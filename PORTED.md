@@ -8,7 +8,9 @@ Each entry: source file, destination, treatment (verbatim, adapted, rewritten), 
 
 ## Phase 1.5 (UI primitive ports, 2026-05-12)
 
-Mechanical ports of architecture-agnostic UI primitives. All five files have zero coupling to storage or sync layers — port verbatim and they slot under any future shell.
+Mechanical ports of architecture-agnostic UI primitives. All files have zero coupling to storage or sync layers — port verbatim and they slot under any future shell.
+
+### UI primitives + schema
 
 | Source | Dest | Treatment | Notes |
 |---|---|---|---|
@@ -18,7 +20,27 @@ Mechanical ports of architecture-agnostic UI primitives. All five files have zer
 | `src/editor/field-schema.ts` | `src/editor/field-schema.ts` | verbatim | SDK FIELD_SCHEMA + ELEMENT_SECTIONS adapter, BASE_FIELDS, resolveWidget |
 | `src/styles/atlas.css` | `src/styles/atlas.css` | verbatim (replaced base) | 1491 lines — full 3-pane shell styling, color tokens, components |
 
-Verified: typecheck clean, all 67 tests still pass, build clean (CSS now 25.58 KB / 4.97 KB gzipped — was 1.17 KB / 0.54 KB).
+### Spatial primitives
+
+| Source | Dest | Treatment | Notes |
+|---|---|---|---|
+| `src/visualization/leaflet-2d/Leaflet2DManager.ts` | same | verbatim | 895 lines — Leaflet wrapper, lifecycle cache, pin/zone/marker layers, fitBounds, zoom defaults |
+| `src/visualization/leaflet-2d/CoordinateUtils.ts` | same | verbatim | Leaflet ↔ storage coord transforms, generateId helper |
+| `src/visualization/leaflet-2d/types.ts` | same | verbatim | Spatial type definitions |
+| `src/visualization/leaflet-2d/index.ts` | same | verbatim | barrel exports |
+| `src/tabs/right/pin-visuals.ts` | same | verbatim | Canvas-rendered Material Symbols per element type |
+| `src/tabs/right/edge-color.ts` | same | verbatim | Image edge sampling for pane background |
+
+### Constants / SDK re-export
+
+| Source | Dest | Treatment | Notes |
+|---|---|---|---|
+| `src/core/constants.ts` ELEMENT_ICONS | added to existing constants.ts | adapted | Re-export from `@onlyworlds/sdk` with strict typing |
+
+### Verification
+- typecheck clean
+- 67 tests passing (no functional change — ports aren't yet wired into main.ts so they're tree-shaken from the bundle, will land when Phase 2 imports them)
+- vite build clean: 25.58 KB CSS / 1.14 KB JS (bundle unchanged — ports unreferenced until shell wires up)
 
 ## Phase 0 (foundation, 2026-05-12)
 

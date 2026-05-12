@@ -1,6 +1,13 @@
 /**
- * Atlas constants — storage keys and small invariants that multiple modules need.
+ * Atlas constants — storage keys, small invariants, SDK re-exports.
  */
+
+import { ELEMENT_ICONS as SDK_ELEMENT_ICONS } from '@onlyworlds/sdk';
+import type { ElementType } from './types';
+
+/** Material Symbol name per element type (re-exported from SDK with strict typing). */
+export const ELEMENT_ICONS = SDK_ELEMENT_ICONS as Record<ElementType, string>;
+
 
 // localStorage keys
 export const REGISTRY_STORAGE_KEY = 'atlas_worlds_registry';
