@@ -3,8 +3,8 @@
  *
  * Pre-update GET happens on every UPDATE push. Behavior per policy:
  * - drain-blind: push anyway, record conflict for info
- * - server-wins: skip push, conflict recorded, local change preserved
- * - ask: (Phase 3.5) treated as server-wins for now
+ * - pause-on-conflict: skip push, conflict recorded, local change preserved
+ * - ask: alias for pause-on-conflict until Phase 3.5 ships the diff modal
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -67,9 +67,9 @@ describe('SyncEngine conflict detection on UPDATE push', () => {
     expect(client.__server_get('character', local.id)?.name).toBe('Alice (mine)');
   });
 
-  it('server-wins: skips push, conflict recorded, local change preserved', async () => {
+  it('pause-on-conflict: skips push, conflict recorded, local change preserved', async () => {
     const fired: Conflict[] = [];
-    const engine = new SyncEngine({ folder, client, policy: 'server-wins', onConflict: c => fired.push(c) });
+    const engine = new SyncEngine({ folder, client, policy: 'pause-on-conflict', onConflict: c => fired.push(c) });
 
     const local = await folder.createElement('character', { name: 'Bob' });
     await engine.syncNow();
@@ -88,7 +88,7 @@ describe('SyncEngine conflict detection on UPDATE push', () => {
     expect((await folder.getElement(local.id))?.name).toBe('Bob (mine)');
   });
 
-  it('ask: treated as server-wins for Phase 1 (push skipped, conflict recorded)', async () => {
+  it('ask: aliases pause-on-conflict for Phase 1 (push skipped, conflict recorded)', async () => {
     const engine = new SyncEngine({ folder, client, policy: 'ask' });
 
     const local = await folder.createElement('character', { name: 'Carol' });

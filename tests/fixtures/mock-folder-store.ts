@@ -101,11 +101,44 @@ export class MockFolderStore implements FolderStore {
     return { ...next };
   }
 
-  async deleteElement(id: string): Promise<void> {
+  async findDependents(id: string): Promise<Element[]> {
+    const target = this.elements.get(id);
+    if (!target) return [];
+    const all = Array.from(this.elements.values());
+    if (target.type === 'map') {
+      return all.filter(e =>
+        (e.type === 'pin' || e.type === 'zone' || e.type === 'marker') &&
+        (e as { map_id?: string }).map_id === id
+      );
+    }
+    // Pin/zone/marker have no dependents (leaves of the graph).
+    if (target.type === 'pin' || target.type === 'zone' || target.type === 'marker') {
+      return [];
+    }
+    // Content element: pins point at it via element_id.
+    return all.filter(e => e.type === 'pin' && (e as { element_id?: string }).element_id === id);
+  }
+
+  async deleteElement(id: string, opts: { cascade?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
+    const cascade = opts.cascade ?? true;
     const existing = this.elements.get(id);
-    if (!existing) return;
-    this.tombstones.push({ id, type: existing.type, deleted_at: this.clock() });
+    if (!existing) return { tombstones: [] };
+
+    const written: Tombstone[] = [];
+    if (cascade) {
+      const deps = await this.findDependents(id);
+      for (const dep of deps) {
+        const tomb: Tombstone = { id: dep.id, type: dep.type, deleted_at: this.clock() };
+        this.tombstones.push(tomb);
+        this.elements.delete(dep.id);
+        written.push(tomb);
+      }
+    }
+    const primary: Tombstone = { id, type: existing.type, deleted_at: this.clock() };
+    this.tombstones.push(primary);
     this.elements.delete(id);
+    written.push(primary);
+    return { tombstones: written };
   }
 
   // ---- Spatial passthroughs — same store, typed accessors ----
@@ -114,7 +147,7 @@ export class MockFolderStore implements FolderStore {
   async getMap(id: string): Promise<WorldMap | null> { return (await this.getElement(id)) as WorldMap | null; }
   async createMap(data: Partial<WorldMap>): Promise<WorldMap> { return (await this.createElement('map', data)) as WorldMap; }
   async updateMap(id: string, patch: Partial<WorldMap>): Promise<WorldMap> { return (await this.updateElement(id, patch)) as WorldMap; }
-  async deleteMap(id: string): Promise<void> { return this.deleteElement(id); }
+  async deleteMap(id: string, opts?: { cascade?: boolean }) { return this.deleteElement(id, opts); }
 
   async listPins(mapId?: string): Promise<Pin[]> {
     const all = (await this.listElements('pin')) as Pin[];
@@ -123,7 +156,7 @@ export class MockFolderStore implements FolderStore {
   async getPin(id: string): Promise<Pin | null> { return (await this.getElement(id)) as Pin | null; }
   async createPin(data: Partial<Pin>): Promise<Pin> { return (await this.createElement('pin', data)) as Pin; }
   async updatePin(id: string, patch: Partial<Pin>): Promise<Pin> { return (await this.updateElement(id, patch)) as Pin; }
-  async deletePin(id: string): Promise<void> { return this.deleteElement(id); }
+  async deletePin(id: string) { return this.deleteElement(id); }
 
   async listZones(mapId?: string): Promise<Zone[]> {
     const all = (await this.listElements('zone')) as Zone[];
@@ -132,7 +165,7 @@ export class MockFolderStore implements FolderStore {
   async getZone(id: string): Promise<Zone | null> { return (await this.getElement(id)) as Zone | null; }
   async createZone(data: Partial<Zone>): Promise<Zone> { return (await this.createElement('zone', data)) as Zone; }
   async updateZone(id: string, patch: Partial<Zone>): Promise<Zone> { return (await this.updateElement(id, patch)) as Zone; }
-  async deleteZone(id: string): Promise<void> { return this.deleteElement(id); }
+  async deleteZone(id: string) { return this.deleteElement(id); }
 
   async listMarkers(mapId?: string): Promise<Marker[]> {
     const all = (await this.listElements('marker')) as Marker[];
@@ -141,7 +174,7 @@ export class MockFolderStore implements FolderStore {
   async getMarker(id: string): Promise<Marker | null> { return (await this.getElement(id)) as Marker | null; }
   async createMarker(data: Partial<Marker>): Promise<Marker> { return (await this.createElement('marker', data)) as Marker; }
   async updateMarker(id: string, patch: Partial<Marker>): Promise<Marker> { return (await this.updateElement(id, patch)) as Marker; }
-  async deleteMarker(id: string): Promise<void> { return this.deleteElement(id); }
+  async deleteMarker(id: string) { return this.deleteElement(id); }
 
   // ---- Media ----
 

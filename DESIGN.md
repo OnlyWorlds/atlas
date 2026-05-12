@@ -250,10 +250,10 @@ User-configurable per world (or globally; default global with per-world override
 | Policy | On conflict during push |
 |---|---|
 | `drain-blind` (**default**) | Push your version anyway. Server's version overwritten. Conflict toast fires as info. |
-| `server-wins` | Drop the local change. Local version is kept on disk but won't push. Conflict recorded. |
-| `ask` (Phase 3.5) | Pause the sync, raise a conflict modal with diff + keep-mine / keep-theirs / manual-merge. |
+| `pause-on-conflict` | Skip the push. Local change is kept on disk untouched (`server_updated_at` baseline NOT advanced). Same conflict will surface again on every subsequent sync until the user resolves it manually (Phase 3.5 ships the modal). |
+| `ask` | Alias for `pause-on-conflict` until the Phase 3.5 per-field diff modal lands. |
 
-The current PHASE-1 implementation ships with `drain-blind` only; the policy hook exists so adding `server-wins` and `ask` is non-invasive.
+All three policies are wired today; `drain-blind` is the default. Note: true "server overwrites local" behavior is intentionally NOT a policy — destructive auto-resolution is too dangerous as an implicit default. Users who want a single element to take the server version invoke an explicit "Pull this element's server copy" action (Phase 3.5).
 
 ### Pause semantics
 
@@ -339,13 +339,13 @@ For users who already created an api world elsewhere (web app, obsidian plugin) 
    - API key
    - PIN
    - **Merge policy** (radio):
-     - **(a) Full overwrite**: server gets wiped, local pushed fresh. Confirmation required ("this will delete all current data in the api world").
-     - **(b) Push, overwrite duplicates**: name+type match → local wins; new locals → pushed; server-only elements → preserved.
+     - **(b) Push, overwrite duplicates** (default): name+type match → local wins; new locals → pushed; server-only elements → preserved.
      - **(c) Push only new**: name+type match → server kept untouched; new locals → pushed.
+
+   Full-overwrite ("wipe server, push local fresh") is intentionally NOT a v1 policy — too easy to nuke a collaborator's data. Users who genuinely want this delete the api world via the web app, then use Route 1 (Make Online → create new).
 3. On submit:
    - Validate credentials, fetch server state.
    - Build diff:
-     - For policy (a): all server elements → DELETE; all local → CREATE.
      - For policy (b): for each local element, look for name+type or id match on server; matched → UPDATE server with local; unmatched → CREATE.
      - For policy (c): for each local element, look for match; matched → skip; unmatched → CREATE.
    - Apply diff with progress UI.
@@ -391,9 +391,16 @@ For Phase 3.5 polish:
 ### W9 — Delete element (cascade-aware)
 
 1. User clicks delete in element-detail header.
-2. Confirmation toast: "Delete X? This will also remove {n} pins."
-3. FolderStore.deleteElement: writes tombstone, removes element file, cascades to dependent pins/markers (removes them and writes their tombstones too).
-4. If api-linked: SyncEngine pushes DELETEs on next sync.
+2. UI calls `folder.findDependents(id)` for the preview count.
+3. Confirmation dialog: "Delete X? This will also remove {n} pins."
+4. `folder.deleteElement(id)` (cascade defaults true): tombstones are written for every dependent first, then for the primary element. Returns `{ tombstones }` so the UI can surface a toast count.
+5. **Cascade rules**:
+   - Content element delete → tombstones every pin whose `element_id` references it.
+   - Map delete → tombstones every pin / zone / marker on that map.
+   - Pin / zone / marker delete → no cascade.
+6. Cascade tombstones are appended BEFORE the primary so server DELETEs execute in dependency-safe order.
+7. If api-linked: SyncEngine pushes DELETEs on next sync.
+8. `opts.cascade: false` is an escape hatch for advanced flows (engine cleanups, repairs). UI flows must use the default.
 
 ### W10 — Multi-machine, same world
 
@@ -547,7 +554,7 @@ Inherited from legacy (hard-won; preserve in new code):
 
 11. **FolderStore stamps `local_updated_at` on every write**. Callers never set this field. SyncEngine stamps `server_updated_at` on successful sync; FolderStore preserves it on round-trip.
 12. **Tombstones append before file unlink**. If the process dies mid-delete, the tombstone is durable; next sync still pushes the delete.
-13. **One writer at a time per folder**. Lock file (`.atlas/lock`) guards against multi-tab races. Second writer gets read-only mode with a warning.
+13. **One writer at a time per folder**. Lock file (`.atlas/lock`) guards against multi-tab races. Format: `{ tab_id, started_at, last_heartbeat }`. The active tab refreshes `last_heartbeat` every 30s. A peer tab that finds a lock with `last_heartbeat` older than 90s treats it as stale and takes it (warning shown). Second writer with a fresh lock gets read-only mode with a warning.
 14. **Element files are the schema**. The `type` field on disk is authoritative. SDK responses get `type` stamped at the adapter boundary (server doesn't echo it on per-type endpoints).
 
 ---

@@ -55,11 +55,27 @@ export interface FolderStore {
    */
   updateElement(id: string, patch: Partial<Element>): Promise<Element>;
   /**
-   * Delete an element. Writes a tombstone, then removes the file. Cascade
-   * deletion of dependent spatial elements (pins, markers referencing it) is
-   * caller's responsibility — pass them through deleteElement individually.
+   * Delete an element. Writes a tombstone, then removes the file.
+   *
+   * Cascade rules (default `opts.cascade = true`):
+   * - Content element delete → also tombstones every pin whose `element_id` references it.
+   * - Map delete → also tombstones every pin / zone / marker on that map.
+   * - Pin / zone / marker delete → no cascade (leaves of the graph).
+   *
+   * Cascade tombstones are pushed BEFORE the primary tombstone so server DELETEs
+   * execute in dependency-safe order. Returns every tombstone written (primary
+   * is always the last entry).
+   *
+   * Pass `cascade: false` only for advanced flows (engine cleanups, repairs);
+   * UI flows must use the default to avoid orphaning dependents.
    */
-  deleteElement(id: string): Promise<void>;
+  deleteElement(id: string, opts?: { cascade?: boolean }): Promise<{ tombstones: Tombstone[] }>;
+  /**
+   * Preview what would be deleted alongside `id` if `deleteElement(id)` ran with
+   * cascade enabled. Returns the dependents (NOT the primary). UI uses this for
+   * "delete X? this will also remove N pins" confirmation dialogs.
+   */
+  findDependents(id: string): Promise<Element[]>;
 
   // ---- Spatial elements ----
 
@@ -67,25 +83,26 @@ export interface FolderStore {
   getMap(id: string): Promise<WorldMap | null>;
   createMap(data: Partial<WorldMap>): Promise<WorldMap>;
   updateMap(id: string, patch: Partial<WorldMap>): Promise<WorldMap>;
-  deleteMap(id: string): Promise<void>;
+  /** Same cascade contract as `deleteElement` — map delete sweeps its spatial children. */
+  deleteMap(id: string, opts?: { cascade?: boolean }): Promise<{ tombstones: Tombstone[] }>;
 
   listPins(mapId?: string): Promise<Pin[]>;
   getPin(id: string): Promise<Pin | null>;
   createPin(data: Partial<Pin>): Promise<Pin>;
   updatePin(id: string, patch: Partial<Pin>): Promise<Pin>;
-  deletePin(id: string): Promise<void>;
+  deletePin(id: string): Promise<{ tombstones: Tombstone[] }>;
 
   listZones(mapId?: string): Promise<Zone[]>;
   getZone(id: string): Promise<Zone | null>;
   createZone(data: Partial<Zone>): Promise<Zone>;
   updateZone(id: string, patch: Partial<Zone>): Promise<Zone>;
-  deleteZone(id: string): Promise<void>;
+  deleteZone(id: string): Promise<{ tombstones: Tombstone[] }>;
 
   listMarkers(mapId?: string): Promise<Marker[]>;
   getMarker(id: string): Promise<Marker | null>;
   createMarker(data: Partial<Marker>): Promise<Marker>;
   updateMarker(id: string, patch: Partial<Marker>): Promise<Marker>;
-  deleteMarker(id: string): Promise<void>;
+  deleteMarker(id: string): Promise<{ tombstones: Tombstone[] }>;
 
   // ---- Media (always local, never synced) ----
 

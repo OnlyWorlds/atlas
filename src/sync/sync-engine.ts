@@ -39,7 +39,15 @@ export interface OwApiClient {
 
 // ---- Policy ----
 
-export type ConflictPolicy = 'drain-blind' | 'server-wins' | 'ask';
+/**
+ * What to do when push detects the server moved since our baseline.
+ * - `drain-blind`: push our version anyway; server overwritten; conflict logged for info.
+ * - `pause-on-conflict`: skip the push; local change preserved on disk; conflict logged;
+ *   next sync will see the same conflict until the user resolves it manually
+ *   (Phase 3.5: dedicated UI; today: log only).
+ * - `ask`: alias for `pause-on-conflict` until Phase 3.5 ships the diff modal.
+ */
+export type ConflictPolicy = 'drain-blind' | 'pause-on-conflict' | 'ask';
 
 export interface SyncEngineOptions {
   folder: FolderStore;
@@ -62,6 +70,8 @@ export class SyncEngine {
   private state: SyncEngineState = { kind: 'idle', last_sync_at: null };
   private paused = false;
   private pauseReason: 'manual' | 'network' | null = null;
+  /** In-flight syncNow promise. Concurrent calls await the same result. */
+  private inFlight: Promise<SyncResult> | null = null;
 
   constructor(opts: SyncEngineOptions) {
     this.folder = opts.folder;
@@ -90,8 +100,18 @@ export class SyncEngine {
   /**
    * Push local changes to server, then pull remote changes to folder.
    * Pull skips elements push already conflicted on (dedup by id).
+   *
+   * Concurrent calls share the in-flight promise rather than racing.
    */
-  async syncNow(): Promise<SyncResult> {
+  syncNow(): Promise<SyncResult> {
+    if (this.inFlight) return this.inFlight;
+    this.inFlight = this.runSync().finally(() => {
+      this.inFlight = null;
+    });
+    return this.inFlight;
+  }
+
+  private async runSync(): Promise<SyncResult> {
     if (this.paused) {
       return emptyResult();
     }
@@ -149,13 +169,10 @@ export class SyncEngine {
           conflicts.push(conflict);
           this.onConflict(conflict);
 
-          if (this.policy === 'server-wins') {
+          if (this.policy === 'pause-on-conflict' || this.policy === 'ask') {
             // Keep local change on disk; do NOT push; leaves baseline unchanged.
             // Next sync will see the same conflict until user resolves it.
-            continue;
-          }
-          if (this.policy === 'ask') {
-            // Phase 3.5: pause for user decision. For now, treat as server-wins.
+            // (`ask` is an alias until Phase 3.5 ships a per-field diff modal.)
             continue;
           }
           // drain-blind: fall through and push our version anyway.
@@ -277,6 +294,10 @@ function stripServerOnlyFields(record: Record<string, unknown>): Record<string, 
 /**
  * Names of fields that differ between a local element and a remote record.
  * Used for conflict reporting. Ignores sync-internal fields.
+ *
+ * Uses an order-independent deep-equal so that semantically equal objects with
+ * different key order don't show up as diverged (the API doesn't guarantee key
+ * ordering, and JSON.stringify is order-sensitive).
  */
 function diffFieldNames(local: Element, remote: Record<string, unknown>): string[] {
   const SKIP = new Set(['id', 'type', 'local_updated_at', 'server_updated_at', 'updated_at']);
@@ -284,11 +305,41 @@ function diffFieldNames(local: Element, remote: Record<string, unknown>): string
   const diff: string[] = [];
   for (const key of keys) {
     if (SKIP.has(key)) continue;
-    if (JSON.stringify((local as Record<string, unknown>)[key]) !== JSON.stringify(remote[key])) {
+    if (!deepEqual((local as Record<string, unknown>)[key], remote[key])) {
       diff.push(key);
     }
   }
   return diff;
+}
+
+/**
+ * Deep, order-independent value equality for diff comparison.
+ * Handles primitives, arrays (positionally), and plain objects (key-set sensitive,
+ * key-order insensitive). NaN compares unequal (matches `===` semantics).
+ */
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  const aRec = a as Record<string, unknown>;
+  const bRec = b as Record<string, unknown>;
+  const aKeys = Object.keys(aRec);
+  const bKeys = Object.keys(bRec);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    if (!(k in bRec)) return false;
+    if (!deepEqual(aRec[k], bRec[k])) return false;
+  }
+  return true;
 }
 
 function zero(): { creates: number; updates: number; deletes: number } {
