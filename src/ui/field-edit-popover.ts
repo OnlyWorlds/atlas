@@ -1,0 +1,187 @@
+/**
+ * FieldEditPopover — small floating editor anchored near a clicked field.
+ *
+ * Replaces in-place inline editors that cause layout shifts. The popover is
+ * position: fixed and overlays the page, so nothing under it moves.
+ *
+ * Positioning:
+ *   - Tries to anchor above the field if there's room there
+ *   - Otherwise below
+ *   - Constrains to viewport edges
+ *
+ * Keys:
+ *   - Short input: Enter = Save, Escape = Cancel
+ *   - Long textarea: Ctrl/Cmd+Enter = Save, Escape = Cancel
+ *   - Click outside (on backdrop) = Cancel
+ */
+
+export interface FieldEditOptions {
+  /** Element whose bounding rect anchors the popover. */
+  anchor: HTMLElement;
+  /** Field display label (shown as popover title). */
+  label: string;
+  /** Initial value (string-ified). */
+  value: string;
+  /** Widget kind controls input vs textarea + parsing. */
+  widget: 'text-short' | 'text-long' | 'number';
+  /** Called with the parsed value when user saves. */
+  onSave: (nextValue: any) => Promise<void> | void;
+  /** Optional cancel callback. */
+  onCancel?: () => void;
+}
+
+export function openFieldEditPopover(opts: FieldEditOptions): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'atlas-edit-popover-backdrop';
+
+  const panel = document.createElement('div');
+  panel.className = 'atlas-edit-popover';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'atlas-edit-popover-header';
+  header.textContent = opts.label;
+  panel.appendChild(header);
+
+  // Input
+  const isLong = opts.widget === 'text-long';
+  const input: HTMLInputElement | HTMLTextAreaElement = isLong
+    ? document.createElement('textarea')
+    : document.createElement('input');
+  input.className = isLong ? 'atlas-textarea' : 'atlas-input';
+  if (input instanceof HTMLTextAreaElement) input.rows = 6;
+  else if (opts.widget === 'number') input.type = 'number';
+  else input.type = 'text';
+  input.value = opts.value;
+  panel.appendChild(input);
+
+  // Footer (hint + actions)
+  const footer = document.createElement('div');
+  footer.className = 'atlas-edit-popover-footer';
+
+  const hint = document.createElement('span');
+  hint.className = 'atlas-edit-popover-hint';
+  hint.textContent = isLong ? 'Ctrl+Enter to save · Esc to cancel' : 'Enter to save · Esc to cancel';
+  footer.appendChild(hint);
+
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;gap:6px;';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'atlas-btn-ghost';
+  cancelBtn.textContent = 'Cancel';
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'atlas-btn-primary';
+  saveBtn.textContent = 'Save';
+  actions.appendChild(cancelBtn);
+  actions.appendChild(saveBtn);
+  footer.appendChild(actions);
+
+  panel.appendChild(footer);
+
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  positionPopover(panel, opts.anchor);
+
+  // Focus + select after layout
+  setTimeout(() => {
+    input.focus();
+    if (input instanceof HTMLInputElement) input.select();
+    else input.setSelectionRange(input.value.length, input.value.length);
+  }, 0);
+
+  function cleanup(): void {
+    document.removeEventListener('keydown', keyHandler);
+    overlay.remove();
+  }
+
+  function cancel(): void {
+    opts.onCancel?.();
+    cleanup();
+  }
+
+  async function save(): Promise<void> {
+    let nextValue: any = input.value;
+    if (opts.widget === 'number') {
+      if (nextValue === '') nextValue = undefined;
+      else {
+        const n = Number(nextValue);
+        if (Number.isNaN(n)) return;
+        nextValue = n;
+      }
+    } else {
+      if (nextValue === '') nextValue = undefined;
+    }
+    saveBtn.textContent = 'Saving…';
+    saveBtn.setAttribute('disabled', 'true');
+    try {
+      await opts.onSave(nextValue);
+      cleanup();
+    } catch {
+      saveBtn.textContent = 'Save';
+      saveBtn.removeAttribute('disabled');
+    }
+  }
+
+  cancelBtn.addEventListener('click', cancel);
+  saveBtn.addEventListener('click', () => { save(); });
+
+  // Click-outside on backdrop cancels
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) cancel();
+  });
+
+  const keyHandler = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      cancel();
+    } else if (e.key === 'Enter') {
+      if (isLong) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          save();
+        }
+      } else {
+        e.preventDefault();
+        save();
+      }
+    }
+  };
+  document.addEventListener('keydown', keyHandler);
+}
+
+/**
+ * Anchor the popover near the given element. Try above first, then below;
+ * constrain horizontally to the viewport.
+ */
+function positionPopover(panel: HTMLElement, anchor: HTMLElement): void {
+  const anchorRect = anchor.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+  const margin = 8;
+
+  // Horizontal: align panel's left with anchor's left, but clamp to viewport
+  let left = anchorRect.left;
+  const maxLeft = window.innerWidth - panelRect.width - margin;
+  if (left > maxLeft) left = maxLeft;
+  if (left < margin) left = margin;
+
+  // Vertical: prefer below the anchor; flip above if no room
+  const spaceBelow = window.innerHeight - anchorRect.bottom;
+  const spaceAbove = anchorRect.top;
+  let top: number;
+  if (spaceBelow >= panelRect.height + margin || spaceBelow >= spaceAbove) {
+    top = anchorRect.bottom + 4;
+  } else {
+    top = anchorRect.top - panelRect.height - 4;
+  }
+  if (top < margin) top = margin;
+  if (top + panelRect.height > window.innerHeight - margin) {
+    top = window.innerHeight - panelRect.height - margin;
+  }
+
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+}

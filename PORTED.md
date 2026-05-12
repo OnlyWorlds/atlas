@@ -6,6 +6,20 @@ Each entry: source file, destination, treatment (verbatim, adapted, rewritten), 
 
 ---
 
+## Phase 1.5 (UI primitive ports, 2026-05-12)
+
+Mechanical ports of architecture-agnostic UI primitives. All five files have zero coupling to storage or sync layers — port verbatim and they slot under any future shell.
+
+| Source | Dest | Treatment | Notes |
+|---|---|---|---|
+| `src/ui/modal-base.ts` | `src/ui/modal-base.ts` | verbatim | BaseModal class — extends pattern, ESC + click-outside, smooth cleanup |
+| `src/ui/toast-manager.ts` | `src/ui/toast-manager.ts` | verbatim | Queue-based, max 3, XSS-safe message escape, success/error/info |
+| `src/ui/field-edit-popover.ts` | `src/ui/field-edit-popover.ts` | verbatim | Floating popover anchored to field, Enter to save, Esc cancel, smart viewport positioning |
+| `src/editor/field-schema.ts` | `src/editor/field-schema.ts` | verbatim | SDK FIELD_SCHEMA + ELEMENT_SECTIONS adapter, BASE_FIELDS, resolveWidget |
+| `src/styles/atlas.css` | `src/styles/atlas.css` | verbatim (replaced base) | 1491 lines — full 3-pane shell styling, color tokens, components |
+
+Verified: typecheck clean, all 67 tests still pass, build clean (CSS now 25.58 KB / 4.97 KB gzipped — was 1.17 KB / 0.54 KB).
+
 ## Phase 0 (foundation, 2026-05-12)
 
 ### Configuration files (verbatim or near-verbatim)
