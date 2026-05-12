@@ -33,6 +33,8 @@ export interface OwApiClient {
   updateElement(type: ElementType, id: string, body: Record<string, unknown>): Promise<{ id: string; updated_at: string } & Record<string, unknown>>;
   deleteElement(type: ElementType, id: string): Promise<void>;
   listElements(type: ElementType): Promise<Array<{ id: string; updated_at: string } & Record<string, unknown>>>;
+  /** Fetch single element. Used by SyncEngine pre-update conflict check. */
+  getElement(type: ElementType, id: string): Promise<({ id: string; updated_at: string } & Record<string, unknown>) | null>;
 }
 
 // ---- Policy ----
@@ -87,6 +89,7 @@ export class SyncEngine {
 
   /**
    * Push local changes to server, then pull remote changes to folder.
+   * Pull skips elements push already conflicted on (dedup by id).
    */
   async syncNow(): Promise<SyncResult> {
     if (this.paused) {
@@ -95,7 +98,8 @@ export class SyncEngine {
     this.setState({ kind: 'syncing', phase: 'push' });
     const pushResult = await this.pushPhase();
     this.setState({ kind: 'syncing', phase: 'pull' });
-    const pullResult = await this.pullPhase();
+    const handledIds = new Set(pushResult.conflicts.map(c => c.element_id));
+    const pullResult = await this.pullPhase(handledIds);
     const result: SyncResult = {
       pushed: pushResult.pushed,
       pulled: pullResult.pulled,
@@ -124,17 +128,46 @@ export class SyncEngine {
           const response = await this.client.createElement(elem.type, body);
           await this.folder.stampServerUpdatedAt(elem.id, elem.type, response.updated_at);
           creates++;
-        } else {
-          // Previously synced → UPDATE on server.
-          // Conflict detection is deferred to Phase 1.5; drain-blind just pushes.
-          const body = stripSyncFields(elem);
-          const response = await this.client.updateElement(elem.type, elem.id, body);
-          await this.folder.stampServerUpdatedAt(elem.id, elem.type, response.updated_at);
-          updates++;
+          continue;
         }
+
+        // UPDATE path: pre-fetch server state to detect external changes since
+        // our cached `server_updated_at` baseline.
+        const remote = await this.client.getElement(elem.type, elem.id);
+        const baseline = elem.server_updated_at;
+        const serverMoved = remote ? remote.updated_at > baseline : false;
+
+        if (serverMoved && remote) {
+          const conflict: Conflict = {
+            element_id: elem.id,
+            type: elem.type,
+            detected_at: nowIso(),
+            local_updated_at: elem.local_updated_at,
+            server_updated_at: remote.updated_at,
+            fields: diffFieldNames(elem, stripServerOnlyFields(remote)),
+          };
+          conflicts.push(conflict);
+          this.onConflict(conflict);
+
+          if (this.policy === 'server-wins') {
+            // Keep local change on disk; do NOT push; leaves baseline unchanged.
+            // Next sync will see the same conflict until user resolves it.
+            continue;
+          }
+          if (this.policy === 'ask') {
+            // Phase 3.5: pause for user decision. For now, treat as server-wins.
+            continue;
+          }
+          // drain-blind: fall through and push our version anyway.
+        }
+
+        const body = stripSyncFields(elem);
+        const response = await this.client.updateElement(elem.type, elem.id, body);
+        await this.folder.stampServerUpdatedAt(elem.id, elem.type, response.updated_at);
+        updates++;
       } catch (err) {
-        // Network errors abort the whole push; SDK 4xx errors will surface as
-        // conflicts in Phase 1.5. For now, rethrow.
+        // Network errors abort the whole push; SDK 4xx errors surface as
+        // conflicts in a later phase. For now, rethrow.
         throw err;
       }
     }
@@ -153,7 +186,7 @@ export class SyncEngine {
     return { pushed: { creates, updates, deletes }, pulled: zero(), conflicts };
   }
 
-  private async pullPhase(): Promise<SyncResult> {
+  private async pullPhase(skipIds: Set<string> = new Set()): Promise<SyncResult> {
     let creates = 0;
     let updates = 0;
     const conflicts: Conflict[] = [];
@@ -167,6 +200,8 @@ export class SyncEngine {
       for (const remote of serverElements) {
         // Skip elements pending local delete — they'll be DELETEd by next push.
         if (tombstoneIds.has(remote.id)) continue;
+        // Skip elements push already conflicted on (avoid double-reporting).
+        if (skipIds.has(remote.id)) continue;
 
         const local = await this.folder.getElement(remote.id);
         const remoteBody = stripServerOnlyFields(remote);

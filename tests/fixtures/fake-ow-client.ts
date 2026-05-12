@@ -27,6 +27,7 @@ export class FakeOwApiClient implements OwApiClient {
     | { method: 'update'; type: ElementType; id: string; body: Record<string, unknown> }
     | { method: 'delete'; type: ElementType; id: string }
     | { method: 'list'; type: ElementType }
+    | { method: 'get'; type: ElementType; id: string }
   > = [];
 
   setClock(fn: () => string): void { this.clock = fn; }
@@ -63,6 +64,21 @@ export class FakeOwApiClient implements OwApiClient {
   async listElements(type: ElementType): Promise<ServerRecord[]> {
     this.calls.push({ method: 'list', type });
     return Array.from(this.bucket(type).values()).map(r => ({ ...r }));
+  }
+
+  async getElement(type: ElementType, id: string): Promise<ServerRecord | null> {
+    this.calls.push({ method: 'get', type, id });
+    const r = this.bucket(type).get(id);
+    return r ? { ...r } : null;
+  }
+
+  /** Server-side mutation that doesn't show up in `calls` — for setting up
+   *  conflict scenarios in tests without polluting the call log. */
+  __server_mutate(type: ElementType, id: string, patch: Record<string, unknown>): void {
+    const m = this.bucket(type);
+    const existing = m.get(id);
+    if (!existing) throw new Error(`__server_mutate: ${type}/${id} not found`);
+    m.set(id, { ...existing, ...patch, id, type, updated_at: this.clock() });
   }
 
   // Test introspection
