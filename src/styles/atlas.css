@@ -1,0 +1,86 @@
+/**
+ * Atlas — base styles. Folder-first rebuild.
+ *
+ * Full styling will be ported deliberately from atlas-deprecated/src/styles/atlas.css
+ * as the shell, panes, and components come online. This file holds only the
+ * baseline tokens and the placeholder screen for now.
+ */
+
+:root {
+  /* OW visual identity baseline — ported from atlas-deprecated */
+  --atlas-bg: #000;
+  --atlas-fg: #e7e7e7;
+  --atlas-cyan: #22d3ee;
+  --atlas-glass: rgba(0, 0, 0, 0.7);
+  --atlas-border: rgba(255, 255, 255, 0.08);
+
+  /* Text palette */
+  --atlas-text: rgba(255, 255, 255, 0.92);
+  --atlas-text-soft: rgba(255, 255, 255, 0.72);
+  --atlas-text-muted: rgba(255, 255, 255, 0.48);
+  --atlas-text-dim: rgba(255, 255, 255, 0.28);
+
+  /* Spacing scale */
+  --atlas-gap-1: 4px;
+  --atlas-gap-2: 8px;
+  --atlas-gap-3: 12px;
+  --atlas-gap-4: 16px;
+  --atlas-gap-6: 24px;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--atlas-bg);
+  color: var(--atlas-fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  text-transform: lowercase;
+}
+
+#app {
+  height: 100vh;
+  width: 100vw;
+}
+
+#toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Placeholder screen (development only — removed when shell lands) */
+.atlas-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: var(--atlas-gap-3);
+  text-align: center;
+}
+
+.atlas-placeholder h1 {
+  font-size: 32px;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  margin: 0;
+  color: var(--atlas-cyan);
+}
+
+.atlas-placeholder p {
+  margin: 0;
+  color: var(--atlas-text-soft);
+}
+
+.atlas-placeholder .hint {
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+  max-width: 360px;
+}

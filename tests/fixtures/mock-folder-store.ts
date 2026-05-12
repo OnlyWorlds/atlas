@@ -1,0 +1,218 @@
+/**
+ * MockFolderStore — in-memory implementation of FolderStore for tests.
+ *
+ * Honors the same contract as the real FolderStore (FS Access API). All writes
+ * stamp `local_updated_at`. Deletes write tombstones. Sync state and per-element
+ * `server_updated_at` mirror what the real one will do.
+ */
+
+import type { FolderStore } from '../../src/store/folder-store';
+import { newId, nowIso } from '../../src/store/folder-store';
+import type {
+  Element,
+  ElementType,
+  WorldMap,
+  Pin,
+  Zone,
+  Marker,
+  MediaItem,
+  WorldMeta,
+  SyncState,
+  Tombstone,
+} from '../../src/core/types';
+
+const defaultMeta: WorldMeta = { id: 'mock-world', name: 'mock world' };
+const defaultSyncState: SyncState = {
+  last_pull_at: null,
+  last_push_at: null,
+  paused: false,
+  conflicts: [],
+};
+
+export class MockFolderStore implements FolderStore {
+  private opened = false;
+  private meta: WorldMeta = { ...defaultMeta };
+  private elements = new Map<string, Element>();
+  private tombstones: Tombstone[] = [];
+  private syncState: SyncState = { ...defaultSyncState };
+  private mediaItems = new Map<string, MediaItem>();
+  private mediaBlobs = new Map<string, Blob>();
+
+  // Time injection for deterministic tests.
+  private clock: () => string = nowIso;
+  setClock(fn: () => string): void { this.clock = fn; }
+
+  async open(_handle: FileSystemDirectoryHandle | null): Promise<void> {
+    this.opened = true;
+  }
+
+  async close(): Promise<void> {
+    this.opened = false;
+  }
+
+  // ---- World metadata ----
+
+  async readWorldMeta(): Promise<WorldMeta> {
+    return { ...this.meta };
+  }
+
+  async writeWorldMeta(patch: Partial<WorldMeta>): Promise<WorldMeta> {
+    this.meta = { ...this.meta, ...patch };
+    return { ...this.meta };
+  }
+
+  // ---- Elements (content + spatial unified) ----
+
+  async listElements(type?: ElementType): Promise<Element[]> {
+    const all = Array.from(this.elements.values());
+    return type ? all.filter(e => e.type === type) : all;
+  }
+
+  async getElement(id: string): Promise<Element | null> {
+    return this.elements.get(id) ?? null;
+  }
+
+  async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
+    const id = (data.id as string) ?? newId();
+    const elem: Element = {
+      ...data,
+      id,
+      type,
+      name: (data.name as string) ?? '',
+      local_updated_at: this.clock(),
+    };
+    this.elements.set(id, elem);
+    return { ...elem };
+  }
+
+  async updateElement(id: string, patch: Partial<Element>): Promise<Element> {
+    const existing = this.elements.get(id);
+    if (!existing) throw new Error(`element ${id} not found`);
+    const next: Element = {
+      ...existing,
+      ...patch,
+      id: existing.id,
+      type: existing.type,
+      local_updated_at: this.clock(),
+      // Preserve server_updated_at unless patch explicitly sets it.
+      server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
+    };
+    this.elements.set(id, next);
+    return { ...next };
+  }
+
+  async deleteElement(id: string): Promise<void> {
+    const existing = this.elements.get(id);
+    if (!existing) return;
+    this.tombstones.push({ id, type: existing.type, deleted_at: this.clock() });
+    this.elements.delete(id);
+  }
+
+  // ---- Spatial passthroughs — same store, typed accessors ----
+
+  async listMaps(): Promise<WorldMap[]> { return this.listElements('map') as Promise<WorldMap[]>; }
+  async getMap(id: string): Promise<WorldMap | null> { return (await this.getElement(id)) as WorldMap | null; }
+  async createMap(data: Partial<WorldMap>): Promise<WorldMap> { return (await this.createElement('map', data)) as WorldMap; }
+  async updateMap(id: string, patch: Partial<WorldMap>): Promise<WorldMap> { return (await this.updateElement(id, patch)) as WorldMap; }
+  async deleteMap(id: string): Promise<void> { return this.deleteElement(id); }
+
+  async listPins(mapId?: string): Promise<Pin[]> {
+    const all = (await this.listElements('pin')) as Pin[];
+    return mapId ? all.filter(p => p.map_id === mapId) : all;
+  }
+  async getPin(id: string): Promise<Pin | null> { return (await this.getElement(id)) as Pin | null; }
+  async createPin(data: Partial<Pin>): Promise<Pin> { return (await this.createElement('pin', data)) as Pin; }
+  async updatePin(id: string, patch: Partial<Pin>): Promise<Pin> { return (await this.updateElement(id, patch)) as Pin; }
+  async deletePin(id: string): Promise<void> { return this.deleteElement(id); }
+
+  async listZones(mapId?: string): Promise<Zone[]> {
+    const all = (await this.listElements('zone')) as Zone[];
+    return mapId ? all.filter(z => z.map_id === mapId) : all;
+  }
+  async getZone(id: string): Promise<Zone | null> { return (await this.getElement(id)) as Zone | null; }
+  async createZone(data: Partial<Zone>): Promise<Zone> { return (await this.createElement('zone', data)) as Zone; }
+  async updateZone(id: string, patch: Partial<Zone>): Promise<Zone> { return (await this.updateElement(id, patch)) as Zone; }
+  async deleteZone(id: string): Promise<void> { return this.deleteElement(id); }
+
+  async listMarkers(mapId?: string): Promise<Marker[]> {
+    const all = (await this.listElements('marker')) as Marker[];
+    return mapId ? all.filter(m => m.map_id === mapId) : all;
+  }
+  async getMarker(id: string): Promise<Marker | null> { return (await this.getElement(id)) as Marker | null; }
+  async createMarker(data: Partial<Marker>): Promise<Marker> { return (await this.createElement('marker', data)) as Marker; }
+  async updateMarker(id: string, patch: Partial<Marker>): Promise<Marker> { return (await this.updateElement(id, patch)) as Marker; }
+  async deleteMarker(id: string): Promise<void> { return this.deleteElement(id); }
+
+  // ---- Media ----
+
+  async addMedia(elementId: string, file: File, folder = 'default'): Promise<MediaItem> {
+    const id = newId();
+    const item: MediaItem = {
+      id,
+      element_id: elementId,
+      folder,
+      filename: file.name,
+      mime: file.type,
+      size_bytes: file.size,
+      added_at: this.clock(),
+    };
+    this.mediaItems.set(id, item);
+    this.mediaBlobs.set(id, file);
+    return { ...item };
+  }
+
+  async listMedia(elementId: string): Promise<MediaItem[]> {
+    return Array.from(this.mediaItems.values()).filter(m => m.element_id === elementId);
+  }
+
+  async getMediaBlob(mediaId: string): Promise<Blob | null> {
+    return this.mediaBlobs.get(mediaId) ?? null;
+  }
+
+  async deleteMedia(mediaId: string): Promise<void> {
+    this.mediaItems.delete(mediaId);
+    this.mediaBlobs.delete(mediaId);
+  }
+
+  // ---- Sync-relevant reads ----
+
+  async listLocallyChangedSince(baseline: string | null): Promise<Element[]> {
+    return Array.from(this.elements.values()).filter(elem => {
+      // Never synced → always pending.
+      if (!elem.server_updated_at) return true;
+      // No baseline → all of them.
+      if (baseline === null) return elem.local_updated_at > elem.server_updated_at;
+      return elem.local_updated_at > baseline;
+    });
+  }
+
+  async listTombstonesSince(baseline: string | null): Promise<Tombstone[]> {
+    if (baseline === null) return [...this.tombstones];
+    return this.tombstones.filter(t => t.deleted_at > baseline);
+  }
+
+  async clearTombstone(id: string): Promise<void> {
+    this.tombstones = this.tombstones.filter(t => t.id !== id);
+  }
+
+  async readSyncState(): Promise<SyncState> {
+    return { ...this.syncState };
+  }
+
+  async writeSyncState(patch: Partial<SyncState>): Promise<SyncState> {
+    this.syncState = { ...this.syncState, ...patch };
+    return { ...this.syncState };
+  }
+
+  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string): Promise<void> {
+    const existing = this.elements.get(id);
+    if (!existing) return;
+    this.elements.set(id, { ...existing, server_updated_at });
+  }
+
+  // ---- Test introspection helpers ----
+
+  __debug_elementCount(): number { return this.elements.size; }
+  __debug_tombstoneCount(): number { return this.tombstones.length; }
+  __debug_isOpen(): boolean { return this.opened; }
+}
