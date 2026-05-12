@@ -6,6 +6,52 @@ Each entry: source file, destination, treatment (verbatim, adapted, rewritten), 
 
 ---
 
+## Phase 2 polish (Bouts 4-6 — Atlas root + refinements, 2026-05-12 session 198)
+
+| File | Source | Treatment | Notes |
+|---|---|---|---|
+| `src/setup/atlas-root-flow.ts` | new | rewritten | `setupAtlasRoot` with wrap-by-default + re-use detection, `discoverWorldsInRoot` (imports world subfolders into a fresh registry), `createWorldInRoot` (name-only creation under root), `slugify`. |
+| Registry: `atlas_root` field | new | rewritten | `setAtlasRoot` / `clearAtlasRoot` helpers; `loadRegistry` now spreads parsed payload (was hand-picking and dropping new fields). |
+| State: `atlasRoot` slice | new | rewritten | Runtime ref to the configured root; hydrated on boot via `hydrateAtlasRoot`. |
+| Router: `#/settings` standalone | new | rewritten | Settings panel reachable without an active world (gear icon now works on first-launch). |
+| `core/constants.ts` additions | new | n/a | `ATLAS_ROOT_HANDLE_KEY`, `ATLAS_ROOT_MARKER` (`.atlas-root`), `ATLAS_ROOT_SUBFOLDER` (`onlyworlds-atlas`), `ATLAS_ROOT_SUBFOLDER_LEGACY_NAMES` (`['atlas-worlds']`). |
+
+UI panels (welcome, sidebar header, settings) all switch on `state.atlasRoot` presence: no root → setup CTA, root → create-local / world list.
+
+## Phase 2 (Bout 3 — Minimal UI, 2026-05-12 session 198)
+
+| File | Source | Treatment | Notes |
+|---|---|---|---|
+| `src/layout/app-shell.ts` | `atlas-deprecated/src/layout/app-shell.ts` | adapted (verbatim minus constant rename) | `SHELL_RATIO_KEY` → `SHELL_RATIOS_STORAGE_KEY`. Otherwise identical 3-pane layout + draggable dividers + ratio persistence. |
+| `src/core/state.ts` | new | rewritten | Tiny observable: getState, patchSlice, subscribe. Same idiom as legacy but ~30 lines instead of a class. |
+| `src/core/router.ts` | new (inspired by legacy) | rewritten | Hash-based, Phase 2 routes only (`#/`, `#/w/<id>`, `#/w/<id>/settings`). Will extend in later phases. |
+| `src/sidebar/worlds-sidebar.ts` | new | rewritten | Different from legacy — registry-driven, no api-store coupling, FsFolderStore activation flow. |
+| `src/ui/create-world-modal.ts` | new | rewritten | Legacy's link-world-modal handled api/local elsewhere; new is single-purpose with `pickDirectory()` injection seam. |
+| `src/ui/directory-picker.ts` | new | rewritten | Single indirection over `window.showDirectoryPicker` with test-API override. |
+| `src/middle/welcome-panel.ts` | new | rewritten | Replaces legacy's timeline-as-default with a stat-based welcome (placeholder until Phase 4). |
+| `src/middle/settings-panel.ts` | new | rewritten | Identity + active-world meta + forget-world. Make-Online actions arrive in Phase 3. |
+| `src/app.ts` | new | rewritten | Smaller than legacy `app.ts`; orchestrates shell + sidebar + routed middle. |
+
+UI primitives `modal-base.ts`, `toast-manager.ts`, `field-edit-popover.ts` were already ported verbatim in Bout 9 of session 197. This bout's only modification: exported `ToastManager` class (was private) so subsystems can hold a typed reference to the singleton.
+
+CSS additions: ~190 lines appended to `atlas.css` for Phase 2 components (sidebar worlds list, welcome panel, settings, modal fields, button primitives `.ow-btn`).
+
+## Phase 1 (Bout 2 — Real FolderStore, 2026-05-12 session 198)
+
+The legacy had no real FolderStore — its store layer was IDB-cached, not folder-first. So these are **fresh writes**, not ports. Logged here so future-readers know what landed when.
+
+| File | Source | Notes |
+|---|---|---|
+| `src/store/fs-utils.ts` | new | Atomic write (tmp + verify + promote), corruption-tolerant `readJson`, dir helpers. `idFromFilename` roundtrip. |
+| `src/store/idb.ts` | new | Minimal promise-wrapped IDB primitives. **Only** used by handle-vault — world data stays in the folder. |
+| `src/store/handle-vault.ts` | new | `FileSystemDirectoryHandle` persistence keyed by `handle_key`. `ensureWritable` does the per-session permission re-grant. |
+| `src/store/folder-store-fs.ts` | new | Full FsFolderStore. One-file-per-element on disk (content + spatial uniformly). 30s heartbeat lock with 90s stale TTL. Media sidecar `*.meta.json` for browsable filenames. |
+| `src/vite-env.d.ts` | new | `/// <reference types="vite/client" />` — enables `import.meta.env.DEV` for the dev-only test harness. |
+
+**Layout decision**: pins/zones/markers stored as one file per element under `spatial/<type>/<id>.json` (not bundled per map as the legacy DESIGN suggested). Bundle-per-map was never implemented; uniform one-file-per-element is simpler and works fine for OW scale.
+
+---
+
 ## Phase 1.5 (UI primitive ports, 2026-05-12)
 
 Mechanical ports of architecture-agnostic UI primitives. All files have zero coupling to storage or sync layers — port verbatim and they slot under any future shell.

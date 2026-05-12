@@ -22,12 +22,12 @@ export function loadRegistry(): WorldsRegistry {
     if (!raw) return defaultRegistry();
     const parsed = JSON.parse(raw) as Partial<WorldsRegistry>;
     if (!parsed || !Array.isArray(parsed.worlds)) return defaultRegistry();
+    // Spread all stored fields (including atlas_root and any future additions),
+    // then narrow with defaults. Hand-picking fields silently drops new ones.
     return {
+      ...parsed,
       version: parsed.version ?? 1,
       worlds: parsed.worlds,
-      pin: parsed.pin,
-      email: parsed.email,
-      active_world_id: parsed.active_world_id,
     };
   } catch (err) {
     console.error('[registry] load failed, resetting:', err);
@@ -254,4 +254,29 @@ export function setPin(reg: WorldsRegistry, pin: string | undefined): WorldsRegi
 
 export function setEmail(reg: WorldsRegistry, email: string | undefined): WorldsRegistry {
   return { ...reg, email: email?.trim() || undefined };
+}
+
+// ---- Atlas root (default container for new local worlds) ----
+
+export interface SetAtlasRootOpts {
+  handleKey: string;
+  folderName: string;
+  pathHint?: string;
+}
+
+export function setAtlasRoot(reg: WorldsRegistry, opts: SetAtlasRootOpts): WorldsRegistry {
+  return {
+    ...reg,
+    atlas_root: {
+      handle_key: opts.handleKey,
+      folder_name: opts.folderName,
+      path_hint: opts.pathHint,
+      set_at: new Date().toISOString(),
+    },
+  };
+}
+
+export function clearAtlasRoot(reg: WorldsRegistry): WorldsRegistry {
+  const { atlas_root, ...rest } = reg;
+  return rest;
 }

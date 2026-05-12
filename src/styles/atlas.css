@@ -1489,3 +1489,215 @@
 .atlas-shell *::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.16);
 }
+
+/* ============================================================
+   Phase 2 — Sidebar (worlds list, create button)
+   ============================================================ */
+.atlas-sidebar-section { padding: 12px 12px 4px; }
+.atlas-sidebar-title {
+  text-transform: lowercase;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.42);
+  margin-bottom: 8px;
+}
+.atlas-sidebar-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  text-transform: lowercase;
+}
+.atlas-sidebar-action .material-symbols-outlined { font-size: 16px; }
+
+.atlas-worlds-list {
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.atlas-worlds-empty {
+  padding: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  font-style: italic;
+}
+.atlas-world-row {
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: background 0.12s ease;
+}
+.atlas-world-row:hover { background: rgba(255, 255, 255, 0.04); }
+.atlas-world-row.is-active {
+  background: rgba(34, 211, 238, 0.10);
+  outline: 1px solid rgba(34, 211, 238, 0.30);
+}
+.atlas-world-row.is-settings { background: rgba(255, 255, 255, 0.06); }
+.atlas-world-name { font-size: 13px; color: rgba(255, 255, 255, 0.92); }
+.atlas-world-meta { display: flex; gap: 4px; }
+.atlas-world-badge {
+  font-size: 10px;
+  text-transform: lowercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.66);
+  background: rgba(255, 255, 255, 0.08);
+}
+.atlas-world-badge[data-state="api"] {
+  color: #22d3ee;
+  background: rgba(34, 211, 238, 0.12);
+}
+
+/* ============================================================
+   Phase 2 — Welcome panel
+   ============================================================ */
+.atlas-welcome-empty,
+.atlas-welcome-body { padding: 16px 24px; color: rgba(255, 255, 255, 0.78); line-height: 1.5; }
+.atlas-welcome-hint { color: rgba(255, 255, 255, 0.50); margin-top: 8px; font-size: 13px; }
+.atlas-welcome-hint code {
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: rgba(34, 211, 238, 0.85);
+}
+.atlas-welcome-actions { margin-top: 16px; display: flex; gap: 8px; }
+
+/* ============================================================
+   Phase 2 — Settings panel
+   ============================================================ */
+.atlas-settings { display: flex; flex-direction: column; }
+.atlas-settings-section {
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.atlas-settings-section h3 {
+  text-transform: lowercase;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 8px;
+}
+.atlas-settings-hint {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.atlas-settings-field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+  gap: 4px;
+}
+.atlas-settings-field > span {
+  text-transform: lowercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.55);
+}
+.atlas-settings-field .ow-input { max-width: 320px; }
+.atlas-settings-meta {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 4px 16px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.atlas-settings-meta dt {
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: lowercase;
+}
+.atlas-settings-meta dd {
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0;
+}
+.atlas-settings-meta code {
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: rgba(34, 211, 238, 0.85);
+}
+.atlas-settings-actions { display: flex; gap: 8px; }
+
+/* ============================================================
+   Phase 2 — Modal additions (create-world fields, errors, actions)
+   ============================================================ */
+.atlas-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.atlas-modal-field > span {
+  text-transform: lowercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.55);
+}
+.atlas-modal-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.50);
+  line-height: 1.5;
+  margin: 4px 0 16px;
+}
+.atlas-modal-error {
+  background: rgba(239, 68, 68, 0.10);
+  border: 1px solid rgba(239, 68, 68, 0.30);
+  color: rgba(255, 200, 200, 0.95);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.atlas-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ============================================================
+   Phase 2 — Button primitives (used by sidebar + modals + settings)
+   ============================================================ */
+.ow-btn {
+  font-family: inherit;
+  font-size: 12px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ow-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ow-btn-primary {
+  background: rgba(34, 211, 238, 0.15);
+  border-color: rgba(34, 211, 238, 0.40);
+  color: #22d3ee;
+}
+.ow-btn-primary:hover:not(:disabled) {
+  background: rgba(34, 211, 238, 0.22);
+  border-color: rgba(34, 211, 238, 0.60);
+}
+.ow-btn-secondary {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+}
+.ow-btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+}

@@ -12,7 +12,7 @@ interface Toast {
   duration: number;
 }
 
-class ToastManager {
+export class ToastManager {
   private container: HTMLElement | null = null;
   private toasts: Toast[] = [];
   private maxToasts = 3;

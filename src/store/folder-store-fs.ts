@@ -1,0 +1,569 @@
+/**
+ * FsFolderStore — the real FolderStore, backed by the File System Access API.
+ *
+ * The folder on disk IS the world. Every element is a file. Sync state, tombstones,
+ * and the writer lock live under `.atlas/`. Layout matches DESIGN.md:
+ *
+ *   <root>/
+ *     world.json
+ *     .atlas/{sync-state.json, tombstones.json, lock}
+ *     elements/<content-type>/<id>.json
+ *     spatial/<spatial-type>/<id>.json
+ *     media/<element-id>/<folder>/<filename>
+ *
+ * Same contract as MockFolderStore (see folder-store.ts). All writes stamp
+ * `local_updated_at`. Deletes cascade per the documented rules.
+ *
+ * Writer lock: a single tab "owns" the folder at a time. Owner writes
+ * `.atlas/lock = { tab_id, started_at, last_heartbeat }` and refreshes
+ * `last_heartbeat` every LOCK_HEARTBEAT_MS. A peer opening the same folder
+ * checks the lock: missing or older than LOCK_STALE_MS → take it. Otherwise →
+ * open in read-only mode (writes throw).
+ */
+
+import {
+  ATLAS_INTERNAL_DIR,
+  ELEMENTS_DIR,
+  LOCK_FILE,
+  LOCK_HEARTBEAT_MS,
+  LOCK_STALE_MS,
+  MEDIA_DIR,
+  SPATIAL_DIR,
+  SPATIAL_TYPES,
+  SYNC_STATE_FILE,
+  TOMBSTONES_FILE,
+  WORLD_META_FILE,
+} from '../core/constants';
+import { ALL_ELEMENT_TYPES, CONTENT_ELEMENT_TYPES, SPATIAL_ELEMENT_TYPES } from '../core/types';
+import type {
+  Element,
+  ElementType,
+  Marker,
+  MediaItem,
+  Pin,
+  SyncState,
+  Tombstone,
+  WorldMap,
+  WorldMeta,
+  Zone,
+} from '../core/types';
+import type { FolderStore } from './folder-store';
+import { newId, nowIso } from './folder-store';
+import {
+  elementDirSegments,
+  elementFilename,
+  getDir,
+  idFromFilename,
+  isNotFound,
+  listFiles,
+  readJson,
+  removeFile,
+  tryGetDir,
+  writeJsonAtomic,
+} from './fs-utils';
+
+const DEFAULT_META: WorldMeta = { id: '', name: '' };
+const DEFAULT_SYNC_STATE: SyncState = {
+  last_pull_at: null,
+  last_push_at: null,
+  paused: false,
+  conflicts: [],
+};
+
+interface LockPayload {
+  tab_id: string;
+  started_at: string;
+  last_heartbeat: string;
+}
+
+export interface FsFolderStoreOptions {
+  /** Override clock for tests. */
+  clock?: () => string;
+  /** Override the tab id used in the lock file (tests use a deterministic id). */
+  tabId?: string;
+  /**
+   * If true, opening with a stale lock is allowed and silently takes the lock.
+   * If false and another tab holds a live lock, open() throws ELockHeld.
+   * Default true (matches the "one writer per folder, with stale recovery" rule).
+   */
+  takeStaleLock?: boolean;
+  /** Disable heartbeat timer (tests that don't want the interval). */
+  disableHeartbeat?: boolean;
+}
+
+export class ELockHeld extends Error {
+  constructor(public lock: LockPayload) {
+    super(`folder lock held by tab ${lock.tab_id} (heartbeat ${lock.last_heartbeat})`);
+    this.name = 'ELockHeld';
+  }
+}
+
+export class FsFolderStore implements FolderStore {
+  private root: FileSystemDirectoryHandle | null = null;
+  private clock: () => string;
+  private tabId: string;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private opts: FsFolderStoreOptions;
+
+  constructor(opts: FsFolderStoreOptions = {}) {
+    this.opts = opts;
+    this.clock = opts.clock ?? nowIso;
+    this.tabId = opts.tabId ?? getOrCreateTabId();
+  }
+
+  // ---- Lifecycle ----
+
+  async open(handle: FileSystemDirectoryHandle | null): Promise<void> {
+    if (!handle) throw new Error('FsFolderStore.open requires a directory handle');
+    this.root = handle;
+    await this.ensureLayout();
+    await this.claimLock();
+    if (!this.opts.disableHeartbeat) {
+      this.heartbeatTimer = setInterval(() => {
+        this.refreshHeartbeat().catch(err => console.warn('[fs-folder-store] heartbeat:', err));
+      }, LOCK_HEARTBEAT_MS);
+    }
+  }
+
+  async close(): Promise<void> {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    if (this.root) {
+      const atlasDir = await tryGetDir(this.root, [ATLAS_INTERNAL_DIR]);
+      if (atlasDir) await removeFile(atlasDir, LOCK_FILE);
+    }
+    this.root = null;
+  }
+
+  // ---- Layout setup + lock ----
+
+  private async ensureLayout(): Promise<void> {
+    const root = this.requireRoot();
+    await getDir(root, [ATLAS_INTERNAL_DIR]);
+    await getDir(root, [ELEMENTS_DIR]);
+    await getDir(root, [SPATIAL_DIR]);
+    await getDir(root, [MEDIA_DIR]);
+    for (const t of CONTENT_ELEMENT_TYPES) await getDir(root, [ELEMENTS_DIR, t]);
+    for (const t of SPATIAL_ELEMENT_TYPES) await getDir(root, [SPATIAL_DIR, t]);
+  }
+
+  private async claimLock(): Promise<void> {
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    const existing = await readJson<LockPayload>(atlasDir, LOCK_FILE);
+    if (existing) {
+      const heartbeat = Date.parse(existing.last_heartbeat);
+      const age = Date.now() - heartbeat;
+      if (Number.isFinite(heartbeat) && age < LOCK_STALE_MS) {
+        if (this.opts.takeStaleLock === false) {
+          throw new ELockHeld(existing);
+        }
+        // takeStaleLock: stale-only enforcement happens in the else branch.
+        // Live lock + takeStaleLock !== false → still throw (we don't steal live).
+        if (existing.tab_id !== this.tabId) {
+          throw new ELockHeld(existing);
+        }
+      }
+      // Stale: fall through, overwrite below.
+    }
+    const fresh: LockPayload = {
+      tab_id: this.tabId,
+      started_at: this.clock(),
+      last_heartbeat: this.clock(),
+    };
+    await writeJsonAtomic(atlasDir, LOCK_FILE, fresh);
+  }
+
+  private async refreshHeartbeat(): Promise<void> {
+    if (!this.root) return;
+    const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
+    const existing = await readJson<LockPayload>(atlasDir, LOCK_FILE);
+    if (!existing || existing.tab_id !== this.tabId) {
+      // Lock was taken by another tab; stop heartbeating.
+      if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
+      return;
+    }
+    await writeJsonAtomic(atlasDir, LOCK_FILE, { ...existing, last_heartbeat: this.clock() });
+  }
+
+  private requireRoot(): FileSystemDirectoryHandle {
+    if (!this.root) throw new Error('FsFolderStore not open');
+    return this.root;
+  }
+
+  // ---- World meta ----
+
+  async readWorldMeta(): Promise<WorldMeta> {
+    const meta = await readJson<WorldMeta>(this.requireRoot(), WORLD_META_FILE);
+    return meta ?? { ...DEFAULT_META };
+  }
+
+  async writeWorldMeta(patch: Partial<WorldMeta>): Promise<WorldMeta> {
+    const current = await this.readWorldMeta();
+    const next: WorldMeta = { ...current, ...patch };
+    await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, next);
+    return next;
+  }
+
+  // ---- Elements (unified content + spatial) ----
+
+  async listElements(type?: ElementType): Promise<Element[]> {
+    const types = type ? [type] : (ALL_ELEMENT_TYPES as readonly ElementType[]);
+    const out: Element[] = [];
+    for (const t of types) {
+      const dir = await tryGetDir(this.requireRoot(), elementDirSegments(t));
+      if (!dir) continue;
+      const files = await listFiles(dir);
+      for (const name of files) {
+        const elem = await readJson<Element>(dir, name);
+        if (elem) out.push(elem);
+      }
+    }
+    return out;
+  }
+
+  async getElement(id: string): Promise<Element | null> {
+    // O(types) directory probe. Pin/zone/marker scans add 4 lookups; trivial.
+    for (const t of ALL_ELEMENT_TYPES) {
+      const dir = await tryGetDir(this.requireRoot(), elementDirSegments(t));
+      if (!dir) continue;
+      const elem = await readJson<Element>(dir, elementFilename(id));
+      if (elem) return elem;
+    }
+    return null;
+  }
+
+  async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
+    const id = (data.id as string) ?? newId();
+    const elem: Element = {
+      ...data,
+      id,
+      type,
+      name: (data.name as string) ?? '',
+      local_updated_at: this.clock(),
+    };
+    const dir = await getDir(this.requireRoot(), elementDirSegments(type));
+    await writeJsonAtomic(dir, elementFilename(id), elem);
+    return elem;
+  }
+
+  async updateElement(id: string, patch: Partial<Element>): Promise<Element> {
+    const existing = await this.getElement(id);
+    if (!existing) throw new Error(`element ${id} not found`);
+    const next: Element = {
+      ...existing,
+      ...patch,
+      id: existing.id,
+      type: existing.type,
+      local_updated_at: this.clock(),
+      server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
+    };
+    const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
+    await writeJsonAtomic(dir, elementFilename(id), next);
+    return next;
+  }
+
+  async findDependents(id: string): Promise<Element[]> {
+    const target = await this.getElement(id);
+    if (!target) return [];
+    if (target.type === 'pin' || target.type === 'zone' || target.type === 'marker') return [];
+    if (target.type === 'map') {
+      const out: Element[] = [];
+      for (const t of ['pin', 'zone', 'marker'] as const) {
+        const list = (await this.listElements(t)) as Array<Element & { map_id?: string }>;
+        for (const e of list) if (e.map_id === id) out.push(e);
+      }
+      return out;
+    }
+    // Content element: pins that reference it
+    const pins = (await this.listElements('pin')) as Array<Element & { element_id?: string }>;
+    return pins.filter(p => p.element_id === id);
+  }
+
+  async deleteElement(id: string, opts: { cascade?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
+    const cascade = opts.cascade ?? true;
+    const existing = await this.getElement(id);
+    if (!existing) return { tombstones: [] };
+
+    const written: Tombstone[] = [];
+    if (cascade) {
+      const deps = await this.findDependents(id);
+      for (const dep of deps) {
+        const tomb: Tombstone = { id: dep.id, type: dep.type, deleted_at: this.clock() };
+        await this.appendTombstone(tomb);
+        await this.unlinkElement(dep);
+        written.push(tomb);
+      }
+    }
+    const primary: Tombstone = { id, type: existing.type, deleted_at: this.clock() };
+    await this.appendTombstone(primary);
+    await this.unlinkElement(existing);
+    written.push(primary);
+    return { tombstones: written };
+  }
+
+  private async unlinkElement(elem: Element): Promise<void> {
+    const dir = await tryGetDir(this.requireRoot(), elementDirSegments(elem.type));
+    if (!dir) return;
+    await removeFile(dir, elementFilename(elem.id));
+  }
+
+  // ---- Spatial wrappers (typed accessors over the unified element store) ----
+
+  async listMaps(): Promise<WorldMap[]> { return (await this.listElements('map')) as WorldMap[]; }
+  async getMap(id: string): Promise<WorldMap | null> { return (await this.getElement(id)) as WorldMap | null; }
+  async createMap(data: Partial<WorldMap>): Promise<WorldMap> { return (await this.createElement('map', data)) as WorldMap; }
+  async updateMap(id: string, patch: Partial<WorldMap>): Promise<WorldMap> { return (await this.updateElement(id, patch)) as WorldMap; }
+  async deleteMap(id: string, opts?: { cascade?: boolean }) { return this.deleteElement(id, opts); }
+
+  async listPins(mapId?: string): Promise<Pin[]> {
+    const all = (await this.listElements('pin')) as Pin[];
+    return mapId ? all.filter(p => p.map_id === mapId) : all;
+  }
+  async getPin(id: string): Promise<Pin | null> { return (await this.getElement(id)) as Pin | null; }
+  async createPin(data: Partial<Pin>): Promise<Pin> { return (await this.createElement('pin', data)) as Pin; }
+  async updatePin(id: string, patch: Partial<Pin>): Promise<Pin> { return (await this.updateElement(id, patch)) as Pin; }
+  async deletePin(id: string) { return this.deleteElement(id); }
+
+  async listZones(mapId?: string): Promise<Zone[]> {
+    const all = (await this.listElements('zone')) as Zone[];
+    return mapId ? all.filter(z => z.map_id === mapId) : all;
+  }
+  async getZone(id: string): Promise<Zone | null> { return (await this.getElement(id)) as Zone | null; }
+  async createZone(data: Partial<Zone>): Promise<Zone> { return (await this.createElement('zone', data)) as Zone; }
+  async updateZone(id: string, patch: Partial<Zone>): Promise<Zone> { return (await this.updateElement(id, patch)) as Zone; }
+  async deleteZone(id: string) { return this.deleteElement(id); }
+
+  async listMarkers(mapId?: string): Promise<Marker[]> {
+    const all = (await this.listElements('marker')) as Marker[];
+    return mapId ? all.filter(m => m.map_id === mapId) : all;
+  }
+  async getMarker(id: string): Promise<Marker | null> { return (await this.getElement(id)) as Marker | null; }
+  async createMarker(data: Partial<Marker>): Promise<Marker> { return (await this.createElement('marker', data)) as Marker; }
+  async updateMarker(id: string, patch: Partial<Marker>): Promise<Marker> { return (await this.updateElement(id, patch)) as Marker; }
+  async deleteMarker(id: string) { return this.deleteElement(id); }
+
+  // ---- Media ----
+
+  async addMedia(elementId: string, file: File, folder = 'default'): Promise<MediaItem> {
+    const mediaRoot = await getDir(this.requireRoot(), [MEDIA_DIR, elementId, folder]);
+    const id = newId();
+    // Use the original filename to keep the folder browsable; collisions get suffixed.
+    let filename = file.name;
+    const existingNames = await listFiles(mediaRoot);
+    if (existingNames.includes(filename)) {
+      const dot = filename.lastIndexOf('.');
+      const stem = dot >= 0 ? filename.slice(0, dot) : filename;
+      const ext = dot >= 0 ? filename.slice(dot) : '';
+      filename = `${stem}-${id.slice(0, 8)}${ext}`;
+    }
+    const fh = await mediaRoot.getFileHandle(filename, { create: true });
+    const writer = await fh.createWritable();
+    await writer.write(file);
+    await writer.close();
+
+    const item: MediaItem = {
+      id,
+      element_id: elementId,
+      folder,
+      filename,
+      mime: file.type,
+      size_bytes: file.size,
+      added_at: this.clock(),
+    };
+    // Sidecar metadata so we don't have to re-stat every file to enumerate items.
+    const metaName = `${id}.meta.json`;
+    await writeJsonAtomic(mediaRoot, metaName, item);
+    return item;
+  }
+
+  async listMedia(elementId: string): Promise<MediaItem[]> {
+    const elementDir = await tryGetDir(this.requireRoot(), [MEDIA_DIR, elementId]);
+    if (!elementDir) return [];
+    const out: MediaItem[] = [];
+    // scan folder/* for *.meta.json
+    // @ts-expect-error — values() is FS Access API, not in lib.dom
+    for await (const folderEntry of elementDir.values()) {
+      if (folderEntry.kind !== 'directory') continue;
+      const folderHandle = folderEntry as FileSystemDirectoryHandle;
+      const files = await listFiles(folderHandle);
+      for (const name of files) {
+        if (!name.endsWith('.meta.json')) continue;
+        const item = await readJson<MediaItem>(folderHandle, name);
+        if (item) out.push(item);
+      }
+    }
+    return out;
+  }
+
+  async getMediaBlob(mediaId: string): Promise<Blob | null> {
+    // Scan element folders for a matching meta sidecar, then return the blob.
+    const mediaRoot = await tryGetDir(this.requireRoot(), [MEDIA_DIR]);
+    if (!mediaRoot) return null;
+    // @ts-expect-error — values()
+    for await (const elementEntry of mediaRoot.values()) {
+      if (elementEntry.kind !== 'directory') continue;
+      const elementDir = elementEntry as FileSystemDirectoryHandle;
+      // @ts-expect-error — values()
+      for await (const folderEntry of elementDir.values()) {
+        if (folderEntry.kind !== 'directory') continue;
+        const folderHandle = folderEntry as FileSystemDirectoryHandle;
+        const meta = await readJson<MediaItem>(folderHandle, `${mediaId}.meta.json`);
+        if (!meta) continue;
+        try {
+          const fh = await folderHandle.getFileHandle(meta.filename);
+          return await fh.getFile();
+        } catch (err) {
+          if (isNotFound(err)) return null;
+          throw err;
+        }
+      }
+    }
+    return null;
+  }
+
+  async deleteMedia(mediaId: string): Promise<void> {
+    const mediaRoot = await tryGetDir(this.requireRoot(), [MEDIA_DIR]);
+    if (!mediaRoot) return;
+    // @ts-expect-error — values()
+    for await (const elementEntry of mediaRoot.values()) {
+      if (elementEntry.kind !== 'directory') continue;
+      const elementDir = elementEntry as FileSystemDirectoryHandle;
+      // @ts-expect-error — values()
+      for await (const folderEntry of elementDir.values()) {
+        if (folderEntry.kind !== 'directory') continue;
+        const folderHandle = folderEntry as FileSystemDirectoryHandle;
+        const meta = await readJson<MediaItem>(folderHandle, `${mediaId}.meta.json`);
+        if (!meta) continue;
+        await removeFile(folderHandle, meta.filename);
+        await removeFile(folderHandle, `${mediaId}.meta.json`);
+        return;
+      }
+    }
+  }
+
+  // ---- Sync-relevant reads ----
+
+  async listLocallyChangedSince(baseline: string | null): Promise<Element[]> {
+    const all = await this.listElements();
+    return all.filter(elem => {
+      if (!elem.server_updated_at) return true;
+      if (baseline === null) return elem.local_updated_at > elem.server_updated_at;
+      return elem.local_updated_at > baseline;
+    });
+  }
+
+  async listTombstonesSince(baseline: string | null): Promise<Tombstone[]> {
+    const all = await this.readTombstoneList();
+    if (baseline === null) return all;
+    return all.filter(t => t.deleted_at > baseline);
+  }
+
+  async clearTombstone(id: string): Promise<void> {
+    const all = await this.readTombstoneList();
+    const next = all.filter(t => t.id !== id);
+    await this.writeTombstoneList(next);
+  }
+
+  async readSyncState(): Promise<SyncState> {
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    const state = await readJson<SyncState>(atlasDir, SYNC_STATE_FILE);
+    return state ?? { ...DEFAULT_SYNC_STATE };
+  }
+
+  async writeSyncState(patch: Partial<SyncState>): Promise<SyncState> {
+    const current = await this.readSyncState();
+    const next: SyncState = { ...current, ...patch };
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    await writeJsonAtomic(atlasDir, SYNC_STATE_FILE, next);
+    return next;
+  }
+
+  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string): Promise<void> {
+    const existing = await this.getElement(id);
+    if (!existing) return;
+    const next: Element = { ...existing, server_updated_at };
+    const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
+    await writeJsonAtomic(dir, elementFilename(id), next);
+  }
+
+  async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
+    const id = record.id as string;
+    if (!id) throw new Error('applyServerRecord: record missing id');
+    const elem: Element = {
+      ...record,
+      id,
+      type,
+      name: (record.name as string) ?? '',
+      local_updated_at: server_updated_at,
+      server_updated_at,
+    };
+    const dir = await getDir(this.requireRoot(), elementDirSegments(type));
+    await writeJsonAtomic(dir, elementFilename(id), elem);
+    return elem;
+  }
+
+  // ---- Internals ----
+
+  private async readTombstoneList(): Promise<Tombstone[]> {
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    const payload = await readJson<{ deletions: Tombstone[] }>(atlasDir, TOMBSTONES_FILE);
+    return payload?.deletions ?? [];
+  }
+
+  private async writeTombstoneList(deletions: Tombstone[]): Promise<void> {
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    await writeJsonAtomic(atlasDir, TOMBSTONES_FILE, { deletions });
+  }
+
+  private async appendTombstone(t: Tombstone): Promise<void> {
+    const existing = await this.readTombstoneList();
+    existing.push(t);
+    await this.writeTombstoneList(existing);
+  }
+
+  // ---- Test introspection ----
+
+  __debug_tabId(): string { return this.tabId; }
+
+  async __debug_readLock(): Promise<LockPayload | null> {
+    if (!this.root) return null;
+    const atlasDir = await tryGetDir(this.root, [ATLAS_INTERNAL_DIR]);
+    if (!atlasDir) return null;
+    return await readJson<LockPayload>(atlasDir, LOCK_FILE);
+  }
+
+  /**
+   * Manually trigger a heartbeat refresh. Tests use this to bump the lock
+   * without waiting for the interval timer.
+   */
+  async __debug_heartbeat(): Promise<void> {
+    await this.refreshHeartbeat();
+  }
+}
+
+// idFromFilename re-export so consumers can roundtrip ids without importing fs-utils.
+export { idFromFilename };
+
+/**
+ * Per-tab stable id. Persists across reloads (sessionStorage) so a reloaded
+ * tab can reclaim its own lock instead of seeing it as held by a stranger.
+ * Each genuinely-new browser tab gets a fresh id.
+ *
+ * Tests that need a deterministic id pass `opts.tabId` directly and bypass this.
+ */
+function getOrCreateTabId(): string {
+  const KEY = 'atlas_tab_id';
+  try {
+    let id = sessionStorage.getItem(KEY);
+    if (!id) {
+      id = newId();
+      sessionStorage.setItem(KEY, id);
+    }
+    return id;
+  } catch {
+    // No sessionStorage (e.g. private mode under strict settings). Best-effort: fresh id.
+    return newId();
+  }
+}

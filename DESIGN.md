@@ -66,15 +66,15 @@ User picks a root folder once per world (persisted via `FileSystemDirectoryHandl
       institution/
         <id>.json
       ... (18 content element types)
-    spatial/                         ← map artifacts
-      maps/
+    spatial/                         ← map artifacts (one file per element, like content)
+      map/
         <id>.json
-      pins/
-        <map-id>.json                ← bundled per map
-      zones/
-        <map-id>.json
-      markers/
-        <map-id>.json
+      pin/
+        <id>.json
+      zone/
+        <id>.json
+      marker/
+        <id>.json
     media/
       <element-id>/
         <folder-name>/

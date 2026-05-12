@@ -8,20 +8,29 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 ## Current State
 
 **Phase 0 — Foundation: complete (session 197).**
-**Phase 1 — Sync foundation: ~80% complete (sessions 197-198).**
+**Phase 1 — Sync foundation + real FolderStore: ~95% complete (sessions 197-198).**
 **Phase 1.5 — Architecture-agnostic UI primitive ports: complete (session 197).**
+**Phase 2 — Minimal UI bootstrap: complete (session 198, Bout 3).** First hands-on testable build.
 
 Skeleton package green across the board. Architecture locked. Full sync contract (push + pull + conflict detection on UPDATE) proven against MockFolderStore + FakeOwApiClient. Real OwApiClient adapter wraps the SDK; tested end-to-end via MSW with real `@onlyworlds/sdk`.
 
 Session 198 (Bout 1) added: cascade-delete in FolderStore contract + `findDependents` preview helper, `syncNow` concurrency mutex, order-independent `deepEqual` in conflict diff (no more spurious field-list churn from key-order differences), policy rename `server-wins` → `pause-on-conflict` (matches the actual code behavior; old name lied), Route 2 policy (a) dropped (full-overwrite footgun), lock-file format specced in conventions.
 
+Session 198 (Bout 2) added: real FolderStore backed by File System Access API. `fs-utils.ts` (atomic write via tmp+verify+promote, corruption-tolerant readJson, dir helpers), `idb.ts` (minimal promise IDB), `handle-vault.ts` (FileSystemDirectoryHandle persistence + permission re-grant helper), `folder-store-fs.ts` (full FsFolderStore impl with layout setup, heartbeat lock, all CRUD, media sidecar, sync-state file). One-file-per-element on disk for everything (content + spatial), no bundle-per-map. Playwright drives it via OPFS — same FS Access API interface as a user-chosen folder, so the real impl is exercised end-to-end.
+
+Session 198 (Bout 3) added: Phase 2 minimal UI. App shell (3-pane, draggable dividers, ratios persisted), observable state store, hash router, worlds sidebar with create-local + per-world activate, create-world modal (name + folder picker, test-injectable directory source), welcome panel (active world stats), settings panel (PIN + email + forget-world). Real `FsFolderStore` wired throughout — clicking create opens a real folder via FS Access API and writes a real `world.json`. Two lock-correctness fixes also landed: per-tab stable id via `sessionStorage` (reload reclaims own lock) + prior-store close in `createLocalWorldFlow` (defensive). 7 new Playwright specs cover the full flows (shell mount, create, settings, reload, forget, cancel, multi-world switching).
+
+Session 198 (Bout 4) added: atlas-root concept. Single user-chosen folder that holds all atlas-managed worlds; one-time setup. New worlds become subfolders (`<slug>-<uuid-prefix>`). Sidebar swaps `[ + create local ]` for `[ set up atlas ]` until root is configured. Welcome panel mirrors the same first-launch CTA. Settings shows + lets you change the atlas folder. Each world still has its OWN handle in the vault — atlas root is a creation convenience, not a storage layer. Existing test worlds keep working as "external" worlds. Three small fixes also landed: `loadRegistry` was hand-picking fields and silently dropping new ones (including `atlas_root` on reload) — now spreads; `slugify()` for filesystem-safe folder names; `.atlas-root` marker file dropped in each root for future "import existing atlas folder" detection.
+
+Session 198 (Bout 5) refined Bout 4: atlas root now uses the "library wrapper" convention. When user picks a folder, atlas creates `atlas-worlds/` inside it (matching legacy) UNLESS the picked folder is already an atlas root (`.atlas-root` marker present) or already contains one. Three cases handled by `resolveOrCreateRoot()`: (1) pick a folder with marker → use directly; (2) pick a folder containing `atlas-worlds/` with marker → use that subfolder; (3) pick a generic folder → create `atlas-worlds/` inside. Picking the user's Documents folder no longer pollutes it with world subfolders. State + UI show `pathHint` (parent/atlas-worlds when wrapped, picked-folder-name when re-used).
+
 UI primitives ported verbatim (modal-base, toast-manager, field-edit-popover, field-schema, Leaflet2DManager + spatial siblings, pin-visuals, edge-color). Full atlas.css styling in place (1491 lines). These ports are sitting unreferenced until Phase 2 wires them into the shell.
 
 Local git: 8 commits on master (origin pushed via force to GitHub main by Captain in session 197). Session 198 work uncommitted.
 
-**Bundle**: not yet meaningful (placeholder boot only — ports tree-shaken). CSS 25.58 KB / 4.97 KB gzipped (full styling).
-**Tests**: 89 passing across 9 files (was 67).
-**Type-check**: clean. **Build**: clean. **E2E**: 1 Playwright spec passes.
+**Bundle**: 33.52 KB JS / 10.18 KB gzipped. CSS 29.20 KB / 5.56 KB gzipped.
+**Tests**: 96 vitest + 24 Playwright = 120 total.
+**Type-check**: clean. **Build**: clean. **E2E**: 24 Playwright specs (12 FsFolderStore + 11 Phase 2 UI + 1 shell smoke), all chromium.
 
 ### What's live
 
@@ -73,32 +82,33 @@ Local git: 8 commits on master (origin pushed via force to GitHub main by Captai
 
 ## Next Up
 
-### Phase 1 remaining (next bouts)
+### Next bouts (post Phase 2)
 
-**Bout 2 — Real FolderStore** (browser File System Access API impl)
-- `src/store/fs-utils.ts` — path helpers, atomic write (write-temp + rename), JSON read with corruption-recovery
-- `src/store/idb.ts` — minimal promise-wrapped IDB primitives
-- `src/store/handle-vault.ts` — `FileSystemDirectoryHandle` persistence keyed by `handle_key`
-- `src/store/folder-store-fs.ts` — full FolderStore impl backed by FS Access API
-- `.atlas/lock` with 30s heartbeat / 90s TTL stale-recovery
-- Tested via Playwright (FS Access API isn't in node)
-
-**Bout 3 — Shared contract test suite**
-- Extract the existing integration tests into a parameterized contract that runs against MockFolderStore (vitest, fast) AND FsFolderStore (Playwright, real disk).
-- Divergence guard. Without this, mock-passes-but-real-fails will bite us mid-Phase 2.
-
-**Bout 4 — Sync polish**
+**Bout 4 — Sync polish** (~45min)
 - Per-type download cursor in `sync-state.json` (resumable link-existing)
 - Replace per-element pre-update GET with batched listElements baseline check
 - Network error handling (pause vs retry vs throw — clarify and test)
+- `syncNow` lock semantics test against real FS (port the OPFS-backed test from Bout 2 spec)
 
-### Phase 2 — Minimal UI to test foundation (Bout 5)
-- App shell (port from legacy)
-- Worlds sidebar (simplified)
-- Settings panel with PIN + email
-- Sync indicator (attached to SyncEngine state events)
-- Welcome panel with create/link/make-online entry points
-- First real-user E2E: create local world → pick folder → edit → reopen and persist
+**Bout 5 — Phase 3: API flows** (~90min)
+- Link existing API world modal (initial download with progress)
+- Make-Online Route 1 (create new api world via `POST /api/worldsync/create-world-external/`)
+- Make-Online Route 2 (link existing with merge policy b or c — full overwrite (a) was dropped)
+- Sync indicator wired to real SyncEngine state events
+- E2E: end-to-end smoke against MSW-mocked OW API
+
+**Deferred — Shared contract test suite**
+The parameterized "runs against mock + fs" suite is nice but lower ROI right now: the same scenarios already exist on both sides written by the same author. Re-evaluate when Phase 3 brings divergence pressure.
+
+**Phase 4 — Content UI (later)**
+- Elements sidebar (mode toggle, filter chips, search, list)
+- Element detail (schema-driven editor, popover field edit)
+- Create modal, picker modal
+
+**Phase 5 — Spatial UI (later)**
+- Map tabs (Leaflet), pin placement, zone editor
+
+**Phase 7 — Smoke against real OW + cutover**
 
 ---
 
@@ -125,14 +135,11 @@ Also: new `atlas-tool` skill (replaces deprecated reference). Fresh `project_atl
 
 ## Known Issues / Rough Edges
 
-- **No real FolderStore yet** — only the mock. Real browser impl (FS Access API) is the major remaining Phase 1 piece. Bout 2 work.
-- **No handle vault yet** — IDB persistence of FileSystemDirectoryHandle. Bout 2.
-- **No lock file yet** — design specced in conventions (heartbeat 30s, TTL 90s, JSON `{tab_id, started_at, last_heartbeat}`). Implemented in Bout 2.
 - **No initial-download cursor** — link-existing-API partial failures aren't resumable. Bout 4 adds per-type cursor in `sync-state.json`.
 - **Pre-update GET is N+1** — every UPDATE does an extra GET. Acceptable at debounce rates; brutal on "resume after long offline." Bout 4 replaces with a single batched listElements baseline before push.
 - **Pull-only conflict tests are weak** — for drain-blind policy, push runs first and overwrites, so a "pure pull-time conflict" requires server-side race hard to simulate. The conflict detection is verified via push-phase pre-update GET tests instead, which is the more important path.
-- **Element files lack corruption-recovery on read** — a partial-write JSON file currently throws. Real FolderStore (Bout 2) must catch + skip with a console warn so one bad file doesn't break list ops.
-- **Atomic write primitive missing** — write-temp + rename is non-negotiable for the real FS impl. Bout 2.
+- **OPFS != disk for some edge cases** — concurrent multi-tab race semantics differ slightly (OPFS is isolated per origin so the heartbeat tests use forged stale locks, not real cross-tab contention). Smoke against real disk-backed FS Access in Bout 5 will confirm.
+- **Permission re-prompt every session** — FS Access API requires user gesture per session. `handle-vault.ensureWritable()` does the re-grant; UX needs an "Open all" or per-card grant button in Phase 2.
 
 ---
 
@@ -148,5 +155,10 @@ Also: new `atlas-tool` skill (replaces deprecated reference). Fresh `project_atl
 
 ## Session Log
 
-- **2026-05-12 (session 198, Bout 1)** — Foundation polish before more building. Five decisions locked (cascade-delete in FolderStore; lock-file heartbeat 30s/90s TTL; policy rename `server-wins` → `pause-on-conflict`; Route 2 policy (a) dropped; email global). Four code changes: deepEqual diff, cascade-delete contract + `findDependents`, syncNow mutex, policy rename. 22 new tests (67 → 89). Typecheck + build clean. Bout 2 next: real FolderStore.
+- **2026-05-12 (session 198, Bout 6)** — Three fixes. `#/settings` standalone route (gear icon now works without an active world). `discoverWorldsInRoot()`: setup scans the atlas root for subfolders with valid `world.json` and imports them — critical after localStorage wipe + re-pick. Migration note added to settings ("changing this folder doesn't move existing worlds"). 2 new Phase 2 specs.
+- **2026-05-12 (session 198, Bout 5)** — Atlas-root refinement: wrap-by-default with re-use detection. Picked folder becomes parent; atlas creates `onlyworlds-atlas/` inside (renamed from `atlas-worlds/` for brand clarity, with legacy detection). Display switched to pathHint (parent/wrapper) for context. 2 new Phase 2 specs.
+- **2026-05-12 (session 198, Bout 4)** — Atlas-root concept. One-time folder setup before world creation. New: `src/setup/atlas-root-flow.ts` (setup + hydrate + createWorldInRoot + slugify), atlas_root field in registry + state, sidebar/welcome/settings all switch on root presence. Modal becomes name-only when root is set. Each world keeps its own handle so root is a creation convenience, not storage. Fixed `loadRegistry` field-dropping bug. New tests: 9 Phase 2 UI specs (rewritten) + 7 atlas-root unit tests. 96 vitest + 22 Playwright = 118 total.
+- **2026-05-12 (session 198, Bout 3)** — Phase 2 minimal UI. New: `core/state.ts`, `core/router.ts`, `layout/app-shell.ts`, `sidebar/worlds-sidebar.ts`, `middle/welcome-panel.ts`, `middle/settings-panel.ts`, `ui/directory-picker.ts`, `ui/create-world-modal.ts`, `app.ts`. `main.ts` boots `startApp(root)`. Toast singleton wired. Two lock-correctness fixes: per-tab `sessionStorage` id (reload reclaims own lock); prior-store close on create flow (defensive). Bundle 1.14 KB → 29.21 KB (full UI). 7 new Playwright specs (89 vitest + 20 e2e = 109 total). First user-testable build.
+- **2026-05-12 (session 198, Bout 2)** — Real FolderStore via FS Access API. New: `fs-utils.ts`, `idb.ts`, `handle-vault.ts`, `folder-store-fs.ts`, `vite-env.d.ts`. Dev-only test harness on `window.__atlasTestApi` (tree-shaken from prod). 12 Playwright specs drive the real impl against OPFS — same `FileSystemDirectoryHandle` interface as a user-chosen folder. All green: layout creation, round-trip CRUD, cross-session persistence, cascade delete, tombstone durability, sync state round-trip, lock file write/clear, live-lock rejection, stale-lock recovery. Total tests: 89 vitest + 13 Playwright = 102.
+- **2026-05-12 (session 198, Bout 1)** — Foundation polish before more building. Five decisions locked (cascade-delete in FolderStore; lock-file heartbeat 30s/90s TTL; policy rename `server-wins` → `pause-on-conflict`; Route 2 policy (a) dropped; email global). Four code changes: deepEqual diff, cascade-delete contract + `findDependents`, syncNow mutex, policy rename. 22 new tests (67 → 89). Typecheck + build clean.
 - **2026-05-12 (session 197)** — Phase 0 foundation + Phase 1 sync. 8 bouts, 67 tests, 5 git commits, clean build. Refactor pivot from legacy IDB-cached atlas. New atlas at `tools/atlas/`; legacy archived at `tools/atlas-deprecated/`. Local git initialized; remote pointed at https://github.com/OnlyWorlds/atlas.git (legacy still on main, Captain force-pushes when ready).

@@ -181,6 +181,19 @@ export interface WorldsRegistry {
   /** Global email for OW account (used by create-world-external). */
   email?: string;
   active_world_id?: string;
+  /**
+   * Default container folder for newly-created local worlds.
+   * Holds atlas-managed worlds as subfolders.
+   * The actual handle lives in handle-vault under `ATLAS_ROOT_HANDLE_KEY`.
+   * Independently of this, each world has its own handle in the vault — so
+   * the root is a creation convenience, not a storage layer.
+   */
+  atlas_root?: {
+    handle_key: string;
+    folder_name: string;
+    path_hint?: string;
+    set_at: string;
+  };
 }
 
 export function defaultRegistry(): WorldsRegistry {

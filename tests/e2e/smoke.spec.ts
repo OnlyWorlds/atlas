@@ -1,12 +1,12 @@
 /**
- * E2E smoke — verifies the dev server boots and the placeholder renders.
- * Real flow specs will land alongside the shell.
+ * E2E smoke — verifies the dev server boots and the app shell renders.
  */
 
 import { test, expect } from '@playwright/test';
 
-test('atlas placeholder boots', async ({ page }) => {
+test('atlas shell boots with sidebar and middle pane', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('.atlas-placeholder h1')).toHaveText('atlas');
-  await expect(page.locator('.atlas-placeholder')).toContainText('folder-first rebuild');
+  await expect(page.locator('.atlas-shell')).toBeVisible();
+  await expect(page.locator('.atlas-sidebar')).toBeVisible();
+  await expect(page.locator('.atlas-middle')).toBeVisible();
 });
