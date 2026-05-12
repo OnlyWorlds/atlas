@@ -77,43 +77,31 @@ export function mountRightPane(mount: RightPaneMount): () => void {
     tabs.forEach((tab, idx) => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'atlas-right-tab' + (idx === activeIndex ? ' is-active' : '');
+      btn.className = 'atlas-tab' + (idx === activeIndex ? ' active' : '');
       btn.setAttribute('data-tab-index', String(idx));
+      btn.addEventListener('click', () => {
+        patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
+      });
       if (tab.kind === 'map-index') {
         btn.setAttribute('data-tab-kind', 'map-index');
         btn.innerHTML = `<span class="material-symbols-outlined">view_list</span><span>maps</span>`;
-        btn.addEventListener('click', () => {
-          patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
-        });
         tabBar.appendChild(btn);
         return;
       }
-      // Map tab: button for activation + sibling button for close (no nested buttons).
       btn.setAttribute('data-tab-kind', 'map');
       btn.setAttribute('data-tab-map-id', tab.mapId);
       const m = getState().data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === tab.mapId);
       const label = m?.name || tab.label || '(untitled)';
-      btn.innerHTML = `<span class="material-symbols-outlined">map</span><span class="atlas-right-tab-label">${escapeText(label)}</span>`;
-      btn.addEventListener('click', () => {
-        patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
-      });
-      const closeBtn = document.createElement('button');
-      closeBtn.type = 'button';
-      closeBtn.className = 'atlas-right-tab-close';
-      closeBtn.setAttribute('data-role', 'close');
-      closeBtn.setAttribute('aria-label', 'close tab');
-      closeBtn.textContent = '×';
-      closeBtn.addEventListener('click', (e) => {
+      // Close affordance lives inside the tab as a span (legacy `.atlas-tab-close`)
+      // — direct child listener on the span, no nested buttons.
+      btn.innerHTML = `<span class="material-symbols-outlined">map</span><span>${escapeText(label)}</span><span class="atlas-tab-close" data-role="close" aria-label="close tab">×</span>`;
+      const closeEl = btn.querySelector<HTMLElement>('[data-role="close"]');
+      closeEl?.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
         if (tab.kind === 'map') closeMapTab(idx, tab.mapId);
       });
-      // Wrap activate + close in a tab group so the bar layout stays the same.
-      const group = document.createElement('div');
-      group.className = 'atlas-right-tab-group' + (idx === activeIndex ? ' is-active' : '');
-      group.appendChild(btn);
-      group.appendChild(closeBtn);
-      tabBar.appendChild(group);
+      tabBar.appendChild(btn);
     });
   }
 

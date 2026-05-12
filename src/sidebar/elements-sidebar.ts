@@ -16,8 +16,8 @@ import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { ToastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
 
-/** Types shown in the filter strip — all 18 content types plus map. */
-const FILTER_TYPES_WITH_MAP: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map'];
+/** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
+const FILTER_TYPES_WITH_MAP: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
 
 export interface ElementsBodyMount {
   content: HTMLElement;
@@ -28,24 +28,12 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   const { content, toasts } = mount;
   content.innerHTML = '';
 
-  // ----- Header: slim flex row with + new element on the right -----
-  const header = document.createElement('div');
-  header.className = 'atlas-elements-header';
-  const newBtn = document.createElement('button');
-  newBtn.className = 'atlas-btn-ghost';
-  newBtn.setAttribute('data-action', 'create-element');
-  newBtn.textContent = '+ new element';
-  newBtn.title = 'create a new element';
-  newBtn.addEventListener('click', () => new ElementCreateModal(toasts).open());
-  header.appendChild(newBtn);
-  content.appendChild(header);
-
   // ----- Filter strip -----
   const strip = document.createElement('div');
   strip.className = 'atlas-filter-strip';
   content.appendChild(strip);
 
-  // ----- Search row -----
+  // ----- Search + create row (legacy pattern: + icon inside the search row) -----
   const searchRow = document.createElement('div');
   searchRow.className = 'atlas-search-row';
   const searchInput = document.createElement('input');
@@ -53,7 +41,18 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   searchInput.type = 'text';
   searchInput.placeholder = 'search elements...';
   searchInput.setAttribute('data-role', 'elements-search');
+  searchInput.style.flex = '1 1 auto';
   searchRow.appendChild(searchInput);
+
+  const createBtn = document.createElement('button');
+  createBtn.type = 'button';
+  createBtn.className = 'atlas-create-btn';
+  createBtn.setAttribute('data-action', 'create-element');
+  createBtn.title = 'new element';
+  createBtn.innerHTML = '<span class="material-symbols-outlined">add</span>';
+  createBtn.addEventListener('click', () => new ElementCreateModal(toasts).open());
+  searchRow.appendChild(createBtn);
+
   content.appendChild(searchRow);
 
   searchInput.addEventListener('input', () => {

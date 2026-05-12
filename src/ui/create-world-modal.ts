@@ -59,7 +59,7 @@ export class CreateWorldModal extends BaseModal {
       <form data-form="create-world">
         <label class="atlas-modal-field">
           <span>name</span>
-          <input class="ow-input" type="text" name="world-name" placeholder="untitled world" autocomplete="off" />
+          <input class="atlas-input" type="text" name="world-name" placeholder="untitled world" autocomplete="off" />
         </label>
         <p class="atlas-modal-hint">
           ${rootDisplay
@@ -68,8 +68,8 @@ export class CreateWorldModal extends BaseModal {
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
-          <button type="button" class="ow-btn ow-btn-secondary" data-action="cancel">cancel</button>
-          <button type="submit" class="ow-btn ow-btn-primary" data-action="pick" ${rootDisplay ? '' : 'disabled'}>create</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
+          <button type="submit" class="atlas-btn-primary" data-action="pick" ${rootDisplay ? '' : 'disabled'}>create</button>
         </div>
       </form>
     `;

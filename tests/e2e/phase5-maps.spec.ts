@@ -45,8 +45,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('right pane shows map index tab by default with empty state', async ({ page }) => {
-  await expect(page.locator('.atlas-right-tab[data-tab-kind="map-index"]')).toBeVisible();
-  await expect(page.locator('.atlas-right-tab[data-tab-kind="map-index"]')).toHaveClass(/is-active/);
+  await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toBeVisible();
+  await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toHaveClass(/active/);
   await expect(page.locator('.atlas-map-index-pane')).toBeVisible();
   await expect(page.locator('.atlas-map-index-pane')).toContainText('no maps yet');
 });
@@ -59,11 +59,11 @@ test('create map via map index — adds row and opens map tab', async ({ page })
   await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
 
   // Row appears in map index (have to switch back to see it since tab switched).
-  await page.click('.atlas-right-tab[data-tab-kind="map-index"]');
+  await page.click('.atlas-tab[data-tab-kind="map-index"]');
   await expect(page.locator('.atlas-row[data-map-id]', { hasText: 'Middle Earth' })).toBeVisible();
 
   // New tab created for the map and is active.
-  const mapTab = page.locator('.atlas-right-tab[data-tab-kind="map"]', { hasText: 'Middle Earth' });
+  const mapTab = page.locator('.atlas-tab[data-tab-kind="map"]', { hasText: 'Middle Earth' });
   await expect(mapTab).toBeVisible();
 });
 
@@ -73,19 +73,19 @@ test('clicking a map row opens or focuses its tab', async ({ page }) => {
     await page.click('[data-action="new-map"]');
     await page.fill('input[name="map-name"]', name);
     await page.click('[data-modal="create-map"] [data-action="create"]');
-    await page.click('.atlas-right-tab[data-tab-kind="map-index"]');
+    await page.click('.atlas-tab[data-tab-kind="map-index"]');
   }
   // Both rows present.
   await expect(page.locator('.atlas-row[data-map-id]')).toHaveCount(2);
 
   // Click Alpha Map row → focuses Alpha tab.
   await page.click('.atlas-row[data-map-id]:has-text("Alpha Map")');
-  await expect(page.locator('.atlas-right-tab.is-active', { hasText: 'Alpha Map' })).toBeVisible();
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Alpha Map' })).toBeVisible();
 
   // Click Beta Map row → focuses Beta tab.
-  await page.click('.atlas-right-tab[data-tab-kind="map-index"]');
+  await page.click('.atlas-tab[data-tab-kind="map-index"]');
   await page.click('.atlas-row[data-map-id]:has-text("Beta Map")');
-  await expect(page.locator('.atlas-right-tab.is-active', { hasText: 'Beta Map' })).toBeVisible();
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Beta Map' })).toBeVisible();
 });
 
 test('close button on a map tab removes it from the bar', async ({ page }) => {
@@ -94,14 +94,13 @@ test('close button on a map tab removes it from the bar', async ({ page }) => {
   await page.click('[data-modal="create-map"] [data-action="create"]');
   await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
 
-  const tab = page.locator('.atlas-right-tab[data-tab-kind="map"]', { hasText: 'Disposable' });
+  const tab = page.locator('.atlas-tab[data-tab-kind="map"]', { hasText: 'Disposable' });
   await expect(tab).toBeVisible();
-  const group = page.locator('.atlas-right-tab-group', { has: tab });
-  await group.locator('[data-role="close"]').click();
+  await tab.locator('[data-role="close"]').click();
   await expect(tab).toHaveCount(0);
 
   // Map-index tab still present and active.
-  await expect(page.locator('.atlas-right-tab[data-tab-kind="map-index"]')).toHaveClass(/is-active/);
+  await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toHaveClass(/active/);
 });
 
 test('map index pin-count badge updates as pins are added (via FolderStore)', async ({ page }) => {
@@ -139,7 +138,7 @@ test('map index pin-count badge updates as pins are added (via FolderStore)', as
   }, { heroId, mapId });
 
   // Map index shows pin count badge "1".
-  await page.click('.atlas-right-tab[data-tab-kind="map-index"]');
+  await page.click('.atlas-tab[data-tab-kind="map-index"]');
   const row = page.locator('.atlas-row[data-map-id]', { hasText: 'Pinned Map' });
   await expect(row.locator('.atlas-row-meta')).toHaveText('1');
 });
@@ -148,14 +147,14 @@ test('delete map cascades pins and removes the tab', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Doomed Map');
   await page.click('[data-modal="create-map"] [data-action="create"]');
-  await page.click('.atlas-right-tab[data-tab-kind="map-index"]');
+  await page.click('.atlas-tab[data-tab-kind="map-index"]');
 
   page.on('dialog', d => d.accept());
   await page.locator('.atlas-row[data-map-id]', { hasText: 'Doomed Map' }).hover();
   await page.locator('.atlas-row[data-map-id] [data-action="delete-map"]').click();
 
   await expect(page.locator('.atlas-row[data-map-id]', { hasText: 'Doomed Map' })).toHaveCount(0);
-  await expect(page.locator('.atlas-right-tab[data-tab-kind="map"]', { hasText: 'Doomed Map' })).toHaveCount(0);
+  await expect(page.locator('.atlas-tab[data-tab-kind="map"]', { hasText: 'Doomed Map' })).toHaveCount(0);
 });
 
 test('pin button appears in element detail when a map tab is active', async ({ page }) => {

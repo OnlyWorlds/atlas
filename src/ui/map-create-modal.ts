@@ -85,7 +85,7 @@ class MapCreateModal extends BaseModal {
       <form data-form="create-map">
         <label class="atlas-modal-field">
           <span>name</span>
-          <input class="ow-input" type="text" name="map-name" placeholder="map name..." autocomplete="off" />
+          <input class="atlas-input" type="text" name="map-name" placeholder="map name..." autocomplete="off" />
         </label>
         <div class="atlas-modal-field">
           <span>location (optional)</span>
@@ -93,7 +93,7 @@ class MapCreateModal extends BaseModal {
         </div>
         <label class="atlas-modal-field">
           <span>image URL (optional)</span>
-          <input class="ow-input" type="text" name="map-image-url" placeholder="https://..." autocomplete="off" spellcheck="false" />
+          <input class="atlas-input" type="text" name="map-image-url" placeholder="https://..." autocomplete="off" spellcheck="false" />
         </label>
         <label class="atlas-modal-field">
           <span>local image (optional)</span>
@@ -102,8 +102,8 @@ class MapCreateModal extends BaseModal {
         </label>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
-          <button type="button" class="ow-btn ow-btn-secondary" data-action="cancel">cancel</button>
-          <button type="submit" class="ow-btn ow-btn-primary" data-action="create">create</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
+          <button type="submit" class="atlas-btn-primary" data-action="create">create</button>
         </div>
       </form>
     `;
@@ -192,7 +192,7 @@ class MapCreateModal extends BaseModal {
     }
     const pickBtn = document.createElement('button');
     pickBtn.type = 'button';
-    pickBtn.className = 'ow-btn ow-btn-ghost';
+    pickBtn.className = 'atlas-btn-ghost';
     pickBtn.textContent = this.locationPreview ? 'change' : '+ pick location';
     pickBtn.addEventListener('click', async () => {
       const picked = await pickElement({

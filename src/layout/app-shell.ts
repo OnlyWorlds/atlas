@@ -83,7 +83,7 @@ export function mountAppShell(container: HTMLElement): AppShell {
   const right = document.createElement('section');
   right.className = 'atlas-right';
   const rightTabBar = document.createElement('div');
-  rightTabBar.className = 'atlas-right-tab-bar';
+  rightTabBar.className = 'atlas-tab-bar';
   right.appendChild(rightTabBar);
   const rightPane = document.createElement('div');
   rightPane.className = 'atlas-pane atlas-right-pane';
