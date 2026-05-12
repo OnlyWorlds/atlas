@@ -210,6 +210,21 @@ export class MockFolderStore implements FolderStore {
     this.elements.set(id, { ...existing, server_updated_at });
   }
 
+  async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
+    const id = record.id as string;
+    if (!id) throw new Error('applyServerRecord: record missing id');
+    const elem: Element = {
+      ...record,
+      id,
+      type,
+      name: (record.name as string) ?? '',
+      local_updated_at: server_updated_at,
+      server_updated_at,
+    };
+    this.elements.set(id, elem);
+    return { ...elem };
+  }
+
   // ---- Test introspection helpers ----
 
   __debug_elementCount(): number { return this.elements.size; }

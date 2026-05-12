@@ -30,6 +30,10 @@ beforeEach(async () => {
   engine = new SyncEngine({ folder, client });
 });
 
+/** Push tests focus on write methods. Pull phase issues list calls every sync;
+ *  filter those out so push assertions stay focused on the push surface. */
+const writeCalls = () => client.calls.filter(c => c.method !== 'list');
+
 describe('SyncEngine push phase', () => {
   it('pushes a locally-created element as CREATE', async () => {
     const local = await folder.createElement('character', { name: 'Alice' });
@@ -39,8 +43,9 @@ describe('SyncEngine push phase', () => {
 
     expect(result.pushed.creates).toBe(1);
     expect(result.pushed.updates).toBe(0);
-    expect(client.calls).toHaveLength(1);
-    const call = client.calls[0];
+    const writes = writeCalls();
+    expect(writes).toHaveLength(1);
+    const call = writes[0];
     expect(call.method).toBe('create');
     if (call.method !== 'create') throw new Error('expected create');
     expect(call.type).toBe('character');
@@ -76,7 +81,7 @@ describe('SyncEngine push phase', () => {
     // First sync: create + push.
     const local = await folder.createElement('character', { name: 'Dora' });
     await engine.syncNow();
-    expect(client.calls).toHaveLength(1);
+    expect(writeCalls()).toHaveLength(1);
 
     // Local edit after sync.
     await folder.updateElement(local.id, { name: 'Dora the Brave' });
@@ -108,7 +113,7 @@ describe('SyncEngine push phase', () => {
     expect(result.pushed.creates).toBe(0);
     expect(result.pushed.updates).toBe(0);
     expect(result.pushed.deletes).toBe(0);
-    expect(client.calls).toHaveLength(0);
+    expect(writeCalls()).toHaveLength(0);
   });
 
   it('does not push while paused', async () => {
@@ -117,7 +122,7 @@ describe('SyncEngine push phase', () => {
 
     const result = await engine.syncNow();
     expect(result.pushed.creates).toBe(0);
-    expect(client.calls).toHaveLength(0);
+    expect(client.calls).toHaveLength(0); // pause short-circuits before pull too
   });
 
   it('resume clears paused state and the next sync proceeds', async () => {

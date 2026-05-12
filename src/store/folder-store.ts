@@ -116,6 +116,16 @@ export interface FolderStore {
    * push or pull). Does NOT change `local_updated_at`.
    */
   stampServerUpdatedAt(id: string, type: ElementType, server_updated_at: string): Promise<void>;
+
+  /**
+   * Apply a server record verbatim. Sets BOTH `local_updated_at` and
+   * `server_updated_at` to the server's authoritative timestamp, ensuring the
+   * element won't be flagged as locally-changed on the next push pass.
+   *
+   * Used by SyncEngine.pullPhase when a server element is new locally OR
+   * server-newer than the folder version (no local change to preserve).
+   */
+  applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element>;
 }
 
 export function newId(): string {

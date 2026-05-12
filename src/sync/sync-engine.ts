@@ -8,6 +8,9 @@
 
 import type { FolderStore } from '../store/folder-store';
 import { nowIso } from '../store/folder-store';
+import {
+  ALL_ELEMENT_TYPES,
+} from '../core/types';
 import type {
   Conflict,
   Element,
@@ -151,11 +154,64 @@ export class SyncEngine {
   }
 
   private async pullPhase(): Promise<SyncResult> {
-    // Phase 1: minimal pull — fetch all elements per type, write any that are
-    // new or have a newer server timestamp than what we have locally.
-    // (Phase 2 adds smart "only since last_pull_at" diffing using server-side
-    // filter once we wire it.)
-    return { pushed: zero(), pulled: zero(), conflicts: [] };
+    let creates = 0;
+    let updates = 0;
+    const conflicts: Conflict[] = [];
+
+    const tombstones = await this.folder.listTombstonesSince(null);
+    const tombstoneIds = new Set(tombstones.map(t => t.id));
+
+    for (const type of ALL_ELEMENT_TYPES) {
+      const serverElements = await this.client.listElements(type);
+
+      for (const remote of serverElements) {
+        // Skip elements pending local delete — they'll be DELETEd by next push.
+        if (tombstoneIds.has(remote.id)) continue;
+
+        const local = await this.folder.getElement(remote.id);
+        const remoteBody = stripServerOnlyFields(remote);
+
+        if (!local) {
+          // New on server → write locally with both timestamps = server's.
+          await this.folder.applyServerRecord(type, remoteBody, remote.updated_at);
+          creates++;
+          continue;
+        }
+
+        // Local has it. Decide based on timestamps.
+        const localBaseline = local.server_updated_at ?? '';
+        const localChanged = local.local_updated_at > localBaseline;
+        const serverChanged = remote.updated_at > localBaseline;
+
+        if (!serverChanged) continue;
+
+        if (localChanged) {
+          // Both sides changed since last sync → conflict.
+          conflicts.push({
+            element_id: remote.id,
+            type,
+            detected_at: nowIso(),
+            local_updated_at: local.local_updated_at,
+            server_updated_at: remote.updated_at,
+            fields: diffFieldNames(local, remoteBody),
+          });
+          // Don't overwrite local; preserve the user's change.
+          continue;
+        }
+
+        // Server newer, local untouched → overwrite locally.
+        await this.folder.applyServerRecord(type, remoteBody, remote.updated_at);
+        updates++;
+      }
+    }
+
+    const currentState = await this.folder.readSyncState();
+    await this.folder.writeSyncState({
+      last_pull_at: nowIso(),
+      conflicts: [...currentState.conflicts, ...conflicts],
+    });
+
+    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts };
   }
 
   // ---- Internals ----
@@ -171,6 +227,33 @@ export class SyncEngine {
 function stripSyncFields(elem: Element): Record<string, unknown> {
   const { local_updated_at, server_updated_at, ...rest } = elem;
   return rest;
+}
+
+/**
+ * Strip fields that are server-managed (updated_at) before writing to folder.
+ * The server's authoritative timestamp gets stamped separately via
+ * applyServerRecord / stampServerUpdatedAt.
+ */
+function stripServerOnlyFields(record: Record<string, unknown>): Record<string, unknown> {
+  const { updated_at, ...rest } = record;
+  return rest;
+}
+
+/**
+ * Names of fields that differ between a local element and a remote record.
+ * Used for conflict reporting. Ignores sync-internal fields.
+ */
+function diffFieldNames(local: Element, remote: Record<string, unknown>): string[] {
+  const SKIP = new Set(['id', 'type', 'local_updated_at', 'server_updated_at', 'updated_at']);
+  const keys = new Set<string>([...Object.keys(local), ...Object.keys(remote)]);
+  const diff: string[] = [];
+  for (const key of keys) {
+    if (SKIP.has(key)) continue;
+    if (JSON.stringify((local as Record<string, unknown>)[key]) !== JSON.stringify(remote[key])) {
+      diff.push(key);
+    }
+  }
+  return diff;
 }
 
 function zero(): { creates: number; updates: number; deletes: number } {
