@@ -9,6 +9,40 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
   <link rel="stylesheet" href="/src/styles/atlas.css" />
+  <style>
+    /* Browser default body margin = 8px; without this reset the shell overflows
+       and leaves a thin border of body background visible on right/bottom. */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a0a;
+      /* System font stack — same as legacy onlyworlds-base.css. Without an
+         explicit body font-family, h1/h2/etc default to browser serif (Times
+         New Roman on Windows) which makes titles look noticeably less crisp. */
+      font-family: system-ui, -apple-system, BlinkMacSystemFont,
+                   'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif,
+                   'Apple Color Emoji', 'Segoe UI Emoji';
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+    #app {
+      height: 100vh;
+      width: 100vw;
+    }
+    /* Toast container — fixed top-right, above modals. */
+    #toast-container {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+  </style>
 </head>
 <body>
   <div id="app"></div>

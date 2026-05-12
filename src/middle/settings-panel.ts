@@ -133,6 +133,8 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
       await deleteHandle(target.folder.handle_key).catch(() => {});
       patchSlice('registry', next);
       patchSlice('active', null);
+      patchSlice('data', { elements: [] });
+      patchSlice('ui', { ...getState().ui, selectedElementId: null });
       toasts.success(`forgot ${target.name}`);
       navigate('#/');
     });

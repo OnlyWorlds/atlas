@@ -1491,70 +1491,6 @@
 }
 
 /* ============================================================
-   Phase 2 — Sidebar (worlds list, create button)
-   ============================================================ */
-.atlas-sidebar-section { padding: 12px 12px 4px; }
-.atlas-sidebar-title {
-  text-transform: lowercase;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.42);
-  margin-bottom: 8px;
-}
-.atlas-sidebar-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  text-transform: lowercase;
-}
-.atlas-sidebar-action .material-symbols-outlined { font-size: 16px; }
-
-.atlas-worlds-list {
-  padding: 4px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.atlas-worlds-empty {
-  padding: 12px;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 12px;
-  font-style: italic;
-}
-.atlas-world-row {
-  padding: 8px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  transition: background 0.12s ease;
-}
-.atlas-world-row:hover { background: rgba(255, 255, 255, 0.04); }
-.atlas-world-row.is-active {
-  background: rgba(34, 211, 238, 0.10);
-  outline: 1px solid rgba(34, 211, 238, 0.30);
-}
-.atlas-world-row.is-settings { background: rgba(255, 255, 255, 0.06); }
-.atlas-world-name { font-size: 13px; color: rgba(255, 255, 255, 0.92); }
-.atlas-world-meta { display: flex; gap: 4px; }
-.atlas-world-badge {
-  font-size: 10px;
-  text-transform: lowercase;
-  padding: 1px 6px;
-  border-radius: 3px;
-  letter-spacing: 0.03em;
-  color: rgba(255, 255, 255, 0.66);
-  background: rgba(255, 255, 255, 0.08);
-}
-.atlas-world-badge[data-state="api"] {
-  color: #22d3ee;
-  background: rgba(34, 211, 238, 0.12);
-}
-
-/* ============================================================
    Phase 2 — Welcome panel
    ============================================================ */
 .atlas-welcome-empty,
@@ -1700,4 +1636,305 @@
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.22);
   color: rgba(255, 255, 255, 0.92);
+}
+
+/* =================================================================
+   Bout A polish — Elements sidebar minor refinements
+   ================================================================= */
+
+.atlas-elements-header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--atlas-divider);
+}
+.atlas-search-row {
+  padding: 6px 8px 4px;
+}
+
+/* =================================================================
+   Bout B — Element picker modal + referenced-by chips
+   ================================================================= */
+
+.atlas-picker-panel {
+  width: 560px;
+  max-width: 92vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.atlas-picker-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.atlas-picker-count {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+}
+.atlas-picker-search {
+  width: 100%;
+}
+.atlas-picker-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 0;
+  max-height: 96px;
+  overflow-y: auto;
+}
+.atlas-picker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.atlas-picker-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+}
+.atlas-picker-chip.is-active {
+  background: rgba(34, 211, 238, 0.15);
+  color: #22d3ee;
+  border-color: rgba(34, 211, 238, 0.4);
+}
+.atlas-picker-chip .material-symbols-outlined {
+  font-size: 14px;
+}
+.atlas-picker-list {
+  flex: 1;
+  min-height: 200px;
+  max-height: 48vh;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.atlas-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: inherit;
+  text-align: left;
+}
+.atlas-picker-row:hover {
+  background: rgba(34, 211, 238, 0.08);
+  border-color: rgba(34, 211, 238, 0.25);
+}
+.atlas-picker-row-icon {
+  font-size: 16px !important;
+  color: rgba(255, 255, 255, 0.55);
+  flex-shrink: 0;
+}
+.atlas-picker-row-name {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.atlas-picker-row-type {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+}
+.atlas-picker-empty {
+  padding: 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+}
+
+/* Referenced-by section */
+.atlas-refs-count {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-left: 6px;
+}
+.atlas-detail-refs .atlas-field {
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+.atlas-detail-refs .atlas-field:last-child {
+  border-bottom: none;
+}
+.atlas-link-chip-icon {
+  font-size: 12px !important;
+  margin-right: 2px;
+  color: rgba(34, 211, 238, 0.7);
+}
+
+/* =================================================================
+   Bout C — Right-pane tabs, map index, map create
+   ================================================================= */
+
+.atlas-right-tab-bar {
+  display: flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--atlas-divider);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.atlas-right-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+  border-bottom: 2px solid transparent;
+  font-family: inherit;
+  white-space: nowrap;
+  min-width: 0;
+}
+.atlas-right-tab:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.85);
+}
+.atlas-right-tab.is-active {
+  color: #22d3ee;
+  border-bottom-color: #22d3ee;
+  background: rgba(34, 211, 238, 0.04);
+}
+.atlas-right-tab .material-symbols-outlined {
+  font-size: 16px;
+}
+.atlas-right-tab-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atlas-right-tab-group {
+  display: inline-flex;
+  align-items: center;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 2px solid transparent;
+}
+.atlas-right-tab-group.is-active {
+  border-bottom-color: #22d3ee;
+  background: rgba(34, 211, 238, 0.04);
+}
+.atlas-right-tab-group > .atlas-right-tab {
+  border-right: none;
+  border-bottom: none;
+  background: transparent;
+}
+.atlas-right-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  border-radius: 2px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+}
+.atlas-right-tab-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Map index */
+.atlas-map-index-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.atlas-map-index-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+.atlas-map-row-imgtag {
+  font-size: 12px !important;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* Map create modal — location row */
+.atlas-map-create-panel {
+  width: 460px;
+}
+.atlas-map-create-location {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* =================================================================
+   Bout D — Sync indicator pill states + welcome actions
+   ================================================================= */
+
+/* Extend legacy `.atlas-sync-pill` (position: fixed, bottom-right) with the
+   states the new atlas uses today. Sync states (synced/saving/...) come in
+   Phase 3 when api-linked worlds wire SyncEngine state through. */
+.atlas-sync-pill[data-state="local"] .atlas-sync-pill-dot {
+  background: rgba(255, 255, 255, 0.35);
+}
+.atlas-sync-pill[data-state="api"] .atlas-sync-pill-dot {
+  background: #22d3ee;
+}
+.atlas-sync-pill[data-state="none"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Welcome panel action row */
+.atlas-welcome-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Favorite-star button in worlds list row */
+.atlas-icon-btn-sm.fav-btn .material-symbols-outlined {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 0.12s ease;
+}
+.atlas-icon-btn-sm.fav-btn:hover .material-symbols-outlined {
+  color: rgba(255, 255, 255, 0.85);
+}
+.atlas-icon-btn-sm.fav-btn.is-fav .material-symbols-outlined {
+  color: #fbbf24;
+}
+/* Favorite stars stay visible even when not hovering the row. */
+.atlas-row .atlas-inline-actions:has(.fav-btn.is-fav) {
+  opacity: 1;
 }

@@ -266,6 +266,9 @@ export async function createWorldInRoot(name: string): Promise<{ entry: WorldReg
   patchSlice('registry', activated);
   patchSlice('active', { worldId: entry.id, meta: { id: worldUuid, name: trimmed }, opened: true });
   setActiveStore(store);
+  // Fresh world: no elements yet. Reset cache + selection for the new active world.
+  patchSlice('data', { elements: [] });
+  patchSlice('ui', { ...getState().ui, selectedElementId: null });
 
   return { entry };
 }

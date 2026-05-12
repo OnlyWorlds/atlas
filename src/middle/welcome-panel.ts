@@ -12,6 +12,7 @@ import { getState, subscribe } from '../core/state';
 import { getActiveStore } from '../ui/create-world-modal';
 import { setupAtlasRoot } from '../setup/atlas-root-flow';
 import { toastManager } from '../ui/toast-manager';
+import { navigate, timelineHash } from '../core/router';
 
 export function mountWelcomePanel(target: HTMLElement): () => void {
   target.innerHTML = '';
@@ -91,11 +92,14 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       <div class="atlas-welcome-body">
         <p>${counts.content} content element${counts.content === 1 ? '' : 's'},
            ${counts.spatial} spatial element${counts.spatial === 1 ? '' : 's'}.</p>
-        <p class="atlas-welcome-hint">
-          element sidebar and detail editor land in phase 4. for now this is the welcome lobby.
-        </p>
+        <div class="atlas-welcome-actions">
+          <button class="atlas-btn-ghost" data-action="open-timeline">view timeline →</button>
+        </div>
       </div>
     `;
+    root.querySelector<HTMLButtonElement>('[data-action="open-timeline"]')?.addEventListener('click', () => {
+      if (active) navigate(timelineHash(active.worldId));
+    });
   }
 
   const unsub = subscribe(() => { render().catch(console.error); });

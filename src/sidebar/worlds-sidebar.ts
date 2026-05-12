@@ -1,52 +1,45 @@
 /**
- * Worlds sidebar — Phase 2 minimum.
+ * Worlds-mode sidebar body.
  *
  * Lists the registry. Clicking a world activates it (re-grants FS permission,
  * opens the FolderStore). "+ Create Local" launches the create-world modal.
- * Settings gear at the bottom routes to the settings panel for the active world.
+ *
+ * Body-only — the parent sidebar driver owns the mode toggle (in shell.sidebarToggle)
+ * and the footer gear (in shell.sidebarFooter).
  */
 
-import { getState, subscribe } from '../core/state';
-import { onHashChange, parseHash, navigate, worldHash, settingsHash } from '../core/router';
-import { setActiveWorld, saveRegistry } from '../registry/registry';
+import { getState, subscribe, patchSlice } from '../core/state';
+import { onHashChange, parseHash, navigate, worldHash } from '../core/router';
+import { setActiveWorld, saveRegistry, setFavorite } from '../registry/registry';
 import { loadHandle, ensureWritable } from '../store/handle-vault';
 import { FsFolderStore } from '../store/folder-store-fs';
-import { patchSlice } from '../core/state';
 import { setActiveStore, getActiveStore, CreateWorldModal } from '../ui/create-world-modal';
 import { setupAtlasRoot } from '../setup/atlas-root-flow';
 import { ToastManager } from '../ui/toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
 
-export interface WorldsSidebarMount {
+export interface WorldsBodyMount {
   content: HTMLElement;
-  footer: HTMLElement;
   toasts: ToastManager;
 }
 
-export function mountWorldsSidebar(mount: WorldsSidebarMount): () => void {
-  const { content, footer, toasts } = mount;
+export function mountWorldsBody(mount: WorldsBodyMount): () => void {
+  const { content, toasts } = mount;
   content.innerHTML = '';
-  footer.innerHTML = '';
 
   // Header — switches between "set up atlas" and "create local" depending on root state.
   const header = document.createElement('div');
-  header.className = 'atlas-sidebar-section atlas-worlds-header';
+  header.className = 'atlas-section atlas-worlds-header';
   content.appendChild(header);
 
   function renderHeader(): void {
     const root = getState().atlasRoot;
     header.innerHTML = root
       ? `
-        <div class="atlas-sidebar-title">worlds</div>
-        <button class="ow-btn ow-btn-secondary atlas-sidebar-action" data-action="create-local">
-          <span class="material-symbols-outlined">add</span> create local
-        </button>
+        <button class="atlas-btn-ghost" data-action="create-local" title="create a new world in your atlas folder">+ new local</button>
       `
       : `
-        <div class="atlas-sidebar-title">setup</div>
-        <button class="ow-btn ow-btn-primary atlas-sidebar-action" data-action="setup-atlas">
-          <span class="material-symbols-outlined">folder_open</span> set up atlas
-        </button>
+        <button class="atlas-btn-ghost" data-action="setup-atlas" title="pick the folder atlas will use for all your worlds">+ set up atlas</button>
       `;
     const createBtn = header.querySelector<HTMLButtonElement>('[data-action="create-local"]');
     createBtn?.addEventListener('click', () => new CreateWorldModal(toasts).open());
@@ -72,25 +65,25 @@ export function mountWorldsSidebar(mount: WorldsSidebarMount): () => void {
 
   // List body
   const listEl = document.createElement('div');
-  listEl.className = 'atlas-worlds-list';
+  listEl.className = 'atlas-list';
   content.appendChild(listEl);
 
-  // Footer: settings gear
-  const gear = document.createElement('button');
-  gear.className = 'atlas-icon-btn';
-  gear.setAttribute('data-action', 'open-settings');
-  gear.setAttribute('aria-label', 'settings');
-  gear.innerHTML = '<span class="material-symbols-outlined">settings</span>';
-  footer.appendChild(gear);
-
-  gear.addEventListener('click', () => {
-    const active = getState().active;
-    navigate(settingsHash(active?.worldId ?? null));
-  });
-
-  // Click delegation for the list (event bubbling so we don't re-bind per row)
+  // Click delegation — separate the favorite-toggle from the row click.
   listEl.addEventListener('click', async (e) => {
-    const row = (e.target as HTMLElement).closest<HTMLElement>('[data-world-id]');
+    const target = e.target as HTMLElement;
+    const favBtn = target.closest<HTMLElement>('[data-role="fav-toggle"]');
+    if (favBtn) {
+      e.stopPropagation();
+      const worldId = favBtn.getAttribute('data-world-id')!;
+      const reg = getState().registry;
+      const entry = reg.worlds.find(w => w.id === worldId);
+      if (!entry) return;
+      const next = setFavorite(reg, worldId, !entry.favorite);
+      saveRegistry(next);
+      patchSlice('registry', next);
+      return;
+    }
+    const row = target.closest<HTMLElement>('[data-world-id]');
     if (!row) return;
     const worldId = row.getAttribute('data-world-id')!;
     await activateWorld(worldId, toasts);
@@ -105,12 +98,19 @@ export function mountWorldsSidebar(mount: WorldsSidebarMount): () => void {
 
     if (worlds.length === 0) {
       listEl.innerHTML = state.atlasRoot
-        ? `<div class="atlas-worlds-empty">no worlds yet — create one to start.</div>`
-        : `<div class="atlas-worlds-empty">set up your atlas folder above to begin.</div>`;
+        ? `<div class="atlas-pane-empty">no worlds yet — create one to start.</div>`
+        : `<div class="atlas-pane-empty">set up your atlas folder above to begin.</div>`;
       return;
     }
 
-    listEl.innerHTML = worlds
+    // Favorites first, then alphabetical.
+    const sorted = [...worlds].sort((a, b) => {
+      const fa = a.favorite ? 1 : 0;
+      const fb = b.favorite ? 1 : 0;
+      if (fa !== fb) return fb - fa;
+      return (a.name ?? '').localeCompare(b.name ?? '');
+    });
+    listEl.innerHTML = sorted
       .map(w => renderRow(w, w.id === activeId, route.mode === 'settings' && w.id === activeId))
       .join('');
   }
@@ -121,26 +121,32 @@ export function mountWorldsSidebar(mount: WorldsSidebarMount): () => void {
   return () => { unsubState(); unsubHash(); };
 }
 
-function renderRow(world: WorldRegistryEntry, active: boolean, settingsActive: boolean): string {
-  const stateBadge = world.state === 'api-linked'
-    ? '<span class="atlas-world-badge" data-state="api">api</span>'
-    : '<span class="atlas-world-badge" data-state="local">local</span>';
-  const cls = [
-    'atlas-world-row',
-    active ? 'is-active' : '',
-    settingsActive ? 'is-settings' : '',
-  ].filter(Boolean).join(' ');
+function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: boolean): string {
+  const stateIcon = world.state === 'api-linked' ? 'cloud' : 'folder';
+  const stateChip = world.state === 'api-linked'
+    ? '<span class="atlas-world-state-chip api-linked">api</span>'
+    : '';
+  const favIcon = world.favorite ? 'star' : 'star_border';
+  const favCls = world.favorite ? 'is-fav' : '';
+  const cls = ['atlas-row', active ? 'selected' : ''].filter(Boolean).join(' ');
   return `
     <div class="${cls}" data-world-id="${escapeAttr(world.id)}" role="button" tabindex="0">
-      <div class="atlas-world-name">${escapeText(world.name)}</div>
-      <div class="atlas-world-meta">${stateBadge}</div>
+      <span class="material-symbols-outlined">${stateIcon}</span>
+      <span class="atlas-row-main">${escapeText(world.name)}</span>
+      ${stateChip}
+      <span class="atlas-inline-actions">
+        <button type="button" class="atlas-icon-btn-sm fav-btn ${favCls}" data-role="fav-toggle" data-world-id="${escapeAttr(world.id)}" title="${world.favorite ? 'unfavorite' : 'favorite'}">
+          <span class="material-symbols-outlined">${favIcon}</span>
+        </button>
+      </span>
     </div>
   `;
 }
 
 /**
  * Activate (or re-activate) a world by id: recall its FS handle from the vault,
- * re-grant write permission, open the FolderStore, push state.
+ * re-grant write permission, open the FolderStore, push state. Also primes the
+ * `data.elements` cache from the newly-opened folder.
  */
 export async function activateWorld(worldId: string, toasts: ToastManager): Promise<void> {
   const state = getState();
@@ -179,6 +185,18 @@ export async function activateWorld(worldId: string, toasts: ToastManager): Prom
   saveRegistry(nextRegistry);
   patchSlice('registry', nextRegistry);
   patchSlice('active', { worldId, meta, opened: true });
+
+  // Prime the elements cache for this world.
+  try {
+    const elements = await store.listElements();
+    patchSlice('data', { elements });
+  } catch (err) {
+    console.warn('[worlds-sidebar] failed to prime elements:', err);
+    patchSlice('data', { elements: [] });
+  }
+  // Reset selection (different world → no stale selectedElementId).
+  patchSlice('ui', { ...getState().ui, selectedElementId: null });
+
   navigate(worldHash(worldId));
 }
 

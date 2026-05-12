@@ -8,6 +8,32 @@ import type { ElementType } from './types';
 /** Material Symbol name per element type (re-exported from SDK with strict typing). */
 export const ELEMENT_ICONS = SDK_ELEMENT_ICONS as Record<ElementType, string>;
 
+/** Friendly singular/plural per element type. */
+export const ELEMENT_LABELS: Record<ElementType, { singular: string; plural: string }> = {
+  character: { singular: 'character', plural: 'characters' },
+  creature: { singular: 'creature', plural: 'creatures' },
+  species: { singular: 'species', plural: 'species' },
+  family: { singular: 'family', plural: 'families' },
+  collective: { singular: 'collective', plural: 'collectives' },
+  institution: { singular: 'institution', plural: 'institutions' },
+  location: { singular: 'location', plural: 'locations' },
+  object: { singular: 'object', plural: 'objects' },
+  construct: { singular: 'construct', plural: 'constructs' },
+  ability: { singular: 'ability', plural: 'abilities' },
+  trait: { singular: 'trait', plural: 'traits' },
+  title: { singular: 'title', plural: 'titles' },
+  language: { singular: 'language', plural: 'languages' },
+  law: { singular: 'law', plural: 'laws' },
+  event: { singular: 'event', plural: 'events' },
+  narrative: { singular: 'narrative', plural: 'narratives' },
+  phenomenon: { singular: 'phenomenon', plural: 'phenomena' },
+  relation: { singular: 'relation', plural: 'relations' },
+  map: { singular: 'map', plural: 'maps' },
+  pin: { singular: 'pin', plural: 'pins' },
+  marker: { singular: 'marker', plural: 'markers' },
+  zone: { singular: 'zone', plural: 'zones' },
+};
+
 
 // localStorage keys
 export const REGISTRY_STORAGE_KEY = 'atlas_worlds_registry';

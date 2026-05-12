@@ -136,6 +136,40 @@ Append-only during local deletes. SyncEngine pushes each entry to the API as a D
 
 ---
 
+## Atlas Root (creation-default container for worlds)
+
+A single user-chosen folder that holds atlas-managed worlds. Set up once per browser profile; the handle persists in IndexedDB under `ATLAS_ROOT_HANDLE_KEY`. New worlds default to becoming subfolders inside this root.
+
+**Critical**: the atlas root is a **creation convenience**, not a storage layer. Each world stores its own `FileSystemDirectoryHandle` in the vault under `world-<uuid>`. Existing worlds work independently of the root — changing the root doesn't move them; losing the root doesn't break them.
+
+**Wrap convention**: when the user picks a parent folder, atlas creates an `onlyworlds-atlas/` subfolder inside it for worlds, unless:
+- the picked folder itself has a `.atlas-root` marker → use it directly
+- the picked folder already contains an `onlyworlds-atlas/` (or legacy `atlas-worlds/`) with marker → use that subfolder
+
+This sandboxes atlas data in a known subfolder when the user picks a busy folder like Documents, while supporting power users who pick the wrapper directly.
+
+**World discovery on root setup**: after resolving the root, atlas scans its subfolders for any with a valid `world.json` and imports them into the registry (using `handle.isSameEntry()` to avoid duplicates). Critical when localStorage is wiped but the disk folder remains.
+
+**Subfolder naming**: created worlds get `<slugified-name>-<uuid-prefix>` directories. Each world's `world.json` has the friendly name; the folder name is a backstage detail.
+
+```
+<user-picked-parent>/
+  onlyworlds-atlas/
+    .atlas-root                   ← marker file with {version, created_at}
+    my-first-world-7a3f0c12/      ← per-world subfolder (the actual world)
+      world.json
+      .atlas/{lock, sync-state.json, tombstones.json}
+      elements/<type>/<id>.json
+      spatial/<type>/<id>.json
+      media/<element-id>/<folder>/<filename>
+    another-world-92b4ee01/
+      ...
+```
+
+The atlas root also supports **external worlds** (advanced path, no UI in v1): a world folder anywhere on disk, registered via its own handle, not living inside any atlas root. Existing local-only worlds created before the atlas-root concept work as external automatically.
+
+---
+
 ## The FolderStore
 
 Single source of truth. Implements every read/write Atlas needs.

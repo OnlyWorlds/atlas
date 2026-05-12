@@ -7,6 +7,8 @@
 
 import { FsFolderStore, ELockHeld } from './store/folder-store-fs';
 import { startApp } from './app';
+import { getState as _getState, patchSlice as _patchSlice } from './core/state';
+import { getActiveStore as _getActiveStore } from './ui/create-world-modal';
 
 function boot(): void {
   const root = document.getElementById('app');
@@ -80,5 +82,9 @@ if (import.meta.env.DEV) {
         await root.removeEntry(entry.name, { recursive: true }).catch(() => {});
       }
     },
+    /** Tests use these to read state and refresh the elements cache after direct store edits. */
+    getState: () => _getState(),
+    getActiveStore: () => _getActiveStore(),
+    patchData: (elements: unknown[]) => _patchSlice('data', { elements: elements as never }),
   };
 }

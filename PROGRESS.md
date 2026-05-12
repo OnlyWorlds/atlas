@@ -11,6 +11,9 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 **Phase 1 — Sync foundation + real FolderStore: ~95% complete (sessions 197-198).**
 **Phase 1.5 — Architecture-agnostic UI primitive ports: complete (session 197).**
 **Phase 2 — Minimal UI bootstrap: complete (session 198, Bout 3).** First hands-on testable build.
+**Phase 4 — Content UI: Bouts A+B complete (session 199, 2026-05-12).** Elements sidebar mode, create modal, schema-driven element detail (FIELD_SCHEMA + ELEMENT_SECTIONS), element-picker modal, single/multi-link fields with picker, collapsible sections, Referenced-By reverse-link section.
+**Phase 5 — Spatial UI: Bout C complete (session 199, 2026-05-12).** Right-pane tab bar, map-index tab pinned, per-map Leaflet tabs with cache lifecycle, map-create modal with image upload via FolderStore.addMedia, pin placement flow (element-detail pin button → map click → createPin), pin tooltip on hover, contextual right-click element-create + pin drop, map cascade-delete closes open tabs.
+**Phase 6 — Polish: Bout C.5 + Bout D complete (session 199, 2026-05-12).** Visual alignment to legacy aesthetic (worlds/elements/maps now use `.atlas-list`/`.atlas-row`; sidebar mode toggle uses `.atlas-mode-btn` with cyan underline; element-detail uses `.atlas-middle-header` + delete/pin via `.atlas-icon-btn-sm`). Timeline view (`#/w/<id>/timeline`) + `+ event` button. Sync indicator pill (fixed bottom-right, legacy `.atlas-sync-pill` reused). Worlds favorites star toggle with favorites-first sort.
 
 Skeleton package green across the board. Architecture locked. Full sync contract (push + pull + conflict detection on UPDATE) proven against MockFolderStore + FakeOwApiClient. Real OwApiClient adapter wraps the SDK; tested end-to-end via MSW with real `@onlyworlds/sdk`.
 
@@ -28,9 +31,19 @@ UI primitives ported verbatim (modal-base, toast-manager, field-edit-popover, fi
 
 Local git: 8 commits on master (origin pushed via force to GitHub main by Captain in session 197). Session 198 work uncommitted.
 
-**Bundle**: 33.52 KB JS / 10.18 KB gzipped. CSS 29.20 KB / 5.56 KB gzipped.
-**Tests**: 96 vitest + 24 Playwright = 120 total.
-**Type-check**: clean. **Build**: clean. **E2E**: 24 Playwright specs (12 FsFolderStore + 11 Phase 2 UI + 1 shell smoke), all chromium.
+Session 199 (Bout A — Phase 4 minimum) added: sidebar mode toggle (worlds ↔ elements, lives in `shell.sidebarToggle`), `state.data.elements` cache (array, force-rerender via new ref on mutation), `state.ui.{sidebarMode, selectedElementId, elementFilters, search}`, `parseHash` extended for `#/w/<id>/elements` + `#/w/<id>/element/<eid>`. New `sidebar/sidebar.ts` driver dispatches body and owns the footer gear; `worlds-sidebar.ts` refactored to body-only (`mountWorldsBody`). New `sidebar/elements-sidebar.ts` (filter strip + search + create + list). New `middle/element-detail.ts` (header + name/description fields with popover edit + delete button with dependent-count confirm). New `ui/element-create-modal.ts` (BaseModal subclass, name + 18-type grid, FolderStore-backed). `activateWorld` and `createWorldInRoot` both prime `data.elements` and reset `selectedElementId` so the new world's view is clean. Delete-world also clears the elements cache.
+
+Session 199 (Bout B — Phase 4 schema editor) added: full schema-driven detail rendering via `sectionsFor(type)` (Base + ELEMENT_SECTIONS), collapsible sections persisted in module-level `collapsedSections` Set, three widget renderers (text-short/text-long/number → popover edit; single-link → chip + pick; multi-link → multi chips + add). New `ui/element-picker-modal.ts` (BaseModal subclass, `pickElement({restrictToType, excludeIds, title})` Promise API, FolderStore-backed, search + type strip + 200-row cap). Referenced-By section uses SDK-shape-agnostic reverse scan (convention #5) — iterates all field values for string/array/object id matches. Chip click navigates; chip × removes via patchField. `humanizeFieldName` + ACRONYMS uppercase preserved from legacy.
+
+Session 199 (Bout C — Phase 5 spatial UI) added: state extensions (`ui.rightTabs: RightTabRef[]`, `ui.rightActiveIndex`, `ui.pinPlacement`), router `#/w/<id>/map/<mid>` route (+ optional `/element/<eid>` chained), right-pane driver with tab bar (map-index pinned, per-map tabs as close-able groups). Map-index reads from `data.elements` (no separate `data.maps`), shows pin counts and image badges. Map tab: full Leaflet2DManager wiring with module-level cache, image preference (local media → image_url → grid), pin sync from `data.elements` (filter type === 'pin' && map_id), pin click → element detail nav, pin hover → tooltip, right-click → contextual element-create + pin drop, drag-from-list deferred. Pin placement flow: element-detail header gets a push_pin button when a map tab is active; click toggles `ui.pinPlacement`; map click while placement is active creates pin via FolderStore. Map cascade-delete also closes the open tab. `closeMapTab` navigates away from /map/<mid> route before splicing the tab so ensureMapTabOpen doesn't immediately re-add it.
+
+Session 199 (Bout C.5 — Visual polish) replaced bespoke component classes (atlas-world-row, atlas-element-row, atlas-map-row, atlas-detail-header/body/field) with legacy `.atlas-row`/`.atlas-list`/`.atlas-middle-header` and dropped ~270 lines of duplicate CSS. The sidebar mode toggle, worlds list, elements list, map index, element-detail header, and element-detail field rows all now render with the legacy markup. Updated e2e selectors across all spec files to match.
+
+Session 199 (Bout D — Polish features) added: `middle/timeline.ts` ported from legacy, route `#/w/<id>/timeline`, "view timeline →" CTA in welcome panel. Sync indicator pill — reuses legacy `.atlas-sync-pill` (fixed bottom-right) with `data-state` modifier (local/api/none) and `.atlas-sync-pill-dot` child. Worlds sidebar: favorite-star toggle in `.atlas-inline-actions` with favorites-first sort; star is yellow when active. App-shell tab bar got an `.atlas-right-tab-bar` class for proper flex display.
+
+**Bundle**: 272.02 KB JS / 75.23 KB gzipped. CSS 48.33 KB / 12.37 KB gzipped.
+**Tests**: 96 vitest + 61 Playwright = 157 total.
+**Type-check**: clean. **Build**: clean. **E2E**: 61 Playwright specs (12 FsFolderStore + 14 Phase 2 UI + 10 Phase 4 elements + 9 Phase 4 schema + 9 Phase 5 maps + 6 Phase 6 polish + 1 shell smoke), all chromium.
 
 ### What's live
 
@@ -82,9 +95,15 @@ Local git: 8 commits on master (origin pushed via force to GitHub main by Captai
 
 ## Next Up
 
-### Next bouts (post Phase 2)
+### Next session: UI port
 
-**Bout 4 — Sync polish** (~45min)
+**Read `UI_PORT_BRIEF.md`** at session start. Dedicated session to bring atlas to visual + functional parity with `tools/atlas-deprecated/`. Covers Phase 4 (content UI: elements sidebar, schema-driven editor, picker) and Phase 5 (spatial UI: map tabs, pin placement, Leaflet wiring). Brief includes per-bout file lists, key constraints, risk areas, done criteria.
+
+After that session: Phase 3 (api flows — Make-Online, Link existing, sync indicator wired) is next.
+
+### Lower-priority bouts (deferred)
+
+**Sync polish** (~45min, defer until api flows land)
 - Per-type download cursor in `sync-state.json` (resumable link-existing)
 - Replace per-element pre-update GET with batched listElements baseline check
 - Network error handling (pause vs retry vs throw — clarify and test)
@@ -155,6 +174,12 @@ Also: new `atlas-tool` skill (replaces deprecated reference). Fresh `project_atl
 
 ## Session Log
 
+- **2026-05-12 (session 199, body+font reset)** — Two CSS regressions diagnosed and fixed in `index.html`. (1) Body had default 8px margin (no html/body reset → shell overflowed → thin light-gray border visible right+bottom). (2) Body had no `font-family` → `<h2>` titles fell back to Times New Roman serif and the rest of the UI lacked antialiasing. Both root-caused to Phase 2 rebuild dropping the legacy inline `<style>` block. Restored system-font stack + smoothing + reset.
+- **2026-05-12 (session 199, Bout D)** — Polish features. New `middle/timeline.ts` (port from legacy adapted to array-shaped data.elements). Router gained `timeline` mode + `timelineHash` helper. Welcome panel got a "view timeline →" CTA. Sync indicator pill: reuses pre-existing legacy `.atlas-sync-pill` CSS (fixed bottom-right with backdrop blur); rendered to document.body so position is independent of tab bar. Worlds sidebar favorites: star toggle via `.atlas-inline-actions`, persists via `setFavorite`, favorites-first sort. Tab bar got `.atlas-right-tab-bar` class for explicit flex layout. 6 new Playwright specs (61 e2e total).
+- **2026-05-12 (session 199, Bout C.5)** — Visual polish pass. Replaced all bespoke list markup (`.atlas-world-row`, `.atlas-element-row`, `.atlas-map-row`) with legacy `.atlas-row` + `.atlas-list`. Sidebar mode toggle uses legacy `.atlas-mode-btn` with `.active` modifier + OW icon for worlds tab. Element-detail header reverted to legacy `.atlas-middle-header` markup (icon + h2 + spacer + icon buttons). Stripped ~270 lines of duplicate CSS. Updated ~30 e2e selectors. All tests green; bundle CSS shrank from 52.96 KB to 47.44 KB.
+- **2026-05-12 (session 199, Bout C)** — Phase 5 spatial UI. State extensions: `ui.rightTabs`, `ui.rightActiveIndex`, `ui.pinPlacement`. Router: `#/w/<id>/map/<mid>[/element/<eid>]`. New files: `tabs/right/right-pane.ts` (driver: tab bar + body dispatch), `tabs/right/map-index-tab.ts` (list + favorites stub deferred), `tabs/right/map-tab.ts` (Leaflet wiring, ~290 lines, ported with arch changes), `ui/map-create-modal.ts` (BaseModal subclass, FolderStore-backed). Element-detail header gains pin button when map tab is active. Test harness extended (`getState`, `getActiveStore`, `patchData`). 9 new Playwright specs (55 e2e total). Typecheck + build + all tests green.
+- **2026-05-12 (session 199, Bout B)** — Phase 4 schema editor. Rewrote `middle/element-detail.ts` to full schema-driven (sectionsFor → header+body→fields, collapsible toggle, link chips, picker dispatch, Referenced-By scan, footer with id+timestamps). New `ui/element-picker-modal.ts` (search + type strip + row cap + Promise resolve). CSS additions ~130 lines for picker panel/list/chips, referenced-by styling. Updated 2 Bout A tests to match new schema-driven DOM. 9 new Playwright specs (46 e2e total). Typecheck + build + all tests green.
+- **2026-05-12 (session 199, Bout A)** — Phase 4 minimum. Sidebar mode toggle + Elements mode + minimum element detail + create modal. New files: `sidebar/sidebar.ts` (driver), `sidebar/elements-sidebar.ts`, `middle/element-detail.ts`, `ui/element-create-modal.ts`. Refactored: `sidebar/worlds-sidebar.ts` → body-only (`mountWorldsBody`); `app.ts` mounts new sidebar driver + element middle. State shape extended (`data.elements`, `ui.{sidebarMode, selectedElementId, elementFilters, search}`). Router extended for `#/w/<id>/elements` + `#/w/<id>/element/<eid>`. CSS additions ~210 lines for elements list, detail field rows, mode toggle, empty states. 10 new Playwright specs (37 e2e total). Typecheck + build + all tests green.
 - **2026-05-12 (session 198, Bout 6)** — Three fixes. `#/settings` standalone route (gear icon now works without an active world). `discoverWorldsInRoot()`: setup scans the atlas root for subfolders with valid `world.json` and imports them — critical after localStorage wipe + re-pick. Migration note added to settings ("changing this folder doesn't move existing worlds"). 2 new Phase 2 specs.
 - **2026-05-12 (session 198, Bout 5)** — Atlas-root refinement: wrap-by-default with re-use detection. Picked folder becomes parent; atlas creates `onlyworlds-atlas/` inside (renamed from `atlas-worlds/` for brand clarity, with legacy detection). Display switched to pathHint (parent/wrapper) for context. 2 new Phase 2 specs.
 - **2026-05-12 (session 198, Bout 4)** — Atlas-root concept. One-time folder setup before world creation. New: `src/setup/atlas-root-flow.ts` (setup + hydrate + createWorldInRoot + slugify), atlas_root field in registry + state, sidebar/welcome/settings all switch on root presence. Modal becomes name-only when root is set. Each world keeps its own handle so root is a creation convenience, not storage. Fixed `loadRegistry` field-dropping bug. New tests: 9 Phase 2 UI specs (rewritten) + 7 atlas-root unit tests. 96 vitest + 22 Playwright = 118 total.

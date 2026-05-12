@@ -9,13 +9,15 @@
  *
  * Force-rerender pattern (documented in DESIGN convention #2): to nudge a
  * subscriber that depends on a stable object, patch with a fresh reference
- * for the value they're watching.
+ * for the value they're watching. For elements specifically: replace
+ * `data.elements` with a new array reference after every mutation.
  */
 
-import type { WorldsRegistry, WorldMeta } from './types';
+import type { WorldsRegistry, WorldMeta, Element, ElementType } from './types';
 import { defaultRegistry } from './types';
 
-export type MiddleMode = 'welcome' | 'settings';
+export type MiddleMode = 'welcome' | 'settings' | 'element' | 'timeline';
+export type SidebarMode = 'worlds' | 'elements';
 
 export interface ActiveWorldRef {
   /** Registry entry id (NOT the OW api world id). */
@@ -37,11 +39,40 @@ export interface AtlasRootRef {
   pathHint?: string;
 }
 
+/**
+ * In-memory cache of the active world's elements. Refreshed from the
+ * FolderStore on world activation and after every mutation. Always patched
+ * with a new array reference so subscribers re-fire.
+ */
+export interface DataState {
+  elements: Element[];
+}
+
+/** One open tab on the right pane. Map-index is implicit (always first). */
+export type RightTabRef =
+  | { kind: 'map-index' }
+  | { kind: 'map'; mapId: string; label: string };
+
+export interface UiState {
+  sidebarMode: SidebarMode;
+  selectedElementId: string | null;
+  /** Filter chips: empty = no filter (show all), populated = restrict to these. */
+  elementFilters: Set<ElementType>;
+  search: string;
+  /** Right-pane tabs (always begins with implicit map-index; additional are maps). */
+  rightTabs: RightTabRef[];
+  rightActiveIndex: number;
+  /** When set, next click on the active map drops a pin for this element. */
+  pinPlacement: { elementId: string } | null;
+}
+
 export interface AppState {
   registry: WorldsRegistry;
   atlasRoot: AtlasRootRef | null;
   active: ActiveWorldRef | null;
   middleMode: MiddleMode;
+  data: DataState;
+  ui: UiState;
   /** Toast surface state — currently unused; reserved for next bouts. */
   busy: boolean;
 }
@@ -52,6 +83,16 @@ let state: AppState = {
   atlasRoot: null,
   active: null,
   middleMode: 'welcome',
+  data: { elements: [] },
+  ui: {
+    sidebarMode: 'worlds',
+    selectedElementId: null,
+    elementFilters: new Set(),
+    search: '',
+    rightTabs: [{ kind: 'map-index' }],
+    rightActiveIndex: 0,
+    pinPlacement: null,
+  },
   busy: false,
 };
 

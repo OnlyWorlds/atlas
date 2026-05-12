@@ -6,6 +6,82 @@ Each entry: source file, destination, treatment (verbatim, adapted, rewritten), 
 
 ---
 
+## index.html inline-style reset (2026-05-12 session 199)
+
+| File | Source | Treatment | Notes |
+|---|---|---|---|
+| `tools/atlas/index.html` | `tools/atlas-deprecated/index.html` inline `<style>` block | adapted | The Phase 2 rebuild dropped the legacy inline style; restored as a single block. Critical fixes restored: (1) `html, body { margin: 0; padding: 0; height: 100%; overflow: hidden }` — without this, body's default 8px margin makes the shell overflow and leak browser-default body bg as a thin border on right/bottom. (2) System-font stack `system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ...` — without this, `<h2>` elements default to Times New Roman serif. (3) `-webkit-font-smoothing: antialiased`, `-moz-osx-font-smoothing: grayscale`, `text-rendering: optimizeLegibility` — font crispness parity with legacy. Belt-and-braces also added `background: #0a0a0a` on body so any future overflow stays dark. |
+
+This duplicates rules that the legacy got via `onlyworlds-base.css` (imported into legacy `main.ts`). The new atlas deliberately doesn't import `onlyworlds-base.css` (too many side-effects for the focused atlas surface) — only the body/font subset that matters is pulled into the inline style.
+
+## Phase 6 Bout D (Timeline + sync pill + worlds favorites, 2026-05-12 session 199)
+
+| File | Source | Treatment | Notes |
+|---|---|---|---|
+| `src/middle/timeline.ts` | `atlas-deprecated/src/middle/timeline.ts` (254 lines) | adapted | Same layout algorithm (date parse + nice ticks + dot positioning). Reads from `state.data.elements` array (filter type==='event'). Click dot → navigate to element detail. Empty state preserved. |
+| `src/middle/welcome-panel.ts` | self | small addition | Active-world view gained a "view timeline →" CTA. |
+| `src/sidebar/worlds-sidebar.ts` | self | small addition | Favorites star button in `.atlas-inline-actions` (visible-on-hover or when starred). `setFavorite` registry helper wired. List sort: favorites first, then alphabetical. |
+| `src/tabs/right/right-pane.ts` | self | small addition | `renderSyncIndicator(state)` mounts pill to `document.body` (fixed-positioned via legacy CSS). data-state="local|api|none". The legacy `.atlas-sync-pill` CSS expected `.atlas-sync-pill-dot` child — used as-is. |
+| `src/layout/app-shell.ts` | self | small addition | `rightTabBar` element gained `.atlas-right-tab-bar` class for explicit flex layout. |
+
+CSS additions (`src/styles/atlas.css`, ~30 lines): new state colors for the sync-pill dot (local=grey, api=cyan), tab bar layout class, welcome action row, favorite-star color states.
+
+## Phase 6 Bout C.5 (Visual polish — align components to legacy aesthetic, 2026-05-12 session 199)
+
+Refactor pass — no new ports, but aligns Bout A/B/C components to use legacy CSS instead of bespoke classes.
+
+| File | Treatment | Notes |
+|---|---|---|
+| `src/sidebar/sidebar.ts` | adapted | Mode toggle uses `.atlas-mode-btn` (legacy) instead of `.atlas-sidebar-mode-btn` (new). Worlds tab carries OW logo via `.atlas-mode-ow-icon` like legacy. |
+| `src/sidebar/worlds-sidebar.ts` | adapted | List uses `.atlas-list` + `.atlas-row` + `.atlas-row-main` markup. Folder/cloud icon based on state. State chip `.atlas-world-state-chip api-linked`. |
+| `src/sidebar/elements-sidebar.ts` | adapted | Same `.atlas-list` + `.atlas-row` swap. Header is `.atlas-elements-header` (slim flex row). Search row uses `.atlas-search-row`. Empty state uses `.atlas-pane-empty`. |
+| `src/tabs/right/map-index-tab.ts` | adapted | Same. Header uses `.atlas-section` + `.atlas-section-title`. Rows use `.atlas-row`. Inline action for delete in `.atlas-inline-actions`. |
+| `src/middle/element-detail.ts` | adapted | Header now uses legacy `.atlas-middle-header` (icon + h2 + spacer + icon-btn-sm). Body uses `.atlas-middle-body` + `.atlas-detail`. Pin button uses `.atlas-icon-btn-sm` with `.active` modifier (matches legacy). |
+
+CSS cleanup: stripped ~270 lines of duplicate component CSS that conflicted with legacy. Bundle CSS dropped from 52.96 KB to 47.44 KB. Test selectors updated across `phase2-ui`, `phase4-elements`, `phase4-schema-editor`, `phase5-maps` to match new class structure.
+
+## Phase 5 Bout C (Map tabs + Leaflet + pin placement, 2026-05-12 session 199)
+
+| File | Source | Treatment | Notes |
+|---|---|---|---|
+| `src/tabs/right/right-pane.ts` | new | rewritten | Right-pane driver. Tab bar + body dispatch. Wraps each map tab in a `.atlas-right-tab-group` div so the close button is a SIBLING (not nested inside another button) — avoids nested-button DOM and event-bubbling complications. `closeMapTab` navigates away from `/map/<mid>` first if the URL still names this map (prevents `ensureMapTabOpen` from re-adding the tab on the next state tick). |
+| `src/tabs/right/map-index-tab.ts` | `atlas-deprecated/src/tabs/right/map-index-tab.ts` (316 lines) | adapted | Simpler — drops location-group sections and per-world favorites for v1 (defer to Bout D polish). Reads from `state.data.elements` filtered by `type === 'map'`. Pin counts via `type === 'pin'` matching `map_id`. `openMapTab(m)` exported for app.ts auto-open on `/map/<mid>` route. |
+| `src/tabs/right/map-tab.ts` | `atlas-deprecated/src/tabs/right/map-tab.ts` (506 lines) | adapted | Full Leaflet wiring. Module-level cache keyed by mapId. Background prefers local media (FolderStore.getMediaBlob) → image_url → grid. `syncPins(entry)` reads pins from `state.data.elements`. Pin click → element detail nav. Hover → tooltip. Right-click → contextual element-create + pin drop. `disposeAllMapTabs` called on world switch in right-pane. Drag-from-list deferred (`atlas/pin-placement` button is the primary flow for v1). |
+| `src/ui/map-create-modal.ts` | `atlas-deprecated/src/ui/map-create-modal.ts` (331 lines) | adapted | BaseModal subclass. FolderStore.createMap + addMedia for local image. Location field uses element-picker-modal with `restrictToType: 'location'`. Image dims decoded before create so initial record carries them. |
+| `src/middle/element-detail.ts` | self | small addition | Header gets a pin button when `ui.rightTabs[rightActiveIndex]` is a map tab. Click toggles `ui.pinPlacement`; map click while placement is active drops the pin. |
+| `src/main.ts` (test harness) | self | small addition | Exposes `getState`, `getActiveStore`, `patchData` so Playwright specs can verify state and inject FolderStore-derived element lists. |
+
+State extensions (`src/core/state.ts`): `ui.rightTabs: RightTabRef[]` (always begins with implicit `map-index`), `ui.rightActiveIndex`, `ui.pinPlacement`. `RightTabRef` discriminated union: `{kind: 'map-index'}` | `{kind: 'map', mapId, label}`. Router (`src/core/router.ts`): `mode === 'map'` with optional chained `/element/<eid>` parsing.
+
+CSS additions (`src/styles/atlas.css`, ~150 lines): right-pane tabs + close button + tab group wrapper, map index pane + rows + pin-count badge, map-create-modal location row, active pin button highlight.
+
+## Phase 4 Bout B (Schema-driven detail + picker + relations, 2026-05-12 session 199)
+
+| File | Source | Treatment | Notes |
+|---|---|---|---|
+| `src/middle/element-detail.ts` | `atlas-deprecated/src/middle/element-detail.ts` (502 lines) | adapted (rewrite of Bout A's minimum) | Same shape as legacy: header + sections (Base always-expanded + schema sections collapsible) + Referenced-By + footer. Per-field dispatch by widget (text-short / text-long / number → popover; single-link / multi-link → chip + picker). Reads schema via `sectionsFor(el.type)` from already-ported `field-schema.ts`. Persists via FolderStore.updateElement → refresh `data.elements` with new array ref. `collapsedSections` Set at module level (survives re-render). `forceRerender` helper emits `data.elements` with a new array ref to trigger subscribers after collapse-toggle. Reverse-scan for "Referenced By" walks all fields per SDK-shape-agnostic convention #5 (string/array-of-strings/array-of-objects-with-id/object-with-id). |
+| `src/ui/element-picker-modal.ts` | `atlas-deprecated/src/ui/element-picker-modal.ts` (266 lines) | adapted | BaseModal subclass (consistent with new modal patterns). `pickElement(opts) → Promise<Element\|null>` API preserved. Reads from `state.data.elements` (array, not Record). Search + type strip + 200-row cap intact. Escape/click-outside both resolve null. Excludes pin/marker/zone from type strip (they're map artifacts). |
+
+CSS additions (`src/styles/atlas.css`, ~130 lines): picker panel layout, picker title/search/strip/list/row, referenced-by chip refinements with type-colored leading icon, refs count badge.
+
+Legacy `state.data.elements` was `Record<id, Element>`; new is `Element[]`. All reads via `.find(e => e.id === id)` or `.filter(...)`. No noticeable perf cost at OW worldscale.
+
+## Phase 4 Bout A (Elements sidebar + minimum detail + create modal, 2026-05-12 session 199)
+
+| File | Source | Treatment | Notes |
+|---|---|---|---|
+| `src/sidebar/sidebar.ts` | new (informed by legacy `app-shell.ts` sidebar wiring) | rewritten | Mode-toggle driver lives in `shell.sidebarToggle`. Mounts/unmounts body component by mode. Owns footer gear (extracted from worlds-sidebar). Mode is derived from URL; toggle button just navigates. |
+| `src/sidebar/worlds-sidebar.ts` | self | refactored | Renamed `mountWorldsSidebar` → `mountWorldsBody`, dropped footer gear (now in sidebar driver). Also primes `data.elements` cache + resets selection on `activateWorld`. All `data-action` attributes preserved (tests pass unchanged). |
+| `src/sidebar/elements-sidebar.ts` | `atlas-deprecated/src/sidebar/elements.ts` (196 lines) | adapted | Same shape (filter strip + search + list) but reads from FolderStore-backed `state.data.elements` instead of api-store. Sort by name. Pin/marker/zone excluded from list (those are map artifacts). Filter strip covers 18 content types + map. |
+| `src/middle/element-detail.ts` | `atlas-deprecated/src/middle/element-detail.ts` (502 lines) | adapted, MINIMUM CUT | Bout A version handles name + description only via popover edit. Header with type icon + delete button (uses `findDependents` for confirm count, follows cascade-delete contract). Bout B will expand to schema-driven rendering with ELEMENT_SECTIONS + FIELD_SCHEMA + relation pickers. |
+| `src/ui/element-create-modal.ts` | `atlas-deprecated/src/ui/element-create-modal.ts` (322 lines) | adapted | BaseModal subclass (matches new modal pattern). FolderStore.createElement instead of api-store. Patches `data.elements` with a new array reference (force-rerender). Type grid covers all 18 content element types (no autocomplete ghost yet — defer to polish bout). |
+| `src/setup/atlas-root-flow.ts` | self | small fix | `createWorldInRoot` now also resets `data.elements: []` + `selectedElementId: null` on world switch. |
+| `src/middle/settings-panel.ts` | self | small fix | Delete-world flow also clears the elements cache + selection. |
+
+State shape extended (`src/core/state.ts`): added `data: DataState` slice (`{ elements: Element[] }`) and `ui: UiState` slice (`sidebarMode`, `selectedElementId`, `elementFilters`, `search`). `MiddleMode` gained `'element'`. Router (`src/core/router.ts`) extended with `elements`/`element` route modes + helpers `elementsHash`, `elementHash`.
+
+CSS additions (`src/styles/atlas.css`, ~210 lines): mode toggle in sidebar header, elements list rows, detail field rows, generic empty state, ow-btn-ghost variant.
+
 ## Phase 2 polish (Bouts 4-6 — Atlas root + refinements, 2026-05-12 session 198)
 
 | File | Source | Treatment | Notes |

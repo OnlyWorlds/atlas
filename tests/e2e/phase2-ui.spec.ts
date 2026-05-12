@@ -94,7 +94,7 @@ test('re-use: picking a folder that is already an atlas root does NOT double-wra
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'In Existing Root');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-world-row', { hasText: 'In Existing Root' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'In Existing Root' })).toBeVisible();
   await page.click('[data-action="open-settings"]');
   await expect(page.locator('.atlas-settings')).toContainText('existing-root');
 
@@ -124,9 +124,9 @@ test('create local world inside atlas root → sidebar + welcome + URL', async (
   await page.click('[data-action="pick"]');
 
   await expect(page.locator('[data-modal="create-world"]')).toHaveCount(0);
-  const row = page.locator('.atlas-world-row', { hasText: 'My First World' });
+  const row = page.locator('.atlas-row[data-world-id]', { hasText: 'My First World' });
   await expect(row).toBeVisible();
-  await expect(row).toHaveClass(/is-active/);
+  await expect(row).toHaveClass(/selected/);
   await expect(page.locator('.atlas-middle-header h2')).toContainText('My First World');
 
   const hash = await page.evaluate(() => window.location.hash);
@@ -152,19 +152,19 @@ test('two worlds created in root share parent folder', async ({ page }) => {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Alpha');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-world-row', { hasText: 'Alpha' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Alpha' })).toBeVisible();
 
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Beta');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-world-row', { hasText: 'Beta' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Beta' })).toBeVisible();
 
   // Beta is the most-recently-created so it's active.
-  await expect(page.locator('.atlas-world-row', { hasText: 'Beta' })).toHaveClass(/is-active/);
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Beta' })).toHaveClass(/selected/);
 
   // Switch to Alpha.
-  await page.click('.atlas-world-row:has-text("Alpha")');
-  await expect(page.locator('.atlas-world-row', { hasText: 'Alpha' })).toHaveClass(/is-active/);
+  await page.click('.atlas-row[data-world-id]:has-text("Alpha")');
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Alpha' })).toHaveClass(/selected/);
 
   // Both worlds live as subfolders inside the wrapped atlas-worlds/ folder.
   const subfolders = await page.evaluate(async () => {
@@ -190,7 +190,7 @@ test('settings shows atlas folder + identity fields', async ({ page }) => {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'For Settings');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-world-row', { hasText: 'For Settings' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'For Settings' })).toBeVisible();
 
   await page.click('[data-action="open-settings"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
@@ -254,7 +254,7 @@ test('reload → atlas root + world both persist, click re-activates', async ({ 
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Persistent');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-world-row', { hasText: 'Persistent' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Persistent' })).toBeVisible();
 
   // Reload.
   await page.goto('/');
@@ -265,13 +265,13 @@ test('reload → atlas root + world both persist, click re-activates', async ({ 
   await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
 
   // World is listed but not active.
-  const row = page.locator('.atlas-world-row', { hasText: 'Persistent' });
+  const row = page.locator('.atlas-row[data-world-id]', { hasText: 'Persistent' });
   await expect(row).toBeVisible();
-  await expect(row).not.toHaveClass(/is-active/);
+  await expect(row).not.toHaveClass(/selected/);
 
   // Click → activates.
   await row.click();
-  await expect(row).toHaveClass(/is-active/);
+  await expect(row).toHaveClass(/selected/);
   await expect(page.locator('.atlas-middle-header h2')).toContainText('Persistent');
 });
 
@@ -280,14 +280,14 @@ test('forget world removes it from sidebar + nav to root, atlas root preserved',
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Doomed');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-world-row', { hasText: 'Doomed' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Doomed' })).toBeVisible();
 
   page.on('dialog', d => d.accept());
   await page.click('[data-action="open-settings"]');
   await page.click('[data-action="delete-world"]');
 
   // World list empty but atlas root still present (we forgot the world, not the folder root).
-  await expect(page.locator('.atlas-worlds-empty')).toBeVisible();
+  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toBeVisible();
   await expect(page.locator('[data-action="create-local"]')).toBeVisible();
   await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
 });
@@ -297,7 +297,7 @@ test('change atlas folder swaps the root without losing existing worlds', async 
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Pre-Swap');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-world-row', { hasText: 'Pre-Swap' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Pre-Swap' })).toBeVisible();
 
   // Go to settings, queue a different folder, click change.
   await page.click('[data-action="open-settings"]');
@@ -313,7 +313,7 @@ test('change atlas folder swaps the root without losing existing worlds', async 
   // Settings now shows the new folder.
   await expect(page.locator('.atlas-settings')).toContainText('atlas-root-g2');
   // Pre-Swap world is still in the sidebar (its own handle is independent of root).
-  await expect(page.locator('.atlas-world-row', { hasText: 'Pre-Swap' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Pre-Swap' })).toBeVisible();
 });
 
 test('settings gear opens panel without an active world', async ({ page }) => {
@@ -336,11 +336,11 @@ test('rescan: re-picking an existing root after a localStorage wipe imports worl
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'kept world');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-world-row', { hasText: 'kept world' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'kept world' })).toBeVisible();
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'second world');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-world-row', { hasText: 'second world' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'second world' })).toBeVisible();
 
   // 2. Wipe localStorage + IDB ONLY (keep OPFS — that's the disk).
   await page.evaluate(async () => {
@@ -357,7 +357,7 @@ test('rescan: re-picking an existing root after a localStorage wipe imports worl
 
   // First-launch CTA returns; sidebar is empty.
   await expect(page.locator('[data-action="setup-atlas"]').first()).toBeVisible();
-  await expect(page.locator('.atlas-worlds-empty')).toBeVisible();
+  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toBeVisible();
 
   // 3. Re-pick the SAME parent folder. Discovery should find both worlds.
   await page.evaluate(async () => {
@@ -369,8 +369,8 @@ test('rescan: re-picking an existing root after a localStorage wipe imports worl
   await page.waitForSelector('[data-action="create-local"]');
 
   // Both worlds should be visible in the sidebar again.
-  await expect(page.locator('.atlas-world-row', { hasText: 'kept world' })).toBeVisible();
-  await expect(page.locator('.atlas-world-row', { hasText: 'second world' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'kept world' })).toBeVisible();
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'second world' })).toBeVisible();
 });
 
 test('create modal cancel button closes without creating a world', async ({ page }) => {
@@ -379,5 +379,5 @@ test('create modal cancel button closes without creating a world', async ({ page
   await expect(page.locator('[data-modal="create-world"]')).toBeVisible();
   await page.click('[data-action="cancel"]');
   await expect(page.locator('[data-modal="create-world"]')).toHaveCount(0);
-  await expect(page.locator('.atlas-worlds-empty')).toBeVisible();
+  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toBeVisible();
 });
