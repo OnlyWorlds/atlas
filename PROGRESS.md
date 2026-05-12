@@ -9,12 +9,15 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 
 **Phase 0 — Foundation: complete (session 197, 2026-05-12).**
 **Phase 1 — Sync foundation: ~75% complete (session 197).**
+**Phase 1.5 — Architecture-agnostic UI primitive ports: complete (session 197).**
 
 Skeleton package green across the board. Architecture locked. Full sync contract (push + pull + conflict detection on UPDATE) proven against MockFolderStore + FakeOwApiClient. Real OwApiClient adapter wraps the SDK; tested end-to-end via MSW with real `@onlyworlds/sdk`.
 
-Local git initialized inside `tools/atlas/` (5 commits). Remote `origin` points at `https://github.com/OnlyWorlds/atlas.git` (legacy code still on `main`). Captain force-pushes when ready.
+UI primitives ported verbatim (modal-base, toast-manager, field-edit-popover, field-schema, Leaflet2DManager + spatial siblings, pin-visuals, edge-color). Full atlas.css styling in place (1491 lines). These ports are sitting unreferenced until Phase 2 wires them into the shell.
 
-**Bundle**: not yet meaningful (placeholder boot only).
+Local git: 8 commits on master (origin pushed via force to GitHub main by Captain).
+
+**Bundle**: not yet meaningful (placeholder boot only — ports tree-shaken). CSS 25.58 KB / 4.97 KB gzipped (full styling).
 **Tests**: 67 passing across 6 files.
 **Type-check**: clean. **Build**: clean. **E2E**: 1 Playwright spec passes.
 
@@ -90,9 +93,9 @@ Local git initialized inside `tools/atlas/` (5 commits). Remote `origin` points 
 
 ## Done
 
-### 2026-05-12 — Session 197: foundation + Phase 1 sync
+### 2026-05-12 — Session 197: foundation + Phase 1 sync + UI primitive ports
 
-Eight bouts, 67 tests, 5 commits on local master.
+Ten bouts, 67 tests, 8 commits on local master (pushed to GitHub main).
 
 - **Bout 1**: deprecation. `tools/atlas/` → `tools/atlas-deprecated/`. tools.json, README, CLAUDE.md, .gitignore, memory MEMORY.md + project_atlas.md → project_atlas_deprecated.md updated. Skill renamed `atlas-tool` → `atlas-deprecated-tool` with deprecation framing. DEPRECATED.md written with port list + drop list.
 - **Bout 2**: package skeleton. Fresh `tools/atlas/`, vite/tsc/vitest/playwright all green on empty.
@@ -102,8 +105,10 @@ Eight bouts, 67 tests, 5 commits on local master.
 - **Bout 6**: SyncEngine pull phase + 9 integration tests. applyServerRecord prevents false re-push. Conflict on dual-change. Tombstone skip.
 - **Bout 7**: Push-phase conflict detection + 7 tests. Pre-update GET. Three policies (drain-blind / server-wins / ask). syncNow dedups push+pull conflicts.
 - **Bout 8**: OwApiClient adapter wrapping real SDK + 14 tests. Raw `client.request` sidesteps prepareRelations pin quirk. adaptRecord stamps type + unwraps nested relations. MSW handlers exercise round-trip.
+- **Bout 9**: Port 5 UI primitives verbatim. modal-base, toast-manager, field-edit-popover, field-schema, atlas.css (full 1491 lines).
+- **Bout 10**: Port spatial primitives. Leaflet2DManager + siblings, pin-visuals, edge-color. ELEMENT_ICONS added to constants.
 
-Also: new `atlas-tool` skill (replaces deprecated reference). Fresh `project_atlas.md` memory file. Local git initialized. Remote pointed at legacy GitHub repo; Captain will force-push when ready.
+Also: new `atlas-tool` skill (replaces deprecated reference). Fresh `project_atlas.md` memory file. Local git initialized. Captain force-pushed to GitHub `main` overwriting legacy.
 
 ---
 
