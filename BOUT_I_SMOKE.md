@@ -1,6 +1,13 @@
-# Bout I — Smoke Test Plan
+# Bout I — Smoke Test Plan (SUPERSEDED by Phase 3.5)
 
-**Status**: pending — Captain-driven manual session
+> **NOTE (2026-05-13)**: This smoke plan was written at the end of Phase 3 (session 200).
+> The session-201 critical review surfaced enough additional flows (pull, unlink, conflict
+> review, server-delete, settings redesign, etc.) that we deferred BOUT_I and rolled smoke
+> into a single mega-pass at the end of Phase 3.5. See `PHASE3.5_BRIEF.md` for the
+> active scope. A successor `BOUT_R_SMOKE.md` will be written at the end of 3.5
+> covering every flow.
+
+**Status**: superseded — kept as historical reference
 **Target world**: `5474990854` (Captain's messworld on production OW)
 **Goal**: surface anything MSW couldn't simulate. Pass this and we cut over.
 

@@ -15,24 +15,39 @@
 
 export type RouteMode = 'welcome' | 'settings' | 'elements' | 'element' | 'map' | 'timeline';
 
+export type SettingsTab = 'identity' | 'atlas' | 'sync' | 'world' | 'about';
+
+export const SETTINGS_TABS: SettingsTab[] = ['identity', 'atlas', 'sync', 'world', 'about'];
+
 export interface Route {
   worldId: string | null;
   mode: RouteMode;
   elementId?: string;
   mapId?: string;
+  /** Active settings tab when mode === 'settings'. Defaults to 'identity'. */
+  settingsTab?: SettingsTab;
+}
+
+function parseSettingsTab(s: string | undefined): SettingsTab {
+  if (s && (SETTINGS_TABS as string[]).includes(s)) return s as SettingsTab;
+  return 'identity';
 }
 
 export function parseHash(hash: string): Route {
   const clean = hash.replace(/^#?\/?/, '');
   if (!clean) return { worldId: null, mode: 'welcome' };
   const parts = clean.split('/');
-  // /settings (no world)
-  if (parts[0] === 'settings') return { worldId: null, mode: 'settings' };
+  // /settings[/:tab] (no world)
+  if (parts[0] === 'settings') {
+    return { worldId: null, mode: 'settings', settingsTab: parseSettingsTab(parts[1]) };
+  }
   // /w/<id>...
   if (parts[0] === 'w' && parts[1]) {
     const worldId = parts[1];
     const sub = parts[2];
-    if (sub === 'settings') return { worldId, mode: 'settings' };
+    if (sub === 'settings') {
+      return { worldId, mode: 'settings', settingsTab: parseSettingsTab(parts[3]) };
+    }
     if (sub === 'elements') return { worldId, mode: 'elements' };
     if (sub === 'timeline') return { worldId, mode: 'timeline' };
     if (sub === 'element' && parts[3]) return { worldId, mode: 'element', elementId: parts[3] };
@@ -60,8 +75,9 @@ export function worldHash(worldId: string): string {
   return `#/w/${worldId}`;
 }
 
-export function settingsHash(worldId: string | null): string {
-  return worldId ? `#/w/${worldId}/settings` : '#/settings';
+export function settingsHash(worldId: string | null, tab?: SettingsTab): string {
+  const base = worldId ? `#/w/${worldId}/settings` : '#/settings';
+  return tab ? `${base}/${tab}` : base;
 }
 
 export function elementsHash(worldId: string): string {

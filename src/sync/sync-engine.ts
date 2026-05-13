@@ -119,12 +119,30 @@ export class SyncEngine {
    * Override the debounce window for tests via `setDebounceMs`.
    */
   requestPush(): void {
-    if (this.paused) return;
+    if (this.paused) {
+      console.info('[atlas:sync] push requested but engine paused — skipping');
+      return;
+    }
     if (this.debouncePushTimer) clearTimeout(this.debouncePushTimer);
     this.debouncePushTimer = setTimeout(() => {
       this.debouncePushTimer = null;
-      void this.pushOnce();
+      console.info('[atlas:sync] debounce fired → pushOnce');
+      void this.pushOnce().then(r => {
+        console.info('[atlas:sync] push complete', {
+          creates: r.pushed.creates,
+          updates: r.pushed.updates,
+          deletes: r.pushed.deletes,
+          conflicts: r.conflicts.length,
+          failures: r.failures.length,
+        });
+        if (r.failures.length > 0) {
+          console.warn('[atlas:sync] push failures:', r.failures);
+        }
+      }).catch(err => {
+        console.error('[atlas:sync] push errored:', err);
+      });
     }, this.debouncePushMs);
+    console.info('[atlas:sync] push scheduled (debounce', this.debouncePushMs, 'ms)');
   }
 
   /** Test seam — override the debounce window. */
@@ -140,6 +158,109 @@ export class SyncEngine {
     }
     this.paused = true;
     this.pauseReason = 'manual';
+  }
+
+  /**
+   * Resolve a pending conflict (3.5+). Removes the conflict from sync-state
+   * and applies the chosen action:
+   *   - `overwrite-mine`: re-push local element to server. Server's content
+   *             is overwritten with local's. Stamps `server_updated_at` on
+   *             local. Bypasses pre-update GET (the user explicitly asked).
+   *   - `pull-theirs`: fetch server's current state, write to local folder.
+   *             Local's pending edit to this element is LOST (the user
+   *             explicitly asked).
+   *
+   * Throws on network/server error so the UI can show a row-level error.
+   */
+  async resolveConflict(
+    id: string,
+    action: 'overwrite-mine' | 'pull-theirs'
+  ): Promise<void> {
+    console.info(`[atlas:sync] resolveConflict ${action} ${id}`);
+    const syncState = await this.folder.readSyncState();
+    const conflict = syncState.conflicts.find(c => c.element_id === id);
+    if (!conflict) {
+      console.info(`[atlas:sync] resolveConflict: no conflict entry for ${id} — already cleared`);
+      return;
+    }
+
+    if (action === 'overwrite-mine') {
+      const local = await this.folder.getElement(id);
+      if (!local) throw new Error(`element ${id} not found locally`);
+      const body = stripSyncFields(local);
+      console.info(`[atlas:sync] resolveConflict overwrite-mine: pushing local to server`, {
+        id, type: local.type, hasServerBaseline: !!local.server_updated_at,
+      });
+      const response = local.server_updated_at
+        ? await this.client.updateElement(local.type, id, body)
+        : await this.client.createElement(local.type, body);
+      await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at);
+      console.info(`[atlas:sync] resolveConflict overwrite-mine: stamped baseline ${response.updated_at}`);
+    } else if (action === 'pull-theirs') {
+      console.info(`[atlas:sync] resolveConflict pull-theirs: fetching ${conflict.type}/${id}`);
+      const remote = await this.client.getElement(conflict.type, id);
+      if (!remote) throw new Error(`element ${id} not found on server (already deleted?)`);
+      const { updated_at, ...body } = remote;
+      console.info(`[atlas:sync] resolveConflict pull-theirs: applying server record`, {
+        id,
+        type: conflict.type,
+        server_updated_at: updated_at,
+        fieldCount: Object.keys(body).length,
+        descriptionPreview: typeof body.description === 'string'
+          ? (body.description as string).slice(0, 60)
+          : undefined,
+      });
+      await this.folder.applyServerRecord(conflict.type, body, updated_at);
+      console.info(`[atlas:sync] resolveConflict pull-theirs: applied; local file now reflects server`);
+    }
+
+    // Clear the conflict regardless of action.
+    await this.folder.writeSyncState({
+      conflicts: syncState.conflicts.filter(c => c.element_id !== id),
+    });
+  }
+
+  /** List currently-recorded conflicts. Reads from sync-state.json. */
+  async listConflicts(): Promise<import('../core/types').Conflict[]> {
+    const s = await this.folder.readSyncState();
+    return [...s.conflicts];
+  }
+
+  /** List pending server-deleted records awaiting user review. */
+  async listServerDeletes(): Promise<import('../core/types').ServerDeleteRecord[]> {
+    const s = await this.folder.readSyncState();
+    return [...(s.server_deletes ?? [])];
+  }
+
+  /**
+   * Resolve a server-deleted entry (3.5+). Two actions:
+   *   - `delete-locally`: remove the local file silently (no tombstone — the
+   *                       server already deleted it).
+   *   - `keep`: clear `server_updated_at` on local. Next push will re-CREATE
+   *             the element on the server.
+   *
+   * Clears the entry from sync-state regardless of which action was chosen.
+   */
+  async resolveServerDelete(
+    id: string,
+    action: 'delete-locally' | 'keep'
+  ): Promise<void> {
+    const syncState = await this.folder.readSyncState();
+    const list = syncState.server_deletes ?? [];
+    const target = list.find(d => d.id === id);
+    if (!target) return; // already cleared
+
+    if (action === 'delete-locally') {
+      await this.folder.deleteElement(id, { silent: true });
+    } else {
+      // `keep` — clear server baseline. Next push treats this as never-synced
+      // and CREATEs it on the server again.
+      await this.folder.clearServerBaseline(id);
+    }
+
+    await this.folder.writeSyncState({
+      server_deletes: list.filter(d => d.id !== id),
+    });
   }
 
   /**
@@ -170,10 +291,28 @@ export class SyncEngine {
     return this.inFlight;
   }
 
+  /**
+   * Pull-only path. Used by "Refresh from API" button and periodic auto-pull.
+   * Pulls server changes to local without pushing local edits up. No-op while
+   * paused. Concurrent calls share the in-flight promise.
+   *
+   * Push-then-pull (`syncNow`) is what runs after a debounced edit because the
+   * user's intent is to sync everything. `pullNow` is the one-direction read
+   * for "show me what others did."
+   */
+  pullNow(): Promise<SyncResult> {
+    if (this.inFlight) return this.inFlight;
+    this.inFlight = this.runPullOnly().finally(() => {
+      this.inFlight = null;
+    });
+    return this.inFlight;
+  }
+
   private async runPushOnly(): Promise<SyncResult> {
     if (this.paused) return emptyResult();
     this.setState({ kind: 'syncing', phase: 'push' });
     const pushResult = await this.pushPhase();
+    await this.persistConflicts(pushResult.conflicts);
     this.setState({ kind: 'idle', last_sync_at: nowIso() });
     return {
       pushed: pushResult.pushed,
@@ -183,12 +322,28 @@ export class SyncEngine {
     };
   }
 
+  private async runPullOnly(): Promise<SyncResult> {
+    if (this.paused) return emptyResult();
+    this.setState({ kind: 'syncing', phase: 'pull' });
+    const pullResult = await this.pullPhase();
+    this.setState({ kind: 'idle', last_sync_at: nowIso() });
+    return {
+      pushed: zero(),
+      pulled: pullResult.pulled,
+      conflicts: pullResult.conflicts,
+      failures: pullResult.failures,
+    };
+  }
+
   private async runSync(): Promise<SyncResult> {
     if (this.paused) {
       return emptyResult();
     }
     this.setState({ kind: 'syncing', phase: 'push' });
     const pushResult = await this.pushPhase();
+    // Persist push conflicts to sync-state BEFORE pull phase. Pull then reads
+    // currentState.conflicts and merges in its own findings.
+    await this.persistConflicts(pushResult.conflicts);
     this.setState({ kind: 'syncing', phase: 'pull' });
     const handledIds = new Set(pushResult.conflicts.map(c => c.element_id));
     const pullResult = await this.pullPhase(handledIds);
@@ -202,11 +357,69 @@ export class SyncEngine {
     return result;
   }
 
+  /**
+   * Rewrite a single id reference across every local element. Used when the
+   * server assigns its own id on CREATE — any local element that referenced
+   * the old client-side id must be updated to point at the server's id.
+   *
+   * Walks every string + string-array field (skipping schema-irrelevant fields
+   * like name/timestamps). Updates elements via folder.updateElement so the
+   * change is durable and they'll be picked up on the next push pass.
+   */
+  private async rewriteIdReferences(oldId: string, newId: string): Promise<void> {
+    const SKIP = new Set(['id', 'type', 'name', 'local_updated_at', 'server_updated_at']);
+    const all = await this.folder.listElements();
+    for (const el of all) {
+      let modified = false;
+      const patch: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(el)) {
+        if (SKIP.has(key)) continue;
+        if (typeof value === 'string' && value === oldId) {
+          patch[key] = newId;
+          modified = true;
+        } else if (Array.isArray(value)) {
+          let changed = false;
+          const newArr = value.map(v => {
+            if (typeof v === 'string' && v === oldId) {
+              changed = true;
+              return newId;
+            }
+            return v;
+          });
+          if (changed) { patch[key] = newArr; modified = true; }
+        }
+      }
+      if (modified) {
+        await this.folder.updateElement(el.id, patch);
+        console.info(`[atlas:sync] rewrote id reference ${oldId} → ${newId} in ${el.type}/${el.id}`);
+      }
+    }
+  }
+
+  /** Append new conflicts to sync-state.json (dedupe by element_id). */
+  private async persistConflicts(conflicts: import('../core/types').Conflict[]): Promise<void> {
+    if (conflicts.length === 0) return;
+    const curr = await this.folder.readSyncState();
+    const existingIds = new Set(curr.conflicts.map(c => c.element_id));
+    const fresh = conflicts.filter(c => !existingIds.has(c.element_id));
+    if (fresh.length === 0) return;
+    await this.folder.writeSyncState({ conflicts: [...curr.conflicts, ...fresh] });
+  }
+
   // ---- Phases ----
 
   private async pushPhase(): Promise<SyncResult> {
-    const changed = await this.folder.listLocallyChangedSince(null);
+    const allChanged = await this.folder.listLocallyChangedSince(null);
     const tombstones = await this.folder.listTombstonesSince(null);
+    // Partition: CREATEs (never-synced) before UPDATEs. New elements MUST land
+    // server-side before any UPDATE references them as a foreign key — otherwise
+    // server 400s with "Invalid FK: referenced X with id ... does not exist".
+    // This handles the common chain: create Location locally → set character's
+    // birthplace = newLoc → push: Location lands, then Character update succeeds.
+    const changed = [
+      ...allChanged.filter(e => !e.server_updated_at),
+      ...allChanged.filter(e => !!e.server_updated_at),
+    ];
     const total = changed.length + tombstones.length;
     let done = 0;
 
@@ -220,27 +433,69 @@ export class SyncEngine {
       const isCreate = !elem.server_updated_at;
       try {
         if (isCreate) {
-          // Never synced before → CREATE on server.
-          const body = stripSyncFields(elem);
-          const response = await this.client.createElement(elem.type, body);
-          await this.folder.stampServerUpdatedAt(elem.id, elem.type, response.updated_at);
+          // Never synced before → CREATE on server. The server may assign its
+          // own id (e.g., enforcing UUID v7 format) regardless of what we
+          // sent. If so, we id-swap the local file to match the server's id
+          // and rewrite any references — otherwise foreign-key fields pointing
+          // at the OLD local id would fail on subsequent pushes ("Invalid FK").
+          //
+          // Re-fetch current state in case an in-loop id-swap on a previously
+          // processed CREATE rewrote one of this element's reference fields.
+          // The snapshot `elem` would otherwise carry stale ids.
+          const current = await this.folder.getElement(elem.id);
+          if (!current) {
+            // Was silently removed by an earlier in-loop swap targeting this id
+            // — nothing to push.
+            continue;
+          }
+          const body = stripSyncFields(current);
+          const response = await this.client.createElement(current.type, body);
+          if (response.id !== current.id) {
+            console.info(`[atlas:sync] server assigned new id on create`, {
+              type: current.type, localId: current.id, serverId: response.id,
+            });
+            // Write local file at the server's id (current content + stamped).
+            const swapped = {
+              ...stripSyncFields(current),
+              id: response.id,
+            };
+            await this.folder.applyServerRecord(current.type, swapped, response.updated_at);
+            // Remove old local file silently — there's no server counterpart
+            // at the old id, so no DELETE should propagate.
+            await this.folder.deleteElement(current.id, { silent: true });
+            // Rewrite refs to old id across all local elements.
+            await this.rewriteIdReferences(current.id, response.id);
+          } else {
+            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at);
+          }
           creates++;
         } else {
-          // UPDATE path: pre-fetch server state to detect external changes since
-          // our cached `server_updated_at` baseline.
-          const remote = await this.client.getElement(elem.type, elem.id);
-          const baseline = elem.server_updated_at!;
+          // UPDATE path: re-fetch element from folder in case an in-loop
+          // id-swap rewrote one of its reference fields (e.g., a Character
+          // whose location_id was rewritten after the Location's CREATE swap).
+          // The original `elem` snapshot would still carry the stale old id.
+          const current = await this.folder.getElement(elem.id);
+          if (!current) {
+            // Could happen if elem was silently removed by an id-swap (unlikely
+            // for an UPDATE path since UPDATE implies server_updated_at present,
+            // but defensive).
+            continue;
+          }
+
+          // Pre-update server check: detect concurrent external changes.
+          const remote = await this.client.getElement(current.type, current.id);
+          const baseline = current.server_updated_at!;
           const serverMoved = remote ? remote.updated_at > baseline : false;
 
           let skipPush = false;
           if (serverMoved && remote) {
             const conflict: Conflict = {
-              element_id: elem.id,
-              type: elem.type,
+              element_id: current.id,
+              type: current.type,
               detected_at: nowIso(),
-              local_updated_at: elem.local_updated_at,
+              local_updated_at: current.local_updated_at,
               server_updated_at: remote.updated_at,
-              fields: diffFieldNames(elem, stripServerOnlyFields(remote)),
+              fields: diffFieldNames(current, stripServerOnlyFields(remote)),
             };
             conflicts.push(conflict);
             this.onConflict(conflict);
@@ -252,9 +507,9 @@ export class SyncEngine {
           }
 
           if (!skipPush) {
-            const body = stripSyncFields(elem);
-            const response = await this.client.updateElement(elem.type, elem.id, body);
-            await this.folder.stampServerUpdatedAt(elem.id, elem.type, response.updated_at);
+            const body = stripSyncFields(current);
+            const response = await this.client.updateElement(current.type, current.id, body);
+            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at);
             updates++;
           }
         }
@@ -301,14 +556,19 @@ export class SyncEngine {
     let creates = 0;
     let updates = 0;
     const conflicts: Conflict[] = [];
+    const newServerDeletes: import('../core/types').ServerDeleteRecord[] = [];
 
     const tombstones = await this.folder.listTombstonesSince(null);
     const tombstoneIds = new Set(tombstones.map(t => t.id));
+    // Track which previously-synced local elements were SEEN on the server
+    // this pull; any unseen ones (with server_updated_at set) were deleted.
+    const seenLocalIds = new Set<string>();
 
     for (const type of ALL_ELEMENT_TYPES) {
       const serverElements = await this.client.listElements(type);
 
       for (const remote of serverElements) {
+        seenLocalIds.add(remote.id);
         // Skip elements pending local delete — they'll be DELETEd by next push.
         if (tombstoneIds.has(remote.id)) continue;
         // Skip elements push already conflicted on (avoid double-reporting).
@@ -321,6 +581,7 @@ export class SyncEngine {
           // New on server → write locally with both timestamps = server's.
           await this.folder.applyServerRecord(type, remoteBody, remote.updated_at);
           creates++;
+          console.info(`[atlas:sync] pull create ${type}/${remote.id} (server: ${remote.updated_at})`);
           continue;
         }
 
@@ -329,7 +590,15 @@ export class SyncEngine {
         const localChanged = local.local_updated_at > localBaseline;
         const serverChanged = remote.updated_at > localBaseline;
 
-        if (!serverChanged) continue;
+        if (!serverChanged) {
+          // Server matches our baseline — nothing to pull for this element.
+          // Surface only when a local change is pending so user knows it's
+          // queued for push (otherwise this is just noise).
+          if (localChanged) {
+            console.info(`[atlas:sync] pull skip ${type}/${remote.id} — server unchanged since baseline, local edit pending push`);
+          }
+          continue;
+        }
 
         if (localChanged) {
           // Both sides changed since last sync → conflict.
@@ -341,6 +610,12 @@ export class SyncEngine {
             server_updated_at: remote.updated_at,
             fields: diffFieldNames(local, remoteBody),
           });
+          console.warn(`[atlas:sync] pull conflict ${type}/${remote.id}`, {
+            local_updated_at: local.local_updated_at,
+            server_updated_at: remote.updated_at,
+            baseline: localBaseline,
+            divergedFields: diffFieldNames(local, remoteBody),
+          });
           // Don't overwrite local; preserve the user's change.
           continue;
         }
@@ -348,13 +623,37 @@ export class SyncEngine {
         // Server newer, local untouched → overwrite locally.
         await this.folder.applyServerRecord(type, remoteBody, remote.updated_at);
         updates++;
+        console.info(`[atlas:sync] pull update ${type}/${remote.id}`, {
+          before: localBaseline,
+          after: remote.updated_at,
+        });
       }
     }
 
+    // Detect server-side deletes: local elements that have server_updated_at
+    // set (meaning they were once on the server) but didn't appear in any
+    // list this pass.
+    const allLocal = await this.folder.listElements();
+    for (const elem of allLocal) {
+      if (!elem.server_updated_at) continue; // never synced
+      if (seenLocalIds.has(elem.id)) continue; // still on server
+      if (tombstoneIds.has(elem.id)) continue; // pending local delete already
+      newServerDeletes.push({
+        id: elem.id,
+        type: elem.type,
+        detected_at: nowIso(),
+        name: elem.name,
+      });
+    }
+
     const currentState = await this.folder.readSyncState();
+    const existingServerDeletes = currentState.server_deletes ?? [];
+    const existingDeleteIds = new Set(existingServerDeletes.map(d => d.id));
+    const freshServerDeletes = newServerDeletes.filter(d => !existingDeleteIds.has(d.id));
     await this.folder.writeSyncState({
       last_pull_at: nowIso(),
       conflicts: [...currentState.conflicts, ...conflicts],
+      server_deletes: [...existingServerDeletes, ...freshServerDeletes],
     });
 
     return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures: [] };

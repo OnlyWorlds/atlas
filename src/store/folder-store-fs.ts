@@ -281,8 +281,9 @@ export class FsFolderStore implements FolderStore {
     return pins.filter(p => p.element_id === id);
   }
 
-  async deleteElement(id: string, opts: { cascade?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
-    const cascade = opts.cascade ?? true;
+  async deleteElement(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
+    const silent = opts.silent ?? false;
+    const cascade = silent ? false : (opts.cascade ?? true);
     const existing = await this.getElement(id);
     if (!existing) return { tombstones: [] };
 
@@ -296,10 +297,12 @@ export class FsFolderStore implements FolderStore {
         written.push(tomb);
       }
     }
-    const primary: Tombstone = { id, type: existing.type, deleted_at: this.clock() };
-    await this.appendTombstone(primary);
+    if (!silent) {
+      const primary: Tombstone = { id, type: existing.type, deleted_at: this.clock() };
+      await this.appendTombstone(primary);
+      written.push(primary);
+    }
     await this.unlinkElement(existing);
-    written.push(primary);
     return { tombstones: written };
   }
 
@@ -488,6 +491,14 @@ export class FsFolderStore implements FolderStore {
     await writeJsonAtomic(dir, elementFilename(id), next);
   }
 
+  async clearServerBaseline(id: string): Promise<void> {
+    const existing = await this.getElement(id);
+    if (!existing) return;
+    const { server_updated_at: _drop, ...rest } = existing;
+    const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
+    await writeJsonAtomic(dir, elementFilename(id), rest as Element);
+  }
+
   async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');
@@ -501,6 +512,32 @@ export class FsFolderStore implements FolderStore {
     };
     const dir = await getDir(this.requireRoot(), elementDirSegments(type));
     await writeJsonAtomic(dir, elementFilename(id), elem);
+
+    // Diagnostic: read the file back immediately and confirm content matches.
+    // Catches "write reports success but disk content didn't change" Chromium
+    // quirks that the in-flight write-buffer can mask.
+    try {
+      const readback = await readJson<Element>(dir, elementFilename(id));
+      const writtenDesc = typeof elem.description === 'string' ? (elem.description as string).slice(0, 60) : undefined;
+      const readDesc = typeof readback?.description === 'string' ? (readback.description as string).slice(0, 60) : undefined;
+      if (writtenDesc !== readDesc) {
+        console.warn('[fs-folder-store] applyServerRecord: post-write readback DIFFERS', {
+          id,
+          type,
+          intendedDescription: writtenDesc,
+          diskDescription: readDesc,
+        });
+      } else {
+        console.info('[fs-folder-store] applyServerRecord: post-write readback ok', {
+          id,
+          type,
+          descriptionPreview: readDesc,
+        });
+      }
+    } catch (err) {
+      console.warn('[fs-folder-store] applyServerRecord: post-write readback failed:', err);
+    }
+
     return elem;
   }
 

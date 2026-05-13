@@ -109,20 +109,32 @@ export interface MergeProgress {
 }
 
 export interface MergeResult {
+  /** Local-only elements pushed to server. */
   creates: number;
+  /** Matched elements whose local content overwrote server (policy b only). */
   updates: number;
+  /** Matched elements where server kept its version (policy c only). */
   skipped: number;
+  /** Server-only elements downloaded to local. Same for both policies. */
+  downloaded: number;
   failures: PerElementFailure[];
 }
 
 /**
- * Merge the local folder's elements into the server's existing api world.
- * Caller has already validated creds + opened the client.
+ * Bidirectional merge between a local folder and an existing api world.
  *
- *   - Policy (b) — matched (by id OR name+type) → UPDATE server with local;
- *                  unmatched → CREATE.
- *   - Policy (c) — matched → skip (but stamp `server_updated_at` so future
- *                  edits diff correctly); unmatched → CREATE.
+ * Three buckets after matching by id-or-name+type:
+ *   - **Local-only**: no server counterpart → CREATE on server.
+ *   - **Server-only**: no local counterpart → DOWNLOAD to local
+ *     (enforces local-representation invariant).
+ *   - **Matched**: name+type or id match → apply policy:
+ *     - Policy (b) — overwrite duplicates: local content wins, server[server_id]
+ *       gets UPDATEd with local body. If local.id ≠ server.id, local file is
+ *       re-saved at server.id (id swap) and references are rewritten across
+ *       all other local elements.
+ *     - Policy (c) — skip duplicates: server content wins. Local file at
+ *       server.id (overwrites prior local content). Local edits to matched
+ *       elements are LOST. Same id-swap discipline as (b) when ids differ.
  *
  * Per-element write errors are non-fatal and recorded in `failures`.
  */
@@ -134,10 +146,12 @@ export async function mergeLocalIntoApi(
 ): Promise<MergeResult> {
   // 1. List all server elements (one fetch per type).
   const serverByType = new Map<ElementType, Array<{ id: string; updated_at: string } & Record<string, unknown>>>();
+  let serverTotalForList = 0;
   for (const type of ALL_ELEMENT_TYPES) {
-    onProgress?.({ done: 0, total: 0, phase: 'list' });
+    onProgress?.({ done: 0, total: serverTotalForList, phase: 'list' });
     const records = await adapter.listElements(type);
     serverByType.set(type, records);
+    serverTotalForList += records.length;
   }
 
   // 2. List all local elements (single call, then group by type).
@@ -148,74 +162,184 @@ export async function mergeLocalIntoApi(
     localByType.get(e.type)!.push(e);
   }
 
-  const total = allLocal.length;
-  let done = 0;
-  let creates = 0;
-  let updates = 0;
-  let skipped = 0;
-  const failures: PerElementFailure[] = [];
+  // 3. Match phase — decide what each element does without touching anything yet.
+  type LocalDecision =
+    | { kind: 'create'; local: Element; type: ElementType }
+    | { kind: 'matched-same-id'; local: Element; server: ServerRec; type: ElementType }
+    | { kind: 'matched-swap'; local: Element; server: ServerRec; type: ElementType };
+  type DownloadDecision = { kind: 'download'; server: ServerRec; type: ElementType };
 
-  // 3. Walk every local element. Decide create/update/skip based on match + policy.
-  for (const [type, locals] of localByType) {
+  const localDecisions: LocalDecision[] = [];
+  const downloadDecisions: DownloadDecision[] = [];
+  const idSwaps = new Map<string, string>(); // oldLocalId → serverId
+
+  for (const type of ALL_ELEMENT_TYPES) {
     const serverList = serverByType.get(type) ?? [];
+    const locals = localByType.get(type) ?? [];
+
+    const matchedServerIds = new Set<string>();
+
     for (const local of locals) {
-      try {
-        const match = findMatch(local, serverList);
-        if (match) {
-          if (policy === 'b') {
-            // Overwrite server with local.
-            const { local_updated_at: _l, server_updated_at: _s, ...body } = local;
-            const response = await adapter.updateElement(type, match.id, body);
-            await folder.stampServerUpdatedAt(local.id, type, response.updated_at);
-            updates++;
-          } else {
-            // Policy c: keep server unchanged, stamp local baseline so future
-            // diffs work. If the match's id differs from local's id, the local
-            // file's id stays — we just record the server timestamp.
-            await folder.stampServerUpdatedAt(local.id, type, match.updated_at);
-            skipped++;
-          }
-        } else {
-          // Unmatched on server → CREATE.
-          const { local_updated_at: _l, server_updated_at: _s, ...body } = local;
-          const response = await adapter.createElement(type, body);
-          await folder.stampServerUpdatedAt(local.id, type, response.updated_at);
-          creates++;
-        }
-      } catch (err) {
-        failures.push({
-          element_id: local.id,
-          type,
-          operation: 'create', // best-effort label; could be 'update' but caller mostly cares about the count
-          message: err instanceof Error ? err.message : String(err),
-        });
-      } finally {
-        done++;
-        onProgress?.({ done, total, phase: 'apply' });
+      const byId = serverList.find(r => r.id === local.id);
+      if (byId) {
+        matchedServerIds.add(byId.id);
+        localDecisions.push({ kind: 'matched-same-id', local, server: byId, type });
+        continue;
+      }
+      const byName = local.name
+        ? serverList.find(r =>
+            !matchedServerIds.has(r.id) &&
+            typeof r.name === 'string' &&
+            r.name.trim().toLowerCase() === local.name.trim().toLowerCase()
+          )
+        : undefined;
+      if (byName) {
+        matchedServerIds.add(byName.id);
+        localDecisions.push({ kind: 'matched-swap', local, server: byName, type });
+        idSwaps.set(local.id, byName.id);
+        continue;
+      }
+      localDecisions.push({ kind: 'create', local, type });
+    }
+
+    // Server-only — anything not matched.
+    for (const server of serverList) {
+      if (!matchedServerIds.has(server.id)) {
+        downloadDecisions.push({ kind: 'download', server, type });
       }
     }
   }
 
-  return { creates, updates, skipped, failures };
+  // 4. Apply phase.
+  const total = localDecisions.length + downloadDecisions.length;
+  let done = 0;
+  let creates = 0;
+  let updates = 0;
+  let skipped = 0;
+  let downloaded = 0;
+  const failures: PerElementFailure[] = [];
+
+  // 4a. Downloads first — guarantees server-only elements are present before
+  // any id-swap rewrite walks them.
+  for (const d of downloadDecisions) {
+    try {
+      const { updated_at, ...body } = d.server;
+      await folder.applyServerRecord(d.type, body, updated_at);
+      downloaded++;
+    } catch (err) {
+      failures.push({
+        element_id: d.server.id,
+        type: d.type,
+        operation: 'create',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      done++;
+      onProgress?.({ done, total, phase: 'apply' });
+    }
+  }
+
+  // 4b. Local-side decisions.
+  for (const dec of localDecisions) {
+    try {
+      const { local, type } = dec;
+      if (dec.kind === 'create') {
+        const { local_updated_at: _l, server_updated_at: _s, ...body } = local;
+        const response = await adapter.createElement(type, body);
+        await folder.stampServerUpdatedAt(local.id, type, response.updated_at);
+        creates++;
+      } else if (dec.kind === 'matched-same-id') {
+        if (policy === 'b') {
+          const { local_updated_at: _l, server_updated_at: _s, ...body } = local;
+          const response = await adapter.updateElement(type, dec.server.id, body);
+          await folder.stampServerUpdatedAt(local.id, type, response.updated_at);
+          updates++;
+        } else {
+          // Policy c: overwrite local with server's full record.
+          const { updated_at, ...serverBody } = dec.server;
+          await folder.applyServerRecord(type, serverBody, updated_at);
+          skipped++;
+        }
+      } else {
+        // matched-swap: local.id !== server.id; server.id wins.
+        const serverId = dec.server.id;
+        if (policy === 'b') {
+          // UPDATE server with local body (server keeps server.id).
+          const { id: _lid, local_updated_at: _l, server_updated_at: _s, ...body } = local;
+          const response = await adapter.updateElement(type, serverId, body);
+          // Re-save local at the new id with local's content.
+          await folder.applyServerRecord(type, { ...body, id: serverId }, response.updated_at);
+          // Remove the old local file silently — never had a server counterpart.
+          await folder.deleteElement(local.id, { silent: true });
+          updates++;
+        } else {
+          // Policy c: pull server's full content into local at server.id.
+          const { updated_at, ...serverBody } = dec.server;
+          await folder.applyServerRecord(type, serverBody, updated_at);
+          // Remove the old local file silently.
+          await folder.deleteElement(local.id, { silent: true });
+          skipped++;
+        }
+      }
+    } catch (err) {
+      failures.push({
+        element_id: dec.local.id,
+        type: dec.type,
+        operation: dec.kind === 'create' ? 'create' : 'update',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      done++;
+      onProgress?.({ done, total, phase: 'apply' });
+    }
+  }
+
+  // 5. Rewrite id references across all remaining local elements.
+  //    Any element that referenced a swapped local id should now point at the
+  //    new server id. We scan every field of every element.
+  if (idSwaps.size > 0) {
+    await rewriteIdReferences(folder, idSwaps);
+  }
+
+  return { creates, updates, skipped, downloaded, failures };
 }
 
+type ServerRec = { id: string; updated_at: string } & Record<string, unknown>;
+
 /**
- * Find a server-side counterpart for a local element. Strategy:
- *   1. Same id → match (handles re-uploads from the same machine).
- *   2. Same name+type (case-insensitive) → match.
- * Returns the first match found, or undefined.
+ * Walk every local element and rewrite any field value (string OR array of
+ * strings) whose value matches a key in `idMap`. Updates via updateElement so
+ * `local_updated_at` advances — these rewrites are real local edits the engine
+ * will push on next sync (the server already has the new ids, so push will
+ * succeed cleanly).
  */
-function findMatch(
-  local: Element,
-  serverList: Array<{ id: string; updated_at: string } & Record<string, unknown>>
-): ({ id: string; updated_at: string } & Record<string, unknown>) | undefined {
-  // 1. id match.
-  const byId = serverList.find(r => r.id === local.id);
-  if (byId) return byId;
-  // 2. name+type match (case-insensitive).
-  if (!local.name) return undefined;
-  const target = local.name.trim().toLowerCase();
-  return serverList.find(r => typeof r.name === 'string' && r.name.trim().toLowerCase() === target);
+async function rewriteIdReferences(folder: FolderStore, idMap: Map<string, string>): Promise<void> {
+  const SKIP = new Set(['id', 'type', 'name', 'local_updated_at', 'server_updated_at']);
+  const all = await folder.listElements();
+  for (const el of all) {
+    let modified = false;
+    const patch: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(el)) {
+      if (SKIP.has(key)) continue;
+      if (typeof value === 'string' && idMap.has(value)) {
+        patch[key] = idMap.get(value);
+        modified = true;
+      } else if (Array.isArray(value)) {
+        let changed = false;
+        const newArr = value.map(v => {
+          if (typeof v === 'string' && idMap.has(v)) {
+            changed = true;
+            return idMap.get(v)!;
+          }
+          return v;
+        });
+        if (changed) { patch[key] = newArr; modified = true; }
+      }
+    }
+    if (modified) {
+      await folder.updateElement(el.id, patch);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

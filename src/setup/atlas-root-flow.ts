@@ -421,6 +421,35 @@ export async function linkExistingApiWorldInRoot(
 }
 
 /**
+ * Permanently delete a world's folder under the atlas root. The world MUST
+ * be inside the configured root (i.e., a real subfolder of the atlas-root
+ * handle) — external worlds are not supported here for safety.
+ *
+ * Steps:
+ *   1. Verify atlas root + world exists in registry.
+ *   2. Find the world subfolder by name under root.
+ *   3. `rootHandle.removeEntry(name, { recursive: true })`.
+ *   4. Caller is responsible for closing the FolderStore + registry cleanup.
+ *
+ * Throws on any failure — caller surfaces as toast.
+ */
+export async function deleteWorldFolderUnderRoot(folderName: string): Promise<void> {
+  const reg = getState().registry;
+  if (!reg.atlas_root) {
+    throw new Error('atlas root not configured — cannot delete');
+  }
+  const rootHandle = await loadHandle(reg.atlas_root.handle_key);
+  if (!rootHandle) {
+    throw new Error('atlas root handle missing — re-pick the root in settings');
+  }
+  const granted = await ensureWritable(rootHandle);
+  if (!granted) {
+    throw new Error('write permission denied for atlas folder');
+  }
+  await rootHandle.removeEntry(folderName, { recursive: true });
+}
+
+/**
  * Slugify a world name for use as an on-disk subfolder.
  * Lowercased, ascii-ish, hyphen-separated, length-capped, fallback `world`.
  */

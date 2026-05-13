@@ -10,13 +10,13 @@
 
 import { getState, subscribe, patchSlice } from '../core/state';
 import { onHashChange, parseHash, navigate, elementsHash } from '../core/router';
-import { setActiveWorld, saveRegistry, setFavorite } from '../registry/registry';
+import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused } from '../registry/registry';
 import { loadHandle, ensureWritable, queryWritable } from '../store/handle-vault';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { setActiveStore, getActiveStore, CreateWorldModal } from '../ui/create-world-modal';
 import { LinkWorldModal } from '../ui/link-world-modal';
 import { setupAtlasRoot } from '../setup/atlas-root-flow';
-import { attachSyncEngine } from '../sync/sync-attach';
+import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
 import { ToastManager } from '../ui/toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
@@ -40,6 +40,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     header.innerHTML = root
       ? `
         <button class="atlas-btn-ghost" data-action="create-local" title="create a new world in your atlas folder">+ new local</button>
+        <button class="atlas-btn-ghost" data-action="new-api" title="create a new world on onlyworlds.com AND in your atlas folder">+ new api</button>
         <button class="atlas-btn-ghost" data-action="link-api" title="download an existing OnlyWorlds api world into atlas">+ link api</button>
       `
       : `
@@ -47,6 +48,12 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       `;
     const createBtn = header.querySelector<HTMLButtonElement>('[data-action="create-local"]');
     createBtn?.addEventListener('click', () => new CreateWorldModal(toasts).open());
+    const newApiBtn = header.querySelector<HTMLButtonElement>('[data-action="new-api"]');
+    newApiBtn?.addEventListener('click', () => {
+      void import('../ui/new-api-world-modal').then(({ NewApiWorldModal }) => {
+        new NewApiWorldModal(toasts).open();
+      });
+    });
     const linkBtn = header.querySelector<HTMLButtonElement>('[data-action="link-api"]');
     linkBtn?.addEventListener('click', () => new LinkWorldModal(toasts).open());
     const setupBtn = header.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]');
@@ -87,6 +94,46 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       const next = setFavorite(reg, worldId, !entry.favorite);
       saveRegistry(next);
       patchSlice('registry', next);
+      return;
+    }
+    const pauseBtn = target.closest<HTMLElement>('[data-role="toggle-paused"]');
+    if (pauseBtn) {
+      e.stopPropagation();
+      const worldId = pauseBtn.getAttribute('data-world-id')!;
+      const reg = getState().registry;
+      const entry = reg.worlds.find(w => w.id === worldId);
+      if (!entry) return;
+      const next = setWorldPaused(reg, worldId, !entry.sync_paused);
+      saveRegistry(next);
+      patchSlice('registry', next);
+      // If this is the active world's engine, toggle its pause state immediately.
+      if (worldId === getCurrentSyncWorldId()) {
+        const engine = getCurrentSyncEngine();
+        if (engine) {
+          if (!entry.sync_paused) engine.pause('manual');
+          else engine.resume();
+        }
+      }
+      toasts.info(!entry.sync_paused ? 'stayed offline' : 'sync resumed');
+      return;
+    }
+    const refreshBtn = target.closest<HTMLElement>('[data-role="refresh-world"]');
+    if (refreshBtn) {
+      e.stopPropagation();
+      const worldId = refreshBtn.getAttribute('data-world-id')!;
+      // If the world isn't active yet, activate it first; refresh fires after.
+      if (worldId !== getCurrentSyncWorldId()) {
+        const ok = await activateWorld(worldId, toasts);
+        if (!ok) return;
+      }
+      try {
+        const result = await pullNowAndRefresh();
+        if (!result) { toasts.info('engine not ready'); return; }
+        const total = result.pulled.creates + result.pulled.updates;
+        toasts.success(total === 0 ? 'already up to date' : `pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
+      } catch (err) {
+        toasts.error(err instanceof Error ? err.message : String(err));
+      }
       return;
     }
     const row = target.closest<HTMLElement>('[data-world-id]');
@@ -135,12 +182,22 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   const favIcon = world.favorite ? 'star' : 'star_border';
   const favCls = world.favorite ? 'is-fav' : '';
   const cls = ['atlas-row', active ? 'selected' : ''].filter(Boolean).join(' ');
+  // Hover-reveal sync controls only for api-linked worlds.
+  const syncActions = world.state === 'api-linked'
+    ? `
+        <button type="button" class="atlas-icon-btn-sm sync-action-btn ${world.sync_paused ? 'is-paused' : ''}" data-role="toggle-paused" data-world-id="${escapeAttr(world.id)}" title="${world.sync_paused ? 'resume sync' : 'stay offline'}">
+          <span class="material-symbols-outlined">${world.sync_paused ? 'play_arrow' : 'pause'}</span>
+        </button>
+        <button type="button" class="atlas-icon-btn-sm sync-action-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="refresh from api">
+          <span class="material-symbols-outlined">refresh</span>
+        </button>`
+    : '';
   return `
     <div class="${cls}" data-world-id="${escapeAttr(world.id)}" role="button" tabindex="0">
       <span class="material-symbols-outlined">${stateIcon}</span>
       <span class="atlas-row-main">${escapeText(world.name)}</span>
       ${stateChip}
-      <span class="atlas-inline-actions">
+      <span class="atlas-inline-actions">${syncActions}
         <button type="button" class="atlas-icon-btn-sm fav-btn ${favCls}" data-role="fav-toggle" data-world-id="${escapeAttr(world.id)}" title="${world.favorite ? 'unfavorite' : 'favorite'}">
           <span class="material-symbols-outlined">${favIcon}</span>
         </button>

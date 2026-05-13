@@ -113,6 +113,19 @@ export interface SyncState {
   paused: boolean;
   pause_reason?: 'manual' | 'network';
   conflicts: Conflict[];
+  /**
+   * Server-deleted elements detected during pull (Phase 3.5+).
+   * Local file still exists; awaiting user decision (delete locally vs re-push).
+   */
+  server_deletes?: ServerDeleteRecord[];
+}
+
+export interface ServerDeleteRecord {
+  id: string;
+  type: ElementType;
+  detected_at: string;
+  /** Local name at detection time — for display in the review modal. */
+  name?: string;
 }
 
 export interface Conflict {
@@ -180,6 +193,12 @@ export interface WorldRegistryEntry {
   favorite?: boolean;
   created_at: string;
   last_opened_at?: string;
+  /**
+   * Per-world "stay offline" toggle (Phase 3.5+). When true, the engine is
+   * attached but immediately paused — no pushes, no pulls, no debounced sync.
+   * User can flip it back on to resume. Persists across reloads.
+   */
+  sync_paused?: boolean;
 }
 
 export interface WorldsRegistry {
@@ -203,6 +222,27 @@ export interface WorldsRegistry {
     path_hint?: string;
     set_at: string;
   };
+
+  // ---- Sync settings (Phase 3.5+) ----
+  // All global. Per-world overrides are deferred to 3.6 if needed.
+
+  /** Pull from API when an api-linked world activates. Default: false. */
+  sync_pull_on_activate?: boolean;
+
+  /**
+   * Cadence for periodic auto-pull while the tab is visible and an api-linked
+   * world is active. Null/undefined = off (default). Otherwise ms between polls.
+   */
+  sync_cadence_ms?: number | null;
+
+  /** Default conflict policy for new engines. Default: `drain-blind`. */
+  sync_default_policy?: 'drain-blind' | 'pause-on-conflict' | 'ask';
+
+  /** Confirm before deleting locally to match a server-side delete. Default: true. */
+  sync_confirm_server_deletes?: boolean;
+
+  /** Master kill switch — pauses every engine if true. Default: false. */
+  sync_pause_all?: boolean;
 }
 
 export function defaultRegistry(): WorldsRegistry {

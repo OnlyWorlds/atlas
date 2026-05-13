@@ -27,6 +27,27 @@ This is the only architectural decision that matters. Everything else falls out 
 
 The legacy atlas had two parallel local-storage layers (filesystem for local-only worlds, IndexedDB for api-linked worlds). That split made "where does my data live?" depend on "am I synced?" — wrong dimensions. The rebuild collapses them: one storage layer, one mental model.
 
+### Local representation invariant
+
+**Every world Atlas knows about is fully represented in local files, regardless of origin.** No "partial-shadow-of-server" mode. Consequences for every flow:
+
+- Link existing api → initial download of every element BEFORE registry flips to api-linked.
+- Make Online Route 2 (merge into existing api) → bidirectional. Local pushes up AND server-only pulls down. After the merge, local folder contains every element on either side.
+- After a pull, server-side new elements are written to local; server-side deletes prompt user review (default: confirm before deleting locally).
+- Even on auto-pull (cadence-driven), the rule holds — pull always reconciles into local first.
+
+If a user goes offline indefinitely with an api-linked world, every element they had access to is still on disk and editable.
+
+### Sync orientation: local-first by default
+
+User intent is captured by what they DON'T have to opt into:
+
+- Autosave (debounced push) is on by default — they made an edit, they want it persisted.
+- Auto-pull is OFF by default — Atlas doesn't fetch unless asked. Pull on activate is a setting, periodic cadence is a setting, both default off.
+- The manual "Refresh from API" button is always available regardless of cadence settings.
+
+The asymmetry is deliberate: pushes reflect user intent (you typed → it saves). Pulls don't, unless the user opted in.
+
 ---
 
 ## World States
@@ -307,11 +328,16 @@ The auto-debounce is implemented in `SyncEngine.requestPush()`: schedules `pushO
 
 `pushPhase` is per-element error tolerant: 4xx, validation, transient network failures on a single element are recorded in `result.failures: PerElementFailure[]` and iteration continues. This matters most for `pushOnce()` invoked by Make-Online flows that upload dozens of elements at once — one bad element shouldn't abort the upload. Successful elements get `server_updated_at` stamped; failed ones retry on the next sync.
 
-### Pull triggers
+### Pull triggers (3.5+)
 
-- Manual: `pullNow()` / "Refresh from API" button.
-- On `start()`: one initial pull to catch up.
-- Periodic (optional, Phase 3.5): every N minutes if visible.
+Pull is local-first opt-in. None of these fire unless the user enabled the corresponding setting.
+
+- **Manual** (always available): `pullNow()` via "Refresh from API" button on the sync pill / world settings.
+- **On world activate** (default OFF): if `registry.sync_pull_on_activate` is true, `pullNow()` runs after `attachSyncEngine` whenever an api-linked world activates.
+- **Periodic auto-pull** (default OFF — `registry.sync_cadence_ms = null`): scheduler polls every N ms; pauses on `visibilitychange:hidden`; only ever calls `pullNow()` on the currently-active engine.
+- **On `online` event**: when network returns AND the engine was network-auto-paused, a one-shot `syncNow()` flushes queued pushes + pulls.
+
+Push triggers are unchanged — autosave debounce is the only push trigger; user typed = user wants saved.
 
 ---
 
@@ -372,25 +398,28 @@ Consequences:
 
 ### W4 — Make local online: Route 2 (link to existing api world)
 
-For users who already created an api world elsewhere (web app, obsidian plugin) and want to push their local content into it.
+For users who already created an api world elsewhere (web app, obsidian plugin) and want to merge their local content into it. **Bidirectional**: local-only elements push up, server-only elements pull down, matched elements resolve per policy. End state: local folder contains every element on either side.
 
 1. Same context menu entry → "Link to Existing API World…"
 2. Modal:
    - API key
    - PIN
-   - **Merge policy** (radio):
-     - **(b) Push, overwrite duplicates** (default): name+type match → local wins; new locals → pushed; server-only elements → preserved.
-     - **(c) Push only new**: name+type match → server kept untouched; new locals → pushed.
+   - **Merge policy** (radio) for the MATCHED elements (same name+type on both sides):
+     - **(b) Push, overwrite duplicates** (default): local content wins → UPDATE server. Local file's id is rewritten to the server's id (server-side id always wins).
+     - **(c) Skip duplicates**: server content kept → local file fully overwritten with server's record (adopts server's id and content). Local edits to matched elements are LOST under this policy — explicit warning in UI.
 
    Full-overwrite ("wipe server, push local fresh") is intentionally NOT a v1 policy — too easy to nuke a collaborator's data. Users who genuinely want this delete the api world via the web app, then use Route 1 (Make Online → create new).
 3. On submit:
-   - Validate credentials, fetch server state.
-   - Build diff:
-     - For policy (b): for each local element, look for name+type or id match on server; matched → UPDATE server with local; unmatched → CREATE.
-     - For policy (c): for each local element, look for match; matched → skip; unmatched → CREATE.
-   - Apply diff with progress UI.
-   - On success: flip registry state, attach SyncEngine, stamp `server_updated_at`.
-4. Toast: "{name} linked. {n} elements synced."
+   - Validate credentials, fetch server state for every type.
+   - Build diff (three buckets):
+     - **Local-only** (no server match) → CREATE on server.
+     - **Server-only** (no local match) → DOWNLOAD to local (via `applyServerRecord`).
+     - **Matched** (name+type match) → policy (b): UPDATE server with local + rewrite local id to server's id; policy (c): overwrite local file with server's full record.
+   - Apply diff with progress UI showing all three counts.
+   - On success: flip registry state, attach SyncEngine, stamp `server_updated_at` everywhere.
+4. Toast: "{name} linked. {n} pushed, {m} downloaded, {p} updated/skipped."
+
+**Id-swap on matched elements (policy b)**: when local id ≠ server id and they match by name+type, local file is re-saved with the server's id. Foreign-key references to the old local id (pins on this element, relations, etc.) MUST be rewritten in the same atomic operation. The folder-store provides a helper for this rewrite.
 
 ### W5 — Edit element (online, autosave default)
 

@@ -24,6 +24,12 @@ import {
   setFavorite,
   setParent,
   setPin,
+  setSyncPullOnActivate,
+  setSyncCadenceMs,
+  setSyncDefaultPolicy,
+  setSyncConfirmServerDeletes,
+  setSyncPauseAll,
+  setWorldPaused,
 } from '../../src/registry/registry';
 
 beforeEach(() => {
@@ -268,5 +274,63 @@ describe('registry — global identity (PIN + email)', () => {
     expect(r1.email).toBe('a@b');
     const r2 = setEmail(r1, '');
     expect(r2.email).toBeUndefined();
+  });
+});
+
+describe('registry — sync settings (Phase 3.5+)', () => {
+  it('setSyncPullOnActivate stores boolean', () => {
+    const r1 = setSyncPullOnActivate(defaultRegistry(), true);
+    expect(r1.sync_pull_on_activate).toBe(true);
+    const r2 = setSyncPullOnActivate(r1, false);
+    expect(r2.sync_pull_on_activate).toBe(false);
+  });
+
+  it('setSyncCadenceMs accepts number or null (off)', () => {
+    const r1 = setSyncCadenceMs(defaultRegistry(), 5 * 60_000);
+    expect(r1.sync_cadence_ms).toBe(300_000);
+    const r2 = setSyncCadenceMs(r1, null);
+    expect(r2.sync_cadence_ms).toBeNull();
+  });
+
+  it('setSyncDefaultPolicy stores the chosen policy', () => {
+    const r1 = setSyncDefaultPolicy(defaultRegistry(), 'pause-on-conflict');
+    expect(r1.sync_default_policy).toBe('pause-on-conflict');
+    const r2 = setSyncDefaultPolicy(r1, 'drain-blind');
+    expect(r2.sync_default_policy).toBe('drain-blind');
+  });
+
+  it('setSyncConfirmServerDeletes stores boolean', () => {
+    const r1 = setSyncConfirmServerDeletes(defaultRegistry(), false);
+    expect(r1.sync_confirm_server_deletes).toBe(false);
+  });
+
+  it('setSyncPauseAll stores boolean', () => {
+    const r1 = setSyncPauseAll(defaultRegistry(), true);
+    expect(r1.sync_pause_all).toBe(true);
+  });
+
+  it('setWorldPaused only flips the named world', () => {
+    let reg = defaultRegistry();
+    reg = createLocalWorld(reg, { name: 'A', folderName: 'a', handleKey: 'kA' }).next;
+    reg = createLocalWorld(reg, { name: 'B', folderName: 'b', handleKey: 'kB' }).next;
+    const targetId = reg.worlds[0].id;
+    const after = setWorldPaused(reg, targetId, true);
+    expect(after.worlds[0].sync_paused).toBe(true);
+    expect(after.worlds[1].sync_paused).toBeUndefined();
+  });
+
+  it('all sync settings round-trip through save/load', () => {
+    let reg = setSyncPullOnActivate(defaultRegistry(), true);
+    reg = setSyncCadenceMs(reg, 60_000);
+    reg = setSyncDefaultPolicy(reg, 'ask');
+    reg = setSyncConfirmServerDeletes(reg, false);
+    reg = setSyncPauseAll(reg, true);
+    saveRegistry(reg);
+    const loaded = loadRegistry();
+    expect(loaded.sync_pull_on_activate).toBe(true);
+    expect(loaded.sync_cadence_ms).toBe(60_000);
+    expect(loaded.sync_default_policy).toBe('ask');
+    expect(loaded.sync_confirm_server_deletes).toBe(false);
+    expect(loaded.sync_pause_all).toBe(true);
   });
 });

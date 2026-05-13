@@ -10,10 +10,46 @@ import { startApp } from './app';
 import { getState as _getState, patchSlice as _patchSlice } from './core/state';
 import { getActiveStore as _getActiveStore } from './ui/create-world-modal';
 
+function isFolderModeSupported(): boolean {
+  return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+}
+
+function renderUnsupportedPage(root: HTMLElement): void {
+  root.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'atlas-unsupported';
+  wrap.innerHTML = `
+    <div class="atlas-unsupported-panel">
+      <div class="atlas-unsupported-icon">
+        <span class="material-symbols-outlined">folder_special</span>
+      </div>
+      <h1>atlas needs a chromium browser</h1>
+      <p>
+        atlas stores your worlds as real files on your computer using the
+        <b>file system access api</b>, which is currently only available in chrome
+        and edge (and other chromium-based browsers).
+      </p>
+      <p>
+        open this page in <b>chrome</b> or <b>edge</b> to use atlas. firefox and
+        safari can browse but not edit local worlds.
+      </p>
+      <div class="atlas-unsupported-actions">
+        <a href="https://www.google.com/chrome/" target="_blank" rel="noopener">download chrome →</a>
+        <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener">download edge →</a>
+      </div>
+    </div>
+  `;
+  root.appendChild(wrap);
+}
+
 function boot(): void {
   const root = document.getElementById('app');
   if (!root) {
     console.error('[atlas] #app element missing');
+    return;
+  }
+  if (!isFolderModeSupported()) {
+    renderUnsupportedPage(root);
     return;
   }
   startApp(root);

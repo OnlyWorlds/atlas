@@ -63,6 +63,8 @@ export type RightTabRef =
 export interface SyncSummaryState {
   byWorld: Record<string, SyncEngineState>;
   activeSync: SyncEngineState | null;
+  /** Pending conflicts count for the active world, surfaced as a badge. */
+  activeConflictsCount: number;
 }
 
 export interface UiState {
@@ -109,6 +111,7 @@ let state: AppState = {
   sync: {
     byWorld: {},
     activeSync: null,
+    activeConflictsCount: 0,
   },
   busy: false,
 };

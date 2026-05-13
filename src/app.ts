@@ -17,6 +17,7 @@ import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
 import { onHashChange, parseHash } from './core/router';
 import { hydrateAtlasRoot } from './setup/atlas-root-flow';
 import { activateWorld } from './sidebar/worlds-sidebar';
+import { initAutoPullScheduler } from './sync/auto-pull-scheduler';
 import type { WorldMap } from './core/types';
 
 export interface AppHandle {
@@ -34,6 +35,10 @@ export function startApp(container: HTMLElement): AppHandle {
   // Mount toast surface (uses #toast-container element from index.html)
   toastManager.init();
   const toasts = toastManager;
+
+  // Wire periodic auto-pull (Phase 3.5+). Reads settings from registry;
+  // reconciles every state tick. No-op when cadence is off (default).
+  initAutoPullScheduler();
 
   // Boot-time auto-activation: if the URL names a world and FS permission was
   // already granted in a previous session (queryPermission returns 'granted'

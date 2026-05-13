@@ -119,8 +119,9 @@ export class MockFolderStore implements FolderStore {
     return all.filter(e => e.type === 'pin' && (e as { element_id?: string }).element_id === id);
   }
 
-  async deleteElement(id: string, opts: { cascade?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
-    const cascade = opts.cascade ?? true;
+  async deleteElement(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
+    const silent = opts.silent ?? false;
+    const cascade = silent ? false : (opts.cascade ?? true);
     const existing = this.elements.get(id);
     if (!existing) return { tombstones: [] };
 
@@ -134,10 +135,12 @@ export class MockFolderStore implements FolderStore {
         written.push(tomb);
       }
     }
-    const primary: Tombstone = { id, type: existing.type, deleted_at: this.clock() };
-    this.tombstones.push(primary);
+    if (!silent) {
+      const primary: Tombstone = { id, type: existing.type, deleted_at: this.clock() };
+      this.tombstones.push(primary);
+      written.push(primary);
+    }
     this.elements.delete(id);
-    written.push(primary);
     return { tombstones: written };
   }
 
@@ -241,6 +244,13 @@ export class MockFolderStore implements FolderStore {
     const existing = this.elements.get(id);
     if (!existing) return;
     this.elements.set(id, { ...existing, server_updated_at });
+  }
+
+  async clearServerBaseline(id: string): Promise<void> {
+    const existing = this.elements.get(id);
+    if (!existing) return;
+    const { server_updated_at: _drop, ...rest } = existing;
+    this.elements.set(id, rest as Element);
   }
 
   async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {

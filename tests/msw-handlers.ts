@@ -26,6 +26,15 @@ export interface StatefulServerOptions {
   clock?: () => string;
   /** When true, GET returns nested relation objects to exercise the unwrap path. */
   serveNestedRelations?: boolean;
+  /**
+   * When true, CREATE ignores client-sent `id` and assigns a fresh server-side
+   * UUID. Matches real OW behavior in production: even though the API once
+   * accepted client UUIDs, the live server now appears to enforce its own
+   * id format (UUID v7) and silently overrides client-sent v4 ids.
+   *
+   * Tests covering the id-swap path on CREATE should enable this.
+   */
+  assignsServerIds?: boolean;
 }
 
 export function statefulOwHandlers(options: StatefulServerOptions = {}): {
@@ -111,7 +120,10 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
     http.post(`${base}/:type/`, async ({ params, request }) => {
       const type = String(params.type);
       const body = (await request.json()) as Record<string, unknown>;
-      const id = (body.id as string) ?? crypto.randomUUID();
+      // assignsServerIds: ignore client id entirely (real OW behavior with v4 input).
+      const id = options.assignsServerIds
+        ? crypto.randomUUID()
+        : (body.id as string) ?? crypto.randomUUID();
       const record: ServerRecord = { ...body, id, updated_at: clock() };
       bucket(type).set(id, record);
       return HttpResponse.json(maybeNestRelations(record), { status: 201 });

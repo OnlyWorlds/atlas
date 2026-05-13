@@ -358,13 +358,24 @@ export class MakeOnlineModal extends BaseModal {
       const updatedEntry = reg.worlds.find((w) => w.id === active.worldId)!;
       attachSyncEngine(updatedEntry, folder);
 
+      // 5b. Refresh elements cache — bidirectional merge may have downloaded
+      // server-only elements and swapped local ids, so the in-memory cache is
+      // stale by now.
+      try {
+        const elements = await folder.listElements();
+        patchSlice('data', { elements });
+      } catch (err) {
+        console.warn('[make-online] refresh-after-merge failed:', err);
+      }
+
       // 6. Toast.
-      const { creates, updates, skipped, failures } = mergeResult;
+      const { creates, updates, skipped, downloaded, failures } = mergeResult;
       const failed = failures.length;
       const parts: string[] = [];
-      if (creates) parts.push(`${creates} created`);
+      if (creates) parts.push(`${creates} pushed`);
       if (updates) parts.push(`${updates} updated`);
       if (skipped) parts.push(`${skipped} skipped`);
+      if (downloaded) parts.push(`${downloaded} downloaded`);
       if (failed) parts.push(`${failed} failed`);
       const summary = parts.length ? parts.join(', ') : 'nothing to merge';
       const verb = failed > 0 ? this.toasts.error.bind(this.toasts) : this.toasts.success.bind(this.toasts);

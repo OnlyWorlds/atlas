@@ -51,13 +51,44 @@ describe('adaptRecord (unit) — wire-shape conversion', () => {
     expect(out.map).toBeUndefined();
   });
 
-  it('unwraps nested relation array → <field>_ids', () => {
+  it('unwraps nested relation array to bare field name (3.5+ disk shape)', () => {
     const out = adaptRecord(
       { id: 'c1', updated_at: 't', species: [{ id: 's1', name: 'elf' }, { id: 's2', name: 'hobbit' }] },
       'character'
     );
-    expect(out.species_ids).toEqual(['s1', 's2']);
-    expect(out.species).toBeUndefined();
+    // Bare field name (matches FIELD_SCHEMA + UI). Wire conversion happens
+    // on push, not on storage.
+    expect(out.species).toEqual(['s1', 's2']);
+    expect(out.species_ids).toBeUndefined();
+  });
+
+  it('unwraps nested single relation to bare field name for non-pin types', () => {
+    const out = adaptRecord(
+      { id: 'c1', updated_at: 't', birthplace: { id: 'loc-1', name: 'Bag End' } },
+      'character'
+    );
+    expect(out.birthplace).toBe('loc-1');
+    expect(out.birthplace_id).toBeUndefined();
+  });
+
+  it('normalizes wire-shape `_id`/`_ids` from server back to bare for non-pin types', () => {
+    const out = adaptRecord(
+      { id: 'c1', updated_at: 't', birthplace_id: 'loc-1', species_ids: ['s1', 's2'] },
+      'character'
+    );
+    expect(out.birthplace).toBe('loc-1');
+    expect(out.species).toEqual(['s1', 's2']);
+    expect(out.birthplace_id).toBeUndefined();
+    expect(out.species_ids).toBeUndefined();
+  });
+
+  it('pin keeps `_id` suffix (storage matches wire — element_id stays element_id)', () => {
+    const out = adaptRecord(
+      { id: 'p1', updated_at: 't', map_id: 'map42', element_id: 'char7' },
+      'pin'
+    );
+    expect(out.map_id).toBe('map42');
+    expect(out.element_id).toBe('char7');
   });
 
   it('leaves non-relation arrays alone (no id property)', () => {

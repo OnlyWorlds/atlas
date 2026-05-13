@@ -79,9 +79,21 @@ export async function writeJsonAtomic(
   const tmpName = `${name}${TMP_SUFFIX}`;
   const json = JSON.stringify(value, null, 2);
 
-  // Write tmp
+  // Quick read of the existing file (if any) so we can detect "write succeeded
+  // but content didn't actually change" — a Chromium FS Access API quirk
+  // observed in the wild. Diagnostic only; doesn't change behavior on success.
+  const before = await (async () => {
+    try {
+      const h = await dir.getFileHandle(name);
+      return (await h.getFile()).text();
+    } catch { return null; }
+  })();
+
+  // Write tmp — explicitly truncate so we don't inherit stale bytes from any
+  // prior write.
   const tmpHandle = await dir.getFileHandle(tmpName, { create: true });
   const writer = await tmpHandle.createWritable();
+  await writer.truncate(0);
   await writer.write(json);
   await writer.close();
 
@@ -95,10 +107,33 @@ export async function writeJsonAtomic(
 
   // Promote: write final, then drop tmp. (Real rename isn't exposed by FS
   // Access API; this two-step is the best portable approximation.)
+  // Truncate first — without this, if the new content is shorter than the
+  // existing file, trailing bytes from the old content remain and produce
+  // malformed JSON on the next read.
   const finalHandle = await dir.getFileHandle(name, { create: true });
   const finalWriter = await finalHandle.createWritable();
+  await finalWriter.truncate(0);
   await finalWriter.write(json);
   await finalWriter.close();
+
+  // Read-back verify on the FINAL file too. Catches the silent-write quirk
+  // where close() reports success but the on-disk content didn't actually
+  // change. If this fires, we throw rather than letting the caller believe
+  // the write succeeded.
+  const finalVerify = await (await finalHandle.getFile()).text();
+  if (finalVerify !== json) {
+    console.warn(`[fs-utils] writeJsonAtomic final read-back diverges from intent`, {
+      name,
+      beforeLength: before?.length ?? null,
+      expectedLength: json.length,
+      gotLength: finalVerify.length,
+      expectedPreview: json.slice(0, 200),
+      gotPreview: finalVerify.slice(0, 200),
+      sameAsBefore: before !== null && finalVerify === before,
+    });
+    await dir.removeEntry(tmpName).catch(() => {});
+    throw new Error(`writeJsonAtomic: final file does not match intent for ${name} (silent-write quirk?)`);
+  }
 
   await dir.removeEntry(tmpName).catch(() => {});
 }

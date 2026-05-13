@@ -96,6 +96,7 @@ test('re-use: picking a folder that is already an atlas root does NOT double-wra
   await page.click('[data-action="pick"]');
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'In Existing Root' })).toBeVisible();
   await page.click('[data-action="open-settings"]');
+  await page.click('[data-settings-tab="atlas"]');
   await expect(page.locator('.atlas-settings')).toContainText('existing-root');
 
   // No atlas-worlds subfolder should have been created.
@@ -199,14 +200,15 @@ test('settings shows atlas folder + identity fields', async ({ page }) => {
   await page.click('[data-action="open-settings"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
 
-  // Atlas folder section shows the picked folder name.
-  await expect(page.locator('.atlas-settings')).toContainText('atlas-root-d');
-
-  // Identity fields persist.
+  // Default tab is 'identity' — email/pin inputs are visible.
   await page.fill('input[name="email"]', 'titus@example.com');
   await page.locator('input[name="email"]').blur();
   await page.fill('input[name="pin"]', '4242');
   await page.locator('input[name="pin"]').blur();
+
+  // Click atlas tab to verify the picked folder name shows up.
+  await page.click('[data-settings-tab="atlas"]');
+  await expect(page.locator('.atlas-settings')).toContainText('atlas-root-d');
 
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('atlas_worlds_registry')!));
   expect(stored.email).toBe('titus@example.com');
@@ -316,6 +318,8 @@ test('forget world removes it from sidebar + nav to root, atlas root preserved',
 
   page.on('dialog', d => d.accept());
   await page.click('[data-action="open-settings"]');
+  // Delete-world button lives on the World tab.
+  await page.click('[data-settings-tab="world"]');
   await page.click('[data-action="delete-world"]');
 
   // World list empty but atlas root still present (we forgot the world, not the folder root).
@@ -331,8 +335,9 @@ test('change atlas folder swaps the root without losing existing worlds', async 
   await page.click('[data-action="pick"]');
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Pre-Swap' })).toBeVisible();
 
-  // Go to settings, queue a different folder, click change.
+  // Go to settings, switch to atlas tab, queue a different folder, click change.
   await page.click('[data-action="open-settings"]');
+  await page.click('[data-settings-tab="atlas"]');
   await expect(page.locator('.atlas-settings')).toContainText('atlas-root-g1');
   await page.evaluate(async () => {
     const api = (window as any).__atlasTestApi;
@@ -354,12 +359,13 @@ test('settings gear opens panel without an active world', async ({ page }) => {
   await page.click('[data-action="open-settings"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
   await expect(page.locator('.atlas-settings h2')).toContainText('settings');
-  // Atlas folder section shows "not set up yet" with primary CTA.
+  // Click the atlas tab to verify the "not set up" prompt is in there.
+  await page.click('[data-settings-tab="atlas"]');
   await expect(page.locator('.atlas-settings')).toContainText('not set up yet');
   await expect(page.locator('[data-action="change-atlas-root"]')).toBeVisible();
-  // URL hash uses the standalone settings route.
+  // URL hash uses the standalone settings route (with tab segment).
   const hash = await page.evaluate(() => window.location.hash);
-  expect(hash).toBe('#/settings');
+  expect(hash).toMatch(/^#\/settings\/atlas$/);
 });
 
 test('rescan: re-picking an existing root after a localStorage wipe imports worlds', async ({ page }) => {

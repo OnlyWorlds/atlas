@@ -19,6 +19,8 @@ import { ToastManager } from '../../ui/toast-manager';
 import { mountMapIndexTab } from './map-index-tab';
 import { mountMapTab, disposeMapTab, disposeAllMapTabs } from './map-tab';
 import { navigate, parseHash, worldHash } from '../../core/router';
+import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount } from '../../sync/sync-attach';
+import { ConflictReviewModal } from '../../ui/conflict-review-modal';
 
 export interface RightPaneMount {
   tabBar: HTMLElement;
@@ -54,7 +56,7 @@ export function mountRightPane(mount: RightPaneMount): () => void {
     }
 
     renderTabBar(ui.rightTabs, ui.rightActiveIndex);
-    renderSyncIndicator(state);
+    renderSyncIndicator(state, toasts);
 
     const tabKey = activeTabKey();
     if (tabKey === lastTabKey) return;
@@ -140,7 +142,7 @@ function closeMapTab(idx: number, mapId: string): void {
  *   (SyncEngineState.kind): idle→synced, syncing→saving, paused→offline, error→error.
  *   Falls back to `linked` if no engine state has reported yet.
  */
-function renderSyncIndicator(state: ReturnType<typeof getState>): void {
+function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastManager): void {
   let pill = document.querySelector<HTMLElement>('[data-role="sync-pill"]');
   if (!pill) {
     pill = document.createElement('div');
@@ -152,6 +154,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>): void {
   if (!active) {
     pill.dataset.state = 'none';
     pill.innerHTML = '';
+    pill.removeAttribute('data-clickable');
     return;
   }
   const entry = state.registry.worlds.find(w => w.id === active.worldId);
@@ -163,18 +166,69 @@ function renderSyncIndicator(state: ReturnType<typeof getState>): void {
       <span class="atlas-sync-pill-dot"></span>
       <span>local</span>
     `;
+    pill.removeAttribute('data-clickable');
     return;
   }
 
   // api-linked: surface engine state if available.
   const engine = state.sync.activeSync;
+  const conflictCount = state.sync.activeConflictsCount;
   const { dataState, label, title } = mapEngineStateToPill(engine);
   pill.dataset.state = dataState;
-  pill.title = title;
+  pill.dataset.clickable = 'true';
+  pill.title = title + ' · click to refresh from api';
+  const conflictBadge = conflictCount > 0
+    ? `<span class="atlas-sync-pill-conflict" data-role="review-conflicts" title="${conflictCount} conflict${conflictCount === 1 ? '' : 's'} to review">⚠ ${conflictCount}</span>`
+    : '';
   pill.innerHTML = `
     <span class="atlas-sync-pill-dot"></span>
     <span>${label}</span>
+    ${conflictBadge}
+    <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="refresh from api">refresh</span>
   `;
+
+  // Conflict badge click — open the review modal. Caller stops propagation
+  // so the pill's parent click handler doesn't fire a refresh.
+  pill.querySelector<HTMLElement>('[data-role="review-conflicts"]')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    void new ConflictReviewModal(toasts).open().then(() => refreshConflictsCount());
+  });
+
+  // Click anywhere on the pill triggers a manual pull (when not already syncing).
+  pill.onclick = async () => {
+    const eng = getCurrentSyncEngine();
+    if (!eng) {
+      toasts.info('engine not ready');
+      return;
+    }
+    const cur = state.sync.activeSync;
+    if (cur?.kind === 'syncing') {
+      // Already in flight; the engine will dedupe but no need to fire again.
+      return;
+    }
+    if (cur?.kind === 'paused') {
+      toasts.info(cur.reason === 'network' ? 'offline — pull skipped' : 'sync paused — flip stay-offline off to pull');
+      return;
+    }
+    try {
+      const result = await pullNowAndRefresh();
+      if (!result) {
+        toasts.info('engine not ready');
+        return;
+      }
+      const total = result.pulled.creates + result.pulled.updates;
+      if (total === 0) {
+        toasts.info('already up to date');
+      } else {
+        toasts.success(`pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
+      }
+      if (result.conflicts.length > 0) {
+        toasts.info(`${result.conflicts.length} conflict${result.conflicts.length === 1 ? '' : 's'} detected — review pending`);
+      }
+    } catch (err) {
+      toasts.error(err instanceof Error ? err.message : String(err));
+    }
+  };
 }
 
 function mapEngineStateToPill(

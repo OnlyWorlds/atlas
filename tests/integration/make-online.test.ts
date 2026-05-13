@@ -205,4 +205,116 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     expect(apply.map(e => e.done)).toEqual([1, 2, 3]);
     expect(apply.every(e => e.total === 3)).toBe(true);
   });
+
+  // ---- Bidirectional merge (3.5+) ----
+
+  it('downloads server-only elements into local folder', async () => {
+    const adapter = makeAdapter();
+    // Server has two elements local doesn't know about.
+    await adapter.createElement('character', { id: 'srv-1', name: 'ServerAlice' });
+    await adapter.createElement('location', { id: 'srv-loc-1', name: 'ServerShire' });
+    // Local has one element server doesn't have.
+    await folder.createElement('character', { name: 'LocalBob' });
+
+    const result = await mergeLocalIntoApi(folder, adapter, 'b');
+
+    expect(result.creates).toBe(1);      // LocalBob pushed
+    expect(result.downloaded).toBe(2);   // ServerAlice + ServerShire pulled
+    expect(result.updates).toBe(0);
+    expect(result.skipped).toBe(0);
+
+    // Local now has 3 elements: LocalBob (original local id), ServerAlice + ServerShire (server ids).
+    const localAfter = await folder.listElements();
+    expect(localAfter).toHaveLength(3);
+    expect(localAfter.find(e => e.id === 'srv-1')?.name).toBe('ServerAlice');
+    expect(localAfter.find(e => e.id === 'srv-loc-1')?.name).toBe('ServerShire');
+  });
+
+  it('id-swap on policy b name+type match: local file moves to server id, old file silently removed', async () => {
+    const adapter = makeAdapter();
+    await adapter.createElement('character', { id: 'srv-alice', name: 'Alice' });
+
+    // Local Alice has a different (random) id.
+    const localAlice = await folder.createElement('character', { name: 'Alice' });
+    expect(localAlice.id).not.toBe('srv-alice');
+
+    const result = await mergeLocalIntoApi(folder, adapter, 'b');
+    expect(result.updates).toBe(1);
+
+    // Local now has Alice at srv-alice; the old local id is gone.
+    expect(await folder.getElement('srv-alice')).not.toBeNull();
+    expect(await folder.getElement(localAlice.id)).toBeNull();
+
+    // No tombstone written for the silent removal (otherwise next sync would
+    // try to DELETE srv-alice on the server, undoing the merge).
+    const tombs = await folder.listTombstonesSince(null);
+    expect(tombs.find(t => t.id === localAlice.id)).toBeUndefined();
+  });
+
+  it('id-swap on policy c name+type match: local file adopts server content + id', async () => {
+    const adapter = makeAdapter();
+    await adapter.createElement('character', { id: 'srv-alice', name: 'Alice', description: 'wizardly' });
+
+    const localAlice = await folder.createElement('character', { name: 'Alice', description: 'sneaky' });
+
+    const result = await mergeLocalIntoApi(folder, adapter, 'c');
+    expect(result.skipped).toBe(1);
+
+    // Local Alice has server's content + server's id.
+    const adoptedAlice = await folder.getElement('srv-alice');
+    expect(adoptedAlice?.description).toBe('wizardly');
+    // Old local file gone.
+    expect(await folder.getElement(localAlice.id)).toBeNull();
+  });
+
+  it('rewrites foreign-key references after id-swap (single-link field)', async () => {
+    const adapter = makeAdapter();
+    await adapter.createElement('species', { id: 'srv-hobbit', name: 'Hobbit' });
+
+    // Local species + local character referencing it.
+    const localHobbit = await folder.createElement('species', { name: 'Hobbit' });
+    await folder.createElement('character', { name: 'Frodo', species: localHobbit.id });
+
+    await mergeLocalIntoApi(folder, adapter, 'b');
+
+    const frodo = (await folder.listElements()).find(e => e.name === 'Frodo');
+    expect(frodo?.species).toBe('srv-hobbit');
+    // Old local species id is no longer referenced anywhere.
+    expect(frodo?.species).not.toBe(localHobbit.id);
+  });
+
+  it('rewrites foreign-key references in array fields after id-swap', async () => {
+    const adapter = makeAdapter();
+    await adapter.createElement('species', { id: 'srv-hobbit', name: 'Hobbit' });
+
+    const localHobbit = await folder.createElement('species', { name: 'Hobbit' });
+    await folder.createElement('character', {
+      name: 'Frodo',
+      species_ids: [localHobbit.id, 'other-id-untouched'],
+    });
+
+    await mergeLocalIntoApi(folder, adapter, 'b');
+
+    const frodo = (await folder.listElements()).find(e => e.name === 'Frodo');
+    expect(frodo?.species_ids).toEqual(['srv-hobbit', 'other-id-untouched']);
+  });
+
+  it('counts all three buckets across multiple types', async () => {
+    const adapter = makeAdapter();
+    // Server has: 1 char (Alice), 1 location (Shire) — neither matches local.
+    await adapter.createElement('character', { id: 's-a', name: 'ServerAlice' });
+    await adapter.createElement('location', { id: 's-s', name: 'ServerShire' });
+    // Local has: 1 char same name (will swap), 1 char new, 1 location new.
+    await folder.createElement('character', { name: 'ServerAlice' }); // name-match → swap
+    await folder.createElement('character', { name: 'LocalCarol' });
+    await folder.createElement('location', { name: 'LocalForest' });
+
+    const result = await mergeLocalIntoApi(folder, adapter, 'b');
+
+    expect(result.creates).toBe(2);      // LocalCarol, LocalForest
+    expect(result.updates).toBe(1);      // matched-swap ServerAlice
+    expect(result.skipped).toBe(0);
+    expect(result.downloaded).toBe(1);   // ServerShire (no local match)
+    expect(result.failures).toEqual([]);
+  });
 });

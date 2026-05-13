@@ -68,8 +68,13 @@ export interface FolderStore {
    *
    * Pass `cascade: false` only for advanced flows (engine cleanups, repairs);
    * UI flows must use the default to avoid orphaning dependents.
+   *
+   * Pass `silent: true` to remove the file WITHOUT writing tombstones. Used by
+   * id-swap during Route 2 merge — the local file at the old id never had a
+   * server counterpart, so no DELETE should propagate. Silent also implies
+   * `cascade: false` (silent delete is a surgical operation, not a sweep).
    */
-  deleteElement(id: string, opts?: { cascade?: boolean }): Promise<{ tombstones: Tombstone[] }>;
+  deleteElement(id: string, opts?: { cascade?: boolean; silent?: boolean }): Promise<{ tombstones: Tombstone[] }>;
   /**
    * Preview what would be deleted alongside `id` if `deleteElement(id)` ran with
    * cascade enabled. Returns the dependents (NOT the primary). UI uses this for
@@ -133,6 +138,13 @@ export interface FolderStore {
    * push or pull). Does NOT change `local_updated_at`.
    */
   stampServerUpdatedAt(id: string, type: ElementType, server_updated_at: string): Promise<void>;
+
+  /**
+   * Clear `server_updated_at` on a local element. Used when resolving a
+   * server-side delete as "keep" — the element should be treated as never-synced
+   * so the next push CREATEs it back on the server.
+   */
+  clearServerBaseline(id: string): Promise<void>;
 
   /**
    * Apply a server record verbatim. Sets BOTH `local_updated_at` and

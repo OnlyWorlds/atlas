@@ -22,6 +22,12 @@ export class FakeOwApiClient implements OwApiClient {
   private byType = new Map<ElementType, Map<string, ServerRecord>>();
   /** Test seam: per-id-and-operation error injection. */
   private injectedFailures = new Map<string, { msg: string }>();
+  /**
+   * Test seam: when true, CREATE ignores client-sent `id` and assigns a fresh
+   * uuid (simulating real OW server behavior that enforces v7 format).
+   * Tests covering the id-swap path on CREATE should enable this.
+   */
+  assignServerIds = false;
 
   // Capture of every call for assertion.
   calls: Array<
@@ -42,7 +48,8 @@ export class FakeOwApiClient implements OwApiClient {
 
   async createElement(type: ElementType, body: Record<string, unknown>): Promise<ServerRecord> {
     this.calls.push({ method: 'create', type, body: { ...body } });
-    const id = (body.id as string) ?? cryptoRandomId();
+    // Real OW behavior: ignore client-sent id when assignServerIds=true.
+    const id = this.assignServerIds ? cryptoRandomId() : (body.id as string) ?? cryptoRandomId();
     this.throwIfInjected('create', id);
     const record: ServerRecord = { ...body, id, type, updated_at: this.clock() };
     this.bucket(type).set(id, record);

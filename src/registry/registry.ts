@@ -256,6 +256,45 @@ export function setEmail(reg: WorldsRegistry, email: string | undefined): Worlds
   return { ...reg, email: email?.trim() || undefined };
 }
 
+// ---- Sync settings (Phase 3.5+) ----
+
+export function setSyncPullOnActivate(reg: WorldsRegistry, on: boolean): WorldsRegistry {
+  return { ...reg, sync_pull_on_activate: on };
+}
+
+export function setSyncCadenceMs(reg: WorldsRegistry, ms: number | null): WorldsRegistry {
+  return { ...reg, sync_cadence_ms: ms };
+}
+
+export function setSyncDefaultPolicy(
+  reg: WorldsRegistry,
+  policy: 'drain-blind' | 'pause-on-conflict' | 'ask'
+): WorldsRegistry {
+  return { ...reg, sync_default_policy: policy };
+}
+
+export function setSyncConfirmServerDeletes(reg: WorldsRegistry, on: boolean): WorldsRegistry {
+  return { ...reg, sync_confirm_server_deletes: on };
+}
+
+export function setSyncPauseAll(reg: WorldsRegistry, paused: boolean): WorldsRegistry {
+  return { ...reg, sync_pause_all: paused };
+}
+
+/** Per-world "stay offline" toggle. */
+export function setWorldPaused(
+  reg: WorldsRegistry,
+  worldId: string,
+  paused: boolean
+): WorldsRegistry {
+  return {
+    ...reg,
+    worlds: reg.worlds.map(w =>
+      w.id === worldId ? { ...w, sync_paused: paused } : w
+    ),
+  };
+}
+
 // ---- Atlas root (default container for new local worlds) ----
 
 export interface SetAtlasRootOpts {
