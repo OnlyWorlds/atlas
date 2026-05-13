@@ -12,7 +12,7 @@
 
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
-import { getCurrentSyncEngine, getCurrentSyncFolder } from '../sync/sync-attach';
+import { getCurrentSyncEngine, getCurrentSyncFolder, refreshConflictsCount } from '../sync/sync-attach';
 import { patchSlice, getState } from '../core/state';
 import type { Conflict } from '../core/types';
 
@@ -98,6 +98,10 @@ export class ConflictReviewModal extends BaseModal {
               console.warn('[conflict-modal] refresh-after-resolve failed:', e);
             }
           }
+          // Refresh the badge count from sync-state so the pill updates
+          // immediately. Without this, the badge stays at the old count
+          // until the next engine state transition.
+          await refreshConflictsCount();
           this.updateTitle();
           if (this.conflicts.length === 0) {
             this.toasts.success('all conflicts resolved');

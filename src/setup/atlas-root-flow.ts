@@ -27,6 +27,7 @@ import {
   setActiveWorld,
   setPin,
   saveRegistry,
+  findLinkedWorld,
 } from '../registry/registry';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { newId } from '../store/folder-store';
@@ -343,6 +344,18 @@ export async function linkExistingApiWorldInRoot(
 
   const serverWorldId = world.id;
   const displayName = (opts.displayName ?? '').trim() || world.name?.trim() || 'untitled world';
+
+  // Block double-linking: atlas refuses to register a second local world to
+  // the same api world. Multi-device is handled by separate atlas instances
+  // (each with its own folder); two locals in one atlas linked to the same
+  // api would cause confusing sync amplification and has no valid use case.
+  const existingLink = findLinkedWorld(getState().registry, serverWorldId);
+  if (existingLink) {
+    throw new Error(
+      `this api world is already linked to a local world ("${existingLink.name}"). ` +
+      `open it from the sidebar, or unlink it first if you want to start fresh.`
+    );
+  }
 
   const rootHandle = await loadHandle(reg.atlas_root.handle_key);
   if (!rootHandle) {

@@ -173,10 +173,20 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // api-linked: surface engine state if available.
   const engine = state.sync.activeSync;
   const conflictCount = state.sync.activeConflictsCount;
-  const { dataState, label, title } = mapEngineStateToPill(engine);
+  const base = mapEngineStateToPill(engine);
+  // Pending conflicts override "synced" — sync is technically idle but the
+  // user has unresolved divergence. Show warm "review N" label instead of
+  // misleading green-synced.
+  const { dataState, label, title } = conflictCount > 0 && base.dataState === 'synced'
+    ? {
+        dataState: 'pending',
+        label: `review ${conflictCount}`,
+        title: `${conflictCount} unresolved conflict${conflictCount === 1 ? '' : 's'} — click ⚠ to resolve`,
+      }
+    : base;
   pill.dataset.state = dataState;
   pill.dataset.clickable = 'true';
-  pill.title = title + ' · click to refresh from api';
+  pill.title = title + (conflictCount > 0 ? '' : ' · click to refresh from api');
   const conflictBadge = conflictCount > 0
     ? `<span class="atlas-sync-pill-conflict" data-role="review-conflicts" title="${conflictCount} conflict${conflictCount === 1 ? '' : 's'} to review">⚠ ${conflictCount}</span>`
     : '';
@@ -216,14 +226,14 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
         toasts.info('engine not ready');
         return;
       }
-      const total = result.pulled.creates + result.pulled.updates;
-      if (total === 0) {
-        toasts.info('already up to date');
-      } else {
+      const totalUpdates = result.pulled.creates + result.pulled.updates;
+      // Engine's onSyncResult callback owns conflict toasts (policy-aware).
+      // Pill emits feedback only for the clean cases: pulled-something + nothing-new.
+      // Avoid double-toasting on conflicts.
+      if (totalUpdates > 0) {
         toasts.success(`pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
-      }
-      if (result.conflicts.length > 0) {
-        toasts.info(`${result.conflicts.length} conflict${result.conflicts.length === 1 ? '' : 's'} detected — review pending`);
+      } else if (result.conflicts.length === 0) {
+        toasts.info('already up to date');
       }
     } catch (err) {
       toasts.error(err instanceof Error ? err.message : String(err));

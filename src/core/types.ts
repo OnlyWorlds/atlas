@@ -235,8 +235,18 @@ export interface WorldsRegistry {
    */
   sync_cadence_ms?: number | null;
 
-  /** Default conflict policy for new engines. Default: `drain-blind`. */
-  sync_default_policy?: 'drain-blind' | 'pause-on-conflict' | 'ask';
+  /**
+   * Default conflict policy (Phase 3.5+, simplified to two values):
+   *   - `local-wins` (default): local edits always win. Push overwrites server.
+   *     Pull skips applying server changes for elements you've also edited.
+   *     One-shot toast per sync round. No badge, no modal.
+   *   - `pause-and-review`: nothing auto-resolves. Push skips, pull skips.
+   *     ⚠ badge fires. Modal lets user pick overwrite vs pull per element.
+   *
+   * Legacy values (`drain-blind`, `pause-on-conflict`, `ask`) are migrated on
+   * load — see `loadRegistry`.
+   */
+  sync_default_policy?: 'local-wins' | 'pause-and-review';
 
   /** Confirm before deleting locally to match a server-side delete. Default: true. */
   sync_confirm_server_deletes?: boolean;

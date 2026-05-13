@@ -138,12 +138,29 @@ export interface MergeResult {
  *
  * Per-element write errors are non-fatal and recorded in `failures`.
  */
+export interface MergeOpts {
+  /**
+   * Whether to treat same-name elements as duplicates. Default true (existing
+   * behavior). When false, only exact id matches count as duplicates — name
+   * collisions are pushed as fresh elements. Useful for worlds with
+   * intentional name collisions ("John the merchant" + "John the bandit").
+   */
+  matchByName?: boolean;
+  onProgress?: (p: MergeProgress) => void;
+}
+
 export async function mergeLocalIntoApi(
   folder: FolderStore,
   adapter: OwClientAdapter,
   policy: MergePolicy,
-  onProgress?: (p: MergeProgress) => void
+  optsOrProgress?: MergeOpts | ((p: MergeProgress) => void)
 ): Promise<MergeResult> {
+  // Back-compat: callers can still pass a progress callback as the 4th arg.
+  const opts: MergeOpts = typeof optsOrProgress === 'function'
+    ? { onProgress: optsOrProgress }
+    : (optsOrProgress ?? {});
+  const matchByName = opts.matchByName ?? true;
+  const onProgress = opts.onProgress;
   // 1. List all server elements (one fetch per type).
   const serverByType = new Map<ElementType, Array<{ id: string; updated_at: string } & Record<string, unknown>>>();
   let serverTotalForList = 0;
@@ -186,7 +203,7 @@ export async function mergeLocalIntoApi(
         localDecisions.push({ kind: 'matched-same-id', local, server: byId, type });
         continue;
       }
-      const byName = local.name
+      const byName = (matchByName && local.name)
         ? serverList.find(r =>
             !matchedServerIds.has(r.id) &&
             typeof r.name === 'string' &&
@@ -239,20 +256,57 @@ export async function mergeLocalIntoApi(
     }
   }
 
-  // 4b. Local-side decisions.
-  for (const dec of localDecisions) {
+  // 4b. Matched elements FIRST — populates idSwaps for any name+type matches
+  //     so subsequent CREATEs can reference the server's id, not the stale
+  //     local one. Without this ordering, a new local Character with
+  //     `friends: [matchedCharLocalId]` would send the local id to the
+  //     server's CREATE — server stores stale FK, local later rewrites only
+  //     its OWN file, server stays wrong.
+  const matchedDecisions = localDecisions.filter(d => d.kind !== 'create');
+  const createDecisions = localDecisions.filter(d => d.kind === 'create');
+
+  async function processDecision(dec: LocalDecision): Promise<void> {
     try {
       const { local, type } = dec;
+      // Always re-fetch local before sending to server. Picks up any in-loop
+      // rewrites from previous decisions (e.g. matched-swap registered a swap
+      // and rewriteIdReferences updated this element's FKs).
+      const current = await folder.getElement(local.id);
+      if (!current) {
+        // Silently removed by an in-loop swap targeting this id. Defensive.
+        done++;
+        onProgress?.({ done, total, phase: 'apply' });
+        return;
+      }
       if (dec.kind === 'create') {
-        const { local_updated_at: _l, server_updated_at: _s, ...body } = local;
+        const { local_updated_at: _l, server_updated_at: _s, ...body } = current;
         const response = await adapter.createElement(type, body);
-        await folder.stampServerUpdatedAt(local.id, type, response.updated_at);
+        if (response.id !== local.id) {
+          // Server assigned its own id (UUID v7 enforcement). Re-key the local
+          // file to the server's id so refs and the next pull's seenLocalIds
+          // check line up — otherwise pull would flag the old local id as
+          // "vanished from server" and fire the server-delete review modal.
+          console.info('[atlas:sync] merge: server assigned new id on create', {
+            type, localId: local.id, serverId: response.id,
+          });
+          const swapped = { ...body, id: response.id };
+          await folder.applyServerRecord(type, swapped, response.updated_at);
+          await folder.deleteElement(local.id, { silent: true });
+          idSwaps.set(local.id, response.id);
+        } else {
+          await folder.stampServerUpdatedAt(local.id, type, response.updated_at);
+        }
         creates++;
       } else if (dec.kind === 'matched-same-id') {
         if (policy === 'b') {
-          const { local_updated_at: _l, server_updated_at: _s, ...body } = local;
+          const { local_updated_at: _l, server_updated_at: _s, ...body } = current;
           const response = await adapter.updateElement(type, dec.server.id, body);
-          await folder.stampServerUpdatedAt(local.id, type, response.updated_at);
+          // Apply the SERVER's full post-PATCH response to local. PATCH is
+          // partial — fields the user didn't set locally stay on server.
+          // To make local reflect actual server state (so the UI shows the
+          // merged truth, not just what user typed), use the response body.
+          const { updated_at: _ts, ...fullBody } = response;
+          await folder.applyServerRecord(type, fullBody, response.updated_at);
           updates++;
         } else {
           // Policy c: overwrite local with server's full record.
@@ -265,10 +319,14 @@ export async function mergeLocalIntoApi(
         const serverId = dec.server.id;
         if (policy === 'b') {
           // UPDATE server with local body (server keeps server.id).
-          const { id: _lid, local_updated_at: _l, server_updated_at: _s, ...body } = local;
+          const { id: _lid, local_updated_at: _l, server_updated_at: _s, ...body } = current;
           const response = await adapter.updateElement(type, serverId, body);
-          // Re-save local at the new id with local's content.
-          await folder.applyServerRecord(type, { ...body, id: serverId }, response.updated_at);
+          // Apply server's full post-PATCH response (not just our local body)
+          // so the local file reflects everything server has — including the
+          // fields server kept untouched. Without this, the merged local would
+          // be missing every field local didn't explicitly set.
+          const { updated_at: _ts, ...fullBody } = response;
+          await folder.applyServerRecord(type, fullBody, response.updated_at);
           // Remove the old local file silently — never had a server counterpart.
           await folder.deleteElement(local.id, { silent: true });
           updates++;
@@ -294,9 +352,47 @@ export async function mergeLocalIntoApi(
     }
   }
 
-  // 5. Rewrite id references across all remaining local elements.
-  //    Any element that referenced a swapped local id should now point at the
-  //    new server id. We scan every field of every element.
+  // Phase ordering — circular FK dependency between matched + new locals:
+  //   - Matched element (e.g. Splashworth) may reference new locals (Bob, Carol)
+  //     via FK fields like friends/rivals
+  //   - New locals may reference the matched element
+  //
+  // To get both directions right server-side, we must:
+  //
+  //   1. Rewrite local files with the match-phase idSwaps (so any local that
+  //      references the matched-old-id now references the matched-server-id).
+  //   2. CREATE the new locals. Their body now correctly references the
+  //      matched-server-id. Their CREATE may produce more idSwaps (server-
+  //      assigned UUID v7).
+  //   3. Rewrite again with CREATE-time swaps (so the matched element's local
+  //      file now references the new locals' server-assigned ids).
+  //   4. UPDATE the matched elements with the now-correct refs in their bodies.
+  //   5. Final rewrite to catch any remaining propagation.
+
+  // 4b-1: Rewrite for match-phase swaps (matched-swap entries built idSwaps
+  // during the match phase already).
+  if (idSwaps.size > 0) {
+    await rewriteIdReferences(folder, idSwaps);
+  }
+
+  // 4b-2: Process CREATEs. Re-fetched local already has the post-rewrite FKs.
+  for (const dec of createDecisions) {
+    await processDecision(dec);
+  }
+
+  // 4b-3: Rewrite again — picks up any CREATE-time server-assigned ids so the
+  // matched elements' local files now reference the new server ids.
+  if (idSwaps.size > 0) {
+    await rewriteIdReferences(folder, idSwaps);
+  }
+
+  // 4b-4: Process matched UPDATEs. Re-fetched local body now has the new
+  // server ids for any references to created elements.
+  for (const dec of matchedDecisions) {
+    await processDecision(dec);
+  }
+
+  // 4b-5: Final rewrite — catches anything not yet propagated.
   if (idSwaps.size > 0) {
     await rewriteIdReferences(folder, idSwaps);
   }

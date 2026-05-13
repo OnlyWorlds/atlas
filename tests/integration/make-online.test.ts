@@ -299,6 +299,162 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     expect(frodo?.species_ids).toEqual(['srv-hobbit', 'other-id-untouched']);
   });
 
+  it('new local CREATE that references a matched-swap element sends server id, not local id', async () => {
+    // Captain's scenario: matched char has different ids local vs server.
+    // Two new local chars reference the matched one via FK (friends field).
+    // After merge, server should have those new chars with friends pointing
+    // at the SERVER's id of the matched char — not the stale local id.
+    const adapter = makeAdapter();
+    await adapter.createElement('character', { id: 'srv-alice', name: 'Alice' });
+
+    // Local Alice with a different (random) id.
+    const localAlice = await folder.createElement('character', { name: 'Alice' });
+    // Two new locals that reference Alice via FK.
+    const bob = await folder.createElement('character', { name: 'Bob', friends: [localAlice.id] });
+    const carol = await folder.createElement('character', { name: 'Carol', friends: [localAlice.id] });
+
+    await mergeLocalIntoApi(folder, adapter, 'b');
+
+    // Server-side: bob and carol's friends_ids should point at 'srv-alice',
+    // NOT localAlice.id. (Wire shape uses friends_ids per FIELD_SCHEMA;
+    // the test MSW handler doesn't run prepareRelations, so we check whatever
+    // form the body was sent in.)
+    const charsOnServer = await adapter.listElements('character');
+    const serverBob = charsOnServer.find(c => c.name === 'Bob')!;
+    const serverCarol = charsOnServer.find(c => c.name === 'Carol')!;
+    // Adapter normalizes _ids back to bare on read.
+    const bobFriends = (serverBob.friends as string[] | undefined) ?? (serverBob.friends_ids as string[] | undefined);
+    const carolFriends = (serverCarol.friends as string[] | undefined) ?? (serverCarol.friends_ids as string[] | undefined);
+    expect(bobFriends).toEqual(['srv-alice']);
+    expect(carolFriends).toEqual(['srv-alice']);
+
+    // Local files also have the correct refs.
+    const localAfter = await folder.listElements();
+    const localBob = localAfter.find(e => e.name === 'Bob')!;
+    const localCarol = localAfter.find(e => e.name === 'Carol')!;
+    expect(localBob.friends).toEqual(['srv-alice']);
+    expect(localCarol.friends).toEqual(['srv-alice']);
+    void bob; void carol;
+  });
+
+  it('handles server-assigned ids on local-only CREATE (id-swap during merge)', async () => {
+    // Simulates real OW: server assigns its own v7 id, ignoring client uuid.
+    // Regression for the "vanished from server" false-positive Captain caught
+    // immediately after a Route 2 merge with newly-created locals.
+    const adapter = makeAdapter();
+    // Server starts empty (no matches).
+    // Local has 2 unique characters.
+    const a = await folder.createElement('character', { name: 'NewA' });
+    const b = await folder.createElement('character', { name: 'NewB' });
+
+    // Override MSW to ignore client-sent ids on POST and assign fresh ones.
+    const { http, HttpResponse } = await import('msw');
+    mswServer.use(
+      http.post(`${TEST_BASE}/character/`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        // Strip client id; force server-side fresh uuid.
+        const { id: _drop, ...rest } = body;
+        void _drop;
+        const id = crypto.randomUUID();
+        return HttpResponse.json({ ...rest, id, updated_at: clock.next() }, { status: 201 });
+      })
+    );
+
+    const result = await mergeLocalIntoApi(folder, adapter, 'b');
+
+    expect(result.creates).toBe(2);
+    expect(result.failures).toEqual([]);
+
+    // Local files should now be at the SERVER's ids, not the client uuids.
+    expect(await folder.getElement(a.id)).toBeNull();
+    expect(await folder.getElement(b.id)).toBeNull();
+    const allLocal = await folder.listElements();
+    expect(allLocal).toHaveLength(2);
+    expect(allLocal.find(e => e.name === 'NewA')!.server_updated_at).toBeTruthy();
+    expect(allLocal.find(e => e.name === 'NewB')!.server_updated_at).toBeTruthy();
+
+    // Tombstones: should be EMPTY (silent removal) — otherwise a subsequent
+    // sync would push DELETE for the old client uuid.
+    const tombs = await folder.listTombstonesSince(null);
+    expect(tombs.find(t => t.id === a.id)).toBeUndefined();
+    expect(tombs.find(t => t.id === b.id)).toBeUndefined();
+  });
+
+  it('matched element references new local elements via FK — both directions push correctly', async () => {
+    // Captain's bug: Splashworth (matched by name) has friends/rivals
+    // pointing at locally-created Bob and Carol. After merge, server should
+    // have Splashworth WITH those friends pointing at Bob's and Carol's
+    // SERVER ids — not the stale local ids.
+    //
+    // Use assignsServerIds so server diverges from client ids — makes the
+    // assertion meaningful (otherwise serverBob.id === bob.id and "no leak"
+    // is trivially true).
+    const altState = statefulOwHandlers({
+      baseUrl: TEST_BASE,
+      clock: clock.next,
+      assignsServerIds: true,
+    });
+    mswServer.resetHandlers();
+    mswServer.use(...altState.handlers);
+    // Seed srv-alice DIRECTLY into the stateful state — bypassing the handler
+    // (which would assign a fresh id and we'd lose srv-alice).
+    if (!altState.state.get('character')) altState.state.set('character', new Map());
+    altState.state.get('character')!.set('srv-alice', {
+      id: 'srv-alice',
+      name: 'Alice',
+      updated_at: clock.next(),
+    });
+
+    const adapter = makeAdapter();
+
+    const bob = await folder.createElement('character', { name: 'Bob' });
+    const carol = await folder.createElement('character', { name: 'Carol' });
+    await folder.createElement('character', {
+      name: 'Alice',
+      friends: [bob.id, carol.id],
+    });
+
+    await mergeLocalIntoApi(folder, adapter, 'b');
+
+    const charsOnServer = await adapter.listElements('character');
+    const serverAlice = charsOnServer.find(c => c.id === 'srv-alice')!;
+    const serverBob = charsOnServer.find(c => c.name === 'Bob')!;
+    const serverCarol = charsOnServer.find(c => c.name === 'Carol')!;
+    // Server assigned its own ids — diverge from local.
+    expect(serverBob.id).not.toBe(bob.id);
+    expect(serverCarol.id).not.toBe(carol.id);
+    // Alice's friends point at the SERVER ids of Bob/Carol.
+    const aliceFriends = (serverAlice.friends as string[] | undefined) ?? (serverAlice.friends_ids as string[] | undefined) ?? [];
+    expect(aliceFriends).toContain(serverBob.id);
+    expect(aliceFriends).toContain(serverCarol.id);
+    // NOT the stale local ids.
+    expect(aliceFriends).not.toContain(bob.id);
+    expect(aliceFriends).not.toContain(carol.id);
+  });
+
+  it('matchByName=false: same-name elements are treated as separate items', async () => {
+    const adapter = makeAdapter();
+    // Server has Alice.
+    await adapter.createElement('character', { id: 'srv-alice', name: 'Alice' });
+    // Local also has Alice (different id, same name) + a unique Bob.
+    await folder.createElement('character', { name: 'Alice' });
+    await folder.createElement('character', { name: 'Bob' });
+
+    // With matchByName=false, local Alice should NOT match server Alice;
+    // both end up on server as separate elements with different ids.
+    const result = await mergeLocalIntoApi(folder, adapter, 'b', { matchByName: false });
+
+    expect(result.updates).toBe(0);  // no matched-swap or matched-same-id
+    expect(result.creates).toBe(2);  // local Alice + Bob both pushed as new
+    expect(result.downloaded).toBe(1);  // srv-alice has no local match → pulled
+
+    // Server now has 3 characters: srv-alice + new Alice + Bob.
+    const list = await adapter.listElements('character');
+    expect(list).toHaveLength(3);
+    expect(list.filter(c => c.name === 'Alice')).toHaveLength(2); // both Alices coexist
+    expect(list.find(c => c.name === 'Bob')).toBeDefined();
+  });
+
   it('counts all three buckets across multiple types', async () => {
     const adapter = makeAdapter();
     // Server has: 1 char (Alice), 1 location (Shire) — neither matches local.

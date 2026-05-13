@@ -65,8 +65,9 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
   const engine = new SyncEngine({
     folder,
     client: adapter,
-    policy: reg.sync_default_policy ?? 'drain-blind',
+    policy: reg.sync_default_policy ?? 'local-wins',
     onStateChange: (s) => publishSyncState(entry.id, s),
+    onSyncResult: (phase, result) => emitConflictToasts(phase, result),
   });
 
   currentEngine = engine;
@@ -231,6 +232,59 @@ function publishSyncState(worldId: string, engineState: SyncEngineState): void {
     void refreshConflictsCount();
     void refreshElementsCache();
   }
+}
+
+/**
+ * Emit a one-shot toast summarizing conflicts after a sync round + close the
+ * loop under `local-wins` by triggering a follow-up push.
+ *
+ * Behavior:
+ * - `pause-and-review`: stay silent. Badge + modal handle surfacing.
+ * - `local-wins`, push phase: server already overwritten. Toast confirms.
+ * - `local-wins`, pull phase: pull detected unpushed local divergence. Atlas
+ *   doesn't wait for the 5s autosave debounce — fire `pushOnce()` immediately
+ *   so local wins are propagated server-side right now. The subsequent
+ *   push-phase callback emits the final toast ("saved over..."). No "next
+ *   sync" hand-waving — convergence happens in one user action.
+ * - `local-wins`, combined sync phase: both already happened; emit a summary.
+ */
+function emitConflictToasts(
+  phase: 'push' | 'pull' | 'sync',
+  result: import('../core/types').SyncResult
+): void {
+  if (result.conflicts.length === 0) return;
+  const reg = getState().registry;
+  const policy = reg.sync_default_policy ?? 'local-wins';
+  if (policy === 'pause-and-review') return; // badge + modal handle it
+
+  const n = result.conflicts.length;
+
+  // Pull-phase conflicts under local-wins: trigger an immediate push so the
+  // local version actually propagates without waiting for the autosave timer.
+  // The push's own onSyncResult callback emits the user-facing toast — quieter
+  // and more accurate than a "will push later" message.
+  //
+  // CRITICAL: defer to next macrotask. The engine's `inFlight` is still set
+  // here (we're called from inside runPullOnly, before `.finally` clears it).
+  // Calling pushOnce() synchronously would return the in-flight PULL promise
+  // and silently no-op. setTimeout(0) yields until inFlight is cleared.
+  if (phase === 'pull') {
+    setTimeout(() => {
+      const engine = currentEngine;
+      if (!engine) return;
+      console.info('[atlas:sync] local-wins: pull detected conflict, firing pushOnce to converge');
+      engine.pushOnce().catch(err => {
+        console.warn('[atlas:sync] post-pull-conflict push failed:', err);
+      });
+    }, 0);
+    return;
+  }
+
+  // Push or sync phase: server was overwritten — confirm.
+  const message = phase === 'push'
+    ? `saved over server change${n === 1 ? '' : 's'} for ${n} element${n === 1 ? '' : 's'}`
+    : `resolved ${n} divergent element${n === 1 ? '' : 's'} in your favor`;
+  toastManager.info(message);
 }
 
 /** Re-prime `state.data.elements` from the active folder. Fire-and-forget. */

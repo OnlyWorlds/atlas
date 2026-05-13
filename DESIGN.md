@@ -298,17 +298,24 @@ interface SyncResult {
 3. For server elements missing locally that have NO tombstone → they were created on the server while we were offline; pull them.
 4. For folder elements missing on server that have NO tombstone AND `server_updated_at` is present (meaning they were synced before) → server deleted them; ask user (delete locally? restore on server? — Phase 3.5 polish, default behavior TBD).
 
-### Sync policies
+### Sync policies (Phase 3.5+, simplified to two)
 
-User-configurable per world (or globally; default global with per-world override later):
+Global setting (per-world overrides deferred to 3.6+). Default: `local-wins`.
 
-| Policy | On conflict during push |
-|---|---|
-| `drain-blind` (**default**) | Push your version anyway. Server's version overwritten. Conflict toast fires as info. |
-| `pause-on-conflict` | Skip the push. Local change is kept on disk untouched (`server_updated_at` baseline NOT advanced). Same conflict will surface again on every subsequent sync until the user resolves it manually (Phase 3.5 ships the modal). |
-| `ask` | Alias for `pause-on-conflict` until the Phase 3.5 per-field diff modal lands. |
+| Policy | Push conflict | Pull conflict | UI surfacing |
+|---|---|---|---|
+| **`local-wins`** (default) | Push local anyway, server overwritten | Skip applying server change for that element; local stays | One-shot toast per sync round. **No badge, no modal, no sync-state entries persisted.** |
+| **`pause-and-review`** | Skip the push, conflict persisted | Skip applying server change, conflict persisted | ⚠ badge fires on sync pill. Click → modal with per-element `overwrite (mine wins)` / `pull (theirs wins)` actions. Closing without picking = "decide later"; badge persists. |
 
-All three policies are wired today; `drain-blind` is the default. Note: true "server overwrites local" behavior is intentionally NOT a policy — destructive auto-resolution is too dangerous as an implicit default. Users who want a single element to take the server version invoke an explicit "Pull this element's server copy" action (Phase 3.5).
+Both policies apply symmetrically across push AND pull (same divergence, different direction). Legacy values (`drain-blind`, `pause-on-conflict`, `ask`) are migrated on load — see `registry.loadRegistry`.
+
+#### Why no `server-wins` policy
+
+Destructive auto-overwrite of local edits is too dangerous as an implicit default. Users who want server's version for a specific element invoke the explicit `pull (theirs wins)` action in the conflict modal (or the future per-element refresh button).
+
+#### When `pause-and-review` is the right choice
+
+When you're editing the world from multiple places (web app, multiple atlas instances, obsidian plugin) and need to know when changes diverge. The modal forces an explicit choice per conflict so nothing gets silently overwritten in either direction. Default for solo atlas users is `local-wins` since their edits should generally win.
 
 ### Pause semantics
 

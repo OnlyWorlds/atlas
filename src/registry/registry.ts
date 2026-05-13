@@ -20,14 +20,20 @@ export function loadRegistry(): WorldsRegistry {
   try {
     const raw = localStorage.getItem(REGISTRY_STORAGE_KEY);
     if (!raw) return defaultRegistry();
-    const parsed = JSON.parse(raw) as Partial<WorldsRegistry>;
+    const parsed = JSON.parse(raw) as Partial<WorldsRegistry> & { sync_default_policy?: string };
     if (!parsed || !Array.isArray(parsed.worlds)) return defaultRegistry();
+    // Migrate legacy conflict-policy names (Phase 3.5+ simplified to two values).
+    let policy: string | undefined = parsed.sync_default_policy;
+    if (policy === 'drain-blind') policy = 'local-wins';
+    else if (policy === 'pause-on-conflict' || policy === 'ask') policy = 'pause-and-review';
+    else if (policy !== 'local-wins' && policy !== 'pause-and-review') policy = undefined;
     // Spread all stored fields (including atlas_root and any future additions),
     // then narrow with defaults. Hand-picking fields silently drops new ones.
     return {
       ...parsed,
       version: parsed.version ?? 1,
       worlds: parsed.worlds,
+      sync_default_policy: policy as 'local-wins' | 'pause-and-review' | undefined,
     };
   } catch (err) {
     console.error('[registry] load failed, resetting:', err);
@@ -152,6 +158,24 @@ export function findWorld(reg: WorldsRegistry, worldId: string): WorldRegistryEn
   return reg.worlds.find(w => w.id === worldId);
 }
 
+/**
+ * Find a registered world already linked to the given api world id. Used to
+ * block double-linking: linking two local worlds to the same api world is
+ * confusing and has no legitimate use case in a single atlas instance
+ * (multi-device is handled by separate atlases, not separate worlds).
+ */
+export function findLinkedWorld(
+  reg: WorldsRegistry,
+  apiWorldId: string,
+  exceptWorldId?: string
+): WorldRegistryEntry | undefined {
+  return reg.worlds.find(w =>
+    w.id !== exceptWorldId &&
+    w.state === 'api-linked' &&
+    w.api?.world_id === apiWorldId
+  );
+}
+
 export function childrenOf(
   reg: WorldsRegistry,
   worldId: string | undefined
@@ -268,7 +292,7 @@ export function setSyncCadenceMs(reg: WorldsRegistry, ms: number | null): Worlds
 
 export function setSyncDefaultPolicy(
   reg: WorldsRegistry,
-  policy: 'drain-blind' | 'pause-on-conflict' | 'ask'
+  policy: 'local-wins' | 'pause-and-review'
 ): WorldsRegistry {
   return { ...reg, sync_default_policy: policy };
 }

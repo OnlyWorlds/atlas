@@ -24,7 +24,7 @@
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
-import { attachApi, saveRegistry, setPin, setEmail } from '../registry/registry';
+import { attachApi, saveRegistry, setPin, setEmail, findLinkedWorld } from '../registry/registry';
 import { getActiveStore } from './create-world-modal';
 import { attachSyncEngine, detachSyncEngine } from '../sync/sync-attach';
 import { SyncEngine } from '../sync/sync-engine';
@@ -138,6 +138,10 @@ export class MakeOnlineModal extends BaseModal {
               <span><strong>skip</strong> — keep server copy</span>
             </label>
           </fieldset>
+          <label class="atlas-settings-toggle" style="margin-top: 4px;">
+            <input type="checkbox" name="link-match-by-name" checked />
+            <span>treat same-name elements as duplicates (uncheck to allow same-name elements as separate items)</span>
+          </label>
           <div class="atlas-modal-error" data-role="link-error" hidden></div>
           <div class="atlas-modal-progress" data-role="link-progress" hidden></div>
           <div class="atlas-modal-actions">
@@ -227,6 +231,14 @@ export class MakeOnlineModal extends BaseModal {
       const world = await client.worlds.get() as { id?: string; name?: string };
       if (!world.id) throw new Error('server did not return a world id');
 
+      // 3b. Block double-link: refuse to link if another local world in this
+      // atlas is already linked to this api world.
+      const active1 = getState().active!;
+      const dupe1 = findLinkedWorld(getState().registry, world.id, active1.worldId);
+      if (dupe1) {
+        throw new Error(`this api world is already linked to "${dupe1.name}" locally. unlink it first or open it from the sidebar.`);
+      }
+
       // 4. Push all local elements as CREATEs via pushOnce on a transient engine.
       //    Detach any existing engine first; we'll attach a fresh one after the
       //    registry transition.
@@ -300,6 +312,8 @@ export class MakeOnlineModal extends BaseModal {
     const pin = (form.querySelector<HTMLInputElement>('input[name="link-pin"]')!).value.trim();
     const policyRadio = form.querySelector<HTMLInputElement>('input[name="link-policy"]:checked');
     const policy: MergePolicy = (policyRadio?.value === 'c') ? 'c' : 'b';
+    const matchByNameInput = form.querySelector<HTMLInputElement>('input[name="link-match-by-name"]');
+    const matchByName = matchByNameInput?.checked ?? true;
 
     if (!apiKey) {
       errorBox.textContent = 'api key is required';
@@ -332,6 +346,14 @@ export class MakeOnlineModal extends BaseModal {
       }
       if (!world.id) throw new Error('server returned no world id');
 
+      // 1b. Block double-link: refuse if another local world in this atlas
+      // is already linked to this api world.
+      const active0 = getState().active!;
+      const dupe0 = findLinkedWorld(getState().registry, world.id, active0.worldId);
+      if (dupe0) {
+        throw new Error(`this api world is already linked to "${dupe0.name}" locally. unlink it first or open it from the sidebar.`);
+      }
+
       // 2. Run the merge.
       const adapter = new OwClientAdapter(client);
       detachSyncEngine();
@@ -341,7 +363,10 @@ export class MakeOnlineModal extends BaseModal {
           ? 'reading server elements…'
           : `merging ${p.done} of ${p.total} elements…`;
       };
-      const mergeResult = await mergeLocalIntoApi(folder, adapter, policy, renderProgress);
+      const mergeResult = await mergeLocalIntoApi(folder, adapter, policy, {
+        matchByName,
+        onProgress: renderProgress,
+      });
 
       // 3. Registry transition + persist creds.
       const active = getState().active!;

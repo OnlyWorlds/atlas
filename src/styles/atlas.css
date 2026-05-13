@@ -2336,8 +2336,8 @@
 
 .atlas-sync-pill-refresh {
   font-size: 14px !important;
-  opacity: 0;
-  color: rgba(255, 255, 255, 0.45);
+  opacity: 0.55;
+  color: rgba(255, 255, 255, 0.7);
   margin-left: 4px;
   transition: opacity 140ms ease, color 140ms ease;
 }

@@ -14,6 +14,7 @@ import {
   createLocalWorld,
   deleteWorldEntry,
   detachApi,
+  findLinkedWorld,
   findWorld,
   isDescendantOf,
   loadRegistry,
@@ -293,10 +294,10 @@ describe('registry — sync settings (Phase 3.5+)', () => {
   });
 
   it('setSyncDefaultPolicy stores the chosen policy', () => {
-    const r1 = setSyncDefaultPolicy(defaultRegistry(), 'pause-on-conflict');
-    expect(r1.sync_default_policy).toBe('pause-on-conflict');
-    const r2 = setSyncDefaultPolicy(r1, 'drain-blind');
-    expect(r2.sync_default_policy).toBe('drain-blind');
+    const r1 = setSyncDefaultPolicy(defaultRegistry(), 'pause-and-review');
+    expect(r1.sync_default_policy).toBe('pause-and-review');
+    const r2 = setSyncDefaultPolicy(r1, 'local-wins');
+    expect(r2.sync_default_policy).toBe('local-wins');
   });
 
   it('setSyncConfirmServerDeletes stores boolean', () => {
@@ -322,15 +323,67 @@ describe('registry — sync settings (Phase 3.5+)', () => {
   it('all sync settings round-trip through save/load', () => {
     let reg = setSyncPullOnActivate(defaultRegistry(), true);
     reg = setSyncCadenceMs(reg, 60_000);
-    reg = setSyncDefaultPolicy(reg, 'ask');
+    reg = setSyncDefaultPolicy(reg, 'pause-and-review');
     reg = setSyncConfirmServerDeletes(reg, false);
     reg = setSyncPauseAll(reg, true);
     saveRegistry(reg);
     const loaded = loadRegistry();
     expect(loaded.sync_pull_on_activate).toBe(true);
     expect(loaded.sync_cadence_ms).toBe(60_000);
-    expect(loaded.sync_default_policy).toBe('ask');
+    expect(loaded.sync_default_policy).toBe('pause-and-review');
     expect(loaded.sync_confirm_server_deletes).toBe(false);
     expect(loaded.sync_pause_all).toBe(true);
+  });
+
+  it('findLinkedWorld returns the world linked to a given api world id', () => {
+    let reg = defaultRegistry();
+    reg = createLocalWorld(reg, { name: 'Local Only', folderName: 'lo', handleKey: 'kL' }).next;
+    reg = createApiLinkedWorld(reg, {
+      name: 'Linked',
+      apiWorldId: 'srv-xyz',
+      apiKey: 'key-1',
+      folderName: 'linked',
+      handleKey: 'kA',
+    }).next;
+    expect(findLinkedWorld(reg, 'srv-xyz')).toBeDefined();
+    expect(findLinkedWorld(reg, 'srv-xyz')!.name).toBe('Linked');
+    expect(findLinkedWorld(reg, 'srv-other')).toBeUndefined();
+  });
+
+  it('findLinkedWorld can exclude a specific world id (for self-update checks)', () => {
+    let reg = defaultRegistry();
+    const { next, entry } = createApiLinkedWorld(reg, {
+      name: 'Linked',
+      apiWorldId: 'srv-xyz',
+      apiKey: 'key',
+      folderName: 'l',
+      handleKey: 'k',
+    });
+    reg = next;
+    // If we exclude that world's own id, no dupe found.
+    expect(findLinkedWorld(reg, 'srv-xyz', entry.id)).toBeUndefined();
+    // Otherwise the world matches itself.
+    expect(findLinkedWorld(reg, 'srv-xyz')).toBeDefined();
+  });
+
+  it('migrates legacy policy names on load', () => {
+    // Simulate a registry written by an older atlas version.
+    const legacy = {
+      version: 1,
+      worlds: [],
+      sync_default_policy: 'drain-blind',
+    };
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify(legacy));
+    expect(loadRegistry().sync_default_policy).toBe('local-wins');
+
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify({ ...legacy, sync_default_policy: 'pause-on-conflict' }));
+    expect(loadRegistry().sync_default_policy).toBe('pause-and-review');
+
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify({ ...legacy, sync_default_policy: 'ask' }));
+    expect(loadRegistry().sync_default_policy).toBe('pause-and-review');
+
+    // Unknown value → coerced to undefined (engine treats as default).
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify({ ...legacy, sync_default_policy: 'gibberish' }));
+    expect(loadRegistry().sync_default_policy).toBeUndefined();
   });
 });

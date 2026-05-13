@@ -159,22 +159,51 @@ Verify pushes still work after Phase 3.5.
 
 ---
 
-## Path 13 — Conflict review modal
+## Path 13 — Conflict review (two policies)
 
-This requires forcing a conflict.
+The policy lives in Settings → Sync tab → `default conflict policy`. Two values: **`local wins`** (default) and **`pause and review`**. Test BOTH.
 
-- [ ] On the api-linked world, edit a field locally (let it save).
-- [ ] Quickly edit the SAME field on onlyworlds.com web app to a different value.
-- [ ] In atlas settings → Sync tab → change `default conflict policy` to `skip on conflict`.
-- [ ] Click the pill (refresh from api). Or wait for autosave to fire.
-- [ ] **Expected**: pill grows a warm badge `⚠ 1`. Hover shows "1 conflict to review".
-- [ ] Click the badge — conflict modal opens, listing the element.
-- [ ] Each row has: skip / overwrite / pull buttons.
-- [ ] Click `pull` (theirs) — local element gets server's value. Modal row removed. Badge clears.
-- [ ] Re-create the conflict (same edit-collision) and click `overwrite` (mine) — server gets local's value. Verify on web app.
-- [ ] Re-create and click `skip` — both sides unchanged.
+### 13a — `local wins` policy (default)
 
-**Flag if**: badge never appears OR actions don't propagate.
+- [ ] Confirm Settings → Sync → policy = `local wins`.
+- [ ] On the api-linked world, edit a character's description on web → "server-version".
+- [ ] In atlas, edit the SAME field → "atlas-version".
+- [ ] Wait 5s for autosave debounce → push fires.
+- [ ] **Expected**:
+  - Toast: `saved over server change(s) for 1 element`.
+  - Pill: `synced` (no badge).
+  - Sync-state has NO conflict entry persisted.
+  - Server side: now has "atlas-version" (your local won, server overwritten).
+- [ ] Now test pull-conflict: edit BOTH sides again to fresh values. Click pill refresh.
+- [ ] **Expected**:
+  - Toast: `skipped pulling 1 element you also edited locally — your version pushes next sync`.
+  - Local stays at your version. Server unchanged at its version.
+  - Next autosave (or manual): your version pushed over server.
+
+### 13b — `pause and review` policy
+
+- [ ] Settings → Sync → switch policy to `pause and review`.
+- [ ] Edit on web → "server-v2". Edit on atlas → "atlas-v2".
+- [ ] Wait 5s → autosave fires.
+- [ ] **Expected**:
+  - Push is SKIPPED. Pill shows ⚠ badge `1`.
+  - Server unchanged at "server-v2" (atlas didn't overwrite this time).
+- [ ] Click badge → modal opens with `Admiral Splashworth` row, 1 field diverged: description.
+- [ ] Click `pull (theirs wins)` — local file now has "server-v2". Badge clears. Verify on disk.
+- [ ] Re-create the conflict. Click `overwrite (mine wins)` — server gets "atlas-v2". Badge clears.
+- [ ] Re-create the conflict. Close modal without picking — badge STAYS (decide-later). Re-open works.
+
+### 13c — Pull-time conflict under `pause and review`
+
+- [ ] Keep policy as `pause and review`.
+- [ ] Edit on web to "fresh-server". Edit on atlas to "fresh-local". DON'T let autosave run (pause atlas, or expect skip).
+- [ ] Click pill refresh.
+- [ ] **Expected**:
+  - Pull SKIPS applying server for that element.
+  - ⚠ badge fires with 1.
+  - Modal lets you resolve.
+
+**Flag if**: badge appears under `local wins`, OR toast appears under `pause and review`, OR sync-state persists conflicts under `local wins`, OR pull-time conflict isn't badge-surfaced under `pause and review`.
 
 ---
 

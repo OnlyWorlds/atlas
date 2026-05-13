@@ -41,14 +41,40 @@ export interface OwApiClient {
 // ---- Policy ----
 
 /**
- * What to do when push detects the server moved since our baseline.
- * - `drain-blind`: push our version anyway; server overwritten; conflict logged for info.
- * - `pause-on-conflict`: skip the push; local change preserved on disk; conflict logged;
- *   next sync will see the same conflict until the user resolves it manually
- *   (Phase 3.5: dedicated UI; today: log only).
- * - `ask`: alias for `pause-on-conflict` until Phase 3.5 ships the diff modal.
+ * Conflict resolution policy (Phase 3.5+, simplified).
+ *
+ * - `local-wins` (default): local edits always win.
+ *   - Push: server overwritten; one toast.
+ *   - Pull: skip applying server changes for elements local also edited; one toast.
+ *   - No badge, no modal, no sync-state entries persisted.
+ *
+ * - `pause-and-review`: nothing auto-resolves.
+ *   - Push: skipped on conflict. Conflict persisted to sync-state.
+ *   - Pull: skip applying. Conflict persisted to sync-state.
+ *   - ⚠ badge on pill. Modal lets user pick overwrite vs pull per element.
+ *
+ * Legacy values `drain-blind` / `pause-on-conflict` / `ask` are accepted for
+ * backward compatibility — `drain-blind` maps to `local-wins`, the other two
+ * map to `pause-and-review`. The engine normalizes internally.
  */
-export type ConflictPolicy = 'drain-blind' | 'pause-on-conflict' | 'ask';
+export type ConflictPolicy =
+  | 'local-wins'
+  | 'pause-and-review'
+  // legacy aliases — engine maps these to the new names
+  | 'drain-blind'
+  | 'pause-on-conflict'
+  | 'ask';
+
+/** Internal canonical form after normalizing legacy aliases. */
+type CanonicalPolicy = 'local-wins' | 'pause-and-review';
+
+function normalizePolicy(p: ConflictPolicy | undefined): CanonicalPolicy {
+  if (p === 'pause-and-review' || p === 'pause-on-conflict' || p === 'ask') {
+    return 'pause-and-review';
+  }
+  // default + 'local-wins' + 'drain-blind' all map to local-wins
+  return 'local-wins';
+}
 
 export interface SyncEngineOptions {
   folder: FolderStore;
@@ -63,6 +89,15 @@ export interface SyncEngineOptions {
    * (success OR failure). Used by Make-Online flows for an upload progress bar.
    */
   onPushProgress?: (done: number, total: number) => void;
+  /**
+   * Fires after each sync round completes. `phase` distinguishes push-only
+   * (`autosave`), pull-only (`refresh`), and combined (`sync`). UI uses this
+   * to emit toasts under `local-wins` policy (no badge/modal in that mode).
+   */
+  onSyncResult?: (
+    phase: 'push' | 'pull' | 'sync',
+    result: SyncResult
+  ) => void;
 }
 
 // ---- The engine ----
@@ -70,10 +105,11 @@ export interface SyncEngineOptions {
 export class SyncEngine {
   private folder: FolderStore;
   private client: OwApiClient;
-  private policy: ConflictPolicy;
+  private policy: CanonicalPolicy;
   private onConflict: (conflict: Conflict) => void;
   private onStateChange: (state: SyncEngineState) => void;
   private onPushProgress: (done: number, total: number) => void;
+  private onSyncResult: (phase: 'push' | 'pull' | 'sync', result: SyncResult) => void;
   private state: SyncEngineState = { kind: 'idle', last_sync_at: null };
   private paused = false;
   private pauseReason: 'manual' | 'network' | null = null;
@@ -87,14 +123,24 @@ export class SyncEngine {
   constructor(opts: SyncEngineOptions) {
     this.folder = opts.folder;
     this.client = opts.client;
-    this.policy = opts.policy ?? 'drain-blind';
+    this.policy = normalizePolicy(opts.policy);
     this.onConflict = opts.onConflict ?? (() => {});
     this.onStateChange = opts.onStateChange ?? (() => {});
     this.onPushProgress = opts.onPushProgress ?? (() => {});
+    this.onSyncResult = opts.onSyncResult ?? (() => {});
   }
 
   getState(): SyncEngineState {
     return this.state;
+  }
+
+  /**
+   * Live-update the policy on a running engine. Called from settings when the
+   * user flips the radio so the change takes effect immediately without
+   * detaching/re-attaching the engine (which would interrupt in-flight syncs).
+   */
+  setPolicy(p: ConflictPolicy): void {
+    this.policy = normalizePolicy(p);
   }
 
   pause(reason: 'manual' | 'network' = 'manual'): void {
@@ -312,14 +358,21 @@ export class SyncEngine {
     if (this.paused) return emptyResult();
     this.setState({ kind: 'syncing', phase: 'push' });
     const pushResult = await this.pushPhase();
-    await this.persistConflicts(pushResult.conflicts);
+    // Only persist under pause-and-review. Under local-wins, conflicts are
+    // informational (server already overwritten) — persisting would falsely
+    // fire the badge for resolved divergence.
+    if (this.policy === 'pause-and-review') {
+      await this.persistConflicts(pushResult.conflicts);
+    }
     this.setState({ kind: 'idle', last_sync_at: nowIso() });
-    return {
+    const result: SyncResult = {
       pushed: pushResult.pushed,
       pulled: zero(),
       conflicts: pushResult.conflicts,
       failures: pushResult.failures,
     };
+    this.onSyncResult('push', result);
+    return result;
   }
 
   private async runPullOnly(): Promise<SyncResult> {
@@ -327,12 +380,14 @@ export class SyncEngine {
     this.setState({ kind: 'syncing', phase: 'pull' });
     const pullResult = await this.pullPhase();
     this.setState({ kind: 'idle', last_sync_at: nowIso() });
-    return {
+    const result: SyncResult = {
       pushed: zero(),
       pulled: pullResult.pulled,
       conflicts: pullResult.conflicts,
       failures: pullResult.failures,
     };
+    this.onSyncResult('pull', result);
+    return result;
   }
 
   private async runSync(): Promise<SyncResult> {
@@ -341,9 +396,12 @@ export class SyncEngine {
     }
     this.setState({ kind: 'syncing', phase: 'push' });
     const pushResult = await this.pushPhase();
-    // Persist push conflicts to sync-state BEFORE pull phase. Pull then reads
-    // currentState.conflicts and merges in its own findings.
-    await this.persistConflicts(pushResult.conflicts);
+    // Persist push conflicts BEFORE pull phase (so pull's currentState read
+    // sees them when computing the union). Under local-wins, skip — server
+    // is already in our state, the entries would be misleading.
+    if (this.policy === 'pause-and-review') {
+      await this.persistConflicts(pushResult.conflicts);
+    }
     this.setState({ kind: 'syncing', phase: 'pull' });
     const handledIds = new Set(pushResult.conflicts.map(c => c.element_id));
     const pullResult = await this.pullPhase(handledIds);
@@ -354,6 +412,7 @@ export class SyncEngine {
       failures: [...pushResult.failures, ...pullResult.failures],
     };
     this.setState({ kind: 'idle', last_sync_at: nowIso() });
+    this.onSyncResult('sync', result);
     return result;
   }
 
@@ -499,11 +558,11 @@ export class SyncEngine {
             };
             conflicts.push(conflict);
             this.onConflict(conflict);
-            if (this.policy === 'pause-on-conflict' || this.policy === 'ask') {
+            if (this.policy === 'pause-and-review') {
               // Keep local change on disk; do NOT push. Baseline stays.
               skipPush = true;
             }
-            // drain-blind: fall through and push our version anyway.
+            // local-wins: fall through and push our version anyway.
           }
 
           if (!skipPush) {
@@ -650,9 +709,21 @@ export class SyncEngine {
     const existingServerDeletes = currentState.server_deletes ?? [];
     const existingDeleteIds = new Set(existingServerDeletes.map(d => d.id));
     const freshServerDeletes = newServerDeletes.filter(d => !existingDeleteIds.has(d.id));
+    // Persist pull-time conflicts to sync-state ONLY under pause-and-review.
+    // Under local-wins, pull-conflicts are skipped silently; toast count is
+    // surfaced by sync-attach via onSyncResult.
+    //
+    // Dedup by element_id — without this, repeated refreshes would append the
+    // same conflict over and over (Captain caught this growing 1 → 2 → 3).
+    let persistedConflicts = currentState.conflicts;
+    if (this.policy === 'pause-and-review') {
+      const existingIds = new Set(currentState.conflicts.map(c => c.element_id));
+      const fresh = conflicts.filter(c => !existingIds.has(c.element_id));
+      persistedConflicts = [...currentState.conflicts, ...fresh];
+    }
     await this.folder.writeSyncState({
       last_pull_at: nowIso(),
-      conflicts: [...currentState.conflicts, ...conflicts],
+      conflicts: persistedConflicts,
       server_deletes: [...existingServerDeletes, ...freshServerDeletes],
     });
 

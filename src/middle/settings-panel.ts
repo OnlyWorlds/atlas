@@ -60,24 +60,19 @@ const CADENCE_OPTIONS: Array<{ label: string; ms: number | null }> = [
 ];
 
 const POLICY_OPTIONS: Array<{
-  value: 'drain-blind' | 'pause-on-conflict' | 'ask';
+  value: 'local-wins' | 'pause-and-review';
   label: string;
   hint: string;
 }> = [
   {
-    value: 'drain-blind',
+    value: 'local-wins',
     label: 'local wins',
-    hint: 'when server changed since baseline, push your version anyway. conflicts are logged for review.',
+    hint: 'your edits always win. push overwrites server; pull skips applying server changes for elements you also edited. one toast per round, no badge.',
   },
   {
-    value: 'pause-on-conflict',
-    label: 'skip on conflict',
-    hint: 'when server moved, skip pushing that element. resolve from the review modal.',
-  },
-  {
-    value: 'ask',
-    label: 'ask each time',
-    hint: 'every conflict opens the review modal before further sync.',
+    value: 'pause-and-review',
+    label: 'pause and review',
+    hint: 'on conflict, nothing auto-resolves. push pauses, pull skips. ⚠ badge fires; modal lets you pick overwrite vs pull per element.',
   },
 ];
 
@@ -215,7 +210,7 @@ function renderAtlasTab(): string {
 
 function renderSyncTab(reg: ReturnType<typeof getState>['registry']): string {
   const cadenceMs = reg.sync_cadence_ms ?? null;
-  const defaultPolicy = reg.sync_default_policy ?? 'drain-blind';
+  const defaultPolicy = reg.sync_default_policy ?? 'local-wins';
   const pullOnActivate = !!reg.sync_pull_on_activate;
   const confirmServerDel = reg.sync_confirm_server_deletes !== false; // default true
   const pauseAll = !!reg.sync_pause_all;
@@ -430,10 +425,13 @@ function wireSyncTab(toasts: ToastManager): void {
   policyInputs.forEach((input) => {
     input.addEventListener('change', () => {
       if (!input.checked) return;
-      const v = input.value as 'drain-blind' | 'pause-on-conflict' | 'ask';
+      const v = input.value as 'local-wins' | 'pause-and-review';
       const next = setSyncDefaultPolicy(getState().registry, v);
       saveRegistry(next);
       patchSlice('registry', next);
+      // Apply to the running engine immediately — no detach/re-attach needed.
+      const engine = getCurrentSyncEngine();
+      if (engine) engine.setPolicy(v);
     });
   });
 

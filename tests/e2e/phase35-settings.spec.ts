@@ -94,9 +94,9 @@ test('sync tab — toggles persist to localStorage', async ({ page }) => {
   reg = await loadRegistry(page);
   expect(reg.sync_cadence_ms).toBe(300_000);
 
-  await page.check('input[name="policy"][value="pause-on-conflict"]');
+  await page.check('input[name="policy"][value="pause-and-review"]');
   reg = await loadRegistry(page);
-  expect(reg.sync_default_policy).toBe('pause-on-conflict');
+  expect(reg.sync_default_policy).toBe('pause-and-review');
 
   await page.uncheck('input[name="confirm-server-del"]');
   reg = await loadRegistry(page);
