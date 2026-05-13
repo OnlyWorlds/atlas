@@ -36,6 +36,16 @@ export interface OwApiClient {
   listElements(type: ElementType): Promise<Array<{ id: string; updated_at: string } & Record<string, unknown>>>;
   /** Fetch single element. Used by SyncEngine pre-update conflict check. */
   getElement(type: ElementType, id: string): Promise<({ id: string; updated_at: string } & Record<string, unknown>) | null>;
+  /**
+   * Optional: report which element types were paginated on their most recent
+   * listElements() call (i.e., the server reported more records than this page
+   * returned). The engine uses this to suppress server-delete detection for
+   * those types — without the guard, page-2 elements would be falsely flagged
+   * as "vanished from server" and the user would be prompted to delete them.
+   *
+   * Implementations that always return the full set (test fakes) can omit this.
+   */
+  getPaginatedTypes?(): ReadonlySet<ElementType>;
 }
 
 // ---- Policy ----
@@ -501,11 +511,30 @@ export class SyncEngine {
           // Re-fetch current state in case an in-loop id-swap on a previously
           // processed CREATE rewrote one of this element's reference fields.
           // The snapshot `elem` would otherwise carry stale ids.
-          const current = await this.folder.getElement(elem.id);
+          let current = await this.folder.getElement(elem.id);
           if (!current) {
             // Was silently removed by an earlier in-loop swap targeting this id
             // — nothing to push.
             continue;
+          }
+          // Self-heal pins missing `element_type` (legacy bug — creation paths
+          // didn't set it before session 202). Real OW returns 400 with
+          // "element_type must be provided when element_id is specified" if
+          // absent. Resolve from the referenced element's type and persist
+          // back so subsequent pushes/pulls see a complete pin.
+          if (
+            current.type === 'pin' &&
+            typeof current.element_id === 'string' &&
+            !current.element_type
+          ) {
+            const pinned = await this.folder.getElement(current.element_id);
+            if (pinned) {
+              current = await this.folder.updateElement(current.id, { element_type: pinned.type });
+              console.info('[atlas:sync] self-healed pin missing element_type', {
+                pinId: current.id,
+                elementType: pinned.type,
+              });
+            }
           }
           const body = stripSyncFields(current);
           const response = await this.client.createElement(current.type, body);
@@ -692,11 +721,21 @@ export class SyncEngine {
     // Detect server-side deletes: local elements that have server_updated_at
     // set (meaning they were once on the server) but didn't appear in any
     // list this pass.
+    //
+    // CRITICAL SAFETY: skip detection for any type whose list was paginated.
+    // For paginated types, `seenLocalIds` is incomplete — it only contains the
+    // first page. Page-2+ elements ARE on the server but absent from our set,
+    // so naive detection would falsely flag them as "deleted on server" and
+    // prompt the user to delete them locally → silent data loss for elements
+    // alive on the server. The pagination flag is per-type, so types we DID
+    // see fully still get server-delete detection.
+    const paginatedTypes = this.client.getPaginatedTypes?.() ?? new Set<ElementType>();
     const allLocal = await this.folder.listElements();
     for (const elem of allLocal) {
       if (!elem.server_updated_at) continue; // never synced
       if (seenLocalIds.has(elem.id)) continue; // still on server
       if (tombstoneIds.has(elem.id)) continue; // pending local delete already
+      if (paginatedTypes.has(elem.type)) continue; // can't trust seenLocalIds for this type
       newServerDeletes.push({
         id: elem.id,
         type: elem.type,

@@ -650,6 +650,10 @@ Inherited from legacy (hard-won; preserve in new code):
 17. **Folder writes from the UI call `requestPushIfLinked()`**. After any successful `FolderStore.update/create/delete` from a UI handler, call `requestPushIfLinked()` so the autosave debounce fires. No-op for local-only worlds. Without this, edits to api-linked worlds wouldn't sync until the user manually triggered a push.
 18. **Element-detail scroll position is preserved across re-renders** via a module-level `Map<elementId, scrollTop>`. Captured before `target.innerHTML = ''`, restored via `queueMicrotask` after layout, live-tracked via passive scroll listener. Reset on world switch via `resetElementDetailScrollMemory()`. Without this, field edits/link toggles dump the user back to the top of the panel.
 
+19. **Pin writes require `element_type`** (server rule, surfaced by Bout V.5 smoke). Every code path that creates a pin MUST populate `element_type` from the referenced element. UI: map-tab placement looks it up from `state.data.elements`; the contextual-create flow receives `(id, type)` from `ElementCreateModal.onCreated`. Engine: `pushPhase` self-heals legacy pins missing this field by looking up the referenced element's type and writing back. Fakes (MSW + FakeOwApiClient) enforce the rule — any new code path forgetting it fails its tests immediately.
+
+20. **Encode real-server validation rules in fakes BEFORE fixing the caller**. When live OW returns a 4xx with a clear message that fakes didn't catch (Bout V.5's pin element_type rule was the canonical example), first add the rule to `statefulOwHandlers` AND `FakeOwApiClient`, then fix the caller. The fix lands with a regression test that locks the rule in, and future test code violating the rule fails immediately. This is how fakes get more faithful over time without contract-testing infrastructure.
+
 ---
 
 ## Test Strategy

@@ -25,13 +25,31 @@
  */
 
 import { OnlyWorldsClient } from '@onlyworlds/sdk';
+import { ATLAS_LOCAL_EXTENSION_FIELDS } from '../core/constants';
 import type { ElementType } from '../core/types';
 import type { OwApiClient } from './sync-engine';
 
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
 export class OwClientAdapter implements OwApiClient {
+  /**
+   * Types whose most recent listElements() saw a paginated response (server
+   * reported `count` greater than the records returned on this page). The
+   * sync engine consumes this via `getPaginatedTypes()` to skip server-delete
+   * detection for these types — page-2 records would otherwise be falsely
+   * flagged as "vanished from server."
+   *
+   * Cleared per-type at the start of each listElements call so stale state
+   * from a prior pull can't poison a fresh one.
+   */
+  private paginatedTypes = new Set<ElementType>();
+
   constructor(private client: OnlyWorldsClient) {}
+
+  /** Engine-facing: types whose latest list was paginated. */
+  getPaginatedTypes(): ReadonlySet<ElementType> {
+    return this.paginatedTypes;
+  }
 
   async createElement(type: ElementType, body: Record<string, unknown>): Promise<ServerRecord> {
     // CREATE keeps `id` (client UUID preserved server-side).
@@ -62,6 +80,10 @@ export class OwClientAdapter implements OwApiClient {
   }
 
   async listElements(type: ElementType): Promise<ServerRecord[]> {
+    // Clear prior pagination flag for this type — every listElements call
+    // re-decides per-type whether the response was paginated.
+    this.paginatedTypes.delete(type);
+
     const response = await this.client.request<unknown>('GET', `/${type}/`);
     // Backend may return a raw array or paginated { count, results } envelope.
     let records: unknown[] = [];
@@ -70,12 +92,14 @@ export class OwClientAdapter implements OwApiClient {
     } else if (response && typeof response === 'object') {
       const env = response as { results?: unknown[]; count?: number };
       records = env.results ?? [];
-      // Pagination warning: if the envelope reports more elements than this
-      // page returned, surface a console warning. Phase 3.5+ ceiling note —
-      // a "load more" UX is deferred. The smoke test catches the visible cap.
+      // Pagination detection: if the envelope reports more elements than this
+      // page returned, mark the type as paginated. The engine will skip
+      // server-delete detection on paginated types to avoid silent data loss
+      // on page-2+ elements. A "load more" UX is deferred to 3.6+.
       if (typeof env.count === 'number' && env.count > records.length) {
+        this.paginatedTypes.add(type);
         console.warn(
-          `[ow-adapter] pagination cap hit on ${type}: server has ${env.count}, page returned ${records.length}. atlas only sees the first page until pagination is wired.`
+          `[ow-adapter] pagination cap hit on ${type}: server has ${env.count}, page returned ${records.length}. atlas only sees the first page until pagination is wired; server-delete detection suppressed for this type until then.`
         );
       }
     }
@@ -178,11 +202,17 @@ const SERVER_MANAGED_FIELDS = new Set([
   'updated_at',   // server-managed
 ]);
 
-/** Atlas-local fields the server doesn't know about — never send. */
-const ATLAS_LOCAL_FIELDS = new Set([
+/**
+ * Atlas-local fields the server doesn't know about — never send.
+ * Sync-metadata fields (local_updated_at, server_updated_at) plus the
+ * shared ATLAS_LOCAL_EXTENSION_FIELDS list (image_media_id, etc.).
+ * Adding a new extension field to ATLAS_LOCAL_EXTENSION_FIELDS in
+ * constants.ts also protects it on pull via applyServerRecord.
+ */
+const ATLAS_LOCAL_FIELDS = new Set<string>([
   'local_updated_at',
   'server_updated_at',
-  'image_media_id', // atlas extension for local image binding
+  ...ATLAS_LOCAL_EXTENSION_FIELDS,
 ]);
 
 /**
@@ -249,6 +279,11 @@ function isObjectWithId(v: unknown): boolean {
 /**
  * Log a failed write with the wire body so we can diagnose 4xx server errors.
  * Stays as console.warn to avoid throwing during dev — the caller will throw.
+ *
+ * Pin failures are common enough during smoke (chain-FK, deleted-map refs,
+ * missing element_type) that we surface the key pin fields inline rather than
+ * making the user expand the body object. Generalizes to any type's FK fields
+ * by extracting any `_id` / `_ids` field for quick diagnosis.
  */
 function logWireError(
   method: 'POST' | 'PATCH',
@@ -259,7 +294,13 @@ function logWireError(
 ): void {
   const path = id ? `/${type}/${id}/` : `/${type}/`;
   const msg = err instanceof Error ? err.message : String(err);
-  console.warn(`[atlas:sync] ${method} ${path} failed — ${msg}`, { body });
+  // Extract FK-shaped fields for inline visibility (no need to expand {body}).
+  const refs: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(body)) {
+    if (k.endsWith('_id') || k.endsWith('_ids') || k.endsWith('_type')) refs[k] = v;
+  }
+  const refsBlurb = Object.keys(refs).length > 0 ? ` refs=${JSON.stringify(refs)}` : '';
+  console.warn(`[atlas:sync] ${method} ${path} failed — ${msg}${refsBlurb}`, { body });
 }
 
 function isNotFound(err: unknown): boolean {

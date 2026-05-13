@@ -1,35 +1,6 @@
 # Bout R — Next session pickup
 
-
----
-
-## Tier B — Originally requested big paths
-
-### B1 — Make Online → link existing (Route 2) — Path 5 in BOUT_R_SMOKE
-
-The biggest untested code path. Bidirectional merge.
-
-- [ ] Create `+ new local` named `Merge Test`. Add 3 elements:
-  - One with same name as an element on an existing api world (creates a duplicate match).
-  - Two with unique names.
-- [ ] Settings → World → Make Online → "link to existing" tab.
-- [ ] Policy `overwrite`. Submit.
-- [ ] **Expected toast**: `1 updated, 2 pushed, N downloaded` (N = server-only elements pulled into local).
-- [ ] **Verify locally**: Open elements view → should show BOTH your 3 local elements (with proper ids) AND every server-only element that came down.
-- [ ] **Verify server-side**: matched element has your content. Your unique elements appear. Server-original elements untouched.
-
-Then re-run with policy `skip`:
-- [ ] Same setup, fresh local world.
-- [ ] **Expected toast**: `0 updated, 2 pushed, 1 skipped, N downloaded`. Matched element locally has SERVER's content.
-
-### B2 — Cascade-delete propagation — Path 6 in BOUT_R_SMOKE
-
-- [ ] Open a map that has pins. Note pin count.
-- [ ] Delete the map from atlas (element-detail trash icon → confirm dialog should say "this will also remove X pins").
-- [ ] Wait 5s for push.
-- [ ] **Verify server-side**: map AND all its pins are gone.
-
----
+ 
 
 ## Tier C — Smaller smoke items (in order)
 

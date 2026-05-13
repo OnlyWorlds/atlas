@@ -170,9 +170,20 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       try {
         const store = getActiveStore();
         if (!store) return;
+        // Resolve element_type from the pinned element. The OW server rejects
+        // pin CREATE with 400 ("element_type must be provided when element_id
+        // is specified") if this field is absent. Look it up from state cache;
+        // fall back to a store read if not cached.
+        const cached = getState().data.elements.find(e => e.id === placement.elementId);
+        const pinned = cached ?? await store.getElement(placement.elementId);
+        if (!pinned) {
+          toasts.error('cannot place pin — element not found');
+          return;
+        }
         await store.createPin({
           map_id: entry.mapId,
           element_id: placement.elementId,
+          element_type: pinned.type,
           x: ev.point.x,
           y: ev.point.y,
         });
@@ -219,13 +230,14 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       const point = leafletToStorage(latlng, height);
 
       const modal = new ElementCreateModal(toasts, {
-        onCreated: async (elementId) => {
+        onCreated: async (elementId, elementType) => {
           try {
             const store = getActiveStore();
             if (!store) return;
             await store.createPin({
               map_id: entry.mapId,
               element_id: elementId,
+              element_type: elementType,
               x: point.x,
               y: point.y,
             });

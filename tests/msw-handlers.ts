@@ -120,6 +120,15 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
     http.post(`${base}/:type/`, async ({ params, request }) => {
       const type = String(params.type);
       const body = (await request.json()) as Record<string, unknown>;
+      // Enforce real-OW invariant: pin requires element_type whenever element_id
+      // is specified. The live API responds with 400 in this case; our handler
+      // mirrors it so tests catch regressions of this requirement.
+      if (type === 'pin' && body.element_id && !body.element_type) {
+        return HttpResponse.json(
+          { error: 'element_type must be provided when element_id is specified' },
+          { status: 400 }
+        );
+      }
       // assignsServerIds: ignore client id entirely (real OW behavior with v4 input).
       const id = options.assignsServerIds
         ? crypto.randomUUID()

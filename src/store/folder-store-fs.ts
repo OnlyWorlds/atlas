@@ -23,6 +23,7 @@
 
 import {
   ATLAS_INTERNAL_DIR,
+  ATLAS_LOCAL_EXTENSION_FIELDS,
   ELEMENTS_DIR,
   LOCK_FILE,
   LOCK_HEARTBEAT_MS,
@@ -502,8 +503,25 @@ export class FsFolderStore implements FolderStore {
   async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');
+
+    // Preserve atlas-extension fields (image_media_id, ...) from the existing
+    // local file if present. The server doesn't know about these fields, so
+    // its response carries none — overlaying the response directly would
+    // silently destroy the local binding (e.g. a Map's locally-uploaded image
+    // pointer). Sync metadata (local_updated_at, server_updated_at) is set
+    // authoritatively below, so we don't carry it over from existing.
+    const existing = await this.getElement(id);
+    const preserved: Record<string, unknown> = {};
+    if (existing) {
+      for (const field of ATLAS_LOCAL_EXTENSION_FIELDS) {
+        const value = (existing as Record<string, unknown>)[field];
+        if (value !== undefined) preserved[field] = value;
+      }
+    }
+
     const elem: Element = {
       ...record,
+      ...preserved,
       id,
       type,
       name: (record.name as string) ?? '',

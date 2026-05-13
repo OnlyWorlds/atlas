@@ -269,9 +269,23 @@ function emitConflictToasts(
   // Calling pushOnce() synchronously would return the in-flight PULL promise
   // and silently no-op. setTimeout(0) yields until inFlight is cleared.
   if (phase === 'pull') {
+    // Capture the world id at schedule time. If the user switches worlds
+    // between scheduling and firing (sub-millisecond, but possible via
+    // user-driven nav), `currentEngine` will be the new world's engine and
+    // pushing on it would propagate the WRONG conflict's intent — and worse,
+    // would leave the original world's local divergence un-converged. Bail
+    // gracefully if the world has changed.
+    const scheduledWorldId = currentWorldId;
     setTimeout(() => {
       const engine = currentEngine;
       if (!engine) return;
+      if (currentWorldId !== scheduledWorldId) {
+        console.info('[atlas:sync] post-pull-conflict push skipped: world switched during defer', {
+          scheduledWorldId,
+          currentWorldId,
+        });
+        return;
+      }
       console.info('[atlas:sync] local-wins: pull detected conflict, firing pushOnce to converge');
       engine.pushOnce().catch(err => {
         console.warn('[atlas:sync] post-pull-conflict push failed:', err);

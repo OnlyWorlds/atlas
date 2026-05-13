@@ -8,6 +8,7 @@
 
 import type { FolderStore } from '../../src/store/folder-store';
 import { newId, nowIso } from '../../src/store/folder-store';
+import { ATLAS_LOCAL_EXTENSION_FIELDS } from '../../src/core/constants';
 import type {
   Element,
   ElementType,
@@ -261,8 +262,20 @@ export class MockFolderStore implements FolderStore {
       this.applyFailures.delete(id); // one-shot
       throw new Error(failure);
     }
+    // Mirror FsFolderStore: preserve atlas-extension fields from existing
+    // before overlaying the server record. See FsFolderStore.applyServerRecord
+    // for the rationale (image_media_id and friends never live on server).
+    const existing = this.elements.get(id);
+    const preserved: Record<string, unknown> = {};
+    if (existing) {
+      for (const field of ATLAS_LOCAL_EXTENSION_FIELDS) {
+        const value = (existing as Record<string, unknown>)[field];
+        if (value !== undefined) preserved[field] = value;
+      }
+    }
     const elem: Element = {
       ...record,
+      ...preserved,
       id,
       type,
       name: (record.name as string) ?? '',

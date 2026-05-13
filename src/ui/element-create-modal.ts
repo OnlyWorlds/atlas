@@ -29,8 +29,13 @@ export interface ElementCreateOptions {
   initialType?: ElementType;
   /** Pre-fill the name field. */
   initialName?: string;
-  /** Called after the element is created. */
-  onCreated?: (id: string) => void;
+  /**
+   * Called after the element is created. Receives both the new id AND the
+   * resolved element type — callers like the contextual pin-drop in map-tab
+   * need the type to construct a valid pin body (server requires
+   * `element_type` when `element_id` is set).
+   */
+  onCreated?: (id: string, type: ElementType) => void;
 }
 
 export class ElementCreateModal extends BaseModal {
@@ -164,7 +169,7 @@ export class ElementCreateModal extends BaseModal {
         requestPushIfLinked();
         this.toasts.success(`created ${this.selected}: ${el.name}`);
         this.hide();
-        this.opts.onCreated?.(el.id);
+        this.opts.onCreated?.(el.id, this.selected);
         const worldId = getState().active?.worldId;
         if (worldId) navigate(elementHash(worldId, el.id));
       } catch (err) {

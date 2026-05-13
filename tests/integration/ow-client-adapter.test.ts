@@ -155,6 +155,7 @@ describe('OwClientAdapter — round-trip via MSW', () => {
       name: 'pin',
       map_id: 'map42',
       element_id: 'char7',
+      element_type: 'character',
       x: 100,
       y: 200,
     });
@@ -178,6 +179,7 @@ describe('OwClientAdapter — round-trip via MSW', () => {
       name: 'pin',
       map_id: 'm1',
       element_id: 'c1',
+      element_type: 'character',
       x: 10,
       y: 20,
     });

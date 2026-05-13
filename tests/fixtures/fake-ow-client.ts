@@ -28,6 +28,12 @@ export class FakeOwApiClient implements OwApiClient {
    * Tests covering the id-swap path on CREATE should enable this.
    */
   assignServerIds = false;
+  /**
+   * Test seam: types reported as paginated via getPaginatedTypes(). Lets
+   * server-delete tests simulate "server has more elements than our first
+   * page returned" without actually paginating responses.
+   */
+  private forcedPaginatedTypes = new Set<ElementType>();
 
   // Capture of every call for assertion.
   calls: Array<
@@ -48,6 +54,11 @@ export class FakeOwApiClient implements OwApiClient {
 
   async createElement(type: ElementType, body: Record<string, unknown>): Promise<ServerRecord> {
     this.calls.push({ method: 'create', type, body: { ...body } });
+    // Mirror real OW: pin requires element_type whenever element_id is set.
+    // Throwing here lets engine/merge tests catch regressions of this rule.
+    if (type === 'pin' && body.element_id && !body.element_type) {
+      throw new Error('API Error 400: element_type must be provided when element_id is specified');
+    }
     // Real OW behavior: ignore client-sent id when assignServerIds=true.
     const id = this.assignServerIds ? cryptoRandomId() : (body.id as string) ?? cryptoRandomId();
     this.throwIfInjected('create', id);
@@ -82,6 +93,17 @@ export class FakeOwApiClient implements OwApiClient {
     this.calls.push({ method: 'get', type, id });
     const r = this.bucket(type).get(id);
     return r ? { ...r } : null;
+  }
+
+  /** Engine reads this to learn which types are paginated. */
+  getPaginatedTypes(): ReadonlySet<ElementType> {
+    return this.forcedPaginatedTypes;
+  }
+
+  /** Test seam: mark a type as paginated for the engine's safety check. */
+  __force_paginated(type: ElementType, enabled = true): void {
+    if (enabled) this.forcedPaginatedTypes.add(type);
+    else this.forcedPaginatedTypes.delete(type);
   }
 
   /** Server-side mutation that doesn't show up in `calls` — for setting up

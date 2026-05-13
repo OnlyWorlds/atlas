@@ -432,6 +432,88 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     expect(aliceFriends).not.toContain(carol.id);
   });
 
+  it('chain-CREATE: new element references another new element — server receives the swapped FK', async () => {
+    // Bout V (session 202) regression — the gap was: within phase 4b-2's
+    // CREATE loop, no file-level rewrite runs between iterations. Carol
+    // (iteration 2) whose `friends` references Bob (iteration 1) would send
+    // Bob's stale local id to the server even though Bob's CREATE produced an
+    // idSwap. Server ended up with `Carol.friends = [bob.localId]` (a dangling
+    // reference). Phase 4b-3 would rewrite Carol's LOCAL file correctly, but
+    // the server stayed stale until something else triggered a push for Carol.
+    //
+    // Fix: applyIdSwapsToBody runs on the body in-memory before each send.
+    //
+    // Use assignsServerIds so server diverges from client ids, making the
+    // assertion meaningful (server.bob.id !== local.bob.id).
+    const altState = statefulOwHandlers({
+      baseUrl: TEST_BASE,
+      clock: clock.next,
+      assignsServerIds: true,
+    });
+    mswServer.resetHandlers();
+    mswServer.use(...altState.handlers);
+
+    const adapter = makeAdapter();
+
+    // Local Bob (no FK) + local Carol (friends -> Bob's local id).
+    const bob = await folder.createElement('character', { name: 'Bob' });
+    await folder.createElement('character', { name: 'Carol', friends: [bob.id] });
+
+    await mergeLocalIntoApi(folder, adapter, 'b');
+
+    const charsOnServer = await adapter.listElements('character');
+    const serverBob = charsOnServer.find(c => c.name === 'Bob')!;
+    const serverCarol = charsOnServer.find(c => c.name === 'Carol')!;
+    // Server assigned its own ids.
+    expect(serverBob.id).not.toBe(bob.id);
+    // CRITICAL: Carol's friends on the SERVER point at server-Bob, not local-Bob.
+    const serverCarolFriends =
+      (serverCarol.friends as string[] | undefined) ??
+      (serverCarol.friends_ids as string[] | undefined) ??
+      [];
+    expect(serverCarolFriends).toContain(serverBob.id);
+    expect(serverCarolFriends).not.toContain(bob.id);
+  });
+
+  it('chain-CREATE three deep: A → B → C with all server-assigned ids', async () => {
+    // Extended scenario: three new locals in a forward chain. Each iteration
+    // depends on the prior iteration's idSwap to land correctly on the wire.
+    const altState = statefulOwHandlers({
+      baseUrl: TEST_BASE,
+      clock: clock.next,
+      assignsServerIds: true,
+    });
+    mswServer.resetHandlers();
+    mswServer.use(...altState.handlers);
+
+    const adapter = makeAdapter();
+
+    const a = await folder.createElement('character', { name: 'A' });
+    const b = await folder.createElement('character', { name: 'B', friends: [a.id] });
+    const c = await folder.createElement('character', { name: 'C', friends: [b.id] });
+
+    await mergeLocalIntoApi(folder, adapter, 'b');
+
+    const charsOnServer = await adapter.listElements('character');
+    const sA = charsOnServer.find(x => x.name === 'A')!;
+    const sB = charsOnServer.find(x => x.name === 'B')!;
+    const sC = charsOnServer.find(x => x.name === 'C')!;
+
+    const bFriends =
+      (sB.friends as string[] | undefined) ??
+      (sB.friends_ids as string[] | undefined) ??
+      [];
+    const cFriends =
+      (sC.friends as string[] | undefined) ??
+      (sC.friends_ids as string[] | undefined) ??
+      [];
+    expect(bFriends).toContain(sA.id);
+    expect(bFriends).not.toContain(a.id);
+    expect(cFriends).toContain(sB.id);
+    expect(cFriends).not.toContain(b.id);
+    void c;
+  });
+
   it('matchByName=false: same-name elements are treated as separate items', async () => {
     const adapter = makeAdapter();
     // Server has Alice.

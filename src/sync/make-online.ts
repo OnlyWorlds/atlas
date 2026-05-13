@@ -271,6 +271,14 @@ export async function mergeLocalIntoApi(
       // Always re-fetch local before sending to server. Picks up any in-loop
       // rewrites from previous decisions (e.g. matched-swap registered a swap
       // and rewriteIdReferences updated this element's FKs).
+      //
+      // BUT: re-fetching the FILE isn't enough for CREATE-references-CREATE
+      // chains in phase 4b-2. Between iterations of the CREATE loop, no
+      // file-level rewrite runs, so a Carol whose friends pointed at Bob's
+      // local id would still send Bob's stale id in her CREATE body even if
+      // Bob's CREATE in the prior iteration produced an idSwap. We therefore
+      // ALSO apply current idSwaps to the in-memory body before sending —
+      // belt-and-suspenders on top of the per-iteration re-fetch.
       const current = await folder.getElement(local.id);
       if (!current) {
         // Silently removed by an in-loop swap targeting this id. Defensive.
@@ -279,7 +287,8 @@ export async function mergeLocalIntoApi(
         return;
       }
       if (dec.kind === 'create') {
-        const { local_updated_at: _l, server_updated_at: _s, ...body } = current;
+        const { local_updated_at: _l, server_updated_at: _s, ...rawBody } = current;
+        const body = applyIdSwapsToBody(rawBody, idSwaps);
         const response = await adapter.createElement(type, body);
         if (response.id !== local.id) {
           // Server assigned its own id (UUID v7 enforcement). Re-key the local
@@ -299,7 +308,12 @@ export async function mergeLocalIntoApi(
         creates++;
       } else if (dec.kind === 'matched-same-id') {
         if (policy === 'b') {
-          const { local_updated_at: _l, server_updated_at: _s, ...body } = current;
+          const { local_updated_at: _l, server_updated_at: _s, ...rawBody } = current;
+          // Apply current idSwaps defensively. By the time matched UPDATEs run
+          // (phase 4b-4, after 4b-3 rewrote local files), the body's FKs should
+          // already be correct — but body-level rewrite is idempotent and adds
+          // defense in depth at negligible cost.
+          const body = applyIdSwapsToBody(rawBody, idSwaps);
           const response = await adapter.updateElement(type, dec.server.id, body);
           // Apply the SERVER's full post-PATCH response to local. PATCH is
           // partial — fields the user didn't set locally stay on server.
@@ -319,7 +333,8 @@ export async function mergeLocalIntoApi(
         const serverId = dec.server.id;
         if (policy === 'b') {
           // UPDATE server with local body (server keeps server.id).
-          const { id: _lid, local_updated_at: _l, server_updated_at: _s, ...body } = current;
+          const { id: _lid, local_updated_at: _l, server_updated_at: _s, ...rawBody } = current;
+          const body = applyIdSwapsToBody(rawBody, idSwaps);
           const response = await adapter.updateElement(type, serverId, body);
           // Apply server's full post-PATCH response (not just our local body)
           // so the local file reflects everything server has — including the
@@ -401,6 +416,59 @@ export async function mergeLocalIntoApi(
 }
 
 type ServerRec = { id: string; updated_at: string } & Record<string, unknown>;
+
+/**
+ * Apply id-swaps to a single in-memory body just before sending to the server.
+ * Closes the chain-CREATE FK gap: within phase 4b-2's CREATE loop, file-level
+ * rewriteIdReferences only runs AFTER the loop (phase 4b-3). Without body-level
+ * rewrite, iteration 2 (e.g. Carol whose friends references iteration 1's Bob)
+ * would send Bob's stale local id to the server even after Bob's CREATE
+ * produced an idSwap.
+ *
+ * Idempotent — if the body has no fields referencing keys in idMap, it returns
+ * the original body unchanged. Safe to call on UPDATE bodies too as defense
+ * in depth (local file should already be rewritten by phase 4b-3, but if a
+ * timing window opened, this catches it).
+ *
+ * Walks scalar string fields AND string-array fields. Other shapes (objects,
+ * numbers) pass through. Doesn't touch nested objects — atlas writes never
+ * nest relations (the adapter and FIELD_SCHEMA both use bare names or _id
+ * suffixes at the top level).
+ */
+function applyIdSwapsToBody(
+  body: Record<string, unknown>,
+  idMap: Map<string, string>
+): Record<string, unknown> {
+  if (idMap.size === 0) return body;
+  let modified = false;
+  const result: Record<string, unknown> = { ...body };
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string') {
+      const next = idMap.get(value);
+      if (next !== undefined) {
+        result[key] = next;
+        modified = true;
+      }
+    } else if (Array.isArray(value)) {
+      let arrChanged = false;
+      const newArr = value.map(v => {
+        if (typeof v === 'string') {
+          const next = idMap.get(v);
+          if (next !== undefined) {
+            arrChanged = true;
+            return next;
+          }
+        }
+        return v;
+      });
+      if (arrChanged) {
+        result[key] = newArr;
+        modified = true;
+      }
+    }
+  }
+  return modified ? result : body;
+}
 
 /**
  * Walk every local element and rewrite any field value (string OR array of

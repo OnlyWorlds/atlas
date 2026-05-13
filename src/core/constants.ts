@@ -78,3 +78,18 @@ export const SPATIAL_TYPES = new Set(['map', 'pin', 'zone', 'marker']);
 // Lock file lifecycle
 export const LOCK_HEARTBEAT_MS = 30_000;
 export const LOCK_STALE_MS = 90_000;
+
+/**
+ * Atlas-extension fields that live ONLY on local element files and are never
+ * sent to/from the OW server. Two consequences:
+ *
+ *   1. Adapter strips them from write bodies (server 422s on unknown fields).
+ *   2. `applyServerRecord` MUST preserve them from the existing local file
+ *      when overlaying a server response — otherwise pulling an update on
+ *      e.g. a Map silently destroys its local `image_media_id` binding,
+ *      orphaning the media file under `media/`.
+ *
+ * Add new atlas-only fields here; both ends pick them up automatically.
+ */
+export const ATLAS_LOCAL_EXTENSION_FIELDS = ['image_media_id'] as const;
+export type AtlasLocalExtensionField = typeof ATLAS_LOCAL_EXTENSION_FIELDS[number];
