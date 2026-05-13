@@ -45,7 +45,7 @@ class ElementPickerModal extends BaseModal {
   private stripEl: HTMLElement | null = null;
 
   constructor(opts: PickElementOptions, onPick: (el: Element | null) => void) {
-    super('atlas-modal-overlay');
+    super();
     this.opts = opts;
     this.onPick = onPick;
     this.typeFilter = opts.restrictToType ?? null;
@@ -85,19 +85,19 @@ class ElementPickerModal extends BaseModal {
   }
 
   private buildModal(): HTMLElement {
-    const overlay = document.createElement('div');
-    overlay.className = 'atlas-modal-overlay';
-
-    const panel = document.createElement('div');
-    panel.className = 'atlas-modal-panel atlas-picker-panel';
-    panel.setAttribute('data-modal', 'pick-element');
+    // Picker provides its own title row (title + count badge), so skip the
+    // base shell's title slot.
+    const { overlay, body } = this.buildModalShell({
+      panelClass: 'atlas-picker-panel',
+      dataModal: 'pick-element',
+    });
 
     const titleText = this.opts.title
       ?? (this.opts.restrictToType
         ? `pick a ${ELEMENT_LABELS[this.opts.restrictToType].singular}`
         : 'pick an element');
 
-    panel.innerHTML = `
+    body.innerHTML = `
       <div class="atlas-picker-title-row">
         <div class="atlas-modal-title">${escapeText(titleText)}</div>
         <div class="atlas-picker-count" data-role="count">0 elements</div>
@@ -107,13 +107,11 @@ class ElementPickerModal extends BaseModal {
       <div class="atlas-picker-list" data-role="picker-list"></div>
     `;
 
-    overlay.appendChild(panel);
+    this.countEl = body.querySelector<HTMLElement>('[data-role="count"]')!;
+    this.listEl = body.querySelector<HTMLElement>('[data-role="picker-list"]')!;
+    this.stripEl = body.querySelector<HTMLElement>('[data-role="type-strip"]')!;
 
-    this.countEl = panel.querySelector<HTMLElement>('[data-role="count"]')!;
-    this.listEl = panel.querySelector<HTMLElement>('[data-role="picker-list"]')!;
-    this.stripEl = panel.querySelector<HTMLElement>('[data-role="type-strip"]')!;
-
-    const search = panel.querySelector<HTMLInputElement>('[data-role="picker-search"]')!;
+    const search = body.querySelector<HTMLInputElement>('[data-role="picker-search"]')!;
     search.addEventListener('input', () => {
       this.search = search.value.trim().toLowerCase();
       this.refreshList();

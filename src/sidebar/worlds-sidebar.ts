@@ -9,12 +9,15 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
-import { onHashChange, parseHash, navigate, worldHash } from '../core/router';
+import { onHashChange, parseHash, navigate, elementsHash } from '../core/router';
 import { setActiveWorld, saveRegistry, setFavorite } from '../registry/registry';
-import { loadHandle, ensureWritable } from '../store/handle-vault';
+import { loadHandle, ensureWritable, queryWritable } from '../store/handle-vault';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { setActiveStore, getActiveStore, CreateWorldModal } from '../ui/create-world-modal';
+import { LinkWorldModal } from '../ui/link-world-modal';
 import { setupAtlasRoot } from '../setup/atlas-root-flow';
+import { attachSyncEngine } from '../sync/sync-attach';
+import { resetElementDetailScrollMemory } from '../middle/element-detail';
 import { ToastManager } from '../ui/toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
 
@@ -37,12 +40,15 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     header.innerHTML = root
       ? `
         <button class="atlas-btn-ghost" data-action="create-local" title="create a new world in your atlas folder">+ new local</button>
+        <button class="atlas-btn-ghost" data-action="link-api" title="download an existing OnlyWorlds api world into atlas">+ link api</button>
       `
       : `
         <button class="atlas-btn-ghost" data-action="setup-atlas" title="pick the folder atlas will use for all your worlds">+ set up atlas</button>
       `;
     const createBtn = header.querySelector<HTMLButtonElement>('[data-action="create-local"]');
     createBtn?.addEventListener('click', () => new CreateWorldModal(toasts).open());
+    const linkBtn = header.querySelector<HTMLButtonElement>('[data-action="link-api"]');
+    linkBtn?.addEventListener('click', () => new LinkWorldModal(toasts).open());
     const setupBtn = header.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]');
     setupBtn?.addEventListener('click', async () => {
       setupBtn.disabled = true;
@@ -143,38 +149,70 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   `;
 }
 
+export interface ActivateWorldOpts {
+  /** No toasts on failure paths. Useful for silent boot-time auto-activation. */
+  silent?: boolean;
+  /** Keep `selectedElementId` as-is (so a URL like /element/<eid> survives activation). Default false. */
+  preserveSelection?: boolean;
+  /**
+   * `request` (default) calls `requestPermission` — needs a user gesture, throws/returns false otherwise.
+   * `query` calls `queryPermission` only — silent, used at boot when no gesture is available.
+   */
+  permissionMode?: 'request' | 'query';
+}
+
 /**
  * Activate (or re-activate) a world by id: recall its FS handle from the vault,
  * re-grant write permission, open the FolderStore, push state. Also primes the
  * `data.elements` cache from the newly-opened folder.
+ *
+ * Returns true on success. Returns false silently if the silent/query path
+ * couldn't acquire permission — caller decides what to surface.
+ *
+ * Navigation behavior on success:
+ * - If the current URL already names this world (e.g. user reloaded into a deep
+ *   `/element/<eid>` URL), the URL is preserved and a hashchange is fired so
+ *   subscribers re-resolve.
+ * - Otherwise, navigates to `elementsHash(worldId)` for legacy parity (clicking
+ *   a world drops the user into elements mode, not the welcome panel).
  */
-export async function activateWorld(worldId: string, toasts: ToastManager): Promise<void> {
+export async function activateWorld(
+  worldId: string,
+  toasts: ToastManager,
+  opts: ActivateWorldOpts = {}
+): Promise<boolean> {
+  const { silent = false, preserveSelection = false, permissionMode = 'request' } = opts;
   const state = getState();
   const entry = state.registry.worlds.find(w => w.id === worldId);
   if (!entry) {
-    toasts.error(`world ${worldId} not found in registry`);
-    return;
+    if (!silent) toasts.error(`world ${worldId} not found in registry`);
+    return false;
   }
-  // Already active? Just navigate.
+  // Already active? Just navigate (still respect deep URL).
   if (state.active?.worldId === worldId) {
-    navigate(worldHash(worldId));
-    return;
+    navigateAfterActivate(worldId);
+    return true;
   }
 
   const handle = await loadHandle(entry.folder.handle_key);
   if (!handle) {
-    toasts.error(`folder handle missing for ${entry.name}. delete + recreate to recover.`);
-    return;
+    if (!silent) toasts.error(`folder handle missing for ${entry.name}. delete + recreate to recover.`);
+    return false;
   }
-  const granted = await ensureWritable(handle);
+  const granted = permissionMode === 'query'
+    ? await queryWritable(handle)
+    : await ensureWritable(handle);
   if (!granted) {
-    toasts.error(`folder permission denied for ${entry.name}`);
-    return;
+    if (!silent) toasts.error(`folder permission denied for ${entry.name}`);
+    return false;
   }
 
   // Close prior active store if any.
   const prior = getActiveStore();
   if (prior) await prior.close().catch(() => {});
+  // World switch: drop scroll memory so stale element ids from the previous
+  // world don't survive into this one.
+  resetElementDetailScrollMemory();
 
   const store = new FsFolderStore();
   await store.open(handle);
@@ -194,10 +232,31 @@ export async function activateWorld(worldId: string, toasts: ToastManager): Prom
     console.warn('[worlds-sidebar] failed to prime elements:', err);
     patchSlice('data', { elements: [] });
   }
-  // Reset selection (different world → no stale selectedElementId).
-  patchSlice('ui', { ...getState().ui, selectedElementId: null });
+  // Reset selection unless caller asked us to preserve it (URL-driven restore).
+  if (!preserveSelection) {
+    patchSlice('ui', { ...getState().ui, selectedElementId: null });
+  }
 
-  navigate(worldHash(worldId));
+  // Attach SyncEngine if this world is api-linked. Auto-detaches the previous
+  // world's engine. For local-only worlds this is a no-op (returns null).
+  attachSyncEngine(entry, store);
+
+  navigateAfterActivate(worldId);
+  return true;
+}
+
+/**
+ * Honor the existing deep URL if it already names this world; otherwise land
+ * on elements mode (legacy click→elements behavior).
+ */
+function navigateAfterActivate(worldId: string): void {
+  const route = parseHash(window.location.hash);
+  if (route.worldId === worldId) {
+    // URL is already on this world (possibly deep route) — re-fire hashchange.
+    navigate(window.location.hash);
+  } else {
+    navigate(elementsHash(worldId));
+  }
 }
 
 // ---- Escapes ----

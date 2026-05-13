@@ -19,6 +19,7 @@ import { navigate, elementHash } from '../core/router';
 import { getActiveStore } from './create-world-modal';
 import { CONTENT_ELEMENT_TYPES, type ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { requestPushIfLinked } from '../sync/sync-attach';
 
 /** Types offered in the create modal — matches legacy: all 22 except pin/marker. */
 const CREATE_TYPES: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
@@ -42,7 +43,7 @@ export class ElementCreateModal extends BaseModal {
   private ghostSuffix!: HTMLSpanElement;
 
   constructor(toasts: ToastManager, opts: ElementCreateOptions = {}) {
-    super('atlas-modal-overlay');
+    super();
     this.toasts = toasts;
     this.opts = opts;
     this.selected = opts.initialType ?? 'character';
@@ -67,15 +68,12 @@ export class ElementCreateModal extends BaseModal {
   }
 
   private buildModal(): HTMLElement {
-    const overlay = document.createElement('div');
-    overlay.className = 'atlas-modal-overlay';
+    const { overlay, body } = this.buildModalShell({
+      title: 'new element',
+      dataModal: 'create-element',
+    });
 
-    const panel = document.createElement('div');
-    panel.className = 'atlas-modal-panel';
-    panel.setAttribute('data-modal', 'create-element');
-
-    panel.innerHTML = `
-      <div class="atlas-modal-title">new element</div>
+    body.innerHTML = `
       <form data-form="create-element">
         <label class="atlas-modal-field">
           <span>name</span>
@@ -97,15 +95,13 @@ export class ElementCreateModal extends BaseModal {
       </form>
     `;
 
-    overlay.appendChild(panel);
-
     // Capture the category input + ghost spans.
-    this.typeInput = panel.querySelector<HTMLInputElement>('input[name="element-type"]')!;
-    this.ghostTyped = panel.querySelector<HTMLSpanElement>('.ghost-typed')!;
-    this.ghostSuffix = panel.querySelector<HTMLSpanElement>('.ghost-suffix')!;
+    this.typeInput = body.querySelector<HTMLInputElement>('input[name="element-type"]')!;
+    this.ghostTyped = body.querySelector<HTMLSpanElement>('.ghost-typed')!;
+    this.ghostSuffix = body.querySelector<HTMLSpanElement>('.ghost-suffix')!;
 
     // Render the type grid + initial input value + initial ghost state.
-    const grid = panel.querySelector<HTMLElement>('[data-role="type-grid"]')!;
+    const grid = body.querySelector<HTMLElement>('[data-role="type-grid"]')!;
     this.renderTypeGrid(grid);
     this.typeInput.value = ELEMENT_LABELS[this.selected].singular;
     this.updateGhost();
@@ -134,10 +130,10 @@ export class ElementCreateModal extends BaseModal {
       }
     });
 
-    const form = panel.querySelector<HTMLFormElement>('form')!;
-    const errorBox = panel.querySelector<HTMLElement>('[data-role="error"]')!;
-    const cancelBtn = panel.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
-    const submitBtn = panel.querySelector<HTMLButtonElement>('[data-action="create"]')!;
+    const form = body.querySelector<HTMLFormElement>('form')!;
+    const errorBox = body.querySelector<HTMLElement>('[data-role="error"]')!;
+    const cancelBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
+    const submitBtn = body.querySelector<HTMLButtonElement>('[data-action="create"]')!;
 
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
 
@@ -165,6 +161,7 @@ export class ElementCreateModal extends BaseModal {
         const elements = await store.listElements();
         patchSlice('data', { elements });
         patchSlice('ui', { ...getState().ui, selectedElementId: el.id });
+        requestPushIfLinked();
         this.toasts.success(`created ${this.selected}: ${el.name}`);
         this.hide();
         this.opts.onCreated?.(el.id);

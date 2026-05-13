@@ -1321,6 +1321,14 @@
   letter-spacing: 0.02em;
 }
 
+/* Body wrapper — flat container so subclasses can drop form/list/grid content
+   directly without managing the title position. No padding/margin so existing
+   subclass markup keeps its visual spacing. */
+.atlas-modal-body {
+  display: flex;
+  flex-direction: column;
+}
+
 /* Field edit popover — small floating editor, no layout shift underneath */
 .atlas-edit-popover-backdrop {
   position: fixed;
@@ -1856,6 +1864,56 @@
   border-radius: 4px;
   font-size: 12px;
   margin-bottom: 12px;
+}
+
+.atlas-modal-progress {
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  color: rgba(220, 240, 248, 0.92);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-bottom: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tab bar inside a modal — picks between create vs link routes in make-online */
+.atlas-modal-tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--atlas-divider-strong);
+  padding-bottom: 4px;
+}
+
+/* Policy radio fieldset in the link route */
+.atlas-policy-fieldset {
+  border: 1px solid var(--atlas-divider-strong);
+  border-radius: 4px;
+  padding: 8px 12px 10px;
+  margin-bottom: 12px;
+}
+
+.atlas-policy-fieldset > legend {
+  padding: 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: lowercase;
+}
+
+.atlas-policy-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+}
+
+.atlas-policy-option > input[type="radio"] {
+  accent-color: #22d3ee;
 }
 
 .atlas-modal-actions {

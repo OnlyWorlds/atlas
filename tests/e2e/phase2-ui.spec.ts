@@ -162,8 +162,12 @@ test('two worlds created in root share parent folder', async ({ page }) => {
   // Beta is the most-recently-created so it's active.
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Beta' })).toHaveClass(/selected/);
 
-  // Switch to Alpha.
+  // Switch to Alpha. Clicking a world flips the sidebar to elements mode
+  // (legacy behavior: "open the world's contents immediately").
   await page.click('.atlas-row[data-world-id]:has-text("Alpha")');
+  await expect(page.locator('[data-action="mode-elements"].active')).toBeVisible();
+  // Toggle back to worlds mode to verify which one is selected.
+  await page.click('[data-action="mode-worlds"]');
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Alpha' })).toHaveClass(/selected/);
 
   // Both worlds live as subfolders inside the wrapped atlas-worlds/ folder.
@@ -256,7 +260,8 @@ test('reload → atlas root + world both persist, click re-activates', async ({ 
   await page.click('[data-action="pick"]');
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Persistent' })).toBeVisible();
 
-  // Reload.
+  // Reload via `/` — this drops the URL hash, so auto-activate-from-url has no
+  // worldId to act on. The world should remain listed but not active.
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
 
@@ -264,15 +269,42 @@ test('reload → atlas root + world both persist, click re-activates', async ({ 
   await expect(page.locator('[data-action="create-local"]')).toBeVisible();
   await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
 
-  // World is listed but not active.
+  // World is listed but not active (URL hash was cleared, nothing to auto-restore).
   const row = page.locator('.atlas-row[data-world-id]', { hasText: 'Persistent' });
   await expect(row).toBeVisible();
   await expect(row).not.toHaveClass(/selected/);
 
-  // Click → activates.
+  // Click → activates and flips sidebar to elements mode.
   await row.click();
-  await expect(row).toHaveClass(/selected/);
+  await expect(page.locator('[data-action="mode-elements"].active')).toBeVisible();
+  // Toggle back to worlds mode to confirm which world is now selected.
+  await page.click('[data-action="mode-worlds"]');
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Persistent' })).toHaveClass(/selected/);
   await expect(page.locator('.atlas-middle-header h2')).toContainText('Persistent');
+});
+
+test('reload with world in URL hash → silent auto-activate preserves state', async ({ page }) => {
+  // Set up a world and navigate explicitly to its hash before reloading.
+  await setupAtlasRoot(page, 'atlas-root-e2');
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'AutoOpen');
+  await page.click('[data-action="pick"]');
+  const row = page.locator('.atlas-row[data-world-id]', { hasText: 'AutoOpen' });
+  await expect(row).toBeVisible();
+
+  // Capture the world's id from its row and build a deep URL into elements mode.
+  const worldId = await row.getAttribute('data-world-id');
+  expect(worldId).toBeTruthy();
+
+  // Reload preserving the worlds-mode URL for this world.
+  await page.goto(`/#/w/${worldId}`);
+  await page.waitForSelector('.atlas-shell');
+
+  // OPFS handles auto-grant permission, so silent auto-activate succeeds.
+  // The world should show as active in the sidebar without any click.
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'AutoOpen' })).toHaveClass(/selected/);
+  // And the middle pane reflects the active world.
+  await expect(page.locator('.atlas-middle-header h2')).toContainText('AutoOpen');
 });
 
 test('forget world removes it from sidebar + nav to root, atlas root preserved', async ({ page }) => {

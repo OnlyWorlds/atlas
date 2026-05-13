@@ -16,6 +16,7 @@ import { loadRegistry } from './registry/registry';
 import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
 import { onHashChange, parseHash } from './core/router';
 import { hydrateAtlasRoot } from './setup/atlas-root-flow';
+import { activateWorld } from './sidebar/worlds-sidebar';
 import type { WorldMap } from './core/types';
 
 export interface AppHandle {
@@ -33,6 +34,13 @@ export function startApp(container: HTMLElement): AppHandle {
   // Mount toast surface (uses #toast-container element from index.html)
   toastManager.init();
   const toasts = toastManager;
+
+  // Boot-time auto-activation: if the URL names a world and FS permission was
+  // already granted in a previous session (queryPermission returns 'granted'
+  // without a gesture), silently re-open the world so a reload preserves state.
+  // If permission isn't auto-granted, do nothing — sidebar click is the
+  // explicit re-grant path (it has a user gesture).
+  void tryAutoActivateFromUrl(toasts);
 
   // Mount shell.
   const shell = mountAppShell(container);
@@ -136,8 +144,34 @@ function patchSliceIfChanged<K extends keyof ReturnType<typeof getState>>(
 
 async function maybeAutoActivate(routeWorldId: string | null, activeWorldId: string | undefined): Promise<void> {
   if (!routeWorldId || routeWorldId === activeWorldId) return;
-  // No-op for Phase 2 — sidebar click is the explicit permission path. We keep
-  // the URL "ahead of state" deliberately so a fresh tab landing on /w/<id>
-  // shows the empty welcome until the user clicks the world (which triggers
-  // the FS Access permission prompt).
+  // Mid-session activation is intentionally NOT automatic — without a fresh
+  // user gesture, requestPermission would fail and we'd downgrade the URL to a
+  // confusing "welcome" view. Sidebar click is the explicit permission path.
+  // Boot-time silent activation is handled separately by `tryAutoActivateFromUrl`.
+}
+
+/**
+ * On app boot, attempt to re-activate the world named in the URL without
+ * prompting for permission. This uses `queryPermission` (no gesture needed):
+ * if Chrome already considers permission granted from a recent session, we
+ * activate silently and the URL's deep route (element selection, open map tab)
+ * is restored via the normal render path. If permission isn't pre-granted, we
+ * do nothing — the user clicks the world in the sidebar to re-grant.
+ */
+async function tryAutoActivateFromUrl(toasts: ToastManager): Promise<void> {
+  const route = parseHash(window.location.hash);
+  if (!route.worldId) return;
+  const entry = getState().registry.worlds.find(w => w.id === route.worldId);
+  if (!entry) return;
+  try {
+    await activateWorld(route.worldId, toasts, {
+      silent: true,
+      preserveSelection: true,
+      permissionMode: 'query',
+    });
+  } catch (err) {
+    // Errors here would be surprising — log and move on. The user can always
+    // click the world card to retry with a gesture.
+    console.warn('[boot] silent auto-activate failed:', err);
+  }
 }

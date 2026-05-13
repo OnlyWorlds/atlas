@@ -22,6 +22,7 @@ import { ElementCreateModal } from '../../ui/element-create-modal';
 import { getActiveStore } from '../../ui/create-world-modal';
 import { extractEdgeColor } from './edge-color';
 import { navigate, elementHash } from '../../core/router';
+import { requestPushIfLinked } from '../../sync/sync-attach';
 
 interface MapTabCacheEntry {
   mapId: string;
@@ -178,6 +179,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         const elements = await store.listElements();
         patchSlice('data', { elements });
         patchSlice('ui', { ...getState().ui, pinPlacement: null });
+        requestPushIfLinked();
         toasts.success('pin placed');
       } catch (err) {
         console.error('[map-tab] create pin failed:', err);
@@ -229,6 +231,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
             });
             const elements = await store.listElements();
             patchSlice('data', { elements });
+            requestPushIfLinked();
             toasts.success('pin placed');
           } catch (err) {
             console.error('[map-tab] contextual pin create failed:', err);

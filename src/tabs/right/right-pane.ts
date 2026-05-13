@@ -132,6 +132,13 @@ function closeMapTab(idx: number, mapId: string): void {
 /**
  * Sync pill — fixed-positioned (bottom-right) via legacy `.atlas-sync-pill`
  * CSS. Mounts once to document.body and updates in place.
+ *
+ * State derivation:
+ * - No active world → hidden (`data-state="none"`)
+ * - Active world is local-only → `data-state="local"`, label "local"
+ * - Active world is api-linked → label + state derived from `state.sync.activeSync`
+ *   (SyncEngineState.kind): idle→synced, syncing→saving, paused→offline, error→error.
+ *   Falls back to `linked` if no engine state has reported yet.
  */
 function renderSyncIndicator(state: ReturnType<typeof getState>): void {
   let pill = document.querySelector<HTMLElement>('[data-role="sync-pill"]');
@@ -149,12 +156,76 @@ function renderSyncIndicator(state: ReturnType<typeof getState>): void {
   }
   const entry = state.registry.worlds.find(w => w.id === active.worldId);
   const linked = entry?.state === 'api-linked';
-  pill.dataset.state = linked ? 'api' : 'local';
-  pill.title = linked ? 'api-linked world (sync flows land in phase 3)' : 'local-only world';
+  if (!linked) {
+    pill.dataset.state = 'local';
+    pill.title = 'local-only world — folder is the source of truth';
+    pill.innerHTML = `
+      <span class="atlas-sync-pill-dot"></span>
+      <span>local</span>
+    `;
+    return;
+  }
+
+  // api-linked: surface engine state if available.
+  const engine = state.sync.activeSync;
+  const { dataState, label, title } = mapEngineStateToPill(engine);
+  pill.dataset.state = dataState;
+  pill.title = title;
   pill.innerHTML = `
     <span class="atlas-sync-pill-dot"></span>
-    <span>${linked ? 'linked' : 'local'}</span>
+    <span>${label}</span>
   `;
+}
+
+function mapEngineStateToPill(
+  engine: ReturnType<typeof getState>['sync']['activeSync']
+): { dataState: string; label: string; title: string } {
+  if (!engine) {
+    return {
+      dataState: 'api',
+      label: 'linked',
+      title: 'api-linked world — engine starting up',
+    };
+  }
+  switch (engine.kind) {
+    case 'idle':
+      return {
+        dataState: 'synced',
+        label: 'synced',
+        title: engine.last_sync_at ? `last synced ${formatTime(engine.last_sync_at)}` : 'idle — no sync yet',
+      };
+    case 'syncing':
+      return {
+        dataState: 'saving',
+        label: engine.phase === 'push' ? 'saving…' : 'fetching…',
+        title: `syncing (${engine.phase})${engine.progress ? ` ${engine.progress.done}/${engine.progress.total}` : ''}`,
+      };
+    case 'paused':
+      return {
+        dataState: 'pending',
+        label: engine.reason === 'network' ? 'offline' : 'paused',
+        title: engine.pending_changes
+          ? `${engine.reason === 'network' ? 'offline' : 'paused'} — ${engine.pending_changes} pending`
+          : engine.reason === 'network'
+            ? 'offline'
+            : 'paused — local edits queued',
+      };
+    case 'error':
+      return {
+        dataState: 'error',
+        label: 'error',
+        title: engine.message,
+      };
+  }
+}
+
+function formatTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString();
+  } catch {
+    return iso;
+  }
 }
 
 function escapeText(s: string): string {

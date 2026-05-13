@@ -71,17 +71,18 @@ export async function listHandleKeys(): Promise<string[]> {
   }
 }
 
+// Permission API extensions to FileSystemDirectoryHandle — typed loosely in lib.dom.
+type PermAware = FileSystemDirectoryHandle & {
+  queryPermission?: (d: { mode: 'readwrite' }) => Promise<PermissionState>;
+  requestPermission?: (d: { mode: 'readwrite' }) => Promise<PermissionState>;
+};
+
 /**
  * Verify and (re-)request read-write permission on a handle. Returns true if
  * the handle is now writable. Must be called inside a user-gesture handler in
  * production; tests can bypass via OPFS (auto-granted).
  */
 export async function ensureWritable(handle: FileSystemDirectoryHandle): Promise<boolean> {
-  // queryPermission and requestPermission are spec but typed loosely in lib.dom.
-  type PermAware = FileSystemDirectoryHandle & {
-    queryPermission?: (d: { mode: 'readwrite' }) => Promise<PermissionState>;
-    requestPermission?: (d: { mode: 'readwrite' }) => Promise<PermissionState>;
-  };
   const h = handle as PermAware;
   const opts = { mode: 'readwrite' as const };
   if (h.queryPermission) {
@@ -94,4 +95,20 @@ export async function ensureWritable(handle: FileSystemDirectoryHandle): Promise
   }
   // OPFS handles: no permission API; auto-granted.
   return true;
+}
+
+/**
+ * Query whether the handle is already writable WITHOUT prompting the user.
+ * Safe to call without a user gesture (e.g. at page boot). Returns true if
+ * permission is already 'granted', false otherwise.
+ *
+ * Used for boot-time silent auto-activation: if the user recently picked the
+ * folder, queryPermission can return 'granted' without an interaction. If not,
+ * we leave activation for an explicit sidebar click (the user gesture path).
+ */
+export async function queryWritable(handle: FileSystemDirectoryHandle): Promise<boolean> {
+  const h = handle as PermAware;
+  if (!h.queryPermission) return true; // OPFS handles: no permission API; auto-granted.
+  const state = await h.queryPermission({ mode: 'readwrite' });
+  return state === 'granted';
 }

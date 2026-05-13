@@ -221,6 +221,40 @@ test('picker excludes already-linked targets in multi-link', async ({ page }) =>
   await expect(page.locator('.atlas-picker-row:has-text("Hobbit")')).toBeVisible();
 });
 
+test('scroll position is preserved across field link/delink re-renders', async ({ page }) => {
+  // Build enough data so the element-detail body actually scrolls.
+  await createElement(page, 'species', 'Hobbit');
+  await page.click('.atlas-row[data-element-id]:has-text("Hobbit")');
+  await createElement(page, 'character', 'Bilbo');
+
+  const body = page.locator('.atlas-middle-body[data-element-id]');
+  await expect(body).toBeVisible();
+
+  // Force a scroll on the body. Use a generous value; gets clamped to scrollHeight - clientHeight.
+  await body.evaluate((el) => { el.scrollTop = 200; });
+  const before = await body.evaluate((el) => el.scrollTop);
+  expect(before).toBeGreaterThan(0);
+
+  // Link a species (causes re-render via picker resolve + folder update).
+  const speciesRow = page.locator('.atlas-field', { has: page.locator('.atlas-field-label', { hasText: 'Species' }) });
+  await speciesRow.locator('.atlas-link-pick').click();
+  await page.click('.atlas-picker-row:has-text("Hobbit")');
+  await expect(speciesRow.locator('.atlas-link-chip', { hasText: 'Hobbit' })).toBeVisible();
+
+  // After link insert + re-render, scrollTop should be restored close to `before`.
+  // Small drift tolerance — content height changes when the chip is added but
+  // the saved scrollTop should land within a few px of the original.
+  const after = await body.evaluate((el) => el.scrollTop);
+  expect(Math.abs(after - before)).toBeLessThan(20);
+
+  // De-link via the chip remove — another re-render. Same scrollTop expected.
+  await speciesRow.locator('.atlas-link-chip:has-text("Hobbit") .atlas-link-chip-remove').click();
+  await expect(speciesRow.locator('.atlas-link-chip')).toHaveCount(0);
+
+  const afterDelink = await body.evaluate((el) => el.scrollTop);
+  expect(Math.abs(afterDelink - before)).toBeLessThan(20);
+});
+
 test('picker cancel via Escape leaves the field untouched', async ({ page }) => {
   await createElement(page, 'location', 'Shire');
   await page.click('.atlas-row[data-element-id]:has-text("Shire")');

@@ -13,7 +13,7 @@
  * `data.elements` with a new array reference after every mutation.
  */
 
-import type { WorldsRegistry, WorldMeta, Element, ElementType } from './types';
+import type { WorldsRegistry, WorldMeta, Element, ElementType, SyncEngineState } from './types';
 import { defaultRegistry } from './types';
 
 export type MiddleMode = 'welcome' | 'settings' | 'element' | 'timeline';
@@ -53,6 +53,18 @@ export type RightTabRef =
   | { kind: 'map-index' }
   | { kind: 'map'; mapId: string; label: string };
 
+/**
+ * SyncEngine state surfaced to the UI. One entry per api-linked world that has
+ * been activated this session. `activeSync` is a convenience pointer to the
+ * currently-active world's engine state.
+ *
+ * Updates flow: SyncEngine.onStateChange → `attachSyncEngine` → patchSlice('sync', ...).
+ */
+export interface SyncSummaryState {
+  byWorld: Record<string, SyncEngineState>;
+  activeSync: SyncEngineState | null;
+}
+
 export interface UiState {
   sidebarMode: SidebarMode;
   selectedElementId: string | null;
@@ -73,6 +85,7 @@ export interface AppState {
   middleMode: MiddleMode;
   data: DataState;
   ui: UiState;
+  sync: SyncSummaryState;
   /** Toast surface state — currently unused; reserved for next bouts. */
   busy: boolean;
 }
@@ -92,6 +105,10 @@ let state: AppState = {
     rightTabs: [{ kind: 'map-index' }],
     rightActiveIndex: 0,
     pinPlacement: null,
+  },
+  sync: {
+    byWorld: {},
+    activeSync: null,
   },
   busy: false,
 };

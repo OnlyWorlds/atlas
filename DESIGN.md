@@ -298,8 +298,14 @@ All three policies are wired today; `drain-blind` is the default. Note: true "se
 ### Push triggers
 
 - Manual: `pushNow()` button.
-- Auto-debounced: 5 seconds after the last local write, if not paused and online. Configurable later.
+- Auto-debounced: 5 seconds after the last local write, if not paused and online. Configurable later via `engine.setDebounceMs(ms)`.
 - On resume / online event.
+
+The auto-debounce is implemented in `SyncEngine.requestPush()`: schedules `pushOnce()` after the debounce window, resets on each call so bursts of edits coalesce. Wired into every folder-write site (element edit + delete + create, map create + delete, pin placement) via `requestPushIfLinked()` in `sync-attach.ts` — a no-op for local-only worlds. `SyncEngine.stop()` cancels any pending debounced push (called on engine detach).
+
+### Push resilience
+
+`pushPhase` is per-element error tolerant: 4xx, validation, transient network failures on a single element are recorded in `result.failures: PerElementFailure[]` and iteration continues. This matters most for `pushOnce()` invoked by Make-Online flows that upload dozens of elements at once — one bad element shouldn't abort the upload. Successful elements get `server_updated_at` stamped; failed ones retry on the next sync.
 
 ### Pull triggers
 
@@ -544,9 +550,22 @@ interface UiState {
 
 interface SyncSummaryState {
   byWorld: Record<string, SyncEngineState>;
-  activeWorldSync?: SyncEngineState;       // convenience pointer
+  activeSync: SyncEngineState | null;       // convenience pointer to active world's engine
 }
 ```
+
+The `state.sync` slice is populated by `attachSyncEngine(entry, folder)` (singleton in `src/sync/sync-attach.ts`). The helper:
+
+1. No-ops for `local-only` worlds (and detaches any prior engine).
+2. For `api-linked` worlds: constructs `OnlyWorldsClient` from `entry.api.api_key` + `registry.pin`, wraps in `OwClientAdapter`, instantiates `SyncEngine`, wires `onStateChange → patchSlice('sync', ...)`.
+3. Detaches the previous world's engine on switch — at most one active at a time.
+4. Exposed: `getCurrentSyncEngine()` for autosave callers, `requestPushIfLinked()` as a fire-and-forget convenience.
+
+`attachSyncEngine` is called from:
+- `worlds-sidebar.activateWorld` — every world activation.
+- `atlas-root-flow.createWorldInRoot` — fresh local world (detaches prior engine).
+- `atlas-root-flow.linkExistingApiWorldInRoot` — after initial download.
+- `make-online-modal` — after registry transition to api-linked.
 
 UI prefs (sidebarMode default, showcaseMode, defaultCreateType, allowMultiPin) → `localStorage.atlas_ui_prefs`.
 Navigation state (active world, selection, open maps) → URL hash.
@@ -590,6 +609,10 @@ Inherited from legacy (hard-won; preserve in new code):
 12. **Tombstones append before file unlink**. If the process dies mid-delete, the tombstone is durable; next sync still pushes the delete.
 13. **One writer at a time per folder**. Lock file (`.atlas/lock`) guards against multi-tab races. Format: `{ tab_id, started_at, last_heartbeat }`. The active tab refreshes `last_heartbeat` every 30s. A peer tab that finds a lock with `last_heartbeat` older than 90s treats it as stale and takes it (warning shown). Second writer with a fresh lock gets read-only mode with a warning.
 14. **Element files are the schema**. The `type` field on disk is authoritative. SDK responses get `type` stamped at the adapter boundary (server doesn't echo it on per-type endpoints).
+15. **One engine, attached at world activation**. `attachSyncEngine` is a module-level singleton — at most one `SyncEngine` exists at a time. Switching worlds detaches the previous engine (`stop()` cancels pending debounced push, slice resets). Avoids cross-world push contamination.
+16. **Modal chrome lives in `BaseModal.buildModalShell`**. All modals (`create-world`, `element-create`, `element-picker`, `map-create`, `link-world`, `make-online`) share the same overlay+panel+title+body via `buildModalShell({title?, panelClass?, dataModal?})`. Title is optional (picker skips it for a custom title-row). Future modals MUST use this helper — never build overlay/panel from scratch.
+17. **Folder writes from the UI call `requestPushIfLinked()`**. After any successful `FolderStore.update/create/delete` from a UI handler, call `requestPushIfLinked()` so the autosave debounce fires. No-op for local-only worlds. Without this, edits to api-linked worlds wouldn't sync until the user manually triggered a push.
+18. **Element-detail scroll position is preserved across re-renders** via a module-level `Map<elementId, scrollTop>`. Captured before `target.innerHTML = ''`, restored via `queueMicrotask` after layout, live-tracked via passive scroll listener. Reset on world switch via `resetElementDetailScrollMemory()`. Without this, field edits/link toggles dump the user back to the top of the panel.
 
 ---
 

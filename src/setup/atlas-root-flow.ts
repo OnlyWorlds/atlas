@@ -23,14 +23,20 @@ import { storeHandle, loadHandle, ensureWritable } from '../store/handle-vault';
 import {
   setAtlasRoot,
   createLocalWorld,
+  createApiLinkedWorld,
   setActiveWorld,
+  setPin,
   saveRegistry,
 } from '../registry/registry';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { newId } from '../store/folder-store';
 import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-utils';
 import { getActiveStore, setActiveStore } from '../ui/create-world-modal';
-import type { WorldRegistryEntry } from '../core/types';
+import { attachSyncEngine } from '../sync/sync-attach';
+import { OnlyWorldsClient } from '@onlyworlds/sdk';
+import { OwClientAdapter } from '../sync/ow-client-adapter';
+import { initialDownloadAll, type InitialDownloadProgress } from '../sync/initial-download';
+import type { WorldRegistryEntry, PerElementFailure } from '../core/types';
 
 /**
  * Prompt the user to pick the atlas root folder. On success: resolve the
@@ -270,7 +276,148 @@ export async function createWorldInRoot(name: string): Promise<{ entry: WorldReg
   patchSlice('data', { elements: [] });
   patchSlice('ui', { ...getState().ui, selectedElementId: null });
 
+  // Local-only world: this detaches any prior engine. The make-online flow
+  // (later) is what attaches a real engine once api credentials exist.
+  attachSyncEngine(entry, store);
+
   return { entry };
+}
+
+/**
+ * Link an existing OnlyWorlds API world to atlas, downloading all elements
+ * into a fresh subfolder under the atlas root.
+ *
+ * Steps:
+ *   1. Validate creds — `client.worlds.get()` returns `{id, name}`.
+ *   2. Build slug from display name + uuid prefix from server world id.
+ *   3. Create subfolder under atlas root, persist handle in vault.
+ *   4. Open FsFolderStore, write world.json with id + name + api fields.
+ *   5. Download all elements via `initialDownloadAll`.
+ *   6. Register entry as api-linked, set active, attach SyncEngine.
+ *   7. Persist PIN globally if registry didn't have one.
+ *
+ * Throws on validation failure (bad creds, world not found, network error)
+ * or on root-folder issues. Per-element download failures are non-fatal:
+ * returned in `failures` for the modal to surface as a toast count.
+ */
+export interface LinkExistingApiWorldOpts {
+  apiKey: string;
+  apiPin: string;
+  /** Optional override; empty falls back to the server-reported world name. */
+  displayName?: string;
+  /** Per-element progress during the initial download. */
+  onProgress?: (p: InitialDownloadProgress) => void;
+}
+
+export interface LinkExistingApiWorldResult {
+  entry: WorldRegistryEntry;
+  downloaded: number;
+  failures: PerElementFailure[];
+}
+
+export async function linkExistingApiWorldInRoot(
+  opts: LinkExistingApiWorldOpts
+): Promise<LinkExistingApiWorldResult> {
+  const reg = getState().registry;
+  if (!reg.atlas_root) {
+    throw new Error('atlas root is not set up — pick a folder first');
+  }
+  const apiKey = opts.apiKey.trim();
+  const apiPin = opts.apiPin.trim();
+  if (!apiKey) throw new Error('api key is required');
+  if (!apiPin) throw new Error('pin is required');
+
+  // Validate creds. The SDK throws "API Error NNN: ..." on auth/network failure.
+  const client = new OnlyWorldsClient({ apiKey, apiPin });
+  let world: { id?: string; name?: string };
+  try {
+    world = await client.worlds.get();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/401|403/.test(msg)) throw new Error('api key or pin invalid');
+    if (/404/.test(msg)) throw new Error('no world found for that api key');
+    if (/network|fetch/i.test(msg)) throw new Error('could not reach onlyworlds — check your connection');
+    throw new Error(msg);
+  }
+  if (!world.id) throw new Error('server returned no world id (unexpected)');
+
+  const serverWorldId = world.id;
+  const displayName = (opts.displayName ?? '').trim() || world.name?.trim() || 'untitled world';
+
+  const rootHandle = await loadHandle(reg.atlas_root.handle_key);
+  if (!rootHandle) {
+    throw new Error('atlas root handle is missing from the vault — re-pick it from settings');
+  }
+  const granted = await ensureWritable(rootHandle);
+  if (!granted) {
+    throw new Error('write permission for the atlas folder was denied');
+  }
+
+  // Close any prior active store before we open a new one.
+  const prior = getActiveStore();
+  if (prior) await prior.close().catch(() => {});
+  setActiveStore(null);
+
+  const slug = slugify(displayName);
+  const subName = `${slug}-${serverWorldId.slice(0, 8)}`;
+
+  // Create the subfolder under the root.
+  const worldHandle = await rootHandle.getDirectoryHandle(subName, { create: true });
+
+  // Local-side uuid for the registry/folder identity. Distinct from serverWorldId.
+  const localWorldUuid = newId();
+  const handleKey = `world-${localWorldUuid}`;
+  await storeHandle(handleKey, worldHandle);
+
+  // Open FolderStore + write meta with api credentials so reload-after-restart
+  // can rebuild the engine from registry+world.json alone.
+  const store = new FsFolderStore();
+  await store.open(worldHandle);
+  await store.writeWorldMeta({
+    id: localWorldUuid,
+    name: displayName,
+    api: { world_id: serverWorldId, api_key: apiKey },
+  });
+
+  // Initial download — all elements of all types stamped with `server_updated_at`.
+  const adapter = new OwClientAdapter(client);
+  const downloadResult = await initialDownloadAll(store, adapter, opts.onProgress);
+
+  // Register the world in registry. Persist PIN globally if not set yet.
+  let regAfter = getState().registry;
+  if (!regAfter.pin) regAfter = setPin(regAfter, apiPin);
+  const { next, entry } = createApiLinkedWorld(regAfter, {
+    name: displayName,
+    apiWorldId: serverWorldId,
+    apiKey,
+    folderName: subName,
+    handleKey,
+    pathHint: `${reg.atlas_root.folder_name}/${subName}`,
+  });
+  const activated = setActiveWorld(next, entry.id);
+  saveRegistry(activated);
+  patchSlice('registry', activated);
+  patchSlice('active', { worldId: entry.id, meta: { id: localWorldUuid, name: displayName }, opened: true });
+  setActiveStore(store);
+
+  // Prime the elements cache from the newly-downloaded folder.
+  try {
+    const elements = await store.listElements();
+    patchSlice('data', { elements });
+  } catch (err) {
+    console.warn('[link-api] failed to prime elements after download:', err);
+    patchSlice('data', { elements: [] });
+  }
+  patchSlice('ui', { ...getState().ui, selectedElementId: null });
+
+  // Attach SyncEngine — api-linked entry, so the engine spins up.
+  attachSyncEngine(entry, store);
+
+  return {
+    entry,
+    downloaded: downloadResult.totalDownloaded,
+    failures: downloadResult.failures,
+  };
 }
 
 /**

@@ -15,6 +15,7 @@ import { saveRegistry, setPin, setEmail, deleteWorldEntry } from '../registry/re
 import { deleteHandle } from '../store/handle-vault';
 import { getActiveStore, setActiveStore } from '../ui/create-world-modal';
 import { setupAtlasRoot } from '../setup/atlas-root-flow';
+import { MakeOnlineModal } from '../ui/make-online-modal';
 import { ToastManager } from '../ui/toast-manager';
 import { navigate } from '../core/router';
 
@@ -116,6 +117,9 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
       }
     });
 
+    const makeOnlineBtn = root.querySelector<HTMLButtonElement>('[data-action="make-online"]');
+    makeOnlineBtn?.addEventListener('click', () => new MakeOnlineModal(toasts).open());
+
     const deleteBtn = root.querySelector<HTMLButtonElement>('[data-action="delete-world"]');
     deleteBtn?.addEventListener('click', async () => {
       const target = active;
@@ -147,6 +151,9 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
 
 function renderActiveWorld(world: import('../core/types').WorldRegistryEntry): string {
   const stateLabel = world.state === 'api-linked' ? 'api-linked' : 'local-only';
+  const makeOnlineBtn = world.state === 'local-only'
+    ? '<button class="ow-btn ow-btn-primary" data-action="make-online">make online</button>'
+    : '';
   return `
     <dl class="atlas-settings-meta">
       <dt>name</dt><dd>${escapeText(world.name)}</dd>
@@ -155,6 +162,7 @@ function renderActiveWorld(world: import('../core/types').WorldRegistryEntry): s
       <dt>id</dt><dd><code>${escapeText(world.id)}</code></dd>
     </dl>
     <div class="atlas-settings-actions">
+      ${makeOnlineBtn}
       <button class="ow-btn ow-btn-secondary" data-action="delete-world">forget world (keep folder)</button>
     </div>
   `;

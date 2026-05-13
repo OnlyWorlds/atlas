@@ -15,6 +15,7 @@ import type {
   Conflict,
   Element,
   ElementType,
+  PerElementFailure,
   SyncEngineState,
   SyncResult,
 } from '../core/types';
@@ -57,6 +58,11 @@ export interface SyncEngineOptions {
   onConflict?: (conflict: Conflict) => void;
   /** Called whenever engine state changes (for UI). */
   onStateChange?: (state: SyncEngineState) => void;
+  /**
+   * Per-iteration progress callback during push. Fires after each element
+   * (success OR failure). Used by Make-Online flows for an upload progress bar.
+   */
+  onPushProgress?: (done: number, total: number) => void;
 }
 
 // ---- The engine ----
@@ -67,11 +73,16 @@ export class SyncEngine {
   private policy: ConflictPolicy;
   private onConflict: (conflict: Conflict) => void;
   private onStateChange: (state: SyncEngineState) => void;
+  private onPushProgress: (done: number, total: number) => void;
   private state: SyncEngineState = { kind: 'idle', last_sync_at: null };
   private paused = false;
   private pauseReason: 'manual' | 'network' | null = null;
   /** In-flight syncNow promise. Concurrent calls await the same result. */
   private inFlight: Promise<SyncResult> | null = null;
+  /** Debounce timer for `requestPush()` autosave. Reset on each write. */
+  private debouncePushTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Debounce window for autosave pushes. ms. Configurable later. */
+  private debouncePushMs = 5000;
 
   constructor(opts: SyncEngineOptions) {
     this.folder = opts.folder;
@@ -79,6 +90,7 @@ export class SyncEngine {
     this.policy = opts.policy ?? 'drain-blind';
     this.onConflict = opts.onConflict ?? (() => {});
     this.onStateChange = opts.onStateChange ?? (() => {});
+    this.onPushProgress = opts.onPushProgress ?? (() => {});
   }
 
   getState(): SyncEngineState {
@@ -98,6 +110,39 @@ export class SyncEngine {
   }
 
   /**
+   * Request a debounced push. Called by element-detail after every folder
+   * write (popover save, link/delink, delete). The timer resets on each call,
+   * so a burst of edits coalesces into one push N seconds after the last edit.
+   *
+   * No-op while paused — the user is intentionally offline.
+   *
+   * Override the debounce window for tests via `setDebounceMs`.
+   */
+  requestPush(): void {
+    if (this.paused) return;
+    if (this.debouncePushTimer) clearTimeout(this.debouncePushTimer);
+    this.debouncePushTimer = setTimeout(() => {
+      this.debouncePushTimer = null;
+      void this.pushOnce();
+    }, this.debouncePushMs);
+  }
+
+  /** Test seam — override the debounce window. */
+  setDebounceMs(ms: number): void {
+    this.debouncePushMs = ms;
+  }
+
+  /** Stop the engine: cancel pending debounced push, pause. Used on detach. */
+  stop(): void {
+    if (this.debouncePushTimer) {
+      clearTimeout(this.debouncePushTimer);
+      this.debouncePushTimer = null;
+    }
+    this.paused = true;
+    this.pauseReason = 'manual';
+  }
+
+  /**
    * Push local changes to server, then pull remote changes to folder.
    * Pull skips elements push already conflicted on (dedup by id).
    *
@@ -109,6 +154,33 @@ export class SyncEngine {
       this.inFlight = null;
     });
     return this.inFlight;
+  }
+
+  /**
+   * Push-only path with progress reporting. Used by Make-Online flows that
+   * want to upload everything in one go without running a pull. Best-effort:
+   * per-element failures accumulate in result.failures but do NOT abort the
+   * iteration. Caller decides what to surface (toast count, retry UX).
+   */
+  pushOnce(): Promise<SyncResult> {
+    if (this.inFlight) return this.inFlight;
+    this.inFlight = this.runPushOnly().finally(() => {
+      this.inFlight = null;
+    });
+    return this.inFlight;
+  }
+
+  private async runPushOnly(): Promise<SyncResult> {
+    if (this.paused) return emptyResult();
+    this.setState({ kind: 'syncing', phase: 'push' });
+    const pushResult = await this.pushPhase();
+    this.setState({ kind: 'idle', last_sync_at: nowIso() });
+    return {
+      pushed: pushResult.pushed,
+      pulled: zero(),
+      conflicts: pushResult.conflicts,
+      failures: pushResult.failures,
+    };
   }
 
   private async runSync(): Promise<SyncResult> {
@@ -124,6 +196,7 @@ export class SyncEngine {
       pushed: pushResult.pushed,
       pulled: pullResult.pulled,
       conflicts: [...pushResult.conflicts, ...pullResult.conflicts],
+      failures: [...pushResult.failures, ...pullResult.failures],
     };
     this.setState({ kind: 'idle', last_sync_at: nowIso() });
     return result;
@@ -134,58 +207,71 @@ export class SyncEngine {
   private async pushPhase(): Promise<SyncResult> {
     const changed = await this.folder.listLocallyChangedSince(null);
     const tombstones = await this.folder.listTombstonesSince(null);
+    const total = changed.length + tombstones.length;
+    let done = 0;
 
     let creates = 0;
     let updates = 0;
     let deletes = 0;
     const conflicts: Conflict[] = [];
+    const failures: PerElementFailure[] = [];
 
     for (const elem of changed) {
+      const isCreate = !elem.server_updated_at;
       try {
-        if (!elem.server_updated_at) {
+        if (isCreate) {
           // Never synced before → CREATE on server.
           const body = stripSyncFields(elem);
           const response = await this.client.createElement(elem.type, body);
           await this.folder.stampServerUpdatedAt(elem.id, elem.type, response.updated_at);
           creates++;
-          continue;
-        }
+        } else {
+          // UPDATE path: pre-fetch server state to detect external changes since
+          // our cached `server_updated_at` baseline.
+          const remote = await this.client.getElement(elem.type, elem.id);
+          const baseline = elem.server_updated_at!;
+          const serverMoved = remote ? remote.updated_at > baseline : false;
 
-        // UPDATE path: pre-fetch server state to detect external changes since
-        // our cached `server_updated_at` baseline.
-        const remote = await this.client.getElement(elem.type, elem.id);
-        const baseline = elem.server_updated_at;
-        const serverMoved = remote ? remote.updated_at > baseline : false;
-
-        if (serverMoved && remote) {
-          const conflict: Conflict = {
-            element_id: elem.id,
-            type: elem.type,
-            detected_at: nowIso(),
-            local_updated_at: elem.local_updated_at,
-            server_updated_at: remote.updated_at,
-            fields: diffFieldNames(elem, stripServerOnlyFields(remote)),
-          };
-          conflicts.push(conflict);
-          this.onConflict(conflict);
-
-          if (this.policy === 'pause-on-conflict' || this.policy === 'ask') {
-            // Keep local change on disk; do NOT push; leaves baseline unchanged.
-            // Next sync will see the same conflict until user resolves it.
-            // (`ask` is an alias until Phase 3.5 ships a per-field diff modal.)
-            continue;
+          let skipPush = false;
+          if (serverMoved && remote) {
+            const conflict: Conflict = {
+              element_id: elem.id,
+              type: elem.type,
+              detected_at: nowIso(),
+              local_updated_at: elem.local_updated_at,
+              server_updated_at: remote.updated_at,
+              fields: diffFieldNames(elem, stripServerOnlyFields(remote)),
+            };
+            conflicts.push(conflict);
+            this.onConflict(conflict);
+            if (this.policy === 'pause-on-conflict' || this.policy === 'ask') {
+              // Keep local change on disk; do NOT push. Baseline stays.
+              skipPush = true;
+            }
+            // drain-blind: fall through and push our version anyway.
           }
-          // drain-blind: fall through and push our version anyway.
-        }
 
-        const body = stripSyncFields(elem);
-        const response = await this.client.updateElement(elem.type, elem.id, body);
-        await this.folder.stampServerUpdatedAt(elem.id, elem.type, response.updated_at);
-        updates++;
+          if (!skipPush) {
+            const body = stripSyncFields(elem);
+            const response = await this.client.updateElement(elem.type, elem.id, body);
+            await this.folder.stampServerUpdatedAt(elem.id, elem.type, response.updated_at);
+            updates++;
+          }
+        }
       } catch (err) {
-        // Network errors abort the whole push; SDK 4xx errors surface as
-        // conflicts in a later phase. For now, rethrow.
-        throw err;
+        // Per-element failure (4xx, validation, transient network) is non-fatal:
+        // record and continue. Caller inspects result.failures to decide what
+        // to surface. This matters most for Make-Online flows uploading dozens
+        // of elements — one bad element shouldn't abort the rest.
+        failures.push({
+          element_id: elem.id,
+          type: elem.type,
+          operation: isCreate ? 'create' : 'update',
+          message: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        done++;
+        this.onPushProgress(done, total);
       }
     }
 
@@ -195,12 +281,20 @@ export class SyncEngine {
         await this.folder.clearTombstone(tomb.id);
         deletes++;
       } catch (err) {
-        throw err;
+        failures.push({
+          element_id: tomb.id,
+          type: tomb.type,
+          operation: 'delete',
+          message: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        done++;
+        this.onPushProgress(done, total);
       }
     }
 
     await this.folder.writeSyncState({ last_push_at: nowIso() });
-    return { pushed: { creates, updates, deletes }, pulled: zero(), conflicts };
+    return { pushed: { creates, updates, deletes }, pulled: zero(), conflicts, failures };
   }
 
   private async pullPhase(skipIds: Set<string> = new Set()): Promise<SyncResult> {
@@ -263,7 +357,7 @@ export class SyncEngine {
       conflicts: [...currentState.conflicts, ...conflicts],
     });
 
-    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts };
+    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures: [] };
   }
 
   // ---- Internals ----
@@ -347,5 +441,5 @@ function zero(): { creates: number; updates: number; deletes: number } {
 }
 
 function emptyResult(): SyncResult {
-  return { pushed: zero(), pulled: zero(), conflicts: [] };
+  return { pushed: zero(), pulled: zero(), conflicts: [], failures: [] };
 }

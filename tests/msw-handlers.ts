@@ -31,6 +31,8 @@ export interface StatefulServerOptions {
 export function statefulOwHandlers(options: StatefulServerOptions = {}): {
   handlers: HttpHandler[];
   state: Map<string, Map<string, ServerRecord>>;
+  /** Capture of every successful create-world-external call. */
+  worldCreations: Array<{ name: string; email: string; api_key: string }>;
   __mutate: (type: string, id: string, patch: Record<string, unknown>) => void;
 } {
   const base = (options.baseUrl ?? DEFAULT_BASE).replace(/\/$/, '');
@@ -65,7 +67,32 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
     return out as ServerRecord;
   }
 
+  // The world-creation endpoint lives under /worldsync, not /worldapi.
+  // Derive its base from `base` by swapping the suffix.
+  const worldsyncBase = base.endsWith('/worldapi') ? base.replace(/\/worldapi$/, '/worldsync') : base;
+
+  /** Track world creations for test assertions: `[name, email, generated api_key]`. */
+  const worldCreations: Array<{ name: string; email: string; api_key: string }> = [];
+
   const handlers: HttpHandler[] = [
+    // CREATE WORLD (external, no auth) — used by Make-Online Route 1.
+    // POST /worldsync/create-world-external/
+    // body: { name, email, pin }
+    // 200: { success: true, api_key: string }
+    // 400: { success: false, message: string }
+    http.post(`${worldsyncBase}/create-world-external/`, async ({ request }) => {
+      const body = (await request.json()) as { name?: string; email?: string; pin?: string };
+      if (!body.name || !body.email || !body.pin) {
+        return HttpResponse.json(
+          { success: false, message: 'name, email, and pin are required' },
+          { status: 400 }
+        );
+      }
+      const api_key = `mock-api-key-${crypto.randomUUID().slice(0, 8)}`;
+      worldCreations.push({ name: body.name, email: body.email, api_key });
+      return HttpResponse.json({ success: true, api_key });
+    }),
+
     // LIST
     http.get(`${base}/:type/`, ({ params }) => {
       const type = String(params.type);
@@ -112,6 +139,7 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
   return {
     handlers,
     state,
+    worldCreations,
     __mutate: (type, id, patch) => {
       const existing = bucket(type).get(id);
       if (!existing) throw new Error(`__mutate: ${type}/${id} not found`);

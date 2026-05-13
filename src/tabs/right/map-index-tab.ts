@@ -13,6 +13,7 @@ import { ToastManager } from '../../ui/toast-manager';
 import { createMapDialog } from '../../ui/map-create-modal';
 import { navigate, mapHash } from '../../core/router';
 import { getActiveStore } from '../../ui/create-world-modal';
+import { requestPushIfLinked } from '../../sync/sync-attach';
 
 export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -143,6 +144,7 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
     await store.deleteMap(m.id);
     const elements = await store.listElements();
     patchSlice('data', { elements });
+    requestPushIfLinked();
 
     const ui = getState().ui;
     const tabIdx = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === m.id);

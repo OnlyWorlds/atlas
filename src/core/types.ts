@@ -145,6 +145,15 @@ export interface SyncResult {
   pushed: { creates: number; updates: number; deletes: number };
   pulled: { creates: number; updates: number; deletes: number };
   conflicts: Conflict[];
+  /** Per-element failures during push (4xx, validation, etc.) — non-fatal. */
+  failures: PerElementFailure[];
+}
+
+export interface PerElementFailure {
+  element_id: string;
+  type: ElementType;
+  operation: 'create' | 'update' | 'delete';
+  message: string;
 }
 
 // ---- Registry ----

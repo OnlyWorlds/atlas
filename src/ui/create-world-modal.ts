@@ -30,7 +30,7 @@ export class CreateWorldModal extends BaseModal {
   private toasts: ToastManager;
 
   constructor(toasts: ToastManager, onCreated?: (r: CreateWorldResult) => void) {
-    super('atlas-modal-overlay');
+    super();
     this.toasts = toasts;
     this.onCreated = onCreated;
   }
@@ -45,17 +45,14 @@ export class CreateWorldModal extends BaseModal {
   }
 
   private buildModal(): HTMLElement {
-    const overlay = document.createElement('div');
-    overlay.className = 'atlas-modal-overlay';
-
-    const panel = document.createElement('div');
-    panel.className = 'atlas-modal-panel';
-    panel.setAttribute('data-modal', 'create-world');
+    const { overlay, body } = this.buildModalShell({
+      title: 'create local world',
+      dataModal: 'create-world',
+    });
 
     const atlasRoot = getState().atlasRoot;
     const rootDisplay = atlasRoot?.pathHint ?? atlasRoot?.folderName;
-    panel.innerHTML = `
-      <div class="atlas-modal-title">create local world</div>
+    body.innerHTML = `
       <form data-form="create-world">
         <label class="atlas-modal-field">
           <span>name</span>
@@ -74,12 +71,10 @@ export class CreateWorldModal extends BaseModal {
       </form>
     `;
 
-    overlay.appendChild(panel);
-
-    const form = panel.querySelector<HTMLFormElement>('form')!;
-    const errorBox = panel.querySelector<HTMLElement>('[data-role="error"]')!;
-    const cancelBtn = panel.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
-    const submitBtn = panel.querySelector<HTMLButtonElement>('[data-action="pick"]')!;
+    const form = body.querySelector<HTMLFormElement>('form')!;
+    const errorBox = body.querySelector<HTMLElement>('[data-role="error"]')!;
+    const cancelBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
+    const submitBtn = body.querySelector<HTMLButtonElement>('[data-action="pick"]')!;
 
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
 

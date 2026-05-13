@@ -246,6 +246,11 @@ export class MockFolderStore implements FolderStore {
   async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');
+    const failure = this.applyFailures.get(id);
+    if (failure) {
+      this.applyFailures.delete(id); // one-shot
+      throw new Error(failure);
+    }
     const elem: Element = {
       ...record,
       id,
@@ -259,6 +264,12 @@ export class MockFolderStore implements FolderStore {
   }
 
   // ---- Test introspection helpers ----
+
+  /** Inject a one-shot failure for a future applyServerRecord call. */
+  __inject_apply_failure(id: string, msg = 'injected failure'): void {
+    this.applyFailures.set(id, msg);
+  }
+  private applyFailures = new Map<string, string>();
 
   __debug_elementCount(): number { return this.elements.size; }
   __debug_tombstoneCount(): number { return this.tombstones.length; }

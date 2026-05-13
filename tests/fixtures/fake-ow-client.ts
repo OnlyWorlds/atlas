@@ -20,6 +20,8 @@ interface ServerRecord {
 export class FakeOwApiClient implements OwApiClient {
   private clock = () => new Date().toISOString();
   private byType = new Map<ElementType, Map<string, ServerRecord>>();
+  /** Test seam: per-id-and-operation error injection. */
+  private injectedFailures = new Map<string, { msg: string }>();
 
   // Capture of every call for assertion.
   calls: Array<
@@ -41,6 +43,7 @@ export class FakeOwApiClient implements OwApiClient {
   async createElement(type: ElementType, body: Record<string, unknown>): Promise<ServerRecord> {
     this.calls.push({ method: 'create', type, body: { ...body } });
     const id = (body.id as string) ?? cryptoRandomId();
+    this.throwIfInjected('create', id);
     const record: ServerRecord = { ...body, id, type, updated_at: this.clock() };
     this.bucket(type).set(id, record);
     return { ...record };
@@ -48,6 +51,7 @@ export class FakeOwApiClient implements OwApiClient {
 
   async updateElement(type: ElementType, id: string, body: Record<string, unknown>): Promise<ServerRecord> {
     this.calls.push({ method: 'update', type, id, body: { ...body } });
+    this.throwIfInjected('update', id);
     const m = this.bucket(type);
     const existing = m.get(id);
     if (!existing) throw new Error(`update: ${type}/${id} not found`);
@@ -58,6 +62,7 @@ export class FakeOwApiClient implements OwApiClient {
 
   async deleteElement(type: ElementType, id: string): Promise<void> {
     this.calls.push({ method: 'delete', type, id });
+    this.throwIfInjected('delete', id);
     this.bucket(type).delete(id);
   }
 
@@ -79,6 +84,24 @@ export class FakeOwApiClient implements OwApiClient {
     const existing = m.get(id);
     if (!existing) throw new Error(`__server_mutate: ${type}/${id} not found`);
     m.set(id, { ...existing, ...patch, id, type, updated_at: this.clock() });
+  }
+
+  /**
+   * Inject a failure for a specific (operation, id). The next call to that
+   * operation on that id will throw with the given message instead of
+   * succeeding. Used to verify the engine tolerates per-element errors.
+   */
+  __inject_failure(op: 'create' | 'update' | 'delete', id: string, msg = 'injected failure'): void {
+    this.injectedFailures.set(`${op}:${id}`, { msg });
+  }
+
+  private throwIfInjected(op: 'create' | 'update' | 'delete', id: string): void {
+    const key = `${op}:${id}`;
+    const f = this.injectedFailures.get(key);
+    if (f) {
+      this.injectedFailures.delete(key); // one-shot
+      throw new Error(f.msg);
+    }
   }
 
   // Test introspection

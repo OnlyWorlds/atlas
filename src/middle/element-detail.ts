@@ -25,12 +25,29 @@ import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { toastManager } from '../ui/toast-manager';
 import { sectionsFor, type FieldMeta, type SectionLayout } from '../editor/field-schema';
 import { pickElement } from '../ui/element-picker-modal';
+import { requestPushIfLinked } from '../sync/sync-attach';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */
 const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
 
 /** Set of `${type}::${section}` keys currently collapsed. Module-level (survives re-render). */
 const collapsedSections = new Set<string>();
+
+/**
+ * Per-element scroll position memory. Survives re-renders (field edits, link
+ * toggles, picker resolves all cause re-renders that would otherwise reset
+ * scroll to 0) and back-navigation (A → B → back to A returns to A's saved
+ * scrollTop).
+ *
+ * Key = element id. Cleared lazily on world switch via `resetElementDetailScrollMemory()`.
+ * See atlas-deprecated/src/middle/element-detail.ts and craft #104 for rationale.
+ */
+const scrollMemory = new Map<string, number>();
+
+/** Drop scroll memory — call on world switch so stale ids don't accumulate. */
+export function resetElementDetailScrollMemory(): void {
+  scrollMemory.clear();
+}
 
 export function mountElementDetail(target: HTMLElement): () => void {
   target.innerHTML = '';
@@ -43,7 +60,22 @@ export function mountElementDetail(target: HTMLElement): () => void {
     return state.data.elements.find(e => e.id === id) ?? null;
   }
 
+  /**
+   * Capture the current body's scrollTop BEFORE we wipe target.innerHTML.
+   * Without this, every re-render (field edit, link toggle) would lose the
+   * scroll position before the live listener has a chance to save it.
+   */
+  function captureScrollBeforeRender(): void {
+    const prevBody = target.querySelector<HTMLElement>('.atlas-middle-body');
+    if (!prevBody) return;
+    const prevId = prevBody.dataset.elementId;
+    if (prevId && prevBody.scrollTop > 0) {
+      scrollMemory.set(prevId, prevBody.scrollTop);
+    }
+  }
+
   function render(): void {
+    captureScrollBeforeRender();
     target.innerHTML = '';
     const state = getState();
     const route = parseHash(window.location.hash);
@@ -71,6 +103,13 @@ export function mountElementDetail(target: HTMLElement): () => void {
     body.dataset.elementId = el.id;
     target.appendChild(body);
 
+    // Live-track scroll position so even partial scrolls survive re-renders.
+    body.addEventListener(
+      'scroll',
+      () => { scrollMemory.set(el.id, body.scrollTop); },
+      { passive: true }
+    );
+
     const detail = document.createElement('div');
     detail.className = 'atlas-detail';
     body.appendChild(detail);
@@ -85,6 +124,13 @@ export function mountElementDetail(target: HTMLElement): () => void {
     if (refs) detail.appendChild(refs);
 
     detail.appendChild(renderFooter(el));
+
+    // Restore previous scrollTop after the body has laid out. scrollTop set on
+    // an empty/unrendered body is silently dropped, hence queueMicrotask.
+    const restoreTop = scrollMemory.get(el.id);
+    if (typeof restoreTop === 'number' && restoreTop > 0) {
+      queueMicrotask(() => { body.scrollTop = restoreTop; });
+    }
   }
 
   // ====== Header ======
@@ -431,6 +477,8 @@ export function mountElementDetail(target: HTMLElement): () => void {
       await store.updateElement(el.id, { [fieldName]: nextValue } as Partial<Element>);
       const elements = await store.listElements();
       patchSlice('data', { elements });
+      // Local write succeeded — schedule a debounced push. No-op for local-only.
+      requestPushIfLinked();
     } catch (err) {
       console.error('[element-detail] update failed:', err);
       toastManager.error(err instanceof Error ? err.message : String(err));
@@ -454,6 +502,8 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const elements = await store.listElements();
       patchSlice('data', { elements });
       patchSlice('ui', { ...getState().ui, selectedElementId: null });
+      // Local delete + tombstones written — schedule a push to DELETE on server.
+      requestPushIfLinked();
       toastManager.success(`deleted ${el.name || 'element'}`);
       const worldId = getState().active?.worldId;
       if (worldId) navigate(elementsHash(worldId));

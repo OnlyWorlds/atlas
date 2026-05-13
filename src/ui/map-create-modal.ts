@@ -13,6 +13,7 @@ import { pickElement } from './element-picker-modal';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { getActiveStore } from './create-world-modal';
+import { requestPushIfLinked } from '../sync/sync-attach';
 import type { WorldMap } from '../core/types';
 
 export interface MapCreateResult {
@@ -33,7 +34,7 @@ class MapCreateModal extends BaseModal {
   private locationPreview: { id: string; name: string } | null = null;
 
   constructor(toasts: ToastManager, onDone: (result: MapCreateResult | null) => void) {
-    super('atlas-modal-overlay');
+    super();
     this.toasts = toasts;
     this.onDone = onDone;
   }
@@ -73,15 +74,13 @@ class MapCreateModal extends BaseModal {
   }
 
   private buildModal(): HTMLElement {
-    const overlay = document.createElement('div');
-    overlay.className = 'atlas-modal-overlay';
+    const { overlay, body } = this.buildModalShell({
+      title: 'new map',
+      panelClass: 'atlas-map-create-panel',
+      dataModal: 'create-map',
+    });
 
-    const panel = document.createElement('div');
-    panel.className = 'atlas-modal-panel atlas-map-create-panel';
-    panel.setAttribute('data-modal', 'create-map');
-
-    panel.innerHTML = `
-      <div class="atlas-modal-title">new map</div>
+    body.innerHTML = `
       <form data-form="create-map">
         <label class="atlas-modal-field">
           <span>name</span>
@@ -107,17 +106,16 @@ class MapCreateModal extends BaseModal {
         </div>
       </form>
     `;
-    overlay.appendChild(panel);
 
-    const locationRow = panel.querySelector<HTMLElement>('[data-role="location-row"]')!;
+    const locationRow = body.querySelector<HTMLElement>('[data-role="location-row"]')!;
     this.renderLocationChip(locationRow);
 
-    const cancelBtn = panel.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
+    const cancelBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.cancel(); });
 
-    const form = panel.querySelector<HTMLFormElement>('form')!;
-    const errorBox = panel.querySelector<HTMLElement>('[data-role="error"]')!;
-    const submitBtn = panel.querySelector<HTMLButtonElement>('[data-action="create"]')!;
+    const form = body.querySelector<HTMLFormElement>('form')!;
+    const errorBox = body.querySelector<HTMLElement>('[data-role="error"]')!;
+    const submitBtn = body.querySelector<HTMLButtonElement>('[data-action="create"]')!;
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -162,6 +160,7 @@ class MapCreateModal extends BaseModal {
 
         const elements = await store.listElements();
         patchSlice('data', { elements });
+        requestPushIfLinked();
 
         this.toasts.success(`created map "${name}"`);
         this.resolved = true;

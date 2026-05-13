@@ -1,0 +1,146 @@
+/**
+ * LinkWorldModal — link an existing OnlyWorlds API world to atlas.
+ *
+ * Flow:
+ *   1. User enters api_key + pin (pre-filled from registry.pin) + optional display name.
+ *   2. Submit triggers `linkExistingApiWorldInRoot` — validates creds,
+ *      creates a subfolder under the atlas root, downloads all elements,
+ *      registers as api-linked, attaches SyncEngine.
+ *   3. During download, the form is replaced with a progress indicator
+ *      ("downloading 47 of 412 elements…").
+ *   4. On success: toast + close + navigate to the world's elements view.
+ *   5. On error: form re-enabled with the error message inline.
+ *
+ * Prereqs:
+ *   - Atlas root must be configured (modal errors out otherwise).
+ *   - Modal is opened from the sidebar header `+ link api` button.
+ */
+
+import { BaseModal } from './modal-base';
+import { ToastManager } from './toast-manager';
+import { getState } from '../core/state';
+import { navigate, elementsHash } from '../core/router';
+import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
+import type { InitialDownloadProgress } from '../sync/initial-download';
+
+export class LinkWorldModal extends BaseModal {
+  private toasts: ToastManager;
+
+  constructor(toasts: ToastManager) {
+    super();
+    this.toasts = toasts;
+  }
+
+  open(): void {
+    if (!getState().atlasRoot) {
+      this.toasts.error('set up your atlas folder first');
+      return;
+    }
+    this.modal = this.buildModal();
+    this.show();
+    queueMicrotask(() => {
+      const input = this.modal?.querySelector<HTMLInputElement>('input[name="api-key"]');
+      input?.focus();
+    });
+  }
+
+  private buildModal(): HTMLElement {
+    const { overlay, body } = this.buildModalShell({
+      title: 'link existing world',
+      dataModal: 'link-world',
+    });
+
+    const prefilledPin = getState().registry.pin ?? '';
+    body.innerHTML = `
+      <form data-form="link-world">
+        <label class="atlas-modal-field">
+          <span>api key</span>
+          <input class="atlas-input" type="text" name="api-key" placeholder="from onlyworlds.com" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="atlas-modal-field">
+          <span>pin</span>
+          <input class="atlas-input" type="text" name="api-pin" value="${escapeAttr(prefilledPin)}" placeholder="four-digit pin" autocomplete="off" maxlength="8" />
+        </label>
+        <label class="atlas-modal-field">
+          <span>display name (optional)</span>
+          <input class="atlas-input" type="text" name="display-name" placeholder="defaults to server world name" autocomplete="off" />
+        </label>
+        <p class="atlas-modal-hint">
+          atlas will download every element of this world into a new folder inside your atlas folder. you can keep editing while offline; changes sync back next time you open it.
+        </p>
+        <div class="atlas-modal-error" data-role="error" hidden></div>
+        <div class="atlas-modal-progress" data-role="progress" hidden></div>
+        <div class="atlas-modal-actions">
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
+          <button type="submit" class="atlas-btn-primary" data-action="link">link</button>
+        </div>
+      </form>
+    `;
+
+    const form = body.querySelector<HTMLFormElement>('form')!;
+    const errorBox = body.querySelector<HTMLElement>('[data-role="error"]')!;
+    const progressBox = body.querySelector<HTMLElement>('[data-role="progress"]')!;
+    const cancelBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
+    const submitBtn = body.querySelector<HTMLButtonElement>('[data-action="link"]')!;
+
+    cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.hidden = true;
+      progressBox.hidden = true;
+
+      const apiKey = (form.querySelector<HTMLInputElement>('input[name="api-key"]')!).value;
+      const apiPin = (form.querySelector<HTMLInputElement>('input[name="api-pin"]')!).value;
+      const displayName = (form.querySelector<HTMLInputElement>('input[name="display-name"]')!).value;
+
+      // Disable form for the duration. Cancel stays enabled (best-effort abort).
+      const inputs = form.querySelectorAll<HTMLInputElement>('input');
+      inputs.forEach(i => (i.disabled = true));
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'linking…';
+
+      const renderProgress = (p: InitialDownloadProgress) => {
+        if (p.phase === 'list') {
+          progressBox.textContent = `discovering ${p.currentType ?? ''}…`;
+        } else {
+          progressBox.textContent = p.total === 0
+            ? 'world is empty — finishing up'
+            : `downloading ${p.done} of ${p.total} elements…`;
+        }
+        progressBox.hidden = false;
+      };
+
+      try {
+        const result = await linkExistingApiWorldInRoot({
+          apiKey,
+          apiPin,
+          displayName,
+          onProgress: renderProgress,
+        });
+        const failures = result.failures.length;
+        if (failures > 0) {
+          this.toasts.error(`linked ${result.entry.name} — ${failures} element${failures === 1 ? '' : 's'} failed (will retry on next sync)`);
+        } else {
+          this.toasts.success(`linked ${result.entry.name} — ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
+        }
+        this.hide();
+        navigate(elementsHash(result.entry.id));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        errorBox.textContent = message;
+        errorBox.hidden = false;
+        progressBox.hidden = true;
+        inputs.forEach(i => (i.disabled = false));
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'link';
+      }
+    });
+
+    return overlay;
+  }
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
