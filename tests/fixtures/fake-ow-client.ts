@@ -72,7 +72,11 @@ export class FakeOwApiClient implements OwApiClient {
     this.throwIfInjected('update', id);
     const m = this.bucket(type);
     const existing = m.get(id);
-    if (!existing) throw new Error(`update: ${type}/${id} not found`);
+    // Mirror real OW: PATCH on a deleted/unknown id returns 404 with the
+    // "X not found in this world" body. The engine treats this as a
+    // server-side delete and routes via the same review modal as pull-time
+    // detection — see pushPhase / resolveConflict.
+    if (!existing) throw new Error(`API Error 404: ${id} not found in this world.`);
     const next: ServerRecord = { ...existing, ...body, id, type, updated_at: this.clock() };
     m.set(id, next);
     return { ...next };
@@ -81,7 +85,15 @@ export class FakeOwApiClient implements OwApiClient {
   async deleteElement(type: ElementType, id: string): Promise<void> {
     this.calls.push({ method: 'delete', type, id });
     this.throwIfInjected('delete', id);
-    this.bucket(type).delete(id);
+    // Mirror real OW (DRF default): DELETE of an unknown id returns 404.
+    // The engine treats this as "already gone" and clears the tombstone, so
+    // unknown-id tombstones (never-synced local deletes) don't accumulate.
+    // Tests verifying that recovery path rely on this rule being enforced.
+    const m = this.bucket(type);
+    if (!m.has(id)) {
+      throw new Error(`API Error 404: Not found.`);
+    }
+    m.delete(id);
   }
 
   async listElements(type: ElementType): Promise<ServerRecord[]> {

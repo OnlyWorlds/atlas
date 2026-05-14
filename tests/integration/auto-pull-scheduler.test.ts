@@ -14,6 +14,8 @@ import {
   __test_currentCadence,
   __test_reconcile,
   __test_stop,
+  __test_lastPullAt,
+  __test_maybeCatchUpOnVisible,
 } from '../../src/sync/auto-pull-scheduler';
 import { attachSyncEngine, detachSyncEngine } from '../../src/sync/sync-attach';
 import { patchSlice, getState } from '../../src/core/state';
@@ -121,20 +123,25 @@ describe('auto-pull scheduler', () => {
     expect(__test_isRunning()).toBe(true);
   });
 
-  it('stops when document is hidden', async () => {
+  it('keeps the interval running while the tab is hidden (cadence is continuous)', async () => {
+    // Earlier versions clear()'d the interval on visibilitychange. That reset
+    // the cadence countdown every time the user alt-tabbed to make a change on
+    // the web app — they could never reach a full cadence cycle. The fix:
+    // keep the timer running; the tick callback skips the pull when hidden.
     await setupAttached();
     patchSlice('registry', setSyncCadenceMs(getState().registry, 5000));
     __test_reconcile();
     expect(__test_isRunning()).toBe(true);
 
-    // Spoof document.hidden (jsdom default is false).
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
     __test_reconcile();
-    expect(__test_isRunning()).toBe(false);
+    expect(__test_isRunning()).toBe(true);
+    expect(__test_currentCadence()).toBe(5000);
 
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
     __test_reconcile();
     expect(__test_isRunning()).toBe(true);
+    expect(__test_currentCadence()).toBe(5000);
   });
 
   it('stops when engine detaches', async () => {
@@ -146,5 +153,46 @@ describe('auto-pull scheduler', () => {
     detachSyncEngine();
     __test_reconcile();
     expect(__test_isRunning()).toBe(false);
+  });
+
+  describe('catch-up on becoming visible', () => {
+    beforeEach(() => {
+      // Ensure tab is visible at test start; individual tests can flip it.
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    });
+
+    it('does nothing when no cadence is running', () => {
+      __test_maybeCatchUpOnVisible();
+      // No assertion beyond "doesn't throw" — just verifies the early return
+      // when activeCadenceMs is null.
+      expect(__test_lastPullAt()).toBeNull();
+    });
+
+    it('does nothing while the tab is still hidden', async () => {
+      await setupAttached();
+      patchSlice('registry', setSyncCadenceMs(getState().registry, 5000));
+      __test_reconcile();
+
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+      __test_maybeCatchUpOnVisible();
+      expect(__test_lastPullAt()).toBeNull();
+    });
+
+    it('does nothing when sync is paused', async () => {
+      await setupAttached();
+      patchSlice('registry', setSyncCadenceMs(getState().registry, 5000));
+      __test_reconcile();
+
+      patchSlice('registry', setSyncPauseAll(getState().registry, true));
+      __test_maybeCatchUpOnVisible();
+      expect(__test_lastPullAt()).toBeNull();
+    });
+
+    // The "fires when elapsed > cadence" path calls pullNowAndRefresh which
+    // wraps real engine.pullNow + real folder reads + real listener
+    // notifications. That's covered end-to-end by the sync-engine.pullNow
+    // tests; here we verify the eligibility checks only. The cadence-bug
+    // regression that motivated this whole bout is covered by the "keeps the
+    // interval running while the tab is hidden" test above.
   });
 });

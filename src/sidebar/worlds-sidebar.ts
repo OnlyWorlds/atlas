@@ -163,8 +163,9 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       if (fa !== fb) return fb - fa;
       return (a.name ?? '').localeCompare(b.name ?? '');
     });
+    const globalPaused = !!state.registry.sync_pause_all;
     listEl.innerHTML = sorted
-      .map(w => renderRow(w, w.id === activeId, route.mode === 'settings' && w.id === activeId))
+      .map(w => renderRow(w, w.id === activeId, route.mode === 'settings' && w.id === activeId, globalPaused))
       .join('');
   }
 
@@ -174,8 +175,14 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   return () => { unsubState(); unsubHash(); };
 }
 
-function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: boolean): string {
-  const stateIcon = world.state === 'api-linked' ? 'cloud' : 'folder';
+function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: boolean, globalPaused: boolean): string {
+  // `cloud_off` (strike-through cloud) when this world is paused — either by
+  // its own toggle or by the global "pause all sync" master switch. Local-only
+  // worlds always render `folder` regardless of pause state (no sync to pause).
+  const isPaused = world.state === 'api-linked' && (!!world.sync_paused || globalPaused);
+  const stateIcon = world.state === 'api-linked'
+    ? (isPaused ? 'cloud_off' : 'cloud')
+    : 'folder';
   const stateChip = world.state === 'api-linked'
     ? '<span class="atlas-world-state-chip api-linked">api</span>'
     : '';

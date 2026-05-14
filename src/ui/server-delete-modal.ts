@@ -104,6 +104,20 @@ export class ServerDeleteReviewModal extends BaseModal {
             console.warn('[server-delete-modal] refresh failed:', e);
           }
           this.updateTitle();
+          if (action === 'keep') {
+            // User said "keep" — push immediately so the element actually
+            // re-lands on the server. Without this, the cleared baseline just
+            // sits until the next folder write triggers an autosave, which
+            // could be never. Fire-and-forget: the engine's onSyncResult /
+            // toast paths surface the result; if the in-flight lock is busy,
+            // pushOnce shares the existing promise (no-op-safe).
+            const eng = getCurrentSyncEngine();
+            if (eng) {
+              void eng.pushOnce().catch((e) => {
+                console.warn('[server-delete-modal] keep+push failed:', e);
+              });
+            }
+          }
           if (this.records.length === 0) {
             this.toasts.success('all server-side deletes resolved');
             this.hide();

@@ -308,7 +308,7 @@ function syncPins(entry: MapTabCacheEntry): void {
   }
 }
 
-function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: string): void {
+export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: string): void {
   try {
     if (marker.dragging) marker.dragging.enable();
     else marker.options.draggable = true;
@@ -323,6 +323,11 @@ function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: string): voi
       await store.updatePin(pinId, { x: point.x, y: point.y });
       const elements = await store.listElements();
       patchSlice('data', { elements });
+      // Local write succeeded — schedule autosave. Without this, dragged pins
+      // never propagate server-side until another folder edit triggers a push
+      // (or the user manually clicks sync). Parity with map-click + contextual-
+      // create handlers above.
+      requestPushIfLinked();
     } catch (err) {
       console.error('[map-tab] pin drag persist failed:', err);
     }

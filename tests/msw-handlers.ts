@@ -152,7 +152,14 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
     http.delete(`${base}/:type/:id/`, ({ params }) => {
       const type = String(params.type);
       const id = String(params.id);
-      bucket(type).delete(id);
+      // Mirror real OW (DRF default): unknown id → 404. Engine treats this as
+      // "already gone" and clears the tombstone so orphan tombstones don't
+      // accumulate forever.
+      const m = bucket(type);
+      if (!m.has(id)) {
+        return HttpResponse.json({ error: 'not found' }, { status: 404 });
+      }
+      m.delete(id);
       return new HttpResponse(null, { status: 204 });
     }),
   ];

@@ -108,6 +108,14 @@ export interface SyncEngineOptions {
     phase: 'push' | 'pull' | 'sync',
     result: SyncResult
   ) => void;
+  /**
+   * Fires when push CREATE produces a server-assigned id different from the
+   * local one (id-swap). UI uses this to migrate `state.ui.selectedElementId`
+   * and the URL hash when the swap affects the currently-viewed element —
+   * without it, the user sees a confusing "element <old-id> not found in this
+   * world" empty state because the URL still references the pre-swap id.
+   */
+  onIdSwap?: (swap: { old_id: string; new_id: string; type: ElementType }) => void;
 }
 
 // ---- The engine ----
@@ -120,6 +128,7 @@ export class SyncEngine {
   private onStateChange: (state: SyncEngineState) => void;
   private onPushProgress: (done: number, total: number) => void;
   private onSyncResult: (phase: 'push' | 'pull' | 'sync', result: SyncResult) => void;
+  private onIdSwap: (swap: { old_id: string; new_id: string; type: ElementType }) => void;
   private state: SyncEngineState = { kind: 'idle', last_sync_at: null };
   private paused = false;
   private pauseReason: 'manual' | 'network' | null = null;
@@ -138,6 +147,7 @@ export class SyncEngine {
     this.onStateChange = opts.onStateChange ?? (() => {});
     this.onPushProgress = opts.onPushProgress ?? (() => {});
     this.onSyncResult = opts.onSyncResult ?? (() => {});
+    this.onIdSwap = opts.onIdSwap ?? (() => {});
   }
 
   getState(): SyncEngineState {
@@ -247,11 +257,31 @@ export class SyncEngine {
       console.info(`[atlas:sync] resolveConflict overwrite-mine: pushing local to server`, {
         id, type: local.type, hasServerBaseline: !!local.server_updated_at,
       });
-      const response = local.server_updated_at
-        ? await this.client.updateElement(local.type, id, body)
-        : await this.client.createElement(local.type, body);
-      await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at);
-      console.info(`[atlas:sync] resolveConflict overwrite-mine: stamped baseline ${response.updated_at}`);
+      try {
+        const response = local.server_updated_at
+          ? await this.client.updateElement(local.type, id, body)
+          : await this.client.createElement(local.type, body);
+        await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at);
+        console.info(`[atlas:sync] resolveConflict overwrite-mine: stamped baseline ${response.updated_at}`);
+      } catch (err) {
+        if (local.server_updated_at && isNotFoundError(err)) {
+          // Server deleted this element between the conflict and our resolve.
+          // Don't surface as a raw error — clear the conflict, route to
+          // server_deletes for review. Same UX as pull-time detection.
+          console.info('[atlas:sync] resolveConflict overwrite-mine: server has lost element — routing to server-delete review', {
+            id, type: local.type,
+          });
+          await this.folder.writeSyncState({
+            conflicts: syncState.conflicts.filter(c => c.element_id !== id),
+            server_deletes: [
+              ...(syncState.server_deletes ?? []),
+              { id, type: local.type, detected_at: nowIso(), name: local.name },
+            ],
+          });
+          return;
+        }
+        throw err;
+      }
     } else if (action === 'pull-theirs') {
       console.info(`[atlas:sync] resolveConflict pull-theirs: fetching ${conflict.type}/${id}`);
       const remote = await this.client.getElement(conflict.type, id);
@@ -497,6 +527,15 @@ export class SyncEngine {
     let deletes = 0;
     const conflicts: Conflict[] = [];
     const failures: PerElementFailure[] = [];
+    /**
+     * Server-side deletes detected DURING push (pre-update GET returned null,
+     * or PATCH returned 404). Symmetric to pullPhase server-delete detection.
+     * Persisted into sync_state.server_deletes at end of pushPhase so the
+     * review modal can offer keep / delete-locally for each one — same UX as
+     * pull-detected server deletes. This prevents UPDATE 404s from leaking up
+     * as raw error toasts and getting stuck in a retry loop.
+     */
+    const serverDeletesDetected: import('../core/types').ServerDeleteRecord[] = [];
 
     for (const elem of changed) {
       const isCreate = !elem.server_updated_at;
@@ -553,6 +592,12 @@ export class SyncEngine {
             await this.folder.deleteElement(current.id, { silent: true });
             // Rewrite refs to old id across all local elements.
             await this.rewriteIdReferences(current.id, response.id);
+            // Notify the UI so it can migrate selectedElementId / URL hash if
+            // the swap affects the currently-viewed element. Without this,
+            // the user sees a confusing "element <old-id> not found in this
+            // world" empty state because the URL still references the pre-
+            // swap id.
+            this.onIdSwap({ old_id: current.id, new_id: response.id, type: current.type });
           } else {
             await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at);
           }
@@ -570,13 +615,35 @@ export class SyncEngine {
             continue;
           }
 
-          // Pre-update server check: detect concurrent external changes.
+          // Pre-update server check: detect concurrent external changes OR
+          // server-side delete. `getElement` returns null on 404 (adapter
+          // catches it); a null remote with a non-null local baseline means
+          // the server lost this element — route to server_deletes for review.
           const remote = await this.client.getElement(current.type, current.id);
           const baseline = current.server_updated_at!;
-          const serverMoved = remote ? remote.updated_at > baseline : false;
+
+          if (!remote) {
+            // Server doesn't have this element anymore (deleted via web app,
+            // admin, another atlas instance, or never landed despite a local
+            // baseline). PATCH would 404 — skip it. Add to server_deletes;
+            // the review modal will offer keep + re-push (clears baseline)
+            // or delete-locally.
+            serverDeletesDetected.push({
+              id: current.id,
+              type: current.type,
+              detected_at: nowIso(),
+              name: current.name,
+            });
+            console.info('[atlas:sync] push detected server-side delete', {
+              id: current.id, type: current.type,
+            });
+            continue;
+          }
+
+          const serverMoved = remote.updated_at > baseline;
 
           let skipPush = false;
-          if (serverMoved && remote) {
+          if (serverMoved) {
             const conflict: Conflict = {
               element_id: current.id,
               type: current.type,
@@ -602,16 +669,32 @@ export class SyncEngine {
           }
         }
       } catch (err) {
-        // Per-element failure (4xx, validation, transient network) is non-fatal:
-        // record and continue. Caller inspects result.failures to decide what
-        // to surface. This matters most for Make-Online flows uploading dozens
-        // of elements — one bad element shouldn't abort the rest.
-        failures.push({
-          element_id: elem.id,
-          type: elem.type,
-          operation: isCreate ? 'create' : 'update',
-          message: err instanceof Error ? err.message : String(err),
-        });
+        // 404 on a non-CREATE means the server lost the element between our
+        // pre-GET (which succeeded) and our PATCH. Race or out-of-band delete.
+        // Route to server_deletes — same UX as the inline detection above.
+        // Don't add to failures (would surface as a raw error elsewhere).
+        if (!isCreate && isNotFoundError(err)) {
+          serverDeletesDetected.push({
+            id: elem.id,
+            type: elem.type,
+            detected_at: nowIso(),
+            name: elem.name,
+          });
+          console.info('[atlas:sync] push UPDATE 404 — routing to server-delete review', {
+            id: elem.id, type: elem.type,
+          });
+        } else {
+          // Per-element failure (4xx, validation, transient network) is non-fatal:
+          // record and continue. Caller inspects result.failures to decide what
+          // to surface. This matters most for Make-Online flows uploading dozens
+          // of elements — one bad element shouldn't abort the rest.
+          failures.push({
+            element_id: elem.id,
+            type: elem.type,
+            operation: isCreate ? 'create' : 'update',
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
       } finally {
         done++;
         this.onPushProgress(done, total);
@@ -624,19 +707,50 @@ export class SyncEngine {
         await this.folder.clearTombstone(tomb.id);
         deletes++;
       } catch (err) {
-        failures.push({
-          element_id: tomb.id,
-          type: tomb.type,
-          operation: 'delete',
-          message: err instanceof Error ? err.message : String(err),
-        });
+        // 404 means "server doesn't have it" — that IS the desired post-
+        // condition of a DELETE, so we treat it as success and clear the
+        // tombstone. Without this, three vectors produce orphan tombstones
+        // that retry forever:
+        //   1. Never-synced create-then-delete (id never existed server-side).
+        //   2. Cascade-delete writing tombstones for never-synced dependents.
+        //   3. Out-of-band server-side delete (another client / admin).
+        // The fakes (FakeOwApiClient + msw-handlers) now mirror real-OW 404
+        // on unknown ids, so this contract is locked in by tests.
+        if (isNotFoundError(err)) {
+          console.info('[atlas:sync] tombstone target already gone (404) — clearing', {
+            id: tomb.id, type: tomb.type,
+          });
+          await this.folder.clearTombstone(tomb.id);
+          deletes++;
+        } else {
+          failures.push({
+            element_id: tomb.id,
+            type: tomb.type,
+            operation: 'delete',
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
       } finally {
         done++;
         this.onPushProgress(done, total);
       }
     }
 
-    await this.folder.writeSyncState({ last_push_at: nowIso() });
+    // Persist server-side deletes detected during push. Append + dedup with
+    // any pre-existing entries (e.g. from a prior pull) so the review modal
+    // sees the union. Symmetric with pullPhase's persistence pattern.
+    if (serverDeletesDetected.length > 0) {
+      const curr = await this.folder.readSyncState();
+      const existing = curr.server_deletes ?? [];
+      const existingIds = new Set(existing.map(d => d.id));
+      const fresh = serverDeletesDetected.filter(d => !existingIds.has(d.id));
+      await this.folder.writeSyncState({
+        last_push_at: nowIso(),
+        server_deletes: [...existing, ...fresh],
+      });
+    } else {
+      await this.folder.writeSyncState({ last_push_at: nowIso() });
+    }
     return { pushed: { creates, updates, deletes }, pulled: zero(), conflicts, failures };
   }
 
@@ -851,4 +965,15 @@ function zero(): { creates: number; updates: number; deletes: number } {
 
 function emptyResult(): SyncResult {
   return { pushed: zero(), pulled: zero(), conflicts: [], failures: [] };
+}
+
+/**
+ * Detect a 404 / "not found" server response from an arbitrary thrown error.
+ * The SDK wraps server errors as `API Error <status>: <body>`; some adapters
+ * also surface plain `404` strings. Defensive against both shapes so the
+ * tombstone-recovery contract holds regardless of which adapter is in use.
+ */
+function isNotFoundError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return /api error 404/i.test(err.message) || /\b404\b/.test(err.message) || /not found/i.test(err.message);
 }

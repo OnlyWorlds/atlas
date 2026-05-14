@@ -20,8 +20,9 @@ import { OwClientAdapter } from './ow-client-adapter';
 import { SyncEngine } from './sync-engine';
 import { patchSlice, getState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
+import { navigate, elementHash, parseHash } from '../core/router';
 import type { FolderStore } from '../store/folder-store';
-import type { WorldRegistryEntry, SyncEngineState } from '../core/types';
+import type { WorldRegistryEntry, SyncEngineState, ElementType } from '../core/types';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
@@ -68,6 +69,7 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
     policy: reg.sync_default_policy ?? 'local-wins',
     onStateChange: (s) => publishSyncState(entry.id, s),
     onSyncResult: (phase, result) => emitConflictToasts(phase, result),
+    onIdSwap: (swap) => handleIdSwap(swap),
   });
 
   currentEngine = engine;
@@ -105,7 +107,59 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
     });
   }
 
+  // Flush-on-attach: the autosave debounce timer lives in memory, so a reload
+  // (or browser crash, or world switch within the 5s window) loses any
+  // unfired push. Without recovery, those writes sit on disk forever marked
+  // `local_updated_at > server_updated_at` but never reach the api.
+  //
+  // Symmetric to pull-on-activate but UNCONDITIONAL when there are pending
+  // writes — pending local edits already encode user intent (they typed → they
+  // want it saved), same logic as why autosave fires at all. Skipped only when
+  // the user has explicitly paused sync.
+  if (!shouldPause) {
+    void flushPendingOnAttach(engine, folder, entry.name);
+  }
+
   return engine;
+}
+
+/**
+ * Fire a pushOnce() iff the folder has any locally-changed elements or
+ * pending tombstones. Surfaces a one-shot toast on recovery so the user can
+ * see "we caught up writes that were stuck from your last session."
+ *
+ * Failure-tolerant: per-element errors are recorded in result.failures and
+ * surfaced via the normal engine state path. A complete network failure
+ * throws and we just log — next push attempt (autosave / cadence / manual)
+ * will retry.
+ */
+async function flushPendingOnAttach(
+  engine: SyncEngine,
+  folder: FolderStore,
+  worldName: string
+): Promise<void> {
+  try {
+    const changed = await folder.listLocallyChangedSince(null);
+    const tombstones = await folder.listTombstonesSince(null);
+    const pending = changed.length + tombstones.length;
+    if (pending === 0) return;
+    console.info('[atlas:sync] flush-on-attach: pending writes found', {
+      world: worldName,
+      changed: changed.length,
+      tombstones: tombstones.length,
+    });
+    const result = await engine.pushOnce();
+    const synced = result.pushed.creates + result.pushed.updates + result.pushed.deletes;
+    if (synced > 0) {
+      // Notify the user — these writes were stuck from a prior session.
+      toastManager.success(`synced ${synced} pending change${synced === 1 ? '' : 's'} from previous session`);
+    }
+    if (result.failures.length > 0) {
+      console.warn('[atlas:sync] flush-on-attach: some writes failed', result.failures);
+    }
+  } catch (err) {
+    console.warn('[atlas:sync] flush-on-attach failed:', err);
+  }
 }
 
 /**
@@ -185,6 +239,20 @@ export async function pullNowAndRefresh(): Promise<import('../core/types').SyncR
   }
   await refreshConflictsCount();
   await maybeAutoOpenServerDeleteModal();
+  // Surface a count toast when scheduled / pull-on-activate / catch-up pulls
+  // actually land changes. Without this, automatic pulls are silent and the
+  // user can't tell if their web-app edits propagated. Conflict toasts are
+  // handled separately by emitConflictToasts under local-wins (don't
+  // double-toast). Pill-click handler does its own "already up to date" toast
+  // for the manual case — that's intentionally only fired on user-initiated
+  // pulls so cadence ticks don't spam.
+  const totalUpdates = result.pulled.creates + result.pulled.updates;
+  if (totalUpdates > 0 && result.conflicts.length === 0) {
+    const parts: string[] = [];
+    if (result.pulled.creates > 0) parts.push(`${result.pulled.creates} new`);
+    if (result.pulled.updates > 0) parts.push(`${result.pulled.updates} updated`);
+    toastManager.info(`pulled ${parts.join(' + ')} from api`);
+  }
   return result;
 }
 
@@ -299,6 +367,63 @@ function emitConflictToasts(
     ? `saved over server change${n === 1 ? '' : 's'} for ${n} element${n === 1 ? '' : 's'}`
     : `resolved ${n} divergent element${n === 1 ? '' : 's'} in your favor`;
   toastManager.info(message);
+}
+
+/**
+ * Migrate UI state when push CREATE results in a server-assigned id (id-swap).
+ * Without this, the user keeps viewing the URL `/element/<old-id>` after the
+ * engine has moved the local file to `<new-id>` and rewritten refs — the
+ * middle pane shows a confusing "element <old-id> not found in this world"
+ * empty-state because the elements cache no longer contains the old id.
+ *
+ * Three migrations:
+ *   - `state.ui.selectedElementId` → new_id (if it pointed at old_id)
+ *   - URL hash `/element/<old-id>` → `/element/<new-id>` (if visible there)
+ *   - URL hash `/map/<mid>/element/<old-id>` → same with new_id
+ */
+function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType }): void {
+  const ui = getState().ui;
+  if (ui.selectedElementId === swap.old_id) {
+    patchSlice('ui', { ...ui, selectedElementId: swap.new_id });
+  }
+  // Update URL if it currently names the old id. Use replace-style navigate
+  // by leaving history untouched — back-button shouldn't take the user to a
+  // 404'd /element/<old-id>.
+  const worldId = getState().active?.worldId;
+  if (!worldId) return;
+  const route = parseHash(window.location.hash);
+  if (route.elementId === swap.old_id && route.worldId === worldId) {
+    if (route.mode === 'map' && route.mapId) {
+      // Preserve map context.
+      navigate(`#/w/${worldId}/map/${route.mapId}/element/${swap.new_id}`);
+    } else {
+      navigate(elementHash(worldId, swap.new_id));
+    }
+  }
+}
+
+/**
+ * Test-only: invoke the conflict-toast emitter with a synthetic SyncResult.
+ * Used to verify the setTimeout(0) world-switch race guard without standing
+ * up a full conflict scenario through MSW.
+ */
+export function __test_emitConflictToasts(
+  phase: 'push' | 'pull' | 'sync',
+  result: import('../core/types').SyncResult
+): void {
+  emitConflictToasts(phase, result);
+}
+
+/**
+ * Test-only: invoke the id-swap UI migration directly. Verifies the state +
+ * URL transitions without standing up the full engine CREATE flow.
+ */
+export function __test_handleIdSwap(swap: {
+  old_id: string;
+  new_id: string;
+  type: ElementType;
+}): void {
+  handleIdSwap(swap);
 }
 
 /** Re-prime `state.data.elements` from the active folder. Fire-and-forget. */

@@ -227,12 +227,11 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
         return;
       }
       const totalUpdates = result.pulled.creates + result.pulled.updates;
-      // Engine's onSyncResult callback owns conflict toasts (policy-aware).
-      // Pill emits feedback only for the clean cases: pulled-something + nothing-new.
-      // Avoid double-toasting on conflicts.
-      if (totalUpdates > 0) {
-        toasts.success(`pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
-      } else if (result.conflicts.length === 0) {
+      // pullNowAndRefresh fires the "pulled N" toast itself (so cadence /
+      // pull-on-activate / catch-up pulls also surface). Pill-click adds ONLY
+      // the "already up to date" affordance — it's a manual-only signal that
+      // would spam if it fired on every cadence tick.
+      if (totalUpdates === 0 && result.conflicts.length === 0) {
         toasts.info('already up to date');
       }
     } catch (err) {

@@ -290,6 +290,26 @@ Real OW returns `400 — element_type must be provided when element_id is specif
 
 ---
 
+## DELETE 404 means "already gone" — clear the tombstone (closed Bout W)
+
+(Added Bout W, session 203.)
+
+Three vectors produce tombstones for ids the OW server never knew (or no longer knows):
+
+1. **Never-synced create-then-delete** — user creates a local element, deletes it before any push. The tombstone carries a client-side id the server never received.
+2. **Cascade-delete of never-synced dependents** — deleting a map cascades tombstones to its pins. If any pin was created within the autosave debounce window (5s) and immediately gets cascaded, its tombstone is also orphan.
+3. **Out-of-band server delete** — another client / admin deleted the element while we were offline or between pulls.
+
+Real OW (DRF default) returns 404 on `DELETE /element/{unknown_id}/`. Naive handling treats this as a hard failure and retains the tombstone → every subsequent push retries the same DELETE → 404 → tombstone retained → forever.
+
+**The contract**: 404 on DELETE means "server doesn't have it" — that IS the desired post-condition of a DELETE. Treat it as success and clear the tombstone. `sync-engine.ts:pushPhase` checks `isNotFoundError(err)` in the tombstone-iteration catch block and clears the tombstone via the same path as 2xx success.
+
+**Why fakes had hidden this for so long**: both `FakeOwApiClient.deleteElement` and the MSW DELETE handler silently no-op'd on unknown ids, returning 204 regardless of presence. Tests passed while real OW would accumulate orphans. Both fakes now mirror real-OW 404-on-unknown — any future code that mistakenly retains an unknown-id tombstone fails its tests immediately.
+
+**Generalizes the Bout V.5 pin-element_type lesson**: whenever real-server smoke surfaces a 4xx that fakes don't catch, the FIRST move is encoding the rule into both fakes (`statefulOwHandlers` + `FakeOwApiClient`) BEFORE fixing the caller. The fix lands with a regression test that locks the rule in; future test code violating the rule fails immediately. The fakes get more faithful over time without expensive contract-testing infrastructure.
+
+---
+
 ## Cross-world push race in conflict-toast defer (closed Bout V)
 
 (Added Bout V, session 202.)
