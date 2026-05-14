@@ -290,6 +290,47 @@ Real OW returns `400 — element_type must be provided when element_id is specif
 
 ---
 
+## UPDATE 404 means "server has lost it" — route to server_deletes (closed Bout 8)
+
+(Added Bout 8, session 204. Companion to the DELETE 404 rule below.)
+
+When push's pre-update GET returns null (adapter caught 404 → null) OR the PATCH itself throws 404 (race between GET and PATCH), the server doesn't have the record. Naive handling: try the PATCH anyway → 404 → record as `failures` → user sees raw error message + element keeps trying every subsequent push.
+
+**The rule**: in `pushPhase` UPDATE branch, treat "server doesn't have it" symmetrically with pull-time server-delete detection. Add the element to `sync_state.server_deletes`. The same review modal that opens for pull-detected deletes also opens for push-detected ones — user picks `keep + re-push` (clears baseline, immediately pushes as CREATE) or `delete locally` (silently removes the file).
+
+Three vectors produce this state:
+1. Out-of-band server-side delete (another atlas instance, web app, admin).
+2. Element previously synced to a NOW-defunct api world (e.g. world re-linked, baseline carried over from prior linkage).
+3. Race between pre-update GET (200) and PATCH (404 — element deleted in the gap).
+
+Same fix covers `resolveConflict('overwrite-mine')` — that path also does an UPDATE and is reachable if the user resolves a conflict on a server-deleted element. The catch routes to `server_deletes`, clears the conflict, returns silently.
+
+**Fakes mirror real OW**: `FakeOwApiClient.updateElement` throws `API Error 404: <id> not found in this world.` on unknown id. MSW PATCH handler returns 404 with body. `isNotFoundError` regex (in `sync-engine.ts`) catches both. Same Bout V.5 fakes-mirror-real discipline.
+
+**`keep + re-push` triggers immediate push**: the server-delete modal's `keep` action calls `engine.pushOnce()` right after `resolveServerDelete`. Without this, the cleared baseline sits until the next autosave trigger — could be never. Sharing the engine's `inFlight` lock makes this safe under concurrent triggers.
+
+---
+
+## ID-swap propagates to UI state + URL (closed Bouts 9 + 9b)
+
+(Added Bout 9, session 204.)
+
+When push CREATE produces a server-assigned id different from the local one (id-swap path — real OW enforces UUID v7), the engine moves the local file `old_id` → `new_id`, rewrites every ref pointing at `old_id`, and silently deletes the old file. Without UI propagation, the user's `state.ui.selectedElementId` + URL hash still reference `old_id`, and the middle pane renders atlas's own empty-state message: **"element <old_id> not found in this world."** Looks like a server error; isn't.
+
+**The rule**: engine emits an `onIdSwap({old_id, new_id, type})` callback at the moment of swap. `sync-attach.handleIdSwap` migrates:
+- `state.ui.selectedElementId` (if equals `old_id`)
+- URL hash `/element/<old>` → `/element/<new>` (preserves `/map/<mid>/` context if present)
+
+**Atomic transition rule (Bout 9b)**: use `setState` to update BOTH `data.elements` (substituting the entry's id) AND `ui.selectedElementId` in a single state transition. Two separate `patchSlice` calls produce two renders — the in-between one has `ui.selectedElementId = new_id` but `data.elements` still has `old_id`, causing a brief empty-state flash before the engine's subsequent `refreshElementsCache` reconciles at idle.
+
+The in-memory id-substitution carries the old entry's content with the new id grafted. This is fine: the CREATE body was what local already had; the on-disk file at `new_id` (via `applyServerRecord`) has identical content + stamped `server_updated_at`. `refreshElementsCache` at engine idle reconciles to the on-disk version shortly after, with no user-visible change.
+
+Verified by a regression test that subscribes + counts notifications (dual-patch produces 2, atomic `setState` produces 1).
+
+**Other id-swap call sites not yet wired**: `mergeLocalIntoApi` accumulates `idSwaps` and applies file-level rewrites between phases, but doesn't emit `onIdSwap` for UI propagation. Merge runs inside the make-online modal — user typically isn't viewing a specific merged element when the modal closes. Defer wiring unless smoke surfaces a flash there. Same for `resolveConflict('overwrite-mine')` CREATE branch (also doesn't id-swap currently — separate corner case).
+
+---
+
 ## DELETE 404 means "already gone" — clear the tombstone (closed Bout W)
 
 (Added Bout W, session 203.)

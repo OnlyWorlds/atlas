@@ -1,320 +1,199 @@
+# Atlas — Core Smoke Test
 
-- [ ] Chromium browser (FS Access API is Chromium-only) // yes and should we add, like deprecated atlas, a screen when not on chrome/edge that explains this? so firefox users know whatsup
+A grounded sanity check that atlas works end-to-end against real OW. ~20 min if everything's green. Not exhaustive — edge cases are covered by the 234-test vitest suite (`npm run test:run`). This smoke validates **integration in a real browser** for the core lifecycle + the recent regression-fix surface.
 
-
- 
-
- 
- 
- 
----
+If something here fails, fix and re-run. If something *not* listed here fails in normal use, add it to this doc.
 
 ---
 
-## Path 2 — `+ link api` (download existing api world)
+## Setup
 
-The "I made a world on onlyworlds.com, suck it down" flow.
-
-- [ ] Sidebar → `+ link api`
-- [ ] Paste api_key for `5474990854`. Leave display name blank.
-- [ ] Submit
-- [ ] Progress box: `discovering character…` → `downloading N of M elements…`
-- [ ] **Expected**: toast `linked <name> — N elements downloaded`. Sync pill flips to `synced`.
-- [ ] Browse around — characters, locations, maps. Verify content.
-- [ ] DevTools console: any pagination warning? (`pagination cap hit on TYPE: server has X, page returned Y`) — note if so.
-
-**Flag if**:
-- Pagination warning fires (we may need to wire load-more before cutover).
-- Elements render with missing fields → adapter unwrap missed a shape.
-- Sync pill stuck on saving or never goes to synced.
+- [ ] Chromium browser (Firefox/Safari get the friendly "needs chromium" landing page — verify it still shows them that, not a broken UI)
+- [ ] DevTools open — `[atlas:sync]` and `[auto-pull]` log lines are useful evidence
+- [ ] Test world id available: `5474990854`
+- [ ] Test PIN + email on hand for create-new-api paths
 
 ---
 
-## Path 3 — `+ new api` shortcut (sidebar one-step)
+# Tier 1 — Must pass (core lifecycle, ~10 min)
 
-New 3.5 shortcut: skips the "create local then make-online" two-step.
+These are the load-bearing flows. If any of these break, atlas isn't shippable.
 
-- [ ] Sidebar → `+ new api`
-- [ ] Enter name `Smoke New API`, email, pin
-- [ ] Submit → progress: `creating local folder` → `creating api world` → `fetching new world id`
-- [ ] **Expected**: toast `Smoke New API created online`. Sidebar entry has cloud icon.
-- [ ] Verify on onlyworlds.com: the world appears in the account's list with an api_key
+## 1.1 — Bootstrap (atlas root setup)
 
-**Flag if**:
-- Local folder is created but api world isn't (orphaned local).
-- Sync pill stuck on starting state.
+- [ ] Open atlas in a profile without prior atlas state (or after `localStorage.clear()` + IDB clear)
+- [ ] Welcome panel shows the "set up atlas folder" CTA
+- [ ] Click → pick a folder
+- [ ] **Expected**: atlas creates `atlas-worlds/` subfolder with `.atlas-root` marker. Settings → Atlas tab shows the path hint.
+- [ ] If picking a folder that already has `atlas-worlds/` with a marker → atlas reuses it (no nested wrap).
 
----
+## 1.2 — Local-only world lifecycle
 
-## Path 4 — Make online → create new (Route 1 from settings)
+- [ ] Sidebar → `+ new local` → name `Smoke Local` → folder created under atlas root
+- [ ] Sidebar entry has folder icon
+- [ ] Sidebar → mode toggle → Elements → `+ new element` → create a Character. Edit a field via popover.
+- [ ] Create 2 more elements of different types (Location, Object).
+- [ ] Hard-reload (Ctrl+F5).
+- [ ] **Expected**: URL preserves `/w/<id>/element/<eid>` — world auto-activates, selected element loads, fields persisted.
+- [ ] **Flag if**: silent auto-activate fails AND the world card is missing from the sidebar (registry write didn't persist).
 
-Same as Path 3 but starts from an existing local world.
+## 1.3 — Link existing API world
 
-- [ ] Create a fresh `+ new local` named `Pre-online`. Add 2-3 elements.
-- [ ] Open settings → World tab → `make online`
-- [ ] Tab defaults to `create new`. Display name pre-filled with world name.
-- [ ] Submit → progress: `creating world` → `reading new world id` → `uploading N of M elements`
-- [ ] **Expected**: toast `<name> is online — N elements uploaded`. Sidebar entry flips to cloud.
-- [ ] Verify on onlyworlds.com: the new world has those elements.
+- [ ] Sidebar → `+ link api` → paste api key for `5474990854` → submit
+- [ ] Progress: `discovering character…` → `downloading N of M elements…`
+- [ ] **Expected**: toast `linked <name> — N elements downloaded`. Sync pill: `synced`. Sidebar entry has cloud icon.
+- [ ] Browse — characters, locations, maps render with field values.
+- [ ] **Flag if**: pagination warning fires in console (`pagination cap hit on TYPE`) — note for 3.6 backlog. Not a blocker.
 
----
+## 1.4 — Edit + autosave roundtrip
 
-## Path 5 — Make online → link existing (Route 2 bidirectional)
+- [ ] On the linked world: edit a character's description via the popover.
+- [ ] Watch the pill: `synced → saving… → synced` within 5-6 seconds.
+- [ ] Verify on onlyworlds.com web app: the edit landed server-side.
+- [ ] Hard-reload atlas. Re-open the element — edit is persisted on disk + still on server.
 
-The trickiest path. **Critical for 3.5 — bidirectional merge.**
+## 1.5 — Manual pull surfaces server-side changes
 
-- [ ] On onlyworlds.com, note an api_key for a world that has 2-3 elements (different from `5474990854`).
-- [ ] In atlas: `+ new local` → `Smoke Merge`. Add 3 elements:
-  - One with a name matching an element on that existing api world (duplicate by name).
-  - Two with unique names.
-- [ ] Settings → World tab → `make online` → `link to existing`
-- [ ] **Policy b (overwrite)**: paste api_key + pin, submit.
-- [ ] Progress: `validating` → `reading server elements` → `merging N of M`
-- [ ] **Expected**: toast like `linked to <name> — 1 updated, 2 pushed, X downloaded`. The X downloaded should be the server-only elements (the ones you didn't have locally).
-- [ ] Browse the linked world in atlas — verify both your pushed elements AND the server's original elements are present locally.
-- [ ] Verify on onlyworlds.com: matched element has your content, your unique elements appear, server-original elements unchanged.
+- [ ] On the web app, edit something in the linked world.
+- [ ] In atlas, click the sync pill.
+- [ ] **Expected**: toast `pulled 0 new + 1 updated from api`. The element refreshes on screen.
+- [ ] Click pill again immediately → toast `already up to date`.
 
-Then re-run with Policy c (skip) on another fresh local world:
-- [ ] Match expects `0 updated, N pushed, X skipped, Y downloaded`
-- [ ] The matched element on local should now have SERVER's content (you've "merged toward server")
+## 1.6 — Make online: Route 1 (create new api world from a local)
 
-**Flag if**:
-- Local folder is missing any server element after merge (violates the local-rep invariant).
-- Matched local element's id didn't swap to server's id (check JSON of local file).
-- Duplicate ids exist after merge.
-
----
-
-## Path 6 — Edit + autosave roundtrip
-
-Verify pushes still work after Phase 3.5.
-
-- [ ] Pick any element in the linked `5474990854` world, edit its description.
-- [ ] Sync pill: `synced → saving… → synced` within 5-6s.
-- [ ] Refresh page; world auto-activates from URL.
-- [ ] Re-open the element — edit is persistent.
-- [ ] Verify on onlyworlds.com: edit landed server-side.
+- [ ] Sidebar → `+ new local` → `Smoke Goes Online` → add 2-3 elements.
+- [ ] Settings (gear icon) → World tab → `make online` → defaults to `create new`.
+- [ ] Submit with display name + email + pin → progress: `creating world` → `reading new world id` → `uploading N of M elements`.
+- [ ] **Expected**: toast `<name> is online — N elements uploaded`. Sidebar entry flips folder → cloud.
+- [ ] Verify on web app: new world appears with the elements.
 
 ---
 
-## Path 7 — Manual refresh (3.5 NEW)
+# Tier 2 — Should pass (UI + recent-fix surface, ~5 min)
 
-- [ ] On the linked `5474990854` world: hover the sync pill — refresh icon appears.
-- [ ] Click the pill — toast `already up to date` (since you're in sync).
-- [ ] Edit something on onlyworlds.com web app (a description, anything).
-- [ ] In atlas, click pill again — toast `pulled 0 new + 1 updated`. The element's content refreshes on screen.
+These validate UX flows and the regression-fixes shipped this session. They're tested via vitest but real-browser behavior is the integration check.
 
-**Flag if**: refresh doesn't fire OR doesn't reflect the server-side edit.
+## 2.1 — Paused world visual indicator (session 204)
 
----
+- [ ] Settings → World tab on an api-linked world → check `stay offline`
+- [ ] **Expected**: pill says `paused`. Sidebar row's cloud icon swaps to **`cloud_off` (strikethrough cloud)**. Pause button in inline-actions turns warm-orange and stays visible without hover.
+- [ ] Edit a field — saves locally, no network requests (verify in DevTools Network).
+- [ ] Uncheck → pill `saving → synced`, queued edit pushes. Cloud icon returns to plain `cloud`.
 
-## Path 8 — Pull on activate setting
+## 2.2 — Pin lifecycle (spatial UX, was missing from old smoke)
 
-- [ ] Settings → Sync tab → toggle `pull from api when a world activates` ON
-- [ ] Edit something on onlyworlds.com web app for a world you have linked
-- [ ] In atlas: switch to a different world, then back to the edited one
-- [ ] **Expected**: pill goes through `synced → fetching → synced`. The edit appears.
+- [ ] On an api-linked world: `+ new element` → Map. Use a small image file (under 1 MB).
+- [ ] Map tab opens on the right pane. Image renders with edge-color background.
+- [ ] **Right-click empty map** → contextual element-create modal → create Character → pin drops at click location.
+- [ ] Click pin → element detail loads + selectedElementId migrates.
+- [ ] Hover pin → tooltip with name + type + description preview.
+- [ ] **Drag pin** to new position → autosave fires within 5s (pill flicks). Reload to confirm position persisted server-side.
+- [ ] Delete the map (element-detail header trash icon) → confirm dialog says `this will also remove N pins`.
+- [ ] **Expected**: map + pins gone from atlas. Verify on web app: also gone server-side.
 
----
+## 2.3 — Recovery: flush pending writes on attach (Bout 5)
 
-## Path 9 — Auto-refresh cadence (3.5 NEW)
+- [ ] On an api-linked world: edit a field.
+- [ ] **Before the 5s autosave fires**: close the tab (or hard-reload).
+- [ ] Re-open atlas, activate the world.
+- [ ] **Expected**: toast `synced N pending change(s) from previous session`. Verify the edit landed on the web app.
 
-- [ ] Settings → Sync tab → set cadence to `every 1 min` (test mode)
-- [ ] Edit on onlyworlds.com web app
-- [ ] Wait ~1 minute. Watch the pill — should see `fetching` flash, then update appear.
-- [ ] Tab into another browser tab (hide atlas). Make another edit on web. Wait 1 min.
-- [ ] Tab back to atlas — the change should appear shortly (visibility resume + tick).
-- [ ] Set cadence back to `off`.
+## 2.4 — Server-delete review + id-swap silent migration (Bouts 8 + 9)
 
-**Flag if**: cadence keeps firing when tab is hidden.
-
----
-
-## Path 10 — Stay offline (per-world)
-
-- [ ] Settings → World tab → check `stay offline` for the linked world
-- [ ] Pill changes to `paused — local edits queued` (warm-tinted dot)
-- [ ] Edit a field. Edit is saved locally but no network request (check DevTools)
-- [ ] Sidebar row should show the pause icon (visible without hover when paused)
-- [ ] Uncheck `stay offline` — pill goes to `saving → synced`; the queued edit pushes.
-
----
-
-## Path 11 — Global pause-all
-
-- [ ] Settings → Sync tab → check `pause all sync (master kill switch)`
-- [ ] Every api-linked world's engine pauses. Pill shows `paused`.
-- [ ] Edits to any api-linked world stay local. No network requests.
-- [ ] Uncheck → resumes for whichever world is active.
-
----
-
-## Path 12 — Sidebar hover icons (3.5 NEW)
-
-- [ ] Hover an api-linked world row in the sidebar
-- [ ] Pause (or play, if paused) icon + refresh icon appear inline
-- [ ] Click the pause icon → toggles offline; toast confirms
-- [ ] Click refresh icon → pulls from api (toast indicates result)
-- [ ] Local-only rows do NOT show these icons.
-
----
-
-## Path 13 — Conflict review (two policies)
-
-The policy lives in Settings → Sync tab → `default conflict policy`. Two values: **`local wins`** (default) and **`pause and review`**. Test BOTH.
-
-### 13a — `local wins` policy (default)
-
-- [ ] Confirm Settings → Sync → policy = `local wins`.
-- [ ] On the api-linked world, edit a character's description on web → "server-version".
-- [ ] In atlas, edit the SAME field → "atlas-version".
-- [ ] Wait 5s for autosave debounce → push fires.
-- [ ] **Expected**:
-  - Toast: `saved over server change(s) for 1 element`.
-  - Pill: `synced` (no badge).
-  - Sync-state has NO conflict entry persisted.
-  - Server side: now has "atlas-version" (your local won, server overwritten).
-- [ ] Now test pull-conflict: edit BOTH sides again to fresh values. Click pill refresh.
-- [ ] **Expected**:
-  - Toast: `skipped pulling 1 element you also edited locally — your version pushes next sync`.
-  - Local stays at your version. Server unchanged at its version.
-  - Next autosave (or manual): your version pushed over server.
-
-### 13b — `pause and review` policy
-
-- [ ] Settings → Sync → switch policy to `pause and review`.
-- [ ] Edit on web → "server-v2". Edit on atlas → "atlas-v2".
-- [ ] Wait 5s → autosave fires.
-- [ ] **Expected**:
-  - Push is SKIPPED. Pill shows ⚠ badge `1`.
-  - Server unchanged at "server-v2" (atlas didn't overwrite this time).
-- [ ] Click badge → modal opens with `Admiral Splashworth` row, 1 field diverged: description.
-- [ ] Click `pull (theirs wins)` — local file now has "server-v2". Badge clears. Verify on disk.
-- [ ] Re-create the conflict. Click `overwrite (mine wins)` — server gets "atlas-v2". Badge clears.
-- [ ] Re-create the conflict. Close modal without picking — badge STAYS (decide-later). Re-open works.
-
-### 13c — Pull-time conflict under `pause and review`
-
-- [ ] Keep policy as `pause and review`.
-- [ ] Edit on web to "fresh-server". Edit on atlas to "fresh-local". DON'T let autosave run (pause atlas, or expect skip).
-- [ ] Click pill refresh.
-- [ ] **Expected**:
-  - Pull SKIPS applying server for that element.
-  - ⚠ badge fires with 1.
-  - Modal lets you resolve.
-
-**Flag if**: badge appears under `local wins`, OR toast appears under `pause and review`, OR sync-state persists conflicts under `local wins`, OR pull-time conflict isn't badge-surfaced under `pause and review`.
-
----
-
-## Path 14 — Server-side delete review
-
-- [ ] On onlyworlds.com, delete an element from the api-linked world.
+- [ ] On the web app, delete an element you have locally.
 - [ ] In atlas, click the pill to refresh.
-- [ ] **Expected**: server-delete review modal pops up auto-magically.
-  - It lists the deleted element with `delete locally` and `keep + re-push` buttons.
-- [ ] Click `delete locally` for one — local file removed; no tombstone written.
-- [ ] Click `keep + re-push` for another — local element keeps its content; next push re-creates it on server. Verify on web app.
+- [ ] **Expected**: server-delete review modal auto-opens, lists the deleted element with `delete locally` and `keep + re-push` buttons.
+- [ ] Click `keep + re-push`.
+- [ ] **Expected**:
+  - Push fires immediately (no 5s wait).
+  - Element re-CREATEs on api with a fresh server-assigned id.
+  - The URL silently rewrites from `/element/<old-id>` to `/element/<new-id>` — **no "element not found in this world" flash** in the middle pane.
+  - Toast confirms re-sync.
+- [ ] Verify on web app: element is back.
 
-Optional: Settings → Sync tab → uncheck `confirm before deleting locally to match server deletes`. Delete another server-side element. Refresh from atlas. The modal should NOT auto-open. The element's local file should still be removed automatically (Phase 3.6 polish — actually currently still records to sync-state but does not auto-delete; verify behavior matches expectations).
+## 2.5 — Cascade-delete (cross-bay tested via vitest; quick browser check)
 
----
-
-## Path 15 — Unlink from api
-
-- [ ] Settings → World tab on an api-linked world → `unlink from api`
-- [ ] Confirm the dialog
-- [ ] Sidebar row's cloud icon becomes folder icon; pill says `local`
-- [ ] Edit fields locally; no network requests (DevTools verify)
-- [ ] Verify on onlyworlds.com: the api world still exists there (not deleted server-side).
-- [ ] In atlas, re-link via `+ link api` with the same api_key — initial download brings everything back.
+- [ ] Delete a character that has pins on a map.
+- [ ] Confirm dialog mentions the pin count.
+- [ ] Verify on web app: character + its pins all gone.
+- [ ] Verify atlas: pin is no longer rendered on the map.
 
 ---
 
-## Path 16 — Test connection (settings)
+# Tier 3 — Spot-check (heavily tested elsewhere, one line each, ~3 min)
 
-- [ ] On an api-linked world: Settings → World tab → `test connection`
-- [ ] **Expected**: toast `connected — <world name>`
-- [ ] Change PIN in identity tab to wrong value. Click `test connection` again.
-- [ ] **Expected**: toast `api key or pin invalid`. Engine should re-attach with the new pin automatically (look at the pill transition).
+These were hammered in recent sessions (201-204) and locked in by regression tests. Just verify they don't visibly regress.
 
----
+## 3.1 — Make online: Route 2 (merge into existing)
 
-## Path 17 — PIN re-attach
+- [ ] Settings → make online → `link to existing` → policy `b` → 1+ duplicate-by-name + 1+ local-only → submit. **Expected**: toast `linked — N updated, M pushed, X downloaded`. Done.
 
-- [ ] On an api-linked world (pill says `synced`).
-- [ ] Identity tab → change pin to the correct one. Blur the field.
-- [ ] **Expected**: pill momentarily transitions (re-attach), then back to `synced`.
-- [ ] Edit a field — autosave should still work with the new pin.
+## 3.2 — Conflict review (local-wins, the default)
 
----
+- [ ] Edit same field on web + atlas → autosave → **toast** `saved over server change for 1 element`. No badge. Server has atlas's version.
 
-## Path 18 — Bad creds path
+## 3.3 — Auto-refresh cadence
 
-- [ ] Sidebar → `+ link api`. Paste a bogus api_key (or right key, wrong pin).
-- [ ] **Expected**: inline error in modal: "api key or pin invalid". Modal stays open.
-- [ ] Same for `+ new api` with a wrong-format email → 400 surfaces in modal.
+- [ ] Settings → Sync → cadence `every 1 min`. Edit on web. Wait ~60s. **Expected**: pill flickers fetching, toast `pulled ...`, element refreshes.
+- [ ] Tab away + back: cadence countdown stays continuous (no reset on visibility change — Bout W6 fix).
 
----
+## 3.4 — Per-world stay-offline + global pause
 
-## Path 19 — Settings deep-link
+- [ ] Per-world: tested in 2.1. Global: Settings → Sync → `pause all sync (master kill switch)` → all api-linked worlds show `cloud_off`, edits stay local. Unset → resumes for the active world.
 
-- [ ] Navigate manually to `#/settings/sync` — settings opens on the sync tab.
-- [ ] Navigate to `#/w/<id>/settings/world` (where `<id>` is a real world id) — world tab opens for that world.
-- [ ] Click tabs and watch URL change.
+## 3.5 — Multi-world switching
+
+- [ ] Switch between two api-linked worlds. Each: pill flips correctly, no cross-contamination (a push triggered in one world doesn't fire on the other).
+
+## 3.6 — Pull-on-activate
+
+- [ ] Settings → Sync → toggle `pull from api when a world activates` ON → edit on web → switch worlds away + back → element refreshes without manual pill click.
 
 ---
 
-## Path 20 — Reload + auto-activate
+# Tier 4 — Optional deeper (defer if time short)
 
-- [ ] On an api-linked world, hard-refresh (Ctrl+F5).
-- [ ] World auto-activates from URL (if chrome remembers FS permission).
-- [ ] Pill resumes; engine state survives.
-- [ ] If chrome doesn't auto-grant: row appears but isn't active. Click row → permission prompt → activate.
+Cheap to verify, low blast radius if any fails.
 
----
-
-## Path 21 — Multi-world switching
-
-- [ ] Switch between two api-linked worlds.
-- [ ] Each time: pill flips correctly, sync engine detaches/re-attaches.
-- [ ] Edit in world A — wait for synced. Switch to world B. Edit there. Wait for synced. Back to A — A's edit is still there + still synced.
+- [ ] **Bad creds**: `+ link api` with wrong pin → inline error `api key or pin invalid` in modal.
+- [ ] **Test connection**: Settings → World → `test connection` → toast `connected — <world name>`. Wrong pin → toast `api key or pin invalid`.
+- [ ] **PIN re-attach**: change pin in identity → engine re-attaches automatically (pill transitions).
+- [ ] **Settings deep-link**: navigate to `#/w/<id>/settings/sync` directly → settings opens on sync tab.
+- [ ] **Unlink from api**: Settings → World → `unlink from api` → cloud icon becomes folder, world stays editable locally, web world unchanged.
+- [ ] **Multi-tab lock**: open the same world in a second atlas tab → second tab warns about read-only mode.
+- [ ] **Toast for pulled changes from auto-cadence** (Bout 7): cadence tick lands updates → toast surfaces (`pulled N updated from api`).
+- [ ] **Pin-drag autosave** (Bout 1 fix): drag a pin on api-linked world, wait 5s — verify on web app position synced.
 
 ---
 
-## After all paths pass — Cutover
+# After all green — Cutover
 
-When everything looks right:
-
-1. From `C:/Users/Titus/Carrier/Forge/tools/atlas/`:
-   - `git status` — confirm working tree (commits between bouts).
-   - `git remote -v` should still point at the atlas repo.
-2. **Force-push**: `git push --force origin main` (overwrites previous build).
-3. Cloudflare Pages auto-redeploys.
-4. Update `Forge/tools.json`:
-   - Atlas status stays `deployed`.
-   - Note 3.5 milestone in description.
-5. Update memory `project_atlas.md`: phase 3.5 shipped.
-6. Archive `PHASE3.5_BRIEF.md` (mark as shipped at top).
+1. `cd C:/Users/Titus/Carrier/Forge/tools/atlas`
+2. `git status` — confirm working tree state. Multiple bouts of unpushed commits ready.
+3. `git push --force origin main` — overwrites previous build on the atlas repo.
+4. Cloudflare Pages auto-redeploys (~1 min).
+5. Update `Forge/tools.json`: atlas stays `deployed`; note 3.5 milestone in description.
+6. Update memory `project_atlas.md`: phase 3.5 shipped.
+7. Archive `PHASE3.5_BRIEF.md` (mark SHIPPED at top).
+8. `/reflect` (session-close).
 
 ---
 
-## Backlog (after smoke — phase 3.6 candidates)
+# Backlog (phase 3.6+ candidates)
 
-Items deferred from 3.5:
+Deferred from 3.5 — surface as polish bouts when Captain has time. None are blockers.
 
 1. **Manual save toggle** — autosave-only today.
 2. **Per-world conflict policy overrides** — global only today.
-3. **Pagination beyond first page** — single-page only; warning logs in console.
-4. **Conflict review for `ask` policy** — auto-open on conflict detection (vs badge-click).
-5. **Drag-from-element-list pin drop** — right-click + create covers primary case.
-6. **Worlds sidebar nesting UI** — parent_id exists in registry, no UI yet.
-7. **Maps location-grouped index sections** — legacy had this.
-8. **Map upload warning** — visual indicator for maps without `image_url` after make-online.
-9. **"Last synced X min ago"** prominent on pill (currently in title attribute).
-
-None are blockers — surface as polish bouts when Captain has time.
+3. **Full pagination** — first page only; safety guard prevents data loss but `>200 elements/type` worlds don't fully render.
+4. **Drag-from-element-list pin drop** — right-click + create covers primary spatial flow.
+5. **Worlds sidebar nesting UI** — `parent_id` exists in registry, no UI yet.
+6. **Maps location-grouped index sections** — legacy had this; not yet ported.
+7. **Map upload warning** — visual indicator for maps lacking `image_url` after make-online.
+8. **"Last synced X min ago"** prominent on pill (currently only in title attribute).
+9. **Visual indicator on auto-updated elements** — flash/glow when a pulled change lands on a row.
+10. **`getElement` perf** — O(types) directory probe per lookup; cache id→type when load warrants.
 
 ---
 
-*Written 2026-05-13, session 201 close. Phase 3.5 bouts J–Q feature-complete.*
+*Rewritten 2026-05-14, session 204 close. Tiered structure: T1 core lifecycle • T2 UI + recent fixes • T3 spot-check what tests already cover • T4 optional deeper. 234 vitest tests stand behind T2/T3 — this smoke is the real-browser integration check.*
