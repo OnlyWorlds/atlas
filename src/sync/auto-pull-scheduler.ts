@@ -51,21 +51,29 @@ function reconcileScheduler(): void {
   const cadence = reg.sync_cadence_ms ?? null;
   const engine = getCurrentSyncEngine();
   const engineState = state.sync.activeSync;
-  const enginePaused = engineState?.kind === 'paused';
+  // Treat `error` like `paused` — both indicate the engine isn't pushing or
+  // pulling against the api. After Bout T (session 205) auth failures
+  // transition the engine to `error` (not `paused`); without this guard the
+  // scheduler kept ticking and each tick invoked `pullNowAndRefresh` which
+  // engine.pullNow short-circuits because the engine itself is paused. No
+  // network spam, but wasted timer churn every cadence cycle until either
+  // the user fixes the PIN (which spins up a fresh engine) or unlinks.
+  const engineInactive =
+    engineState?.kind === 'paused' || engineState?.kind === 'error';
   const globalPause = !!reg.sync_pause_all;
 
   const shouldRun =
     !!cadence &&
     cadence > 0 &&
     !!engine &&
-    !enginePaused &&
+    !engineInactive &&
     !globalPause;
 
   if (!shouldRun) {
     if (intervalId !== null) {
       console.info('[auto-pull] stopping scheduler', {
         previousCadenceMs: activeCadenceMs,
-        reason: { cadence, hasEngine: !!engine, enginePaused, globalPause },
+        reason: { cadence, hasEngine: !!engine, engineInactive, engineKind: engineState?.kind, globalPause },
       });
       clearInterval(intervalId);
       intervalId = null;
@@ -106,8 +114,13 @@ function tickPull(): void {
     return;
   }
   const s = getState().sync.activeSync;
-  if (s?.kind === 'paused' || s?.kind === 'syncing') {
-    console.info('[auto-pull] tick: engine busy/paused — skipping', { kind: s?.kind });
+  // Defense-in-depth: even if reconcile didn't yet stop the interval (e.g.
+  // engine transitioned mid-tick), the tick itself bails for any non-idle
+  // engine. Includes `error` so post-Bout-T auth-failed engines don't burn
+  // pullNow calls (engine.pullNow already no-ops while paused — this just
+  // skips the wrapper plumbing too).
+  if (s?.kind === 'paused' || s?.kind === 'syncing' || s?.kind === 'error') {
+    console.info('[auto-pull] tick: engine busy/paused/error — skipping', { kind: s?.kind });
     return;
   }
   if (getState().registry.sync_pause_all) {
@@ -131,7 +144,9 @@ function maybeCatchUpOnVisible(): void {
   if (activeCadenceMs === null) return;
   if (!getCurrentSyncEngine()) return;
   const s = getState().sync.activeSync;
-  if (s?.kind === 'paused' || s?.kind === 'syncing') return;
+  // Same set as tickPull — include `error` so the catch-up doesn't fire
+  // against an auth-failed engine.
+  if (s?.kind === 'paused' || s?.kind === 'syncing' || s?.kind === 'error') return;
   if (getState().registry.sync_pause_all) return;
   const elapsed = lastPullAt === null ? Infinity : Date.now() - lastPullAt;
   if (elapsed < activeCadenceMs) return;

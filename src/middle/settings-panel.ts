@@ -502,15 +502,37 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
   });
 
   const unlinkBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="unlink-from-api"]');
-  unlinkBtn?.addEventListener('click', () => {
+  unlinkBtn?.addEventListener('click', async () => {
     const ok = window.confirm(
       `unlink "${world.name}" from api?\n\nlocal files stay where they are. the world stops syncing. you can re-link later from settings or via "+ link api".\n\nthe api world on onlyworlds.com is NOT deleted.`
     );
     if (!ok) return;
+    // Order matters:
+    //   1. Detach the engine FIRST so no in-flight sync round mutates files
+    //      while we're clearing baselines underneath it.
+    //   2. Sever the sync history on disk — strip server_updated_at on every
+    //      element, drop tombstones, reset sync-state, strip world.json.api.
+    //      Without this, lingering server_updated_at stamps from the old api
+    //      world make a future Make-Online Route 1 treat them as UPDATEs
+    //      against the new world (all 404 → routed to server_deletes →
+    //      "world is online but empty").
+    //   3. Update the registry. The world flips to local-only with no api block.
+    detachSyncEngine();
+    const folder = getActiveStore();
+    if (folder) {
+      try {
+        await folder.resetSyncBaseline();
+      } catch (err) {
+        // Don't block the unlink on a disk-write hiccup — the registry update
+        // still proceeds, but warn loudly so the next Make-Online doesn't
+        // silently produce an empty world.
+        console.warn('[unlink] resetSyncBaseline failed:', err);
+        toasts.error('warning: could not fully clear sync history — re-linking may produce an empty world. check console.');
+      }
+    }
     const next = detachApi(getState().registry, world.id);
     saveRegistry(next);
     patchSlice('registry', next);
-    detachSyncEngine();
     toasts.success(`unlinked ${world.name}`);
   });
 

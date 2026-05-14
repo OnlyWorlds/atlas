@@ -147,6 +147,24 @@ export interface MergeOpts {
    */
   matchByName?: boolean;
   onProgress?: (p: MergeProgress) => void;
+  /**
+   * Fires whenever a local id is replaced by a server id during the merge.
+   * Two vectors produce swaps:
+   *
+   *   1. **Match phase** — a local element matches an api element by name+type
+   *      but has a different id. The server's id wins; the local file is
+   *      re-saved at the server's id later in the apply phase.
+   *   2. **CREATE phase** — server enforces UUID v7 and returns a fresh id
+   *      different from the client v4 we sent.
+   *
+   * UI callers wire this to migrate `state.ui.selectedElementId` + URL hash so
+   * the user doesn't see "element <old-id> not found in this world" after the
+   * modal closes. The Route 1 transient engine plugs into the same UI
+   * propagation via its `onIdSwap` option — keeping Route 1 and Route 2
+   * symmetric for the user. Without this callback the merge still works
+   * server-side; only the post-merge UI state is left stale.
+   */
+  onIdSwap?: (swap: { old_id: string; new_id: string; type: ElementType }) => void;
 }
 
 export async function mergeLocalIntoApi(
@@ -161,6 +179,25 @@ export async function mergeLocalIntoApi(
     : (optsOrProgress ?? {});
   const matchByName = opts.matchByName ?? true;
   const onProgress = opts.onProgress;
+  const onIdSwap = opts.onIdSwap;
+  /**
+   * Map of every (localId → serverId) replacement that happens during the
+   * merge. Drives both the file-level `rewriteIdReferences` passes (so other
+   * local elements' FKs follow the swap) and the in-memory
+   * `applyIdSwapsToBody` (so CREATE bodies dispatched mid-phase carry
+   * up-to-date refs). Declared early so `recordIdSwap` can close over it.
+   */
+  const idSwaps = new Map<string, string>(); // oldLocalId → serverId
+  /**
+   * Record a swap into the rewrite map AND notify the caller (UI) so
+   * selectedElementId + URL hash migrate atomically. Centralizing this keeps
+   * every swap site honest — adding a future swap path elsewhere just calls
+   * `recordIdSwap` and the UI propagation comes for free.
+   */
+  const recordIdSwap = (oldId: string, newId: string, type: ElementType): void => {
+    idSwaps.set(oldId, newId);
+    if (onIdSwap) onIdSwap({ old_id: oldId, new_id: newId, type });
+  };
   // 1. List all server elements (one fetch per type).
   const serverByType = new Map<ElementType, Array<{ id: string; updated_at: string } & Record<string, unknown>>>();
   let serverTotalForList = 0;
@@ -188,7 +225,6 @@ export async function mergeLocalIntoApi(
 
   const localDecisions: LocalDecision[] = [];
   const downloadDecisions: DownloadDecision[] = [];
-  const idSwaps = new Map<string, string>(); // oldLocalId → serverId
 
   for (const type of ALL_ELEMENT_TYPES) {
     const serverList = serverByType.get(type) ?? [];
@@ -213,7 +249,10 @@ export async function mergeLocalIntoApi(
       if (byName) {
         matchedServerIds.add(byName.id);
         localDecisions.push({ kind: 'matched-swap', local, server: byName, type });
-        idSwaps.set(local.id, byName.id);
+        // Notify caller now (UI propagation happens immediately); the actual
+        // file/rewrite happens in the apply phase below. handleIdSwap is
+        // idempotent in the rare case the swap is later re-recorded.
+        recordIdSwap(local.id, byName.id, type);
         continue;
       }
       localDecisions.push({ kind: 'create', local, type });
@@ -301,7 +340,7 @@ export async function mergeLocalIntoApi(
           const swapped = { ...body, id: response.id };
           await folder.applyServerRecord(type, swapped, response.updated_at);
           await folder.deleteElement(local.id, { silent: true });
-          idSwaps.set(local.id, response.id);
+          recordIdSwap(local.id, response.id, type);
         } else {
           await folder.stampServerUpdatedAt(local.id, type, response.updated_at);
         }

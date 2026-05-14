@@ -26,7 +26,7 @@ import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { attachApi, saveRegistry, setPin, setEmail, findLinkedWorld } from '../registry/registry';
 import { getActiveStore } from './create-world-modal';
-import { attachSyncEngine, detachSyncEngine } from '../sync/sync-attach';
+import { attachSyncEngine, detachSyncEngine, applyIdSwapToUi } from '../sync/sync-attach';
 import { SyncEngine } from '../sync/sync-engine';
 import { OwClientAdapter } from '../sync/ow-client-adapter';
 import {
@@ -249,6 +249,13 @@ export class MakeOnlineModal extends BaseModal {
       const engine = new SyncEngine({
         folder,
         client: adapter,
+        // Wire UI propagation on every server-assigned id. Real OW enforces
+        // UUID v7, so every CREATE here can swap. Without this, the user's
+        // selectedElementId / URL keeps pointing at the pre-swap local id,
+        // and after the modal closes the middle pane renders
+        // "element <old-id> not found in this world." (Same machinery the
+        // attached engine uses — convention #15 + #124.)
+        onIdSwap: applyIdSwapToUi,
         onPushProgress: (done, total) => {
           pushDone = done;
           pushTotal = total;
@@ -366,6 +373,11 @@ export class MakeOnlineModal extends BaseModal {
       const mergeResult = await mergeLocalIntoApi(folder, adapter, policy, {
         matchByName,
         onProgress: renderProgress,
+        // Mirror Route 1: fire UI propagation on every id-swap that happens
+        // during the merge (match-phase + server-assigned-on-CREATE). Without
+        // this, a user viewing a local element whose id gets replaced sees
+        // "element <old-id> not found in this world" after the modal closes.
+        onIdSwap: applyIdSwapToUi,
       });
 
       // 3. Registry transition + persist creds.

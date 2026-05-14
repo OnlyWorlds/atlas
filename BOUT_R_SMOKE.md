@@ -10,10 +10,12 @@ If something here fails, fix and re-run. If something *not* listed here fails in
 ## 1.6 — Make online: Route 1 (create new api world from a local)
 
 - [ ] Sidebar → `+ new local` → `Smoke Goes Online` → add 2-3 elements **including a Character with `birthplace` set to a Location** (this exercises Bout U topo-sort).
+- [ ] **Select the Character** before opening the modal (this exercises Bout X id-swap UI propagation through the transient engine).
 - [ ] Settings (gear icon) → World tab → `make online` → defaults to `create new`.
 - [ ] Submit with display name + email + pin → progress: `creating world` → `reading new world id` → `uploading N of M elements`.
 - [ ] **Expected**: toast `<name> is online — N elements uploaded` (NOT "1 element failed" — that's the Bout-U regression). Sidebar entry flips folder → cloud.
 - [ ] **DevTools console (Bout U)**: NO `400 Invalid FK` warnings during the upload. Two clean `server assigned new id on create` lines per element.
+- [ ] **Bout X check**: after the modal closes, the middle pane STILL shows the Character (NOT `element <id> not found in this world`). The URL has silently advanced from `/element/<v4-id>` to `/element/<v7-id>`.
 - [ ] Verify on web app: new world appears, and the Character's birthplace resolves to the Location (cross-element FK survives the id-swap).
 
 ---
@@ -76,6 +78,20 @@ These validate UX flows and the regression-fixes shipped this session. They're t
 - [ ] **Text variant**: blank a description field via popover → save (Enter). Pill flicks. Web shows empty description.
 - [ ] **DevTools Network (optional)**: the PATCH body should contain `"birthplace_id": null` (not the field missing). That's the visible proof of the fix.
 
+## 2.8 — Unlink + re-link Route 1 produces a fully-populated new world (Bout Y)
+
+This regression covers the bug surfaced mid-T1.6 smoke (session 206): unlink without clearing sync metadata caused the second Route 1 to create a world server-side but skip uploading every element (each got routed to server_deletes via UPDATE → 404).
+
+- [ ] On the world you made online in T1.6: Settings → World → `unlink from api` → confirm.
+- [ ] **Expected**: toast `unlinked <name>`. Sidebar entry shows folder icon (not cloud). Pill goes grey/`local`. DevTools console shows `[atlas:folder] resetSyncBaseline complete` with the number of elements cleared.
+- [ ] **Delete the world on onlyworlds.com web app** (to ensure the next Route 1 uses fresh server state).
+- [ ] In atlas: Settings → World → `make online` → `create new` → submit with display name + email + pin.
+- [ ] **Expected (the regression check)**: progress shows `uploading N of M elements…` with the FULL element count (the bug was 0 elements uploaded). Toast: `<name> is online — N elements uploaded` matching the count of local elements.
+- [ ] **DevTools console (Bout Y)**: NO `push detected server-side delete` lines during the upload. NO `Failed to load resource: 404` from `/character/` or any element URL.
+- [ ] **Verify on web app**: new world has every element.
+
+---
+
 ## 2.7 — Auth-failure surfaces correctly (Bout T)
 
 - [ ] Make a fresh local world online via Make-Online Route 1 (or pick a disposable test world).
@@ -95,6 +111,7 @@ These were hammered in recent sessions (201-204) and locked in by regression tes
 ## 3.1 — Make online: Route 2 (merge into existing)
 
 - [ ] Settings → make online → `link to existing` → policy `b` → 1+ duplicate-by-name + 1+ local-only → submit. **Expected**: toast `linked — N updated, M pushed, X downloaded`. Done.
+- [ ] **Bout X check (Route 2)**: if you had a local-only element selected (one that'll get a new server id), or a duplicate-by-name element selected (one that'll swap to server id), the middle pane should still show it post-modal — no `not found` flash. URL silently advances.
 
 ## 3.2 — Conflict review (local-wins, the default)
 
@@ -164,4 +181,4 @@ Deferred from 3.5 — surface as polish bouts when Captain has time. None are bl
 
 ---
 
-*Rewritten 2026-05-14, session 204 close; Bout S/T/U checks folded in session 205 close. Tiered structure: T1 core lifecycle • T2 UI + recent fixes • T3 spot-check what tests already cover • T4 optional deeper. 258 vitest tests stand behind T2/T3 — this smoke is the real-browser integration check.*
+*Rewritten 2026-05-14, session 204 close; Bout S/T/U checks folded in session 205 close; Bout X (transient-engine + merge id-swap UI propagation) checks folded in session 206. Tiered structure: T1 core lifecycle • T2 UI + recent fixes • T3 spot-check what tests already cover • T4 optional deeper. 266 vitest tests stand behind T2/T3 — this smoke is the real-browser integration check.*

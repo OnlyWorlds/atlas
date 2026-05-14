@@ -500,6 +500,38 @@ export class FsFolderStore implements FolderStore {
     await writeJsonAtomic(dir, elementFilename(id), rest as Element);
   }
 
+  async resetSyncBaseline(): Promise<void> {
+    // 1. Strip server_updated_at from every element (across every type bucket).
+    //    Touching only files that ACTUALLY had a baseline keeps churn minimal
+    //    on never-synced folders. Iteration is sequential — atomic writes per
+    //    file matter more than parallelism here.
+    const all = await this.listElements();
+    let cleared = 0;
+    for (const elem of all) {
+      if (!elem.server_updated_at) continue;
+      const { server_updated_at: _drop, ...rest } = elem;
+      const dir = await getDir(this.requireRoot(), elementDirSegments(elem.type));
+      await writeJsonAtomic(dir, elementFilename(elem.id), rest as Element);
+      cleared++;
+    }
+    // 2. Drop every tombstone — they target ids on the now-defunct api world.
+    await this.writeTombstoneList([]);
+    // 3. Reset sync-state.json to the default empty-history shape. This also
+    //    clears any persisted conflicts + server_deletes from the old world.
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    await writeJsonAtomic(atlasDir, SYNC_STATE_FILE, { ...DEFAULT_SYNC_STATE });
+    // 4. Strip the api block from world.json so a future reload-and-rescan
+    //    (e.g., handle re-permission, fresh atlas root setup) doesn't try to
+    //    auto-attach against dead credentials.
+    const meta = await this.readWorldMeta();
+    const { api: _dropApi, ...metaRest } = meta;
+    await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, metaRest as WorldMeta);
+    console.info('[atlas:folder] resetSyncBaseline complete', {
+      elementsCleared: cleared,
+      apiStripped: !!meta.api,
+    });
+  }
+
   async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');

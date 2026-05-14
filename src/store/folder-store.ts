@@ -155,6 +155,32 @@ export interface FolderStore {
    * server-newer than the folder version (no local change to preserve).
    */
   applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element>;
+
+  /**
+   * Sever every link this folder has to a remote api world. Used by the
+   * "unlink from api" flow: after the user unlinks, the folder is
+   * conceptually no longer associated with any api world, so all sync
+   * metadata is invalidated. Local content (element fields, names, media,
+   * relationships) is untouched.
+   *
+   * Concretely:
+   *   - Every element's `server_updated_at` is stripped (next push treats
+   *     them as never-synced → CREATEs on whatever api world is linked next).
+   *   - Every tombstone is dropped (DELETEs targeted at the now-defunct api
+   *     world; sending them to a different api world would 404).
+   *   - sync-state.json resets to defaults (conflicts + server_deletes +
+   *     last_pull_at + last_push_at all reference a now-meaningless context).
+   *   - world.json's `api` block is removed (so a reload-and-rescan doesn't
+   *     try to auto-re-attach with dead credentials).
+   *
+   * IDEMPOTENT — safe to call on a folder with no prior sync history. Without
+   * this, after an unlink + re-link via Make-Online Route 1, elements with
+   * lingering `server_updated_at` stamps from the deleted api world get
+   * treated as UPDATEs against the new world, their pre-update GETs 404, and
+   * the elements are silently routed to server_deletes — leaving the new
+   * api world empty when the user expects a fresh upload.
+   */
+  resetSyncBaseline(): Promise<void>;
 }
 
 export function newId(): string {

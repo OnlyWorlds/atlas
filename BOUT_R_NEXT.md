@@ -1,6 +1,6 @@
 # Atlas — Next session pickup
 
-*Updated 2026-05-14, session 205 close.*
+*Updated 2026-05-14, session 206 (pre-smoke critical-review bout) close.*
 
 ---
 
@@ -11,14 +11,19 @@ Phase 3.5 sync engine is feature-complete + hardened across five sessions of liv
 - **Session 202** — Bouts V + V.5: pre-smoke verification-exo + pin element_type wire fix.
 - **Session 203** — Bout W round 1: pin-drag autosave + orphan tombstones + worldId-capture test + cadence visibility unstick.
 - **Session 204** — Bouts 7–9b: pull toast + log cleanup + paused-cloud icon (B7), keep-pushes-now + UPDATE-404 → server_deletes routing (B8), id-swap UI propagation + atomic state transition (B9 + B9b).
-- **Session 205** (this) — Bouts S/T/U: pressure-test pass, then three smoke-discovered fixes.
+- **Session 205** — Bouts S/T/U: pressure-test pass, then three smoke-discovered fixes.
   - **Bout S** — Field-clear propagation (H1+H2 from pressure-test): UI clear actions send `null` / `''` instead of `undefined`, so the server sees the clear via the PATCH body. Fakes encode JSON-wire `stripUndefined` semantics.
   - **Bout T** — Auth-failed rounds bail + surface: 401/403 from any push or pull bails the round immediately, transitions engine to `error` state, fires dedicated toast. Recovery is a fresh engine (PIN change in settings). Smoke-validated against real OW (Captain deleted a world server-side, atlas correctly stopped lying).
   - **Bout U** — Topo-sort CREATEs by FK dependency: Kahn's algorithm orders CREATEs so dependencies push before references. Eliminates the `400 Invalid FK` chain that previously self-healed but produced alarming console noise. Smoke-validated.
+- **Session 206** (this) — Pre-smoke critical review + Bouts X and Y.
+  - **Bout X** — Closed two architectural gaps surfaced by critical code review BEFORE re-running smoke:
+    - **C1** (id-swap UI propagation through transient pushes). Route 1 Make-Online's transient `SyncEngine` had no `onIdSwap` callback — so any server-assigned-v7 swap during the upload left the user's URL/`selectedElementId` pointing at the pre-swap local id, surfacing as "element <old-id> not found in this world" after the modal closed. Route 2's `mergeLocalIntoApi` had the same gap (idSwaps Map accumulated but never told the UI). Fix: exported `applyIdSwapToUi` from sync-attach as the single public surface, wired into Route 1's transient engine and Route 2 via new `MergeOpts.onIdSwap` callback. Merge's internal `recordIdSwap` helper centralises the swap registration so future swap sites can't forget the UI side.
+    - **C2** (auto-pull scheduler doesn't recognise `error` state). `reconcileScheduler` only checked `kind === 'paused'`, so post-Bout-T auth-failed engines kept the timer alive (engine internally short-circuited, no network spam, but wasted timer churn each cadence). Fix: include `'error'` in the inactive set in reconcile + tickPull + maybeCatchUpOnVisible.
+  - **Bout Y** — Smoke-driven fix surfaced during T1.6 by Captain: **unlink leaves stale sync metadata on disk → second Make-Online Route 1 produces an empty world.** After Make-Online, every element gets stamped with `server_updated_at`. Unlink stripped only the registry's `api` block — left `server_updated_at` on every element, tombstones queued for the dead api world, `sync-state.json` history, and `world.json.api`. The next Make-Online Route 1 saw elements with baselines → treated as UPDATEs → pre-update GET 404 → all routed to server_deletes. World created on api with ZERO elements. Fix: added `FolderStore.resetSyncBaseline()` (new convention #24); unlink handler calls it AFTER detachSyncEngine, BEFORE registry update. Strips every element's `server_updated_at`, drops tombstones, resets sync-state, strips `world.json.api`.
 
-**Tests**: 258 vitest passing (was 234 at session 204 close — **+24 net new tests** this session across 3 new test files).
+**Tests**: 274 vitest passing (was 258 at session 205 close — **+16 net new tests** across Bouts X+Y in 4 files).
 **Build + typecheck**: clean.
-**Bundle**: 346.96 KB JS / 96.46 KB gzipped.
+**Bundle**: 347.91 KB JS / 96.82 KB gzipped.
 
 ## First moves next chat
 
@@ -52,9 +57,9 @@ Phase 3.5 sync engine is feature-complete + hardened across five sessions of liv
 - New tests: `tests/integration/sync-engine.createOrder.test.ts` (5).
 - Convention #23 in DESIGN.md.
 
-## Pending commit (session 205)
+## Pending commit (sessions 205-206)
 
-3 logical commits:
+5 logical commits (3 from session 205 + 2 from session 206):
 
 - **Bout S** (`H1+H2 field-clear`):
   - `src/middle/element-detail.ts` (one-line: undefined → null in × handler)
@@ -81,6 +86,25 @@ Phase 3.5 sync engine is feature-complete + hardened across five sessions of liv
   - `DESIGN.md` (convention #23)
   - `SYNC_NOTES.md` ("CREATE order: topo-sort" section)
   - `PROGRESS.md` (bout S/T/U entries)
+
+- **Bout X** (`id-swap-ui-propagation-transient + scheduler-error-guard`):
+  - `src/sync/sync-attach.ts` (new public `applyIdSwapToUi` export)
+  - `src/ui/make-online-modal.ts` (Route 1 transient engine wires `onIdSwap`; Route 2 wires `MergeOpts.onIdSwap`)
+  - `src/sync/make-online.ts` (`MergeOpts.onIdSwap` field; central `recordIdSwap` helper; idSwaps Map hoisted above helper)
+  - `src/sync/auto-pull-scheduler.ts` (`engineInactive` includes `'error'`; tickPull + maybeCatchUpOnVisible match)
+  - `tests/integration/sync-attach.idSwap.test.ts` (+2 tests: public surface + transient-engine wiring)
+  - `tests/integration/make-online.test.ts` (+5 tests: merge onIdSwap match-phase, CREATE-time, mixed, no-op, optional)
+  - `tests/integration/auto-pull-scheduler.test.ts` (+1 test: stops on `error` state)
+
+- **Bout Y** (`unlink-resets-sync-baseline`):
+  - `src/store/folder-store.ts` (new `resetSyncBaseline()` interface method + convention doc)
+  - `src/store/folder-store-fs.ts` (FsFolderStore implementation — strips every element's `server_updated_at`, clears tombstones, resets `sync-state.json`, strips `world.json.api`)
+  - `tests/fixtures/mock-folder-store.ts` (MockFolderStore mirror implementation)
+  - `src/middle/settings-panel.ts` (unlink handler calls `resetSyncBaseline()` between detachSyncEngine and registry save; graceful fallback toast if reset throws)
+  - `tests/integration/folder-store.resetSyncBaseline.test.ts` (new file, 8 tests: contract checks + the Captain-bug regression scenario)
+  - `DESIGN.md` (convention #24)
+  - `BOUT_R_SMOKE.md` (new T2.8 smoke check covering unlink + re-link Route 1)
+  - `BOUT_R_NEXT.md` (this update)
 
 Captain reserves the push action.
 

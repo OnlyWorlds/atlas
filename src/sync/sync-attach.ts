@@ -477,6 +477,36 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
 }
 
 /**
+ * Public id-swap propagation. Used by every push path that can produce a
+ * server-assigned id different from the local one:
+ *
+ *   - The long-running engine attached via `attachSyncEngine` — wired through
+ *     the engine's `onIdSwap` option above.
+ *   - The TRANSIENT engine spun up by Make-Online Route 1 (`make-online-modal.ts`).
+ *     That engine pushes everything to a brand-new api world while the modal
+ *     is open; without this callback, every id-swapped element leaves the
+ *     user's URL/selection pointing at the pre-swap local id, and after the
+ *     modal closes the middle pane renders "element <old-id> not found in
+ *     this world."
+ *   - The Route 2 merge flow (`mergeLocalIntoApi`) — doesn't use a SyncEngine,
+ *     but accumulates id-swaps in a Map. The caller passes this same function
+ *     via `MergeOpts.onIdSwap` so match-phase + CREATE-time swaps migrate UI
+ *     state symmetrically with Route 1.
+ *
+ * All three call sites land at the same `handleIdSwap` implementation. The
+ * atomic-state-transition discipline (convention #124) lives there — single
+ * `setState` patching both `data.elements` and `ui.selectedElementId` in one
+ * notification so subscribers never observe a half-migrated state.
+ */
+export function applyIdSwapToUi(swap: {
+  old_id: string;
+  new_id: string;
+  type: ElementType;
+}): void {
+  handleIdSwap(swap);
+}
+
+/**
  * Test-only: invoke the conflict-toast emitter with a synthetic SyncResult.
  * Used to verify the setTimeout(0) world-switch race guard without standing
  * up a full conflict scenario through MSW.
@@ -491,6 +521,9 @@ export function __test_emitConflictToasts(
 /**
  * Test-only: invoke the id-swap UI migration directly. Verifies the state +
  * URL transitions without standing up the full engine CREATE flow.
+ *
+ * Retained for backward compatibility with `sync-attach.idSwap.test.ts`; new
+ * call sites should use the public `applyIdSwapToUi` export above.
  */
 export function __test_handleIdSwap(swap: {
   old_id: string;

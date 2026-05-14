@@ -556,3 +556,115 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     expect(result.failures).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// MergeOpts.onIdSwap (UI propagation) — symmetric to SyncEngine.onIdSwap.
+//
+// Both routes through Make-Online must propagate id-swaps to the UI so the
+// user doesn't see "element <old-id> not found in this world" after the modal
+// closes. Route 1 plugs `applyIdSwapToUi` into the transient engine's
+// onIdSwap option; Route 2 plugs it into MergeOpts.onIdSwap. These tests pin
+// the contract at the merge layer.
+// ---------------------------------------------------------------------------
+
+describe('mergeLocalIntoApi onIdSwap callback', () => {
+  it('fires for a match-phase swap (local has Alice, server has Alice at different id)', async () => {
+    const adapter = makeAdapter();
+    await adapter.createElement('character', { id: 'srv-alice', name: 'Alice' });
+    const localAlice = await folder.createElement('character', { name: 'Alice' });
+
+    const swaps: Array<{ old_id: string; new_id: string; type: string }> = [];
+    const result = await mergeLocalIntoApi(folder, adapter, 'b', {
+      onIdSwap: (s) => swaps.push(s),
+    });
+
+    expect(result.updates).toBe(1);
+    expect(swaps).toHaveLength(1);
+    expect(swaps[0]).toEqual({
+      old_id: localAlice.id,
+      new_id: 'srv-alice',
+      type: 'character',
+    });
+  });
+
+  it('fires for a CREATE-time server-assigned id (local-only Bob, server assigns v7)', async () => {
+    // The MSW handler preserves client-provided ids by default. Real OW
+    // enforces UUID v7, replacing the client v4. Switch to that mode for this
+    // test so the swap actually happens.
+    mswServer.resetHandlers();
+    mswServer.use(
+      ...statefulOwHandlers({ baseUrl: TEST_BASE, clock: clock.next, assignsServerIds: true }).handlers
+    );
+
+    const adapter = makeAdapter();
+    const localBob = await folder.createElement('character', { name: 'Bob' });
+
+    const swaps: Array<{ old_id: string; new_id: string; type: string }> = [];
+    const result = await mergeLocalIntoApi(folder, adapter, 'b', {
+      onIdSwap: (s) => swaps.push(s),
+    });
+
+    expect(result.creates).toBe(1);
+    expect(swaps).toHaveLength(1);
+    expect(swaps[0].old_id).toBe(localBob.id);
+    expect(swaps[0].new_id).not.toBe(localBob.id);
+    expect(swaps[0].type).toBe('character');
+  });
+
+  it('fires for both a match-swap AND a CREATE-swap in the same merge', async () => {
+    // Enable server-assigned ids so the local-only Dave triggers a CREATE-swap
+    // alongside the match-phase swap for Alice. (assignsServerIds only affects
+    // CREATEs the merge issues — seed POSTs against the same handler also get
+    // re-keyed, so we capture their post-write ids for the name match.)
+    mswServer.resetHandlers();
+    const fresh = statefulOwHandlers({ baseUrl: TEST_BASE, clock: clock.next, assignsServerIds: true });
+    mswServer.use(...fresh.handlers);
+    const adapter = makeAdapter();
+    await adapter.createElement('character', { name: 'Alice' });
+
+    // Local: Alice (name match → swap) + Dave (new → CREATE swap).
+    const localAlice = await folder.createElement('character', { name: 'Alice' });
+    const localDave = await folder.createElement('character', { name: 'Dave' });
+
+    const swaps: Array<{ old_id: string; new_id: string; type: string }> = [];
+    await mergeLocalIntoApi(folder, adapter, 'b', {
+      onIdSwap: (s) => swaps.push(s),
+    });
+
+    expect(swaps).toHaveLength(2);
+    const oldIds = swaps.map((s) => s.old_id).sort();
+    expect(oldIds).toEqual([localAlice.id, localDave.id].sort());
+  });
+
+  it('no-op when the merge has no swaps at all (same-id + downloads only)', async () => {
+    const adapter = makeAdapter();
+    await adapter.createElement('character', { id: 'a', name: 'Alpha' });
+    await adapter.createElement('location', { id: 'b', name: 'Beta' });
+    // Local has same-id Alpha; nothing else.
+    await folder.createElement('character', { id: 'a', name: 'Alpha' });
+
+    const swaps: Array<{ old_id: string; new_id: string; type: string }> = [];
+    const result = await mergeLocalIntoApi(folder, adapter, 'b', {
+      onIdSwap: (s) => swaps.push(s),
+    });
+
+    expect(swaps).toHaveLength(0);
+    expect(result.downloaded).toBe(1); // Beta downloaded
+    expect(result.updates).toBe(1);    // Alpha updated (same-id path)
+  });
+
+  it('does not require onIdSwap (callback is optional)', async () => {
+    // The merge must still work end-to-end without a callback. Asserting this
+    // explicitly prevents future contributors from making the callback
+    // required by accident.
+    const adapter = makeAdapter();
+    await adapter.createElement('character', { id: 'srv-alice', name: 'Alice' });
+    await folder.createElement('character', { name: 'Alice' });
+    await folder.createElement('character', { name: 'Bob' });
+
+    const result = await mergeLocalIntoApi(folder, adapter, 'b');
+    expect(result.creates).toBe(1);
+    expect(result.updates).toBe(1);
+    expect(result.failures).toEqual([]);
+  });
+});

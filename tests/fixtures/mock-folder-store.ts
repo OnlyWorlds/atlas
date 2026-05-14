@@ -254,6 +254,26 @@ export class MockFolderStore implements FolderStore {
     this.elements.set(id, rest as Element);
   }
 
+  async resetSyncBaseline(): Promise<void> {
+    // Mirror FsFolderStore.resetSyncBaseline contract: strip server_updated_at
+    // from every element, drop tombstones, reset sync-state, strip world.json
+    // api block. See folder-store.ts interface comment for rationale.
+    for (const [id, elem] of this.elements) {
+      if (!elem.server_updated_at) continue;
+      const { server_updated_at: _drop, ...rest } = elem;
+      this.elements.set(id, rest as Element);
+    }
+    this.tombstones = [];
+    this.syncState = {
+      last_pull_at: null,
+      last_push_at: null,
+      paused: false,
+      conflicts: [],
+    };
+    const { api: _dropApi, ...metaRest } = this.meta;
+    this.meta = metaRest as WorldMeta;
+  }
+
   async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');

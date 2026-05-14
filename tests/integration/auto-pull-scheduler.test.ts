@@ -111,6 +111,28 @@ describe('auto-pull scheduler', () => {
     expect(__test_isRunning()).toBe(false);
   });
 
+  // After Bout T (session 205), auth-failed rounds transition the engine to
+  // `error` state (not `paused`). The scheduler must treat `error` the same
+  // as `paused` for eligibility — otherwise it keeps ticking and burns
+  // pullNow calls every cadence cycle against an engine that's internally
+  // paused. The pull short-circuits inside the engine but the timer waste
+  // accumulates until the user fixes the PIN.
+  it('stops when engine is in error state (auth-failed round)', async () => {
+    await setupAttached();
+    patchSlice('registry', setSyncCadenceMs(getState().registry, 5000));
+    __test_reconcile();
+    expect(__test_isRunning()).toBe(true);
+
+    // Simulate engine entering error state (as setAuthError does internally).
+    patchSlice('sync', {
+      byWorld: getState().sync.byWorld,
+      activeSync: { kind: 'error', message: 'authentication failed', recoverable: true },
+      activeConflictsCount: 0,
+    });
+    __test_reconcile();
+    expect(__test_isRunning()).toBe(false);
+  });
+
   it('restarts when cadence changes', async () => {
     await setupAttached();
     patchSlice('registry', setSyncCadenceMs(getState().registry, 5000));
