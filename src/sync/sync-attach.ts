@@ -98,26 +98,35 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
   // Refresh conflict count from sync-state.json — engine doesn't know yet.
   void refreshConflictsCount();
 
-  // Pull-on-activate (3.5+). Only when not paused and the setting is on.
-  if (!shouldPause && reg.sync_pull_on_activate) {
-    // Fire-and-forget; failures surface via engine state. Use the wrapper so
-    // newly-pulled elements appear in the UI cache.
-    pullNowAndRefresh().catch(err => {
-      console.warn('[sync-attach] pull-on-activate failed:', err);
-    });
-  }
-
-  // Flush-on-attach: the autosave debounce timer lives in memory, so a reload
-  // (or browser crash, or world switch within the 5s window) loses any
-  // unfired push. Without recovery, those writes sit on disk forever marked
-  // `local_updated_at > server_updated_at` but never reach the api.
+  // Sequence flush + pull-on-activate via a single async chain. Without this
+  // ordering, both fire-and-forget and race for the engine's shared `inFlight`
+  // lock: whichever loses the race silently returns the winner's promise. In
+  // practice that meant `flushPendingOnAttach`'s `pushOnce()` returned the
+  // pull's promise, `pushed.* === 0`, no "synced N pending" toast, and the
+  // stranded edits never reached the server until the next user-driven write
+  // re-armed the autosave debounce.
   //
-  // Symmetric to pull-on-activate but UNCONDITIONAL when there are pending
-  // writes — pending local edits already encode user intent (they typed → they
-  // want it saved), same logic as why autosave fires at all. Skipped only when
-  // the user has explicitly paused sync.
+  // Order: flush goes FIRST. Pending writes already encode user intent (they
+  // typed in a prior session, lost the debounce to a reload) and should land
+  // server-side before pull-on-activate looks for newer remote changes. Flush
+  // is unconditional when pending exist; pull-on-activate is opt-in.
   if (!shouldPause) {
-    void flushPendingOnAttach(engine, folder, entry.name);
+    void (async () => {
+      try {
+        await flushPendingOnAttach(engine, folder, entry.name);
+      } catch (err) {
+        // flushPendingOnAttach swallows its own errors; outer catch is defense-
+        // in-depth in case the helper is ever refactored to throw.
+        console.warn('[sync-attach] flush-on-attach failed:', err);
+      }
+      if (reg.sync_pull_on_activate) {
+        try {
+          await pullNowAndRefresh();
+        } catch (err) {
+          console.warn('[sync-attach] pull-on-activate failed:', err);
+        }
+      }
+    })();
   }
 
   return engine;

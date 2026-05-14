@@ -1,89 +1,8 @@
  
 
     
-
-## 2.1 — Paused world visual indicator (session 204)
-
  
-- [ ] Edit a field — saves locally, no network requests (verify in DevTools Network).
-- [ ] Uncheck → pill `saving → synced`, queued edit pushes. Cloud icon returns to plain `cloud`.
-
-## 2.2 — Pin lifecycle (spatial UX, was missing from old smoke)
-
-- [ ] On an api-linked world: `+ new element` → Map. Use a small image file (under 1 MB).
-- [ ] Map tab opens on the right pane. Image renders with edge-color background.
-- [ ] **Right-click empty map** → contextual element-create modal → create Character → pin drops at click location.
-- [ ] Click pin → element detail loads + selectedElementId migrates.
-- [ ] Hover pin → tooltip with name + type + description preview.
-- [ ] **Drag pin** to new position → autosave fires within 5s (pill flicks). Reload to confirm position persisted server-side.
-- [ ] Delete the map (element-detail header trash icon) → confirm dialog says `this will also remove N pins`.
-- [ ] **Expected**: map + pins gone from atlas. Verify on web app: also gone server-side.
-
-## 2.3 — Recovery: flush pending writes on attach (Bout 5)
-
-- [ ] On an api-linked world: edit a field.
-- [ ] **Before the 5s autosave fires**: close the tab (or hard-reload).
-- [ ] Re-open atlas, activate the world.
-- [ ] **Expected**: toast `synced N pending change(s) from previous session`. Verify the edit landed on the web app.
-
-## 2.4 — Server-delete review + id-swap silent migration (Bouts 8 + 9)
-
-- [ ] On the web app, delete an element you have locally.
-- [ ] In atlas, click the pill to refresh.
-- [ ] **Expected**: server-delete review modal auto-opens, lists the deleted element with `delete locally` and `keep + re-push` buttons.
-- [ ] Click `keep + re-push`.
-- [ ] **Expected**:
-  - Push fires immediately (no 5s wait).
-  - Element re-CREATEs on api with a fresh server-assigned id.
-  - The URL silently rewrites from `/element/<old-id>` to `/element/<new-id>` — **no "element not found in this world" flash** in the middle pane.
-  - Toast confirms re-sync.
-- [ ] Verify on web app: element is back.
-
-## 2.5 — Cascade-delete (cross-bay tested via vitest; quick browser check)
-
-- [ ] Delete a character that has pins on a map.
-- [ ] Confirm dialog mentions the pin count.
-- [ ] Verify on web app: character + its pins all gone.
-- [ ] Verify atlas: pin is no longer rendered on the map.
-
-## 2.6 — Field clear propagates to server (Bout S)
-
-- [ ] On an api-linked world, find a Character with `birthplace` set to a Location. (Set one first if needed; wait for `synced`.)
-- [ ] Click the `×` on the birthplace chip. Pill flicks `synced → saving → synced`.
-- [ ] **Verify on web app**: birthplace is now empty/null server-side.
-- [ ] Reload atlas. Birthplace stays empty locally AND on web app.
-- [ ] **Text variant**: blank a description field via popover → save (Enter). Pill flicks. Web shows empty description.
-- [ ] **DevTools Network (optional)**: the PATCH body should contain `"birthplace_id": null` (not the field missing). That's the visible proof of the fix.
-
-## 2.9 — API name shows in Settings + flags divergence (Bout Z)
-
-Make-Online with a display name different from the local name should cache the server-side name and surface the mismatch in settings.
-
-- [ ] On a local world (e.g. local name "MyLocal"), Settings → World → `make online` → set the display name to something different (e.g. "MyOnlinePublicName") + submit.
-- [ ] After the modal closes, open Settings → World tab.
-- [ ] **Expected**: meta list shows a `name on api` row with the value `MyOnlinePublicName` followed by a small `(differs from local)` hint. The `name` input still says `MyLocal`.
-- [ ] Click `test connection`.
-- [ ] **Expected toast**: `connected — name on api is "MyOnlinePublicName"` (no "(was ...)" suffix on this run because cache already matched).
-- [ ] On onlyworlds.com web app: rename the world to `MyOnlineRenamedOnServer`.
-- [ ] In atlas: click `test connection` again.
-- [ ] **Expected toast**: `connected — name on api is "MyOnlineRenamedOnServer" (was "MyOnlinePublicName")`. Settings re-renders with the new value.
-- [ ] **Reload atlas tab**: the `name on api` row still says `MyOnlineRenamedOnServer` (persisted in registry AND world.json).
-
----
-
-## 2.8 — Unlink + re-link Route 1 produces a fully-populated new world (Bout Y)
-
-This regression covers the bug surfaced mid-T1.6 smoke (session 206): unlink without clearing sync metadata caused the second Route 1 to create a world server-side but skip uploading every element (each got routed to server_deletes via UPDATE → 404).
-
-- [ ] On the world you made online in T1.6: Settings → World → `unlink from api` → confirm.
-- [ ] **Expected**: toast `unlinked <name>`. Sidebar entry shows folder icon (not cloud). Pill goes grey/`local`. DevTools console shows `[atlas:folder] resetSyncBaseline complete` with the number of elements cleared.
-- [ ] **Delete the world on onlyworlds.com web app** (to ensure the next Route 1 uses fresh server state).
-- [ ] In atlas: Settings → World → `make online` → `create new` → submit with display name + email + pin.
-- [ ] **Expected (the regression check)**: progress shows `uploading N of M elements…` with the FULL element count (the bug was 0 elements uploaded). Toast: `<name> is online — N elements uploaded` matching the count of local elements.
-- [ ] **DevTools console (Bout Y)**: NO `push detected server-side delete` lines during the upload. NO `Failed to load resource: 404` from `/character/` or any element URL.
-- [ ] **Verify on web app**: new world has every element.
-
----
+  
 
 ## 2.7 — Auth-failure surfaces correctly (Bout T)
 
@@ -141,6 +60,27 @@ Cheap to verify, low blast radius if any fails.
 - [ ] **Multi-tab lock**: open the same world in a second atlas tab → second tab warns about read-only mode.
 - [ ] **Toast for pulled changes from auto-cadence** (Bout 7): cadence tick lands updates → toast surfaces (`pulled N updated from api`).
 - [ ] **Pin-drag autosave** (Bout 1 fix): drag a pin on api-linked world, wait 5s — verify on web app position synced.
+
+
+## 2.2 — Pin lifecycle (spatial UX, was missing from old smoke)
+
+- [ ] On an api-linked world: `+ new element` → Map. Use a small image file (under 1 MB).
+- [ ] Map tab opens on the right pane. Image renders with edge-color background.
+- [ ] **Right-click empty map** → contextual element-create modal → create Character → pin drops at click location.
+- [ ] Click pin → element detail loads + selectedElementId migrates.
+- [ ] Hover pin → tooltip with name + type + description preview.
+- [ ] **Drag pin** to new position → autosave fires within 5s (pill flicks). Reload to confirm position persisted server-side.
+- [ ] Delete the map (element-detail header trash icon) → confirm dialog says `this will also remove N pins`.
+- [ ] **Expected**: map + pins gone from atlas. Verify on web app: also gone server-side.
+
+
+## 2.5 — Cascade-delete (cross-bay tested via vitest; quick browser check)
+
+- [ ] Delete a character that has pins on a map.
+- [ ] Confirm dialog mentions the pin count.
+- [ ] Verify on web app: character + its pins all gone.
+- [ ] Verify atlas: pin is no longer rendered on the map.
+
 
 ---
 

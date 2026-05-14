@@ -339,8 +339,17 @@ Useful sequences:
 - `local-wins: pull detected conflict, firing pushOnce to converge` — the auto-push
 - `server assigned new id on create {type, localId, serverId}` — id-swap triggered
 - `resolveConflict pull-theirs ... applying server record {descriptionPreview}` — modal action firing
+- `push detected server-side delete {id, type}` — pull-time AND push-time symmetric detection (Bout 8)
+- `push hit auth error — bailing round {id, type, message}` — 401/403 from push, engine → error (Bout T)
+- `pull hit auth error — bailing round {type, message}` — 401/403 from pull, engine → error (Bout T)
+- `FK cycle detected in CREATE batch — falling back to input order {unsortedCount}` — genuine cycle in topo-sort (Bout U)
+- `self-healed pin missing element_type {pinId, elementType}` — legacy pin fixed at push time (Bout V.5)
+- `tombstone target already gone (404) — clearing` — 404-on-DELETE treated as success (Bout W)
+- `post-pull-conflict push skipped: world switched during defer` — world-switch race guard fired (Bout V)
+- `[atlas:folder] resetSyncBaseline complete {elementsCleared, apiStripped}` — unlink severed sync history (Bout Y)
+- `[auto-pull]` prefix logs — scheduler lifecycle: `scheduling periodic pull / stopping scheduler / tick: firing / tick: skipping {reason} / became visible after a cadence window — firing catch-up pull`
 
-`logWireError` in adapter prints the wire body on 4xx — invaluable when server rejects.
+`logWireError` in adapter prints the wire body on 4xx — invaluable when server rejects. Pin failures specifically extract `_id` / `_ids` / `_type` fields inline for quick diagnosis.
 
 ---
 
@@ -480,15 +489,50 @@ Fix: capture `currentWorldId` at schedule time, compare to current at fire time.
 
 ## Known soft-edges to revisit (3.6+)
 
-Updated Bout V — pagination guard added; full pagination still deferred.
+Updated through session 206. Listed by surface — none are cutover blockers.
 
+### Sync engine internals
 - **Concurrent-edit race on autosave**: applying server response post-push would catch normalization but risks overwriting user's mid-push edit. Today we stamp-only (eventually consistent via next pull).
+- **`pushPhase` UPDATE doesn't apply server response back to local**: refuted-by-design from session-205 pressure-test (push asserts local is correct). Revisit only if OW server starts normalizing fields server-side.
+- **User edit during pullPhase race-overwrites** (pressure-test M3): single-`await` window (~1-5ms). Fix is ~10 LOC re-reading element before `applyServerRecord`. Defer unless smoke surfaces.
+- **`resolveConflict` CREATE path id-swap**: corner case — resolve-conflict on never-synced element doesn't swap if server returns a different id. Not tripped in practice.
+- **`rewriteIdReferences` bumps `local_updated_at`**: causes harmless re-push on next sync after id-swap. Add a "rewrite without bumping" mode if the trailing-push cost ever shows up in profiling.
+
+### Pagination
 - **Pagination (full)**: `listElements` reads the first page only. Bout V added a SAFETY guard so server-delete detection doesn't run on paginated types — but atlas still only sees first-page data. Implement load-more / page-cursor for worlds >200 elements per type.
+
+### UI surfacing of UI-state during transient pushes
+- **Map id-swap doesn't migrate `state.ui.rightTabs[].mapId` / `state.ui.pinPlacement.elementId`** (pressure-test H3): Bout X covered `selectedElementId` + URL but not those slices. Only reachable if user has a map tab open during Make-Online Route 1 or first push of a locally-created map. ~8 LOC in `sync-attach.handleIdSwap`.
+- **Pill click during debounced push toasts misleadingly** (pressure-test M2): returns push-shaped result; "already up to date" reads wrong when push actually moved 0 records. ~3 LOC: gate the toast on `result.pushed.* > 0`. Benign for single-user smoke.
+- **Stale conflicts persist after policy flip to local-wins** (pressure-test M4): if user had `pause-and-review` conflicts pending then switched policy, the badge stays. ~5 LOC: settings-panel policy-change clears persisted conflicts. Easy fix.
+- **Modal actions silent no-op on world switch mid-modal** (pressure-test M5): reachability low (modal overlay blocks worlds-sidebar). ~3 LOC: capture worldId at modal open, validate before resolving.
+- ~~**L7 leftover** — `engine.resume()` erases `last_sync_at` (pressure-test M7)~~ — closed by Bout BB.
+
+### Reliability edges
+- **Cascade-delete loop crash leaves inconsistent state** (pressure-test Path 10): FS Access API has no transactions. Pre-collect tombstones into one write before unlinking files would harden. Worst case today: "confusing server-delete modal on next sync."
+- **Stuck-pin auto-cleanup**: repeated `Map not found` 404s when a pin's map was deleted server-side currently require manual delete. Auto-clear after N failures would help.
+
+### Polish
 - **Per-element refresh button**: useful escape hatch for "force pull this one element" especially around the m2m gotcha if the server fix regresses.
 - **Per-world conflict policy override**: global only today. Settings → Sync sets default for everyone.
 - **Server-delete confirm setting wiring**: setting exists, auto-modal exists, but a checkbox + UI to control might benefit from a "review later" affordance (currently just hides the modal but doesn't clear the badge).
+- **"Last synced X min ago" on the pill**: currently only in title attribute. Prominent display would be polish.
+- **Visual indicator on auto-pulled elements**: toast covers the count; per-element flash on the row would make it feel live.
+- **Drag-from-element-list pin drop**: right-click + create covers primary spatial flow.
 - **`getElement` O(types) probe**: walks 22 directories per lookup. Cache id→type in FsFolderStore for hot-path operations.
-- **`rewriteIdReferences` bumps `local_updated_at`**: causes harmless re-push on next sync after id-swap. Add a "rewrite without bumping" mode if the trailing-push cost ever shows up in profiling.
+- **L1-L6 cosmetic** — log inconsistencies (e.g. `'drain-blind'` vs `'local-wins'` in one log line), 1-frame "not found" flash on delete, etc.
+
+### Closed during sessions 205-207 (kept here for searchability)
+- **H1+H2** — field-clear propagation → fixed by Bout S (`null`/`''` sentinels, fakes encode JSON-wire semantics).
+- **T-class** — "lying pill" on auth failure → fixed by Bout T (bail-the-round + error state).
+- **U-class** — `400 Invalid FK` chain noise → fixed by Bout U (topo-sort CREATEs).
+- **C1** — Make-Online transient engine id-swap UI propagation → fixed by Bout X.
+- **C2** — auto-pull scheduler doesn't recognise `error` state → fixed by Bout X.
+- **Unlink leaves stale sync metadata** → fixed by Bout Y (new `resetSyncBaseline()`).
+- **M1** — `engine.resume()` doesn't flush pending writes → fixed by Bout AA.
+- **Api-vs-local name divergence invisible** → fixed by Bout Z (`api.world_name` cached + Settings row).
+- **Pre-T2-smoke F1** — flush-on-attach raced pull-on-activate via shared inFlight lock, silently no-op'd → fixed by Bout BB (sequence flush BEFORE pull via single async IIFE in `attachSyncEngine`). Convention #25.
+- **M7** — `engine.resume()` reset `last_sync_at` to null, pill briefly read "never synced" → fixed by Bout BB (engine tracks `lastSyncAt` privately, `resume()` restores). Convention #26.
 
 ---
 

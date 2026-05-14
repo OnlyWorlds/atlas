@@ -138,6 +138,13 @@ export class SyncEngine {
   private debouncePushTimer: ReturnType<typeof setTimeout> | null = null;
   /** Debounce window for autosave pushes. ms. Configurable later. */
   private debouncePushMs = 5000;
+  /**
+   * Most recent `last_sync_at` we've reported via state. Survives pause/resume
+   * so the pill's "synced X min ago" tooltip doesn't reset to "never synced"
+   * the moment the user toggles stay-offline. `setState` writes this whenever
+   * an idle transition carries a non-null timestamp; `resume()` reads it back.
+   */
+  private lastSyncAt: string | null = null;
 
   constructor(opts: SyncEngineOptions) {
     this.folder = opts.folder;
@@ -172,7 +179,11 @@ export class SyncEngine {
   resume(): void {
     this.paused = false;
     this.pauseReason = null;
-    this.setState({ kind: 'idle', last_sync_at: null });
+    // Preserve last_sync_at from before pause — toggling stay-offline off
+    // shouldn't erase the pill's "synced X min ago" tooltip. The push round
+    // below (or a subsequent successful sync) will stamp a fresher value if
+    // anything actually moves.
+    this.setState({ kind: 'idle', last_sync_at: this.lastSyncAt });
     // Flush pending writes immediately. Without this, edits the user made
     // during the pause window sit on disk indefinitely: `requestPush()`
     // early-returned while paused (no debounce timer was scheduled), so
@@ -1150,6 +1161,12 @@ export class SyncEngine {
 
   private setState(state: SyncEngineState): void {
     this.state = state;
+    // Capture the most recent successful-sync timestamp so it survives
+    // pause/resume. `last_sync_at` only lives on idle states; non-idle
+    // transitions don't overwrite the captured value.
+    if (state.kind === 'idle' && state.last_sync_at) {
+      this.lastSyncAt = state.last_sync_at;
+    }
     this.onStateChange(state);
   }
 }
