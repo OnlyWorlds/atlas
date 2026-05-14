@@ -34,6 +34,13 @@ export class FakeOwApiClient implements OwApiClient {
    * page returned" without actually paginating responses.
    */
   private forcedPaginatedTypes = new Set<ElementType>();
+  /**
+   * Test seam: when true, EVERY CRUD operation throws 401. Mirrors real-OW
+   * behavior when credentials go dead — bad PIN, revoked api_key, or world
+   * deleted server-side (which invalidates the api_key). Engine should
+   * detect via isAuthError and transition to error state.
+   */
+  private authBlocked = false;
 
   // Capture of every call for assertion.
   calls: Array<
@@ -53,22 +60,34 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   async createElement(type: ElementType, body: Record<string, unknown>): Promise<ServerRecord> {
-    this.calls.push({ method: 'create', type, body: { ...body } });
+    this.throwIfAuthBlocked();
+    // Mirror real-OW wire semantics: JSON.stringify drops undefined values,
+    // so any field set to `undefined` in the body never reaches the server.
+    // Without this, FakeOwApiClient would mask UI bugs that pass `undefined`
+    // for "clear this field" (real OW would interpret the missing key as
+    // "no change", FakeOwApiClient would otherwise apply it as "clear").
+    const wireBody = stripUndefined(body);
+    this.calls.push({ method: 'create', type, body: { ...wireBody } });
     // Mirror real OW: pin requires element_type whenever element_id is set.
     // Throwing here lets engine/merge tests catch regressions of this rule.
-    if (type === 'pin' && body.element_id && !body.element_type) {
+    if (type === 'pin' && wireBody.element_id && !wireBody.element_type) {
       throw new Error('API Error 400: element_type must be provided when element_id is specified');
     }
     // Real OW behavior: ignore client-sent id when assignServerIds=true.
-    const id = this.assignServerIds ? cryptoRandomId() : (body.id as string) ?? cryptoRandomId();
+    const id = this.assignServerIds ? cryptoRandomId() : (wireBody.id as string) ?? cryptoRandomId();
     this.throwIfInjected('create', id);
-    const record: ServerRecord = { ...body, id, type, updated_at: this.clock() };
+    const record: ServerRecord = { ...wireBody, id, type, updated_at: this.clock() };
     this.bucket(type).set(id, record);
     return { ...record };
   }
 
   async updateElement(type: ElementType, id: string, body: Record<string, unknown>): Promise<ServerRecord> {
-    this.calls.push({ method: 'update', type, id, body: { ...body } });
+    this.throwIfAuthBlocked();
+    // Same wire-semantics rule as createElement: drop undefined before the
+    // spread-merge. Real PATCH treats a missing key as "no change"; only an
+    // explicit `null` (or a new value) overwrites the field.
+    const wireBody = stripUndefined(body);
+    this.calls.push({ method: 'update', type, id, body: { ...wireBody } });
     this.throwIfInjected('update', id);
     const m = this.bucket(type);
     const existing = m.get(id);
@@ -77,12 +96,13 @@ export class FakeOwApiClient implements OwApiClient {
     // server-side delete and routes via the same review modal as pull-time
     // detection — see pushPhase / resolveConflict.
     if (!existing) throw new Error(`API Error 404: ${id} not found in this world.`);
-    const next: ServerRecord = { ...existing, ...body, id, type, updated_at: this.clock() };
+    const next: ServerRecord = { ...existing, ...wireBody, id, type, updated_at: this.clock() };
     m.set(id, next);
     return { ...next };
   }
 
   async deleteElement(type: ElementType, id: string): Promise<void> {
+    this.throwIfAuthBlocked();
     this.calls.push({ method: 'delete', type, id });
     this.throwIfInjected('delete', id);
     // Mirror real OW (DRF default): DELETE of an unknown id returns 404.
@@ -97,11 +117,13 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   async listElements(type: ElementType): Promise<ServerRecord[]> {
+    this.throwIfAuthBlocked();
     this.calls.push({ method: 'list', type });
     return Array.from(this.bucket(type).values()).map(r => ({ ...r }));
   }
 
   async getElement(type: ElementType, id: string): Promise<ServerRecord | null> {
+    this.throwIfAuthBlocked();
     this.calls.push({ method: 'get', type, id });
     const r = this.bucket(type).get(id);
     return r ? { ...r } : null;
@@ -116,6 +138,22 @@ export class FakeOwApiClient implements OwApiClient {
   __force_paginated(type: ElementType, enabled = true): void {
     if (enabled) this.forcedPaginatedTypes.add(type);
     else this.forcedPaginatedTypes.delete(type);
+  }
+
+  /**
+   * Test seam: simulate dead credentials. When enabled, ALL CRUD ops throw
+   * 401. Toggle off to simulate "PIN was fixed in settings" (which in
+   * production triggers attachSyncEngine to spin up a fresh engine with new
+   * creds — engine error state clears on the new instance).
+   */
+  __inject_auth_failure(enabled = true): void {
+    this.authBlocked = enabled;
+  }
+
+  private throwIfAuthBlocked(): void {
+    if (this.authBlocked) {
+      throw new Error('API Error 401: Unauthorized');
+    }
   }
 
   /** Server-side mutation that doesn't show up in `calls` — for setting up
@@ -153,4 +191,24 @@ export class FakeOwApiClient implements OwApiClient {
 function cryptoRandomId(): string {
   // Mirror the engine's behavior. In tests we expect callers to provide ids.
   return crypto.randomUUID();
+}
+
+/**
+ * Strip keys with `undefined` value. Mirrors what JSON.stringify does to a
+ * request body on the way out of fetch — undefined fields don't cross the
+ * network, so the server never sees them. Real PATCH treats a missing key
+ * as "no change to this field"; an explicit `null` is "clear this field".
+ *
+ * Without this stripping, FakeOwApiClient would silently apply
+ * `{ field: undefined }` via spread-merge — masking UI bugs that pass
+ * undefined when they mean "clear" (those bugs would surface only against
+ * MSW or real OW).
+ */
+function stripUndefined(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(body)) {
+    if (v === undefined) continue;
+    out[k] = v;
+  }
+  return out;
 }

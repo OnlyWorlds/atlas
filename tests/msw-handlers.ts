@@ -35,6 +35,13 @@ export interface StatefulServerOptions {
    * Tests covering the id-swap path on CREATE should enable this.
    */
   assignsServerIds?: boolean;
+  /**
+   * Mutable holder for "credentials are dead" mode. When `.blocked` is true,
+   * every endpoint returns 401. Mirrors real OW when the api_key is revoked
+   * or the world is deleted server-side. Object indirection lets tests flip
+   * the flag mid-test without rebuilding handlers.
+   */
+  authState?: { blocked: boolean };
 }
 
 export function statefulOwHandlers(options: StatefulServerOptions = {}): {
@@ -83,6 +90,14 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
   /** Track world creations for test assertions: `[name, email, generated api_key]`. */
   const worldCreations: Array<{ name: string; email: string; api_key: string }> = [];
 
+  /** Helper: return a 401 if auth is currently blocked (dead-creds simulation). */
+  function authBlocked(): Response | null {
+    if (options.authState?.blocked) {
+      return HttpResponse.json({ detail: 'Invalid api key or pin.' }, { status: 401 });
+    }
+    return null;
+  }
+
   const handlers: HttpHandler[] = [
     // CREATE WORLD (external, no auth) — used by Make-Online Route 1.
     // POST /worldsync/create-world-external/
@@ -104,12 +119,16 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
 
     // LIST
     http.get(`${base}/:type/`, ({ params }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
       const type = String(params.type);
       const records = Array.from(bucket(type).values()).map(maybeNestRelations);
       return HttpResponse.json(records);
     }),
     // GET single
     http.get(`${base}/:type/:id/`, ({ params }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
       const type = String(params.type);
       const id = String(params.id);
       const r = bucket(type).get(id);
@@ -118,6 +137,8 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
     }),
     // CREATE
     http.post(`${base}/:type/`, async ({ params, request }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
       const type = String(params.type);
       const body = (await request.json()) as Record<string, unknown>;
       // Enforce real-OW invariant: pin requires element_type whenever element_id
@@ -139,6 +160,8 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
     }),
     // UPDATE
     http.patch(`${base}/:type/:id/`, async ({ params, request }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
       const type = String(params.type);
       const id = String(params.id);
       const existing = bucket(type).get(id);
@@ -150,6 +173,8 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
     }),
     // DELETE
     http.delete(`${base}/:type/:id/`, ({ params }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
       const type = String(params.type);
       const id = String(params.id);
       // Mirror real OW (DRF default): unknown id → 404. Engine treats this as

@@ -176,6 +176,29 @@ export class SyncEngine {
   }
 
   /**
+   * Mark the engine as auth-blocked. Called when a push or pull round bails
+   * out due to 401/403 — there's no point retrying with the same dead key,
+   * and the user needs to know via the pill.
+   *
+   * Sets `paused = true` so `requestPush()` short-circuits and the autosave
+   * debounce stops firing against a dead endpoint. Transitions state to
+   * `error` so the pill renders red with the recovery message in the tooltip.
+   *
+   * Recovery: changing PIN in settings re-attaches a fresh engine (see
+   * `sync-attach.attachSyncEngine`). The new engine starts at idle. The user
+   * can also unlink the world from settings → World tab.
+   */
+  private setAuthError(): void {
+    this.paused = true;
+    this.pauseReason = 'manual';
+    this.setState({
+      kind: 'error',
+      message: 'authentication failed — verify pin in settings, test connection, or unlink',
+      recoverable: true,
+    });
+  }
+
+  /**
    * Request a debounced push. Called by element-detail after every folder
    * write (popover save, link/delink, delete). The timer resets on each call,
    * so a burst of edits coalesces into one push N seconds after the last edit.
@@ -404,12 +427,17 @@ export class SyncEngine {
     if (this.policy === 'pause-and-review') {
       await this.persistConflicts(pushResult.conflicts);
     }
-    this.setState({ kind: 'idle', last_sync_at: nowIso() });
+    if (pushResult.auth_blocked) {
+      this.setAuthError();
+    } else {
+      this.setState({ kind: 'idle', last_sync_at: nowIso() });
+    }
     const result: SyncResult = {
       pushed: pushResult.pushed,
       pulled: zero(),
       conflicts: pushResult.conflicts,
       failures: pushResult.failures,
+      auth_blocked: pushResult.auth_blocked,
     };
     this.onSyncResult('push', result);
     return result;
@@ -418,13 +446,27 @@ export class SyncEngine {
   private async runPullOnly(): Promise<SyncResult> {
     if (this.paused) return emptyResult();
     this.setState({ kind: 'syncing', phase: 'pull' });
-    const pullResult = await this.pullPhase();
-    this.setState({ kind: 'idle', last_sync_at: nowIso() });
+    let pullResult: SyncResult;
+    try {
+      pullResult = await this.pullPhase();
+    } catch (err) {
+      // Non-auth pull failures (network, 5xx) propagate to caller for toast
+      // surfacing — but we MUST restore idle state first or the pill stays
+      // stuck at 'fetching...' forever.
+      this.setState({ kind: 'idle', last_sync_at: null });
+      throw err;
+    }
+    if (pullResult.auth_blocked) {
+      this.setAuthError();
+    } else {
+      this.setState({ kind: 'idle', last_sync_at: nowIso() });
+    }
     const result: SyncResult = {
       pushed: zero(),
       pulled: pullResult.pulled,
       conflicts: pullResult.conflicts,
       failures: pullResult.failures,
+      auth_blocked: pullResult.auth_blocked,
     };
     this.onSyncResult('pull', result);
     return result;
@@ -442,18 +484,125 @@ export class SyncEngine {
     if (this.policy === 'pause-and-review') {
       await this.persistConflicts(pushResult.conflicts);
     }
+    // If push bailed for auth, skip pulling — same dead key would 401 there
+    // too. Surface via error state + result.auth_blocked.
+    if (pushResult.auth_blocked) {
+      this.setAuthError();
+      const result: SyncResult = {
+        pushed: pushResult.pushed,
+        pulled: zero(),
+        conflicts: pushResult.conflicts,
+        failures: pushResult.failures,
+        auth_blocked: true,
+      };
+      this.onSyncResult('sync', result);
+      return result;
+    }
     this.setState({ kind: 'syncing', phase: 'pull' });
     const handledIds = new Set(pushResult.conflicts.map(c => c.element_id));
-    const pullResult = await this.pullPhase(handledIds);
+    let pullResult: SyncResult;
+    try {
+      pullResult = await this.pullPhase(handledIds);
+    } catch (err) {
+      this.setState({ kind: 'idle', last_sync_at: null });
+      throw err;
+    }
     const result: SyncResult = {
       pushed: pushResult.pushed,
       pulled: pullResult.pulled,
       conflicts: [...pushResult.conflicts, ...pullResult.conflicts],
       failures: [...pushResult.failures, ...pullResult.failures],
+      auth_blocked: pushResult.auth_blocked || pullResult.auth_blocked,
     };
-    this.setState({ kind: 'idle', last_sync_at: nowIso() });
+    if (pullResult.auth_blocked) {
+      this.setAuthError();
+    } else {
+      this.setState({ kind: 'idle', last_sync_at: nowIso() });
+    }
     this.onSyncResult('sync', result);
     return result;
+  }
+
+  /**
+   * Order CREATE candidates so each element's FK dependencies are pushed
+   * BEFORE the element itself. Without this ordering, real OW returns
+   * `400 Invalid FK: <field> — referenced X with id 'Y' does not exist` for
+   * elements pushed before their references — which then get retried on the
+   * next round after `rewriteIdReferences` propagates id-swaps. Topo-sort
+   * eliminates that ping-pong: dependencies go first, references resolve
+   * within the same round.
+   *
+   * Builds the graph by scanning every string + string-array field on each
+   * candidate; any value matching another candidate's id becomes a dep edge.
+   * Schema-agnostic — doesn't need FIELD_SCHEMA — matches the same approach
+   * `rewriteIdReferences` uses.
+   *
+   * Cycles fall back to input order (rare in OW data; the user can clean up
+   * by removing one side of the cycle). The first push round in a cycle
+   * still produces an FK error, then self-heals as before.
+   */
+  private sortCreatesByDependencies(creates: Element[]): Element[] {
+    if (creates.length < 2) return creates;
+    const SKIP = new Set(['id', 'type', 'name', 'local_updated_at', 'server_updated_at']);
+    const candidateIds = new Set(creates.map(e => e.id));
+
+    // For each element: which other candidates does it reference?
+    const dependsOn = new Map<string, Set<string>>();
+    for (const el of creates) {
+      const refs = new Set<string>();
+      for (const [key, value] of Object.entries(el)) {
+        if (SKIP.has(key)) continue;
+        if (typeof value === 'string' && candidateIds.has(value) && value !== el.id) {
+          refs.add(value);
+        } else if (Array.isArray(value)) {
+          for (const v of value) {
+            if (typeof v === 'string' && candidateIds.has(v) && v !== el.id) refs.add(v);
+          }
+        }
+      }
+      dependsOn.set(el.id, refs);
+    }
+
+    // Reverse adjacency: who depends on me?
+    const dependents = new Map<string, Set<string>>();
+    for (const el of creates) dependents.set(el.id, new Set());
+    for (const [id, refs] of dependsOn) {
+      for (const r of refs) dependents.get(r)?.add(id);
+    }
+
+    // Kahn's algorithm: start with elements that depend on nothing.
+    const inDegree = new Map<string, number>();
+    for (const [id, refs] of dependsOn) inDegree.set(id, refs.size);
+    const idToCreate = new Map<string, Element>();
+    for (const el of creates) idToCreate.set(el.id, el);
+
+    const queue: string[] = [];
+    for (const [id, deg] of inDegree) {
+      if (deg === 0) queue.push(id);
+    }
+    const sorted: Element[] = [];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      const el = idToCreate.get(id);
+      if (el) sorted.push(el);
+      for (const dep of dependents.get(id) ?? []) {
+        const next = (inDegree.get(dep) ?? 0) - 1;
+        inDegree.set(dep, next);
+        if (next === 0) queue.push(dep);
+      }
+    }
+    // Cycle in the FK graph — emit any leftovers in original order. They'll
+    // still produce a 400 on first push and self-heal via the next round.
+    if (sorted.length < creates.length) {
+      const seen = new Set(sorted.map(e => e.id));
+      for (const el of creates) {
+        if (!seen.has(el.id)) sorted.push(el);
+      }
+      console.info('[atlas:sync] FK cycle detected in CREATE batch — falling back to input order', {
+        unsortedCount: creates.length - seen.size,
+      });
+    }
+    return sorted;
   }
 
   /**
@@ -515,8 +664,17 @@ export class SyncEngine {
     // server 400s with "Invalid FK: referenced X with id ... does not exist".
     // This handles the common chain: create Location locally → set character's
     // birthplace = newLoc → push: Location lands, then Character update succeeds.
+    // Sort the CREATEs by FK dependency: if Character.birthplace references
+    // Location, push Location first. Without this, the wrong order produces
+    // a 400 "Invalid FK" from the server (the referenced element doesn't
+    // exist yet server-side). The chain self-heals via the next round's
+    // re-fetch + rewriteIdReferences, but the console noise is alarming and
+    // takes 5s+ to settle. Topo-sort eliminates the class.
+    const createsSorted = this.sortCreatesByDependencies(
+      allChanged.filter(e => !e.server_updated_at)
+    );
     const changed = [
-      ...allChanged.filter(e => !e.server_updated_at),
+      ...createsSorted,
       ...allChanged.filter(e => !!e.server_updated_at),
     ];
     const total = changed.length + tombstones.length;
@@ -536,8 +694,16 @@ export class SyncEngine {
      * as raw error toasts and getting stuck in a retry loop.
      */
     const serverDeletesDetected: import('../core/types').ServerDeleteRecord[] = [];
+    /**
+     * Set when any operation throws 401/403. After the first auth failure we
+     * bail the round — every subsequent op would fail the same way, and we
+     * want to surface the auth state once via the pill, not as a wall of
+     * per-element failure toasts. Caller transitions engine to `error` state.
+     */
+    let authBlocked = false;
 
     for (const elem of changed) {
+      if (authBlocked) break;
       const isCreate = !elem.server_updated_at;
       try {
         if (isCreate) {
@@ -669,11 +835,28 @@ export class SyncEngine {
           }
         }
       } catch (err) {
+        // Auth failure (401/403): bail the round. Every subsequent element
+        // would 401 with the same dead credentials; no point hammering the
+        // server. Record the element as failed so the user knows the round
+        // produced no progress; caller (runPushOnly/runSync) transitions
+        // engine state to `error` based on the auth_blocked flag.
+        if (isAuthError(err)) {
+          authBlocked = true;
+          failures.push({
+            element_id: elem.id,
+            type: elem.type,
+            operation: isCreate ? 'create' : 'update',
+            message: err instanceof Error ? err.message : String(err),
+          });
+          console.warn('[atlas:sync] push hit auth error — bailing round', {
+            id: elem.id, type: elem.type, message: err instanceof Error ? err.message : String(err),
+          });
+        }
         // 404 on a non-CREATE means the server lost the element between our
         // pre-GET (which succeeded) and our PATCH. Race or out-of-band delete.
         // Route to server_deletes — same UX as the inline detection above.
         // Don't add to failures (would surface as a raw error elsewhere).
-        if (!isCreate && isNotFoundError(err)) {
+        else if (!isCreate && isNotFoundError(err)) {
           serverDeletesDetected.push({
             id: elem.id,
             type: elem.type,
@@ -702,11 +885,25 @@ export class SyncEngine {
     }
 
     for (const tomb of tombstones) {
+      if (authBlocked) break;
       try {
         await this.client.deleteElement(tomb.type, tomb.id);
         await this.folder.clearTombstone(tomb.id);
         deletes++;
       } catch (err) {
+        // Auth failure here behaves identically to the elements loop: bail.
+        if (isAuthError(err)) {
+          authBlocked = true;
+          failures.push({
+            element_id: tomb.id,
+            type: tomb.type,
+            operation: 'delete',
+            message: err instanceof Error ? err.message : String(err),
+          });
+          console.warn('[atlas:sync] push (tombstone) hit auth error — bailing round', {
+            id: tomb.id, type: tomb.type,
+          });
+        }
         // 404 means "server doesn't have it" — that IS the desired post-
         // condition of a DELETE, so we treat it as success and clear the
         // tombstone. Without this, three vectors produce orphan tombstones
@@ -716,7 +913,7 @@ export class SyncEngine {
         //   3. Out-of-band server-side delete (another client / admin).
         // The fakes (FakeOwApiClient + msw-handlers) now mirror real-OW 404
         // on unknown ids, so this contract is locked in by tests.
-        if (isNotFoundError(err)) {
+        else if (isNotFoundError(err)) {
           console.info('[atlas:sync] tombstone target already gone (404) — clearing', {
             id: tomb.id, type: tomb.type,
           });
@@ -739,19 +936,31 @@ export class SyncEngine {
     // Persist server-side deletes detected during push. Append + dedup with
     // any pre-existing entries (e.g. from a prior pull) so the review modal
     // sees the union. Symmetric with pullPhase's persistence pattern.
-    if (serverDeletesDetected.length > 0) {
-      const curr = await this.folder.readSyncState();
-      const existing = curr.server_deletes ?? [];
-      const existingIds = new Set(existing.map(d => d.id));
-      const fresh = serverDeletesDetected.filter(d => !existingIds.has(d.id));
-      await this.folder.writeSyncState({
-        last_push_at: nowIso(),
-        server_deletes: [...existing, ...fresh],
-      });
-    } else {
-      await this.folder.writeSyncState({ last_push_at: nowIso() });
+    //
+    // SKIP if the round was auth-blocked — we can't trust any state derived
+    // from a half-aborted round. The fresh engine post-recovery will detect
+    // any real server-deletes via its first pull.
+    if (!authBlocked) {
+      if (serverDeletesDetected.length > 0) {
+        const curr = await this.folder.readSyncState();
+        const existing = curr.server_deletes ?? [];
+        const existingIds = new Set(existing.map(d => d.id));
+        const fresh = serverDeletesDetected.filter(d => !existingIds.has(d.id));
+        await this.folder.writeSyncState({
+          last_push_at: nowIso(),
+          server_deletes: [...existing, ...fresh],
+        });
+      } else {
+        await this.folder.writeSyncState({ last_push_at: nowIso() });
+      }
     }
-    return { pushed: { creates, updates, deletes }, pulled: zero(), conflicts, failures };
+    return {
+      pushed: { creates, updates, deletes },
+      pulled: zero(),
+      conflicts,
+      failures,
+      auth_blocked: authBlocked || undefined,
+    };
   }
 
   private async pullPhase(skipIds: Set<string> = new Set()): Promise<SyncResult> {
@@ -759,6 +968,12 @@ export class SyncEngine {
     let updates = 0;
     const conflicts: Conflict[] = [];
     const newServerDeletes: import('../core/types').ServerDeleteRecord[] = [];
+    /**
+     * Set if any listElements throws 401/403. Bail the rest of the round;
+     * a half-pulled view would let server-delete detection falsely flag
+     * the un-pulled types as "vanished from server."
+     */
+    let authBlocked = false;
 
     const tombstones = await this.folder.listTombstonesSince(null);
     const tombstoneIds = new Set(tombstones.map(t => t.id));
@@ -767,7 +982,23 @@ export class SyncEngine {
     const seenLocalIds = new Set<string>();
 
     for (const type of ALL_ELEMENT_TYPES) {
-      const serverElements = await this.client.listElements(type);
+      if (authBlocked) break;
+      let serverElements;
+      try {
+        serverElements = await this.client.listElements(type);
+      } catch (err) {
+        if (isAuthError(err)) {
+          authBlocked = true;
+          console.warn('[atlas:sync] pull hit auth error — bailing round', {
+            type, message: err instanceof Error ? err.message : String(err),
+          });
+          break;
+        }
+        // Non-auth errors propagate. Caller's runPullOnly/runSync wraps in
+        // try/catch to restore idle state so the pill doesn't stay stuck
+        // at 'fetching...'.
+        throw err;
+      }
 
       for (const remote of serverElements) {
         seenLocalIds.add(remote.id);
@@ -830,6 +1061,19 @@ export class SyncEngine {
           after: remote.updated_at,
         });
       }
+    }
+
+    // Auth-blocked: skip everything below — server-delete detection AND
+    // sync-state persistence. A partial pull would produce wrong derived
+    // state (types we didn't reach would look "vanished").
+    if (authBlocked) {
+      return {
+        pushed: zero(),
+        pulled: zero(),
+        conflicts: [],
+        failures: [],
+        auth_blocked: true,
+      };
     }
 
     // Detect server-side deletes: local elements that have server_updated_at
@@ -897,6 +1141,13 @@ function stripSyncFields(elem: Element): Record<string, unknown> {
   const { local_updated_at, server_updated_at, ...rest } = elem;
   return rest;
 }
+
+// NOTE on clearing fields: `null` is the correct sentinel for "this field has
+// been cleared." `undefined` gets silently dropped by JSON.stringify (at disk
+// AND at the wire), so the PATCH body omits the field and the server keeps
+// its old value. UI code paths that mean "clear this field" must pass null
+// (relations, numbers) or '' (text), never undefined. See
+// sync-engine.fieldClear.test.ts for the rule and DESIGN convention #21.
 
 /**
  * Strip fields that are server-managed (updated_at) before writing to folder.
@@ -976,4 +1227,27 @@ function emptyResult(): SyncResult {
 function isNotFoundError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   return /api error 404/i.test(err.message) || /\b404\b/.test(err.message) || /not found/i.test(err.message);
+}
+
+/**
+ * Detect an authentication failure (HTTP 401/403). Three vectors produce this
+ * in practice:
+ *   1. PIN changed on the server but atlas still has the old PIN in registry.
+ *   2. api_key was revoked (e.g., admin action on onlyworlds.com).
+ *   3. The world was deleted server-side — its api_key becomes a dead key,
+ *      so all CRUD ops 401. (Atlas can't distinguish "deleted" from "bad
+ *      creds" without a server-side signal — recovery path is identical.)
+ *
+ * When this fires from inside a push or pull, the engine bails the round
+ * early (no point retrying every element with the same dead key) and
+ * transitions to `error` state. See `setAuthError`.
+ */
+export function isAuthError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return /api error 401/i.test(err.message)
+    || /api error 403/i.test(err.message)
+    || /\b401\b/.test(err.message)
+    || /\b403\b/.test(err.message)
+    || /unauthor/i.test(err.message)
+    || /forbidden/i.test(err.message);
 }

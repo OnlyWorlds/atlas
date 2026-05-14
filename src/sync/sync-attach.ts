@@ -156,6 +156,17 @@ async function flushPendingOnAttach(
     }
     if (result.failures.length > 0) {
       console.warn('[atlas:sync] flush-on-attach: some writes failed', result.failures);
+      // Surface to user — silent failures here are how Captain hit the "lying
+      // pill" bug: pending writes from a prior session bounced off a dead
+      // world (deleted server-side / bad PIN), failures collected but never
+      // shown. Auth failures get their own dedicated toast via emitRoundToasts
+      // below (pill also goes red); skip the generic warning in that case.
+      if (!result.auth_blocked) {
+        const failed = result.failures.length;
+        toastManager.error(
+          `couldn't sync ${failed} pending change${failed === 1 ? '' : 's'} — check console or test connection in settings`
+        );
+      }
     }
   } catch (err) {
     console.warn('[atlas:sync] flush-on-attach failed:', err);
@@ -303,23 +314,53 @@ function publishSyncState(worldId: string, engineState: SyncEngineState): void {
 }
 
 /**
- * Emit a one-shot toast summarizing conflicts after a sync round + close the
- * loop under `local-wins` by triggering a follow-up push.
+ * Emit one-shot toasts summarizing the outcome of a sync round.
  *
- * Behavior:
- * - `pause-and-review`: stay silent. Badge + modal handle surfacing.
- * - `local-wins`, push phase: server already overwritten. Toast confirms.
- * - `local-wins`, pull phase: pull detected unpushed local divergence. Atlas
- *   doesn't wait for the 5s autosave debounce — fire `pushOnce()` immediately
- *   so local wins are propagated server-side right now. The subsequent
- *   push-phase callback emits the final toast ("saved over..."). No "next
- *   sync" hand-waving — convergence happens in one user action.
- * - `local-wins`, combined sync phase: both already happened; emit a summary.
+ * Three concerns surface here, in priority order:
+ *   1. Auth-blocked round: pill already went to red `error` (engine
+ *      transitioned via setAuthError). One sticky-ish toast points the user
+ *      at recovery. No retry-spam — engine is paused until PIN change or
+ *      detach re-attaches a fresh engine.
+ *   2. Non-auth per-element failures with NO successes: pill stays idle but
+ *      the round produced nothing. Without a toast the user thinks "synced"
+ *      because the spinner went idle. This is the "lying pill" class. Toast
+ *      that something failed and link them to settings.
+ *   3. Conflicts:
+ *      - `pause-and-review`: stay silent. Badge + modal handle it.
+ *      - `local-wins` push: server overwritten. Confirm.
+ *      - `local-wins` pull: trigger follow-up push so local converges now
+ *        (don't wait for the 5s autosave debounce).
+ *      - `local-wins` sync: emit summary.
  */
 function emitConflictToasts(
   phase: 'push' | 'pull' | 'sync',
   result: import('../core/types').SyncResult
 ): void {
+  // Auth-blocked: one clear toast. Engine state is already 'error' so the
+  // pill carries the persistent signal; this toast is the moment-it-happened
+  // notification. Skip if the round had successes (mixed-blocked is rare and
+  // the engine still went to error — keep the surfacing single).
+  if (result.auth_blocked) {
+    toastManager.error(
+      'sync paused: authentication failed. verify your pin in settings, or unlink this world if it was deleted on the server.'
+    );
+    return;
+  }
+
+  // Non-auth failures with no successes: the round produced zero progress.
+  // This is the "lying pill" guard — without a toast here, the user sees the
+  // pill go saving → idle and assumes everything synced.
+  const synced =
+    result.pushed.creates + result.pushed.updates + result.pushed.deletes +
+    result.pulled.creates + result.pulled.updates;
+  if (result.failures.length > 0 && synced === 0) {
+    const n = result.failures.length;
+    toastManager.error(
+      `couldn't sync ${n} change${n === 1 ? '' : 's'} — check console or test connection in settings`
+    );
+    // Fall through — there might be conflicts to surface too.
+  }
+
   if (result.conflicts.length === 0) return;
   const reg = getState().registry;
   const policy = reg.sync_default_policy ?? 'local-wins';

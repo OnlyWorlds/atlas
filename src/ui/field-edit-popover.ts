@@ -105,14 +105,20 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
   async function save(): Promise<void> {
     let nextValue: any = input.value;
     if (opts.widget === 'number') {
-      if (nextValue === '') nextValue = undefined;
+      // Empty number → `null` (not undefined). undefined gets dropped through
+      // JSON.stringify → server keeps the old value. null survives the wire
+      // and the server clears the field. See sync-engine.fieldClear.test.ts.
+      if (nextValue === '') nextValue = null;
       else {
         const n = Number(nextValue);
         if (Number.isNaN(n)) return;
         nextValue = n;
       }
     } else {
-      if (nextValue === '') nextValue = undefined;
+      // Empty text-short / text-long → keep as empty string. Server applies
+      // the empty string as the field's new value. (Don't convert to
+      // undefined — that would silently drop the clear via JSON.stringify.)
+      // Convention #21 in DESIGN.md.
     }
     saveBtn.textContent = 'Saving…';
     saveBtn.setAttribute('disabled', 'true');

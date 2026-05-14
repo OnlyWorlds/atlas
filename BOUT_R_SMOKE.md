@@ -3,69 +3,18 @@
 A grounded sanity check that atlas works end-to-end against real OW. ~20 min if everything's green. Not exhaustive — edge cases are covered by the 234-test vitest suite (`npm run test:run`). This smoke validates **integration in a real browser** for the core lifecycle + the recent regression-fix surface.
 
 If something here fails, fix and re-run. If something *not* listed here fails in normal use, add it to this doc.
+ 
 
----
-
-## Setup
-
-- [ ] Chromium browser (Firefox/Safari get the friendly "needs chromium" landing page — verify it still shows them that, not a broken UI)
-- [ ] DevTools open — `[atlas:sync]` and `[auto-pull]` log lines are useful evidence
-- [ ] Test world id available: `5474990854`
-- [ ] Test PIN + email on hand for create-new-api paths
-
----
-
-# Tier 1 — Must pass (core lifecycle, ~10 min)
-
-These are the load-bearing flows. If any of these break, atlas isn't shippable.
-
-## 1.1 — Bootstrap (atlas root setup)
-
-- [ ] Open atlas in a profile without prior atlas state (or after `localStorage.clear()` + IDB clear)
-- [ ] Welcome panel shows the "set up atlas folder" CTA
-- [ ] Click → pick a folder
-- [ ] **Expected**: atlas creates `atlas-worlds/` subfolder with `.atlas-root` marker. Settings → Atlas tab shows the path hint.
-- [ ] If picking a folder that already has `atlas-worlds/` with a marker → atlas reuses it (no nested wrap).
-
-## 1.2 — Local-only world lifecycle
-
-- [ ] Sidebar → `+ new local` → name `Smoke Local` → folder created under atlas root
-- [ ] Sidebar entry has folder icon
-- [ ] Sidebar → mode toggle → Elements → `+ new element` → create a Character. Edit a field via popover.
-- [ ] Create 2 more elements of different types (Location, Object).
-- [ ] Hard-reload (Ctrl+F5).
-- [ ] **Expected**: URL preserves `/w/<id>/element/<eid>` — world auto-activates, selected element loads, fields persisted.
-- [ ] **Flag if**: silent auto-activate fails AND the world card is missing from the sidebar (registry write didn't persist).
-
-## 1.3 — Link existing API world
-
-- [ ] Sidebar → `+ link api` → paste api key for `5474990854` → submit
-- [ ] Progress: `discovering character…` → `downloading N of M elements…`
-- [ ] **Expected**: toast `linked <name> — N elements downloaded`. Sync pill: `synced`. Sidebar entry has cloud icon.
-- [ ] Browse — characters, locations, maps render with field values.
-- [ ] **Flag if**: pagination warning fires in console (`pagination cap hit on TYPE`) — note for 3.6 backlog. Not a blocker.
-
-## 1.4 — Edit + autosave roundtrip
-
-- [ ] On the linked world: edit a character's description via the popover.
-- [ ] Watch the pill: `synced → saving… → synced` within 5-6 seconds.
-- [ ] Verify on onlyworlds.com web app: the edit landed server-side.
-- [ ] Hard-reload atlas. Re-open the element — edit is persisted on disk + still on server.
-
-## 1.5 — Manual pull surfaces server-side changes
-
-- [ ] On the web app, edit something in the linked world.
-- [ ] In atlas, click the sync pill.
-- [ ] **Expected**: toast `pulled 0 new + 1 updated from api`. The element refreshes on screen.
-- [ ] Click pill again immediately → toast `already up to date`.
-
+    
+ 
 ## 1.6 — Make online: Route 1 (create new api world from a local)
 
-- [ ] Sidebar → `+ new local` → `Smoke Goes Online` → add 2-3 elements.
+- [ ] Sidebar → `+ new local` → `Smoke Goes Online` → add 2-3 elements **including a Character with `birthplace` set to a Location** (this exercises Bout U topo-sort).
 - [ ] Settings (gear icon) → World tab → `make online` → defaults to `create new`.
 - [ ] Submit with display name + email + pin → progress: `creating world` → `reading new world id` → `uploading N of M elements`.
-- [ ] **Expected**: toast `<name> is online — N elements uploaded`. Sidebar entry flips folder → cloud.
-- [ ] Verify on web app: new world appears with the elements.
+- [ ] **Expected**: toast `<name> is online — N elements uploaded` (NOT "1 element failed" — that's the Bout-U regression). Sidebar entry flips folder → cloud.
+- [ ] **DevTools console (Bout U)**: NO `400 Invalid FK` warnings during the upload. Two clean `server assigned new id on create` lines per element.
+- [ ] Verify on web app: new world appears, and the Character's birthplace resolves to the Location (cross-element FK survives the id-swap).
 
 ---
 
@@ -117,6 +66,25 @@ These validate UX flows and the regression-fixes shipped this session. They're t
 - [ ] Confirm dialog mentions the pin count.
 - [ ] Verify on web app: character + its pins all gone.
 - [ ] Verify atlas: pin is no longer rendered on the map.
+
+## 2.6 — Field clear propagates to server (Bout S)
+
+- [ ] On an api-linked world, find a Character with `birthplace` set to a Location. (Set one first if needed; wait for `synced`.)
+- [ ] Click the `×` on the birthplace chip. Pill flicks `synced → saving → synced`.
+- [ ] **Verify on web app**: birthplace is now empty/null server-side.
+- [ ] Reload atlas. Birthplace stays empty locally AND on web app.
+- [ ] **Text variant**: blank a description field via popover → save (Enter). Pill flicks. Web shows empty description.
+- [ ] **DevTools Network (optional)**: the PATCH body should contain `"birthplace_id": null` (not the field missing). That's the visible proof of the fix.
+
+## 2.7 — Auth-failure surfaces correctly (Bout T)
+
+- [ ] Make a fresh local world online via Make-Online Route 1 (or pick a disposable test world).
+- [ ] On onlyworlds.com web app: **delete that world**.
+- [ ] In atlas, make a field edit on any element.
+- [ ] **Expected pill**: brief `saving` flash, then **red `error` state** (NOT `synced`). Tooltip says "authentication failed — verify pin in settings, test connection, or unlink".
+- [ ] **Expected toast**: "sync paused: authentication failed. verify your pin in settings, or unlink this world if it was deleted on the server."
+- [ ] Make a second edit. Pill stays red. **DevTools console**: NO new 401 request fires (the engine is paused; debounce no-ops).
+- [ ] Recover via Settings → World → `unlink from api`. Pill goes grey `local`. World stays editable locally.
 
 ---
 
@@ -196,4 +164,4 @@ Deferred from 3.5 — surface as polish bouts when Captain has time. None are bl
 
 ---
 
-*Rewritten 2026-05-14, session 204 close. Tiered structure: T1 core lifecycle • T2 UI + recent fixes • T3 spot-check what tests already cover • T4 optional deeper. 234 vitest tests stand behind T2/T3 — this smoke is the real-browser integration check.*
+*Rewritten 2026-05-14, session 204 close; Bout S/T/U checks folded in session 205 close. Tiered structure: T1 core lifecycle • T2 UI + recent fixes • T3 spot-check what tests already cover • T4 optional deeper. 258 vitest tests stand behind T2/T3 — this smoke is the real-browser integration check.*

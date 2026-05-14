@@ -160,6 +160,15 @@ export interface SyncResult {
   conflicts: Conflict[];
   /** Per-element failures during push (4xx, validation, etc.) — non-fatal. */
   failures: PerElementFailure[];
+  /**
+   * Set when the round was aborted by an authentication failure (HTTP 401/403).
+   * Distinct from per-element `failures` because auth-failed pushes/pulls bail
+   * early — every subsequent op would fail the same way, so the engine stops
+   * the round and transitions to `error` state. UI surfaces "auth failed —
+   * verify pin or unlink" in the sync pill; pending writes stay on disk until
+   * recovery (PIN change in settings → engine re-attach with fresh creds).
+   */
+  auth_blocked?: boolean;
 }
 
 export interface PerElementFailure {

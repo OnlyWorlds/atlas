@@ -286,7 +286,14 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const raw = (el as any)[meta.name];
     if (raw) {
       row.appendChild(buildLinkChip(String(raw), meta, async () => {
-        await persistFieldPatch(el, meta.name, undefined);
+        // Use `null`, not `undefined`. undefined gets dropped by JSON.stringify
+        // at disk-write AND by the adapter's wire serializer, so the PATCH
+        // body omits the field entirely and the server keeps its old value
+        // (real PATCH treats missing keys as "no change"). `null` survives
+        // both layers; the SDK's prepareRelations maps it to `<field>_id: null`
+        // and the server clears the relation. See sync-engine.fieldClear.test.ts
+        // for the rule. Convention #21 in DESIGN.md.
+        await persistFieldPatch(el, meta.name, null);
       }));
     } else {
       const empty = document.createElement('div');

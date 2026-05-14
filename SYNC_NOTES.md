@@ -187,6 +187,123 @@ If you see a 422, check the wire body (now logged via `logWireError` on failure)
 
 ---
 
+## CREATE order: topo-sort by FK dependency (Bout U)
+
+(Added Bout U, smoke-driven post-Bout-T. Captain hit it during a fresh
+Make-Online: local Character with `birthplace` pointing at a local Location.
+Character pushed first → real OW returned `400 Invalid FK: birthplace_id —
+referenced Location with id '...' does not exist`. The chain self-healed
+on the next round, but the console noise was alarming.)
+
+### The contract
+
+`pushPhase` runs Kahn's algorithm over the CREATE batch before iterating:
+
+1. Scan every string + string-array field on each candidate (skip the meta
+   fields: `id, type, name, local_updated_at, server_updated_at`).
+2. Any value matching another candidate's id is a dep edge.
+3. Topologically sort: dependency-free elements emit first; processing each
+   element decrements its dependents' in-degrees.
+4. Cycle fallback: anything not emitted by the sort is appended in original
+   order. Logged via `console.info` so it's visible-but-not-alarming.
+
+### Why scanning, not FIELD_SCHEMA
+
+`FIELD_SCHEMA` from `@onlyworlds/sdk` gives strict knowledge of which fields
+are relations. We don't use it — the scan-all-strings approach mirrors what
+`rewriteIdReferences` does, which has worked across schema evolutions. If a
+field's value happens to match another element's id, it's treated as a dep.
+UUIDs are 36 chars; accidental collisions with descriptive strings are
+astronomically unlikely.
+
+### Doesn't fix the cycle case
+
+If A references B and B references A (genuine FK cycle), neither can go
+fully first. Atlas falls back to input order; ONE side still 400s on first
+push, then `rewriteIdReferences` propagates the post-id-swap state, next
+round retries. Same as pre-Bout-U behavior, scoped to the rare case.
+
+### Combined with id-swap
+
+The id-swap path (server enforces UUID v7, overrides client's v4) still
+fires. After Location's CREATE produces a server-assigned id,
+`rewriteIdReferences` updates Character's local file before Character's
+push happens in the same round. Character's body carries the swapped id;
+no FK error. Verified by the `assignServerIds` test case.
+
+---
+
+## Auth-failed rounds bail + surface (Bout T)
+
+(Added Bout T, session 205. Smoke surfaced the "lying pill" case: Captain made a world online via Make-Online, then deleted it on onlyworlds.com web. Atlas's api_key became a dead reference. Subsequent edits hit 401, pill went `saving → synced`, user thought work was saved — wasn't.)
+
+### The trap
+
+The previous design had push collect per-element failures into `result.failures` without distinction. After the loop:
+- Engine state → `idle` (regardless of failures).
+- `onSyncResult` fired only for conflicts.
+- Per-element failures got `console.warn`'d but never surfaced.
+
+For mixed failures (one bad pin in a batch, otherwise healthy world) that's fine — the user fixes the bad data and moves on. For **systemic** failures like auth-down, every element fails the same way, the round produces zero successes, but the engine still showed "synced." That's the lying-pill class — silent in production, eventually surfaces as "wait, none of my edits are on the server."
+
+### The contract
+
+When `pushPhase` or `pullPhase` sees a 401/403:
+
+1. **Bail the round.** Set `authBlocked = true` and `break` out of the loop. The next iteration's `if (authBlocked) break` short-circuits. The fakes throw on every CRUD op when `__inject_auth_failure(true)` is set, so the bail-after-first behavior is testable.
+2. **Don't persist sync-state.** A partial round produces wrong derived state (server-delete detection would falsely flag types we didn't reach). Skip the `writeSyncState` call when auth-blocked.
+3. **Surface via state.** Caller (runPushOnly / runPullOnly / runSync) checks `result.auth_blocked` and calls `setAuthError()` instead of transitioning to idle. `setAuthError` sets `paused=true` AND state to `{kind: 'error', message: 'authentication failed...', recoverable: true}`. The pill maps `error` to red display.
+4. **Bail pull when push auth-blocks.** `runSync` skips the pull phase if push hit auth — same dead key would 401 there too.
+5. **Surface via toast.** `sync-attach.emitConflictToasts` (despite the name) now checks `result.auth_blocked` first and fires the dedicated "sync paused: authentication failed..." error toast pointing to settings. The conflict-handling code stays below.
+6. **Surface flush-on-attach failures.** Previously logged to console only. Now toasts "couldn't sync N pending change(s)" when post-attach push has failures with no successes. Auth case gets the dedicated toast; generic failures get the generic message.
+
+### Detection
+
+`isAuthError(err)` matches the SDK's `API Error 401:` / `API Error 403:` prefixes plus generic 401/403/Unauthorized/Forbidden substrings, mirroring `isNotFoundError`. Exported so tests can assert.
+
+### Recovery
+
+Two paths:
+- **PIN change in settings**: `wireIdentityTab` already calls `attachSyncEngine` on PIN change, which spins up a fresh `SyncEngine` instance. The new instance starts in idle. The old engine's error state doesn't bleed across.
+- **Unlink from API**: settings → World tab → "unlink from api" calls `detachSyncEngine`. World becomes local-only. No more sync attempts.
+- **Test connection** (existing): explicit `client.worlds.get()` call. Doesn't auto-recover — informs the user. If it succeeds, the original auth-error was likely transient; manual refresh from API would re-engage.
+
+### What atlas CAN'T detect (server-side limitation)
+
+When the OW server deletes a world, the api_key for it becomes invalid. Every subsequent call returns 401 — same response as wrong PIN or revoked key. Atlas can't distinguish "deleted" from "bad creds" without a server-side signal (e.g., a 410 Gone with `{"error": "world_deleted"}`). Worth asking Skeld for; for now we treat all three the same, because the recovery path is the same.
+
+### Bail-the-round is not bail-the-engine
+
+After auth failure, the engine is paused but the SyncEngine instance is alive. Test introspection methods (`listConflicts`, `listServerDeletes`, `getState`) still work — they just read disk. This matters for the conflict-review modal staying functional even when the world is auth-blocked (user might want to inspect what conflicts were pending before they unlink).
+
+---
+
+## Clearing a field — `null` or `''`, never `undefined`
+
+(Added Bout S, post-pressure-test session 205. Closed both H1 and H2 from the audit.)
+
+The natural way to say "this field has been cleared" in JS is `undefined`. **Don't.** `JSON.stringify` drops `undefined` keys silently at every layer atlas writes:
+
+1. `FolderStore.updateElement` spreads `{...existing, ...patch}`, but `writeJsonAtomic` then runs `JSON.stringify` to disk — the field vanishes from the file.
+2. Engine push re-reads the file (no field) and builds the PATCH body via `stripSyncFields` — body has no field either.
+3. The adapter's `toWireShape` also explicitly drops undefined (`if (v === undefined) continue`).
+4. Real PATCH semantics: a missing key means "no change to this field." Server keeps the old value.
+
+Result: the UI shows the field cleared locally, the server keeps the relation/text/number, and the next time someone opens that world on a different device (or via the web app), the "removed" link is still there.
+
+**The contract**:
+
+- Single-link relations cleared via the `×` button → `null`. Adapter's `prepareRelations` maps it to `<field>_id: null`; the server clears.
+- Multi-link relations cleared → `[]` (empty array). Already worked before this bout because JSON preserves arrays.
+- Number fields blanked in the popover → `null`.
+- Text-short / text-long fields blanked → `''` (empty string). The server applies the empty string as the new value.
+
+**The fakes mirror this**: `FakeOwApiClient.createElement` and `updateElement` strip undefined from the body before the spread-merge, so unit tests match what real OW does over the JSON wire. Without this, the buggy UI path passed unit tests but failed against MSW + real OW.
+
+**Verified by**: `tests/integration/sync-engine.fieldClear.test.ts`. The "trap" tests assert undefined doesn't propagate (documents the rule); the "contract" tests assert null/'' do. If anyone re-introduces undefined-as-clear in element-detail or field-edit-popover, the user-visible bug returns but unit tests stay green — so audit the UI write sites when working in this area. (A future Playwright spec asserting "click × on chip → field also cleared on server" would close the regression loop at the UI layer.)
+
+---
+
 ## Pull-time conflict semantics
 
 Pull detects a per-element conflict when:
