@@ -18,7 +18,7 @@
 import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { OwClientAdapter } from './ow-client-adapter';
 import { SyncEngine } from './sync-engine';
-import { patchSlice, getState } from '../core/state';
+import { patchSlice, getState, setState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
 import { navigate, elementHash, parseHash } from '../core/router';
 import type { FolderStore } from '../store/folder-store';
@@ -382,14 +382,47 @@ function emitConflictToasts(
  *   - URL hash `/map/<mid>/element/<old-id>` → same with new_id
  */
 function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType }): void {
-  const ui = getState().ui;
-  if (ui.selectedElementId === swap.old_id) {
-    patchSlice('ui', { ...ui, selectedElementId: swap.new_id });
+  // ATOMIC migration: substitute the element's id in the cached elements list
+  // AND migrate selectedElementId in a single setState call. Without this, two
+  // separate patchSlice writes produce two renders — the in-between one has
+  // ui.selectedElementId = new_id but data.elements still has old_id, so the
+  // middle pane flashes "element <new_id> not found in this world" before the
+  // engine's subsequent refreshElementsCache catches up at idle.
+  //
+  // The substitution carries the OLD entry's content with the NEW id grafted.
+  // This is fine: the content sent on CREATE is what local just had; the
+  // server's response (now under new_id on disk via applyServerRecord) is the
+  // same content + a stamped server_updated_at. refreshElementsCache at engine
+  // idle reconciles to the on-disk version shortly after.
+  const current = getState();
+
+  const oldIndex = current.data.elements.findIndex((e) => e.id === swap.old_id);
+  const nextElements =
+    oldIndex >= 0
+      ? current.data.elements.map((e, i) =>
+          i === oldIndex ? { ...e, id: swap.new_id } : e
+        )
+      : current.data.elements;
+
+  const nextUi =
+    current.ui.selectedElementId === swap.old_id
+      ? { ...current.ui, selectedElementId: swap.new_id }
+      : current.ui;
+
+  // Only setState if at least one slice actually changed — avoids a spurious
+  // render when the swap doesn't intersect anything the UI is showing.
+  if (nextElements !== current.data.elements || nextUi !== current.ui) {
+    setState({
+      ...current,
+      data: { ...current.data, elements: nextElements },
+      ui: nextUi,
+    });
   }
+
   // Update URL if it currently names the old id. Use replace-style navigate
   // by leaving history untouched — back-button shouldn't take the user to a
   // 404'd /element/<old-id>.
-  const worldId = getState().active?.worldId;
+  const worldId = current.active?.worldId;
   if (!worldId) return;
   const route = parseHash(window.location.hash);
   if (route.elementId === swap.old_id && route.worldId === worldId) {

@@ -18,7 +18,7 @@ import {
   detachSyncEngine,
   __test_handleIdSwap,
 } from '../../src/sync/sync-attach';
-import { patchSlice, getState } from '../../src/core/state';
+import { patchSlice, getState, subscribe } from '../../src/core/state';
 import { defaultRegistry } from '../../src/core/types';
 
 beforeEach(() => {
@@ -108,5 +108,69 @@ describe('sync-attach: id-swap migrates UI state', () => {
     __test_handleIdSwap({ old_id: 'old-id', new_id: 'new-id', type: 'character' });
 
     expect(window.location.hash).toBe('#/w/w1/element/old-id');
+  });
+
+  it('substitutes the cached element entry so the new id resolves immediately', () => {
+    // Seed data.elements with an entry at old-id — simulates the cache state
+    // right before the engine fires onIdSwap (file has been moved on disk but
+    // refreshElementsCache hasn't run yet).
+    patchSlice('data', {
+      elements: [
+        { id: 'old-id', type: 'character', name: 'WillSwap', local_updated_at: 't', server_updated_at: 't' } as any,
+        { id: 'other', type: 'location', name: 'Untouched', local_updated_at: 't' } as any,
+      ],
+    });
+    patchSlice('ui', { ...getState().ui, selectedElementId: 'old-id' });
+
+    __test_handleIdSwap({ old_id: 'old-id', new_id: 'new-id', type: 'character' });
+
+    const els = getState().data.elements;
+    // The previously-old entry now resolves under new-id with content intact.
+    expect(els.find((e) => e.id === 'new-id')).toMatchObject({ name: 'WillSwap' });
+    expect(els.find((e) => e.id === 'old-id')).toBeUndefined();
+    // Untouched entries stay.
+    expect(els.find((e) => e.id === 'other')?.name).toBe('Untouched');
+    // selectedElementId migrated in the same transition.
+    expect(getState().ui.selectedElementId).toBe('new-id');
+  });
+
+  it('leaves data.elements alone when the swap does not match a cached entry', () => {
+    patchSlice('data', {
+      elements: [{ id: 'other', type: 'location', name: 'X', local_updated_at: 't' } as any],
+    });
+    const before = getState().data.elements;
+
+    __test_handleIdSwap({ old_id: 'old-id', new_id: 'new-id', type: 'character' });
+
+    // Identity preserved — no spurious patch.
+    expect(getState().data.elements).toBe(before);
+  });
+
+  it('atomically migrates data + ui in a single state transition', () => {
+    // If the handler did two separate patchSlice calls, subscribers would
+    // observe an intermediate state where ui.selectedElementId = new-id but
+    // data.elements still had old-id (causing the empty-state flash). Verify
+    // subscribers see ONE update, with both slices consistent.
+    patchSlice('data', {
+      elements: [{ id: 'old-id', type: 'character', name: 'Flashy', local_updated_at: 't' } as any],
+    });
+    patchSlice('ui', { ...getState().ui, selectedElementId: 'old-id' });
+
+    const observed: Array<{ uiSel: string | null; hasOld: boolean; hasNew: boolean }> = [];
+    const unsub = subscribe(() => {
+      const s = getState();
+      observed.push({
+        uiSel: s.ui.selectedElementId,
+        hasOld: !!s.data.elements.find((e: any) => e.id === 'old-id'),
+        hasNew: !!s.data.elements.find((e: any) => e.id === 'new-id'),
+      });
+    });
+
+    __test_handleIdSwap({ old_id: 'old-id', new_id: 'new-id', type: 'character' });
+    unsub();
+
+    // Exactly one notification fired, and at that snapshot ui+data agree on new-id.
+    expect(observed).toHaveLength(1);
+    expect(observed[0]).toEqual({ uiSel: 'new-id', hasOld: false, hasNew: true });
   });
 });
