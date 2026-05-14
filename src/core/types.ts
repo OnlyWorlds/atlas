@@ -95,6 +95,15 @@ export interface WorldMeta {
   api?: {
     world_id: string;
     api_key: string;
+    /**
+     * Name of the world on the OW server, as returned by `client.worlds.get()`.
+     * Populated at link time AND refreshed on every Test Connection. May
+     * differ from the LOCAL world name (`WorldMeta.name`) when the user
+     * picked a different display name during Make-Online, or when the user
+     * renamed locally vs server-side. Display-only — atlas never renames
+     * the server world to match local.
+     */
+    world_name?: string;
   };
   /** Time format config — passes through to OW schema. */
   time_format_names?: string[];
@@ -190,6 +199,8 @@ export interface WorldRegistryEntry {
   api?: {
     world_id: string;
     api_key: string;
+    /** See `WorldMeta.api.world_name` — display-only mirror of server-side name. */
+    world_name?: string;
   };
   /** Present for every world — Atlas always has a folder. */
   folder: {

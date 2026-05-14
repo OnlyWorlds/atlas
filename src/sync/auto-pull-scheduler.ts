@@ -182,12 +182,12 @@ export function initAutoPullScheduler(): void {
       const engine = getCurrentSyncEngine();
       if (engine && getState().sync.activeSync?.kind === 'paused' &&
           (getState().sync.activeSync as { reason?: string }).reason === 'network') {
-        // Came back online — resume engine. NOTE: SyncEngine.resume() only
-        // clears the paused flag; it does NOT trigger a sync round. Pending
-        // local writes wait for the next debounced push (re-armed on the next
-        // user edit) and pulls wait for the next cadence tick or manual click.
-        // If you need "immediately catch up on resume," call engine.syncNow()
-        // explicitly here.
+        // Came back online — resume engine. `resume()` now also fires
+        // pushOnce internally so pending writes from the offline window
+        // flush immediately (previously they sat on disk until the next
+        // user edit re-armed autosave). Pulls still wait for the next
+        // cadence tick or manual click — the cadence scheduler also
+        // reconciles on this state change.
         engine.resume();
       }
       reconcileScheduler();

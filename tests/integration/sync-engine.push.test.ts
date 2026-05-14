@@ -131,7 +131,13 @@ describe('SyncEngine push phase', () => {
     expect(engine.getState().kind).toBe('paused');
 
     engine.resume();
-    expect(engine.getState().kind).toBe('idle');
+    // resume() now also fires pushOnce internally (Bout AA fix for the
+    // pause+edit+resume gap), so the engine may transition through
+    // `syncing` before settling at `idle`. Either state immediately after
+    // resume() proves "no longer paused" — the load-bearing assertion is
+    // that the subsequent syncNow proceeds.
+    const afterResume = engine.getState().kind;
+    expect(afterResume === 'idle' || afterResume === 'syncing').toBe(true);
 
     const result = await engine.syncNow();
     expect(result.pushed.creates).toBe(1);

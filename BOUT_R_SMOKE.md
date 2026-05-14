@@ -1,33 +1,10 @@
-# Atlas — Core Smoke Test
-
-A grounded sanity check that atlas works end-to-end against real OW. ~20 min if everything's green. Not exhaustive — edge cases are covered by the 234-test vitest suite (`npm run test:run`). This smoke validates **integration in a real browser** for the core lifecycle + the recent regression-fix surface.
-
-If something here fails, fix and re-run. If something *not* listed here fails in normal use, add it to this doc.
  
 
     
- 
-## 1.6 — Make online: Route 1 (create new api world from a local)
-
-- [ ] Sidebar → `+ new local` → `Smoke Goes Online` → add 2-3 elements **including a Character with `birthplace` set to a Location** (this exercises Bout U topo-sort).
-- [ ] **Select the Character** before opening the modal (this exercises Bout X id-swap UI propagation through the transient engine).
-- [ ] Settings (gear icon) → World tab → `make online` → defaults to `create new`.
-- [ ] Submit with display name + email + pin → progress: `creating world` → `reading new world id` → `uploading N of M elements`.
-- [ ] **Expected**: toast `<name> is online — N elements uploaded` (NOT "1 element failed" — that's the Bout-U regression). Sidebar entry flips folder → cloud.
-- [ ] **DevTools console (Bout U)**: NO `400 Invalid FK` warnings during the upload. Two clean `server assigned new id on create` lines per element.
-- [ ] **Bout X check**: after the modal closes, the middle pane STILL shows the Character (NOT `element <id> not found in this world`). The URL has silently advanced from `/element/<v4-id>` to `/element/<v7-id>`.
-- [ ] Verify on web app: new world appears, and the Character's birthplace resolves to the Location (cross-element FK survives the id-swap).
-
----
-
-# Tier 2 — Should pass (UI + recent-fix surface, ~5 min)
-
-These validate UX flows and the regression-fixes shipped this session. They're tested via vitest but real-browser behavior is the integration check.
 
 ## 2.1 — Paused world visual indicator (session 204)
 
-- [ ] Settings → World tab on an api-linked world → check `stay offline`
-- [ ] **Expected**: pill says `paused`. Sidebar row's cloud icon swaps to **`cloud_off` (strikethrough cloud)**. Pause button in inline-actions turns warm-orange and stays visible without hover.
+ 
 - [ ] Edit a field — saves locally, no network requests (verify in DevTools Network).
 - [ ] Uncheck → pill `saving → synced`, queued edit pushes. Cloud icon returns to plain `cloud`.
 
@@ -77,6 +54,22 @@ These validate UX flows and the regression-fixes shipped this session. They're t
 - [ ] Reload atlas. Birthplace stays empty locally AND on web app.
 - [ ] **Text variant**: blank a description field via popover → save (Enter). Pill flicks. Web shows empty description.
 - [ ] **DevTools Network (optional)**: the PATCH body should contain `"birthplace_id": null` (not the field missing). That's the visible proof of the fix.
+
+## 2.9 — API name shows in Settings + flags divergence (Bout Z)
+
+Make-Online with a display name different from the local name should cache the server-side name and surface the mismatch in settings.
+
+- [ ] On a local world (e.g. local name "MyLocal"), Settings → World → `make online` → set the display name to something different (e.g. "MyOnlinePublicName") + submit.
+- [ ] After the modal closes, open Settings → World tab.
+- [ ] **Expected**: meta list shows a `name on api` row with the value `MyOnlinePublicName` followed by a small `(differs from local)` hint. The `name` input still says `MyLocal`.
+- [ ] Click `test connection`.
+- [ ] **Expected toast**: `connected — name on api is "MyOnlinePublicName"` (no "(was ...)" suffix on this run because cache already matched).
+- [ ] On onlyworlds.com web app: rename the world to `MyOnlineRenamedOnServer`.
+- [ ] In atlas: click `test connection` again.
+- [ ] **Expected toast**: `connected — name on api is "MyOnlineRenamedOnServer" (was "MyOnlinePublicName")`. Settings re-renders with the new value.
+- [ ] **Reload atlas tab**: the `name on api` row still says `MyOnlineRenamedOnServer` (persisted in registry AND world.json).
+
+---
 
 ## 2.8 — Unlink + re-link Route 1 produces a fully-populated new world (Bout Y)
 

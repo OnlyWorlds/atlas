@@ -21,6 +21,7 @@ import {
   renameWorld,
   saveRegistry,
   setActiveWorld,
+  setApiWorldName,
   setEmail,
   setFavorite,
   setParent,
@@ -150,6 +151,61 @@ describe('registry — attachApi / detachApi (Make-Online transitions)', () => {
     expect(r4.worlds[0].state).toBe('api-linked');
     expect(r4.worlds[0].api?.world_id).toBe('b');
     expect(r4.worlds[0].folder.folder_name).toBe('c');
+  });
+
+  // Bout Z — cache the server-side world name so settings can flag when local
+  // and api names diverge (e.g., user picked a different display name during
+  // Make-Online). attachApi accepts an optional worldName; setApiWorldName
+  // refreshes it when Test Connection fetches a different name later.
+  it('attachApi persists worldName when supplied', () => {
+    const { next: r1, entry } = createLocalWorld(defaultRegistry(), {
+      name: 'My Working Name', folderName: 'work', handleKey: 'h',
+    });
+    const r2 = attachApi(r1, entry.id, { worldId: 'srv-1', apiKey: 'k', worldName: 'Cool World v1' });
+    expect(r2.worlds[0].api?.world_name).toBe('Cool World v1');
+    // Local name untouched — different identities by design.
+    expect(r2.worlds[0].name).toBe('My Working Name');
+  });
+
+  it('attachApi omits worldName when not supplied (no spurious key)', () => {
+    const { next: r1, entry } = createLocalWorld(defaultRegistry(), {
+      name: 'Plain', folderName: 'p', handleKey: 'h',
+    });
+    const r2 = attachApi(r1, entry.id, { worldId: 'srv-2', apiKey: 'k' });
+    expect(r2.worlds[0].api).toEqual({ world_id: 'srv-2', api_key: 'k' });
+    expect(r2.worlds[0].api?.world_name).toBeUndefined();
+  });
+
+  it('setApiWorldName refreshes the cached name on an already-linked world', () => {
+    const { next: r1, entry } = createLocalWorld(defaultRegistry(), {
+      name: 'Local', folderName: 'l', handleKey: 'h',
+    });
+    const r2 = attachApi(r1, entry.id, { worldId: 'srv', apiKey: 'k', worldName: 'Old Name' });
+    expect(r2.worlds[0].api?.world_name).toBe('Old Name');
+    const r3 = setApiWorldName(r2, entry.id, 'New Name');
+    expect(r3.worlds[0].api?.world_name).toBe('New Name');
+    // Other api fields untouched.
+    expect(r3.worlds[0].api?.world_id).toBe('srv');
+    expect(r3.worlds[0].api?.api_key).toBe('k');
+  });
+
+  it('setApiWorldName is a no-op on a local-only world', () => {
+    const { next: r1, entry } = createLocalWorld(defaultRegistry(), {
+      name: 'Local', folderName: 'l', handleKey: 'h',
+    });
+    const r2 = setApiWorldName(r1, entry.id, 'Should Not Appear');
+    expect(r2.worlds[0].api).toBeUndefined();
+    expect(r2.worlds[0].state).toBe('local-only');
+  });
+
+  it('detachApi drops the cached worldName along with everything else in api', () => {
+    const { next: r1, entry } = createApiLinkedWorld(defaultRegistry(), {
+      name: 'W', apiWorldId: 's', apiKey: 'k', folderName: 'w', handleKey: 'h',
+      apiWorldName: 'Server Side Name',
+    });
+    expect(r1.worlds[0].api?.world_name).toBe('Server Side Name');
+    const r2 = detachApi(r1, entry.id);
+    expect(r2.worlds[0].api).toBeUndefined();
   });
 });
 

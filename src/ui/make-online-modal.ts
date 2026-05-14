@@ -271,12 +271,17 @@ export class MakeOnlineModal extends BaseModal {
       let reg = getState().registry;
       if (!reg.pin) reg = setPin(reg, pin);
       if (!reg.email) reg = setEmail(reg, email);
-      reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey });
+      reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey, worldName: world.name });
       saveRegistry(reg);
       patchSlice('registry', reg);
 
-      // 6. Persist api credentials to disk (so reload-after-restart re-attaches engine).
-      await folder.writeWorldMeta({ api: { world_id: world.id, api_key: apiKey } });
+      // 6. Persist api credentials + cached server-side name to disk. Storing
+      //    world_name in world.json means a reload-after-restart picks up the
+      //    divergence display without a network fetch — atlas-root-flow's
+      //    world rescan already reads world.json on import.
+      await folder.writeWorldMeta({
+        api: { world_id: world.id, api_key: apiKey, ...(world.name ? { world_name: world.name } : {}) },
+      });
 
       // 7. Attach the long-running SyncEngine for this world.
       const updatedEntry = reg.worlds.find((w) => w.id === active.worldId)!;
@@ -384,12 +389,14 @@ export class MakeOnlineModal extends BaseModal {
       const active = getState().active!;
       let reg = getState().registry;
       if (!reg.pin) reg = setPin(reg, pin);
-      reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey });
+      reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey, worldName: world.name });
       saveRegistry(reg);
       patchSlice('registry', reg);
 
-      // 4. Persist api credentials to disk.
-      await folder.writeWorldMeta({ api: { world_id: world.id, api_key: apiKey } });
+      // 4. Persist api credentials + cached server-side name to disk.
+      await folder.writeWorldMeta({
+        api: { world_id: world.id, api_key: apiKey, ...(world.name ? { world_name: world.name } : {}) },
+      });
 
       // 5. Attach SyncEngine for ongoing sync.
       const updatedEntry = reg.worlds.find((w) => w.id === active.worldId)!;

@@ -22,6 +22,7 @@ import {
   deleteWorldEntry,
   detachApi,
   renameWorld,
+  setApiWorldName,
   setSyncPullOnActivate,
   setSyncCadenceMs,
   setSyncDefaultPolicy,
@@ -287,6 +288,16 @@ function renderWorldTab(world: WorldRegistryEntry): string {
         ${world.state === 'api-linked' && world.api
           ? `<dt>api world id</dt><dd><code>${escapeText(world.api.world_id)}</code></dd>`
           : ''}
+        ${world.state === 'api-linked' && world.api?.world_name
+          ? (() => {
+              const apiName = world.api.world_name!;
+              const differs = apiName !== world.name;
+              const hint = differs
+                ? ' <span class="atlas-settings-hint-inline" title="local name and server-side name diverged. atlas never renames the server world automatically.">(differs from local)</span>'
+                : '';
+              return `<dt>name on api</dt><dd>${escapeText(apiName)}${hint}</dd>`;
+            })()
+          : ''}
       </dl>
       ${apiActions}
       <div class="atlas-settings-actions atlas-settings-actions-danger">
@@ -490,7 +501,30 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
     try {
       const client = new OnlyWorldsClient({ apiKey: world.api.api_key, apiPin: pin });
       const fetched = await client.worlds.get();
-      toasts.success(`connected — ${fetched?.name ?? 'world'}`);
+      const liveName: string | undefined = fetched?.name;
+      // If the server name differs from what we cached at link time, refresh
+      // both the registry's api.world_name AND world.json so the Settings →
+      // World tab reflects the live state immediately. The local entry name
+      // is NOT touched — those are intentionally separate identities.
+      const cachedName = world.api.world_name;
+      if (liveName && liveName !== cachedName) {
+        const next = setApiWorldName(getState().registry, world.id, liveName);
+        saveRegistry(next);
+        patchSlice('registry', next);
+        const folder = getActiveStore();
+        if (folder) {
+          try {
+            await folder.writeWorldMeta({
+              api: { world_id: world.api.world_id, api_key: world.api.api_key, world_name: liveName },
+            });
+          } catch (err) {
+            console.warn('[settings] persist api.world_name to world.json failed:', err);
+          }
+        }
+        toasts.success(`connected — name on api is "${liveName}"${cachedName ? ` (was "${cachedName}")` : ''}`);
+      } else {
+        toasts.success(`connected — ${liveName ?? 'world'}`);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (/401|403/.test(msg)) toasts.error('api key or pin invalid');

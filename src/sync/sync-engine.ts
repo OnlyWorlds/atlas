@@ -173,6 +173,25 @@ export class SyncEngine {
     this.paused = false;
     this.pauseReason = null;
     this.setState({ kind: 'idle', last_sync_at: null });
+    // Flush pending writes immediately. Without this, edits the user made
+    // during the pause window sit on disk indefinitely: `requestPush()`
+    // early-returned while paused (no debounce timer was scheduled), so
+    // `resume()` clearing the flag alone doesn't have a queued push to fire.
+    // The next user edit would re-arm autosave and eventually carry them up,
+    // but the smoke-observable behavior is "edit, pause, unpause → no push" —
+    // confusing and silently broken.
+    //
+    // pushOnce is async + idempotent: shares the inFlight lock so concurrent
+    // callers don't race, and emits the normal SyncResult through
+    // onSyncResult so toasts + auth handling + conflict surfacing all fire
+    // through the existing pipeline. Failures (network, auth) transition the
+    // engine the same way an autosave failure would.
+    //
+    // Three callers benefit: per-world "stay offline" uncheck, global
+    // pause-all uncheck, and the `online` event listener (network return).
+    void this.pushOnce().catch(err => {
+      console.warn('[atlas:sync] resume-flush push failed:', err);
+    });
   }
 
   /**

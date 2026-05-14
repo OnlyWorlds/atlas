@@ -88,6 +88,8 @@ export interface CreateApiLinkedWorldOpts {
   handleKey: string;
   pathHint?: string;
   parentId?: string;
+  /** Server-side world name from `client.worlds.get()`. Display-only. */
+  apiWorldName?: string;
 }
 
 /**
@@ -99,11 +101,16 @@ export function createApiLinkedWorld(
   opts: CreateApiLinkedWorldOpts
 ): { next: WorldsRegistry; entry: WorldRegistryEntry } {
   const now = new Date().toISOString();
+  const apiBlock: WorldRegistryEntry['api'] = {
+    world_id: opts.apiWorldId,
+    api_key: opts.apiKey,
+  };
+  if (opts.apiWorldName) apiBlock.world_name = opts.apiWorldName;
   const entry: WorldRegistryEntry = {
     id: crypto.randomUUID(),
     name: opts.name.trim() || 'untitled world',
     state: 'api-linked',
-    api: { world_id: opts.apiWorldId, api_key: opts.apiKey },
+    api: apiBlock,
     folder: {
       handle_key: opts.handleKey,
       folder_name: opts.folderName,
@@ -125,15 +132,40 @@ export function createApiLinkedWorld(
 export function attachApi(
   reg: WorldsRegistry,
   worldId: string,
-  api: { worldId: string; apiKey: string }
+  api: { worldId: string; apiKey: string; worldName?: string }
 ): WorldsRegistry {
   return {
     ...reg,
-    worlds: reg.worlds.map(w =>
-      w.id === worldId
-        ? { ...w, state: 'api-linked', api: { world_id: api.worldId, api_key: api.apiKey } }
-        : w
-    ),
+    worlds: reg.worlds.map(w => {
+      if (w.id !== worldId) return w;
+      const apiBlock: WorldRegistryEntry['api'] = {
+        world_id: api.worldId,
+        api_key: api.apiKey,
+      };
+      if (api.worldName) apiBlock.world_name = api.worldName;
+      return { ...w, state: 'api-linked', api: apiBlock };
+    }),
+  };
+}
+
+/**
+ * Update only the cached `world_name` on an already-api-linked world's api
+ * block. Used by Test Connection: when `client.worlds.get()` returns a name
+ * different from the one we stored at link time, refresh the cache so the
+ * Settings → World tab reflects the live name. No-op if the world isn't
+ * api-linked.
+ */
+export function setApiWorldName(
+  reg: WorldsRegistry,
+  worldId: string,
+  worldName: string
+): WorldsRegistry {
+  return {
+    ...reg,
+    worlds: reg.worlds.map(w => {
+      if (w.id !== worldId || !w.api) return w;
+      return { ...w, api: { ...w.api, world_name: worldName } };
+    }),
   };
 }
 

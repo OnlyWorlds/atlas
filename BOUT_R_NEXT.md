@@ -20,10 +20,12 @@ Phase 3.5 sync engine is feature-complete + hardened across five sessions of liv
     - **C1** (id-swap UI propagation through transient pushes). Route 1 Make-Online's transient `SyncEngine` had no `onIdSwap` callback — so any server-assigned-v7 swap during the upload left the user's URL/`selectedElementId` pointing at the pre-swap local id, surfacing as "element <old-id> not found in this world" after the modal closed. Route 2's `mergeLocalIntoApi` had the same gap (idSwaps Map accumulated but never told the UI). Fix: exported `applyIdSwapToUi` from sync-attach as the single public surface, wired into Route 1's transient engine and Route 2 via new `MergeOpts.onIdSwap` callback. Merge's internal `recordIdSwap` helper centralises the swap registration so future swap sites can't forget the UI side.
     - **C2** (auto-pull scheduler doesn't recognise `error` state). `reconcileScheduler` only checked `kind === 'paused'`, so post-Bout-T auth-failed engines kept the timer alive (engine internally short-circuited, no network spam, but wasted timer churn each cadence). Fix: include `'error'` in the inactive set in reconcile + tickPull + maybeCatchUpOnVisible.
   - **Bout Y** — Smoke-driven fix surfaced during T1.6 by Captain: **unlink leaves stale sync metadata on disk → second Make-Online Route 1 produces an empty world.** After Make-Online, every element gets stamped with `server_updated_at`. Unlink stripped only the registry's `api` block — left `server_updated_at` on every element, tombstones queued for the dead api world, `sync-state.json` history, and `world.json.api`. The next Make-Online Route 1 saw elements with baselines → treated as UPDATEs → pre-update GET 404 → all routed to server_deletes. World created on api with ZERO elements. Fix: added `FolderStore.resetSyncBaseline()` (new convention #24); unlink handler calls it AFTER detachSyncEngine, BEFORE registry update. Strips every element's `server_updated_at`, drops tombstones, resets sync-state, strips `world.json.api`.
+  - **Bout Z** — Smoke-discussion follow-on: surface api-vs-local name divergence in Settings. When a user makes-online with a display name different from local, the two names diverge silently. Fix: added `world_name?: string` to the api block on both `WorldRegistryEntry.api` and `WorldMeta.api`. Populated at all 4 link sites (Make-Online Route 1 + Route 2, atlas-root-flow link-existing, new-api-world-modal). New `setApiWorldName(reg, worldId, name)` registry helper. Settings → World tab renders a `name on api` row with `(differs from local)` hint when divergent. Test Connection refreshes the cached name on every successful fetch and persists to both registry + world.json — also surfaces the change in a toast (`name on api is "X" (was "Y")`). Local entry name is intentionally never touched — api and local names are separate identities.
+  - **Bout AA** — Smoke fail in T2.1 (paused world): user paused → edited → unpaused, and the edit never reached the server. Root cause: `engine.requestPush()` early-returns while paused so no debounce timer is scheduled; `engine.resume()` only cleared the paused flag, leaving the pending write on disk indefinitely (it'd only flush at the next user edit or a reload via flush-on-attach). Fix: `resume()` now fires `pushOnce()` after clearing the flag. The push is async and routes through the normal pipeline (onSyncResult callback, conflict toasts, auth handling via setAuthError, failure handling). One change covers all three resume entry points: per-world stay-offline uncheck, global pause-all uncheck, online-event auto-resume. Also tightened the `online` event comment in `auto-pull-scheduler.ts` (it specifically noted this as a known gap).
 
-**Tests**: 274 vitest passing (was 258 at session 205 close — **+16 net new tests** across Bouts X+Y in 4 files).
+**Tests**: 282 vitest passing (was 258 at session 205 close — **+24 net new tests** across Bouts X+Y+Z+AA in 5 files).
 **Build + typecheck**: clean.
-**Bundle**: 347.91 KB JS / 96.82 KB gzipped.
+**Bundle**: 349.07 KB JS / 97.20 KB gzipped.
 
 ## First moves next chat
 
@@ -59,7 +61,7 @@ Phase 3.5 sync engine is feature-complete + hardened across five sessions of liv
 
 ## Pending commit (sessions 205-206)
 
-5 logical commits (3 from session 205 + 2 from session 206):
+7 logical commits (3 from session 205 + 4 from session 206):
 
 - **Bout S** (`H1+H2 field-clear`):
   - `src/middle/element-detail.ts` (one-line: undefined → null in × handler)
@@ -104,6 +106,22 @@ Phase 3.5 sync engine is feature-complete + hardened across five sessions of liv
   - `tests/integration/folder-store.resetSyncBaseline.test.ts` (new file, 8 tests: contract checks + the Captain-bug regression scenario)
   - `DESIGN.md` (convention #24)
   - `BOUT_R_SMOKE.md` (new T2.8 smoke check covering unlink + re-link Route 1)
+
+- **Bout AA** (`resume-flushes-pending-writes`):
+  - `src/sync/sync-engine.ts` (`resume()` fires `pushOnce()` after clearing the paused flag)
+  - `src/sync/auto-pull-scheduler.ts` (updated comment on the online-event handler — the known gap is closed)
+  - `tests/integration/sync-engine.autosave.test.ts` (+3 tests: edits-during-pause flush on resume, near-no-op when nothing pending, multiple edits coalesce into one resume push)
+  - `tests/integration/sync-engine.push.test.ts` (loosened `kind === 'idle'` assertion right after resume — now allows `syncing` as well, since resume itself starts the flush)
+
+- **Bout Z** (`api-world-name-cache`):
+  - `src/core/types.ts` (`world_name?: string` added to `api` block on both `WorldRegistryEntry` and `WorldMeta`)
+  - `src/registry/registry.ts` (`attachApi` accepts `worldName`; `createApiLinkedWorld` accepts `apiWorldName`; new `setApiWorldName(reg, worldId, name)` helper for Test Connection refresh)
+  - `src/ui/make-online-modal.ts` (Route 1 + Route 2 pass `world.name` from `client.worlds.get()` into both registry + world.json)
+  - `src/setup/atlas-root-flow.ts` (link-existing-api flow passes `world.name` through to `createApiLinkedWorld` + `writeWorldMeta`)
+  - `src/ui/new-api-world-modal.ts` (`+ new api world` shortcut passes `world.name` through)
+  - `src/middle/settings-panel.ts` (Test Connection refreshes cached `world_name` if server name differs; renderWorldTab shows `name on api` row with `(differs from local)` hint)
+  - `tests/unit/registry.test.ts` (+5 tests: attachApi persists worldName, omits when absent, setApiWorldName refreshes, no-op on local-only, detachApi clears it)
+  - `BOUT_R_SMOKE.md` (new T2.9 smoke check)
   - `BOUT_R_NEXT.md` (this update)
 
 Captain reserves the push action.

@@ -389,7 +389,13 @@ export async function linkExistingApiWorldInRoot(
   await store.writeWorldMeta({
     id: localWorldUuid,
     name: displayName,
-    api: { world_id: serverWorldId, api_key: apiKey },
+    // Cache the server-side name so settings can show api-vs-local
+    // divergence without a network fetch on reload.
+    api: {
+      world_id: serverWorldId,
+      api_key: apiKey,
+      ...(world.name ? { world_name: world.name } : {}),
+    },
   });
 
   // Initial download — all elements of all types stamped with `server_updated_at`.
@@ -406,6 +412,7 @@ export async function linkExistingApiWorldInRoot(
     folderName: subName,
     handleKey,
     pathHint: `${reg.atlas_root.folder_name}/${subName}`,
+    apiWorldName: world.name,
   });
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);

@@ -105,12 +105,24 @@ export class NewApiWorldModal extends BaseModal {
         if (!world?.id) throw new Error('server returned no world id');
 
         // Flip registry to api-linked + persist credentials to disk.
-        regAfter = attachApi(getState().registry, entry.id, { worldId: world.id, apiKey });
+        // Cache the server-side world name so settings can flag api-vs-local
+        // name divergence without a network fetch.
+        regAfter = attachApi(getState().registry, entry.id, {
+          worldId: world.id,
+          apiKey,
+          worldName: world.name,
+        });
         saveRegistry(regAfter);
         patchSlice('registry', regAfter);
         const folder = getActiveStore();
         if (folder) {
-          await folder.writeWorldMeta({ api: { world_id: world.id, api_key: apiKey } });
+          await folder.writeWorldMeta({
+            api: {
+              world_id: world.id,
+              api_key: apiKey,
+              ...(world.name ? { world_name: world.name } : {}),
+            },
+          });
           const updatedEntry = regAfter.worlds.find((w) => w.id === entry.id)!;
           attachSyncEngine(updatedEntry, folder);
         }
