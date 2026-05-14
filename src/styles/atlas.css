@@ -806,12 +806,11 @@
 /* Field row */
 .atlas-field {
   display: grid;
-  grid-template-columns: 160px 1fr;
-  gap: 12px;
+  grid-template-columns: 150px 1fr;
+  gap: 18px;
   align-items: start;
-  padding: 7px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  /* bumped 0.025 → 0.05 for a touch more scannability without losing minimal feel */
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .atlas-field:last-child {
@@ -827,6 +826,15 @@
   letter-spacing: 0;
   line-height: 1.4;
   word-break: break-word;
+}
+
+/* Label doubles as a click target for the field's edit affordance. Hover
+   echoes the value-hover background so the row reads as one clickable unit. */
+.atlas-field-label-clickable {
+  cursor: pointer;
+}
+.atlas-field-label-clickable:hover {
+  color: var(--atlas-text);
 }
 
 .atlas-field-label .field-required {
@@ -864,8 +872,23 @@
   font-style: normal;
 }
 
+/* Default empty placeholder: thin line. Widget-aware overrides below. */
 .atlas-field-value.empty::before {
   content: '—';
+  opacity: 0.5;
+}
+
+.atlas-field-value.empty[data-widget="number"]::before {
+  content: '#';
+  opacity: 0.45;
+  font-weight: 500;
+}
+
+.atlas-field-value.empty[data-widget="text-long"]::before {
+  /* text-long fields read better with a slightly longer placeholder hint */
+  content: '——';
+  opacity: 0.45;
+  letter-spacing: -0.2em;
 }
 
 .atlas-field-edit-actions {
@@ -920,11 +943,86 @@
 .atlas-link-pick {
   margin-left: auto;
   color: var(--atlas-text-soft);
-  /* a touch brighter than muted — the link icon IS the field hint now */
 }
 
 .atlas-link-pick:hover {
   color: var(--atlas-cyan);
+}
+
+/* When the row is empty, the `+` icon doubles as both the placeholder and
+   affordance. Use soft grey + left alignment so it sits where a chip would
+   appear, not pushed to the far right. */
+.atlas-link-row-empty {
+  justify-content: flex-start;
+}
+
+.atlas-link-pick-empty {
+  margin-left: 0;
+  color: var(--atlas-text-dim);
+  opacity: 0.7;
+}
+
+.atlas-link-pick-empty:hover {
+  color: var(--atlas-cyan);
+  opacity: 1;
+}
+
+/* Map row pin-count badge — small cyan-tinted chip showing how many pins on
+   each map. The earlier `.atlas-row-meta` was too low-contrast to read. */
+/* Per-element sync/save indicator in the detail header (Bout II). */
+.atlas-element-sync-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 6px;
+  cursor: default;
+  color: var(--atlas-text-muted);
+  transition: color 140ms ease, opacity 140ms ease;
+}
+
+.atlas-element-sync-dot .material-symbols-outlined {
+  font-size: 16px;
+  color: inherit;
+}
+
+.atlas-element-sync-dot[data-state="local"] {
+  color: var(--atlas-text-muted);
+  opacity: 0.75;
+}
+
+.atlas-element-sync-dot[data-state="synced"] {
+  color: var(--atlas-text-muted);
+  opacity: 0.75;
+}
+
+.atlas-element-sync-dot[data-state="dirty"] {
+  color: var(--atlas-cyan);
+  opacity: 1;
+  animation: atlas-element-dirty-pulse 1400ms ease-in-out infinite;
+}
+
+@keyframes atlas-element-dirty-pulse {
+  0%, 100% { opacity: 0.65; }
+  50%      { opacity: 1; }
+}
+
+.atlas-pin-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.10);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  border-radius: 8px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 
 /* ============================================================
@@ -1748,9 +1846,8 @@
 }
 
 .atlas-settings-section h3 {
-  text-transform: lowercase;
   font-size: 12px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: rgba(255, 255, 255, 0.55);
   margin-bottom: 8px;
 }
@@ -1769,9 +1866,8 @@
 }
 
 .atlas-settings-field>span {
-  text-transform: lowercase;
   font-size: 11px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   color: rgba(255, 255, 255, 0.55);
 }
 
@@ -1789,7 +1885,6 @@
 
 .atlas-settings-meta dt {
   color: rgba(255, 255, 255, 0.55);
-  text-transform: lowercase;
 }
 
 .atlas-settings-meta dd {
@@ -1844,8 +1939,7 @@
   text-align: left;
   padding: 8px 18px;
   font-size: 12px;
-  letter-spacing: 0.05em;
-  text-transform: lowercase;
+  letter-spacing: 0.02em;
   cursor: pointer;
   border-left: 2px solid transparent;
   transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
@@ -1896,9 +1990,8 @@
 }
 
 .atlas-settings-fieldset legend {
-  text-transform: lowercase;
   font-size: 11px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.55);
   padding: 0 6px;
 }
@@ -1956,9 +2049,8 @@
 }
 
 .atlas-modal-field>span {
-  text-transform: lowercase;
   font-size: 11px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.55);
 }
 
@@ -2010,9 +2102,8 @@
 .atlas-policy-fieldset > legend {
   padding: 0 4px;
   font-size: 11px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.55);
-  text-transform: lowercase;
 }
 
 .atlas-policy-option {
@@ -2041,8 +2132,7 @@
 .ow-btn {
   font-family: inherit;
   font-size: 12px;
-  text-transform: lowercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   padding: 6px 14px;
   border-radius: 4px;
   border: 1px solid transparent;
@@ -2361,7 +2451,6 @@
   font-weight: 600;
   margin: 0 0 16px;
   color: #fff;
-  text-transform: lowercase;
 }
 
 .atlas-unsupported p {

@@ -30,7 +30,7 @@ export class NewApiWorldModal extends BaseModal {
     }
     const reg = getState().registry;
     const { overlay, body } = this.buildModalShell({
-      title: 'new api world',
+      title: 'New API world',
       panelClass: 'atlas-create-api-panel',
       dataModal: 'new-api-world',
     });
@@ -42,18 +42,18 @@ export class NewApiWorldModal extends BaseModal {
         <input class="ow-input" type="text" name="api-name" placeholder="my new world" autocomplete="off" required />
       </label>
       <label class="atlas-modal-field">
-        <span>email</span>
+        <span>Email</span>
         <input class="ow-input" type="email" name="api-email" placeholder="you@example.com" value="${escapeAttr(reg.email ?? '')}" autocomplete="email" required />
       </label>
       <label class="atlas-modal-field">
-        <span>pin</span>
+        <span>PIN</span>
         <input class="ow-input" type="text" name="api-pin" placeholder="onlyworlds pin (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
       </label>
       <p class="atlas-modal-error" data-role="error" hidden></p>
       <div class="atlas-modal-progress" data-role="progress" hidden></div>
       <div class="atlas-modal-actions">
-        <button class="ow-btn atlas-btn-ghost" data-action="cancel">cancel</button>
-        <button class="ow-btn atlas-btn-primary" data-action="create-api">create</button>
+        <button class="ow-btn atlas-btn-ghost" data-action="cancel">Cancel</button>
+        <button class="ow-btn atlas-btn-primary" data-action="create-api">Create</button>
       </div>
     `;
 

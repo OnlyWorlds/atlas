@@ -33,9 +33,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     header.className = 'atlas-timeline-header';
     header.innerHTML = `
       <span class="material-symbols-outlined">timeline</span>
-      <h2>timeline</h2>
+      <h2>Timeline</h2>
       <div style="flex:1 1 auto"></div>
-      <button class="atlas-btn-ghost" data-action="new-event" title="create a new event">+ event</button>
+      <button class="atlas-btn-ghost" data-action="new-event" title="create a new event">+ Event</button>
     `;
     header.querySelector<HTMLButtonElement>('[data-action="new-event"]')!.addEventListener('click', () => {
       new ElementCreateModal(toasts, { initialType: 'event' }).open();

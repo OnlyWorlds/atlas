@@ -72,7 +72,7 @@ export class MakeOnlineModal extends BaseModal {
 
   private buildModal(): HTMLElement {
     const { overlay, body } = this.buildModalShell({
-      title: 'make online',
+      title: 'Make online',
       dataModal: 'make-online',
     });
 
@@ -94,22 +94,22 @@ export class MakeOnlineModal extends BaseModal {
         </p>
         <form data-form="create-route">
           <label class="atlas-modal-field">
-            <span>display name</span>
+            <span>Display name</span>
             <input class="atlas-input" type="text" name="create-name" value="${escapeAttr(defaultName)}" autocomplete="off" />
           </label>
           <label class="atlas-modal-field">
-            <span>email</span>
+            <span>Email</span>
             <input class="atlas-input" type="email" name="create-email" value="${escapeAttr(prefilledEmail)}" placeholder="your onlyworlds account email" autocomplete="off" />
           </label>
           <label class="atlas-modal-field">
-            <span>pin</span>
+            <span>PIN</span>
             <input class="atlas-input" type="text" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="four-digit pin" maxlength="8" autocomplete="off" />
           </label>
           <div class="atlas-modal-error" data-role="create-error" hidden></div>
           <div class="atlas-modal-progress" data-role="create-progress" hidden></div>
           <div class="atlas-modal-actions">
-            <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
-            <button type="submit" class="atlas-btn-primary" data-action="create-submit">create + upload</button>
+            <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+            <button type="submit" class="atlas-btn-primary" data-action="create-submit">Create + upload</button>
           </div>
         </form>
       </div>
@@ -120,11 +120,11 @@ export class MakeOnlineModal extends BaseModal {
         </p>
         <form data-form="link-route">
           <label class="atlas-modal-field">
-            <span>api key</span>
+            <span>API key</span>
             <input class="atlas-input" type="text" name="link-api-key" placeholder="from onlyworlds.com" autocomplete="off" spellcheck="false" />
           </label>
           <label class="atlas-modal-field">
-            <span>pin</span>
+            <span>PIN</span>
             <input class="atlas-input" type="text" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="four-digit pin" maxlength="8" autocomplete="off" />
           </label>
           <fieldset class="atlas-modal-field atlas-policy-fieldset">
@@ -145,8 +145,8 @@ export class MakeOnlineModal extends BaseModal {
           <div class="atlas-modal-error" data-role="link-error" hidden></div>
           <div class="atlas-modal-progress" data-role="link-progress" hidden></div>
           <div class="atlas-modal-actions">
-            <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
-            <button type="submit" class="atlas-btn-primary" data-action="link-submit">link + sync</button>
+            <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+            <button type="submit" class="atlas-btn-primary" data-action="link-submit">Link + sync</button>
           </div>
         </form>
       </div>
@@ -214,7 +214,7 @@ export class MakeOnlineModal extends BaseModal {
 
     inputs.forEach((i) => (i.disabled = true));
     submitBtn.disabled = true;
-    submitBtn.textContent = 'creating…';
+    submitBtn.textContent = 'Creating…';
     // Hide every cancel button in this modal during the in-flight create —
     // both routes' panes have one. Bailing mid-create-and-upload leaves
     // partial server-side state and a confused user.
@@ -310,7 +310,7 @@ export class MakeOnlineModal extends BaseModal {
       progressBox.hidden = true;
       inputs.forEach((i) => (i.disabled = false));
       submitBtn.disabled = false;
-      submitBtn.textContent = 'create + upload';
+      submitBtn.textContent = 'Create + upload';
       form.closest<HTMLElement>('[data-modal]')
         ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
         .forEach((b) => (b.hidden = false));
@@ -349,7 +349,7 @@ export class MakeOnlineModal extends BaseModal {
 
     inputs.forEach((i) => (i.disabled = true));
     submitBtn.disabled = true;
-    submitBtn.textContent = 'linking…';
+    submitBtn.textContent = 'Linking…';
     form.closest<HTMLElement>('[data-modal]')
       ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
       .forEach((b) => (b.hidden = true));
@@ -445,7 +445,7 @@ export class MakeOnlineModal extends BaseModal {
       progressBox.hidden = true;
       inputs.forEach((i) => (i.disabled = false));
       submitBtn.disabled = false;
-      submitBtn.textContent = 'link + sync';
+      submitBtn.textContent = 'Link + sync';
       form.closest<HTMLElement>('[data-modal]')
         ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
         .forEach((b) => (b.hidden = false));

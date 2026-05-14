@@ -666,6 +666,8 @@ Inherited from legacy (hard-won; preserve in new code):
 
 26. **Engine preserves `last_sync_at` across pause/resume.** `pause()` transitions to a `paused` state that doesn't carry the timestamp; without preservation, `resume()` would emit `{kind:'idle', last_sync_at: null}` and the pill's "synced X min ago" tooltip would briefly read "never synced" between resume and the post-resume push completing. The engine keeps a private `lastSyncAt` field updated by `setState` on every idle transition with a non-null timestamp; `resume()` reads it back so the brief idle window post-resume carries the prior value. A successful sync afterwards stamps a fresher value normally. Verified by `tests/integration/sync-engine.resumePreservesLastSyncAt.test.ts`.
 
+27. **Sidebar mode toggle reads URL + registry, NOT `state.active`.** The right-tab label is the active world's name. `state.active` only fills in AFTER the slow FS work in `activateWorld` (handle resolve, permission re-grant, `store.open`, `listElements`); during that window the registry entry exists but `state.active` is still null or stale. Reading `state.active.meta.name` in the toggle would lag the UI ~500ms behind the click. Reading `registry.worlds.find(w => w.id === route.worldId).name` flips the label synchronously in the same frame as the click — the "instant-feel world switch" depends on it. The same principle applies to any UI whose visible identity should match the URL: source from registry+URL, not from store state that catches up async. `activateWorld` clears `data.elements` + `selectedElementId` and navigates synchronously BEFORE the FS work for the same reason; failure paths revert URL to the priorHash.
+
 ---
 
 ## Test Strategy

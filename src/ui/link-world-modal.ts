@@ -46,7 +46,7 @@ export class LinkWorldModal extends BaseModal {
 
   private buildModal(): HTMLElement {
     const { overlay, body } = this.buildModalShell({
-      title: 'link existing world',
+      title: 'Link existing world',
       dataModal: 'link-world',
     });
 
@@ -54,11 +54,11 @@ export class LinkWorldModal extends BaseModal {
     body.innerHTML = `
       <form data-form="link-world">
         <label class="atlas-modal-field">
-          <span>api key</span>
+          <span>API key</span>
           <input class="atlas-input" type="text" name="api-key" placeholder="from onlyworlds.com" autocomplete="off" spellcheck="false" />
         </label>
         <label class="atlas-modal-field">
-          <span>pin</span>
+          <span>PIN</span>
           <input class="atlas-input" type="text" name="api-pin" value="${escapeAttr(prefilledPin)}" placeholder="four-digit pin" autocomplete="off" maxlength="8" />
         </label>
         <label class="atlas-modal-field">
@@ -71,8 +71,8 @@ export class LinkWorldModal extends BaseModal {
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-progress" data-role="progress" hidden></div>
         <div class="atlas-modal-actions">
-          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="link">link</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+          <button type="submit" class="atlas-btn-primary" data-action="link">Link</button>
         </div>
       </form>
     `;
@@ -99,7 +99,7 @@ export class LinkWorldModal extends BaseModal {
       const inputs = form.querySelectorAll<HTMLInputElement>('input');
       inputs.forEach(i => (i.disabled = true));
       submitBtn.disabled = true;
-      submitBtn.textContent = 'linking…';
+      submitBtn.textContent = 'Linking…';
       cancelBtn.hidden = true;
 
       const renderProgress = (p: InitialDownloadProgress) => {
@@ -135,7 +135,7 @@ export class LinkWorldModal extends BaseModal {
         progressBox.hidden = true;
         inputs.forEach(i => (i.disabled = false));
         submitBtn.disabled = false;
-        submitBtn.textContent = 'link';
+        submitBtn.textContent = 'Link';
         cancelBtn.hidden = false;
       }
     });

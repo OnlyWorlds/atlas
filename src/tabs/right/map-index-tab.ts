@@ -39,7 +39,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     const newBtn = document.createElement('button');
     newBtn.className = 'atlas-btn-ghost';
     newBtn.setAttribute('data-action', 'new-map');
-    newBtn.textContent = '+ new map';
+    newBtn.textContent = '+ New map';
     newBtn.title = 'create a new map';
     newBtn.addEventListener('click', async () => {
       const result = await createMapDialog(toasts);
@@ -61,9 +61,9 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       list.innerHTML = `
         <div class="atlas-pane-empty">
           <div style="max-width:340px">
-            <div style="margin-bottom:10px">no maps yet.</div>
+            <div style="margin-bottom:10px">No maps yet.</div>
             <div style="color:var(--atlas-text-muted);font-size:11px;line-height:1.5">
-              click <b>+ new map</b> to create one. attach an image as the base canvas, or start blank.
+              Click <b>+ New map</b> to create one. Attach an image as the base canvas, or start blank.
             </div>
           </div>
         </div>
@@ -102,7 +102,7 @@ function renderRow(m: WorldMap, isActive: boolean, pinCount: number, toasts: Toa
 
   if (pinCount > 0) {
     const badge = document.createElement('span');
-    badge.className = 'atlas-row-meta';
+    badge.className = 'atlas-pin-count-badge';
     badge.title = `${pinCount} pin${pinCount === 1 ? '' : 's'}`;
     badge.textContent = `${pinCount}`;
     row.appendChild(badge);

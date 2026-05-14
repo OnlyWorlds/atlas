@@ -49,7 +49,7 @@ test.describe('Bout CC — sidebar toggle + gear + selection UX', () => {
     // its name. The Worlds tab always shows "worlds".
     const worldsBtn = page.locator('[data-action="mode-worlds"]');
     const rightBtn = page.locator('[data-action="mode-elements"]');
-    await expect(worldsBtn).toContainText('worlds');
+    await expect(worldsBtn).toContainText('Worlds');
     await expect(rightBtn).toContainText('Middle-earth');
   });
 

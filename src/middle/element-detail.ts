@@ -24,6 +24,7 @@ import { getActiveStore } from '../ui/create-world-modal';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { toastManager } from '../ui/toast-manager';
 import { sectionsFor, type FieldMeta, type SectionLayout } from '../editor/field-schema';
+import { getFieldDescription } from '../editor/field-descriptions';
 import { pickElement } from '../ui/element-picker-modal';
 import { requestPushIfLinked } from '../sync/sync-attach';
 
@@ -135,6 +136,42 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
   // ====== Header ======
 
+  function buildSyncDot(el: Element): HTMLElement {
+    const dot = document.createElement('span');
+    dot.className = 'atlas-element-sync-dot';
+    dot.setAttribute('data-role', 'element-sync-dot');
+    const activeId = getState().active?.worldId;
+    const worldEntry = activeId
+      ? getState().registry.worlds.find((w) => w.id === activeId)
+      : undefined;
+    const isApi = worldEntry?.state === 'api-linked';
+    let icon: string;
+    let title: string;
+    let state: 'local' | 'synced' | 'dirty';
+    if (!isApi) {
+      icon = 'save';
+      title = 'Saved to folder';
+      state = 'local';
+    } else {
+      const localStamp = el.local_updated_at ?? '';
+      const serverStamp = el.server_updated_at ?? '';
+      const dirty = !serverStamp || localStamp > serverStamp;
+      if (dirty) {
+        icon = 'cloud_upload';
+        title = 'Pending sync — autosave will push within a few seconds';
+        state = 'dirty';
+      } else {
+        icon = 'cloud_done';
+        title = 'Synced';
+        state = 'synced';
+      }
+    }
+    dot.dataset.state = state;
+    dot.title = title;
+    dot.innerHTML = `<span class="material-symbols-outlined">${icon}</span>`;
+    return dot;
+  }
+
   function renderHeader(el: Element): HTMLElement {
     const header = document.createElement('div');
     header.className = 'atlas-middle-header';
@@ -153,6 +190,15 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const spacer = document.createElement('div');
     spacer.className = 'atlas-middle-spacer';
     header.appendChild(spacer);
+
+    // Per-element save/sync indicator. Visual feedback for "is this element's
+    // current state persisted everywhere it should be?":
+    //   - Local-only world: file is written synchronously to disk on save, so
+    //     it's always "Saved" (the icon is the affordance for that promise).
+    //   - Api-linked world + local_updated_at <= server_updated_at: in sync.
+    //   - Api-linked world + local_updated_at > server_updated_at (or missing
+    //     server stamp): edit is pending push by the autosave debounce.
+    header.appendChild(buildSyncDot(el));
 
     // Pin button — only shown when a map tab is currently active.
     const ui = getState().ui;
@@ -239,6 +285,10 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
     const label = document.createElement('div');
     label.className = 'atlas-field-label';
+    // SDK-sourced field description shown as a tooltip on label hover. Falls
+    // back silently when no description exists for this (type, field) pair.
+    const description = getFieldDescription(el.type, meta.name);
+    if (description) label.title = description;
     const labelText = document.createElement('span');
     labelText.textContent = humanizeFieldName(meta.name);
     label.appendChild(labelText);
@@ -248,6 +298,20 @@ export function mountElementDetail(target: HTMLElement): () => void {
       req.textContent = '*';
       label.appendChild(req);
     }
+    // Clicking the label triggers the same edit affordance as clicking the
+    // value — opens the popover for text/number, opens the picker for links.
+    // The actual click handlers live on the value/pick button below; we just
+    // forward the click here.
+    label.classList.add('atlas-field-label-clickable');
+    label.addEventListener('click', (e) => {
+      // Don't double-fire if user clicked the value (would bubble up otherwise).
+      if ((e.target as HTMLElement).closest('.atlas-field-value, .atlas-link-pick, .atlas-link-chip')) return;
+      // Forward to whichever affordance lives in this row.
+      const target = wrap.querySelector<HTMLElement>(
+        '.atlas-field-value, .atlas-link-pick'
+      );
+      target?.click();
+    });
     wrap.appendChild(label);
 
     if (meta.widget === 'single-link') {
@@ -261,9 +325,16 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
     const raw = (el as any)[meta.name];
     const valueText = formatValue(raw);
+    const isEmpty = !valueText;
     const valueEl = document.createElement('div');
-    valueEl.className = 'atlas-field-value' + (valueText ? '' : ' empty');
-    valueEl.textContent = valueText || '—';
+    valueEl.className = 'atlas-field-value' + (isEmpty ? ' empty' : '');
+    if (isEmpty) {
+      // Widget-aware empty placeholder via CSS ::before (see atlas.css). Number
+      // shows '#', text fields show a thin line. Avoids putting the placeholder
+      // glyph in textContent so copy/select doesn't pick up sentinel chars.
+      valueEl.dataset.widget = meta.widget;
+    }
+    valueEl.textContent = valueText;
     valueEl.addEventListener('click', () => {
       openFieldEditPopover({
         anchor: valueEl,
@@ -282,32 +353,28 @@ export function mountElementDetail(target: HTMLElement): () => void {
   function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
     const row = document.createElement('div');
     row.className = 'atlas-link-row';
-
     const raw = (el as any)[meta.name];
+
     if (raw) {
       row.appendChild(buildLinkChip(String(raw), meta, async () => {
         // Use `null`, not `undefined`. undefined gets dropped by JSON.stringify
         // at disk-write AND by the adapter's wire serializer, so the PATCH
-        // body omits the field entirely and the server keeps its old value
-        // (real PATCH treats missing keys as "no change"). `null` survives
-        // both layers; the SDK's prepareRelations maps it to `<field>_id: null`
-        // and the server clears the relation. See sync-engine.fieldClear.test.ts
-        // for the rule. Convention #21 in DESIGN.md.
+        // body omits the field and the server keeps its old value. See
+        // sync-engine.fieldClear.test.ts. Convention #21.
         await persistFieldPatch(el, meta.name, null);
       }));
     } else {
-      const empty = document.createElement('div');
-      empty.className = 'atlas-field-value empty';
-      empty.style.flex = '1';
-      empty.textContent = '—';
-      row.appendChild(empty);
+      row.classList.add('atlas-link-row-empty');
     }
 
     const pickBtn = document.createElement('button');
     pickBtn.type = 'button';
     pickBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
-    pickBtn.title = raw ? `change link` : `pick a ${meta.target ?? 'link'}`;
-    pickBtn.innerHTML = `<span class="material-symbols-outlined">${pickIconFor(meta.target)}</span>`;
+    if (!raw) pickBtn.classList.add('atlas-link-pick-empty');
+    pickBtn.title = raw ? 'change link' : `pick a ${meta.target ?? 'link'}`;
+    // Empty: soft-grey `+` placeholder/affordance. Linked: type-specific icon.
+    const iconName = raw ? pickIconFor(meta.target) : 'add';
+    pickBtn.innerHTML = `<span class="material-symbols-outlined">${iconName}</span>`;
     pickBtn.addEventListener('click', async () => {
       // Exclude the current element itself and any value already linked here.
       // Self-linking is never meaningful — a Character pointing at itself via
@@ -341,11 +408,15 @@ export function mountElementDetail(target: HTMLElement): () => void {
       }));
     });
 
+    if (ids.length === 0) wrap.classList.add('atlas-link-row-empty');
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
+    if (ids.length === 0) addBtn.classList.add('atlas-link-pick-empty');
     addBtn.title = ids.length === 0 ? `pick a ${meta.target ?? 'link'}` : `add another ${meta.target ?? 'link'}`;
-    addBtn.innerHTML = `<span class="material-symbols-outlined">${pickIconFor(meta.target)}</span>`;
+    // Always show `+` for multi-link add: it's an "add another" affordance even
+    // when chips exist. The `margin-left: auto` slides it past existing chips.
+    addBtn.innerHTML = `<span class="material-symbols-outlined">add</span>`;
     addBtn.addEventListener('click', async () => {
       // Exclude the current element + everything already in the list. Same
       // self-link rule as renderSingleLink — A Character's `friends` shouldn't

@@ -48,7 +48,7 @@ test('right pane shows map index tab by default with empty state', async ({ page
   await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toBeVisible();
   await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toHaveClass(/active/);
   await expect(page.locator('.atlas-map-index-pane')).toBeVisible();
-  await expect(page.locator('.atlas-map-index-pane')).toContainText('no maps yet');
+  await expect(page.locator('.atlas-map-index-pane')).toContainText('No maps yet');
 });
 
 test('create map via map index — adds row and opens map tab', async ({ page }) => {
@@ -140,7 +140,7 @@ test('map index pin-count badge updates as pins are added (via FolderStore)', as
   // Map index shows pin count badge "1".
   await page.click('.atlas-tab[data-tab-kind="map-index"]');
   const row = page.locator('.atlas-row[data-map-id]', { hasText: 'Pinned Map' });
-  await expect(row.locator('.atlas-row-meta')).toHaveText('1');
+  await expect(row.locator('.atlas-pin-count-badge')).toHaveText('1');
 });
 
 test('delete map cascades pins and removes the tab', async ({ page }) => {

@@ -45,8 +45,8 @@ test('first launch shows the setup-atlas CTA, not create-local', async ({ page }
   await expect(page.locator('.atlas-shell')).toBeVisible();
   await expect(page.locator('[data-action="setup-atlas"]').first()).toBeVisible();
   await expect(page.locator('[data-action="create-local"]')).toHaveCount(0);
-  await expect(page.locator('.atlas-middle')).toContainText('welcome to atlas');
-  await expect(page.locator('.atlas-middle')).toContainText('set up atlas folder');
+  await expect(page.locator('.atlas-middle')).toContainText('Welcome to Atlas');
+  await expect(page.locator('.atlas-middle')).toContainText('Set up atlas folder');
 });
 
 test('set up atlas folder flips the UI into create-local mode', async ({ page }) => {

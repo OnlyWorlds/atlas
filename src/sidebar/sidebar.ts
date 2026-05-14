@@ -84,8 +84,8 @@ export function mountSidebar(mount: SidebarMount): () => void {
     worldsBtn.type = 'button';
     worldsBtn.className = 'atlas-mode-btn atlas-mode-btn-worlds' + (worldsActive ? ' active' : '');
     worldsBtn.setAttribute('data-action', 'mode-worlds');
-    worldsBtn.title = 'worlds';
-    worldsBtn.innerHTML = '<span class="atlas-mode-btn-label">worlds</span>';
+    worldsBtn.title = 'Worlds';
+    worldsBtn.innerHTML = '<span class="atlas-mode-btn-label">Worlds</span>';
     worldsBtn.addEventListener('click', () => switchMode('worlds'));
     toggle.appendChild(worldsBtn);
 

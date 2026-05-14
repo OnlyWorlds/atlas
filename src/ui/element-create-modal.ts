@@ -74,14 +74,14 @@ export class ElementCreateModal extends BaseModal {
 
   private buildModal(): HTMLElement {
     const { overlay, body } = this.buildModalShell({
-      title: 'new element',
+      title: 'New element',
       dataModal: 'create-element',
     });
 
     body.innerHTML = `
       <form data-form="create-element">
         <label class="atlas-modal-field">
-          <span>name</span>
+          <span>Name</span>
           <input class="atlas-input" type="text" name="element-name" placeholder="element name" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
         </label>
         <div class="atlas-modal-field">
@@ -94,8 +94,8 @@ export class ElementCreateModal extends BaseModal {
         </div>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
-          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="create">create</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+          <button type="submit" class="atlas-btn-primary" data-action="create">Create</button>
         </div>
       </form>
     `;
@@ -159,7 +159,7 @@ export class ElementCreateModal extends BaseModal {
         return;
       }
       submitBtn.disabled = true;
-      submitBtn.textContent = 'creating…';
+      submitBtn.textContent = 'Creating…';
       cancelBtn.hidden = true;
       try {
         const store = getActiveStore()!;
@@ -178,7 +178,7 @@ export class ElementCreateModal extends BaseModal {
         errorBox.textContent = err instanceof Error ? err.message : String(err);
         errorBox.hidden = false;
         submitBtn.disabled = false;
-        submitBtn.textContent = 'create';
+        submitBtn.textContent = 'Create';
         cancelBtn.hidden = false;
       }
     });

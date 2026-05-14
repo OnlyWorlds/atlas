@@ -62,7 +62,7 @@ test('elements mode becomes enabled and toggles when a world is active', async (
   expect(await page.evaluate(() => window.location.hash)).toMatch(/\/elements$/);
   await expect(page.locator('.atlas-mode-btn[data-action="mode-elements"]')).toHaveClass(/active/);
   await expect(page.locator('.atlas-sidebar .atlas-list')).toBeVisible();
-  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toContainText('no elements yet');
+  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toContainText('No elements yet');
 });
 
 test('create element from elements sidebar → row + detail view', async ({ page }) => {
@@ -240,5 +240,7 @@ test('switching worlds resets the elements view to the new world', async ({ page
   // Now active world is beta — switch to elements mode, alpha hero must NOT appear.
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
   await expect(page.locator('.atlas-row[data-element-id]', { hasText: 'alpha hero' })).toHaveCount(0);
-  await expect(page.locator('.atlas-pane-empty')).toBeVisible();
+  // Scope to the elements sidebar — the map index also renders an
+  // atlas-pane-empty when no maps exist.
+  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toBeVisible();
 });

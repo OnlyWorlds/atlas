@@ -46,7 +46,7 @@ export class CreateWorldModal extends BaseModal {
 
   private buildModal(): HTMLElement {
     const { overlay, body } = this.buildModalShell({
-      title: 'create local world',
+      title: 'Create local world',
       dataModal: 'create-world',
     });
 
@@ -55,7 +55,7 @@ export class CreateWorldModal extends BaseModal {
     body.innerHTML = `
       <form data-form="create-world">
         <label class="atlas-modal-field">
-          <span>name</span>
+          <span>Name</span>
           <input class="atlas-input" type="text" name="world-name" placeholder="untitled world" autocomplete="off" />
         </label>
         <p class="atlas-modal-hint">
@@ -65,8 +65,8 @@ export class CreateWorldModal extends BaseModal {
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
-          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="pick" ${rootDisplay ? '' : 'disabled'}>create</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+          <button type="submit" class="atlas-btn-primary" data-action="pick" ${rootDisplay ? '' : 'disabled'}>Create</button>
         </div>
       </form>
     `;
@@ -85,7 +85,7 @@ export class CreateWorldModal extends BaseModal {
       const name = nameInput.value.trim() || 'untitled world';
 
       submitBtn.disabled = true;
-      submitBtn.textContent = 'creating…';
+      submitBtn.textContent = 'Creating…';
       // Hide cancel during the in-flight operation so the user can't cancel
       // mid-creation (the FS work isn't safely interruptable). Restored on
       // failure below; not needed on success since the modal closes.
@@ -99,7 +99,7 @@ export class CreateWorldModal extends BaseModal {
       } catch (err) {
         this.showError(errorBox, err instanceof Error ? err.message : String(err));
         submitBtn.disabled = false;
-        submitBtn.textContent = 'create';
+        submitBtn.textContent = 'Create';
         cancelBtn.hidden = false;
       }
     });

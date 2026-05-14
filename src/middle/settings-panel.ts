@@ -163,17 +163,17 @@ function renderTab(
 function renderIdentityTab(reg: ReturnType<typeof getState>['registry']): string {
   return `
     <section class="atlas-settings-section">
-      <h3>identity</h3>
+      <h3>Identity</h3>
       <p class="atlas-settings-hint">global, used when creating or linking online worlds. changes to PIN take effect immediately — any active sync engine is re-attached.</p>
       <label class="atlas-settings-field">
-        <span>email</span>
+        <span>Email</span>
         <input class="ow-input" type="email" name="email"
                value="${escapeAttr(reg.email ?? '')}"
                placeholder="you@example.com"
                autocomplete="email" />
       </label>
       <label class="atlas-settings-field">
-        <span>pin</span>
+        <span>PIN</span>
         <input class="ow-input" type="text" name="pin"
                value="${escapeAttr(reg.pin ?? '')}"
                placeholder="onlyworlds pin (4 digits)"
@@ -190,18 +190,18 @@ function renderAtlasTab(): string {
   const ar = getState().atlasRoot;
   return `
     <section class="atlas-settings-section">
-      <h3>atlas folder</h3>
+      <h3>Atlas folder</h3>
       <p class="atlas-settings-hint">where atlas keeps your worlds. new local worlds default here. changing this folder doesn't move existing worlds — they stay where they were created.</p>
       ${ar
         ? `<dl class="atlas-settings-meta">
-            <dt>folder</dt><dd><code>${escapeText(ar.pathHint ?? ar.folderName)}</code></dd>
+            <dt>Folder</dt><dd><code>${escapeText(ar.pathHint ?? ar.folderName)}</code></dd>
           </dl>
           <div class="atlas-settings-actions">
-            <button class="ow-btn ow-btn-secondary" data-action="change-atlas-root">change folder</button>
+            <button class="ow-btn ow-btn-secondary" data-action="change-atlas-root">Change folder</button>
           </div>`
         : `<p>not set up yet.</p>
            <div class="atlas-settings-actions">
-             <button class="ow-btn ow-btn-primary" data-action="change-atlas-root">set up atlas folder</button>
+             <button class="ow-btn ow-btn-primary" data-action="change-atlas-root">Set up atlas folder</button>
            </div>`}
     </section>
   `;
@@ -217,18 +217,18 @@ function renderSyncTab(reg: ReturnType<typeof getState>['registry']): string {
   const pauseAll = !!reg.sync_pause_all;
   return `
     <section class="atlas-settings-section">
-      <h3>sync — global</h3>
+      <h3>Sync — global</h3>
       <p class="atlas-settings-hint">applies to every api-linked world. atlas is local-first: pulls are opt-in.</p>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="pause-all" ${pauseAll ? 'checked' : ''} />
-        <span>pause all sync (master kill switch)</span>
+        <span>Pause all sync (master kill switch)</span>
       </label>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="pull-on-activate" ${pullOnActivate ? 'checked' : ''} ${pauseAll ? 'disabled' : ''} />
-        <span>pull from api when a world activates</span>
+        <span>Pull from API when a world activates</span>
       </label>
       <label class="atlas-settings-field">
-        <span>auto-refresh cadence</span>
+        <span>Auto-refresh cadence</span>
         <select class="ow-input" name="cadence" ${pauseAll ? 'disabled' : ''}>
           ${CADENCE_OPTIONS.map(o =>
             `<option value="${o.ms ?? ''}" ${o.ms === cadenceMs ? 'selected' : ''}>${o.label}</option>`
@@ -236,7 +236,7 @@ function renderSyncTab(reg: ReturnType<typeof getState>['registry']): string {
         </select>
       </label>
       <fieldset class="atlas-settings-fieldset" ${pauseAll ? 'disabled' : ''}>
-        <legend>default conflict policy</legend>
+        <legend>Default conflict policy</legend>
         ${POLICY_OPTIONS.map(p => `
           <label class="atlas-settings-radio">
             <input type="radio" name="policy" value="${p.value}" ${p.value === defaultPolicy ? 'checked' : ''} />
@@ -249,7 +249,7 @@ function renderSyncTab(reg: ReturnType<typeof getState>['registry']): string {
       </fieldset>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="confirm-server-del" ${confirmServerDel ? 'checked' : ''} />
-        <span>confirm before deleting locally to match a server delete</span>
+        <span>Confirm before deleting locally to match a server delete</span>
       </label>
     </section>
   `;
@@ -264,29 +264,29 @@ function renderWorldTab(world: WorldRegistryEntry): string {
     ? `
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="world-paused" ${paused ? 'checked' : ''} />
-        <span>stay offline (per-world)</span>
+        <span>Stay offline (per-world)</span>
       </label>
       <div class="atlas-settings-actions">
-        <button class="ow-btn ow-btn-secondary" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>refresh from api</button>
-        <button class="ow-btn ow-btn-secondary" data-action="test-connection">test connection</button>
-        <button class="ow-btn ow-btn-secondary" data-action="unlink-from-api">unlink from api</button>
+        <button class="ow-btn ow-btn-secondary" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from API</button>
+        <button class="ow-btn ow-btn-secondary" data-action="test-connection">Test connection</button>
+        <button class="ow-btn ow-btn-secondary" data-action="unlink-from-api">Unlink from API</button>
       </div>`
     : `<div class="atlas-settings-actions">
-        <button class="ow-btn ow-btn-primary" data-action="make-online">make online</button>
+        <button class="ow-btn ow-btn-primary" data-action="make-online">Make online</button>
       </div>`;
   return `
     <section class="atlas-settings-section">
-      <h3>active world</h3>
+      <h3>Active world</h3>
       <label class="atlas-settings-field">
-        <span>name</span>
+        <span>Name</span>
         <input class="ow-input" type="text" name="world-name" value="${escapeAttr(world.name)}" />
       </label>
       <dl class="atlas-settings-meta">
-        <dt>state</dt><dd>${stateLabel}</dd>
-        <dt>folder</dt><dd><code>${escapeText(world.folder.folder_name)}</code></dd>
-        <dt>id</dt><dd><code>${escapeText(world.id)}</code></dd>
+        <dt>State</dt><dd>${stateLabel}</dd>
+        <dt>Folder</dt><dd><code>${escapeText(world.folder.folder_name)}</code></dd>
+        <dt>ID</dt><dd><code>${escapeText(world.id)}</code></dd>
         ${world.state === 'api-linked' && world.api
-          ? `<dt>api world id</dt><dd><code>${escapeText(world.api.world_id)}</code></dd>`
+          ? `<dt>API world ID</dt><dd><code>${escapeText(world.api.world_id)}</code></dd>`
           : ''}
         ${world.state === 'api-linked' && world.api?.world_name
           ? (() => {
@@ -295,14 +295,14 @@ function renderWorldTab(world: WorldRegistryEntry): string {
               const hint = differs
                 ? ' <span class="atlas-settings-hint-inline" title="local name and server-side name diverged. atlas never renames the server world automatically.">(differs from local)</span>'
                 : '';
-              return `<dt>name on api</dt><dd>${escapeText(apiName)}${hint}</dd>`;
+              return `<dt>Name on API</dt><dd>${escapeText(apiName)}${hint}</dd>`;
             })()
           : ''}
       </dl>
       ${apiActions}
       <div class="atlas-settings-actions atlas-settings-actions-danger">
-        <button class="ow-btn ow-btn-secondary" data-action="delete-world">forget world (keep folder)</button>
-        <button class="ow-btn ow-btn-secondary" data-action="delete-world-permanent" title="remove from atlas AND delete the world folder on disk">delete world + folder</button>
+        <button class="ow-btn ow-btn-secondary" data-action="delete-world">Forget world (keep folder)</button>
+        <button class="ow-btn ow-btn-secondary" data-action="delete-world-permanent" title="remove from atlas AND delete the world folder on disk">Delete world + folder</button>
       </div>
     </section>
   `;
@@ -313,12 +313,12 @@ function renderWorldTab(world: WorldRegistryEntry): string {
 function renderAboutTab(): string {
   return `
     <section class="atlas-settings-section">
-      <h3>about atlas</h3>
+      <h3>About Atlas</h3>
       <p>local-first OnlyWorlds browser + editor. folder is the source of truth; api sync is optional.</p>
       <dl class="atlas-settings-meta">
-        <dt>version</dt><dd>0.0.1 (phase 3.5)</dd>
-        <dt>repo</dt><dd><a href="https://github.com/OnlyWorlds/atlas" target="_blank" rel="noopener">github.com/OnlyWorlds/atlas</a></dd>
-        <dt>onlyworlds</dt><dd><a href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a></dd>
+        <dt>Version</dt><dd>0.0.1 (phase 3.5)</dd>
+        <dt>Repo</dt><dd><a href="https://github.com/OnlyWorlds/atlas" target="_blank" rel="noopener">github.com/OnlyWorlds/atlas</a></dd>
+        <dt>OnlyWorlds</dt><dd><a href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a></dd>
       </dl>
     </section>
   `;

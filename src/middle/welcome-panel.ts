@@ -27,12 +27,12 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // First-launch: no atlas folder yet.
     if (!atlasRoot) {
       root.innerHTML = `
-        <header class="atlas-middle-header"><h2>welcome to atlas</h2></header>
+        <header class="atlas-middle-header"><h2>Welcome to Atlas</h2></header>
         <div class="atlas-welcome-empty">
           <p>atlas keeps your worlds as folders on disk. one chosen folder holds all your worlds.</p>
           <p class="atlas-welcome-hint">pick any folder — atlas will create an <code>onlyworlds-atlas/</code> subfolder inside it for your worlds. (if you pick a folder that's already an atlas root, atlas just re-uses it.)</p>
           <div class="atlas-welcome-actions">
-            <button class="ow-btn ow-btn-primary" data-action="setup-atlas">set up atlas folder</button>
+            <button class="ow-btn ow-btn-primary" data-action="setup-atlas">Set up atlas folder</button>
           </div>
         </div>
       `;
@@ -53,7 +53,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           toastManager.error(err instanceof Error ? err.message : String(err));
         } finally {
           btn.disabled = false;
-          btn.textContent = 'set up atlas folder';
+          btn.textContent = 'Set up atlas folder';
         }
       });
       return;
@@ -62,7 +62,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // Atlas root set but no world active.
     if (!active) {
       root.innerHTML = `
-        <header class="atlas-middle-header"><h2>atlas</h2></header>
+        <header class="atlas-middle-header"><h2>Atlas</h2></header>
         <div class="atlas-welcome-empty">
           <p>no world open.</p>
           <p class="atlas-welcome-hint">use the sidebar to <strong>create local</strong>, or pick an existing world from the list.</p>
@@ -93,7 +93,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         <p>${counts.content} content element${counts.content === 1 ? '' : 's'},
            ${counts.spatial} spatial element${counts.spatial === 1 ? '' : 's'}.</p>
         <div class="atlas-welcome-actions">
-          <button class="atlas-btn-ghost" data-action="open-timeline">view timeline →</button>
+          <button class="atlas-btn-ghost" data-action="open-timeline">View timeline →</button>
         </div>
       </div>
     `;

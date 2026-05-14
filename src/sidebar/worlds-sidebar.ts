@@ -40,12 +40,12 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const root = getState().atlasRoot;
     header.innerHTML = root
       ? `
-        <button class="atlas-btn-ghost" data-action="create-local" title="create a new world in your atlas folder">+ new local</button>
-        <button class="atlas-btn-ghost" data-action="new-api" title="create a new world on onlyworlds.com AND in your atlas folder">+ new api</button>
-        <button class="atlas-btn-ghost" data-action="link-api" title="download an existing OnlyWorlds api world into atlas">+ link api</button>
+        <button class="atlas-btn-ghost" data-action="create-local" title="create a new world in your atlas folder">+ New local</button>
+        <button class="atlas-btn-ghost" data-action="new-api" title="create a new world on onlyworlds.com AND in your atlas folder">+ New API</button>
+        <button class="atlas-btn-ghost" data-action="link-api" title="download an existing OnlyWorlds api world into atlas">+ Link API</button>
       `
       : `
-        <button class="atlas-btn-ghost" data-action="setup-atlas" title="pick the folder atlas will use for all your worlds">+ set up atlas</button>
+        <button class="atlas-btn-ghost" data-action="setup-atlas" title="pick the folder atlas will use for all your worlds">+ Set up atlas</button>
       `;
     const createBtn = header.querySelector<HTMLButtonElement>('[data-action="create-local"]');
     createBtn?.addEventListener('click', () => new CreateWorldModal(toasts).open());
@@ -152,8 +152,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
 
     if (worlds.length === 0) {
       listEl.innerHTML = state.atlasRoot
-        ? `<div class="atlas-pane-empty">no worlds yet — create one to start.</div>`
-        : `<div class="atlas-pane-empty">set up your atlas folder above to begin.</div>`;
+        ? `<div class="atlas-pane-empty">No worlds yet — create one to start.</div>`
+        : `<div class="atlas-pane-empty">Set up your atlas folder above to begin.</div>`;
       return;
     }
 

@@ -39,7 +39,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   const searchInput = document.createElement('input');
   searchInput.className = 'atlas-input';
   searchInput.type = 'text';
-  searchInput.placeholder = 'search elements...';
+  searchInput.placeholder = 'Search elements...';
   searchInput.setAttribute('data-role', 'elements-search');
   searchInput.style.flex = '1 1 auto';
   searchRow.appendChild(searchInput);
@@ -116,7 +116,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     if (!state.active) {
       strip.innerHTML = '';
-      listEl.innerHTML = `<div class="atlas-pane-empty">no active world. pick one from the worlds tab.</div>`;
+      listEl.innerHTML = `<div class="atlas-pane-empty">No active world. Pick one from the Worlds tab.</div>`;
       return;
     }
 
@@ -137,8 +137,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     if (filtered.length === 0) {
       const msg = elements.length === 0
-        ? 'no elements yet — click <b>+ new element</b> to start.'
-        : 'no elements match the current filter.';
+        ? 'No elements yet — click <b>+ new element</b> to start.'
+        : 'No elements match the current filter.';
       listEl.innerHTML = `<div class="atlas-pane-empty">${msg}</div>`;
       return;
     }

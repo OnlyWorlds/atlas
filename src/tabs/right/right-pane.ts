@@ -86,7 +86,7 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       });
       if (tab.kind === 'map-index') {
         btn.setAttribute('data-tab-kind', 'map-index');
-        btn.innerHTML = `<span class="material-symbols-outlined">view_list</span><span>maps</span>`;
+        btn.innerHTML = `<span class="material-symbols-outlined">view_list</span><span>Maps</span>`;
         tabBar.appendChild(btn);
         return;
       }

@@ -75,7 +75,7 @@ class MapCreateModal extends BaseModal {
 
   private buildModal(): HTMLElement {
     const { overlay, body } = this.buildModalShell({
-      title: 'new map',
+      title: 'New map',
       panelClass: 'atlas-map-create-panel',
       dataModal: 'create-map',
     });
@@ -83,7 +83,7 @@ class MapCreateModal extends BaseModal {
     body.innerHTML = `
       <form data-form="create-map">
         <label class="atlas-modal-field">
-          <span>name</span>
+          <span>Name</span>
           <input class="atlas-input" type="text" name="map-name" placeholder="map name..." autocomplete="off" />
         </label>
         <div class="atlas-modal-field">
@@ -101,8 +101,8 @@ class MapCreateModal extends BaseModal {
         </label>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
-          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="create">create</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+          <button type="submit" class="atlas-btn-primary" data-action="create">Create</button>
         </div>
       </form>
     `;
@@ -131,7 +131,7 @@ class MapCreateModal extends BaseModal {
         return;
       }
       submitBtn.disabled = true;
-      submitBtn.textContent = 'creating...';
+      submitBtn.textContent = 'Creating...';
       cancelBtn.hidden = true;
       try {
         const store = getActiveStore()!;
@@ -172,7 +172,7 @@ class MapCreateModal extends BaseModal {
         errorBox.textContent = err instanceof Error ? err.message : String(err);
         errorBox.hidden = false;
         submitBtn.disabled = false;
-        submitBtn.textContent = 'create';
+        submitBtn.textContent = 'Create';
         cancelBtn.hidden = false;
       }
     });
