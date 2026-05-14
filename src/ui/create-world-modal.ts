@@ -86,6 +86,10 @@ export class CreateWorldModal extends BaseModal {
 
       submitBtn.disabled = true;
       submitBtn.textContent = 'creating…';
+      // Hide cancel during the in-flight operation so the user can't cancel
+      // mid-creation (the FS work isn't safely interruptable). Restored on
+      // failure below; not needed on success since the modal closes.
+      cancelBtn.hidden = true;
       try {
         const { entry } = await createWorldInRoot(name);
         this.toasts.success(`created ${entry.name}`);
@@ -96,6 +100,7 @@ export class CreateWorldModal extends BaseModal {
         this.showError(errorBox, err instanceof Error ? err.message : String(err));
         submitBtn.disabled = false;
         submitBtn.textContent = 'create';
+        cancelBtn.hidden = false;
       }
     });
 

@@ -160,6 +160,7 @@ export class ElementCreateModal extends BaseModal {
       }
       submitBtn.disabled = true;
       submitBtn.textContent = 'creating…';
+      cancelBtn.hidden = true;
       try {
         const store = getActiveStore()!;
         const el = await store.createElement(this.selected, { name });
@@ -178,6 +179,7 @@ export class ElementCreateModal extends BaseModal {
         errorBox.hidden = false;
         submitBtn.disabled = false;
         submitBtn.textContent = 'create';
+        cancelBtn.hidden = false;
       }
     });
 

@@ -170,13 +170,15 @@ test('unlink-from-api flips state back to local-only', async ({ page }) => {
   page.on('dialog', d => d.accept());
   await page.click('[data-action="unlink-from-api"]');
 
+  // The unlink handler is async (awaits resetSyncBaseline). Wait for the
+  // visible signal that it completed: make-online replaces unlink in the
+  // world tab. Without this, reading localStorage races the handler.
+  await expect(page.locator('[data-action="make-online"]')).toBeVisible();
+  await expect(page.locator('[data-action="unlink-from-api"]')).toHaveCount(0);
+
   // Registry flipped back to local-only.
   const reg = await loadRegistry(page);
   const world = (reg.worlds as Array<{ state: string; api?: unknown }>)[0];
   expect(world.state).toBe('local-only');
   expect(world.api).toBeUndefined();
-
-  // World tab now shows make-online (local-only), not unlink/refresh.
-  await expect(page.locator('[data-action="make-online"]')).toBeVisible();
-  await expect(page.locator('[data-action="unlink-from-api"]')).toHaveCount(0);
 });

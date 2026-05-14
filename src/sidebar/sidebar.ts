@@ -9,10 +9,36 @@
  */
 
 import { getState, patchSlice, subscribe, type SidebarMode } from '../core/state';
-import { onHashChange, parseHash, navigate, worldHash, elementsHash, settingsHash } from '../core/router';
+import { onHashChange, parseHash, navigate, worldHash, elementsHash, elementHash, settingsHash } from '../core/router';
+import type { ActiveWorldRef } from '../core/state';
 import { mountWorldsBody } from './worlds-sidebar';
 import { mountElementsBody } from './elements-sidebar';
 import { ToastManager } from '../ui/toast-manager';
+
+/**
+ * Right-tab destination given an active world: if a selection survives in
+ * `ui.selectedElementId` AND that element still exists in the active world's
+ * cache, return the element URL; otherwise return the bare elements-list URL.
+ *
+ * Used by:
+ *   - sidebar mode toggle (clicking the right tab restores selection)
+ *   - gear-as-toggle (clicking gear while on Settings returns to the right
+ *     context, which is the selected element if any)
+ *   - worlds-sidebar.activateWorld (instant-feel navigation)
+ *
+ * The "still exists" check matters because the cache may be empty (we just
+ * cleared it for an instant-feel world switch) — in that case fall back to
+ * the elements list rather than navigating to a URL that would render the
+ * "element not found" empty state.
+ */
+export function rightTabHashFor(active: ActiveWorldRef): string {
+  const state = getState();
+  const sel = state.ui.selectedElementId;
+  if (sel && state.data.elements.some(e => e.id === sel)) {
+    return elementHash(active.worldId, sel);
+  }
+  return elementsHash(active.worldId);
+}
 
 function escapeText(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -23,71 +49,115 @@ export interface SidebarMount {
   content: HTMLElement;
   footer: HTMLElement;
   toasts: ToastManager;
+  /**
+   * Reset the three-pane shell ratios to defaults (and clear the persisted
+   * value). Wired to the reset-layout icon button rendered next to the gear.
+   */
+  onResetLayout: () => void;
 }
 
 export function mountSidebar(mount: SidebarMount): () => void {
-  const { toggle, content, footer, toasts } = mount;
+  const { toggle, content, footer, toasts, onResetLayout } = mount;
   toggle.innerHTML = '';
   footer.innerHTML = '';
 
-  // ----- Mode toggle (renders into shell.sidebarToggle which already has CSS) -----
+  // ----- Mode toggle: [ worlds | <world-name> ] -----
+  //
+  // Reads URL + registry rather than `state.active` so the right-tab label
+  // flips synchronously when a world is activated (the registry has the entry
+  // immediately; state.active only fills in after FS work completes). This is
+  // the lever that makes world-switch feel instant.
+  //
+  // Right tab is hidden entirely when no world is active — there's nothing
+  // meaningful to switch to. The Worlds tab is always present.
   function renderToggle(): void {
     toggle.innerHTML = '';
+    const route = parseHash(window.location.hash);
     const mode = getState().ui.sidebarMode;
-    const active = getState().active;
+    const reg = getState().registry;
+    const worldId = route.worldId;
+    const entry = worldId ? reg.worlds.find(w => w.id === worldId) : undefined;
     const worldsActive = mode === 'worlds';
     const elementsActive = mode === 'elements';
-    const elementsDisabled = !active;
 
-    const worldLabel = active?.meta.name || 'worlds';
     const worldsBtn = document.createElement('button');
     worldsBtn.type = 'button';
     worldsBtn.className = 'atlas-mode-btn atlas-mode-btn-worlds' + (worldsActive ? ' active' : '');
     worldsBtn.setAttribute('data-action', 'mode-worlds');
-    worldsBtn.title = active ? `active: ${active.meta.name}. click to manage worlds.` : 'worlds';
-    worldsBtn.innerHTML = `
-      <img class="atlas-mode-ow-icon" src="./owlogo.png" alt="OnlyWorlds" />
-      <span class="atlas-mode-btn-label">${escapeText(worldLabel)}</span>
-    `;
+    worldsBtn.title = 'worlds';
+    worldsBtn.innerHTML = '<span class="atlas-mode-btn-label">worlds</span>';
     worldsBtn.addEventListener('click', () => switchMode('worlds'));
     toggle.appendChild(worldsBtn);
 
-    const elementsBtn = document.createElement('button');
-    elementsBtn.type = 'button';
-    elementsBtn.className = 'atlas-mode-btn' + (elementsActive ? ' active' : '');
-    elementsBtn.setAttribute('data-action', 'mode-elements');
-    elementsBtn.disabled = elementsDisabled;
-    elementsBtn.title = elementsDisabled ? 'open a world to browse elements' : 'elements';
-    elementsBtn.innerHTML = '<span class="atlas-mode-btn-label">elements</span>';
-    elementsBtn.addEventListener('click', () => switchMode('elements'));
-    toggle.appendChild(elementsBtn);
+    if (entry) {
+      const rightBtn = document.createElement('button');
+      rightBtn.type = 'button';
+      rightBtn.className = 'atlas-mode-btn' + (elementsActive ? ' active' : '');
+      rightBtn.setAttribute('data-action', 'mode-elements');
+      rightBtn.title = entry.name;
+      rightBtn.innerHTML = `<span class="atlas-mode-btn-label">${escapeText(entry.name)}</span>`;
+      rightBtn.addEventListener('click', () => switchMode('elements'));
+      toggle.appendChild(rightBtn);
+    }
   }
 
   function switchMode(target: SidebarMode): void {
     const state = getState();
     const active = state.active;
-    if (target === 'elements' && !active) return;
-    // Settings sub-routes don't have a mode; leaving settings via mode click
-    // returns to the relevant top-level for that mode.
     if (target === 'worlds') {
+      // Worlds tab works even without an active world: lands on the welcome
+      // root. If a world IS active, navigating to its worldHash keeps the
+      // sidebar in worlds mode and the middle in welcome.
       if (active) navigate(worldHash(active.worldId));
       else navigate('#/');
-    } else {
-      if (active) navigate(elementsHash(active.worldId));
+      return;
     }
+    // target === 'elements'. Right tab navigates to the element if a selection
+    // survives in state.ui (Q3 — selection-aware switch). Falls back to the
+    // elements list if there's no selection or the selected element no longer
+    // exists in the cache.
+    if (!active) return;
+    navigate(rightTabHashFor(active));
   }
 
-  // ----- Footer gear -----
+  // ----- Footer gear: toggles Settings open/closed -----
+  //
+  // Clicking gear from any non-settings route → opens Settings.
+  // Clicking gear from Settings → closes Settings + restores the right-tab
+  // context (selected element if any, else elements list). This is Q3:
+  // gear-as-toggle returns the user to where they were instead of stranding
+  // them in a settings view.
   const gear = document.createElement('button');
   gear.className = 'atlas-icon-btn';
+  // data-action stays "open-settings" for selector stability (heavy e2e usage);
+  // the BEHAVIOR is open-on-first-click, close-on-second-click (toggle).
   gear.setAttribute('data-action', 'open-settings');
   gear.setAttribute('aria-label', 'settings');
   gear.innerHTML = '<span class="material-symbols-outlined">settings</span>';
   footer.appendChild(gear);
   gear.addEventListener('click', () => {
-    const active = getState().active;
-    navigate(settingsHash(active?.worldId ?? null));
+    const state = getState();
+    const active = state.active;
+    const route = parseHash(window.location.hash);
+    if (route.mode === 'settings') {
+      // Close Settings.
+      if (active) navigate(rightTabHashFor(active));
+      else navigate('#/');
+    } else {
+      // Open Settings, scoped to active world if any.
+      navigate(settingsHash(active?.worldId ?? null));
+    }
   });
+
+  // ----- Footer reset-layout icon — restore divider ratios to defaults -----
+  const resetLayoutBtn = document.createElement('button');
+  resetLayoutBtn.className = 'atlas-icon-btn';
+  resetLayoutBtn.setAttribute('data-action', 'reset-layout');
+  resetLayoutBtn.setAttribute('aria-label', 'reset layout');
+  resetLayoutBtn.title = 'reset pane widths to defaults';
+  resetLayoutBtn.innerHTML = '<span class="material-symbols-outlined">restart_alt</span>';
+  footer.appendChild(resetLayoutBtn);
+  resetLayoutBtn.addEventListener('click', () => onResetLayout());
 
   // ----- Body mount/unmount as mode changes -----
   let unmountBody: (() => void) | null = null;
@@ -114,9 +184,15 @@ export function mountSidebar(mount: SidebarMount): () => void {
     }
   }
 
+  function renderGearState(): void {
+    const route = parseHash(window.location.hash);
+    gear.classList.toggle('active', route.mode === 'settings');
+  }
+
   function render(): void {
     syncModeFromRoute();
     renderToggle();
+    renderGearState();
     mountBody();
   }
 

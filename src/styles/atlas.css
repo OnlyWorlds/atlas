@@ -169,29 +169,6 @@
   cursor: not-allowed;
 }
 
-/* Worlds button has an OW icon anchored at the far left; label remains centered. */
-.atlas-mode-btn-worlds {
-  position: relative;
-  padding-left: 32px;
-  /* room for the icon */
-}
-
-.atlas-mode-ow-icon {
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 15px;
-  height: 15px;
-  object-fit: contain;
-  opacity: 0.8;
-  pointer-events: none;
-}
-
-.atlas-mode-btn-worlds.active .atlas-mode-ow-icon {
-  opacity: 1;
-}
-
 .atlas-mode-btn-label {
   display: inline-block;
   overflow: hidden;
@@ -1202,8 +1179,9 @@
 }
 
 #toast-container {
-  top: 12px !important;
+  bottom: 12px !important;
   right: 12px !important;
+  top: auto !important;
   gap: 6px !important;
 }
 
@@ -1212,24 +1190,25 @@
    ============================================================ */
 
 .atlas-sync-pill {
-  position: fixed;
-  right: 14px;
-  bottom: 14px;
-  z-index: 9000;
+  /* Bout EE: pill lives inside the sidebar footer as a flex sibling of the
+     gear + reset buttons. `margin-left: auto` anchors it to the right edge
+     of the footer regardless of how many other buttons sit on the left. */
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 11px;
-  border-radius: 12px;
+  padding: 4px 9px;
+  border-radius: 11px;
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.78);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   color: rgba(255, 255, 255, 0.78);
   user-select: none;
-  transition: opacity 160ms ease, background 160ms ease, border-color 160ms ease;
+  transition: background 160ms ease, border-color 160ms ease;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .atlas-sync-pill[data-active="false"] {
@@ -2306,8 +2285,7 @@
 }
 
 .atlas-sync-pill[data-state="none"] {
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 
 /* Conflict badge inside the pill — actionable, warm-tinted. */

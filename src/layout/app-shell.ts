@@ -23,10 +23,18 @@ export interface AppShell {
   right: HTMLElement;
   rightTabBar: HTMLElement;
   rightPane: HTMLElement;
+  /**
+   * Reset divider ratios to defaults and clear the persisted value.
+   * Wired to the reset-layout button in the sidebar footer.
+   */
+  resetRatios: () => void;
 }
 
 interface Ratios { sidebar: number; middle: number; }
-const DEFAULT_RATIOS: Ratios = { sidebar: 0.18, middle: 0.52 };
+// Sidebar default at 19% — a touch wider than the original 18% so the footer
+// fits gear + reset + sync pill without crowding, but tighter than 20% which
+// took a noticeable bite out of the middle pane.
+const DEFAULT_RATIOS: Ratios = { sidebar: 0.19, middle: 0.51 };
 
 function loadRatios(): Ratios {
   try {
@@ -123,7 +131,14 @@ export function mountAppShell(container: HTMLElement): AppShell {
     applyRatios();
   }, () => saveRatios(ratios));
 
-  return { root: shell, sidebar, sidebarToggle, sidebarContent, sidebarFooter, middle, right, rightTabBar, rightPane };
+  function resetRatios(): void {
+    ratios = { ...DEFAULT_RATIOS };
+    applyRatios();
+    try { localStorage.removeItem(SHELL_RATIOS_STORAGE_KEY); } catch { /* ignore */ }
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  return { root: shell, sidebar, sidebarToggle, sidebarContent, sidebarFooter, middle, right, rightTabBar, rightPane, resetRatios };
 }
 
 function attachDivider(

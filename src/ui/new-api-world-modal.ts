@@ -77,7 +77,10 @@ export class NewApiWorldModal extends BaseModal {
       if (!pin) { errorEl.textContent = 'pin is required'; errorEl.hidden = false; return; }
 
       submitBtn.disabled = true;
-      cancelBtn.disabled = true;
+      // Hide cancel: this flow does local + remote work in sequence, and
+      // bailing mid-way is hard to recover from cleanly. Hidden > disabled —
+      // user shouldn't even see the affordance.
+      cancelBtn.hidden = true;
       nameInput.disabled = true;
       emailInput.disabled = true;
       pinInput.disabled = true;
@@ -135,7 +138,7 @@ export class NewApiWorldModal extends BaseModal {
         errorEl.textContent = msg;
         errorEl.hidden = false;
         submitBtn.disabled = false;
-        cancelBtn.disabled = false;
+        cancelBtn.hidden = false;
         nameInput.disabled = false;
         emailInput.disabled = false;
         pinInput.disabled = false;

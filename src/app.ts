@@ -56,6 +56,7 @@ export function startApp(container: HTMLElement): AppHandle {
     content: shell.sidebarContent,
     footer: shell.sidebarFooter,
     toasts,
+    onResetLayout: () => shell.resetRatios(),
   });
 
   // Right pane (tab bar + active tab body).

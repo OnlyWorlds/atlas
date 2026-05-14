@@ -42,9 +42,11 @@ async function setupWorldA(page: Page) {
   await createWorld(page, 'world a');
 }
 
-test('elements mode toggle is disabled without an active world', async ({ page }) => {
+test('right tab is hidden without an active world; worlds tab remains', async ({ page }) => {
   await freshBoot(page);
-  await expect(page.locator('.atlas-mode-btn[data-action="mode-elements"]')).toBeDisabled();
+  // Right tab (per-world label) is rendered only when a world is active. With
+  // no active world there's nothing meaningful to switch to.
+  await expect(page.locator('.atlas-mode-btn[data-action="mode-elements"]')).toHaveCount(0);
   await expect(page.locator('.atlas-mode-btn[data-action="mode-worlds"]')).toBeEnabled();
 });
 

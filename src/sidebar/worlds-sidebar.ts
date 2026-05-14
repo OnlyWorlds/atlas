@@ -18,6 +18,7 @@ import { LinkWorldModal } from '../ui/link-world-modal';
 import { setupAtlasRoot } from '../setup/atlas-root-flow';
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
+import { rightTabHashFor } from './sidebar';
 import { ToastManager } from '../ui/toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
 
@@ -252,15 +253,61 @@ export async function activateWorld(
     if (!silent) toasts.error(`world ${worldId} not found in registry`);
     return false;
   }
-  // Already active? Just navigate (still respect deep URL).
+  // Already active? Click should still "open" — switch to the right-tab view
+  // if we're not already on a meaningful one. Without this, clicking the
+  // already-active world from worlds-mode (default landing) appeared to do
+  // nothing — Captain flagged this as a regression in the Bout CC follow-up.
   if (state.active?.worldId === worldId) {
-    navigateAfterActivate(worldId);
+    const route = parseHash(window.location.hash);
+    const onRightTab =
+      route.mode === 'elements' ||
+      route.mode === 'element' ||
+      route.mode === 'map' ||
+      route.mode === 'timeline';
+    if (!onRightTab) {
+      // Worlds-mode landing or Settings → switch to the right tab (selected
+      // element if any, else elements list).
+      navigate(rightTabHashFor(state.active));
+    } else {
+      // Already on a right-tab route — re-fire hashchange so subscribers can
+      // refresh against the (re-clicked) world.
+      navigate(window.location.hash);
+    }
     return true;
+  }
+
+  // INSTANT-FEEL navigation (normal click path only).
+  //
+  // The slow part of world activation is the FS work below (handle resolve,
+  // permission re-grant, store.open, listElements). Pre-fix, navigation
+  // happened AFTER all that — the user clicked, the UI froze ~500ms, then
+  // suddenly switched. Move the cheap stuff up: clear stale cache + flip the
+  // URL synchronously, so the sidebar toggle re-renders against the new
+  // world's URL in the same frame as the click. The elements list mounts
+  // empty until FS reads complete; the user sees the switch happen
+  // immediately and the loading delay bleeds into a brief empty state rather
+  // than into a frozen UI.
+  //
+  // The toggle reads world name from registry+URL (not state.active), so the
+  // right-tab label flips correctly before state.active fills in.
+  //
+  // preserveSelection=true (boot path with a deep URL) skips this: the URL
+  // already names the world, we don't want to wipe selection that the URL is
+  // about to re-establish.
+  const priorHash = window.location.hash;
+  if (!preserveSelection) {
+    patchSlice('data', { elements: [] });
+    patchSlice('ui', { ...getState().ui, selectedElementId: null });
+    const currentRoute = parseHash(window.location.hash);
+    if (currentRoute.worldId !== worldId) {
+      navigate(elementsHash(worldId));
+    }
   }
 
   const handle = await loadHandle(entry.folder.handle_key);
   if (!handle) {
     if (!silent) toasts.error(`folder handle missing for ${entry.name}. delete + recreate to recover.`);
+    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
     return false;
   }
   const granted = permissionMode === 'query'
@@ -268,6 +315,7 @@ export async function activateWorld(
     : await ensureWritable(handle);
   if (!granted) {
     if (!silent) toasts.error(`folder permission denied for ${entry.name}`);
+    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
     return false;
   }
 
@@ -296,16 +344,17 @@ export async function activateWorld(
     console.warn('[worlds-sidebar] failed to prime elements:', err);
     patchSlice('data', { elements: [] });
   }
-  // Reset selection unless caller asked us to preserve it (URL-driven restore).
-  if (!preserveSelection) {
-    patchSlice('ui', { ...getState().ui, selectedElementId: null });
-  }
 
   // Attach SyncEngine if this world is api-linked. Auto-detaches the previous
   // world's engine. For local-only worlds this is a no-op (returns null).
   attachSyncEngine(entry, store);
 
-  navigateAfterActivate(worldId);
+  if (preserveSelection) {
+    // Boot path: URL was already correct (deep route, possibly with /element/<id>).
+    // Fire hashchange so route-aware subscribers re-resolve against the now-
+    // populated state. Non-boot already navigated synchronously above.
+    navigateAfterActivate(worldId);
+  }
   return true;
 }
 

@@ -309,9 +309,15 @@ export function mountElementDetail(target: HTMLElement): () => void {
     pickBtn.title = raw ? `change link` : `pick a ${meta.target ?? 'link'}`;
     pickBtn.innerHTML = `<span class="material-symbols-outlined">${pickIconFor(meta.target)}</span>`;
     pickBtn.addEventListener('click', async () => {
+      // Exclude the current element itself and any value already linked here.
+      // Self-linking is never meaningful — a Character pointing at itself via
+      // `friends`, a Location pointing at itself via `parent_location_id`, etc.
+      const exclude = new Set<string>();
+      exclude.add(el.id);
+      if (raw) exclude.add(String(raw));
       const picked = await pickElement({
         restrictToType: meta.target,
-        excludeIds: raw ? [String(raw)] : undefined,
+        excludeIds: [...exclude],
         title: `pick a ${meta.target ?? 'link'} for ${humanizeFieldName(meta.name)}`,
       });
       if (!picked) return;
@@ -341,9 +347,12 @@ export function mountElementDetail(target: HTMLElement): () => void {
     addBtn.title = ids.length === 0 ? `pick a ${meta.target ?? 'link'}` : `add another ${meta.target ?? 'link'}`;
     addBtn.innerHTML = `<span class="material-symbols-outlined">${pickIconFor(meta.target)}</span>`;
     addBtn.addEventListener('click', async () => {
+      // Exclude the current element + everything already in the list. Same
+      // self-link rule as renderSingleLink — A Character's `friends` shouldn't
+      // include the character itself.
       const picked = await pickElement({
         restrictToType: meta.target,
-        excludeIds: ids,
+        excludeIds: [el.id, ...ids],
         title: `add a ${meta.target ?? 'link'} to ${humanizeFieldName(meta.name)}`,
       });
       if (!picked) return;

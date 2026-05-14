@@ -148,7 +148,12 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     pill = document.createElement('div');
     pill.setAttribute('data-role', 'sync-pill');
     pill.className = 'atlas-sync-pill';
-    document.body.appendChild(pill);
+    // Bout EE: pill lives in the sidebar footer alongside the gear and the
+    // reset-layout button (anchored right via margin-left:auto in CSS). Falls
+    // back to document.body only if the shell hasn't mounted yet (test envs
+    // that bypass the shell, etc.).
+    const target = document.querySelector('.atlas-sidebar-footer') ?? document.body;
+    target.appendChild(pill);
   }
   const active = state.active;
   if (!active) {

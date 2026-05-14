@@ -94,11 +94,13 @@ export class LinkWorldModal extends BaseModal {
       const apiPin = (form.querySelector<HTMLInputElement>('input[name="api-pin"]')!).value;
       const displayName = (form.querySelector<HTMLInputElement>('input[name="display-name"]')!).value;
 
-      // Disable form for the duration. Cancel stays enabled (best-effort abort).
+      // Disable form for the duration. Cancel is hidden — interrupting a partial
+      // initial download mid-flight leaves the folder in an inconsistent state.
       const inputs = form.querySelectorAll<HTMLInputElement>('input');
       inputs.forEach(i => (i.disabled = true));
       submitBtn.disabled = true;
       submitBtn.textContent = 'linking…';
+      cancelBtn.hidden = true;
 
       const renderProgress = (p: InitialDownloadProgress) => {
         if (p.phase === 'list') {
@@ -134,6 +136,7 @@ export class LinkWorldModal extends BaseModal {
         inputs.forEach(i => (i.disabled = false));
         submitBtn.disabled = false;
         submitBtn.textContent = 'link';
+        cancelBtn.hidden = false;
       }
     });
 

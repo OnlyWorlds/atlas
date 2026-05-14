@@ -132,6 +132,7 @@ class MapCreateModal extends BaseModal {
       }
       submitBtn.disabled = true;
       submitBtn.textContent = 'creating...';
+      cancelBtn.hidden = true;
       try {
         const store = getActiveStore()!;
         const url = urlInput.value.trim();
@@ -172,6 +173,7 @@ class MapCreateModal extends BaseModal {
         errorBox.hidden = false;
         submitBtn.disabled = false;
         submitBtn.textContent = 'create';
+        cancelBtn.hidden = false;
       }
     });
     return overlay;

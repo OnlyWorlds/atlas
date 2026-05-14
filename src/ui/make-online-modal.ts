@@ -215,6 +215,12 @@ export class MakeOnlineModal extends BaseModal {
     inputs.forEach((i) => (i.disabled = true));
     submitBtn.disabled = true;
     submitBtn.textContent = 'creating…';
+    // Hide every cancel button in this modal during the in-flight create —
+    // both routes' panes have one. Bailing mid-create-and-upload leaves
+    // partial server-side state and a confused user.
+    form.closest<HTMLElement>('[data-modal]')
+      ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
+      .forEach((b) => (b.hidden = true));
 
     try {
       // 1. Create new api world (server-side).
@@ -305,6 +311,9 @@ export class MakeOnlineModal extends BaseModal {
       inputs.forEach((i) => (i.disabled = false));
       submitBtn.disabled = false;
       submitBtn.textContent = 'create + upload';
+      form.closest<HTMLElement>('[data-modal]')
+        ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
+        .forEach((b) => (b.hidden = false));
     }
   }
 
@@ -341,6 +350,9 @@ export class MakeOnlineModal extends BaseModal {
     inputs.forEach((i) => (i.disabled = true));
     submitBtn.disabled = true;
     submitBtn.textContent = 'linking…';
+    form.closest<HTMLElement>('[data-modal]')
+      ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
+      .forEach((b) => (b.hidden = true));
 
     try {
       // 1. Validate via client.worlds.get().
@@ -434,6 +446,9 @@ export class MakeOnlineModal extends BaseModal {
       inputs.forEach((i) => (i.disabled = false));
       submitBtn.disabled = false;
       submitBtn.textContent = 'link + sync';
+      form.closest<HTMLElement>('[data-modal]')
+        ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
+        .forEach((b) => (b.hidden = false));
     }
   }
 }
