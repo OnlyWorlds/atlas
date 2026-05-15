@@ -16,6 +16,7 @@ import { getState, patchSlice, subscribe } from '../../core/state';
 import { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManager';
 import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import type { Element, Pin, WorldMap } from '../../core/types';
+import { pickMapImageSource } from './map-image-source';
 import { pinVisualFor, onPinVisualsReady } from './pin-visuals';
 import { ToastManager } from '../../ui/toast-manager';
 import { ElementCreateModal } from '../../ui/element-create-modal';
@@ -105,7 +106,9 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   entry.ready = (async () => {
     await manager.init();
 
-    // Background: prefer local media, fall back to image_url, then grid.
+    // Background source precedence (DESIGN_MAPS.md §4): image_url > image_media_id > grid.
+    // pickMapImageSource encodes the rule (unit-tested in tests/unit/map-image-source.test.ts).
+    const source = pickMapImageSource(map);
     let backgroundApplied = false;
 
     const applyImage = (url: string, dims: { w: number; h: number }) => {
@@ -120,29 +123,12 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       });
     };
 
-    if (map.image_media_id) {
-      try {
-        const store = getActiveStore();
-        const blob = store ? await store.getMediaBlob(map.image_media_id) : null;
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          entry.objectUrls.push(url);
-          const dims = (typeof map.width === 'number' && typeof map.height === 'number' && map.width > 0)
-            ? { w: map.width, h: map.height }
-            : (await decodeImageDims(url)) ?? { w: width, h: height };
-          applyImage(url, dims);
-        }
-      } catch (err) {
-        console.warn('[map-tab] failed to load local media for map:', err);
-      }
-    }
-
-    if (!backgroundApplied && map.image_url) {
+    if (source.kind === 'url') {
       let dims: { w: number; h: number };
       if (typeof map.width === 'number' && typeof map.height === 'number' && map.width > 0 && map.height > 0) {
         dims = { w: map.width, h: map.height };
       } else {
-        const decoded = await decodeImageDims(map.image_url);
+        const decoded = await decodeImageDims(source.url);
         dims = decoded ?? { w: width, h: height };
         if (decoded) {
           const store = getActiveStore();
@@ -156,7 +142,22 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
           }
         }
       }
-      applyImage(map.image_url, dims);
+      applyImage(source.url, dims);
+    } else if (source.kind === 'local') {
+      try {
+        const store = getActiveStore();
+        const blob = store ? await store.getMediaBlob(source.mediaId) : null;
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          entry.objectUrls.push(url);
+          const dims = (typeof map.width === 'number' && typeof map.height === 'number' && map.width > 0)
+            ? { w: map.width, h: map.height }
+            : (await decodeImageDims(url)) ?? { w: width, h: height };
+          applyImage(url, dims);
+        }
+      } catch (err) {
+        console.warn('[map-tab] failed to load local media for map:', err);
+      }
     }
 
     if (!backgroundApplied) {
@@ -184,8 +185,9 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
           map_id: entry.mapId,
           element_id: placement.elementId,
           element_type: pinned.type,
-          x: ev.point.x,
-          y: ev.point.y,
+          // OW API requires integer pin coordinates — round here, the only seam.
+          x: Math.round(ev.point.x),
+          y: Math.round(ev.point.y),
         });
         const elements = await store.listElements();
         patchSlice('data', { elements });
@@ -230,6 +232,10 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       const point = leafletToStorage(latlng, height);
 
       const modal = new ElementCreateModal(toasts, {
+        // 'map' is hidden in this contextual flow — pins don't target maps
+        // (DESIGN_MAPS.md §1.4). The user wants to drop a pin for an element
+        // they're creating; that element must be content/loc/etc.
+        excludeTypes: ['map'],
         onCreated: async (elementId, elementType) => {
           try {
             const store = getActiveStore();
@@ -238,8 +244,8 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
               map_id: entry.mapId,
               element_id: elementId,
               element_type: elementType,
-              x: point.x,
-              y: point.y,
+              x: Math.round(point.x),
+              y: Math.round(point.y),
             });
             const elements = await store.listElements();
             patchSlice('data', { elements });
@@ -320,7 +326,7 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
     try {
       const store = getActiveStore();
       if (!store) return;
-      await store.updatePin(pinId, { x: point.x, y: point.y });
+      await store.updatePin(pinId, { x: Math.round(point.x), y: Math.round(point.y) });
       const elements = await store.listElements();
       patchSlice('data', { elements });
       // Local write succeeded — schedule autosave. Without this, dragged pins

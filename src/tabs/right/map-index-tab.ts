@@ -1,19 +1,25 @@
 /**
  * Map Index tab — pinned as tab 0 on the right pane.
  *
- * Uses legacy `.atlas-list` / `.atlas-row` markup. Lists all maps for the
- * active world. Click a row → opens (or focuses) its map tab.
+ * Renders the world's maps as a NESTED TREE built by `buildMapTree`. Tree
+ * structure follows: explicit parent_map > location-inferred via Location
+ * parent chain > root with location chip. Siblings sort by hierarchy then
+ * alpha. See DESIGN_MAPS.md §2 / §3.1 for the full model.
  *
- * Maps and pin counts come from `state.data.elements` filtered by type.
+ * Click a row → open or focus its map tab. Delete affordance on hover.
+ *
+ * TODO (later bout): collapse/expand affordance per node with children,
+ * persisted per-world in the registry. For now all nodes render expanded.
  */
 
 import { getState, patchSlice, subscribe, type RightTabRef } from '../../core/state';
-import type { WorldMap, Pin } from '../../core/types';
+import type { WorldMap, Pin, Element } from '../../core/types';
 import { ToastManager } from '../../ui/toast-manager';
 import { createMapDialog } from '../../ui/map-create-modal';
-import { navigate, mapHash } from '../../core/router';
+import { navigate, mapHash, elementHash } from '../../core/router';
 import { getActiveStore } from '../../ui/create-world-modal';
 import { requestPushIfLinked } from '../../sync/sync-attach';
+import { buildMapTree, type MapTreeNode, type LocationLike } from './map-tree';
 
 export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -50,11 +56,28 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
 
     const maps = state.data.elements.filter((e): e is WorldMap => e.type === 'map');
     const pins = state.data.elements.filter((e): e is Pin => e.type === 'pin');
+    const locations: LocationLike[] = state.data.elements
+      .filter((e): e is Element => e.type === 'location')
+      .map(e => {
+        // Element's index signature is `[field: string]: unknown` — read
+        // parent_location via the bracketed access to avoid a cast.
+        const raw = e['parent_location'];
+        return {
+          id: e.id,
+          parent_location: typeof raw === 'string' ? raw : undefined,
+        };
+      });
+
     const pinCounts = new Map<string, number>();
     for (const p of pins) pinCounts.set(p.map_id, (pinCounts.get(p.map_id) ?? 0) + 1);
 
+    const locationNames = new Map<string, string>();
+    for (const e of state.data.elements) {
+      if (e.type === 'location') locationNames.set(e.id, e.name || '(unnamed location)');
+    }
+
     const list = document.createElement('div');
-    list.className = 'atlas-list';
+    list.className = 'atlas-list atlas-map-tree';
     root.appendChild(list);
 
     if (maps.length === 0) {
@@ -73,9 +96,14 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
 
     const active = state.ui.rightTabs[state.ui.rightActiveIndex];
     const activeMapId = active && active.kind === 'map' ? active.mapId : null;
-    const sorted = [...maps].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    const tree = buildMapTree(maps, locations);
 
-    sorted.forEach(m => list.appendChild(renderRow(m, m.id === activeMapId, pinCounts.get(m.id) ?? 0, toasts)));
+    renderTree(list, tree, 0, {
+      activeMapId,
+      pinCounts,
+      locationNames,
+      toasts,
+    });
   }
 
   const unsubState = subscribe(render);
@@ -83,12 +111,39 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
   return unsubState;
 }
 
-function renderRow(m: WorldMap, isActive: boolean, pinCount: number, toasts: ToastManager): HTMLElement {
+interface RenderCtx {
+  activeMapId: string | null;
+  pinCounts: Map<string, number>;
+  locationNames: Map<string, string>;
+  toasts: ToastManager;
+}
+
+function renderTree(list: HTMLElement, nodes: MapTreeNode[], depth: number, ctx: RenderCtx): void {
+  for (const node of nodes) {
+    list.appendChild(renderRow(node, depth, ctx));
+    if (node.children.length > 0) {
+      renderTree(list, node.children, depth + 1, ctx);
+    }
+  }
+}
+
+function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx): HTMLElement {
+  const m = node.map;
   const row = document.createElement('div');
-  row.className = 'atlas-row' + (isActive ? ' selected' : '');
+  row.className = 'atlas-row atlas-map-tree-row' + (m.id === ctx.activeMapId ? ' selected' : '');
   row.setAttribute('data-map-id', m.id);
+  if (depth > 0) row.setAttribute('data-depth', String(depth));
+  row.style.setProperty('--atlas-map-tree-depth', String(depth));
   row.setAttribute('role', 'button');
   row.tabIndex = 0;
+
+  // Indent spacer — purely visual; CSS uses the custom property too.
+  if (depth > 0) {
+    const spacer = document.createElement('span');
+    spacer.className = 'atlas-map-tree-indent';
+    spacer.style.width = `${depth * 14}px`;
+    row.appendChild(spacer);
+  }
 
   const icon = document.createElement('span');
   icon.className = 'material-symbols-outlined';
@@ -100,6 +155,46 @@ function renderRow(m: WorldMap, isActive: boolean, pinCount: number, toasts: Toa
   main.textContent = m.name || '(untitled map)';
   row.appendChild(main);
 
+  // Location chip — surfaces loc-bound maps and lets users click through to
+  // the location's element-detail. Material icon prefix disambiguates from
+  // the image badge (both used to be unlabeled glyphs side by side, which
+  // read as one cluster).
+  if (typeof m.location === 'string' && m.location) {
+    const locName = ctx.locationNames.get(m.location);
+    if (locName) {
+      const chip = document.createElement('span');
+      chip.className = 'atlas-row-chip atlas-row-chip-location';
+      chip.title = `Location: ${locName} (click to open)`;
+      chip.setAttribute('role', 'button');
+      chip.tabIndex = 0;
+      const icon = document.createElement('span');
+      icon.className = 'material-symbols-outlined atlas-row-chip-icon';
+      icon.textContent = 'location_on';
+      chip.appendChild(icon);
+      const label = document.createElement('span');
+      label.textContent = locName;
+      chip.appendChild(label);
+      const locationId = m.location;
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const worldId = getState().active?.worldId;
+        if (!worldId) return;
+        patchSlice('ui', { ...getState().ui, selectedElementId: locationId, sidebarMode: 'elements' });
+        navigate(elementHash(worldId, locationId));
+      });
+      row.appendChild(chip);
+    }
+  }
+
+  if (node.brokenParent) {
+    const chip = document.createElement('span');
+    chip.className = 'atlas-row-chip atlas-row-chip-warn';
+    chip.title = 'parent_map references a missing map (or would create a cycle) — surfaced at root';
+    chip.textContent = 'broken parent';
+    row.appendChild(chip);
+  }
+
+  const pinCount = ctx.pinCounts.get(m.id) ?? 0;
   if (pinCount > 0) {
     const badge = document.createElement('span');
     badge.className = 'atlas-pin-count-badge';
@@ -111,7 +206,13 @@ function renderRow(m: WorldMap, isActive: boolean, pinCount: number, toasts: Toa
   if (m.image_media_id || m.image_url) {
     const tag = document.createElement('span');
     tag.className = 'material-symbols-outlined atlas-map-row-imgtag';
-    tag.title = m.image_media_id ? 'has local image' : 'has image url';
+    if (m.image_url && m.image_media_id) {
+      tag.title = 'image: URL shown, local file kept as fallback';
+    } else if (m.image_url) {
+      tag.title = 'image: URL';
+    } else {
+      tag.title = 'image: local file (no URL set)';
+    }
     tag.textContent = 'image';
     row.appendChild(tag);
   }
@@ -126,7 +227,7 @@ function renderRow(m: WorldMap, isActive: boolean, pinCount: number, toasts: Toa
   del.innerHTML = '<span class="material-symbols-outlined">delete</span>';
   del.addEventListener('click', (e) => {
     e.stopPropagation();
-    void handleMapDelete(m, pinCount, toasts);
+    void handleMapDelete(m, pinCount, ctx.toasts);
   });
   actions.appendChild(del);
   row.appendChild(actions);

@@ -12,7 +12,7 @@
 
 import { REGISTRY_STORAGE_KEY } from '../core/constants';
 import { defaultRegistry } from '../core/types';
-import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
+import type { WorldRegistryEntry, WorldsRegistry, RightTabsSnapshot, RightTabRef } from '../core/types';
 
 // ---- Persistence ----
 
@@ -283,6 +283,52 @@ export function setFavorite(
   return {
     ...reg,
     worlds: reg.worlds.map(w => (w.id === worldId ? { ...w, favorite } : w)),
+  };
+}
+
+// ---- Right-pane tab persistence (per-world) ----
+
+/**
+ * Read the right-tabs snapshot for a world. Returns null if absent or
+ * structurally invalid (corrupted localStorage etc.). Callers default to
+ * `[{kind:'map-index'}]` + index 0 on null.
+ */
+export function getWorldRightTabs(
+  reg: WorldsRegistry,
+  worldId: string,
+): RightTabsSnapshot | null {
+  const entry = reg.worlds.find(w => w.id === worldId);
+  if (!entry?.right_tabs) return null;
+  const snap = entry.right_tabs;
+  if (!Array.isArray(snap.tabs) || typeof snap.activeIndex !== 'number') return null;
+  // Filter out any malformed tab entries defensively.
+  const tabs = snap.tabs.filter((t): t is RightTabRef => {
+    if (!t || typeof t !== 'object') return false;
+    if (t.kind === 'map-index') return true;
+    return t.kind === 'map' && typeof (t as { mapId?: unknown }).mapId === 'string';
+  });
+  const activeIndex = Math.max(0, Math.min(snap.activeIndex, tabs.length - 1));
+  return { tabs, activeIndex };
+}
+
+/**
+ * Snapshot a world's right-tabs into the registry. Returns the new registry
+ * (pure, caller saves). Passing `null` clears the snapshot.
+ */
+export function setWorldRightTabs(
+  reg: WorldsRegistry,
+  worldId: string,
+  snapshot: RightTabsSnapshot | null,
+): WorldsRegistry {
+  return {
+    ...reg,
+    worlds: reg.worlds.map(w => {
+      if (w.id !== worldId) return w;
+      const next: WorldRegistryEntry = { ...w };
+      if (snapshot) next.right_tabs = snapshot;
+      else delete next.right_tabs;
+      return next;
+    }),
   };
 }
 

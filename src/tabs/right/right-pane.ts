@@ -49,10 +49,15 @@ export function mountRightPane(mount: RightPaneMount): () => void {
     const ui = state.ui;
     const worldId = state.active?.worldId ?? null;
 
-    // World switched? dispose all map caches.
+    // World switched? dispose all map caches AND invalidate lastTabKey so the
+    // body actually remounts even when both worlds happen to have the same
+    // active tab kind (e.g. both default to map-index, or both restored to
+    // `map:X` — without the reset, the body stayed wedged showing the prior
+    // world's pane, which is the bug behind DESIGN_MAPS.md §5 (Issue C).
     if (lastWorldId !== worldId) {
       disposeAllMapTabs();
       lastWorldId = worldId;
+      lastTabKey = null;
     }
 
     renderTabBar(ui.rightTabs, ui.rightActiveIndex);

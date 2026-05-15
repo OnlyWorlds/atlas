@@ -20,6 +20,7 @@ import { getActiveStore } from './create-world-modal';
 import { CONTENT_ELEMENT_TYPES, type ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { requestPushIfLinked } from '../sync/sync-attach';
+import { configureMapDialog } from './map-create-modal';
 
 /** Types offered in the create modal — matches legacy: all 22 except pin/marker. */
 const CREATE_TYPES: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
@@ -29,6 +30,12 @@ export interface ElementCreateOptions {
   initialType?: ElementType;
   /** Pre-fill the name field. */
   initialName?: string;
+  /**
+   * Hide these types from the grid (and reject in matchCategory). Used by
+   * the contextual right-click-on-map flow to drop 'map' — pins don't target
+   * maps in atlas (DESIGN_MAPS.md §1.4).
+   */
+  excludeTypes?: ElementType[];
   /**
    * Called after the element is created. Receives both the new id AND the
    * resolved element type — callers like the contextual pin-drop in map-tab
@@ -52,6 +59,13 @@ export class ElementCreateModal extends BaseModal {
     this.toasts = toasts;
     this.opts = opts;
     this.selected = opts.initialType ?? 'character';
+  }
+
+  /** Types this modal instance offers — CREATE_TYPES minus opts.excludeTypes. */
+  private effectiveTypes(): ElementType[] {
+    if (!this.opts.excludeTypes?.length) return CREATE_TYPES;
+    const excluded = new Set(this.opts.excludeTypes);
+    return CREATE_TYPES.filter(t => !excluded.has(t));
   }
 
   open(): void {
@@ -112,8 +126,9 @@ export class ElementCreateModal extends BaseModal {
     this.updateGhost();
 
     // Type filtering: best-match category from the typed text → highlight + ghost.
+    const effective = this.effectiveTypes();
     this.typeInput.addEventListener('input', () => {
-      const matched = matchCategory(this.typeInput.value);
+      const matched = matchCategory(this.typeInput.value, effective);
       if (matched) this.setType(matched);
       this.updateGhost();
     });
@@ -153,7 +168,7 @@ export class ElementCreateModal extends BaseModal {
         nameInput.focus();
         return;
       }
-      if (!CREATE_TYPES.includes(this.selected)) {
+      if (!this.effectiveTypes().includes(this.selected)) {
         errorBox.textContent = 'pick a category';
         errorBox.hidden = false;
         return;
@@ -167,11 +182,36 @@ export class ElementCreateModal extends BaseModal {
         const elements = await store.listElements();
         patchSlice('data', { elements });
         patchSlice('ui', { ...getState().ui, selectedElementId: el.id });
-        requestPushIfLinked();
         this.toasts.success(`created ${this.selected}: ${el.name}`);
         this.hide();
         this.opts.onCreated?.(el.id, this.selected);
         const worldId = getState().active?.worldId;
+
+        // Type=map post-create: open the map-configure modal so the user can
+        // set location/image without re-finding the map in the editor. Skip
+        // when a custom onCreated handler is set (contextual map-create flow
+        // — that flow already excludes 'map' from the type grid, but the
+        // guard is defensive). DESIGN_MAPS.md §3.2 / Issue A.
+        //
+        // CRITICAL: defer the autosave push until AFTER the configure dialog
+        // closes. If we kick off a push immediately after createElement, the
+        // debounce timer fires while the user is filling the configure form;
+        // on api-linked worlds the server reassigns the id and emits an
+        // id-swap, but the configure modal still holds the original (now
+        // stale) id in its closure. Submit then fails with "element <old-id>
+        // not found". By deferring, no push fires during the modal-open
+        // window, so no id-swap can race the closure.
+        const willConfigure = this.selected === 'map' && !this.opts.onCreated;
+        if (!willConfigure) {
+          requestPushIfLinked();
+        } else {
+          await configureMapDialog(this.toasts, el.id);
+          // Configure's submit handler calls requestPushIfLinked itself, but
+          // on cancel it doesn't — fire here to guarantee the bare map syncs.
+          // Idempotent: extra calls reset the same debounce timer.
+          requestPushIfLinked();
+        }
+
         if (worldId) navigate(elementHash(worldId, el.id));
       } catch (err) {
         console.error('[element-create] failed:', err);
@@ -212,7 +252,7 @@ export class ElementCreateModal extends BaseModal {
   private renderTypeGrid(grid: HTMLElement): void {
     grid.innerHTML = '';
     this.typeButtons.clear();
-    CREATE_TYPES.forEach(type => {
+    this.effectiveTypes().forEach(type => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'atlas-create-type-btn' + (type === this.selected ? ' active' : '');
@@ -234,16 +274,16 @@ export class ElementCreateModal extends BaseModal {
 }
 
 /**
- * Best-match a partial category string.
+ * Best-match a partial category string against the supplied candidate types.
  * Strategy: exact match → startsWith → includes → null.
  */
-function matchCategory(input: string): ElementType | null {
+function matchCategory(input: string, candidates: ElementType[] = CREATE_TYPES): ElementType | null {
   const q = input.trim().toLowerCase();
   if (!q) return null;
   let exact: ElementType | null = null;
   let starts: ElementType | null = null;
   let contains: ElementType | null = null;
-  for (const t of CREATE_TYPES) {
+  for (const t of candidates) {
     const name = ELEMENT_LABELS[t].singular.toLowerCase();
     if (name === q) { exact = t; break; }
     if (!starts && name.startsWith(q)) starts = t;

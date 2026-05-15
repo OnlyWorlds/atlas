@@ -16,6 +16,7 @@ import {
   detachApi,
   findLinkedWorld,
   findWorld,
+  getWorldRightTabs,
   isDescendantOf,
   loadRegistry,
   renameWorld,
@@ -32,6 +33,7 @@ import {
   setSyncConfirmServerDeletes,
   setSyncPauseAll,
   setWorldPaused,
+  setWorldRightTabs,
 } from '../../src/registry/registry';
 
 beforeEach(() => {
@@ -441,5 +443,136 @@ describe('registry — sync settings (Phase 3.5+)', () => {
     // Unknown value → coerced to undefined (engine treats as default).
     localStorage.setItem('atlas_worlds_registry', JSON.stringify({ ...legacy, sync_default_policy: 'gibberish' }));
     expect(loadRegistry().sync_default_policy).toBeUndefined();
+  });
+});
+
+// ---- Per-world right-tab persistence (DESIGN_MAPS.md §5 / Issue C) ----
+
+describe('registry — right-pane tab persistence', () => {
+  function withTwoWorlds(): { reg: ReturnType<typeof defaultRegistry>; aId: string; bId: string } {
+    let reg = defaultRegistry();
+    const a = createLocalWorld(reg, { name: 'World A', folderName: 'a', handleKey: 'ka' });
+    reg = a.next;
+    const b = createLocalWorld(reg, { name: 'World B', folderName: 'b', handleKey: 'kb' });
+    reg = b.next;
+    return { reg, aId: a.entry.id, bId: b.entry.id };
+  }
+
+  it('getWorldRightTabs returns null for unknown world', () => {
+    const reg = defaultRegistry();
+    expect(getWorldRightTabs(reg, 'no-such-id')).toBeNull();
+  });
+
+  it('getWorldRightTabs returns null when no snapshot exists', () => {
+    const { reg, aId } = withTwoWorlds();
+    expect(getWorldRightTabs(reg, aId)).toBeNull();
+  });
+
+  it('setWorldRightTabs writes a snapshot, getWorldRightTabs reads it back', () => {
+    const { reg, aId } = withTwoWorlds();
+    const next = setWorldRightTabs(reg, aId, {
+      tabs: [{ kind: 'map-index' }, { kind: 'map', mapId: 'map-1', label: 'World Map' }],
+      activeIndex: 1,
+    });
+    const got = getWorldRightTabs(next, aId);
+    expect(got).toEqual({
+      tabs: [{ kind: 'map-index' }, { kind: 'map', mapId: 'map-1', label: 'World Map' }],
+      activeIndex: 1,
+    });
+  });
+
+  it('snapshots survive serialization (save + load round-trip)', () => {
+    const { reg, aId } = withTwoWorlds();
+    const withSnap = setWorldRightTabs(reg, aId, {
+      tabs: [{ kind: 'map-index' }, { kind: 'map', mapId: 'm-42', label: 'Atlas' }],
+      activeIndex: 1,
+    });
+    saveRegistry(withSnap);
+    const reloaded = loadRegistry();
+    expect(getWorldRightTabs(reloaded, aId)).toEqual({
+      tabs: [{ kind: 'map-index' }, { kind: 'map', mapId: 'm-42', label: 'Atlas' }],
+      activeIndex: 1,
+    });
+  });
+
+  it('snapshots are isolated per world (the bug behind Issue C)', () => {
+    const { reg, aId, bId } = withTwoWorlds();
+    let next = setWorldRightTabs(reg, aId, {
+      tabs: [{ kind: 'map-index' }, { kind: 'map', mapId: 'A-map', label: "A's map" }],
+      activeIndex: 1,
+    });
+    next = setWorldRightTabs(next, bId, {
+      tabs: [{ kind: 'map-index' }],
+      activeIndex: 0,
+    });
+    expect(getWorldRightTabs(next, aId)).toEqual({
+      tabs: [{ kind: 'map-index' }, { kind: 'map', mapId: 'A-map', label: "A's map" }],
+      activeIndex: 1,
+    });
+    expect(getWorldRightTabs(next, bId)).toEqual({
+      tabs: [{ kind: 'map-index' }],
+      activeIndex: 0,
+    });
+  });
+
+  it('setWorldRightTabs(..., null) clears the snapshot', () => {
+    const { reg, aId } = withTwoWorlds();
+    const withSnap = setWorldRightTabs(reg, aId, {
+      tabs: [{ kind: 'map-index' }],
+      activeIndex: 0,
+    });
+    expect(getWorldRightTabs(withSnap, aId)).not.toBeNull();
+    const cleared = setWorldRightTabs(withSnap, aId, null);
+    expect(getWorldRightTabs(cleared, aId)).toBeNull();
+  });
+
+  it('getWorldRightTabs filters out malformed tab entries defensively', () => {
+    // Simulate a corrupted localStorage payload.
+    let reg = defaultRegistry();
+    reg = createLocalWorld(reg, { name: 'X', folderName: 'x', handleKey: 'kx' }).next;
+    const id = reg.worlds[0].id;
+    // Inject garbage directly to mimic a tampered registry.
+    const malformed = {
+      ...reg,
+      worlds: reg.worlds.map(w => ({
+        ...w,
+        right_tabs: {
+          tabs: [
+            { kind: 'map-index' },
+            { kind: 'map', mapId: 'ok', label: 'fine' },
+            // bad entries:
+            null,
+            { kind: 'map' /* missing mapId */ },
+            { kind: 'something-else' },
+          ],
+          activeIndex: 1,
+        },
+      })),
+    };
+    saveRegistry(malformed as ReturnType<typeof defaultRegistry>);
+    const loaded = loadRegistry();
+    const got = getWorldRightTabs(loaded, id);
+    expect(got).not.toBeNull();
+    expect(got!.tabs).toEqual([
+      { kind: 'map-index' },
+      { kind: 'map', mapId: 'ok', label: 'fine' },
+    ]);
+    // activeIndex clamped into valid range.
+    expect(got!.activeIndex).toBe(1);
+  });
+
+  it('getWorldRightTabs returns null when activeIndex isnt a number (structural invalid)', () => {
+    let reg = defaultRegistry();
+    reg = createLocalWorld(reg, { name: 'X', folderName: 'x', handleKey: 'kx' }).next;
+    const malformed = {
+      ...reg,
+      worlds: reg.worlds.map(w => ({
+        ...w,
+        right_tabs: { tabs: [{ kind: 'map-index' }], activeIndex: 'oops' as unknown as number },
+      })),
+    };
+    saveRegistry(malformed as ReturnType<typeof defaultRegistry>);
+    const loaded = loadRegistry();
+    expect(getWorldRightTabs(loaded, reg.worlds[0].id)).toBeNull();
   });
 });

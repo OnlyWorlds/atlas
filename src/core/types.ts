@@ -41,12 +41,38 @@ export interface Element {
 
 // ---- Spatial-specific types (light typing; SDK has the truth) ----
 
+/**
+ * Map element.
+ *
+ * Schema fields (sync with OW API): image_url, width, height, depth,
+ * background_color, hierarchy, parent_map, location. All optional except
+ * the inherited name/id.
+ *
+ * Atlas-extension field (never pushed to API): image_media_id — reference
+ * to a local media item used as image fallback when image_url is empty.
+ *
+ * Field semantics (see DESIGN_MAPS.md §1):
+ *   - parent_map: "this map is geographically within the parent map's
+ *     boundaries." Explicit nesting in the map tree.
+ *   - location: "this map is OF this place." When set without parent_map,
+ *     the tree-builder infers placement via Location.parent_location chain.
+ *   - hierarchy: sibling ordering only (lower comes first). No absolute-
+ *     scale semantic. Ties broken alphabetically.
+ *   - background_color: fallback canvas color; atlas auto-extracts edge
+ *     color from image too.
+ *   - depth: reserved, currently unused.
+ */
 export interface WorldMap extends Element {
   type: 'map';
   image_url?: string;
   width?: number;
   height?: number;
+  depth?: number;
+  background_color?: string;
+  hierarchy?: number;
+  parent_map?: string;
   location?: string;
+  /** Atlas-extension: reference to local media item (never pushed to API). */
   image_media_id?: string;
 }
 
@@ -191,6 +217,24 @@ export interface PerElementFailure {
 
 export type WorldState = 'local-only' | 'api-linked';
 
+/**
+ * One open tab on the right pane. Map-index is implicit (always present).
+ * Lives in types.ts (not state.ts) because the registry persists it per-world
+ * and importing state.ts from registry/ would create a dependency cycle.
+ */
+export type RightTabRef =
+  | { kind: 'map-index' }
+  | { kind: 'map'; mapId: string; label: string };
+
+/**
+ * Per-world right-pane tab snapshot. Persisted on WorldRegistryEntry so the
+ * tab state survives world switches and page reloads.
+ */
+export interface RightTabsSnapshot {
+  tabs: RightTabRef[];
+  activeIndex: number;
+}
+
 export interface WorldRegistryEntry {
   id: string;
   name: string;
@@ -219,6 +263,12 @@ export interface WorldRegistryEntry {
    * User can flip it back on to resume. Persists across reloads.
    */
   sync_paused?: boolean;
+  /**
+   * Per-world right-pane tab snapshot (DESIGN_MAPS.md §5). Restored on
+   * activation; snapshotted before world switch. Absent → defaults to
+   * `[{kind:'map-index'}]` + active index 0.
+   */
+  right_tabs?: RightTabsSnapshot;
 }
 
 export interface WorldsRegistry {

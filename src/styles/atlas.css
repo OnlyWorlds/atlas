@@ -1025,6 +1025,54 @@
   flex-shrink: 0;
 }
 
+/* Map index tree rows — depth-based indent, smaller chips for location anchor. */
+.atlas-map-tree-row {
+  /* CSS custom property carries depth; reserved if future tweaks need it. */
+}
+.atlas-map-tree-indent {
+  display: inline-block;
+  flex-shrink: 0;
+}
+.atlas-row-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px 1px 5px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-radius: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atlas-row-chip-icon {
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.atlas-row-chip-location {
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+.atlas-row-chip-location:hover,
+.atlas-row-chip-location:focus-visible {
+  color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.08);
+  border-color: rgba(34, 211, 238, 0.30);
+  outline: none;
+}
+.atlas-row-chip-warn {
+  color: #f6b26b;
+  background: rgba(246, 178, 107, 0.08);
+  border: 1px solid rgba(246, 178, 107, 0.30);
+}
+
 /* ============================================================
    World registry chips
    ============================================================ */
@@ -2059,6 +2107,9 @@
   color: rgba(255, 255, 255, 0.50);
   line-height: 1.5;
   margin: 4px 0 16px;
+}
+.atlas-modal-hint.atlas-modal-hint-warn {
+  color: #f6b26b;
 }
 
 .atlas-modal-error {

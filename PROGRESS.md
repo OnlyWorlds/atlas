@@ -7,6 +7,32 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 
 ## Current State
 
+**Phase M (Maps subsystem rebuild) — in progress (session 208, 2026-05-15).** Design doc `DESIGN_MAPS.md` (573 lines) drafted from foundation conversation with Captain. Hierarchy reframed as sibling-order only; parent_map = "within boundaries"; pin-targets-map disallowed (zones deferred); image_url wins over image_media_id with both stored; per-world tab persistence via registry. Bout sequence M1-M8. Test world fixtures A/B/C — Skeld messaged 2026-05-15 to populate via API once Captain hands them keys.
+
+**Bout M1 — Schema-honesty foundation (session 208).** `core/types.ts` WorldMap interface extended with `hierarchy`, `parent_map`, `depth`, `background_color` (image_url typed explicitly too, was previously only present via Element index signature). Atlas-extension `image_media_id` retained with a clarifying comment. Field-descriptions for the MAP type sharpened per the new semantics (sibling-ordering, within-boundaries, location-OF). No UI change — type coverage only. 287 vitest. 364.78 KB JS / 102.91 KB gzipped. Build clean.
+
+**Bout M2 — Issues A + B + C + pin coord rounding (session 208).** Four-fix bug payload:
+- **Issue A** (element-create map post-modal): `MapCreateModal` extended with a configure-existing mode (constructor takes `existingMapId`; submit updates instead of creates). New `configureMapDialog(toasts, mapId)` helper. `ElementCreateModal` opens it post-create when type=`map` AND no caller-provided `onCreated` (so the global element-create grid lands users into configuration). Added `excludeTypes` option to `ElementCreateModal`; the contextual right-click-on-map flow in `map-tab.ts` now passes `excludeTypes: ['map']` since pins don't target maps (DESIGN_MAPS.md §1.4).
+- **Issue B** (image precedence): swapped — `image_url` now wins over `image_media_id` in both local-only and api-linked worlds. Extracted to a pure helper `pickMapImageSource` in `tabs/right/map-image-source.ts` so the rule is unit-testable. Map-index row title text reflects which source is rendering (URL, local, or URL-shown-with-local-fallback). Map-create modal hint dynamically updates: when a URL is typed, the local-image field's hint becomes a warm warning ("URL is set — local will be stored but URL will display").
+- **Issue C** (per-world tab persistence): `RightTabRef` moved to `core/types.ts` (avoids cycle); new `RightTabsSnapshot`; `WorldRegistryEntry.right_tabs?` field; `getWorldRightTabs` + `setWorldRightTabs` helpers in `registry.ts` (defensive validation against corrupted localStorage). `activateWorld` in `worlds-sidebar.ts` now snapshots the outgoing world's tabs to its registry entry BEFORE state changes, and a new `hydrateRightTabsFromRegistry` restores the incoming world's tabs (filtering out stale map ids whose maps no longer exist). `right-pane.ts` resets `lastTabKey = null` on `worldId` change so the body remounts even when the active tab kind is the same.
+- **Pin coord rounding**: `Math.round` on every pin x/y at create/update/drag (SDK requires integers).
+
+New tests: +8 registry tab persistence (round-trip, isolation, malformed-payload defense, structural-invalid null) + 7 image source (precedence in all combinations + whitespace) = +15. 302 vitest (was 287). 367.86 KB JS / 103.61 KB gzipped (+3 KB from configure-existing modal branch).
+
+**Bout M3 — Tree-builder pure function (session 208).** Per DESIGN_MAPS.md §2. New `src/tabs/right/map-tree.ts` exports `buildMapTree(maps, locations) → MapTreeNode[]`. Three phases: (1) explicit parent_map edges with cycle defense + dangling reference handling, (2) location-inferred placement walking the Location parent chain to find ancestor maps, (3) sort siblings by hierarchy ascending then alphabetically. Nodes annotated with `brokenParent` (dangling/cycle) and `inferred` (Phase 2 placement). No UI integration yet — pure function.
+
+Fixtures: `tests/fixtures/map-worlds/{shared,world-a,world-b,world-c}.ts`. World A (pure parent_map nesting, 9 maps), World B (pure location-based, 4 maps + 7 locations with intermediate-no-map hops), World C (messy mix, 8 maps + 4 locations covering override, orphan, dangling, multi-sibling hierarchy sort).
+
+Tests: 27 in `tests/unit/map-tree.test.ts`. Full structural snapshots for each world; sibling sort by hierarchy+alpha; cycle defense (2-node A↔B); self-referential parent_map rejection; multi-map ancestor location prefers un-parented sibling for inference target; empty inputs; determinism. 329 vitest (was 302, +27). Same bundle (367.86 KB / 103.61 KB) — tree-builder is unused so vite tree-shakes it until M4 wires it in.
+
+Regression-verify confirmed: cycle test depends on `wouldCreateCycle` (reverting fails); World C snapshot depends on both Phase 2 inference AND hierarchy sort (reverting either breaks it).
+
+**Bout M4 — Map index tree rendering (session 208).** Per DESIGN_MAPS.md §3.1. `map-index-tab.ts` now drives off `buildMapTree(maps, locations)` instead of the alpha-sorted flat list. Each row carries a depth-based indent spacer, optional location chip (loc-bound maps), optional broken-parent warn chip, pin count badge, image badge, hover-delete. All nodes render expanded (collapse/expand affordance deferred to a later bout, TODO in code). New CSS: `.atlas-row-chip`, `.atlas-row-chip-location`, `.atlas-row-chip-warn`, `.atlas-map-tree-indent`. Locations imported from `state.data.elements` filtered by type with `parent_location` read via the Element index signature. 329 vitest unchanged. 370.84 KB JS / 104.52 KB gzipped (+3 KB renderer + tree wiring).
+
+**Live test worlds delivered (Skeld, 2026-05-15).** Three OW worlds populated per §6 spec: AAARGAAAA (pure parent_map), AAARGBBBB (pure location-based), AAARGCCC (messy mix). 31 elements, all image_urls set, zero retries. Structurally matches fixtures. UUIDs + API keys captured in `tests/fixtures/map-worlds/LIVE_WORLDS.md`. Skeld confirmed no schema surprises; OW API write-side uses `parent_map_id`/`location_id`, read-side returns nested `{id,name}` objects (same pattern atlas's adapter already handles).
+
+---
+
 **Phase 0 — Foundation: complete (session 197).**
 **Phase 1 — Sync foundation + real FolderStore: ~95% complete (sessions 197-198).**
 **Phase 1.5 — Architecture-agnostic UI primitive ports: complete (session 197).**

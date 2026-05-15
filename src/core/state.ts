@@ -13,8 +13,13 @@
  * `data.elements` with a new array reference after every mutation.
  */
 
-import type { WorldsRegistry, WorldMeta, Element, ElementType, SyncEngineState } from './types';
+import type { WorldsRegistry, WorldMeta, Element, ElementType, SyncEngineState, RightTabRef } from './types';
 import { defaultRegistry } from './types';
+
+// Re-export so existing imports (`import { RightTabRef } from '../core/state'`)
+// continue to work after the type moved to types.ts to avoid a registry
+// dependency cycle.
+export type { RightTabRef };
 
 export type MiddleMode = 'welcome' | 'settings' | 'element' | 'timeline';
 export type SidebarMode = 'worlds' | 'elements';
@@ -47,11 +52,6 @@ export interface AtlasRootRef {
 export interface DataState {
   elements: Element[];
 }
-
-/** One open tab on the right pane. Map-index is implicit (always first). */
-export type RightTabRef =
-  | { kind: 'map-index' }
-  | { kind: 'map'; mapId: string; label: string };
 
 /**
  * SyncEngine state surfaced to the UI. One entry per api-linked world that has

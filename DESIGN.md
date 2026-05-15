@@ -495,16 +495,11 @@ Native: zip the folder, share it. Recipient picks "Open Local Folder" on their a
 
 ---
 
-## Map Images in API Mode
+## Maps Subsystem
 
-The OW API stores maps with an `image_url` field — a hosted URL to an image. Atlas doesn't host images.
+See **`DESIGN_MAPS.md`** for the full map subsystem design — domain model (parent_map, location, hierarchy as sibling-order), tree-build algorithm, UI surfaces, image source rules, test world fixtures, schema-update pile, and the bout sequence.
 
-**Folder-first behavior**:
-- Maps can be created with EITHER a local image file (stored in `media/`) OR an `image_url`, or both.
-- Locally: map renders whichever is available (local file preferred for display speed).
-- On push to API: `image_url` syncs; local image file does not.
-- Maps without `image_url` are pushed with empty url. UI shows a clear "Atlas-local only — needs URL for API" indicator on those maps in the map index.
-- User can paste a hosted URL anytime in the map's `image_url` field to "share" the map's appearance via API.
+**Image source rule** (supersedes prior text): `image_url` is canonical and wins display when set. `image_media_id` is the atlas-local fallback when no URL exists. Both can be stored simultaneously; UI badges indicate which is rendering. Push to API: `image_url` only.
 
 ---
 

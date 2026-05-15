@@ -1,11 +1,18 @@
 /**
- * MapCreateModal — create a map for the active world via FolderStore.
+ * MapCreateModal — create or configure a map for the active world.
+ *
+ * Two modes:
+ *   - create (default): fresh map. Submit → store.createMap(...).
+ *   - configure-existing: existing map (typically just created via the
+ *     element-create grid). Pre-fills name/location/image_url from current
+ *     state. Submit → store.updateMap(existingId, ...). Cancel = no changes.
  *
  * Collects: name, optional location (via element picker), optional image url,
  * optional local image file (stored in media via addMedia).
  *
- * On submit: createMap → if file, addMedia → update map.image_media_id →
- * refresh data.elements → return the created map.
+ * On submit:
+ *   create flow      → createMap → if file, addMedia → updateMap(image_media_id) → refresh → return map
+ *   configure flow   → updateMap → if file, addMedia → updateMap(image_media_id) → refresh → return map
  */
 
 import { BaseModal } from './modal-base';
@@ -20,9 +27,26 @@ export interface MapCreateResult {
   map: WorldMap;
 }
 
+export interface MapModalOptions {
+  /** When set, the modal runs in configure-existing mode against this id. */
+  existingMapId?: string;
+}
+
 export function createMapDialog(toasts: ToastManager): Promise<MapCreateResult | null> {
   return new Promise((resolve) => {
-    const modal = new MapCreateModal(toasts, (result) => resolve(result));
+    const modal = new MapCreateModal(toasts, (result) => resolve(result), {});
+    modal.open();
+  });
+}
+
+/**
+ * Open the map modal in configure-existing mode against `mapId`. Used after
+ * element-create produces a map element with only a name set — the modal
+ * gives the user a single-pass surface to fill location + image fields.
+ */
+export function configureMapDialog(toasts: ToastManager, mapId: string): Promise<MapCreateResult | null> {
+  return new Promise((resolve) => {
+    const modal = new MapCreateModal(toasts, (result) => resolve(result), { existingMapId: mapId });
     modal.open();
   });
 }
@@ -30,13 +54,20 @@ export function createMapDialog(toasts: ToastManager): Promise<MapCreateResult |
 class MapCreateModal extends BaseModal {
   private onDone: (result: MapCreateResult | null) => void;
   private toasts: ToastManager;
+  private opts: MapModalOptions;
   private resolved = false;
   private locationPreview: { id: string; name: string } | null = null;
+  private existingMap: WorldMap | null = null;
 
-  constructor(toasts: ToastManager, onDone: (result: MapCreateResult | null) => void) {
+  constructor(
+    toasts: ToastManager,
+    onDone: (result: MapCreateResult | null) => void,
+    opts: MapModalOptions,
+  ) {
     super();
     this.toasts = toasts;
     this.onDone = onDone;
+    this.opts = opts;
   }
 
   open(): void {
@@ -44,6 +75,23 @@ class MapCreateModal extends BaseModal {
       this.toasts.error('no active world');
       this.onDone(null);
       return;
+    }
+    if (this.opts.existingMapId) {
+      const found = getState().data.elements.find(
+        (e): e is WorldMap => e.type === 'map' && e.id === this.opts.existingMapId,
+      );
+      if (!found) {
+        this.toasts.error('map not found');
+        this.onDone(null);
+        return;
+      }
+      this.existingMap = found;
+      // Pre-fill the location chip from the existing map's location, looking
+      // up the location's name from state.
+      if (found.location) {
+        const loc = getState().data.elements.find(e => e.id === found.location);
+        this.locationPreview = { id: found.location, name: loc?.name ?? '(unknown)' };
+      }
     }
     this.modal = this.buildModal();
     this.show();
@@ -74,17 +122,21 @@ class MapCreateModal extends BaseModal {
   }
 
   private buildModal(): HTMLElement {
+    const isConfigure = !!this.opts.existingMapId;
+    const initialName = isConfigure ? (this.existingMap?.name ?? '') : '';
+    const initialUrl = isConfigure ? (this.existingMap?.image_url ?? '') : '';
+
     const { overlay, body } = this.buildModalShell({
-      title: 'New map',
+      title: isConfigure ? 'Configure map' : 'New map',
       panelClass: 'atlas-map-create-panel',
-      dataModal: 'create-map',
+      dataModal: isConfigure ? 'configure-map' : 'create-map',
     });
 
     body.innerHTML = `
-      <form data-form="create-map">
+      <form data-form="${isConfigure ? 'configure-map' : 'create-map'}">
         <label class="atlas-modal-field">
           <span>Name</span>
-          <input class="atlas-input" type="text" name="map-name" placeholder="map name..." autocomplete="off" />
+          <input class="atlas-input" type="text" name="map-name" placeholder="map name..." autocomplete="off" value="${escapeAttr(initialName)}" />
         </label>
         <div class="atlas-modal-field">
           <span>location (optional)</span>
@@ -92,17 +144,17 @@ class MapCreateModal extends BaseModal {
         </div>
         <label class="atlas-modal-field">
           <span>image URL (optional)</span>
-          <input class="atlas-input" type="text" name="map-image-url" placeholder="https://..." autocomplete="off" spellcheck="false" />
+          <input class="atlas-input" type="text" name="map-image-url" placeholder="https://..." autocomplete="off" spellcheck="false" value="${escapeAttr(initialUrl)}" />
         </label>
         <label class="atlas-modal-field">
           <span>local image (optional)</span>
           <input type="file" name="map-image-file" accept="image/*" />
-          <span class="atlas-modal-hint">stored locally only — never uploaded. if blank, the map opens with a grid canvas.</span>
+          <span class="atlas-modal-hint" data-role="local-image-hint">used as fallback when image URL is empty. stored locally, never uploaded.</span>
         </label>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
           <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="create">Create</button>
+          <button type="submit" class="atlas-btn-primary" data-action="submit">${isConfigure ? 'Save' : 'Create'}</button>
         </div>
       </form>
     `;
@@ -113,9 +165,25 @@ class MapCreateModal extends BaseModal {
     const cancelBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.cancel(); });
 
+    // Dynamic hint: when URL has text, the local-image becomes a stored
+    // fallback (won't display while URL is set). Make the trade-off visible.
+    const urlField = body.querySelector<HTMLInputElement>('input[name="map-image-url"]')!;
+    const hintEl = body.querySelector<HTMLElement>('[data-role="local-image-hint"]')!;
+    const updateHint = (): void => {
+      if (urlField.value.trim()) {
+        hintEl.textContent = 'image URL is set — local image will be stored but the URL will display.';
+        hintEl.classList.add('atlas-modal-hint-warn');
+      } else {
+        hintEl.textContent = 'used as fallback when image URL is empty. stored locally, never uploaded.';
+        hintEl.classList.remove('atlas-modal-hint-warn');
+      }
+    };
+    urlField.addEventListener('input', updateHint);
+    updateHint();
+
     const form = body.querySelector<HTMLFormElement>('form')!;
     const errorBox = body.querySelector<HTMLElement>('[data-role="error"]')!;
-    const submitBtn = body.querySelector<HTMLButtonElement>('[data-action="create"]')!;
+    const submitBtn = body.querySelector<HTMLButtonElement>('[data-action="submit"]')!;
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -131,28 +199,34 @@ class MapCreateModal extends BaseModal {
         return;
       }
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Creating...';
+      submitBtn.textContent = isConfigure ? 'Saving...' : 'Creating...';
       cancelBtn.hidden = true;
       try {
         const store = getActiveStore()!;
         const url = urlInput.value.trim();
         const file = fileInput.files?.[0];
 
-        // Decode dimensions BEFORE create so the initial record carries them.
+        // Decode dimensions BEFORE persisting so the record carries them.
         let initialDims: { w: number; h: number } | null = null;
         if (file) initialDims = await readImageDims(file);
         else if (url) initialDims = await readImageDimsFromUrl(url);
 
-        const createPatch: Partial<WorldMap> = {
+        const patch: Partial<WorldMap> = {
           name,
           location: this.locationPreview?.id,
           image_url: url || undefined,
         };
         if (initialDims) {
-          createPatch.width = initialDims.w;
-          createPatch.height = initialDims.h;
+          patch.width = initialDims.w;
+          patch.height = initialDims.h;
         }
-        let map = await store.createMap(createPatch);
+
+        let map: WorldMap;
+        if (isConfigure && this.opts.existingMapId) {
+          map = await store.updateMap(this.opts.existingMapId, patch);
+        } else {
+          map = await store.createMap(patch);
+        }
 
         if (file) {
           const media = await store.addMedia(map.id, file, 'base-image');
@@ -163,16 +237,16 @@ class MapCreateModal extends BaseModal {
         patchSlice('data', { elements });
         requestPushIfLinked();
 
-        this.toasts.success(`created map "${name}"`);
+        this.toasts.success(isConfigure ? `updated map "${name}"` : `created map "${name}"`);
         this.resolved = true;
         this.onDone({ map });
         this.hide();
       } catch (err) {
-        console.error('[map-create] failed:', err);
+        console.error(isConfigure ? '[map-configure] failed:' : '[map-create] failed:', err);
         errorBox.textContent = err instanceof Error ? err.message : String(err);
         errorBox.hidden = false;
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Create';
+        submitBtn.textContent = isConfigure ? 'Save' : 'Create';
         cancelBtn.hidden = false;
       }
     });
@@ -236,4 +310,8 @@ async function readImageDimsFromUrl(url: string): Promise<{ w: number; h: number
 
 function escapeText(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

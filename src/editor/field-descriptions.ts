@@ -259,13 +259,13 @@ const LOCATION: FieldMap = {
 };
 
 const MAP: FieldMap = {
-  background_color: 'Color around map when zoomed',
-  hierarchy: 'Association/differentiation level',
+  background_color: 'Fallback canvas color (atlas auto-extracts an edge color from the image when one is set)',
+  hierarchy: 'Sibling ordering within a parent_map group or among co-located maps. Lower comes first; ties broken alphabetically.',
   width: 'Width in pixels',
   height: 'Height in pixels',
-  depth: 'Depth in pixels',
-  parent_map: 'Containing map',
-  location: 'Location represented',
+  depth: 'Depth in pixels (reserved, unused)',
+  parent_map: 'Reference to a map this one is geographically within. Sets explicit position in the map tree.',
+  location: 'Reference to the Location this map represents. When set without parent_map, atlas infers tree placement via the location’s parent chain.',
 };
 
 const MARKER: FieldMap = {
