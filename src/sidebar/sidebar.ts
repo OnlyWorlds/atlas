@@ -175,10 +175,18 @@ export function mountSidebar(mount: SidebarMount): () => void {
     }
   }
 
-  // Keep state.ui.sidebarMode in sync with the URL.
+  // Keep state.ui.sidebarMode in sync with the URL. Routes that are
+  // "content-y" (element, elements list, map, timeline) all imply the user
+  // is browsing inside a world — keep the sidebar on the elements list.
+  // Only fall back to worlds-mode for purely navigation/setup routes.
   function syncModeFromRoute(): void {
     const route = parseHash(window.location.hash);
-    const want: SidebarMode = (route.mode === 'elements' || route.mode === 'element') ? 'elements' : 'worlds';
+    const contenty =
+      route.mode === 'elements' ||
+      route.mode === 'element' ||
+      route.mode === 'map' ||
+      route.mode === 'timeline';
+    const want: SidebarMode = contenty ? 'elements' : 'worlds';
     if (getState().ui.sidebarMode !== want) {
       patchSlice('ui', { ...getState().ui, sidebarMode: want });
     }

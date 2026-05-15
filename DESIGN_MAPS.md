@@ -284,45 +284,125 @@ Advanced section is collapsed by default. The hint text under "Local image" upda
 
 When a map is the selected element, the middle pane shows the standard element-detail editor (works today). All map fields edit-in-place via the schema-driven editor. The map's tab on the right shows the canvas.
 
-### 3.4 Lock toggle
+### 3.4 Lock toggle — REMOVED (session 210)
 
-Small lock icon in the map tab header (next to the close ×). Unlocked by default.
+Lock semantics existed to suppress pin-click auto-open. Auto-open itself was removed at the end of session 209 (both sidebar-click and pin-click paths). With auto-open gone, lock had no observable behavior to gate, so the icon, the single-locked-at-a-time logic, and the per-tab `locked` field have been deleted.
 
-- **Unlocked** → selecting an element (via sidebar OR pin click) that has an associated map auto-loads that map per §3.6.
-- **Locked** → selection events do NOT change the current map. User can still manually open other maps from the maps tab.
+If auto-open returns later (e.g. as an opt-in setting), revive the lock model from git history. Until then: explicit clicks via the top-bar affordances in §3.5 are the only path to opening a map from an element, and locking has nothing to constrain.
 
-State persists per-tab while the world is active. Doesn't survive a world switch (each world's tabs come back unlocked).
+### 3.5 Map affordances in element-detail top bar (revised session 209)
 
-### 3.5 Inline "map presence" widget in element-detail
+The v1.0 inline "map presence" widget at the BOTTOM of the element-detail body was implemented in M7. Smoke testing showed it was buried — visible but easy to miss, and the visual weight felt wrong for what is core navigation. Replacement: **fold map and pin affordances into the element-detail top bar**, the existing icon row that currently carries save/trash/create-pin.
 
-A new section in the middle-pane element detail, rendered for any element whose context relates to maps. Two variants:
+**Revised layout (reading left → right):**
 
-**For Location elements** — "Maps related to this place":
-- Maps directly OF this location (where `Map.location == this.id`)
-- Maps within descendant locations (via Location's parent_location subtree)
-- Optionally: ancestor maps that contain this location (where this location's parent chain reaches a map's location)
+For **Location elements**:
+```
+[map] [map] [map]  |  [pin] [pin] [pin]  |  [+ map]  [+ pin]  [save]  [trash]
+   ↑ existing maps      ↑ existing pins      ↑ create   ↑ create
+   anchored here        for this element     map        pin
+   (cyan map icons,     (subtler, smaller    (solid,    (existing)
+    click to open)      pin icons, click     same
+                        opens map +          weight as
+                        camera-pans to       create-pin)
+                        pin)
+```
 
-**For other content elements** — "Appears on maps":
-- All maps where a pin exists with `element_id == this.id`
-- Click → open that map (with pin focused — future enhancement)
+For **non-Location elements** (Character, Object, etc.):
+```
+[pin] [pin] [pin]  |  [+ pin]  [save]  [trash]
+   ↑ existing pins      ↑ create
+   only                 pin
+```
 
-Render as a compact list with thumbnails (when available). One row per related map. Click row → open map tab.
+**Rules**:
+- `[map]` icons render only for Locations. Click → open that map tab.
+- `[pin]` icons render for ALL element types. Click → open the pin's map AND camera-pan to that pin's coords. Less visual weight than the create-pin button (smaller, muted-cyan).
+- `[+ map]` button renders only for Locations. Click → opens MapCreateModal pre-filled with this location selected, and a suggested name like `Map of <Location Name>` (user editable).
+- `[+ pin]` button retains existing behavior.
+- When a Location has 0 maps AND 0 pins, the `[+ map]` button still renders (it's the affordance to start), but no existing-icon clusters render.
+- Visual ordering invariant: existing affordances on the LEFT, create buttons in the MIDDLE, file/state actions (save / trash) anchored RIGHT.
 
-If the list is empty, the section doesn't render. No empty-state noise.
+**Maps Settings section** (new, in the existing Settings panel):
+- Toggle: "Show map names alongside map icons in element header" — default OFF. When ON, each `[map]` icon in the top bar gets a small name label.
+- Future toggles for atlas map behavior live here too (e.g. "auto-show characters at location on maps" once §8 lands).
 
-### 3.6 Pin click-through and element selection
+**Inline body widget removed**: the M7 "Maps" section in the element-detail body is deleted. Top bar carries all map affordances.
 
-Unified rule for both pin clicks and sidebar selections (treat as the same intent: "I want to look at this thing"):
+**Why the redesign**: the top bar is where the user's eye lands after navigating to an element. Putting map navigation there makes it discoverable in-flow. The inline section was too easy to miss past a long body of fields.
 
-Element has N maps where N = count of maps with `location == element.id` (for Location elements) OR count of distinct maps in this element's pins (for others):
+### 3.6 Pin click-through and element selection (revised session 210)
 
-| N | Behavior (unlocked tab) | Behavior (locked tab) |
-|---|---|---|
-| 0 | open element-detail in middle pane | open element-detail in middle pane |
-| 1 | auto-open that map on the right; element-detail in middle pane | element-detail only; current map stays |
-| ≥2 | small picker overlay listing maps (default highlight: highest hierarchy = top of stack); on picker confirm, behave as N=1 | element-detail only |
+**Auto-open is REMOVED entirely** (both sidebar-click and pin-click). Clicking an element anywhere in atlas — sidebar row, pin on a map, ghost pin, chip in element-detail — sets `selectedElementId` and navigates to the element-detail route. The right pane does NOT change unless the user explicitly clicks a `[map]` or `[pin]` affordance in the element-detail top bar (§3.5).
 
-Picker can be skipped by holding Shift on click (advanced affordance, not in v1).
+Rationale: smoke showed that auto-opening the right pane on element selection was disorienting — users wanted to read element details, not have their map view jump around. Making "open this element's map" an explicit gesture (§3.5 cluster click) keeps the right pane stable until the user asks for a change.
+
+Pin-click flow today:
+1. User clicks a pin on a map → `selectedElementId` patched, route changes to `#/w/<id>/element/<eid>` (or `#/w/<id>/map/<mid>/element/<eid>` if a map tab is active).
+2. Middle pane re-renders to element-detail.
+3. Right pane stays put.
+
+To navigate the user TO a map, see §3.5 (top-bar `[map]` / `[pin]` clusters).
+
+### 3.7 Right-click on map — place existing OR create new (planned, session 209)
+
+Current behavior: right-click → opens element-create modal → new element + drops pin pointing at it. Renamed and extended to support **placing existing elements**:
+
+**Modal name**: "New pin" (was "New element from map").
+
+**Form** (same shape as ElementCreateModal):
+- Name field (autofocus)
+- Category ghost-autocomplete field (the existing type-input)
+- Type grid
+
+**Ghost-completion behavior**:
+- As user types in the name field, scan elements of the currently-selected category whose name starts with the typed text.
+- If a match exists: render a ghost suffix in the name field (mirroring the type-field ghost pattern).
+- **TAB at end of typed input** accepts the ghost → name input shows full element name, button label flips `Create` → `Place`, a small chip near the modal title signals `placing existing · <category>`.
+- **Multi-match tiebreaker**: prefer the element with the latest `local_updated_at`. (TAB-to-cycle deferred.)
+- **Submit `Place`**: drops a pin pointing at the existing element. No element creation.
+- **Submit `Create`** (default): creates new element AND drops pin. Current behavior.
+
+**Category filter**: only matches within the currently-selected category. (Maps category is excluded entirely per §1.4 — pins don't target maps.)
+
+---
+
+### 3.8 Ghost pins — right-click pin to reveal related elements
+
+**Concept**: a real pin marks "this element is here." A **ghost pin** is a translucent, computed-display marker showing "this OTHER element is also at this location." Ghosts are ephemeral — visual scaffolding for exploration, not stored data.
+
+**Trigger**: right-click on a real (non-ghost) pin.
+- The pin's referenced element must itself have a `location` field set. If absent, toast: *"this pin's element has no location set — nothing to ghost."*
+- Atlas looks up the pin's element's `location` → finds all elements (across the world) whose `location` field points at the same location, AND who don't already have a real pin on this map.
+- For each candidate, spawn a ghost pin in a circle around the source pin (radius ~70px, angles evenly spaced).
+- If the same source pin is right-clicked again AND it currently has active ghosts → clear all ghosts spawned from this pin (toggle off).
+
+**Eligible element types**: those with a `location: single_link → location` field in the SDK FIELD_SCHEMA. Verified at runtime; no hardcoded list. Currently (SDK 2.2.x): `character, creature, object`. `map` also has the field but is excluded since pins don't target maps (§1.4).
+
+**Visual treatment**:
+- Same canvas icon as real pins (via `pin-visuals.ts`), rendered at ~40% opacity.
+- No name label by default. Hover reveals a tooltip with the element name + type.
+- Visually distinct from real pins (translucent = "not committed").
+
+**Interactions on a ghost pin**:
+- **Left click**: selects the element (sets `selectedElementId`, navigates to element-detail in middle pane). Does NOT remove the ghost. Does NOT open another map.
+- **Right click**: prunes just that single ghost from the cache. Other ghosts (from this source or others) remain.
+- **Drag**: not supported. Ghosts are not placeable — they're a discovery affordance. Users who want a real pin at a specific spot use the existing pin-placement flow.
+
+**Persistence**:
+- In-memory per map tab. Stored as a module-level cache keyed by `mapId → { ghosts: Map<ghostId, {sourcePinId, elementId, x, y}> }`.
+- Cleared automatically on: map tab close, world switch (`disposeAllMapTabs`), map element delete.
+- NOT persisted to disk, NOT synced to OW, NOT stored in localStorage. Reload = ghosts gone. Map tab close + reopen = ghosts gone.
+- Multiple source pins can have their own ghost groups active simultaneously. Each source pin's group toggles independently.
+
+**Spatial layout**: ghosts circle the source pin at fixed radius. For N candidates, angles = `(2π/N) * i` starting from due north (i.e. straight up from the source pin). If N is small (1-2), this leaves the layout sparse; if N is large (10+), ghosts cluster tightly but evenly. No collision avoidance against existing pins — ghosts overlap if they must (they're ephemeral; user can prune).
+
+**Why no toggle in Settings or on map canvas**: the right-click gesture is itself the toggle. Adding a settings toggle would create two sources of truth ("default state" vs "current state per-tab") that would conflict. The simplest mental model: ghosts only exist while you're actively exploring; they appear when you ask, disappear when you don't.
+
+**Edge cases**:
+- Source pin's element has `location` set, but no OTHER elements share that location → toast: *"no other elements at this location."*
+- Source pin's element has a `location` that points at a now-deleted Location → still works; we match by location id, not by location existence.
+- The map's anchored location (`map.location`) is NOT auto-included as a ghost candidate — that's the map's own context, not a discovery.
 
 ---
 
@@ -346,9 +426,31 @@ Picker can be skipped by holding Shift on click (advanced affordance, not in v1)
 
 **Implication**: a user with only `image_media_id` (no URL) on an api-linked world has a map that displays locally but shows as image-less on other machines. We surface this in the maps tab row as a soft hint: *"local-only image — set a URL to share."* Same hint used for orphan loc-bound surfaces — non-blocking, just informational.
 
+### 4.1 Pin placement is gated on image presence (session 209)
+
+Pins anchor to the map's image coordinate system. To prevent the "pins-placed-on-default-2000-grid-then-canvas-shrinks-to-image" bug, **pin placement is refused when a map has neither `image_url` nor `image_media_id`**. The grid canvas still renders as visual fallback for image-less maps, but the placement banner and the right-click contextual-create flow both early-return with an info toast (`"set a map image first — pins anchor to the image"`).
+
+**Implication when changing an image**: pins keep their stored coordinates. If the new image has different dimensions, pin display positions may look "off" relative to image content — but the pins didn't move; the world under them did. Atlas does not auto-rescale pin coords on image change, by design. Users can manually adjust or accept the new positions.
+
+**Existing broken pins** (placed before this gate landed): not auto-migrated. They render wherever their stored coords place them on the now-image-sized canvas. Delete and re-place to fix.
+
 ---
 
-## 5. Tab state across world switches
+## 5. Tab state across world switches (revised session 209)
+
+**Decision**: `ui.rightTabs` is GLOBAL across world switches. Tabs persist when changing worlds; tabs whose `mapId` isn't in the current world's `data.elements` render as stale (darkened, italic, cloud_off icon, click anywhere on the tab to close). User decides when to close cross-world tabs.
+
+**Why this model**: per-world tab persistence (the original M2 attempt) auto-replaced tabs on world switch, which felt like "tabs closing" to the user even though they were technically being snapshotted. The global model with stale-rendering matches the user's mental model: "my open tabs stay where I put them; ones from other worlds are dimmed but recoverable."
+
+**Implementation** (current):
+- `right-pane.ts` checks each tab's mapId against `data.elements` on every render. Missing → `atlas-tab-stale` class + click handler that closes (vs activates).
+- Stale tab body pane (`map-tab.ts`) shows a friendly "this map isn't in the current world" state with an explicit Close button.
+- `activateWorld` does NOT touch `ui.rightTabs` on world switch. Tabs persist.
+- Per-world snapshot helpers (`setWorldRightTabs` / `getWorldRightTabs` in registry) are retained as dormant code, in case future UX work wants to revive per-world persistence as an alternate mode.
+
+---
+
+## 5-deprecated. Legacy per-world plan (kept for archaeology)
 
 (Foundational fix needed before the map index UI work — see Issue C from the design conversation.)
 
@@ -478,6 +580,8 @@ These are explicitly OUT of v1 scope but parked for later consideration. Not fou
 - **Picker keyboard shortcut**: Shift-click to skip the picker on multi-map elements. Wait for user feedback to decide if needed.
 - **Drag-to-reorder hierarchy**: dragging map rows in the index to set hierarchy values. Defer until users complain about the numeric field.
 - **Map subtype as visual filter** (e.g. "show only political maps"): filter chips on the maps tab. Defer.
+- **Cross-element rendering on maps** (session 209 backlog): "show all Characters/Objects/Creatures at this location on its map" toggle. The old maptool had a button that spawned ephemeral pins (not stored) for any element whose `location` field matched the map's location. Worth designing properly — touches the boundary between persistent pins and computed-display markers. Needs its own design session.
+- **Pin coord council motion**: separate paperwork — document the origin convention (top-left, x grows right, y grows down) and canvas-anchored semantics (pin coords are absolute against the map's `width × height`) in the OW `Pin.x` / `Pin.y` field descriptions. Bundle with §7's map-field description updates.
 
 ---
 
@@ -563,6 +667,67 @@ Add the §3.5 widget to element-detail middle pane. Type-aware content: Location
 ### Bout M8 — Schema description council motion
 
 After M1-M7 ship and feel stable in real use, draft and submit the §7 council motion. Likely a single bundled motion.
+
+---
+
+## 10b. Smoke-driven follow-on bouts (session 209)
+
+After M1-M7 landed, Captain's smoke against the live test worlds (Skeld's AAARGAAAA/BBBB/CCC) surfaced a substantial pile of bugs and design adjustments. Triaged below.
+
+### Bout N1 — Safe knock-outs batch (this session)
+
+Mechanical fixes, no design ambiguity:
+
+1. **Picker → sidebar mode**: when `MapPickerModal` resolves and `openMapTab` navigates to a map hash, sidebar mode must stay `elements` (the mode the user was in when they triggered the pick). Currently flips to `worlds` on map navigation.
+2. **Map tab id-swap propagation**: after make-online, server reassigns ids; `applyIdSwapToUi` in `sync-attach.ts` migrates `selectedElementId` + URL but NOT `rightTabs[*].mapId`. Extend it to walk `rightTabs` and rewrite map ids. Symptom this fixes: "map not found" panel after make-online with open map tab(s).
+3. **Map tab refresh on image edit**: when a map element's `image_url` / `image_media_id` changes (via field editing), the cached map tab doesn't re-apply the background. Subscribe to data.elements changes inside `map-tab.ts` cache and diff the image-source fields per cached entry.
+4. **Disable sidebar Location auto-open** (§3.6 revision): remove the `maybeAutoOpenMapFor` call from `elements-sidebar.ts`. Pin-click path retains auto-open.
+5. **Sidebar Location row indicator**: small map icon anchored right (left of the category label) on Location rows whose maps include any anchored to them. Affordance "this place has maps."
+
+Deliverable: typecheck/vitest/build green. Some new unit tests for the id-swap migration.
+
+### Bout MR — Map tab system refresh refactor (this session)
+
+Cache invalidation and tab lifecycle, subsumes a few smaller items:
+
+- Subscribe to `data.elements` per cached map entry; diff `name`, `image_url`, `image_media_id`, `width`, `height`. Reapply background and re-label tab on change.
+- Stale-tab handling: tabs whose `mapId` isn't in current `data.elements` (because the map was deleted in another world OR id-swapped without migration before N1's fix) get a darkened visual and a "click to close" affordance — click anywhere in the panel area closes the tab.
+- World-switch cleanup gets tighter: dispose all cache entries on world change (already done), but ALSO scrub stale entries that managed to leak.
+- One pass through the `map-tab.ts` module to clean up the `subscribe` hot path (currently runs on every notification, even for unrelated state changes).
+
+Deliverable: a sturdier map tab subsystem. No new visible features.
+
+### Bout N2 — Lock UX rework (this session)
+
+Per §3.4 revision: hide lock icon by default, hover-reveal, single-locked-at-a-time, click-anywhere-on-tab to toggle. Auto-unlock-others on new lock.
+
+Deliverable: cleaner tab strip. Lock retains its purpose (suppresses pin-click auto-open) per the revised §3.6.
+
+---
+
+## 10c. Next-session pile (session 210+)
+
+Captured here so we don't lose the alignment from the session 209 design conversation.
+
+### Bout MW — Map affordances in element-detail top bar
+
+Per §3.5 (revised). Move map+pin affordances into the element-detail top bar; remove the inline body widget. Add Maps Settings section to the existing Settings panel (first toggle: "show map names alongside map icons in element header" — default off).
+
+### Bout NPM — New-pin modal with TAB-autocomplete
+
+Per §3.7. Rename ElementCreateModal's contextual variant to "New pin"; add ghost-line name autocompletion against existing elements of current category; TAB accepts → `Place` mode; multi-match tiebreaker = latest `local_updated_at`.
+
+### Investigation — Pin coord origin / canvas-resize behavior
+
+Per §8 "Pin coord origin & canvas semantics." Look at `Leaflet2DManager.ts` `leafletToStorage`/`storageToLeaflet` and the canvas-vs-image-dim mismatch logic. Propose fix candidates (rescale, refuse-until-dims-known, clamp+indicator). Likely produces a small atlas fix AND a council-motion entry for schema clarity on pin coord origin.
+
+### Design conversation — Cross-element rendering
+
+Per §8 "Cross-element rendering on maps." How to show elements with `location` fields on the matching map(s). Persistent pins vs ephemeral computed markers. Worth a session of design alignment before any code.
+
+### Bout M8 — Schema description council motion (after all above stable)
+
+Bundle: §7 description updates + pin coord origin clarification + any other prose discrepancies surfaced during use.
 
 ---
 

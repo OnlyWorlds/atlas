@@ -12,11 +12,14 @@
  * Leaflet markers (add missing, remove stale, update existing).
  */
 
+import L from 'leaflet';
 import { getState, patchSlice, subscribe } from '../../core/state';
 import { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManager';
 import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import type { Element, Pin, WorldMap } from '../../core/types';
 import { pickMapImageSource } from './map-image-source';
+// maybeAutoOpenMapFor — auto-open behavior is currently disabled; the helper
+// is kept in the codebase for a future opt-in (DESIGN_MAPS.md §3.6).
 import { pinVisualFor, onPinVisualsReady } from './pin-visuals';
 import { ToastManager } from '../../ui/toast-manager';
 import { ElementCreateModal } from '../../ui/element-create-modal';
@@ -33,6 +36,13 @@ interface MapTabCacheEntry {
   objectUrls: string[];
   ready: Promise<void>;
   tooltip: HTMLDivElement;
+  /**
+   * Snapshot of the image source last used to render the background. When the
+   * map element's image fields change (URL edited, local file added/removed),
+   * the subscriber compares and re-applies. Stored as the same shape as
+   * pickMapImageSource so we don't recompute on every notification.
+   */
+  lastBg: string;
 }
 
 const cache = new Map<string, MapTabCacheEntry>();
@@ -52,7 +62,34 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   }
   const map = state.data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId);
   if (!map) {
-    pane.innerHTML = `<div class="atlas-empty-state">map not found — it may have been deleted.</div>`;
+    // Stale tab: this mapId isn't in the current world's elements. Resolve
+    // the owning world's name via the tab's worldId stamp (openMapTab sets
+    // this; legacy tabs without it fall back to a generic message).
+    const tab = state.ui.rightTabs.find(t => t.kind === 'map' && t.mapId === mapId);
+    const ownerWorldId = tab && tab.kind === 'map' ? tab.worldId : undefined;
+    const ownerWorld = ownerWorldId ? state.registry.worlds.find(w => w.id === ownerWorldId) : undefined;
+    const ownerLabel = ownerWorld?.name ?? null;
+    const tabLabel = tab && tab.kind === 'map' ? tab.label : '';
+    const subMsg = ownerLabel
+      ? `this map belongs to <b>${escapeHtml(ownerLabel)}</b>${tabLabel ? ` ("${escapeHtml(tabLabel)}")` : ''} — switch to that world to view it.`
+      : `it may have been deleted, or you switched worlds while it was open.`;
+    pane.innerHTML = `
+      <div class="atlas-empty-state atlas-map-stale-pane" data-role="map-stale-pane">
+        <div class="material-symbols-outlined atlas-map-stale-icon">cloud_off</div>
+        <div class="atlas-map-stale-title">${ownerLabel ? `Map from another world` : `this map isn't in the current world`}</div>
+        <div class="atlas-map-stale-sub">${subMsg}</div>
+        <button type="button" class="atlas-btn-ghost" data-action="close-stale">Close tab</button>
+      </div>
+    `;
+    pane.querySelector<HTMLButtonElement>('[data-action="close-stale"]')?.addEventListener('click', () => {
+      const ui = getState().ui;
+      const tabIdx = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === mapId);
+      if (tabIdx < 0) return;
+      const next = [...ui.rightTabs];
+      next.splice(tabIdx, 1);
+      const active = ui.rightActiveIndex >= tabIdx ? Math.max(0, ui.rightActiveIndex - 1) : ui.rightActiveIndex;
+      patchSlice('ui', { ...ui, rightTabs: next, rightActiveIndex: active });
+    });
     return;
   }
 
@@ -90,6 +127,12 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     showLabels: true,
     defaultIconSize: 32,
     defaultLabelOffset: 12,
+    // Constrain pan/click to canvas bounds (DESIGN_MAPS.md §4.1 pin coord
+    // discipline). Without this, Leaflet's CRS.Simple lets the user pan and
+    // click anywhere in infinite 2D space — pin coords then end up outside
+    // the canvas (e.g. y > image height → pin renders below the map).
+    // maxBounds is in storage-coord form [[minX, minY], [maxX, maxY]].
+    maxBounds: [[0, 0], [width, height]],
   });
 
   const entry: MapTabCacheEntry = {
@@ -100,6 +143,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     objectUrls: [],
     ready: Promise.resolve(),
     tooltip,
+    lastBg: '',
   };
   cache.set(mapId, entry);
 
@@ -108,66 +152,24 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
 
     // Background source precedence (DESIGN_MAPS.md §4): image_url > image_media_id > grid.
     // pickMapImageSource encodes the rule (unit-tested in tests/unit/map-image-source.test.ts).
-    const source = pickMapImageSource(map);
-    let backgroundApplied = false;
-
-    const applyImage = (url: string, dims: { w: number; h: number }) => {
-      manager.setBackgroundImage(url, dims.w, dims.h);
-      backgroundApplied = true;
-      extractEdgeColor(url).then(color => {
-        if (color) {
-          container.style.backgroundColor = color;
-          const leafEl = container.querySelector('.leaflet-container') as HTMLElement | null;
-          if (leafEl) leafEl.style.backgroundColor = color;
-        }
-      });
-    };
-
-    if (source.kind === 'url') {
-      let dims: { w: number; h: number };
-      if (typeof map.width === 'number' && typeof map.height === 'number' && map.width > 0 && map.height > 0) {
-        dims = { w: map.width, h: map.height };
-      } else {
-        const decoded = await decodeImageDims(source.url);
-        dims = decoded ?? { w: width, h: height };
-        if (decoded) {
-          const store = getActiveStore();
-          if (store) {
-            store.updateMap(mapId, { width: decoded.w, height: decoded.h })
-              .then(async () => {
-                const elements = await store.listElements();
-                patchSlice('data', { elements });
-              })
-              .catch(err => console.warn('[map-tab] dim persist failed:', err));
-          }
-        }
-      }
-      applyImage(source.url, dims);
-    } else if (source.kind === 'local') {
-      try {
-        const store = getActiveStore();
-        const blob = store ? await store.getMediaBlob(source.mediaId) : null;
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          entry.objectUrls.push(url);
-          const dims = (typeof map.width === 'number' && typeof map.height === 'number' && map.width > 0)
-            ? { w: map.width, h: map.height }
-            : (await decodeImageDims(url)) ?? { w: width, h: height };
-          applyImage(url, dims);
-        }
-      } catch (err) {
-        console.warn('[map-tab] failed to load local media for map:', err);
-      }
-    }
-
-    if (!backgroundApplied) {
-      manager.setBackgroundGrid(100);
-    }
+    await applyMapBackground(entry, map, width, height);
 
     // Map click → if pin placement is active, drop a pin at this point.
     manager.on('map-click', async (ev) => {
       const placement = getState().ui.pinPlacement;
       if (!placement) return;
+      // Gate: pin placement requires a map image (DESIGN_MAPS.md §pin-coords
+      // strict rule, session 209). The 2000-default grid canvas exists for
+      // visual fallback only — pin coords placed there would diverge from
+      // the canvas the user actually intended (the image), producing pins
+      // that render outside image bounds once the image arrives.
+      const currentMap = getState().data.elements.find(
+        (e): e is WorldMap => e.type === 'map' && e.id === entry.mapId,
+      );
+      if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
+        toasts.info('set a map image first — pins anchor to the image');
+        return;
+      }
       try {
         const store = getActiveStore();
         if (!store) return;
@@ -185,9 +187,11 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
           map_id: entry.mapId,
           element_id: placement.elementId,
           element_type: pinned.type,
-          // OW API requires integer pin coordinates — round here, the only seam.
-          x: Math.round(ev.point.x),
-          y: Math.round(ev.point.y),
+          // OW API requires integer pin coordinates. Clamp to canvas bounds
+          // as defense in depth — Leaflet maxBounds restricts panning but
+          // doesn't guarantee click events stay within bounds at every zoom.
+          x: clampToCanvas(Math.round(ev.point.x), width),
+          y: clampToCanvas(Math.round(ev.point.y), height),
         });
         const elements = await store.listElements();
         patchSlice('data', { elements });
@@ -201,6 +205,13 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     });
 
     // Pin click → navigate to that element's detail.
+    //
+    // Auto-open of an associated map is REMOVED (session 209 revision per
+    // Captain): map choice should stay stable when the user is exploring
+    // pins, not surprise-switch the right pane. The map-tab cache and the
+    // `maybeAutoOpenMapFor` helper remain in the codebase for a possible
+    // future re-enable (e.g. as an opt-in setting), but no surface invokes
+    // them right now. See DESIGN_MAPS.md §3.6.
     manager.on('pin-click', (ev) => {
       const pin = getState().data.elements.find((e): e is Pin => e.type === 'pin' && e.id === ev.pin.id);
       if (!pin) return;
@@ -229,6 +240,14 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       (e.originalEvent as MouseEvent).preventDefault();
       const latlng = (e as any).latlng;
       if (!latlng) return;
+      // Same gate as the placement-banner map-click path: no image, no pins.
+      const currentMap = getState().data.elements.find(
+        (em): em is WorldMap => em.type === 'map' && em.id === entry.mapId,
+      );
+      if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
+        toasts.info('set a map image first — pins anchor to the image');
+        return;
+      }
       const point = leafletToStorage(latlng, height);
 
       const modal = new ElementCreateModal(toasts, {
@@ -244,8 +263,8 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
               map_id: entry.mapId,
               element_id: elementId,
               element_type: elementType,
-              x: Math.round(point.x),
-              y: Math.round(point.y),
+              x: clampToCanvas(Math.round(point.x), width),
+              y: clampToCanvas(Math.round(point.y), height),
             });
             const elements = await store.listElements();
             patchSlice('data', { elements });
@@ -293,13 +312,27 @@ function syncPins(entry: MapTabCacheEntry): void {
 
   for (const pin of minePins) {
     const el = elements.find(e => e.id === pin.element_id);
-    const name = el?.name ?? '(element)';
-    const type = el?.type ?? 'object';
-    const visual = pinVisualFor(type);
+    const existing = entry.manager.getPin(pin.id);
 
-    if (entry.manager.getPin(pin.id)) {
-      entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y, name, icon: visual.iconUrl });
+    if (existing) {
+      // Update only the fields whose source data is reliable. Element lookup
+      // can briefly fail during sync transitions (an in-flight id-swap on a
+      // referenced element races the pin's element_id update). Overwriting
+      // the label to '(element)' in that window produces a visible flicker
+      // on reload. Keep the prior label and icon when lookup misses; the
+      // next subscriber tick after sync settles will re-resolve cleanly.
+      if (el) {
+        const visual = pinVisualFor(el.type);
+        entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y, name: el.name, icon: visual.iconUrl });
+      } else {
+        entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y });
+      }
     } else {
+      // New marker — fall back to a friendlier placeholder while element
+      // data is still resolving (vs the raw '(element)' string).
+      const name = el?.name ?? '(loading…)';
+      const type = el?.type ?? 'object';
+      const visual = pinVisualFor(type);
       const added = entry.manager.addPin({
         id: pin.id,
         name,
@@ -326,7 +359,12 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
     try {
       const store = getActiveStore();
       if (!store) return;
-      await store.updatePin(pinId, { x: Math.round(point.x), y: Math.round(point.y) });
+      const dragCanvasH = entry.manager.getConfig().canvasHeight;
+      const dragCanvasW = entry.manager.getConfig().canvasWidth;
+      await store.updatePin(pinId, {
+        x: clampToCanvas(Math.round(point.x), dragCanvasW),
+        y: clampToCanvas(Math.round(point.y), dragCanvasH),
+      });
       const elements = await store.listElements();
       patchSlice('data', { elements });
       // Local write succeeded — schedule autosave. Without this, dragged pins
@@ -363,6 +401,118 @@ export function refreshActiveMapPins(): void {
   const entry = cache.get(active.mapId);
   if (!entry) return;
   entry.ready.then(() => syncPins(entry));
+}
+
+/**
+ * Clamp a pin coord to [0, max]. Defense-in-depth alongside Leaflet's
+ * maxBounds (DESIGN_MAPS.md §4.1) — guarantees no stored pin coord is
+ * outside the map's canvas, regardless of where the click event actually
+ * fired (Leaflet maxBounds restricts panning but isn't 100% reliable at
+ * every zoom level and on all input devices).
+ */
+function clampToCanvas(value: number, max: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > max) return max;
+  return value;
+}
+
+/**
+ * Serialize the picked image source to a comparable key. Used by the
+ * subscriber to detect when a cached map's background needs re-applying
+ * (e.g. user edits image_url in element-detail).
+ */
+function sourceKey(map: WorldMap): string {
+  const s = pickMapImageSource(map);
+  if (s.kind === 'url') return `url:${s.url}`;
+  if (s.kind === 'local') return `local:${s.mediaId}`;
+  return 'grid';
+}
+
+/**
+ * Apply the map's current image source to its rendered background. Idempotent
+ * given a stable `map` — calling repeatedly with the same source is fine
+ * (Leaflet2DManager handles re-set). Stamps `entry.lastBg` with the key so
+ * subscribers can compare against subsequent renders.
+ */
+async function applyMapBackground(
+  entry: MapTabCacheEntry,
+  map: WorldMap,
+  defaultWidth: number,
+  defaultHeight: number,
+): Promise<void> {
+  const source = pickMapImageSource(map);
+  const manager = entry.manager;
+  const container = entry.container;
+  let backgroundApplied = false;
+
+  const applyImage = (url: string, dims: { w: number; h: number }) => {
+    manager.setBackgroundImage(url, dims.w, dims.h);
+    backgroundApplied = true;
+    // Recenter camera + reset maxBounds to the new image bounds whenever
+    // the background is applied. Important when the image's dims differ
+    // from the manager's construction-time canvas (e.g. user adds image_url
+    // to a map that initially had no image — the manager was built with
+    // 2000×2000 default but the image is much smaller; without this the
+    // camera lands outside the image, "too far top right," and the next
+    // click via the placement banner produces out-of-bounds storage coords).
+    const lMap = manager.getMap();
+    if (lMap) {
+      const bounds = L.latLngBounds(L.latLng(0, 0), L.latLng(dims.h, dims.w));
+      lMap.setMaxBounds(bounds);
+      lMap.fitBounds(bounds, { padding: [20, 20], animate: false });
+    }
+    extractEdgeColor(url).then(color => {
+      if (color) {
+        container.style.backgroundColor = color;
+        const leafEl = container.querySelector('.leaflet-container') as HTMLElement | null;
+        if (leafEl) leafEl.style.backgroundColor = color;
+      }
+    });
+  };
+
+  if (source.kind === 'url') {
+    let dims: { w: number; h: number };
+    if (typeof map.width === 'number' && typeof map.height === 'number' && map.width > 0 && map.height > 0) {
+      dims = { w: map.width, h: map.height };
+    } else {
+      const decoded = await decodeImageDims(source.url);
+      dims = decoded ?? { w: defaultWidth, h: defaultHeight };
+      if (decoded) {
+        const store = getActiveStore();
+        if (store) {
+          store.updateMap(map.id, { width: decoded.w, height: decoded.h })
+            .then(async () => {
+              const elements = await store.listElements();
+              patchSlice('data', { elements });
+            })
+            .catch(err => console.warn('[map-tab] dim persist failed:', err));
+        }
+      }
+    }
+    applyImage(source.url, dims);
+  } else if (source.kind === 'local') {
+    try {
+      const store = getActiveStore();
+      const blob = store ? await store.getMediaBlob(source.mediaId) : null;
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        entry.objectUrls.push(url);
+        const dims = (typeof map.width === 'number' && typeof map.height === 'number' && map.width > 0)
+          ? { w: map.width, h: map.height }
+          : (await decodeImageDims(url)) ?? { w: defaultWidth, h: defaultHeight };
+        applyImage(url, dims);
+      }
+    } catch (err) {
+      console.warn('[map-tab] failed to load local media for map:', err);
+    }
+  }
+
+  if (!backgroundApplied) {
+    manager.setBackgroundGrid(100);
+  }
+
+  entry.lastBg = sourceKey(map);
 }
 
 async function decodeImageDims(url: string): Promise<{ w: number; h: number } | null> {
@@ -415,5 +565,31 @@ onPinVisualsReady(() => {
   }
 });
 
-// Subscribe to state so pin changes flow into the visible map.
-subscribe(() => { refreshActiveMapPins(); });
+// Subscribe to state so pin AND background changes flow into visible maps.
+// HOT-PATH NARROWING (DESIGN_MAPS.md §10b MR): the subscribe fires on every
+// notification — including unrelated ones like sidebar mode toggles, filter
+// chip clicks, every keystroke in element-detail edits. Pin sync and
+// background re-apply are cheap (early-returns when no diff) but they walk
+// the elements array. Track the last seen reference and short-circuit when
+// data.elements hasn't changed since last render.
+let lastElementsRef: unknown = null;
+subscribe(() => {
+  const elements = getState().data.elements;
+  if (elements === lastElementsRef) return;
+  lastElementsRef = elements;
+  refreshActiveMapPins();
+  refreshCachedBackgrounds();
+});
+
+function refreshCachedBackgrounds(): void {
+  const elements = getState().data.elements;
+  for (const entry of cache.values()) {
+    const map = elements.find((e): e is WorldMap => e.type === 'map' && e.id === entry.mapId);
+    if (!map) continue;
+    const currentKey = sourceKey(map);
+    if (currentKey === entry.lastBg) continue;
+    entry.ready.then(() =>
+      applyMapBackground(entry, map, entry.manager.getConfig().canvasWidth, entry.manager.getConfig().canvasHeight)
+    );
+  }
+}

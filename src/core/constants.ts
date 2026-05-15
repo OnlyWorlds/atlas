@@ -39,6 +39,8 @@ export const ELEMENT_LABELS: Record<ElementType, { singular: string; plural: str
 export const REGISTRY_STORAGE_KEY = 'atlas_worlds_registry';
 export const UI_PREFS_STORAGE_KEY = 'atlas_ui_prefs';
 export const SHELL_RATIOS_STORAGE_KEY = 'atlas_shell_ratios_v2';
+/** Right-pane open tabs (rightTabs + rightActiveIndex). Persists across reloads. */
+export const RIGHT_TABS_STORAGE_KEY = 'atlas_right_tabs';
 
 // IDB schema (handle-vault only — no world data in IDB)
 export const HANDLE_VAULT_DB = 'atlas-handles';

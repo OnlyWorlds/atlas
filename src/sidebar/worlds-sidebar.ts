@@ -10,7 +10,7 @@
 
 import { getState, subscribe, patchSlice } from '../core/state';
 import { onHashChange, parseHash, navigate, elementsHash } from '../core/router';
-import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused, setWorldRightTabs, getWorldRightTabs } from '../registry/registry';
+import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused } from '../registry/registry';
 import { loadHandle, ensureWritable, queryWritable } from '../store/handle-vault';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { setActiveStore, getActiveStore, CreateWorldModal } from '../ui/create-world-modal';
@@ -295,21 +295,11 @@ export async function activateWorld(
   // already names the world, we don't want to wipe selection that the URL is
   // about to re-establish.
   const priorHash = window.location.hash;
-  // Snapshot the outgoing world's right-pane tabs into its registry entry
-  // BEFORE we touch state. Per-world tab persistence (DESIGN_MAPS.md §5):
-  // each world remembers which maps it had open and which was active. Even
-  // on the preserve-selection boot path we snapshot, since the active world
-  // might have just been activated by /wake-style code paths.
-  const priorActive = state.active?.worldId;
-  if (priorActive && priorActive !== worldId) {
-    const priorUi = getState().ui;
-    const snapshotted = setWorldRightTabs(state.registry, priorActive, {
-      tabs: priorUi.rightTabs,
-      activeIndex: priorUi.rightActiveIndex,
-    });
-    saveRegistry(snapshotted);
-    patchSlice('registry', snapshotted);
-  }
+  // Tabs are GLOBAL across world switches by design (DESIGN_MAPS.md §5 revised
+  // session 209). Tabs whose mapId isn't in the active world's elements get
+  // the stale visual treatment (darkened, click-to-close) in right-pane.ts.
+  // The per-world persistence layer (setWorldRightTabs / hydrateRightTabsFromRegistry)
+  // is left in the registry helpers but not invoked here.
   if (!preserveSelection) {
     patchSlice('data', { elements: [] });
     patchSlice('ui', { ...getState().ui, selectedElementId: null });
@@ -346,7 +336,7 @@ export async function activateWorld(
   const meta = await store.readWorldMeta();
   setActiveStore(store);
 
-  const nextRegistry = setActiveWorld(state.registry, worldId);
+  const nextRegistry = setActiveWorld(getState().registry, worldId);
   saveRegistry(nextRegistry);
   patchSlice('registry', nextRegistry);
   patchSlice('active', { worldId, meta, opened: true });
@@ -359,11 +349,8 @@ export async function activateWorld(
     console.warn('[worlds-sidebar] failed to prime elements:', err);
     patchSlice('data', { elements: [] });
   }
-
-  // Hydrate right-pane tabs from the registry snapshot. Filter out stale
-  // map tabs whose ids aren't in the world's elements (the map was deleted
-  // while this world was inactive). Falls back to map-index-only default.
-  hydrateRightTabsFromRegistry(worldId);
+  // No tab hydration — tabs are global across world switches (see comment
+  // earlier in this function).
 
   // Attach SyncEngine if this world is api-linked. Auto-detaches the previous
   // world's engine. For local-only worlds this is a no-op (returns null).
@@ -376,28 +363,6 @@ export async function activateWorld(
     navigateAfterActivate(worldId);
   }
   return true;
-}
-
-/**
- * Restore the right-pane tabs for the just-activated world from the registry
- * snapshot. Drops any cached map-tab whose mapId isn't in the world's
- * elements cache (cleanup for maps deleted while the world was inactive).
- * If no snapshot exists, falls back to the default `[{kind:'map-index'}]`.
- */
-function hydrateRightTabsFromRegistry(worldId: string): void {
-  const state = getState();
-  const snap = getWorldRightTabs(state.registry, worldId);
-  const validMapIds = new Set(
-    state.data.elements.filter(e => e.type === 'map').map(e => e.id),
-  );
-  if (!snap) {
-    patchSlice('ui', { ...getState().ui, rightTabs: [{ kind: 'map-index' }], rightActiveIndex: 0 });
-    return;
-  }
-  const tabs = snap.tabs.filter(t => t.kind === 'map-index' || validMapIds.has(t.mapId));
-  if (tabs.length === 0) tabs.push({ kind: 'map-index' });
-  const activeIndex = Math.max(0, Math.min(snap.activeIndex, tabs.length - 1));
-  patchSlice('ui', { ...getState().ui, rightTabs: tabs, rightActiveIndex: activeIndex });
 }
 
 /**

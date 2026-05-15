@@ -30,11 +30,16 @@ export interface MapCreateResult {
 export interface MapModalOptions {
   /** When set, the modal runs in configure-existing mode against this id. */
   existingMapId?: string;
+  /** Pre-fill the name field (used when invoked from element-create grid). */
+  initialName?: string;
 }
 
-export function createMapDialog(toasts: ToastManager): Promise<MapCreateResult | null> {
+export function createMapDialog(
+  toasts: ToastManager,
+  opts: { initialName?: string } = {},
+): Promise<MapCreateResult | null> {
   return new Promise((resolve) => {
-    const modal = new MapCreateModal(toasts, (result) => resolve(result), {});
+    const modal = new MapCreateModal(toasts, (result) => resolve(result), { initialName: opts.initialName });
     modal.open();
   });
 }
@@ -57,7 +62,9 @@ class MapCreateModal extends BaseModal {
   private opts: MapModalOptions;
   private resolved = false;
   private locationPreview: { id: string; name: string } | null = null;
+  private parentMapPreview: { id: string; name: string } | null = null;
   private existingMap: WorldMap | null = null;
+  private advancedOpen = false;
 
   constructor(
     toasts: ToastManager,
@@ -92,11 +99,35 @@ class MapCreateModal extends BaseModal {
         const loc = getState().data.elements.find(e => e.id === found.location);
         this.locationPreview = { id: found.location, name: loc?.name ?? '(unknown)' };
       }
+      if (typeof found.parent_map === 'string' && found.parent_map) {
+        const parent = getState().data.elements.find(
+          (e): e is WorldMap => e.type === 'map' && e.id === found.parent_map,
+        );
+        this.parentMapPreview = { id: found.parent_map, name: parent?.name ?? '(unknown)' };
+      }
+      // Reveal the advanced section by default when any advanced field is
+      // already populated — saves a click and signals "there's stuff here."
+      if (
+        this.parentMapPreview ||
+        typeof found.hierarchy === 'number' ||
+        (typeof found.background_color === 'string' && found.background_color)
+      ) {
+        this.advancedOpen = true;
+      }
     }
     this.modal = this.buildModal();
     this.show();
     queueMicrotask(() => {
-      this.modal?.querySelector<HTMLInputElement>('input[name="map-name"]')?.focus();
+      const input = this.modal?.querySelector<HTMLInputElement>('input[name="map-name"]');
+      if (!input) return;
+      input.focus();
+      // Place cursor at the END of the pre-filled name. Without this, focus()
+      // on a pre-populated input lands the caret at start in most browsers,
+      // and the user typing right after open prepends to the name instead of
+      // continuing it. Important for the element-create → createMapDialog
+      // hand-off where the name field arrives already filled.
+      const len = input.value.length;
+      input.setSelectionRange(len, len);
     });
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -123,8 +154,12 @@ class MapCreateModal extends BaseModal {
 
   private buildModal(): HTMLElement {
     const isConfigure = !!this.opts.existingMapId;
-    const initialName = isConfigure ? (this.existingMap?.name ?? '') : '';
+    const initialName = isConfigure ? (this.existingMap?.name ?? '') : (this.opts.initialName ?? '');
     const initialUrl = isConfigure ? (this.existingMap?.image_url ?? '') : '';
+    const initialHierarchy = isConfigure && typeof this.existingMap?.hierarchy === 'number'
+      ? String(this.existingMap.hierarchy)
+      : '';
+    const initialBgColor = isConfigure ? (this.existingMap?.background_color ?? '') : '';
 
     const { overlay, body } = this.buildModalShell({
       title: isConfigure ? 'Configure map' : 'New map',
@@ -151,6 +186,29 @@ class MapCreateModal extends BaseModal {
           <input type="file" name="map-image-file" accept="image/*" />
           <span class="atlas-modal-hint" data-role="local-image-hint">used as fallback when image URL is empty. stored locally, never uploaded.</span>
         </label>
+
+        <button type="button" class="atlas-modal-advanced-toggle" data-role="advanced-toggle" aria-expanded="${this.advancedOpen}">
+          <span class="material-symbols-outlined atlas-modal-advanced-chevron">${this.advancedOpen ? 'expand_more' : 'chevron_right'}</span>
+          <span>advanced</span>
+        </button>
+        <div class="atlas-modal-advanced" data-role="advanced-body" ${this.advancedOpen ? '' : 'hidden'}>
+          <div class="atlas-modal-field">
+            <span>parent map (override)</span>
+            <div class="atlas-map-create-parent" data-role="parent-map-row"></div>
+            <span class="atlas-modal-hint">explicit nesting. by default, location-based maps are placed under the nearest ancestor location's map automatically.</span>
+          </div>
+          <label class="atlas-modal-field">
+            <span>hierarchy (sibling order)</span>
+            <input class="atlas-input" type="number" name="map-hierarchy" placeholder="0" autocomplete="off" value="${escapeAttr(initialHierarchy)}" />
+            <span class="atlas-modal-hint">lower comes first. only matters when 2+ maps share the same parent or location.</span>
+          </label>
+          <label class="atlas-modal-field">
+            <span>background color (optional)</span>
+            <input class="atlas-input" type="text" name="map-bg-color" placeholder="#000000 or rgb(...)" autocomplete="off" spellcheck="false" value="${escapeAttr(initialBgColor)}" />
+            <span class="atlas-modal-hint">canvas fallback color. atlas auto-extracts an edge color from the image when one is set.</span>
+          </label>
+        </div>
+
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
           <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
@@ -161,6 +219,21 @@ class MapCreateModal extends BaseModal {
 
     const locationRow = body.querySelector<HTMLElement>('[data-role="location-row"]')!;
     this.renderLocationChip(locationRow);
+
+    const parentRow = body.querySelector<HTMLElement>('[data-role="parent-map-row"]')!;
+    this.renderParentMapChip(parentRow);
+
+    // Advanced toggle — show/hide the section.
+    const advancedToggle = body.querySelector<HTMLButtonElement>('[data-role="advanced-toggle"]')!;
+    const advancedBody = body.querySelector<HTMLElement>('[data-role="advanced-body"]')!;
+    const advancedChevron = body.querySelector<HTMLElement>('.atlas-modal-advanced-chevron')!;
+    advancedToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.advancedOpen = !this.advancedOpen;
+      advancedBody.hidden = !this.advancedOpen;
+      advancedToggle.setAttribute('aria-expanded', String(this.advancedOpen));
+      advancedChevron.textContent = this.advancedOpen ? 'expand_more' : 'chevron_right';
+    });
 
     const cancelBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.cancel(); });
@@ -191,12 +264,27 @@ class MapCreateModal extends BaseModal {
       const nameInput = form.querySelector<HTMLInputElement>('input[name="map-name"]')!;
       const urlInput = form.querySelector<HTMLInputElement>('input[name="map-image-url"]')!;
       const fileInput = form.querySelector<HTMLInputElement>('input[name="map-image-file"]')!;
+      const hierarchyInput = form.querySelector<HTMLInputElement>('input[name="map-hierarchy"]')!;
+      const bgColorInput = form.querySelector<HTMLInputElement>('input[name="map-bg-color"]')!;
       const name = nameInput.value.trim();
       if (!name) {
         errorBox.textContent = 'name is required';
         errorBox.hidden = false;
         nameInput.focus();
         return;
+      }
+      // Validate hierarchy if provided — must be a finite number.
+      let hierarchyValue: number | undefined;
+      const hierarchyRaw = hierarchyInput.value.trim();
+      if (hierarchyRaw) {
+        const parsed = Number(hierarchyRaw);
+        if (!Number.isFinite(parsed)) {
+          errorBox.textContent = 'hierarchy must be a number';
+          errorBox.hidden = false;
+          hierarchyInput.focus();
+          return;
+        }
+        hierarchyValue = parsed;
       }
       submitBtn.disabled = true;
       submitBtn.textContent = isConfigure ? 'Saving...' : 'Creating...';
@@ -205,6 +293,7 @@ class MapCreateModal extends BaseModal {
         const store = getActiveStore()!;
         const url = urlInput.value.trim();
         const file = fileInput.files?.[0];
+        const bgColor = bgColorInput.value.trim();
 
         // Decode dimensions BEFORE persisting so the record carries them.
         let initialDims: { w: number; h: number } | null = null;
@@ -215,6 +304,9 @@ class MapCreateModal extends BaseModal {
           name,
           location: this.locationPreview?.id,
           image_url: url || undefined,
+          parent_map: this.parentMapPreview?.id,
+          hierarchy: hierarchyValue,
+          background_color: bgColor || undefined,
         };
         if (initialDims) {
           patch.width = initialDims.w;
@@ -277,6 +369,41 @@ class MapCreateModal extends BaseModal {
       if (!picked) return;
       this.locationPreview = { id: picked.id, name: picked.name };
       this.renderLocationChip(row);
+    });
+    row.appendChild(pickBtn);
+  }
+
+  private renderParentMapChip(row: HTMLElement): void {
+    row.innerHTML = '';
+    if (this.parentMapPreview) {
+      const chip = document.createElement('span');
+      chip.className = 'atlas-link-chip';
+      chip.innerHTML = `<span>${escapeText(this.parentMapPreview.name || '(unnamed)')}</span><span class="material-symbols-outlined atlas-link-chip-remove" data-remove="1">close</span>`;
+      row.appendChild(chip);
+      chip.querySelector<HTMLElement>('.atlas-link-chip-remove')!.addEventListener('click', () => {
+        this.parentMapPreview = null;
+        this.renderParentMapChip(row);
+      });
+    }
+    const pickBtn = document.createElement('button');
+    pickBtn.type = 'button';
+    pickBtn.className = 'atlas-btn-ghost';
+    pickBtn.textContent = this.parentMapPreview ? 'change' : '+ pick parent map';
+    pickBtn.addEventListener('click', async () => {
+      // In configure-existing mode, exclude self to prevent the obvious cycle.
+      // Deeper cycle prevention (descendants of self) is delegated to the
+      // tree-builder's wouldCreateCycle defense; if a user picks a descendant
+      // anyway, the tree surfaces it with a brokenParent chip rather than
+      // mis-rendering.
+      const excludeIds = this.opts.existingMapId ? [this.opts.existingMapId] : [];
+      const picked = await pickElement({
+        restrictToType: 'map',
+        excludeIds,
+        title: 'pick a parent map',
+      });
+      if (!picked) return;
+      this.parentMapPreview = { id: picked.id, name: picked.name };
+      this.renderParentMapChip(row);
     });
     row.appendChild(pickBtn);
   }

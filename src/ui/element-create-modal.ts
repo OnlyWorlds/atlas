@@ -20,7 +20,7 @@ import { getActiveStore } from './create-world-modal';
 import { CONTENT_ELEMENT_TYPES, type ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { requestPushIfLinked } from '../sync/sync-attach';
-import { configureMapDialog } from './map-create-modal';
+import { createMapDialog } from './map-create-modal';
 
 /** Types offered in the create modal — matches legacy: all 22 except pin/marker. */
 const CREATE_TYPES: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
@@ -177,6 +177,24 @@ export class ElementCreateModal extends BaseModal {
       submitBtn.textContent = 'Creating…';
       cancelBtn.hidden = true;
       try {
+        // Type=map gets a different flow: don't create a bare element first
+        // and then configure. Instead delegate to createMapDialog which
+        // gathers all the map's info (name, location, image, advanced
+        // fields) and creates a fully-formed map on submit. Cancel = nothing
+        // is created. Eliminates the "bare empty map left behind on cancel"
+        // wart the post-create-configure flow had. The element-create grid
+        // serves as the entry point; the proper map modal owns the data.
+        const willCreateMapInline = this.selected === 'map' && !this.opts.onCreated;
+        if (willCreateMapInline) {
+          this.hide();
+          const result = await createMapDialog(this.toasts, { initialName: name });
+          if (!result) return; // user cancelled — no element created
+          const worldId = getState().active?.worldId;
+          patchSlice('ui', { ...getState().ui, selectedElementId: result.map.id });
+          if (worldId) navigate(elementHash(worldId, result.map.id));
+          return;
+        }
+
         const store = getActiveStore()!;
         const el = await store.createElement(this.selected, { name });
         const elements = await store.listElements();
@@ -185,33 +203,9 @@ export class ElementCreateModal extends BaseModal {
         this.toasts.success(`created ${this.selected}: ${el.name}`);
         this.hide();
         this.opts.onCreated?.(el.id, this.selected);
+        requestPushIfLinked();
+
         const worldId = getState().active?.worldId;
-
-        // Type=map post-create: open the map-configure modal so the user can
-        // set location/image without re-finding the map in the editor. Skip
-        // when a custom onCreated handler is set (contextual map-create flow
-        // — that flow already excludes 'map' from the type grid, but the
-        // guard is defensive). DESIGN_MAPS.md §3.2 / Issue A.
-        //
-        // CRITICAL: defer the autosave push until AFTER the configure dialog
-        // closes. If we kick off a push immediately after createElement, the
-        // debounce timer fires while the user is filling the configure form;
-        // on api-linked worlds the server reassigns the id and emits an
-        // id-swap, but the configure modal still holds the original (now
-        // stale) id in its closure. Submit then fails with "element <old-id>
-        // not found". By deferring, no push fires during the modal-open
-        // window, so no id-swap can race the closure.
-        const willConfigure = this.selected === 'map' && !this.opts.onCreated;
-        if (!willConfigure) {
-          requestPushIfLinked();
-        } else {
-          await configureMapDialog(this.toasts, el.id);
-          // Configure's submit handler calls requestPushIfLinked itself, but
-          // on cancel it doesn't — fire here to guarantee the bare map syncs.
-          // Idempotent: extra calls reset the same debounce timer.
-          requestPushIfLinked();
-        }
-
         if (worldId) navigate(elementHash(worldId, el.id));
       } catch (err) {
         console.error('[element-create] failed:', err);

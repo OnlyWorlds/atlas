@@ -72,6 +72,9 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     if (!worldId) return;
     patchSlice('ui', { ...getState().ui, selectedElementId: id });
     navigate(elementHash(worldId, id));
+    // Sidebar-click no longer auto-opens an associated map (DESIGN_MAPS.md
+    // §3.6 revised session 209). Auto-open from pin-click stays; the top-bar
+    // affordances from MW will be the explicit path from element detail.
   });
 
   function renderFilters(): void {
@@ -143,7 +146,18 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       return;
     }
 
-    listEl.innerHTML = filtered.map(el => renderElementRow(el, el.id === selectedId)).join('');
+    // Index which location ids have at least one map anchored to them, so
+    // the renderer can paint a small map icon on those Location rows. Built
+    // once per render rather than scanning per-row. (DESIGN_MAPS.md §10b N1
+    // fix #5 — affordance "this place has maps.")
+    const locationsWithMaps = new Set<string>();
+    for (const el of elements) {
+      if (el.type !== 'map') continue;
+      const loc = (el as { location?: unknown }).location;
+      if (typeof loc === 'string' && loc) locationsWithMaps.add(loc);
+    }
+
+    listEl.innerHTML = filtered.map(el => renderElementRow(el, el.id === selectedId, locationsWithMaps.has(el.id))).join('');
   }
 
   const unsubState = subscribe(render);
@@ -152,13 +166,19 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   return () => { unsubState(); unsubHash(); };
 }
 
-function renderElementRow(el: Element, selected: boolean): string {
+function renderElementRow(el: Element, selected: boolean, hasMap: boolean): string {
   const icon = ELEMENT_ICONS[el.type] ?? 'category';
   const cls = ['atlas-row', selected ? 'selected' : ''].filter(Boolean).join(' ');
+  // hasMap is set only for Location rows that have at least one map anchored.
+  // Renders a small cyan-tinted map glyph between the name and the type chip.
+  const mapBadge = hasMap
+    ? `<span class="material-symbols-outlined atlas-elements-row-mapbadge" title="this location has at least one map">map</span>`
+    : '';
   return `
     <div class="${cls}" data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}" role="button" tabindex="0">
       <span class="material-symbols-outlined">${icon}</span>
       <span class="atlas-row-main">${escapeText(el.name || '(unnamed)')}</span>
+      ${mapBadge}
       <span class="atlas-row-meta">${escapeText(el.type)}</span>
     </div>
   `;

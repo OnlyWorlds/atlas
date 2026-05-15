@@ -454,10 +454,27 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
         )
       : current.data.elements;
 
-  const nextUi =
+  // Also migrate any open map tabs that reference the swapping id. Without
+  // this, after a make-online a tab whose `mapId` was the local pre-swap id
+  // now points at nothing — the map pane shows "map not found" until the
+  // user closes and reopens the tab. (DESIGN_MAPS.md §10b N1, swap fix #2.)
+  let nextRightTabs = current.ui.rightTabs;
+  let tabsChanged = false;
+  if (swap.type === 'map') {
+    nextRightTabs = current.ui.rightTabs.map((t) => {
+      if (t.kind === 'map' && t.mapId === swap.old_id) {
+        tabsChanged = true;
+        return { ...t, mapId: swap.new_id };
+      }
+      return t;
+    });
+  }
+
+  const baseUi =
     current.ui.selectedElementId === swap.old_id
       ? { ...current.ui, selectedElementId: swap.new_id }
       : current.ui;
+  const nextUi = tabsChanged ? { ...baseUi, rightTabs: nextRightTabs } : baseUi;
 
   // Only setState if at least one slice actually changed — avoids a spurious
   // render when the swap doesn't intersect anything the UI is showing.

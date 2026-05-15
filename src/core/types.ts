@@ -221,10 +221,18 @@ export type WorldState = 'local-only' | 'api-linked';
  * One open tab on the right pane. Map-index is implicit (always present).
  * Lives in types.ts (not state.ts) because the registry persists it per-world
  * and importing state.ts from registry/ would create a dependency cycle.
+ *
+ * `locked` (map tabs only): when true, selecting an element (sidebar OR pin
+ * click) does NOT auto-switch the map. See DESIGN_MAPS.md §3.4.
+ *
+ * `worldId` (map tabs only): stamped when the tab opens. Lets the stale-tab
+ * pane name which world the map belongs to ("this map belongs to <World X>")
+ * — tabs persist across world switches by design (§5), so we can't infer the
+ * owning world from active state.
  */
 export type RightTabRef =
   | { kind: 'map-index' }
-  | { kind: 'map'; mapId: string; label: string };
+  | { kind: 'map'; mapId: string; label: string; worldId?: string; locked?: boolean };
 
 /**
  * Per-world right-pane tab snapshot. Persisted on WorldRegistryEntry so the

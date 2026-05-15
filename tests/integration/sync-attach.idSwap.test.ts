@@ -241,4 +241,87 @@ describe('sync-attach: id-swap migrates UI state', () => {
     expect(observed).toHaveLength(1);
     expect(observed[0]).toEqual({ uiSel: 'new-id', hasOld: false, hasNew: true });
   });
+
+  // ---- Map-tab id propagation (DESIGN_MAPS.md §10b N1 fix #2) ----
+
+  it('id-swap of type=map rewrites mapId in any open rightTabs', () => {
+    patchSlice('data', {
+      elements: [{ id: 'm-old', type: 'map', name: 'My Map', local_updated_at: 't' } as any],
+    });
+    patchSlice('ui', {
+      ...getState().ui,
+      rightTabs: [
+        { kind: 'map-index' },
+        { kind: 'map', mapId: 'm-old', label: 'My Map' },
+      ],
+      rightActiveIndex: 1,
+    });
+
+    __test_handleIdSwap({ old_id: 'm-old', new_id: 'm-new', type: 'map' });
+
+    const tabs = getState().ui.rightTabs;
+    expect(tabs).toHaveLength(2);
+    expect(tabs[1]).toMatchObject({ kind: 'map', mapId: 'm-new' });
+    // rightActiveIndex stays put.
+    expect(getState().ui.rightActiveIndex).toBe(1);
+  });
+
+  it('id-swap of type=map preserves the locked flag on the migrated tab', () => {
+    patchSlice('data', {
+      elements: [{ id: 'm-old', type: 'map', name: 'M', local_updated_at: 't' } as any],
+    });
+    patchSlice('ui', {
+      ...getState().ui,
+      rightTabs: [
+        { kind: 'map-index' },
+        { kind: 'map', mapId: 'm-old', label: 'M', locked: true },
+      ],
+      rightActiveIndex: 1,
+    });
+
+    __test_handleIdSwap({ old_id: 'm-old', new_id: 'm-new', type: 'map' });
+
+    const migrated = getState().ui.rightTabs[1];
+    expect(migrated).toMatchObject({ kind: 'map', mapId: 'm-new', locked: true });
+  });
+
+  it('id-swap of non-map type does NOT touch rightTabs (map-tab refs unaffected)', () => {
+    patchSlice('data', {
+      elements: [
+        { id: 'c-old', type: 'character', name: 'Bob', local_updated_at: 't' } as any,
+        { id: 'm-1', type: 'map', name: 'Atlas', local_updated_at: 't' } as any,
+      ],
+    });
+    const beforeTabs = [
+      { kind: 'map-index' as const },
+      { kind: 'map' as const, mapId: 'm-1', label: 'Atlas' },
+    ];
+    patchSlice('ui', {
+      ...getState().ui,
+      rightTabs: beforeTabs,
+      rightActiveIndex: 1,
+    });
+
+    __test_handleIdSwap({ old_id: 'c-old', new_id: 'c-new', type: 'character' });
+
+    const tabs = getState().ui.rightTabs;
+    expect(tabs).toEqual(beforeTabs);
+  });
+
+  it('id-swap of type=map with no matching tab does not crash or create a tab', () => {
+    patchSlice('data', {
+      elements: [{ id: 'm-old', type: 'map', name: 'M', local_updated_at: 't' } as any],
+    });
+    patchSlice('ui', {
+      ...getState().ui,
+      rightTabs: [{ kind: 'map-index' }],
+      rightActiveIndex: 0,
+    });
+
+    __test_handleIdSwap({ old_id: 'm-old', new_id: 'm-new', type: 'map' });
+
+    // Only the map-index tab remains; the elements list got the id migrated.
+    expect(getState().ui.rightTabs).toEqual([{ kind: 'map-index' }]);
+    expect(getState().data.elements[0].id).toBe('m-new');
+  });
 });

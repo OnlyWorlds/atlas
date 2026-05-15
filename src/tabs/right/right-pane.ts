@@ -21,6 +21,7 @@ import { mountMapTab, disposeMapTab, disposeAllMapTabs } from './map-tab';
 import { navigate, parseHash, worldHash } from '../../core/router';
 import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount } from '../../sync/sync-attach';
 import { ConflictReviewModal } from '../../ui/conflict-review-modal';
+import { savePersistedRightTabs } from './right-tabs-persistence';
 
 export interface RightPaneMount {
   tabBar: HTMLElement;
@@ -35,6 +36,10 @@ export function mountRightPane(mount: RightPaneMount): () => void {
 
   let lastTabKey: string | null = null;
   let lastWorldId: string | null = null;
+  let lastActiveStale: boolean | null = null;
+  let lastActiveMapDimsKey: string | null = null;
+  let lastPersistedTabsRef: unknown = null;
+  let lastPersistedActiveIndex = -1;
   let unmountActive: (() => void) | null = null;
 
   function activeTabKey(): string {
@@ -42,6 +47,13 @@ export function mountRightPane(mount: RightPaneMount): () => void {
     const t = ui.rightTabs[ui.rightActiveIndex];
     if (!t) return 'map-index';
     return t.kind === 'map' ? `map:${t.mapId}` : 'map-index';
+  }
+
+  function activeTabIsStale(state: ReturnType<typeof getState>): boolean {
+    const ui = state.ui;
+    const t = ui.rightTabs[ui.rightActiveIndex];
+    if (!t || t.kind !== 'map') return false;
+    return !state.data.elements.find(e => e.type === 'map' && e.id === t.mapId);
   }
 
   function render(): void {
@@ -62,6 +74,47 @@ export function mountRightPane(mount: RightPaneMount): () => void {
 
     renderTabBar(ui.rightTabs, ui.rightActiveIndex);
     renderSyncIndicator(state, toasts);
+
+    // Persist tab snapshot to localStorage when either the array reference
+    // or the active index changes. Survives page reloads (DESIGN_MAPS.md §5).
+    if (ui.rightTabs !== lastPersistedTabsRef || ui.rightActiveIndex !== lastPersistedActiveIndex) {
+      savePersistedRightTabs(ui.rightTabs, ui.rightActiveIndex);
+      lastPersistedTabsRef = ui.rightTabs;
+      lastPersistedActiveIndex = ui.rightActiveIndex;
+    }
+
+    // Staleness flip → force a body remount. Without this, when the user
+    // switches back to the world that owns a stale map tab, the tab kind +
+    // mapId don't change but the underlying data did (map is now in
+    // elements). tabKey-based short-circuit would skip the remount and the
+    // stale pane would persist forever. See DESIGN_MAPS.md §5.
+    const stale = activeTabIsStale(state);
+    if (lastActiveStale !== null && lastActiveStale !== stale) {
+      lastTabKey = null;
+    }
+    lastActiveStale = stale;
+
+    // Active map's canvas DIMS flip → dispose + remount with fresh manager.
+    // The Leaflet2DManager freezes canvasWidth/canvasHeight at construction;
+    // when an image URL is added to a no-image map (or replaced with one of
+    // different dims), the underlying map.width/height auto-update via
+    // applyMapBackground's decode-and-store path. The manager's internal
+    // canvasHeight stays stale → leafletToStorage uses the wrong Y-flip →
+    // pins stored at click-time have coords valid for the OLD canvas but
+    // misplace on reload when the manager is built with the NEW dims.
+    // Dispose+remount aligns the manager's canvas with current map dims.
+    const activeTab = ui.rightTabs[ui.rightActiveIndex];
+    if (activeTab?.kind === 'map' && !stale) {
+      const m = state.data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === activeTab.mapId);
+      const newDimsKey = m ? `${m.width ?? 2000}x${m.height ?? 2000}` : null;
+      if (lastActiveMapDimsKey !== null && newDimsKey !== null && lastActiveMapDimsKey !== newDimsKey) {
+        disposeMapTab(activeTab.mapId);
+        lastTabKey = null;
+      }
+      lastActiveMapDimsKey = newDimsKey;
+    } else {
+      lastActiveMapDimsKey = null;
+    }
 
     const tabKey = activeTabKey();
     if (tabKey === lastTabKey) return;
@@ -86,28 +139,55 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       btn.type = 'button';
       btn.className = 'atlas-tab' + (idx === activeIndex ? ' active' : '');
       btn.setAttribute('data-tab-index', String(idx));
-      btn.addEventListener('click', () => {
-        patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
-      });
       if (tab.kind === 'map-index') {
         btn.setAttribute('data-tab-kind', 'map-index');
         btn.innerHTML = `<span class="material-symbols-outlined">view_list</span><span>Maps</span>`;
+        btn.addEventListener('click', () => {
+          patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
+        });
         tabBar.appendChild(btn);
         return;
       }
       btn.setAttribute('data-tab-kind', 'map');
       btn.setAttribute('data-tab-map-id', tab.mapId);
       const m = getState().data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === tab.mapId);
-      const label = m?.name || tab.label || '(untitled)';
-      // Close affordance lives inside the tab as a span (legacy `.atlas-tab-close`)
-      // — direct child listener on the span, no nested buttons.
-      btn.innerHTML = `<span class="material-symbols-outlined">map</span><span>${escapeText(label)}</span><span class="atlas-tab-close" data-role="close" aria-label="close tab">×</span>`;
+      // STALE = the world's elements no longer contain this map id (deleted
+      // elsewhere, never restored after a stale-tab persist, or a sync swap
+      // that didn't migrate). Visual: darkened tab with click-to-close
+      // affordance per DESIGN_MAPS.md §10b MR.
+      const isStale = !m;
+      if (isStale) btn.classList.add('atlas-tab-stale');
+      const label = m?.name || tab.label || '(missing map)';
+      // Lock UI is currently HIDDEN (DESIGN_MAPS.md §3.4 revised — auto-open
+      // is disabled so lock has no observable effect). State machinery on
+      // RightTabRef.locked is preserved so we can re-enable the affordance
+      // when/if auto-open returns. No lock element in the rendered tab.
+      btn.innerHTML = `<span class="material-symbols-outlined">${isStale ? 'cloud_off' : 'map'}</span><span>${escapeText(label)}</span><span class="atlas-tab-close" data-role="close" aria-label="close tab">×</span>`;
+      if (isStale) {
+        btn.title = 'this map is no longer in the current world — click anywhere on the tab to close it';
+      }
+      // Lock click handler intentionally absent — the lock affordance is
+      // hidden (see HTML above and DESIGN_MAPS.md §3.4). Re-enable by
+      // restoring both the icon span and the click handler when auto-open
+      // returns as a setting.
       const closeEl = btn.querySelector<HTMLElement>('[data-role="close"]');
       closeEl?.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
         if (tab.kind === 'map') closeMapTab(idx, tab.mapId);
       });
+      // Stale tabs: ANY click on the tab body (not the lock — there's none —
+      // and not the explicit close ×) closes the tab. Active-on-click would
+      // just show the same "missing map" pane, which is dead-end UX.
+      if (isStale) {
+        btn.addEventListener('click', () => {
+          if (tab.kind === 'map') closeMapTab(idx, tab.mapId);
+        });
+      } else {
+        btn.addEventListener('click', () => {
+          patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
+        });
+      }
       tabBar.appendChild(btn);
     });
   }

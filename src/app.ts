@@ -11,6 +11,7 @@ import { mountElementDetail } from './middle/element-detail';
 import { mountTimeline } from './middle/timeline';
 import { mountRightPane } from './tabs/right/right-pane';
 import { openMapTab } from './tabs/right/map-index-tab';
+import { loadPersistedRightTabs } from './tabs/right/right-tabs-persistence';
 import { toastManager, ToastManager } from './ui/toast-manager';
 import { loadRegistry } from './registry/registry';
 import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
@@ -29,6 +30,18 @@ export interface AppHandle {
 export function startApp(container: HTMLElement): AppHandle {
   // Hydrate registry from localStorage into observable state.
   patchSlice('registry', loadRegistry());
+  // Restore right-pane tabs from localStorage so map tabs survive a page
+  // reload. Stale tabs from worlds not currently active will surface as
+  // darkened-and-click-to-close per the §5 design (their mapId isn't in
+  // current data.elements until the world is activated).
+  const persistedTabs = loadPersistedRightTabs();
+  if (persistedTabs) {
+    patchSlice('ui', {
+      ...getState().ui,
+      rightTabs: persistedTabs.tabs,
+      rightActiveIndex: persistedTabs.activeIndex,
+    });
+  }
   // Resolve atlas root reference (runtime info only; handle stays in vault).
   void hydrateAtlasRoot();
 

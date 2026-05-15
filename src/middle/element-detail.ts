@@ -18,7 +18,7 @@
 
 import { getState, patchSlice, subscribe } from '../core/state';
 import { onHashChange, parseHash, navigate, elementsHash, elementHash } from '../core/router';
-import type { Element, ElementType } from '../core/types';
+import type { Element, ElementType, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { getActiveStore } from '../ui/create-world-modal';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
@@ -27,6 +27,8 @@ import { sectionsFor, type FieldMeta, type SectionLayout } from '../editor/field
 import { getFieldDescription } from '../editor/field-descriptions';
 import { pickElement } from '../ui/element-picker-modal';
 import { requestPushIfLinked } from '../sync/sync-attach';
+import { getAssociatedMaps, getLocationMapPresence } from '../tabs/right/auto-open-map';
+import { openMapTab } from '../tabs/right/map-index-tab';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */
 const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
@@ -120,6 +122,9 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const sectionEl = renderSection(section, el, idx === 0);
       if (sectionEl) detail.appendChild(sectionEl);
     });
+
+    const mapPresence = renderMapPresence(el);
+    if (mapPresence) detail.appendChild(mapPresence);
 
     const refs = renderReferencedBy(el);
     if (refs) detail.appendChild(refs);
@@ -472,6 +477,93 @@ export function mountElementDetail(target: HTMLElement): () => void {
   }
 
   // ====== Referenced By ======
+
+  /**
+   * Inline "map presence" widget (DESIGN_MAPS.md §3.5). For Locations:
+   * "Maps of this place" + "Maps within this place" (descendants). For other
+   * elements: "Appears on maps" (resolved via pins). Renders nothing when
+   * empty — no empty-state noise.
+   */
+  function renderMapPresence(el: Element): HTMLElement | null {
+    const elements = getState().data.elements;
+
+    let directMaps: WorldMap[] = [];
+    let descendantMaps: WorldMap[] = [];
+    let appearsOn: WorldMap[] = [];
+    if (el.type === 'location') {
+      const presence = getLocationMapPresence(el.id, elements);
+      directMaps = presence.direct;
+      descendantMaps = presence.descendants;
+    } else if (el.type === 'map') {
+      // Don't show this widget on Map detail itself — the map's own canvas
+      // surfaces in the right pane already; the section is for elements that
+      // RELATE to maps without being one.
+      return null;
+    } else {
+      const { maps } = getAssociatedMaps(el.id, elements, false);
+      appearsOn = maps;
+    }
+
+    if (directMaps.length === 0 && descendantMaps.length === 0 && appearsOn.length === 0) {
+      return null;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'atlas-detail-section atlas-detail-map-presence';
+
+    const header = document.createElement('div');
+    header.className = 'atlas-detail-section-header no-toggle';
+    const totalCount = directMaps.length + descendantMaps.length + appearsOn.length;
+    header.innerHTML = `<span>Maps</span><span class="atlas-refs-count">${totalCount}</span>`;
+    wrap.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'atlas-detail-section-body atlas-detail-map-presence-body';
+    wrap.appendChild(body);
+
+    const appendGroup = (label: string, maps: WorldMap[]): void => {
+      if (maps.length === 0) return;
+      const group = document.createElement('div');
+      group.className = 'atlas-field';
+      const lbl = document.createElement('div');
+      lbl.className = 'atlas-field-label';
+      lbl.textContent = label;
+      group.appendChild(lbl);
+      const row = document.createElement('div');
+      row.className = 'atlas-link-row';
+      for (const m of maps) row.appendChild(buildMapPresenceChip(m));
+      group.appendChild(row);
+      body.appendChild(group);
+    };
+
+    if (el.type === 'location') {
+      appendGroup('Maps of this place', directMaps);
+      appendGroup('Maps within this place', descendantMaps);
+    } else {
+      appendGroup('Appears on maps', appearsOn);
+    }
+
+    return wrap;
+  }
+
+  function buildMapPresenceChip(m: WorldMap): HTMLElement {
+    const chip = document.createElement('span');
+    chip.className = 'atlas-link-chip';
+    const hasImage = !!(m.image_url || m.image_media_id);
+    chip.title = hasImage ? `${m.name} (has image)` : m.name || '(untitled map)';
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined atlas-link-chip-icon' + (hasImage ? ' atlas-map-tree-icon-has-image' : '');
+    icon.textContent = 'map';
+    chip.appendChild(icon);
+    const name = document.createElement('span');
+    name.textContent = m.name || '(untitled map)';
+    chip.appendChild(name);
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openMapTab(m);
+    });
+    return chip;
+  }
 
   function renderReferencedBy(el: Element): HTMLElement | null {
     const incoming = findIncomingReferences(el.id);

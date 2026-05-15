@@ -283,6 +283,76 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Map tab lock toggle (DESIGN_MAPS.md §3.4 revised session 209).
+ *
+ * Behavior:
+ *   - Hidden by default (opacity 0).
+ *   - Revealed on tab hover (muted grey, lock_open icon).
+ *   - Always visible when locked (solid lock icon, grey).
+ *   - Single-locked invariant enforced in right-pane.ts.
+ *
+ * The opacity-based hide keeps layout stable (vs display:none which would
+ * shift the close × leftward on hover-only).
+ */
+.atlas-tab-lock {
+  margin-left: 4px;
+  font-size: 14px !important;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+.atlas-tab:hover .atlas-tab-lock {
+  opacity: 1;
+}
+.atlas-tab-lock[data-locked="true"] {
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.65);
+}
+.atlas-tab-lock:hover {
+  color: var(--atlas-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Stale map tab — mapId not in current world's elements. Darkened, italic
+ * label, click anywhere to close (DESIGN_MAPS.md §10b MR). */
+.atlas-tab.atlas-tab-stale {
+  opacity: 0.55;
+}
+.atlas-tab.atlas-tab-stale > span:nth-child(2) {
+  font-style: italic;
+}
+.atlas-tab.atlas-tab-stale:hover {
+  opacity: 0.75;
+}
+
+/* Stale map pane — content when an open map tab points at a missing map. */
+.atlas-map-stale-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px;
+  color: var(--atlas-text-muted);
+  text-align: center;
+}
+.atlas-map-stale-icon {
+  font-size: 48px !important;
+  opacity: 0.5;
+}
+.atlas-map-stale-title {
+  font-size: 14px;
+  color: var(--atlas-text);
+}
+.atlas-map-stale-sub {
+  font-size: 12px;
+  max-width: 360px;
+  line-height: 1.4;
+}
+
 /* ============================================================
    Rows / lists (used in sidebar)
    ============================================================ */
@@ -323,6 +393,28 @@
 }
 
 .atlas-row.selected .material-symbols-outlined {
+  color: var(--atlas-cyan);
+}
+
+/* Map index: subtle cyan tint when the map has an image source.
+ * Replaces the explicit image badge — the icon itself signals "has canvas".
+ * Selected-row color still wins. */
+.atlas-row .material-symbols-outlined.atlas-map-tree-icon-has-image {
+  color: rgba(34, 211, 238, 0.70);
+}
+.atlas-row.selected .material-symbols-outlined.atlas-map-tree-icon-has-image {
+  color: var(--atlas-cyan);
+}
+
+/* Elements-sidebar row: small map glyph on Location rows that have at least
+ * one map anchored. Anchored to the right but left of the type chip. */
+.atlas-elements-row-mapbadge {
+  font-size: 14px !important;
+  color: rgba(34, 211, 238, 0.65);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.atlas-row.selected .atlas-elements-row-mapbadge {
   color: var(--atlas-cyan);
 }
 
@@ -1024,6 +1116,11 @@
   letter-spacing: 0.02em;
   flex-shrink: 0;
 }
+.atlas-pin-count-badge[data-empty="true"] {
+  color: rgba(255, 255, 255, 0.30);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
 
 /* Map index tree rows — depth-based indent, smaller chips for location anchor. */
 .atlas-map-tree-row {
@@ -1066,6 +1163,21 @@
   background: rgba(34, 211, 238, 0.08);
   border-color: rgba(34, 211, 238, 0.30);
   outline: none;
+}
+
+/* Map tree row metadata group — pin count + image badge, pushed right with
+ * margin-left:auto. Keeps chips (identity) left, badges (metadata) right.
+ * Note: the global .atlas-row-meta above is text-style; this overrides for
+ * the map tree row context only.
+ */
+.atlas-map-tree-row .atlas-row-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  flex-shrink: 0;
 }
 .atlas-row-chip-warn {
   color: #f6b26b;
@@ -2110,6 +2222,37 @@
 }
 .atlas-modal-hint.atlas-modal-hint-warn {
   color: #f6b26b;
+}
+
+/* Collapsible "advanced" section inside modals. Used by map-create-modal §3.2. */
+.atlas-modal-advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 8px;
+  padding: 4px 6px 4px 4px;
+  background: transparent;
+  border: none;
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+.atlas-modal-advanced-toggle:hover,
+.atlas-modal-advanced-toggle:focus-visible {
+  color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.06);
+  outline: none;
+}
+.atlas-modal-advanced-chevron {
+  font-size: 16px;
+  line-height: 1;
+}
+.atlas-modal-advanced {
+  padding-left: 8px;
+  border-left: 1px solid var(--atlas-divider);
+  margin-bottom: 8px;
 }
 
 .atlas-modal-error {

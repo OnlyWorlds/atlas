@@ -145,9 +145,19 @@ function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx): HTMLElemen
     row.appendChild(spacer);
   }
 
+  const hasImage = !!(m.image_url || m.image_media_id);
   const icon = document.createElement('span');
-  icon.className = 'material-symbols-outlined';
+  icon.className = 'material-symbols-outlined' + (hasImage ? ' atlas-map-tree-icon-has-image' : '');
   icon.textContent = 'map';
+  if (hasImage) {
+    if (m.image_url && m.image_media_id) {
+      icon.title = 'has image (URL shown, local file kept as fallback)';
+    } else if (m.image_url) {
+      icon.title = 'has image (URL)';
+    } else {
+      icon.title = 'has image (local file)';
+    }
+  }
   row.appendChild(icon);
 
   const main = document.createElement('span');
@@ -194,28 +204,19 @@ function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx): HTMLElemen
     row.appendChild(chip);
   }
 
+  // Metadata zone — pin count always renders (including 0) so labels align
+  // across the list. Zero-count gets a muted variant via data-empty so it
+  // visually recedes vs counts > 0.
   const pinCount = ctx.pinCounts.get(m.id) ?? 0;
-  if (pinCount > 0) {
-    const badge = document.createElement('span');
-    badge.className = 'atlas-pin-count-badge';
-    badge.title = `${pinCount} pin${pinCount === 1 ? '' : 's'}`;
-    badge.textContent = `${pinCount}`;
-    row.appendChild(badge);
-  }
-
-  if (m.image_media_id || m.image_url) {
-    const tag = document.createElement('span');
-    tag.className = 'material-symbols-outlined atlas-map-row-imgtag';
-    if (m.image_url && m.image_media_id) {
-      tag.title = 'image: URL shown, local file kept as fallback';
-    } else if (m.image_url) {
-      tag.title = 'image: URL';
-    } else {
-      tag.title = 'image: local file (no URL set)';
-    }
-    tag.textContent = 'image';
-    row.appendChild(tag);
-  }
+  const meta = document.createElement('span');
+  meta.className = 'atlas-row-meta';
+  const badge = document.createElement('span');
+  badge.className = 'atlas-pin-count-badge';
+  if (pinCount === 0) badge.setAttribute('data-empty', 'true');
+  badge.title = `${pinCount} pin${pinCount === 1 ? '' : 's'}`;
+  badge.textContent = `${pinCount}`;
+  meta.appendChild(badge);
+  row.appendChild(meta);
 
   const actions = document.createElement('span');
   actions.className = 'atlas-inline-actions';
@@ -265,14 +266,19 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
 /** Open (or focus) a map tab on the right. */
 export function openMapTab(m: WorldMap): void {
   const ui = getState().ui;
+  const activeWorldId = getState().active?.worldId;
   const existingIndex = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === m.id);
   if (existingIndex >= 0) {
     patchSlice('ui', { ...ui, rightActiveIndex: existingIndex });
   } else {
-    const newTab: RightTabRef = { kind: 'map', mapId: m.id, label: m.name || '(untitled)' };
+    const newTab: RightTabRef = {
+      kind: 'map',
+      mapId: m.id,
+      label: m.name || '(untitled)',
+      worldId: activeWorldId,
+    };
     const nextTabs = [...ui.rightTabs, newTab];
     patchSlice('ui', { ...ui, rightTabs: nextTabs, rightActiveIndex: nextTabs.length - 1 });
   }
-  const worldId = getState().active?.worldId;
-  if (worldId) navigate(mapHash(worldId, m.id));
+  if (activeWorldId) navigate(mapHash(activeWorldId, m.id));
 }
