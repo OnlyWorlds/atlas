@@ -93,9 +93,14 @@ export function startApp(container: HTMLElement): AppHandle {
     else if (route.mode === 'timeline') nextMode = 'timeline';
     else if (route.mode === 'map') {
       if (route.mapId) ensureMapTabOpen(route.mapId);
-      nextMode = route.elementId ? 'element' : 'welcome';
+      // Map route with no element selection → timeline is the better default
+      // than the welcome stat-panel (DESIGN_MAPS.md §10c session 210 smoke
+      // note from Captain). Welcome lives ONLY at the "no active world" root.
+      nextMode = route.elementId ? 'element' : (active ? 'timeline' : 'welcome');
     }
-    else nextMode = 'welcome';
+    // Bare `/w/<id>` or any other unrecognised route while a world is active
+    // → timeline. Pure root (`/`) with no active world stays on welcome.
+    else nextMode = active ? 'timeline' : 'welcome';
 
     if (nextMode !== currentMode) {
       unmountMiddle?.();

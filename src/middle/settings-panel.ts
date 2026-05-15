@@ -29,6 +29,7 @@ import {
   setSyncConfirmServerDeletes,
   setSyncPauseAll,
   setWorldPaused,
+  setMapsSettings,
 } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
 import { getActiveStore, setActiveStore } from '../ui/create-world-modal';
@@ -151,11 +152,40 @@ function renderTab(
       return renderAtlasTab();
     case 'sync':
       return renderSyncTab(reg);
+    case 'maps':
+      return renderMapsTab(reg);
     case 'world':
       return activeWorld ? renderWorldTab(activeWorld) : '<p class="atlas-settings-hint">no world is active.</p>';
     case 'about':
       return renderAboutTab();
   }
+}
+
+// ---- Maps subsystem settings (DESIGN_MAPS.md §3.5) ----
+
+function renderMapsTab(reg: ReturnType<typeof getState>['registry']): string {
+  const s = reg.maps_settings ?? {};
+  const showMaps = !!s.show_map_names_in_header;
+  const showPinMaps = !!s.show_pin_map_names_in_header;
+  const showPinnedEls = !!s.show_pinned_element_names_in_header;
+  return `
+    <section class="atlas-settings-section">
+      <h3>Maps</h3>
+      <p class="atlas-settings-hint">how atlas renders maps and map affordances across the UI. label toggles default off — tighter icon-only layout. flip on for explicit names.</p>
+      <label class="atlas-settings-toggle">
+        <input type="checkbox" name="show-map-names-in-header" ${showMaps ? 'checked' : ''} />
+        <span>Show map names alongside map icons in element header</span>
+      </label>
+      <label class="atlas-settings-toggle">
+        <input type="checkbox" name="show-pin-map-names-in-header" ${showPinMaps ? 'checked' : ''} />
+        <span>Show map names alongside pin icons in element header</span>
+      </label>
+      <label class="atlas-settings-toggle">
+        <input type="checkbox" name="show-pinned-element-names-in-header" ${showPinnedEls ? 'checked' : ''} />
+        <span>Show element names alongside category icons on Map detail</span>
+      </label>
+    </section>
+  `;
 }
 
 // ---- Identity ----
@@ -341,6 +371,9 @@ function wireTabHandlers(
     case 'sync':
       wireSyncTab(toasts);
       break;
+    case 'maps':
+      wireMapsTab(toasts);
+      break;
     case 'world':
       if (activeWorld) wireWorldTab(activeWorld, toasts);
       break;
@@ -451,6 +484,26 @@ function wireSyncTab(toasts: ToastManager): void {
     saveRegistry(next);
     patchSlice('registry', next);
   });
+}
+
+function wireMapsTab(_toasts: ToastManager): void {
+  // Three independent toggles all stored on registry.maps_settings via the
+  // partial-merge setMapsSettings helper. No info toasts — the visible state
+  // change in element-detail headers is its own feedback.
+  const wireToggle = (
+    name: string,
+    key: 'show_map_names_in_header' | 'show_pin_map_names_in_header' | 'show_pinned_element_names_in_header',
+  ): void => {
+    const el = document.querySelector<HTMLInputElement>(`.atlas-settings input[name="${name}"]`);
+    el?.addEventListener('change', () => {
+      const next = setMapsSettings(getState().registry, { [key]: el.checked });
+      saveRegistry(next);
+      patchSlice('registry', next);
+    });
+  };
+  wireToggle('show-map-names-in-header', 'show_map_names_in_header');
+  wireToggle('show-pin-map-names-in-header', 'show_pin_map_names_in_header');
+  wireToggle('show-pinned-element-names-in-header', 'show_pinned_element_names_in_header');
 }
 
 function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {

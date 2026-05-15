@@ -421,3 +421,31 @@ export function clearAtlasRoot(reg: WorldsRegistry): WorldsRegistry {
   const { atlas_root, ...rest } = reg;
   return rest;
 }
+
+// ---- Maps subsystem settings (DESIGN_MAPS.md §3.5) ----
+
+export function setMapsSettings(
+  reg: WorldsRegistry,
+  patch: Partial<NonNullable<WorldsRegistry['maps_settings']>>
+): WorldsRegistry {
+  return {
+    ...reg,
+    maps_settings: {
+      ...(reg.maps_settings ?? {}),
+      ...patch,
+    },
+  };
+}
+
+/** Returns the registry's maps settings with defaults applied for unset toggles. */
+export function getMapsSettings(reg: WorldsRegistry): {
+  show_map_names_in_header: boolean;
+  show_pin_map_names_in_header: boolean;
+  show_pinned_element_names_in_header: boolean;
+} {
+  return {
+    show_map_names_in_header: reg.maps_settings?.show_map_names_in_header ?? false,
+    show_pin_map_names_in_header: reg.maps_settings?.show_pin_map_names_in_header ?? false,
+    show_pinned_element_names_in_header: reg.maps_settings?.show_pinned_element_names_in_header ?? false,
+  };
+}

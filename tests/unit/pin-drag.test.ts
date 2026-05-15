@@ -93,10 +93,20 @@ function makeEntry() {
     mapId: 'm1',
     worldId: 'w1',
     container: document.createElement('div'),
-    manager: { getConfig: () => ({ canvasHeight: 1000 }) } as any,
+    manager: {
+      getConfig: () => ({ canvasHeight: 1000, canvasWidth: 1000 }),
+      // Drag handler reads getMap() to compute screen point for the
+      // trash-zone hit-test. Returning null short-circuits the check; the
+      // drag path falls through to the existing update behavior.
+      getMap: () => null,
+    } as any,
     objectUrls: [],
     ready: Promise.resolve(),
     tooltip: document.createElement('div'),
+    // New: trash drop-zone div the handler toggles via data-active. Not a
+    // real Leaflet target for these tests; just satisfies setAttribute calls.
+    trashZone: document.createElement('div'),
+    lastBg: '',
   };
 }
 

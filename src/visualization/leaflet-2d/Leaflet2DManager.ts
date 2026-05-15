@@ -349,6 +349,14 @@ export class Leaflet2DManager {
       this.emit('pin-hover-end', { pin, originalEvent: e });
     });
 
+    marker.on('contextmenu', (e: L.LeafletMouseEvent) => {
+      // Block the map-level contextmenu so consumers (atlas's ghost-pin
+      // toggle) get clean per-pin events without also opening the map's
+      // "new pin" modal that fires on map.contextmenu.
+      L.DomEvent.stop(e.originalEvent ?? (e as unknown as Event));
+      this.emit('pin-contextmenu', { pin, originalEvent: e });
+    });
+
     // Add to map if visible
     if (pin.visible) {
       marker.addTo(this.pinsLayer);

@@ -32,14 +32,24 @@ export interface MapModalOptions {
   existingMapId?: string;
   /** Pre-fill the name field (used when invoked from element-create grid). */
   initialName?: string;
+  /**
+   * Pre-fill the location chip with this Location element id. Used by the
+   * `[+map]` button on the element-detail top bar for Locations — clicking
+   * jumps straight into a map create form already anchored to that place.
+   * DESIGN_MAPS.md §3.5.
+   */
+  initialLocationId?: string;
 }
 
 export function createMapDialog(
   toasts: ToastManager,
-  opts: { initialName?: string } = {},
+  opts: { initialName?: string; initialLocationId?: string } = {},
 ): Promise<MapCreateResult | null> {
   return new Promise((resolve) => {
-    const modal = new MapCreateModal(toasts, (result) => resolve(result), { initialName: opts.initialName });
+    const modal = new MapCreateModal(toasts, (result) => resolve(result), {
+      initialName: opts.initialName,
+      initialLocationId: opts.initialLocationId,
+    });
     modal.open();
   });
 }
@@ -82,6 +92,15 @@ class MapCreateModal extends BaseModal {
       this.toasts.error('no active world');
       this.onDone(null);
       return;
+    }
+    // Create mode + initialLocationId → pre-fill the location chip so the
+    // user lands inside an already-anchored map create form. The chip is
+    // editable; user can clear it via × if they change their mind.
+    if (!this.opts.existingMapId && this.opts.initialLocationId) {
+      const loc = getState().data.elements.find(e => e.id === this.opts.initialLocationId);
+      if (loc) {
+        this.locationPreview = { id: loc.id, name: loc.name ?? '(unnamed)' };
+      }
     }
     if (this.opts.existingMapId) {
       const found = getState().data.elements.find(

@@ -222,9 +222,6 @@ export type WorldState = 'local-only' | 'api-linked';
  * Lives in types.ts (not state.ts) because the registry persists it per-world
  * and importing state.ts from registry/ would create a dependency cycle.
  *
- * `locked` (map tabs only): when true, selecting an element (sidebar OR pin
- * click) does NOT auto-switch the map. See DESIGN_MAPS.md §3.4.
- *
  * `worldId` (map tabs only): stamped when the tab opens. Lets the stale-tab
  * pane name which world the map belongs to ("this map belongs to <World X>")
  * — tabs persist across world switches by design (§5), so we can't infer the
@@ -232,7 +229,7 @@ export type WorldState = 'local-only' | 'api-linked';
  */
 export type RightTabRef =
   | { kind: 'map-index' }
-  | { kind: 'map'; mapId: string; label: string; worldId?: string; locked?: boolean };
+  | { kind: 'map'; mapId: string; label: string; worldId?: string };
 
 /**
  * Per-world right-pane tab snapshot. Persisted on WorldRegistryEntry so the
@@ -331,6 +328,25 @@ export interface WorldsRegistry {
 
   /** Master kill switch — pauses every engine if true. Default: false. */
   sync_pause_all?: boolean;
+
+  // ---- Maps subsystem settings (DESIGN_MAPS.md §3.5) ----
+  /**
+   * Atlas-level map behavior toggles. All default OFF. Stored at the registry
+   * level (not per-world) — they're user preferences about how atlas presents
+   * maps, not facts about any particular world.
+   *
+   * Three independent label toggles, each surfacing a different name next to
+   * a glyph in the element-detail top bar. Splits originally bundled "show
+   * names" into per-context preferences (session 211 smoke).
+   */
+  maps_settings?: {
+    /** Show map name next to `[map]` icons in Location element headers. */
+    show_map_names_in_header?: boolean;
+    /** Show pin's map name next to `[pin]` icons in any element header. */
+    show_pin_map_names_in_header?: boolean;
+    /** Show pinned element name next to category icons on Map detail header. */
+    show_pinned_element_names_in_header?: boolean;
+  };
 }
 
 export function defaultRegistry(): WorldsRegistry {

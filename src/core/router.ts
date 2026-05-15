@@ -15,9 +15,9 @@
 
 export type RouteMode = 'welcome' | 'settings' | 'elements' | 'element' | 'map' | 'timeline';
 
-export type SettingsTab = 'identity' | 'atlas' | 'sync' | 'world' | 'about';
+export type SettingsTab = 'identity' | 'atlas' | 'sync' | 'maps' | 'world' | 'about';
 
-export const SETTINGS_TABS: SettingsTab[] = ['identity', 'atlas', 'sync', 'world', 'about'];
+export const SETTINGS_TABS: SettingsTab[] = ['identity', 'atlas', 'sync', 'maps', 'world', 'about'];
 
 export interface Route {
   worldId: string | null;
@@ -88,8 +88,9 @@ export function elementHash(worldId: string, elementId: string): string {
   return `#/w/${worldId}/element/${elementId}`;
 }
 
-export function mapHash(worldId: string, mapId: string): string {
-  return `#/w/${worldId}/map/${mapId}`;
+export function mapHash(worldId: string, mapId: string, elementId?: string): string {
+  const base = `#/w/${worldId}/map/${mapId}`;
+  return elementId ? `${base}/element/${elementId}` : base;
 }
 
 export function timelineHash(worldId: string): string {

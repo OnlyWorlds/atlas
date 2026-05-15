@@ -21,6 +21,7 @@ import { CONTENT_ELEMENT_TYPES, type ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { createMapDialog } from './map-create-modal';
+import { findExistingNameMatch } from './element-name-match';
 
 /** Types offered in the create modal — matches legacy: all 22 except pin/marker. */
 const CREATE_TYPES: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
@@ -43,6 +44,21 @@ export interface ElementCreateOptions {
    * `element_type` when `element_id` is set).
    */
   onCreated?: (id: string, type: ElementType) => void;
+  /**
+   * NPM mode (DESIGN_MAPS.md §3.7). When set, the name field gets ghost-line
+   * autocomplete against existing elements of the currently-selected category;
+   * TAB at end of input accepts the suggestion and flips the submit button
+   * to `Place`, which calls `onPlaceExisting(id, type)` instead of creating a
+   * new element. Multi-match tiebreaker = latest `local_updated_at`.
+   */
+  enablePlaceExisting?: boolean;
+  /**
+   * Called when the user submits a Place — drop a pin pointing at an existing
+   * element. Receives the existing element's id and type.
+   */
+  onPlaceExisting?: (id: string, type: ElementType) => void;
+  /** Override the modal title. Default: 'New element'. */
+  title?: string;
 }
 
 export class ElementCreateModal extends BaseModal {
@@ -53,6 +69,16 @@ export class ElementCreateModal extends BaseModal {
   private typeInput!: HTMLInputElement;
   private ghostTyped!: HTMLSpanElement;
   private ghostSuffix!: HTMLSpanElement;
+  // NPM (DESIGN_MAPS.md §3.7) — when an existing-name autocomplete is accepted
+  // via TAB, the submit button flips to "Place" and we remember which element
+  // to point the new pin at. Cleared when the user edits the name back to
+  // something that no longer matches the accepted suggestion.
+  private placingExistingId: string | null = null;
+  private nameInput!: HTMLInputElement;
+  private nameGhostTyped!: HTMLSpanElement;
+  private nameGhostSuffix!: HTMLSpanElement;
+  private modeChip!: HTMLSpanElement;
+  private submitBtn!: HTMLButtonElement;
 
   constructor(toasts: ToastManager, opts: ElementCreateOptions = {}) {
     super();
@@ -87,17 +113,37 @@ export class ElementCreateModal extends BaseModal {
   }
 
   private buildModal(): HTMLElement {
-    const { overlay, body } = this.buildModalShell({
-      title: 'New element',
+    const placeMode = !!this.opts.enablePlaceExisting;
+    const { overlay, body, panel } = this.buildModalShell({
+      title: this.opts.title ?? 'New element',
       dataModal: 'create-element',
     });
 
-    body.innerHTML = `
-      <form data-form="create-element">
-        <label class="atlas-modal-field">
+    // Mode chip — visible only after a TAB-accept in NPM mode. Appended next
+    // to the title for inline placement signal ("placing existing · char").
+    this.modeChip = document.createElement('span');
+    this.modeChip.className = 'atlas-modal-title-chip';
+    this.modeChip.setAttribute('data-role', 'mode-chip');
+    this.modeChip.hidden = true;
+    const titleEl = panel.querySelector<HTMLElement>('.atlas-modal-title');
+    if (titleEl) titleEl.appendChild(this.modeChip);
+
+    const nameFieldHtml = placeMode
+      ? `<label class="atlas-modal-field">
+          <span>Name</span>
+          <div class="atlas-input-ghost-wrap">
+            <span class="atlas-input-ghost"><span class="name-ghost-typed"></span><span class="name-ghost-suffix"></span></span>
+            <input class="atlas-input" type="text" name="element-name" placeholder="element name (TAB to place existing)" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
+          </div>
+        </label>`
+      : `<label class="atlas-modal-field">
           <span>Name</span>
           <input class="atlas-input" type="text" name="element-name" placeholder="element name" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
-        </label>
+        </label>`;
+
+    body.innerHTML = `
+      <form data-form="create-element">
+        ${nameFieldHtml}
         <div class="atlas-modal-field">
           <span>category</span>
           <div class="atlas-input-ghost-wrap">
@@ -150,10 +196,19 @@ export class ElementCreateModal extends BaseModal {
       }
     });
 
+    // Capture name field + its ghost spans (only present in NPM mode).
+    this.nameInput = body.querySelector<HTMLInputElement>('input[name="element-name"]')!;
+    if (placeMode) {
+      this.nameGhostTyped = body.querySelector<HTMLSpanElement>('.name-ghost-typed')!;
+      this.nameGhostSuffix = body.querySelector<HTMLSpanElement>('.name-ghost-suffix')!;
+      this.wireNameAutocomplete();
+    }
+
     const form = body.querySelector<HTMLFormElement>('form')!;
     const errorBox = body.querySelector<HTMLElement>('[data-role="error"]')!;
     const cancelBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
     const submitBtn = body.querySelector<HTMLButtonElement>('[data-action="create"]')!;
+    this.submitBtn = submitBtn;
 
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
 
@@ -173,6 +228,36 @@ export class ElementCreateModal extends BaseModal {
         errorBox.hidden = false;
         return;
       }
+
+      // NPM Place mode — short-circuit the create path. Drop a pin at the
+      // existing element and exit. No createElement, no state.data refresh.
+      // The caller's onPlaceExisting handles the pin write.
+      if (this.placingExistingId) {
+        const targetId = this.placingExistingId;
+        const targetEl = getState().data.elements.find(e => e.id === targetId);
+        if (!targetEl) {
+          errorBox.textContent = 'existing element no longer exists';
+          errorBox.hidden = false;
+          this.clearPlaceExisting();
+          return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Placing…';
+        cancelBtn.hidden = true;
+        try {
+          this.hide();
+          this.opts.onPlaceExisting?.(targetEl.id, targetEl.type);
+        } catch (err) {
+          console.error('[element-create] place existing failed:', err);
+          errorBox.textContent = err instanceof Error ? err.message : String(err);
+          errorBox.hidden = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Place';
+          cancelBtn.hidden = false;
+        }
+        return;
+      }
+
       submitBtn.disabled = true;
       submitBtn.textContent = 'Creating…';
       cancelBtn.hidden = true;
@@ -223,6 +308,81 @@ export class ElementCreateModal extends BaseModal {
   private setType(type: ElementType): void {
     this.selected = type;
     this.typeButtons.forEach((btn, t) => btn.classList.toggle('active', t === type));
+    // Category change invalidates any accepted place-existing selection — the
+    // selected element belonged to the prior category. Drop back to Create.
+    if (this.placingExistingId) this.clearPlaceExisting();
+    // Refresh the name-field ghost against the new category's candidates.
+    if (this.opts.enablePlaceExisting) this.updateNameGhost();
+  }
+
+  /**
+   * Wire ghost-line autocomplete on the name field (NPM mode, DESIGN_MAPS.md
+   * §3.7). On every keystroke, compute the best candidate name and render the
+   * ghost suffix. TAB at end of typed input accepts → place mode.
+   */
+  private wireNameAutocomplete(): void {
+    this.nameInput.addEventListener('input', () => {
+      // User editing → ghost may stale; recompute. Also bail out of place mode
+      // if the typed text no longer matches the chosen suggestion exactly.
+      if (this.placingExistingId) {
+        const target = getState().data.elements.find(e => e.id === this.placingExistingId);
+        if (!target || this.nameInput.value.trim() !== (target.name ?? '').trim()) {
+          this.clearPlaceExisting();
+        }
+      }
+      this.updateNameGhost();
+    });
+
+    this.nameInput.addEventListener('keydown', (e) => {
+      const ghostVisible = !!this.nameGhostSuffix.textContent;
+      if (!ghostVisible) return;
+      const atEnd = this.nameInput.selectionStart === this.nameInput.value.length;
+      if (e.key === 'Tab' && !e.shiftKey) {
+        e.preventDefault();
+        this.acceptNameGhost();
+      } else if (e.key === 'ArrowRight' && atEnd) {
+        e.preventDefault();
+        this.acceptNameGhost();
+      }
+    });
+  }
+
+  private updateNameGhost(): void {
+    if (!this.opts.enablePlaceExisting) return;
+    const typed = this.nameInput.value;
+    if (!typed) {
+      this.nameGhostTyped.textContent = '';
+      this.nameGhostSuffix.textContent = '';
+      return;
+    }
+    const match = findExistingNameMatch(typed, this.selected, getState().data.elements);
+    if (!match) {
+      this.nameGhostTyped.textContent = '';
+      this.nameGhostSuffix.textContent = '';
+      return;
+    }
+    this.nameGhostTyped.textContent = typed;
+    this.nameGhostSuffix.textContent = match.name.slice(typed.length);
+  }
+
+  private acceptNameGhost(): void {
+    const match = findExistingNameMatch(this.nameInput.value, this.selected, getState().data.elements);
+    if (!match) return;
+    this.nameInput.value = match.name;
+    this.placingExistingId = match.id;
+    this.nameGhostTyped.textContent = '';
+    this.nameGhostSuffix.textContent = '';
+    this.modeChip.hidden = false;
+    this.modeChip.textContent = `placing existing · ${ELEMENT_LABELS[match.type].singular}`;
+    this.submitBtn.textContent = 'Place';
+    this.nameInput.setSelectionRange(match.name.length, match.name.length);
+  }
+
+  private clearPlaceExisting(): void {
+    this.placingExistingId = null;
+    this.modeChip.hidden = true;
+    this.modeChip.textContent = '';
+    this.submitBtn.textContent = 'Create';
   }
 
   private updateGhost(): void {

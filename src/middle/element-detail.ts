@@ -27,8 +27,12 @@ import { sectionsFor, type FieldMeta, type SectionLayout } from '../editor/field
 import { getFieldDescription } from '../editor/field-descriptions';
 import { pickElement } from '../ui/element-picker-modal';
 import { requestPushIfLinked } from '../sync/sync-attach';
-import { getAssociatedMaps, getLocationMapPresence } from '../tabs/right/auto-open-map';
+import { getAssociatedMaps } from '../tabs/right/auto-open-map';
 import { openMapTab } from '../tabs/right/map-index-tab';
+import { panMapTabTo } from '../tabs/right/map-tab';
+import { createMapDialog } from '../ui/map-create-modal';
+import { getMapsSettings } from '../registry/registry';
+import { mapHash } from '../core/router';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */
 const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
@@ -123,9 +127,6 @@ export function mountElementDetail(target: HTMLElement): () => void {
       if (sectionEl) detail.appendChild(sectionEl);
     });
 
-    const mapPresence = renderMapPresence(el);
-    if (mapPresence) detail.appendChild(mapPresence);
-
     const refs = renderReferencedBy(el);
     if (refs) detail.appendChild(refs);
 
@@ -196,38 +197,18 @@ export function mountElementDetail(target: HTMLElement): () => void {
     spacer.className = 'atlas-middle-spacer';
     header.appendChild(spacer);
 
-    // Per-element save/sync indicator. Visual feedback for "is this element's
-    // current state persisted everywhere it should be?":
-    //   - Local-only world: file is written synchronously to disk on save, so
-    //     it's always "Saved" (the icon is the affordance for that promise).
-    //   - Api-linked world + local_updated_at <= server_updated_at: in sync.
-    //   - Api-linked world + local_updated_at > server_updated_at (or missing
-    //     server stamp): edit is pending push by the autosave debounce.
-    header.appendChild(buildSyncDot(el));
+    // Map/pin affordances cluster (DESIGN_MAPS.md §3.5). Replaces the M7
+    // inline body widget. Visual ordering left → right:
+    //   - For Locations: [map][map] | [pin][pin] | [+map] [+pin] [sync] [trash]
+    //   - For others:                  [pin][pin] | [+pin]        [sync] [trash]
+    // The clusters render only when they have items. Empty Locations still
+    // get [+map] so the affordance to start is always visible.
+    renderMapPinClusters(el, header);
 
-    // Pin button — only shown when a map tab is currently active.
-    const ui = getState().ui;
-    const active = ui.rightTabs[ui.rightActiveIndex];
-    const activeMapId = active && active.kind === 'map' ? active.mapId : null;
-    if (activeMapId) {
-      const placing = ui.pinPlacement?.elementId === el.id;
-      const pinBtn = document.createElement('button');
-      pinBtn.type = 'button';
-      pinBtn.className = 'atlas-icon-btn-sm' + (placing ? ' active' : '');
-      pinBtn.setAttribute('data-action', 'pin-element');
-      pinBtn.title = placing ? 'cancel pin placement' : 'place pin on active map';
-      pinBtn.innerHTML = '<span class="material-symbols-outlined">push_pin</span>';
-      pinBtn.addEventListener('click', () => {
-        const placement = getState().ui.pinPlacement;
-        if (placement?.elementId === el.id) {
-          patchSlice('ui', { ...getState().ui, pinPlacement: null });
-        } else {
-          patchSlice('ui', { ...getState().ui, pinPlacement: { elementId: el.id } });
-          toastManager.info('click on the map to place the pin');
-        }
-      });
-      header.appendChild(pinBtn);
-    }
+    // Per-element save/sync indicator. Local-only world = always "saved"
+    // (synchronous disk write). Api-linked + local stamp > server stamp =
+    // pending push (autosave debounce will fire soon).
+    header.appendChild(buildSyncDot(el));
 
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
@@ -239,6 +220,306 @@ export function mountElementDetail(target: HTMLElement): () => void {
     header.appendChild(delBtn);
 
     return header;
+  }
+
+  // ====== Map / Pin clusters (DESIGN_MAPS.md §3.5) ======
+
+  /**
+   * Append the map/pin affordance clusters to the element-detail header. For
+   * Locations: existing-maps cluster, existing-pins cluster, [+map] button,
+   * [+pin] button. For non-Locations: existing-pins cluster, [+pin] button.
+   * Dividers render only between non-empty clusters.
+   */
+  function renderMapPinClusters(el: Element, header: HTMLElement): void {
+    const state = getState();
+    const elements = state.data.elements;
+    const mapsSettings = getMapsSettings(state.registry);
+    const showMapNames = mapsSettings.show_map_names_in_header;
+    const showPinMapNames = mapsSettings.show_pin_map_names_in_header;
+    const isLocation = el.type === 'location';
+    const isMap = el.type === 'map';
+
+    // Map detail gets a different cluster: a strip of category icons, one per
+    // element pinned on this map. Click any → navigate to that element while
+    // keeping the map open in the right pane (via chained URL). DESIGN_MAPS.md
+    // §3.5 — Map case (added session 211 from Captain's smoke).
+    if (isMap) {
+      renderMapPinnedElementStrip(el, elements, header, mapsSettings.show_pinned_element_names_in_header);
+      return;
+    }
+
+    // Existing maps anchored to this element (Locations only).
+    const associatedMaps = isLocation ? getAssociatedMaps(el.id, elements) : [];
+    // Existing pins targeting this element. Includes Locations too — a
+    // Location can have pins (e.g. a city's flag pinned on a continent map).
+    const pinsForElement = elements.filter(
+      (e): e is Element & { map_id: string; element_id: string; x: number; y: number } =>
+        e.type === 'pin' && (e as { element_id?: string }).element_id === el.id,
+    );
+
+    const hasMaps = associatedMaps.length > 0;
+    const hasPins = pinsForElement.length > 0;
+
+    if (hasMaps || hasPins) {
+      const cluster = document.createElement('div');
+      cluster.className = 'atlas-header-cluster atlas-header-existing';
+
+      if (hasMaps) {
+        for (const m of associatedMaps) {
+          cluster.appendChild(buildMapAffordance(m, showMapNames, el.id));
+        }
+      }
+
+      if (hasMaps && hasPins) {
+        cluster.appendChild(buildClusterDivider());
+      }
+
+      if (hasPins) {
+        for (const pin of pinsForElement) {
+          cluster.appendChild(buildPinAffordance(pin, elements, el.id, showPinMapNames));
+        }
+      }
+
+      header.appendChild(cluster);
+    }
+
+    // Create buttons cluster — [+map] for Locations, [+pin] always (gated on
+    // active map tab same as before).
+    const createCluster = document.createElement('div');
+    createCluster.className = 'atlas-header-cluster atlas-header-create';
+
+    if (isLocation) {
+      const addMapBtn = document.createElement('button');
+      addMapBtn.type = 'button';
+      addMapBtn.className = 'atlas-icon-btn-sm atlas-header-add-glyph';
+      addMapBtn.setAttribute('data-action', 'add-map');
+      addMapBtn.title = `create a new map of ${el.name || 'this location'}`;
+      // Two-glyph composition reads as "add map" — small + plus the action
+      // glyph. Same shape as [+pin]; the two read as a coherent pair.
+      addMapBtn.innerHTML =
+        '<span class="material-symbols-outlined atlas-add-glyph-plus">add</span>' +
+        '<span class="material-symbols-outlined atlas-add-glyph-main">map</span>';
+      addMapBtn.addEventListener('click', async () => {
+        const suggestedName = `Map of ${el.name || 'this location'}`;
+        await createMapDialog(toastManager, {
+          initialName: suggestedName,
+          initialLocationId: el.id,
+        });
+      });
+      createCluster.appendChild(addMapBtn);
+    }
+
+    // [+pin] retains its existing gating: only renders when a map tab is
+    // active in the right pane. Without an active map there's nowhere to
+    // drop the pin. Same as before MW.
+    const ui = state.ui;
+    const active = ui.rightTabs[ui.rightActiveIndex];
+    const activeMapId = active && active.kind === 'map' ? active.mapId : null;
+    if (activeMapId) {
+      const placing = ui.pinPlacement?.elementId === el.id;
+      const pinBtn = document.createElement('button');
+      pinBtn.type = 'button';
+      pinBtn.className = 'atlas-icon-btn-sm atlas-header-add-glyph' + (placing ? ' active' : '');
+      pinBtn.setAttribute('data-action', 'pin-element');
+      pinBtn.title = placing ? 'cancel pin placement' : 'place pin on active map';
+      // Two-glyph composition matches `[+map]` — small `add` + the action
+      // glyph (push_pin). Reads "+pin" at a glance, parallel to "+map".
+      pinBtn.innerHTML =
+        '<span class="material-symbols-outlined atlas-add-glyph-plus">add</span>' +
+        '<span class="material-symbols-outlined atlas-add-glyph-main">push_pin</span>';
+      pinBtn.addEventListener('click', () => {
+        const placement = getState().ui.pinPlacement;
+        if (placement?.elementId === el.id) {
+          patchSlice('ui', { ...getState().ui, pinPlacement: null });
+        } else {
+          patchSlice('ui', { ...getState().ui, pinPlacement: { elementId: el.id } });
+          toastManager.info('click on the map to place the pin');
+        }
+      });
+      createCluster.appendChild(pinBtn);
+    }
+
+    if (createCluster.children.length > 0) {
+      header.appendChild(createCluster);
+    }
+  }
+
+  function buildClusterDivider(): HTMLElement {
+    const div = document.createElement('span');
+    div.className = 'atlas-header-cluster-divider';
+    div.setAttribute('aria-hidden', 'true');
+    return div;
+  }
+
+  /**
+   * Render the strip of pinned-element category icons in a Map element's top
+   * bar. First N visible; if more exist, a `+K more` chip opens an element
+   * picker filtered to the remaining pinned-element ids.
+   *
+   * Clicking a single icon navigates to that element via the chained map URL
+   * — keeps the current Map tab open in the right pane.
+   */
+  function renderMapPinnedElementStrip(
+    mapEl: Element,
+    elements: readonly Element[],
+    header: HTMLElement,
+    showElementNames: boolean,
+  ): void {
+    const VISIBLE_CAP = 12;
+    // Pins belonging to this map.
+    const pinsOnMap = elements.filter(
+      (e): e is Element & { map_id: string; element_id: string } =>
+        e.type === 'pin' && (e as Record<string, unknown>).map_id === mapEl.id,
+    );
+    if (pinsOnMap.length === 0) return;
+    // Dedupe element ids — multiple pins for the same element collapse to one
+    // strip entry.
+    const seenIds = new Set<string>();
+    const uniqElementIds: string[] = [];
+    for (const p of pinsOnMap) {
+      if (seenIds.has(p.element_id)) continue;
+      seenIds.add(p.element_id);
+      uniqElementIds.push(p.element_id);
+    }
+    // Resolve to Element objects, drop any that no longer exist (broken pins).
+    const pinnedEls: Element[] = [];
+    for (const id of uniqElementIds) {
+      const el = elements.find(e => e.id === id);
+      if (el) pinnedEls.push(el);
+    }
+    if (pinnedEls.length === 0) return;
+    pinnedEls.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+
+    const cluster = document.createElement('div');
+    cluster.className = 'atlas-header-cluster atlas-header-map-pinned-strip';
+
+    const visible = pinnedEls.slice(0, VISIBLE_CAP);
+    const overflow = pinnedEls.slice(VISIBLE_CAP);
+
+    for (const pinnedEl of visible) {
+      cluster.appendChild(buildPinnedElementIcon(mapEl, pinnedEl, showElementNames));
+    }
+
+    if (overflow.length > 0) {
+      const moreBtn = document.createElement('button');
+      moreBtn.type = 'button';
+      moreBtn.className = 'atlas-icon-btn-sm atlas-header-pinned-more';
+      moreBtn.setAttribute('data-action', 'pinned-more');
+      moreBtn.title = `${overflow.length} more pinned element${overflow.length === 1 ? '' : 's'} — click to search all`;
+      moreBtn.textContent = `+${overflow.length}`;
+      moreBtn.addEventListener('click', async () => {
+        // Picker filtered to the remaining ids. User can search by name +
+        // filter by type; click any row → navigate to that element + keep
+        // the map open via chained URL.
+        const picked = await pickElement({
+          title: `Pinned on ${mapEl.name || '(this map)'}`,
+          restrictToIds: pinnedEls.map(e => e.id),
+        });
+        if (!picked) return;
+        navigateToPinnedElement(mapEl, picked);
+      });
+      cluster.appendChild(moreBtn);
+    }
+
+    header.appendChild(cluster);
+  }
+
+  function buildPinnedElementIcon(mapEl: Element, pinnedEl: Element, showName: boolean): HTMLElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'atlas-icon-btn-sm atlas-header-pinned-icon';
+    btn.setAttribute('data-action', 'goto-pinned-element');
+    btn.setAttribute('data-element-id', pinnedEl.id);
+    btn.title = `${pinnedEl.name || '(unnamed)'} (${pinnedEl.type})`;
+    const iconHtml = `<span class="material-symbols-outlined">${ELEMENT_ICONS[pinnedEl.type] ?? 'category'}</span>`;
+    if (showName) {
+      btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(pinnedEl.name || '(unnamed)')}</span>`;
+      // Reuse the labeled-affordance CSS pattern so width grows past the
+      // 22×22 fixed square. atlas-header-map-affordance-labeled is the
+      // semantic name but its rules apply equally here.
+      btn.classList.add('atlas-header-map-affordance-labeled');
+    } else {
+      btn.innerHTML = iconHtml;
+    }
+    btn.addEventListener('click', () => navigateToPinnedElement(mapEl, pinnedEl));
+    return btn;
+  }
+
+  function navigateToPinnedElement(mapEl: Element, pinnedEl: Element): void {
+    const worldId = getState().active?.worldId;
+    if (!worldId) return;
+    // Chained URL: open the map AND select the pinned element. Keeps the map
+    // open in the right pane while the middle flips to the pinned element.
+    patchSlice('ui', { ...getState().ui, selectedElementId: pinnedEl.id });
+    navigate(mapHash(worldId, mapEl.id, pinnedEl.id));
+    // Also pan+zoom the map tab to one of this element's pins on this map.
+    // Same zoom-and-center logic as the element-detail top-bar [pin] click,
+    // so the user lands inside the pin's neighborhood rather than at the
+    // tab's wide default view. Use the first pin found — multi-pin elements
+    // on the same map are uncommon and "first match" is a reasonable default.
+    const elements = getState().data.elements;
+    const pin = elements.find(
+      (e): e is Element & { map_id: string; element_id: string; x: number; y: number } =>
+        e.type === 'pin'
+        && (e as Record<string, unknown>).map_id === mapEl.id
+        && (e as Record<string, unknown>).element_id === pinnedEl.id,
+    );
+    if (pin) panMapTabTo(mapEl.id, pin.x, pin.y);
+  }
+
+  function buildMapAffordance(m: WorldMap, showName: boolean, sourceElementId: string): HTMLElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'atlas-icon-btn-sm atlas-header-map-affordance';
+    btn.setAttribute('data-action', 'open-map');
+    btn.setAttribute('data-map-id', m.id);
+    const hasImage = !!(m.image_url || m.image_media_id);
+    if (hasImage) btn.classList.add('atlas-map-tree-icon-has-image');
+    btn.title = `open map: ${m.name || '(untitled)'}`;
+    const iconHtml = '<span class="material-symbols-outlined">map</span>';
+    if (showName) {
+      btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(m.name || '(untitled)')}</span>`;
+      btn.classList.add('atlas-header-map-affordance-labeled');
+    } else {
+      btn.innerHTML = iconHtml;
+    }
+    // Preserve the current element selection in the URL so the middle pane
+    // doesn't drop into the welcome-stat panel when the map opens. The
+    // chained `/map/<mid>/element/<eid>` route keeps element-detail mounted.
+    btn.addEventListener('click', () => openMapTab(m, sourceElementId));
+    return btn;
+  }
+
+  function buildPinAffordance(
+    pin: Element & { map_id: string; element_id: string; x: number; y: number },
+    elements: readonly Element[],
+    sourceElementId: string,
+    showMapName: boolean,
+  ): HTMLElement {
+    const m = elements.find((e): e is WorldMap => e.type === 'map' && e.id === pin.map_id);
+    const mapName = m?.name || '(unknown map)';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'atlas-icon-btn-sm atlas-header-pin-affordance';
+    btn.setAttribute('data-action', 'goto-pin');
+    btn.setAttribute('data-pin-id', pin.id);
+    btn.title = `pin on ${mapName} — click to open and center`;
+    const iconHtml = '<span class="material-symbols-outlined">push_pin</span>';
+    if (showMapName) {
+      btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(mapName)}</span>`;
+      btn.classList.add('atlas-header-map-affordance-labeled');
+    } else {
+      btn.innerHTML = iconHtml;
+    }
+    btn.addEventListener('click', () => {
+      if (!m) return;
+      // Preserve the element selection — same chained-URL trick.
+      openMapTab(m, sourceElementId);
+      // panMapTabTo waits on entry.ready, so a freshly opened tab settles
+      // before the camera moves.
+      panMapTabTo(pin.map_id, pin.x, pin.y);
+    });
+    return btn;
   }
 
   // ====== Sections ======
@@ -477,93 +758,6 @@ export function mountElementDetail(target: HTMLElement): () => void {
   }
 
   // ====== Referenced By ======
-
-  /**
-   * Inline "map presence" widget (DESIGN_MAPS.md §3.5). For Locations:
-   * "Maps of this place" + "Maps within this place" (descendants). For other
-   * elements: "Appears on maps" (resolved via pins). Renders nothing when
-   * empty — no empty-state noise.
-   */
-  function renderMapPresence(el: Element): HTMLElement | null {
-    const elements = getState().data.elements;
-
-    let directMaps: WorldMap[] = [];
-    let descendantMaps: WorldMap[] = [];
-    let appearsOn: WorldMap[] = [];
-    if (el.type === 'location') {
-      const presence = getLocationMapPresence(el.id, elements);
-      directMaps = presence.direct;
-      descendantMaps = presence.descendants;
-    } else if (el.type === 'map') {
-      // Don't show this widget on Map detail itself — the map's own canvas
-      // surfaces in the right pane already; the section is for elements that
-      // RELATE to maps without being one.
-      return null;
-    } else {
-      const { maps } = getAssociatedMaps(el.id, elements, false);
-      appearsOn = maps;
-    }
-
-    if (directMaps.length === 0 && descendantMaps.length === 0 && appearsOn.length === 0) {
-      return null;
-    }
-
-    const wrap = document.createElement('div');
-    wrap.className = 'atlas-detail-section atlas-detail-map-presence';
-
-    const header = document.createElement('div');
-    header.className = 'atlas-detail-section-header no-toggle';
-    const totalCount = directMaps.length + descendantMaps.length + appearsOn.length;
-    header.innerHTML = `<span>Maps</span><span class="atlas-refs-count">${totalCount}</span>`;
-    wrap.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'atlas-detail-section-body atlas-detail-map-presence-body';
-    wrap.appendChild(body);
-
-    const appendGroup = (label: string, maps: WorldMap[]): void => {
-      if (maps.length === 0) return;
-      const group = document.createElement('div');
-      group.className = 'atlas-field';
-      const lbl = document.createElement('div');
-      lbl.className = 'atlas-field-label';
-      lbl.textContent = label;
-      group.appendChild(lbl);
-      const row = document.createElement('div');
-      row.className = 'atlas-link-row';
-      for (const m of maps) row.appendChild(buildMapPresenceChip(m));
-      group.appendChild(row);
-      body.appendChild(group);
-    };
-
-    if (el.type === 'location') {
-      appendGroup('Maps of this place', directMaps);
-      appendGroup('Maps within this place', descendantMaps);
-    } else {
-      appendGroup('Appears on maps', appearsOn);
-    }
-
-    return wrap;
-  }
-
-  function buildMapPresenceChip(m: WorldMap): HTMLElement {
-    const chip = document.createElement('span');
-    chip.className = 'atlas-link-chip';
-    const hasImage = !!(m.image_url || m.image_media_id);
-    chip.title = hasImage ? `${m.name} (has image)` : m.name || '(untitled map)';
-    const icon = document.createElement('span');
-    icon.className = 'material-symbols-outlined atlas-link-chip-icon' + (hasImage ? ' atlas-map-tree-icon-has-image' : '');
-    icon.textContent = 'map';
-    chip.appendChild(icon);
-    const name = document.createElement('span');
-    name.textContent = m.name || '(untitled map)';
-    chip.appendChild(name);
-    chip.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openMapTab(m);
-    });
-    return chip;
-  }
 
   function renderReferencedBy(el: Element): HTMLElement | null {
     const incoming = findIncomingReferences(el.id);

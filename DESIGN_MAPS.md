@@ -705,29 +705,35 @@ Deliverable: cleaner tab strip. Lock retains its purpose (suppresses pin-click a
 
 ---
 
-## 10c. Next-session pile (session 210+)
+## 10c. Session 210 work
 
-Captured here so we don't lose the alignment from the session 209 design conversation.
+### Doc reconciliation + lock cleanup (Bout L0)
+
+Strike §3.4 (lock toggle was tied to auto-open, which is gone). Strike auto-open logic from §3.6. Delete dormant lock code (`RightTabRef.locked`, `isActiveMapTabLocked`, lock CSS, `MapPickerModal`, `maybeAutoOpenMapFor`). Update §10c with reality.
+
+### Bout S — Maps Settings tab
+
+New `'maps'` entry in `SETTINGS_TABS`. First toggle: "Show map names alongside map icons in element header" (default OFF). Registry helper. Future map-behavior toggles accumulate here.
 
 ### Bout MW — Map affordances in element-detail top bar
 
-Per §3.5 (revised). Move map+pin affordances into the element-detail top bar; remove the inline body widget. Add Maps Settings section to the existing Settings panel (first toggle: "show map names alongside map icons in element header" — default off).
+Per §3.5. Add map+pin clusters to the element-detail header. Delete the M7 inline body widget (`renderMapPresence`). Reads Maps Settings for the name-label toggle. Implements `[+map]` for Locations (opens MapCreateModal with location pre-filled).
 
 ### Bout NPM — New-pin modal with TAB-autocomplete
 
-Per §3.7. Rename ElementCreateModal's contextual variant to "New pin"; add ghost-line name autocompletion against existing elements of current category; TAB accepts → `Place` mode; multi-match tiebreaker = latest `local_updated_at`.
+Per §3.7. Extends contextual `ElementCreateModal` (right-click on map) with ghost-line name autocomplete against existing elements of selected category. TAB accepts → button flips Create → Place. Multi-match tiebreaker = latest `local_updated_at`.
 
-### Investigation — Pin coord origin / canvas-resize behavior
+### Bout XR — Ghost pins (cross-element rendering)
 
-Per §8 "Pin coord origin & canvas semantics." Look at `Leaflet2DManager.ts` `leafletToStorage`/`storageToLeaflet` and the canvas-vs-image-dim mismatch logic. Propose fix candidates (rescale, refuse-until-dims-known, clamp+indicator). Likely produces a small atlas fix AND a council-motion entry for schema clarity on pin coord origin.
+Per §3.8. Right-click on a real pin → spawn ghost pins around it for elements sharing the same `location`. Right-click again → toggle off. Click ghost = select element. Right-click ghost = prune. Ephemeral, in-memory per map tab.
 
-### Design conversation — Cross-element rendering
+### Pin coord origin council motion (deferred)
 
-Per §8 "Cross-element rendering on maps." How to show elements with `location` fields on the matching map(s). Persistent pins vs ephemeral computed markers. Worth a session of design alignment before any code.
+Now closed as investigation — session 208's dispose-and-remount + §4.1 invariant fixed the underlying bug. Only paperwork remaining: clarify pin coord origin (top-left, x→right, y→down) in OW `Pin.x`/`Pin.y` field descriptions. Bundles with M8.
 
-### Bout M8 — Schema description council motion (after all above stable)
+### Bout M8 — Schema description council motion (after MW/NPM/XR stable)
 
-Bundle: §7 description updates + pin coord origin clarification + any other prose discrepancies surfaced during use.
+Bundle: §7 map field description updates + pin coord origin clarification + any prose discrepancies surfaced during use.
 
 ---
 

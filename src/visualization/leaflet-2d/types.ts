@@ -137,6 +137,7 @@ export interface ResolvedLeaflet2DConfig {
 export type Leaflet2DEventType =
   | 'ready'
   | 'pin-click'
+  | 'pin-contextmenu'
   | 'pin-hover'
   | 'pin-hover-end'
   | 'map-click'
@@ -176,6 +177,7 @@ export interface MapClickEvent {
 export type EventCallbacks = {
   'ready': () => void;
   'pin-click': (event: PinClickEvent) => void;
+  'pin-contextmenu': (event: PinClickEvent) => void;
   'pin-hover': (event: PinHoverEvent) => void;
   'pin-hover-end': (event: PinHoverEvent) => void;
   'map-click': (event: MapClickEvent) => void;

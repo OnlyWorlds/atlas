@@ -263,8 +263,15 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
   }
 }
 
-/** Open (or focus) a map tab on the right. */
-export function openMapTab(m: WorldMap): void {
+/**
+ * Open (or focus) a map tab on the right. When `preserveElementId` is set
+ * (the caller wants the middle pane to keep showing a specific element
+ * detail), the navigated hash uses the chained `/map/<mid>/element/<eid>`
+ * form so the middle pane doesn't drop selection. Otherwise the bare map
+ * hash is used and the middle pane falls through to its world-active
+ * default (timeline).
+ */
+export function openMapTab(m: WorldMap, preserveElementId?: string): void {
   const ui = getState().ui;
   const activeWorldId = getState().active?.worldId;
   const existingIndex = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === m.id);
@@ -280,5 +287,5 @@ export function openMapTab(m: WorldMap): void {
     const nextTabs = [...ui.rightTabs, newTab];
     patchSlice('ui', { ...ui, rightTabs: nextTabs, rightActiveIndex: nextTabs.length - 1 });
   }
-  if (activeWorldId) navigate(mapHash(activeWorldId, m.id));
+  if (activeWorldId) navigate(mapHash(activeWorldId, m.id, preserveElementId));
 }

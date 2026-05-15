@@ -15,12 +15,11 @@
 import L from 'leaflet';
 import { getState, patchSlice, subscribe } from '../../core/state';
 import { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManager';
-import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
+import { leafletToStorage, storageToLeaflet } from '../../visualization/leaflet-2d/CoordinateUtils';
 import type { Element, Pin, WorldMap } from '../../core/types';
 import { pickMapImageSource } from './map-image-source';
-// maybeAutoOpenMapFor — auto-open behavior is currently disabled; the helper
-// is kept in the codebase for a future opt-in (DESIGN_MAPS.md §3.6).
 import { pinVisualFor, onPinVisualsReady } from './pin-visuals';
+import { toggleGhostsAtSourcePin, disposeGhostsForMap } from './ghost-pins';
 import { ToastManager } from '../../ui/toast-manager';
 import { ElementCreateModal } from '../../ui/element-create-modal';
 import { getActiveStore } from '../../ui/create-world-modal';
@@ -36,6 +35,12 @@ interface MapTabCacheEntry {
   objectUrls: string[];
   ready: Promise<void>;
   tooltip: HTMLDivElement;
+  /**
+   * Trash drop-zone overlay used by pin drag-to-delete (DESIGN_MAPS.md §3.5
+   * smoke note session 211). Hidden by default; shown only while a pin is
+   * being dragged. Drop a pin on top → pin is deleted.
+   */
+  trashZone: HTMLDivElement;
   /**
    * Snapshot of the image source last used to render the background. When the
    * map element's image fields change (URL edited, local file added/removed),
@@ -114,6 +119,17 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   tooltip.style.display = 'none';
   container.appendChild(tooltip);
 
+  // Trash drop-zone — top-right of the map canvas, hidden until a pin drag
+  // begins. Drop the pin on it → pin deletion. Pointer-events: none keeps it
+  // from intercepting other clicks; it doesn't need to BE a drop target in
+  // the HTML5 sense — we check the marker's released latlng against this
+  // div's screen rect.
+  const trashZone = document.createElement('div');
+  trashZone.className = 'atlas-pin-trash-zone';
+  trashZone.setAttribute('data-active', 'false');
+  trashZone.innerHTML = '<span class="material-symbols-outlined">delete</span><span>drop to delete</span>';
+  container.appendChild(trashZone);
+
   const width = map.width ?? 2000;
   const height = map.height ?? 2000;
 
@@ -143,6 +159,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     objectUrls: [],
     ready: Promise.resolve(),
     tooltip,
+    trashZone,
     lastBg: '',
   };
   cache.set(mapId, entry);
@@ -204,14 +221,35 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       }
     });
 
-    // Pin click → navigate to that element's detail.
-    //
-    // Auto-open of an associated map is REMOVED (session 209 revision per
-    // Captain): map choice should stay stable when the user is exploring
-    // pins, not surprise-switch the right pane. The map-tab cache and the
-    // `maybeAutoOpenMapFor` helper remain in the codebase for a possible
-    // future re-enable (e.g. as an opt-in setting), but no surface invokes
-    // them right now. See DESIGN_MAPS.md §3.6.
+    // Pin right-click → toggle ghost pins around it (DESIGN_MAPS.md §3.8).
+    // Look up the pin's data from state to get the real pin coords + element
+    // ref. Leaflet2DManager already stops propagation in its marker
+    // contextmenu handler so the map-level "new pin" modal doesn't also fire.
+    manager.on('pin-contextmenu', (ev) => {
+      const pin = getState().data.elements.find(
+        (e): e is Pin => e.type === 'pin' && e.id === ev.pin.id,
+      );
+      if (!pin) return;
+      const lMap = manager.getMap();
+      if (!lMap) return;
+      toggleGhostsAtSourcePin({
+        mapId: entry.mapId,
+        sourcePinId: pin.id,
+        sourcePinElementId: pin.element_id,
+        sourcePinX: pin.x,
+        sourcePinY: pin.y,
+        canvasHeight: height,
+        lMap,
+        onToast: (msg, level) => {
+          if (level === 'error') toasts.error(msg);
+          else toasts.info(msg);
+        },
+      });
+    });
+
+    // Pin click → navigate to that element's detail. The active map tab
+    // stays put — explicit map navigation lives in the element-detail top
+    // bar (DESIGN_MAPS.md §3.5/§3.6).
     manager.on('pin-click', (ev) => {
       const pin = getState().data.elements.find((e): e is Pin => e.type === 'pin' && e.id === ev.pin.id);
       if (!pin) return;
@@ -250,28 +288,49 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       }
       const point = leafletToStorage(latlng, height);
 
+      // Shared pin-write closure used by both Create (new element + pin) and
+      // Place (pin pointing at existing element). Coords are captured from the
+      // click point — they don't change between the two paths.
+      const writePin = async (elementId: string, elementType: string): Promise<void> => {
+        const store = getActiveStore();
+        if (!store) return;
+        await store.createPin({
+          map_id: entry.mapId,
+          element_id: elementId,
+          element_type: elementType,
+          x: clampToCanvas(Math.round(point.x), width),
+          y: clampToCanvas(Math.round(point.y), height),
+        });
+        const elements = await store.listElements();
+        patchSlice('data', { elements });
+        requestPushIfLinked();
+      };
+
       const modal = new ElementCreateModal(toasts, {
         // 'map' is hidden in this contextual flow — pins don't target maps
         // (DESIGN_MAPS.md §1.4). The user wants to drop a pin for an element
-        // they're creating; that element must be content/loc/etc.
+        // they're creating or placing; the target must be content/loc/etc.
         excludeTypes: ['map'],
+        title: 'New pin',
+        // NPM (DESIGN_MAPS.md §3.7) — TAB on a name prefix accepts an existing
+        // element of the current category; Place drops a pin for that element
+        // instead of creating a new one.
+        enablePlaceExisting: true,
         onCreated: async (elementId, elementType) => {
           try {
-            const store = getActiveStore();
-            if (!store) return;
-            await store.createPin({
-              map_id: entry.mapId,
-              element_id: elementId,
-              element_type: elementType,
-              x: clampToCanvas(Math.round(point.x), width),
-              y: clampToCanvas(Math.round(point.y), height),
-            });
-            const elements = await store.listElements();
-            patchSlice('data', { elements });
-            requestPushIfLinked();
+            await writePin(elementId, elementType);
             toasts.success('pin placed');
           } catch (err) {
             console.error('[map-tab] contextual pin create failed:', err);
+            toasts.error('failed to place pin');
+          }
+        },
+        onPlaceExisting: async (elementId, elementType) => {
+          try {
+            await writePin(elementId, elementType);
+            toasts.success('pin placed');
+          } catch (err) {
+            console.error('[map-tab] place existing pin failed:', err);
             toasts.error('failed to place pin');
           }
         },
@@ -353,12 +412,59 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
     else marker.options.draggable = true;
   } catch { /* noop */ }
   const height = entry.manager.getConfig().canvasHeight;
-  marker.on('dragend', async () => {
+
+  // Reveal the trash drop-zone when drag starts; live-track hover so it
+  // highlights as the user passes over it; on drop, decide between delete
+  // (over zone) or move (anywhere else). Also hide the hover tooltip — if
+  // the user starts a drag with the tooltip showing, no mouseout fires
+  // during the drag and the tooltip would hang after delete (session 211
+  // smoke note from Captain).
+  marker.on('dragstart', () => {
+    entry.trashZone.setAttribute('data-active', 'true');
+    entry.trashZone.setAttribute('data-hover', 'false');
+    entry.tooltip.style.display = 'none';
+  });
+
+  marker.on('drag', () => {
+    if (entry.trashZone.getAttribute('data-active') !== 'true') return;
+    const lMap = entry.manager.getMap();
+    if (!lMap) return;
     const latlng = marker.getLatLng();
-    const point = leafletToStorage(latlng, height);
+    const markerScreen = lMap.latLngToContainerPoint(latlng);
+    entry.trashZone.setAttribute('data-hover', String(isInsideZone(entry, markerScreen)));
+  });
+
+  marker.on('dragend', async () => {
+    const lMap = entry.manager.getMap();
+    const latlng = marker.getLatLng();
+    let droppedOnTrash = false;
+    if (lMap) {
+      const markerScreen = lMap.latLngToContainerPoint(latlng);
+      droppedOnTrash = isInsideZone(entry, markerScreen);
+    }
+    // Always hide the zone — drag is over either way. Tooltip stays hidden
+    // (the dragstart already cleared it); we keep it down here defensively
+    // in case some marker variant skipped dragstart.
+    entry.trashZone.setAttribute('data-active', 'false');
+    entry.trashZone.setAttribute('data-hover', 'false');
+    entry.tooltip.style.display = 'none';
+
     try {
       const store = getActiveStore();
       if (!store) return;
+
+      if (droppedOnTrash) {
+        await store.deletePin(pinId);
+        const elements = await store.listElements();
+        patchSlice('data', { elements });
+        requestPushIfLinked();
+        // No toast — the visual zone + the disappearance of the marker are
+        // the feedback. Could surface "pin deleted" via toastManager if
+        // Captain wants extra confirmation, but the action is its own UX.
+        return;
+      }
+
+      const point = leafletToStorage(latlng, height);
       const dragCanvasH = entry.manager.getConfig().canvasHeight;
       const dragCanvasW = entry.manager.getConfig().canvasWidth;
       await store.updatePin(pinId, {
@@ -378,9 +484,35 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
   });
 }
 
+/**
+ * Check whether a marker's container-point lies inside the trash zone's
+ * bounding rect. Both rects are relative to the map container (offsetParent),
+ * so we read getBoundingClientRect on both and compare client coords.
+ */
+function isInsideZone(entry: MapTabCacheEntry, markerScreen: { x: number; y: number }): boolean {
+  const containerRect = entry.container.getBoundingClientRect();
+  const zoneRect = entry.trashZone.getBoundingClientRect();
+  // markerScreen is container-point; convert to client coords.
+  const mx = containerRect.left + markerScreen.x;
+  const my = containerRect.top + markerScreen.y;
+  return (
+    mx >= zoneRect.left &&
+    mx <= zoneRect.right &&
+    my >= zoneRect.top &&
+    my <= zoneRect.bottom
+  );
+}
+
 export function disposeMapTab(mapId: string): void {
   const entry = cache.get(mapId);
   if (!entry) return;
+  // Ghost pins live on a Leaflet layer attached to entry.manager's L.Map. Tear
+  // them down BEFORE the manager destroy so the layer detach goes cleanly;
+  // after destroy the L.Map handle is gone.
+  try {
+    const lMap = entry.manager.getMap();
+    disposeGhostsForMap(mapId, lMap ?? null);
+  } catch { /* noop */ }
   try { entry.manager.destroy(); } catch { /* noop */ }
   for (const url of entry.objectUrls) {
     try { URL.revokeObjectURL(url); } catch { /* noop */ }
@@ -391,6 +523,39 @@ export function disposeMapTab(mapId: string): void {
 
 export function disposeAllMapTabs(): void {
   for (const id of [...cache.keys()]) disposeMapTab(id);
+}
+
+/**
+ * Pan an open map tab to a given storage-coord pin position AND set a
+ * comfortable zoom level. Used by the element-detail top bar's `[pin]`
+ * cluster — click → openMapTab(map) and then center on the pin's stored
+ * x/y at moderate zoom. Waits for the tab's `ready` promise so freshly-
+ * opened tabs settle before the camera moves.
+ *
+ * The chosen zoom is `1` (positive ≈ zoomed in vs the default `initialZoom: -1`
+ * full-canvas view). Avoids the previous behavior where panTo retained the
+ * fresh tab's zoom-far-out level, leaving the pin lost in a wide view.
+ *
+ * No-op if the map tab isn't in the cache (caller should openMapTab first).
+ */
+export function panMapTabTo(mapId: string, x: number, y: number): void {
+  const entry = cache.get(mapId);
+  if (!entry) return;
+  entry.ready.then(() => {
+    try {
+      const lMap = entry.manager.getMap();
+      if (!lMap) return;
+      // Storage → leaflet coord. Leaflet's CRS.Simple uses LatLng [y, x] with
+      // y inverted relative to storage Y-down. Use the manager's coord
+      // transform helper indirectly via storageToLeaflet — accessed via the
+      // map's canvasHeight (config).
+      const height = entry.manager.getConfig().canvasHeight;
+      const latlng = storageToLeaflet({ x, y }, height);
+      lMap.setView(latlng, 1, { animate: true, duration: 0.4 } as L.ZoomPanOptions);
+    } catch (err) {
+      console.error('[map-tab] panMapTabTo failed:', err);
+    }
+  });
 }
 
 /** Re-sync pins for whichever map is currently visible. Subscribe to state and call this. */

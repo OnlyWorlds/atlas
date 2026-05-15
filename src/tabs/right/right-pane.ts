@@ -158,18 +158,10 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       const isStale = !m;
       if (isStale) btn.classList.add('atlas-tab-stale');
       const label = m?.name || tab.label || '(missing map)';
-      // Lock UI is currently HIDDEN (DESIGN_MAPS.md §3.4 revised — auto-open
-      // is disabled so lock has no observable effect). State machinery on
-      // RightTabRef.locked is preserved so we can re-enable the affordance
-      // when/if auto-open returns. No lock element in the rendered tab.
       btn.innerHTML = `<span class="material-symbols-outlined">${isStale ? 'cloud_off' : 'map'}</span><span>${escapeText(label)}</span><span class="atlas-tab-close" data-role="close" aria-label="close tab">×</span>`;
       if (isStale) {
         btn.title = 'this map is no longer in the current world — click anywhere on the tab to close it';
       }
-      // Lock click handler intentionally absent — the lock affordance is
-      // hidden (see HTML above and DESIGN_MAPS.md §3.4). Re-enable by
-      // restoring both the icon span and the click handler when auto-open
-      // returns as a setting.
       const closeEl = btn.querySelector<HTMLElement>('[data-role="close"]');
       closeEl?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -186,6 +178,24 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       } else {
         btn.addEventListener('click', () => {
           patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
+        });
+      }
+      // Middle-click (auxiliary button, e.button === 1) on a non-pinned map
+      // tab closes it. Standard browser-tab QOL. Use `mousedown` so we don't
+      // require the user to also release inside the button — same behavior
+      // every browser tab strip has. preventDefault stops the OS-level
+      // middle-click autoscroll cursor from popping in.
+      if (tab.kind === 'map') {
+        btn.addEventListener('mousedown', (e) => {
+          if (e.button !== 1) return;
+          e.preventDefault();
+          closeMapTab(idx, tab.mapId);
+        });
+        // Also block the auxclick that Chrome fires on middle-mouse so it
+        // doesn't bubble to anything default (paste-on-middle in some
+        // contexts).
+        btn.addEventListener('auxclick', (e) => {
+          if (e.button === 1) e.preventDefault();
         });
       }
       tabBar.appendChild(btn);

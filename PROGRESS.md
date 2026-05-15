@@ -5,6 +5,126 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 
 ---
 
+## Session 210 (2026-05-15) — Map subsystem MW/NPM/XR layer
+
+Five bouts, all green at typecheck + vitest + build at each step. 347 → 375 vitest (+28). Bundle 380.40 → 390.05 KB JS (+9.65 KB across new features).
+
+**Bout L0 — doc reconciliation + lock cleanup.** DESIGN_MAPS.md updates: §3.4 (lock toggle) struck — auto-open is removed, lock had nothing to gate; §3.6 rewrote to reflect the no-auto-open model; §3.8 added (ghost pins / cross-element rendering). §10c updated with the session 210 bout sequence. Deleted dormant lock code: `RightTabRef.locked` field on map tabs, `isActiveMapTabLocked()`, `maybeAutoOpenMapFor()`, `MapPickerModal` (entire file), lock CSS block, lock-related comments/handlers in right-pane.ts and map-tab.ts. `auto-open-map.ts` rewritten down to just `getAssociatedMaps()` + `getLocationMapPresence()` — both still used by MW. Tests pruned: `auto-open-map.test.ts` lost the lock-gate test; `sync-attach.idSwap.test.ts` renamed the "preserves locked flag" case to "preserves worldId stamp." Net -1 vitest from removed lock test.
+
+**Bout S — Maps Settings tab.** `'maps'` added to `SETTINGS_TABS` between `'sync'` and `'world'`. New registry shape `maps_settings: { show_map_names_in_header?: boolean }` (atlas-level, not per-world). Registry helpers `setMapsSettings` / `getMapsSettings` (partial-merge writer + defaults reader). New `renderMapsTab()` + `wireMapsTab()` in settings-panel.ts. First toggle: "Show map names alongside map icons in element header" (default OFF). 4 new vitest in registry.test.ts (defaults, round-trip, partial-merge, save/load persistence). 351 vitest.
+
+**Bout MW — top-bar map+pin affordances.** Element-detail header now carries two new clusters per DESIGN_MAPS.md §3.5:
+- For Locations: `[map][map] | [pin][pin] | [+map] [+pin] [sync-dot] [trash]`
+- For other elements: `[pin][pin] | [+pin] [sync-dot] [trash]`
+
+`[map]` icons render only for Locations (one per anchored map). Click → `openMapTab(m)`. Cyan tint when the map has an image (`atlas-map-tree-icon-has-image` reused). Optional name label appears when Maps Settings toggle is ON.
+
+`[pin]` icons render for ALL element types (one per existing pin). Click → opens that pin's map tab AND camera-pans to the pin's stored coords. New `panMapTabTo(mapId, x, y)` exported from map-tab.ts; waits on `entry.ready` so freshly-opened tabs settle before the camera moves.
+
+`[+map]` button renders only for Locations. Click → opens `MapCreateModal` with location pre-filled (new `initialLocationId` option on `MapModalOptions` + `createMapDialog`) and suggested name `Map of <Location Name>`.
+
+`[+pin]` keeps existing gating (only renders when a map tab is active in the right pane) but moves into the new create-cluster zone.
+
+The M7 inline `renderMapPresence` widget + `buildMapPresenceChip` helper deleted from element-detail.ts (~80 LOC removed). New CSS for `.atlas-header-cluster`, `.atlas-header-existing`, `.atlas-header-create`, `.atlas-header-cluster-divider`, `.atlas-header-map-affordance`, `.atlas-header-pin-affordance`, `.atlas-header-map-label`. 351 vitest (no new tests — visual changes will be exercised by smoke). Bundle 381.36 → 383.11 KB JS.
+
+**Bout NPM — new-pin modal autocomplete (DESIGN_MAPS.md §3.7).** `ElementCreateModal` extended with two options: `enablePlaceExisting: boolean` and `onPlaceExisting?: (id, type) => void` (plus a `title?: string` override). When `enablePlaceExisting` is set, the NAME field gains a ghost-line autocomplete pattern mirroring the existing category-input ghost: typing scans elements of the currently-selected category whose name starts with the typed text; TAB at end of input accepts → button label flips `Create → Place` + a cyan chip appears next to the modal title (`"placing existing · <category>"`). Submit Place calls `onPlaceExisting(id, type)` instead of creating a new element. Multi-match tiebreaker: latest `local_updated_at` wins. Category change while in Place mode reverts to Create mode (the held id belongs to the prior category). Editing the name away from the accepted suggestion also clears Place mode.
+
+The matcher extracted to a pure helper `src/ui/element-name-match.ts` for unit testing. 7 new vitest in `element-name-match.test.ts` covering case-insensitive prefix match, strict-length-required, category filter, tiebreaker, defensive paths. Wired into map-tab.ts right-click contextual flow: modal title becomes "New pin"; both `onCreated` and `onPlaceExisting` share a `writePin(elementId, elementType)` closure for the actual pin write. 358 vitest. Bundle 386.89 KB JS.
+
+**Bout XR — ghost pins (DESIGN_MAPS.md §3.8).** New `src/tabs/right/ghost-pins.ts`:
+- Pure helpers: `computeGhostCandidates(sourceElementId, mapId, elements)` returns siblings sharing the same `location` (excluding source itself, excluding elements already pinned on this map, restricted to eligible types). `computeGhostPositions(sx, sy, n, radius)` places N ghosts evenly around source at fixed radius (default 70px), first ghost at 12 o'clock, walking clockwise. `isGhostEligible(type)` reads SDK `FIELD_SCHEMA` at runtime — types with `location: single_link → location` qualify, except `'map'` (per §1.4). Currently resolves to `character, creature, object`.
+- Stateful side: module-level cache keyed `mapId → { layer: L.LayerGroup, markersBySource: Map<sourcePinId, GhostMarkerEntry[]> }`. `toggleGhostsAtSourcePin()` is the single entry point: returns 0 to signal toggle-off (source had active ghosts → cleared); returns > 0 to signal toggle-on (computed candidates and spawned markers). `pruneSingleGhost(mapId, ghostId)` removes one ghost; the cache cleans up the source bucket when it empties. `disposeGhostsForMap()` runs from `disposeMapTab` to release the Leaflet layer.
+- Visuals: same icons as real pins (via `pinVisualFor`), 40% opacity, `zIndexOffset: 500` so ghosts sit above real pins for click hit-testing.
+- Interactions: left-click ghost → `selectedElementId` + element-detail navigation (same as real pin click). Right-click ghost → prune just that ghost. `L.DomEvent.stop` on both so the underlying map-level contextmenu (the "New pin" modal trigger) doesn't double-fire.
+
+`Leaflet2DManager` gained a `pin-contextmenu` event — emitted from the marker's contextmenu handler with `L.DomEvent.stop()` on the original event so map-level contextmenu doesn't also fire when right-clicking on a real pin. `pin-contextmenu` added to `Leaflet2DEventType` + `EventCallbacks` type registry. `map-tab.ts` subscribes and calls `toggleGhostsAtSourcePin()` with the pin's coords.
+
+17 new vitest in `ghost-pins.test.ts` (eligibility, same-location filter, source-exclusion, already-pinned-exclusion, other-map-pinned still qualifies, ineligible-types skipped, missing-location source returns empty, position math at 1/4 angles, deterministic ordering, default radius). 375 vitest. Bundle 390.05 KB JS / 109.67 KB gzipped.
+
+**Pokeable surfaces (session 210):**
+- Settings → Maps tab → toggle "Show map names alongside map icons in element header" → map icons in element-detail top bar grow name labels.
+- Open any Location detail → top bar shows `[map]` icons for its anchored maps + `[+map]` button → `[+map]` click opens a pre-filled MapCreateModal (location chip set, name "Map of <X>").
+- Open any element with existing pins → top bar shows `[pin]` icons → click one → opens that pin's map and pans to it.
+- Right-click an empty area of a map → modal title "New pin" → type a prefix matching an existing same-category element → ghost suffix appears → TAB → button flips to "Place" + chip "placing existing · <category>" → submit → pin dropped at click point pointing at existing element.
+- Right-click an existing real pin on a map → ghost pins appear in a circle around it for all other Characters/Creatures/Objects sharing the same `location` AND not already pinned on this map. Right-click same pin → ghosts disappear. Right-click a ghost → that one ghost goes away. Left-click a ghost → element-detail opens for that element.
+
+**Next session pile:**
+- M8 council motion (paperwork — map field descriptions + pin coord origin)
+- Zoner port (the "fun stuff" Captain flagged for later)
+- Anything that smoke surfaces from this session's work
+
+---
+
+## Session 211 (2026-05-15 cont.) — first MW/NPM/XR smoke round
+
+Captain's first-pass smoke on session 210 work surfaced 10 issues. All shipped in this round; typecheck/vitest/build green throughout. 375 → 377 vitest (+2 new ghost-pins tests for Location sources). Bundle 390 → 393 KB JS.
+
+**SMK-1 + SMK-5: Top-bar `[map]` / `[pin]` clicks lost element selection.** Root cause: `openMapTab(m)` navigated to `#/w/<id>/map/<mid>` — bare map hash → middle pane fell through to welcome stat-panel. Fix: `mapHash(worldId, mapId, elementId?)` overload + new `preserveElementId` arg on `openMapTab(m, preserveElementId?)`. Element-detail's `buildMapAffordance` and `buildPinAffordance` now pass `el.id` so the chained `/map/<mid>/element/<eid>` URL keeps element-detail mounted in middle while the map opens on the right.
+
+**SMK-2: Welcome stat-panel shouldn't be a default destination.** `app.ts:renderMiddle` flipped: when a world is active and the route doesn't otherwise pin a mode, default to `'timeline'` instead of `'welcome'`. Welcome remains only for the no-active-world root. Applies to map routes without an elementId too — falls back to timeline rather than welcome.
+
+**SMK-3: `[+map]` icon looked like a pin.** Was `add_location_alt` (pin glyph). Replaced with two-glyph composition: small `add` + normal `map`, distinct from `[+pin]` (`push_pin`) and from existing `[map]` icons (just `map`). New `.atlas-header-add-map` + `.atlas-add-map-plus` + `.atlas-add-map-glyph` CSS rules.
+
+**SMK-4: Map name labels didn't show with toggle ON.** Root cause: `.atlas-icon-btn-sm` is fixed 22×22px square — label was being clipped. Added explicit override on `.atlas-header-map-affordance.atlas-header-map-affordance-labeled` to set `width: auto; min-width: 22px; height: 22px` so labeled variant widens to fit the inline name text.
+
+**SMK-6: Map detail middle pane shows pinned-element strip.** New `renderMapPinnedElementStrip(mapEl, elements, header)` renders a cluster of category icons (one per element pinned on this map, deduped) in the top bar — up to 12 visible inline; if more, a `+K more` chip opens `ElementPickerModal` filtered to the remaining pinned-element ids. Each icon click navigates via chained `#/w/<id>/map/<mid>/element/<eid>` so the map stays open. New `restrictToIds?: string[]` option added to `PickElementOptions`. New CSS for `.atlas-header-map-pinned-strip`, `.atlas-header-pinned-icon`, `.atlas-header-pinned-more`.
+
+**SMK-7: Middle-mouse-button closes map tabs.** Auxiliary `mousedown` (`e.button === 1`) on a map tab calls `closeMapTab` — standard browser-tab QOL. `auxclick` also blocked to suppress OS-level autoscroll cursor / paste-on-middle. Map-index tab is untouched (it's pinned). Right-pane.ts:171-189.
+
+**SMK-8: `[pin]` camera-pan was zoomed too far out.** `panMapTabTo` was using `manager.panTo(x, y)` which preserves current (zoomed-out) zoom level. Changed to direct `lMap.setView(latlng, 1, {animate, duration: 0.4})` — zoom level `1` (vs the default `initialZoom: -1`) lands the pin comfortably mid-zoomed.
+
+**SMK-9: Right-click on a Location pin said "no location set."** Root cause: code reached for `source.location`, but Location elements have `parent_location` not `location`. Fix: new `resolveSourceLocationId(source)` helper — for Location sources, the locId IS the source's own id (since other elements' `location` fields point AT it); for content-element sources, use `source.location` as before. `computeGhostCandidates` and the toggle's source check both go through this helper. 2 new tests in `ghost-pins.test.ts` covering Location-pin case + mixed eligible types under a Location source.
+
+**SMK-10: Pin delete via drag-to-trash.** New trash drop-zone div added to each map tab's container (top-right, hidden by default). `enablePinDrag` now wires three marker events: `dragstart` reveals the zone, `drag` live-updates a `data-hover` attribute as the marker passes over the zone bounding rect, `dragend` checks whether the drop fell inside the zone via `latLngToContainerPoint` + `getBoundingClientRect` overlap test. Inside zone → `store.deletePin(pinId)` → refresh elements → `requestPushIfLinked` (existing tombstone + sync path). Outside zone → existing coord-update path. New `.atlas-pin-trash-zone` CSS with red-dashed border, opacity/transform reveal, hover highlight. Pin-drag unit test updated with `getMap: () => null` and `trashZone: document.createElement('div')` on the mock entry.
+
+**Pokeable for next smoke:**
+- Click a `[pin]` or `[map]` icon in any element-detail top bar → map opens, middle pane KEEPS showing the element (no welcome panel jump).
+- With a world active and an unrecognised URL (`#/w/<id>`), middle defaults to timeline (not welcome).
+- `[+map]` button on Locations shows a small "add+map" two-glyph icon, not a pin.
+- Toggle Maps Settings → "Show map names alongside…" → reload an element-detail with map icons → labels appear inline.
+- View any Map element → top bar shows category icons for every pinned element; +N more chip opens picker filtered to remaining pins.
+- Click any pin's `[pin]` icon → map opens, camera centers on pin at moderate zoom (zoom level 1).
+- Right-click a pin pointing at a Location → ghost pins now appear (was broken before).
+- Drag any pin → trash zone appears top-right → drop on it → pin deleted (verify with sync to api-linked world that the DELETE propagates via the existing tombstone flow).
+- Middle-click a map tab → tab closes.
+
+---
+
+## Session 211 cont. — second smoke round (label split + ghost + trash polish)
+
+Six items from Captain's smoke after session 211's first round. All shipped, typecheck/vitest/build green, 377 → 379 vitest (+2 ghost tests). Bundle 393.20 → 395.11 KB JS.
+
+**SMK2-1: Three-way split of label toggles.** `maps_settings` now carries three boolean toggles instead of one: `show_map_names_in_header` (existing), `show_pin_map_names_in_header` (new), `show_pinned_element_names_in_header` (new). All default OFF — pre-existing toggle's behavior preserved. `getMapsSettings` returns all three with defaults applied. Settings → Maps tab shows three independent checkboxes. `wireMapsTab` factored as a per-toggle wireToggle helper. Tests updated for new shape; partial-merge across multiple toggles verified.
+
+**SMK2-2: Labels rendered in two more contexts.**
+- `[pin]` icons in element-detail header now optionally carry the pin's map name as an inline label (driven by `show_pin_map_names_in_header`).
+- Map detail's pinned-element category icons strip optionally carries the element name (driven by `show_pinned_element_names_in_header`).
+
+Both reuse the existing `.atlas-header-map-affordance-labeled` CSS pattern (auto-width override of the 22×22 fixed-square base button). `buildPinAffordance` gains `showMapName: boolean` arg; `buildPinnedElementIcon` gains `showName: boolean`; `renderMapPinnedElementStrip` plumbs through.
+
+**SMK2-3: `[+pin]` two-glyph composition.** Matches `[+map]` shape: small `add` + `push_pin` rendered inline. Shared CSS class `.atlas-header-add-glyph` (with `.atlas-add-glyph-plus` / `.atlas-add-glyph-main` sub-classes) — `[+map]` migrated to the same shape, so the two buttons feel like a coherent pair.
+
+**SMK2-4: Category-icon click pans+zooms.** `navigateToPinnedElement` now also finds the first pin on this map for the pinned element and calls `panMapTabTo(mapEl.id, pin.x, pin.y)`. Same zoom-and-center behavior as the element-detail top-bar `[pin]` click — fresh map opens get the moderate zoom (level 1) view centered on the pin rather than the wide default.
+
+**SMK2-5: Ghost pin labels (when ≤6) + tighter radius.**
+- `GHOST_RADIUS_PX`: 70 → 45. Ghosts cluster much closer to the source pin.
+- New `GHOST_LABEL_THRESHOLD = 6`. When candidate count is at or below the threshold, each ghost gets a non-interactive Leaflet divIcon label rendered below the icon with the element name (pill chrome, 10px font, ellipsis at 110px wide). Above the threshold: no labels — the ring is the read; hover tooltips remain for individual names.
+- `GhostMarkerEntry.labelMarker?: L.Marker` added; toggle-off and pruneSingleGhost remove both marker + label. New CSS for `.atlas-ghost-pin-label`. New regression test pins the radius ceiling at ≤ 50.
+
+**SMK2-6: Trash zone polish + tooltip-stuck bug.**
+- Visual: bg `rgba(239,68,68,0.15)` → `0.28`; hover `0.32` → `0.5`; icon `font-size 18 → 22 + color white + font-weight 600`. Padding `8/14 → 10/16` for a more substantial drop target. Border opacity bumped to make the dashed edge clearer against busy map backgrounds.
+- Bug fix: when the user starts dragging a pin while the hover tooltip is visible, no mouseout fires for the duration of the drag → tooltip would hang after delete (the pin's gone). Now `dragstart` explicitly hides `entry.tooltip` via `style.display = 'none'`, and `dragend` keeps it hidden defensively. Resolves Captain's "text label gets stuck / shows twice / hangs after delete" report.
+
+**Total bundle this round**: 393.20 → 395.11 KB JS, 110.51 → 110.85 KB gzipped. 377 → 379 vitest.
+
+**Pokeable:**
+- Settings → Maps → three independent toggles. Flip combinations; element-detail headers respect each independently.
+- Click any pinned-element category icon on a Map detail → map opens, camera centers at zoom 1 on that pin's position (was: stayed at wide default).
+- Right-click a real pin pointing at a Character with 3-4 same-location siblings → ghosts appear close in around the source AND have name labels by default. Right-click a Location pin with 20+ at-this-location candidates → ghosts still appear but without labels (above threshold).
+- Drag any pin to the (now more visible) trash zone → drop → pin deletes cleanly; no hover tooltip hangs after.
+
+---
+
 ## Current State
 
 **Phase M (Maps subsystem rebuild) — in progress (session 208, 2026-05-15).** Design doc `DESIGN_MAPS.md` (573 lines) drafted from foundation conversation with Captain. Hierarchy reframed as sibling-order only; parent_map = "within boundaries"; pin-targets-map disallowed (zones deferred); image_url wins over image_media_id with both stored; per-world tab persistence via registry. Bout sequence M1-M8. Test world fixtures A/B/C — Skeld messaged 2026-05-15 to populate via API once Captain hands them keys.

@@ -1,12 +1,13 @@
 /**
- * getAssociatedMaps — pure logic from auto-open-map.ts (DESIGN_MAPS.md §3.6).
+ * getAssociatedMaps / getLocationMapPresence — pure logic from auto-open-map.ts
+ * (now serving the top-bar map/pin cluster, DESIGN_MAPS.md §3.5).
  *
  * Verifies:
  *   - Location element → maps anchored to it (via map.location === id)
  *   - Non-location element → maps with pins targeting it
- *   - Hierarchy DESC sort for picker default-highlight
- *   - Locked-active flag is passed through faithfully
- *   - Unknown element id → empty maps
+ *   - Hierarchy DESC sort for picker default-highlight ordering
+ *   - Unknown element id → empty list
+ *   - getLocationMapPresence walks parent_location chain for descendants
  */
 
 import { describe, it, expect } from 'vitest';
@@ -43,8 +44,8 @@ describe('getAssociatedMaps — Location elements', () => {
     const m2 = mkMap({ id: 'm2', name: 'Eldoria Castle', location: 'loc-1', hierarchy: 1 });
     const other = mkMap({ id: 'm3', name: 'Some Other', location: 'loc-2', hierarchy: 0 });
 
-    const result = getAssociatedMaps('loc-1', [loc, m1, m2, other], false);
-    expect(result.maps.map(m => m.id).sort()).toEqual(['m1', 'm2']);
+    const maps = getAssociatedMaps('loc-1', [loc, m1, m2, other]);
+    expect(maps.map(m => m.id).sort()).toEqual(['m1', 'm2']);
   });
 
   it('hierarchy DESC sort places highest-hierarchy first', () => {
@@ -53,8 +54,8 @@ describe('getAssociatedMaps — Location elements', () => {
     const midH = mkMap({ id: 'mid', name: 'Castle Floor 1', location: 'loc-1', hierarchy: 1 });
     const highH = mkMap({ id: 'high', name: 'Throne Room', location: 'loc-1', hierarchy: 2 });
 
-    const result = getAssociatedMaps('loc-1', [loc, lowH, midH, highH], false);
-    expect(result.maps.map(m => m.id)).toEqual(['high', 'mid', 'low']);
+    const maps = getAssociatedMaps('loc-1', [loc, lowH, midH, highH]);
+    expect(maps.map(m => m.id)).toEqual(['high', 'mid', 'low']);
   });
 
   it('hierarchy ties break alphabetically', () => {
@@ -62,15 +63,14 @@ describe('getAssociatedMaps — Location elements', () => {
     const a = mkMap({ id: 'a', name: 'Apple', location: 'loc-1', hierarchy: 0 });
     const z = mkMap({ id: 'z', name: 'Zebra', location: 'loc-1', hierarchy: 0 });
 
-    const result = getAssociatedMaps('loc-1', [loc, z, a], false);
-    expect(result.maps.map(m => m.id)).toEqual(['a', 'z']);
+    const maps = getAssociatedMaps('loc-1', [loc, z, a]);
+    expect(maps.map(m => m.id)).toEqual(['a', 'z']);
   });
 
   it('no associated maps → empty list', () => {
     const loc = mkLocation({ id: 'lonely-loc', name: 'Lonely' });
     const m = mkMap({ id: 'm1', name: 'Other Map', location: 'other-loc' });
-    const result = getAssociatedMaps('lonely-loc', [loc, m], false);
-    expect(result.maps).toEqual([]);
+    expect(getAssociatedMaps('lonely-loc', [loc, m])).toEqual([]);
   });
 });
 
@@ -84,8 +84,8 @@ describe('getAssociatedMaps — non-location elements (via pins)', () => {
     const pinB = mkPin({ id: 'pB', element_id: 'char-1', map_id: 'm2' });
     const pinC = mkPin({ id: 'pC', element_id: 'other-char', map_id: 'm3' });
 
-    const result = getAssociatedMaps('char-1', [char, m1, m2, m3, pinA, pinB, pinC], false);
-    expect(result.maps.map(m => m.id).sort()).toEqual(['m1', 'm2']);
+    const maps = getAssociatedMaps('char-1', [char, m1, m2, m3, pinA, pinB, pinC]);
+    expect(maps.map(m => m.id).sort()).toEqual(['m1', 'm2']);
   });
 
   it('multiple pins on the same map count as one association', () => {
@@ -93,26 +93,19 @@ describe('getAssociatedMaps — non-location elements (via pins)', () => {
     const m1 = mkMap({ id: 'm1', name: 'M' });
     const pinA = mkPin({ id: 'pA', element_id: 'c1', map_id: 'm1' });
     const pinB = mkPin({ id: 'pB', element_id: 'c1', map_id: 'm1' });
-    const result = getAssociatedMaps('c1', [char, m1, pinA, pinB], false);
-    expect(result.maps.map(m => m.id)).toEqual(['m1']);
+    expect(getAssociatedMaps('c1', [char, m1, pinA, pinB]).map(m => m.id)).toEqual(['m1']);
   });
 
   it('character with no pins → empty list', () => {
     const char = mkChar({ id: 'c1', name: 'Bob' });
     const m1 = mkMap({ id: 'm1', name: 'M' });
-    expect(getAssociatedMaps('c1', [char, m1], false).maps).toEqual([]);
+    expect(getAssociatedMaps('c1', [char, m1])).toEqual([]);
   });
 });
 
 describe('getAssociatedMaps — defensive', () => {
   it('unknown element id → empty list', () => {
-    const result = getAssociatedMaps('ghost', [], false);
-    expect(result.maps).toEqual([]);
-  });
-
-  it('lockedActive flag passes through', () => {
-    expect(getAssociatedMaps('ghost', [], false).lockedActive).toBe(false);
-    expect(getAssociatedMaps('ghost', [], true).lockedActive).toBe(true);
+    expect(getAssociatedMaps('ghost', [])).toEqual([]);
   });
 });
 
@@ -176,12 +169,10 @@ describe('getLocationMapPresence — Location subtree map collection', () => {
   });
 
   it('handles pathological parent_location cycle without infinite loop', () => {
-    // Cycle: A → B → A. The algorithm uses a visited-set so this terminates.
     const A = mkLocation({ id: 'A', name: 'A', parent_location: 'B' });
     const B = mkLocation({ id: 'B', name: 'B', parent_location: 'A' });
     const result = getLocationMapPresence('A', [A, B]);
     expect(result.direct).toEqual([]);
-    // No maps exist; descendants are also empty.
     expect(result.descendants).toEqual([]);
   });
 });

@@ -34,6 +34,8 @@ import {
   setSyncPauseAll,
   setWorldPaused,
   setWorldRightTabs,
+  setMapsSettings,
+  getMapsSettings,
 } from '../../src/registry/registry';
 
 beforeEach(() => {
@@ -574,5 +576,56 @@ describe('registry — right-pane tab persistence', () => {
     saveRegistry(malformed as ReturnType<typeof defaultRegistry>);
     const loaded = loadRegistry();
     expect(getWorldRightTabs(loaded, reg.worlds[0].id)).toBeNull();
+  });
+});
+
+describe('registry — maps settings (DESIGN_MAPS.md §3.5)', () => {
+  it('getMapsSettings returns defaults (all three toggles OFF) for a fresh registry', () => {
+    const reg = defaultRegistry();
+    expect(getMapsSettings(reg)).toEqual({
+      show_map_names_in_header: false,
+      show_pin_map_names_in_header: false,
+      show_pinned_element_names_in_header: false,
+    });
+  });
+
+  it('setMapsSettings round-trips show_map_names_in_header', () => {
+    const reg = defaultRegistry();
+    const next = setMapsSettings(reg, { show_map_names_in_header: true });
+    expect(next.maps_settings?.show_map_names_in_header).toBe(true);
+    expect(getMapsSettings(next).show_map_names_in_header).toBe(true);
+  });
+
+  it('setMapsSettings is partial-merge — unset keys retain prior values', () => {
+    const reg = setMapsSettings(defaultRegistry(), { show_map_names_in_header: true });
+    // Now flip a different toggle on. show_map_names_in_header must persist.
+    const next = setMapsSettings(reg, { show_pin_map_names_in_header: true });
+    expect(next.maps_settings?.show_map_names_in_header).toBe(true);
+    expect(next.maps_settings?.show_pin_map_names_in_header).toBe(true);
+  });
+
+  it('all three toggles are independent', () => {
+    const reg = setMapsSettings(defaultRegistry(), {
+      show_map_names_in_header: true,
+      show_pin_map_names_in_header: false,
+      show_pinned_element_names_in_header: true,
+    });
+    const settings = getMapsSettings(reg);
+    expect(settings.show_map_names_in_header).toBe(true);
+    expect(settings.show_pin_map_names_in_header).toBe(false);
+    expect(settings.show_pinned_element_names_in_header).toBe(true);
+  });
+
+  it('maps_settings persists across save → load', () => {
+    const reg = setMapsSettings(defaultRegistry(), {
+      show_map_names_in_header: true,
+      show_pinned_element_names_in_header: true,
+    });
+    saveRegistry(reg);
+    const loaded = loadRegistry();
+    const settings = getMapsSettings(loaded);
+    expect(settings.show_map_names_in_header).toBe(true);
+    expect(settings.show_pinned_element_names_in_header).toBe(true);
+    expect(settings.show_pin_map_names_in_header).toBe(false);
   });
 });

@@ -21,6 +21,13 @@ export interface PickElementOptions {
   restrictToType?: ElementType;
   excludeIds?: string[];
   title?: string;
+  /**
+   * Hard-restrict the candidate pool to these element ids. Useful for the
+   * "pinned on this map" overflow picker (Map detail middle pane) — pass the
+   * ids of pinned elements and the picker becomes a navigable search over
+   * just those, not the whole world.
+   */
+  restrictToIds?: string[];
 }
 
 const ROW_CAP = 200;
@@ -165,9 +172,11 @@ class ElementPickerModal extends BaseModal {
   private refreshList(): void {
     const all = getState().data.elements;
     const exclude = new Set(this.opts.excludeIds ?? []);
+    const restrict = this.opts.restrictToIds ? new Set(this.opts.restrictToIds) : null;
 
     const items = all.filter(el => {
       if (exclude.has(el.id)) return false;
+      if (restrict && !restrict.has(el.id)) return false;
       if (this.typeFilter && el.type !== this.typeFilter) return false;
       if (this.search && !(el.name ?? '').toLowerCase().includes(this.search)) return false;
       return true;

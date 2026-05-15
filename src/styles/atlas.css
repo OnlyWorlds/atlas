@@ -283,37 +283,75 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Map tab lock toggle (DESIGN_MAPS.md §3.4 revised session 209).
- *
- * Behavior:
- *   - Hidden by default (opacity 0).
- *   - Revealed on tab hover (muted grey, lock_open icon).
- *   - Always visible when locked (solid lock icon, grey).
- *   - Single-locked invariant enforced in right-pane.ts.
- *
- * The opacity-based hide keeps layout stable (vs display:none which would
- * shift the close × leftward on hover-only).
- */
-.atlas-tab-lock {
-  margin-left: 4px;
-  font-size: 14px !important;
-  color: var(--atlas-text-muted);
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 2px;
+/* Pin trash drop-zone — appears top-right of the map canvas while a pin is
+ * being dragged. Drop the pin on it → delete. Hidden by default; toggles via
+ * data-active. Pointer-events stays "none" so it doesn't intercept anything;
+ * we test the dropped marker's position against this rect explicitly. */
+.atlas-pin-trash-zone {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  /* Session 211 smoke: bumped bg opacity for clearer read on busy maps. */
+  background: rgba(239, 68, 68, 0.28);
+  border: 1.5px dashed rgba(239, 68, 68, 0.75);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   opacity: 0;
-  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease, background-color 140ms ease, border-color 140ms ease;
 }
-.atlas-tab:hover .atlas-tab-lock {
+.atlas-pin-trash-zone[data-active="true"] {
   opacity: 1;
+  transform: translateY(0);
 }
-.atlas-tab-lock[data-locked="true"] {
-  opacity: 1;
-  color: rgba(255, 255, 255, 0.65);
+.atlas-pin-trash-zone[data-hover="true"] {
+  background: rgba(239, 68, 68, 0.5);
+  border-color: rgba(239, 68, 68, 1);
 }
-.atlas-tab-lock:hover {
-  color: var(--atlas-text);
-  background: rgba(255, 255, 255, 0.08);
+.atlas-pin-trash-zone .material-symbols-outlined {
+  /* Bigger + bolder than the label text — the icon carries the meaning. */
+  font-size: 22px !important;
+  color: rgba(255, 255, 255, 1);
+  font-weight: 600;
+}
+
+/* Ghost pins (DESIGN_MAPS.md §3.8) — right-click on a real pin spawns
+ * translucent computed markers for other elements sharing the same location.
+ * Visual treatment: same canvas icon as real pins, reduced opacity, faint
+ * dashed outline ring to telegraph "ghost = not stored." */
+.atlas-ghost-pin-icon {
+  filter: saturate(0.65);
+}
+
+/* Ghost name label — rendered when candidate count is small (≤ 6). Sits
+ * below the ghost icon, non-interactive (interactive: false on the marker).
+ * Subtle pill chrome so the text reads on any image background. */
+.atlas-ghost-pin-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.atlas-ghost-pin-label > span {
+  padding: 1px 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Stale map tab — mapId not in current world's elements. Darkened, italic
@@ -846,6 +884,118 @@
 
 .atlas-middle-spacer {
   flex: 1 1 auto;
+}
+
+/* Map/pin clusters in element-detail top bar (DESIGN_MAPS.md §3.5).
+ *
+ * Two clusters live between the spacer and the sync-dot/trash actions:
+ *   .atlas-header-existing — clickable affordances for existing maps + pins
+ *   .atlas-header-create   — [+map] and [+pin] create buttons
+ *
+ * Existing-affordance icons are muted by default and brighten on hover.
+ * Map affordances tint cyan when the map has an image (mirrors the same
+ * `atlas-map-tree-icon-has-image` rule used in the maps tab). The optional
+ * map-name label appears inline when the Maps Settings toggle is ON.
+ */
+.atlas-header-cluster {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.atlas-header-cluster.atlas-header-existing {
+  gap: 1px;
+  margin-right: 4px;
+}
+.atlas-header-cluster.atlas-header-create {
+  margin-right: 6px;
+}
+.atlas-header-cluster-divider {
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  margin: 0 6px;
+  background: var(--atlas-divider);
+  opacity: 0.6;
+}
+.atlas-header-map-affordance,
+.atlas-header-pin-affordance {
+  color: var(--atlas-text-muted);
+}
+.atlas-header-map-affordance.atlas-map-tree-icon-has-image .material-symbols-outlined {
+  color: var(--atlas-accent);
+  opacity: 0.7;
+}
+.atlas-header-pin-affordance .material-symbols-outlined {
+  font-size: 16px !important;
+}
+.atlas-header-map-affordance:hover,
+.atlas-header-pin-affordance:hover {
+  color: var(--atlas-text);
+}
+.atlas-header-map-affordance.atlas-header-map-affordance-labeled {
+  /* Override .atlas-icon-btn-sm's fixed 22×22 square — labeled variant must
+   * widen to fit the inline name. */
+  width: auto;
+  min-width: 22px;
+  height: 22px;
+  gap: 4px;
+  padding: 2px 6px;
+}
+.atlas-header-map-label {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--atlas-text);
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Map detail header — strip of category icons, one per element pinned on
+ * this map. Click any → navigate to that element via chained URL. First 12
+ * shown inline; the `+N` chip opens an element picker filtered to the rest.
+ */
+.atlas-header-map-pinned-strip {
+  gap: 1px;
+  margin-right: 6px;
+}
+.atlas-header-pinned-icon .material-symbols-outlined {
+  color: var(--atlas-text-muted);
+}
+.atlas-header-pinned-icon:hover .material-symbols-outlined {
+  color: var(--atlas-text);
+}
+.atlas-header-pinned-more {
+  width: auto;
+  min-width: 28px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--atlas-text-muted);
+}
+.atlas-header-pinned-more:hover {
+  color: var(--atlas-text);
+}
+
+/* [+map] / [+pin] buttons — composed glyph reading "add" + action glyph
+ * (map / push_pin / etc.) inline. The plus glyph is rendered small and the
+ * main glyph normal so it reads "+map" or "+pin" at a glance without a
+ * label. Shared shape so the two buttons feel like a pair. */
+.atlas-header-add-glyph {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 2px;
+  width: auto;
+  min-width: 22px;
+}
+.atlas-add-glyph-plus {
+  font-size: 12px !important;
+  margin-right: -2px;
+  opacity: 0.85;
+}
+.atlas-add-glyph-main {
+  font-size: 18px !important;
 }
 
 .atlas-detail {
@@ -1556,6 +1706,27 @@
   color: var(--atlas-text);
   margin-bottom: 12px;
   letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Mode chip shown beside modal title when NPM accepts an existing element
+ * via TAB (DESIGN_MAPS.md §3.7). Signals "placing existing · <category>"
+ * without taking real estate from the form body. */
+.atlas-modal-title-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--atlas-accent);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+.atlas-modal-title-chip[hidden] {
+  display: none;
 }
 
 /* Body wrapper — flat container so subclasses can drop form/list/grid content

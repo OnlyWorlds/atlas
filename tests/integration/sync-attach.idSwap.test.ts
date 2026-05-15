@@ -266,7 +266,7 @@ describe('sync-attach: id-swap migrates UI state', () => {
     expect(getState().ui.rightActiveIndex).toBe(1);
   });
 
-  it('id-swap of type=map preserves the locked flag on the migrated tab', () => {
+  it('id-swap of type=map preserves the worldId stamp on the migrated tab', () => {
     patchSlice('data', {
       elements: [{ id: 'm-old', type: 'map', name: 'M', local_updated_at: 't' } as any],
     });
@@ -274,7 +274,7 @@ describe('sync-attach: id-swap migrates UI state', () => {
       ...getState().ui,
       rightTabs: [
         { kind: 'map-index' },
-        { kind: 'map', mapId: 'm-old', label: 'M', locked: true },
+        { kind: 'map', mapId: 'm-old', label: 'M', worldId: 'w1' },
       ],
       rightActiveIndex: 1,
     });
@@ -282,7 +282,7 @@ describe('sync-attach: id-swap migrates UI state', () => {
     __test_handleIdSwap({ old_id: 'm-old', new_id: 'm-new', type: 'map' });
 
     const migrated = getState().ui.rightTabs[1];
-    expect(migrated).toMatchObject({ kind: 'map', mapId: 'm-new', locked: true });
+    expect(migrated).toMatchObject({ kind: 'map', mapId: 'm-new', worldId: 'w1' });
   });
 
   it('id-swap of non-map type does NOT touch rightTabs (map-tab refs unaffected)', () => {
