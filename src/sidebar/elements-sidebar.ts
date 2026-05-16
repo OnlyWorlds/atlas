@@ -88,9 +88,11 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const id = row.getAttribute('data-element-id');
     const type = row.getAttribute('data-element-type');
     if (!id || !type) return;
-    // Type guard: maps aren't pinnable per §1.4. The list already filters
-    // pin/marker/zone, but map IS in the list — must skip here.
-    if (type === 'map') {
+    // Type guard: maps and zones aren't pinnable. Map per §1.4; zones
+    // because they're marker-constructed not pinned. Both render in the
+    // sidebar list (zones for browsing, maps for selection) but neither
+    // can become a pin target.
+    if (type === 'map' || type === 'zone') {
       e.preventDefault();
       return;
     }
@@ -162,8 +164,14 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const query = state.ui.search.trim().toLowerCase();
     const selectedId = state.ui.selectedElementId;
 
+    // Pins + markers are truly map artifacts — created from map interactions,
+    // accessible via their owning map's element. Zones, despite being spatial,
+    // are first-class elements with their own identity (name, description,
+    // vertices) and warrant top-level browsing. The filter-strip already
+    // included 'zone'; excluding zones from the row list was a leftover
+    // legacy convention from when zones lacked their own UI.
     const filtered = elements
-      .filter(el => el.type !== 'pin' && el.type !== 'marker' && el.type !== 'zone')
+      .filter(el => el.type !== 'pin' && el.type !== 'marker')
       .filter(el => filters.size === 0 || filters.has(el.type))
       .filter(el => !query || el.name.toLowerCase().includes(query))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -204,10 +212,11 @@ function renderElementRow(el: Element, selected: boolean, hasMap: boolean): stri
   const mapBadge = hasMap
     ? `<span class="material-symbols-outlined atlas-elements-row-mapbadge" title="this location has at least one map">map</span>`
     : '';
-  // draggable=true on every row except maps. Map elements appear in the list
-  // but can't be pin targets (DESIGN_MAPS.md §1.4) — dragstart cancels for
-  // those, but setting the attribute selectively avoids even the start gesture.
-  const draggable = el.type !== 'map' ? 'draggable="true"' : '';
+  // draggable=true on every row except maps and zones. Map elements appear
+  // in the list but can't be pin targets (DESIGN_MAPS.md §1.4); zones can't
+  // be pin targets either (constructed via markers, never pinned). Setting
+  // the attribute selectively avoids even the start gesture.
+  const draggable = (el.type !== 'map' && el.type !== 'zone') ? 'draggable="true"' : '';
   return `
     <div class="${cls}" ${draggable} data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}" role="button" tabindex="0">
       <span class="material-symbols-outlined">${icon}</span>

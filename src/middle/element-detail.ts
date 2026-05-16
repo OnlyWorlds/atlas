@@ -325,11 +325,12 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
     // [+pin] retains its existing gating: only renders when a map tab is
     // active in the right pane. Without an active map there's nowhere to
-    // drop the pin. Same as before MW.
+    // drop the pin. Same as before MW. ALSO: zones are never pinnable —
+    // they're constructed via markers (DESIGN_MAPS.md §1.4 extension).
     const ui = state.ui;
     const active = ui.rightTabs[ui.rightActiveIndex];
     const activeMapId = active && active.kind === 'map' ? active.mapId : null;
-    if (activeMapId) {
+    if (activeMapId && el.type !== 'zone') {
       const placing = ui.pinPlacement?.elementId === el.id;
       const pinBtn = document.createElement('button');
       pinBtn.type = 'button';

@@ -23,8 +23,15 @@ import { requestPushIfLinked } from '../sync/sync-attach';
 import { createMapDialog } from './map-create-modal';
 import { findExistingNameMatch } from './element-name-match';
 
-/** Types offered in the create modal — matches legacy: all 22 except pin/marker. */
-const CREATE_TYPES: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
+/**
+ * Types offered in the create modal.
+ *
+ * Zones are deliberately omitted: they're constructed only by placing
+ * markers on a map, never as standalone elements via the create grid.
+ * Marker-driven zone creation arrives with the zoner port. Pins and
+ * markers are also omitted — both are placed via map interactions.
+ */
+const CREATE_TYPES: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map'];
 
 export interface ElementCreateOptions {
   /** Pre-select a type (otherwise defaults to 'character'). */

@@ -284,9 +284,11 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       };
 
       const modal = new ElementCreateModal(toasts, {
-        // 'map' is hidden in this contextual flow — pins don't target maps
-        // (DESIGN_MAPS.md §1.4).
-        excludeTypes: ['map'],
+        // 'map' and 'zone' are hidden in this contextual flow — pins don't
+        // target maps (DESIGN_MAPS.md §1.4), and zones are constructed via
+        // markers, never pinned. Excluding from the type grid AND the place-
+        // existing autocomplete (the matcher filters by selected category).
+        excludeTypes: ['map', 'zone'],
         title: 'New pin',
         // NPM (DESIGN_MAPS.md §3.7) — TAB on a name prefix accepts an existing
         // element of the current category; Place drops a pin for that element
@@ -348,6 +350,13 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         return;
       }
       if (!payload.id || !payload.type) return;
+      // Defensive: zones and maps can never be pin targets (sidebar dragstart
+      // already refuses both, but a future drag source could bypass that —
+      // gate at the drop site too so the rule lives where pins are created).
+      if (payload.type === 'zone' || payload.type === 'map') {
+        toasts.info(`${payload.type}s can't be pinned`);
+        return;
+      }
       const currentMap = getState().data.elements.find(
         (em): em is WorldMap => em.type === 'map' && em.id === entry.mapId,
       );
