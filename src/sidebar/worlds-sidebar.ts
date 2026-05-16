@@ -10,12 +10,12 @@
 
 import { getState, subscribe, patchSlice } from '../core/state';
 import { onHashChange, parseHash, navigate, elementsHash } from '../core/router';
-import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused } from '../registry/registry';
-import { loadHandle, ensureWritable, queryWritable } from '../store/handle-vault';
+import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused, deleteWorldEntry } from '../registry/registry';
+import { loadHandle, ensureWritable, queryWritable, deleteHandle } from '../store/handle-vault';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { setActiveStore, getActiveStore, CreateWorldModal } from '../ui/create-world-modal';
 import { LinkWorldModal } from '../ui/link-world-modal';
-import { setupAtlasRoot } from '../setup/atlas-root-flow';
+import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
 import { rightTabHashFor } from './sidebar';
@@ -37,16 +37,24 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   content.appendChild(header);
 
   function renderHeader(): void {
-    const root = getState().atlasRoot;
-    header.innerHTML = root
-      ? `
+    const state = getState();
+    const root = state.atlasRoot;
+    const recoverable = state.atlasRootRecoverable;
+    if (root) {
+      header.innerHTML = `
         <button class="atlas-btn-ghost" data-action="create-local" title="create a new world in your atlas folder">+ New local</button>
         <button class="atlas-btn-ghost" data-action="new-api" title="create a new world on onlyworlds.com AND in your atlas folder">+ New API</button>
         <button class="atlas-btn-ghost" data-action="link-api" title="download an existing OnlyWorlds api world into atlas">+ Link API</button>
-      `
-      : `
+      `;
+    } else if (recoverable) {
+      header.innerHTML = `
+        <button class="atlas-btn-ghost" data-action="recover-atlas" title="re-grant access to your existing atlas folder (${escapeAttr(recoverable.folderName)}) and rebuild the world list from disk">↻ Recover atlas folder</button>
+      `;
+    } else {
+      header.innerHTML = `
         <button class="atlas-btn-ghost" data-action="setup-atlas" title="pick the folder atlas will use for all your worlds">+ Set up atlas</button>
       `;
+    }
     const createBtn = header.querySelector<HTMLButtonElement>('[data-action="create-local"]');
     createBtn?.addEventListener('click', () => new CreateWorldModal(toasts).open());
     const newApiBtn = header.querySelector<HTMLButtonElement>('[data-action="new-api"]');
@@ -73,6 +81,24 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         toasts.error(err instanceof Error ? err.message : String(err));
       } finally {
         setupBtn.disabled = false;
+      }
+    });
+    const recoverBtn = header.querySelector<HTMLButtonElement>('[data-action="recover-atlas"]');
+    recoverBtn?.addEventListener('click', async () => {
+      recoverBtn.disabled = true;
+      try {
+        const result = await recoverAtlasRoot();
+        if (result) {
+          toasts.success(
+            result.imported > 0
+              ? `recovered atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
+              : 'recovered atlas folder (no worlds found inside)'
+          );
+        }
+      } catch (err) {
+        toasts.error(err instanceof Error ? err.message : String(err));
+      } finally {
+        recoverBtn.disabled = false;
       }
     });
   }
@@ -151,9 +177,13 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const worlds = state.registry.worlds;
 
     if (worlds.length === 0) {
-      listEl.innerHTML = state.atlasRoot
-        ? `<div class="atlas-pane-empty">No worlds yet — create one to start.</div>`
-        : `<div class="atlas-pane-empty">Set up your atlas folder above to begin.</div>`;
+      if (state.atlasRoot) {
+        listEl.innerHTML = `<div class="atlas-pane-empty">No worlds yet — create one to start.</div>`;
+      } else if (state.atlasRootRecoverable) {
+        listEl.innerHTML = `<div class="atlas-pane-empty">Click <strong>Recover atlas folder</strong> above to restore your worlds from disk.</div>`;
+      } else {
+        listEl.innerHTML = `<div class="atlas-pane-empty">Set up your atlas folder above to begin.</div>`;
+      }
       return;
     }
 
@@ -332,7 +362,26 @@ export async function activateWorld(
   resetElementDetailScrollMemory();
 
   const store = new FsFolderStore();
-  await store.open(handle);
+  try {
+    await store.open(handle);
+  } catch (err) {
+    // Folder gone from disk (user deleted it outside atlas). The handle in
+    // IDB is now a dead reference — clean up the registry entry + handle so
+    // the world stops appearing in the sidebar. No data loss: the folder is
+    // already gone; we're just removing the pointer to it.
+    if (isFolderMissing(err)) {
+      await deleteHandle(entry.folder.handle_key).catch(() => {});
+      const cleaned = deleteWorldEntry(getState().registry, worldId);
+      saveRegistry(cleaned);
+      patchSlice('registry', cleaned);
+      if (!silent) toasts.info(`"${entry.name}" folder is gone — removed from atlas`);
+      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      return false;
+    }
+    if (!silent) toasts.error(`failed to open ${entry.name}: ${err instanceof Error ? err.message : String(err)}`);
+    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    return false;
+  }
   const meta = await store.readWorldMeta();
   setActiveStore(store);
 
@@ -377,6 +426,21 @@ function navigateAfterActivate(worldId: string): void {
   } else {
     navigate(elementsHash(worldId));
   }
+}
+
+/**
+ * Detect the "folder is gone from disk" error shape. FS Access API throws
+ * DOMException with name 'NotFoundError' when the underlying directory has
+ * been deleted out from under the handle. We treat this as "remove from
+ * atlas" rather than a real failure.
+ */
+function isFolderMissing(err: unknown): boolean {
+  if (!err) return false;
+  const e = err as { name?: string; message?: string };
+  if (e.name === 'NotFoundError') return true;
+  // Chrome occasionally throws as a generic Error with a message that names
+  // the underlying cause. Best-effort string match for robustness.
+  return typeof e.message === 'string' && /not\s*found|no such (file|directory)/i.test(e.message);
 }
 
 // ---- Escapes ----

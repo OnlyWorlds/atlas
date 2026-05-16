@@ -50,10 +50,20 @@ export interface PinVisual {
   iconUrl: string;
 }
 
-export function pinVisualFor(type: string): PinVisual {
+/**
+ * Get a pin's visual. When `hasMapBadge` is true, a small map glyph is
+ * baked into the bottom-right corner of the icon — telegraphs "this pin's
+ * element has its own map(s); click-through is available" (DESIGN_MAPS.md §8).
+ *
+ * Badge is cached as a separate cache key so plain + badged pins coexist
+ * cheaply at runtime. Callers compute `hasMapBadge` per-pin from element
+ * relationships and pass it through.
+ */
+export function pinVisualFor(type: string, hasMapBadge: boolean = false): PinVisual {
   const color = (CATEGORY as Record<string, string>)[type] ?? '#22d3ee';
   const iconName = (ELEMENT_ICONS as Record<string, string>)[type] ?? 'place';
-  const key = `${iconName}|${color}`;
+  const badgeSuffix = hasMapBadge ? '|mapbadge' : '';
+  const key = `${iconName}|${color}${badgeSuffix}`;
 
   const cached = cache.get(key);
   if (cached) return { color, iconUrl: cached };
@@ -63,7 +73,7 @@ export function pinVisualFor(type: string): PinVisual {
 
   // Kick off async render once, then bulk-refresh pin visuals when ready.
   ensureFontLoaded().then(() => {
-    const url = renderIcon(iconName, color);
+    const url = renderIcon(iconName, color, hasMapBadge);
     cache.set(key, url);
     notifyReady();
   });
@@ -106,7 +116,7 @@ function ensureFontLoaded(): Promise<void> {
   return fontReady;
 }
 
-function renderIcon(iconName: string, color: string): string {
+function renderIcon(iconName: string, color: string, hasMapBadge: boolean = false): string {
   const size = 40;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -129,6 +139,27 @@ function renderIcon(iconName: string, color: string): string {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#ffffff';
   ctx.fillText(iconName, size / 2, size / 2 + 1);
+
+  if (hasMapBadge) {
+    // Map-having badge — small cyan circle with a map glyph, bottom-right
+    // corner of the pin. Telegraphs "this pin's element has maps; you can
+    // drill in via the element-detail top bar." (DESIGN_MAPS.md §8.)
+    const bx = size - 9;
+    const by = size - 9;
+    const br = 7;
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fillStyle = '#22d3ee';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.lineWidth = 1.25;
+    ctx.stroke();
+    ctx.font = '10px "Material Symbols Outlined"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillText('map', bx, by + 1);
+  }
 
   return canvas.toDataURL('image/png');
 }

@@ -125,6 +125,50 @@ Both reuse the existing `.atlas-header-map-affordance-labeled` CSS pattern (auto
 
 ---
 
+## Session 211 cont. — map subsystem finishing push (MZ + PB + PD)
+
+Three independent bouts to close out the map subsystem before moving on to zoner. All green at typecheck + vitest + build at each step. Tests count unchanged at 379 (no new tests this round — all UI-side changes verified via existing pure-function coverage + the upcoming next-smoke). Bundle 395 → 397 KB JS.
+
+**Bout MZ — Maps tree expand/collapse (resolves the M4 TODO).** Map index tab nodes with children now render a chevron prefix (`expand_more` when expanded, `chevron_right` when collapsed). Click toggles, persisted per-world in `localStorage.atlas_map_tree_collapsed_v1` as `{ [worldId]: string[] }`. Leaf nodes get a same-width placeholder span so icons stay vertically aligned across mixed-arity sibling groups. Lazy-loaded module-local Map, saved on every toggle. Pure UI pref — kept out of the registry (no cross-machine sync surface). When a node is collapsed, `renderTree` skips its subtree entirely.
+
+**Bout PB — Pin styling pass for map-having elements (DESIGN_MAPS.md §8).** Pins whose target element has at least one anchored map (i.e. `getAssociatedMaps(pin.element_id, elements).length > 0`) now render with a small cyan map-glyph badge in the bottom-right corner of the pin icon. Telegraphs "drill-in available — open this pin's element to see its maps." Implementation: `pinVisualFor(type, hasMapBadge?: boolean)` extended cache key with `|mapbadge` suffix; `renderIcon` paints the badge after the main glyph. Wired through `syncPins` which computes `hasMapBadge` per pin at sync time — badge updates live when an element gains/loses maps. SVG fallback (the brief pre-font window) is unchanged; the badge appears once the high-quality render lands via the `onPinVisualsReady` upgrade path.
+
+**Bout PD — Right-click [pin] icon to delete pin.** Symmetric with both the drag-to-trash on the map canvas and the right-click-ghost prune behavior. `contextmenu` listener on each `[pin]` affordance in element-detail headers calls `store.deletePin(pinId)` directly, refreshes elements, triggers `requestPushIfLinked`. Toast confirms. No modal — the action is mild and reversible (re-place the pin) and a confirmation here would dilute the gesture. Title attribute updated to surface the right-click affordance ("click to open and center, right-click to delete pin").
+
+**Pokeable for next smoke:**
+- Deep map tree (Skeld's World C / multi-level parent_map nesting): chevrons appear on nodes with children; click to collapse → subtree disappears. Reload page → collapsed state persists. Switch worlds → each world has its own collapsed set.
+- Open any map containing pins pointing at Locations that have their own maps anchored to them: those pins now carry a small cyan map badge in the corner.
+- Open an element with existing pins → right-click any `[pin]` icon in the top bar → pin deletes, toast confirms.
+
+---
+
+## Session 211 cont. — map subsystem polish push (ID + MS + PF)
+
+Three independent bouts after the three finishing ones. All green at typecheck + vitest + build at each step. 379 → 385 vitest (+6 filter-tree tests). Bundle 397 → 400 KB JS.
+
+**Bout ID — Image dimension auto-detect on URL paste/edit.** Pure helpers extracted to new `src/ui/image-dims.ts` (`readImageDimsFromFile`, `readImageDimsFromUrl`) — previously local helpers in `map-create-modal.ts`. Element-detail's `persistFieldPatch` now hooks the `el.type === 'map' && fieldName === 'image_url'` case: after the field write lands, fires a hidden `Image()` load against the new URL, reads `naturalWidth`/`naturalHeight`, calls `store.updateMap` with the detected dims, refreshes elements, fires autosave. Info toast confirms (`"map dimensions updated to 1920×1080"`). Silent on load failure (CORS, 404) — pins keep working with stale dims; user can manually edit width/height. Resolves the friction case where editing an existing map's image_url left the canvas at old dimensions, causing pins to land off-image.
+
+**Bout MS — Maps tree search/filter.** Search input renders above the tree when ≥3 maps exist (below that, scannability is trivial). Case-insensitive substring match on map name. A node renders if its own name matches OR any descendant matches — ancestry preserved so context for a hit is always visible. During active search, collapsed state is overridden (every match is visible and reachable); clearing the search restores collapsed state. Clear button surfaces when typed text exists. Pure `filterTreeByName(nodes, term)` helper lives in `map-tree.ts` alongside `buildMapTree`; 6 new vitest cases cover empty term, ancestry preservation, case-insensitivity, no-match, substring (not just prefix), and non-mutation of input. Input focus is preserved across re-renders via a queried-fresh-then-focus pattern.
+
+**Bout PF — Pin filter chip strip on map canvas.** New overlay at top-left of each map tab: one chip per distinct element type present in this map's pins, in alpha order by singular label. Each chip shows the category icon + count. Click chip → toggle visibility for that type on this tab. Per-tab state lives as `Set<string>` on `MapTabCacheEntry.hiddenPinTypes`, cleared on dispose. `syncPins` filters `allMinePins` by `!hiddenPinTypes.has(pin.element_type)` so hidden-type pins are treated as removed (manager removes the markers). Chip strip refreshes on every `syncPins` call. Strip self-hides when 0 or 1 distinct types are present (nothing to filter). Defensive: pins missing `element_type` (legacy/in-flight) resolve via the referenced element's type for counting purposes.
+
+**Pokeable for next smoke:**
+- **Image-dim auto-detect**: Open an existing map element with a 2000×2000-default canvas. Edit `image_url` field → paste a real URL. Within ~1s, an info toast confirms the new dims and the canvas resizes. Map tab background re-applies. (Did NOT auto-detect before — manual width/height edit was the only path.)
+- **Tree search**: Open a world with ≥3 maps. Search bar appears above the tree. Type a partial name → tree filters to matches + their ancestry. Collapsed nodes auto-expand to reveal hits. Clear (× button or empty the input) → tree returns to previous state. With <3 maps the search bar stays hidden.
+- **Pin filter chips**: Open a map with pins of 2+ distinct element types. Top-left chip strip appears, one chip per type with count. Click a chip → those pins disappear from the map (strikethrough + dimmed chip). Click again → back. Per-tab; switching worlds or closing the tab resets. Other tabs unaffected.
+
+---
+
+## Session 211 cont. — third smoke fixes (SMK3-1 + SMK3-2)
+
+Two quick fixes from Captain's smoke after the polish push. Both green at typecheck/vitest/build, no test count change. Bundle 400.14 → 400.21 KB JS.
+
+**SMK3-1: Map clicks shouldn't change middle pane.** Regression from SMK-2's "default to timeline when active world has no specific route mode" — clicking a map in the map-index navigated to `/map/<mid>`, which set `route.mode = 'map'` with no `elementId`, which flipped middle to timeline. Captain's report: clicking ANY map opens timeline. Fix: `openMapTab(m, preserveElementId?)` only navigates URL when `preserveElementId` is set. Bare calls (from map-index click, from createMapDialog success, from `ensureMapTabOpen` URL→state path) only mutate `rightTabs` / `rightActiveIndex`. The URL stays whatever it was; the middle pane keeps rendering its prior route. Map tabs are ephemeral session state — not reflecting them in the URL is fine. Element-detail top-bar `[map]` / `[pin]` clicks (which DO pass `preserveElementId`) still navigate to the chained `/map/<mid>/element/<eid>` form so the route fully describes both panes.
+
+**SMK3-2: Zoom widget moved to bottom-right.** Default Leaflet zoom control rendered at top-left, colliding with the new pin filter chip strip from bout PF. Disabled `zoomControl` in `Leaflet2DManager`'s map options; added `L.control.zoom({ position: 'bottomright' }).addTo(this.map)` post-init (gated on `!fixedZoom` so the fixed-zoom mode behaves as before — no controls at all).
+
+---
+
 ## Current State
 
 **Phase M (Maps subsystem rebuild) — in progress (session 208, 2026-05-15).** Design doc `DESIGN_MAPS.md` (573 lines) drafted from foundation conversation with Captain. Hierarchy reframed as sibling-order only; parent_map = "within boundaries"; pin-targets-map disallowed (zones deferred); image_url wins over image_media_id with both stored; per-world tab persistence via registry. Bout sequence M1-M8. Test world fixtures A/B/C — Skeld messaged 2026-05-15 to populate via API once Captain hands them keys.

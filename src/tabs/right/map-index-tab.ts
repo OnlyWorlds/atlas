@@ -8,8 +8,10 @@
  *
  * Click a row → open or focus its map tab. Delete affordance on hover.
  *
- * TODO (later bout): collapse/expand affordance per node with children,
- * persisted per-world in the registry. For now all nodes render expanded.
+ * Disclosure (session 211 finishing bout MZ): nodes with children get a
+ * chevron prefix; click toggles. Collapsed state lives in localStorage per
+ * world (key `atlas_map_tree_collapsed_v1`), independent of registry — pure
+ * UI pref that doesn't merit a cross-machine sync surface.
  */
 
 import { getState, patchSlice, subscribe, type RightTabRef } from '../../core/state';
@@ -19,13 +21,74 @@ import { createMapDialog } from '../../ui/map-create-modal';
 import { navigate, mapHash, elementHash } from '../../core/router';
 import { getActiveStore } from '../../ui/create-world-modal';
 import { requestPushIfLinked } from '../../sync/sync-attach';
-import { buildMapTree, type MapTreeNode, type LocationLike } from './map-tree';
+import { buildMapTree, filterTreeByName, type MapTreeNode, type LocationLike } from './map-tree';
+
+// ---- Collapsed tree-node state ----
+
+const COLLAPSED_STORAGE_KEY = 'atlas_map_tree_collapsed_v1';
+
+/** worldId → set of collapsed map ids. Lazy-loaded from localStorage. */
+let collapsedByWorld: Map<string, Set<string>> | null = null;
+
+function loadCollapsed(): Map<string, Set<string>> {
+  if (collapsedByWorld) return collapsedByWorld;
+  collapsedByWorld = new Map();
+  try {
+    const raw = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      for (const [wid, ids] of Object.entries(parsed)) {
+        if (Array.isArray(ids)) {
+          collapsedByWorld.set(wid, new Set(ids.filter((s): s is string => typeof s === 'string')));
+        }
+      }
+    }
+  } catch {
+    // Corrupted store — start fresh, not worth a warning.
+  }
+  return collapsedByWorld;
+}
+
+function saveCollapsed(): void {
+  if (!collapsedByWorld) return;
+  const dump: Record<string, string[]> = {};
+  for (const [wid, ids] of collapsedByWorld.entries()) {
+    if (ids.size > 0) dump[wid] = [...ids];
+  }
+  try {
+    localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify(dump));
+  } catch {
+    /* localStorage quota / disabled — non-fatal */
+  }
+}
+
+function isNodeCollapsed(worldId: string, mapId: string): boolean {
+  const all = loadCollapsed();
+  return all.get(worldId)?.has(mapId) ?? false;
+}
+
+function toggleNodeCollapsed(worldId: string, mapId: string): void {
+  const all = loadCollapsed();
+  let set = all.get(worldId);
+  if (!set) {
+    set = new Set();
+    all.set(worldId, set);
+  }
+  if (set.has(mapId)) set.delete(mapId);
+  else set.add(mapId);
+  saveCollapsed();
+}
 
 export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
   const root = document.createElement('div');
   root.className = 'atlas-pane atlas-map-index-pane';
   target.appendChild(root);
+
+  // Search state — closure-local so each tab instance has its own. Cleared
+  // when the tab unmounts. Not persisted across page reloads (transient UX
+  // pref, like a sidebar filter chip).
+  let searchTerm = '';
 
   function render(): void {
     const state = getState();
@@ -53,6 +116,51 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     });
     header.appendChild(newBtn);
     root.appendChild(header);
+
+    // Search input — filters the tree by map name (case-insensitive
+    // substring). Hidden when there are 0 maps (no point) and at fewer than
+    // 3 maps (the tree is trivially scannable). Threshold is arbitrary;
+    // erring on the side of "appears when actually useful".
+    const SEARCH_MIN_MAPS = 3;
+    const mapsForGate = state.data.elements.filter(e => e.type === 'map');
+    if (mapsForGate.length >= SEARCH_MIN_MAPS) {
+      const searchRow = document.createElement('div');
+      searchRow.className = 'atlas-map-index-search';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'atlas-input atlas-map-index-search-input';
+      input.placeholder = 'search maps...';
+      input.value = searchTerm;
+      input.spellcheck = false;
+      input.autocomplete = 'off';
+      input.setAttribute('data-role', 'map-search');
+      input.addEventListener('input', () => {
+        searchTerm = input.value;
+        render();
+        // Preserve focus across the re-render.
+        const fresh = root.querySelector<HTMLInputElement>('input[data-role="map-search"]');
+        if (fresh) {
+          fresh.focus();
+          // Restore caret to end of value (re-render reset selection).
+          const len = fresh.value.length;
+          fresh.setSelectionRange(len, len);
+        }
+      });
+      searchRow.appendChild(input);
+      if (searchTerm) {
+        const clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'atlas-map-index-search-clear';
+        clear.title = 'clear search';
+        clear.innerHTML = '<span class="material-symbols-outlined">close</span>';
+        clear.addEventListener('click', () => {
+          searchTerm = '';
+          render();
+        });
+        searchRow.appendChild(clear);
+      }
+      root.appendChild(searchRow);
+    }
 
     const maps = state.data.elements.filter((e): e is WorldMap => e.type === 'map');
     const pins = state.data.elements.filter((e): e is Pin => e.type === 'pin');
@@ -96,13 +204,36 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
 
     const active = state.ui.rightTabs[state.ui.rightActiveIndex];
     const activeMapId = active && active.kind === 'map' ? active.mapId : null;
-    const tree = buildMapTree(maps, locations);
+    // Any map with an open tab (active or background) — highlights the row's
+    // name so users see at a glance which maps are already loaded.
+    const openMapIds = new Set<string>();
+    for (const t of state.ui.rightTabs) {
+      if (t.kind === 'map') openMapIds.add(t.mapId);
+    }
+    const fullTree = buildMapTree(maps, locations);
+    const worldId = state.active.worldId;
+    const trimmedSearch = searchTerm.trim();
+    const tree = trimmedSearch ? filterTreeByName(fullTree, trimmedSearch) : fullTree;
+
+    if (trimmedSearch && tree.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'atlas-pane-empty';
+      empty.innerHTML = `<div style="max-width:340px"><div style="margin-bottom:6px">No maps match "${escapeText(trimmedSearch)}".</div></div>`;
+      list.appendChild(empty);
+      return;
+    }
 
     renderTree(list, tree, 0, {
       activeMapId,
+      openMapIds,
       pinCounts,
       locationNames,
       toasts,
+      worldId,
+      requestRerender: render,
+      // During active search, ignore collapsed state — every match is
+      // visible and reachable. Clearing the search restores it.
+      ignoreCollapsed: !!trimmedSearch,
     });
   }
 
@@ -113,22 +244,32 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
 
 interface RenderCtx {
   activeMapId: string | null;
+  /** Map ids that have an open right-pane tab (active or background). */
+  openMapIds: Set<string>;
   pinCounts: Map<string, number>;
   locationNames: Map<string, string>;
   toasts: ToastManager;
+  worldId: string;
+  requestRerender: () => void;
+  /** When true, collapsed state is ignored — everything renders expanded.
+   *  Set during active search so matching descendants are reachable. */
+  ignoreCollapsed: boolean;
 }
 
 function renderTree(list: HTMLElement, nodes: MapTreeNode[], depth: number, ctx: RenderCtx): void {
   for (const node of nodes) {
-    list.appendChild(renderRow(node, depth, ctx));
-    if (node.children.length > 0) {
+    const collapsed = !ctx.ignoreCollapsed && isNodeCollapsed(ctx.worldId, node.map.id);
+    list.appendChild(renderRow(node, depth, ctx, collapsed));
+    // Skip descendants when this node is collapsed.
+    if (node.children.length > 0 && !collapsed) {
       renderTree(list, node.children, depth + 1, ctx);
     }
   }
 }
 
-function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx): HTMLElement {
+function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx, collapsed: boolean): HTMLElement {
   const m = node.map;
+  const hasChildren = node.children.length > 0;
   const row = document.createElement('div');
   row.className = 'atlas-row atlas-map-tree-row' + (m.id === ctx.activeMapId ? ' selected' : '');
   row.setAttribute('data-map-id', m.id);
@@ -144,6 +285,26 @@ function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx): HTMLElemen
     spacer.style.width = `${depth * 14}px`;
     row.appendChild(spacer);
   }
+
+  // Disclosure chevron — visible only for nodes with children. Leaf nodes
+  // get a placeholder span of the same width so the row icons stay aligned
+  // across siblings (mix of leaves + parents in one group is the common case).
+  const chevron = document.createElement('span');
+  if (hasChildren) {
+    chevron.className = 'atlas-map-tree-chevron';
+    chevron.setAttribute('role', 'button');
+    chevron.setAttribute('aria-label', collapsed ? 'expand' : 'collapse');
+    chevron.title = collapsed ? `expand (${node.children.length} child${node.children.length === 1 ? '' : 'ren'})` : 'collapse';
+    chevron.innerHTML = `<span class="material-symbols-outlined">${collapsed ? 'chevron_right' : 'expand_more'}</span>`;
+    chevron.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleNodeCollapsed(ctx.worldId, m.id);
+      ctx.requestRerender();
+    });
+  } else {
+    chevron.className = 'atlas-map-tree-chevron-placeholder';
+  }
+  row.appendChild(chevron);
 
   const hasImage = !!(m.image_url || m.image_media_id);
   const icon = document.createElement('span');
@@ -162,6 +323,7 @@ function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx): HTMLElemen
 
   const main = document.createElement('span');
   main.className = 'atlas-row-main';
+  if (ctx.openMapIds.has(m.id)) main.classList.add('atlas-map-tree-row-open');
   main.textContent = m.name || '(untitled map)';
   row.appendChild(main);
 
@@ -179,7 +341,10 @@ function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx): HTMLElemen
       chip.tabIndex = 0;
       const icon = document.createElement('span');
       icon.className = 'material-symbols-outlined atlas-row-chip-icon';
-      icon.textContent = 'location_on';
+      // SDK ELEMENT_ICONS.location = 'castle' — match the Location element
+      // type icon used everywhere else (sidebar rows, pin canvas glyph) so
+      // the chip reads as "this is a Location" rather than "this is a pin."
+      icon.textContent = 'castle';
       chip.appendChild(icon);
       const label = document.createElement('span');
       label.textContent = locName;
@@ -264,12 +429,27 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
 }
 
 /**
- * Open (or focus) a map tab on the right. When `preserveElementId` is set
- * (the caller wants the middle pane to keep showing a specific element
- * detail), the navigated hash uses the chained `/map/<mid>/element/<eid>`
- * form so the middle pane doesn't drop selection. Otherwise the bare map
- * hash is used and the middle pane falls through to its world-active
- * default (timeline).
+ * Open (or focus) a map tab on the right pane.
+ *
+ * Middle-pane behavior is governed by the URL. Two cases:
+ *
+ *   - `preserveElementId` is set: caller wants the middle pane to KEEP
+ *     showing a specific element detail (e.g. element-detail top-bar
+ *     `[map]` / `[pin]` click). We navigate to the chained
+ *     `/map/<mid>/element/<eid>` form so the middle pane stays on that
+ *     element AND the right pane opens this map. Both parts of the URL
+ *     describe what's displayed.
+ *
+ *   - `preserveElementId` is NOT set: caller wants to add a map tab to the
+ *     right pane WITHOUT touching the middle pane. We mutate `rightTabs`
+ *     only — no `navigate()` call. The URL stays whatever it was, so the
+ *     middle pane keeps rendering whatever the user was looking at
+ *     (element-detail, timeline, settings, etc.). Map tabs are ephemeral
+ *     session state; not having them in the URL is fine.
+ *
+ * This split fixes the regression where clicking a map in the index would
+ * navigate to `/map/<mid>` and flip the middle pane to timeline (the
+ * world-active default for routes with no elementId).
  */
 export function openMapTab(m: WorldMap, preserveElementId?: string): void {
   const ui = getState().ui;
@@ -287,5 +467,14 @@ export function openMapTab(m: WorldMap, preserveElementId?: string): void {
     const nextTabs = [...ui.rightTabs, newTab];
     patchSlice('ui', { ...ui, rightTabs: nextTabs, rightActiveIndex: nextTabs.length - 1 });
   }
-  if (activeWorldId) navigate(mapHash(activeWorldId, m.id, preserveElementId));
+  // Only navigate when the caller wants the URL to reflect a specific
+  // element selection alongside the map. Otherwise leave the URL alone —
+  // the right pane is independent of the middle pane's primary route.
+  if (preserveElementId && activeWorldId) {
+    navigate(mapHash(activeWorldId, m.id, preserveElementId));
+  }
+}
+
+function escapeText(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

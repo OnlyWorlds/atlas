@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildMapTree, type MapTreeNode } from '../../src/tabs/right/map-tree';
+import { buildMapTree, filterTreeByName, type MapTreeNode } from '../../src/tabs/right/map-tree';
 import { WORLD_A } from '../fixtures/map-worlds/world-a';
 import { WORLD_B } from '../fixtures/map-worlds/world-b';
 import { WORLD_C } from '../fixtures/map-worlds/world-c';
@@ -282,5 +282,54 @@ describe('buildMapTree — defensive behavior', () => {
     const a = buildMapTree(WORLD_C.maps, WORLD_C.locations);
     const b = buildMapTree(WORLD_C.maps, WORLD_C.locations);
     expect(shape(a)).toEqual(shape(b));
+  });
+});
+
+describe('filterTreeByName', () => {
+  it('returns all nodes when the term is empty', () => {
+    const tree = buildMapTree(WORLD_A.maps, []);
+    expect(shape(filterTreeByName(tree, ''))).toEqual(shape(tree));
+  });
+
+  it('keeps the matching node and its ancestry intact', () => {
+    const tree = buildMapTree(WORLD_A.maps, []);
+    const filtered = filterTreeByName(tree, 'Castle Interior');
+    // World A: Multiverse > Universe Alpha > Continent Aurora > Eldoria City > Castle Interior
+    // Filter should preserve that ancestry as a single chain.
+    expect(shape(filtered)).toContain('Castle Interior');
+    expect(shape(filtered)).toContain('Eldoria City');
+    expect(shape(filtered)).toContain('Continent Aurora');
+    expect(shape(filtered)).toContain('Universe Alpha');
+    expect(shape(filtered)).toContain('Multiverse');
+    // Sibling branches (Universe Beta, Twin City, Continent Borealis) should drop.
+    expect(shape(filtered)).not.toContain('Universe Beta');
+    expect(shape(filtered)).not.toContain('Twin City');
+    expect(shape(filtered)).not.toContain('Continent Borealis');
+  });
+
+  it('is case-insensitive', () => {
+    const tree = buildMapTree(WORLD_A.maps, []);
+    const lower = filterTreeByName(tree, 'castle');
+    const upper = filterTreeByName(tree, 'CASTLE');
+    expect(shape(lower)).toEqual(shape(upper));
+  });
+
+  it('returns an empty array when nothing matches', () => {
+    const tree = buildMapTree(WORLD_A.maps, []);
+    expect(filterTreeByName(tree, 'definitely-not-a-map-zzz')).toEqual([]);
+  });
+
+  it('matches substring, not just prefix', () => {
+    const tree = buildMapTree(WORLD_A.maps, []);
+    // 'interior' is in the middle of 'Castle Interior' — must still match.
+    const filtered = filterTreeByName(tree, 'interior');
+    expect(shape(filtered)).toContain('Castle Interior');
+  });
+
+  it('does not mutate the input tree', () => {
+    const tree = buildMapTree(WORLD_A.maps, []);
+    const before = shape(tree);
+    filterTreeByName(tree, 'castle');
+    expect(shape(tree)).toEqual(before);
   });
 });

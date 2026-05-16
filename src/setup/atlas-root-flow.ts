@@ -19,7 +19,7 @@ import {
 } from '../core/constants';
 import { getState, patchSlice } from '../core/state';
 import { pickDirectory } from '../ui/directory-picker';
-import { storeHandle, loadHandle, ensureWritable } from '../store/handle-vault';
+import { storeHandle, loadHandle, ensureWritable, deleteHandle } from '../store/handle-vault';
 import {
   setAtlasRoot,
   createLocalWorld,
@@ -106,13 +106,22 @@ export async function discoverWorldsInRoot(
   rootPathHint: string
 ): Promise<{ imported: number }> {
   let imported = 0;
+  let seen = 0;
+  let skippedDot = 0;
+  let skippedNoWorldJson = 0;
+  let skippedBadMeta = 0;
+  let alreadyTrackedCount = 0;
   const existingHandles = await Promise.all(
     getState().registry.worlds.map(w => loadHandle(w.folder.handle_key))
   );
 
   for await (const entry of (rootHandle as any).values()) {
+    seen++;
     if (entry.kind !== 'directory') continue;
-    if (entry.name.startsWith('.')) continue; // skip .atlas etc.
+    if (entry.name.startsWith('.')) {
+      skippedDot++;
+      continue;
+    }
     const folderHandle = entry as FileSystemDirectoryHandle;
 
     // Already tracked? Same on-disk folder as some registered world?
@@ -123,32 +132,61 @@ export async function discoverWorldsInRoot(
         if (await folderHandle.isSameEntry(existing)) { alreadyTracked = true; break; }
       } catch { /* isSameEntry can throw on cross-origin handles; treat as not-same */ }
     }
-    if (alreadyTracked) continue;
-
-    // Is this an atlas world folder? Read world.json.
-    let meta: { id?: string; name?: string } | null = null;
-    try {
-      meta = await readJson<{ id?: string; name?: string }>(folderHandle, 'world.json');
-    } catch (err) {
-      if (!isNotFound(err)) console.warn(`[discover] read ${entry.name}/world.json:`, err);
+    if (alreadyTracked) {
+      alreadyTrackedCount++;
       continue;
     }
-    if (!meta || typeof meta.id !== 'string' || typeof meta.name !== 'string') continue;
 
-    // Adopt: store handle, register, push to state.
+    // Is this an atlas world folder? Read world.json.
+    let meta: { id?: string; name?: string; api?: { world_id?: string; api_key?: string; world_name?: string } } | null = null;
+    try {
+      meta = await readJson(folderHandle, 'world.json');
+    } catch (err) {
+      if (!isNotFound(err)) console.warn(`[discover] read ${entry.name}/world.json threw:`, err);
+      skippedNoWorldJson++;
+      continue;
+    }
+    if (!meta) {
+      skippedNoWorldJson++;
+      continue;
+    }
+    if (typeof meta.id !== 'string' || typeof meta.name !== 'string') {
+      console.warn('[discover] bad meta in', entry.name, meta);
+      skippedBadMeta++;
+      continue;
+    }
+
+    // Adopt: store handle, register as local-only OR api-linked depending on
+    // whether world.json carries an `api` block. Without this, recovered
+    // api-linked worlds would lose their sync wiring on recovery.
     const handleKey = `world-${meta.id}`;
     await storeHandle(handleKey, folderHandle);
     const reg = getState().registry;
-    const { next } = createLocalWorld(reg, {
-      name: meta.name,
-      folderName: entry.name,
-      handleKey,
-      pathHint: `${rootPathHint}/${entry.name}`,
-    });
+    const hasApi = !!(meta.api && typeof meta.api.world_id === 'string' && typeof meta.api.api_key === 'string');
+    let next: typeof reg;
+    if (hasApi) {
+      ({ next } = createApiLinkedWorld(reg, {
+        name: meta.name,
+        apiWorldId: meta.api!.world_id!,
+        apiKey: meta.api!.api_key!,
+        folderName: entry.name,
+        handleKey,
+        pathHint: `${rootPathHint}/${entry.name}`,
+        apiWorldName: meta.api!.world_name,
+      }));
+    } else {
+      ({ next } = createLocalWorld(reg, {
+        name: meta.name,
+        folderName: entry.name,
+        handleKey,
+        pathHint: `${rootPathHint}/${entry.name}`,
+      }));
+    }
     saveRegistry(next);
     patchSlice('registry', next);
     imported++;
   }
+  console.info('[atlas-root] discover summary', { seen, imported, skippedDot, skippedNoWorldJson, skippedBadMeta, alreadyTrackedCount });
   return { imported };
 }
 
@@ -194,24 +232,98 @@ async function hasAtlasRootMarker(dir: FileSystemDirectoryHandle): Promise<boole
  * Try to recover the atlas root on app boot. If the registry says we have one
  * and the vault still has a handle for it, push the runtime ref into state.
  *
+ * Also detects the "orphan handle" case — registry has no atlas_root (e.g.
+ * user cleared site data / localStorage) but the vault still holds the handle
+ * under the fixed `ATLAS_ROOT_HANDLE_KEY`. We surface this as
+ * `atlasRootRecoverable` so the UI can offer a one-click recover CTA.
+ *
  * Does NOT re-grant permission here (no user gesture available at boot).
- * Permission is requested lazily on first use (creating a world inside it).
+ * Permission is requested lazily on first use (creating a world inside it,
+ * or via the recover CTA).
  */
 export async function hydrateAtlasRoot(): Promise<void> {
   const reg = getState().registry;
   if (!reg.atlas_root) {
+    // Registry has no atlas_root, but the vault might still have an orphan
+    // handle from a prior session. Localstorage clear + IDB survival is the
+    // common path. Surface as recoverable so the UI offers a restore button.
+    const orphan = await loadHandle(ATLAS_ROOT_HANDLE_KEY);
     patchSlice('atlasRoot', null);
+    patchSlice('atlasRootRecoverable', orphan ? { folderName: orphan.name } : null);
     return;
   }
   const handle = await loadHandle(reg.atlas_root.handle_key);
   if (!handle) {
     patchSlice('atlasRoot', null);
+    patchSlice('atlasRootRecoverable', null);
     return;
   }
   patchSlice('atlasRoot', {
     folderName: reg.atlas_root.folder_name,
     pathHint: reg.atlas_root.path_hint,
   });
+  patchSlice('atlasRootRecoverable', null);
+}
+
+/**
+ * Recover an orphan atlas root: the vault has a handle under
+ * `ATLAS_ROOT_HANDLE_KEY` but the registry doesn't reference it (typically
+ * after a localStorage clear). Re-grants permission via a user gesture,
+ * validates the on-disk marker, restores the registry entry, then runs
+ * `discoverWorldsInRoot` to repopulate the world list from disk.
+ *
+ * Throws on permission denied, missing handle, or missing marker (the orphan
+ * is cleared from the vault in the missing-marker case — the folder is no
+ * longer an atlas root and the stale handle would block fresh setup).
+ *
+ * Returns the number of worlds discovered + adopted, or null if no orphan
+ * existed (defensive — UI should check `state.atlasRootRecoverable` first).
+ */
+export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
+  const handle = await loadHandle(ATLAS_ROOT_HANDLE_KEY);
+  if (!handle) {
+    patchSlice('atlasRootRecoverable', null);
+    return null;
+  }
+  const granted = await ensureWritable(handle);
+  if (!granted) {
+    throw new Error('write permission denied');
+  }
+  // Validate marker so a re-purposed folder doesn't masquerade as an atlas
+  // root. If the marker's gone, clear the orphan and let the user pick fresh.
+  const hasMarker = await hasAtlasRootMarker(handle);
+  if (!hasMarker) {
+    await deleteHandle(ATLAS_ROOT_HANDLE_KEY);
+    patchSlice('atlasRootRecoverable', null);
+    throw new Error('folder no longer looks like an atlas root — pick again');
+  }
+  const pathHint = handle.name;
+  const nextRegistry = setAtlasRoot(getState().registry, {
+    handleKey: ATLAS_ROOT_HANDLE_KEY,
+    folderName: handle.name,
+    pathHint,
+  });
+  saveRegistry(nextRegistry);
+  patchSlice('registry', nextRegistry);
+  patchSlice('atlasRoot', { folderName: handle.name, pathHint });
+  patchSlice('atlasRootRecoverable', null);
+
+  let imported = 0;
+  try {
+    const result = await discoverWorldsInRoot(handle, pathHint);
+    imported = result.imported;
+  } catch (err) {
+    console.warn('[atlas-root] recover-time discovery failed:', err);
+  }
+  // Post-recovery URL hygiene: if the hash still points at a deep route
+  // (`/w/<id>/...`) from before the localStorage wipe, sidebar mode would
+  // stay 'elements' showing the "no active world" empty state — the just-
+  // restored worlds list would only be reachable via the Worlds tab.
+  // Reset to root so the user lands looking at the populated list.
+  if (window.location.hash && window.location.hash !== '#/' && window.location.hash !== '#') {
+    window.location.hash = '#/';
+  }
+  return { imported };
 }
 
 /**

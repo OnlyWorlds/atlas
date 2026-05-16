@@ -107,7 +107,10 @@ export class Leaflet2DManager {
       crs: L.CRS.Simple,
       minZoom: this.config.fixedZoom ? this.config.initialZoom : this.config.minZoom,
       maxZoom: this.config.fixedZoom ? this.config.initialZoom : this.config.maxZoom,
-      zoomControl: !this.config.fixedZoom,
+      // Disable Leaflet's default top-left zoom control. We re-add it at
+      // bottom-right below, where it won't collide with atlas's top-left
+      // pin-filter chip strip (DESIGN_MAPS.md session 211 polish).
+      zoomControl: false,
       attributionControl: false,
       renderer: L.canvas(),
       zoomSnap: 0.25,
@@ -129,6 +132,12 @@ export class Leaflet2DManager {
     }
 
     this.map = L.map(this.config.containerId, mapOptions);
+
+    // Add zoom control at bottom-right (unless fixedZoom disables zooming
+    // entirely). Bottom-right avoids the top-left chip-strip collision.
+    if (!this.config.fixedZoom) {
+      L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+    }
 
     // Configure pan controls
     if (!this.config.enablePan) {

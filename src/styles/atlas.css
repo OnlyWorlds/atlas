@@ -283,6 +283,60 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Pin filter chip strip — top-left overlay on map canvas. One chip per
+ * distinct pin element-type present. Click chip → toggle visibility for
+ * pins of that type on this tab. data-hidden="true" mutes the chip. Hidden
+ * entirely when there's nothing to filter (< 2 types). */
+.atlas-pin-filter-strip {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 60%;
+  pointer-events: none; /* children re-enable */
+}
+.atlas-pin-filter-strip[data-active="false"] {
+  display: none;
+}
+.atlas-pin-filter-chip {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease, border-color 120ms ease;
+}
+.atlas-pin-filter-chip:hover {
+  background: rgba(0, 0, 0, 0.8);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+.atlas-pin-filter-chip[data-hidden="true"] {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+.atlas-pin-filter-chip[data-hidden="true"]:hover {
+  opacity: 0.75;
+}
+.atlas-pin-filter-chip .material-symbols-outlined {
+  font-size: 14px !important;
+}
+.atlas-pin-filter-chip-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
 /* Pin trash drop-zone — appears top-right of the map canvas while a pin is
  * being dragged. Drop the pin on it → delete. Hidden by default; toggles via
  * data-active. Pointer-events stays "none" so it doesn't intercept anything;
@@ -1279,6 +1333,89 @@
 .atlas-map-tree-indent {
   display: inline-block;
   flex-shrink: 0;
+}
+/* Row name highlight when this map has an open right-pane tab (active OR
+ * background). Distinct from `.selected` (active tab only) — this signals
+ * "loaded but not focused" so the user can see which maps are warm. */
+.atlas-row-main.atlas-map-tree-row-open {
+  color: var(--atlas-cyan);
+  font-weight: 500;
+}
+
+/* Element row being dragged from the sidebar onto a map. Subtle dim so the
+ * source disappears visually while the cursor carries it. */
+.atlas-row.atlas-row-dragging {
+  opacity: 0.45;
+}
+
+/* Map canvas: drop target highlight when a draggable element hovers over it.
+ * Cyan inner outline reads as "drop here" without obscuring the map content. */
+.atlas-map-pane > div.atlas-map-drop-target {
+  outline: 2px dashed rgba(34, 211, 238, 0.65);
+  outline-offset: -6px;
+}
+
+/* Maps tree search row — appears above the tree when worlds reach a
+ * scannability threshold (3+ maps). Clear button surfaces when typed text
+ * exists. */
+.atlas-map-index-search {
+  position: relative;
+  padding: 0 12px 8px;
+  display: flex;
+  align-items: center;
+}
+.atlas-map-index-search-input {
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 28px 6px 10px;
+}
+.atlas-map-index-search-clear {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  margin-top: -4px; /* visual centering against the padded-bottom row */
+}
+.atlas-map-index-search-clear:hover {
+  color: var(--atlas-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+.atlas-map-index-search-clear .material-symbols-outlined {
+  font-size: 14px !important;
+}
+/* Disclosure chevron on tree nodes with children. Placeholder for leaves
+ * preserves alignment across siblings in mixed-arity groups. */
+.atlas-map-tree-chevron,
+.atlas-map-tree-chevron-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--atlas-text-muted);
+}
+.atlas-map-tree-chevron {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+.atlas-map-tree-chevron:hover {
+  color: var(--atlas-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+.atlas-map-tree-chevron .material-symbols-outlined {
+  font-size: 14px !important;
 }
 .atlas-row-chip {
   display: inline-flex;

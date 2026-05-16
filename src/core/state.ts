@@ -45,6 +45,16 @@ export interface AtlasRootRef {
 }
 
 /**
+ * Orphan-handle signal: the vault has an atlas-root handle but localStorage
+ * doesn't (e.g. user cleared site data but the folder + IDB survived). UI
+ * surfaces a one-click "recover" CTA that re-grants permission and restores
+ * the registry from on-disk world.json files.
+ */
+export interface AtlasRootRecoverableRef {
+  folderName: string;
+}
+
+/**
  * In-memory cache of the active world's elements. Refreshed from the
  * FolderStore on world activation and after every mutation. Always patched
  * with a new array reference so subscribers re-fire.
@@ -83,6 +93,7 @@ export interface UiState {
 export interface AppState {
   registry: WorldsRegistry;
   atlasRoot: AtlasRootRef | null;
+  atlasRootRecoverable: AtlasRootRecoverableRef | null;
   active: ActiveWorldRef | null;
   middleMode: MiddleMode;
   data: DataState;
@@ -96,6 +107,7 @@ const listeners = new Set<() => void>();
 let state: AppState = {
   registry: defaultRegistry(),
   atlasRoot: null,
+  atlasRootRecoverable: null,
   active: null,
   middleMode: 'welcome',
   data: { elements: [] },

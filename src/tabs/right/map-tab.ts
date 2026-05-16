@@ -20,6 +20,8 @@ import type { Element, Pin, WorldMap } from '../../core/types';
 import { pickMapImageSource } from './map-image-source';
 import { pinVisualFor, onPinVisualsReady } from './pin-visuals';
 import { toggleGhostsAtSourcePin, disposeGhostsForMap } from './ghost-pins';
+import { getAssociatedMaps } from './auto-open-map';
+import { ELEMENT_ICONS, ELEMENT_LABELS } from '../../core/constants';
 import { ToastManager } from '../../ui/toast-manager';
 import { ElementCreateModal } from '../../ui/element-create-modal';
 import { getActiveStore } from '../../ui/create-world-modal';
@@ -41,6 +43,17 @@ interface MapTabCacheEntry {
    * being dragged. Drop a pin on top → pin is deleted.
    */
   trashZone: HTMLDivElement;
+  /**
+   * Pin filter chip strip — top-left overlay. One chip per element type
+   * present in this map's pins. Click chip toggles `hiddenPinTypes`.
+   */
+  chipStrip: HTMLDivElement;
+  /**
+   * Per-tab in-memory set of element types whose pins are hidden on this
+   * map. Default empty (all visible). Reset on tab dispose. Pure UX pref —
+   * never persisted.
+   */
+  hiddenPinTypes: Set<string>;
   /**
    * Snapshot of the image source last used to render the background. When the
    * map element's image fields change (URL edited, local file added/removed),
@@ -130,6 +143,14 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   trashZone.innerHTML = '<span class="material-symbols-outlined">delete</span><span>drop to delete</span>';
   container.appendChild(trashZone);
 
+  // Pin filter chip strip — top-left overlay showing element types present
+  // in this map's pins. Click chip → toggle visibility for that type. Per-
+  // tab in-memory only; cleared on dispose. Populated on every render of
+  // refreshChipStrip (driven by syncPins notifications).
+  const chipStrip = document.createElement('div');
+  chipStrip.className = 'atlas-pin-filter-strip';
+  container.appendChild(chipStrip);
+
   const width = map.width ?? 2000;
   const height = map.height ?? 2000;
 
@@ -160,6 +181,8 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     ready: Promise.resolve(),
     tooltip,
     trashZone,
+    chipStrip,
+    hiddenPinTypes: new Set(),
     lastBg: '',
   };
   cache.set(mapId, entry);
@@ -344,6 +367,72 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       if (e.key === 'f' || e.key === 'F') manager.fitBounds(40);
     });
 
+    // Drag-from-sidebar → drop creates a pin (DESIGN_MAPS.md §8 — was
+    // deferred from legacy). The sidebar's elements list marks rows as
+    // draggable and sets a custom MIME payload `application/x-atlas-element`
+    // with `{id, type}`. Drop fires on the map container; we project the
+    // drop point into image coords and write a pin via the same path as
+    // contextual right-click create.
+    container.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer?.types.includes('application/x-atlas-element')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      container.classList.add('atlas-map-drop-target');
+    });
+    container.addEventListener('dragleave', (e) => {
+      // dragleave fires for child elements too; only clear when leaving the
+      // container itself (relatedTarget outside container).
+      const related = e.relatedTarget as Node | null;
+      if (related && container.contains(related)) return;
+      container.classList.remove('atlas-map-drop-target');
+    });
+    container.addEventListener('drop', async (e) => {
+      container.classList.remove('atlas-map-drop-target');
+      const raw = e.dataTransfer?.getData('application/x-atlas-element');
+      if (!raw) return;
+      e.preventDefault();
+      let payload: { id?: string; type?: string };
+      try {
+        payload = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (!payload.id || !payload.type) return;
+      // Same image-presence gate as the click + contextmenu paths
+      // (DESIGN_MAPS.md §4.1). Image-less maps cannot accept pins.
+      const currentMap = getState().data.elements.find(
+        (em): em is WorldMap => em.type === 'map' && em.id === entry.mapId,
+      );
+      if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
+        toasts.info('set a map image first — pins anchor to the image');
+        return;
+      }
+      const lMap = manager.getMap();
+      if (!lMap) return;
+      // DragEvent extends MouseEvent in the DOM spec; Leaflet's
+      // mouseEventToLatLng accepts the drop event directly.
+      const latlng = lMap.mouseEventToLatLng(e);
+      const point = leafletToStorage(latlng, height);
+      try {
+        const store = getActiveStore();
+        if (!store) return;
+        await store.createPin({
+          map_id: entry.mapId,
+          element_id: payload.id,
+          element_type: payload.type,
+          x: clampToCanvas(Math.round(point.x), width),
+          y: clampToCanvas(Math.round(point.y), height),
+        });
+        const elements = await store.listElements();
+        patchSlice('data', { elements });
+        requestPushIfLinked();
+        toasts.success('pin placed');
+      } catch (err) {
+        console.error('[map-tab] drag-drop create pin failed:', err);
+        toasts.error('failed to place pin');
+      }
+    });
+
     // Seed pins from state.
     syncPins(entry);
 
@@ -360,10 +449,19 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
 
 function syncPins(entry: MapTabCacheEntry): void {
   const elements = getState().data.elements;
-  const minePins = elements.filter((e): e is Pin =>
+  const allMinePins = elements.filter((e): e is Pin =>
     e.type === 'pin' && e.map_id === entry.mapId
   );
+  // Pin filter chip strip (DESIGN_MAPS.md §3 polish, session 211 bout PF):
+  // pins whose element_type is in hiddenPinTypes are treated as removed —
+  // syncPins removes their markers from the manager. Toggling a chip on the
+  // strip is a syncPins re-call, so add/remove flips naturally.
+  const minePins = allMinePins.filter(p => !entry.hiddenPinTypes.has(p.element_type ?? ''));
   const mineIds = new Set(minePins.map(p => p.id));
+
+  // Refresh the chip strip on every sync — type set may have changed if a
+  // pin was added/removed/element type changed.
+  refreshChipStrip(entry, allMinePins);
 
   for (const existing of entry.manager.getAllPins()) {
     if (!mineIds.has(existing.id)) entry.manager.removePin(existing.id);
@@ -381,7 +479,8 @@ function syncPins(entry: MapTabCacheEntry): void {
       // on reload. Keep the prior label and icon when lookup misses; the
       // next subscriber tick after sync settles will re-resolve cleanly.
       if (el) {
-        const visual = pinVisualFor(el.type);
+        const hasMapBadge = getAssociatedMaps(el.id, elements).length > 0;
+        const visual = pinVisualFor(el.type, hasMapBadge);
         entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y, name: el.name, icon: visual.iconUrl });
       } else {
         entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y });
@@ -391,7 +490,8 @@ function syncPins(entry: MapTabCacheEntry): void {
       // data is still resolving (vs the raw '(element)' string).
       const name = el?.name ?? '(loading…)';
       const type = el?.type ?? 'object';
-      const visual = pinVisualFor(type);
+      const hasMapBadge = el ? getAssociatedMaps(el.id, elements).length > 0 : false;
+      const visual = pinVisualFor(type, hasMapBadge);
       const added = entry.manager.addPin({
         id: pin.id,
         name,
@@ -403,6 +503,70 @@ function syncPins(entry: MapTabCacheEntry): void {
       });
       enablePinDrag(entry, added.marker, pin.id);
     }
+  }
+}
+
+/**
+ * Re-render the pin-filter chip strip from the current pin set. One chip per
+ * distinct element_type, in canonical ELEMENT_LABELS order. Each chip shows
+ * the category icon + count. Active = type is visible (default); muted +
+ * `data-hidden="true"` = type is hidden. Click toggles `hiddenPinTypes` and
+ * re-syncs pins.
+ *
+ * Hidden when 0 distinct types (nothing to filter) or 1 type (toggling all
+ * off would empty the map — not useful as a chip strip).
+ */
+function refreshChipStrip(entry: MapTabCacheEntry, allMinePins: Pin[]): void {
+  const elements = getState().data.elements;
+  const countByType = new Map<string, number>();
+  for (const pin of allMinePins) {
+    let type = pin.element_type;
+    if (!type) {
+      // Defensive: legacy pins missing element_type — resolve from the
+      // referenced element. The engine self-heal writes it back on push,
+      // but the local cache may not reflect that until next refresh.
+      const el = elements.find(e => e.id === pin.element_id);
+      type = el?.type ?? '';
+    }
+    if (!type) continue;
+    countByType.set(type, (countByType.get(type) ?? 0) + 1);
+  }
+
+  if (countByType.size < 2) {
+    entry.chipStrip.innerHTML = '';
+    entry.chipStrip.setAttribute('data-active', 'false');
+    return;
+  }
+
+  entry.chipStrip.setAttribute('data-active', 'true');
+  entry.chipStrip.innerHTML = '';
+  // Render in alpha order by singular label (stable per render).
+  const types = [...countByType.keys()].sort((a, b) => {
+    const aL = ELEMENT_LABELS[a as keyof typeof ELEMENT_LABELS]?.singular ?? a;
+    const bL = ELEMENT_LABELS[b as keyof typeof ELEMENT_LABELS]?.singular ?? b;
+    return aL.localeCompare(bL);
+  });
+  for (const type of types) {
+    const count = countByType.get(type)!;
+    const hidden = entry.hiddenPinTypes.has(type);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'atlas-pin-filter-chip';
+    chip.setAttribute('data-type', type);
+    chip.setAttribute('data-hidden', String(hidden));
+    const label = ELEMENT_LABELS[type as keyof typeof ELEMENT_LABELS]?.singular ?? type;
+    chip.title = hidden
+      ? `${count} ${label}${count === 1 ? '' : 's'} hidden — click to show`
+      : `${count} ${label}${count === 1 ? '' : 's'} shown — click to hide`;
+    const iconName = ELEMENT_ICONS[type as keyof typeof ELEMENT_ICONS] ?? 'category';
+    chip.innerHTML = `<span class="material-symbols-outlined">${iconName}</span><span class="atlas-pin-filter-chip-count">${count}</span>`;
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (entry.hiddenPinTypes.has(type)) entry.hiddenPinTypes.delete(type);
+      else entry.hiddenPinTypes.add(type);
+      syncPins(entry);
+    });
+    entry.chipStrip.appendChild(chip);
   }
 }
 

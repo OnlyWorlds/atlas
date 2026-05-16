@@ -21,6 +21,8 @@ import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { getActiveStore } from './create-world-modal';
 import { requestPushIfLinked } from '../sync/sync-attach';
+import { readImageDimsFromFile, readImageDimsFromUrl } from './image-dims';
+import { openMapTab } from '../tabs/right/map-index-tab';
 import type { WorldMap } from '../core/types';
 
 export interface MapCreateResult {
@@ -46,7 +48,18 @@ export function createMapDialog(
   opts: { initialName?: string; initialLocationId?: string } = {},
 ): Promise<MapCreateResult | null> {
   return new Promise((resolve) => {
-    const modal = new MapCreateModal(toasts, (result) => resolve(result), {
+    const modal = new MapCreateModal(toasts, (result) => {
+      // Auto-open the new map's tab when it has any image source — the
+      // typical create flow is "name + image → see it." Image-less maps
+      // skip auto-open since their canvas is the grid fallback and the
+      // user is more likely still configuring (parent_map, hierarchy, etc).
+      if (result?.map) {
+        const m = result.map;
+        const hasImage = !!(m.image_url || m.image_media_id);
+        if (hasImage) openMapTab(m);
+      }
+      resolve(result);
+    }, {
       initialName: opts.initialName,
       initialLocationId: opts.initialLocationId,
     });
@@ -257,13 +270,18 @@ class MapCreateModal extends BaseModal {
     const cancelBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.cancel(); });
 
-    // Dynamic hint: when URL has text, the local-image becomes a stored
-    // fallback (won't display while URL is set). Make the trade-off visible.
+    // Dynamic hint: the warning only fires when BOTH a local image was
+    // uploaded AND a URL was typed — that's the only case where the local
+    // file gets stored as silent fallback. URL-only is the canonical path
+    // and shouldn't trigger any warning.
     const urlField = body.querySelector<HTMLInputElement>('input[name="map-image-url"]')!;
+    const fileField = body.querySelector<HTMLInputElement>('input[name="map-image-file"]')!;
     const hintEl = body.querySelector<HTMLElement>('[data-role="local-image-hint"]')!;
     const updateHint = (): void => {
-      if (urlField.value.trim()) {
-        hintEl.textContent = 'image URL is set — local image will be stored but the URL will display.';
+      const hasFile = !!fileField.files?.length;
+      const hasUrl = !!urlField.value.trim();
+      if (hasFile && hasUrl) {
+        hintEl.textContent = 'image URL is set — your uploaded file will be stored as fallback but the URL will display.';
         hintEl.classList.add('atlas-modal-hint-warn');
       } else {
         hintEl.textContent = 'used as fallback when image URL is empty. stored locally, never uploaded.';
@@ -271,6 +289,7 @@ class MapCreateModal extends BaseModal {
       }
     };
     urlField.addEventListener('input', updateHint);
+    fileField.addEventListener('change', updateHint);
     updateHint();
 
     const form = body.querySelector<HTMLFormElement>('form')!;
@@ -316,7 +335,7 @@ class MapCreateModal extends BaseModal {
 
         // Decode dimensions BEFORE persisting so the record carries them.
         let initialDims: { w: number; h: number } | null = null;
-        if (file) initialDims = await readImageDims(file);
+        if (file) initialDims = await readImageDimsFromFile(file);
         else if (url) initialDims = await readImageDimsFromUrl(url);
 
         const patch: Partial<WorldMap> = {
@@ -428,31 +447,8 @@ class MapCreateModal extends BaseModal {
   }
 }
 
-async function readImageDims(file: File): Promise<{ w: number; h: number } | null> {
-  try {
-    const bmp = await createImageBitmap(file);
-    const dims = { w: bmp.width, h: bmp.height };
-    bmp.close?.();
-    return dims;
-  } catch {
-    return new Promise((resolve) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => { resolve({ w: img.naturalWidth, h: img.naturalHeight }); URL.revokeObjectURL(url); };
-      img.onerror = () => { resolve(null); URL.revokeObjectURL(url); };
-      img.src = url;
-    });
-  }
-}
-
-async function readImageDimsFromUrl(url: string): Promise<{ w: number; h: number } | null> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
-}
+// Image-dim helpers live in ui/image-dims.ts (shared with element-detail's
+// image_url field-edit hook). Import below.
 
 function escapeText(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

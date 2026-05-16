@@ -10,7 +10,7 @@
 
 import { getState, subscribe } from '../core/state';
 import { getActiveStore } from '../ui/create-world-modal';
-import { setupAtlasRoot } from '../setup/atlas-root-flow';
+import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
 import { toastManager } from '../ui/toast-manager';
 import { navigate, timelineHash } from '../core/router';
 
@@ -22,7 +22,44 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
 
   async function render(): Promise<void> {
     const state = getState();
-    const { active, atlasRoot } = state;
+    const { active, atlasRoot, atlasRootRecoverable } = state;
+
+    // Recoverable: vault has an orphan atlas-root handle (typically after a
+    // localStorage clear). Surface a single restore button before falling
+    // through to the standard first-launch CTA.
+    if (!atlasRoot && atlasRootRecoverable) {
+      root.innerHTML = `
+        <header class="atlas-middle-header"><h2>Welcome back</h2></header>
+        <div class="atlas-welcome-empty">
+          <p>atlas detected a previously-set-up folder on this device: <code>${escapeText(atlasRootRecoverable.folderName)}</code>.</p>
+          <p class="atlas-welcome-hint">your worlds are still on disk — click below to re-grant folder access and restore the world list. localStorage was cleared but the folder and your saved permission survived.</p>
+          <div class="atlas-welcome-actions">
+            <button class="ow-btn ow-btn-primary" data-action="recover-atlas">Recover atlas folder</button>
+          </div>
+        </div>
+      `;
+      const btn = root.querySelector<HTMLButtonElement>('[data-action="recover-atlas"]')!;
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'recovering…';
+        try {
+          const result = await recoverAtlasRoot();
+          if (result) {
+            toastManager.success(
+              result.imported > 0
+                ? `recovered atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
+                : 'recovered atlas folder (no worlds found inside)'
+            );
+          }
+        } catch (err) {
+          toastManager.error(err instanceof Error ? err.message : String(err));
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Recover atlas folder';
+        }
+      });
+      return;
+    }
 
     // First-launch: no atlas folder yet.
     if (!atlasRoot) {

@@ -77,6 +77,36 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // affordances from MW will be the explicit path from element detail.
   });
 
+  // Drag-onto-map: rows are draggable; payload is {id, type}. Map tabs accept
+  // the drop and create a pin at the drop coords (DESIGN_MAPS.md §8 — was
+  // deferred from legacy as "drag-from-list deferred"; now landed). Pin/
+  // marker/zone/map are pre-filtered from the list, so every draggable row
+  // is a valid pin target.
+  listEl.addEventListener('dragstart', (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('[data-element-id]');
+    if (!row) return;
+    const id = row.getAttribute('data-element-id');
+    const type = row.getAttribute('data-element-type');
+    if (!id || !type) return;
+    // Type guard: maps aren't pinnable per §1.4. The list already filters
+    // pin/marker/zone, but map IS in the list — must skip here.
+    if (type === 'map') {
+      e.preventDefault();
+      return;
+    }
+    const payload = JSON.stringify({ id, type });
+    // Custom MIME so map-tab's drop handler can identify it cleanly without
+    // colliding with file drops or generic text drops.
+    e.dataTransfer?.setData('application/x-atlas-element', payload);
+    e.dataTransfer?.setData('text/plain', id);
+    e.dataTransfer!.effectAllowed = 'copy';
+    row.classList.add('atlas-row-dragging');
+  });
+  listEl.addEventListener('dragend', (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('[data-element-id]');
+    row?.classList.remove('atlas-row-dragging');
+  });
+
   function renderFilters(): void {
     const state = getState();
     const elements = state.data.elements;
@@ -174,8 +204,12 @@ function renderElementRow(el: Element, selected: boolean, hasMap: boolean): stri
   const mapBadge = hasMap
     ? `<span class="material-symbols-outlined atlas-elements-row-mapbadge" title="this location has at least one map">map</span>`
     : '';
+  // draggable=true on every row except maps. Map elements appear in the list
+  // but can't be pin targets (DESIGN_MAPS.md §1.4) — dragstart cancels for
+  // those, but setting the attribute selectively avoids even the start gesture.
+  const draggable = el.type !== 'map' ? 'draggable="true"' : '';
   return `
-    <div class="${cls}" data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}" role="button" tabindex="0">
+    <div class="${cls}" ${draggable} data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}" role="button" tabindex="0">
       <span class="material-symbols-outlined">${icon}</span>
       <span class="atlas-row-main">${escapeText(el.name || '(unnamed)')}</span>
       ${mapBadge}

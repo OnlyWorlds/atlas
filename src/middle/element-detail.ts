@@ -31,6 +31,7 @@ import { getAssociatedMaps } from '../tabs/right/auto-open-map';
 import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
 import { createMapDialog } from '../ui/map-create-modal';
+import { readImageDimsFromUrl } from '../ui/image-dims';
 import { getMapsSettings } from '../registry/registry';
 import { mapHash } from '../core/router';
 
@@ -240,11 +241,14 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const isMap = el.type === 'map';
 
     // Map detail gets a different cluster: a strip of category icons, one per
-    // element pinned on this map. Click any → navigate to that element while
-    // keeping the map open in the right pane (via chained URL). DESIGN_MAPS.md
-    // §3.5 — Map case (added session 211 from Captain's smoke).
+    // element pinned on this map, PLUS a single "open this map in a tab"
+    // affordance. Click any pinned icon → navigate to that element while
+    // keeping the map open in the right pane (via chained URL). Click the
+    // open-tab icon → open this map's right-pane tab (or focus if already
+    // open). DESIGN_MAPS.md §3.5 — Map case.
     if (isMap) {
       renderMapPinnedElementStrip(el, elements, header, mapsSettings.show_pinned_element_names_in_header);
+      header.appendChild(buildSelfOpenMapAffordance(el as WorldMap));
       return;
     }
 
@@ -467,6 +471,28 @@ export function mountElementDetail(target: HTMLElement): () => void {
     if (pin) panMapTabTo(mapEl.id, pin.x, pin.y);
   }
 
+  /**
+   * Self-open affordance for Map elements: a single icon button in the
+   * map-detail top bar that opens (or focuses) this map's right-pane tab.
+   * Distinct from the location-Map affordance: this one is for the map
+   * element viewing its own detail.
+   */
+  function buildSelfOpenMapAffordance(m: WorldMap): HTMLElement {
+    const cluster = document.createElement('div');
+    cluster.className = 'atlas-header-cluster atlas-header-create';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'atlas-icon-btn-sm atlas-header-map-affordance';
+    btn.setAttribute('data-action', 'open-self-map');
+    const hasImage = !!(m.image_url || m.image_media_id);
+    if (hasImage) btn.classList.add('atlas-map-tree-icon-has-image');
+    btn.title = 'open this map in the right pane';
+    btn.innerHTML = '<span class="material-symbols-outlined">map</span>';
+    btn.addEventListener('click', () => openMapTab(m));
+    cluster.appendChild(btn);
+    return cluster;
+  }
+
   function buildMapAffordance(m: WorldMap, showName: boolean, sourceElementId: string): HTMLElement {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -503,7 +529,9 @@ export function mountElementDetail(target: HTMLElement): () => void {
     btn.className = 'atlas-icon-btn-sm atlas-header-pin-affordance';
     btn.setAttribute('data-action', 'goto-pin');
     btn.setAttribute('data-pin-id', pin.id);
-    btn.title = `pin on ${mapName} — click to open and center`;
+    // Surface the right-click affordance in the tooltip — symmetric with
+    // the drag-to-trash on the map canvas and the right-click-ghost prune.
+    btn.title = `pin on ${mapName} — click to open and center, right-click to delete pin`;
     const iconHtml = '<span class="material-symbols-outlined">push_pin</span>';
     if (showMapName) {
       btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(mapName)}</span>`;
@@ -519,7 +547,33 @@ export function mountElementDetail(target: HTMLElement): () => void {
       // before the camera moves.
       panMapTabTo(pin.map_id, pin.x, pin.y);
     });
+    btn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      void deletePinFromHeader(pin.id, mapName);
+    });
     return btn;
+  }
+
+  /**
+   * Delete a pin via the element-detail header's right-click affordance.
+   * Symmetric with the drag-to-trash flow on the map canvas — same store
+   * call, same autosave path. No confirmation modal: the action is mild
+   * (re-place the pin if you change your mind) and a modal here would
+   * dilute the gesture's lightness.
+   */
+  async function deletePinFromHeader(pinId: string, mapName: string): Promise<void> {
+    const store = getActiveStore();
+    if (!store) return;
+    try {
+      await store.deletePin(pinId);
+      const elements = await store.listElements();
+      patchSlice('data', { elements });
+      requestPushIfLinked();
+      toastManager.success(`pin on ${mapName} deleted`);
+    } catch (err) {
+      console.error('[element-detail] deletePinFromHeader failed:', err);
+      toastManager.error('failed to delete pin');
+    }
   }
 
   // ====== Sections ======
@@ -852,10 +906,42 @@ export function mountElementDetail(target: HTMLElement): () => void {
       patchSlice('data', { elements });
       // Local write succeeded — schedule a debounced push. No-op for local-only.
       requestPushIfLinked();
+
+      // Map.image_url auto-detect (DESIGN_MAPS.md §4 + session 211 bout ID):
+      // when a Map element's image_url changes to a non-empty value, fetch
+      // the image's natural dims and update the map's width/height so the
+      // canvas matches the new image. Without this, the stored dims stay
+      // pinned to whatever the prior image was (or the 2000-default), and
+      // pins end up off-image when image dimensions change.
+      if (el.type === 'map' && fieldName === 'image_url' && typeof nextValue === 'string' && nextValue.trim()) {
+        void autoUpdateMapDims(el.id, nextValue.trim());
+      }
     } catch (err) {
       console.error('[element-detail] update failed:', err);
       toastManager.error(err instanceof Error ? err.message : String(err));
       throw err;
+    }
+  }
+
+  /**
+   * Fire-and-forget: decode an image URL's natural dimensions and patch the
+   * map's width/height. Silent on failure (CORS, 404, etc.) — pins keep
+   * working with stale dims; user can manually edit width/height fields
+   * if the auto-detect can't reach the image.
+   */
+  async function autoUpdateMapDims(mapId: string, url: string): Promise<void> {
+    const dims = await readImageDimsFromUrl(url);
+    if (!dims) return;
+    const store = getActiveStore();
+    if (!store) return;
+    try {
+      await store.updateMap(mapId, { width: dims.w, height: dims.h });
+      const elements = await store.listElements();
+      patchSlice('data', { elements });
+      requestPushIfLinked();
+      toastManager.info(`map dimensions updated to ${dims.w}×${dims.h}`);
+    } catch (err) {
+      console.error('[element-detail] map dim auto-update failed:', err);
     }
   }
 

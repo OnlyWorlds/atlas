@@ -177,3 +177,23 @@ function sortRecursively(nodes: MapTreeNode[]): void {
   // visited externally.
   for (const n of nodes) sortRecursively(n.children);
 }
+
+/**
+ * Filter a tree by a case-insensitive substring match on map name. A node
+ * survives the filter if its own name matches OR any descendant survives —
+ * ancestry is preserved so context for a match is always visible.
+ *
+ * Pure function. Doesn't mutate the input.
+ */
+export function filterTreeByName(nodes: MapTreeNode[], term: string): MapTreeNode[] {
+  const lower = term.toLowerCase();
+  const result: MapTreeNode[] = [];
+  for (const node of nodes) {
+    const filteredChildren = filterTreeByName(node.children, term);
+    const selfMatch = (node.map.name ?? '').toLowerCase().includes(lower);
+    if (selfMatch || filteredChildren.length > 0) {
+      result.push({ ...node, children: filteredChildren });
+    }
+  }
+  return result;
+}
