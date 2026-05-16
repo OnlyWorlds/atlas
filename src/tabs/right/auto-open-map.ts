@@ -14,11 +14,14 @@
  * Both are pure functions over an elements snapshot — no state reads, no DOM.
  */
 
-import type { Element, Pin, WorldMap } from '../../core/types';
+import type { Element, Pin, Marker, WorldMap } from '../../core/types';
 
 /**
  * Maps associated with an element, sorted by hierarchy DESC then alpha:
  *   - Location element  → maps where `map.location === element.id`
+ *   - Zone element      → distinct maps that have a marker with
+ *                         `marker.zone_id === element.id` (zones live on
+ *                         a map via their markers, not directly)
  *   - Other element     → distinct maps that have a pin with
  *                         `pin.element_id === element.id`
  */
@@ -33,6 +36,17 @@ export function getAssociatedMaps(
   if (el.type === 'location') {
     candidates = elements.filter(
       (m): m is WorldMap => m.type === 'map' && m.location === elementId,
+    );
+  } else if (el.type === 'zone') {
+    // Zones live on maps transitively via their markers (DESIGN_ZONES.md §1).
+    const targetedMapIds = new Set<string>();
+    for (const m of elements) {
+      if (m.type !== 'marker') continue;
+      const marker = m as Marker;
+      if (marker.zone_id === elementId) targetedMapIds.add(marker.map_id);
+    }
+    candidates = elements.filter(
+      (m): m is WorldMap => m.type === 'map' && targetedMapIds.has(m.id),
     );
   } else {
     // Find pins for this element; collect their distinct map ids.

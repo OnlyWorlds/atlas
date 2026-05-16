@@ -245,4 +245,6 @@ function rejectDoubleSuffix(
       );
     }
   }
+  // Marker.order is write-allowed as of 2026-05-16 (Anchor migration).
+  // No rejection rule here.
 }

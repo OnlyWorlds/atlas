@@ -39,6 +39,7 @@ import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import { startDrawing, placeMarkerAt, getActiveDraft, cancelDrawing, disposeDraftForMap } from './zone-drawing';
 import { ZoneOverlay } from '../../visualization/leaflet-2d/ZoneOverlay';
 import { syncZones, wireChipStrip, refreshActiveMapZones } from './map-tab-zones';
+import { enterEditMode, isEditing, getEditingZoneId, abortEditModeForMap, syncEditMode } from './zone-edit-mode';
 
 let containerSeq = 0;
 
@@ -257,8 +258,29 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     const lMap = manager.getMap();
     if (lMap) {
       const overlay = new ZoneOverlay(lMap, height);
+      // Single click → select zone AND navigate to its element-detail route
+      // so the middle pane updates AND the sidebar/midpanel reflect the
+      // selection (parity with pin-click flow). Without the nav step,
+      // selectedElementId is patched but the route never changes, so the
+      // middle pane stays on whatever was there before. Leaflet natively
+      // suppresses the click preceding a dblclick, so the nav doesn't
+      // race with edit-mode entry.
       overlay.onZoneClick((zoneId) => {
-        patchSlice('ui', { ...getState().ui, selectedElementId: zoneId });
+        const worldId = getState().active?.worldId;
+        if (!worldId) return;
+        patchSlice('ui', {
+          ...getState().ui,
+          selectedElementId: zoneId,
+          sidebarMode: 'elements',
+        });
+        navigate(elementHash(worldId, zoneId));
+      });
+      // Double click → enter edit mode (DESIGN_ZONES.md §3.1, S4). Leaflet's
+      // native dblclick already suppresses the preceding click; the single-
+      // click select fired first but that's actually fine — selecting before
+      // editing matches user intent.
+      overlay.onZoneDoubleClick((zoneId) => {
+        enterEditMode(zoneId, mapId, toasts);
       });
       entry.zoneOverlay = overlay;
       syncZones(entry);
@@ -523,6 +545,9 @@ export function disposeMapTab(mapId: string): void {
   closeVisualSettingsPopover();
   // Cancel any in-flight zone draft on this map.
   disposeDraftForMap(mapId);
+  // Abort any in-flight zone edit on this map (skip snapshot restoration —
+  // the tab is gone).
+  abortEditModeForMap(mapId);
   // Ghost pins live on a Leaflet layer attached to entry.manager's L.Map. Tear
   // them down BEFORE the manager destroy so the layer detach goes cleanly;
   // after destroy the L.Map handle is gone.
@@ -603,4 +628,9 @@ subscribe(() => {
   refreshActiveMapPins();
   refreshCachedBackgrounds();
   refreshActiveMapZones();
+  syncEditMode();
 });
+
+// Quiet unused-import warnings: these names are public via re-import paths.
+void isEditing;
+void getEditingZoneId;

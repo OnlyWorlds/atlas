@@ -19,6 +19,7 @@ import { requestPushIfLinked } from '../sync/sync-attach';
 import type { Zone, Marker, WorldMap } from '../core/types';
 import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
+import { enterEditMode, isEditing, getEditingZoneId, doneEdit, cancelEdit } from '../tabs/right/zone-edit-mode';
 import type { ToastManager } from '../ui/toast-manager';
 
 export function buildZoneSections(zone: Zone, toasts: ToastManager): HTMLElement[] {
@@ -130,9 +131,51 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
 
   const header = document.createElement('div');
   header.className = 'atlas-detail-section-header';
+
+  const editingThisZone = isEditing() && getEditingZoneId() === zone.id;
+  const editButtonLabel = editingThisZone ? 'Done editing' : 'Edit shape';
+  const editButtonIcon = editingThisZone ? 'check' : 'edit';
   header.innerHTML = `
     <span class="atlas-detail-section-title">Markers</span>
+    <span class="atlas-detail-section-spacer"></span>
+    <button type="button" class="atlas-zone-edit-shape-btn ${editingThisZone ? 'is-editing' : ''}" data-action="toggle-edit">
+      <span class="material-symbols-outlined">${editButtonIcon}</span>
+      ${editButtonLabel}
+    </button>
+    ${editingThisZone ? `
+      <button type="button" class="atlas-zone-edit-cancel-btn" data-action="cancel-edit" title="Discard changes (ESC)">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    ` : ''}
   `;
+
+  header.querySelector<HTMLButtonElement>('[data-action="toggle-edit"]')?.addEventListener('click', () => {
+    if (isEditing() && getEditingZoneId() === zone.id) {
+      doneEdit();
+      return;
+    }
+    // Find a map this zone has markers on. If only one such map, enter edit
+    // on it directly. If multiple, pick the first (zone editing is per-map;
+    // user can switch maps via the Markers list groups if needed).
+    const elements = getState().data.elements;
+    const markers = elements.filter(
+      (e): e is Marker => e.type === 'marker' && (e as Marker).zone_id === zone.id,
+    );
+    if (markers.length === 0) {
+      toasts.info('zone has no markers to edit — draw it on a map first');
+      return;
+    }
+    const mapId = markers[0].map_id;
+    // Open the map if not already open.
+    const map = elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId);
+    if (map) openMapTab(map);
+    enterEditMode(zone.id, mapId, toasts);
+  });
+
+  header.querySelector<HTMLButtonElement>('[data-action="cancel-edit"]')?.addEventListener('click', () => {
+    cancelEdit();
+  });
+
   section.appendChild(header);
 
   const body = document.createElement('div');

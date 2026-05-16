@@ -247,6 +247,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const showPinMapNames = mapsSettings.show_pin_map_names_in_header;
     const isLocation = el.type === 'location';
     const isMap = el.type === 'map';
+    const isZone = el.type === 'zone';
 
     // Map detail gets a different cluster: a strip of category icons, one per
     // element pinned on this map, PLUS a single "open this map in a tab"
@@ -260,11 +261,15 @@ export function mountElementDetail(target: HTMLElement): () => void {
       return;
     }
 
-    // Existing maps anchored to this element (Locations only).
-    const associatedMaps = isLocation ? getAssociatedMaps(el.id, elements) : [];
+    // Existing maps anchored to / hosting this element.
+    //   - Location → maps with map.location === el.id
+    //   - Zone     → distinct maps that hold any marker for this zone
+    //   - other    → none here (their pins handle "where it is")
+    const associatedMaps = (isLocation || isZone) ? getAssociatedMaps(el.id, elements) : [];
     // Existing pins targeting this element. Includes Locations too — a
     // Location can have pins (e.g. a city's flag pinned on a continent map).
-    const pinsForElement = elements.filter(
+    // Zones cannot be pin targets (DESIGN_MAPS.md §1.4) so they skip pins.
+    const pinsForElement = isZone ? [] : elements.filter(
       (e): e is Element & { map_id: string; element_id: string; x: number; y: number } =>
         e.type === 'pin' && (e as { element_id?: string }).element_id === el.id,
     );
@@ -288,7 +293,9 @@ export function mountElementDetail(target: HTMLElement): () => void {
           return aHas ? 1 : -1; // imageless first
         });
         for (const m of sortedMaps) {
-          cluster.appendChild(buildMapAffordance(m, showMapNames, el.id));
+          cluster.appendChild(
+            buildMapAffordance(m, showMapNames, el.id, isZone ? el.id : undefined),
+          );
         }
       }
 
@@ -512,7 +519,12 @@ export function mountElementDetail(target: HTMLElement): () => void {
     return cluster;
   }
 
-  function buildMapAffordance(m: WorldMap, showName: boolean, sourceElementId: string): HTMLElement {
+  function buildMapAffordance(
+    m: WorldMap,
+    showName: boolean,
+    sourceElementId: string,
+    panToZoneId?: string,
+  ): HTMLElement {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'atlas-icon-btn-sm atlas-header-map-affordance';
@@ -520,7 +532,8 @@ export function mountElementDetail(target: HTMLElement): () => void {
     btn.setAttribute('data-map-id', m.id);
     const hasImage = !!(m.image_url || m.image_media_id);
     if (hasImage) btn.classList.add('atlas-map-tree-icon-has-image');
-    btn.title = `open map: ${m.name || '(untitled)'}`;
+    const titleSuffix = panToZoneId ? ' (will pan to zone)' : '';
+    btn.title = `open map: ${m.name || '(untitled)'}${titleSuffix}`;
     const iconHtml = '<span class="material-symbols-outlined">map</span>';
     if (showName) {
       btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(m.name || '(untitled)')}</span>`;
@@ -531,7 +544,30 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // Preserve the current element selection in the URL so the middle pane
     // doesn't drop into the welcome-stat panel when the map opens. The
     // chained `/map/<mid>/element/<eid>` route keeps element-detail mounted.
-    btn.addEventListener('click', () => openMapTab(m, sourceElementId));
+    btn.addEventListener('click', () => {
+      openMapTab(m, sourceElementId);
+      // Zone case: pan to the zone's centroid (average of its markers on
+      // this map). Captain's request session 215 — clicking a zone's map
+      // icon should center-view the zone.
+      if (panToZoneId) {
+        const state = getState();
+        const zoneMarkers = state.data.elements.filter(
+          (e): e is import('../core/types').Marker =>
+            e.type === 'marker' &&
+            (e as import('../core/types').Marker).zone_id === panToZoneId &&
+            (e as import('../core/types').Marker).map_id === m.id,
+        );
+        if (zoneMarkers.length > 0) {
+          const cx = Math.round(
+            zoneMarkers.reduce((s, mk) => s + mk.x, 0) / zoneMarkers.length,
+          );
+          const cy = Math.round(
+            zoneMarkers.reduce((s, mk) => s + mk.y, 0) / zoneMarkers.length,
+          );
+          panMapTabTo(m.id, cx, cy);
+        }
+      }
+    });
     return btn;
   }
 

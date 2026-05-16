@@ -43,6 +43,24 @@ interface ZoneEntry {
   visibleLayer: L.Path;
   hitLayer?: L.Polyline;    // invisible polyline for line hit-testing
   labelMarker?: L.Marker;
+  /**
+   * Vertex dots rendered when the zone is selected (DESIGN_ZONES.md §4.3).
+   * Read-only here — they become drag handles in edit mode via a separate
+   * module (`zone-edit-mode.ts`) which TEMPORARILY hides these dots while
+   * its own draggable handles render in their place at the same coords.
+   *
+   * Implementation: L.Marker + DivIcon (HTML in markerPane), NOT L.CircleMarker
+   * (SVG in overlayPane). Using the same primitive as edit-mode handles
+   * ensures consistent sub-pixel rendering — circleMarker vs divIcon in
+   * different panes was visually misaligned in smoke (session 215).
+   */
+  vertexDots: L.Marker[];
+  /**
+   * When true, the vertex dots are suppressed by the edit module — its own
+   * draggable handles take over at the same coords. Polygon outline + glow
+   * remain visible (selection is unchanged). Default false.
+   */
+  vertexDotsSuppressed: boolean;
   shape: ZoneShape;
   selected: boolean;
   visible: boolean;
@@ -50,6 +68,7 @@ interface ZoneEntry {
 
 type ZoneClickHandler = (zoneId: string, event: L.LeafletMouseEvent) => void;
 type ZoneContextHandler = (zoneId: string, event: L.LeafletMouseEvent) => void;
+type ZoneDblClickHandler = (zoneId: string, event: L.LeafletMouseEvent) => void;
 
 export class ZoneOverlay {
   private layerGroup: L.LayerGroup;
@@ -57,6 +76,7 @@ export class ZoneOverlay {
   private layerVisible = true;
   private onClick?: ZoneClickHandler;
   private onContext?: ZoneContextHandler;
+  private onDblClick?: ZoneDblClickHandler;
 
   constructor(
     private map: L.Map,
@@ -108,6 +128,7 @@ export class ZoneOverlay {
   removeZone(id: string): void {
     const entry = this.entries.get(id);
     if (!entry) return;
+    this.hideVertexDots(entry);
     this.layerGroup.removeLayer(entry.visibleLayer);
     if (entry.hitLayer) this.layerGroup.removeLayer(entry.hitLayer);
     if (entry.labelMarker) this.layerGroup.removeLayer(entry.labelMarker);
@@ -157,6 +178,10 @@ export class ZoneOverlay {
     this.onContext = handler;
   }
 
+  onZoneDoubleClick(handler: ZoneDblClickHandler): void {
+    this.onDblClick = handler;
+  }
+
   /** Tear down — removes all layers and event subscriptions. */
   dispose(): void {
     for (const id of Array.from(this.entries.keys())) this.removeZone(id);
@@ -200,11 +225,17 @@ export class ZoneOverlay {
     hitLayer?.addTo(this.layerGroup);
 
     // Wire interaction handlers. Both the visible and hit layers forward
-    // clicks to the same zone callback.
+    // clicks to the same zone callback. Leaflet natively suppresses the
+    // single `click` event that would otherwise precede a `dblclick`, so
+    // separate handlers don't need a manual timeout dance.
     const wire = (layer: L.Layer) => {
       layer.on('click', (e: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(e);
         this.onClick?.(shape.id, e);
+      });
+      layer.on('dblclick', (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stop(e);
+        this.onDblClick?.(shape.id, e);
       });
       layer.on('contextmenu', (e: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(e);
@@ -220,6 +251,8 @@ export class ZoneOverlay {
       shape,
       selected: false,
       visible: true,
+      vertexDots: [],
+      vertexDotsSuppressed: false,
     };
 
     if (shape.labelText) {
@@ -228,6 +261,67 @@ export class ZoneOverlay {
     }
 
     return entry;
+  }
+
+  /**
+   * Show vertex dots on a selected zone. Each marker position gets a small
+   * cyan dot rendered above the polygon. Read-only — drag-edit handles are
+   * rendered by the edit module which suppresses these dots via
+   * `setVertexDotsSuppressed`. Idempotent — calling repeatedly rebuilds.
+   *
+   * Uses L.Marker + DivIcon (NOT L.CircleMarker) so the dots render in
+   * markerPane alongside any edit-mode handles, ensuring identical
+   * sub-pixel positioning between the two visual states.
+   */
+  private showVertexDots(entry: ZoneEntry): void {
+    this.hideVertexDots(entry);
+    if (entry.vertexDotsSuppressed) return;
+    // Vertex dots include their 1-indexed order number so you can see at a
+    // glance which marker is which (matches the edit-mode handles and the
+    // draft-mode markers — same visual language across all three states).
+    entry.shape.points.forEach((p, i) => {
+      const latlng = storageToLeaflet(p, this.canvasHeight);
+      const displayOrder = i + 1;
+      const icon = L.divIcon({
+        className: 'atlas-zone-vertex-dot',
+        html: `<span class="atlas-zone-vertex-dot-num">${displayOrder}</span>`,
+        iconSize: [12, 12],
+        iconAnchor: [6, 6],
+      });
+      const dot = L.marker(latlng, {
+        icon,
+        interactive: false,
+        keyboard: false,
+      });
+      dot.addTo(this.layerGroup);
+      entry.vertexDots.push(dot);
+    });
+  }
+
+  private hideVertexDots(entry: ZoneEntry): void {
+    for (const d of entry.vertexDots) {
+      this.layerGroup.removeLayer(d);
+    }
+    entry.vertexDots = [];
+  }
+
+  /**
+   * Suppress / unsuppress the read-only vertex dots for a zone. Called by
+   * the edit module on enter (suppress, then render its own draggable
+   * handles in their place) and exit (unsuppress, dots come back).
+   *
+   * Polygon outline + selection glow remain unchanged.
+   */
+  setVertexDotsSuppressed(id: string, suppressed: boolean): void {
+    const entry = this.entries.get(id);
+    if (!entry) return;
+    if (entry.vertexDotsSuppressed === suppressed) return;
+    entry.vertexDotsSuppressed = suppressed;
+    if (suppressed) {
+      this.hideVertexDots(entry);
+    } else if (entry.selected) {
+      this.showVertexDots(entry);
+    }
   }
 
   private applyStyle(entry: ZoneEntry): void {
@@ -250,6 +344,22 @@ export class ZoneOverlay {
       if (labelEl) {
         (labelEl as HTMLElement).style.opacity = showShape ? '1' : '0';
       }
+    }
+    // Selected styling: drop-shadow glow on the SVG path + show vertex dots.
+    // The glow uses a CSS class on the underlying SVG element so it can be
+    // toggled without re-applying style on every notification.
+    const visibleEl = (entry.visibleLayer as L.Path & { _path?: SVGElement })._path;
+    if (visibleEl) {
+      if (entry.selected && showShape) {
+        visibleEl.classList.add('atlas-zone-selected');
+      } else {
+        visibleEl.classList.remove('atlas-zone-selected');
+      }
+    }
+    if (entry.selected && showShape) {
+      this.showVertexDots(entry);
+    } else {
+      this.hideVertexDots(entry);
     }
   }
 

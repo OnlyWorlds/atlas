@@ -88,6 +88,13 @@ export interface UiState {
   rightActiveIndex: number;
   /** When set, next click on the active map drops a pin for this element. */
   pinPlacement: { elementId: string } | null;
+  /**
+   * When set, a zone is in edit mode on this map. Vertex dots become
+   * draggable handles; segment hover overlays accept clicks for inserting
+   * markers. ESC restores the snapshot taken on entry; Enter/Done commits
+   * (no-op since autosave). See zone-edit-mode.ts.
+   */
+  zoneEditing: { zoneId: string; mapId: string } | null;
 }
 
 export interface AppState {
@@ -119,6 +126,7 @@ let state: AppState = {
     rightTabs: [{ kind: 'map-index' }],
     rightActiveIndex: 0,
     pinPlacement: null,
+    zoneEditing: null,
   },
   sync: {
     byWorld: {},

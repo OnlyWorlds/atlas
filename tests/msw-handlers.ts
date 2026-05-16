@@ -162,6 +162,7 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
           );
         }
       }
+      // Marker.order is a valid write field (Anchor migration 2026-05-16).
       // assignsServerIds: ignore client id entirely (real OW behavior with v4 input).
       const id = options.assignsServerIds
         ? crypto.randomUUID()
@@ -188,6 +189,7 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
           );
         }
       }
+      // No `order` rejection on PATCH (Anchor migration 2026-05-16).
       const next: ServerRecord = { ...existing, ...body, id, updated_at: clock() };
       bucket(type).set(id, next);
       return HttpResponse.json(maybeNestRelations(next));

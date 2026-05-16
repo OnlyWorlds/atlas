@@ -10,6 +10,7 @@
  */
 
 import { getState, patchSlice } from '../../core/state';
+import { navigate, elementHash } from '../../core/router';
 import { ELEMENT_LABELS } from '../../core/constants';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import {
@@ -143,8 +144,21 @@ export function wireChipStrip(entry: MapTabCacheEntry, toasts: ToastManager): vo
       return;
     }
 
-    // Plain click → select zone.
-    patchSlice('ui', { ...getState().ui, selectedElementId: zoneId });
+    // Plain click → select zone AND navigate to element-detail route so the
+    // middle pane + sidebar reflect the selection (parity with canvas zone-
+    // click flow). Without nav, only state.ui.selectedElementId changes —
+    // the URL-driven middle pane stays put.
+    const worldId = getState().active?.worldId;
+    if (worldId) {
+      patchSlice('ui', {
+        ...getState().ui,
+        selectedElementId: zoneId,
+        sidebarMode: 'elements',
+      });
+      navigate(elementHash(worldId, zoneId));
+    } else {
+      patchSlice('ui', { ...getState().ui, selectedElementId: zoneId });
+    }
   });
 
   strip.addEventListener('contextmenu', (e) => {

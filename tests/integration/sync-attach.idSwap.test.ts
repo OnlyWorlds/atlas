@@ -38,6 +38,7 @@ beforeEach(() => {
     rightTabs: [{ kind: 'map-index' }],
     rightActiveIndex: 0,
     pinPlacement: null,
+    zoneEditing: null,
   });
   window.location.hash = '#/';
 });

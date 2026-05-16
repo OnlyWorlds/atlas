@@ -256,23 +256,26 @@ User hits ESC or clicks ✗. Clear `ui.zoneDrafting`. Discard all transient poin
 
 ---
 
-## 3. Edit flow
+## 3. Edit flow (as shipped S4)
 
 ### 3.1 Entry
 
-Editing a zone's shape is a deliberate action. Entry points:
+Single click selects the zone (highlight + element-detail in middle). Double click enters edit mode. The "Edit shape" button in element-detail's Markers section is an explicit alias for users who don't know the double-click gesture.
 
-- **Element-detail Markers section** — "Edit zone shape" button.
-- **Zone chip context menu** — "Edit shape" item.
-- **Canvas right-click on zone outline** — context menu item "Edit shape" (deferred to polish — not v1).
+Entry points:
+- **Double click on the zone polygon/polyline on canvas** (primary gesture, zoner-compatible muscle memory).
+- **"Edit shape" button in element-detail Markers section** (alias). Opens the first map this zone has markers on if not already open, then enters edit mode there.
+
+Leaflet's native `dblclick` event natively suppresses the preceding `click`, so no 200ms timeout disambiguation is needed — single click and double click are cleanly distinguished. Atlas does not use zoner's clickTimeout pattern.
 
 On entry:
-1. The zone must already be the `selectedElementId` (set automatically if entry was from chip).
-2. Push a HistoryManager snapshot (full markers-on-this-map state for the active map).
-3. Set `ui.zoneEditing = { zoneId, mapId, savedSnapshot }`.
-4. Canvas renders handles on every marker belonging to this zone-on-this-map. Handles are larger than normal pins (~22px), white-bordered cyan circles.
-5. Segment overlays render (20px invisible polyline between consecutive markers, for click-to-insert).
-6. The drawing overlay strip mounts in edit-mode shape:
+1. Snapshot all markers belonging to this zone-on-this-map: `Map<markerId, {x, y, order}>`. Stored in the EditSession for cancel restoration.
+2. Set `ui.zoneEditing = { zoneId, mapId }`.
+3. Map's `doubleClickZoom` disabled (avoids accidental zoom during edit; restored on exit).
+4. Canvas container gets `.atlas-zone-editing` class → `cursor: crosshair`.
+5. Canvas renders draggable vertex handles (14px cyan circles with `cursor: grab`) at each marker's coords. Replaces the read-only vertex dots from S3 (visually similar, functionally different).
+6. Segment overlays render: 20px-weight invisible polyline between every consecutive pair of markers (including last→first for polygon zones). Opacity 0 by default, 0.3 cyan dashed on hover.
+7. Element-detail header's "Edit shape" button flips to "Done editing" + a Cancel ✗ button appears.
 
 ```
 ┌────────────────────────────────────────────────────┐
@@ -282,35 +285,44 @@ On entry:
 
 ### 3.2 Interactions during edit
 
-- **Drag marker handle** — on dragend, `store.updateMarker(id, {x, y})`. Re-render. `requestPushIfLinked()`.
-- **Click on segment overlay** — compute insertion order (between adjacent markers' orders, using fractional ordering or a renumber-all approach; F3 picks the cleaner). `store.createMarker({ map_id, zone_id, x, y, order })`. If using renumber: re-stamp orders on all markers in the zone.
-- **Right-click on marker handle** — `store.deleteMarker(id)`. If this drops marker count below the shape's minimum (3 polygon / 2 line), zone becomes degenerate; render warning but allow (user might be mid-edit, will re-add).
-- **Toolbar undo (↶)** — pops the HistoryManager stack one entry.
-- **ESC** — cancel (same as ✗).
+- **Drag marker handle** — `dragstart` suppresses subsequent click handlers (50ms guard) so the released marker doesn't fire a stale click. `drag` is preview-only (handle visually follows cursor). `dragend` projects the new latlng back to storage coords, rounds to integer, calls `store.updateMarker(id, {x, y})`, refreshes state, fires `requestPushIfLinked()`, and rebuilds handles+overlays so segment overlays follow the new vertex position.
+- **Hover over segment** — overlay opacity 0 → 0.3 (cyan dashed). Mouseout returns to invisible.
+- **Click on segment** — compute the midpoint of the two endpoints (`(a.x+b.x)/2, (a.y+b.y)/2`, rounded), bump every marker with order ≥ `i+1` up by one (processed in reverse to avoid collisions), then `createMarker({ map_id, zone_id, x: midX, y: midY, order: i+1 })`. Refresh + rebuild.
+- **Right-click on marker handle** — `store.deleteMarker(id)`. Refuses if zone would drop below shape minimum (3 polygon, 2 line) — toasts info instead. Remaining markers' orders renumbered to close the gap.
+- **ESC key** — cancel (restore snapshot, see §3.4).
+- **Enter key** or **"Done editing" button** — commit + exit (no-op since everything autosaved).
 
-### 3.3 Done
+Every action is per-action autosave + `requestPushIfLinked` — no batching, no "Save" button. Cancel via snapshot is the only way to revert.
 
-User clicks ✓ Done:
+### 3.3 Done (commit)
+
+`exitEditMode('commit')`:
 - Clear `ui.zoneEditing`.
-- HistoryManager snapshot remains in history for global undo (deferred).
-- Single `requestPushIfLinked()` if it didn't already fire from in-edit writes.
+- Remove the edit layer group (handles + segment overlays) from the map.
+- Restore default `doubleClickZoom`.
+- Remove `.atlas-zone-editing` class from canvas container.
 
-### 3.4 Cancel
+Nothing to "commit" — autosave already persisted every action.
 
-User clicks ✗ or hits ESC:
-- Restore from `savedSnapshot` — for each marker that was modified/inserted/deleted during edit, revert the folder-store state. Implementation: re-apply the snapshot's marker set, deleting markers that weren't there originally and re-creating/restoring those that were.
-- Clear `ui.zoneEditing`.
+### 3.4 Cancel (restore snapshot)
 
-Edge case: if Cancel is hit but writes already flushed to server via autosave, the cancel only undoes locally. Server gets the cancel's writes on next push. Document this — it's a tradeoff of optimistic autosave. Captain can revisit if it bites in practice.
+`exitEditMode('cancel')` → 3-way diff against the snapshot:
 
-### 3.5 Renumber-all vs fractional ordering
+1. **In current but NOT in snapshot** — marker was added during edit → `deleteMarker(id)`.
+2. **In snapshot but NOT in current** — marker was deleted during edit → `createMarker(id, x, y, order)` to restore.
+3. **In both** — if `x`/`y`/`order` mutated, `updateMarker(id, {…revert…})`.
 
-When inserting a marker between two existing ones (say between order=2 and order=3), we need to decide its order.
+Then tear down overlays + restore map state.
 
-- **Fractional**: insert as order=2.5. Cheap, no other writes. But over many inserts, orders drift to floats and the schema-driven editor's number field shows funny numbers.
-- **Renumber-all**: insert as order=3, then bump every subsequent marker's order by 1. Clean integers, but N writes per insert.
+**Edge case**: writes already flushed to server via autosave during the edit. Cancel only undoes locally — the cancel's revert-writes flow to the server on next autosave. Net effect: server eventually converges to the pre-edit state, just with extra updated_at noise. Acceptable tradeoff for v1.
 
-Atlas v1 picks **renumber-all** for cleanliness. The write batch is small (markers in one zone, typically <20) and only happens on explicit insert actions, not on every edit. The atomicity needed is achievable via the single requestPushIfLinked debounce window — all bumps coalesce.
+**Aborted edit** (map tab closed mid-edit): `abortEditModeForMap(mapId)` clears `ui.zoneEditing` without running the snapshot restore — the map is gone anyway, restoration would be pointless. Local writes from before the close remain committed.
+
+### 3.5 Renumber-all (chosen approach)
+
+Atlas v1 uses **renumber-all** for marker insertion (not fractional). When inserting between order=2 and order=3, every marker with order ≥ 3 bumps to ≥ 4. The write batch is small (markers in one zone, typically <20) and only happens on explicit insert actions. All bumps coalesce into a single `requestPushIfLinked` debounce window so push hits the server once per insert action.
+
+Renumber on delete too: when a marker is deleted from edit mode, remaining markers' orders close the gap (becomes 0, 1, 2, …).
 
 ---
 
@@ -443,6 +455,22 @@ While `ui.zoneDrafting` is set: canvas clicks go to placement, NOT to existing z
 ## 8. Sync semantics
 
 Zones and markers sync through the standard SyncEngine push/pull paths (no zone-specific logic in sync). One gotcha that F2 addresses:
+
+### 8.0 Marker `order` field — write-allowed since 2026-05-16
+
+**Status: shipped.** Anchor deployed the server migration adding `order` to the marker write validator on 2026-05-16. Atlas sends `order` on both CREATE and PATCH; server stores it; pulls return it. Adapter passes it through (it's a plain number — no relation handling needed).
+
+Atlas's vertex visuals (read-only dots + edit handles + draft markers) all display 1-indexed order numbers inside the cyan circles, driven directly by the disk `order` field. Multi-machine sync of the same zone is now order-stable — both atlas instances pulling from the same server see the same explicit order, polygons reconstruct identically.
+
+Earlier session-215 chronology (kept for future-me as a lesson):
+- S1: stripped `order` after first 422 from live OW.
+- S9: removed the strip thinking the server accepted it (Captain saw the field on the schema page).
+- S9 follow-up: live OW 422'd again → re-stripped.
+- S9 final: messaged Anchor; Anchor deployed the missing write-side migration; verified the push works without the strip → strip dropped permanently.
+
+The takeaway for future server-schema-lag triage: the SDK and read-side schema can both declare a field that the write validator hasn't been deployed for. Trust the live 4xx, but also raise it to Anchor — usually a fast server fix is the right answer rather than a long-lived atlas-side workaround.
+
+`SERVER_UNKNOWN_FIELDS_BY_TYPE` in `ow-client-adapter.ts` is now empty. The hook stays as the established pattern for future cases.
 
 ### 8.1 Marker SDK adapter — bypass NOT required (verified in F2)
 

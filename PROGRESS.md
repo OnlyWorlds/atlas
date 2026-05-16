@@ -5,6 +5,187 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 
 ---
 
+## NEXT CHAT PILE (curated 2026-05-16, session 215 close)
+
+Captain-validated work queue for the next chat. Listed in rough do-first order; mix-and-match as smoke surfaces priorities.
+
+### Zone subsystem follow-ups
+- **Inline name editing on element-detail header (all element types)**. Replace the popover-edit pattern for the *name* field only with inline edit-in-place: click the name → field becomes editable + select-all-text. Enter commits + exits edit; Escape reverts; click-outside commits. The schema for all OTHER fields stays popover-driven. One-field exception, deliberate.
+- **Auto-highlight name on zone create**. After Finish → already auto-selects the new zone. Add: navigate user to element-detail AND put the name field in inline-edit-mode with the placeholder text selected so they can immediately type a real name. Enter saves and deselects-the-field (zone stays selected, just exits the inline editor).
+- **Allow moving existing markers while drafting a new zone**. Today drafting suspends other map interaction. Open up: vertex drag on existing selected zones should remain functional while a draft is in progress. Care needed around event-handler precedence — drafting must still capture canvas clicks for placement.
+- **Visual polish on draft + edit markers** to match zoner's look. Zoner's numbered cyan markers + dashed preview path have a small visual edge atlas can match (glow, sub-pixel anti-aliasing on the number, finer dashed stroke).
+
+### Visual settings popover follow-ups
+- **Pin style / labels / tint live wiring** (V1.5, deferred from session 213). Today these prefs persist but don't render-respond. Wire pin-visuals.ts consumers:
+  - `pin_style`: extend the cache key in `pinVisualFor` to include style; draw `round-icon` and `pin-shape` variants alongside the existing `icon` mode.
+  - `pin_tint`: cache key + tint resolution (`type-color` / `accent` / `muted`) — return the color string the cache should use.
+  - `pin_labels` + `pin_label_threshold`: render a divIcon label below each pin per the mode (always / hover / threshold / never). Lift the ghost-pin label threshold helper.
+- **Popover label capitalization** — minor styling pass to match the rest of atlas (lowercase section labels with cyan accent chips).
+
+### Sync / API
+- **Repair existing server markers** pushed during the pre-migration broken window (their `order` is null server-side because atlas was stripping). Atlas's local data has order intact, so atlas renders fine; but other tools (or atlas-after-fresh-relink) might not. **Repair path**: enter edit mode on each affected zone → drag any marker a pixel and release → `updateMarker` PATCH now includes order → server updates → done. Alternative: wipe + redraw. Future zones push correctly from the start.
+- **Verify zoner discrepancy resolved**. Pre-migration: zoner showed atlas-pushed polygons mangled because server had no order data and zoner's read pipeline didn't fall back to insertion order. Post-migration + after the marker repair above, both tools have explicit order from the server → zoner should render correctly. Smoke this: push a fresh zone from atlas, open in zoner, verify polygon outline is correct.
+
+### Smaller items
+- **ESC cancel during edit mode is shipped** (S4) but unverified in smoke. Quick test: enter edit, drag a vertex, hit ESC → vertex should snap back to original. If it doesn't, that's a bug to file.
+- **Centroid drag handle** (zoner has a center dot that bulk-shifts the whole zone). Deferred; vertex-by-vertex covers v1.
+- **Snap-to-existing-vertex** during draw/edit (zoner Ctrl+hover snaps onto another marker's coord). Polish, not v1.
+- **DESIGN_ZONES.md cleanup** — §3 prose still mentions some not-shipped variants; the as-shipped behavior is mostly in §3.1-3.5 but a re-read pass would catch drift.
+
+---
+
+## Session 215 (2026-05-16) — Smoke fixes for zone subsystem
+
+**Headline**: Captain smoked session 214's zone work. Five bug-fix bouts landed: image background z-stacking + popover-image collision + edit-handle positioning + selection-state cleanup + zone top-bar + on-map presence + the big one — marker read-side wire-shape preservation (made pulled zones invisible after relink). 477/477 vitest, bundle 447.04 → 448.55 KB JS, CSS 73.88 → 74.02 KB.
+
+### Bug fixes
+
+**Image disappears on popover open**. `setBackgroundGrid` was calling `backgroundLayer.clearLayers()` → wiped the image. Fix: separate `gridLayer` from `backgroundLayer` in Leaflet2DManager; new `setGridOverlay()` / `clearGridOverlay()` methods don't touch the background image.
+
+**Canvas panels rendered behind the bg image**. Leaflet's pane z-indexes (180-700) bled up into the wrapper's stacking context because `.atlas-map-canvas-container` had no z-index. Fix: `z-index: 0` on the container — establishes a self-contained stacking context bounding all Leaflet z-indexes inside. Panels above (toolbar z=2, popover z=10, drawing overlay z=9) trivially beat container's z=0. Pre-fix also added: a custom Leaflet pane `atlasBgImagePane` at z=180 so the image renders below all other Leaflet panes regardless of DOM order. Both stay.
+
+**Edit handle position off relative to read-only dots**. `margin: 0 !important` on the vertex-dot and edit-handle CSS was clobbering Leaflet's inline `margin-left: -anchor.x` / `margin-top: -anchor.y` (how it centers icons on latlng). Marker rendered with top-left at latlng instead of center. Edit handles' 7px offset was clearly visible. Fix: drop the margin/width/height `!important` overrides; let Leaflet's inline styles win.
+
+### S6 — Selection state cleanup + vertex unification
+
+Three coupled fixes:
+- **Zone click on canvas didn't update sidebar/midpanel**: I was patching `selectedElementId` but not `navigate()`-ing to the element route. URL-driven middle pane stayed put. Pin click does both; zone click now does too (patch + navigate + sidebarMode: 'elements'). Chip click also navigates for consistency.
+- **Two sets of vertex markers visible during edit**: S3 used `L.circleMarker` (SVG/overlayPane); S4 used `L.marker + divIcon` (HTML/markerPane). Different panes → different sub-pixel snapping. Switched S3 to `L.marker + divIcon` (same primitive as edit handles). Added `setVertexDotsSuppressed(zoneId, true)` to ZoneOverlay — edit module calls on entry to hide read-only dots while its handles take over at the same coords. On exit, dots unsuppress (zone still selected).
+- **Edit state persisted when selecting another zone**: `syncEditMode` only handled "edited zone deleted." Added: exit edit when `selectedElementId !== editingZoneId` (selection change at any layer — chip, canvas, sidebar, midpanel — supersedes edit). Edit state is now genuinely a layer ON TOP OF selection.
+
+### S7 — Zone top-bar maps + on-map presence badge
+
+**Zone top bar**: extended `getAssociatedMaps` to handle zone type — returns distinct maps that have markers for the zone (cross-map zones surface multiple icons). Element-detail header for zones now renders `[map]` icons for each. Click → opens the map AND pans to the zone's centroid (average x/y of its markers on that map). No pin icons cluttering things up.
+
+**On-map presence badge in sidebar**: new small cyan `place` icon rendered left of the type chip in elements-sidebar rows when the element has presence on the currently-active map. Two presence kinds:
+- Element has a pin on the active map (any element type)
+- Element is a zone with a marker on the active map
+
+Computed once per render from `state.data.elements` + the active map tab. Distinct from the existing Location "has anchored maps" badge — this one says "currently visible on the open map."
+
+### S8 — Marker read-side wire-shape preservation (the big one)
+
+**Symptom** (Captain smoke): pushed markers to OW successfully; server confirmed map/zone links + coords correct; but neither zoner nor atlas-after-relink could see the zones on the map.
+
+**Root cause**: `adaptRecord` was hardcoded `isPin = type === 'pin'` for the "preserve wire-shape" branch. Markers fell through to the non-pin path — `_id` suffix stripped to bare names on read. So disk got `{map: 'x', zone: 'z'}` instead of `{map_id, zone_id}`. Every atlas helper (`zone-derived`, `syncZones`, chip strip, edit mode) checks `marker.map_id` / `marker.zone_id` — undefined after pull → markers don't match any map+zone → no zones rendered.
+
+**Fix**: renamed `isPin → wireShape`, included both `pin` AND `marker` in the bypass. Symmetric to the write-side convention #8 — pin and marker are both wire-shape on disk, both ways. Added 3 regression tests covering server response in nested form (`{map: {id, name}}`), flat form (`{map_id: 'x'}`), and null-zone-id (free marker case).
+
+**Zoner-side note**: zoner displays the same server data messed up. Server is correct (atlas confirms). Zoner-side investigation deferred — see Next Chat Pile.
+
+### S9 — Marker visuals (order labels) + Anchor migration + final centering
+
+**Visual order labels** (1-indexed numbers inside the cyan circles):
+- Read-only vertex dots (selected zone): 12×12 with 8px number.
+- Edit-mode draggable handles: 16×16 with 10px number.
+- Draft-mode markers: 18×18 with 10px number (unchanged from S2).
+Three states share the same visual language: numbered cyan circles that grow as interaction deepens.
+
+**Anchor server migration** (the real fix): atlas was workarounding a `422 Unknown field 'order'` from live OW via a per-type wire-strip. After messaging Anchor with the exact failing body + asymmetry vs zoner, Anchor identified the missing server-side write validator entry and **deployed the migration 2026-05-16**. Atlas now sends `order` on both CREATE and PATCH; server stores it; pulls return it. Strip removed permanently. `SERVER_UNKNOWN_FIELDS_BY_TYPE` in `ow-client-adapter.ts` is empty (hook retained for future cases). Multi-machine sync of zones is now order-stable.
+
+**Chronology kept honest** in DESIGN_ZONES.md §8.0 — S1 strip → S9 attempted-remove (wrong, hit 422 again) → re-strip → messaged Anchor → migration deployed → strip dropped → verified. Lesson: trust the live 4xx, but raise it to Anchor for the real fix rather than long-lived workarounds.
+
+**Centering fix** (final pass): the original number-centering pattern (`position: absolute; top/left: 50%; transform: translate(-50%, -50%)`) plus a defensive `position: relative !important` on the parent broke marker positioning in two ways:
+- `position: relative !important` clobbered Leaflet's inline `position: absolute`, which broke the iconAnchor margin-based centering — markers rendered with top-left at the latlng instead of center.
+- The percentage-based absolute centering inside a 12-16px parent with `box-sizing: border-box` + 2px border had a padding-box vs border-box percentage edge case that shifted the number bottom-left.
+
+**Rebuilt** using flex centering on the parent (`display: flex; align-items: center; justify-content: center`). No `position: relative` override — Leaflet's inline `position: absolute` stays intact and the iconAnchor margin centers the marker on its latlng correctly. The number sits dead-center via flex, robust against pixel rounding.
+
+**Visual fix**: restored 1-indexed order number labels inside vertex visuals:
+- **Read-only vertex dots** (selected zone, not editing): 12×12 with 8px number, absolute-centered.
+- **Edit-mode draggable handles**: 16×16 with 10px number, absolute-centered.
+- **Draft-mode markers** already had numbers from S2; unchanged.
+Three states now share the same visual language: "numbered cyan circle, gets bigger as you go deeper into interaction." `position: absolute; top/left: 50%; transform: translate(-50%, -50%)` pattern — defeats Leaflet's div-icon defaults reliably.
+
+### Pokeable for next smoke:
+- **Push a zone with markers** to api-linked world → no 422, server has the data with `order` populated, atlas pulls back correctly after unlink+relink. Server `GET /marker/?map_id=X` should now return each marker with its `order` value.
+- **Zoner should now also render the polygon correctly** since markers carry explicit order on server.
+- **Click any zone on canvas** → element-detail middle pane updates + sidebar reflects selection (the S6 fix).
+- **Enter edit mode** → vertex handles appear at exactly the same positions the read-only dots were (S6 unification + edit-handle margin fix).
+- **Switch from editing zone A to selecting zone B** (any path — chip click, canvas click, sidebar) → edit mode dissolves cleanly on A; B is just selected, not auto-edited.
+- **Open a zone's element-detail** → top bar shows map icon(s) for each map with the zone's markers. Click → opens map + pans to zone centroid.
+- **Browse the elements sidebar with a map tab open** → any element with a pin or zone-marker on that map shows the small cyan place badge next to its type chip.
+
+### Known not-yet-shipped from the pile (see top of file):
+Inline name editing, auto-highlight on create, marker drag during draft, pin style/tint/labels live preview, council motion for `Marker.order`.
+
+---
+
+## Session 214 (2026-05-16) — Zone smoke fixes + edit mode
+
+**Headline**: Captain smoked session 213's zone work. Five fixes/features landed in one session, addressing real bugs (image background + canvas panel z-stacking + marker push 422), polish (draft label centering), and the largest missing piece (shape edit mode with drag/insert/delete). Zone subsystem is now end-to-end usable: create, view, sync, edit. 474/474 vitest green throughout (+2 new for the marker order strip; selection/edit visuals verified by smoke). Bundle 439.58 → 447.04 KB JS / 122.60 → 124.82 KB gzipped (+7.5 KB for edit mode). CSS 72.31 → 73.88 KB.
+
+### Bug fixes from smoke
+
+**Image disappears on visual settings popover open**. Root cause: my V1 `applyGrid` called `manager.setBackgroundGrid()` which calls `backgroundLayer.clearLayers()` — wiping the image. For URL images the destruction was synchronous; for local-image uploads, the blob loaded async after the clear so the image survived. Opening the popover triggered `applyLivePrefs` → `applyGrid(false)` → clear → image gone. **Fix**: separate `gridLayer` from `backgroundLayer` in `Leaflet2DManager`. New methods `setGridOverlay(spacing, color)` (non-destructive grid overlay above whatever background is set) and `clearGridOverlay()` (only touches the grid). `setBackgroundGrid` retained for the no-image fallback case. `applyGrid` in the popover now uses these clean methods.
+
+**Canvas panels rendered behind the bg image**. Root cause: `.atlas-map-canvas-container` was `position: relative` but had no z-index, so it didn't create a stacking context. Leaflet's pane z-indexes (atlasBgImagePane=180, tilePane=200, overlayPane=400, markerPane=600) bled up into the wrapper's stacking context and competed with toolbar (z=2), popover (z=10), drawing overlay (z=9). Image at z=180 beat popover at z=10 → image rendered over the popover. **Fix**: added `z-index: 0` to `.atlas-map-canvas-container` — establishes a self-contained stacking context, bounding all Leaflet z-indexes inside. The wrapper's panels just need to beat container's z=0 as a whole (which they all do). Also added `overflow: hidden` on the container as belt-and-braces against oversized image overlay leaking into toolbar/zone-strip rows. **Pre-fix** I also added a custom low-z Leaflet pane (`atlasBgImagePane` at z=180) so the image renders below all other Leaflet panes regardless of DOM insertion order — that part stays; it solves a parallel issue (zone polygons in overlayPane at z=400 should sit above the image, and now they do).
+
+**Marker push 422 "Unknown field 'order'"**. Root cause: OW server schema rejects `order` on marker writes despite SDK FIELD_SCHEMA declaring it (server schema lags SDK). **Fix**: new `SERVER_UNKNOWN_FIELDS_BY_TYPE` map in `ow-client-adapter.ts` keyed by ElementType — entries are stripped from wire body but preserved on disk. `marker → {order}` is the inaugural entry. Disk retains `order` for local geometry reconstruction (zone-derived.ts).`FakeOwApiClient` + `statefulOwHandlers` now both 422 on marker writes containing `order` (Convention #20: encode the rule in fakes before the caller). 2 new integration tests in `ow-client-adapter.marker.test.ts` lock the contract — marker bodies omit `order` on push regardless of caller input. Existing marker drawing flow updated: `zone-drawing.ts` finish still writes `order` to disk (it just doesn't reach the API). Bundle into M8 council motion (DESIGN_ZONES.md §7) — ask Anchor when/if marker.order will be settable server-side.
+
+### S1 — Marker order strip (bout above)
+### S2 — Draft marker label centering
+
+Number labels on draft markers (cyan dots while drawing) were rendering bottom-left of the circle instead of centered. Root cause: my flex centering was losing to Leaflet's default `.leaflet-div-icon` background/padding rules. **Fix**: switched the inner `.atlas-zone-draft-marker-num` to `position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%)` — reliable absolute centering that doesn't compete with Leaflet defaults.
+
+### S3 — Proper selection visual: glow + vertex dots
+
+DESIGN_ZONES.md §4.3's "selected zone visual" was underbuilt. Shipped:
+- **Drop-shadow glow** on the SVG path via CSS class `.atlas-zone-selected` toggled in `ZoneOverlay.applyStyle`. `filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.85))`.
+- **Vertex dots** at each marker position when zone is selected. Read-only in S3 (interactive in S4). Rendered as `L.circleMarker` (4px radius, cyan fill, white border) per point. `showVertexDots/hideVertexDots` lifecycle in `ZoneOverlay`.
+
+Now when you click a zone chip, the canvas clearly shows: glowing outline + every marker as a visible dot. You can see what you've got. Sets up S4 (dots become drag handles).
+
+### S4 — Shape edit mode (the big one)
+
+Full implementation of DESIGN_ZONES.md §3, modeled on zoner with cleanups. New module `src/tabs/right/zone-edit-mode.ts` (~370 LOC). Captain's pattern locked: **single click selects, double click enters edit mode**; "Edit shape" button in element-detail Markers section is the alias entry; **ESC cancels (restores snapshot), Enter commits**.
+
+**Entry**:
+- **Dblclick zone polygon/polyline on canvas** → `enterEditMode(zoneId, mapId, toasts)`. New `onZoneDoubleClick` callback on `ZoneOverlay` wired to Leaflet's native `dblclick` event (which natively suppresses the preceding `click`, so no 200ms timeout dance — zoner's pattern was flagged janky in the second audit; atlas does it right).
+- **"Edit shape" button** in element-detail Markers section (added in S4). Finds the first map this zone has markers on, opens the map tab if needed, enters edit mode there. Button label flips to "Done editing" + a Cancel ✗ button appears next to it while editing.
+
+**During edit**:
+- Vertex dots become draggable `L.Marker` instances (cyan circles, slightly larger, `cursor: grab`). Drag commits to folder-store on `dragend` (not during drag — `drag` is preview-only).
+- Segment hover overlays — invisible 20px-weight polylines between consecutive markers (wrapping last→first for polygon zones). On hover, opacity 0 → 0.3 (cyan dashed). Click → insert marker at the **midpoint** of that segment (zoner pattern; not projection foot of click point) at order `i+1`, with renumber-all bumping every subsequent marker's order +1.
+- **Right-click vertex** → delete marker. Refuses if it would drop below shape minimum (3 polygon / 2 line); toasts info.
+- Map's `doubleClickZoom` is disabled on entry, restored on exit (avoids zooming when user dblclicks for another reason).
+- Canvas container gets `.atlas-zone-editing` class → `cursor: crosshair`.
+
+**Exit**:
+- **Enter** key or **"Done editing"** button → commits (no-op since autosaved) + exits.
+- **ESC** key or **Cancel ✗** button → cancel. Restores snapshot via 3-way diff: markers added during edit → delete; markers deleted during edit → recreate with original id/order; matched markers with mutated position/order → revert.
+- **Map tab disposed** while editing → `abortEditModeForMap(mapId)` exits without restoring (the map's gone anyway).
+- **Edited zone deleted from elsewhere** → `syncEditMode()` (in the global subscribe loop) detects it and exits cleanly.
+
+**State**: new `ui.zoneEditing: { zoneId, mapId } | null` slice. Single global slot — entering another zone's edit commits-and-exits the current one first.
+
+### Visual settings panel — confirmation
+Yes, popover IS functional (per PROGRESS session 213): grid + pin drag lock are wired live, others persist correctly but don't render-respond yet. V1.5 follow-up will wire pin style/labels/tint to `pin-visuals.ts` (cache key expansion) when prioritized.
+
+### Pokeable for next smoke:
+
+- **Marker sync**: create a zone with N markers, push to online — no more 422. Server stores marker with map_id + zone_id + x/y but no order. Local file retains order. Multi-machine pull (if simulated): server markers come back without order; atlas reconstructs via created_at fallback.
+- **Image still shows after popover open**: open visual settings cog, grid toggle on/off, image background remains untouched.
+- **All panels render above the image**: toolbar, popover, drawing overlay, zone chip strip all visibly on top of the canvas.
+- **Draft marker numbers centered**: while drawing a zone, each cyan dot has its order number centered inside.
+- **Selection visual**: click a zone chip → polygon glows + vertex dots appear at each marker position. Switch to a Character → glow + dots disappear. Switch back via chip → reappear.
+- **Edit mode entry**: dblclick a zone on canvas → vertex dots become draggable + segment hover overlays appear + cursor becomes crosshair + "Edit shape" button in element-detail header flips to "Done editing" + a Cancel ✗ appears.
+- **Drag a vertex** → it moves, autosaves; polygon outline follows on dragend.
+- **Hover over a segment** → cyan dashed line appears. Click → new marker inserted at the segment midpoint; subsequent markers' orders bumped.
+- **Right-click a vertex** → marker deleted. Refuses if zone would drop below 3 (polygon) or 2 (line).
+- **ESC during edit** → toast "edit cancelled"; all your drags/inserts/deletes from this edit session are rolled back.
+- **Enter or "Done editing" button** → exits cleanly, changes preserved.
+- **Cross-zone edit switch**: dblclick another zone while editing → first edit commits, second enters edit.
+
+### Known rough edges (deferred):
+- **Pin style/tint/labels live preview** (V1.5 — popover persists but consumer wiring deferred to follow-up).
+- **Capitalization in popover labels** — minor styling consistency pass; bundle with future visual polish.
+- **Centroid drag handle** (zoner has this — drag the whole zone at once via a center dot). Deferred; vertex-by-vertex is sufficient for v1.
+- **Multi-machine marker order ambiguity**: when atlas A pushes markers (server has no order field), atlas B pulls them; B reconstructs order by created_at. If two atlas instances edit the same zone simultaneously, order might drift. Solo case is fine; multi-instance edit is a known limitation pending server schema update (M8 motion).
+- **`order` field server motion** — bundle into M8 council motion.
+
+---
+
 ## Session 213 (2026-05-16) — Zones subsystem foundation + features
 
 **Headline**: The zone subsystem landed in one autonomous session. Pure-markers model (OW canon, no spurious map_id/coordinates on Zone), full drawing flow, chip strip, element-detail visuals + markers list, canvas toolbar with show/hide + fit-to-image. 13 bouts, all green at typecheck + vitest + build at every seam. 385 → 472 vitest tests (+87 — Zone CRUD, derived views, marker SDK, geometry math, prefs, drawing helpers). Bundle 410.21 → 439.58 KB JS / 114.85 → 122.60 KB gzipped (+29 KB across foundations + features). CSS 61.38 → 72.31 KB.

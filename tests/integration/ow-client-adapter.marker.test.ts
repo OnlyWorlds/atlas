@@ -19,7 +19,7 @@ import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { mswServer } from '../setup';
 import { statefulOwHandlers } from '../msw-handlers';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
-import { OwClientAdapter } from '../../src/sync/ow-client-adapter';
+import { OwClientAdapter, adaptRecord } from '../../src/sync/ow-client-adapter';
 
 let clock: MonotonicClock;
 let adapter: OwClientAdapter;
@@ -51,7 +51,6 @@ describe('OwClientAdapter — marker write bypass', () => {
       zone_id: 'zone-1',
       x: 100,
       y: 200,
-      order: 0,
     });
 
     const stored = state.get('marker')!.get('mk1')!;
@@ -72,7 +71,6 @@ describe('OwClientAdapter — marker write bypass', () => {
       zone_id: 'zone-1',
       x: 0,
       y: 0,
-      order: 0,
     });
 
     await adapter.updateElement('marker', 'mk2', {
@@ -104,6 +102,107 @@ describe('OwClientAdapter — marker write bypass', () => {
     expect(stored.map_id).toBe('map-A');
     expect((stored as Record<string, unknown>).map_id_id).toBeUndefined();
     expect(stored.zone_id).toBeUndefined();
+  });
+});
+
+describe('OwClientAdapter — marker `order` sent on push (post-Anchor-migration)', () => {
+  // Anchor deployed marker.order as write-allowed 2026-05-16. Atlas now
+  // sends `order` on both CREATE and PATCH; server stores it; geometry
+  // round-trips cleanly across machines.
+  it('marker create body preserves `order`', async () => {
+    const { handlers, state } = statefulOwHandlers({ baseUrl: TEST_BASE, clock: clock.next });
+    mswServer.use(...handlers);
+
+    await adapter.createElement('marker', {
+      id: 'mk-o',
+      name: '',
+      map_id: 'map-A',
+      zone_id: 'zone-1',
+      x: 50,
+      y: 50,
+      order: 7,
+    });
+
+    const stored = state.get('marker')!.get('mk-o')!;
+    expect(stored.map_id).toBe('map-A');
+    expect((stored as Record<string, unknown>).order).toBe(7);
+  });
+
+  it('marker update body preserves `order` on patch', async () => {
+    const { handlers, state } = statefulOwHandlers({ baseUrl: TEST_BASE, clock: clock.next });
+    mswServer.use(...handlers);
+
+    await adapter.createElement('marker', {
+      id: 'mk-u',
+      name: '',
+      map_id: 'map-A',
+      zone_id: 'zone-1',
+      x: 0,
+      y: 0,
+      order: 0,
+    });
+
+    await adapter.updateElement('marker', 'mk-u', { x: 99, order: 12 });
+
+    const stored = state.get('marker')!.get('mk-u')!;
+    expect(stored.x).toBe(99);
+    expect((stored as Record<string, unknown>).order).toBe(12);
+  });
+});
+
+describe('adaptRecord — marker preserves wire-shape on read (session 215)', () => {
+  it('unwraps nested {map: {id}} → map_id (with suffix)', () => {
+    const out = adaptRecord(
+      {
+        id: 'mk1',
+        updated_at: '2026-01-01T00:00:00Z',
+        map: { id: 'map-X', name: 'World Map' },
+        zone: { id: 'zone-Y', name: 'Forest' },
+        x: 100,
+        y: 200,
+      },
+      'marker',
+    );
+    expect(out.map_id).toBe('map-X');
+    expect(out.zone_id).toBe('zone-Y');
+    expect(out.map).toBeUndefined();
+    expect(out.zone).toBeUndefined();
+    expect(out.x).toBe(100);
+    expect(out.y).toBe(200);
+  });
+
+  it('keeps flat map_id / zone_id literal (no strip to bare)', () => {
+    const out = adaptRecord(
+      {
+        id: 'mk2',
+        updated_at: '2026-01-01T00:00:00Z',
+        map_id: 'map-A',
+        zone_id: 'zone-1',
+        x: 50,
+        y: 50,
+      },
+      'marker',
+    );
+    expect(out.map_id).toBe('map-A');
+    expect(out.zone_id).toBe('zone-1');
+    expect(out.map).toBeUndefined();
+    expect(out.zone).toBeUndefined();
+  });
+
+  it('handles null zone_id (free marker, not attached to a zone)', () => {
+    const out = adaptRecord(
+      {
+        id: 'mk-free',
+        updated_at: '2026-01-01T00:00:00Z',
+        map_id: 'map-A',
+        zone_id: null,
+        x: 0,
+        y: 0,
+      },
+      'marker',
+    );
+    expect(out.map_id).toBe('map-A');
+    expect(out.zone_id).toBeNull();
   });
 });
 

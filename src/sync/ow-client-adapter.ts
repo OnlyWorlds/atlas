@@ -122,22 +122,29 @@ export class OwClientAdapter implements OwApiClient {
 // ---- Adapter helpers ----
 
 /**
- * Convert a server response into our internal disk shape (bare relation names).
+ * Convert a server response into our internal disk shape.
  *
  * Three cases per field:
- *   1. Nested relation object `{map: {id, name, ...}}` → `{map: 'id'}` (bare).
- *   2. Nested relation array `{species: [{id, name}, ...]}` → `{species: ['id', ...]}`.
+ *   1. Nested relation object `{map: {id, name, ...}}` → unwrap to the id.
+ *   2. Nested relation array `{species: [{id, name}, ...]}` → unwrap to array of ids.
  *   3. Wire-shape `_id` / `_ids` from server (e.g. raw `{birthplace_id: 'id'}`)
- *      → re-keyed to bare `{birthplace: 'id'}` so disk shape matches FIELD_SCHEMA.
+ *      → re-keyed to bare for non-spatial types so disk matches FIELD_SCHEMA.
  *   4. Everything else (primitives, raw arrays of strings, etc.) passes through.
  *
  * Always stamps the `type` field — server per-type endpoints omit it.
  *
- * Pin is special: its FIELD_SCHEMA fields `map` (single_link) and `element_id`
- * (single_link, literally suffixed) need different handling. We keep pin's
- * `element_id` literal AND its `map_id` literal (matching the Pin type def in
- * core/types.ts which uses `_id` suffix). For pin we DO NOT collapse `_id`
- * suffix back to bare.
+ * **Wire-shape spatial types** (pin + marker): atlas stores these on disk
+ * with `_id` / `_ids` suffix on every relation field (matches the obsidian-
+ * plugin convention and the Pin / Marker type defs in core/types.ts —
+ * `map_id`, `zone_id`, `element_id`). For these types adaptRecord MUST:
+ *   - Wrap unwrapped nested relations BACK INTO `_id`/`_ids` form.
+ *   - NOT strip an `_id`/`_ids` suffix the server may have returned literally.
+ *
+ * Session 215 smoke: marker was previously not in the bypass — server-stored
+ * markers came back with `map`/`zone` (bare) on disk instead of
+ * `map_id`/`zone_id`, so zone-derived helpers couldn't match them to maps
+ * and pulled zones never rendered after relink. Symmetric to pin's write
+ * convention (#8), this is the read-side counterpart.
  */
 export function adaptRecord(raw: unknown, type: ElementType): ServerRecord {
   if (!raw || typeof raw !== 'object') {
@@ -145,7 +152,10 @@ export function adaptRecord(raw: unknown, type: ElementType): ServerRecord {
   }
   const src = raw as Record<string, unknown>;
   const out: Record<string, unknown> = { type };
-  const isPin = type === 'pin';
+  // Spatial types whose disk shape uses `_id` / `_ids` suffix verbatim.
+  // Keep these in sync with the Pin / Marker / (no Zone here — zone's
+  // relations are bare-name arrays like content elements) type defs.
+  const wireShape = type === 'pin' || type === 'marker';
 
   for (const [key, value] of Object.entries(src)) {
     if (key === 'type') continue;  // we stamp our own
@@ -153,26 +163,26 @@ export function adaptRecord(raw: unknown, type: ElementType): ServerRecord {
     const unwrapped = tryUnwrap(value);
     if (unwrapped.unwrapped) {
       // Server gave us a nested relation.
-      //   Pin: always add `_id` / `_ids` suffix (wire shape locally).
+      //   Wire-shape types: add `_id` / `_ids` suffix (wire shape locally).
       //   Other: keep bare field name to match FIELD_SCHEMA + UI.
-      const targetKey = isPin
+      const targetKey = wireShape
         ? (unwrapped.kind === 'single' ? `${key}_id` : `${key}_ids`)
         : key;
-      // For non-pin: we're replacing the nested object with its id under the
-      // same key — always write. For pin: targetKey differs from key, only
-      // skip if server also sent the suffix-form key separately.
+      // For non-wire-shape: replacing nested object with its id under the
+      // same key — always write. For wire-shape: targetKey differs from key,
+      // only skip if server also sent the suffix-form key separately.
       if (targetKey === key || !(targetKey in src)) out[targetKey] = unwrapped.value;
       continue;
     }
 
-    // Re-key `_id` / `_ids` → bare for non-pin so disk shape matches FIELD_SCHEMA.
+    // Re-key `_id` / `_ids` → bare for non-wire-shape so disk matches schema.
     // Handles both string ids and explicit nulls (server's way of saying "cleared").
-    if (!isPin && key.endsWith('_id') && key !== 'id' && (typeof value === 'string' || value === null)) {
+    if (!wireShape && key.endsWith('_id') && key !== 'id' && (typeof value === 'string' || value === null)) {
       const bare = key.slice(0, -3);
       if (!(bare in src)) out[bare] = value;
       continue;
     }
-    if (!isPin && Array.isArray(value) && key.endsWith('_ids')) {
+    if (!wireShape && Array.isArray(value) && key.endsWith('_ids')) {
       const bare = key.slice(0, -4);
       if (!(bare in src)) out[bare] = value.filter(v => typeof v === 'string');
       continue;
@@ -216,6 +226,17 @@ const ATLAS_LOCAL_FIELDS = new Set<string>([
 ]);
 
 /**
+ * Per-type fields the SDK FIELD_SCHEMA declares but the live OW server
+ * currently rejects on write. Stripped from wire body but preserved on disk
+ * so atlas's local behavior keeps working.
+ *
+ * Currently empty: Anchor deployed a server migration adding `Marker.order`
+ * to the write validator on 2026-05-16. The earlier strip (S1) is no longer
+ * needed. The hook stays for future server-schema-lag cases.
+ */
+const SERVER_UNKNOWN_FIELDS_BY_TYPE: Partial<Record<ElementType, ReadonlySet<string>>> = {};
+
+/**
  * Convert a disk-shape body (bare relation names) to wire-shape (_id / _ids
  * suffix) per FIELD_SCHEMA. Uses the SDK's static `prepareRelations` helper.
  *
@@ -245,11 +266,13 @@ function toWireShape(
   type: ElementType,
   isUpdate: boolean
 ): Record<string, unknown> {
+  const perTypeStrips = SERVER_UNKNOWN_FIELDS_BY_TYPE[type];
   const clean: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {
     if (k === 'id' && isUpdate) continue;
     if (SERVER_MANAGED_FIELDS.has(k)) continue;
     if (ATLAS_LOCAL_FIELDS.has(k)) continue;
+    if (perTypeStrips?.has(k)) continue;
     if (v === undefined) continue;
     clean[k] = v;
   }

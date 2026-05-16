@@ -195,7 +195,43 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       if (typeof loc === 'string' && loc) locationsWithMaps.add(loc);
     }
 
-    listEl.innerHTML = filtered.map(el => renderElementRow(el, el.id === selectedId, locationsWithMaps.has(el.id))).join('');
+    // Index which element ids have presence on the CURRENTLY ACTIVE map
+    // (Captain's session 215 request). Two kinds of presence:
+    //   - a pin on the active map references this element → presence
+    //   - this element is a zone with a marker on the active map → presence
+    // Renders as a small map icon left of the row's category label,
+    // signalling "this element is placed on the open map."
+    const activeMapId = (() => {
+      const active = state.ui.rightTabs[state.ui.rightActiveIndex];
+      return active && active.kind === 'map' ? active.mapId : null;
+    })();
+    const elementsOnActiveMap = new Set<string>();
+    if (activeMapId) {
+      for (const e of elements) {
+        if (e.type === 'pin') {
+          const pin = e as { element_id?: string; map_id?: string };
+          if (pin.map_id === activeMapId && typeof pin.element_id === 'string') {
+            elementsOnActiveMap.add(pin.element_id);
+          }
+        } else if (e.type === 'marker') {
+          const marker = e as { zone_id?: string; map_id?: string };
+          if (marker.map_id === activeMapId && typeof marker.zone_id === 'string') {
+            elementsOnActiveMap.add(marker.zone_id);
+          }
+        }
+      }
+    }
+
+    listEl.innerHTML = filtered
+      .map(el =>
+        renderElementRow(
+          el,
+          el.id === selectedId,
+          locationsWithMaps.has(el.id),
+          elementsOnActiveMap.has(el.id),
+        ),
+      )
+      .join('');
   }
 
   const unsubState = subscribe(render);
@@ -204,13 +240,26 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   return () => { unsubState(); unsubHash(); };
 }
 
-function renderElementRow(el: Element, selected: boolean, hasMap: boolean): string {
+function renderElementRow(
+  el: Element,
+  selected: boolean,
+  hasMap: boolean,
+  onActiveMap: boolean,
+): string {
   const icon = ELEMENT_ICONS[el.type] ?? 'category';
   const cls = ['atlas-row', selected ? 'selected' : ''].filter(Boolean).join(' ');
   // hasMap is set only for Location rows that have at least one map anchored.
   // Renders a small cyan-tinted map glyph between the name and the type chip.
   const mapBadge = hasMap
     ? `<span class="material-symbols-outlined atlas-elements-row-mapbadge" title="this location has at least one map">map</span>`
+    : '';
+  // onActiveMap is set for any element with presence on the currently active
+  // map (pin pointing at it, or zone with a marker on the map). Different
+  // semantic from `hasMap`: hasMap says "this place anchors a map"; onActiveMap
+  // says "this element is rendered on the map you're looking at right now."
+  // Rendered just left of the type chip, anchored right.
+  const onMapBadge = onActiveMap
+    ? `<span class="material-symbols-outlined atlas-elements-row-onmap-badge" title="this element is on the open map">place</span>`
     : '';
   // draggable=true on every row except maps and zones. Map elements appear
   // in the list but can't be pin targets (DESIGN_MAPS.md §1.4); zones can't
@@ -222,6 +271,7 @@ function renderElementRow(el: Element, selected: boolean, hasMap: boolean): stri
       <span class="material-symbols-outlined">${icon}</span>
       <span class="atlas-row-main">${escapeText(el.name || '(unnamed)')}</span>
       ${mapBadge}
+      ${onMapBadge}
       <span class="atlas-row-meta">${escapeText(el.type)}</span>
     </div>
   `;

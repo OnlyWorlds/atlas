@@ -3559,13 +3559,20 @@
   border: 2px solid rgba(255, 255, 255, 0.95);
   border-radius: 50%;
   box-shadow: 0 0 8px rgba(34, 211, 238, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
+  /* Defeat Leaflet's default .leaflet-div-icon background/border that would
+     otherwise compete with our cyan circle styling. */
+  background-color: #22d3ee;
+  /* Explicit anchor so the inner number can absolute-center reliably across
+     browsers — flex centering was losing to Leaflet's defaults in smoke. */
+  position: relative;
 }
 
 .atlas-zone-draft-marker-num {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   font-size: 10px;
   font-weight: 700;
   color: #0a0a0a;
@@ -3888,4 +3895,172 @@
 .atlas-zone-markers-pan .material-symbols-outlined,
 .atlas-zone-markers-del .material-symbols-outlined {
   font-size: 14px;
+}
+
+/* Selected zone — drop-shadow glow on the SVG path (DESIGN_ZONES.md §4.3, S3).
+   Vertex dots are rendered separately as L.circleMarkers in ZoneOverlay. */
+svg .atlas-zone-selected {
+  filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.85));
+}
+
+/* ============================================================
+   Zone shape edit mode (DESIGN_ZONES.md §3, S4)
+   ============================================================ */
+
+/* Cursor cue on the canvas container while editing. */
+.atlas-map-canvas-container.atlas-zone-editing {
+  cursor: crosshair;
+}
+
+/* Draggable vertex handle. Leaflet inline-styles width/height/margin per
+   iconSize/iconAnchor — those MUST NOT be overridden with !important, or
+   Leaflet's center-on-latlng positioning breaks: margin: 0 clobbers the
+   margin-left: -anchor.x / margin-top: -anchor.y that centers the icon
+   on the latlng, leaving the marker rendered with top-left at the latlng
+   instead. Session 215 smoke confirmed.
+
+   `className` on the DivIcon REPLACES the default `.leaflet-div-icon`
+   class entirely — no fight with leaflet defaults to win. */
+.atlas-zone-edit-handle {
+  background: #22d3ee;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(34, 211, 238, 0.7), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  cursor: grab;
+  box-sizing: border-box;
+}
+
+.atlas-zone-edit-handle:active {
+  cursor: grabbing;
+}
+
+/* Segment hover overlay — invisible by default, dashed cyan on hover.
+   The hit polyline is 20px weight per zoner pattern (DESIGN_ZONES.md §7). */
+.atlas-zone-edit-segment {
+  cursor: copy !important;
+}
+
+/* Edit-shape button in element-detail header. */
+.atlas-detail-section-spacer {
+  flex: 1;
+}
+
+.atlas-zone-edit-shape-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 12px;
+  color: rgba(34, 211, 238, 0.95);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.atlas-zone-edit-shape-btn:hover {
+  background: rgba(34, 211, 238, 0.18);
+  border-color: rgba(34, 211, 238, 0.55);
+}
+
+.atlas-zone-edit-shape-btn.is-editing {
+  background: rgba(34, 211, 238, 0.22);
+  border-color: rgba(34, 211, 238, 0.6);
+  color: #22d3ee;
+}
+
+.atlas-zone-edit-shape-btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.atlas-zone-edit-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 4px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 50%;
+  color: rgba(248, 113, 113, 0.95);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.atlas-zone-edit-cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.atlas-zone-edit-cancel-btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
+/* Read-only vertex dots on a selected zone (DESIGN_ZONES.md §4.3, session 215).
+   L.marker + divIcon so the dots render in markerPane alongside the edit-mode
+   draggable handles (which use the same primitive). This guarantees identical
+   sub-pixel rendering between the two visual states — the dots "grow" cleanly
+   into edit handles on edit entry, no positional drift. */
+.atlas-zone-vertex-dot {
+  background: #22d3ee;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(34, 211, 238, 0.6);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+/* Active-map presence badge on sidebar element rows. Renders left of the
+   type chip (anchored right) when an element has a pin on the active map,
+   or is a zone with markers on the active map. Distinct from the existing
+   `atlas-elements-row-mapbadge` (Locations-with-maps) — semantic is
+   "placed on the open map", not "anchors a map". */
+.atlas-elements-row-onmap-badge {
+  font-size: 14px !important;
+  color: rgba(34, 211, 238, 0.85);
+  opacity: 0.9;
+  margin-right: 4px;
+}
+
+/* Number labels inside vertex dots (read-only) + edit handles (interactive).
+   Centered via flex on the parent (NOT position:absolute on the child) to
+   sidestep two issues seen in session 215 final smoke:
+     1. position: relative !important on the parent clobbered Leaflet's
+        inline position: absolute, which broke the iconAnchor-via-margin
+        centering — markers ended up rendering with TOP-LEFT at the latlng
+        instead of CENTER, so the polygon corner pointed to each marker's
+        bottom-left.
+     2. position: absolute child + top/left 50% + translate(-50%, -50%) is
+        finicky in a tiny (12-16px) container with box-sizing: border-box
+        and a 2px border — the padding-box vs border-box percentage rule
+        shifted the number bottom-left visibly.
+   Flex centering on the parent is robust against both. Leaflet's inline
+   position: absolute stays intact (no !important on us), iconAnchor margins
+   apply normally, and the number sits dead-center. */
+.atlas-zone-edit-handle-num,
+.atlas-zone-vertex-dot-num {
+  font-weight: 700;
+  color: #0a0a0a;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.atlas-zone-vertex-dot-num {
+  font-size: 8px;
+}
+
+.atlas-zone-edit-handle-num {
+  font-size: 10px;
+}
+
+/* Center the number via flex on the parent. No `position: relative` override —
+   Leaflet's inline position: absolute (used to place the icon at the latlng
+   via transform + iconAnchor margin) stays in effect. */
+.atlas-zone-edit-handle,
+.atlas-zone-vertex-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
