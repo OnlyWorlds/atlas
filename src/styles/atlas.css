@@ -976,9 +976,18 @@
 .atlas-header-pin-affordance {
   color: var(--atlas-text-muted);
 }
+/* No-image map affordances: distinctly dimmer than 48% so the contrast with
+ * the cyan has-image siblings reads as a real hierarchy. Without this drop,
+ * the muted-white default sat too close to plain readable text and competed
+ * visually with the active cyan ones (which sit on the right via the sort). */
+.atlas-header-map-affordance:not(.atlas-map-tree-icon-has-image) .material-symbols-outlined {
+  color: rgba(255, 255, 255, 0.25);
+}
 .atlas-header-map-affordance.atlas-map-tree-icon-has-image .material-symbols-outlined {
-  color: var(--atlas-accent);
-  opacity: 0.7;
+  color: var(--atlas-cyan);
+  /* No opacity reduction — has-image should read as "this is the active /
+   * viewable map," visually MORE present than no-image. Earlier 0.7 opacity
+   * made saturated cyan dimmer than 48% white, inverting the affordance. */
 }
 .atlas-header-pin-affordance .material-symbols-outlined {
   font-size: 16px !important;
@@ -1340,6 +1349,37 @@
 .atlas-row-main.atlas-map-tree-row-open {
   color: var(--atlas-cyan);
   font-weight: 500;
+}
+/* Imageless maps — muted name to signal "not viewable as canvas yet." Pairs
+ * with openMapTab's refusal to open these as tabs; click opens element
+ * detail so the user can add an image_url or upload. */
+.atlas-row-main.atlas-map-tree-row-imageless {
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+}
+
+/* Drag-to-reorder visual feedback on map tree rows. Drop indicator is a
+ * 2px cyan line above or below the hovered row, depending on cursor Y vs
+ * row midpoint. Pseudo-elements so the line is purely visual and never
+ * intercepts pointer events. */
+.atlas-map-tree-row {
+  position: relative;
+}
+.atlas-map-tree-row[data-drop-pos]::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: var(--atlas-cyan);
+  border-radius: 1px;
+  pointer-events: none;
+}
+.atlas-map-tree-row[data-drop-pos="before"]::after { top: -1px; }
+.atlas-map-tree-row[data-drop-pos="after"]::after  { bottom: -1px; }
+/* Source row dimmed while it's being carried. */
+.atlas-map-tree-row.atlas-row-dragging {
+  opacity: 0.45;
 }
 
 /* Element row being dragged from the sidebar onto a map. Subtle dim so the
@@ -1856,7 +1896,7 @@
   padding: 2px 8px;
   border-radius: 10px;
   background: rgba(34, 211, 238, 0.12);
-  color: var(--atlas-accent);
+  color: var(--atlas-cyan);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.04em;

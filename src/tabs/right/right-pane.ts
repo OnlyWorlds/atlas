@@ -18,7 +18,7 @@ import type { WorldMap } from '../../core/types';
 import { ToastManager } from '../../ui/toast-manager';
 import { mountMapIndexTab } from './map-index-tab';
 import { mountMapTab, disposeMapTab, disposeAllMapTabs } from './map-tab';
-import { navigate, parseHash, worldHash } from '../../core/router';
+import { navigate, parseHash, worldHash, elementHash } from '../../core/router';
 import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount } from '../../sync/sync-attach';
 import { ConflictReviewModal } from '../../ui/conflict-review-modal';
 import { savePersistedRightTabs } from './right-tabs-persistence';
@@ -197,6 +197,19 @@ export function mountRightPane(mount: RightPaneMount): () => void {
         btn.addEventListener('auxclick', (e) => {
           if (e.button === 1) e.preventDefault();
         });
+        // Right-click → select this map ELEMENT (navigate to element-detail).
+        // Symmetric with the map-index tree row's right-click. Left-click
+        // activates the tab; right-click is the "edit this map's fields"
+        // gesture. Skip for stale tabs (no element to select).
+        if (!isStale) {
+          btn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const worldId = getState().active?.worldId;
+            if (!worldId || tab.kind !== 'map') return;
+            patchSlice('ui', { ...getState().ui, selectedElementId: tab.mapId, sidebarMode: 'elements' });
+            navigate(elementHash(worldId, tab.mapId));
+          });
+        }
       }
       tabBar.appendChild(btn);
     });

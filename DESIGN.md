@@ -169,7 +169,9 @@ A single user-chosen folder that holds atlas-managed worlds. Set up once per bro
 
 This sandboxes atlas data in a known subfolder when the user picks a busy folder like Documents, while supporting power users who pick the wrapper directly.
 
-**World discovery on root setup**: after resolving the root, atlas scans its subfolders for any with a valid `world.json` and imports them into the registry (using `handle.isSameEntry()` to avoid duplicates). Critical when localStorage is wiped but the disk folder remains.
+**World discovery on root setup**: after resolving the root, atlas scans its subfolders for any with a valid `world.json` and imports them into the registry (using `handle.isSameEntry()` to avoid duplicates). Critical when localStorage is wiped but the disk folder remains. Discovery reads each `world.json`'s `api` block — present → registered as api-linked (sync engine attaches normally on activation); absent → registered as local-only.
+
+**Orphan-handle recovery** (session 212): the atlas-root handle persists in IndexedDB under the fixed `ATLAS_ROOT_HANDLE_KEY`. When localStorage is cleared but IDB survives (the common "clear site data" partial-wipe), `hydrateAtlasRoot` detects the orphan and surfaces `state.atlasRootRecoverable`. UI shows a one-click `↻ Recover atlas folder` button (sidebar header + welcome panel) that ensures-writable + validates the `.atlas-root` marker + restores the registry entry + runs `discoverWorldsInRoot`. Post-recovery, deep URLs from before the wipe are reset to `#/` so the sidebar lands on Worlds mode without requiring an extra click.
 
 **Subfolder naming**: created worlds get `<slugified-name>-<uuid-prefix>` directories. Each world's `world.json` has the friendly name; the folder name is a backstage detail.
 

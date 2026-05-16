@@ -269,7 +269,17 @@ export function mountElementDetail(target: HTMLElement): () => void {
       cluster.className = 'atlas-header-cluster atlas-header-existing';
 
       if (hasMaps) {
-        for (const m of associatedMaps) {
+        // Imageless maps render LEFT, has-image maps RIGHT. Reading
+        // left-to-right, the eye lands on the bright cyan "ready to view"
+        // ones last. Imageless ones group as muted background — present
+        // for completeness but visually subordinate.
+        const sortedMaps = [...associatedMaps].sort((a, b) => {
+          const aHas = !!(a.image_url || a.image_media_id);
+          const bHas = !!(b.image_url || b.image_media_id);
+          if (aHas === bHas) return 0;
+          return aHas ? 1 : -1; // imageless first
+        });
+        for (const m of sortedMaps) {
           cluster.appendChild(buildMapAffordance(m, showMapNames, el.id));
         }
       }

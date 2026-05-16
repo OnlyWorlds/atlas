@@ -6,6 +6,23 @@ Each entry: source file, destination, treatment (verbatim, adapted, rewritten), 
 
 ---
 
+## map-tab.ts split (2026-05-16 session 212 Bout SP)
+
+Long-term-health refactor — not a port from legacy, but a restructure of new-atlas code. `map-tab.ts` had accreted to 858 lines doing 5 concerns; split into single-concern submodules so per-concern unit tests become viable in future bouts.
+
+| File | Lines | Contents |
+|---|---|---|
+| `src/tabs/right/map-tab.ts` | 470 | Mount/dispose/pan + interaction wiring (click, contextmenu, drag, drop) + subscribe hot path |
+| `src/tabs/right/map-tab-cache.ts` | 45 | `MapTabCacheEntry` type + `mapTabCache` Map (shared) |
+| `src/tabs/right/map-tab-pins.ts` | 149 | `syncPins`, `refreshChipStrip`, `refreshActiveMapPins` |
+| `src/tabs/right/map-tab-pin-drag.ts` | 129 | `enablePinDrag`, `isInsideZone`, `clampToCanvas` |
+| `src/tabs/right/map-tab-backgrounds.ts` | 144 | `applyMapBackground`, `sourceKey`, `refreshCachedBackgrounds`, `decodeImageDims` |
+| `src/tabs/right/map-tab-tooltip.ts` | 32 | `buildPinTooltipHtml`, `escapeHtml` |
+
+Public surface unchanged: `mountMapTab` / `disposeMapTab` / `disposeAllMapTabs` / `panMapTabTo`. One internal test path updated: `tests/unit/pin-drag.test.ts` imports `enablePinDrag` from `map-tab-pin-drag` instead of `map-tab`. All 385 vitest still pass after split.
+
+---
+
 ## index.html inline-style reset (2026-05-12 session 199)
 
 | File | Source | Treatment | Notes |

@@ -16,7 +16,7 @@
 
 import { getState, patchSlice, subscribe, type RightTabRef } from '../../core/state';
 import type { WorldMap, Pin, Element } from '../../core/types';
-import { ToastManager } from '../../ui/toast-manager';
+import { ToastManager, toastManager } from '../../ui/toast-manager';
 import { createMapDialog } from '../../ui/map-create-modal';
 import { navigate, mapHash, elementHash } from '../../core/router';
 import { getActiveStore } from '../../ui/create-world-modal';
@@ -89,6 +89,131 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
   // when the tab unmounts. Not persisted across page reloads (transient UX
   // pref, like a sidebar filter chip).
   let searchTerm = '';
+
+  // ---- Drag-to-reorder (same-sibling-group only) ----
+  //
+  // Rows are draggable=true. On drop, the source's `data-parent-id` must
+  // match the target's (same rendered-tree group). Cross-parent drag is
+  // refused with a toast — reparenting via this gesture would conflate two
+  // distinct mutations (changing the parent_map link AND the sibling order).
+  // The map-create modal's parent_map override handles reparenting.
+  //
+  // Algorithm: compute the new visual order, then re-stamp `hierarchy` as
+  // 0,1,2,... on every sibling whose value changed. Multiple writes but the
+  // siblings count is usually small; one requestPushIfLinked at the end so
+  // sync sees a single autosave window.
+  let dragSourceMapId: string | null = null;
+
+  function clearDragHighlight(): void {
+    root.querySelectorAll<HTMLElement>('.atlas-map-tree-row[data-drop-pos]').forEach(el => {
+      el.removeAttribute('data-drop-pos');
+    });
+  }
+
+  function dropPositionFor(row: HTMLElement, clientY: number): 'before' | 'after' {
+    const rect = row.getBoundingClientRect();
+    return clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+  }
+
+  root.addEventListener('dragstart', (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('.atlas-map-tree-row');
+    if (!row) return;
+    const mapId = row.getAttribute('data-map-id');
+    if (!mapId) return;
+    dragSourceMapId = mapId;
+    e.dataTransfer?.setData('application/x-atlas-map', mapId);
+    e.dataTransfer!.effectAllowed = 'move';
+    row.classList.add('atlas-row-dragging');
+  });
+  root.addEventListener('dragend', () => {
+    root.querySelectorAll<HTMLElement>('.atlas-row-dragging').forEach(el => el.classList.remove('atlas-row-dragging'));
+    clearDragHighlight();
+    dragSourceMapId = null;
+  });
+  root.addEventListener('dragover', (e) => {
+    if (!dragSourceMapId) return;
+    const row = (e.target as HTMLElement).closest<HTMLElement>('.atlas-map-tree-row');
+    if (!row) return;
+    const targetId = row.getAttribute('data-map-id');
+    if (!targetId || targetId === dragSourceMapId) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = 'move';
+    const pos = dropPositionFor(row, e.clientY);
+    clearDragHighlight();
+    row.setAttribute('data-drop-pos', pos);
+  });
+  root.addEventListener('dragleave', (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('.atlas-map-tree-row');
+    if (!row) return;
+    // Only clear when leaving for a non-row target — keeps the highlight
+    // stable while the cursor moves across child elements within a row.
+    const related = e.relatedTarget as Node | null;
+    if (related && row.contains(related)) return;
+    row.removeAttribute('data-drop-pos');
+  });
+  root.addEventListener('drop', async (e) => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>('.atlas-map-tree-row');
+    if (!row) return;
+    e.preventDefault();
+    const targetId = row.getAttribute('data-map-id');
+    const sourceId = dragSourceMapId;
+    const pos = (row.getAttribute('data-drop-pos') ?? 'after') as 'before' | 'after';
+    clearDragHighlight();
+    dragSourceMapId = null;
+    if (!sourceId || !targetId || sourceId === targetId) return;
+
+    const state = getState();
+    const allMaps = state.data.elements.filter((el): el is WorldMap => el.type === 'map');
+    const source = allMaps.find(m => m.id === sourceId);
+    const target = allMaps.find(m => m.id === targetId);
+    if (!source || !target) return;
+
+    // Same-sibling-group check via `data-parent-id` (rendered-tree parent).
+    const sourceRow = root.querySelector<HTMLElement>(`.atlas-map-tree-row[data-map-id="${sourceId}"]`);
+    const sourceParentId = sourceRow?.getAttribute('data-parent-id') ?? '';
+    const targetParentId = row.getAttribute('data-parent-id') ?? '';
+    if (sourceParentId !== targetParentId) {
+      toasts.info('drag-to-reorder works within the same sibling group — use the create modal\'s parent map override to reparent');
+      return;
+    }
+
+    // Gather siblings in their current document order from the rendered DOM.
+    // This already reflects hierarchy + alpha ordering from buildMapTree.
+    const siblingRows = Array.from(
+      root.querySelectorAll<HTMLElement>(`.atlas-map-tree-row[data-parent-id="${CSS.escape(sourceParentId)}"]`),
+    );
+    const orderedIds = siblingRows
+      .map(r => r.getAttribute('data-map-id'))
+      .filter((id): id is string => !!id);
+    const without = orderedIds.filter(id => id !== sourceId);
+    const targetIndex = without.indexOf(targetId);
+    if (targetIndex < 0) return;
+    const insertAt = pos === 'before' ? targetIndex : targetIndex + 1;
+    const reordered = [...without.slice(0, insertAt), sourceId, ...without.slice(insertAt)];
+
+    // Re-stamp hierarchy. Only write maps whose value actually changes.
+    const store = getActiveStore();
+    if (!store) return;
+    const writes: Promise<unknown>[] = [];
+    for (let i = 0; i < reordered.length; i++) {
+      const m = allMaps.find(x => x.id === reordered[i]);
+      if (!m) continue;
+      if (m.hierarchy !== i) {
+        writes.push(store.updateMap(m.id, { hierarchy: i }));
+      }
+    }
+    if (writes.length === 0) return;
+    try {
+      await Promise.all(writes);
+      const elements = await store.listElements();
+      patchSlice('data', { elements });
+      requestPushIfLinked();
+      toasts.success(`reordered ${writes.length} map${writes.length === 1 ? '' : 's'}`);
+    } catch (err) {
+      console.error('[map-index] reorder failed:', err);
+      toasts.error('failed to reorder maps');
+    }
+  });
 
   function render(): void {
     const state = getState();
@@ -223,7 +348,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       return;
     }
 
-    renderTree(list, tree, 0, {
+    renderTree(list, tree, 0, null, {
       activeMapId,
       openMapIds,
       pinCounts,
@@ -256,23 +381,29 @@ interface RenderCtx {
   ignoreCollapsed: boolean;
 }
 
-function renderTree(list: HTMLElement, nodes: MapTreeNode[], depth: number, ctx: RenderCtx): void {
+function renderTree(list: HTMLElement, nodes: MapTreeNode[], depth: number, parentId: string | null, ctx: RenderCtx): void {
   for (const node of nodes) {
     const collapsed = !ctx.ignoreCollapsed && isNodeCollapsed(ctx.worldId, node.map.id);
-    list.appendChild(renderRow(node, depth, ctx, collapsed));
+    list.appendChild(renderRow(node, depth, parentId, ctx, collapsed));
     // Skip descendants when this node is collapsed.
     if (node.children.length > 0 && !collapsed) {
-      renderTree(list, node.children, depth + 1, ctx);
+      renderTree(list, node.children, depth + 1, node.map.id, ctx);
     }
   }
 }
 
-function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx, collapsed: boolean): HTMLElement {
+function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ctx: RenderCtx, collapsed: boolean): HTMLElement {
   const m = node.map;
   const hasChildren = node.children.length > 0;
   const row = document.createElement('div');
   row.className = 'atlas-row atlas-map-tree-row' + (m.id === ctx.activeMapId ? ' selected' : '');
   row.setAttribute('data-map-id', m.id);
+  // Rendered-tree parent id — drives the drag-reorder same-group check. Empty
+  // string for root nodes. NOT the same as `parent_map` on disk: a map without
+  // an explicit `parent_map` whose tree position came from location inference
+  // sits under the inferred parent's id here.
+  row.setAttribute('data-parent-id', parentId ?? '');
+  row.setAttribute('draggable', 'true');
   if (depth > 0) row.setAttribute('data-depth', String(depth));
   row.style.setProperty('--atlas-map-tree-depth', String(depth));
   row.setAttribute('role', 'button');
@@ -324,6 +455,10 @@ function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx, collapsed: 
   const main = document.createElement('span');
   main.className = 'atlas-row-main';
   if (ctx.openMapIds.has(m.id)) main.classList.add('atlas-map-tree-row-open');
+  // Imageless maps get a muted name to signal "this isn't ready to view yet."
+  // Pairs with openMapTab's refusal to open the tab for image-less maps —
+  // grey label, click toasts + opens element detail to configure.
+  if (!hasImage) main.classList.add('atlas-map-tree-row-imageless');
   main.textContent = m.name || '(untitled map)';
   row.appendChild(main);
 
@@ -399,6 +534,16 @@ function renderRow(node: MapTreeNode, depth: number, ctx: RenderCtx, collapsed: 
   row.appendChild(actions);
 
   row.addEventListener('click', () => openMapTab(m));
+  // Right-click → select this map ELEMENT (navigate to element-detail). The
+  // left-click already opens the map's tab; right-click is the "I want to
+  // edit this map's fields" gesture.
+  row.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const worldId = getState().active?.worldId;
+    if (!worldId) return;
+    patchSlice('ui', { ...getState().ui, selectedElementId: m.id, sidebarMode: 'elements' });
+    navigate(elementHash(worldId, m.id));
+  });
   return row;
 }
 
@@ -454,6 +599,22 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
 export function openMapTab(m: WorldMap, preserveElementId?: string): void {
   const ui = getState().ui;
   const activeWorldId = getState().active?.worldId;
+
+  // Imageless maps have nothing meaningful to render on canvas — the grid
+  // fallback is jarring and the user almost certainly meant to edit the map's
+  // fields. Refuse to open the tab; if the caller wasn't already navigating
+  // (no preserveElementId), divert to the map's element detail so the user
+  // lands somewhere actionable.
+  const hasImage = !!(m.image_url || m.image_media_id);
+  if (!hasImage) {
+    toastManager.info('set a map image to view its canvas');
+    if (!preserveElementId && activeWorldId) {
+      patchSlice('ui', { ...ui, selectedElementId: m.id, sidebarMode: 'elements' });
+      navigate(elementHash(activeWorldId, m.id));
+    }
+    return;
+  }
+
   const existingIndex = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === m.id);
   if (existingIndex >= 0) {
     patchSlice('ui', { ...ui, rightActiveIndex: existingIndex });

@@ -5,6 +5,54 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 
 ---
 
+## Session 212 (2026-05-16) — Recovery, polish, and the map-tab split
+
+Ten bouts, all green at typecheck + vitest + build at each step. 385 → 385 vitest (UI/behavior changes verified by existing coverage + smoke; no new tests). Bundle 400.21 → 409.16 KB JS / 110.85 → 114.56 KB gzipped (+9 KB across all bouts).
+
+**Bout R1 — Atlas root recovery.** New `atlasRootRecoverable` state slice. `hydrateAtlasRoot` now detects the "orphan handle" case (registry has no `atlas_root` but the vault still holds the handle under `ATLAS_ROOT_HANDLE_KEY` — typical after localStorage clear). Surfaces as a recoverable signal. New `recoverAtlasRoot()` flow: loads orphan handle → `ensureWritable` (user gesture from the recover button) → validates `.atlas-root` marker → restores registry entry → runs `discoverWorldsInRoot` to rebuild the world list from disk. Sidebar header swaps to `↻ Recover atlas folder` button when recoverable; welcome panel shows "Welcome back" CTA with folder name. Marker-gone case purges the orphan and toasts "folder no longer looks like an atlas root — pick again." Also extended `discoverWorldsInRoot` to register api-linked worlds (read `world.json`'s `api` block) instead of always-local-only — fixes a latent bug where recovered api-linked worlds lost their sync wiring. Post-recovery URL hygiene: if hash is deep (`#/w/<id>/...`) from before the clear, reset to `#/` so sidebar lands on worlds mode without requiring a tab click.
+
+**Bout R2 — Map tree polish.** New `atlas-map-tree-row-open` class: open-tab map names (active OR background) get cyan + medium weight, distinct from `.selected` which is active-tab-only. Distinguishes "loaded but not focused" from "currently focused." Location chip icon swapped from `location_on` (pin-shape glyph) to `castle` (matches SDK `ELEMENT_ICONS.location` used everywhere else — sidebar, pin canvas). Chip now reads as "this is a Location" rather than "this is a pin."
+
+**Bout R3 — Map create modal fixes.** Hint warning now only fires when BOTH a local file is uploaded AND a URL is typed (was firing on URL-only, which is the canonical path). Auto-open the new map's tab on create when the map has any image source — image-less maps skip auto-open (user likely still configuring).
+
+**Bout R4 — Map element top-bar self-open.** Map detail header gets a single `map` icon button → opens (or focuses) this map's right-pane tab. Cyan tint when image present. Symmetric with the location-Map affordance pattern but distinct: this one is for the map element viewing its own detail.
+
+**Bout R5 — Drag elements from sidebar onto map (DESIGN_MAPS.md §8, deferred → shipped).** Element rows in elements-sidebar are now `draggable=true` (except `map`, which can't be a pin target per §1.4). Custom MIME `application/x-atlas-element` carries `{id, type}`. Map tab container is a drop target with cyan dashed outline on dragover. Drop handler: gates on image presence (§4.1), projects drop event to image coords via Leaflet's `mouseEventToLatLng`, writes pin through the same `createPin` path used by right-click + placement-banner — element_type included from the drag payload so the OW server-validation rule (convention #19) is honored.
+
+**Bout F1 — Folder-gone auto-cleanup.** Activating a world whose folder was deleted outside atlas now: catches the `NotFoundError` from `store.open` → deletes the dead handle from vault → removes the registry entry → surfaces a toast "<name> folder is gone — removed from atlas" → reverts URL to priorHash. No new buttons; the user's natural "click to open" gesture triggers cleanup. Click-time covers the 95% case; mid-session sweep is heavier than the payoff.
+
+**Bout DR — Drag-to-reorder maps in tree (DESIGN_MAPS.md §8, deferred → shipped).** Tree rows are `draggable=true`; on drop, source and target must share `data-parent-id` (rendered-tree parent — same explicit `parent_map` OR same location-inferred parent). Cross-parent drag refused with toast directing to the create-modal's parent_map override. Drop position (above/below) computed from cursor-Y vs target row midpoint. New cyan drop-indicator line via `::after` pseudo-element. After drop, hierarchy is re-stamped 0,1,2,... on all affected siblings — many writes but siblings count is usually small, single `requestPushIfLinked` at the end coalesces into one autosave window.
+
+**Bout SP — `map-tab.ts` split (long-term health refactor).** The file had grown to 858 lines doing 5 concerns. Split into:
+- `map-tab.ts` (470 lines) — mount/dispose/pan + interaction wiring (click, contextmenu, drag, drop) + the subscribe hot path
+- `map-tab-cache.ts` (45 lines) — `MapTabCacheEntry` type + shared `mapTabCache` Map
+- `map-tab-pins.ts` (149 lines) — `syncPins`, `refreshChipStrip`, `refreshActiveMapPins`
+- `map-tab-pin-drag.ts` (129 lines) — `enablePinDrag`, `isInsideZone`, `clampToCanvas`
+- `map-tab-backgrounds.ts` (144 lines) — `applyMapBackground`, `sourceKey`, `refreshCachedBackgrounds`, `decodeImageDims`
+- `map-tab-tooltip.ts` (32 lines) — `buildPinTooltipHtml`, `escapeHtml`
+
+Public surface unchanged (`mountMapTab` / `disposeMapTab` / `disposeAllMapTabs` / `panMapTabTo`). Internal: `pin-drag.test.ts` updated to import `enablePinDrag` from the new submodule. All 385 tests still pass. Unlocks per-concern unit tests in future bouts (e.g. chip-strip ordering, drop-on-trash predicate).
+
+**Two right-click select tweaks** — right-clicking a map in the tree row OR a map tab in the right-pane tab bar now selects the map ELEMENT (navigate to element-detail in middle). Left-click still opens the tab. Right-click is the "edit this map's fields" gesture. Stale tabs skipped (no element to select). Symmetric across both surfaces.
+
+**Late addition — imageless maps don't open tabs + greyed tree label.** Map subsystem completion touch. Two coordinated changes:
+- `openMapTab` gates at the funnel: if the map has neither `image_url` nor `image_media_id`, toast "set a map image to view its canvas" and (if no `preserveElementId`) divert the user to the map's element detail. No tab added. Catches every caller automatically — tree row click, top-bar self-open icon, Location top-bar `[map]` icon, any future invocation. Removes the jarring empty-canvas state when clicking an imageless map.
+- New `.atlas-map-tree-row-imageless` CSS class on the row's name span: muted white (35%) + italic. Pairs with the open-tab cyan state — three orthogonal row states now (open, imageless, selected) that compose cleanly. Imageless can't be open after this change, so those two never co-occur in practice.
+
+**Pokeable for next smoke:**
+- Clear localStorage → reload → welcome shows "Welcome back" → recover → worlds list populates AND URL resets to `#/` → sidebar already on Worlds mode (no need to click Worlds tab).
+- Activate a world whose folder you've deleted in OS → toast "folder is gone — removed from atlas" → entry disappears from sidebar.
+- Drag any element row from sidebar onto a map → cyan dashed outline → drop → pin placed.
+- Drag a map tree row up/down within the same group → cyan drop-indicator line → release → hierarchy re-stamped, push fires.
+- Right-click any map tree row OR map tab → middle pane flips to that map's element detail, right pane unchanged.
+- Click an imageless map (no `image_url`, no upload) in the tree → toast + middle flips to its element detail, NO tab added. Its tree label renders muted+italic so you can spot which maps still need configuration.
+
+**Next chat pile:**
+- Zones port (the "fun stuff" — fresh design conversation up-front, like the map foundation)
+- M8 council motion (paperwork — map field descriptions + pin coord origin)
+
+---
+
 ## Session 210 (2026-05-15) — Map subsystem MW/NPM/XR layer
 
 Five bouts, all green at typecheck + vitest + build at each step. 347 → 375 vitest (+28). Bundle 380.40 → 390.05 KB JS (+9.65 KB across new features).

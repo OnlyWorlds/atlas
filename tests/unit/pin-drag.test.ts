@@ -75,7 +75,7 @@ vi.mock('../../src/core/router', () => ({
   onHashChange: () => () => {},
 }));
 
-import { enablePinDrag } from '../../src/tabs/right/map-tab';
+import { enablePinDrag } from '../../src/tabs/right/map-tab-pin-drag';
 
 function makeMarker() {
   const handlers: Record<string, (...args: any[]) => void> = {};
