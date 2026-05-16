@@ -107,13 +107,21 @@ export class MockFolderStore implements FolderStore {
     if (!target) return [];
     const all = Array.from(this.elements.values());
     if (target.type === 'map') {
+      // Pins + markers carry map_id. Zones do NOT — zones are pure metadata
+      // and survive the loss of a map (DESIGN_ZONES.md §6.1).
       return all.filter(e =>
-        (e.type === 'pin' || e.type === 'zone' || e.type === 'marker') &&
+        (e.type === 'pin' || e.type === 'marker') &&
         (e as { map_id?: string }).map_id === id
       );
     }
-    // Pin/zone/marker have no dependents (leaves of the graph).
-    if (target.type === 'pin' || target.type === 'zone' || target.type === 'marker') {
+    if (target.type === 'zone') {
+      // Markers carry the zone relationship.
+      return all.filter(e =>
+        e.type === 'marker' && (e as { zone_id?: string }).zone_id === id
+      );
+    }
+    // Pin and marker are leaves (no cascade).
+    if (target.type === 'pin' || target.type === 'marker') {
       return [];
     }
     // Content element: pins point at it via element_id.
@@ -162,18 +170,21 @@ export class MockFolderStore implements FolderStore {
   async updatePin(id: string, patch: Partial<Pin>): Promise<Pin> { return (await this.updateElement(id, patch)) as Pin; }
   async deletePin(id: string) { return this.deleteElement(id); }
 
-  async listZones(mapId?: string): Promise<Zone[]> {
-    const all = (await this.listElements('zone')) as Zone[];
-    return mapId ? all.filter(z => z.map_id === mapId) : all;
+  async listZones(): Promise<Zone[]> {
+    return (await this.listElements('zone')) as Zone[];
   }
   async getZone(id: string): Promise<Zone | null> { return (await this.getElement(id)) as Zone | null; }
   async createZone(data: Partial<Zone>): Promise<Zone> { return (await this.createElement('zone', data)) as Zone; }
   async updateZone(id: string, patch: Partial<Zone>): Promise<Zone> { return (await this.updateElement(id, patch)) as Zone; }
   async deleteZone(id: string) { return this.deleteElement(id); }
 
-  async listMarkers(mapId?: string): Promise<Marker[]> {
+  async listMarkers(filter?: { mapId?: string; zoneId?: string }): Promise<Marker[]> {
     const all = (await this.listElements('marker')) as Marker[];
-    return mapId ? all.filter(m => m.map_id === mapId) : all;
+    if (!filter) return all;
+    return all.filter(m =>
+      (filter.mapId === undefined || m.map_id === filter.mapId) &&
+      (filter.zoneId === undefined || m.zone_id === filter.zoneId),
+    );
   }
   async getMarker(id: string): Promise<Marker | null> { return (await this.getElement(id)) as Marker | null; }
   async createMarker(data: Partial<Marker>): Promise<Marker> { return (await this.createElement('marker', data)) as Marker; }

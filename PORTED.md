@@ -1,8 +1,38 @@
 # Atlas — Port Log
 
 Tracks what code/conventions were ported from `tools/atlas-deprecated/` into the new atlas, and HOW.
+Also tracks ports from other tools (e.g. zoner) where their patterns informed atlas modules.
 
 Each entry: source file, destination, treatment (verbatim, adapted, rewritten), why.
+
+---
+
+## Zones subsystem foundation (2026-05-16 session 213)
+
+The zone/marker subsystem is largely a fresh build for atlas — but several pure-function helpers were adapted from zoner's `canvas/ZoneCanvas.ts` (audit log captured pre-build, summarized in `DESIGN_ZONES.md` §1.1 and the zoner-audit agent report).
+
+| Source (zoner) | Dest (atlas) | Treatment | Notes |
+|---|---|---|---|
+| `src/canvas/ZoneCanvas.ts:322-347` (distance-to-segment math) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`distanceToSegment`, `distanceToSegmentSquared`, `projectToSegment`) | adapted to pure functions | Same clamped-projection algorithm. Returns Point shapes instead of mutating Leaflet primitives. Squared-distance variant added for cheap nearest-segment iteration. |
+| `src/canvas/ZoneCanvas.ts:293-316` (`findClosestSegment` proximity scan) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`findClosestSegment`) | adapted | Added explicit `closed` parameter so polygons include the wrap segment; null return for <2 points. |
+| `src/canvas/ZoneCanvas.ts:745-754` (centroid by vertex averaging) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`polygonCentroid`) | verbatim algorithm | Simple average. Not area-weighted; matches zoner's pragmatic choice for label/handle placement. |
+| (new in atlas) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`polylineLabelAnchor`) | rewritten | Midpoint of the longest segment — chosen for line-label placement so the label has visual room. |
+| (new in atlas) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`pointInPolygon`) | rewritten | Standard ray-casting algorithm. Used for future hit-testing without Leaflet (zoner had this implicitly via L.Polygon click). |
+| (new in atlas, Captain-requested) | `src/visualization/leaflet-2d/ZoneGeometry.ts` (`snapAngleTo45`, `snapToAxis`) | new | Shift-snap math — projects a click vector onto the nearest 45° axis from anchor. Clamps to non-negative projection so the new marker is always forward-of-anchor or AT anchor. Enables perfect rectangles via 4 shift-clicks. |
+| `src/canvas/ZoneCanvas.ts:397-450` (DivIcon marker rendering during draw) | `src/tabs/right/zone-drawing.ts` (preview render via L.DivIcon) | adapted | Cyan circle + numbered order. CSS class `.atlas-zone-draft-marker` mirrors zoner's `.marker-number` visual. Live preview polyline rendered via `L.polyline` with `dashArray: '5, 5'`. |
+| `src/canvas/ZoneCanvas.ts:456-476` (live preview polygon/polyline) | `src/tabs/right/zone-drawing.ts` (rerenderPreview) | adapted | Same dashed-cyan visual. Polygon closes back when ≥3 markers; line stays open. |
+| `src/state/AppState.ts:332-375` (drawing state machine) | `src/tabs/right/zone-drawing.ts` (module-level singleton) | rewritten cleaner | Atlas uses a module-level singleton with `start/place/undo/finish/cancel` API rather than zoner's tangle of `activeMarkers` + `editingZoneId`. **Improvements over zoner**: batch save on Finish (not per-marker autosave), explicit cancel-via-ESC, integrates with state.ui slice. |
+| Zoner DESIGN.md (sync pattern: in-memory points → markers at sync time) | atlas folder-first model (markers ARE the disk truth from creation) | rewritten | Atlas materializes markers at write time (folder is the truth, per atlas's folder-first principle); zoner deferred to sync time. Cleaner because atlas always has the canonical representation regardless of api-link state. |
+| Auto-numbered name pattern ("new zone", "new zone (2)") | `src/tabs/right/zone-drawing.ts` (`findUniqueZoneName`) | rewritten | Same idea; pure function so it can be unit-tested without UI. 6 unit tests in `tests/unit/zone-drawing.test.ts`. |
+
+**Things from zoner explicitly NOT ported** (yet, or by choice):
+
+- **HistoryManager** (zoner's `src/state/HistoryManager.ts`): a per-map snapshot stack with JSON clone, max 50 entries. Atlas needs this for shape-edit cancel-via-restore (DESIGN_ZONES.md §3.4). Not in v1; lands with the shape-edit-mode bout.
+- **Click-timeout debouncing** for single vs double click (zoner's ZoneCanvas.ts:546-549, 579-584): janky global timeout pattern. Atlas defers to Leaflet's native dblclick event ordering (or skips entirely — atlas doesn't currently bind double-click on zone outlines).
+- **Snap-to-existing-vertex** (zoner's ZoneCanvas.ts:1041-1074, ctrl+hover within 20px screen radius): nice UX, deferred to a polish bout.
+- **Box-select / multi-zone-move** (zoner's ZoneCanvas.ts:1081-1164): not in v1 scope (DESIGN_ZONES.md §10 out-of-scope).
+- **Per-zone z-index ordering** (no zoner equivalent — would need design): deferred.
+- **`originalEditPoints` state backup** (zoner's AppState.ts:36, 507): planned replacement is HistoryManager when shape-edit ships.
 
 ---
 

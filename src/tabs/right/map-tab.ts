@@ -33,6 +33,12 @@ import { syncPins, refreshActiveMapPins } from './map-tab-pins';
 import { enablePinDrag, clampToCanvas } from './map-tab-pin-drag';
 import { applyMapBackground, refreshCachedBackgrounds } from './map-tab-backgrounds';
 import { buildPinTooltipHtml, escapeHtml } from './map-tab-tooltip';
+import { buildCanvasToolbar } from './map-tab-toolbar';
+import { toggleVisualSettingsPopover, applyLivePrefs, closeVisualSettingsPopover } from './map-visual-settings-popover';
+import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
+import { startDrawing, placeMarkerAt, getActiveDraft, cancelDrawing, disposeDraftForMap } from './zone-drawing';
+import { ZoneOverlay } from '../../visualization/leaflet-2d/ZoneOverlay';
+import { syncZones, wireChipStrip, refreshActiveMapZones } from './map-tab-zones';
 
 let containerSeq = 0;
 
@@ -83,7 +89,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
 
   const cached = mapTabCache.get(mapId);
   if (cached) {
-    pane.appendChild(cached.container);
+    pane.appendChild(cached.wrapper);
     cached.ready.then(() => {
       cached.manager.getMap()?.invalidateSize();
       syncPins(cached);
@@ -91,11 +97,86 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     return;
   }
 
-  // Fresh mount
+  // Fresh mount: wrapper is a vertical flex column with toolbar above the
+  // leaflet container. Caching the wrapper preserves leaflet state across
+  // tab re-mounts.
+  const wrapper = document.createElement('div');
+  wrapper.className = 'atlas-map-tab-wrapper';
+
+  const toolbarRefs = buildCanvasToolbar();
+  wrapper.appendChild(toolbarRefs.root);
+
+  // Settings cog → toggle the visual settings popover.
+  toolbarRefs.settingsBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (e) toggleVisualSettingsPopover(e, toolbarRefs.settingsBtn);
+  });
+
+  // Visibility toggles (transient, not persisted to prefs). State held in
+  // the button's `is-active` class; default = visible (button not active).
+  toolbarRefs.toggleZonesBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (!e?.zoneOverlay) return;
+    const wasVisible = e.zoneOverlay.isLayerVisible();
+    e.zoneOverlay.setLayerVisible(!wasVisible);
+    toolbarRefs.toggleZonesBtn.classList.toggle('is-active', wasVisible);
+    // Glyph swap: visibility ↔ visibility_off mirrors the state.
+    const icon = toolbarRefs.toggleZonesBtn.querySelector('.material-symbols-outlined');
+    if (icon) icon.textContent = wasVisible ? 'visibility_off' : 'visibility';
+  });
+
+  toolbarRefs.togglePinsBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (!e) return;
+    const currentlyActive = toolbarRefs.togglePinsBtn.classList.contains('is-active');
+    // Active class indicates "pins hidden" — flip.
+    const nextHidden = !currentlyActive;
+    e.manager.setPinsLayerVisible(!nextHidden);
+    toolbarRefs.togglePinsBtn.classList.toggle('is-active', nextHidden);
+    const icon = toolbarRefs.togglePinsBtn.querySelector('.material-symbols-outlined');
+    if (icon) icon.textContent = nextHidden ? 'visibility_off' : 'visibility';
+  });
+
+  toolbarRefs.fitToImageBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (!e) return;
+    e.manager.fitToCanvas();
+  });
+
+  // Draw buttons → toggle drawing mode for this map.
+  toolbarRefs.drawPolygonBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (!e) return;
+    const active = getActiveDraft();
+    if (active && active.mode === 'polygon' && active.mapId === mapId) {
+      cancelDrawing();
+    } else {
+      startDrawing(e, 'polygon', toasts);
+    }
+  });
+  toolbarRefs.drawLineBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (!e) return;
+    const active = getActiveDraft();
+    if (active && active.mode === 'line' && active.mapId === mapId) {
+      cancelDrawing();
+    } else {
+      startDrawing(e, 'line', toasts);
+    }
+  });
+
   const container = document.createElement('div');
   container.id = `atlas-map-${++containerSeq}`;
-  container.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
-  pane.appendChild(container);
+  container.className = 'atlas-map-canvas-container';
+  wrapper.appendChild(container);
+
+  // Below-canvas chip strip — zones on this map. Hidden until populated.
+  const zoneStrip = document.createElement('div');
+  zoneStrip.className = 'atlas-zone-chip-strip';
+  zoneStrip.style.display = 'none';
+  wrapper.appendChild(zoneStrip);
+
+  pane.appendChild(wrapper);
 
   const tooltip = document.createElement('div');
   tooltip.className = 'atlas-pin-tooltip';
@@ -141,6 +222,8 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   const entry: MapTabCacheEntry = {
     mapId,
     worldId,
+    wrapper,
+    toolbar: toolbarRefs.root,
     container,
     manager,
     objectUrls: [],
@@ -150,7 +233,10 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     chipStrip,
     hiddenPinTypes: new Set(),
     lastBg: '',
+    zoneOverlay: null,
+    zoneStrip,
   };
+  wireChipStrip(entry, toasts);
   mapTabCache.set(mapId, entry);
 
   entry.ready = (async () => {
@@ -159,8 +245,34 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     // Background source precedence (DESIGN_MAPS.md §4): image_url > image_media_id > grid.
     await applyMapBackground(entry, map, width, height);
 
-    // Map click → if pin placement is active, drop a pin at this point.
+    // Apply per-map visual prefs once the manager + background are ready.
+    // Idempotent — re-applying does no harm and lets the prefs system act as
+    // the single integration point for live consumers.
+    try { applyLivePrefs(entry, getEffectiveMapPrefs(mapId)); } catch { /* noop */ }
+
+    // Mount the zone overlay (polygon/polyline rendering). Construct after
+    // manager.init so the underlying L.Map handle is ready. Wire click to
+    // select-zone navigation; right-click on a zone outline opens the same
+    // chip context menu via shared select logic.
+    const lMap = manager.getMap();
+    if (lMap) {
+      const overlay = new ZoneOverlay(lMap, height);
+      overlay.onZoneClick((zoneId) => {
+        patchSlice('ui', { ...getState().ui, selectedElementId: zoneId });
+      });
+      entry.zoneOverlay = overlay;
+      syncZones(entry);
+    }
+
+    // Map click → if drawing mode is active, place a marker. Else if pin
+    // placement is active, drop a pin. Drawing has priority because the
+    // user just entered draw mode; pin placement is a less recent gesture.
     manager.on('map-click', async (ev) => {
+      const draft = getActiveDraft();
+      if (draft && draft.mapId === mapId) {
+        placeMarkerAt(ev.point, width, height);
+        return;
+      }
       const placement = getState().ui.pinPlacement;
       if (!placement) return;
       // Gate: pin placement requires a map image (DESIGN_MAPS.md §4.1).
@@ -406,6 +518,11 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
 export function disposeMapTab(mapId: string): void {
   const entry = mapTabCache.get(mapId);
   if (!entry) return;
+  // Close any open visual settings popover for this tab — its anchored DOM
+  // lives inside entry.wrapper which is about to be torn down.
+  closeVisualSettingsPopover();
+  // Cancel any in-flight zone draft on this map.
+  disposeDraftForMap(mapId);
   // Ghost pins live on a Leaflet layer attached to entry.manager's L.Map. Tear
   // them down BEFORE the manager destroy so the layer detach goes cleanly;
   // after destroy the L.Map handle is gone.
@@ -413,11 +530,16 @@ export function disposeMapTab(mapId: string): void {
     const lMap = entry.manager.getMap();
     disposeGhostsForMap(mapId, lMap ?? null);
   } catch { /* noop */ }
+  // Dispose zone overlay BEFORE the manager destroy (its LayerGroup is
+  // attached to the manager's L.Map).
+  try { entry.zoneOverlay?.dispose(); } catch { /* noop */ }
+  entry.zoneOverlay = null;
   try { entry.manager.destroy(); } catch { /* noop */ }
   for (const url of entry.objectUrls) {
     try { URL.revokeObjectURL(url); } catch { /* noop */ }
   }
-  if (entry.container.parentElement) entry.container.parentElement.removeChild(entry.container);
+  // Remove the wrapper (and its toolbar + container) in one go.
+  if (entry.wrapper.parentElement) entry.wrapper.parentElement.removeChild(entry.wrapper);
   mapTabCache.delete(mapId);
 }
 
@@ -470,10 +592,15 @@ onPinVisualsReady(() => {
 // notification — including unrelated ones. Track the last seen reference and
 // short-circuit when data.elements hasn't changed.
 let lastElementsRef: unknown = null;
+let lastSelectedRef: unknown = null;
 subscribe(() => {
-  const elements = getState().data.elements;
-  if (elements === lastElementsRef) return;
+  const state = getState();
+  const elements = state.data.elements;
+  const selected = state.ui.selectedElementId;
+  if (elements === lastElementsRef && selected === lastSelectedRef) return;
   lastElementsRef = elements;
+  lastSelectedRef = selected;
   refreshActiveMapPins();
   refreshCachedBackgrounds();
+  refreshActiveMapZones();
 });

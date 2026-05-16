@@ -737,7 +737,165 @@ Bundle: §7 map field description updates + pin coord origin clarification + any
 
 ---
 
-## 11. Sign-off
+## 11. Map visual settings (per-map prefs popover)
+
+Replaces the "no per-map controls" state that has stood since map work started. Per-map preferences for pin and zone rendering, accessible from a settings cog on the canvas toolbar (§12). Each map can override atlas-global defaults; defaults can be promoted from any map's current state.
+
+### 11.1 Storage shape
+
+Two localStorage keys:
+
+```
+atlas_map_view_defaults: MapViewPrefs     ← atlas-global defaults (single object)
+atlas_map_view_prefs:    Record<mapId, Partial<MapViewPrefs>>  ← per-map overrides
+```
+
+Schema:
+
+```ts
+interface MapViewPrefs {
+  pin_style:         'icon' | 'round-icon' | 'pin-shape';   // default: 'icon'
+  pin_labels:        'always' | 'hover' | 'threshold' | 'never';  // default: 'hover'
+  pin_label_threshold: number;                              // default: 6 (used iff pin_labels === 'threshold')
+  pin_tint:          'type-color' | 'accent' | 'muted';     // default: 'type-color'
+  show_grid:         boolean;                               // default: false
+  grid_spacing:      50 | 100 | 200;                        // default: 100
+  lock_pin_drag:     boolean;                               // default: false
+  zone_fill_opacity: number;                                // default: 0.4
+  zone_labels:       'always' | 'hover' | 'never';          // default: 'hover'
+}
+```
+
+`getEffectiveMapPrefs(mapId)` merges atlas-global defaults with the per-map partial override. UI reads only the effective object.
+
+### 11.2 Popover surface
+
+Click the ⚙ settings cog on the canvas toolbar → left-anchored floating panel (~320px wide, full canvas height, dark glass aesthetic matching atlas conventions). Map remains visible to its right — the user sees changes apply live.
+
+Layout:
+
+```
+┌─ Map visual settings ────────────────────────┐
+│                                              │
+│  Pin style                                   │
+│  ( ) icon  ( ) round + icon  ( ) pin shape   │
+│                                              │
+│  Pin labels                                  │
+│  ( ) always  ( ) hover  (•) ≤ [6] visible  ( ) never │
+│                                              │
+│  Pin tint                                    │
+│  (•) type color  ( ) accent  ( ) muted       │
+│                                              │
+│  ☐ Show grid                                 │
+│     Spacing: ( ) 50  (•) 100  ( ) 200 px     │
+│                                              │
+│  ☐ Lock pin dragging                         │
+│                                              │
+│  ── Zones ──                                 │
+│                                              │
+│  Zone fill opacity   ━━━●━━━━━━━━━━  40%     │
+│                                              │
+│  Zone labels                                 │
+│  ( ) always  (•) hover  ( ) never            │
+│                                              │
+├──────────────────────────────────────────────┤
+│  [ Save current as default for new maps ]    │
+│  [ Reset to defaults ]                       │
+└──────────────────────────────────────────────┘
+```
+
+Toggle interactions apply live — every change patches state and triggers re-render. `Reset to defaults` clears the per-map override (effective prefs become atlas-global defaults). `Save current as default for new maps` copies effective prefs into atlas-global defaults.
+
+Close: click ⚙ again, click outside the popover, or hit Escape.
+
+### 11.3 Pin rendering response
+
+Pin visuals layer must re-render when `pin_style`, `pin_tint`, `pin_labels`, or `pin_label_threshold` change. The `pin-visuals.ts` cache key already includes badge state (Bout PB); extend it with style + tint composition. Labels render via Leaflet's tooltip/divIcon depending on `pin_labels` mode.
+
+### 11.4 Grid rendering
+
+When `show_grid === true`, render a `L.GridLayer` (or a custom canvas overlay) at the configured spacing. Subtle stroke (`rgba(255,255,255,0.08)`), 1px. Visually behind the image background where present.
+
+### 11.5 Pin drag lock
+
+When `lock_pin_drag === true`, the pin marker creation in `map-tab-pin-drag.ts` skips wiring drag events (or the drag handler short-circuits). User can still click pins, just can't move them. Useful for "published" maps where positions should be stable.
+
+### 11.6 Zone opacity + labels
+
+`zone_fill_opacity` applies as default to every zone on this map. Individual zones can override via the `atlas_opacity` extension field (DESIGN_ZONES.md §5). Zone labels (rendered above the centroid as a divIcon) follow `zone_labels` mode; individual zones with `atlas_label_visible === true` may force visibility.
+
+---
+
+## 12. Canvas toolbar (always visible above the leaflet canvas)
+
+A thin row (~36px tall) docked at the top of each map tab's body, above the leaflet container. Map index tab (the pinned first tab) does NOT get a toolbar.
+
+```
+┌─ map tab body ─────────────────────────────────────────────────┐
+│ [⚙] | [⬡ polygon] [╱ line] | [👁 zones] [👁 pins] | [⤢ fit]     │ ← toolbar (~36px)
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│                                                                │
+│                   leaflet canvas                               │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### 12.1 Buttons
+
+| Button | Tooltip | Behavior |
+|---|---|---|
+| ⚙ | "Map visual settings" | Toggles the §11 popover |
+| ⬡ | "Draw polygon" | Enters drawing mode (DESIGN_ZONES.md §2). Active state styled when `ui.zoneDrafting?.mode === 'polygon'`. Disabled if the map has no image (per §4.1 pin gate, same logic). |
+| ╱ | "Draw line" | Same, for line mode. |
+| 👁 zones | "Show/hide zones" | Toggles zonesLayer visibility on Leaflet2DManager. Transient (not persisted). |
+| 👁 pins | "Show/hide pins" | Toggles pinsLayer visibility. Transient. |
+| ⤢ | "Fit to image" | Camera animates to fit the map's image bounds. |
+
+Dividers between conceptual groups (settings | drawing | visibility | camera).
+
+### 12.2 Drawing-mode toolbar state
+
+When `ui.zoneDrafting` is set, the corresponding draw button gains an `.active` state. Clicking the active button again cancels drawing (ESC also).
+
+### 12.3 DOM placement and flex layout
+
+Toolbar mounts in `mountMapTab` inside `.atlas-tab-body`. The body becomes a vertical flex: toolbar (flex: 0 0 auto), leaflet container (flex: 1 1 0, min-height: 0). Disposal in `disposeMapTab`. Toolbar element gets `data-map-tab-toolbar` for test selectors.
+
+---
+
+## 13. Zone chip strip (below the canvas)
+
+Mirrors the existing pin chip strip pattern. Mounts at the bottom of each map tab's body, BELOW the leaflet canvas. Only renders when `listZonesOnMap(activeMapId, markers, zones).length > 0`.
+
+### 13.1 Chip shape
+
+```
+┌─────────────────────────┐
+│ ⬡ • Forest         × │
+└─────────────────────────┘
+```
+
+- Shape glyph (⬡ for polygon, ╱ for line)
+- Filled color dot (`atlas_color ?? '#22d3ee'`)
+- Name (truncated at ~20 chars with ellipsis)
+- Optional `×` on hover (alternate delete affordance besides drag-to-trash)
+
+### 13.2 Interactions
+
+- **Left click**: `selectedElementId = zone.id`, navigates to element-detail in middle pane. Zone outline gets selection highlight on canvas.
+- **Right click**: context menu — Rename, Duplicate, Edit shape, Delete.
+- **Drag**: drag-to-trash zone (same drop-zone pattern as pins from Bout SMK-10). Drop on trash = `deleteZone(id)` cascading marker tombstones per DESIGN_ZONES.md §6.2.
+
+### 13.3 Strip layout
+
+Horizontal scrollable strip, ~32px tall. Selected zone's chip gets a stronger border + slight scale-up. CSS subscribes to `data.elements` changes — chips appear/disappear when zones are added/deleted in another flow (drawing, element-create modal, deletion from element-detail).
+
+If the chip strip ever grows too wide for the canvas width, it horizontally scrolls. Future: overflow chip "+N more" opening a picker (deferred).
+
+---
+
+## 14. Sign-off
 
 This doc is the source of truth for the map subsystem foundation. Bouts execute against it. If a decision proves wrong during implementation, the doc gets updated FIRST and then the code follows — never the reverse.
 

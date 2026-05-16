@@ -52,8 +52,9 @@ export class Leaflet2DManager {
   private map: L.Map | null = null;
   private config: ResolvedLeaflet2DConfig;
 
-  // Layer groups (z-index order: background < connections < pins < labels)
+  // Layer groups (z-index order: background < grid < connections < pins < labels)
   private backgroundLayer: L.LayerGroup | null = null;
+  private gridLayer: L.LayerGroup | null = null;
   private connectionsLayer: L.LayerGroup | null = null;
   private pinsLayer: L.LayerGroup | null = null;
   private labelsLayer: L.LayerGroup | null = null;
@@ -163,8 +164,23 @@ export class Leaflet2DManager {
       this.map.setMaxBounds(L.latLngBounds(sw, ne));
     }
 
+    // Custom pane for the background image — sits BELOW Leaflet's default
+    // panes (tilePane=200, overlayPane=400, markerPane=600) so the image
+    // never paints over zones, pins, the grid, or transient drawing UI.
+    // Without this the image renders in overlayPane (z=400) alongside zone
+    // polygons; DOM order then determines stacking and the image can end
+    // up obscuring the polygons (session 213 smoke).
+    this.map.createPane('atlasBgImagePane');
+    const bgPane = this.map.getPane('atlasBgImagePane');
+    if (bgPane) bgPane.style.zIndex = '180';
+
     // Create layer groups (order matters for z-index)
     this.backgroundLayer = L.layerGroup().addTo(this.map);
+    // gridLayer is independent of backgroundLayer so the grid overlay can
+    // toggle on/off without disturbing an image background. Sits in the
+    // default overlayPane (z=400) so its lines render on top of the image
+    // (z=180) but under pins (z=600).
+    this.gridLayer = L.layerGroup().addTo(this.map);
     this.connectionsLayer = L.layerGroup().addTo(this.map);
     this.pinsLayer = L.layerGroup().addTo(this.map);
     this.labelsLayer = L.layerGroup().addTo(this.map);
@@ -204,43 +220,64 @@ export class Leaflet2DManager {
       [imgHeight, imgWidth]
     ];
 
-    L.imageOverlay(url, bounds).addTo(this.backgroundLayer);
+    // Render into the low-z custom pane so the image never obscures zones,
+    // pins, grid, or transient drawing UI regardless of DOM insertion order.
+    L.imageOverlay(url, bounds, { pane: 'atlasBgImagePane' }).addTo(this.backgroundLayer);
     this.log('Background image set:', url);
   }
 
   /**
-   * Set a grid background (cyan grid pattern)
+   * Render a grid as the SOLE background (replaces any existing image).
+   *
+   * Used when a map has no image — the grid fills the canvas as visual scaffolding.
+   * Clears the backgroundLayer. **DO NOT call this when a map has an image** —
+   * use `setGridOverlay` instead, which renders the grid as a non-destructive
+   * translucent overlay above whatever background is set.
    */
   setBackgroundGrid(spacing: number = 100, color: string = 'rgba(34, 211, 238, 0.1)'): void {
     if (!this.map || !this.backgroundLayer) return;
 
     this.backgroundLayer.clearLayers();
-
-    // Create vertical lines
-    for (let x = 0; x <= this.config.canvasWidth; x += spacing) {
-      const line = L.polyline(
-        [
-          [0, x],
-          [this.config.canvasHeight, x]
-        ],
-        { color, weight: 1, opacity: 1 }
-      );
-      line.addTo(this.backgroundLayer);
-    }
-
-    // Create horizontal lines
-    for (let y = 0; y <= this.config.canvasHeight; y += spacing) {
-      const line = L.polyline(
-        [
-          [y, 0],
-          [y, this.config.canvasWidth]
-        ],
-        { color, weight: 1, opacity: 1 }
-      );
-      line.addTo(this.backgroundLayer);
-    }
+    this.drawGridLines(this.backgroundLayer, spacing, color);
 
     this.log('Background grid set');
+  }
+
+  /**
+   * Render a grid as a TRANSLUCENT OVERLAY on top of any existing background.
+   *
+   * Used by the canvas toolbar's "show grid" toggle (DESIGN_MAPS.md §11) when
+   * the map already has an image background — the grid lines overlay on top
+   * without clearing the image. Idempotent — calling repeatedly replaces the
+   * previous grid overlay.
+   */
+  setGridOverlay(spacing: number = 100, color: string = 'rgba(34, 211, 238, 0.18)'): void {
+    if (!this.map || !this.gridLayer) return;
+    this.gridLayer.clearLayers();
+    this.drawGridLines(this.gridLayer, spacing, color);
+  }
+
+  /** Remove the grid overlay, leaving the background image (if any) intact. */
+  clearGridOverlay(): void {
+    if (!this.gridLayer) return;
+    this.gridLayer.clearLayers();
+  }
+
+  private drawGridLines(target: L.LayerGroup, spacing: number, color: string): void {
+    // Vertical lines
+    for (let x = 0; x <= this.config.canvasWidth; x += spacing) {
+      L.polyline(
+        [[0, x], [this.config.canvasHeight, x]],
+        { color, weight: 1, opacity: 1 }
+      ).addTo(target);
+    }
+    // Horizontal lines
+    for (let y = 0; y <= this.config.canvasHeight; y += spacing) {
+      L.polyline(
+        [[y, 0], [y, this.config.canvasWidth]],
+        { color, weight: 1, opacity: 1 }
+      ).addTo(target);
+    }
   }
 
   /**
@@ -747,6 +784,41 @@ export class Leaflet2DManager {
     if (typeof maxZoom === 'number') opts.maxZoom = maxZoom;
 
     this.map.fitBounds(bounds, opts);
+  }
+
+  /**
+   * Fit view to the canvas (entire image / world bounds).
+   *
+   * Unlike fitBounds() which fits to visible pins, this fits to the
+   * full canvas defined by canvasWidth × canvasHeight. Used by the
+   * canvas toolbar's "fit to image" button (DESIGN_MAPS.md §12).
+   */
+  fitToCanvas(padding: number = 20): void {
+    if (!this.map) return;
+    const sw = storageToLeaflet({ x: 0, y: this.config.canvasHeight }, this.config.canvasHeight);
+    const ne = storageToLeaflet({ x: this.config.canvasWidth, y: 0 }, this.config.canvasHeight);
+    const bounds = L.latLngBounds(sw, ne);
+    this.map.fitBounds(bounds, { padding: [padding, padding] });
+  }
+
+  /**
+   * Show or hide the pins layer in bulk (DESIGN_MAPS.md §12 toolbar
+   * declutter toggle). Transient — not persisted to prefs. Markers remain
+   * in memory; the layer is just detached/attached.
+   */
+  setPinsLayerVisible(visible: boolean): void {
+    if (!this.map || !this.pinsLayer) return;
+    if (visible) {
+      if (!this.map.hasLayer(this.pinsLayer)) this.map.addLayer(this.pinsLayer);
+      if (this.labelsLayer && !this.map.hasLayer(this.labelsLayer)) {
+        this.map.addLayer(this.labelsLayer);
+      }
+    } else {
+      if (this.map.hasLayer(this.pinsLayer)) this.map.removeLayer(this.pinsLayer);
+      if (this.labelsLayer && this.map.hasLayer(this.labelsLayer)) {
+        this.map.removeLayer(this.labelsLayer);
+      }
+    }
   }
 
   /**

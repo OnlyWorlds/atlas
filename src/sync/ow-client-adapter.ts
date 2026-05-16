@@ -224,9 +224,21 @@ const ATLAS_LOCAL_FIELDS = new Set<string>([
  * 422s on any of these in a write body. `id` is kept on CREATE (client UUID
  * preserved) and stripped on UPDATE (path parameter).
  *
- * Pin bodies skip prepareRelations: pin's local representation already uses
- * `element_id` and `map_id` (wire shape). Running prepareRelations on pin
- * would double-suffix `element_id` → `element_id_id`.
+ * Pin bodies skip prepareRelations: pin's FIELD_SCHEMA literally names the
+ * relation field `element_id` (single_link), so prepareRelations would
+ * double-suffix it to `element_id_id`. The bypass is per-type and is needed
+ * iff the schema names a field with an `_id` suffix.
+ *
+ * Marker is NOT bypassed: marker's FIELD_SCHEMA uses bare relation names
+ * (`map`, `zone`); atlas disk shape uses wire-shape (`map_id`, `zone_id`).
+ * prepareRelations sees `map_id`/`zone_id` in the body, doesn't find them
+ * in the schema (which only knows `map`/`zone`), and leaves them alone —
+ * the server receives wire-shape and is happy. Verified by
+ * tests/integration/ow-client-adapter.marker.test.ts.
+ *
+ * Zone is NOT bypassed: all zone relations (phenomena, linked_zones,
+ * populations, titles, principles) are bare-name arrays that
+ * prepareRelations correctly converts to `_ids` wire shape.
  */
 function toWireShape(
   body: Record<string, unknown>,

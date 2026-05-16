@@ -268,10 +268,18 @@ export class FsFolderStore implements FolderStore {
   async findDependents(id: string): Promise<Element[]> {
     const target = await this.getElement(id);
     if (!target) return [];
-    if (target.type === 'pin' || target.type === 'zone' || target.type === 'marker') return [];
+    if (target.type === 'pin' || target.type === 'marker') return [];
+    if (target.type === 'zone') {
+      // Markers carry the zone relationship; the zone has no children otherwise.
+      const markers = (await this.listElements('marker')) as Array<Element & { zone_id?: string }>;
+      return markers.filter(m => m.zone_id === id);
+    }
     if (target.type === 'map') {
+      // Pins + markers carry map_id. Zones do NOT (see DESIGN_ZONES.md §1):
+      // a zone whose only markers were on the deleted map becomes "orphan"
+      // metadata, preserved for potential re-acquisition of geometry.
       const out: Element[] = [];
-      for (const t of ['pin', 'zone', 'marker'] as const) {
+      for (const t of ['pin', 'marker'] as const) {
         const list = (await this.listElements(t)) as Array<Element & { map_id?: string }>;
         for (const e of list) if (e.map_id === id) out.push(e);
       }
@@ -330,18 +338,21 @@ export class FsFolderStore implements FolderStore {
   async updatePin(id: string, patch: Partial<Pin>): Promise<Pin> { return (await this.updateElement(id, patch)) as Pin; }
   async deletePin(id: string) { return this.deleteElement(id); }
 
-  async listZones(mapId?: string): Promise<Zone[]> {
-    const all = (await this.listElements('zone')) as Zone[];
-    return mapId ? all.filter(z => z.map_id === mapId) : all;
+  async listZones(): Promise<Zone[]> {
+    return (await this.listElements('zone')) as Zone[];
   }
   async getZone(id: string): Promise<Zone | null> { return (await this.getElement(id)) as Zone | null; }
   async createZone(data: Partial<Zone>): Promise<Zone> { return (await this.createElement('zone', data)) as Zone; }
   async updateZone(id: string, patch: Partial<Zone>): Promise<Zone> { return (await this.updateElement(id, patch)) as Zone; }
   async deleteZone(id: string) { return this.deleteElement(id); }
 
-  async listMarkers(mapId?: string): Promise<Marker[]> {
+  async listMarkers(filter?: { mapId?: string; zoneId?: string }): Promise<Marker[]> {
     const all = (await this.listElements('marker')) as Marker[];
-    return mapId ? all.filter(m => m.map_id === mapId) : all;
+    if (!filter) return all;
+    return all.filter(m =>
+      (filter.mapId === undefined || m.map_id === filter.mapId) &&
+      (filter.zoneId === undefined || m.zone_id === filter.zoneId),
+    );
   }
   async getMarker(id: string): Promise<Marker | null> { return (await this.getElement(id)) as Marker | null; }
   async createMarker(data: Partial<Marker>): Promise<Marker> { return (await this.createElement('marker', data)) as Marker; }

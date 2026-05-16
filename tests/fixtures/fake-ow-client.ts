@@ -73,6 +73,14 @@ export class FakeOwApiClient implements OwApiClient {
     if (type === 'pin' && wireBody.element_id && !wireBody.element_type) {
       throw new Error('API Error 400: element_type must be provided when element_id is specified');
     }
+    // Convention #8 invariant: spatial element bodies (pin, marker) carry
+    // wire-shape relation fields directly (map_id, zone_id, element_id).
+    // Running them through prepareRelations double-suffixes the field to
+    // map_id_id / zone_id_id / element_id_id — the server then 4xx's. The
+    // fake encodes the invariant so any code path violating it fails its
+    // tests immediately (Convention #20). The fix is to bypass
+    // prepareRelations in the adapter for these types.
+    rejectDoubleSuffix(type, wireBody, 'create');
     // Real OW behavior: ignore client-sent id when assignServerIds=true.
     const id = this.assignServerIds ? cryptoRandomId() : (wireBody.id as string) ?? cryptoRandomId();
     this.throwIfInjected('create', id);
@@ -89,6 +97,7 @@ export class FakeOwApiClient implements OwApiClient {
     const wireBody = stripUndefined(body);
     this.calls.push({ method: 'update', type, id, body: { ...wireBody } });
     this.throwIfInjected('update', id);
+    rejectDoubleSuffix(type, wireBody, 'update');
     const m = this.bucket(type);
     const existing = m.get(id);
     // Mirror real OW: PATCH on a deleted/unknown id returns 404 with the
@@ -211,4 +220,29 @@ function stripUndefined(body: Record<string, unknown>): Record<string, unknown> 
     out[k] = v;
   }
   return out;
+}
+
+/**
+ * Throw on double-suffixed relation fields for pin/marker bodies. These
+ * spatial types carry wire-shape relation names (map_id, zone_id, element_id)
+ * on disk; the adapter must bypass prepareRelations for them. If any
+ * `*_id_id` or `*_ids_ids` key appears, the bypass is broken — reject so the
+ * regression is caught in tests rather than only at runtime against real OW.
+ *
+ * See ow-client-adapter.ts:244 (bypass set) and DESIGN_ZONES.md §8.1.
+ */
+function rejectDoubleSuffix(
+  type: ElementType,
+  body: Record<string, unknown>,
+  op: 'create' | 'update',
+): void {
+  if (type !== 'pin' && type !== 'marker') return;
+  for (const k of Object.keys(body)) {
+    if (k.endsWith('_id_id') || k.endsWith('_ids_ids')) {
+      throw new Error(
+        `API Error 400: ${op} ${type} body contains double-suffixed relation field "${k}". ` +
+          `The adapter must bypass prepareRelations for ${type}; see ow-client-adapter.ts:244.`,
+      );
+    }
+  }
 }

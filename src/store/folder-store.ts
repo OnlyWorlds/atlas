@@ -97,13 +97,25 @@ export interface FolderStore {
   updatePin(id: string, patch: Partial<Pin>): Promise<Pin>;
   deletePin(id: string): Promise<{ tombstones: Tombstone[] }>;
 
-  listZones(mapId?: string): Promise<Zone[]>;
+  /**
+   * Lists all zones. Zones have no map relationship — to find zones that
+   * appear on a specific map, use the in-memory derived helper
+   * `listZonesOnMap(mapId, markers, zones)` over `state.data.elements`.
+   */
+  listZones(): Promise<Zone[]>;
   getZone(id: string): Promise<Zone | null>;
   createZone(data: Partial<Zone>): Promise<Zone>;
   updateZone(id: string, patch: Partial<Zone>): Promise<Zone>;
   deleteZone(id: string): Promise<{ tombstones: Tombstone[] }>;
 
-  listMarkers(mapId?: string): Promise<Marker[]>;
+  /**
+   * Lists markers, optionally filtered by map and/or zone.
+   *   - `{ mapId }` → markers on that map (any or no zone)
+   *   - `{ zoneId }` → markers belonging to that zone (across maps)
+   *   - `{ mapId, zoneId }` → both (this zone's markers on this map)
+   * Omitted filter returns all markers.
+   */
+  listMarkers(filter?: { mapId?: string; zoneId?: string }): Promise<Marker[]>;
   getMarker(id: string): Promise<Marker | null>;
   createMarker(data: Partial<Marker>): Promise<Marker>;
   updateMarker(id: string, patch: Partial<Marker>): Promise<Marker>;

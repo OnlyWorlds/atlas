@@ -5,6 +5,101 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 
 ---
 
+## Session 213 (2026-05-16) — Zones subsystem foundation + features
+
+**Headline**: The zone subsystem landed in one autonomous session. Pure-markers model (OW canon, no spurious map_id/coordinates on Zone), full drawing flow, chip strip, element-detail visuals + markers list, canvas toolbar with show/hide + fit-to-image. 13 bouts, all green at typecheck + vitest + build at every seam. 385 → 472 vitest tests (+87 — Zone CRUD, derived views, marker SDK, geometry math, prefs, drawing helpers). Bundle 410.21 → 439.58 KB JS / 114.85 → 122.60 KB gzipped (+29 KB across foundations + features). CSS 61.38 → 72.31 KB.
+
+**Captain was off**. Work proceeded autonomously after design alignment. No commits — Captain will commit on return after smoke.
+
+### Design (D1, D2)
+
+**D1 — DESIGN_ZONES.md (new, 12 sections + bouts).** Full architectural reference for the zone subsystem: domain model (Zone = pure metadata, Markers = the only spatial truth — map relationship + zone relationship + x/y/order all on Marker), drawing flow (transient in-memory → materialize Zone + N Markers in one batch on Finish), edit flow (explicit Edit entry, handles, segment insertion, drag, delete, Done/Cancel with HistoryManager), UI surfaces (canvas toolbar + transient overlay + chip strip + element-detail zone sections), atlas-extension visual fields (atlas_color, atlas_opacity, atlas_label_visible — folder-only), cascade rules (map delete tombstones markers but preserves zones as orphan metadata), hit testing (20px invisible polyline overlay for lines), test fixture specs (Worlds D/E/F), and the F0→V5 bout sequence.
+
+**D2 — DESIGN_MAPS.md §11-13 added.** New sections for the map visual settings popover, the canvas toolbar surface (settings/draw/show-hide/fit-to-image), and the zone chip strip docking model. Cross-references DESIGN_ZONES.md for zone-specific behavior. Existing §1-§10c untouched.
+
+### Foundation (F0 — F5)
+
+**F0 — Zone type cleanup**. Removed spurious `map_id` and `coordinates` fields from atlas's `Zone` interface. Added `zone_id?`, `z?`, `order?` to `Marker`. Updated FolderStore `listZones()` signature (no mapId — zones don't carry map relationship; derived view `listZonesOnMap` lives at the UI layer). Updated `findDependents` cascade: map-delete returns pins + markers (NOT zones — orphan zones preserved as metadata per DESIGN_ZONES.md §6.1). Migrated cascade tests to the new shape.
+
+**F1 — Zone/marker cascade + CRUD tests** (+28 vitest). New `src/tabs/right/zone-derived.ts` with pure functions: `listZonesOnMap`, `markersForZoneOnMap`, `zoneGeometry`, `isOrphanZone`, `partitionZonesAndMarkers`. 13 unit tests cover the derived views including cross-map zones (one Zone with markers on two different maps surfaces correctly on both). 15 integration tests cover Zone CRUD, marker CRUD (mapId/zoneId/both filter), zone-delete cascades markers, marker-delete is a leaf, map-delete cascade preserves zone metadata, orphan zone survival.
+
+**F2 — Marker SDK adapter (no bypass needed — finding)**. Initial assumption was that markers would need the same prepareRelations bypass as pins (Convention #8). Investigation showed otherwise: pin's SDK FIELD_SCHEMA has `element_id` as a literal single_link (so prepareRelations would re-suffix to `element_id_id` → bug). Marker's schema uses BARE names (`map`, `zone`) — atlas disk shape uses wire-shape (`map_id`, `zone_id`), prepareRelations sees fields not in the schema and leaves them alone. The server receives wire-shape, is happy. No code change required. Defense encoded in `FakeOwApiClient` + `statefulOwHandlers`: any pin or marker write body containing `*_id_id` / `*_ids_ids` keys now triggers a 400 in the fakes, so a future regression fails its tests immediately. 5 new integration tests in `ow-client-adapter.marker.test.ts` cover marker create/update/free-marker AND zone create/update (the latter verifying prepareRelations correctly suffixes `phenomena → phenomena_ids` etc.). Adapter comment block updated with the rationale.
+
+**F3 — Leaflet2DManager polygon/polyline support** (+28 vitest). New `src/visualization/leaflet-2d/ZoneGeometry.ts` — pure geometry helpers ported from zoner's `ZoneCanvas.ts` (audit session pre-build): `distanceToSegment`, `distanceToSegmentSquared`, `projectToSegment`, `findClosestSegment` (with closed-polygon support), `polygonCentroid`, `polylineLabelAnchor`, `pointInPolygon`, `snapAngleTo45`, `snapToAxis` (the shift-snap math — projects click onto nearest 45° axis from anchor, clamped to non-negative distance), `pointListsEqual`. 28 unit tests cover edge cases including degenerate segments, point on segment, clamped projections, closed-vs-open polylines, label-anchor on longest segment. Decision: keep Leaflet2DManager pin-focused (already 895 lines); zones live in a sibling `ZoneOverlay.ts` class that takes the L.Map handle and manages its own LayerGroup. Polygons use Leaflet's native fill click; lines get an invisible 20px-weight polyline hit-overlay. Z-order naturally correct via Leaflet's `overlayPane` (zones, z=400) sitting below `markerPane` (pins, z=600).
+
+**F4 — map_view_prefs storage** (+18 vitest). New `src/core/map-view-prefs.ts`. Two localStorage slices: `atlas_map_view_defaults` (atlas-global) + `atlas_map_view_prefs` (Record<mapId, Partial<MapViewPrefs>>). Schema: pin_style (icon/round-icon/pin-shape), pin_labels (always/hover/threshold/never) + pin_label_threshold number, pin_tint (type-color/accent/muted), show_grid + grid_spacing (50/100/200), lock_pin_drag, zone_fill_opacity (0..1), zone_labels (always/hover/never). Helpers: `getAtlasDefaults`, `setAtlasDefaults`, `resetAtlasDefaults`, `getMapOverride`, `setMapOverride` (undefined removes a field), `resetMapOverride`, `getEffectiveMapPrefs` (factory → atlas defaults → per-map merge), `saveMapPrefsAsDefault` (promotes effective prefs to atlas-wide and clears the map's override). Atlas-extension fields added to `ATLAS_LOCAL_EXTENSION_FIELDS`: `atlas_color`, `atlas_opacity`, `atlas_label_visible` (Zone-specific). 18 unit tests cover storage round-trips, merge precedence, partial-merge accumulation, the save-as-default + reset flows, and corrupt JSON fallback.
+
+**F5 — Canvas toolbar scaffold**. New `src/tabs/right/map-tab-toolbar.ts` — `buildCanvasToolbar()` returns DOM refs for 6 buttons (settings cog, draw polygon, draw line, show/hide zones, show/hide pins, fit-to-image) plus dividers. `MapTabCacheEntry` extended with `wrapper` (the new vertical flex column wrapping toolbar + canvas container) and `toolbar` (the toolbar div). `mountMapTab` restructured: pane now hosts the wrapper, wrapper hosts toolbar (flex 0) above the leaflet canvas container (flex 1, position relative, preserves the existing absolute overlays). `disposeMapTab` removes the wrapper as one unit. Toolbar buttons stub with `data-action` attributes; behavior wires in V1-V5. CSS: `.atlas-map-tab-wrapper`, `.atlas-map-canvas-container`, `.atlas-map-toolbar`, `.atlas-map-toolbar-btn` (with `is-active` state for drawing-mode highlight), `.atlas-map-toolbar-divider`.
+
+### Features (V1 — V5)
+
+**V1 — Visual settings popover**. New `src/tabs/right/map-visual-settings-popover.ts` — left-anchored floating panel (~320px wide), opens on settings-cog click. Contents per DESIGN_MAPS.md §11: pin style 3-way, pin labels mode + threshold input, pin tint 3-way, grid toggle + spacing radio, pin drag lock, zone fill opacity slider, zone labels mode. Footer: "Save as default" + "Reset this map". Live consumers wired in V1: **grid (show/hide + spacing) via `manager.setBackgroundGrid()`** and **pin drag lock via `marker.dragging.enable/disable()` on all existing pins**. The other prefs (pin style, labels, tint, zone fill opacity, zone labels) persist correctly but their consumers ship in follow-up bouts — V3 wires zone_fill_opacity + zone_labels via ZoneOverlay; pin-style/tint/labels live wiring deferred to V1.5 (per the bout's "MUST/NICE/DEFER" budget). Outside-click + Escape close the popover; settings cog re-click toggles.
+
+**V2 — Zone drawing on canvas**. New `src/tabs/right/zone-drawing.ts` + `zone-drawing-overlay.ts`. Module-level singleton draft state (only one in-progress zone across atlas at a time). Toolbar's Polygon/Line buttons enter draw mode → cursor flips to crosshair → toolbar button gets `is-active` highlight → transient overlay strip mounts below the toolbar (count + shift-snap hint + undo/finish/cancel). Click on canvas appends a marker (clamped to canvas bounds, integer-rounded). **Shift-snap** (DESIGN_ZONES.md §2.4): hold Shift while clicking → new marker snaps to nearest 45° axis from the previous → perfect rectangles via 4 shift-clicks. Live preview: numbered cyan DivIcon markers (ported zoner pattern) + dashed cyan polyline (for line) or polygon-fill ghost (for polygon, once ≥3 markers). Undo pops last marker. Cancel (button or ESC) discards. **Finish**: in one batch, `createZone({ name, supertype })` (no map_id — pure metadata) → `createMarker({ map_id, zone_id, x, y, order: i })` × N → patch elements → `requestPushIfLinked` → select the new zone (lands user in element-detail). Auto-numbered name: `findUniqueZoneName('new zone'|'new line', zones)` walks `<base>` / `<base> (2)` / `<base> (3)` series — 6 unit tests cover the helper. Min-marker gate enforced (3 polygon, 2 line). On dispose-map-tab, any in-flight draft on that map cancels automatically.
+
+**V3 — Zone chip strip + canvas rendering** (the canvas-side ZoneOverlay finally lights up). New `src/tabs/right/map-tab-zones.ts`. `syncZones(entry)` reads `state.data.elements`, derives zones-on-this-map via `listZonesOnMap`, computes geometry per zone from `markersForZoneOnMap`, calls `overlay.addZone/updateZone/removeZone`. Effective color/opacity per zone uses `atlas_color` / `atlas_opacity` with fallback to the map's `zone_fill_opacity` pref. Label text from `atlas_label_visible` + map's `zone_labels` mode. Below-canvas chip strip rendered for each zone: shape glyph (hexagon/show_chart) + color dot + name + on-hover delete-X. Click chip → select zone (sets `selectedElementId` → chip + canvas outline both highlight). Right-click chip → context menu (Rename / Delete) via prompt/confirm. Delete cascades markers per DESIGN_ZONES.md §6.2. Hooked into the global subscribe loop so any element change re-syncs zones on the active map; selection changes also trigger re-sync so canvas highlight reflects element selection from anywhere. ZoneOverlay disposed BEFORE manager.destroy in `disposeMapTab`.
+
+**V4 — Element-detail Zone sections**. New `src/middle/element-detail-zone-sections.ts`. When `selectedElementId` is a Zone, element-detail injects two new sections AFTER the standard schema sections and BEFORE Referenced-By. "Zone visuals (local)" — color picker (HTML5 color input + text mirror, validates 6-digit hex), opacity slider 0–100% with live readout, label-visible checkbox. All write via `store.updateZone` → atlas-extension fields stripped from API push by adapter. "Markers" — for zones with no markers, friendly empty state with hint. For populated zones: grouped by map (small per-map header with map icon + name + count), then ordered list of marker rows (order # + (x,y) coords + pan-to button + delete trash). Pan-to opens the map tab if not already open then calls `panMapTabTo` to center on the marker. Delete cascades nothing (markers are leaves) but bumps subsequent markers' implicit order (display only — disk order stays as-is). All wired with event delegation.
+
+**V5 — Remaining toolbar buttons**. New methods on Leaflet2DManager: `fitToCanvas(padding)` (fits view to full canvas dimensions, not just pin bounds) and `setPinsLayerVisible(visible)` (bulk toggle of pinsLayer + labelsLayer attach/detach). Toolbar buttons wired: Show/hide zones → `zoneOverlay.setLayerVisible()` with glyph-swap visibility↔visibility_off + button is-active state. Show/hide pins → `manager.setPinsLayerVisible()` same pattern. Fit-to-image → `manager.fitToCanvas()`. Both visibility toggles are transient (not persisted to prefs — they're quick declutters, not preferences).
+
+### Cleanup
+- `_isDrawing` import in map-tab.ts pruned (never called externally; module's `getActiveDraft()` covers the access pattern).
+- DESIGN_ZONES.md §8.1 rewritten to reflect F2's actual finding (marker doesn't need bypass).
+
+### Pokeable for next smoke (Captain's return):
+
+**Zone drawing**:
+- Open a map with an image → toolbar shows ⚙ ⬡ ╱ 👁zones 👁pins ⤢ buttons.
+- Click ⬡ Polygon → cursor flips crosshair, transient overlay strip appears top-center ("0 markers • hold shift to snap • undo finish cancel").
+- Click around 3+ times on the canvas → numbered cyan dots appear, dashed cyan polygon preview connects them.
+- Hold Shift + click → next marker snaps to 0/45/90° axis from previous. Click 4 times at right angles → perfect rectangle.
+- ↶ Undo button enabled after first marker; pops last.
+- ✓ Finish button disabled until ≥3 markers (polygon) or ≥2 (line); enabled → click → zone + markers persist with auto-named "new zone" / "new zone (2)" / etc; canvas now renders the real cyan polygon outline + fill; element-detail in middle pane jumps to the new zone.
+- Same with Line tool (╱) — 2-marker min, polyline preview, no fill.
+- ESC at any point or ✗ Cancel discards the draft.
+
+**Zone chip strip**:
+- A zone exists on this map → strip appears below the canvas with a chip showing shape glyph + color dot + name.
+- Click chip → middle pane navigates to that zone's element-detail; canvas outline thickens (selection style).
+- Right-click chip → menu with Rename / Delete. Rename uses a prompt. Delete confirms and cascades markers.
+- Hover chip → small × appears on the right; click → same delete confirm.
+
+**Element-detail Zone sections** (when a Zone is selected):
+- "Zone visuals (local)" section with `local only` chip in the header (tooltip explains: stored locally, not synced to API).
+- Color picker → live update + autosave. Hex text input mirror works; invalid hex reverts.
+- Opacity slider → live update with % readout.
+- Show-label checkbox → toggles a divIcon label rendered at the polygon centroid / line midpoint.
+- "Markers" section grouped by map with per-marker pan-to (crosshair icon) and delete (trash).
+
+**Visual settings popover** (⚙ cog):
+- Click ⚙ → left-anchored floating panel slides in over the canvas. Map stays visible to its right.
+- Grid toggle + spacing (50/100/200) → live applies to canvas. Pin drag lock → all existing pins go un-draggable / re-draggable.
+- Pin style / labels / tint / zone fields persist but live preview for pin-style/tint/labels is deferred — V1.5 will wire those consumers.
+- Save as default → promotes current effective prefs to atlas-wide defaults; clears this map's override.
+- Reset this map → clears the per-map override; effective prefs fall back to atlas defaults.
+- Re-click ⚙ or Escape or click outside → close.
+
+**Show/hide layers + fit-to-image**:
+- Click 👁 zones → all zone polygons/polylines vanish from canvas; button gets active state; glyph swaps to visibility_off. Re-click restores.
+- Same for 👁 pins.
+- Click ⤢ → camera animates to fit the full map image (not just pins).
+
+### Known rough edges (intentional v1 deferrals):
+- Pin style / labels / tint live preview deferred to V1.5 (popover writes through but pin-visuals layer doesn't yet listen).
+- Zone shape editing (drag handles, segment insertion, marker delete via canvas right-click) is unwired in v1 — markers can be deleted from the element-detail Markers section, but in-place edit needs a future bout (DESIGN_ZONES.md §3, marked for after smoke).
+- HistoryManager (zoner audit identified for port) is not yet imported. Edit-mode cancel-via-undo lands with that port.
+- Zone canvas right-click context menu (Edit shape) is unimplemented (DESIGN_ZONES.md §3.1 lists this as a future entry-point).
+- Grid "off" path uses a max-spacing render (effectively invisible) rather than a proper layer clear. A future `Leaflet2DManager.clearGrid()` method would be cleaner; deferred.
+- Trash-zone drag for chips not implemented — chip click-X + right-click delete cover the gesture.
+
+### Continuity threads:
+- Zone subsystem is feature-complete for drawing + viewing + visual editing. **Edit-shape mode is the next major bout** (handles, segment insert, HistoryManager-backed cancel).
+- Schema/council motion still pending (DESIGN_ZONES.md §10 lists Open Extensions). M8 in DESIGN_MAPS.md bundles zone field description updates.
+- Atlas-extension visual fields are now established for Zone (atlas_color / atlas_opacity / atlas_label_visible) — same pattern can extend to other element types as desired.
+
+---
+
 ## Session 212 (2026-05-16) — Recovery, polish, and the map-tab split
 
 Ten bouts, all green at typecheck + vitest + build at each step. 385 → 385 vitest (UI/behavior changes verified by existing coverage + smoke; no new tests). Bundle 400.21 → 409.16 KB JS / 110.85 → 114.56 KB gzipped (+9 KB across all bouts).

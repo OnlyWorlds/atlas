@@ -93,5 +93,17 @@ export const LOCK_STALE_MS = 90_000;
  *
  * Add new atlas-only fields here; both ends pick them up automatically.
  */
-export const ATLAS_LOCAL_EXTENSION_FIELDS = ['image_media_id'] as const;
+export const ATLAS_LOCAL_EXTENSION_FIELDS = [
+  'image_media_id',
+  // Zone visual extensions (DESIGN_ZONES.md §5) — stored on the Zone element
+  // file, never pushed to the OW API. atlas_color is a hex string; atlas_opacity
+  // is 0..1; atlas_label_visible is boolean.
+  'atlas_color',
+  'atlas_opacity',
+  'atlas_label_visible',
+] as const;
 export type AtlasLocalExtensionField = typeof ATLAS_LOCAL_EXTENSION_FIELDS[number];
+
+// Map visual prefs storage keys (DESIGN_MAPS.md §11).
+export const MAP_VIEW_PREFS_DEFAULTS_KEY = 'atlas_map_view_defaults';
+export const MAP_VIEW_PREFS_BY_MAP_KEY = 'atlas_map_view_prefs';

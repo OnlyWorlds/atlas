@@ -85,17 +85,45 @@ export interface Pin extends Element {
   y: number;
 }
 
+/**
+ * Zone — pure metadata (per OW SDK Zone schema, verified 2026-05-16).
+ *
+ * Zones have NO map field and NO geometry. They are conceptual elements
+ * (a Kingdom, a Forest, a Trade Route). Their spatial existence is emergent:
+ * a zone "appears" on a map IFF at least one Marker references both that
+ * zone and that map. Geometry is reconstructed by sorting those markers
+ * by `order`. See DESIGN_ZONES.md §1.
+ *
+ * Atlas-extension fields (folder-only, never pushed to API):
+ *   - atlas_color: zone outline + fill color (hex string)
+ *   - atlas_opacity: zone fill opacity (0..1)
+ *   - atlas_label_visible: render zone name as on-canvas label
+ *
+ * Other fields come through the index signature on `Element` from the SDK
+ * schema (role, dates, phenomena, linked_zones, populations, etc.).
+ */
 export interface Zone extends Element {
   type: 'zone';
-  map_id: string;
-  coordinates?: number[][];
+  atlas_color?: string;
+  atlas_opacity?: number;
+  atlas_label_visible?: boolean;
 }
 
+/**
+ * Marker — spatial truth for zones.
+ *
+ * Each marker carries BOTH the map relationship AND the zone relationship
+ * AND the coordinates. `order` determines sequence within a zone's geometry.
+ * See DESIGN_ZONES.md §1.
+ */
 export interface Marker extends Element {
   type: 'marker';
   map_id: string;
+  zone_id?: string;
   x: number;
   y: number;
+  z?: number;
+  order?: number;
 }
 
 // ---- Media ----

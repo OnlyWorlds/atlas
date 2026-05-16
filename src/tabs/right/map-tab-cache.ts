@@ -8,10 +8,23 @@
  */
 
 import type { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManager';
+import type { ZoneOverlay } from '../../visualization/leaflet-2d/ZoneOverlay';
 
 export interface MapTabCacheEntry {
   mapId: string;
   worldId: string;
+  /**
+   * Vertical flex column that hosts the toolbar (top) + the leaflet container
+   * (below). This is what gets re-attached to the active map pane on tab
+   * switch — caching the wrapper preserves the leaflet state inside.
+   */
+  wrapper: HTMLDivElement;
+  /**
+   * Thin toolbar row above the canvas (DESIGN_MAPS.md §12). Contains the
+   * settings cog, draw-polygon, draw-line, show/hide zones, show/hide pins,
+   * fit-to-image buttons. F5 scaffold; behavior wired in V1-V5.
+   */
+  toolbar: HTMLDivElement;
   container: HTMLDivElement;
   manager: Leaflet2DManager;
   objectUrls: string[];
@@ -40,6 +53,17 @@ export interface MapTabCacheEntry {
    * the subscriber compares and re-applies.
    */
   lastBg: string;
+  /**
+   * Zone polygon/polyline renderer attached to this tab's leaflet map.
+   * Constructed in mountMapTab after manager.init lands; null before that.
+   * Disposed in disposeMapTab before manager.destroy.
+   */
+  zoneOverlay: ZoneOverlay | null;
+  /**
+   * Below-canvas chip strip listing zones present on this map. One chip per
+   * zone (computed via listZonesOnMap). Click selects, right-click context.
+   */
+  zoneStrip: HTMLDivElement;
 }
 
 export const mapTabCache = new Map<string, MapTabCacheEntry>();

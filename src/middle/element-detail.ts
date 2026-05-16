@@ -34,6 +34,7 @@ import { createMapDialog } from '../ui/map-create-modal';
 import { readImageDimsFromUrl } from '../ui/image-dims';
 import { getMapsSettings } from '../registry/registry';
 import { mapHash } from '../core/router';
+import { buildZoneSections } from './element-detail-zone-sections';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */
 const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
@@ -127,6 +128,13 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const sectionEl = renderSection(section, el, idx === 0);
       if (sectionEl) detail.appendChild(sectionEl);
     });
+
+    // Zone-specific sections (visuals + markers) — DESIGN_ZONES.md §4.4.
+    if (el.type === 'zone') {
+      for (const node of buildZoneSections(el as import('../core/types').Zone, toastManager)) {
+        detail.appendChild(node);
+      }
+    }
 
     const refs = renderReferencedBy(el);
     if (refs) detail.appendChild(refs);

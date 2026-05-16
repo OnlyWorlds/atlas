@@ -33,23 +33,41 @@ describe('FolderStore.findDependents', () => {
     expect(deps.map(d => d.id).sort()).toEqual(['pin-1', 'pin-2']);
   });
 
-  it('returns pins, zones, and markers on a deleted map', async () => {
+  it('returns pins and markers on a deleted map (zones are NOT cascaded)', async () => {
+    // Per DESIGN_ZONES.md §6.1: Zones have no map relationship.
+    // Markers carry the map. A map delete tombstones pins + markers; zones
+    // whose only markers were on the deleted map become orphan metadata.
     const map = await folder.createMap({ id: 'map-1', name: 'Atlas' });
     const other = await folder.createMap({ id: 'map-2', name: 'Other' });
     await folder.createPin({ id: 'pin-1', name: 'p', element_id: 'el-1', map_id: map.id, x: 0, y: 0 });
-    await folder.createZone({ id: 'zone-1', name: 'z', map_id: map.id });
-    await folder.createMarker({ id: 'mark-1', name: 'm', map_id: map.id, x: 0, y: 0 });
+    await folder.createZone({ id: 'zone-1', name: 'z' });
+    await folder.createMarker({ id: 'mark-1', name: 'm', map_id: map.id, zone_id: 'zone-1', x: 0, y: 0, order: 0 });
     // Decoy on a different map.
     await folder.createPin({ id: 'pin-other', name: 'p', element_id: 'el-2', map_id: other.id, x: 0, y: 0 });
 
     const deps = await folder.findDependents(map.id);
-    expect(deps.map(d => d.id).sort()).toEqual(['mark-1', 'pin-1', 'zone-1']);
+    expect(deps.map(d => d.id).sort()).toEqual(['mark-1', 'pin-1']);
   });
 
-  it('returns empty for leaf types (pin, zone, marker)', async () => {
+  it('returns markers belonging to a deleted zone', async () => {
+    await folder.createMap({ id: 'map-1', name: 'Atlas' });
+    await folder.createZone({ id: 'zone-1', name: 'z' });
+    await folder.createMarker({ id: 'm1', name: 'm', map_id: 'map-1', zone_id: 'zone-1', x: 0, y: 0, order: 0 });
+    await folder.createMarker({ id: 'm2', name: 'm', map_id: 'map-1', zone_id: 'zone-1', x: 1, y: 1, order: 1 });
+    // Decoy: marker on a different zone.
+    await folder.createZone({ id: 'zone-2', name: 'z2' });
+    await folder.createMarker({ id: 'm3', name: 'm', map_id: 'map-1', zone_id: 'zone-2', x: 2, y: 2, order: 0 });
+
+    const deps = await folder.findDependents('zone-1');
+    expect(deps.map(d => d.id).sort()).toEqual(['m1', 'm2']);
+  });
+
+  it('returns empty for leaf types (pin, marker)', async () => {
     const map = await folder.createMap({ id: 'map-1', name: 'Atlas' });
     const pin = await folder.createPin({ id: 'pin-1', name: 'p', element_id: 'el-1', map_id: map.id, x: 0, y: 0 });
     expect(await folder.findDependents(pin.id)).toEqual([]);
+    const marker = await folder.createMarker({ id: 'mk-1', name: 'm', map_id: map.id, x: 0, y: 0 });
+    expect(await folder.findDependents(marker.id)).toEqual([]);
   });
 
   it('returns empty for missing ids', async () => {
@@ -77,15 +95,40 @@ describe('FolderStore.deleteElement cascade behavior', () => {
     expect(await folder.getElement('pin-2')).toBeNull();
   });
 
-  it('cascade-deletes pins/zones/markers when a map is removed', async () => {
+  it('cascade-deletes pins and markers when a map is removed (zones survive)', async () => {
     const map = await folder.createMap({ id: 'map-1', name: 'Atlas' });
     await folder.createPin({ id: 'pin-1', name: 'p', element_id: 'el-1', map_id: map.id, x: 0, y: 0 });
-    await folder.createZone({ id: 'zone-1', name: 'z', map_id: map.id });
-    await folder.createMarker({ id: 'mark-1', name: 'm', map_id: map.id, x: 0, y: 0 });
+    await folder.createZone({ id: 'zone-1', name: 'z' });
+    await folder.createMarker({ id: 'mark-1', name: 'm', map_id: map.id, zone_id: 'zone-1', x: 0, y: 0, order: 0 });
 
     const { tombstones } = await folder.deleteMap(map.id);
-    expect(tombstones).toHaveLength(4);
+    // 3 tombstones: pin + marker + map (zone is NOT cascaded — pure metadata survives)
+    expect(tombstones).toHaveLength(3);
     expect(tombstones[tombstones.length - 1].id).toBe(map.id);
+    expect(tombstones.slice(0, -1).map(t => t.id).sort()).toEqual(['mark-1', 'pin-1']);
+
+    // Zone is preserved (orphan metadata, no spatial existence).
+    expect(await folder.getElement('zone-1')).not.toBeNull();
+  });
+
+  it('cascade-deletes markers when a zone is removed', async () => {
+    await folder.createMap({ id: 'map-1', name: 'Atlas' });
+    await folder.createZone({ id: 'zone-1', name: 'Forest' });
+    await folder.createMarker({ id: 'm1', name: 'm', map_id: 'map-1', zone_id: 'zone-1', x: 0, y: 0, order: 0 });
+    await folder.createMarker({ id: 'm2', name: 'm', map_id: 'map-1', zone_id: 'zone-1', x: 1, y: 1, order: 1 });
+    await folder.createMarker({ id: 'm3', name: 'm', map_id: 'map-1', zone_id: 'zone-1', x: 2, y: 2, order: 2 });
+
+    const { tombstones } = await folder.deleteZone('zone-1');
+    // 4 tombstones: 3 markers + the zone itself, zone is primary (last).
+    expect(tombstones).toHaveLength(4);
+    expect(tombstones[tombstones.length - 1].id).toBe('zone-1');
+    expect(tombstones.slice(0, -1).map(t => t.id).sort()).toEqual(['m1', 'm2', 'm3']);
+
+    // All gone.
+    expect(await folder.getElement('zone-1')).toBeNull();
+    expect(await folder.getElement('m1')).toBeNull();
+    expect(await folder.getElement('m2')).toBeNull();
+    expect(await folder.getElement('m3')).toBeNull();
   });
 
   it('cascade: false skips dependents (escape hatch)', async () => {

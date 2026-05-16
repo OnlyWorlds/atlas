@@ -150,6 +150,18 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
           { status: 400 }
         );
       }
+      // Convention #8 + #20: pin/marker bodies are wire-shape on disk; the
+      // adapter MUST bypass prepareRelations for them. If a *_id_id /
+      // *_ids_ids field shows up, the bypass is broken.
+      if (type === 'pin' || type === 'marker') {
+        const bad = Object.keys(body).find(k => k.endsWith('_id_id') || k.endsWith('_ids_ids'));
+        if (bad) {
+          return HttpResponse.json(
+            { error: `${type} body contains double-suffixed relation field "${bad}"` },
+            { status: 400 },
+          );
+        }
+      }
       // assignsServerIds: ignore client id entirely (real OW behavior with v4 input).
       const id = options.assignsServerIds
         ? crypto.randomUUID()
@@ -167,6 +179,15 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
       const existing = bucket(type).get(id);
       if (!existing) return HttpResponse.json({ error: 'not found' }, { status: 404 });
       const body = (await request.json()) as Record<string, unknown>;
+      if (type === 'pin' || type === 'marker') {
+        const bad = Object.keys(body).find(k => k.endsWith('_id_id') || k.endsWith('_ids_ids'));
+        if (bad) {
+          return HttpResponse.json(
+            { error: `${type} body contains double-suffixed relation field "${bad}"` },
+            { status: 400 },
+          );
+        }
+      }
       const next: ServerRecord = { ...existing, ...body, id, updated_at: clock() };
       bucket(type).set(id, next);
       return HttpResponse.json(maybeNestRelations(next));
