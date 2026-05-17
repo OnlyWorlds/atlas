@@ -124,31 +124,39 @@ let dragSuppressUntil = 0;
 const DRAG_SUPPRESS_MS = 150;
 
 /**
- * rAF-throttled live-outline scheduler. Vertex-drag (and centroid-drag) used
- * to call setZonePointsLive on EVERY drag event — for polygons with many
- * markers, the SVG re-projection cost stacked up and made the drag visually
- * lag behind the cursor. We batch: each drag event stashes its intended
- * points; one frame later the latest stash is applied. If multiple drag
- * events arrive within a frame, only the latest gets applied. Same SVG
- * mutation work; one apply per frame instead of N per frame.
+ * rAF-throttled live-outline scheduler. The drag handler used to call
+ * collectLivePointsFromHandles + setZonePointsLive SYNCHRONOUSLY on every
+ * drag event — Leaflet's L.Draggable sets the marker's CSS transform on
+ * mousemove, then synchronously fires `drag`. Our work in the drag handler
+ * runs BEFORE the browser commits the next paint, so any non-trivial cost
+ * delays the marker's visible position. Result: marker trails cursor.
  *
- * Captain smoke session 219: "if i move a marker, it drags behind cursor,
- * catching up... in zoner, these were not delayed, snappier."
+ * Wave 3 (Captain "marker still lags"): move ALL work — including
+ * collectLivePointsFromHandles itself — into requestAnimationFrame. The
+ * drag handler is now O(1): just sets a dirty flag and (idempotently)
+ * schedules rAF. The marker's transform commits to paint immediately;
+ * the outline catches up on the next frame, which is invisible at 60Hz.
+ *
+ * Earlier session 219 baseline ("snappier than every-event") batched
+ * setZonePointsLive but still ran collectLivePointsFromHandles per event.
  */
-let pendingLivePoints: Point[] | null = null;
+let liveDirty = false;
 let liveRafHandle: number | null = null;
+let liveRafCanvasHeight = 0;
 
-function scheduleLivePointsApply(points: Point[]): void {
-  pendingLivePoints = points;
+function scheduleLiveOutlineRefresh(canvasHeight: number): void {
+  liveDirty = true;
+  liveRafCanvasHeight = canvasHeight;
   if (liveRafHandle !== null) return;
   liveRafHandle = requestAnimationFrame(() => {
     liveRafHandle = null;
-    const pts = pendingLivePoints;
-    pendingLivePoints = null;
-    if (!pts || !active) return;
+    if (!liveDirty || !active) return;
+    liveDirty = false;
     const entry = mapTabCache.get(active.mapId);
     if (!entry?.zoneOverlay) return;
-    if (pts.length >= 2) entry.zoneOverlay.setZonePointsLive(active.zoneId, pts);
+    // Read handle positions INSIDE rAF so the drag event handler stays O(1).
+    const points = collectLivePointsFromHandles(liveRafCanvasHeight);
+    if (points.length >= 2) entry.zoneOverlay.setZonePointsLive(active.zoneId, points);
   });
 }
 
@@ -157,7 +165,7 @@ function cancelPendingLivePoints(): void {
     cancelAnimationFrame(liveRafHandle);
     liveRafHandle = null;
   }
-  pendingLivePoints = null;
+  liveDirty = false;
 }
 
 export function markDragInProgress(): void {
@@ -439,8 +447,10 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   // SVG path in place. No store write here; dragend handles persistence.
   handle.on('drag', () => {
     if (!active) return;
-    const points = collectLivePointsFromHandles(canvasHeight);
-    scheduleLivePointsApply(points);
+    // O(1): just mark dirty. Reading handle positions + applying setLatLngs
+    // happens in rAF, OUT of the paint-blocking path. The marker's CSS
+    // transform commits immediately; the polygon catches up one frame later.
+    scheduleLiveOutlineRefresh(canvasHeight);
   });
   handle.on('dragend', async () => {
     setTimeout(() => { suppressClick = false; }, 50);
@@ -539,10 +549,10 @@ function buildCentroidHandle(center: Point, canvasHeight: number): L.Marker {
       if (!vh) continue;
       vh.setLatLng(storageToLeaflet({ x: origPos.x + dx, y: origPos.y + dy }, canvasHeight));
     }
-    // Live outline (ZD4) — rAF-throttled so SVG re-projection doesn't block
-    // the centroid-handle's render frame.
-    const points = collectLivePointsFromHandles(canvasHeight);
-    scheduleLivePointsApply(points);
+    // Live outline (ZD4) — rAF-throttled. We don't even read handle positions
+    // here; the rAF callback reads them. The bulk-move loop above sets each
+    // handle's latlng synchronously so the rAF reads see the new positions.
+    scheduleLiveOutlineRefresh(canvasHeight);
   });
 
   handle.on('dragend', async () => {
