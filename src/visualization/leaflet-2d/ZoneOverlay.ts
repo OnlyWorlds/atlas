@@ -26,6 +26,19 @@ const SELECTED_WEIGHT = 3;
 const UNSELECTED_WEIGHT = 2;
 const LINE_HIT_WEIGHT = 20;
 
+// Lazy-init shared SVG renderer for zone shapes. Stored per-map at module
+// level because each Leaflet map needs its own renderer instance, but
+// within a single map all zones share. Map keyed by the L.Map instance.
+const svgRendererByMap = new WeakMap<L.Map, L.Renderer>();
+function getZoneSvgRendererForMap(map: L.Map): L.Renderer {
+  let r = svgRendererByMap.get(map);
+  if (!r) {
+    r = L.svg({ pane: 'overlayPane' });
+    svgRendererByMap.set(map, r);
+  }
+  return r;
+}
+
 export interface ZoneShape {
   id: string;
   mode: 'polygon' | 'line';
@@ -114,11 +127,43 @@ export class ZoneOverlay {
       !pointsEqual(entry.shape.points, patch.points);
     const modeChanged = patch.mode !== undefined && patch.mode !== entry.shape.mode;
 
-    if (pointsChanged || modeChanged) {
-      // Rebuild shape (cheaper than mutating Leaflet primitives).
+    if (modeChanged) {
+      // Mode change → rebuild (different primitive: polygon vs polyline).
       this.removeZone(id);
       this.addZone(nextShape);
-      // Preserve selection.
+      if (entry.selected) this.setZoneSelected(id, true);
+      return;
+    }
+    if (pointsChanged && patch.points) {
+      // Points-only change — mutate the existing SVG path in place via
+      // setLatLngs. Avoids the dragend visual flicker the previous rebuild
+      // path caused (Captain smoke session 219: "in editmode, when i drag a
+      // marker, the lines look a bit glitchy"). The handlers and selection
+      // state stay intact since the primitive doesn't change.
+      const latLngs = patch.points.map(p => storageToLeaflet(p, this.canvasHeight));
+      const layer = entry.visibleLayer as L.Path & {
+        setLatLngs?: (latlngs: L.LatLng[]) => void;
+      };
+      if (typeof layer.setLatLngs === 'function') {
+        layer.setLatLngs(latLngs);
+        if (entry.hitLayer) entry.hitLayer.setLatLngs(latLngs);
+        entry.shape = nextShape;
+        this.applyStyle(entry);
+        // Vertex dots reposition on next selection/edit state change; cheap
+        // to re-show when selected.
+        if (entry.selected) this.showVertexDots(entry);
+        // Label position should follow centroid/midpoint for selected zones.
+        if (entry.labelMarker && nextShape.labelText) {
+          const anchor = nextShape.mode === 'polygon'
+            ? centroid(nextShape.points)
+            : lineMidAnchor(nextShape.points);
+          entry.labelMarker.setLatLng(storageToLeaflet(anchor, this.canvasHeight));
+        }
+        return;
+      }
+      // Fallback path (shouldn't happen for polygon/polyline — both have setLatLngs).
+      this.removeZone(id);
+      this.addZone(nextShape);
       if (entry.selected) this.setZoneSelected(id, true);
       return;
     }
@@ -249,6 +294,14 @@ export class ZoneOverlay {
     let visibleLayer: L.Path;
     let hitLayer: L.Polyline | undefined;
 
+    // Force SVG renderer for zone shapes. Leaflet2DManager defaults to
+    // L.canvas() which has unreliable dashArray support for polygons —
+    // edit-mode's dashed outline (applyStyle sets dashArray: '5, 5' when
+    // editing) renders as solid under canvas. SVG renderer guarantees
+    // dashed strokes for both polygon AND polyline (Captain smoke
+    // session 219). One shared renderer per map.
+    const renderer = getZoneSvgRendererForMap(this.map);
+
     if (shape.mode === 'polygon') {
       visibleLayer = L.polygon(latLngs, {
         color,
@@ -256,12 +309,14 @@ export class ZoneOverlay {
         fillOpacity: opacity,
         weight: UNSELECTED_WEIGHT,
         opacity: 0.9,
+        renderer,
       });
     } else {
       visibleLayer = L.polyline(latLngs, {
         color,
         weight: UNSELECTED_WEIGHT,
         opacity: 0.9,
+        renderer,
       });
       // Invisible hit-overlay for line zones (wider click target).
       hitLayer = L.polyline(latLngs, {
@@ -269,6 +324,7 @@ export class ZoneOverlay {
         weight: LINE_HIT_WEIGHT,
         opacity: 0,
         interactive: true,
+        renderer,
       });
     }
 

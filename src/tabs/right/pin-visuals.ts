@@ -276,11 +276,13 @@ function drawPinShape(ctx: CanvasRenderingContext2D, size: number, color: string
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // White glyph inside the round head.
+  // Dark glyph inside the round head — readable across the full type-color
+  // palette (many of which are light: yellow, lime, pink). White-on-color
+  // disappeared against the lighter tints (Captain smoke session 219).
   ctx.font = '18px "Material Symbols Outlined"';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#0a0a0a';
   ctx.fillText(iconName, cx, headCy + 1);
 }
 

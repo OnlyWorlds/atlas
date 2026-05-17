@@ -420,6 +420,19 @@ function rebuildPreviewPath(): void {
   buildPreviewPath(canvasHeight);
 }
 
+// Lazy-init shared SVG renderer for draft paths. Leaflet's L.canvas() renderer
+// (set as default in Leaflet2DManager init) has unreliable dashArray support
+// for polygons — works for polyline strokes but not for polygon outlines.
+// SVG renderer guarantees the dashed preview line stays dashed across all
+// rebuilds (Captain smoke session 219: "after first moving a marker, the
+// dotted lines turn whole"). One renderer instance is fine — Leaflet shares
+// it across all layers added with this `renderer` option.
+let draftSvgRenderer: L.Renderer | null = null;
+function getDraftSvgRenderer(): L.Renderer {
+  if (!draftSvgRenderer) draftSvgRenderer = L.svg({ pane: 'overlayPane' });
+  return draftSvgRenderer;
+}
+
 function buildPreviewPath(canvasHeight: number): void {
   if (!active) return;
   // Remove the prior path layer if any. Markers are untouched.
@@ -429,6 +442,7 @@ function buildPreviewPath(canvasHeight: number): void {
   }
   if (active.points.length < 2) return;
   const latLngs = active.points.map(p => storageToLeaflet(p, canvasHeight));
+  const renderer = getDraftSvgRenderer();
   if (active.mode === 'polygon' && active.points.length >= 3) {
     active.pathLayer = L.polygon(latLngs, {
       color: '#22d3ee',
@@ -437,6 +451,7 @@ function buildPreviewPath(canvasHeight: number): void {
       dashArray: '5, 5',
       fillColor: '#22d3ee',
       fillOpacity: 0.12,
+      renderer,
     });
   } else {
     active.pathLayer = L.polyline(latLngs, {
@@ -444,6 +459,7 @@ function buildPreviewPath(canvasHeight: number): void {
       weight: 2,
       opacity: 0.9,
       dashArray: '5, 5',
+      renderer,
     });
   }
   active.pathLayer.addTo(active.previewLayer);
