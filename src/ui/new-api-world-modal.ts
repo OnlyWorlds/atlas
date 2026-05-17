@@ -39,21 +39,21 @@ export class NewApiWorldModal extends BaseModal {
       <p class="atlas-modal-hint">creates a local folder AND a new api world on onlyworlds.com. you can then add elements to both at once.</p>
       <label class="atlas-modal-field">
         <span>world name</span>
-        <input class="ow-input" type="text" name="api-name" placeholder="my new world" autocomplete="off" required />
+        <input class="atlas-input" type="text" name="api-name" placeholder="my new world" autocomplete="off" required />
       </label>
       <label class="atlas-modal-field">
         <span>Email</span>
-        <input class="ow-input" type="email" name="api-email" placeholder="you@example.com" value="${escapeAttr(reg.email ?? '')}" autocomplete="email" required />
+        <input class="atlas-input" type="email" name="api-email" placeholder="you@example.com" value="${escapeAttr(reg.email ?? '')}" autocomplete="email" required />
       </label>
       <label class="atlas-modal-field">
         <span>PIN</span>
-        <input class="ow-input" type="text" name="api-pin" placeholder="onlyworlds pin (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
+        <input class="atlas-input" type="text" name="api-pin" placeholder="onlyworlds pin (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
       </label>
       <p class="atlas-modal-error" data-role="error" hidden></p>
       <div class="atlas-modal-progress" data-role="progress" hidden></div>
       <div class="atlas-modal-actions">
-        <button class="ow-btn atlas-btn-ghost" data-action="cancel">Cancel</button>
-        <button class="ow-btn atlas-btn-primary" data-action="create-api">Create</button>
+        <button class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+        <button class="atlas-btn-primary" data-action="create-api">Create</button>
       </div>
     `;
 

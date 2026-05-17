@@ -72,8 +72,8 @@ export class ConflictReviewModal extends BaseModal {
         <span class="atlas-conflict-fields">${c.fields.length} field${c.fields.length === 1 ? '' : 's'} diverged${c.fields.length ? `: ${c.fields.map(escapeText).join(', ')}` : ''}</span>
       </div>
       <div class="atlas-conflict-row-actions">
-        <button class="ow-btn atlas-btn-ghost" data-action="overwrite-mine" title="push local content to server">overwrite (mine wins)</button>
-        <button class="ow-btn atlas-btn-ghost" data-action="pull-theirs" title="overwrite local with server">pull (theirs wins)</button>
+        <button class="atlas-btn-ghost" data-action="overwrite-mine" title="push local content to server">overwrite (mine wins)</button>
+        <button class="atlas-btn-ghost" data-action="pull-theirs" title="overwrite local with server">pull (theirs wins)</button>
       </div>
     `;
     row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
@@ -120,7 +120,7 @@ export class ConflictReviewModal extends BaseModal {
     const footer = document.createElement('div');
     footer.className = 'atlas-conflict-footer';
     const close = document.createElement('button');
-    close.className = 'ow-btn atlas-btn-ghost';
+    close.className = 'atlas-btn-ghost';
     close.dataset.action = 'close';
     close.textContent = 'close';
     close.addEventListener('click', () => this.hide());

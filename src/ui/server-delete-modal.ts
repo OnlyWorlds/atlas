@@ -79,8 +79,8 @@ export class ServerDeleteReviewModal extends BaseModal {
         <span class="atlas-conflict-fields">vanished from the server</span>
       </div>
       <div class="atlas-conflict-row-actions">
-        <button class="ow-btn atlas-btn-ghost" data-action="delete-locally" title="remove this from local; matches the server">delete locally</button>
-        <button class="ow-btn atlas-btn-ghost" data-action="keep" title="keep locally; next push re-creates on server">keep + re-push</button>
+        <button class="atlas-btn-ghost" data-action="delete-locally" title="remove this from local; matches the server">delete locally</button>
+        <button class="atlas-btn-ghost" data-action="keep" title="keep locally; next push re-creates on server">keep + re-push</button>
       </div>
     `;
     row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
@@ -135,7 +135,7 @@ export class ServerDeleteReviewModal extends BaseModal {
     const footer = document.createElement('div');
     footer.className = 'atlas-conflict-footer';
     const close = document.createElement('button');
-    close.className = 'ow-btn atlas-btn-ghost';
+    close.className = 'atlas-btn-ghost';
     close.dataset.action = 'close';
     close.textContent = 'review later';
     close.addEventListener('click', () => this.hide());

@@ -200,14 +200,14 @@ function renderIdentityTab(reg: ReturnType<typeof getState>['registry']): string
       <p class="atlas-settings-hint">global, used when creating or linking online worlds. changes to PIN take effect immediately — any active sync engine is re-attached.</p>
       <label class="atlas-settings-field">
         <span>Email</span>
-        <input class="ow-input" type="email" name="email"
+        <input class="atlas-input" type="email" name="email"
                value="${escapeAttr(reg.email ?? '')}"
                placeholder="you@example.com"
                autocomplete="email" />
       </label>
       <label class="atlas-settings-field">
         <span>PIN</span>
-        <input class="ow-input" type="text" name="pin"
+        <input class="atlas-input" type="text" name="pin"
                value="${escapeAttr(reg.pin ?? '')}"
                placeholder="onlyworlds pin (4 digits)"
                inputmode="numeric"
@@ -232,11 +232,11 @@ function renderAtlasTab(): string {
             <dt>Folder</dt><dd><code>${escapeText(ar.pathHint ?? ar.folderName)}</code></dd>
           </dl>
           <div class="atlas-settings-actions">
-            <button class="ow-btn ow-btn-secondary" data-action="change-atlas-root">Change folder</button>
+            <button class="atlas-btn-ghost" data-action="change-atlas-root">Change folder</button>
           </div>`
         : `<p>not set up yet.</p>
            <div class="atlas-settings-actions">
-             <button class="ow-btn ow-btn-primary" data-action="change-atlas-root">Set up atlas folder</button>
+             <button class="atlas-btn-primary" data-action="change-atlas-root">Set up atlas folder</button>
            </div>`}
     </section>
     <section class="atlas-settings-section">
@@ -292,7 +292,7 @@ function renderSyncTab(reg: ReturnType<typeof getState>['registry']): string {
       </label>
       <label class="atlas-settings-field">
         <span>Auto-refresh cadence</span>
-        <select class="ow-input" name="cadence" ${pauseAll ? 'disabled' : ''}>
+        <select class="atlas-input" name="cadence" ${pauseAll ? 'disabled' : ''}>
           ${CADENCE_OPTIONS.map(o =>
             `<option value="${o.ms ?? ''}" ${o.ms === cadenceMs ? 'selected' : ''}>${o.label}</option>`
           ).join('')}
@@ -330,19 +330,19 @@ function renderWorldTab(world: WorldRegistryEntry): string {
         <span>Stay offline (per-world)</span>
       </label>
       <div class="atlas-settings-actions">
-        <button class="ow-btn ow-btn-secondary" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from API</button>
-        <button class="ow-btn ow-btn-secondary" data-action="test-connection">Test connection</button>
-        <button class="ow-btn ow-btn-secondary" data-action="unlink-from-api">Unlink from API</button>
+        <button class="atlas-btn-ghost" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from API</button>
+        <button class="atlas-btn-ghost" data-action="test-connection">Test connection</button>
+        <button class="atlas-btn-ghost" data-action="unlink-from-api">Unlink from API</button>
       </div>`
     : `<div class="atlas-settings-actions">
-        <button class="ow-btn ow-btn-primary" data-action="make-online">Make online</button>
+        <button class="atlas-btn-primary" data-action="make-online">Make online</button>
       </div>`;
   return `
     <section class="atlas-settings-section">
       <h3>Active world</h3>
       <label class="atlas-settings-field">
         <span>Name</span>
-        <input class="ow-input" type="text" name="world-name" value="${escapeAttr(world.name)}" />
+        <input class="atlas-input" type="text" name="world-name" value="${escapeAttr(world.name)}" />
       </label>
       <dl class="atlas-settings-meta">
         <dt>State</dt><dd>${stateLabel}</dd>
@@ -364,8 +364,8 @@ function renderWorldTab(world: WorldRegistryEntry): string {
       </dl>
       ${apiActions}
       <div class="atlas-settings-actions atlas-settings-actions-danger">
-        <button class="ow-btn ow-btn-secondary" data-action="delete-world">Forget world (keep folder)</button>
-        <button class="ow-btn ow-btn-secondary" data-action="delete-world-permanent" title="remove from atlas AND delete the world folder on disk">Delete world + folder</button>
+        <button class="atlas-btn-ghost" data-action="delete-world">Forget world (keep folder)</button>
+        <button class="atlas-btn-ghost" data-action="delete-world-permanent" title="remove from atlas AND delete the world folder on disk">Delete world + folder</button>
       </div>
     </section>
   `;

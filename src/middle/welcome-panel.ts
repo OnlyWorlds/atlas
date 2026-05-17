@@ -34,7 +34,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           <p>atlas detected a previously-set-up folder on this device: <code>${escapeText(atlasRootRecoverable.folderName)}</code>.</p>
           <p class="atlas-welcome-hint">your worlds are still on disk — click below to re-grant folder access and restore the world list. localStorage was cleared but the folder and your saved permission survived.</p>
           <div class="atlas-welcome-actions">
-            <button class="ow-btn ow-btn-primary" data-action="recover-atlas">Recover atlas folder</button>
+            <button class="atlas-btn-primary" data-action="recover-atlas">Recover atlas folder</button>
           </div>
         </div>
       `;
@@ -69,7 +69,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           <p>atlas keeps your worlds as folders on disk. one chosen folder holds all your worlds.</p>
           <p class="atlas-welcome-hint">pick any folder — atlas will create an <code>onlyworlds-atlas/</code> subfolder inside it for your worlds. (if you pick a folder that's already an atlas root, atlas just re-uses it.)</p>
           <div class="atlas-welcome-actions">
-            <button class="ow-btn ow-btn-primary" data-action="setup-atlas">Set up atlas folder</button>
+            <button class="atlas-btn-primary" data-action="setup-atlas">Set up atlas folder</button>
           </div>
         </div>
       `;
