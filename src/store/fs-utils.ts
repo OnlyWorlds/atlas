@@ -27,8 +27,78 @@ export function elementDirSegments(type: ElementType): [string, string] {
   return SPATIAL_TYPES.has(type) ? [SPATIAL_DIR, type] : [ELEMENTS_DIR, type];
 }
 
-export function elementFilename(id: string): string {
-  return `${id}.json`;
+/**
+ * Filename for an element on disk.
+ *
+ * Default format: `<slug>--<uuid>.json` where slug is a normalized lowercase
+ * version of the element name. Browsable-by-name in the OS file picker while
+ * the UUID at the end keeps identity unambiguous.
+ *
+ * The double-hyphen separator is deliberate: slugify() collapses non-alphanumeric
+ * runs to a single `-`, so slugs can never produce `--`. That gives
+ * parseIdFromFilename a clean delimiter — split on the LAST `--` and the right
+ * side is the id, regardless of whether the id is UUID-shaped or a short test
+ * fixture string like `char-1`.
+ *
+ * When `name` is empty/missing, we emit the bare `<uuid>.json` form. This is
+ * the fallback for elements that haven't been named yet — they get renamed
+ * to slug-prefix form on the first updateElement that supplies a name.
+ */
+export const SLUG_ID_SEP = '--';
+
+export function elementFilename(id: string, name?: string | null): string {
+  const slug = slugify(name ?? '');
+  return slug ? `${slug}${SLUG_ID_SEP}${id}.json` : `${id}.json`;
+}
+
+/**
+ * Normalize a name into a filename-safe slug. Lowercase, hyphenated, ASCII-only,
+ * collapsed-hyphens, length-capped, suffix-trimmed. Empty input → empty string
+ * (caller fallback decides what to do).
+ *
+ * - Lowercase
+ * - Strip diacritics via NFKD then drop combining marks (José → jose)
+ * - Spaces / underscores / non-alphanumeric → `-`
+ * - Collapse consecutive `-`
+ * - Trim leading/trailing `-`
+ * - Cap at SLUG_MAX_LEN chars (re-trim trailing `-` after cap)
+ */
+export const SLUG_MAX_LEN = 40;
+
+export function slugify(name: string): string {
+  if (!name) return '';
+  // NFKD decomposes accents into base + combining mark. Remove the marks
+  // BEFORE the alphanumeric pass, otherwise `ü` (= `u` + U+0308) becomes
+  // `u-` because the combining mark is treated as a separator.
+  const ascii = name
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+  const trimmed = ascii
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (trimmed.length <= SLUG_MAX_LEN) return trimmed;
+  return trimmed.slice(0, SLUG_MAX_LEN).replace(/-+$/g, '');
+}
+
+/**
+ * Extract the id portion of an element filename.
+ * Handles both formats:
+ *   `<uuid>.json`                → `<uuid>`
+ *   `<slug>--<uuid>.json`        → `<uuid>`
+ * Returns null if the input isn't a .json file or stem is empty.
+ *
+ * Split on the LAST `--`: if present, the id is the part after; otherwise the
+ * whole stem is the id. Slugs cannot contain `--` (slugify collapses runs of
+ * non-alphanumerics), so this split is unambiguous.
+ */
+export function parseIdFromFilename(filename: string): string | null {
+  if (!filename.endsWith('.json')) return null;
+  const stem = filename.slice(0, -'.json'.length);
+  if (!stem) return null;
+  const sepIdx = stem.lastIndexOf(SLUG_ID_SEP);
+  if (sepIdx < 0) return stem;
+  return stem.slice(sepIdx + SLUG_ID_SEP.length);
 }
 
 // ---- Directory helpers ----
@@ -218,6 +288,7 @@ export function isNotFound(err: unknown): boolean {
   return name === 'NotFoundError' || /not found/i.test(err.message);
 }
 
+/** @deprecated Use parseIdFromFilename — handles both legacy and slug-prefix formats. */
 export function idFromFilename(name: string): string {
-  return name.endsWith('.json') ? name.slice(0, -'.json'.length) : name;
+  return parseIdFromFilename(name) ?? (name.endsWith('.json') ? name.slice(0, -'.json'.length) : name);
 }

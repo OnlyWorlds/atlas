@@ -57,6 +57,7 @@ import {
   idFromFilename,
   isNotFound,
   listFiles,
+  parseIdFromFilename,
   readJson,
   removeFile,
   tryGetDir,
@@ -106,6 +107,19 @@ export class FsFolderStore implements FolderStore {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private opts: FsFolderStoreOptions;
 
+  /**
+   * Per-element filename index. Maps `id → { type, filename }` so reads and
+   * writes can locate the on-disk file without scanning directories. Critical
+   * because filenames are no longer derivable from id alone — they encode the
+   * element's name as a slug prefix (`<slug>--<uuid>.json`).
+   *
+   * Built lazily per type on first read/write that needs it. Updated in-place
+   * on create/update/delete. Cleared in close().
+   */
+  private fileIndex: Map<string, { type: ElementType; filename: string }> = new Map();
+  /** Set of types whose dirs have been scanned into fileIndex. */
+  private indexedTypes: Set<ElementType> = new Set();
+
   constructor(opts: FsFolderStoreOptions = {}) {
     this.opts = opts;
     this.clock = opts.clock ?? nowIso;
@@ -136,6 +150,8 @@ export class FsFolderStore implements FolderStore {
       if (atlasDir) await removeFile(atlasDir, LOCK_FILE);
     }
     this.root = null;
+    this.fileIndex.clear();
+    this.indexedTypes.clear();
   }
 
   // ---- Layout setup + lock ----
@@ -193,6 +209,80 @@ export class FsFolderStore implements FolderStore {
     return this.root;
   }
 
+  // ---- File index ----
+
+  /**
+   * Ensure the in-memory filename index is populated for `type`. Idempotent —
+   * subsequent calls for the same type return immediately.
+   *
+   * Handles the rename-crash dedupe: if the directory contains multiple files
+   * for the same id (atlas crashed between writing the new filename and
+   * deleting the old), the survivor is the one whose body has the latest
+   * `local_updated_at`. Losers are removed from disk.
+   */
+  private async ensureIndexFor(type: ElementType): Promise<void> {
+    if (this.indexedTypes.has(type)) return;
+    const dir = await tryGetDir(this.requireRoot(), elementDirSegments(type));
+    if (!dir) { this.indexedTypes.add(type); return; }
+    const files = await listFiles(dir);
+    // Group filenames by id; if multiple, dedupe by latest local_updated_at.
+    const grouped = new Map<string, string[]>();
+    for (const name of files) {
+      const id = parseIdFromFilename(name);
+      if (!id) continue;
+      const list = grouped.get(id);
+      if (list) list.push(name);
+      else grouped.set(id, [name]);
+    }
+    for (const [id, names] of grouped) {
+      if (names.length === 1) {
+        this.fileIndex.set(id, { type, filename: names[0] });
+      } else {
+        const survivor = await this.dedupeFilesForId(dir, names);
+        if (survivor) this.fileIndex.set(id, { type, filename: survivor });
+      }
+    }
+    this.indexedTypes.add(type);
+  }
+
+  /**
+   * Two-or-more files claim the same id. Read each body, keep the one with the
+   * latest `local_updated_at`, unlink the others. Returns the survivor name or
+   * null if every read failed.
+   */
+  private async dedupeFilesForId(
+    dir: FileSystemDirectoryHandle,
+    names: string[],
+  ): Promise<string | null> {
+    type Candidate = { name: string; ts: string };
+    const candidates: Candidate[] = [];
+    for (const name of names) {
+      const body = await readJson<Element>(dir, name);
+      if (!body) continue;
+      candidates.push({ name, ts: body.local_updated_at ?? '' });
+    }
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
+    const [survivor, ...losers] = candidates;
+    for (const loser of losers) {
+      await removeFile(dir, loser.name).catch(() => {});
+    }
+    if (losers.length > 0) {
+      console.warn(`[fs-folder-store] dedupe: kept ${survivor.name}, removed ${losers.map(l => l.name).join(', ')}`);
+    }
+    return survivor.name;
+  }
+
+  /** Resolve the on-disk filename for an id. Returns null if not indexed. */
+  private indexEntry(id: string): { type: ElementType; filename: string } | undefined {
+    return this.fileIndex.get(id);
+  }
+
+  /** Record a new or updated filename binding. */
+  private setIndex(id: string, type: ElementType, filename: string): void {
+    this.fileIndex.set(id, { type, filename });
+  }
+
   // ---- World meta ----
 
   async readWorldMeta(): Promise<WorldMeta> {
@@ -213,11 +303,12 @@ export class FsFolderStore implements FolderStore {
     const types = type ? [type] : (ALL_ELEMENT_TYPES as readonly ElementType[]);
     const out: Element[] = [];
     for (const t of types) {
+      await this.ensureIndexFor(t);
       const dir = await tryGetDir(this.requireRoot(), elementDirSegments(t));
       if (!dir) continue;
-      const files = await listFiles(dir);
-      for (const name of files) {
-        const elem = await readJson<Element>(dir, name);
+      for (const [, entry] of this.fileIndex) {
+        if (entry.type !== t) continue;
+        const elem = await readJson<Element>(dir, entry.filename);
         if (elem) out.push(elem);
       }
     }
@@ -225,14 +316,28 @@ export class FsFolderStore implements FolderStore {
   }
 
   async getElement(id: string): Promise<Element | null> {
-    // O(types) directory probe. Pin/zone/marker scans add 4 lookups; trivial.
-    for (const t of ALL_ELEMENT_TYPES) {
-      const dir = await tryGetDir(this.requireRoot(), elementDirSegments(t));
-      if (!dir) continue;
-      const elem = await readJson<Element>(dir, elementFilename(id));
-      if (elem) return elem;
+    let entry = this.indexEntry(id);
+    if (!entry) {
+      // Cache miss — could be a never-indexed type, or an unknown id. Warm
+      // every type's index, then retry. Most read paths hit listElements
+      // first so the cache is usually warm; this branch covers cold-start
+      // direct getElement calls.
+      for (const t of ALL_ELEMENT_TYPES) {
+        if (this.indexedTypes.has(t)) continue;
+        await this.ensureIndexFor(t);
+        entry = this.indexEntry(id);
+        if (entry) break;
+      }
     }
-    return null;
+    if (!entry) return null;
+    const dir = await tryGetDir(this.requireRoot(), elementDirSegments(entry.type));
+    if (!dir) return null;
+    const elem = await readJson<Element>(dir, entry.filename);
+    if (!elem) {
+      // File vanished out from under us — drop the stale index entry.
+      this.fileIndex.delete(id);
+    }
+    return elem;
   }
 
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
@@ -244,8 +349,11 @@ export class FsFolderStore implements FolderStore {
       name: (data.name as string) ?? '',
       local_updated_at: this.clock(),
     };
+    await this.ensureIndexFor(type);
     const dir = await getDir(this.requireRoot(), elementDirSegments(type));
-    await writeJsonAtomic(dir, elementFilename(id), elem);
+    const filename = elementFilename(id, elem.name);
+    await writeJsonAtomic(dir, filename, elem);
+    this.setIndex(id, type, filename);
     return elem;
   }
 
@@ -260,9 +368,38 @@ export class FsFolderStore implements FolderStore {
       local_updated_at: this.clock(),
       server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
     };
-    const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
-    await writeJsonAtomic(dir, elementFilename(id), next);
+    await this.writeElementAndRename(existing.type, id, next, existing.name);
     return next;
+  }
+
+  /**
+   * Write an element body, renaming the file if the name (and therefore the
+   * slug) changed since the last write. Crash window between write-new and
+   * delete-old is covered by ensureIndexFor's dedupe pass on next open.
+   */
+  private async writeElementAndRename(
+    type: ElementType,
+    id: string,
+    next: Element,
+    previousName: string,
+  ): Promise<void> {
+    const dir = await getDir(this.requireRoot(), elementDirSegments(type));
+    const entry = this.indexEntry(id);
+    const currentFilename = entry?.filename ?? elementFilename(id, previousName);
+    const newFilename = elementFilename(id, next.name);
+    if (currentFilename === newFilename) {
+      await writeJsonAtomic(dir, newFilename, next);
+      this.setIndex(id, type, newFilename);
+      return;
+    }
+    // Name changed — write the new file first, then remove the old. If we
+    // crash between these two steps, ensureIndexFor's dedupe (latest
+    // local_updated_at wins) cleans it up on next open.
+    await writeJsonAtomic(dir, newFilename, next);
+    this.setIndex(id, type, newFilename);
+    await removeFile(dir, currentFilename).catch(err => {
+      console.warn(`[fs-folder-store] rename: failed to remove old file ${currentFilename}`, err);
+    });
   }
 
   async findDependents(id: string): Promise<Element[]> {
@@ -318,7 +455,10 @@ export class FsFolderStore implements FolderStore {
   private async unlinkElement(elem: Element): Promise<void> {
     const dir = await tryGetDir(this.requireRoot(), elementDirSegments(elem.type));
     if (!dir) return;
-    await removeFile(dir, elementFilename(elem.id));
+    const entry = this.indexEntry(elem.id);
+    const filename = entry?.filename ?? elementFilename(elem.id, elem.name);
+    await removeFile(dir, filename);
+    this.fileIndex.delete(elem.id);
   }
 
   // ---- Spatial wrappers (typed accessors over the unified element store) ----
@@ -499,16 +639,20 @@ export class FsFolderStore implements FolderStore {
     const existing = await this.getElement(id);
     if (!existing) return;
     const next: Element = { ...existing, server_updated_at };
+    const entry = this.indexEntry(id);
+    const filename = entry?.filename ?? elementFilename(id, existing.name);
     const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
-    await writeJsonAtomic(dir, elementFilename(id), next);
+    await writeJsonAtomic(dir, filename, next);
   }
 
   async clearServerBaseline(id: string): Promise<void> {
     const existing = await this.getElement(id);
     if (!existing) return;
     const { server_updated_at: _drop, ...rest } = existing;
+    const entry = this.indexEntry(id);
+    const filename = entry?.filename ?? elementFilename(id, existing.name);
     const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
-    await writeJsonAtomic(dir, elementFilename(id), rest as Element);
+    await writeJsonAtomic(dir, filename, rest as Element);
   }
 
   async resetSyncBaseline(): Promise<void> {
@@ -521,8 +665,10 @@ export class FsFolderStore implements FolderStore {
     for (const elem of all) {
       if (!elem.server_updated_at) continue;
       const { server_updated_at: _drop, ...rest } = elem;
+      const entry = this.indexEntry(elem.id);
+      const filename = entry?.filename ?? elementFilename(elem.id, elem.name);
       const dir = await getDir(this.requireRoot(), elementDirSegments(elem.type));
-      await writeJsonAtomic(dir, elementFilename(elem.id), rest as Element);
+      await writeJsonAtomic(dir, filename, rest as Element);
       cleared++;
     }
     // 2. Drop every tombstone — they target ids on the now-defunct api world.
@@ -571,14 +717,20 @@ export class FsFolderStore implements FolderStore {
       local_updated_at: server_updated_at,
       server_updated_at,
     };
-    const dir = await getDir(this.requireRoot(), elementDirSegments(type));
-    await writeJsonAtomic(dir, elementFilename(id), elem);
+    // Pull-side rename: the server may have changed the name, which changes
+    // the slug-prefix filename. writeElementAndRename handles the rename +
+    // dedupe path.
+    const previousName = existing?.name ?? '';
+    await this.writeElementAndRename(type, id, elem, previousName);
 
     // Diagnostic: read the file back immediately and confirm content matches.
     // Catches "write reports success but disk content didn't change" Chromium
     // quirks that the in-flight write-buffer can mask.
     try {
-      const readback = await readJson<Element>(dir, elementFilename(id));
+      const dir = await getDir(this.requireRoot(), elementDirSegments(type));
+      const entry = this.indexEntry(id);
+      const filename = entry?.filename ?? elementFilename(id, elem.name);
+      const readback = await readJson<Element>(dir, filename);
       const writtenDesc = typeof elem.description === 'string' ? (elem.description as string).slice(0, 60) : undefined;
       const readDesc = typeof readback?.description === 'string' ? (readback.description as string).slice(0, 60) : undefined;
       if (writtenDesc !== readDesc) {

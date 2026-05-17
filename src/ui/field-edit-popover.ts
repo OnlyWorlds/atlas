@@ -94,8 +94,11 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
 
   function cleanup(): void {
     document.removeEventListener('keydown', keyHandler);
+    document.removeEventListener('atlas:save-request', saveRequestHandler);
     overlay.remove();
   }
+
+  const saveRequestHandler = () => { save(); };
 
   function cancel(): void {
     opts.onCancel?.();
@@ -157,6 +160,8 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
     }
   };
   document.addEventListener('keydown', keyHandler);
+  // Ctrl/Cmd+S also commits — even on long-text where Enter inserts newlines.
+  document.addEventListener('atlas:save-request', saveRequestHandler);
 }
 
 /**

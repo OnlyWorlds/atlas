@@ -235,7 +235,13 @@ export function mountElementDetail(target: HTMLElement): () => void {
         input.blur();
       }
     });
+    // Ctrl/Cmd+S also commits — same effect as Enter, but routed through the
+    // shared save-request event so the global hotkey works while the input
+    // is focused.
+    const saveRequestHandler = () => { input.blur(); };
+    document.addEventListener('atlas:save-request', saveRequestHandler);
     input.addEventListener('blur', () => {
+      document.removeEventListener('atlas:save-request', saveRequestHandler);
       if (reverting) {
         host.textContent = original || '(unnamed)';
         return;
@@ -874,6 +880,16 @@ export function mountElementDetail(target: HTMLElement): () => void {
       if (suppressNextClick) {
         suppressNextClick = false;
         return;
+      }
+      // Double-gate: even if the mouseup discriminator missed (mouseup outside
+      // valueEl during a drag, browser timing quirks, etc.), bail if there's
+      // ANY active text selection inside or overlapping valueEl at click time.
+      // Without this, asymmetric drag directions can leak past the mouseup gate.
+      const sel = window.getSelection();
+      if (sel && sel.toString().length > 0) {
+        const anchorIn = sel.anchorNode && valueEl.contains(sel.anchorNode);
+        const focusIn = sel.focusNode && valueEl.contains(sel.focusNode);
+        if (anchorIn || focusIn) return;
       }
       // Resolve dispatch mode from registry editor settings (session 219).
       // Default is 'modal' (back-compat with everything that shipped before).

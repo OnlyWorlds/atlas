@@ -684,32 +684,6 @@
   cursor: pointer;
 }
 
-/* Override OW base ow-input/ow-textarea inside the atlas shell so they slim down. */
-.atlas-shell .ow-input,
-.atlas-shell .ow-textarea,
-.atlas-shell .ow-select {
-  font-size: 13px;
-  padding: 5px 9px;
-  min-height: 28px;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--atlas-divider-strong);
-  color: var(--atlas-text);
-}
-
-.atlas-shell .ow-textarea {
-  min-height: 80px;
-  padding: 6px 9px;
-}
-
-.atlas-shell .ow-input:focus,
-.atlas-shell .ow-textarea:focus,
-.atlas-shell .ow-select:focus {
-  border-color: var(--atlas-cyan-soft);
-  background: rgba(0, 0, 0, 0.45);
-  box-shadow: none;
-}
-
 /* ============================================================
    Custom checkbox
    ============================================================ */
@@ -1375,15 +1349,11 @@
   color: var(--atlas-cyan);
 }
 
-/* When the row is empty, the `+` icon doubles as both the placeholder and
-   affordance. Use soft grey + left alignment so it sits where a chip would
-   appear, not pushed to the far right. */
-.atlas-link-row-empty {
-  justify-content: flex-start;
-}
-
+/* Empty-state styling: the picker icon stays anchored RIGHT (same position
+   as when chips are present) so users always know where the affordance lives,
+   regardless of whether the field currently has a value. Muted color marks
+   the empty state without moving the target. */
 .atlas-link-pick-empty {
-  margin-left: 0;
   color: var(--atlas-text-dim);
   opacity: 0.7;
 }
@@ -2530,10 +2500,6 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
-.atlas-settings-field .ow-input {
-  max-width: 320px;
-}
-
 .atlas-settings-meta {
   display: grid;
   grid-template-columns: 90px 1fr;
@@ -2913,51 +2879,6 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-
-/* ============================================================
-   Phase 2 — Button primitives (used by sidebar + modals + settings)
-   ============================================================ */
-.ow-btn {
-  font-family: inherit;
-  font-size: 12px;
-  letter-spacing: 0.01em;
-  padding: 6px 14px;
-  border-radius: 4px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ow-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ow-btn-primary {
-  background: rgba(34, 211, 238, 0.15);
-  border-color: rgba(34, 211, 238, 0.40);
-  color: #22d3ee;
-}
-
-.ow-btn-primary:hover:not(:disabled) {
-  background: rgba(34, 211, 238, 0.22);
-  border-color: rgba(34, 211, 238, 0.60);
-}
-
-.ow-btn-secondary {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.ow-btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.22);
-  color: rgba(255, 255, 255, 0.92);
 }
 
 /* =================================================================
@@ -4569,4 +4490,56 @@ svg .atlas-zone-selected {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* ---- Hotkey reference modal ---- */
+
+.atlas-hotkey-reference {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 320px;
+}
+
+.atlas-hotkey-section-header {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.atlas-hotkey-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.atlas-hotkey-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  padding: 0.25rem 0;
+}
+
+.atlas-hotkey-combo {
+  flex: 0 0 auto;
+  min-width: 78px;
+  padding: 0.18rem 0.5rem;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 4px;
+  background: rgba(34, 211, 238, 0.08);
+  color: #22d3ee;
+  font-family: var(--atlas-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.atlas-hotkey-desc {
+  flex: 1 1 auto;
+  color: rgba(255, 255, 255, 0.85);
 }

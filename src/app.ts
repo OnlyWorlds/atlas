@@ -15,10 +15,12 @@ import { loadPersistedRightTabs } from './tabs/right/right-tabs-persistence';
 import { toastManager, ToastManager } from './ui/toast-manager';
 import { loadRegistry } from './registry/registry';
 import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
-import { onHashChange, parseHash } from './core/router';
+import { onHashChange, parseHash, navigate, elementsHash } from './core/router';
 import { hydrateAtlasRoot } from './setup/atlas-root-flow';
 import { activateWorld } from './sidebar/worlds-sidebar';
 import { initAutoPullScheduler } from './sync/auto-pull-scheduler';
+import { installHotkeys, setHotkeyCallbacks } from './core/hotkeys';
+import { ElementCreateModal } from './ui/element-create-modal';
 import type { WorldMap } from './core/types';
 
 export interface AppHandle {
@@ -136,6 +138,34 @@ export function startApp(container: HTMLElement): AppHandle {
   });
   renderMiddle();
 
+  // Global hotkeys. Callbacks bind the dispatcher to app behavior (creating
+  // an element, focusing search) without coupling hotkeys.ts to UI modules.
+  setHotkeyCallbacks({
+    getActiveWorldId: () => getState().active?.worldId ?? null,
+    openCreateElement: () => {
+      const active = getState().active;
+      if (!active) return;
+      new ElementCreateModal(toasts).open();
+    },
+    focusSearch: () => {
+      const active = getState().active;
+      if (!active) return;
+      // Flip to elements mode if needed (search lives in the elements body).
+      if (getState().ui.sidebarMode !== 'elements') {
+        navigate(elementsHash(active.worldId));
+      }
+      // Defer focus to after the elements body mounts.
+      queueMicrotask(() => {
+        const input = document.querySelector<HTMLInputElement>('input[data-role="elements-search"]');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      });
+    },
+  });
+  const uninstallHotkeys = installHotkeys();
+
   return {
     shell,
     toasts,
@@ -145,6 +175,7 @@ export function startApp(container: HTMLElement): AppHandle {
       unsubHash();
       unsubState();
       unmountMiddle?.();
+      uninstallHotkeys();
     },
   };
 }
