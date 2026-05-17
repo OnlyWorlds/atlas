@@ -29,6 +29,7 @@ import {
 } from '../../core/map-view-prefs';
 import type { MapTabCacheEntry } from './map-tab-cache';
 import { syncPins } from './map-tab-pins';
+import { syncZones } from './map-tab-zones';
 
 let openPopover: { wrapper: HTMLDivElement; entry: MapTabCacheEntry } | null = null;
 
@@ -151,9 +152,15 @@ function template(prefs: MapViewPrefs, hasOverride: boolean): string {
         </label>
         <div class="atlas-popover-radio-row ${prefs.show_grid ? '' : 'is-muted'}" data-field="grid_spacing">
           Spacing
+          ${radio('grid_spacing', '20',  '20',  String(prefs.grid_spacing))}
           ${radio('grid_spacing', '50',  '50',  String(prefs.grid_spacing))}
           ${radio('grid_spacing', '100', '100', String(prefs.grid_spacing))}
           ${radio('grid_spacing', '200', '200', String(prefs.grid_spacing))}
+          <span class="atlas-popover-radio-trailing">px</span>
+        </div>
+        <div class="atlas-popover-inline-num ${prefs.show_grid ? '' : 'is-muted'}">
+          Custom:
+          <input type="number" min="2" max="2000" step="1" value="${prefs.grid_spacing}" data-field="grid_spacing_custom" />
           <span class="atlas-popover-radio-trailing">px</span>
         </div>
       </section>
@@ -172,9 +179,9 @@ function template(prefs: MapViewPrefs, hasOverride: boolean): string {
 
         <label class="atlas-popover-section-label">Zone labels</label>
         <div class="atlas-popover-radio-row" data-field="zone_labels">
-          ${radio('zone_labels', 'always', 'Always', prefs.zone_labels)}
-          ${radio('zone_labels', 'hover',  'Hover',  prefs.zone_labels)}
-          ${radio('zone_labels', 'never',  'Never',  prefs.zone_labels)}
+          ${radio('zone_labels', 'always', 'Always',     prefs.zone_labels)}
+          ${radio('zone_labels', 'hover',  'On hover',   prefs.zone_labels)}
+          ${radio('zone_labels', 'never',  'Never',      prefs.zone_labels)}
         </div>
       </section>
     </div>
@@ -230,8 +237,23 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
     });
   });
 
-  // Number inputs (pin_label_threshold)
+  // Number inputs (pin_label_threshold + custom grid spacing)
   wrapper.querySelectorAll<HTMLInputElement>('input[type="number"]').forEach(input => {
+    // Custom grid spacing updates LIVE on each keystroke (input event) so the
+    // grid redraws as the user types — same UX as the opacity slider. We also
+    // listen on 'change' (blur/Enter) to re-render the popover so radio
+    // chip-selection state reflects whether the value matches a preset.
+    if (input.getAttribute('data-field') === 'grid_spacing_custom') {
+      input.addEventListener('input', () => {
+        const value = Number(input.value);
+        if (!Number.isFinite(value) || value < 2) return;
+        // Don't trigger a re-render (loses focus); apply silently.
+        setMapOverride(mapId, { grid_spacing: value });
+        applyLivePrefs(entry, getEffectiveMapPrefs(mapId));
+      });
+      input.addEventListener('change', () => rerender());
+      return;
+    }
     input.addEventListener('change', () => {
       const field = input.getAttribute('data-field');
       const value = Number(input.value);
@@ -294,9 +316,15 @@ export function applyLivePrefs(entry: MapTabCacheEntry, prefs: MapViewPrefs): vo
   applyGrid(entry, prefs.show_grid, prefs.grid_spacing);
   // Pin drag lock
   applyPinDragLock(entry, prefs.lock_pin_drag);
-  // Pin tint + labels — both ride on a syncPins re-call. Cheap (cache-key keyed
-  // visuals + DOM-level display toggle); no per-marker rebuild.
+  // Pin tint + labels + style — ride on a syncPins re-call. Cheap (cache-key
+  // keyed visuals + DOM-level display toggle); no per-marker rebuild.
   syncPins(entry);
+  // Zone fill opacity + label visibility — syncZones re-applies via
+  // zoneEffectiveOpacity (which reads prefs.zone_fill_opacity) and
+  // computeLabelText (which reads prefs.zone_labels). Cheaper than touching
+  // ZoneOverlay directly: tracks add/update/remove + label create/destroy
+  // through the same pipeline syncZones already uses.
+  syncZones(entry);
 }
 
 function applyGrid(entry: MapTabCacheEntry, show: boolean, spacing: number): void {

@@ -586,12 +586,12 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     // Seed pins from state.
     syncPins(entry);
 
-    // Auto-fit only when 2+ pins exist.
-    const pinsHere = getState().data.elements.filter((e): e is Pin =>
-      e.type === 'pin' && e.map_id === entry.mapId
-    );
-    if (pinsHere.length >= 2) manager.fitBounds(40, -1);
+    // Always fit the canvas image bounds on mount so the image fills the
+    // visible viewport. Previously: fit-to-pins only when ≥2 pins existed;
+    // without pins users saw the default zoom which often left the image
+    // at half-screen on page refresh (Captain smoke session 218→219).
     manager.getMap()?.invalidateSize();
+    manager.fitToCanvas(20);
   })();
 
   entry.ready.catch(err => console.error('[map-tab] init failed:', err));

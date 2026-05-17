@@ -251,7 +251,7 @@ export class Leaflet2DManager {
    * without clearing the image. Idempotent — calling repeatedly replaces the
    * previous grid overlay.
    */
-  setGridOverlay(spacing: number = 100, color: string = 'rgba(34, 211, 238, 0.18)'): void {
+  setGridOverlay(spacing: number = 100, color: string = 'rgba(34, 211, 238, 0.32)'): void {
     if (!this.map || !this.gridLayer) return;
     this.gridLayer.clearLayers();
     this.drawGridLines(this.gridLayer, spacing, color);

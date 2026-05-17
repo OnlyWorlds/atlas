@@ -126,8 +126,23 @@ export class ZoneOverlay {
     // Style-only update.
     entry.shape = nextShape;
     this.applyStyle(entry);
-    if (entry.labelMarker && patch.labelText !== undefined) {
-      entry.labelMarker.setIcon(this.buildLabelIcon(patch.labelText));
+    // Label create/update/remove. The popover toggles zone_labels mode at
+    // runtime, which flips labelText between zone.name and undefined for the
+    // SAME existing zone — so updateZone must dynamically build OR tear down
+    // the labelMarker, not just patch the icon of an existing one. Without
+    // this branch, switching from 'never' → 'always' did nothing on already-
+    // rendered zones (labelMarker was never created during buildEntry).
+    if (patch.labelText !== undefined || ('labelText' in patch)) {
+      const desired = nextShape.labelText;
+      if (desired && entry.labelMarker) {
+        entry.labelMarker.setIcon(this.buildLabelIcon(desired));
+      } else if (desired && !entry.labelMarker) {
+        entry.labelMarker = this.buildLabelMarker(nextShape);
+        entry.labelMarker.addTo(this.layerGroup);
+      } else if (!desired && entry.labelMarker) {
+        this.layerGroup.removeLayer(entry.labelMarker);
+        entry.labelMarker = undefined;
+      }
     }
   }
 

@@ -877,9 +877,11 @@ export function mountElementDetail(target: HTMLElement): () => void {
     pickBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
     if (!raw) pickBtn.classList.add('atlas-link-pick-empty');
     pickBtn.title = raw ? 'change link' : `pick a ${meta.target ?? 'link'}`;
-    // Empty: soft-grey `+` placeholder/affordance. Linked: type-specific icon.
-    const iconName = raw ? pickIconFor(meta.target) : 'add';
-    pickBtn.innerHTML = `<span class="material-symbols-outlined">${iconName}</span>`;
+    // ALWAYS show the type-specific icon so users see at a glance what kind of
+    // element this field links to — even before any link exists. Empty state
+    // still uses the `atlas-link-pick-empty` class for muted styling (was a
+    // generic `+` before, which hid which category the field targeted).
+    pickBtn.innerHTML = `<span class="material-symbols-outlined">${pickIconFor(meta.target)}</span>`;
     pickBtn.addEventListener('click', async () => {
       // Exclude the current element itself and any value already linked here.
       // Self-linking is never meaningful — a Character pointing at itself via
@@ -919,9 +921,10 @@ export function mountElementDetail(target: HTMLElement): () => void {
     addBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
     if (ids.length === 0) addBtn.classList.add('atlas-link-pick-empty');
     addBtn.title = ids.length === 0 ? `pick a ${meta.target ?? 'link'}` : `add another ${meta.target ?? 'link'}`;
-    // Always show `+` for multi-link add: it's an "add another" affordance even
-    // when chips exist. The `margin-left: auto` slides it past existing chips.
-    addBtn.innerHTML = `<span class="material-symbols-outlined">add</span>`;
+    // Always show the type-specific icon so users see WHICH category this
+    // multi-link field targets at a glance. `margin-left: auto` keeps the
+    // button anchored right past any existing chips.
+    addBtn.innerHTML = `<span class="material-symbols-outlined">${pickIconFor(meta.target)}</span>`;
     addBtn.addEventListener('click', async () => {
       // Exclude the current element + everything already in the list. Same
       // self-link rule as renderSingleLink — A Character's `friends` shouldn't

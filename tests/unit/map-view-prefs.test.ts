@@ -128,7 +128,12 @@ describe('getEffectiveMapPrefs', () => {
 });
 
 describe('saveMapPrefsAsDefault', () => {
-  it('promotes effective prefs to atlas defaults and clears the override', () => {
+  it('promotes effective prefs to atlas defaults AND pins the source map via its own override', () => {
+    // Captain's rule (session 219): a map that had ANY specific settings keeps
+    // them after Save-as-default. Otherwise a future save-from-another-map
+    // would silently re-pin this one. The source map's effective prefs are
+    // snapshotted into its override so it stays at its current values
+    // regardless of future default movement.
     setAtlasDefaults({ pin_style: 'round-icon' });
     setMapOverride('map-1', { show_grid: true, grid_spacing: 200 });
 
@@ -140,12 +145,37 @@ describe('saveMapPrefsAsDefault', () => {
     expect(d.show_grid).toBe(true);
     expect(d.grid_spacing).toBe(200);
 
-    // Map-1's override is cleared (defaults ARE its prefs now).
-    expect(getMapOverride('map-1')).toBeNull();
+    // Map-1's override now snapshots the effective prefs at save time. Every
+    // key is present (not just the prior partial), so subsequent atlas-default
+    // changes can't drift this map's view.
+    const override = getMapOverride('map-1');
+    expect(override).not.toBeNull();
+    expect(override!.show_grid).toBe(true);
+    expect(override!.grid_spacing).toBe(200);
+    expect(override!.pin_style).toBe('round-icon');
 
-    // Effective prefs for map-1 unchanged from before — same values, just sourced differently.
+    // Effective prefs for map-1 unchanged from before — same values, now
+    // sourced from a complete override rather than a partial + atlas defaults.
     expect(getEffectiveMapPrefs('map-1').show_grid).toBe(true);
     expect(getEffectiveMapPrefs('map-1').grid_spacing).toBe(200);
+  });
+
+  it('source-map override stays pinned when defaults later move', () => {
+    setMapOverride('source-map', { pin_style: 'pin-shape', show_grid: true });
+
+    saveMapPrefsAsDefault('source-map');
+
+    // Defaults move to something else via a different map's save.
+    setMapOverride('other-map', { pin_style: 'icon', show_grid: false });
+    saveMapPrefsAsDefault('other-map');
+
+    // source-map is unaffected — its snapshot retained the values from its save moment.
+    expect(getEffectiveMapPrefs('source-map').pin_style).toBe('pin-shape');
+    expect(getEffectiveMapPrefs('source-map').show_grid).toBe(true);
+
+    // other-map gets the new defaults via its own snapshot too.
+    expect(getEffectiveMapPrefs('other-map').pin_style).toBe('icon');
+    expect(getEffectiveMapPrefs('other-map').show_grid).toBe(false);
   });
 
   it('other maps inherit new defaults unless they have their own overrides', () => {

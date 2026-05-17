@@ -18,7 +18,12 @@ export type PinStyle = 'icon' | 'round-icon' | 'pin-shape';
 export type PinLabels = 'always' | 'hover' | 'threshold' | 'never';
 export type PinTint = 'type-color' | 'accent' | 'muted';
 export type ZoneLabels = 'always' | 'hover' | 'never';
-export type GridSpacing = 50 | 100 | 200;
+/**
+ * Grid spacing in storage-coord pixels. Common presets are 50/100/200 (shown
+ * as radio chips in the popover), but any positive integer is valid via the
+ * "Custom" input. Defaults to 100.
+ */
+export type GridSpacing = number;
 
 export interface MapViewPrefs {
   pin_style: PinStyle;
@@ -45,7 +50,10 @@ export const FACTORY_DEFAULTS: MapViewPrefs = {
   grid_spacing: 100,
   lock_pin_drag: false,
   zone_fill_opacity: 0.4,
-  zone_labels: 'hover',
+  // 'always' by default so labels appear out of the box. 'hover' mode is
+  // currently TBD — behaves identically to 'never' until the canvas-hover
+  // tooltip wires up (Bout H deliverable).
+  zone_labels: 'always',
 };
 
 /**
@@ -136,15 +144,21 @@ export function getEffectiveMapPrefs(mapId: string): MapViewPrefs {
  * "Save current map's effective prefs as the atlas-wide defaults."
  *
  * Reads the effective prefs for the source map and writes them to atlas
- * defaults. The source map's per-map override is then cleared since its
- * preferences ARE the new defaults — no override needed. Other maps that
- * had no override now reflect the new defaults; maps with overrides keep
- * those overrides.
+ * defaults. The source map's per-map override is RETAINED — Captain's rule:
+ * "as soon as a map has ANY of its own settings, it can NOT be overwritten
+ * this way." Even though the source map was the one we saved-from, it had
+ * specific settings that motivated the save; clearing its override would
+ * make a FUTURE 'Save as default' from another map silently re-pin it.
+ * Other maps that have no override naturally follow the new defaults.
  */
 export function saveMapPrefsAsDefault(mapId: string): void {
   const effective = getEffectiveMapPrefs(mapId);
   writeJson(MAP_VIEW_PREFS_DEFAULTS_KEY, effective);
-  resetMapOverride(mapId);
+  // Snapshot the source map's effective values into its own override so it
+  // stays pinned even if defaults move later. If it had no override yet, this
+  // creates one; if it had one, the values are now == defaults but the
+  // override exists and prevents future drift.
+  setMapOverride(mapId, effective);
 }
 
 // ----- internal localStorage helpers -----
