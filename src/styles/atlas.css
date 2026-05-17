@@ -3409,7 +3409,7 @@
 
 .atlas-map-visual-settings-popover {
   position: absolute;
-  top: 36px; /* below the toolbar */
+  top: 36px; /* below the toolbar (legacy floating-over-canvas fallback) */
   left: 8px;
   width: 320px;
   max-height: calc(100% - 44px);
@@ -3423,6 +3423,18 @@
   font-size: 12px;
   z-index: 10;
   user-select: none;
+}
+
+/* Midpanel-docked variant (session 219 — Captain wanted the panel off the
+   map canvas). Lives at document.body level with position: fixed; coords
+   computed at runtime from the .atlas-middle bounding rect. Z-index higher
+   so it floats above element-detail content. */
+.atlas-map-visual-settings-popover-midpanel {
+  position: fixed !important;
+  top: auto;   /* overridden inline */
+  left: auto;  /* overridden inline */
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
 }
 
 .atlas-popover-header {

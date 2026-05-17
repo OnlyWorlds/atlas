@@ -48,7 +48,8 @@ export function toggleVisualSettingsPopover(entry: MapTabCacheEntry, anchor: HTM
 
 export function closeVisualSettingsPopover(): void {
   if (!openPopover) return;
-  const w = openPopover.wrapper;
+  const w = openPopover.wrapper as HTMLElement & { __atlasCleanupReposition?: () => void };
+  w.__atlasCleanupReposition?.();
   if (w.parentElement) w.parentElement.removeChild(w);
   document.removeEventListener('keydown', escListener);
   document.removeEventListener('mousedown', outsideClickListener);
@@ -75,7 +76,7 @@ function openVisualSettingsPopover(entry: MapTabCacheEntry, _anchor: HTMLElement
   const mapId = entry.mapId;
 
   const wrapper = document.createElement('div');
-  wrapper.className = 'atlas-map-visual-settings-popover';
+  wrapper.className = 'atlas-map-visual-settings-popover atlas-map-visual-settings-popover-midpanel';
   wrapper.setAttribute('role', 'dialog');
   wrapper.setAttribute('aria-label', 'Map visual settings');
 
@@ -87,9 +88,27 @@ function openVisualSettingsPopover(entry: MapTabCacheEntry, _anchor: HTMLElement
 
   render();
 
-  // Anchor against the canvas wrapper (top-left of the leaflet area, just
-  // below the toolbar).
-  entry.wrapper.appendChild(wrapper);
+  // Dock at the RIGHT edge of the midpanel (Captain session 219). The popover
+  // lives at document.body level with position: fixed, with coords computed
+  // from the midpanel's bounding rect each frame. The map (in the right pane)
+  // stays unobstructed; the panel takes a vertical slice of the middle pane
+  // adjacent to the divider. Falls back to floating-over-canvas if the
+  // midpanel isn't present (defensive — should always exist when a map is open).
+  document.body.appendChild(wrapper);
+  const reposition = () => repositionAgainstMidpanel(wrapper);
+  reposition();
+  window.addEventListener('resize', reposition);
+  // ResizeObserver tracks midpanel size changes (divider drag, sidebar mode
+  // toggle, etc.) — cheaper than a global mousemove listener and fires on
+  // every actual size change rather than every cursor pixel.
+  const middle = document.querySelector('.atlas-middle');
+  const ro = middle ? new ResizeObserver(() => reposition()) : null;
+  if (middle && ro) ro.observe(middle);
+  // Store cleanup hook on the wrapper for closeVisualSettingsPopover.
+  (wrapper as HTMLElement & { __atlasCleanupReposition?: () => void }).__atlasCleanupReposition = () => {
+    window.removeEventListener('resize', reposition);
+    ro?.disconnect();
+  };
 
   openPopover = { wrapper, entry };
 
@@ -103,6 +122,26 @@ function openVisualSettingsPopover(entry: MapTabCacheEntry, _anchor: HTMLElement
   // Apply current prefs to live consumers (in case they were stale from a
   // prior session).
   applyLivePrefs(entry, getEffectiveMapPrefs(mapId));
+}
+
+/**
+ * Compute and apply position: fixed coords so the popover sits docked to
+ * the right edge of the `.atlas-middle` pane. If midpanel isn't present
+ * (e.g. some pane disposed), the popover is left at its CSS-default for
+ * fallback floating.
+ */
+function repositionAgainstMidpanel(wrapper: HTMLElement): void {
+  const middle = document.querySelector('.atlas-middle');
+  if (!middle) return;
+  const rect = (middle as HTMLElement).getBoundingClientRect();
+  // Take a slim ~340px vertical slice on the RIGHT edge of midpanel. We
+  // overlay middle content (element-detail), not the map.
+  const width = Math.min(340, Math.max(260, rect.width - 40));
+  wrapper.style.position = 'fixed';
+  wrapper.style.left = `${Math.round(rect.right - width - 8)}px`;
+  wrapper.style.top = `${Math.round(rect.top + 8)}px`;
+  wrapper.style.width = `${width}px`;
+  wrapper.style.maxHeight = `${Math.round(rect.height - 16)}px`;
 }
 
 function template(prefs: MapViewPrefs, hasOverride: boolean): string {
