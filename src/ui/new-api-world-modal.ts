@@ -25,7 +25,7 @@ export class NewApiWorldModal extends BaseModal {
 
   open(): void {
     if (!getState().registry.atlas_root) {
-      this.toasts.error('set up atlas folder first');
+      this.toasts.error('Set up atlas folder first');
       return;
     }
     const reg = getState().registry;
@@ -36,10 +36,10 @@ export class NewApiWorldModal extends BaseModal {
     });
 
     body.innerHTML = `
-      <p class="atlas-modal-hint">creates a local folder AND a new api world on onlyworlds.com. you can then add elements to both at once.</p>
+      <p class="atlas-modal-hint">Creates a local folder AND a new API world on onlyworlds.com. You can then add elements to both at once.</p>
       <label class="atlas-modal-field">
-        <span>world name</span>
-        <input class="atlas-input" type="text" name="api-name" placeholder="my new world" autocomplete="off" required />
+        <span>World name</span>
+        <input class="atlas-input" type="text" name="api-name" placeholder="My new world" autocomplete="off" required />
       </label>
       <label class="atlas-modal-field">
         <span>Email</span>
@@ -47,7 +47,7 @@ export class NewApiWorldModal extends BaseModal {
       </label>
       <label class="atlas-modal-field">
         <span>PIN</span>
-        <input class="atlas-input" type="text" name="api-pin" placeholder="onlyworlds pin (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
+        <input class="atlas-input" type="text" name="api-pin" placeholder="OnlyWorlds PIN (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
       </label>
       <p class="atlas-modal-error" data-role="error" hidden></p>
       <div class="atlas-modal-progress" data-role="progress" hidden></div>
@@ -72,9 +72,9 @@ export class NewApiWorldModal extends BaseModal {
       const email = emailInput.value.trim();
       const pin = pinInput.value.trim();
       errorEl.hidden = true;
-      if (!name) { errorEl.textContent = 'name is required'; errorEl.hidden = false; return; }
-      if (!email) { errorEl.textContent = 'email is required'; errorEl.hidden = false; return; }
-      if (!pin) { errorEl.textContent = 'pin is required'; errorEl.hidden = false; return; }
+      if (!name) { errorEl.textContent = 'Name is required'; errorEl.hidden = false; return; }
+      if (!email) { errorEl.textContent = 'Email is required'; errorEl.hidden = false; return; }
+      if (!pin) { errorEl.textContent = 'PIN is required'; errorEl.hidden = false; return; }
 
       submitBtn.disabled = true;
       // Hide cancel: this flow does local + remote work in sequence, and
@@ -96,16 +96,16 @@ export class NewApiWorldModal extends BaseModal {
           patchSlice('registry', regAfter);
         }
 
-        progressEl.textContent = `creating local folder for "${name}"...`;
+        progressEl.textContent = `Creating local folder for "${name}"...`;
         const { entry } = await createWorldInRoot(name);
 
-        progressEl.textContent = `creating api world on onlyworlds.com...`;
+        progressEl.textContent = `Creating API world on onlyworlds.com...`;
         const { apiKey } = await createApiWorld({ name, email, pin });
 
-        progressEl.textContent = `fetching new world id...`;
+        progressEl.textContent = `Fetching new world ID...`;
         const client = buildOwClient(apiKey, pin);
         const world = await client.worlds.get();
-        if (!world?.id) throw new Error('server returned no world id');
+        if (!world?.id) throw new Error('Server returned no world ID');
 
         // Flip registry to api-linked + persist credentials to disk.
         // Cache the server-side world name so settings can flag api-vs-local

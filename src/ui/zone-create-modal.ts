@@ -38,7 +38,7 @@ class ZoneCreateModal extends BaseModal {
       this.resolveFn = resolve;
 
       const { overlay, body } = this.buildModalShell({
-        title: 'new zone',
+        title: 'New zone',
         dataModal: 'zone-create',
       });
 
@@ -47,11 +47,11 @@ class ZoneCreateModal extends BaseModal {
       body.innerHTML = `
         <div class="atlas-zone-create-shape-badge" data-role="zone-create-shape-badge">
           <span class="material-symbols-outlined">${shapeIcon}</span>
-          <span>${opts.shape}</span>
+          <span>${opts.shape.charAt(0).toUpperCase()}${opts.shape.slice(1)}</span>
         </div>
 
         <div class="atlas-modal-field">
-          <label class="atlas-modal-label" for="zone-create-name">name</label>
+          <label class="atlas-modal-label" for="zone-create-name">Name</label>
           <input
             type="text"
             id="zone-create-name"
@@ -63,7 +63,7 @@ class ZoneCreateModal extends BaseModal {
         </div>
 
         <div class="atlas-modal-field">
-          <label class="atlas-modal-label" for="zone-create-supertype">supertype <span class="atlas-modal-label-hint">(optional)</span></label>
+          <label class="atlas-modal-label" for="zone-create-supertype">Supertype <span class="atlas-modal-label-hint">(optional)</span></label>
           <input
             type="text"
             id="zone-create-supertype"
@@ -75,20 +75,20 @@ class ZoneCreateModal extends BaseModal {
         </div>
 
         <div class="atlas-modal-field">
-          <label class="atlas-modal-label" for="zone-create-subtype">subtype <span class="atlas-modal-label-hint">(optional)</span></label>
+          <label class="atlas-modal-label" for="zone-create-subtype">Subtype <span class="atlas-modal-label-hint">(optional)</span></label>
           <input
             type="text"
             id="zone-create-subtype"
             class="atlas-input"
             data-role="zone-create-subtype"
-            placeholder="e.g. forest, road, plaza…"
+            placeholder="E.g. forest, road, plaza…"
             autocomplete="off"
           />
         </div>
 
         <div class="atlas-modal-actions">
-          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
-          <button type="button" class="atlas-btn-primary" data-action="create">create zone</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+          <button type="button" class="atlas-btn-primary" data-action="create">Create zone</button>
         </div>
       `;
 

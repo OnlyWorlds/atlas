@@ -34,15 +34,17 @@ async function createWorld(page: Page, name: string) {
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
 }
 
-test('timeline route renders empty state when no events exist', async ({ page }) => {
+test('timeline renders empty state when no events exist', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'world a');
 
-  await page.click('[data-action="open-timeline"]');
-  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/timeline$/);
+  // After activation, the middle pane defaults to timeline (the "no element
+  // selected" landing for an active world). The deprecated [data-action="open-
+  // timeline"] button only ever rendered on the welcome panel and is no longer
+  // part of the active-world flow.
   await expect(page.locator('.atlas-timeline')).toBeVisible();
-  await expect(page.locator('.atlas-timeline-empty')).toContainText('no events yet');
+  await expect(page.locator('.atlas-timeline-empty')).toContainText(/no events yet/i);
 });
 
 test('timeline route renders a dot per event element', async ({ page }) => {
@@ -60,9 +62,14 @@ test('timeline route renders a dot per event element', async ({ page }) => {
     await expect(page.locator('.atlas-row[data-element-id]', { hasText: name })).toBeVisible();
   }
 
-  // Switch back to worlds tab and into welcome, then click view timeline.
-  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
-  await page.click('[data-action="open-timeline"]');
+  // The middle defaults to timeline for an active world with no selection;
+  // navigate to the bare worldId hash to clear any element selection and
+  // confirm three event dots render.
+  await page.evaluate(() => {
+    const hash = window.location.hash;
+    const m = hash.match(/#\/w\/([^/]+)/);
+    if (m) window.location.hash = `#/w/${m[1]}`;
+  });
   await expect(page.locator('.atlas-timeline')).toBeVisible();
   await expect(page.locator('.atlas-timeline-dot')).toHaveCount(3);
 });
@@ -72,7 +79,7 @@ test('sync pill shows "local" for a local-only world', async ({ page }) => {
   await setupAtlasRoot(page);
   await createWorld(page, 'local world');
   await expect(page.locator('[data-role="sync-pill"]')).toBeVisible();
-  await expect(page.locator('[data-role="sync-pill"]')).toContainText('local');
+  await expect(page.locator('[data-role="sync-pill"]')).toContainText(/local/i);
   await expect(page.locator('[data-role="sync-pill"]')).toHaveAttribute('data-state', 'local');
 });
 
@@ -123,7 +130,8 @@ test('timeline + event create from timeline header', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'world c');
-  await page.click('[data-action="open-timeline"]');
+  // Middle defaults to timeline post-activation; the [+ Event] button lives
+  // in the timeline header (timeline.ts), so it's already on-page.
 
   await page.click('[data-action="new-event"]');
   await expect(page.locator('[data-modal="create-element"]')).toBeVisible();

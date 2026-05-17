@@ -51,16 +51,16 @@ export class MakeOnlineModal extends BaseModal {
   open(): void {
     const active = getState().active;
     if (!active) {
-      this.toasts.error('no active world');
+      this.toasts.error('No active world');
       return;
     }
     const entry = getState().registry.worlds.find(w => w.id === active.worldId);
     if (entry?.state === 'api-linked') {
-      this.toasts.info('world is already online');
+      this.toasts.info('World is already online');
       return;
     }
     if (!getActiveStore()) {
-      this.toasts.error('active store not open');
+      this.toasts.error('Active store not open');
       return;
     }
     this.modal = this.buildModal();
@@ -78,19 +78,19 @@ export class MakeOnlineModal extends BaseModal {
 
     const reg = getState().registry;
     const active = getState().active!;
-    const defaultName = active.meta.name || 'untitled world';
+    const defaultName = active.meta.name || 'Untitled world';
     const prefilledPin = reg.pin ?? '';
     const prefilledEmail = reg.email ?? '';
 
     body.innerHTML = `
       <div class="atlas-tab-bar atlas-modal-tab-bar">
-        <button type="button" class="atlas-tab active" data-route-tab="create">create new</button>
-        <button type="button" class="atlas-tab" data-route-tab="link">link to existing</button>
+        <button type="button" class="atlas-tab active" data-route-tab="create">Create new</button>
+        <button type="button" class="atlas-tab" data-route-tab="link">Link to existing</button>
       </div>
 
       <div data-route-pane="create">
         <p class="atlas-modal-hint">
-          create a new world on onlyworlds.com and upload this folder's contents.
+          Create a new world on onlyworlds.com and upload this folder's contents.
         </p>
         <form data-form="create-route">
           <label class="atlas-modal-field">
@@ -99,11 +99,11 @@ export class MakeOnlineModal extends BaseModal {
           </label>
           <label class="atlas-modal-field">
             <span>Email</span>
-            <input class="atlas-input" type="email" name="create-email" value="${escapeAttr(prefilledEmail)}" placeholder="your onlyworlds account email" autocomplete="off" />
+            <input class="atlas-input" type="email" name="create-email" value="${escapeAttr(prefilledEmail)}" placeholder="Your OnlyWorlds account email" autocomplete="off" />
           </label>
           <label class="atlas-modal-field">
             <span>PIN</span>
-            <input class="atlas-input" type="text" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="four-digit pin" maxlength="8" autocomplete="off" />
+            <input class="atlas-input" type="text" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="8" autocomplete="off" />
           </label>
           <div class="atlas-modal-error" data-role="create-error" hidden></div>
           <div class="atlas-modal-progress" data-role="create-progress" hidden></div>
@@ -116,39 +116,39 @@ export class MakeOnlineModal extends BaseModal {
 
       <div data-route-pane="link" hidden>
         <p class="atlas-modal-hint">
-          link this folder to a world you've already created on onlyworlds.com. choose how to handle elements that exist on both sides.
+          Link this folder to a world you've already created on onlyworlds.com. Choose how to handle elements that exist on both sides.
         </p>
         <form data-form="link-route">
           <label class="atlas-modal-field">
             <span>API key</span>
-            <input class="atlas-input" type="text" name="link-api-key" placeholder="from onlyworlds.com" autocomplete="off" spellcheck="false" />
+            <input class="atlas-input" type="text" name="link-api-key" placeholder="From onlyworlds.com" autocomplete="off" spellcheck="false" />
           </label>
           <label class="atlas-modal-field">
             <span>PIN</span>
-            <input class="atlas-input" type="text" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="four-digit pin" maxlength="8" autocomplete="off" />
+            <input class="atlas-input" type="text" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="8" autocomplete="off" />
           </label>
           <fieldset class="atlas-modal-field atlas-policy-fieldset">
             <legend>On duplicate (same name + type)</legend>
             <label class="atlas-policy-option">
               <input type="radio" name="link-policy" value="b" checked />
               <span>
-                <strong>overwrite <span class="atlas-settings-default-tag">default</span></strong>
-                <em>local copy wins — pushes your version, server's is replaced.</em>
+                <strong>Overwrite <span class="atlas-settings-default-tag">default</span></strong>
+                <em>Local copy wins — pushes your version, server's is replaced.</em>
               </span>
             </label>
             <label class="atlas-policy-option">
               <input type="radio" name="link-policy" value="c" />
               <span>
-                <strong>skip</strong>
-                <em>keep server copy — local edits to matched elements are lost.</em>
+                <strong>Skip</strong>
+                <em>Keep server copy — local edits to matched elements are lost.</em>
               </span>
             </label>
           </fieldset>
           <label class="atlas-modal-checkbox-row">
             <input type="checkbox" name="link-match-by-name" checked />
             <span>
-              <strong>treat same-name elements as duplicates</strong>
-              <em>uncheck to allow same-name elements to coexist as separate items.</em>
+              <strong>Treat same-name elements as duplicates</strong>
+              <em>Uncheck to allow same-name elements to coexist as separate items.</em>
             </span>
           </label>
           <div class="atlas-modal-error" data-role="link-error" hidden></div>
@@ -233,7 +233,7 @@ export class MakeOnlineModal extends BaseModal {
 
     try {
       // 1. Create new api world (server-side).
-      progressBox.textContent = 'creating world on onlyworlds.com…';
+      progressBox.textContent = 'Creating world on onlyworlds.com…';
       progressBox.hidden = false;
       const { apiKey } = await createApiWorld({ name, email, pin });
 
@@ -242,16 +242,16 @@ export class MakeOnlineModal extends BaseModal {
       const adapter = new OwClientAdapter(client);
 
       // 3. Find the new world's server-side id via client.worlds.get().
-      progressBox.textContent = 'reading new world id…';
+      progressBox.textContent = 'Reading new world ID…';
       const world = await client.worlds.get() as { id?: string; name?: string };
-      if (!world.id) throw new Error('server did not return a world id');
+      if (!world.id) throw new Error('Server did not return a world ID');
 
       // 3b. Block double-link: refuse to link if another local world in this
       // atlas is already linked to this api world.
       const active1 = getState().active!;
       const dupe1 = findLinkedWorld(getState().registry, world.id, active1.worldId);
       if (dupe1) {
-        throw new Error(`this api world is already linked to "${dupe1.name}" locally. unlink it first or open it from the sidebar.`);
+        throw new Error(`This API world is already linked to "${dupe1.name}" locally. Unlink it first or open it from the sidebar.`);
       }
 
       // 4. Push all local elements as CREATEs via pushOnce on a transient engine.
@@ -275,8 +275,8 @@ export class MakeOnlineModal extends BaseModal {
           pushDone = done;
           pushTotal = total;
           progressBox.textContent = total === 0
-            ? 'uploading: nothing to send'
-            : `uploading ${done} of ${total} elements…`;
+            ? 'Uploading: nothing to send'
+            : `Uploading ${done} of ${total} elements…`;
         },
       });
       const pushResult = await engine.pushOnce();
@@ -346,12 +346,12 @@ export class MakeOnlineModal extends BaseModal {
     const matchByName = matchByNameInput?.checked ?? true;
 
     if (!apiKey) {
-      errorBox.textContent = 'api key is required';
+      errorBox.textContent = 'API key is required';
       errorBox.hidden = false;
       return;
     }
     if (!pin) {
-      errorBox.textContent = 'pin is required';
+      errorBox.textContent = 'PIN is required';
       errorBox.hidden = false;
       return;
     }
@@ -365,7 +365,7 @@ export class MakeOnlineModal extends BaseModal {
 
     try {
       // 1. Validate via client.worlds.get().
-      progressBox.textContent = 'validating credentials…';
+      progressBox.textContent = 'Validating credentials…';
       progressBox.hidden = false;
       const client = buildOwClient(apiKey, pin);
       let world: { id?: string; name?: string };
@@ -373,18 +373,18 @@ export class MakeOnlineModal extends BaseModal {
         world = await client.worlds.get();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (/401|403/.test(msg)) throw new Error('api key or pin invalid');
-        if (/404/.test(msg)) throw new Error('no world found for that api key');
+        if (/401|403/.test(msg)) throw new Error('API key or PIN invalid');
+        if (/404/.test(msg)) throw new Error('No world found for that API key');
         throw new Error(msg);
       }
-      if (!world.id) throw new Error('server returned no world id');
+      if (!world.id) throw new Error('Server returned no world ID');
 
       // 1b. Block double-link: refuse if another local world in this atlas
       // is already linked to this api world.
       const active0 = getState().active!;
       const dupe0 = findLinkedWorld(getState().registry, world.id, active0.worldId);
       if (dupe0) {
-        throw new Error(`this api world is already linked to "${dupe0.name}" locally. unlink it first or open it from the sidebar.`);
+        throw new Error(`This API world is already linked to "${dupe0.name}" locally. Unlink it first or open it from the sidebar.`);
       }
 
       // 2. Run the merge.
@@ -393,8 +393,8 @@ export class MakeOnlineModal extends BaseModal {
       const folder = getActiveStore()!;
       const renderProgress = (p: MergeProgress) => {
         progressBox.textContent = p.phase === 'list'
-          ? 'reading server elements…'
-          : `merging ${p.done} of ${p.total} elements…`;
+          ? 'Reading server elements…'
+          : `Merging ${p.done} of ${p.total} elements…`;
       };
       const mergeResult = await mergeLocalIntoApi(folder, adapter, policy, {
         matchByName,
@@ -442,9 +442,9 @@ export class MakeOnlineModal extends BaseModal {
       if (skipped) parts.push(`${skipped} skipped`);
       if (downloaded) parts.push(`${downloaded} downloaded`);
       if (failed) parts.push(`${failed} failed`);
-      const summary = parts.length ? parts.join(', ') : 'nothing to merge';
+      const summary = parts.length ? parts.join(', ') : 'Nothing to merge';
       const verb = failed > 0 ? this.toasts.error.bind(this.toasts) : this.toasts.success.bind(this.toasts);
-      verb(`linked to ${world.name ?? 'world'} — ${summary}`);
+      verb(`Linked to ${world.name ?? 'world'} — ${summary}`);
 
       this.hide();
     } catch (err) {

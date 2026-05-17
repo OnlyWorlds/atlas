@@ -64,9 +64,9 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
   const name = opts.name.trim();
   const email = opts.email.trim();
   const pin = opts.pin.trim();
-  if (!name) throw new Error('name is required');
-  if (!email) throw new Error('email is required');
-  if (!pin) throw new Error('pin is required');
+  if (!name) throw new Error('Name is required');
+  if (!email) throw new Error('Email is required');
+  if (!pin) throw new Error('PIN is required');
 
   const response = await fetch(getWorldsyncUrl(), {
     method: 'POST',
@@ -78,20 +78,20 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
     const text = await response.text();
     try {
       const data = JSON.parse(text);
-      throw new Error(data.message ?? 'invalid email or pin — verify your onlyworlds.com account');
+      throw new Error(data.message ?? 'Invalid email or PIN — verify your onlyworlds.com account');
     } catch {
-      throw new Error('invalid email or pin — verify your onlyworlds.com account');
+      throw new Error('Invalid email or PIN — verify your onlyworlds.com account');
     }
   }
   if (response.status === 429) {
-    throw new Error('too many requests — please try again later');
+    throw new Error('Too many requests — please try again later');
   }
   if (!response.ok) {
-    throw new Error(`server error ${response.status} — unable to create world`);
+    throw new Error(`Server error ${response.status} — unable to create world`);
   }
   const data = await response.json() as { success?: boolean; api_key?: string; message?: string };
   if (!data.success || !data.api_key) {
-    throw new Error(data.message ?? 'server reported failure creating world');
+    throw new Error(data.message ?? 'Server reported failure creating world');
   }
   return { apiKey: data.api_key };
 }

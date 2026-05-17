@@ -741,7 +741,10 @@ export class FsFolderStore implements FolderStore {
           diskDescription: readDesc,
         });
       } else {
-        console.info('[fs-folder-store] applyServerRecord: post-write readback ok', {
+        // Successful readback fires per element on every pull — log at debug
+        // so dev tools default-filter excludes it. The DIFFERS branch above
+        // stays at warn since it indicates an actual data-integrity event.
+        console.debug('[fs-folder-store] applyServerRecord: post-write readback ok', {
           id,
           type,
           descriptionPreview: readDesc,

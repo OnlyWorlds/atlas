@@ -23,19 +23,19 @@ function renderUnsupportedPage(root: HTMLElement): void {
       <div class="atlas-unsupported-icon">
         <span class="material-symbols-outlined">folder_special</span>
       </div>
-      <h1>atlas needs a chromium browser</h1>
+      <h1>Atlas needs a Chromium browser</h1>
       <p>
-        atlas stores your worlds as real files on your computer using the
-        <b>file system access api</b>, which is currently only available in chrome
-        and edge (and other chromium-based browsers).
+        Atlas stores your worlds as real files on your computer using the
+        <b>File System Access API</b>, which is currently only available in Chrome
+        and Edge (and other Chromium-based browsers).
       </p>
       <p>
-        open this page in <b>chrome</b> or <b>edge</b> to use atlas. firefox and
-        safari can browse but not edit local worlds.
+        Open this page in <b>Chrome</b> or <b>Edge</b> to use Atlas. Firefox and
+        Safari can browse but not edit local worlds.
       </p>
       <div class="atlas-unsupported-actions">
-        <a href="https://www.google.com/chrome/" target="_blank" rel="noopener">download chrome →</a>
-        <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener">download edge →</a>
+        <a href="https://www.google.com/chrome/" target="_blank" rel="noopener">Download Chrome →</a>
+        <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener">Download Edge →</a>
       </div>
     </div>
   `;

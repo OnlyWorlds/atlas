@@ -95,7 +95,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   const state = getState();
   const worldId = state.active?.worldId;
   if (!worldId) {
-    pane.innerHTML = `<div class="atlas-empty-state">no active world.</div>`;
+    pane.innerHTML = `<div class="atlas-empty-state">No active world.</div>`;
     return;
   }
   const map = state.data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId);
@@ -109,12 +109,12 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     const ownerLabel = ownerWorld?.name ?? null;
     const tabLabel = tab && tab.kind === 'map' ? tab.label : '';
     const subMsg = ownerLabel
-      ? `this map belongs to <b>${escapeHtml(ownerLabel)}</b>${tabLabel ? ` ("${escapeHtml(tabLabel)}")` : ''} — switch to that world to view it.`
-      : `it may have been deleted, or you switched worlds while it was open.`;
+      ? `This map belongs to <b>${escapeHtml(ownerLabel)}</b>${tabLabel ? ` ("${escapeHtml(tabLabel)}")` : ''} — switch to that world to view it.`
+      : `It may have been deleted, or you switched worlds while it was open.`;
     pane.innerHTML = `
       <div class="atlas-empty-state atlas-map-stale-pane" data-role="map-stale-pane">
         <div class="material-symbols-outlined atlas-map-stale-icon">cloud_off</div>
-        <div class="atlas-map-stale-title">${ownerLabel ? `Map from another world` : `this map isn't in the current world`}</div>
+        <div class="atlas-map-stale-title">${ownerLabel ? `Map from another world` : `This map isn't in the current world`}</div>
         <div class="atlas-map-stale-sub">${subMsg}</div>
         <button type="button" class="atlas-btn-ghost" data-action="close-stale">Close tab</button>
       </div>
@@ -242,7 +242,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   const trashZone = document.createElement('div');
   trashZone.className = 'atlas-pin-trash-zone';
   trashZone.setAttribute('data-active', 'false');
-  trashZone.innerHTML = '<span class="material-symbols-outlined">delete</span><span>drop to delete</span>';
+  trashZone.innerHTML = '<span class="material-symbols-outlined">delete</span><span>Drop to delete</span>';
   container.appendChild(trashZone);
 
   // Pin filter chip strip — top-left overlay showing element types present
@@ -370,7 +370,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         (e): e is WorldMap => e.type === 'map' && e.id === entry.mapId,
       );
       if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
-        toasts.info('set a map image first — pins anchor to the image');
+        toasts.info('Set a map image first — pins anchor to the image');
         return;
       }
       try {
@@ -383,7 +383,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         const cached = getState().data.elements.find(e => e.id === placement.elementId);
         const pinned = cached ?? await store.getElement(placement.elementId);
         if (!pinned) {
-          toasts.error('cannot place pin — element not found');
+          toasts.error('Cannot place pin — element not found');
           return;
         }
         await store.createPin({
@@ -397,10 +397,10 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         patchSlice('data', { elements });
         patchSlice('ui', { ...getState().ui, pinPlacement: null });
         requestPushIfLinked();
-        toasts.success('pin placed');
+        toasts.success('Pin placed');
       } catch (err) {
         console.error('[map-tab] create pin failed:', err);
-        toasts.error('failed to place pin');
+        toasts.error('Failed to place pin');
       }
     });
 
@@ -464,7 +464,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       // exitEditMode-without-cancel). Refuse cleanly with a toast so the
       // user has to exit edit explicitly first.
       if (isEditing() && getEditingMapId() === entry.mapId) {
-        toasts.info('finish zone edit first (Done or Esc)');
+        toasts.info('Finish zone edit first (Done or Esc)');
         return;
       }
       // Same gate as the placement-banner map-click path.
@@ -472,7 +472,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         (em): em is WorldMap => em.type === 'map' && em.id === entry.mapId,
       );
       if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
-        toasts.info('set a map image first — pins anchor to the image');
+        toasts.info('Set a map image first — pins anchor to the image');
         return;
       }
       const point = leafletToStorage(latlng, height);
@@ -508,29 +508,57 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         onCreated: async (elementId, elementType) => {
           try {
             await writePin(elementId, elementType);
-            toasts.success('pin placed');
+            toasts.success('Pin placed');
           } catch (err) {
             console.error('[map-tab] contextual pin create failed:', err);
-            toasts.error('failed to place pin');
+            toasts.error('Failed to place pin');
           }
         },
         onPlaceExisting: async (elementId, elementType) => {
           try {
             await writePin(elementId, elementType);
-            toasts.success('pin placed');
+            toasts.success('Pin placed');
           } catch (err) {
             console.error('[map-tab] place existing pin failed:', err);
-            toasts.error('failed to place pin');
+            toasts.error('Failed to place pin');
           }
         },
       });
       modal.open();
     });
 
-    // 'F' key → fit bounds
+    // Map-tab single-letter hotkeys (only fire while focus is inside the map
+    // canvas — container.tabIndex=0 makes it focusable; clicks on the canvas
+    // grab focus). Bare letters here would otherwise hijack typing if dispatched
+    // globally; scoping to the container keeps them safe.
     container.tabIndex = 0;
     container.addEventListener('keydown', (e) => {
-      if (e.key === 'f' || e.key === 'F') manager.fitBounds(40);
+      // No modifier and not typing into a child input (the toolbar has none,
+      // but be defensive against future markup).
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+
+      const cacheEntry = mapTabCache.get(mapId);
+      if (!cacheEntry) return;
+      const active = getActiveDraft();
+
+      switch (e.key.toLowerCase()) {
+        case 'f':
+          e.preventDefault();
+          manager.fitBounds(40);
+          break;
+        case 'z':
+          e.preventDefault();
+          if (active && active.mode === 'polygon' && active.mapId === mapId) cancelDrawing();
+          else startDrawing(cacheEntry, 'polygon', toasts);
+          break;
+        case 'l':
+          e.preventDefault();
+          if (active && active.mode === 'line' && active.mapId === mapId) cancelDrawing();
+          else startDrawing(cacheEntry, 'line', toasts);
+          break;
+      }
     });
 
     // Drag-from-sidebar → drop creates a pin (DESIGN_MAPS.md §8). The
@@ -572,7 +600,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         (em): em is WorldMap => em.type === 'map' && em.id === entry.mapId,
       );
       if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
-        toasts.info('set a map image first — pins anchor to the image');
+        toasts.info('Set a map image first — pins anchor to the image');
         return;
       }
       const lMap = manager.getMap();
@@ -593,10 +621,10 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         const elements = await store.listElements();
         patchSlice('data', { elements });
         requestPushIfLinked();
-        toasts.success('pin placed');
+        toasts.success('Pin placed');
       } catch (err) {
         console.error('[map-tab] drag-drop create pin failed:', err);
-        toasts.error('failed to place pin');
+        toasts.error('Failed to place pin');
       }
     });
 

@@ -216,7 +216,7 @@ test('reload preserves elements via FolderStore (cache rehydrates on activate)',
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
   await page.locator('.atlas-row[data-world-id]', { hasText: 'world a' }).click();
-  await expect(page.locator('.atlas-middle-header h2')).toContainText('world a');
+  await expect(page.locator('[data-action="mode-elements"] .atlas-mode-btn-label')).toContainText('world a');
 
   // Switch to elements mode — knight should still be there.
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');

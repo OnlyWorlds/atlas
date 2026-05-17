@@ -228,10 +228,10 @@ async function deleteZoneFromChip(zoneId: string, toasts: ToastManager): Promise
       patchSlice('ui', { ...getState().ui, selectedElementId: null });
     }
     requestPushIfLinked();
-    toasts.success(`zone deleted`);
+    toasts.success(`Zone deleted`);
   } catch (err) {
     console.error('[zone-chip] delete failed:', err);
-    toasts.error('failed to delete zone');
+    toasts.error('Failed to delete zone');
   }
 }
 
@@ -286,7 +286,7 @@ async function renameZone(zoneId: string, toasts: ToastManager): Promise<void> {
     requestPushIfLinked();
   } catch (err) {
     console.error('[zone-chip] rename failed:', err);
-    toasts.error('failed to rename zone');
+    toasts.error('Failed to rename zone');
   }
 }
 

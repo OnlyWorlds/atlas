@@ -5,7 +5,23 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 
 ---
 
-## ZONE SUBSYSTEM STATE (handover snapshot, session 218 close)
+## CURRENT STATE (handover snapshot, session 220 close)
+
+Tool is in a tight, healthy state. 532 vitest + 93 Playwright e2e, all green. Bundle 481 KB JS / 135 KB gzipped. Sentence case throughout. Slug-prefix filenames on disk. Hotkeys MVP wired. Modal styling unified. No accidental `.only`/`.skip` left in tests. Obsolete docs archived to `docs-archive/`.
+
+**Open candidates (none blocking)**:
+- Pin STYLE visual specs (V1.5 STYLE deferred from session 216)
+- Snap-to-existing-vertex during draw/edit (polish)
+- A11y keyboard-only walkthrough (explicitly deferred)
+- Map view preserve on reload (currently resets zoom — should fit-to-image instead)
+- Hotkeys grow: `Ctrl/Cmd+Backspace` delete, Tab nav in modals, conflict-modal hotkeys
+- Bundle audit (could check what's heavy in the 481 KB)
+
+**Major subsystems**: foundation + sync + map + zone all shipped and working. Phase 3.5 + zones era closed. No "phase brief" docs active.
+
+---
+
+## ZONE SUBSYSTEM STATE (handover snapshot, session 218 close — kept for reference)
 
 Quick-grasp doc for the next-chat me. The zone subsystem has been the spine of the last 6 sessions (213-218). Architecture is stable; the next batch is polish + cross-cutting concerns.
 
@@ -74,6 +90,137 @@ Captain will re-paste the full list next chat. Themes that emerged:
 ### Sync/API smoke (Captain's tasks, still open)
 - Repair pre-migration server markers (manual: enter edit, nudge a marker, release).
 - Verify zoner cross-tool render of atlas-pushed zones.
+
+---
+
+## Session 220 (2026-05-17) — Tuneup pass: slug-prefix, hotkeys, scrub, e2e fixes
+
+**Headline**: Cross-cutting cleanup session. 532/532 vitest, 93/93 Playwright e2e all green. Bundle 481.29 KB JS / 135.07 KB gzipped. Significant doc + CSS hygiene.
+
+### Slug-prefix element filenames
+
+`<slug>--<uuid>.json` on disk for browsability. Single helper centralizes filename composition in `fs-utils.ts`; FsFolderStore gained a lazy-populated `fileIndex` cache (`id → {type, filename}`) so reads stay O(1) after warm-up. Double-hyphen separator unambiguous regardless of id shape (UUIDs OR test-fixture short ids like `char-1`). Rename-on-save in `writeElementAndRename` writes new file first then deletes old; crash window covered by `ensureIndexFor` dedupe (latest `local_updated_at` wins, losers removed on next open). Server-side rename via `applyServerRecord` flows through the same path so pulls renaming an element also rename the file. No legacy fallback (no data to preserve — fresh format only). 21 unit tests + 7 e2e tests; all 12 existing FS folder-store e2e tests still pass.
+
+### Hotkeys MVP
+
+New `src/core/hotkeys.ts` dispatcher with declarative binding table + context-aware predicates. Cross-platform (`mod` = Cmd on Mac, Ctrl elsewhere). Save-request decoupling via `atlas:save-request` CustomEvent — editors register a listener while open, dispatcher doesn't import editor modules. Bindings:
+- `Ctrl/Cmd+E` — new element (gated on active world, disabled in modal/text-input)
+- `Ctrl/Cmd+S` — save active editor (popover/inline name — both listen for save-request)
+- `Ctrl/Cmd+K` — focus elements search (auto-flips sidebar to elements mode)
+- `?` — open reference modal (disabled in text input so it doesn't hijack typing)
+
+Map-tab single-letter hotkeys (F/Z/L) wired in map-tab.ts keydown listener (scoped to the canvas container, not global — bare letters don't hijack typing). F fits bounds, Z toggles polygon draw, L toggles line draw.
+
+### Shortcuts reference unified
+
+`src/ui/shortcuts-content.ts` produces a single DOM tree used by BOTH the sidebar footer `?` icon popover AND the `?` keyboard reference modal. Auto-generates the keyboard section from `getInstalledBindings()` so adding to the dispatcher table surfaces it for free; merges with hardcoded gestures (Esc, Enter, Shift+click, right-click variants, drag-to-trash). Old "More shortcuts coming next session" footer dropped. Old `.atlas-hotkey-*` CSS (duplicate of `.atlas-shortcuts-*`) purged.
+
+### Lowercase-everywhere → sentence case
+
+Agent-driven scrub: 28 source files, ~250 user-visible strings touched. Acronyms preserved (API, PIN, ID, URL, JSON, UI, OnlyWorlds, Chrome, Atlas as product name, etc.). 7 `text-transform: lowercase;` CSS rules removed. The genesis-era "lowercase everywhere" convention is gone — standard sentence case is now the default.
+
+### Banned legacy classes + dead CSS purge
+
+New `tests/unit/legacy-classes-banned.test.ts` scans `src/**/*.{ts,css,html}` for `ow-input`, `ow-btn`, `ow-btn-primary`, `ow-btn-secondary`, `ow-btn-ghost` and fails the suite if any reintroduce. No new tooling — runs in the existing vitest run. Dead `.atlas-shell .ow-input/textarea/select` overrides + the unused `.ow-btn*` family deleted from atlas.css; -1.1 KB CSS.
+
+### Polish fixes
+
+- **Link-field pick icon always right-anchored**: dropped left-alignment for empty rows; muted opacity marks empty state without moving the affordance.
+- **Text-selection double-gate**: existing mouseup discriminator was missing some asymmetric drag cases; added a click-time check that bails when ANY non-empty selection touches `valueEl`.
+
+### Playwright stale-test fixes (14 → 0)
+
+Three classes of pre-existing bit-rot, all resolved:
+1. **Stale `data-action="create"` selectors** (phase5-maps): map-create-modal uses `data-action="submit"` (vs `create` in other create modals). Tests updated.
+2. **`.atlas-middle-header h2` world-name expectations** (phase2-ui, phase4-elements): post-activation routes to timeline, not welcome — the world name lives in the sidebar mode toggle's right-tab label. Assertions updated to `[data-action="mode-elements"] .atlas-mode-btn-label`.
+3. **`open-timeline` button missing post-activation** (phase6-polish): button only ever rendered on welcome panel. After world creation middle is already timeline. Tests rewritten to assert directly.
+4. **Sentence-case scrub fallout**: a handful of `toContainText('lowercase')` assertions broke when the underlying strings became "Sentence case". Converted to case-insensitive regex (`/.../i`).
+
+### Console.info noise demotion
+
+- `auto-pull-scheduler` tick "skipping" logs (no engine / hidden / busy / paused) → `console.debug`. Tick "firing pullNow" stays at info.
+- `applyServerRecord` post-write readback OK → `console.debug`. The DIFFERS branch stays at warn.
+
+### Docs hygiene
+
+Four transitional Phase 3 → Phase 3.5 → smoke docs moved to `docs-archive/`: `BOUT_I_SMOKE.md`, `BOUT_R_NEXT.md`, `BOUT_R_SMOKE.md`, `PHASE3.5_BRIEF.md`. Archive README documents what each was for. Atlas root is now: `DESIGN.md`, `DESIGN_MAPS.md`, `DESIGN_ZONES.md`, `PROGRESS.md`, `PORTED.md`, `SYNC_NOTES.md`, `README.md` — current, load-bearing only.
+
+### Files touched (high level)
+
+- New: `src/core/hotkeys.ts`, `src/ui/hotkey-reference-modal.ts`, `src/ui/shortcuts-content.ts`, 4 test files (slug unit + e2e, hotkeys unit, legacy-class ban)
+- Modified: `src/store/fs-utils.ts`, `folder-store-fs.ts`, `app.ts`, `field-edit-popover.ts`, `element-detail.ts`, `sidebar.ts`, `tabs/right/map-tab.ts`, ~25 user-visible TS files (scrub), `styles/atlas.css`, `sync/auto-pull-scheduler.ts`
+- Test files updated: phase2-ui, phase3-make-online, phase4-elements, phase5-maps, phase6-polish, make-online integration
+
+### Conventions added
+
+28. **Slug-prefix on-disk filenames** (`<slug>--<uuid>.json`) — `--` separator unambiguous because slugify collapses non-alphanumeric runs to a single `-`. Rename happens on element-name change; crash-dedupe in `ensureIndexFor`. File index is in-memory only.
+
+29. **Hotkey actions never import editor modules** — save-request fires a `atlas:save-request` CustomEvent; editors that have a save handler register a document-level listener while open and remove on close. Lets any future editor opt in with one line, no central registry to maintain.
+
+30. **Sentence case for user-visible strings, acronyms preserved** — the genesis-era lowercase convention is replaced. New code adds `Capital first letter`, leaves `API` / `ID` / `URL` / `PIN` / `JSON` / `UI` / `OnlyWorlds` etc. alone. `humanizeFieldName` already handles labels via the ACRONYMS set; new prose should match the same shape manually.
+
+### Pokeable for next smoke
+
+1. Slug-prefix: create element named "Alice" → check disk file is `alice--<uuid>.json` (case-folded). Rename to "Aliyah" → file becomes `aliyah--<uuid>.json`, old gone.
+2. Hotkeys: `Ctrl/Cmd+E` opens element create (when a world is active). `?` opens reference modal. `Ctrl/Cmd+K` focuses search. `Ctrl/Cmd+S` saves an open field popover or inline name input.
+3. Sidebar `?` icon popover: lists Global / Sidebar / Editor / Map / Mouse sections, no "coming next session" footer.
+4. Map-tab keys: focus the canvas, press F (fits to image), Z (start polygon draw / cancel), L (start line draw / cancel).
+5. Text selection in any field value (LTR or RTL drag): popover does NOT open, your highlight survives.
+6. Link-field pick icon: appears anchored right on empty link rows too (muted color).
+7. Modal text everywhere: sentence case, acronyms ALL-CAPS, no lowercase-forcing CSS.
+
+### Known not-yet-shipped
+
+- Pin STYLE variants (V1.5 STYLE) — needs visual specs. (Still standing from session 218.)
+- Snap-to-existing-vertex during draw/edit — polish. (Still standing.)
+- A11y keyboard-only walkthrough through major modals — Captain explicitly deferred.
+- Map view preserve on reload — not addressed this session.
+- Visual settings popover wiring audit (pin shape, pin color, zone opacity, zone labels live-respond) — still standing from session 218 inventory.
+- Make-online modal walkthrough — 5 visual items Captain flagged in session 219 modal audit; he confirmed they look fine.
+- `Ctrl/Cmd+Backspace` (delete element), Tab nav in modals, conflict-modal hotkeys — full kit from hotkeys proposal still has these deferred.
+
+### Process notes
+
+- The lowercase scrub ran in parallel with Playwright e2e fixes — initially caused detached-element errors because vite HMR was firing during test runs. Lesson: file-edit agents and e2e tests don't mix unless the dev server is paused. Sequenced the work (agent first, then e2e) to get clean signal.
+- Used a vitest-based "ban list" test instead of pulling eslint into the project. Saves a dep + works in the existing CI surface. Convention worth carrying — any "never reintroduce this string" check fits the same pattern.
+
+---
+
+## Session 219 (2026-05-17) — Polish wave: 18 commits, 6 smoke waves
+
+**Headline**: Captain dropped a 17-item polish list before going out for the day. 8 autonomous bouts (A-H) then 6 waves of iterative smoke fixes when he returned. 478 tests green every commit. Atlas significantly tighter on zone editing, pin styling, modal consistency, and a handful of small bug surfaces.
+
+### Autonomous bouts (A-H, before Captain returned)
+
+Mechanical fixes: refresh-fit (zoom-to-image on reload), grid spacing (5→10→25→50→100 multi-step), zone opacity + zone label rendering, save-as-default rule (does NOT propagate to maps with per-map overrides), link icon always-shown, cursor saga round 3 closed (compound selectors — `.atlas-map-canvas-container .leaflet-grab` is descendant not compound; SAME element needs the chain form), pin style + tint full wiring, text-selection bug fix + 3-mode field-edit setting, visual settings popover docked at midpanel right edge via fixed positioning + ResizeObserver, modal audit + `ow-` → `atlas-` class unification across all 10 modals, compound icon buttons for `+ new X` actions, three deliverable design docs (slug-prefix brief, hotkeys proposal, modals audit).
+
+### Smoke-driven waves (1-6, after Captain returned)
+
+**Wave 1 — `dashArray` canvas renderer fix**: Leaflet's `L.canvas()` default renderer doesn't reliably stroke dashed polygons. Forced `L.svg()` explicitly for the zone-create-mode preview. The new SVG renderer is exported as `getZoneSvgRendererForMap(map)` so segment overlays + edit-mode handles can share the same SVG context (critical for the wave 5/6 bringToFront fix).
+
+**Wave 2 — Zone edit data integrity**: Three coupled fixes. (a) Right-click during zone-edit no longer triggers the map context-menu (added `L.DomEvent.stopPropagation`). (b) Dragend race guard — if a marker drag's commit fires after the engine has exited edit mode, the commit no-ops cleanly. (c) Edit-mode autosave + refresh-revert: enter edit → snapshot persisted to localStorage; recovery sweep on world activation replays the 3-way diff revert if the user reloaded mid-edit.
+
+**Wave 3 — Pin shape iconAnchor + `?` shortcuts popover + zone hover-labels + (default) pill**: Pin variants (icon / round-icon / pin-shape) finally render correctly per the iconAnchor math. Help button + popover in the sidebar footer. Zone label-visible "hover" mode wired (fade in on canvas hover). "(default)" pill marker on settings rows whose value matches the global default.
+
+**Wave 4 — Edit-mode snappiness via rAF batching + optimistic insert**: Drag handlers fire on every mousemove; non-trivial work in the handler delays the next paint. Refactor: handler sets a dirty flag (O(1)) and schedules rAF idempotently. rAF callback reads positions + applies updates. Marker's CSS transform commits to paint immediately; the live SVG path catches up one frame later (invisible at 60Hz). Marker insertion is now optimistic — mint client UUID, patch state synchronously, run FS writes in background, revert via re-prime on failure. UI snaps instantly.
+
+**Wave 5 — Drag lerp single CSS line fix**: After waves of rAF batching, the marker STILL trailed cursor. Root cause: a single CSS line — `transition: ... transform 120ms ease` on `.atlas-zone-edit-handle`. Leaflet's L.Draggable sets `transform: translate3d(...)` on every mousemove; the transition was animating each translate over 120ms. Marker was literally lerping. The fix was one CSS-line deletion. Empirical inspection > cascade reasoning.
+
+**Wave 6 — Cross-renderer hit testing**: `bringToFront()` only reorders within a single renderer's DOM element. Segments used the default canvas renderer while the zone polygon used a forced SVG renderer (from wave 1). Two different DOM elements in `overlayPane` → bringToFront couldn't move across them. Solution: export ZoneOverlay's renderer, reuse for segments, now they share one `<svg>`.
+
+### Files touched
+
+Many. The big-ticket ones: `src/styles/atlas.css` (~25 places — popover docking, pin/zone styling, transitions), `src/middle/element-detail.ts` (inline-name editor, text-selection gates, field-edit-mode setting consumer), `src/middle/settings-panel.ts` (Editing tab, "default" pills, audit tab content), `src/tabs/right/map-tab.ts` + `map-tab-zones.ts` + `zone-edit-mode.ts` + `zone-drawing.ts` (most of the wave fixes), `src/ui/map-visual-settings-popover.ts` (docking), `src/ui/zone-create-modal.ts` (shape badge + cleaner inputs), `src/sidebar/sidebar.ts` (footer help button), modal audit touched every modal file (legacy class purge).
+
+### Pokeable for next smoke
+
+(Already smoked live by Captain during this session — all 17 items verified working.)
+
+### Process notes
+
+- Four CSS/Leaflet "reasoning surprise" finds across the session — promoted to craft.md as a category. The pattern: my reasoning about cascade / hit-testing / draggable internals was technically correct but missed the actual mechanism. Empirical inspection (DOM, computed styles, where renderer paths live) would have caught each one in two minutes. When CSS or Leaflet behavior surprises, FIRST move = inspect, not reason.
+- Per-bout commits paid off in waves 5-6 specifically: the bringToFront-only attempt didn't work, but it was a discrete commit; rolling it back would have been messier if bundled.
+- `optimisticInsertMarker` is a generalizable pattern for FS-Access-backed apps where writes are slow but UI should feel instant. Mint id, patch state sync, write background, revert on failure via re-prime.
 
 ---
 

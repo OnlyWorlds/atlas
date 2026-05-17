@@ -35,7 +35,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       <span class="material-symbols-outlined">timeline</span>
       <h2>Timeline</h2>
       <div style="flex:1 1 auto"></div>
-      <button class="atlas-btn-ghost" data-action="new-event" title="create a new event">+ Event</button>
+      <button class="atlas-btn-ghost" data-action="new-event" title="Create a new event">+ Event</button>
     `;
     header.querySelector<HTMLButtonElement>('[data-action="new-event"]')!.addEventListener('click', () => {
       new ElementCreateModal(toasts, { initialType: 'event' }).open();
@@ -103,9 +103,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       empty.className = 'atlas-timeline-empty';
       empty.innerHTML = `
         <span class="material-symbols-outlined">timeline</span>
-        <div style="font-size:13px">no events yet</div>
+        <div style="font-size:13px">No events yet</div>
         <div style="font-size:11px;color:var(--atlas-text-dim);max-width:280px;text-align:center;">
-          click <b style="color:var(--atlas-text-soft)">+ event</b> above to start building your world's history.
+          Click <b style="color:var(--atlas-text-soft)">+ Event</b> above to start building your world's history.
         </div>
       `;
       axis.appendChild(empty);

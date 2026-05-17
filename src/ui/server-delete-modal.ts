@@ -29,7 +29,7 @@ export class ServerDeleteReviewModal extends BaseModal {
   async open(): Promise<void> {
     const engine = getCurrentSyncEngine();
     if (!engine) {
-      this.toasts.error('engine not ready');
+      this.toasts.error('Engine not ready');
       return;
     }
     try {
@@ -39,7 +39,7 @@ export class ServerDeleteReviewModal extends BaseModal {
       return;
     }
     if (this.records.length === 0) {
-      this.toasts.info('no server-side deletes to review');
+      this.toasts.info('No server-side deletes to review');
       return;
     }
 
@@ -50,7 +50,7 @@ export class ServerDeleteReviewModal extends BaseModal {
     });
     const hint = document.createElement('p');
     hint.className = 'atlas-conflict-hint';
-    hint.textContent = 'these elements were deleted on the server (web app, another atlas, etc.). pick what to do with each.';
+    hint.textContent = 'These elements were deleted on the server (web app, another atlas, etc.). Pick what to do with each.';
     body.appendChild(hint);
 
     body.appendChild(this.renderList());
@@ -76,11 +76,11 @@ export class ServerDeleteReviewModal extends BaseModal {
       <div class="atlas-conflict-row-meta">
         <span class="atlas-conflict-type">${escapeText(r.type)}</span>
         <span class="atlas-conflict-name">${escapeText(r.name ?? '(unnamed)')}</span>
-        <span class="atlas-conflict-fields">vanished from the server</span>
+        <span class="atlas-conflict-fields">Vanished from the server</span>
       </div>
       <div class="atlas-conflict-row-actions">
-        <button class="atlas-btn-ghost" data-action="delete-locally" title="remove this from local; matches the server">delete locally</button>
-        <button class="atlas-btn-ghost" data-action="keep" title="keep locally; next push re-creates on server">keep + re-push</button>
+        <button class="atlas-btn-ghost" data-action="delete-locally" title="Remove this from local; matches the server">Delete locally</button>
+        <button class="atlas-btn-ghost" data-action="keep" title="Keep locally; next push re-creates on server">Keep + re-push</button>
       </div>
     `;
     row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
@@ -89,7 +89,7 @@ export class ServerDeleteReviewModal extends BaseModal {
         row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = true));
         try {
           const engine = getCurrentSyncEngine();
-          if (!engine) throw new Error('engine not ready');
+          if (!engine) throw new Error('Engine not ready');
           await engine.resolveServerDelete(r.id, action);
           row.remove();
           this.records = this.records.filter((x) => x.id !== r.id);
@@ -119,7 +119,7 @@ export class ServerDeleteReviewModal extends BaseModal {
             }
           }
           if (this.records.length === 0) {
-            this.toasts.success('all server-side deletes resolved');
+            this.toasts.success('All server-side deletes resolved');
             this.hide();
           }
         } catch (err) {
@@ -137,7 +137,7 @@ export class ServerDeleteReviewModal extends BaseModal {
     const close = document.createElement('button');
     close.className = 'atlas-btn-ghost';
     close.dataset.action = 'close';
-    close.textContent = 'review later';
+    close.textContent = 'Review later';
     close.addEventListener('click', () => this.hide());
     footer.appendChild(close);
     return footer;

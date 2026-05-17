@@ -104,13 +104,13 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const el = getSelectedElement();
 
     if (!state.active) {
-      target.innerHTML = `<div class="atlas-pane-empty">no active world.</div>`;
+      target.innerHTML = `<div class="atlas-pane-empty">No active world.</div>`;
       return;
     }
     if (!el) {
       const msg = route.elementId
-        ? `element <code>${escapeText(route.elementId)}</code> not found in this world.`
-        : 'no element selected. pick one from the <b>elements</b> sidebar.';
+        ? `Element <code>${escapeText(route.elementId)}</code> not found in this world.`
+        : 'No element selected. Pick one from the <b>elements</b> sidebar.';
       target.innerHTML = `<div class="atlas-pane-empty">${msg}</div>`;
       return;
     }
@@ -181,7 +181,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     input.type = 'text';
     input.className = 'atlas-element-name-input';
     input.value = original;
-    input.setAttribute('aria-label', 'rename');
+    input.setAttribute('aria-label', 'Rename');
 
     host.innerHTML = '';
     host.appendChild(input);
@@ -207,7 +207,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const store = getActiveStore();
       if (!store) {
         host.textContent = original || '(unnamed)';
-        toastManager.error('cannot rename — no active world');
+        toastManager.error('Cannot rename — no active world');
         return;
       }
       try {
@@ -221,7 +221,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       } catch (err) {
         console.error('[element-detail] inline rename failed:', err);
         host.textContent = original || '(unnamed)';
-        toastManager.error('failed to rename');
+        toastManager.error('Failed to rename');
       }
     };
 
@@ -300,7 +300,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     title.dataset.role = 'element-name';
     title.className = 'atlas-element-name';
     title.textContent = el.name || '(unnamed)';
-    title.title = 'click to rename';
+    title.title = 'Click to rename';
     title.tabIndex = 0;
     title.addEventListener('click', () => startInlineNameEdit(title, el));
     title.addEventListener('keydown', (e) => {
@@ -340,7 +340,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     delBtn.type = 'button';
     delBtn.className = 'atlas-icon-btn-sm danger';
     delBtn.setAttribute('data-action', 'delete-element');
-    delBtn.title = 'delete element';
+    delBtn.title = 'Delete element';
     delBtn.innerHTML = '<span class="material-symbols-outlined">delete</span>';
     delBtn.addEventListener('click', () => onDelete(el));
     header.appendChild(delBtn);
@@ -439,7 +439,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       addMapBtn.type = 'button';
       addMapBtn.className = 'atlas-icon-btn-sm atlas-header-add-glyph';
       addMapBtn.setAttribute('data-action', 'add-map');
-      addMapBtn.title = `create a new map of ${el.name || 'this location'}`;
+      addMapBtn.title = `Create a new map of ${el.name || 'this location'}`;
       // Two-glyph composition reads as "add map" — small + plus the action
       // glyph. Same shape as [+pin]; the two read as a coherent pair.
       addMapBtn.innerHTML =
@@ -468,7 +468,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       pinBtn.type = 'button';
       pinBtn.className = 'atlas-icon-btn-sm atlas-header-add-glyph' + (placing ? ' active' : '');
       pinBtn.setAttribute('data-action', 'pin-element');
-      pinBtn.title = placing ? 'cancel pin placement' : 'place pin on active map';
+      pinBtn.title = placing ? 'Cancel pin placement' : 'Place pin on active map';
       // Two-glyph composition matches `[+map]` — small `add` + the action
       // glyph (push_pin). Reads "+pin" at a glance, parallel to "+map".
       pinBtn.innerHTML =
@@ -480,7 +480,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
           patchSlice('ui', { ...getState().ui, pinPlacement: null });
         } else {
           patchSlice('ui', { ...getState().ui, pinPlacement: { elementId: el.id } });
-          toastManager.info('click on the map to place the pin');
+          toastManager.info('Click on the map to place the pin');
         }
       });
       createCluster.appendChild(pinBtn);
@@ -629,7 +629,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     btn.setAttribute('data-action', 'open-self-map');
     const hasImage = !!(m.image_url || m.image_media_id);
     if (hasImage) btn.classList.add('atlas-map-tree-icon-has-image');
-    btn.title = 'open this map in the right pane';
+    btn.title = 'Open this map in the right pane';
     btn.innerHTML = '<span class="material-symbols-outlined">map</span>';
     btn.addEventListener('click', () => openMapTab(m));
     cluster.appendChild(btn);
@@ -650,7 +650,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const hasImage = !!(m.image_url || m.image_media_id);
     if (hasImage) btn.classList.add('atlas-map-tree-icon-has-image');
     const titleSuffix = panToZoneId ? ' (will pan to zone)' : '';
-    btn.title = `open map: ${m.name || '(untitled)'}${titleSuffix}`;
+    btn.title = `Open map: ${m.name || '(untitled)'}${titleSuffix}`;
     const iconHtml = '<span class="material-symbols-outlined">map</span>';
     if (showName) {
       btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(m.name || '(untitled)')}</span>`;
@@ -703,7 +703,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     btn.setAttribute('data-pin-id', pin.id);
     // Surface the right-click affordance in the tooltip — symmetric with
     // the drag-to-trash on the map canvas and the right-click-ghost prune.
-    btn.title = `pin on ${mapName} — click to open and center, right-click to delete pin`;
+    btn.title = `Pin on ${mapName} — click to open and center, right-click to delete pin`;
     const iconHtml = '<span class="material-symbols-outlined">push_pin</span>';
     if (showMapName) {
       btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(mapName)}</span>`;
@@ -957,7 +957,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     pickBtn.type = 'button';
     pickBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
     if (!raw) pickBtn.classList.add('atlas-link-pick-empty');
-    pickBtn.title = raw ? 'change link' : `pick a ${meta.target ?? 'link'}`;
+    pickBtn.title = raw ? 'Change link' : `Pick a ${meta.target ?? 'link'}`;
     // ALWAYS show the type-specific icon so users see at a glance what kind of
     // element this field links to — even before any link exists. Empty state
     // still uses the `atlas-link-pick-empty` class for muted styling (was a
@@ -973,7 +973,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const picked = await pickElement({
         restrictToType: meta.target,
         excludeIds: [...exclude],
-        title: `pick a ${meta.target ?? 'link'} for ${humanizeFieldName(meta.name)}`,
+        title: `Pick a ${meta.target ?? 'link'} for ${humanizeFieldName(meta.name)}`,
       });
       if (!picked) return;
       await persistFieldPatch(el, meta.name, picked.id);
@@ -1001,7 +1001,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     addBtn.type = 'button';
     addBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
     if (ids.length === 0) addBtn.classList.add('atlas-link-pick-empty');
-    addBtn.title = ids.length === 0 ? `pick a ${meta.target ?? 'link'}` : `add another ${meta.target ?? 'link'}`;
+    addBtn.title = ids.length === 0 ? `Pick a ${meta.target ?? 'link'}` : `Add another ${meta.target ?? 'link'}`;
     // Always show the type-specific icon so users see WHICH category this
     // multi-link field targets at a glance. `margin-left: auto` keeps the
     // button anchored right past any existing chips.
@@ -1013,7 +1013,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const picked = await pickElement({
         restrictToType: meta.target,
         excludeIds: [el.id, ...ids],
-        title: `add a ${meta.target ?? 'link'} to ${humanizeFieldName(meta.name)}`,
+        title: `Add a ${meta.target ?? 'link'} to ${humanizeFieldName(meta.name)}`,
       });
       if (!picked) return;
       const next = [...ids, picked.id];
@@ -1034,7 +1034,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       chip.title = `${linked.type} · id ${id}`;
     } else {
       name.textContent = id;
-      chip.title = `unresolved id (target type: ${meta.target ?? 'unknown'})`;
+      chip.title = `Unresolved ID (target type: ${meta.target ?? 'unknown'})`;
     }
     chip.appendChild(name);
 
@@ -1132,7 +1132,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const meta = document.createElement('div');
     meta.className = 'atlas-detail-meta';
     const updated = el.local_updated_at ? new Date(el.local_updated_at).toLocaleString() : '—';
-    const synced = el.server_updated_at ? new Date(el.server_updated_at).toLocaleString() : 'not synced';
+    const synced = el.server_updated_at ? new Date(el.server_updated_at).toLocaleString() : 'Not synced';
     meta.innerHTML = `
       <div>ID: <code>${escapeText(el.id)}</code></div>
       <div>Updated locally: ${escapeText(updated)}</div>
@@ -1146,7 +1146,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
   async function persistFieldPatch(el: Element, fieldName: string, nextValue: unknown): Promise<void> {
     const store = getActiveStore();
     if (!store) {
-      toastManager.error('no active store');
+      toastManager.error('No active store');
       return;
     }
     try {
@@ -1188,7 +1188,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const elements = await store.listElements();
       patchSlice('data', { elements });
       requestPushIfLinked();
-      toastManager.info(`map dimensions updated to ${dims.w}×${dims.h}`);
+      toastManager.info(`Map dimensions updated to ${dims.w}×${dims.h}`);
     } catch (err) {
       console.error('[element-detail] map dim auto-update failed:', err);
     }
@@ -1202,8 +1202,8 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const dependents = await store.findDependents(el.id);
       dependentCount = dependents.length;
     } catch { /* fall through with 0 */ }
-    const extra = dependentCount > 0 ? ` this will also remove ${dependentCount} dependent element${dependentCount === 1 ? '' : 's'}.` : '';
-    const ok = window.confirm(`delete "${el.name || el.id}"?${extra}`);
+    const extra = dependentCount > 0 ? ` This will also remove ${dependentCount} dependent element${dependentCount === 1 ? '' : 's'}.` : '';
+    const ok = window.confirm(`Delete "${el.name || el.id}"?${extra}`);
     if (!ok) return;
     try {
       await store.deleteElement(el.id);
@@ -1212,7 +1212,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       patchSlice('ui', { ...getState().ui, selectedElementId: null });
       // Local delete + tombstones written — schedule a push to DELETE on server.
       requestPushIfLinked();
-      toastManager.success(`deleted ${el.name || 'element'}`);
+      toastManager.success(`Deleted ${el.name || 'element'}`);
       const worldId = getState().active?.worldId;
       if (worldId) navigate(elementsHash(worldId));
     } catch (err) {

@@ -128,7 +128,8 @@ test('create local world inside atlas root → sidebar + welcome + URL', async (
   const row = page.locator('.atlas-row[data-world-id]', { hasText: 'My First World' });
   await expect(row).toBeVisible();
   await expect(row).toHaveClass(/selected/);
-  await expect(page.locator('.atlas-middle-header h2')).toContainText('My First World');
+  // Active world shows in the sidebar mode toggle's right tab label.
+  await expect(page.locator('[data-action="mode-elements"] .atlas-mode-btn-label')).toContainText('My First World');
 
   const hash = await page.evaluate(() => window.location.hash);
   expect(hash).toMatch(/^#\/w\/[0-9a-f-]+$/);
@@ -282,7 +283,7 @@ test('reload → atlas root + world both persist, click re-activates', async ({ 
   // Toggle back to worlds mode to confirm which world is now selected.
   await page.click('[data-action="mode-worlds"]');
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Persistent' })).toHaveClass(/selected/);
-  await expect(page.locator('.atlas-middle-header h2')).toContainText('Persistent');
+  await expect(page.locator('[data-action="mode-elements"] .atlas-mode-btn-label')).toContainText('Persistent');
 });
 
 test('reload with world in URL hash → silent auto-activate preserves state', async ({ page }) => {
@@ -305,8 +306,8 @@ test('reload with world in URL hash → silent auto-activate preserves state', a
   // OPFS handles auto-grant permission, so silent auto-activate succeeds.
   // The world should show as active in the sidebar without any click.
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'AutoOpen' })).toHaveClass(/selected/);
-  // And the middle pane reflects the active world.
-  await expect(page.locator('.atlas-middle-header h2')).toContainText('AutoOpen');
+  // Sidebar mode toggle reflects the active world via its right-tab label.
+  await expect(page.locator('[data-action="mode-elements"] .atlas-mode-btn-label')).toContainText('AutoOpen');
 });
 
 test('forget world removes it from sidebar + nav to root, atlas root preserved', async ({ page }) => {
@@ -358,10 +359,10 @@ test('settings gear opens panel without an active world', async ({ page }) => {
   // settings panel and let the user set up an atlas folder.
   await page.click('[data-action="open-settings"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
-  await expect(page.locator('.atlas-settings h2')).toContainText('settings');
+  await expect(page.locator('.atlas-settings h2')).toContainText(/settings/i);
   // Click the atlas tab to verify the "not set up" prompt is in there.
   await page.click('[data-settings-tab="atlas"]');
-  await expect(page.locator('.atlas-settings')).toContainText('not set up yet');
+  await expect(page.locator('.atlas-settings')).toContainText(/not set up yet/i);
   await expect(page.locator('[data-action="change-atlas-root"]')).toBeVisible();
   // URL hash uses the standalone settings route (with tab segment).
   const hash = await page.evaluate(() => window.location.hash);

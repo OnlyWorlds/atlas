@@ -46,25 +46,25 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // full action surfaced in the tooltip. Matches the [+map] / [+pin]
       // pattern in element-detail headers for visual coherence.
       header.innerHTML = `
-        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="create-local" title="new local world (in your atlas folder)">
+        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="create-local" title="New local world (in your atlas folder)">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
         </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="new-api" title="new api world (creates on onlyworlds.com AND locally)">
+        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="new-api" title="New API world (creates on onlyworlds.com AND locally)">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">cloud_upload</span>
         </button>
-        <button class="atlas-create-icon-btn" data-action="link-api" title="link existing api world (downloads into atlas)">
+        <button class="atlas-create-icon-btn" data-action="link-api" title="Link existing API world (downloads into atlas)">
           <span class="material-symbols-outlined">link</span>
         </button>
       `;
     } else if (recoverable) {
       header.innerHTML = `
-        <button class="atlas-btn-ghost" data-action="recover-atlas" title="re-grant access to your existing atlas folder (${escapeAttr(recoverable.folderName)}) and rebuild the world list from disk">↻ Recover atlas folder</button>
+        <button class="atlas-btn-ghost" data-action="recover-atlas" title="Re-grant access to your existing atlas folder (${escapeAttr(recoverable.folderName)}) and rebuild the world list from disk">↻ Recover atlas folder</button>
       `;
     } else {
       header.innerHTML = `
-        <button class="atlas-btn-ghost" data-action="setup-atlas" title="pick the folder atlas will use for all your worlds">+ Set up atlas</button>
+        <button class="atlas-btn-ghost" data-action="setup-atlas" title="Pick the folder atlas will use for all your worlds">+ Set up atlas</button>
       `;
     }
     const createBtn = header.querySelector<HTMLButtonElement>('[data-action="create-local"]');
@@ -85,8 +85,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         if (result) {
           toasts.success(
             result.imported > 0
-              ? `atlas folder set up — found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
-              : 'atlas folder is set up'
+              ? `Atlas folder set up — found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
+              : 'Atlas folder is set up'
           );
         }
       } catch (err) {
@@ -103,8 +103,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         if (result) {
           toasts.success(
             result.imported > 0
-              ? `recovered atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
-              : 'recovered atlas folder (no worlds found inside)'
+              ? `Recovered atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
+              : 'Recovered atlas folder (no worlds found inside)'
           );
         }
       } catch (err) {
@@ -153,7 +153,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           else engine.resume();
         }
       }
-      toasts.info(!entry.sync_paused ? 'stayed offline' : 'sync resumed');
+      toasts.info(!entry.sync_paused ? 'Stayed offline' : 'Sync resumed');
       return;
     }
     const refreshBtn = target.closest<HTMLElement>('[data-role="refresh-world"]');
@@ -167,9 +167,9 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       }
       try {
         const result = await pullNowAndRefresh();
-        if (!result) { toasts.info('engine not ready'); return; }
+        if (!result) { toasts.info('Engine not ready'); return; }
         const total = result.pulled.creates + result.pulled.updates;
-        toasts.success(total === 0 ? 'already up to date' : `pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
+        toasts.success(total === 0 ? 'Already up to date' : `Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
       } catch (err) {
         toasts.error(err instanceof Error ? err.message : String(err));
       }
@@ -227,7 +227,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
     ? (isPaused ? 'cloud_off' : 'cloud')
     : 'folder';
   const stateChip = world.state === 'api-linked'
-    ? '<span class="atlas-world-state-chip api-linked">api</span>'
+    ? '<span class="atlas-world-state-chip api-linked">API</span>'
     : '';
   const favIcon = world.favorite ? 'star' : 'star_border';
   const favCls = world.favorite ? 'is-fav' : '';
@@ -235,10 +235,10 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   // Hover-reveal sync controls only for api-linked worlds.
   const syncActions = world.state === 'api-linked'
     ? `
-        <button type="button" class="atlas-icon-btn-sm sync-action-btn ${world.sync_paused ? 'is-paused' : ''}" data-role="toggle-paused" data-world-id="${escapeAttr(world.id)}" title="${world.sync_paused ? 'resume sync' : 'stay offline'}">
+        <button type="button" class="atlas-icon-btn-sm sync-action-btn ${world.sync_paused ? 'is-paused' : ''}" data-role="toggle-paused" data-world-id="${escapeAttr(world.id)}" title="${world.sync_paused ? 'Resume sync' : 'Stay offline'}">
           <span class="material-symbols-outlined">${world.sync_paused ? 'play_arrow' : 'pause'}</span>
         </button>
-        <button type="button" class="atlas-icon-btn-sm sync-action-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="refresh from api">
+        <button type="button" class="atlas-icon-btn-sm sync-action-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="Refresh from API">
           <span class="material-symbols-outlined">refresh</span>
         </button>`
     : '';
@@ -248,7 +248,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
       <span class="atlas-row-main">${escapeText(world.name)}</span>
       ${stateChip}
       <span class="atlas-inline-actions">${syncActions}
-        <button type="button" class="atlas-icon-btn-sm fav-btn ${favCls}" data-role="fav-toggle" data-world-id="${escapeAttr(world.id)}" title="${world.favorite ? 'unfavorite' : 'favorite'}">
+        <button type="button" class="atlas-icon-btn-sm fav-btn ${favCls}" data-role="fav-toggle" data-world-id="${escapeAttr(world.id)}" title="${world.favorite ? 'Unfavorite' : 'Favorite'}">
           <span class="material-symbols-outlined">${favIcon}</span>
         </button>
       </span>
@@ -292,7 +292,7 @@ export async function activateWorld(
   const state = getState();
   const entry = state.registry.worlds.find(w => w.id === worldId);
   if (!entry) {
-    if (!silent) toasts.error(`world ${worldId} not found in registry`);
+    if (!silent) toasts.error(`World ${worldId} not found in registry`);
     return false;
   }
   // Already active? Click should still "open" — switch to the right-tab view
@@ -353,7 +353,7 @@ export async function activateWorld(
 
   const handle = await loadHandle(entry.folder.handle_key);
   if (!handle) {
-    if (!silent) toasts.error(`folder handle missing for ${entry.name}. delete + recreate to recover.`);
+    if (!silent) toasts.error(`Folder handle missing for ${entry.name}. Delete + recreate to recover.`);
     if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
     return false;
   }
@@ -361,7 +361,7 @@ export async function activateWorld(
     ? await queryWritable(handle)
     : await ensureWritable(handle);
   if (!granted) {
-    if (!silent) toasts.error(`folder permission denied for ${entry.name}`);
+    if (!silent) toasts.error(`Folder permission denied for ${entry.name}`);
     if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
     return false;
   }
@@ -390,7 +390,7 @@ export async function activateWorld(
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }
-    if (!silent) toasts.error(`failed to open ${entry.name}: ${err instanceof Error ? err.message : String(err)}`);
+    if (!silent) toasts.error(`Failed to open ${entry.name}: ${err instanceof Error ? err.message : String(err)}`);
     if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
     return false;
   }

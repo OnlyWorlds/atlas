@@ -129,7 +129,7 @@ export function startDrawing(entry: MapTabCacheEntry, mode: DrawMode, toasts: To
   const state = getState();
   const map = state.data.elements.find(e => e.type === 'map' && e.id === entry.mapId);
   if (!map || (!(map as { image_url?: string }).image_url && !(map as { image_media_id?: string }).image_media_id)) {
-    toasts.info('set a map image first — zones anchor to the image');
+    toasts.info('Set a map image first — zones anchor to the image');
     return;
   }
 
@@ -236,7 +236,7 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
   const draft = active;
   const min = draft.mode === 'polygon' ? 3 : 2;
   if (draft.points.length < min) {
-    draft.toasts.info(`${draft.mode} needs at least ${min} markers`);
+    draft.toasts.info(`${draft.mode.charAt(0).toUpperCase()}${draft.mode.slice(1)} needs at least ${min} markers`);
     return;
   }
 
@@ -246,7 +246,7 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
   // `atlas_shape` extension field (ZD6). OW's `supertype` is now free
   // user-meaningful taxonomy text instead of being misused for shape.
   const zones = (getState().data.elements.filter(e => e.type === 'zone') as Zone[]);
-  const baseName = draft.mode === 'polygon' ? 'new zone' : 'new line';
+  const baseName = draft.mode === 'polygon' ? 'New zone' : 'New line';
   const defaultName = findUniqueZoneName(baseName, zones);
   const values = await openZoneCreateModal({
     shape: draft.mode,
@@ -260,7 +260,7 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
 
   const store = getActiveStore();
   if (!store) {
-    draft.toasts.error('no active world store — cannot save zone');
+    draft.toasts.error('No active world store — cannot save zone');
     return;
   }
 
@@ -292,7 +292,7 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
     patchSlice('data', { elements });
     requestPushIfLinked();
 
-    draft.toasts.success(`${draft.mode} created: ${values.name}`);
+    draft.toasts.success(`${draft.mode.charAt(0).toUpperCase()}${draft.mode.slice(1)} created: ${values.name}`);
 
     // 4. Select the new zone + navigate to its element-detail. No inline
     // rename prompt — modal already captured the name.
@@ -303,7 +303,7 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
     }
   } catch (err) {
     console.error('[zone-drawing] finish failed:', err);
-    draft.toasts.error(`failed to save ${draft.mode}`);
+    draft.toasts.error(`Failed to save ${draft.mode}`);
     return; // keep draft active so user can retry
   }
 

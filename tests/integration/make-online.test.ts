@@ -74,9 +74,9 @@ describe('createApiWorld (Route 1)', () => {
   });
 
   it('throws when required fields are missing', async () => {
-    await expect(createApiWorld({ name: '', email: 'a@b.c', pin: '1' })).rejects.toThrow('name');
-    await expect(createApiWorld({ name: 'X', email: '', pin: '1' })).rejects.toThrow('email');
-    await expect(createApiWorld({ name: 'X', email: 'a@b.c', pin: '' })).rejects.toThrow('pin');
+    await expect(createApiWorld({ name: '', email: 'a@b.c', pin: '1' })).rejects.toThrow(/name/i);
+    await expect(createApiWorld({ name: 'X', email: '', pin: '1' })).rejects.toThrow(/email/i);
+    await expect(createApiWorld({ name: 'X', email: 'a@b.c', pin: '' })).rejects.toThrow(/pin/i);
     expect(serverState.worldCreations).toHaveLength(0);
   });
 

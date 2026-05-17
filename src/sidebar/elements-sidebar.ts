@@ -48,7 +48,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   createBtn.type = 'button';
   createBtn.className = 'atlas-create-btn';
   createBtn.setAttribute('data-action', 'create-element');
-  createBtn.title = 'new element';
+  createBtn.title = 'New element';
   createBtn.innerHTML = '<span class="material-symbols-outlined">add</span>';
   createBtn.addEventListener('click', () => new ElementCreateModal(toasts).open());
   searchRow.appendChild(createBtn);
@@ -251,7 +251,7 @@ function renderElementRow(
   // hasMap is set only for Location rows that have at least one map anchored.
   // Renders a small cyan-tinted map glyph between the name and the type chip.
   const mapBadge = hasMap
-    ? `<span class="material-symbols-outlined atlas-elements-row-mapbadge" title="this location has at least one map">map</span>`
+    ? `<span class="material-symbols-outlined atlas-elements-row-mapbadge" title="This location has at least one map">map</span>`
     : '';
   // onActiveMap is set for any element with presence on the currently active
   // map (pin pointing at it, or zone with a marker on the map). Different
@@ -259,7 +259,7 @@ function renderElementRow(
   // says "this element is rendered on the map you're looking at right now."
   // Rendered just left of the type chip, anchored right.
   const onMapBadge = onActiveMap
-    ? `<span class="material-symbols-outlined atlas-elements-row-onmap-badge" title="this element is on the open map">place</span>`
+    ? `<span class="material-symbols-outlined atlas-elements-row-onmap-badge" title="This element is on the open map">place</span>`
     : '';
   // draggable=true on every row except maps and zones. Map elements appear
   // in the list but can't be pin targets (DESIGN_MAPS.md §1.4); zones can't

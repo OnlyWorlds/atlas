@@ -31,8 +31,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       root.innerHTML = `
         <header class="atlas-middle-header"><h2>Welcome back</h2></header>
         <div class="atlas-welcome-empty">
-          <p>atlas detected a previously-set-up folder on this device: <code>${escapeText(atlasRootRecoverable.folderName)}</code>.</p>
-          <p class="atlas-welcome-hint">your worlds are still on disk — click below to re-grant folder access and restore the world list. localStorage was cleared but the folder and your saved permission survived.</p>
+          <p>Atlas detected a previously-set-up folder on this device: <code>${escapeText(atlasRootRecoverable.folderName)}</code>.</p>
+          <p class="atlas-welcome-hint">Your worlds are still on disk — click below to re-grant folder access and restore the world list. localStorage was cleared but the folder and your saved permission survived.</p>
           <div class="atlas-welcome-actions">
             <button class="atlas-btn-primary" data-action="recover-atlas">Recover atlas folder</button>
           </div>
@@ -41,14 +41,14 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       const btn = root.querySelector<HTMLButtonElement>('[data-action="recover-atlas"]')!;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        btn.textContent = 'recovering…';
+        btn.textContent = 'Recovering…';
         try {
           const result = await recoverAtlasRoot();
           if (result) {
             toastManager.success(
               result.imported > 0
-                ? `recovered atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
-                : 'recovered atlas folder (no worlds found inside)'
+                ? `Recovered atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
+                : 'Recovered atlas folder (no worlds found inside)'
             );
           }
         } catch (err) {
@@ -66,8 +66,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       root.innerHTML = `
         <header class="atlas-middle-header"><h2>Welcome to Atlas</h2></header>
         <div class="atlas-welcome-empty">
-          <p>atlas keeps your worlds as folders on disk. one chosen folder holds all your worlds.</p>
-          <p class="atlas-welcome-hint">pick any folder — atlas will create an <code>onlyworlds-atlas/</code> subfolder inside it for your worlds. (if you pick a folder that's already an atlas root, atlas just re-uses it.)</p>
+          <p>Atlas keeps your worlds as folders on disk. One chosen folder holds all your worlds.</p>
+          <p class="atlas-welcome-hint">Pick any folder — atlas will create an <code>onlyworlds-atlas/</code> subfolder inside it for your worlds. (If you pick a folder that's already an atlas root, atlas just re-uses it.)</p>
           <div class="atlas-welcome-actions">
             <button class="atlas-btn-primary" data-action="setup-atlas">Set up atlas folder</button>
           </div>
@@ -76,14 +76,14 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       const btn = root.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]')!;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        btn.textContent = 'picking…';
+        btn.textContent = 'Picking…';
         try {
           const result = await setupAtlasRoot();
           if (result) {
             toastManager.success(
               result.imported > 0
-                ? `atlas folder set up — found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
-                : 'atlas folder is set up'
+                ? `Atlas folder set up — found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
+                : 'Atlas folder is set up'
             );
           }
         } catch (err) {
@@ -101,9 +101,9 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       root.innerHTML = `
         <header class="atlas-middle-header"><h2>Atlas</h2></header>
         <div class="atlas-welcome-empty">
-          <p>no world open.</p>
-          <p class="atlas-welcome-hint">use the sidebar to <strong>create local</strong>, or pick an existing world from the list.</p>
-          <p class="atlas-welcome-hint">atlas folder: <code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
+          <p>No world open.</p>
+          <p class="atlas-welcome-hint">Use the sidebar to <strong>Create local</strong>, or pick an existing world from the list.</p>
+          <p class="atlas-welcome-hint">Atlas folder: <code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
         </div>
       `;
       return;
@@ -124,7 +124,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     }
     root.innerHTML = `
       <header class="atlas-middle-header">
-        <h2>${escapeText(active.meta.name || 'untitled world')}</h2>
+        <h2>${escapeText(active.meta.name || 'Untitled world')}</h2>
       </header>
       <div class="atlas-welcome-body">
         <p>${counts.content} content element${counts.content === 1 ? '' : 's'},

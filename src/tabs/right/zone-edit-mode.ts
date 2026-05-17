@@ -275,7 +275,7 @@ export function enterEditMode(
 
   const entry = mapTabCache.get(mapId);
   if (!entry) {
-    toasts.error('cannot edit — map tab not open');
+    toasts.error('Cannot edit — map tab not open');
     return;
   }
   const lMap = entry.manager.getMap();
@@ -286,7 +286,7 @@ export function enterEditMode(
   const zoneMarkers = markersForZoneOnMap(zoneId, mapId, markers);
 
   if (zoneMarkers.length === 0) {
-    toasts.info('zone has no markers on this map');
+    toasts.info('Zone has no markers on this map');
     return;
   }
 
@@ -479,7 +479,7 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
       rebuildHandles(); // re-render so segment overlays follow the new position
     } catch (err) {
       console.error('[zone-edit] update marker failed:', err);
-      active?.toasts.error('failed to move marker');
+      active?.toasts.error('Failed to move marker');
       // Snap visual back by rebuilding from current (unchanged) state.
       rebuildHandles();
     }
@@ -593,7 +593,7 @@ function buildCentroidHandle(center: Point, canvasHeight: number): L.Marker {
       rebuildHandles();
     } catch (err) {
       console.error('[zone-edit] centroid drag commit failed:', err);
-      session.toasts.error('failed to move zone');
+      session.toasts.error('Failed to move zone');
       rebuildHandles();
     }
   });
@@ -765,7 +765,7 @@ async function optimisticInsertMarker(args: {
     rebuildHandles();
   } catch (err) {
     console.error('[zone-edit] optimistic insert background-write failed:', err);
-    active?.toasts.error('failed to insert marker — reverting');
+    active?.toasts.error('Failed to insert marker — reverting');
     // Re-prime from disk (truth) and re-render handles.
     try {
       const fresh = await store.listElements();
@@ -792,7 +792,7 @@ async function deleteMarkerInEdit(markerId: string): Promise<void> {
   const isPolygon = getZoneShape(zone) === 'polygon';
   const min = isPolygon ? 3 : 2;
   if (zoneMarkers.length <= min) {
-    active.toasts.info(`${isPolygon ? 'polygon' : 'line'} needs at least ${min} markers`);
+    active.toasts.info(`${isPolygon ? 'Polygon' : 'Line'} needs at least ${min} markers`);
     return;
   }
   try {
@@ -810,7 +810,7 @@ async function deleteMarkerInEdit(markerId: string): Promise<void> {
     rebuildHandles();
   } catch (err) {
     console.error('[zone-edit] delete marker failed:', err);
-    active.toasts.error('failed to delete marker');
+    active.toasts.error('Failed to delete marker');
   }
 }
 
@@ -884,7 +884,7 @@ export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts
   };
   try {
     await restoreFromSnapshot(fakeSession);
-    toasts?.info('reverted unsaved zone edits from previous session');
+    toasts?.info('Reverted unsaved zone edits from previous session');
   } catch (err) {
     console.warn('[zone-edit] orphan-snapshot recovery failed:', err);
   } finally {
@@ -938,10 +938,10 @@ async function restoreFromSnapshot(session: EditSession): Promise<void> {
     const elements = await store.listElements();
     patchSlice('data', { elements });
     requestPushIfLinked();
-    session.toasts.info('edit cancelled');
+    session.toasts.info('Edit cancelled');
   } catch (err) {
     console.error('[zone-edit] restore from snapshot failed:', err);
-    session.toasts.error('failed to fully restore — manual cleanup may be needed');
+    session.toasts.error('Failed to fully restore — manual cleanup may be needed');
   }
 }
 

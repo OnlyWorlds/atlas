@@ -37,7 +37,7 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
   header.className = 'atlas-detail-section-header';
   header.innerHTML = `
     <span class="atlas-detail-section-title">Zone visuals</span>
-    <span class="atlas-detail-section-hint" title="These fields are stored locally and are NOT synced to the OnlyWorlds API.">local only</span>
+    <span class="atlas-detail-section-hint" title="These fields are stored locally and are NOT synced to the OnlyWorlds API.">Local only</span>
   `;
   section.appendChild(header);
 
@@ -79,7 +79,7 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
       requestPushIfLinked();
     } catch (err) {
       console.error('[zone-visuals] update failed:', err);
-      toasts.error('failed to update zone visual');
+      toasts.error('Failed to update zone visual');
     }
   };
 
@@ -162,7 +162,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
       (e): e is Marker => e.type === 'marker' && (e as Marker).zone_id === zone.id,
     );
     if (markers.length === 0) {
-      toasts.info('zone has no markers to edit — draw it on a map first');
+      toasts.info('Zone has no markers to edit — draw it on a map first');
       return;
     }
     const mapId = markers[0].map_id;
@@ -256,7 +256,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
       // Open the map tab if not already open, then pan.
       const map = elements.find((el): el is WorldMap => el.type === 'map' && el.id === marker.map_id);
       if (!map) {
-        toasts.error('marker map not found');
+        toasts.error('Marker map not found');
         return;
       }
       openMapTab(map);
@@ -276,7 +276,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
         requestPushIfLinked();
       } catch (err) {
         console.error('[zone-markers] delete marker failed:', err);
-        toasts.error('failed to delete marker');
+        toasts.error('Failed to delete marker');
       }
     }
   });

@@ -55,7 +55,9 @@ test('create map via map index — adds row and opens map tab', async ({ page })
   await page.click('[data-action="new-map"]');
   await expect(page.locator('[data-modal="create-map"]')).toBeVisible();
   await page.fill('input[name="map-name"]', 'Middle Earth');
-  await page.click('[data-modal="create-map"] [data-action="create"]');
+  // Image source required for auto-open-tab behavior (session 212 R3).
+  await page.fill('input[name="map-image-url"]', 'https://example.com/middle-earth.png');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
   await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
 
   // Row appears in map index (have to switch back to see it since tab switched).
@@ -68,11 +70,12 @@ test('create map via map index — adds row and opens map tab', async ({ page })
 });
 
 test('clicking a map row opens or focuses its tab', async ({ page }) => {
-  // Create two maps.
+  // Create two maps with image urls so tabs auto-open (session 212 R3).
   for (const name of ['Alpha Map', 'Beta Map']) {
     await page.click('[data-action="new-map"]');
     await page.fill('input[name="map-name"]', name);
-    await page.click('[data-modal="create-map"] [data-action="create"]');
+    await page.fill('input[name="map-image-url"]', `https://example.com/${name.toLowerCase().replace(/\s+/g, '-')}.png`);
+    await page.click('[data-modal="create-map"] [data-action="submit"]');
     await page.click('.atlas-tab[data-tab-kind="map-index"]');
   }
   // Both rows present.
@@ -91,7 +94,9 @@ test('clicking a map row opens or focuses its tab', async ({ page }) => {
 test('close button on a map tab removes it from the bar', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('[data-modal="create-map"] input[name="map-name"]', 'Disposable');
-  await page.click('[data-modal="create-map"] [data-action="create"]');
+  // Image source required for auto-open-tab behavior (session 212 R3).
+  await page.fill('[data-modal="create-map"] input[name="map-image-url"]', 'https://example.com/disposable.png');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
   await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
 
   const tab = page.locator('.atlas-tab[data-tab-kind="map"]', { hasText: 'Disposable' });
@@ -121,7 +126,7 @@ test('map index pin-count badge updates as pins are added (via FolderStore)', as
   await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await page.click('[data-action="new-map"]');
   await page.fill('[data-modal="create-map"] input[name="map-name"]', 'Pinned Map');
-  await page.click('[data-modal="create-map"] [data-action="create"]');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
   await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
   const mapId = await page.evaluate(() => {
     const state = (window as any).__atlasTestApi?.getState?.();
@@ -146,7 +151,7 @@ test('map index pin-count badge updates as pins are added (via FolderStore)', as
 test('delete map cascades pins and removes the tab', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Doomed Map');
-  await page.click('[data-modal="create-map"] [data-action="create"]');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
   await page.click('.atlas-tab[data-tab-kind="map-index"]');
 
   page.on('dialog', d => d.accept());
@@ -160,7 +165,9 @@ test('delete map cascades pins and removes the tab', async ({ page }) => {
 test('pin button appears in element detail when a map tab is active', async ({ page }) => {
   await page.click('[data-action="new-map"]');
   await page.fill('input[name="map-name"]', 'Visible Map');
-  await page.click('[data-modal="create-map"] [data-action="create"]');
+  // Image source required for auto-open-tab behavior (session 212 R3).
+  await page.fill('input[name="map-image-url"]', 'https://example.com/visible.png');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
   // Map tab now active in right pane.
 
   // Switch sidebar to elements and create a character.
@@ -209,7 +216,7 @@ test('map create modal — location picker integration', async ({ page }) => {
   await expect(page.locator('[data-modal="create-map"] .atlas-link-chip', { hasText: 'Shire' })).toBeVisible();
 
   await page.fill('[data-modal="create-map"] input[name="map-name"]', 'Shire Map');
-  await page.click('[data-modal="create-map"] [data-action="create"]');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
   await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
 
   // Map exists, and its `location` field is the Shire's id.

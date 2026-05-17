@@ -14,6 +14,7 @@ import type { ActiveWorldRef } from '../core/state';
 import { mountWorldsBody } from './worlds-sidebar';
 import { mountElementsBody } from './elements-sidebar';
 import { ToastManager } from '../ui/toast-manager';
+import { buildShortcutsContent } from '../ui/shortcuts-content';
 
 /**
  * Right-tab destination given an active world: if a selection survives in
@@ -132,7 +133,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
   // data-action stays "open-settings" for selector stability (heavy e2e usage);
   // the BEHAVIOR is open-on-first-click, close-on-second-click (toggle).
   gear.setAttribute('data-action', 'open-settings');
-  gear.setAttribute('aria-label', 'settings');
+  gear.setAttribute('aria-label', 'Settings');
   gear.innerHTML = '<span class="material-symbols-outlined">settings</span>';
   footer.appendChild(gear);
   gear.addEventListener('click', () => {
@@ -153,8 +154,8 @@ export function mountSidebar(mount: SidebarMount): () => void {
   const resetLayoutBtn = document.createElement('button');
   resetLayoutBtn.className = 'atlas-icon-btn';
   resetLayoutBtn.setAttribute('data-action', 'reset-layout');
-  resetLayoutBtn.setAttribute('aria-label', 'reset layout');
-  resetLayoutBtn.title = 'reset pane widths to defaults';
+  resetLayoutBtn.setAttribute('aria-label', 'Reset layout');
+  resetLayoutBtn.title = 'Reset pane widths to defaults';
   resetLayoutBtn.innerHTML = '<span class="material-symbols-outlined">restart_alt</span>';
   footer.appendChild(resetLayoutBtn);
   resetLayoutBtn.addEventListener('click', () => onResetLayout());
@@ -166,8 +167,8 @@ export function mountSidebar(mount: SidebarMount): () => void {
   const helpBtn = document.createElement('button');
   helpBtn.className = 'atlas-icon-btn';
   helpBtn.setAttribute('data-action', 'help-shortcuts');
-  helpBtn.setAttribute('aria-label', 'keyboard shortcuts');
-  helpBtn.title = 'keyboard shortcuts';
+  helpBtn.setAttribute('aria-label', 'Keyboard shortcuts');
+  helpBtn.title = 'Keyboard shortcuts';
   helpBtn.innerHTML = '<span class="material-symbols-outlined">help</span>';
   footer.appendChild(helpBtn);
   helpBtn.addEventListener('click', () => openShortcutsPopover(helpBtn));
@@ -242,21 +243,12 @@ function openShortcutsPopover(anchor: HTMLElement): void {
   const panel = document.createElement('div');
   panel.className = 'atlas-shortcuts-popover';
   panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', 'keyboard shortcuts');
-  panel.innerHTML = `
-    <div class="atlas-shortcuts-title">keyboard shortcuts</div>
-    <dl class="atlas-shortcuts-list">
-      <dt><kbd>Esc</kbd></dt><dd>cancel modal / popover / zone drawing or edit</dd>
-      <dt><kbd>Enter</kbd></dt><dd>finish zone draft · commit zone edit · save field popover</dd>
-      <dt><kbd>F</kbd></dt><dd>fit map to bounds (when map tab is focused)</dd>
-      <dt><kbd>Shift</kbd> + click</dt><dd>snap to 45° axis while drawing a zone</dd>
-      <dt>right-click pin</dt><dd>toggle ghost pins around it</dd>
-      <dt>right-click on map</dt><dd>create element + drop pin (TAB-autocomplete to place existing)</dd>
-      <dt>right-click vertex in edit</dt><dd>delete that marker</dd>
-      <dt>drag pin → trash</dt><dd>delete pin (top-right of map canvas)</dd>
-    </dl>
-    <div class="atlas-shortcuts-footer">more shortcuts coming next session (Ctrl/Cmd+E, Ctrl/Cmd+S, etc.)</div>
-  `;
+  panel.setAttribute('aria-label', 'Keyboard shortcuts');
+  const title = document.createElement('div');
+  title.className = 'atlas-shortcuts-title';
+  title.textContent = 'Keyboard shortcuts';
+  panel.appendChild(title);
+  panel.appendChild(buildShortcutsContent());
   document.body.appendChild(panel);
 
   // Anchor near the help button — pop UP-RIGHT since the button is in the

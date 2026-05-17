@@ -111,7 +111,7 @@ test('Link route requires api key and pin', async ({ page }) => {
   await page.fill('input[name="link-pin"]', '');
   await page.click('[data-action="link-submit"]');
   await expect(page.locator('[data-role="link-error"]')).toBeVisible();
-  await expect(page.locator('[data-role="link-error"]')).toContainText('api key');
+  await expect(page.locator('[data-role="link-error"]')).toContainText(/api key/i);
 });
 
 test('Make Online button is hidden for an already-api-linked world', async ({ page }) => {

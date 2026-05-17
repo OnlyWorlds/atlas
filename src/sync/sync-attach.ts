@@ -161,7 +161,7 @@ async function flushPendingOnAttach(
     const synced = result.pushed.creates + result.pushed.updates + result.pushed.deletes;
     if (synced > 0) {
       // Notify the user — these writes were stuck from a prior session.
-      toastManager.success(`synced ${synced} pending change${synced === 1 ? '' : 's'} from previous session`);
+      toastManager.success(`Synced ${synced} pending change${synced === 1 ? '' : 's'} from previous session`);
     }
     if (result.failures.length > 0) {
       console.warn('[atlas:sync] flush-on-attach: some writes failed', result.failures);
@@ -173,7 +173,7 @@ async function flushPendingOnAttach(
       if (!result.auth_blocked) {
         const failed = result.failures.length;
         toastManager.error(
-          `couldn't sync ${failed} pending change${failed === 1 ? '' : 's'} — check console or test connection in settings`
+          `Couldn't sync ${failed} pending change${failed === 1 ? '' : 's'} — check console or test connection in settings`
         );
       }
     }
@@ -271,7 +271,7 @@ export async function pullNowAndRefresh(): Promise<import('../core/types').SyncR
     const parts: string[] = [];
     if (result.pulled.creates > 0) parts.push(`${result.pulled.creates} new`);
     if (result.pulled.updates > 0) parts.push(`${result.pulled.updates} updated`);
-    toastManager.info(`pulled ${parts.join(' + ')} from api`);
+    toastManager.info(`Pulled ${parts.join(' + ')} from API`);
   }
   return result;
 }
@@ -351,7 +351,7 @@ function emitConflictToasts(
   // the engine still went to error — keep the surfacing single).
   if (result.auth_blocked) {
     toastManager.error(
-      'sync paused: authentication failed. verify your pin in settings, or unlink this world if it was deleted on the server.'
+      'Sync paused: authentication failed. Verify your PIN in settings, or unlink this world if it was deleted on the server.'
     );
     return;
   }
@@ -365,7 +365,7 @@ function emitConflictToasts(
   if (result.failures.length > 0 && synced === 0) {
     const n = result.failures.length;
     toastManager.error(
-      `couldn't sync ${n} change${n === 1 ? '' : 's'} — check console or test connection in settings`
+      `Couldn't sync ${n} change${n === 1 ? '' : 's'} — check console or test connection in settings`
     );
     // Fall through — there might be conflicts to surface too.
   }
@@ -414,8 +414,8 @@ function emitConflictToasts(
 
   // Push or sync phase: server was overwritten — confirm.
   const message = phase === 'push'
-    ? `saved over server change${n === 1 ? '' : 's'} for ${n} element${n === 1 ? '' : 's'}`
-    : `resolved ${n} divergent element${n === 1 ? '' : 's'} in your favor`;
+    ? `Saved over server change${n === 1 ? '' : 's'} for ${n} element${n === 1 ? '' : 's'}`
+    : `Resolved ${n} divergent element${n === 1 ? '' : 's'} in your favor`;
   toastManager.info(message);
 }
 

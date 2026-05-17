@@ -56,12 +56,12 @@ export class CreateWorldModal extends BaseModal {
       <form data-form="create-world">
         <label class="atlas-modal-field">
           <span>Name</span>
-          <input class="atlas-input" type="text" name="world-name" placeholder="untitled world" autocomplete="off" />
+          <input class="atlas-input" type="text" name="world-name" placeholder="Untitled world" autocomplete="off" />
         </label>
         <p class="atlas-modal-hint">
           ${rootDisplay
-            ? `creates a new world folder inside your atlas folder (<code>${escapeText(rootDisplay)}</code>). you can move it online (sync with onlyworlds api) later.`
-            : 'atlas needs an atlas folder before creating worlds. set one up from the welcome panel.'}
+            ? `Creates a new world folder inside your atlas folder (<code>${escapeText(rootDisplay)}</code>). You can move it online (sync with OnlyWorlds API) later.`
+            : 'Atlas needs an atlas folder before creating worlds. Set one up from the welcome panel.'}
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
@@ -82,7 +82,7 @@ export class CreateWorldModal extends BaseModal {
       e.preventDefault();
       errorBox.hidden = true;
       const nameInput = form.querySelector<HTMLInputElement>('input[name="world-name"]')!;
-      const name = nameInput.value.trim() || 'untitled world';
+      const name = nameInput.value.trim() || 'Untitled world';
 
       submitBtn.disabled = true;
       submitBtn.textContent = 'Creating…';
@@ -92,7 +92,7 @@ export class CreateWorldModal extends BaseModal {
       cancelBtn.hidden = true;
       try {
         const { entry } = await createWorldInRoot(name);
-        this.toasts.success(`created ${entry.name}`);
+        this.toasts.success(`Created ${entry.name}`);
         this.hide();
         this.onCreated?.({ entry });
         navigate(worldHash(entry.id));

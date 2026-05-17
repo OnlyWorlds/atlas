@@ -26,7 +26,7 @@ export class ConflictReviewModal extends BaseModal {
   async open(): Promise<void> {
     const engine = getCurrentSyncEngine();
     if (!engine) {
-      this.toasts.error('engine not ready');
+      this.toasts.error('Engine not ready');
       return;
     }
     try {
@@ -36,7 +36,7 @@ export class ConflictReviewModal extends BaseModal {
       return;
     }
     if (this.conflicts.length === 0) {
-      this.toasts.info('no conflicts to review');
+      this.toasts.info('No conflicts to review');
       return;
     }
 
@@ -72,8 +72,8 @@ export class ConflictReviewModal extends BaseModal {
         <span class="atlas-conflict-fields">${c.fields.length} field${c.fields.length === 1 ? '' : 's'} diverged${c.fields.length ? `: ${c.fields.map(escapeText).join(', ')}` : ''}</span>
       </div>
       <div class="atlas-conflict-row-actions">
-        <button class="atlas-btn-ghost" data-action="overwrite-mine" title="push local content to server">overwrite (mine wins)</button>
-        <button class="atlas-btn-ghost" data-action="pull-theirs" title="overwrite local with server">pull (theirs wins)</button>
+        <button class="atlas-btn-ghost" data-action="overwrite-mine" title="Push local content to server">Overwrite (mine wins)</button>
+        <button class="atlas-btn-ghost" data-action="pull-theirs" title="Overwrite local with server">Pull (theirs wins)</button>
       </div>
     `;
     row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
@@ -82,7 +82,7 @@ export class ConflictReviewModal extends BaseModal {
         row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = true));
         try {
           const engine = getCurrentSyncEngine();
-          if (!engine) throw new Error('engine not ready');
+          if (!engine) throw new Error('Engine not ready');
           await engine.resolveConflict(c.element_id, action);
           row.remove();
           this.conflicts = this.conflicts.filter((x) => x.element_id !== c.element_id);
@@ -104,7 +104,7 @@ export class ConflictReviewModal extends BaseModal {
           await refreshConflictsCount();
           this.updateTitle();
           if (this.conflicts.length === 0) {
-            this.toasts.success('all conflicts resolved');
+            this.toasts.success('All conflicts resolved');
             this.hide();
           }
         } catch (err) {
@@ -122,7 +122,7 @@ export class ConflictReviewModal extends BaseModal {
     const close = document.createElement('button');
     close.className = 'atlas-btn-ghost';
     close.dataset.action = 'close';
-    close.textContent = 'close';
+    close.textContent = 'Close';
     close.addEventListener('click', () => this.hide());
     footer.appendChild(close);
     return footer;

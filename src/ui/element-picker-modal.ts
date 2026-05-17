@@ -101,15 +101,15 @@ class ElementPickerModal extends BaseModal {
 
     const titleText = this.opts.title
       ?? (this.opts.restrictToType
-        ? `pick a ${ELEMENT_LABELS[this.opts.restrictToType].singular}`
-        : 'pick an element');
+        ? `Pick a ${ELEMENT_LABELS[this.opts.restrictToType].singular}`
+        : 'Pick an element');
 
     body.innerHTML = `
       <div class="atlas-picker-title-row">
         <div class="atlas-modal-title">${escapeText(titleText)}</div>
         <div class="atlas-picker-count" data-role="count">0 elements</div>
       </div>
-      <input type="text" class="atlas-input atlas-picker-search" data-role="picker-search" placeholder="search by name..." autocomplete="off" />
+      <input type="text" class="atlas-input atlas-picker-search" data-role="picker-search" placeholder="Search by name..." autocomplete="off" />
       <div class="atlas-picker-strip" data-role="type-strip"></div>
       <div class="atlas-picker-list" data-role="picker-list"></div>
     `;
@@ -140,7 +140,7 @@ class ElementPickerModal extends BaseModal {
   private renderTypeStrip(): void {
     if (!this.stripEl) return;
     this.stripEl.innerHTML = '';
-    this.stripEl.appendChild(this.typeChip('all', null, null));
+    this.stripEl.appendChild(this.typeChip('All', null, null));
     ALL_ELEMENT_TYPES.forEach(t => {
       // Skip pin/marker/zone in the picker — those aren't normally picked.
       if (t === 'pin' || t === 'marker' || t === 'zone') return;
@@ -185,14 +185,14 @@ class ElementPickerModal extends BaseModal {
     const total = items.length;
     const capped = items.slice(0, ROW_CAP);
     this.countEl.textContent = total > ROW_CAP
-      ? `showing ${ROW_CAP} of ${total}`
+      ? `Showing ${ROW_CAP} of ${total}`
       : `${total} ${total === 1 ? 'element' : 'elements'}`;
 
     this.listEl.innerHTML = '';
     if (capped.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'atlas-picker-empty';
-      empty.textContent = 'no matching elements';
+      empty.textContent = 'No matching elements';
       this.listEl.appendChild(empty);
       return;
     }

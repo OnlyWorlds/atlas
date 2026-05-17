@@ -103,11 +103,11 @@ export class ElementCreateModal extends BaseModal {
 
   open(): void {
     if (!getState().active) {
-      this.toasts.error('no active world');
+      this.toasts.error('No active world');
       return;
     }
     if (!getActiveStore()) {
-      this.toasts.error('active store not open');
+      this.toasts.error('Active store not open');
       return;
     }
     this.modal = this.buildModal();
@@ -140,22 +140,22 @@ export class ElementCreateModal extends BaseModal {
           <span>Name</span>
           <div class="atlas-input-ghost-wrap">
             <span class="atlas-input-ghost"><span class="name-ghost-typed"></span><span class="name-ghost-suffix"></span></span>
-            <input class="atlas-input" type="text" name="element-name" placeholder="element name (TAB to place existing)" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
+            <input class="atlas-input" type="text" name="element-name" placeholder="Element name (TAB to place existing)" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
           </div>
         </label>`
       : `<label class="atlas-modal-field">
           <span>Name</span>
-          <input class="atlas-input" type="text" name="element-name" placeholder="element name" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
+          <input class="atlas-input" type="text" name="element-name" placeholder="Element name" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
         </label>`;
 
     body.innerHTML = `
       <form data-form="create-element">
         ${nameFieldHtml}
         <div class="atlas-modal-field">
-          <span>category</span>
+          <span>Category</span>
           <div class="atlas-input-ghost-wrap">
             <span class="atlas-input-ghost"><span class="ghost-typed"></span><span class="ghost-suffix"></span></span>
-            <input class="atlas-input" type="text" name="element-type" placeholder="type to filter (e.g. 'char')" autocomplete="off" />
+            <input class="atlas-input" type="text" name="element-type" placeholder="Type to filter (e.g. 'char')" autocomplete="off" />
           </div>
           <div class="atlas-create-type-grid" data-role="type-grid"></div>
         </div>
@@ -225,13 +225,13 @@ export class ElementCreateModal extends BaseModal {
       const nameInput = form.querySelector<HTMLInputElement>('input[name="element-name"]')!;
       const name = nameInput.value.trim();
       if (!name) {
-        errorBox.textContent = 'name is required';
+        errorBox.textContent = 'Name is required';
         errorBox.hidden = false;
         nameInput.focus();
         return;
       }
       if (!this.effectiveTypes().includes(this.selected)) {
-        errorBox.textContent = 'pick a category';
+        errorBox.textContent = 'Pick a category';
         errorBox.hidden = false;
         return;
       }
@@ -243,7 +243,7 @@ export class ElementCreateModal extends BaseModal {
         const targetId = this.placingExistingId;
         const targetEl = getState().data.elements.find(e => e.id === targetId);
         if (!targetEl) {
-          errorBox.textContent = 'existing element no longer exists';
+          errorBox.textContent = 'Existing element no longer exists';
           errorBox.hidden = false;
           this.clearPlaceExisting();
           return;
@@ -292,7 +292,7 @@ export class ElementCreateModal extends BaseModal {
         const elements = await store.listElements();
         patchSlice('data', { elements });
         patchSlice('ui', { ...getState().ui, selectedElementId: el.id });
-        this.toasts.success(`created ${this.selected}: ${el.name}`);
+        this.toasts.success(`Created ${this.selected}: ${el.name}`);
         this.hide();
         this.opts.onCreated?.(el.id, this.selected);
         requestPushIfLinked();

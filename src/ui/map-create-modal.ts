@@ -102,7 +102,7 @@ class MapCreateModal extends BaseModal {
 
   open(): void {
     if (!getState().active || !getActiveStore()) {
-      this.toasts.error('no active world');
+      this.toasts.error('No active world');
       this.onDone(null);
       return;
     }
@@ -120,7 +120,7 @@ class MapCreateModal extends BaseModal {
         (e): e is WorldMap => e.type === 'map' && e.id === this.opts.existingMapId,
       );
       if (!found) {
-        this.toasts.error('map not found');
+        this.toasts.error('Map not found');
         this.onDone(null);
         return;
       }
@@ -203,41 +203,41 @@ class MapCreateModal extends BaseModal {
       <form data-form="${isConfigure ? 'configure-map' : 'create-map'}">
         <label class="atlas-modal-field">
           <span>Name</span>
-          <input class="atlas-input" type="text" name="map-name" placeholder="map name..." autocomplete="off" value="${escapeAttr(initialName)}" />
+          <input class="atlas-input" type="text" name="map-name" placeholder="Map name..." autocomplete="off" value="${escapeAttr(initialName)}" />
         </label>
         <div class="atlas-modal-field">
-          <span>location (optional)</span>
+          <span>Location (optional)</span>
           <div class="atlas-map-create-location" data-role="location-row"></div>
         </div>
         <label class="atlas-modal-field">
-          <span>image URL (optional)</span>
+          <span>Image URL (optional)</span>
           <input class="atlas-input" type="text" name="map-image-url" placeholder="https://..." autocomplete="off" spellcheck="false" value="${escapeAttr(initialUrl)}" />
         </label>
         <label class="atlas-modal-field">
-          <span>local image (optional)</span>
+          <span>Local image (optional)</span>
           <input type="file" name="map-image-file" accept="image/*" />
-          <span class="atlas-modal-hint" data-role="local-image-hint">used as fallback when image URL is empty. stored locally, never uploaded.</span>
+          <span class="atlas-modal-hint" data-role="local-image-hint">Used as fallback when image URL is empty. Stored locally, never uploaded.</span>
         </label>
 
         <button type="button" class="atlas-modal-advanced-toggle" data-role="advanced-toggle" aria-expanded="${this.advancedOpen}">
           <span class="material-symbols-outlined atlas-modal-advanced-chevron">${this.advancedOpen ? 'expand_more' : 'chevron_right'}</span>
-          <span>advanced</span>
+          <span>Advanced</span>
         </button>
         <div class="atlas-modal-advanced" data-role="advanced-body" ${this.advancedOpen ? '' : 'hidden'}>
           <div class="atlas-modal-field">
-            <span>parent map (override)</span>
+            <span>Parent map (override)</span>
             <div class="atlas-map-create-parent" data-role="parent-map-row"></div>
-            <span class="atlas-modal-hint">explicit nesting. by default, location-based maps are placed under the nearest ancestor location's map automatically.</span>
+            <span class="atlas-modal-hint">Explicit nesting. By default, location-based maps are placed under the nearest ancestor location's map automatically.</span>
           </div>
           <label class="atlas-modal-field">
-            <span>hierarchy (sibling order)</span>
+            <span>Hierarchy (sibling order)</span>
             <input class="atlas-input" type="number" name="map-hierarchy" placeholder="0" autocomplete="off" value="${escapeAttr(initialHierarchy)}" />
-            <span class="atlas-modal-hint">lower comes first. only matters when 2+ maps share the same parent or location.</span>
+            <span class="atlas-modal-hint">Lower comes first. Only matters when 2+ maps share the same parent or location.</span>
           </label>
           <label class="atlas-modal-field">
-            <span>background color (optional)</span>
+            <span>Background color (optional)</span>
             <input class="atlas-input" type="text" name="map-bg-color" placeholder="#000000 or rgb(...)" autocomplete="off" spellcheck="false" value="${escapeAttr(initialBgColor)}" />
-            <span class="atlas-modal-hint">canvas fallback color. atlas auto-extracts an edge color from the image when one is set.</span>
+            <span class="atlas-modal-hint">Canvas fallback color. Atlas auto-extracts an edge color from the image when one is set.</span>
           </label>
         </div>
 
@@ -281,10 +281,10 @@ class MapCreateModal extends BaseModal {
       const hasFile = !!fileField.files?.length;
       const hasUrl = !!urlField.value.trim();
       if (hasFile && hasUrl) {
-        hintEl.textContent = 'image URL is set — your uploaded file will be stored as fallback but the URL will display.';
+        hintEl.textContent = 'Image URL is set — your uploaded file will be stored as fallback but the URL will display.';
         hintEl.classList.add('atlas-modal-hint-warn');
       } else {
-        hintEl.textContent = 'used as fallback when image URL is empty. stored locally, never uploaded.';
+        hintEl.textContent = 'Used as fallback when image URL is empty. Stored locally, never uploaded.';
         hintEl.classList.remove('atlas-modal-hint-warn');
       }
     };
@@ -306,7 +306,7 @@ class MapCreateModal extends BaseModal {
       const bgColorInput = form.querySelector<HTMLInputElement>('input[name="map-bg-color"]')!;
       const name = nameInput.value.trim();
       if (!name) {
-        errorBox.textContent = 'name is required';
+        errorBox.textContent = 'Name is required';
         errorBox.hidden = false;
         nameInput.focus();
         return;
@@ -317,7 +317,7 @@ class MapCreateModal extends BaseModal {
       if (hierarchyRaw) {
         const parsed = Number(hierarchyRaw);
         if (!Number.isFinite(parsed)) {
-          errorBox.textContent = 'hierarchy must be a number';
+          errorBox.textContent = 'Hierarchy must be a number';
           errorBox.hidden = false;
           hierarchyInput.focus();
           return;
@@ -367,7 +367,7 @@ class MapCreateModal extends BaseModal {
         patchSlice('data', { elements });
         requestPushIfLinked();
 
-        this.toasts.success(isConfigure ? `updated map "${name}"` : `created map "${name}"`);
+        this.toasts.success(isConfigure ? `Updated map "${name}"` : `Created map "${name}"`);
         this.resolved = true;
         this.onDone({ map });
         this.hide();
@@ -398,11 +398,11 @@ class MapCreateModal extends BaseModal {
     const pickBtn = document.createElement('button');
     pickBtn.type = 'button';
     pickBtn.className = 'atlas-btn-ghost';
-    pickBtn.textContent = this.locationPreview ? 'change' : '+ pick location';
+    pickBtn.textContent = this.locationPreview ? 'Change' : '+ Pick location';
     pickBtn.addEventListener('click', async () => {
       const picked = await pickElement({
         restrictToType: 'location',
-        title: 'pick a location for this map',
+        title: 'Pick a location for this map',
       });
       if (!picked) return;
       this.locationPreview = { id: picked.id, name: picked.name };
@@ -426,7 +426,7 @@ class MapCreateModal extends BaseModal {
     const pickBtn = document.createElement('button');
     pickBtn.type = 'button';
     pickBtn.className = 'atlas-btn-ghost';
-    pickBtn.textContent = this.parentMapPreview ? 'change' : '+ pick parent map';
+    pickBtn.textContent = this.parentMapPreview ? 'Change' : '+ Pick parent map';
     pickBtn.addEventListener('click', async () => {
       // In configure-existing mode, exclude self to prevent the obvious cycle.
       // Deeper cycle prevention (descendants of self) is delegated to the
@@ -437,7 +437,7 @@ class MapCreateModal extends BaseModal {
       const picked = await pickElement({
         restrictToType: 'map',
         excludeIds,
-        title: 'pick a parent map',
+        title: 'Pick a parent map',
       });
       if (!picked) return;
       this.parentMapPreview = { id: picked.id, name: picked.name };

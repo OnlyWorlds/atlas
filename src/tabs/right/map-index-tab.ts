@@ -173,7 +173,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     const sourceParentId = sourceRow?.getAttribute('data-parent-id') ?? '';
     const targetParentId = row.getAttribute('data-parent-id') ?? '';
     if (sourceParentId !== targetParentId) {
-      toasts.info('drag-to-reorder works within the same sibling group — use the create modal\'s parent map override to reparent');
+      toasts.info('Drag-to-reorder works within the same sibling group — use the create modal\'s parent map override to reparent');
       return;
     }
 
@@ -208,17 +208,17 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       const elements = await store.listElements();
       patchSlice('data', { elements });
       requestPushIfLinked();
-      toasts.success(`reordered ${writes.length} map${writes.length === 1 ? '' : 's'}`);
+      toasts.success(`Reordered ${writes.length} map${writes.length === 1 ? '' : 's'}`);
     } catch (err) {
       console.error('[map-index] reorder failed:', err);
-      toasts.error('failed to reorder maps');
+      toasts.error('Failed to reorder maps');
     }
   });
 
   function render(): void {
     const state = getState();
     if (!state.active) {
-      root.innerHTML = `<div class="atlas-pane-empty">no active world.</div>`;
+      root.innerHTML = `<div class="atlas-pane-empty">No active world.</div>`;
       return;
     }
     root.innerHTML = '';
@@ -227,7 +227,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     header.className = 'atlas-section atlas-map-index-header';
     const title = document.createElement('div');
     title.className = 'atlas-section-title';
-    title.textContent = 'maps';
+    title.textContent = 'Maps';
     header.appendChild(title);
 
     const newBtn = document.createElement('button');
@@ -236,7 +236,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     newBtn.innerHTML =
       '<span class="material-symbols-outlined atlas-add-glyph-plus">add</span>' +
       '<span class="material-symbols-outlined atlas-add-glyph-main">map</span>';
-    newBtn.title = 'new map';
+    newBtn.title = 'New map';
     newBtn.addEventListener('click', async () => {
       const result = await createMapDialog(toasts);
       if (result) openMapTab(result.map);
@@ -256,7 +256,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'atlas-input atlas-map-index-search-input';
-      input.placeholder = 'search maps...';
+      input.placeholder = 'Search maps...';
       input.value = searchTerm;
       input.spellcheck = false;
       input.autocomplete = 'off';
@@ -278,7 +278,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
         const clear = document.createElement('button');
         clear.type = 'button';
         clear.className = 'atlas-map-index-search-clear';
-        clear.title = 'clear search';
+        clear.title = 'Clear search';
         clear.innerHTML = '<span class="material-symbols-outlined">close</span>';
         clear.addEventListener('click', () => {
           searchTerm = '';
@@ -426,8 +426,8 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   if (hasChildren) {
     chevron.className = 'atlas-map-tree-chevron';
     chevron.setAttribute('role', 'button');
-    chevron.setAttribute('aria-label', collapsed ? 'expand' : 'collapse');
-    chevron.title = collapsed ? `expand (${node.children.length} child${node.children.length === 1 ? '' : 'ren'})` : 'collapse';
+    chevron.setAttribute('aria-label', collapsed ? 'Expand' : 'Collapse');
+    chevron.title = collapsed ? `Expand (${node.children.length} child${node.children.length === 1 ? '' : 'ren'})` : 'Collapse';
     chevron.innerHTML = `<span class="material-symbols-outlined">${collapsed ? 'chevron_right' : 'expand_more'}</span>`;
     chevron.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -445,11 +445,11 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   icon.textContent = 'map';
   if (hasImage) {
     if (m.image_url && m.image_media_id) {
-      icon.title = 'has image (URL shown, local file kept as fallback)';
+      icon.title = 'Has image (URL shown, local file kept as fallback)';
     } else if (m.image_url) {
-      icon.title = 'has image (URL)';
+      icon.title = 'Has image (URL)';
     } else {
-      icon.title = 'has image (local file)';
+      icon.title = 'Has image (local file)';
     }
   }
   row.appendChild(icon);
@@ -502,7 +502,7 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
     const chip = document.createElement('span');
     chip.className = 'atlas-row-chip atlas-row-chip-warn';
     chip.title = 'parent_map references a missing map (or would create a cycle) — surfaced at root';
-    chip.textContent = 'broken parent';
+    chip.textContent = 'Broken parent';
     row.appendChild(chip);
   }
 
@@ -526,7 +526,7 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   del.type = 'button';
   del.className = 'atlas-icon-btn-sm';
   del.setAttribute('data-action', 'delete-map');
-  del.title = 'delete map';
+  del.title = 'Delete map';
   del.innerHTML = '<span class="material-symbols-outlined">delete</span>';
   del.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -552,8 +552,8 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
 async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManager): Promise<void> {
   const store = getActiveStore();
   if (!store) return;
-  const cascadeNote = pinCount > 0 ? ` this will also remove ${pinCount} pin${pinCount === 1 ? '' : 's'} on this map.` : '';
-  if (!confirm(`delete map "${m.name}"?${cascadeNote}`)) return;
+  const cascadeNote = pinCount > 0 ? ` This will also remove ${pinCount} pin${pinCount === 1 ? '' : 's'} on this map.` : '';
+  if (!confirm(`Delete map "${m.name}"?${cascadeNote}`)) return;
   try {
     await store.deleteMap(m.id);
     const elements = await store.listElements();
@@ -568,7 +568,7 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
       const active = ui.rightActiveIndex >= tabIdx ? Math.max(0, ui.rightActiveIndex - 1) : ui.rightActiveIndex;
       patchSlice('ui', { ...getState().ui, rightTabs: next, rightActiveIndex: active });
     }
-    toasts.success(`deleted map "${m.name}"`);
+    toasts.success(`Deleted map "${m.name}"`);
   } catch (err) {
     console.error('[map-index] delete failed:', err);
     toasts.error(err instanceof Error ? err.message : String(err));

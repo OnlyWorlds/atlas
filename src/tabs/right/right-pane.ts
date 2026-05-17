@@ -158,9 +158,9 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       const isStale = !m;
       if (isStale) btn.classList.add('atlas-tab-stale');
       const label = m?.name || tab.label || '(missing map)';
-      btn.innerHTML = `<span class="material-symbols-outlined">${isStale ? 'cloud_off' : 'map'}</span><span>${escapeText(label)}</span><span class="atlas-tab-close" data-role="close" aria-label="close tab">×</span>`;
+      btn.innerHTML = `<span class="material-symbols-outlined">${isStale ? 'cloud_off' : 'map'}</span><span>${escapeText(label)}</span><span class="atlas-tab-close" data-role="close" aria-label="Close tab">×</span>`;
       if (isStale) {
-        btn.title = 'this map is no longer in the current world — click anywhere on the tab to close it';
+        btn.title = 'This map is no longer in the current world — click anywhere on the tab to close it';
       }
       const closeEl = btn.querySelector<HTMLElement>('[data-role="close"]');
       closeEl?.addEventListener('click', (e) => {
@@ -274,10 +274,10 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   const linked = entry?.state === 'api-linked';
   if (!linked) {
     pill.dataset.state = 'local';
-    pill.title = 'local-only world — folder is the source of truth';
+    pill.title = 'Local-only world — folder is the source of truth';
     pill.innerHTML = `
       <span class="atlas-sync-pill-dot"></span>
-      <span>local</span>
+      <span>Local</span>
     `;
     pill.removeAttribute('data-clickable');
     return;
@@ -293,13 +293,13 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   const { dataState, label, title } = conflictCount > 0 && base.dataState === 'synced'
     ? {
         dataState: 'pending',
-        label: `review ${conflictCount}`,
+        label: `Review ${conflictCount}`,
         title: `${conflictCount} unresolved conflict${conflictCount === 1 ? '' : 's'} — click ⚠ to resolve`,
       }
     : base;
   pill.dataset.state = dataState;
   pill.dataset.clickable = 'true';
-  pill.title = title + (conflictCount > 0 ? '' : ' · click to refresh from api');
+  pill.title = title + (conflictCount > 0 ? '' : ' · click to refresh from API');
   const conflictBadge = conflictCount > 0
     ? `<span class="atlas-sync-pill-conflict" data-role="review-conflicts" title="${conflictCount} conflict${conflictCount === 1 ? '' : 's'} to review">⚠ ${conflictCount}</span>`
     : '';
@@ -307,7 +307,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     <span class="atlas-sync-pill-dot"></span>
     <span>${label}</span>
     ${conflictBadge}
-    <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="refresh from api">refresh</span>
+    <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from API">refresh</span>
   `;
 
   // Conflict badge click — open the review modal. Caller stops propagation
@@ -321,7 +321,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   pill.onclick = async () => {
     const eng = getCurrentSyncEngine();
     if (!eng) {
-      toasts.info('engine not ready');
+      toasts.info('Engine not ready');
       return;
     }
     const cur = state.sync.activeSync;
@@ -330,13 +330,13 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       return;
     }
     if (cur?.kind === 'paused') {
-      toasts.info(cur.reason === 'network' ? 'offline — pull skipped' : 'sync paused — flip stay-offline off to pull');
+      toasts.info(cur.reason === 'network' ? 'Offline — pull skipped' : 'Sync paused — flip stay-offline off to pull');
       return;
     }
     try {
       const result = await pullNowAndRefresh();
       if (!result) {
-        toasts.info('engine not ready');
+        toasts.info('Engine not ready');
         return;
       }
       const totalUpdates = result.pulled.creates + result.pulled.updates;
@@ -345,7 +345,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       // the "already up to date" affordance — it's a manual-only signal that
       // would spam if it fired on every cadence tick.
       if (totalUpdates === 0 && result.conflicts.length === 0) {
-        toasts.info('already up to date');
+        toasts.info('Already up to date');
       }
     } catch (err) {
       toasts.error(err instanceof Error ? err.message : String(err));
@@ -359,37 +359,37 @@ function mapEngineStateToPill(
   if (!engine) {
     return {
       dataState: 'api',
-      label: 'linked',
-      title: 'api-linked world — engine starting up',
+      label: 'Linked',
+      title: 'API-linked world — engine starting up',
     };
   }
   switch (engine.kind) {
     case 'idle':
       return {
         dataState: 'synced',
-        label: 'synced',
-        title: engine.last_sync_at ? `last synced ${formatTime(engine.last_sync_at)}` : 'idle — no sync yet',
+        label: 'Synced',
+        title: engine.last_sync_at ? `Last synced ${formatTime(engine.last_sync_at)}` : 'Idle — no sync yet',
       };
     case 'syncing':
       return {
         dataState: 'saving',
-        label: engine.phase === 'push' ? 'saving…' : 'fetching…',
-        title: `syncing (${engine.phase})${engine.progress ? ` ${engine.progress.done}/${engine.progress.total}` : ''}`,
+        label: engine.phase === 'push' ? 'Saving…' : 'Fetching…',
+        title: `Syncing (${engine.phase})${engine.progress ? ` ${engine.progress.done}/${engine.progress.total}` : ''}`,
       };
     case 'paused':
       return {
         dataState: 'pending',
-        label: engine.reason === 'network' ? 'offline' : 'paused',
+        label: engine.reason === 'network' ? 'Offline' : 'Paused',
         title: engine.pending_changes
-          ? `${engine.reason === 'network' ? 'offline' : 'paused'} — ${engine.pending_changes} pending`
+          ? `${engine.reason === 'network' ? 'Offline' : 'Paused'} — ${engine.pending_changes} pending`
           : engine.reason === 'network'
-            ? 'offline'
-            : 'paused — local edits queued',
+            ? 'Offline'
+            : 'Paused — local edits queued',
       };
     case 'error':
       return {
         dataState: 'error',
-        label: 'error',
+        label: 'Error',
         title: engine.message,
       };
   }

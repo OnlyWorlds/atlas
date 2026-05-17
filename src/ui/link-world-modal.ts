@@ -33,7 +33,7 @@ export class LinkWorldModal extends BaseModal {
 
   open(): void {
     if (!getState().atlasRoot) {
-      this.toasts.error('set up your atlas folder first');
+      this.toasts.error('Set up your atlas folder first');
       return;
     }
     this.modal = this.buildModal();
@@ -55,18 +55,18 @@ export class LinkWorldModal extends BaseModal {
       <form data-form="link-world">
         <label class="atlas-modal-field">
           <span>API key</span>
-          <input class="atlas-input" type="text" name="api-key" placeholder="from onlyworlds.com" autocomplete="off" spellcheck="false" />
+          <input class="atlas-input" type="text" name="api-key" placeholder="From onlyworlds.com" autocomplete="off" spellcheck="false" />
         </label>
         <label class="atlas-modal-field">
           <span>PIN</span>
-          <input class="atlas-input" type="text" name="api-pin" value="${escapeAttr(prefilledPin)}" placeholder="four-digit pin" autocomplete="off" maxlength="8" />
+          <input class="atlas-input" type="text" name="api-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" autocomplete="off" maxlength="8" />
         </label>
         <label class="atlas-modal-field">
-          <span>display name (optional)</span>
-          <input class="atlas-input" type="text" name="display-name" placeholder="defaults to server world name" autocomplete="off" />
+          <span>Display name (optional)</span>
+          <input class="atlas-input" type="text" name="display-name" placeholder="Defaults to server world name" autocomplete="off" />
         </label>
         <p class="atlas-modal-hint">
-          atlas will download every element of this world into a new folder inside your atlas folder. you can keep editing while offline; changes sync back next time you open it.
+          Atlas will download every element of this world into a new folder inside your atlas folder. You can keep editing while offline; changes sync back next time you open it.
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-progress" data-role="progress" hidden></div>
@@ -104,11 +104,11 @@ export class LinkWorldModal extends BaseModal {
 
       const renderProgress = (p: InitialDownloadProgress) => {
         if (p.phase === 'list') {
-          progressBox.textContent = `discovering ${p.currentType ?? ''}…`;
+          progressBox.textContent = `Discovering ${p.currentType ?? ''}…`;
         } else {
           progressBox.textContent = p.total === 0
-            ? 'world is empty — finishing up'
-            : `downloading ${p.done} of ${p.total} elements…`;
+            ? 'World is empty — finishing up'
+            : `Downloading ${p.done} of ${p.total} elements…`;
         }
         progressBox.hidden = false;
       };
@@ -122,9 +122,9 @@ export class LinkWorldModal extends BaseModal {
         });
         const failures = result.failures.length;
         if (failures > 0) {
-          this.toasts.error(`linked ${result.entry.name} — ${failures} element${failures === 1 ? '' : 's'} failed (will retry on next sync)`);
+          this.toasts.error(`Linked ${result.entry.name} — ${failures} element${failures === 1 ? '' : 's'} failed (will retry on next sync)`);
         } else {
-          this.toasts.success(`linked ${result.entry.name} — ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
+          this.toasts.success(`Linked ${result.entry.name} — ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
         }
         this.hide();
         navigate(elementsHash(result.entry.id));

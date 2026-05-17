@@ -22,23 +22,23 @@ export function buildDrawingOverlay(
   root.setAttribute('data-zone-draft-overlay', '');
 
   root.innerHTML = `
-    <span class="atlas-zone-draft-mode">${mode}</span>
+    <span class="atlas-zone-draft-mode">${mode.charAt(0).toUpperCase()}${mode.slice(1)}</span>
     <span class="atlas-zone-draft-count"><span class="atlas-zone-draft-count-num">0</span> markers</span>
-    <span class="atlas-zone-draft-hint" title="hold shift while clicking to snap the new marker to a 45° axis from the previous marker — chain four shift-clicks for a perfect rectangle">hold <kbd>shift</kbd> to snap to 45° axis</span>
+    <span class="atlas-zone-draft-hint" title="Hold shift while clicking to snap the new marker to a 45° axis from the previous marker — chain four shift-clicks for a perfect rectangle">Hold <kbd>Shift</kbd> to snap to 45° axis</span>
     <span class="atlas-zone-draft-spacer"></span>
     <span class="atlas-zone-draft-keys">
-      <kbd>enter</kbd> finish · <kbd>esc</kbd> cancel
+      <kbd>Enter</kbd> finish · <kbd>Esc</kbd> cancel
     </span>
     <button type="button" class="atlas-zone-draft-btn" data-action="undo" disabled>
       <span class="material-symbols-outlined">undo</span>
     </button>
     <button type="button" class="atlas-zone-draft-btn atlas-zone-draft-btn-primary" data-action="finish" disabled>
       <span class="material-symbols-outlined">check</span>
-      finish
+      Finish
     </button>
     <button type="button" class="atlas-zone-draft-btn atlas-zone-draft-btn-secondary" data-action="cancel">
       <span class="material-symbols-outlined">close</span>
-      cancel
+      Cancel
     </button>
   `;
 
@@ -55,7 +55,7 @@ export function buildDrawingOverlay(
     countEl.textContent = String(count);
     undoBtn.disabled = count === 0;
     finishBtn.disabled = count < min;
-    finishBtn.title = count < min ? `need at least ${min} markers` : 'Finish drawing';
+    finishBtn.title = count < min ? `Need at least ${min} markers` : 'Finish drawing';
   }
 
   return { root, update };

@@ -103,14 +103,14 @@ function reconcileScheduler(): void {
 function tickPull(): void {
   const e = getCurrentSyncEngine();
   if (!e) {
-    console.info('[auto-pull] tick: no engine attached — skipping');
+    console.debug('[auto-pull] tick: no engine attached — skipping');
     return;
   }
   // Skip while hidden but keep the interval running. The catch-up handler in
   // visibilitychange below covers the case where the tab was hidden across
   // a cadence boundary.
   if (typeof document !== 'undefined' && document.hidden) {
-    console.info('[auto-pull] tick: tab hidden — skipping');
+    console.debug('[auto-pull] tick: tab hidden — skipping');
     return;
   }
   const s = getState().sync.activeSync;
@@ -120,11 +120,11 @@ function tickPull(): void {
   // pullNow calls (engine.pullNow already no-ops while paused — this just
   // skips the wrapper plumbing too).
   if (s?.kind === 'paused' || s?.kind === 'syncing' || s?.kind === 'error') {
-    console.info('[auto-pull] tick: engine busy/paused/error — skipping', { kind: s?.kind });
+    console.debug('[auto-pull] tick: engine busy/paused/error — skipping', { kind: s?.kind });
     return;
   }
   if (getState().registry.sync_pause_all) {
-    console.info('[auto-pull] tick: global pause active — skipping');
+    console.debug('[auto-pull] tick: global pause active — skipping');
     return;
   }
   console.info('[auto-pull] tick: firing pullNow');

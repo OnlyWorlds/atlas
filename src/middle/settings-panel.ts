@@ -55,13 +55,13 @@ export interface SettingsMount {
 }
 
 const CADENCE_OPTIONS: Array<{ label: string; ms: number | null }> = [
-  { label: 'off', ms: null },
-  { label: 'every 1 min', ms: 60_000 },
-  { label: 'every 5 min', ms: 5 * 60_000 },
-  { label: 'every 15 min', ms: 15 * 60_000 },
-  { label: 'every hour', ms: 60 * 60_000 },
-  { label: 'every 6 hours', ms: 6 * 60 * 60_000 },
-  { label: 'every day', ms: 24 * 60 * 60_000 },
+  { label: 'Off', ms: null },
+  { label: 'Every 1 min', ms: 60_000 },
+  { label: 'Every 5 min', ms: 5 * 60_000 },
+  { label: 'Every 15 min', ms: 15 * 60_000 },
+  { label: 'Every hour', ms: 60 * 60_000 },
+  { label: 'Every 6 hours', ms: 6 * 60 * 60_000 },
+  { label: 'Every day', ms: 24 * 60 * 60_000 },
 ];
 
 const POLICY_OPTIONS: Array<{
@@ -71,13 +71,13 @@ const POLICY_OPTIONS: Array<{
 }> = [
   {
     value: 'local-wins',
-    label: 'local wins',
-    hint: 'your edits always win. push overwrites server; pull skips applying server changes for elements you also edited. one toast per round, no badge.',
+    label: 'Local wins',
+    hint: 'Your edits always win. Push overwrites server; pull skips applying server changes for elements you also edited. One toast per round, no badge.',
   },
   {
     value: 'pause-and-review',
-    label: 'pause and review',
-    hint: 'on conflict, nothing auto-resolves. push pauses, pull skips. ⚠ badge fires; modal lets you pick overwrite vs pull per element.',
+    label: 'Pause and review',
+    hint: 'On conflict, nothing auto-resolves. Push pauses, pull skips. ⚠ badge fires; modal lets you pick overwrite vs pull per element.',
   },
 ];
 
@@ -101,7 +101,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
 
     root.innerHTML = `
       <header class="atlas-middle-header">
-        <h2>settings</h2>
+        <h2>Settings</h2>
       </header>
       <div class="atlas-settings-shell">
         <nav class="atlas-settings-tabs" role="tablist">
@@ -113,7 +113,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
               role="tab"
               data-settings-tab="${t}"
               ${enabled ? '' : 'disabled aria-disabled="true"'}
-              aria-selected="${active}">${t}</button>`;
+              aria-selected="${active}">${t.charAt(0).toUpperCase() + t.slice(1)}</button>`;
           }).join('')}
         </nav>
         <section class="atlas-settings-body" role="tabpanel" data-active-tab="${tab}">
@@ -158,7 +158,7 @@ function renderTab(
     case 'maps':
       return renderMapsTab(reg);
     case 'world':
-      return activeWorld ? renderWorldTab(activeWorld) : '<p class="atlas-settings-hint">no world is active.</p>';
+      return activeWorld ? renderWorldTab(activeWorld) : '<p class="atlas-settings-hint">No world is active.</p>';
     case 'about':
       return renderAboutTab();
   }
@@ -174,7 +174,7 @@ function renderMapsTab(reg: ReturnType<typeof getState>['registry']): string {
   return `
     <section class="atlas-settings-section">
       <h3>Maps</h3>
-      <p class="atlas-settings-hint">how atlas renders maps and map affordances across the UI. label toggles default off — tighter icon-only layout. flip on for explicit names.</p>
+      <p class="atlas-settings-hint">How atlas renders maps and map affordances across the UI. Label toggles default off — tighter icon-only layout. Flip on for explicit names.</p>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="show-map-names-in-header" ${showMaps ? 'checked' : ''} />
         <span>Show map names alongside map icons in element header</span>
@@ -197,7 +197,7 @@ function renderIdentityTab(reg: ReturnType<typeof getState>['registry']): string
   return `
     <section class="atlas-settings-section">
       <h3>Identity</h3>
-      <p class="atlas-settings-hint">global, used when creating or linking online worlds. changes to PIN take effect immediately — any active sync engine is re-attached.</p>
+      <p class="atlas-settings-hint">Global, used when creating or linking online worlds. Changes to PIN take effect immediately — any active sync engine is re-attached.</p>
       <label class="atlas-settings-field">
         <span>Email</span>
         <input class="atlas-input" type="email" name="email"
@@ -209,7 +209,7 @@ function renderIdentityTab(reg: ReturnType<typeof getState>['registry']): string
         <span>PIN</span>
         <input class="atlas-input" type="text" name="pin"
                value="${escapeAttr(reg.pin ?? '')}"
-               placeholder="onlyworlds pin (4 digits)"
+               placeholder="OnlyWorlds PIN (4 digits)"
                inputmode="numeric"
                maxlength="4" />
       </label>
@@ -226,7 +226,7 @@ function renderAtlasTab(): string {
   return `
     <section class="atlas-settings-section">
       <h3>Atlas folder</h3>
-      <p class="atlas-settings-hint">where atlas keeps your worlds. new local worlds default here. changing this folder doesn't move existing worlds — they stay where they were created.</p>
+      <p class="atlas-settings-hint">Where atlas keeps your worlds. New local worlds default here. Changing this folder doesn't move existing worlds — they stay where they were created.</p>
       ${ar
         ? `<dl class="atlas-settings-meta">
             <dt>Folder</dt><dd><code>${escapeText(ar.pathHint ?? ar.folderName)}</code></dd>
@@ -234,35 +234,35 @@ function renderAtlasTab(): string {
           <div class="atlas-settings-actions">
             <button class="atlas-btn-ghost" data-action="change-atlas-root">Change folder</button>
           </div>`
-        : `<p>not set up yet.</p>
+        : `<p>Not set up yet.</p>
            <div class="atlas-settings-actions">
              <button class="atlas-btn-primary" data-action="change-atlas-root">Set up atlas folder</button>
            </div>`}
     </section>
     <section class="atlas-settings-section">
       <h3>Editing</h3>
-      <p class="atlas-settings-hint">how clicking a field's value opens the editor. text selection (dragging across text) never opens the editor regardless of mode.</p>
+      <p class="atlas-settings-hint">How clicking a field's value opens the editor. Text selection (dragging across text) never opens the editor regardless of mode.</p>
       <fieldset class="atlas-settings-fieldset">
         <legend>Field edit mode</legend>
         <label class="atlas-settings-radio">
           <input type="radio" name="field-edit-mode" value="modal" ${fieldMode === 'modal' ? 'checked' : ''} />
           <span class="atlas-settings-radio-body">
             <strong>Modal popover <span class="atlas-settings-default-tag">default</span></strong>
-            <em>floating panel anchored near the field. enter to save, esc to cancel.</em>
+            <em>Floating panel anchored near the field. Enter to save, Esc to cancel.</em>
           </span>
         </label>
         <label class="atlas-settings-radio">
           <input type="radio" name="field-edit-mode" value="inline-single" ${fieldMode === 'inline-single' ? 'checked' : ''} />
           <span class="atlas-settings-radio-body">
             <strong>Inline (single line)</strong>
-            <em>row transforms into a one-line input in place. click away to save, esc to cancel.</em>
+            <em>Row transforms into a one-line input in place. Click away to save, Esc to cancel.</em>
           </span>
         </label>
         <label class="atlas-settings-radio">
           <input type="radio" name="field-edit-mode" value="inline-multi" ${fieldMode === 'inline-multi' ? 'checked' : ''} />
           <span class="atlas-settings-radio-body">
             <strong>Inline (multi-line, ~4 rows)</strong>
-            <em>row transforms into a textarea in place. ctrl+enter to save, esc to cancel.</em>
+            <em>Row transforms into a textarea in place. Ctrl+Enter to save, Esc to cancel.</em>
           </span>
         </label>
       </fieldset>
@@ -281,7 +281,7 @@ function renderSyncTab(reg: ReturnType<typeof getState>['registry']): string {
   return `
     <section class="atlas-settings-section">
       <h3>Sync — global</h3>
-      <p class="atlas-settings-hint">applies to every api-linked world. atlas is local-first: pulls are opt-in.</p>
+      <p class="atlas-settings-hint">Applies to every API-linked world. Atlas is local-first: pulls are opt-in.</p>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="pause-all" ${pauseAll ? 'checked' : ''} />
         <span>Pause all sync (master kill switch)</span>
@@ -356,7 +356,7 @@ function renderWorldTab(world: WorldRegistryEntry): string {
               const apiName = world.api.world_name!;
               const differs = apiName !== world.name;
               const hint = differs
-                ? ' <span class="atlas-settings-hint-inline" title="local name and server-side name diverged. atlas never renames the server world automatically.">(differs from local)</span>'
+                ? ' <span class="atlas-settings-hint-inline" title="Local name and server-side name diverged. Atlas never renames the server world automatically.">(differs from local)</span>'
                 : '';
               return `<dt>Name on API</dt><dd>${escapeText(apiName)}${hint}</dd>`;
             })()
@@ -365,7 +365,7 @@ function renderWorldTab(world: WorldRegistryEntry): string {
       ${apiActions}
       <div class="atlas-settings-actions atlas-settings-actions-danger">
         <button class="atlas-btn-ghost" data-action="delete-world">Forget world (keep folder)</button>
-        <button class="atlas-btn-ghost" data-action="delete-world-permanent" title="remove from atlas AND delete the world folder on disk">Delete world + folder</button>
+        <button class="atlas-btn-ghost" data-action="delete-world-permanent" title="Remove from atlas AND delete the world folder on disk">Delete world + folder</button>
       </div>
     </section>
   `;
@@ -377,7 +377,7 @@ function renderAboutTab(): string {
   return `
     <section class="atlas-settings-section">
       <h3>About Atlas</h3>
-      <p>local-first OnlyWorlds browser + editor. folder is the source of truth; api sync is optional.</p>
+      <p>Local-first OnlyWorlds browser + editor. Folder is the source of truth; API sync is optional.</p>
       <dl class="atlas-settings-meta">
         <dt>Version</dt><dd>0.0.1 (phase 3.5)</dd>
         <dt>Repo</dt><dd><a href="https://github.com/OnlyWorlds/atlas" target="_blank" rel="noopener">github.com/OnlyWorlds/atlas</a></dd>
@@ -422,14 +422,14 @@ function wireIdentityTab(toasts: ToastManager): void {
     const next = setEmail(getState().registry, emailInput.value);
     saveRegistry(next);
     patchSlice('registry', next);
-    toasts.info('email saved');
+    toasts.info('Email saved');
   });
   pinInput?.addEventListener('change', async () => {
     const prevPin = getState().registry.pin;
     const next = setPin(getState().registry, pinInput.value);
     saveRegistry(next);
     patchSlice('registry', next);
-    toasts.info('pin saved');
+    toasts.info('PIN saved');
     // Re-attach engine with new credentials if the active world is api-linked
     // and the PIN actually changed. Otherwise stale creds would persist.
     const newPin = next.pin;
@@ -453,8 +453,8 @@ function wireAtlasTab(toasts: ToastManager): void {
       if (result) {
         toasts.success(
           result.imported > 0
-            ? `atlas folder updated — found ${result.imported} world${result.imported === 1 ? '' : 's'} there`
-            : 'atlas folder updated'
+            ? `Atlas folder updated — found ${result.imported} world${result.imported === 1 ? '' : 's'} there`
+            : 'Atlas folder updated'
         );
       }
     } catch (err) {
@@ -477,7 +477,7 @@ function wireAtlasTab(toasts: ToastManager): void {
       const next = setEditorSettings(getState().registry, { field_edit_mode: mode });
       saveRegistry(next);
       patchSlice('registry', next);
-      toasts.info(`field edit mode: ${mode}`);
+      toasts.info(`Field edit mode: ${mode}`);
     });
   });
 }
@@ -499,7 +499,7 @@ function wireSyncTab(toasts: ToastManager): void {
       if (pauseAll.checked) engine.pause('manual');
       else engine.resume();
     }
-    toasts.info(pauseAll.checked ? 'all sync paused' : 'sync resumed');
+    toasts.info(pauseAll.checked ? 'All sync paused' : 'Sync resumed');
   });
 
   pullOnAct?.addEventListener('change', () => {
@@ -564,7 +564,7 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
     const next = renameWorld(getState().registry, world.id, v);
     saveRegistry(next);
     patchSlice('registry', next);
-    toasts.info('renamed');
+    toasts.info('Renamed');
   });
 
   const pausedInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="world-paused"]');
@@ -577,7 +577,7 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
       if (pausedInput.checked) engine.pause('manual');
       else engine.resume();
     }
-    toasts.info(pausedInput.checked ? 'this world set to offline' : 'sync resumed for this world');
+    toasts.info(pausedInput.checked ? 'This world set to offline' : 'Sync resumed for this world');
   });
 
   const refreshBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="refresh-from-api"]');
@@ -585,9 +585,9 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
     refreshBtn.disabled = true;
     try {
       const result = await pullNowAndRefresh();
-      if (!result) { toasts.info('engine not ready'); return; }
+      if (!result) { toasts.info('Engine not ready'); return; }
       const total = result.pulled.creates + result.pulled.updates;
-      toasts.success(total === 0 ? 'already up to date' : `pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
+      toasts.success(total === 0 ? 'Already up to date' : `Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
     } catch (err) {
       toasts.error(err instanceof Error ? err.message : String(err));
     } finally {
@@ -599,7 +599,7 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
   testBtn?.addEventListener('click', async () => {
     if (!world.api) return;
     const pin = getState().registry.pin;
-    if (!pin) { toasts.error('set your pin first'); return; }
+    if (!pin) { toasts.error('Set your PIN first'); return; }
     testBtn.disabled = true;
     try {
       const client = new OnlyWorldsClient({ apiKey: world.api.api_key, apiPin: pin });
@@ -624,14 +624,14 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
             console.warn('[settings] persist api.world_name to world.json failed:', err);
           }
         }
-        toasts.success(`connected — name on api is "${liveName}"${cachedName ? ` (was "${cachedName}")` : ''}`);
+        toasts.success(`Connected — name on API is "${liveName}"${cachedName ? ` (was "${cachedName}")` : ''}`);
       } else {
-        toasts.success(`connected — ${liveName ?? 'world'}`);
+        toasts.success(`Connected — ${liveName ?? 'world'}`);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (/401|403/.test(msg)) toasts.error('api key or pin invalid');
-      else if (/404/.test(msg)) toasts.error('no world for that api key');
+      if (/401|403/.test(msg)) toasts.error('API key or PIN invalid');
+      else if (/404/.test(msg)) toasts.error('No world for that API key');
       else toasts.error(msg);
     } finally {
       testBtn.disabled = false;
@@ -641,7 +641,7 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
   const unlinkBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="unlink-from-api"]');
   unlinkBtn?.addEventListener('click', async () => {
     const ok = window.confirm(
-      `unlink "${world.name}" from api?\n\nlocal files stay where they are. the world stops syncing. you can re-link later from settings or via "+ link api".\n\nthe api world on onlyworlds.com is NOT deleted.`
+      `Unlink "${world.name}" from API?\n\nLocal files stay where they are. The world stops syncing. You can re-link later from settings or via "+ link api".\n\nThe API world on onlyworlds.com is NOT deleted.`
     );
     if (!ok) return;
     // Order matters:
@@ -664,13 +664,13 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
         // still proceeds, but warn loudly so the next Make-Online doesn't
         // silently produce an empty world.
         console.warn('[unlink] resetSyncBaseline failed:', err);
-        toasts.error('warning: could not fully clear sync history — re-linking may produce an empty world. check console.');
+        toasts.error('Warning: could not fully clear sync history — re-linking may produce an empty world. Check console.');
       }
     }
     const next = detachApi(getState().registry, world.id);
     saveRegistry(next);
     patchSlice('registry', next);
-    toasts.success(`unlinked ${world.name}`);
+    toasts.success(`Unlinked ${world.name}`);
   });
 
   const makeOnlineBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="make-online"]');
@@ -679,8 +679,8 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
   const deleteBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="delete-world"]');
   deleteBtn?.addEventListener('click', async () => {
     const ok = window.confirm(
-      `remove "${world.name}" from atlas?\n\n` +
-      `the folder on disk is NOT deleted — atlas just forgets about it. you can re-open the folder anytime to recover.`
+      `Remove "${world.name}" from atlas?\n\n` +
+      `The folder on disk is NOT deleted — atlas just forgets about it. You can re-open the folder anytime to recover.`
     );
     if (!ok) return;
     const store = getActiveStore();
@@ -693,7 +693,7 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
     patchSlice('active', null);
     patchSlice('data', { elements: [] });
     patchSlice('ui', { ...getState().ui, selectedElementId: null });
-    toasts.success(`forgot ${world.name}`);
+    toasts.success(`Forgot ${world.name}`);
     navigate('#/');
   });
 
@@ -701,10 +701,10 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
   deletePermBtn?.addEventListener('click', async () => {
     const ok = window.confirm(
       `PERMANENTLY DELETE "${world.name}"?\n\n` +
-      `this removes atlas's record AND DELETES the world's folder on disk. ` +
-      `everything in it — elements, maps, media — is gone forever.\n\n` +
-      `${world.state === 'api-linked' ? '\n(the matching api world on onlyworlds.com is NOT deleted server-side.)\n' : ''}` +
-      `there is no undo. continue?`
+      `This removes atlas's record AND DELETES the world's folder on disk. ` +
+      `Everything in it — elements, maps, media — is gone forever.\n\n` +
+      `${world.state === 'api-linked' ? '\n(The matching API world on onlyworlds.com is NOT deleted server-side.)\n' : ''}` +
+      `There is no undo. Continue?`
     );
     if (!ok) return;
     deletePermBtn.disabled = true;
@@ -724,11 +724,11 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
       patchSlice('active', null);
       patchSlice('data', { elements: [] });
       patchSlice('ui', { ...getState().ui, selectedElementId: null });
-      toasts.success(`deleted ${world.name} permanently`);
+      toasts.success(`Deleted ${world.name} permanently`);
       navigate('#/');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      toasts.error(`delete failed: ${msg}`);
+      toasts.error(`Delete failed: ${msg}`);
       deletePermBtn.disabled = false;
     }
   });
