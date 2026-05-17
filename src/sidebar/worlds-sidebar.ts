@@ -41,10 +41,22 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const root = state.atlasRoot;
     const recoverable = state.atlasRootRecoverable;
     if (root) {
+      // Uniform compound-icon-button row (Captain session 219). Each button
+      // reads "+target" via a small `add` glyph + a target glyph, with the
+      // full action surfaced in the tooltip. Matches the [+map] / [+pin]
+      // pattern in element-detail headers for visual coherence.
       header.innerHTML = `
-        <button class="atlas-btn-ghost" data-action="create-local" title="create a new world in your atlas folder">+ New local</button>
-        <button class="atlas-btn-ghost" data-action="new-api" title="create a new world on onlyworlds.com AND in your atlas folder">+ New API</button>
-        <button class="atlas-btn-ghost" data-action="link-api" title="download an existing OnlyWorlds api world into atlas">+ Link API</button>
+        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="create-local" title="new local world (in your atlas folder)">
+          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
+          <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
+        </button>
+        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="new-api" title="new api world (creates on onlyworlds.com AND locally)">
+          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
+          <span class="material-symbols-outlined atlas-add-glyph-main">cloud_upload</span>
+        </button>
+        <button class="atlas-create-icon-btn" data-action="link-api" title="link existing api world (downloads into atlas)">
+          <span class="material-symbols-outlined">link</span>
+        </button>
       `;
     } else if (recoverable) {
       header.innerHTML = `

@@ -231,10 +231,12 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     header.appendChild(title);
 
     const newBtn = document.createElement('button');
-    newBtn.className = 'atlas-btn-ghost';
+    newBtn.className = 'atlas-create-icon-btn atlas-header-add-glyph';
     newBtn.setAttribute('data-action', 'new-map');
-    newBtn.textContent = '+ New map';
-    newBtn.title = 'create a new map';
+    newBtn.innerHTML =
+      '<span class="material-symbols-outlined atlas-add-glyph-plus">add</span>' +
+      '<span class="material-symbols-outlined atlas-add-glyph-main">map</span>';
+    newBtn.title = 'new map';
     newBtn.addEventListener('click', async () => {
       const result = await createMapDialog(toasts);
       if (result) openMapTab(result.map);

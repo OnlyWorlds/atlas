@@ -868,6 +868,46 @@
   color: inherit;
 }
 
+/* Uniform compound-icon create button family (session 219). Used by world
+   sidebar "+ new local / api / link", map index "+ new map", and any
+   future "+ new X" affordance that wants the compound add+target glyph
+   pattern (cf [+map] / [+pin] in element-detail headers). Slightly wider
+   than .atlas-create-btn to fit the two glyphs side-by-side, but visually
+   matches in height + hover. */
+.atlas-create-icon-btn {
+  flex: 0 0 auto;
+  height: 28px;
+  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--atlas-text-soft);
+  cursor: pointer;
+  padding: 0 6px;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.atlas-create-icon-btn:hover {
+  background: var(--atlas-cyan-tint);
+  border-color: var(--atlas-cyan-soft);
+  color: var(--atlas-cyan);
+}
+
+.atlas-create-icon-btn .material-symbols-outlined {
+  color: inherit;
+}
+
+/* When used with .atlas-header-add-glyph: the plus glyph stays at 12px and
+   the main at 18px (per existing .atlas-add-glyph-* sizing). When used
+   standalone (single glyph like "link"), the glyph reads at 18px. */
+.atlas-create-icon-btn > .material-symbols-outlined:only-child {
+  font-size: 18px;
+}
+
 /* ============================================================
    Empty pane
    ============================================================ */
