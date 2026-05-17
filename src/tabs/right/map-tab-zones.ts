@@ -46,7 +46,13 @@ export function syncZones(entry: MapTabCacheEntry): void {
     }));
     const mode = getZoneShape(zone);
     const opacity = zoneEffectiveOpacity(zone, prefs.zone_fill_opacity);
-    const labelText = computeLabelText(zone, prefs.zone_labels);
+    // Label policy:
+    //   - 'always' → labelText = zone.name, hover-only = false (always shown)
+    //   - 'hover'  → labelText = zone.name, hover-only = true  (fade on hover)
+    //   - 'never'  → labelText = undefined (no marker built)
+    const labelMode = prefs.zone_labels;
+    const labelText = labelMode === 'never' ? undefined : zone.name;
+    const labelHoverOnly = labelMode === 'hover';
 
     entry.zoneOverlay.addZone({
       id: zone.id,
@@ -55,6 +61,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
       color: (zone as { atlas_color?: string }).atlas_color,
       opacity,
       labelText,
+      labelHoverOnly,
     });
   }
 
@@ -85,10 +92,11 @@ function zoneEffectiveOpacity(zone: Zone, mapDefault: number): number {
   return mapDefault;
 }
 
-function computeLabelText(zone: Zone, mode: 'always' | 'hover' | 'never'): string | undefined {
-  if (mode === 'never') return undefined;
-  if (mode === 'hover') return undefined; // hover-only labels handled via tooltip in a future pass
-  return zone.name;
+// computeLabelText replaced inline (session 219) — label policy now sets both
+// labelText AND labelHoverOnly on the ZoneShape so ZoneOverlay can wire fade
+// behavior. Kept the export-shape pattern for any external callers.
+export function computeLabelText(zone: Zone, mode: 'always' | 'hover' | 'never'): string | undefined {
+  return mode === 'never' ? undefined : zone.name;
 }
 
 /**

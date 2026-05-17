@@ -2835,9 +2835,9 @@
 
 .atlas-policy-option {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
@@ -2845,6 +2845,68 @@
 
 .atlas-policy-option > input[type="radio"] {
   accent-color: #22d3ee;
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
+
+.atlas-policy-option > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.atlas-policy-option > span > strong {
+  font-weight: 500;
+  color: var(--atlas-text);
+}
+
+.atlas-policy-option > span > em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  line-height: 1.4;
+}
+
+/* Modal checkbox row — matches the policy-option shape for visual coherence
+   when checkbox + radios appear together. Used by make-online's
+   match-by-name toggle (session 219 polish). */
+.atlas-modal-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.015);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.atlas-modal-checkbox-row > input[type="checkbox"] {
+  accent-color: #22d3ee;
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
+
+.atlas-modal-checkbox-row > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.atlas-modal-checkbox-row > span > strong {
+  font-weight: 500;
+  color: var(--atlas-text);
+}
+
+.atlas-modal-checkbox-row > span > em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  line-height: 1.4;
 }
 
 .atlas-modal-actions {
@@ -3423,9 +3485,11 @@
 }
 
 /* Zone label rendered above the centroid / line midpoint (DESIGN_ZONES.md §4.5).
-   ZoneOverlay mounts these as Leaflet divIcons. */
+   ZoneOverlay mounts these as Leaflet divIcons. Opacity is set inline by
+   applyStyle; transition makes hover-only labels fade smoothly. */
 .atlas-zone-label {
   pointer-events: none;
+  transition: opacity 140ms ease;
 }
 
 .atlas-zone-label span {
@@ -3475,6 +3539,88 @@
   left: auto;  /* overridden inline */
   z-index: 100;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
+}
+
+/* "(default)" inline tag used in settings radio labels to signal the
+   factory-default option. Same accent-cyan pill as keyboard shortcut keys. */
+.atlas-settings-default-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid var(--atlas-cyan-soft);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  color: var(--atlas-cyan);
+  vertical-align: middle;
+}
+
+/* Keyboard-shortcuts popover (session 219). Lives at document.body level
+   anchored against the sidebar footer's help button. Same dark-glass look
+   as the visual settings popover for visual coherence. */
+.atlas-shortcuts-popover {
+  width: 320px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: rgba(10, 10, 10, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  padding: 10px 12px 8px;
+  user-select: none;
+}
+
+.atlas-shortcuts-title {
+  font-weight: 600;
+  color: var(--atlas-cyan);
+  margin: 0 0 6px;
+  letter-spacing: 0.02em;
+}
+
+.atlas-shortcuts-list {
+  margin: 0;
+  padding: 4px 0;
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) 1fr;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+
+.atlas-shortcuts-list dt {
+  color: var(--atlas-text-soft);
+  text-align: right;
+  font-family: inherit;
+}
+
+.atlas-shortcuts-list dt kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid var(--atlas-divider-strong);
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--atlas-cyan);
+}
+
+.atlas-shortcuts-list dd {
+  margin: 0;
+  color: var(--atlas-text);
+}
+
+.atlas-shortcuts-footer {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--atlas-divider);
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  font-style: italic;
 }
 
 .atlas-popover-header {

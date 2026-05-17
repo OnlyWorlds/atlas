@@ -46,6 +46,14 @@ export interface ZoneShape {
   color?: string;           // hex, defaults to DEFAULT_COLOR
   opacity?: number;         // 0..1, defaults to DEFAULT_OPACITY
   labelText?: string;       // optional label rendered at centroid / line midpoint
+  /**
+   * When true, the label exists in the DOM but starts hidden; mouseover on
+   * the zone outline (or hit-overlay for lines) fades it in, mouseout fades
+   * it out. When false/undefined, label visibility follows the zone's normal
+   * visible state (always visible when zone visible). Captain session 219:
+   * 'hover' zone_labels mode now actually does something.
+   */
+  labelHoverOnly?: boolean;
 }
 
 interface ZoneEntry {
@@ -80,6 +88,12 @@ interface ZoneEntry {
    * dashed (parity with create-mode preview, ZC6).
    */
   editing: boolean;
+  /**
+   * When the user is hovering this zone's outline (or its hit-overlay for
+   * line zones). Toggled by mouseover/out handlers wired in buildEntry.
+   * Used by applyStyle to fade hover-only labels in/out.
+   */
+  hovered: boolean;
   shape: ZoneShape;
   selected: boolean;
   visible: boolean;
@@ -335,18 +349,35 @@ export class ZoneOverlay {
     // clicks to the same zone callback. Leaflet natively suppresses the
     // single `click` event that would otherwise precede a `dblclick`, so
     // separate handlers don't need a manual timeout dance.
+    const self = this;
     const wire = (layer: L.Layer) => {
       layer.on('click', (e: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(e);
-        this.onClick?.(shape.id, e);
+        self.onClick?.(shape.id, e);
       });
       layer.on('dblclick', (e: L.LeafletMouseEvent) => {
         L.DomEvent.stop(e);
-        this.onDblClick?.(shape.id, e);
+        self.onDblClick?.(shape.id, e);
       });
       layer.on('contextmenu', (e: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(e);
-        this.onContext?.(shape.id, e);
+        self.onContext?.(shape.id, e);
+      });
+      // Hover events for hover-only labels (session 219). Mouseover fades the
+      // label in; mouseout fades it out. Cheap — opacity on the divIcon's DOM
+      // element. Wired on BOTH visible + hit layers since line zones have a
+      // wider invisible hit area than the visible stroke.
+      layer.on('mouseover', () => {
+        const e = self.entries.get(shape.id);
+        if (!e || e.hovered) return;
+        e.hovered = true;
+        self.applyStyle(e);
+      });
+      layer.on('mouseout', () => {
+        const e = self.entries.get(shape.id);
+        if (!e || !e.hovered) return;
+        e.hovered = false;
+        self.applyStyle(e);
       });
     };
     wire(visibleLayer);
@@ -361,6 +392,7 @@ export class ZoneOverlay {
       vertexDots: [],
       vertexDotsSuppressed: false,
       editing: false,
+      hovered: false,
     };
 
     if (shape.labelText) {
@@ -468,7 +500,16 @@ export class ZoneOverlay {
     if (entry.labelMarker) {
       const labelEl = entry.labelMarker.getElement();
       if (labelEl) {
-        (labelEl as HTMLElement).style.opacity = showShape ? '1' : '0';
+        // Label visibility rules (session 219):
+        //   - Zone hidden / layer hidden → always 0
+        //   - labelHoverOnly + not hovered → 0
+        //   - Otherwise → 1
+        // CSS transition on the label span gives a smooth fade.
+        let opacity: string;
+        if (!showShape) opacity = '0';
+        else if (entry.shape.labelHoverOnly && !entry.hovered) opacity = '0';
+        else opacity = '1';
+        (labelEl as HTMLElement).style.opacity = opacity;
       }
     }
     // Selected styling: drop-shadow glow on the SVG path + show vertex dots.

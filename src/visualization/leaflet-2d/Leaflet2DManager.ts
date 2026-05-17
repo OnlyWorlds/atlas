@@ -24,6 +24,21 @@ import type {
 import { leafletToStorage, storageToLeaflet, generateId } from './CoordinateUtils';
 
 /**
+ * Translate the semantic `anchor` choice to a Leaflet [x, y] iconAnchor.
+ *   - 'center': icon centered on the latlng — appropriate for disc/round-icon styles.
+ *   - 'bottom-tip': bottom-center aligns to latlng — appropriate for teardrop
+ *     pin-shape so the visible tip points at the map coord.
+ */
+function computeIconAnchor(iconSize: number, anchor: 'center' | 'bottom-tip'): [number, number] {
+  if (anchor === 'bottom-tip') {
+    // Leave a 2px margin at the bottom of the canvas (matches the
+    // pin-visuals tipY = size - 2 used in drawPinShape).
+    return [iconSize / 2, iconSize - 2];
+  }
+  return [iconSize / 2, iconSize / 2];
+}
+
+/**
  * Default configuration values
  */
 const DEFAULT_CONFIG: Omit<ResolvedLeaflet2DConfig, 'containerId'> = {
@@ -342,12 +357,17 @@ export class Leaflet2DManager {
     const iconUrl = data.icon || `/icons/${data.type}.png`;
     const iconSize = (data.scale || 1) * this.config.defaultIconSize;
 
+    // Anchor — 'center' default; 'bottom-tip' for teardrop pin-shape so the
+    // visible point aligns with the latlng. (atlas pin_style consumer in
+    // syncPins picks this.)
+    const iconAnchorXY = computeIconAnchor(iconSize, data.anchor ?? 'center');
+
     // Create marker
     const marker = L.marker(latlng, {
       icon: L.icon({
         iconUrl,
         iconSize: [iconSize, iconSize],
-        iconAnchor: [iconSize / 2, iconSize / 2]
+        iconAnchor: iconAnchorXY
       })
     });
 
@@ -473,13 +493,15 @@ export class Leaflet2DManager {
     }
 
     // Update icon if changed
-    if (updates.icon || updates.scale) {
+    if (updates.icon || updates.scale || updates.anchor) {
       const iconUrl = updates.icon || pin.data.icon || `/icons/${pin.data.type}.png`;
       const iconSize = (updates.scale || pin.data.scale || 1) * this.config.defaultIconSize;
+      const anchorChoice = updates.anchor ?? pin.data.anchor ?? 'center';
+      const iconAnchorXY = computeIconAnchor(iconSize, anchorChoice);
       pin.marker.setIcon(L.icon({
         iconUrl,
         iconSize: [iconSize, iconSize],
-        iconAnchor: [iconSize / 2, iconSize / 2]
+        iconAnchor: iconAnchorXY
       }));
     }
 

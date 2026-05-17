@@ -247,7 +247,7 @@ function renderAtlasTab(): string {
         <label class="atlas-settings-radio">
           <input type="radio" name="field-edit-mode" value="modal" ${fieldMode === 'modal' ? 'checked' : ''} />
           <span class="atlas-settings-radio-body">
-            <strong>Modal popover</strong>
+            <strong>Modal popover <span class="atlas-settings-default-tag">default</span></strong>
             <em>floating panel anchored near the field. enter to save, esc to cancel.</em>
           </span>
         </label>
@@ -304,7 +304,7 @@ function renderSyncTab(reg: ReturnType<typeof getState>['registry']): string {
           <label class="atlas-settings-radio">
             <input type="radio" name="policy" value="${p.value}" ${p.value === defaultPolicy ? 'checked' : ''} />
             <span class="atlas-settings-radio-body">
-              <strong>${p.label}</strong>
+              <strong>${p.label}${p.value === 'local-wins' ? ' <span class="atlas-settings-default-tag">default</span>' : ''}</strong>
               <em>${p.hint}</em>
             </span>
           </label>

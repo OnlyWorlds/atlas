@@ -410,6 +410,19 @@ export async function activateWorld(
     console.warn('[worlds-sidebar] failed to prime elements:', err);
     patchSlice('data', { elements: [] });
   }
+  // Orphan-snapshot recovery (Captain smoke session 219): if the user
+  // refreshed the page mid-zone-edit, the in-flight snapshot persisted to
+  // localStorage. Replay revert via 3-way diff before sync engine attaches
+  // so the autosave that fires on the diff doesn't fight with a fresh pull.
+  try {
+    const { recoverFromOrphanSnapshot } = await import('../tabs/right/zone-edit-mode');
+    await recoverFromOrphanSnapshot(worldId, toasts);
+    // Re-prime elements after revert so UI reflects the rollback.
+    const fresh = await store.listElements();
+    patchSlice('data', { elements: fresh });
+  } catch (err) {
+    console.warn('[worlds-sidebar] orphan-snapshot recovery failed:', err);
+  }
   // No tab hydration — tabs are global across world switches (see comment
   // earlier in this function).
 

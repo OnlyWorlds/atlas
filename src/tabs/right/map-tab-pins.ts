@@ -57,7 +57,10 @@ export function syncPins(entry: MapTabCacheEntry): void {
       if (el) {
         const hasMapBadge = getAssociatedMaps(el.id, elements).length > 0;
         const visual = pinVisualFor(el.type, hasMapBadge, prefs.pin_tint, prefs.pin_style);
-        entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y, name: el.name, icon: visual.iconUrl });
+        // pin-shape's visible tip should align with the latlng (bottom-tip
+        // anchor); icon + round-icon are symmetric and stay centered.
+        const anchor: 'center' | 'bottom-tip' = prefs.pin_style === 'pin-shape' ? 'bottom-tip' : 'center';
+        entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y, name: el.name, icon: visual.iconUrl, anchor });
       } else {
         entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y });
       }
@@ -68,6 +71,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
       const type = el?.type ?? 'object';
       const hasMapBadge = el ? getAssociatedMaps(el.id, elements).length > 0 : false;
       const visual = pinVisualFor(type, hasMapBadge, prefs.pin_tint, prefs.pin_style);
+      const anchor: 'center' | 'bottom-tip' = prefs.pin_style === 'pin-shape' ? 'bottom-tip' : 'center';
       const added = entry.manager.addPin({
         id: pin.id,
         name,
@@ -76,6 +80,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
         y: pin.y,
         icon: visual.iconUrl,
         scale: 1,
+        anchor,
       });
       enablePinDrag(entry, added.marker, pin.id);
     }

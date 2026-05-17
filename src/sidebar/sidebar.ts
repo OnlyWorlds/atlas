@@ -159,6 +159,19 @@ export function mountSidebar(mount: SidebarMount): () => void {
   footer.appendChild(resetLayoutBtn);
   resetLayoutBtn.addEventListener('click', () => onResetLayout());
 
+  // ----- Footer ? button — keyboard shortcut reference (session 219) -----
+  // Tiny inline popover listing implemented gestures + a "more coming"
+  // footer. Discoverability for the bindings that exist TODAY (Esc, F,
+  // Enter, Shift, right-click, etc.) while a full hotkeys kit lands later.
+  const helpBtn = document.createElement('button');
+  helpBtn.className = 'atlas-icon-btn';
+  helpBtn.setAttribute('data-action', 'help-shortcuts');
+  helpBtn.setAttribute('aria-label', 'keyboard shortcuts');
+  helpBtn.title = 'keyboard shortcuts';
+  helpBtn.innerHTML = '<span class="material-symbols-outlined">help</span>';
+  footer.appendChild(helpBtn);
+  helpBtn.addEventListener('click', () => openShortcutsPopover(helpBtn));
+
   // ----- Body mount/unmount as mode changes -----
   let unmountBody: (() => void) | null = null;
   let currentBodyMode: SidebarMode | null = null;
@@ -213,4 +226,73 @@ export function mountSidebar(mount: SidebarMount): () => void {
     unsubHash();
     unmountBody?.();
   };
+}
+
+// ============================================================================
+// Keyboard-shortcut reference popover (session 219).
+// ============================================================================
+
+let activeShortcutsPopover: HTMLElement | null = null;
+
+function openShortcutsPopover(anchor: HTMLElement): void {
+  if (activeShortcutsPopover) {
+    closeShortcutsPopover();
+    return;
+  }
+  const panel = document.createElement('div');
+  panel.className = 'atlas-shortcuts-popover';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-label', 'keyboard shortcuts');
+  panel.innerHTML = `
+    <div class="atlas-shortcuts-title">keyboard shortcuts</div>
+    <dl class="atlas-shortcuts-list">
+      <dt><kbd>Esc</kbd></dt><dd>cancel modal / popover / zone drawing or edit</dd>
+      <dt><kbd>Enter</kbd></dt><dd>finish zone draft · commit zone edit · save field popover</dd>
+      <dt><kbd>F</kbd></dt><dd>fit map to bounds (when map tab is focused)</dd>
+      <dt><kbd>Shift</kbd> + click</dt><dd>snap to 45° axis while drawing a zone</dd>
+      <dt>right-click pin</dt><dd>toggle ghost pins around it</dd>
+      <dt>right-click on map</dt><dd>create element + drop pin (TAB-autocomplete to place existing)</dd>
+      <dt>right-click vertex in edit</dt><dd>delete that marker</dd>
+      <dt>drag pin → trash</dt><dd>delete pin (top-right of map canvas)</dd>
+    </dl>
+    <div class="atlas-shortcuts-footer">more shortcuts coming next session (Ctrl/Cmd+E, Ctrl/Cmd+S, etc.)</div>
+  `;
+  document.body.appendChild(panel);
+
+  // Anchor near the help button — pop UP-RIGHT since the button is in the
+  // sidebar footer (bottom-left area).
+  const r = anchor.getBoundingClientRect();
+  panel.style.position = 'fixed';
+  panel.style.left = `${Math.round(r.right + 6)}px`;
+  panel.style.bottom = `${Math.round(window.innerHeight - r.bottom)}px`;
+  panel.style.zIndex = '200';
+
+  activeShortcutsPopover = panel;
+
+  const outsideHandler = (e: MouseEvent) => {
+    if (!activeShortcutsPopover) return;
+    const t = e.target as Node;
+    if (panel.contains(t) || anchor.contains(t)) return;
+    closeShortcutsPopover();
+  };
+  const escHandler = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') closeShortcutsPopover();
+  };
+  // Defer so the originating click doesn't immediately close us.
+  setTimeout(() => {
+    document.addEventListener('mousedown', outsideHandler);
+    document.addEventListener('keydown', escHandler);
+  }, 0);
+  (panel as HTMLElement & { __atlasCleanup?: () => void }).__atlasCleanup = () => {
+    document.removeEventListener('mousedown', outsideHandler);
+    document.removeEventListener('keydown', escHandler);
+  };
+}
+
+function closeShortcutsPopover(): void {
+  if (!activeShortcutsPopover) return;
+  const p = activeShortcutsPopover as HTMLElement & { __atlasCleanup?: () => void };
+  p.__atlasCleanup?.();
+  if (p.parentElement) p.parentElement.removeChild(p);
+  activeShortcutsPopover = null;
 }

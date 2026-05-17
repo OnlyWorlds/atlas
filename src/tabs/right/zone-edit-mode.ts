@@ -69,6 +69,74 @@ interface EditSession {
 let active: EditSession | null = null;
 let escListenerInstalled = false;
 
+/**
+ * localStorage key for the in-flight edit snapshot. Survives page reload so
+ * we can revert on next world activation. Only one snapshot exists at a time
+ * (matches the singleton edit-session invariant).
+ *
+ * Captain smoke session 219: "if i refresh page in edit mode; it seems to
+ * store the changes, instead of reverting them, after reload." Root cause:
+ * autosave-during-edit + in-memory-only snapshot = refresh loses the snapshot
+ * before the user can Cancel. Fix below: persist the snapshot to localStorage
+ * on enter, clear on exit; on world activation, replay revert if found.
+ */
+const EDIT_SNAPSHOT_KEY = 'atlas_zone_edit_snapshot_v1';
+
+interface PersistedSnapshot {
+  worldId: string;
+  zoneId: string;
+  mapId: string;
+  snapshot: MarkerSnapshot[];
+}
+
+function writePersistedSnapshot(p: PersistedSnapshot): void {
+  try { localStorage.setItem(EDIT_SNAPSHOT_KEY, JSON.stringify(p)); }
+  catch { /* quota — non-fatal; recovery just won't work this session */ }
+}
+
+function readPersistedSnapshot(): PersistedSnapshot | null {
+  try {
+    const raw = localStorage.getItem(EDIT_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedSnapshot;
+    if (!parsed.worldId || !parsed.zoneId || !parsed.mapId || !Array.isArray(parsed.snapshot)) return null;
+    return parsed;
+  } catch { return null; }
+}
+
+function clearPersistedSnapshot(): void {
+  try { localStorage.removeItem(EDIT_SNAPSHOT_KEY); } catch { /* noop */ }
+}
+
+/**
+ * Module-level "just-dragged" guard. Vertex / centroid drag handlers set this
+ * to `Date.now()` on dragstart and clear-by-timeout on dragend. The map-click
+ * handler in map-tab.ts (via insertMarkerAtClick) checks `isMidDragSuppression()`
+ * before inserting — without this, the mouseup that ENDS a drag can also fire
+ * a map-click event (Leaflet's marker drag doesn't always swallow click
+ * propagation), spawning a stray marker right under the drag-released handle.
+ *
+ * Captain smoke session 219: "sometimes ANOTHER marker gets created when I
+ * move one. hard to recreate. but happens sometimes." The race window is
+ * tiny but real.
+ */
+let dragSuppressUntil = 0;
+const DRAG_SUPPRESS_MS = 150;
+
+export function markDragInProgress(): void {
+  dragSuppressUntil = Number.MAX_SAFE_INTEGER;
+}
+
+export function markDragEnded(): void {
+  // Keep suppression active briefly past dragend so the trailing click event
+  // from the mouseup still gets blocked.
+  dragSuppressUntil = Date.now() + DRAG_SUPPRESS_MS;
+}
+
+export function isMidDragSuppression(): boolean {
+  return Date.now() < dragSuppressUntil;
+}
+
 function ensureEscListener(): void {
   if (escListenerInstalled) return;
   escListenerInstalled = true;
@@ -206,6 +274,14 @@ export function enterEditMode(
     order: m.order ?? 0,
   }));
 
+  // Persist snapshot to localStorage so a mid-edit page refresh can still
+  // revert. Cleared by exitEditMode (commit OR cancel) and by the recovery
+  // path after a successful auto-revert.
+  const worldId = getState().active?.worldId;
+  if (worldId) {
+    writePersistedSnapshot({ worldId, zoneId, mapId, snapshot });
+  }
+
   // Suppress ZoneOverlay's read-only vertex dots — our own draggable handles
   // render in their place at the same coords. Polygon outline + selection
   // glow remain unchanged (zone is still selected throughout edit).
@@ -339,6 +415,7 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   let suppressClick = false;
   handle.on('dragstart', () => {
     suppressClick = true;
+    markDragInProgress();
   });
   // Live outline update (ZD4): on every drag frame, update the ZoneOverlay
   // polygon/polyline via setZonePointsLive. We rebuild the points list from
@@ -354,6 +431,7 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   });
   handle.on('dragend', async () => {
     setTimeout(() => { suppressClick = false; }, 50);
+    markDragEnded();
     const newLatLng = handle.getLatLng();
     const pt = leafletToStorage(newLatLng, canvasHeight);
     const x = Math.round(pt.x);
@@ -417,6 +495,7 @@ function buildCentroidHandle(center: Point, canvasHeight: number): L.Marker {
 
   handle.on('dragstart', () => {
     if (!active) return;
+    markDragInProgress();
     const startLatLng = handle.getLatLng();
     const startPt = leafletToStorage(startLatLng, canvasHeight);
     const state = getState();
@@ -454,6 +533,7 @@ function buildCentroidHandle(center: Point, canvasHeight: number): L.Marker {
   });
 
   handle.on('dragend', async () => {
+    markDragEnded();
     if (!active?.centroidDragStart) return;
     const session = active;
     const startSnap = session.centroidDragStart!;
@@ -619,6 +699,11 @@ export function exitEditMode(mode: 'commit' | 'cancel'): void {
     void restoreFromSnapshot(session);
   }
 
+  // Persisted snapshot is no longer needed — both commit and cancel
+  // resolve the in-flight edit. Clear so the recovery path doesn't
+  // re-revert on the next world activation.
+  clearPersistedSnapshot();
+
   // Tear down primitives.
   try {
     const entry = mapTabCache.get(session.mapId);
@@ -638,6 +723,47 @@ export function exitEditMode(mode: 'commit' | 'cancel'): void {
     }
   } catch (err) {
     console.warn('[zone-edit] teardown error:', err);
+  }
+}
+
+/**
+ * Recovery sweep called on world activation. If a persisted snapshot exists
+ * for the just-activated world, replay the revert via the same 3-way diff
+ * path used by Cancel. Cleared after either success or failure (failure
+ * surface: console warn; refusal to retry forever).
+ *
+ * Captain smoke session 219: "if I refresh page in edit mode; it seems to
+ * store the changes, instead of reverting them, after reload."
+ */
+export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts?: ToastManager): Promise<void> {
+  const persisted = readPersistedSnapshot();
+  if (!persisted) return;
+  if (persisted.worldId !== activatedWorldId) {
+    // Snapshot belongs to a different world. Leave it alone — that world's
+    // activation will pick it up. (Multi-world edit isn't supported but a
+    // mid-edit world-switch shouldn't nuke the snapshot.)
+    return;
+  }
+  // Build a temporary session shape just enough for restoreFromSnapshot.
+  const fakeSession: EditSession = {
+    zoneId: persisted.zoneId,
+    mapId: persisted.mapId,
+    snapshot: persisted.snapshot,
+    layerGroup: L.layerGroup(), // unused in restore path
+    vertexMarkers: new Map(),
+    segmentOverlays: [],
+    centroidHandle: null,
+    centroidDragStart: null,
+    toasts: toasts ?? ({ info: () => {}, success: () => {}, error: () => {}, warn: () => {} } as unknown as ToastManager),
+    defaultDoubleClickZoom: false,
+  };
+  try {
+    await restoreFromSnapshot(fakeSession);
+    toasts?.info('reverted unsaved zone edits from previous session');
+  } catch (err) {
+    console.warn('[zone-edit] orphan-snapshot recovery failed:', err);
+  } finally {
+    clearPersistedSnapshot();
   }
 }
 

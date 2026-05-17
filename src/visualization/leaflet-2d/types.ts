@@ -25,6 +25,15 @@ export interface PinData {
   color?: string;            // Optional color override for styling
   scale?: number;            // Icon scale multiplier (default 1.0)
   visible?: boolean;         // Initial visibility (default true)
+  /**
+   * Semantic anchor point for the icon relative to the latlng.
+   *   'center'    (default): icon centered on the latlng — appropriate for
+   *                          symmetric disc/round-icon style pins.
+   *   'bottom-tip':          icon's bottom-center aligns to the latlng —
+   *                          for teardrop pin-shape so the visible tip points
+   *                          at the actual map coord rather than hovering above.
+   */
+  anchor?: 'center' | 'bottom-tip';
   metadata?: Record<string, unknown>;  // Tool-specific data
 }
 

@@ -128,19 +128,28 @@ export class MakeOnlineModal extends BaseModal {
             <input class="atlas-input" type="text" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="four-digit pin" maxlength="8" autocomplete="off" />
           </label>
           <fieldset class="atlas-modal-field atlas-policy-fieldset">
-            <legend>on duplicate (same name + type)</legend>
+            <legend>On duplicate (same name + type)</legend>
             <label class="atlas-policy-option">
               <input type="radio" name="link-policy" value="b" checked />
-              <span><strong>overwrite</strong> — local copy wins</span>
+              <span>
+                <strong>overwrite <span class="atlas-settings-default-tag">default</span></strong>
+                <em>local copy wins — pushes your version, server's is replaced.</em>
+              </span>
             </label>
             <label class="atlas-policy-option">
               <input type="radio" name="link-policy" value="c" />
-              <span><strong>skip</strong> — keep server copy</span>
+              <span>
+                <strong>skip</strong>
+                <em>keep server copy — local edits to matched elements are lost.</em>
+              </span>
             </label>
           </fieldset>
-          <label class="atlas-settings-toggle" style="margin-top: 4px;">
+          <label class="atlas-modal-checkbox-row">
             <input type="checkbox" name="link-match-by-name" checked />
-            <span>treat same-name elements as duplicates (uncheck to allow same-name elements as separate items)</span>
+            <span>
+              <strong>treat same-name elements as duplicates</strong>
+              <em>uncheck to allow same-name elements to coexist as separate items.</em>
+            </span>
           </label>
           <div class="atlas-modal-error" data-role="link-error" hidden></div>
           <div class="atlas-modal-progress" data-role="link-progress" hidden></div>

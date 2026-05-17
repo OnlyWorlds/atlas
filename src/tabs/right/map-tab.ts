@@ -40,7 +40,7 @@ import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import { startDrawing, placeMarkerAt, getActiveDraft, cancelDrawing, disposeDraftForMap } from './zone-drawing';
 import { ZoneOverlay } from '../../visualization/leaflet-2d/ZoneOverlay';
 import { syncZones, wireChipStrip, refreshActiveMapZones } from './map-tab-zones';
-import { enterEditMode, isEditing, getEditingZoneId, getEditingMapId, abortEditModeForMap, syncEditMode, insertMarkerAtClick } from './zone-edit-mode';
+import { enterEditMode, isEditing, getEditingZoneId, getEditingMapId, abortEditModeForMap, syncEditMode, insertMarkerAtClick, isMidDragSuppression } from './zone-edit-mode';
 
 let containerSeq = 0;
 
@@ -351,8 +351,15 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       // Edit-mode click-anywhere insert: only fires for clicks that didn't hit
       // a vertex handle (marker click doesn't bubble to map-click in Leaflet)
       // or a segment overlay (its handler calls L.DomEvent.stop). So a stray
-      // canvas click while editing safely lands here without double-firing.
+      // canvas click while editing safely lands here without double-firing —
+      // EXCEPT for the brief window right after a vertex/centroid dragend,
+      // where the mouseup that ended the drag can also trigger a map-click
+      // (Captain smoke session 219: "another marker gets created when I move
+      // one. hard to recreate."). The dragend handlers in zone-edit-mode arm
+      // a 150ms suppression window; check that here so post-drag clicks are
+      // swallowed cleanly.
       if (isEditing() && getEditingMapId() === mapId) {
+        if (isMidDragSuppression()) return;
         await insertMarkerAtClick(ev.point);
         return;
       }
@@ -451,6 +458,15 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       (e.originalEvent as MouseEvent).preventDefault();
       const latlng = (e as any).latlng;
       if (!latlng) return;
+      // Block during zone edit mode (Captain smoke session 219). Creating a
+      // pin via right-click WHILE editing a zone tore down the edit overlay
+      // without confirming changes (the modal-open path triggered a stray
+      // exitEditMode-without-cancel). Refuse cleanly with a toast so the
+      // user has to exit edit explicitly first.
+      if (isEditing() && getEditingMapId() === entry.mapId) {
+        toasts.info('finish zone edit first (Done or Esc)');
+        return;
+      }
       // Same gate as the placement-banner map-click path.
       const currentMap = getState().data.elements.find(
         (em): em is WorldMap => em.type === 'map' && em.id === entry.mapId,
@@ -677,7 +693,8 @@ onPinVisualsReady(() => {
           ? getAssociatedMaps(pinnedEl.id, elements).length > 0
           : false;
         const visual = pinVisualFor(type, hasMapBadge, prefs.pin_tint, prefs.pin_style);
-        entry.manager.updatePin(existing.id, { icon: visual.iconUrl });
+        const anchor: 'center' | 'bottom-tip' = prefs.pin_style === 'pin-shape' ? 'bottom-tip' : 'center';
+        entry.manager.updatePin(existing.id, { icon: visual.iconUrl, anchor });
       }
     });
   }
