@@ -188,21 +188,37 @@ function renderIcon(iconName: string, color: string, hasMapBadge: boolean = fals
   return canvas.toDataURL('image/png');
 }
 
-/** Default style — filled disc with a centered Material Symbol glyph. */
+/**
+ * Default style — JUST the icon glyph in the tint color, no background disc.
+ * A double-stroke (wide light halo + thin dark outline) is painted UNDER the
+ * glyph so the icon stays readable against any map background — bright maps
+ * and dark maps alike. Captain feedback session 219: "icon should be JUST
+ * icon, no circle around it. and darker, not white."
+ */
 function drawFilledIcon(ctx: CanvasRenderingContext2D, size: number, color: string, iconName: string): void {
-  ctx.beginPath();
-  ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  const cx = size / 2;
+  const cy = size / 2 + 1;
 
-  ctx.font = '22px "Material Symbols Outlined"';
+  ctx.font = '28px "Material Symbols Outlined"';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(iconName, size / 2, size / 2 + 1);
+
+  // Wide light halo so the icon stays legible on dark maps.
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
+  ctx.strokeText(iconName, cx, cy);
+
+  // Thin dark outline keeps shape definition on bright maps where the
+  // light halo alone would wash out.
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+  ctx.strokeText(iconName, cx, cy);
+
+  // Glyph fill in the tint color.
+  ctx.fillStyle = color;
+  ctx.fillText(iconName, cx, cy);
 }
 
 /**

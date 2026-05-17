@@ -123,6 +123,43 @@ function clearPersistedSnapshot(): void {
 let dragSuppressUntil = 0;
 const DRAG_SUPPRESS_MS = 150;
 
+/**
+ * rAF-throttled live-outline scheduler. Vertex-drag (and centroid-drag) used
+ * to call setZonePointsLive on EVERY drag event — for polygons with many
+ * markers, the SVG re-projection cost stacked up and made the drag visually
+ * lag behind the cursor. We batch: each drag event stashes its intended
+ * points; one frame later the latest stash is applied. If multiple drag
+ * events arrive within a frame, only the latest gets applied. Same SVG
+ * mutation work; one apply per frame instead of N per frame.
+ *
+ * Captain smoke session 219: "if i move a marker, it drags behind cursor,
+ * catching up... in zoner, these were not delayed, snappier."
+ */
+let pendingLivePoints: Point[] | null = null;
+let liveRafHandle: number | null = null;
+
+function scheduleLivePointsApply(points: Point[]): void {
+  pendingLivePoints = points;
+  if (liveRafHandle !== null) return;
+  liveRafHandle = requestAnimationFrame(() => {
+    liveRafHandle = null;
+    const pts = pendingLivePoints;
+    pendingLivePoints = null;
+    if (!pts || !active) return;
+    const entry = mapTabCache.get(active.mapId);
+    if (!entry?.zoneOverlay) return;
+    if (pts.length >= 2) entry.zoneOverlay.setZonePointsLive(active.zoneId, pts);
+  });
+}
+
+function cancelPendingLivePoints(): void {
+  if (liveRafHandle !== null) {
+    cancelAnimationFrame(liveRafHandle);
+    liveRafHandle = null;
+  }
+  pendingLivePoints = null;
+}
+
 export function markDragInProgress(): void {
   dragSuppressUntil = Number.MAX_SAFE_INTEGER;
 }
@@ -205,29 +242,7 @@ export async function insertMarkerAtClick(clickPoint: Point): Promise<void> {
   const x = clamp(Math.round(clickPoint.x), 0, w);
   const y = clamp(Math.round(clickPoint.y), 0, h);
   const newOrder = closest.index + 1;
-
-  try {
-    const bumps = zoneMarkers.filter(m => (m.order ?? 0) >= newOrder);
-    bumps.sort((a, b) => (b.order ?? 0) - (a.order ?? 0));
-    for (const m of bumps) {
-      await store.updateMarker(m.id, { order: (m.order ?? 0) + 1 });
-    }
-    await store.createMarker({
-      name: '',
-      map_id: active.mapId,
-      zone_id: active.zoneId,
-      x,
-      y,
-      order: newOrder,
-    });
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
-    requestPushIfLinked();
-    rebuildHandles();
-  } catch (err) {
-    console.error('[zone-edit] insert-at-click failed:', err);
-    active.toasts.error('failed to insert marker');
-  }
+  await optimisticInsertMarker({ x, y, order: newOrder, zoneMarkers });
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -424,14 +439,15 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   // SVG path in place. No store write here; dragend handles persistence.
   handle.on('drag', () => {
     if (!active) return;
-    const entry = mapTabCache.get(active.mapId);
-    if (!entry?.zoneOverlay) return;
     const points = collectLivePointsFromHandles(canvasHeight);
-    if (points.length >= 2) entry.zoneOverlay.setZonePointsLive(active.zoneId, points);
+    scheduleLivePointsApply(points);
   });
   handle.on('dragend', async () => {
     setTimeout(() => { suppressClick = false; }, 50);
     markDragEnded();
+    // Flush any pending rAF live-point update so the final position is the
+    // committed one, not a stale-frame snapshot.
+    cancelPendingLivePoints();
     const newLatLng = handle.getLatLng();
     const pt = leafletToStorage(newLatLng, canvasHeight);
     const x = Math.round(pt.x);
@@ -523,13 +539,10 @@ function buildCentroidHandle(center: Point, canvasHeight: number): L.Marker {
       if (!vh) continue;
       vh.setLatLng(storageToLeaflet({ x: origPos.x + dx, y: origPos.y + dy }, canvasHeight));
     }
-    // Live outline (ZD4): update the polygon/polyline via ZoneOverlay
-    // setZonePointsLive — reads the handles' fresh latlngs we just set.
-    const entry = mapTabCache.get(active.mapId);
-    if (entry?.zoneOverlay) {
-      const points = collectLivePointsFromHandles(canvasHeight);
-      if (points.length >= 2) entry.zoneOverlay.setZonePointsLive(active.zoneId, points);
-    }
+    // Live outline (ZD4) — rAF-throttled so SVG re-projection doesn't block
+    // the centroid-handle's render frame.
+    const points = collectLivePointsFromHandles(canvasHeight);
+    scheduleLivePointsApply(points);
   });
 
   handle.on('dragend', async () => {
@@ -579,10 +592,15 @@ function buildSegmentOverlay(
 ): L.Polyline {
   const aLatLng = storageToLeaflet({ x: a.x, y: a.y }, canvasHeight);
   const bLatLng = storageToLeaflet({ x: b.x, y: b.y }, canvasHeight);
+  // Wider hit zone (32px) and a non-zero rest opacity (0.01). SVG pointer
+  // events default to `visiblePainted` which won't hit a stroke at opacity 0
+  // on some browsers — Captain smoke session 219: "hard to hover a line
+  // during edit mode... hover feels very exact/finicky." Both changes
+  // combine for reliable hits without making the overlay actually visible.
   const segment = L.polyline([aLatLng, bLatLng], {
     color: '#22d3ee',
-    weight: 20,
-    opacity: 0,
+    weight: 32,
+    opacity: 0.01,
     interactive: true,
     dashArray: '6, 6',
     className: 'atlas-zone-edit-segment',
@@ -592,7 +610,7 @@ function buildSegmentOverlay(
     segment.setStyle({ opacity: 0.3 });
   });
   segment.on('mouseout', () => {
-    segment.setStyle({ opacity: 0 });
+    segment.setStyle({ opacity: 0.01 });
   });
 
   // Click → insert marker at the midpoint of a→b. Renumber-all
@@ -624,31 +642,103 @@ async function insertMarkerOnSegment(segmentIndex: number): Promise<void> {
   const midX = Math.round((a.x + b.x) / 2);
   const midY = Math.round((a.y + b.y) / 2);
   const newOrder = insertAfterIndex + 1;
+  await optimisticInsertMarker({ x: midX, y: midY, order: newOrder, zoneMarkers });
+}
 
+/**
+ * Optimistic marker insertion (session 219). Updates `state.data.elements`
+ * synchronously so the UI shows the new marker + bumped neighbors
+ * immediately, then fires the FS Access store writes in the background. With
+ * 5+ siblings to renumber, the N sequential FS writes used to take ~1s of
+ * visible lag — Captain: "if i place a marker for existing zone during edit,
+ * it takes a second to appear." This path makes the UI feel instant.
+ *
+ * Mints a client UUID for the new marker so the optimistic state and the
+ * subsequent createMarker call agree on id. On store failure, re-prime from
+ * disk + rebuildHandles to roll back.
+ */
+async function optimisticInsertMarker(args: {
+  x: number;
+  y: number;
+  order: number;
+  zoneMarkers: Marker[];
+}): Promise<void> {
+  if (!active) return;
+  const store = getActiveStore();
+  if (!store) return;
+  const { x, y, order: newOrder, zoneMarkers } = args;
+
+  const newId = crypto.randomUUID();
+  const nowIso = new Date().toISOString();
+
+  // Build the optimistic next element set.
+  // - Every marker with current order >= newOrder gets bumped by 1
+  // - The new marker is inserted with the chosen order
+  // Use a Set lookup so other-zone markers + non-marker elements are passed
+  // through untouched.
+  const bumpIds = new Set(
+    zoneMarkers.filter(m => (m.order ?? 0) >= newOrder).map(m => m.id),
+  );
+  const state = getState();
+  const nextElements = state.data.elements.map(e => {
+    if (bumpIds.has(e.id)) {
+      const m = e as Marker;
+      return { ...m, order: (m.order ?? 0) + 1, local_updated_at: nowIso } as Marker;
+    }
+    return e;
+  });
+  const newMarker: Marker = {
+    id: newId,
+    type: 'marker',
+    name: '',
+    map_id: active.mapId,
+    zone_id: active.zoneId,
+    x,
+    y,
+    order: newOrder,
+    local_updated_at: nowIso,
+  } as Marker;
+  nextElements.push(newMarker);
+
+  // FLIP UI now. State subscribers fire → ZoneOverlay.updateZone re-renders
+  // the polygon with the new vertex; rebuildHandles below puts a draggable
+  // handle at the new spot. From the user's perspective: instant.
+  patchSlice('data', { elements: nextElements });
+  rebuildHandles();
+
+  // Background: persist to FolderStore. Failures revert by re-priming from disk.
   try {
-    // First bump every marker whose current order >= newOrder up by one.
-    // Work in REVERSE order so we don't collide with ourselves mid-loop.
-    const bumps = zoneMarkers.filter(m => (m.order ?? 0) >= newOrder);
-    bumps.sort((x, y) => (y.order ?? 0) - (x.order ?? 0));
+    const bumps = zoneMarkers.filter(m => bumpIds.has(m.id));
+    // Work in reverse so we don't collide with ourselves on disk.
+    bumps.sort((p, q) => (q.order ?? 0) - (p.order ?? 0));
     for (const m of bumps) {
       await store.updateMarker(m.id, { order: (m.order ?? 0) + 1 });
     }
-    // Then create the new marker at the midpoint.
     await store.createMarker({
+      id: newId,
       name: '',
       map_id: active.mapId,
       zone_id: active.zoneId,
-      x: midX,
-      y: midY,
+      x,
+      y,
       order: newOrder,
     });
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
+    // Reconcile state with disk for the canonical timestamps + any drift.
+    const fresh = await store.listElements();
+    patchSlice('data', { elements: fresh });
     requestPushIfLinked();
     rebuildHandles();
   } catch (err) {
-    console.error('[zone-edit] insert marker failed:', err);
-    active.toasts.error('failed to insert marker');
+    console.error('[zone-edit] optimistic insert background-write failed:', err);
+    active?.toasts.error('failed to insert marker — reverting');
+    // Re-prime from disk (truth) and re-render handles.
+    try {
+      const fresh = await store.listElements();
+      patchSlice('data', { elements: fresh });
+      rebuildHandles();
+    } catch {
+      /* if even the re-prime fails, leave the UI as-is; reload will recover */
+    }
   }
 }
 
