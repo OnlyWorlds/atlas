@@ -29,8 +29,13 @@ const LINE_HIT_WEIGHT = 20;
 // Lazy-init shared SVG renderer for zone shapes. Stored per-map at module
 // level because each Leaflet map needs its own renderer instance, but
 // within a single map all zones share. Map keyed by the L.Map instance.
+//
+// Exported so zone-edit-mode's segment overlays can use the SAME renderer —
+// putting them in the same SVG element as the polygon, which makes
+// bringToFront() actually reorder them above the polygon (Captain smoke
+// session 219 wave 6 — "hover cuts off as soon as mouse ENTERS the zone").
 const svgRendererByMap = new WeakMap<L.Map, L.Renderer>();
-function getZoneSvgRendererForMap(map: L.Map): L.Renderer {
+export function getZoneSvgRendererForMap(map: L.Map): L.Renderer {
   let r = svgRendererByMap.get(map);
   if (!r) {
     r = L.svg({ pane: 'overlayPane' });

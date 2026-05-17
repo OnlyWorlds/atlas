@@ -33,6 +33,7 @@ import { getActiveStore } from '../../ui/create-world-modal';
 import { requestPushIfLinked } from '../../sync/sync-attach';
 import { storageToLeaflet, leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import { findClosestSegment, polygonCentroid, polylineLabelAnchor, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
+import { getZoneSvgRendererForMap } from '../../visualization/leaflet-2d/ZoneOverlay';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { markersForZoneOnMap, partitionZonesAndMarkers, getZoneShape } from './zone-derived';
 import type { Marker, Zone } from '../../core/types';
@@ -610,17 +611,26 @@ function buildSegmentOverlay(
   const bLatLng = storageToLeaflet({ x: b.x, y: b.y }, canvasHeight);
   // 18px stroke gives a ~9px hit zone on EACH SIDE of the segment centerline.
   // That covers "just inside" the polygon edge as well as just outside —
-  // Captain smoke session 219 wave 5: "in zoner, it creates the click-to-
-  // insert highlight also if you hover just INSIDE the lines. but in atlas
-  // it seems to only detect hovers that are on the line or outside."
+  // Captain smoke session 219 wave 5/6.
   //
-  // Root cause: the polygon's `interactive` fill (fillOpacity 0.4) was
-  // intercepting hover events on the interior side. Fix below: segment
-  // bringToFront() raises it above the polygon in SVG render order so the
-  // polygon's fill no longer captures hovers in the segment's band.
+  // Root cause of the original bug: polygon's interactive fill (fillOpacity
+  // 0.4) intercepted hovers on the interior side. bringToFront alone wasn't
+  // enough — the segments were in the CANVAS renderer (Leaflet2DManager
+  // default) while the polygon uses a forced SVG renderer; canvas and svg
+  // are different DOM elements, so bringToFront couldn't promote segments
+  // above the polygon. Fix: force segments into SVG via `renderer:`
+  // explicitly. Now bringToFront moves segments above the polygon in the
+  // shared SVG context where it actually matters for hit-testing.
   //
-  // Visible weight smaller too (was 32, Captain "highlight visuals slightly
+  // Visible weight smaller (was 32, Captain "highlight visuals slightly
   // smaller"). Hover opacity bumped 0.3 → 0.4 since the stripe is thinner.
+  // Share the EXACT renderer that ZoneOverlay uses for the polygon. Same SVG
+  // element = bringToFront() can move segments above the polygon at the
+  // per-path level. Different renderers (even both SVG) would land in
+  // separate <svg> elements in overlayPane, and bringToFront would only
+  // reorder within each.
+  const map = active ? mapTabCache.get(active.mapId)?.manager.getMap() ?? null : null;
+  const renderer = map ? getZoneSvgRendererForMap(map) : undefined;
   const segment = L.polyline([aLatLng, bLatLng], {
     color: '#22d3ee',
     weight: 18,
@@ -628,6 +638,7 @@ function buildSegmentOverlay(
     interactive: true,
     dashArray: '6, 6',
     className: 'atlas-zone-edit-segment',
+    renderer,
   });
 
   segment.on('mouseover', () => {
