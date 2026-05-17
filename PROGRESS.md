@@ -5,24 +5,75 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 
 ---
 
-## NEXT CHAT PILE (curated 2026-05-17, session 217 close)
+## ZONE SUBSYSTEM STATE (handover snapshot, session 218 close)
 
-Most of the session 215 pile + Captain's 10-tweak batch (session 217) is shipped. What remains:
+Quick-grasp doc for the next-chat me. The zone subsystem has been the spine of the last 6 sessions (213-218). Architecture is stable; the next batch is polish + cross-cutting concerns.
 
-### Deferred polish (lower priority)
-- **Pin STYLE variants** (V1.5 STYLE — deferred since session 216). Popover persists `pin_style` ('icon' / 'round-icon' / 'pin-shape') but no consumer. Needs visual specs for the three variants before implementation pays off. Currently a no-op for the user; the persist-without-effect is the only smell.
-- **Snap-to-existing-vertex** during draw/edit (zoner Ctrl+hover snaps onto another marker's coord). Polish, not v1.
-- **Popover label capitalization** — minor styling pass to match atlas convention (lowercase section labels).
+### Current architecture (as-shipped)
+- **Domain model** (DESIGN_ZONES §1): Zone = pure metadata (no map_id, no coords). Markers carry map_id + zone_id + x/y/order. Geometry is emergent: a zone "appears on map M" iff at least one marker references both.
+- **Shape storage**: `atlas_shape: 'polygon'|'line'` extension field (local-only, never synced). Read via `getZoneShape(zone)` helper which falls back to legacy `supertype` for pre-ZD6 zones. **Never read `zone.supertype` for shape — always go through the helper.**
+- **Supertype / subtype**: free user-meaningful text (OW canon). Empty input → undefined.
 
-### Centroid handle live outline (ZC7 tradeoff)
-- During centroid drag, the polygon outline stays in original position until dragend commit. Vertices follow live but the connecting polygon doesn't. Future polish: call `ZoneOverlay.updateZone` during drag (cheap polyline rebuild) so the outline tracks vertices in real time. Adds ~15-line method + a per-frame call. Worth it if Captain finds the outline-snap-on-release jarring.
+### Drawing flow (sessions 213/217/218)
+- Toolbar ⬡ / ╱ buttons → `startDrawing(entry, mode, toasts)` in `zone-drawing.ts`. Cursor crosshair, draft overlay mounts.
+- Map clicks → `placeMarkerAt`. Shift snaps to 45° axis from last marker. **Close-to-edge clicks splice into the right segment** (ZD5 — `findClosestSegment` with 20-storage-unit threshold).
+- Draft markers are **draggable** (SB3); polygon outline follows live (ZC2). Numbers are bold + haloed (SB4/B4).
+- **Enter** finishes (ZC1) or click ✓ Finish. **Escape** cancels.
+- Finish → opens **ZoneCreateModal** (ZC10). Shape badge (read-only), name (auto-selected), supertype text, subtype text. Submit writes `atlas_shape: draft.mode` + user text. Cancel keeps draft active.
 
-### Sync / API smoke (Captain's tasks)
-- **Repair existing server markers** pushed during the pre-migration broken window. Manual: enter edit mode on each affected zone → drag any marker a pixel → release → updateMarker PATCH includes order → fixed.
-- **Verify zoner discrepancy resolved**. Push a fresh zone from atlas → open in zoner → polygon outline correct.
+### Edit flow (sessions 214/217/218)
+- Double-click polygon OR "Edit shape" button → `enterEditMode(zoneId, mapId, toasts)` in `zone-edit-mode.ts`.
+- ZoneOverlay outline goes **dashed** (ZC6), vertex dots suppressed, **numbered draggable handles** appear, **centroid drag handle** at center (ZC7, `open_with` glyph).
+- **Live outline** during vertex OR centroid drag (ZD4) — `ZoneOverlay.setZonePointsLive` uses `setLatLngs` to mutate SVG path in place per frame.
+- Click anywhere on canvas → insert marker at click point at nearest segment (ZC8).
+- Hover segment → cyan dashed overlay; click → midpoint insert.
+- Right-click vertex → delete (refuses if shape would drop below min).
+- Enter or "Done" commits; Escape or "Cancel ✗" restores from snapshot (3-way diff).
 
-### Cross-tool
-- **map-tab.ts size watch** (named-and-skipped split, session 216). Now 657 lines after this session's wireZonesDropdown + insertMarkerAtClick branch additions. Still under the session 212 threshold (858) but creeping. Next maps-touching bout, evaluate a second extraction (e.g. pull the contextmenu + dragover/drop handlers into `map-tab-drop.ts`).
+### View flow
+- Zone selected (not editing) → glow + plain cyan vertex dots, **no numbers** (ZC4). Outline solid.
+- **Toolbar dropdown** (ZC9, ZD2/ZD3) replaces the bottom chip strip. Right-anchored button shows count; click opens panel listing chips. Trash icon (ZD2) deletes; **canvas updates immediately** after delete (ZD2 fixed the orphan-overlay bug via new `ZoneOverlay.getZoneIds()` accessor).
+
+### Element-detail surface
+- Standard schema-driven editor + two zone-specific sections (DESIGN_ZONES §4.4):
+  - "Zone visuals" — atlas_color, atlas_opacity, atlas_label_visible (all local-only)
+  - "Markers" — per-map grouped list with pan/delete buttons, "Edit shape" button
+- Header `[map]` icons via `getAssociatedMaps` → click pans to centroid.
+
+### Key files (zone subsystem)
+- `src/tabs/right/zone-drawing.ts` — draft state, placeMarkerAt, finishDrawing → modal
+- `src/tabs/right/zone-edit-mode.ts` — enterEditMode, handles, centroid, click-anywhere insert, live outline
+- `src/tabs/right/zone-derived.ts` — listZonesOnMap, markersForZoneOnMap, partitionZonesAndMarkers, **getZoneShape**
+- `src/tabs/right/zone-drawing-overlay.ts` — draft DOM strip
+- `src/tabs/right/map-tab-zones.ts` — syncZones, renderChipStrip (now → dropdown), chip click handlers
+- `src/visualization/leaflet-2d/ZoneOverlay.ts` — addZone/updateZone, setZoneSelected, setZoneEditing, setVertexDotsSuppressed, setZonePointsLive, getZoneIds
+- `src/visualization/leaflet-2d/ZoneGeometry.ts` — findClosestSegment, projectToSegment, snapToAxis, polygonCentroid, polylineLabelAnchor, distanceToSegment
+- `src/middle/element-detail-zone-sections.ts` — visuals + markers sections
+- `src/ui/zone-create-modal.ts` — create modal (ZC10/ZD6)
+- `DESIGN_ZONES.md` + `DESIGN_MAPS.md` §11-13 — design reference
+
+### Known gaps / open work (Captain's next-chat dump)
+Captain will re-paste the full list next chat. Themes that emerged:
+- **Map view preserve on reload** — currently resets to too-far-out zoom; should fit-to-image instead.
+- **Cursor STILL hand** — my ZD1 !important fix may not have caught all cases. Re-investigate (could be an inline style from leaflet's interaction state).
+- **Visual settings popover** — move from on-canvas overlay to anchored-right inside the middle panel (or compact it). Several pin/zone visual prefs still don't render-respond (pin shape, pin color, zone opacity, zone labels — need to audit + wire). Grid is faint, 50px is large, allow custom size. Save-as-default shouldn't propagate to maps with their own override (currently does — bug).
+- **Modal consistency audit** — some modals have white inputs that don't match. Need a uniform modal base + list of all modals.
+- **New-X buttons** (new local world, new map, etc) — visual unification needed.
+- **Hotkeys + accessibility** — Ctrl+E for create element, Ctrl+S for save, tab-fillable modals.
+- **Element file naming**: prepend slug to filename instead of just UUID (audit + smoke for any path-parsing breakage).
+- **Inline edit option for text fields** (alternative to modal): setting with three modes — modal / single-line inline / 4-line inline.
+- **Text selection inside fields** — currently left-to-right selection triggers field-edit; right-to-left doesn't. Inconsistent. Fix to allow free text selection.
+- **Link-field icons** — after a recent change, category icons in link fields are missing until ≥1 link exists. Should always be visible (anchored right) and clickable to open picker.
+
+### Deferred (still standing)
+- Pin STYLE variants (V1.5 STYLE) — needs visual specs.
+- Snap-to-existing-vertex during draw/edit — polish.
+- Popover label capitalization — minor styling.
+- map-tab.ts size watch — 657 lines, still under 858 threshold but creeping. Consider extracting drop/contextmenu handlers if we touch maps work.
+
+### Sync/API smoke (Captain's tasks, still open)
+- Repair pre-migration server markers (manual: enter edit, nudge a marker, release).
+- Verify zoner cross-tool render of atlas-pushed zones.
 
 ---
 

@@ -153,7 +153,11 @@ Both are pure functions over `state.data.elements`. No new store API needed beyo
 
 ### 1.5 Shape kind: polygon or line
 
-OW Zone schema does NOT carry a "polygon vs line" field directly. The convention zoner established (and atlas inherits): **`Zone.supertype` = `'polygon'` or `'line'`**. This is the canonical place. Subtype is user-defined free text (e.g., `'road'`, `'kingdom'`, `'forest'`).
+OW Zone schema does NOT carry a "polygon vs line" field directly. Pre-ZD6 convention (inherited from zoner) put it in `Zone.supertype`, but that conflated shape with OW's free-text taxonomy field.
+
+**As of session 218 (ZD6)** atlas stores shape in a local-only extension field `atlas_shape: 'polygon' | 'line'`. The field is never pushed to the OW API (atlas-local convention) but persists on disk so reloads see it. `Zone.supertype` is now free user-meaningful text again (e.g. "regions", "districts", "biomes"), as is `subtype` ("forest", "road", "plaza").
+
+Reads go through `getZoneShape(zone)` (in `tabs/right/zone-derived.ts`) which checks `atlas_shape` first and falls back to legacy `supertype === 'polygon'|'line'` for zones created before ZD6. Default for ambiguous: `'polygon'`. **Never read `zone.supertype` directly to decide rendering** — go through the helper.
 
 Polygons: ≥3 markers, last connects to first (visually closed).
 Lines: ≥2 markers, open path.
@@ -232,14 +236,15 @@ A small floating control strip near the top-center of the canvas (transient, mou
 
 ### 2.6 Finish
 
-User clicks ✓ Finish. In one atomic folder-store batch:
+User clicks ✓ Finish, hits Enter (ZC1), or — when the click is close to an existing edge (ZD5) — gets shape-preserving auto-insert instead of an append. As of session 217 (ZC10), Finish opens a create modal before writing:
 
-1. Compute zone name: `findUniqueZoneName(mode)` — "new zone" / "new zone (2)" / etc. Or "new line" for line mode.
-2. `store.createZone({ name, supertype: mode })` → returns the new zone with a UUID. No map_id, no coordinates (per §1).
-3. For each `points[i]`: `store.createMarker({ name: '', map_id, zone_id: zone.id, x: points[i].x, y: points[i].y, order: i })`. Marker names default to empty string (user can name them later if they care).
-4. Patch `data.elements` with the new zone + markers (one combined patch to trigger a single render).
-5. `requestPushIfLinked()` — autosave debounce will coalesce the burst into one push window.
-6. Clear `ui.zoneDrafting`. Set `selectedElementId = zone.id` so the user lands in zone element-detail in the middle pane.
+1. Compute default name: `findUniqueZoneName(mode)` — "new zone" / "new zone (2)" / "new line" / etc.
+2. Open `ZoneCreateModal` with the locked shape badge + name (auto-selected) + supertype text + subtype text. Cancel = keep draft active; submit = proceed.
+3. `store.createZone({ name, supertype, subtype, atlas_shape: draft.mode })` — shape lives in the atlas-local field (ZD6); supertype + subtype are whatever the user typed. No map_id, no coordinates.
+4. For each `points[i]`: `store.createMarker({ name: '', map_id, zone_id: zone.id, x, y, order: i })`. Marker names default to empty string.
+5. Patch `data.elements` with the new zone + markers (single combined render).
+6. `requestPushIfLinked()` — autosave debounce coalesces the burst.
+7. Clear `ui.zoneDrafting`. Set `selectedElementId = zone.id` AND navigate to `elementHash(worldId, zone.id)` so the user lands in element-detail.
 
 ### 2.7 Cancel
 
@@ -370,15 +375,21 @@ When the selected element is a Marker (rare — atlas excludes pin/marker/zone f
 - Standard schema editor.
 - Plus: "Go to zone" button → selectedElementId = marker.zone_id.
 
-### 4.5 Zone chip strip
+### 4.5 Zone chip strip → toolbar dropdown (ZC9, session 217)
 
-DESIGN_MAPS.md §13 owns the chip-strip docking. Zone-specific chip rendering:
-- Shape glyph: `⬡` for polygon, `╱` for line, prefix on the chip.
+The bottom-of-canvas chip strip from sessions 213-216 was replaced in session 217 (ZC9) with a right-anchored dropdown on the canvas toolbar. The chip rendering is the same; only the container changed.
+
+**Toolbar trigger** (in `map-tab-toolbar.ts`): a "Zones (N)" button shows count badge + caret; click toggles a floating panel anchored top-right under the button. Hidden entirely when no zones on this map. `wireZonesDropdown` (in `map-tab.ts`) handles open/close + outside-click + Escape close.
+
+**Chip rendering** (`renderChipStrip` in `map-tab-zones.ts`):
+- Shape glyph: `hexagon` for polygon, `show_chart` for line — resolved via `getZoneShape(zone)` (ZD6), NOT direct supertype read.
 - Color dot: small filled circle showing `atlas_color ?? '#22d3ee'`.
-- Name: truncated to ~20 chars.
-- Click → selectedElementId = zone.id, navigates to element-detail. sidebarMode is left alone — the route change drives sidebar.syncModeFromRoute as the single source.
-- Right-click → context menu: Rename, Delete. (Duplicate + Edit-shape entries omitted from v1 — duplicate is rarely needed standalone; edit-shape is reachable via double-click polygon or the element-detail button.)
-- Drag-to-trash zone (when over the canvas trash hot-zone): not wired on the chip strip in v1 (pin chip-drag uses the trash hot-zone; zones use the `×` per-chip and the element-detail delete button).
+- Name: flexes to fill row width.
+- Trash icon (ZD2) for delete, hover-revealed. Click → confirm → `store.deleteZone(id)` → syncZones drops the polygon from canvas immediately (ZD2 also fixed a stale-overlay bug where deleted zones lingered until reload).
+- Click chip → selectedElementId = zone.id, navigates to element-detail. sidebarMode is left alone — route change drives `sidebar.syncModeFromRoute` as the single source.
+- Right-click → context menu: Rename, Delete.
+
+DESIGN_MAPS.md §13 should be updated to match — the chip-strip docking convention is dropped.
 
 Filter: only zones returned by `listZonesOnMap(activeMapId, markers, zones)`. Re-derived on every elements change.
 

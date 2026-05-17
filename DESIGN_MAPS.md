@@ -864,7 +864,19 @@ Toolbar mounts in `mountMapTab` inside `.atlas-tab-body`. The body becomes a ver
 
 ---
 
-## 13. Zone chip strip (below the canvas)
+## 13. Zone chip strip → toolbar dropdown (revised session 217, ZC9)
+
+**Original v1 design**: a bottom-of-canvas chip strip mirroring the pin chip strip pattern.
+
+**Shipped instead** (session 217): a right-anchored dropdown on the canvas toolbar (see DESIGN_ZONES.md §4.5 for full rendering details). Trade-off: better canvas real estate, slight loss in at-a-glance scanning. Captain confirmed this direction; the strip is gone.
+
+Mount: the toolbar button `zonesDropdownBtn` lives in `map-tab-toolbar.ts` (anchored right via a flex spacer). The dropdown panel is the same DOM element that was the chip strip (`entry.zoneStrip` in cache) — re-purposed via CSS class `.atlas-zones-dropdown-panel`. Hidden until the button toggles `.is-open`.
+
+The §13.1-13.3 detail below is the original spec. Keep for archaeology; the as-shipped behavior is in DESIGN_ZONES.md §4.5.
+
+---
+
+### Original v1 spec (archaeology — not as-shipped)
 
 Mirrors the existing pin chip strip pattern. Mounts at the bottom of each map tab's body, BELOW the leaflet canvas. Only renders when `listZonesOnMap(activeMapId, markers, zones).length > 0`.
 
