@@ -386,6 +386,12 @@ function rebuildHandles(): void {
     const b = zoneMarkers[(i + 1) % zoneMarkers.length];
     const overlay = buildSegmentOverlay(a, b, i, height);
     overlay.addTo(active.layerGroup);
+    // Hover INSIDE the polygon edge (Captain wave 5): raise the segment
+    // overlay above the zone polygon in SVG render order so the polygon's
+    // interactive fill doesn't intercept hover events on the inner side of
+    // the edge. bringToFront() reorders within the shared SVG context in
+    // overlayPane regardless of which L.LayerGroup the path belongs to.
+    overlay.bringToFront();
     active.segmentOverlays.push(overlay);
   }
 
@@ -602,14 +608,22 @@ function buildSegmentOverlay(
 ): L.Polyline {
   const aLatLng = storageToLeaflet({ x: a.x, y: a.y }, canvasHeight);
   const bLatLng = storageToLeaflet({ x: b.x, y: b.y }, canvasHeight);
-  // Wider hit zone (32px) and a non-zero rest opacity (0.01). SVG pointer
-  // events default to `visiblePainted` which won't hit a stroke at opacity 0
-  // on some browsers — Captain smoke session 219: "hard to hover a line
-  // during edit mode... hover feels very exact/finicky." Both changes
-  // combine for reliable hits without making the overlay actually visible.
+  // 18px stroke gives a ~9px hit zone on EACH SIDE of the segment centerline.
+  // That covers "just inside" the polygon edge as well as just outside —
+  // Captain smoke session 219 wave 5: "in zoner, it creates the click-to-
+  // insert highlight also if you hover just INSIDE the lines. but in atlas
+  // it seems to only detect hovers that are on the line or outside."
+  //
+  // Root cause: the polygon's `interactive` fill (fillOpacity 0.4) was
+  // intercepting hover events on the interior side. Fix below: segment
+  // bringToFront() raises it above the polygon in SVG render order so the
+  // polygon's fill no longer captures hovers in the segment's band.
+  //
+  // Visible weight smaller too (was 32, Captain "highlight visuals slightly
+  // smaller"). Hover opacity bumped 0.3 → 0.4 since the stripe is thinner.
   const segment = L.polyline([aLatLng, bLatLng], {
     color: '#22d3ee',
-    weight: 32,
+    weight: 18,
     opacity: 0.01,
     interactive: true,
     dashArray: '6, 6',
@@ -617,7 +631,7 @@ function buildSegmentOverlay(
   });
 
   segment.on('mouseover', () => {
-    segment.setStyle({ opacity: 0.3 });
+    segment.setStyle({ opacity: 0.4 });
   });
   segment.on('mouseout', () => {
     segment.setStyle({ opacity: 0.01 });
