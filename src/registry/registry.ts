@@ -449,3 +449,33 @@ export function getMapsSettings(reg: WorldsRegistry): {
     show_pinned_element_names_in_header: reg.maps_settings?.show_pinned_element_names_in_header ?? false,
   };
 }
+
+// ---- Editor settings (session 219 — field edit mode) ----
+
+export type FieldEditMode = 'modal' | 'inline-single' | 'inline-multi';
+
+export function setEditorSettings(
+  reg: WorldsRegistry,
+  patch: Partial<NonNullable<WorldsRegistry['editor_settings']>>
+): WorldsRegistry {
+  return {
+    ...reg,
+    editor_settings: {
+      ...(reg.editor_settings ?? {}),
+      ...patch,
+    },
+  };
+}
+
+/**
+ * Returns the editor settings with defaults applied. `field_edit_mode`
+ * defaults to 'modal' for back-compat with everything that shipped before
+ * this setting existed.
+ */
+export function getEditorSettings(reg: WorldsRegistry): {
+  field_edit_mode: FieldEditMode;
+} {
+  return {
+    field_edit_mode: reg.editor_settings?.field_edit_mode ?? 'modal',
+  };
+}

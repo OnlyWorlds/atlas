@@ -1233,6 +1233,50 @@
   letter-spacing: -0.2em;
 }
 
+/* Inline edit mode — the value cell becomes an input container. Strip the
+   hover background + cursor:text from the wrapper so it doesn't compete
+   with the input. The input itself owns interaction. */
+.atlas-field-value.atlas-field-value-editing {
+  padding: 0;
+  background: transparent !important;
+  cursor: auto;
+}
+.atlas-field-value.atlas-field-value-editing::before { content: none !important; }
+
+.atlas-field-inline-input,
+.atlas-field-inline-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--atlas-text);
+  background: rgba(34, 211, 238, 0.04);
+  border: 1px solid var(--atlas-cyan-soft);
+  border-radius: 3px;
+  padding: 3px 7px;
+  outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.atlas-field-inline-input:focus,
+.atlas-field-inline-textarea:focus {
+  border-color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.atlas-field-inline-textarea {
+  resize: vertical;
+  min-height: calc(1.5em * 4 + 14px);
+  font-family: inherit;
+}
+
+.atlas-field-inline-input[disabled],
+.atlas-field-inline-textarea[disabled] {
+  opacity: 0.5;
+  cursor: progress;
+}
+
 .atlas-field-edit-actions {
   display: flex;
   gap: 6px;

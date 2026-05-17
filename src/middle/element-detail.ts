@@ -22,6 +22,7 @@ import type { Element, ElementType, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { getActiveStore } from '../ui/create-world-modal';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
+import { openFieldEditInline } from '../ui/field-edit-inline';
 import { toastManager } from '../ui/toast-manager';
 import { sectionsFor, type FieldMeta, type SectionLayout } from '../editor/field-schema';
 import { getFieldDescription } from '../editor/field-descriptions';
@@ -32,7 +33,7 @@ import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
 import { createMapDialog } from '../ui/map-create-modal';
 import { readImageDimsFromUrl } from '../ui/image-dims';
-import { getMapsSettings } from '../registry/registry';
+import { getMapsSettings, getEditorSettings } from '../registry/registry';
 import { mapHash } from '../core/router';
 import { buildZoneSections } from './element-detail-zone-sections';
 
@@ -840,12 +841,76 @@ export function mountElementDetail(target: HTMLElement): () => void {
       valueEl.dataset.widget = meta.widget;
     }
     valueEl.textContent = valueText;
+    // Selection-vs-click discriminator: if the user is dragging to select
+    // text, suppress the editor open. mousedown records start coords; on
+    // mouseup we check whether the cursor moved (drag = selection intent)
+    // or whether a non-empty selection now exists. The click handler then
+    // gates on a flag set by mouseup. Fixes the bug where text selection
+    // (especially left→right) opened the modal instead of leaving the user
+    // with their highlight.
+    let mouseDownAt: { x: number; y: number } | null = null;
+    let suppressNextClick = false;
+    valueEl.addEventListener('mousedown', (e) => {
+      mouseDownAt = { x: e.clientX, y: e.clientY };
+      suppressNextClick = false;
+    });
+    valueEl.addEventListener('mouseup', (e) => {
+      if (!mouseDownAt) return;
+      const dx = Math.abs(e.clientX - mouseDownAt.x);
+      const dy = Math.abs(e.clientY - mouseDownAt.y);
+      mouseDownAt = null;
+      // 4px tolerance — accounts for tiny jitter on intended clicks while
+      // catching deliberate drag-selection. Also check actual selection
+      // state in case mouseup landed inside the same px (rapid swipe).
+      const dragged = dx > 4 || dy > 4;
+      const sel = window.getSelection();
+      const hasSelectionInValue = !!sel && sel.toString().length > 0
+        && valueEl.contains(sel.anchorNode) && valueEl.contains(sel.focusNode);
+      if (dragged || hasSelectionInValue) {
+        suppressNextClick = true;
+      }
+    });
     valueEl.addEventListener('click', () => {
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
+      }
+      // Resolve dispatch mode from registry editor settings (session 219).
+      // Default is 'modal' (back-compat with everything that shipped before).
+      const editorSettings = getEditorSettings(getState().registry);
+      const mode = editorSettings.field_edit_mode;
+      const initialValue = raw === undefined || raw === null ? '' : String(raw);
+      const editWidget = meta.widget === 'number' ? 'number' : (meta.widget === 'text-long' ? 'text-long' : 'text-short');
+      if (mode === 'inline-single') {
+        openFieldEditInline({
+          anchor: valueEl,
+          value: initialValue,
+          widget: editWidget,
+          mode: 'single',
+          onSave: async (nextValue) => {
+            await persistFieldPatch(el, meta.name, nextValue);
+          },
+        });
+        return;
+      }
+      if (mode === 'inline-multi') {
+        openFieldEditInline({
+          anchor: valueEl,
+          value: initialValue,
+          widget: editWidget,
+          mode: 'multi',
+          onSave: async (nextValue) => {
+            await persistFieldPatch(el, meta.name, nextValue);
+          },
+        });
+        return;
+      }
+      // mode === 'modal' (default)
       openFieldEditPopover({
         anchor: valueEl,
         label: humanizeFieldName(meta.name),
-        value: raw === undefined || raw === null ? '' : String(raw),
-        widget: meta.widget === 'number' ? 'number' : (meta.widget === 'text-long' ? 'text-long' : 'text-short'),
+        value: initialValue,
+        widget: editWidget,
         onSave: async (nextValue) => {
           await persistFieldPatch(el, meta.name, nextValue);
         },

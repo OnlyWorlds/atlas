@@ -375,6 +375,20 @@ export interface WorldsRegistry {
     /** Show pinned element name next to category icons on Map detail header. */
     show_pinned_element_names_in_header?: boolean;
   };
+
+  /**
+   * Editor-wide preferences for how field rows accept value edits.
+   * `field_edit_mode` selects the affordance:
+   *   - 'modal'         (default): clicking a field value opens FieldEditPopover
+   *   - 'inline-single':           transforms the row into a single-line input
+   *                                in-place; growable as user types more
+   *   - 'inline-multi':            transforms into a ~4-line textarea in-place
+   * Applies to text-short / text-long / number widgets. Link widgets always
+   * use the picker modal regardless.
+   */
+  editor_settings?: {
+    field_edit_mode?: 'modal' | 'inline-single' | 'inline-multi';
+  };
 }
 
 export function defaultRegistry(): WorldsRegistry {

@@ -30,6 +30,9 @@ import {
   setSyncPauseAll,
   setWorldPaused,
   setMapsSettings,
+  setEditorSettings,
+  getEditorSettings,
+  type FieldEditMode,
 } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
 import { getActiveStore, setActiveStore } from '../ui/create-world-modal';
@@ -218,6 +221,8 @@ function renderIdentityTab(reg: ReturnType<typeof getState>['registry']): string
 
 function renderAtlasTab(): string {
   const ar = getState().atlasRoot;
+  const editor = getEditorSettings(getState().registry);
+  const fieldMode = editor.field_edit_mode;
   return `
     <section class="atlas-settings-section">
       <h3>Atlas folder</h3>
@@ -233,6 +238,34 @@ function renderAtlasTab(): string {
            <div class="atlas-settings-actions">
              <button class="ow-btn ow-btn-primary" data-action="change-atlas-root">Set up atlas folder</button>
            </div>`}
+    </section>
+    <section class="atlas-settings-section">
+      <h3>Editing</h3>
+      <p class="atlas-settings-hint">how clicking a field's value opens the editor. text selection (dragging across text) never opens the editor regardless of mode.</p>
+      <fieldset class="atlas-settings-fieldset">
+        <legend>Field edit mode</legend>
+        <label class="atlas-settings-radio">
+          <input type="radio" name="field-edit-mode" value="modal" ${fieldMode === 'modal' ? 'checked' : ''} />
+          <span class="atlas-settings-radio-body">
+            <strong>Modal popover</strong>
+            <em>floating panel anchored near the field. enter to save, esc to cancel.</em>
+          </span>
+        </label>
+        <label class="atlas-settings-radio">
+          <input type="radio" name="field-edit-mode" value="inline-single" ${fieldMode === 'inline-single' ? 'checked' : ''} />
+          <span class="atlas-settings-radio-body">
+            <strong>Inline (single line)</strong>
+            <em>row transforms into a one-line input in place. click away to save, esc to cancel.</em>
+          </span>
+        </label>
+        <label class="atlas-settings-radio">
+          <input type="radio" name="field-edit-mode" value="inline-multi" ${fieldMode === 'inline-multi' ? 'checked' : ''} />
+          <span class="atlas-settings-radio-body">
+            <strong>Inline (multi-line, ~4 rows)</strong>
+            <em>row transforms into a textarea in place. ctrl+enter to save, esc to cancel.</em>
+          </span>
+        </label>
+      </fieldset>
     </section>
   `;
 }
@@ -429,6 +462,23 @@ function wireAtlasTab(toasts: ToastManager): void {
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // Field edit mode radio (session 219). Persists to registry.editor_settings.
+  // The element-detail click handler reads this on every click — no reload
+  // needed; the next field click uses the new mode immediately.
+  const editModeInputs = document.querySelectorAll<HTMLInputElement>(
+    '.atlas-settings input[name="field-edit-mode"]'
+  );
+  editModeInputs.forEach((inp) => {
+    inp.addEventListener('change', () => {
+      if (!inp.checked) return;
+      const mode = inp.value as FieldEditMode;
+      const next = setEditorSettings(getState().registry, { field_edit_mode: mode });
+      saveRegistry(next);
+      patchSlice('registry', next);
+      toasts.info(`field edit mode: ${mode}`);
+    });
   });
 }
 
