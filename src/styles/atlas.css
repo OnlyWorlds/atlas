@@ -1596,20 +1596,25 @@
      - .leaflet-dragging → grabbing (Leaflet's own active-pan state stays)
    Pin hover, zone hover etc. switch to pointer via their own selectors.
 
-   `!important` is required: leaflet.css is JS-imported (loaded after
-   atlas.css) and sets `.leaflet-grab { cursor: grab }` + vendor-prefixed
-   `cursor: -webkit-grab` siblings. The vendor-prefixed declarations cascade
-   independently — overriding with bare `cursor: default` at higher
-   specificity still loses to the `-webkit-grab` line in some browsers.
-   Force with `!important` for all platforms (ZC5 follow-up, ZD1). */
-.atlas-map-canvas-container .leaflet-container,
-.atlas-map-canvas-container .leaflet-grab {
+   Cursor saga round 3 (session 219 — empirical fix):
+   `.leaflet-grab`, `.leaflet-container`, and `.leaflet-dragging` are all
+   classes Leaflet adds to the SAME DOM node — the container div that atlas
+   marks with `.atlas-map-canvas-container`. The earlier descendant selector
+   `.atlas-map-canvas-container .leaflet-grab` (with a space) NEVER MATCHED
+   because there's no parent-child relationship; both classes live on one
+   element. Compound selectors (no space) are required.
+
+   `!important` still required because leaflet.css ships three vendor-prefixed
+   cursor declarations (-webkit-grab / -moz-grab / grab) on `.leaflet-grab`,
+   each cascading independently. */
+.atlas-map-canvas-container.leaflet-container,
+.atlas-map-canvas-container.leaflet-grab {
   cursor: default !important;
 }
 /* Preserve grabbing affordance DURING an active pan. Leaflet adds
    `.leaflet-dragging` to the container while a pan is in progress. */
-.atlas-map-canvas-container .leaflet-dragging,
-.atlas-map-canvas-container .leaflet-dragging .leaflet-grab {
+.atlas-map-canvas-container.leaflet-dragging,
+.atlas-map-canvas-container.leaflet-dragging.leaflet-grab {
   cursor: grabbing !important;
 }
 
