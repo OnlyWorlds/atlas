@@ -13,7 +13,7 @@
 
 import type { ElementType } from '../../core/types';
 import { ELEMENT_ICONS } from '../../core/constants';
-import type { PinTint } from '../../core/map-view-prefs';
+import type { PinTint, PinStyle } from '../../core/map-view-prefs';
 
 const ACCENT_COLOR = '#22d3ee';
 const MUTED_COLOR = '#6b7280';
@@ -70,18 +70,26 @@ export interface PinVisual {
  *   - 'accent':                atlas cyan for all pins
  *   - 'muted':                 neutral grey for all pins
  *
- * Badge + tint are baked into the cache key so plain + badged + tinted pins
- * coexist cheaply at runtime.
+ * `style` selects the shape variant:
+ *   - 'icon':       full filled disc + centered icon glyph (default, original look)
+ *   - 'round-icon': ring outline + smaller centered glyph (lighter visual weight,
+ *                   icon more prominent against transparent center)
+ *   - 'pin-shape':  classic teardrop pin head with glyph inside, pointing down
+ *
+ * Badge + tint + style are baked into the cache key so every combination
+ * coexists cheaply at runtime.
  */
 export function pinVisualFor(
   type: string,
   hasMapBadge: boolean = false,
   tint: PinTint = 'type-color',
+  style: PinStyle = 'icon',
 ): PinVisual {
   const color = resolveColor(type, tint);
   const iconName = (ELEMENT_ICONS as Record<string, string>)[type] ?? 'place';
   const badgeSuffix = hasMapBadge ? '|mapbadge' : '';
-  const key = `${iconName}|${color}${badgeSuffix}`;
+  const styleSuffix = style === 'icon' ? '' : `|${style}`;
+  const key = `${iconName}|${color}${badgeSuffix}${styleSuffix}`;
 
   const cached = cache.get(key);
   if (cached) return { color, iconUrl: cached };
@@ -91,7 +99,7 @@ export function pinVisualFor(
 
   // Kick off async render once, then bulk-refresh pin visuals when ready.
   ensureFontLoaded().then(() => {
-    const url = renderIcon(iconName, color, hasMapBadge);
+    const url = renderIcon(iconName, color, hasMapBadge, style);
     cache.set(key, url);
     notifyReady();
   });
@@ -140,7 +148,7 @@ function ensureFontLoaded(): Promise<void> {
   return fontReady;
 }
 
-function renderIcon(iconName: string, color: string, hasMapBadge: boolean = false): string {
+function renderIcon(iconName: string, color: string, hasMapBadge: boolean = false, style: PinStyle = 'icon'): string {
   const size = 40;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -148,21 +156,13 @@ function renderIcon(iconName: string, color: string, hasMapBadge: boolean = fals
   const ctx = canvas.getContext('2d');
   if (!ctx) return svgCircleDataUrl(color);
 
-  // Background circle
-  ctx.beginPath();
-  ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Material Symbol glyph
-  ctx.font = '22px "Material Symbols Outlined"';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(iconName, size / 2, size / 2 + 1);
+  if (style === 'pin-shape') {
+    drawPinShape(ctx, size, color, iconName);
+  } else if (style === 'round-icon') {
+    drawRoundIcon(ctx, size, color, iconName);
+  } else {
+    drawFilledIcon(ctx, size, color, iconName);
+  }
 
   if (hasMapBadge) {
     // Map-having badge — small cyan circle with a map glyph, bottom-right
@@ -186,6 +186,102 @@ function renderIcon(iconName: string, color: string, hasMapBadge: boolean = fals
   }
 
   return canvas.toDataURL('image/png');
+}
+
+/** Default style — filled disc with a centered Material Symbol glyph. */
+function drawFilledIcon(ctx: CanvasRenderingContext2D, size: number, color: string, iconName: string): void {
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.font = '22px "Material Symbols Outlined"';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(iconName, size / 2, size / 2 + 1);
+}
+
+/**
+ * Ring outline + colored glyph in the center. Lighter visual weight — the
+ * map background reads through the center, making the icon (not the disc)
+ * the primary visual element. Good for dense maps.
+ */
+function drawRoundIcon(ctx: CanvasRenderingContext2D, size: number, color: string, iconName: string): void {
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size / 2 - 3;
+
+  // Faint translucent fill so it reads as a marker against the map, but
+  // doesn't dominate.
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.fill();
+
+  // Bright ring outline in the tint color.
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Icon in the tint color, slightly larger to fill the visual hole.
+  ctx.font = '24px "Material Symbols Outlined"';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  ctx.fillText(iconName, cx, cy + 1);
+}
+
+/**
+ * Classic teardrop pin shape — round head with a tapered point below.
+ * The icon glyph sits inside the round head. The point is drawn so the
+ * VISUAL tip lands near the bottom of the canvas, but the iconAnchor
+ * stays centered (manager-level concern) — slight offset trade-off for
+ * v1 in exchange for caller-side simplicity.
+ */
+function drawPinShape(ctx: CanvasRenderingContext2D, size: number, color: string, iconName: string): void {
+  const cx = size / 2;
+  const headCy = size * 0.36;
+  const headR = size * 0.32;
+  const tipY = size - 2;
+
+  // Build the teardrop path: circular head + two tangent lines meeting at a point.
+  // Compute the tangent angle from the head center to the tip.
+  const dy = tipY - headCy;
+  const tangentAngleFromVertical = Math.acos(headR / Math.hypot(headR, dy));
+  // Symmetric left and right tangent points on the head circle.
+  const leftAngle = Math.PI - Math.PI / 2 + tangentAngleFromVertical; // measured from +x axis
+  const rightAngle = Math.PI / 2 - tangentAngleFromVertical;
+  const leftX = cx + headR * Math.cos(leftAngle);
+  const leftY = headCy + headR * Math.sin(leftAngle);
+  const rightX = cx + headR * Math.cos(rightAngle);
+  const rightY = headCy + headR * Math.sin(rightAngle);
+
+  ctx.beginPath();
+  ctx.moveTo(leftX, leftY);
+  // Arc from left tangent over the top to the right tangent.
+  ctx.arc(cx, headCy, headR, leftAngle, rightAngle, true);
+  // Line down to the tip.
+  ctx.lineTo(cx, tipY);
+  ctx.closePath();
+
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // White glyph inside the round head.
+  ctx.font = '18px "Material Symbols Outlined"';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(iconName, cx, headCy + 1);
 }
 
 function svgCircleDataUrl(color: string): string {

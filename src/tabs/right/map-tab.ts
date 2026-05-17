@@ -22,6 +22,7 @@ import { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManage
 import { leafletToStorage, storageToLeaflet } from '../../visualization/leaflet-2d/CoordinateUtils';
 import type { Element, Pin, WorldMap } from '../../core/types';
 import { pinVisualFor, onPinVisualsReady } from './pin-visuals';
+import { getAssociatedMaps } from './auto-open-map';
 import { toggleGhostsAtSourcePin, disposeGhostsForMap } from './ghost-pins';
 import { ToastManager } from '../../ui/toast-manager';
 import { ElementCreateModal } from '../../ui/element-create-modal';
@@ -656,16 +657,26 @@ export function panMapTabTo(mapId: string, x: number, y: number): void {
 }
 
 // When pin visuals (canvas icons via Material Symbols font) become available
-// later, swap icons on all existing rendered pins in place.
+// later, swap icons on all existing rendered pins in place. Critical: pass
+// the per-map prefs (tint + style) AND recompute map-badge state — without
+// these, tint/style changes get silently reverted every time a new canvas-
+// rendered icon arrives via the font-load callback (the original on-ready
+// path used pinVisualFor with default args, which always meant 'type-color'
+// + 'icon' + no-badge regardless of the user's settings).
 onPinVisualsReady(() => {
   for (const entry of mapTabCache.values()) {
     entry.ready.then(() => {
       const elements = getState().data.elements;
+      const prefs = getEffectiveMapPrefs(entry.mapId);
       for (const existing of entry.manager.getAllPins()) {
         const pin = elements.find((e): e is Pin => e.type === 'pin' && e.id === existing.id);
         if (!pin) continue;
-        const type = elements.find((e: Element) => e.id === pin.element_id)?.type ?? 'object';
-        const visual = pinVisualFor(type);
+        const pinnedEl = elements.find((e: Element) => e.id === pin.element_id);
+        const type = pinnedEl?.type ?? 'object';
+        const hasMapBadge = pinnedEl
+          ? getAssociatedMaps(pinnedEl.id, elements).length > 0
+          : false;
+        const visual = pinVisualFor(type, hasMapBadge, prefs.pin_tint, prefs.pin_style);
         entry.manager.updatePin(existing.id, { icon: visual.iconUrl });
       }
     });

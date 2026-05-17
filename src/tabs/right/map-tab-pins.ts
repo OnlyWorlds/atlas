@@ -56,7 +56,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
       // next subscriber tick after sync settles will re-resolve cleanly.
       if (el) {
         const hasMapBadge = getAssociatedMaps(el.id, elements).length > 0;
-        const visual = pinVisualFor(el.type, hasMapBadge, prefs.pin_tint);
+        const visual = pinVisualFor(el.type, hasMapBadge, prefs.pin_tint, prefs.pin_style);
         entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y, name: el.name, icon: visual.iconUrl });
       } else {
         entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y });
@@ -67,7 +67,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
       const name = el?.name ?? '(loading…)';
       const type = el?.type ?? 'object';
       const hasMapBadge = el ? getAssociatedMaps(el.id, elements).length > 0 : false;
-      const visual = pinVisualFor(type, hasMapBadge, prefs.pin_tint);
+      const visual = pinVisualFor(type, hasMapBadge, prefs.pin_tint, prefs.pin_style);
       const added = entry.manager.addPin({
         id: pin.id,
         name,
