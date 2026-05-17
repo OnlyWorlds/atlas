@@ -4381,7 +4381,13 @@ svg .atlas-zone-selected {
   box-shadow: 0 0 6px rgba(34, 211, 238, 0.7), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
   cursor: grab;
   box-sizing: border-box;
-  transition: box-shadow 120ms ease, transform 120ms ease;
+  /* NO transform transition — Leaflet's L.Draggable sets
+     `transform: translate3d(...)` on every mousemove during drag, and a
+     transition would ANIMATE that translate over 120ms instead of snapping
+     to the cursor. Result: marker trails the cursor visibly ("catching up").
+     Box-shadow transition is fine since shadow doesn't move on drag.
+     Captain smoke session 219 wave 4. */
+  transition: box-shadow 120ms ease;
 }
 
 .atlas-zone-edit-handle:hover {
@@ -4408,7 +4414,9 @@ svg .atlas-zone-selected {
   color: #22d3ee;
   cursor: grab;
   box-sizing: border-box;
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  /* NO transform transition — same reason as vertex handles above (Leaflet's
+     drag translate would lerp). Shadow + background transitions are fine. */
+  transition: box-shadow 120ms ease, background 120ms ease;
 }
 .atlas-zone-centroid-handle:hover {
   background: rgba(34, 211, 238, 0.32);
