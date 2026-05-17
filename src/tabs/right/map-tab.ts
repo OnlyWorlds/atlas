@@ -39,9 +39,51 @@ import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import { startDrawing, placeMarkerAt, getActiveDraft, cancelDrawing, disposeDraftForMap } from './zone-drawing';
 import { ZoneOverlay } from '../../visualization/leaflet-2d/ZoneOverlay';
 import { syncZones, wireChipStrip, refreshActiveMapZones } from './map-tab-zones';
-import { enterEditMode, isEditing, getEditingZoneId, abortEditModeForMap, syncEditMode } from './zone-edit-mode';
+import { enterEditMode, isEditing, getEditingZoneId, getEditingMapId, abortEditModeForMap, syncEditMode, insertMarkerAtClick } from './zone-edit-mode';
 
 let containerSeq = 0;
+
+/**
+ * Toggle behavior for the zones dropdown panel (ZC9). Click the button →
+ * open the panel + add outside-click + Escape listeners. Click again or
+ * outside → close. Defensive: clicks inside the panel don't close it.
+ */
+function wireZonesDropdown(btn: HTMLButtonElement, panel: HTMLElement): void {
+  let outsideListener: ((e: MouseEvent) => void) | null = null;
+  let escListener: ((e: KeyboardEvent) => void) | null = null;
+
+  const close = (): void => {
+    panel.classList.remove('is-open');
+    btn.classList.remove('is-open');
+    if (outsideListener) document.removeEventListener('mousedown', outsideListener);
+    if (escListener) document.removeEventListener('keydown', escListener);
+    outsideListener = null;
+    escListener = null;
+  };
+
+  const open = (): void => {
+    panel.classList.add('is-open');
+    btn.classList.add('is-open');
+    outsideListener = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (panel.contains(t) || btn.contains(t)) return;
+      close();
+    };
+    escListener = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    // Defer registration so the originating click doesn't immediately close.
+    setTimeout(() => {
+      if (outsideListener) document.addEventListener('mousedown', outsideListener);
+      if (escListener) document.addEventListener('keydown', escListener);
+    }, 0);
+  };
+
+  btn.addEventListener('click', () => {
+    if (panel.classList.contains('is-open')) close();
+    else open();
+  });
+}
 
 export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastManager): void {
   target.innerHTML = '';
@@ -171,11 +213,20 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   container.className = 'atlas-map-canvas-container';
   wrapper.appendChild(container);
 
-  // Below-canvas chip strip — zones on this map. Hidden until populated.
+  // Floating zones dropdown panel (ZC9 — was the bottom-of-canvas chip strip
+  // in sessions 213-216). Hidden until the toolbar's dropdown button opens
+  // it; anchored top-right under that button via CSS. The DOM element is
+  // still owned by entry.zoneStrip so renderChipStrip + wireChipStrip from
+  // map-tab-zones.ts keep working without refactor.
   const zoneStrip = document.createElement('div');
-  zoneStrip.className = 'atlas-zone-chip-strip';
+  zoneStrip.className = 'atlas-zones-dropdown-panel';
+  zoneStrip.setAttribute('data-role', 'zones-dropdown-panel');
   zoneStrip.style.display = 'none';
   wrapper.appendChild(zoneStrip);
+
+  // Wire the toolbar dropdown button → toggle the panel. Outside-click +
+  // Escape close it. Re-open by clicking the button again.
+  wireZonesDropdown(toolbarRefs.zonesDropdownBtn, zoneStrip);
 
   pane.appendChild(wrapper);
 
@@ -286,13 +337,22 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       syncZones(entry);
     }
 
-    // Map click → if drawing mode is active, place a marker. Else if pin
-    // placement is active, drop a pin. Drawing has priority because the
-    // user just entered draw mode; pin placement is a less recent gesture.
+    // Map click → if drawing mode is active, place a marker. Else if zone
+    // edit mode is active on this map, insert a marker at the click point
+    // (ZC8). Else if pin placement is active, drop a pin. Drawing wins first
+    // (most recent gesture); edit insert comes next; pin placement last.
     manager.on('map-click', async (ev) => {
       const draft = getActiveDraft();
       if (draft && draft.mapId === mapId) {
         placeMarkerAt(ev.point, width, height);
+        return;
+      }
+      // Edit-mode click-anywhere insert: only fires for clicks that didn't hit
+      // a vertex handle (marker click doesn't bubble to map-click in Leaflet)
+      // or a segment overlay (its handler calls L.DomEvent.stop). So a stray
+      // canvas click while editing safely lands here without double-firing.
+      if (isEditing() && getEditingMapId() === mapId) {
+        await insertMarkerAtClick(ev.point);
         return;
       }
       const placement = getState().ui.pinPlacement;

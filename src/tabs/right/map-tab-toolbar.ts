@@ -19,6 +19,13 @@ export interface CanvasToolbarRefs {
   toggleZonesBtn: HTMLButtonElement;
   togglePinsBtn: HTMLButtonElement;
   fitToImageBtn: HTMLButtonElement;
+  /**
+   * Right-anchored zones dropdown trigger (ZC9). Replaces the previous
+   * bottom chip strip with a single button + expanding dropdown panel.
+   * Hidden until at least one zone exists on the active map. Wired up by
+   * zone-dropdown.ts.
+   */
+  zonesDropdownBtn: HTMLButtonElement;
 }
 
 export function buildCanvasToolbar(): CanvasToolbarRefs {
@@ -39,12 +46,32 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
   togglePinsBtn.classList.add('atlas-map-toolbar-pins-btn');
   toggleZonesBtn.classList.add('atlas-map-toolbar-zones-btn');
 
+  // Right-side zones dropdown (ZC9). Anchored right via margin-left:auto on
+  // the spacer below. The button itself shows a count badge of how many
+  // zones live on this map; clicking it expands a panel of chip-styled rows.
+  const zonesDropdownBtn = document.createElement('button');
+  zonesDropdownBtn.type = 'button';
+  zonesDropdownBtn.className = 'atlas-map-toolbar-btn atlas-zones-dropdown-btn';
+  zonesDropdownBtn.title = 'Zones on this map';
+  zonesDropdownBtn.setAttribute('aria-label', 'Zones on this map');
+  zonesDropdownBtn.setAttribute('data-action', 'zones-dropdown');
+  zonesDropdownBtn.style.display = 'none'; // hidden until populated
+  zonesDropdownBtn.innerHTML = `
+    <span class="material-symbols-outlined">hexagon</span>
+    <span class="atlas-zones-dropdown-count" data-role="zones-count">0</span>
+    <span class="material-symbols-outlined atlas-zones-dropdown-caret">expand_more</span>
+  `;
+
   const divider = () => {
     const d = document.createElement('span');
     d.className = 'atlas-map-toolbar-divider';
     d.setAttribute('aria-hidden', 'true');
     return d;
   };
+
+  const spacer = document.createElement('span');
+  spacer.className = 'atlas-map-toolbar-spacer';
+  spacer.setAttribute('aria-hidden', 'true');
 
   root.append(
     settingsBtn,
@@ -56,6 +83,8 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
     togglePinsBtn,
     divider(),
     fitToImageBtn,
+    spacer,
+    zonesDropdownBtn,
   );
 
   return {
@@ -66,6 +95,7 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
     toggleZonesBtn,
     togglePinsBtn,
     fitToImageBtn,
+    zonesDropdownBtn,
   };
 }
 

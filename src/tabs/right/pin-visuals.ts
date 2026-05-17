@@ -1,12 +1,22 @@
 /**
  * Pin visuals — canvas-rendered Material Symbol icons on colored circle backgrounds.
  *
- * Generates a data URL per (type, color) once, then caches forever. The Material
- * Symbols Outlined font is loaded via index.html; we wait for it before first render.
+ * Generates a data URL per (type, color, tint) once, then caches forever. The
+ * Material Symbols Outlined font is loaded via index.html; we wait for it
+ * before first render.
+ *
+ * `tint` is per-map preference (DESIGN_MAPS.md §11): `type-color` uses the
+ * category palette below; `accent` collapses all pins to atlas cyan; `muted`
+ * collapses to neutral grey. Cache key includes tint so multiple maps with
+ * different tints coexist without thrashing.
  */
 
 import type { ElementType } from '../../core/types';
 import { ELEMENT_ICONS } from '../../core/constants';
+import type { PinTint } from '../../core/map-view-prefs';
+
+const ACCENT_COLOR = '#22d3ee';
+const MUTED_COLOR = '#6b7280';
 
 const CATEGORY: Record<ElementType, string> = {
   // Agents — warm
@@ -55,12 +65,20 @@ export interface PinVisual {
  * baked into the bottom-right corner of the icon — telegraphs "this pin's
  * element has its own map(s); click-through is available" (DESIGN_MAPS.md §8).
  *
- * Badge is cached as a separate cache key so plain + badged pins coexist
- * cheaply at runtime. Callers compute `hasMapBadge` per-pin from element
- * relationships and pass it through.
+ * `tint` resolves the disc color:
+ *   - 'type-color' (default): per-element-type palette (CATEGORY)
+ *   - 'accent':                atlas cyan for all pins
+ *   - 'muted':                 neutral grey for all pins
+ *
+ * Badge + tint are baked into the cache key so plain + badged + tinted pins
+ * coexist cheaply at runtime.
  */
-export function pinVisualFor(type: string, hasMapBadge: boolean = false): PinVisual {
-  const color = (CATEGORY as Record<string, string>)[type] ?? '#22d3ee';
+export function pinVisualFor(
+  type: string,
+  hasMapBadge: boolean = false,
+  tint: PinTint = 'type-color',
+): PinVisual {
+  const color = resolveColor(type, tint);
   const iconName = (ELEMENT_ICONS as Record<string, string>)[type] ?? 'place';
   const badgeSuffix = hasMapBadge ? '|mapbadge' : '';
   const key = `${iconName}|${color}${badgeSuffix}`;
@@ -81,6 +99,12 @@ export function pinVisualFor(type: string, hasMapBadge: boolean = false): PinVis
   // Serve fallback this tick; callers will get the upgraded version next refresh.
   cache.set(key, fallback);
   return { color, iconUrl: fallback };
+}
+
+function resolveColor(type: string, tint: PinTint): string {
+  if (tint === 'accent') return ACCENT_COLOR;
+  if (tint === 'muted') return MUTED_COLOR;
+  return (CATEGORY as Record<string, string>)[type] ?? ACCENT_COLOR;
 }
 
 // ---- Ready notification for live pin upgrades ----

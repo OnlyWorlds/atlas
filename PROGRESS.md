@@ -5,32 +5,215 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 
 ---
 
-## NEXT CHAT PILE (curated 2026-05-16, session 215 close)
+## NEXT CHAT PILE (curated 2026-05-17, session 217 close)
 
-Captain-validated work queue for the next chat. Listed in rough do-first order; mix-and-match as smoke surfaces priorities.
+Most of the session 215 pile + Captain's 10-tweak batch (session 217) is shipped. What remains:
 
-### Zone subsystem follow-ups
-- **Inline name editing on element-detail header (all element types)**. Replace the popover-edit pattern for the *name* field only with inline edit-in-place: click the name → field becomes editable + select-all-text. Enter commits + exits edit; Escape reverts; click-outside commits. The schema for all OTHER fields stays popover-driven. One-field exception, deliberate.
-- **Auto-highlight name on zone create**. After Finish → already auto-selects the new zone. Add: navigate user to element-detail AND put the name field in inline-edit-mode with the placeholder text selected so they can immediately type a real name. Enter saves and deselects-the-field (zone stays selected, just exits the inline editor).
-- **Allow moving existing markers while drafting a new zone**. Today drafting suspends other map interaction. Open up: vertex drag on existing selected zones should remain functional while a draft is in progress. Care needed around event-handler precedence — drafting must still capture canvas clicks for placement.
-- **Visual polish on draft + edit markers** to match zoner's look. Zoner's numbered cyan markers + dashed preview path have a small visual edge atlas can match (glow, sub-pixel anti-aliasing on the number, finer dashed stroke).
-
-### Visual settings popover follow-ups
-- **Pin style / labels / tint live wiring** (V1.5, deferred from session 213). Today these prefs persist but don't render-respond. Wire pin-visuals.ts consumers:
-  - `pin_style`: extend the cache key in `pinVisualFor` to include style; draw `round-icon` and `pin-shape` variants alongside the existing `icon` mode.
-  - `pin_tint`: cache key + tint resolution (`type-color` / `accent` / `muted`) — return the color string the cache should use.
-  - `pin_labels` + `pin_label_threshold`: render a divIcon label below each pin per the mode (always / hover / threshold / never). Lift the ghost-pin label threshold helper.
-- **Popover label capitalization** — minor styling pass to match the rest of atlas (lowercase section labels with cyan accent chips).
-
-### Sync / API
-- **Repair existing server markers** pushed during the pre-migration broken window (their `order` is null server-side because atlas was stripping). Atlas's local data has order intact, so atlas renders fine; but other tools (or atlas-after-fresh-relink) might not. **Repair path**: enter edit mode on each affected zone → drag any marker a pixel and release → `updateMarker` PATCH now includes order → server updates → done. Alternative: wipe + redraw. Future zones push correctly from the start.
-- **Verify zoner discrepancy resolved**. Pre-migration: zoner showed atlas-pushed polygons mangled because server had no order data and zoner's read pipeline didn't fall back to insertion order. Post-migration + after the marker repair above, both tools have explicit order from the server → zoner should render correctly. Smoke this: push a fresh zone from atlas, open in zoner, verify polygon outline is correct.
-
-### Smaller items
-- **ESC cancel during edit mode is shipped** (S4) but unverified in smoke. Quick test: enter edit, drag a vertex, hit ESC → vertex should snap back to original. If it doesn't, that's a bug to file.
-- **Centroid drag handle** (zoner has a center dot that bulk-shifts the whole zone). Deferred; vertex-by-vertex covers v1.
+### Deferred polish (lower priority)
+- **Pin STYLE variants** (V1.5 STYLE — deferred since session 216). Popover persists `pin_style` ('icon' / 'round-icon' / 'pin-shape') but no consumer. Needs visual specs for the three variants before implementation pays off. Currently a no-op for the user; the persist-without-effect is the only smell.
 - **Snap-to-existing-vertex** during draw/edit (zoner Ctrl+hover snaps onto another marker's coord). Polish, not v1.
-- **DESIGN_ZONES.md cleanup** — §3 prose still mentions some not-shipped variants; the as-shipped behavior is mostly in §3.1-3.5 but a re-read pass would catch drift.
+- **Popover label capitalization** — minor styling pass to match atlas convention (lowercase section labels).
+
+### Centroid handle live outline (ZC7 tradeoff)
+- During centroid drag, the polygon outline stays in original position until dragend commit. Vertices follow live but the connecting polygon doesn't. Future polish: call `ZoneOverlay.updateZone` during drag (cheap polyline rebuild) so the outline tracks vertices in real time. Adds ~15-line method + a per-frame call. Worth it if Captain finds the outline-snap-on-release jarring.
+
+### Sync / API smoke (Captain's tasks)
+- **Repair existing server markers** pushed during the pre-migration broken window. Manual: enter edit mode on each affected zone → drag any marker a pixel → release → updateMarker PATCH includes order → fixed.
+- **Verify zoner discrepancy resolved**. Push a fresh zone from atlas → open in zoner → polygon outline correct.
+
+### Cross-tool
+- **map-tab.ts size watch** (named-and-skipped split, session 216). Now 657 lines after this session's wireZonesDropdown + insertMarkerAtClick branch additions. Still under the session 212 threshold (858) but creeping. Next maps-touching bout, evaluate a second extraction (e.g. pull the contextmenu + dragover/drop handlers into `map-tab-drop.ts`).
+
+---
+
+## Session 218 (2026-05-17) — Zone smoke batch (ZD1-ZD6)
+
+**Headline**: Captain's smoke after session 217. Six fixes/refactors. 477/477 vitest still green, typecheck + build clean. Bundle 460.52 → 460.90 KB JS (negligible) / CSS 78.30 → 78.18 KB.
+
+### Smoke fixes
+
+**ZD1 — Cursor override didn't take.** ZC5 added `.atlas-map-canvas-container .leaflet-grab { cursor: default }` (2-class, should beat leaflet's 1-class). Captain still saw the open-hand cursor. Root cause: leaflet ships vendor-prefixed `-webkit-grab` declarations alongside `grab` and the cascade resolves them per-declaration — overriding only the bare `cursor: default` lost on platforms where the `-webkit-grab` line still applied. Fix: `!important` on both the default + dragging state, covering `.leaflet-container` and `.leaflet-grab`. Grabbing during actual pan preserved via `.leaflet-dragging`.
+
+**ZD2 — Dropdown chip × → delete icon + visual sync after delete.** Two fixes:
+- Glyph swap: `close` → `delete` on the chip's per-row × button, matching elements-sidebar trash affordance.
+- Bug: deleting a zone from the dropdown left the polygon on canvas until page reload. Cause: `syncZones` iterated state.data.elements.zones to decide what to remove from the overlay — but a just-deleted zone isn't IN that list, so the loop never visited its id. Fix: added `ZoneOverlay.getZoneIds()` accessor; syncZones now iterates the OVERLAY's known ids and drops anything not in the present-on-this-map set.
+
+**ZD3 — Draft overlay layout (Captain's sshot fix).** The hint and keys clusters were wrapping into vertical stacks ("hold shift to snap to 45° axis" broke into 5 lines). Added `white-space: nowrap` + `flex-shrink: 0` to both clusters and to the mode/count labels. Replaced fixed-width spacer with `flex: 1 1 auto` so unused space pushes the buttons right cleanly.
+
+### Medium
+
+**ZD4 — Live polygon outline in edit mode.** ZC7's named-and-skipped tradeoff. Vertex drag + centroid drag now update the polygon outline live, not just on dragend. Mechanism: new `ZoneOverlay.setZonePointsLive(id, points)` uses Leaflet's `setLatLngs` to mutate the existing SVG path in-place (no rebuild). Each drag frame: read every vertex handle's CURRENT latlng (`collectLivePointsFromHandles` helper), convert to storage coords, push to the overlay. Cheap enough to fire per-frame; hit-overlay (lines) gets the same update so click targets stay accurate during drag.
+
+**ZD5 — Auto-insert in create mode.** Ports edit-mode's segment-insert into the create-mode click flow. When drafting and clicking near an existing segment (`findClosestSegment` with `CREATE_INSERT_THRESHOLD = 20` storage-space units), the new marker splices into the points array between the segment's endpoints instead of appending to the end. Polygons include the wrap segment (last→first) once 3+ markers exist. Shape-preservation: realizing mid-draw that you need a marker between earlier ones is now a single click instead of "undo all → re-place."
+
+### Refactor
+
+**ZD6 — Shape storage decoupled from supertype + modal cleanup.** Captain: the create modal's polygon/line radio felt messy; supertype and subtype should be free user-text fields (their OW canon role). Atlas had been misusing `Zone.supertype` to store 'polygon'/'line', conflating shape with taxonomy.
+
+Refactor:
+- New local-only field `atlas_shape: 'polygon' | 'line'` (extension, never synced — but on disk so it survives reload).
+- New helper `getZoneShape(zone)` in zone-derived.ts: reads `atlas_shape` first, falls back to legacy `supertype === 'polygon' | 'line'` for pre-ZD6 zones. Defaults to 'polygon' for anything else.
+- All 6 read sites refactored to use `getZoneShape` (map-tab-zones × 2, zone-edit-mode × 3, zone-drawing × 1 was inside the now-removed re-check block).
+- Modal rewritten: dropped the shape radio entirely, added a read-only shape badge at top ("polygon" or "line" pill, locked from draft mode). Replaced with two free-text inputs: supertype + subtype, both optional.
+- `finishDrawing` writes `atlas_shape: draft.mode` on createZone; supertype + subtype come from user input.
+- Legacy zones with shape in supertype keep rendering correctly via the fallback — no migration script needed.
+
+### Files touched
+
+- `src/styles/atlas.css` — cursor !important override, chip delete glyph (no CSS change for that), draft overlay nowrap, shape badge styling, dropped shape-radio rules
+- `src/tabs/right/map-tab-zones.ts` — chip glyph, getZoneShape for tree-build, fix syncZones remove loop
+- `src/tabs/right/zone-edit-mode.ts` — live outline via setZonePointsLive in vertex + centroid drag, getZoneShape for isPolygon checks, `collectLivePointsFromHandles` helper
+- `src/tabs/right/zone-drawing.ts` — create-mode auto-insert (ZD5), modal call signature update, writes atlas_shape on create
+- `src/tabs/right/zone-derived.ts` — `getZoneShape` helper + `ZoneShape` type
+- `src/visualization/leaflet-2d/ZoneOverlay.ts` — `getZoneIds`, `setZonePointsLive`
+- `src/ui/zone-create-modal.ts` — rewritten: shape badge + supertype/subtype text fields
+
+### Pokeable for next smoke
+
+1. **Cursor**: default arrow over map, grabbing only during active pan. (ZD1)
+2. **Dropdown**: delete a zone via the chip × → polygon disappears from canvas immediately (no reload). Icon is `delete`, not `close`. (ZD2)
+3. **Draft widget**: hint + keys clusters stay single-line. (ZD3)
+4. **Edit mode**: drag a vertex → polygon outline follows live. Drag the centroid → outline follows live too. Release → outline + handles snap to committed positions. (ZD4)
+5. **Create mode**: draft a polygon with 4-5 markers. Click near an existing edge (within ~20 storage units) → marker inserts between, polygon stays tidy. Click far from any edge → appends to end (old behavior). (ZD5)
+6. **Modal**: after Finish, modal shows shape badge (read-only "polygon" or "line"), name (selected), supertype (text), subtype (text). No more polygon/line radio. Supertype + subtype get saved to the zone as user-meaningful taxonomy. (ZD6)
+7. **Legacy zones**: pre-ZD6 zones (where supertype = 'polygon' or 'line') still render correctly via fallback. New zones store shape in atlas_shape; supertype is whatever the user wrote.
+
+### Not done from list
+
+Nothing — all 6 items shipped.
+
+### Process notes
+
+- `getZoneShape` fallback means we don't need a migration. Old zones keep working; new zones use the cleaner separation. Captain can leave existing zones as-is or manually clear their supertype (re-purpose for taxonomy text) without breaking the canvas.
+- One typecheck run segfaulted (node bug, not code) — re-ran clean.
+
+---
+
+## Session 217 (2026-05-17) — Zone create/edit batch (ZC1-ZC10)
+
+**Headline**: Captain's second smoke batch on the zone subsystem — 10 tweaks knocked off in one chat. 477/477 vitest green, typecheck + build clean. Bundle 450.51 → 460.52 KB JS (+10 KB) / CSS 75.27 → 78.30 KB (+3 KB). No commits — Captain pushes when ready. Supersedes B3 from session 216 (auto-rename in element-detail) with a proper modal flow (ZC10).
+
+### Quick wins
+
+**ZC1 — Enter confirms zone create.** Bug. ensureKeyListeners had Escape but no Enter handler. Wired Enter→finishDrawing; added a guard so Enter/Escape don't hijack input typing (the inline name editor + future modal inputs). Shift handling moved above the input guard so modifier tracking works regardless of focus.
+
+**ZC4 — Vertex number labels only in edit mode.** Read-only vertex dots (showVertexDots in ZoneOverlay) used to render a 1-indexed order number. Captain: visual noise outside edit. Dropped the inner span entirely; dots are now plain 10×10 cyan circles. Numbers stay in edit-mode handles (16×16) + draft markers (18×18) where order matters operationally.
+
+**ZC5 — Default arrow cursor over canvas.** Leaflet's default `.leaflet-grab { cursor: grab }` over-promised pan. New override: `.atlas-map-canvas-container .leaflet-grab { cursor: default }`. Special states (`.atlas-placing` crosshair, `.atlas-zone-editing` crosshair, `.leaflet-dragging` grabbing) still win via their own selectors. Pin/zone hover pointers unchanged.
+
+**ZC6 — Dashed polygon outline in edit mode.** New `setZoneEditing(id, editing)` method on ZoneOverlay flips the outline to `dashArray: '5, 5'` matching the create-mode preview. Wired from zone-edit-mode enterEditMode / exitEditMode. Visual continuity: dashed = mutable.
+
+**ZC3 — Shift-snap diagnose + clarify.** Snap math (snapToAxis) was correct. Captain couldn't tell shift was registering. Three fixes: (1) shift state tracked regardless of focus (modifier, not command); (2) draft overlay gains a `.shift-held` class that turns the hint cyan + bold when shift is down — live visual feedback before the click; (3) hint copy upgraded to "hold shift to snap to 45° axis" with a tooltip explaining the rectangle pattern. Also added a keyboard cluster showing Enter/Esc shortcuts.
+
+### Medium
+
+**ZC2 — Live polygon preview during draft marker drag.** SB3 (session 216) made draft markers draggable but only rebuilt the path on dragend. Now `drag` events also trigger `rebuildPreviewPath()` — same path render path, just swaps the L.Polygon/L.Polyline without touching marker DOM (which would abort the in-progress drag). Path layer tracked separately on the ActiveDraft as `pathLayer: L.Layer | null` for cheap remove/re-add.
+
+**ZC8 — Click anywhere in edit mode inserts at nearest segment.** New `insertMarkerAtClick(point)` in zone-edit-mode uses the ported `findClosestSegment(pts, closed)` helper. Inserts a marker AT the click point (per Captain: "places the marker exactly there", not the projection foot), with order = segIdx + 1, renumbers subsequent. Wired into map-tab.ts's map-click handler between draft + pin-placement branches. Clicks on existing vertex handles (no listener) and segment overlays (`L.DomEvent.stop`) don't double-fire.
+
+**ZC7 — Centroid drag handle in edit mode.** Zoner pattern ported. New `buildCentroidHandle(center, height)` renders a 22×22 cyan ring with an `open_with` glyph at the polygon centroid (`polygonCentroid`) or polyline label anchor (`polylineLabelAnchor`). Dragstart snapshots every marker's position; drag updates every vertex handle's latlng in-place for live feedback; dragend computes the delta and batches updateMarker calls. zIndexOffset: 100 so it grabs above overlapping vertices. **Tradeoff documented**: the polygon OUTLINE stays in original position during live drag (ZoneOverlay subscribes to state.data.elements, which doesn't change mid-drag). Outline snaps to the new shape on dragend commit. Future polish could call ZoneOverlay.updateZone during drag.
+
+### Larger UX
+
+**ZC9 — Zone chips → toolbar dropdown.** Removed the bottom-of-canvas chip strip. New right-anchored toolbar button (`zonesDropdownBtn`) with hexagon glyph + count badge + caret. Click → toggles a floating dropdown panel anchored top-right under the button. Chips render as full-width rows inside the panel (vs content-width in the old horizontal strip). Outside-click + Escape close the dropdown (wireZonesDropdown). All chip click/contextmenu/delete behavior preserved — `renderChipStrip` now also updates the toolbar button (count + visibility) and the panel renders the same chips into the same DOM element (just repurposed via CSS class swap from `.atlas-zone-chip-strip` → `.atlas-zones-dropdown-panel`).
+
+**ZC10 — Zone create modal on Finish.** New `ZoneCreateModal` (BaseModal subclass) opens after Finish on a draft. Fields: name (auto-focused + auto-selected), shape radio (polygon | line, pre-filled from draft mode but switchable), subtype (free text, optional). Enter or "create zone" submits; Esc or "cancel" or outside-click resolves null and keeps the draft active so the user can keep editing. Submit creates the zone with the modal's values (re-validates the min-markers count if the user switched supertype), then materializes N markers as before, navigates to element-detail. **Supersedes B3 (session 216 auto-rename in element-detail)** — the modal captures intent up front. requestInlineNameEditOnNextRender helper still exists in element-detail.ts for future flows but isn't called from zone-drawing anymore.
+
+### Files touched
+
+- `src/tabs/right/zone-drawing.ts` — Enter handler, modifier-aware key gating, shift indicator class, live drag preview path, pathLayer tracking, modal integration on finish
+- `src/tabs/right/zone-drawing-overlay.ts` — hint copy + keys cluster
+- `src/tabs/right/zone-edit-mode.ts` — setZoneEditing, insertMarkerAtClick (ZC8), centroid handle (ZC7), getEditingMapId export
+- `src/tabs/right/map-tab.ts` — wireZonesDropdown, edit-mode click-insert branch in map-click, import insertMarkerAtClick + getEditingMapId
+- `src/tabs/right/map-tab-toolbar.ts` — zonesDropdownBtn + spacer
+- `src/tabs/right/map-tab-zones.ts` — renderChipStrip syncs toolbar button + panel
+- `src/visualization/leaflet-2d/ZoneOverlay.ts` — setZoneEditing, dashArray in applyStyle, vertex dots no-number
+- `src/styles/atlas.css` — default cursor, dropdown panel + button, draft hint shift state + keys, centroid handle, zone-create modal radios, deprecated chip-strip selector hidden
+- `src/ui/zone-create-modal.ts` — new file (ZoneCreateModal class, openZoneCreateModal helper)
+
+### Pokeable for next smoke
+
+See chat for the full ordered list. Key new flows:
+1. Draw zone → Enter finishes (ZC1) → modal opens with name selected (ZC10) → adjust shape/subtype → create.
+2. Drag a draft marker → polygon outline follows live (ZC2).
+3. Hold Shift while drafting → hint goes cyan + bold (ZC3); shift-click snaps to 45° axis from last marker.
+4. Select existing zone → vertex dots are plain cyan, no numbers (ZC4). Polygon outline is solid.
+5. Double-click → enter edit mode → outline goes dashed (ZC6) + numbers appear on draggable handles + centroid handle (open_with glyph) appears in center.
+6. Drag the centroid → all vertices follow live; release → batch commit.
+7. Click anywhere on canvas in edit mode → marker inserts at the click point at the nearest segment's position (ZC8).
+8. Canvas cursor is default arrow (ZC5); zone hover pointer; edit mode crosshair.
+9. Bottom chip strip is gone. Look for the "Zones (N)" button on the right side of the toolbar (ZC9). Click → dropdown.
+
+### Not done from list
+
+Nothing — all 10 items shipped.
+
+### Process notes
+
+- ZC10 superseded B3 cleanly: removed the requestInlineNameEditOnNextRender call from zone-drawing but kept the export in element-detail (cheap, future-proofing).
+- Type system note: @types/leaflet parameterizes Polyline/Polygon with incompatible GeoJSON generics — `pathLayer: L.Layer | null` is the practical common ancestor.
+- Centroid handle outline-during-drag staleness named explicitly in code comment; not worth fixing without a clean ZoneOverlay.updateZone live-call path.
+
+---
+
+## Session 216 (2026-05-16) — Smoke fixes from sessions 213-215 + pile bouts B1-B5
+
+**Headline**: Captain smoked sessions 213-215 → four bugs flagged. Fixed them, then knocked out five pile bouts in the same chat. 477/477 vitest still green, typecheck clean. Bundle 448.55 → 450.51 KB JS / CSS 74.02 → 75.27 KB. No commits — Captain pushes when ready.
+
+### Smoke bugs (SB1-SB4)
+
+**SB1 — Zone chip click "toggles categories, not zones."** Root cause hypothesis: the chip's `.is-selected` styling was too subtle to distinguish from `:hover`, so the user couldn't see the selection land. Compounded by `sidebarMode: 'elements'` being explicitly patched in the chip handler — redundant (the navigate already triggers `sidebar.syncModeFromRoute` to flip to elements mode), and it created a confusing "things change but the zone doesn't visibly select" moment. Fix: stronger `.is-selected` style (solid cyan border, white bold text, double-ring box-shadow); removed the redundant sidebarMode patch; added defensive `e.stopPropagation()` on the chip handler so the click is contained.
+
+**SB2 — Edit-handle number labels render bottom-left.** Real cause: `.leaflet-marker-icon { display: block }` (from leaflet.css, loaded after atlas.css via the JS-import path) ties source-order with our `.atlas-zone-edit-handle { display: flex }` and wins. Flex centering never took effect; the span fell back to inline rendering at the top-left of the element box (visually bottom-left after the iconAnchor margin-offset). Fix: chain `.leaflet-marker-icon` into the selector for 2-class specificity. Wins cleanly without `!important` and without touching `position` (which was the S5 trap). Applies to both edit handles AND read-only vertex dots — Captain only complained about handles because they're bigger (16×16 vs 12×12) so the offset is more visible there.
+
+**SB3 — Cannot drag markers while drafting; map drags instead.** Root cause: `.atlas-zone-draft-marker { pointer-events: none }`. Mousedown on a draft marker passes through to the leaflet canvas, which starts a pan. Fix: remove `pointer-events: none`, add `cursor: grab` for affordance, and wire `draggable: true` on the L.Marker in `rerenderPreview()`. Drag-end writes the new position back into `active.points[idx]` and re-renders the preview path. Shift-snap is intentionally placement-only (drag is for pixel-level correction).
+
+**SB4 — Bolden draft marker number labels.** Folded into SB3's draft-marker CSS pass: 10px → 11px, font-weight 700 → 800, added a soft white text-shadow halo so the dark number stays legible over the cyan disc edge.
+
+### Pile bouts (B1-B5)
+
+**B1 — Pin tint + labels live wiring (V1.5 partial).** `pinVisualFor(type, hasMapBadge, tint)` extended with the third argument. Cache key includes tint so per-map tint settings coexist cheaply (no thrash on map-switch). `syncPins(entry)` reads `getEffectiveMapPrefs(entry.mapId)` once per call, passes `pin_tint` into every pin's visual. Labels: new `applyLabelVisibility(entry, mode, threshold, visiblePinCount)` toggles each pin's existing label DOM display per mode — `always` shows all, `never` hides all, `hover` hides all (the existing custom `.atlas-pin-tooltip` covers hover-time naming), `threshold` shows iff `visiblePinCount ≤ threshold`. `applyLivePrefs` now calls `syncPins` so the popover triggers immediate re-skin. **Pin STYLE deferred** — needs visual specs for the three variants (icon-only / round+icon / pin-shape) and isn't a clear win without them. Popover still persists the pref so a follow-up bout can land the consumer cleanly.
+
+**B2 — Inline name editing on element-detail header.** Click the h2 in the header (any element type) → it swaps to an `<input>` with the current name + select-all. Enter commits, Escape reverts, blur commits. Empty rename is a no-op (won't blank out the name). Hover gives a subtle background hint + `cursor: text`. Edits go through `FolderStore.updateElement` → autosave debounce → push. Schema-driven body fields keep the popover pattern — only the header's name field is inline. Module-level `pendingAutoEditNameForId` + `requestInlineNameEditOnNextRender(id)` export gives other modules a one-shot signal to drop straight into rename mode after the next render.
+
+**B3 — Auto-highlight name on zone create.** `zone-drawing.finishDrawing` now navigates to the new zone's element-detail route and calls `requestInlineNameEditOnNextRender(zone.id)`. The user lands on the zone with the name field already in inline-edit mode, placeholder text ("new zone" / "new line") selected — type-to-replace. Enter commits + exits, Escape reverts to the auto-name.
+
+**B4 — Visual polish on edit handles + vertex dots.** Edit handles gain a 120ms transition + hover-scale (1.12) + brighter shadow (cyan halo widens 6→12px on hover) + active-state scale (1.18). Vertex dots gain an inner-shadow ring for depth. Both share the visual language with draft markers (cyan + numbered) but progress in size: 12 read-only → 16 edit handle → 18 draft. Draft polish from SB4 (bolder number, halo).
+
+**B5 — DESIGN_ZONES.md cleanup pass.** §3.1, §4.3, §4.4, §4.5 reconciled with as-shipped reality:
+- §3.1: edit handles are 16×16 (not 14px), numbered, and ZoneOverlay suppression is explicit.
+- §4.3: vertex dots are 12×12 numbered (not 6px), share visual language with edit handles.
+- §4.4: "Add marker" button removed from the spec — segment-click insertion in edit mode covers single-marker addition; standalone insert-mode was scoped out as redundant.
+- §4.5: chip context menu is Rename + Delete only (Duplicate + Edit-shape entries dropped from v1); drag-to-trash is pin-only.
+
+### Files touched
+
+- `src/styles/atlas.css` — zone chip selected state, edit-handle specificity fix, draft marker (cursor + bolder number), edit-handle hover/active scale, inline name edit input styling
+- `src/tabs/right/map-tab-zones.ts` — chip click: removed redundant sidebarMode patch, added stopPropagation
+- `src/tabs/right/zone-drawing.ts` — draft markers draggable; auto-rename signal on finish
+- `src/tabs/right/pin-visuals.ts` — tint resolution + cache key extension
+- `src/tabs/right/map-tab-pins.ts` — syncPins reads prefs, passes tint, applies label visibility
+- `src/tabs/right/map-visual-settings-popover.ts` — applyLivePrefs calls syncPins
+- `src/middle/element-detail.ts` — inline name edit + auto-edit signal
+- `DESIGN_ZONES.md` — drift cleanup §3.1/§4.3/§4.4/§4.5
+
+### Pokeable for next smoke
+
+See the curated smoke list in chat — covers the four SB fixes (chip click select, edit-handle label centering, draft marker drag, draft number weight), the B1 popover wiring (cycle tint + labels modes), B2 inline name edit (click name in any element), B3 zone create auto-name (draw zone → land in rename mode), and B4 edit handle hover-scale polish.
+
+### Not done from pile (named-and-skipped)
+
+- **Pin style variants** (V1.5 STYLE). Persisted but consumer pending — needs visual specs.
+- **Popover label capitalization** — minor styling, skipped for time.
+- **Repair existing server markers** — Captain's manual edit-drag flow per pile note.
+- **Verify zoner discrepancy resolved** — Captain's smoke task.
+- **ESC cancel during edit** — Captain's smoke verification (S4 shipped, unverified live).
+- **Centroid drag + snap-to-vertex** — true polish, deferred.
+
+### Process notes
+
+- Single Playwright UI repro attempted for SB1 (zone chip click), abandoned after ~15 min of test-API bootstrapping for diminishing returns — committed to fix-by-evidence instead. Time-budget discipline from session 212 ("don't invent work") served well; same logic applied to skipping the STYLE wiring without visual specs.
+- All bouts ended at typecheck-green + vitest-green seams. Final build verified clean.
 
 ---
 

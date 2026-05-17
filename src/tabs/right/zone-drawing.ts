@@ -22,11 +22,13 @@ import L from 'leaflet';
 import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../ui/create-world-modal';
 import { requestPushIfLinked } from '../../sync/sync-attach';
-import { storageToLeaflet } from '../../visualization/leaflet-2d/CoordinateUtils';
-import { snapToAxis, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
+import { storageToLeaflet, leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
+import { snapToAxis, findClosestSegment, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
 import { clampToCanvas } from './map-tab-pin-drag';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { buildDrawingOverlay, type DrawingOverlayRefs } from './zone-drawing-overlay';
+import { navigate, elementHash } from '../../core/router';
+import { openZoneCreateModal } from '../../ui/zone-create-modal';
 import type { Zone } from '../../core/types';
 import type { ToastManager } from '../../ui/toast-manager';
 
@@ -38,6 +40,15 @@ interface ActiveDraft {
   worldId: string;
   points: Point[];
   previewLayer: L.LayerGroup;
+  /**
+   * The polyline/polygon path layer, tracked separately from markers so
+   * `rebuildPreviewPath()` can swap just the path without disturbing the
+   * marker DOM (critical during a live drag — re-adding markers would
+   * abort the in-progress drag). Typed as L.Layer because @types/leaflet
+   * parameterizes Polyline/Polygon with incompatible GeoJSON geometry
+   * generics — the common ancestor is L.Layer.
+   */
+  pathLayer: L.Layer | null;
   overlay: DrawingOverlayRefs;
   toasts: ToastManager;
   // For cleanup on cancel/finish.
@@ -55,12 +66,46 @@ function ensureKeyListeners(): void {
   keyListenersInstalled = true;
   document.addEventListener('keydown', e => {
     if (!active) return;
-    if (e.key === 'Escape') cancelDrawing();
-    if (e.key === 'Shift') shiftHeld = true;
+    // Shift is a modifier — always track its state, regardless of focus target.
+    // Enter/Escape are commands and should NOT hijack input typing.
+    if (e.key === 'Shift') {
+      shiftHeld = true;
+      updateShiftIndicator(true);
+      return;
+    }
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelDrawing();
+      return;
+    }
+    if (e.key === 'Enter') {
+      // Enter finishes the draft when it has ≥min markers; below the
+      // threshold the draft overlay's finish-disabled state already telegraphs
+      // why nothing happens. finishDrawing internally re-checks the minimum
+      // and toasts, so this is safe to call unconditionally.
+      e.preventDefault();
+      if (active.toasts) void finishDrawing(active.toasts);
+      return;
+    }
   });
   document.addEventListener('keyup', e => {
-    if (e.key === 'Shift') shiftHeld = false;
+    if (e.key === 'Shift') {
+      shiftHeld = false;
+      updateShiftIndicator(false);
+    }
   });
+}
+
+/**
+ * Live indicator in the draft overlay so the user can SEE that shift is
+ * registered (ZC3 — Captain couldn't tell shift-snap was active). Toggles a
+ * class on the overlay's hint span; CSS turns it cyan + bold when held.
+ */
+function updateShiftIndicator(held: boolean): void {
+  if (!active) return;
+  active.overlay.root.classList.toggle('shift-held', held);
 }
 
 export function isDrawing(): boolean {
@@ -106,6 +151,7 @@ export function startDrawing(entry: MapTabCacheEntry, mode: DrawMode, toasts: To
     worldId: entry.worldId,
     points: [],
     previewLayer,
+    pathLayer: null,
     overlay,
     toasts,
     containerListeners: [],
@@ -124,6 +170,15 @@ export function startDrawing(entry: MapTabCacheEntry, mode: DrawMode, toasts: To
   refreshOverlay();
 }
 
+/**
+ * Distance threshold (storage-space units) within which a create-mode click
+ * is treated as an INSERT-BETWEEN-EXISTING-MARKERS instead of an append-to-
+ * end. Picked roughly to match a comfortable click target for a 2px polygon
+ * outline at typical zoom levels. ZD5: ports edit-mode's segment-insert
+ * shape preservation into create mode.
+ */
+const CREATE_INSERT_THRESHOLD = 20;
+
 /** Called from map-tab.ts on every map click while drafting. */
 export function placeMarkerAt(rawPoint: Point, canvasWidth: number, canvasHeight: number): void {
   if (!active) return;
@@ -134,10 +189,34 @@ export function placeMarkerAt(rawPoint: Point, canvasWidth: number, canvasHeight
   };
 
   // Shift-snap: when shift is held and we have a prior marker, snap to the
-  // nearest 45° axis from the last point (DESIGN_ZONES.md §2.4).
+  // nearest 45° axis from the last point (DESIGN_ZONES.md §2.4). Snap is
+  // computed BEFORE the insert-vs-append decision so snapped points still
+  // get the shape-preserving treatment.
   if (shiftHeld && active.points.length >= 1) {
     const anchor = active.points[active.points.length - 1];
     point = snapToAxis(anchor, point);
+  }
+
+  // ZD5: shape-preserving insertion. If we already have ≥2 markers AND the
+  // click lands near an existing segment, splice the new marker between the
+  // segment's endpoints instead of appending to the end. Mirrors edit-mode's
+  // segment-click behavior so create-mode polygons stay tidy when the user
+  // realizes mid-draw that they need a marker between earlier ones.
+  //
+  // Polygon includes the wrap segment (last→first) for the threshold check
+  // ONCE a polygon outline exists (3+ markers). Lines never wrap.
+  if (active.points.length >= 2) {
+    const isPolygon = active.mode === 'polygon' && active.points.length >= 3;
+    const closest = findClosestSegment(point, active.points, isPolygon);
+    if (closest && closest.distance <= CREATE_INSERT_THRESHOLD) {
+      // Insert at segmentIndex + 1 — splice into the array, no need for
+      // explicit `order` writes since create-mode order is just the array
+      // index (zone+markers are written in one batch on Finish, indexed 0..N).
+      active.points.splice(closest.index + 1, 0, point);
+      rerenderPreview();
+      refreshOverlay();
+      return;
+    }
   }
 
   active.points.push(point);
@@ -161,6 +240,24 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
     return;
   }
 
+  // ZC10 + ZD6: open the zone-create modal. Captures name + supertype text +
+  // subtype text up front. Shape (polygon/line) is locked from draft mode —
+  // not user-pickable in the modal — and stored in the local-only
+  // `atlas_shape` extension field (ZD6). OW's `supertype` is now free
+  // user-meaningful taxonomy text instead of being misused for shape.
+  const zones = (getState().data.elements.filter(e => e.type === 'zone') as Zone[]);
+  const baseName = draft.mode === 'polygon' ? 'new zone' : 'new line';
+  const defaultName = findUniqueZoneName(baseName, zones);
+  const values = await openZoneCreateModal({
+    shape: draft.mode,
+    defaultName,
+  });
+  if (!values) return; // user cancelled the modal — keep draft active
+
+  // Guard: the draft might have been disposed while the modal was open
+  // (world switch, map close, etc). Re-check active.
+  if (!active || active !== draft) return;
+
   const store = getActiveStore();
   if (!store) {
     draft.toasts.error('no active world store — cannot save zone');
@@ -168,16 +265,14 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
   }
 
   try {
-    // Auto-numbered name: "new zone" / "new line" with numbering if taken.
-    const zones = (getState().data.elements.filter(e => e.type === 'zone') as Zone[]);
-    const baseName = draft.mode === 'polygon' ? 'new zone' : 'new line';
-    const name = findUniqueZoneName(baseName, zones);
-
-    // 1. Create the zone (pure metadata, no map_id).
+    // Create the zone. atlas_shape locks the geometry kind; supertype +
+    // subtype are user-meaningful taxonomy fields (free text).
     const zone = await store.createZone({
-      name,
-      supertype: draft.mode,
-    });
+      name: values.name,
+      supertype: values.supertype,
+      subtype: values.subtype,
+      atlas_shape: draft.mode,
+    } as Partial<Zone>);
 
     // 2. Create N markers in order, all pointing at this zone + this map.
     for (let i = 0; i < draft.points.length; i++) {
@@ -197,10 +292,15 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
     patchSlice('data', { elements });
     requestPushIfLinked();
 
-    draft.toasts.success(`${draft.mode} created: ${name}`);
+    draft.toasts.success(`${draft.mode} created: ${values.name}`);
 
-    // 4. Select the new zone so the user lands in element-detail.
+    // 4. Select the new zone + navigate to its element-detail. No inline
+    // rename prompt — modal already captured the name.
     patchSlice('ui', { ...getState().ui, selectedElementId: zone.id });
+    const worldId = getState().active?.worldId;
+    if (worldId) {
+      navigate(elementHash(worldId, zone.id));
+    }
   } catch (err) {
     console.error('[zone-drawing] finish failed:', err);
     draft.toasts.error(`failed to save ${draft.mode}`);
@@ -252,8 +352,16 @@ function rerenderPreview(): void {
   const canvasHeight = entry.manager.getConfig().canvasHeight;
 
   active.previewLayer.clearLayers();
+  active.pathLayer = null;
 
-  // Render numbered marker DivIcons at each point.
+  // Render numbered marker DivIcons at each point. Draggable so the user can
+  // reposition a placed marker before finishing (smoke fix 2026-05-16 session
+  // 216 — Captain expected to be able to nudge a draft marker, not have to
+  // undo + re-click). Drag-end writes back to `active.points[idx]`; the next
+  // re-render keeps numbering and preview path in sync. Dragging is
+  // intentionally NOT shift-snapped — shift-snap is a placement-time
+  // affordance; for a drag-correction the user wants pixel control.
+  const canvasWidth = entry.manager.getConfig().canvasWidth;
   active.points.forEach((p, idx) => {
     const latlng = storageToLeaflet(p, canvasHeight);
     const icon = L.divIcon({
@@ -262,30 +370,83 @@ function rerenderPreview(): void {
       iconSize: [18, 18],
       iconAnchor: [9, 9],
     });
-    L.marker(latlng, { icon, interactive: false, keyboard: false }).addTo(active!.previewLayer);
+    const marker = L.marker(latlng, {
+      icon,
+      draggable: true,
+      keyboard: false,
+    });
+    marker.addTo(active!.previewLayer);
+    // LIVE preview during drag (ZC2): rebuild the preview polyline/polygon on
+    // every `drag` event so the outline follows the marker in real time. Drag
+    // mutates `active.points[idx]` directly (cheap — same memory). On `dragend`
+    // we clamp + round the final value (the live drag intentionally skips
+    // clamping for fluidity; the canvas-wide bounds already constrain motion).
+    // Placement-pipe map-click is naturally suppressed during a marker drag.
+    marker.on('drag', () => {
+      if (!active) return;
+      const newLatLng = marker.getLatLng();
+      const newPt = leafletToStorage(newLatLng, canvasHeight);
+      active.points[idx] = { x: newPt.x, y: newPt.y };
+      rebuildPreviewPath();
+    });
+    marker.on('dragend', () => {
+      if (!active) return;
+      const newLatLng = marker.getLatLng();
+      const newPt = leafletToStorage(newLatLng, canvasHeight);
+      active.points[idx] = {
+        x: clampToCanvas(Math.round(newPt.x), canvasWidth),
+        y: clampToCanvas(Math.round(newPt.y), canvasHeight),
+      };
+      // Full re-render snaps the marker to the rounded/clamped final position
+      // and rebuilds the path against it.
+      rerenderPreview();
+    });
   });
 
-  // Render preview path (dashed cyan).
-  if (active.points.length >= 2) {
-    const latLngs = active.points.map(p => storageToLeaflet(p, canvasHeight));
-    if (active.mode === 'polygon' && active.points.length >= 3) {
-      L.polygon(latLngs, {
-        color: '#22d3ee',
-        weight: 2,
-        opacity: 0.9,
-        dashArray: '5, 5',
-        fillColor: '#22d3ee',
-        fillOpacity: 0.12,
-      }).addTo(active.previewLayer);
-    } else {
-      L.polyline(latLngs, {
-        color: '#22d3ee',
-        weight: 2,
-        opacity: 0.9,
-        dashArray: '5, 5',
-      }).addTo(active.previewLayer);
-    }
+  buildPreviewPath(canvasHeight);
+}
+
+/**
+ * Rebuild ONLY the preview path layer (polygon/polyline) without touching the
+ * marker DOM. Called from the live drag handler so the path follows the
+ * dragging marker without aborting Leaflet's in-progress drag (which would
+ * happen if we re-added the marker layers).
+ */
+function rebuildPreviewPath(): void {
+  if (!active) return;
+  const entry = mapTabCache.get(active.mapId);
+  if (!entry) return;
+  const canvasHeight = entry.manager.getConfig().canvasHeight;
+  buildPreviewPath(canvasHeight);
+}
+
+function buildPreviewPath(canvasHeight: number): void {
+  if (!active) return;
+  // Remove the prior path layer if any. Markers are untouched.
+  if (active.pathLayer) {
+    try { active.previewLayer.removeLayer(active.pathLayer); } catch { /* noop */ }
+    active.pathLayer = null;
   }
+  if (active.points.length < 2) return;
+  const latLngs = active.points.map(p => storageToLeaflet(p, canvasHeight));
+  if (active.mode === 'polygon' && active.points.length >= 3) {
+    active.pathLayer = L.polygon(latLngs, {
+      color: '#22d3ee',
+      weight: 2,
+      opacity: 0.9,
+      dashArray: '5, 5',
+      fillColor: '#22d3ee',
+      fillOpacity: 0.12,
+    });
+  } else {
+    active.pathLayer = L.polyline(latLngs, {
+      color: '#22d3ee',
+      weight: 2,
+      opacity: 0.9,
+      dashArray: '5, 5',
+    });
+  }
+  active.pathLayer.addTo(active.previewLayer);
 }
 
 function refreshOverlay(): void {

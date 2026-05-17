@@ -28,6 +28,7 @@ import {
   type GridSpacing,
 } from '../../core/map-view-prefs';
 import type { MapTabCacheEntry } from './map-tab-cache';
+import { syncPins } from './map-tab-pins';
 
 let openPopover: { wrapper: HTMLDivElement; entry: MapTabCacheEntry } | null = null;
 
@@ -282,16 +283,20 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
 /**
  * Apply effective prefs to live consumers.
  *
- * V1 wires: grid (show/hide + spacing) and pin-drag lock. Pin style, labels,
- * tint, and zone visuals are persisted but their consumers land in later
- * bouts. This function is the single integration point — additional
- * consumers attach here when they ship.
+ * Wired today (session 216): grid, pin drag lock, pin tint, pin labels.
+ * Pin style variants ('icon' vs 'round-icon' vs 'pin-shape') and zone
+ * visual fields beyond fill_opacity are persisted but consumers TBD.
+ * This function is the single integration point — additional consumers
+ * attach here when they ship.
  */
 export function applyLivePrefs(entry: MapTabCacheEntry, prefs: MapViewPrefs): void {
   // Grid
   applyGrid(entry, prefs.show_grid, prefs.grid_spacing);
   // Pin drag lock
   applyPinDragLock(entry, prefs.lock_pin_drag);
+  // Pin tint + labels — both ride on a syncPins re-call. Cheap (cache-key keyed
+  // visuals + DOM-level display toggle); no per-marker rebuild.
+  syncPins(entry);
 }
 
 function applyGrid(entry: MapTabCacheEntry, show: boolean, spacing: number): void {

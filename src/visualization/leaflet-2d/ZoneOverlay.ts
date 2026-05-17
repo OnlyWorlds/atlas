@@ -61,6 +61,12 @@ interface ZoneEntry {
    * remain visible (selection is unchanged). Default false.
    */
   vertexDotsSuppressed: boolean;
+  /**
+   * Mirrors the editing state for THIS zone. Set by `setZoneEditing` from
+   * zone-edit-mode on enter/exit. When true, applyStyle renders the outline
+   * dashed (parity with create-mode preview, ZC6).
+   */
+  editing: boolean;
   shape: ZoneShape;
   selected: boolean;
   visible: boolean;
@@ -170,6 +176,36 @@ export class ZoneOverlay {
     return this.entries.has(id);
   }
 
+  /** Snapshot of zone ids currently rendered. Used by syncZones to detect
+   * overlays that no longer correspond to an existing zone (deletion). */
+  getZoneIds(): string[] {
+    return Array.from(this.entries.keys());
+  }
+
+  /**
+   * Fast live-update of a zone's polygon/polyline points without rebuilding
+   * the underlying Leaflet primitive (ZD4 — live outline during edit-mode
+   * drags). Uses L.Polyline.setLatLngs which mutates the existing SVG path
+   * in place; cheap enough to fire per drag frame. Does NOT update the
+   * cached `shape.points` (caller is in a transient state — the canonical
+   * write happens on dragend through the normal store flow → applyStyle).
+   *
+   * If `id` isn't tracked or the layer doesn't expose setLatLngs, no-op.
+   */
+  setZonePointsLive(id: string, points: Point[]): void {
+    const entry = this.entries.get(id);
+    if (!entry) return;
+    const layer = entry.visibleLayer as L.Path & {
+      setLatLngs?: (latlngs: L.LatLng[]) => void;
+    };
+    if (typeof layer.setLatLngs !== 'function') return;
+    const latLngs = points.map(p => storageToLeaflet(p, this.canvasHeight));
+    layer.setLatLngs(latLngs);
+    // Hit-overlay (line zones) needs the same update so click target stays
+    // accurate during drag.
+    if (entry.hitLayer) entry.hitLayer.setLatLngs(latLngs);
+  }
+
   onZoneClick(handler: ZoneClickHandler): void {
     this.onClick = handler;
   }
@@ -253,6 +289,7 @@ export class ZoneOverlay {
       visible: true,
       vertexDots: [],
       vertexDotsSuppressed: false,
+      editing: false,
     };
 
     if (shape.labelText) {
@@ -276,17 +313,18 @@ export class ZoneOverlay {
   private showVertexDots(entry: ZoneEntry): void {
     this.hideVertexDots(entry);
     if (entry.vertexDotsSuppressed) return;
-    // Vertex dots include their 1-indexed order number so you can see at a
-    // glance which marker is which (matches the edit-mode handles and the
-    // draft-mode markers — same visual language across all three states).
-    entry.shape.points.forEach((p, i) => {
+    // Read-only vertex dots: plain cyan circles, NO inner order number.
+    // Numbers are reserved for actionable states (draft + edit handles) where
+    // the order matters operationally. Outside edit, they're visual noise.
+    // (Session 217 — Captain's read: "maybe DONT show the little number labels
+    // when a zone is selected but not edit mode. only when editmode.")
+    entry.shape.points.forEach((p) => {
       const latlng = storageToLeaflet(p, this.canvasHeight);
-      const displayOrder = i + 1;
       const icon = L.divIcon({
         className: 'atlas-zone-vertex-dot',
-        html: `<span class="atlas-zone-vertex-dot-num">${displayOrder}</span>`,
-        iconSize: [12, 12],
-        iconAnchor: [6, 6],
+        html: '',
+        iconSize: [10, 10],
+        iconAnchor: [5, 5],
       });
       const dot = L.marker(latlng, {
         icon,
@@ -324,6 +362,19 @@ export class ZoneOverlay {
     }
   }
 
+  /**
+   * Mark a zone as editing or not. Editing-state changes outline to dashed
+   * (parity with create-mode preview) without touching color or weight.
+   * Idempotent — safe to call repeatedly with the same value.
+   */
+  setZoneEditing(id: string, editing: boolean): void {
+    const entry = this.entries.get(id);
+    if (!entry) return;
+    if (entry.editing === editing) return;
+    entry.editing = editing;
+    this.applyStyle(entry);
+  }
+
   private applyStyle(entry: ZoneEntry): void {
     const color = entry.shape.color ?? DEFAULT_COLOR;
     const opacity = entry.shape.opacity ?? DEFAULT_OPACITY;
@@ -333,6 +384,10 @@ export class ZoneOverlay {
       color,
       weight,
       opacity: showShape ? (entry.selected ? 1 : 0.9) : 0,
+      // Editing state renders dashed outline (ZC6) so the user sees at a
+      // glance "this zone's geometry is mutable right now." Same dash pattern
+      // as the draft-mode preview for visual continuity (zone-drawing).
+      dashArray: entry.editing ? '5, 5' : undefined,
     };
     if (entry.shape.mode === 'polygon') {
       style.fillColor = color;

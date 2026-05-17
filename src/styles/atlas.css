@@ -920,6 +920,43 @@
   color: var(--atlas-text);
 }
 
+/* Inline name edit (B2): the h2 itself is the click target. Subtle hover hint
+   so the affordance is discoverable without dominating the header. */
+.atlas-element-name {
+  cursor: text;
+  padding: 0 4px;
+  border-radius: 3px;
+  transition: background 0.12s ease;
+}
+.atlas-element-name:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.atlas-element-name:focus-visible {
+  outline: 1px solid rgba(34, 211, 238, 0.55);
+  outline-offset: 1px;
+}
+
+/* The replacement input matches h2 typography so the visual swap is seamless. */
+.atlas-element-name-input {
+  margin: 0;
+  padding: 0 4px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--atlas-text);
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  border-radius: 3px;
+  outline: none;
+  width: auto;
+  min-width: 12ch;
+  max-width: 100%;
+}
+.atlas-element-name-input:focus {
+  background: rgba(34, 211, 238, 0.12);
+  border-color: rgba(34, 211, 238, 0.85);
+}
+
 .atlas-middle-header .material-symbols-outlined {
   font-size: 20px;
   color: var(--atlas-cyan);
@@ -1549,6 +1586,31 @@
 .atlas-placing .atlas-map-pane,
 .atlas-placing .leaflet-container {
   cursor: crosshair !important;
+}
+
+/* Default map cursor is the OS arrow, not Leaflet's open hand. Captain found
+   the grab cursor over-promising — most of the canvas is for clicking pins /
+   zones, not panning. Special states still override:
+     - .atlas-placing → crosshair (pin placement banner active, rule above)
+     - .atlas-zone-editing → crosshair (defined in zone-editing block)
+     - .leaflet-dragging → grabbing (Leaflet's own active-pan state stays)
+   Pin hover, zone hover etc. switch to pointer via their own selectors.
+
+   `!important` is required: leaflet.css is JS-imported (loaded after
+   atlas.css) and sets `.leaflet-grab { cursor: grab }` + vendor-prefixed
+   `cursor: -webkit-grab` siblings. The vendor-prefixed declarations cascade
+   independently — overriding with bare `cursor: default` at higher
+   specificity still loses to the `-webkit-grab` line in some browsers.
+   Force with `!important` for all platforms (ZC5 follow-up, ZD1). */
+.atlas-map-canvas-container .leaflet-container,
+.atlas-map-canvas-container .leaflet-grab {
+  cursor: default !important;
+}
+/* Preserve grabbing affordance DURING an active pan. Leaflet adds
+   `.leaflet-dragging` to the container while a pan is in progress. */
+.atlas-map-canvas-container .leaflet-dragging,
+.atlas-map-canvas-container .leaflet-dragging .leaflet-grab {
+  cursor: grabbing !important;
 }
 
 /* Pin label container — the divIcon is 150px wide centered on the pin. Without
@@ -2562,6 +2624,40 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
+/* Zone create modal (ZC10 + ZD6). Shape is a read-only badge — locked by
+   draft mode — and supertype + subtype are free text taxonomy inputs.
+   Earlier shape-radio styling was dropped in ZD6 (shape no longer
+   user-pickable in this modal). */
+.atlas-modal-label {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 500;
+}
+.atlas-modal-label-hint {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+.atlas-zone-create-shape-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-bottom: 14px;
+  background: rgba(34, 211, 238, 0.14);
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  border-radius: 12px;
+  color: #22d3ee;
+  font-size: 11px;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  width: fit-content;
+}
+.atlas-zone-create-shape-badge .material-symbols-outlined {
+  font-size: 14px;
+}
+
 .atlas-modal-hint {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.50);
@@ -3473,10 +3569,14 @@
   letter-spacing: 0.04em;
   padding-right: 8px;
   border-right: 1px solid rgba(255, 255, 255, 0.12);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .atlas-zone-draft-count {
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .atlas-zone-draft-count-num {
@@ -3484,12 +3584,20 @@
   font-weight: 600;
 }
 
-.atlas-zone-draft-hint {
+/* Hint + keys clusters must stay single-line — without nowrap the words
+   "shift" / "to" / "snap" wrap into a vertical stack inside the overlay
+   (ZD3 fix: Captain's screenshot showed the hint breaking into 5 lines). */
+.atlas-zone-draft-hint,
+.atlas-zone-draft-keys {
   font-size: 10px;
   color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 120ms ease;
 }
 
-.atlas-zone-draft-hint kbd {
+.atlas-zone-draft-hint kbd,
+.atlas-zone-draft-keys kbd {
   display: inline-block;
   padding: 0 4px;
   border-radius: 2px;
@@ -3497,10 +3605,23 @@
   color: rgba(255, 255, 255, 0.7);
   font-family: inherit;
   font-size: 9px;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+/* Shift held during draft (ZC3): the hint goes bright cyan and its kbd lights
+   up — the user can see the snap is active before clicking. */
+.atlas-zone-draft-overlay.shift-held .atlas-zone-draft-hint {
+  color: #22d3ee;
+  font-weight: 600;
+}
+.atlas-zone-draft-overlay.shift-held .atlas-zone-draft-hint kbd {
+  background: rgba(34, 211, 238, 0.25);
+  color: #ffffff;
 }
 
 .atlas-zone-draft-spacer {
-  width: 4px;
+  flex: 1 1 auto;
+  min-width: 8px;
 }
 
 .atlas-zone-draft-btn {
@@ -3553,13 +3674,18 @@
 
 /* Numbered marker DivIcon used during draft (preview only — not persisted
    until Finish). Mirrors zoner's createMarkerIcon shape (audit
-   ZoneCanvas.ts:18-26). */
+   ZoneCanvas.ts:18-26). Draggable so the user can nudge a misplaced marker
+   without undo + re-click (session 216 smoke fix).
+
+   IMPORTANT: do NOT set `pointer-events: none` here — that was the prior bug.
+   With pointer-events off, mousedown passes through to the leaflet map below
+   and starts a pan instead of a marker drag. */
 .atlas-zone-draft-marker {
   background: #22d3ee;
   border: 2px solid rgba(255, 255, 255, 0.95);
   border-radius: 50%;
   box-shadow: 0 0 8px rgba(34, 211, 238, 0.55);
-  pointer-events: none;
+  cursor: grab;
   /* Defeat Leaflet's default .leaflet-div-icon background/border that would
      otherwise compete with our cyan circle styling. */
   background-color: #22d3ee;
@@ -3568,34 +3694,112 @@
   position: relative;
 }
 
+.atlas-zone-draft-marker:active {
+  cursor: grabbing;
+}
+
 .atlas-zone-draft-marker-num {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   color: #0a0a0a;
   line-height: 1;
+  /* Soft halo so the dark number stays legible over the cyan disc edge. */
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.55);
 }
 
 /* ============================================================
    Zone chip strip below the canvas (DESIGN_MAPS.md §13, V3)
    ============================================================ */
 
-.atlas-zone-chip-strip {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 6px;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.72);
+/* ZC9: replaces the old bottom-of-canvas .atlas-zone-chip-strip with a
+   floating dropdown panel anchored under the toolbar's zones button (right
+   side). Hidden until the .is-open class is toggled by wireZonesDropdown.
+   Same chip children (.atlas-zone-chip) — only the container changed. */
+.atlas-zones-dropdown-panel {
+  position: absolute;
+  top: 44px; /* below the toolbar */
+  right: 8px;
+  z-index: 12; /* above leaflet panes (capped at z=600 inside container z=0) */
+  display: none; /* opens via .is-open */
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(10, 10, 10, 0.96);
   backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  overflow-x: auto;
+  border: 1px solid rgba(34, 211, 238, 0.32);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  min-width: 200px;
+  max-width: 360px;
+  max-height: 60vh;
+  overflow-y: auto;
   scrollbar-width: thin;
-  min-height: 36px;
-  box-sizing: border-box;
   user-select: none;
+}
+.atlas-zones-dropdown-panel.is-open {
+  display: flex;
+}
+
+/* Toolbar dropdown trigger (ZC9). Anchored right via the spacer. Shows a
+   small count badge of zones on this map; expands the panel above. */
+.atlas-map-toolbar-spacer {
+  flex: 1 1 auto;
+}
+.atlas-zones-dropdown-btn {
+  gap: 4px;
+  padding: 0 8px;
+  width: auto !important; /* override atlas-icon-btn-sm fixed width */
+}
+.atlas-zones-dropdown-btn .material-symbols-outlined {
+  font-size: 14px !important;
+}
+.atlas-zones-dropdown-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(34, 211, 238, 0.18);
+  border-radius: 8px;
+  padding: 1px 5px;
+  min-width: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.atlas-zones-dropdown-btn.is-open {
+  background: rgba(34, 211, 238, 0.18);
+  color: #22d3ee;
+}
+.atlas-zones-dropdown-btn.is-open .atlas-zones-dropdown-count {
+  background: rgba(34, 211, 238, 0.35);
+  color: #ffffff;
+}
+.atlas-zones-dropdown-caret {
+  transition: transform 120ms ease;
+}
+.atlas-zones-dropdown-btn.is-open .atlas-zones-dropdown-caret {
+  transform: rotate(180deg);
+}
+
+/* DEPRECATED — keep selector targeting the legacy class harmless in case any
+   stray code or tests still reference it. Hides any orphan element. */
+.atlas-zone-chip-strip {
+  display: none;
+}
+
+/* Chips inside the dropdown panel are full-width rows (vs the previous
+   horizontal strip's content-width chips). Name flexes to fill, X stays
+   right-anchored, hover affordance reveals the X. */
+.atlas-zones-dropdown-panel .atlas-zone-chip {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+}
+.atlas-zones-dropdown-panel .atlas-zone-chip-name {
+  max-width: none;
+  flex: 1 1 auto;
 }
 
 .atlas-zone-chip {
@@ -3619,9 +3823,11 @@
 }
 
 .atlas-zone-chip.is-selected {
-  background: rgba(34, 211, 238, 0.22);
-  border-color: rgba(34, 211, 238, 0.65);
-  color: #22d3ee;
+  background: rgba(34, 211, 238, 0.32);
+  border-color: rgba(34, 211, 238, 1);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.55), 0 0 8px rgba(34, 211, 238, 0.35);
 }
 
 .atlas-zone-chip-shape {
@@ -3928,10 +4134,48 @@ svg .atlas-zone-selected {
   box-shadow: 0 0 6px rgba(34, 211, 238, 0.7), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
   cursor: grab;
   box-sizing: border-box;
+  transition: box-shadow 120ms ease, transform 120ms ease;
+}
+
+.atlas-zone-edit-handle:hover {
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.95), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+  transform: scale(1.12);
 }
 
 .atlas-zone-edit-handle:active {
   cursor: grabbing;
+  transform: scale(1.18);
+}
+
+/* Centroid drag handle (ZC7 — bulk-move). Larger ring than vertex handles
+   with an inner "move" glyph so it reads as "grab to drag the whole zone."
+   Renders above vertices via zIndexOffset on the L.Marker. */
+.leaflet-marker-icon.atlas-zone-centroid-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(34, 211, 238, 0.18);
+  border: 2px solid #22d3ee;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.75), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+  color: #22d3ee;
+  cursor: grab;
+  box-sizing: border-box;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+.atlas-zone-centroid-handle:hover {
+  background: rgba(34, 211, 238, 0.32);
+  box-shadow: 0 0 14px rgba(34, 211, 238, 1), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  transform: scale(1.1);
+  color: #ffffff;
+}
+.atlas-zone-centroid-handle:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
+.atlas-zone-centroid-handle .material-symbols-outlined {
+  font-size: 14px !important;
+  font-weight: 700;
 }
 
 /* Segment hover overlay — invisible by default, dashed cyan on hover.
@@ -4007,7 +4251,7 @@ svg .atlas-zone-selected {
   background: #22d3ee;
   border: 1.5px solid #ffffff;
   border-radius: 50%;
-  box-shadow: 0 0 4px rgba(34, 211, 238, 0.6);
+  box-shadow: 0 0 4px rgba(34, 211, 238, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.2);
   box-sizing: border-box;
   pointer-events: none;
 }
@@ -4057,9 +4301,16 @@ svg .atlas-zone-selected {
 
 /* Center the number via flex on the parent. No `position: relative` override —
    Leaflet's inline position: absolute (used to place the icon at the latlng
-   via transform + iconAnchor margin) stays in effect. */
-.atlas-zone-edit-handle,
-.atlas-zone-vertex-dot {
+   via transform + iconAnchor margin) stays in effect.
+
+   Specificity note: leaflet.css is JS-imported (loaded after atlas.css) and
+   defines `.leaflet-marker-icon { display: block }`. With a single-class
+   selector here we'd tie and lose source-order. Chaining `.leaflet-marker-icon`
+   bumps specificity to 2 classes so our flex centering wins cleanly without
+   `!important` (S9 centering fix re-derived 2026-05-16 session 216 — Captain
+   smoke caught edit handles still rendering bottom-left after the S9 pass). */
+.leaflet-marker-icon.atlas-zone-edit-handle,
+.leaflet-marker-icon.atlas-zone-vertex-dot {
   display: flex;
   align-items: center;
   justify-content: center;

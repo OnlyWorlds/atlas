@@ -32,8 +32,9 @@ import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../ui/create-world-modal';
 import { requestPushIfLinked } from '../../sync/sync-attach';
 import { storageToLeaflet, leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
+import { findClosestSegment, polygonCentroid, polylineLabelAnchor, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
-import { markersForZoneOnMap, partitionZonesAndMarkers } from './zone-derived';
+import { markersForZoneOnMap, partitionZonesAndMarkers, getZoneShape } from './zone-derived';
 import type { Marker, Zone } from '../../core/types';
 import type { ToastManager } from '../../ui/toast-manager';
 
@@ -52,6 +53,14 @@ interface EditSession {
   layerGroup: L.LayerGroup;
   vertexMarkers: Map<string, L.Marker>;  // markerId → leaflet marker
   segmentOverlays: L.Polyline[];
+  /**
+   * Centroid drag handle (ZC7 — zoner-style bulk-move). Single draggable
+   * marker at the polygon centroid (or polyline label anchor). Drag start
+   * snapshots all marker positions; drag delta is applied to every marker
+   * live; dragend commits via batched updateMarker calls.
+   */
+  centroidHandle: L.Marker | null;
+  centroidDragStart: { x: number; y: number; markerPositions: Map<string, { x: number; y: number }> } | null;
   toasts: ToastManager;
   // Saved Leaflet defaults to restore on exit.
   defaultDoubleClickZoom: boolean;
@@ -81,6 +90,80 @@ export function isEditing(): boolean {
 
 export function getEditingZoneId(): string | null {
   return active?.zoneId ?? null;
+}
+
+export function getEditingMapId(): string | null {
+  return active?.mapId ?? null;
+}
+
+/**
+ * Click-anywhere-on-canvas insertion (ZC8). Called from map-tab.ts's map-click
+ * handler when an edit session is active on this map AND the click did NOT
+ * hit a segment overlay or vertex handle (those have their own listeners).
+ *
+ * Finds the nearest segment (polygon includes wrap segment; line does not),
+ * inserts a marker AT the click point (not the projection foot — Captain
+ * wants "places the marker exactly there"), and renumbers subsequent markers.
+ */
+export async function insertMarkerAtClick(clickPoint: Point): Promise<void> {
+  if (!active) return;
+  const store = getActiveStore();
+  if (!store) return;
+  const state = getState();
+  const { markers } = partitionZonesAndMarkers(state.data.elements);
+  const zoneMarkers = markersForZoneOnMap(active.zoneId, active.mapId, markers);
+  if (zoneMarkers.length < 2) return;
+
+  const zone = state.data.elements.find(
+    (e): e is Zone => e.type === 'zone' && e.id === active!.zoneId,
+  );
+  const isPolygon = getZoneShape(zone) === 'polygon';
+
+  const closest = findClosestSegment(
+    clickPoint,
+    zoneMarkers.map(m => ({ x: m.x, y: m.y })),
+    isPolygon,
+  );
+  if (!closest) return;
+
+  // Insert AT click point (rounded + clamped to canvas), with order =
+  // segmentIndex + 1. Renumber bumps every existing marker with order ≥ that
+  // by one. Same flow as segment-click midpoint insert, just with the click
+  // point as the position.
+  const entry = mapTabCache.get(active.mapId);
+  const cfg = entry?.manager.getConfig();
+  const w = cfg?.canvasWidth ?? 2000;
+  const h = cfg?.canvasHeight ?? 2000;
+  const x = clamp(Math.round(clickPoint.x), 0, w);
+  const y = clamp(Math.round(clickPoint.y), 0, h);
+  const newOrder = closest.index + 1;
+
+  try {
+    const bumps = zoneMarkers.filter(m => (m.order ?? 0) >= newOrder);
+    bumps.sort((a, b) => (b.order ?? 0) - (a.order ?? 0));
+    for (const m of bumps) {
+      await store.updateMarker(m.id, { order: (m.order ?? 0) + 1 });
+    }
+    await store.createMarker({
+      name: '',
+      map_id: active.mapId,
+      zone_id: active.zoneId,
+      x,
+      y,
+      order: newOrder,
+    });
+    const elements = await store.listElements();
+    patchSlice('data', { elements });
+    requestPushIfLinked();
+    rebuildHandles();
+  } catch (err) {
+    console.error('[zone-edit] insert-at-click failed:', err);
+    active.toasts.error('failed to insert marker');
+  }
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
 }
 
 /**
@@ -127,6 +210,9 @@ export function enterEditMode(
   // render in their place at the same coords. Polygon outline + selection
   // glow remain unchanged (zone is still selected throughout edit).
   entry.zoneOverlay?.setVertexDotsSuppressed(zoneId, true);
+  // Flip the polygon outline to dashed for the duration of edit (ZC6 —
+  // visual parity with create-mode preview, signals mutability).
+  entry.zoneOverlay?.setZoneEditing(zoneId, true);
 
   const layerGroup = L.layerGroup().addTo(lMap);
 
@@ -143,6 +229,8 @@ export function enterEditMode(
     layerGroup,
     vertexMarkers: new Map(),
     segmentOverlays: [],
+    centroidHandle: null,
+    centroidDragStart: null,
     toasts,
     defaultDoubleClickZoom,
   };
@@ -171,6 +259,10 @@ function rebuildHandles(): void {
   active.vertexMarkers.clear();
   for (const s of active.segmentOverlays) active.layerGroup.removeLayer(s);
   active.segmentOverlays = [];
+  if (active.centroidHandle) {
+    active.layerGroup.removeLayer(active.centroidHandle);
+    active.centroidHandle = null;
+  }
 
   const state = getState();
   const { markers } = partitionZonesAndMarkers(state.data.elements);
@@ -188,7 +280,7 @@ function rebuildHandles(): void {
   const zone = state.data.elements.find(
     (e): e is Zone => e.type === 'zone' && e.id === active!.zoneId,
   );
-  const isPolygon = zone?.supertype === 'polygon';
+  const isPolygon = getZoneShape(zone) === 'polygon';
   const segmentCount = isPolygon ? zoneMarkers.length : zoneMarkers.length - 1;
   for (let i = 0; i < segmentCount; i++) {
     const a = zoneMarkers[i];
@@ -197,6 +289,34 @@ function rebuildHandles(): void {
     overlay.addTo(active.layerGroup);
     active.segmentOverlays.push(overlay);
   }
+
+  // Centroid drag handle (ZC7 — bulk-move via single handle, ported from
+  // zoner). Polygons → vertex-averaged centroid; lines → midpoint of longest
+  // segment (visual room). Drag delta is applied to every marker live; batch
+  // commit on dragend.
+  const pts = zoneMarkers.map(m => ({ x: m.x, y: m.y }));
+  const centerPt = isPolygon ? polygonCentroid(pts) : polylineLabelAnchor(pts);
+  if (centerPt) {
+    active.centroidHandle = buildCentroidHandle(centerPt, height);
+    active.centroidHandle.addTo(active.layerGroup);
+  }
+}
+
+/**
+ * Read each vertex handle's CURRENT latlng (including any handle being
+ * actively dragged) and convert to storage-space points in iteration order.
+ * The Map<id, L.Marker> preserves insertion order which matches the
+ * zoneMarkers sort by `order` from rebuildHandles — so output points are in
+ * canonical zone-vertex order without extra sort.
+ */
+function collectLivePointsFromHandles(canvasHeight: number): Point[] {
+  if (!active) return [];
+  const out: Point[] = [];
+  for (const handle of active.vertexMarkers.values()) {
+    const ll = handle.getLatLng();
+    out.push(leafletToStorage(ll, canvasHeight));
+  }
+  return out;
 }
 
 function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
@@ -219,6 +339,18 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   let suppressClick = false;
   handle.on('dragstart', () => {
     suppressClick = true;
+  });
+  // Live outline update (ZD4): on every drag frame, update the ZoneOverlay
+  // polygon/polyline via setZonePointsLive. We rebuild the points list from
+  // each vertex handle's CURRENT latlng (this includes the one being
+  // dragged), so the outline tracks live. Cheap — setLatLngs mutates the
+  // SVG path in place. No store write here; dragend handles persistence.
+  handle.on('drag', () => {
+    if (!active) return;
+    const entry = mapTabCache.get(active.mapId);
+    if (!entry?.zoneOverlay) return;
+    const points = collectLivePointsFromHandles(canvasHeight);
+    if (points.length >= 2) entry.zoneOverlay.setZonePointsLive(active.zoneId, points);
   });
   handle.on('dragend', async () => {
     setTimeout(() => { suppressClick = false; }, 50);
@@ -247,6 +379,113 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
     L.DomEvent.stop(e);
     if (suppressClick) return;
     await deleteMarkerInEdit(marker.id);
+  });
+
+  return handle;
+}
+
+/**
+ * Centroid drag handle (ZC7). Renders as a slightly larger ring than vertex
+ * handles, in the polygon center (or polyline midpoint). Drag mutates every
+ * marker's position by the same delta; dragend commits via batched
+ * `updateMarker` calls.
+ *
+ * Live drag updates the vertex handles' positions visually but does NOT write
+ * to store per frame (would thrash). Each vertex handle's underlying Leaflet
+ * latlng is set in-place so the polygon outline (rendered by ZoneOverlay
+ * subscribing to state.data.elements — which DOESN'T change mid-drag) won't
+ * update. That's the tradeoff: outline stays in original position until
+ * dragend commits and triggers a re-render. Acceptable for v1; future polish
+ * could re-render the outline via ZoneOverlay.updateZone during drag.
+ */
+function buildCentroidHandle(center: Point, canvasHeight: number): L.Marker {
+  const latlng = storageToLeaflet(center, canvasHeight);
+  const icon = L.divIcon({
+    className: 'atlas-zone-centroid-handle',
+    html: '<span class="material-symbols-outlined">open_with</span>',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+  const handle = L.marker(latlng, {
+    icon,
+    draggable: true,
+    keyboard: false,
+    // Visually above vertex handles so the user can grab it even when it
+    // overlaps a vertex.
+    zIndexOffset: 100,
+  });
+
+  handle.on('dragstart', () => {
+    if (!active) return;
+    const startLatLng = handle.getLatLng();
+    const startPt = leafletToStorage(startLatLng, canvasHeight);
+    const state = getState();
+    const { markers } = partitionZonesAndMarkers(state.data.elements);
+    const zoneMarkers = markersForZoneOnMap(active.zoneId, active.mapId, markers);
+    const positions = new Map<string, { x: number; y: number }>();
+    for (const m of zoneMarkers) positions.set(m.id, { x: m.x, y: m.y });
+    active.centroidDragStart = {
+      x: startPt.x,
+      y: startPt.y,
+      markerPositions: positions,
+    };
+  });
+
+  handle.on('drag', () => {
+    if (!active?.centroidDragStart) return;
+    const curLatLng = handle.getLatLng();
+    const curPt = leafletToStorage(curLatLng, canvasHeight);
+    const dx = curPt.x - active.centroidDragStart.x;
+    const dy = curPt.y - active.centroidDragStart.y;
+    // Move every vertex handle's Leaflet latlng in-place — visual feedback
+    // for the user. State writes happen on dragend.
+    for (const [markerId, origPos] of active.centroidDragStart.markerPositions) {
+      const vh = active.vertexMarkers.get(markerId);
+      if (!vh) continue;
+      vh.setLatLng(storageToLeaflet({ x: origPos.x + dx, y: origPos.y + dy }, canvasHeight));
+    }
+    // Live outline (ZD4): update the polygon/polyline via ZoneOverlay
+    // setZonePointsLive — reads the handles' fresh latlngs we just set.
+    const entry = mapTabCache.get(active.mapId);
+    if (entry?.zoneOverlay) {
+      const points = collectLivePointsFromHandles(canvasHeight);
+      if (points.length >= 2) entry.zoneOverlay.setZonePointsLive(active.zoneId, points);
+    }
+  });
+
+  handle.on('dragend', async () => {
+    if (!active?.centroidDragStart) return;
+    const session = active;
+    const startSnap = session.centroidDragStart!;
+    session.centroidDragStart = null;
+    const curLatLng = handle.getLatLng();
+    const curPt = leafletToStorage(curLatLng, canvasHeight);
+    const dx = Math.round(curPt.x - startSnap.x);
+    const dy = Math.round(curPt.y - startSnap.y);
+    if (dx === 0 && dy === 0) {
+      rebuildHandles();
+      return;
+    }
+    const store = getActiveStore();
+    if (!store) return;
+    const entry = mapTabCache.get(session.mapId);
+    const w = entry?.manager.getConfig().canvasWidth ?? 2000;
+    const h = entry?.manager.getConfig().canvasHeight ?? 2000;
+    try {
+      for (const [markerId, origPos] of startSnap.markerPositions) {
+        const nx = clamp(origPos.x + dx, 0, w);
+        const ny = clamp(origPos.y + dy, 0, h);
+        await store.updateMarker(markerId, { x: nx, y: ny });
+      }
+      const elements = await store.listElements();
+      patchSlice('data', { elements });
+      requestPushIfLinked();
+      rebuildHandles();
+    } catch (err) {
+      console.error('[zone-edit] centroid drag commit failed:', err);
+      session.toasts.error('failed to move zone');
+      rebuildHandles();
+    }
   });
 
   return handle;
@@ -345,7 +584,7 @@ async function deleteMarkerInEdit(markerId: string): Promise<void> {
   const zone = state.data.elements.find(
     (e): e is Zone => e.type === 'zone' && e.id === active!.zoneId,
   );
-  const isPolygon = zone?.supertype === 'polygon';
+  const isPolygon = getZoneShape(zone) === 'polygon';
   const min = isPolygon ? 3 : 2;
   if (zoneMarkers.length <= min) {
     active.toasts.info(`${isPolygon ? 'polygon' : 'line'} needs at least ${min} markers`);
@@ -394,6 +633,8 @@ export function exitEditMode(mode: 'commit' | 'cancel'): void {
       // Unsuppress the ZoneOverlay's read-only vertex dots — they reappear
       // since the zone is still selected.
       entry.zoneOverlay?.setVertexDotsSuppressed(session.zoneId, false);
+      // Flip outline back from dashed → solid (ZC6 reset on exit).
+      entry.zoneOverlay?.setZoneEditing(session.zoneId, false);
     }
   } catch (err) {
     console.warn('[zone-edit] teardown error:', err);

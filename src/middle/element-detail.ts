@@ -58,6 +58,18 @@ export function resetElementDetailScrollMemory(): void {
   scrollMemory.clear();
 }
 
+/**
+ * Pending "auto-edit on next render" signal. When set to an element id, the
+ * very next renderHeader for that element opens its name in inline edit mode
+ * with the text selected — used by zone-create to drop the user straight into
+ * naming (DESIGN_MAPS work pile B3). Consumed on use.
+ */
+let pendingAutoEditNameForId: string | null = null;
+
+export function requestInlineNameEditOnNextRender(elementId: string): void {
+  pendingAutoEditNameForId = elementId;
+}
+
 export function mountElementDetail(target: HTMLElement): () => void {
   target.innerHTML = '';
 
@@ -151,6 +163,86 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
   // ====== Header ======
 
+  /**
+   * Replace the name h2 in-place with an editable input. Enter commits, Escape
+   * reverts, blur commits. Click-outside fires blur via the browser. The next
+   * render will rebuild the h2 from `el.name` post-commit.
+   *
+   * One-field exception to the schema-driven popover pattern (B2). Name is
+   * universally the primary identity field; making it edit-in-place removes a
+   * click without disrupting the popover for everything else.
+   */
+  function startInlineNameEdit(host: HTMLElement, el: Element): void {
+    if (host.querySelector('input')) return; // already editing
+
+    const original = el.name || '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'atlas-element-name-input';
+    input.value = original;
+    input.setAttribute('aria-label', 'rename');
+
+    host.innerHTML = '';
+    host.appendChild(input);
+
+    // Two-phase setup so the browser computes layout before focus + select.
+    queueMicrotask(() => {
+      input.focus();
+      input.select();
+    });
+
+    let reverting = false;
+    let committed = false;
+
+    const commit = async () => {
+      if (committed) return;
+      committed = true;
+      const next = input.value.trim();
+      // Empty rename is a no-op rather than an unnamed element.
+      if (!next || next === original) {
+        host.textContent = original || '(unnamed)';
+        return;
+      }
+      const store = getActiveStore();
+      if (!store) {
+        host.textContent = original || '(unnamed)';
+        toastManager.error('cannot rename — no active world');
+        return;
+      }
+      try {
+        await store.updateElement(el.id, { name: next });
+        const updated = await store.listElements();
+        patchSlice('data', { elements: updated });
+        requestPushIfLinked();
+        // Re-render naturally repaints the header with the new name. Don't
+        // overwrite host.textContent here — the subscribe will fire and the
+        // full header rebuilds.
+      } catch (err) {
+        console.error('[element-detail] inline rename failed:', err);
+        host.textContent = original || '(unnamed)';
+        toastManager.error('failed to rename');
+      }
+    };
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur(); // triggers commit via the blur listener
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        reverting = true;
+        input.blur();
+      }
+    });
+    input.addEventListener('blur', () => {
+      if (reverting) {
+        host.textContent = original || '(unnamed)';
+        return;
+      }
+      void commit();
+    });
+  }
+
   function buildSyncDot(el: Element): HTMLElement {
     const dot = document.createElement('span');
     dot.className = 'atlas-element-sync-dot';
@@ -199,8 +291,26 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
     const title = document.createElement('h2');
     title.dataset.role = 'element-name';
+    title.className = 'atlas-element-name';
     title.textContent = el.name || '(unnamed)';
+    title.title = 'click to rename';
+    title.tabIndex = 0;
+    title.addEventListener('click', () => startInlineNameEdit(title, el));
+    title.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        startInlineNameEdit(title, el);
+      }
+    });
     header.appendChild(title);
+
+    // B3: if zone-create (or another flow) signalled an auto-edit for this
+    // element, drop the user straight into rename mode with the placeholder
+    // text selected. One-shot — clear after consumption.
+    if (pendingAutoEditNameForId === el.id) {
+      pendingAutoEditNameForId = null;
+      queueMicrotask(() => startInlineNameEdit(title, el));
+    }
 
     const spacer = document.createElement('div');
     spacer.className = 'atlas-middle-spacer';

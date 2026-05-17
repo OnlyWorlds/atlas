@@ -17,6 +17,7 @@ import {
   listZonesOnMap,
   markersForZoneOnMap,
   partitionZonesAndMarkers,
+  getZoneShape,
 } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import type { Zone } from '../../core/types';
@@ -43,7 +44,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
       x: m.x,
       y: m.y,
     }));
-    const mode = (zone.supertype === 'line' ? 'line' : 'polygon') as 'polygon' | 'line';
+    const mode = getZoneShape(zone);
     const opacity = zoneEffectiveOpacity(zone, prefs.zone_fill_opacity);
     const labelText = computeLabelText(zone, prefs.zone_labels);
 
@@ -57,13 +58,15 @@ export function syncZones(entry: MapTabCacheEntry): void {
     });
   }
 
-  // Remove zones no longer on this map. Iterate cached ids by querying overlay.
-  // ZoneOverlay doesn't expose its key set; we approximate by removing any
-  // zone in state that isn't on this map AND that the overlay currently has.
-  // Pragmatic enough — the overlay has a `hasZone` helper.
-  for (const z of zones) {
-    if (!present.has(z.id) && entry.zoneOverlay.hasZone(z.id)) {
-      entry.zoneOverlay.removeZone(z.id);
+  // Remove overlay entries that are no longer on this map. Iterate the
+  // OVERLAY's known ids (ZD2 fix) — iterating `zones` from state was wrong
+  // because a just-deleted zone isn't in state.data.elements anymore, so the
+  // remove loop never visited its id and the polygon stayed on the canvas
+  // until page reload. With `getZoneIds`, we see every rendered overlay and
+  // can drop ones not in the current present-on-this-map set.
+  for (const id of entry.zoneOverlay.getZoneIds()) {
+    if (!present.has(id)) {
+      entry.zoneOverlay.removeZone(id);
     }
   }
 
@@ -89,15 +92,39 @@ function computeLabelText(zone: Zone, mode: 'always' | 'hover' | 'never'): strin
 }
 
 /**
- * Render the chip strip below the canvas (DESIGN_MAPS.md §13).
+ * Render the zones dropdown panel + sync the toolbar dropdown button (ZC9
+ * replaces the bottom-of-canvas chip strip from DESIGN_MAPS.md §13).
+ *
+ * - When zones.length === 0: hide both the toolbar button AND the panel.
+ * - Otherwise: show the button with a count badge; render chip-styled rows
+ *   into the panel. Panel opens/closes via the button (wireZonesDropdown).
  */
 function renderChipStrip(entry: MapTabCacheEntry, zones: Zone[], selectedId?: string | null): void {
   const strip = entry.zoneStrip;
   strip.innerHTML = '';
+
+  // Update the toolbar dropdown button (count + visibility). The button lives
+  // in entry.toolbar — query for it by its data-action attribute so this
+  // helper is independent of CanvasToolbarRefs.
+  const btn = entry.toolbar.querySelector<HTMLButtonElement>('[data-action="zones-dropdown"]');
+  const countEl = btn?.querySelector<HTMLElement>('[data-role="zones-count"]');
+
   if (zones.length === 0) {
     strip.style.display = 'none';
+    strip.classList.remove('is-open');
+    if (btn) {
+      btn.style.display = 'none';
+      btn.classList.remove('is-open');
+    }
     return;
   }
+
+  if (btn) {
+    btn.style.display = '';
+    if (countEl) countEl.textContent = String(zones.length);
+  }
+  // Panel itself stays display: '' so the .is-open class controls visibility
+  // (driven by wireZonesDropdown). Keep it laid out so opening doesn't lag.
   strip.style.display = '';
 
   for (const z of zones) {
@@ -107,7 +134,7 @@ function renderChipStrip(entry: MapTabCacheEntry, zones: Zone[], selectedId?: st
     chip.setAttribute('data-zone-id', z.id);
     chip.setAttribute('title', `${ELEMENT_LABELS.zone.singular}: ${z.name}`);
 
-    const shapeIcon = z.supertype === 'line' ? 'show_chart' : 'hexagon';
+    const shapeIcon = getZoneShape(z) === 'line' ? 'show_chart' : 'hexagon';
     const color = (z as { atlas_color?: string }).atlas_color ?? '#22d3ee';
 
     chip.innerHTML = `
@@ -115,7 +142,7 @@ function renderChipStrip(entry: MapTabCacheEntry, zones: Zone[], selectedId?: st
       <span class="atlas-zone-chip-dot" style="background:${color}"></span>
       <span class="atlas-zone-chip-name">${escapeHtml(z.name)}</span>
       <button type="button" class="atlas-zone-chip-x" data-action="delete" title="Delete zone">
-        <span class="material-symbols-outlined">close</span>
+        <span class="material-symbols-outlined">delete</span>
       </button>
     `;
     strip.appendChild(chip);
@@ -134,27 +161,28 @@ export function wireChipStrip(entry: MapTabCacheEntry, toasts: ToastManager): vo
     const target = e.target as HTMLElement;
     const chip = target.closest<HTMLElement>('.atlas-zone-chip');
     if (!chip) return;
+    // Defensive: stop bubbling so the click can't reach any ancestor handler
+    // that might mis-interpret it (e.g. a sibling filter strip that shares a
+    // delegated parent in a future layout). Chip selection should be a
+    // contained gesture.
+    e.stopPropagation();
     const zoneId = chip.getAttribute('data-zone-id');
     if (!zoneId) return;
 
     // Delete affordance.
     if (target.closest('[data-action="delete"]')) {
-      e.stopPropagation();
       await deleteZoneFromChip(zoneId, toasts);
       return;
     }
 
     // Plain click → select zone AND navigate to element-detail route so the
-    // middle pane + sidebar reflect the selection (parity with canvas zone-
-    // click flow). Without nav, only state.ui.selectedElementId changes —
-    // the URL-driven middle pane stays put.
+    // middle pane reflects the selection (parity with canvas zone-click flow).
+    // sidebarMode is intentionally left alone: navigation to /element/<id>
+    // triggers sidebar.syncModeFromRoute which already flips to elements mode
+    // when the route is content-y. Setting it here too creates a double-patch.
     const worldId = getState().active?.worldId;
     if (worldId) {
-      patchSlice('ui', {
-        ...getState().ui,
-        selectedElementId: zoneId,
-        sidebarMode: 'elements',
-      });
+      patchSlice('ui', { ...getState().ui, selectedElementId: zoneId });
       navigate(elementHash(worldId, zoneId));
     } else {
       patchSlice('ui', { ...getState().ui, selectedElementId: zoneId });

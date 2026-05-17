@@ -273,7 +273,7 @@ On entry:
 2. Set `ui.zoneEditing = { zoneId, mapId }`.
 3. Map's `doubleClickZoom` disabled (avoids accidental zoom during edit; restored on exit).
 4. Canvas container gets `.atlas-zone-editing` class → `cursor: crosshair`.
-5. Canvas renders draggable vertex handles (14px cyan circles with `cursor: grab`) at each marker's coords. Replaces the read-only vertex dots from S3 (visually similar, functionally different).
+5. Canvas renders draggable vertex handles (16×16 cyan circles with `cursor: grab`, numbered with the marker's 1-indexed order) at each marker's coords. Replaces the read-only vertex dots from S3 — same visual language, larger size signals interactivity. ZoneOverlay's read-only dots are suppressed for this zone while editing (`setVertexDotsSuppressed(id, true)`); restored on exit.
 6. Segment overlays render: 20px-weight invisible polyline between every consecutive pair of markers (including last→first for polygon zones). Opacity 0 by default, 0.3 cyan dashed on hover.
 7. Element-detail header's "Edit shape" button flips to "Done editing" + a Cancel ✗ button appears.
 
@@ -347,9 +347,9 @@ See §2.5 for the strip during draw, §3.1 for edit-mode. Same DOM mount point �
 ### 4.3 Zone selection highlight
 
 When `selectedElementId` points at a zone:
-- That zone's polygon/polyline renders with `weight: 3` (vs 2 default) and a subtle outer glow (`filter: drop-shadow(0 0 4px var(--ow-accent))`).
-- Markers for that zone render as small dots (~6px) at each point, visible even when not in edit mode. This signals "this zone has these many markers" at a glance.
-- The dots are NOT interactive outside edit mode. Click on a dot does nothing.
+- That zone's polygon/polyline renders with `weight: 3` (vs 2 default) and a drop-shadow glow via the `.atlas-zone-selected` class (`filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.85))`).
+- Read-only vertex dots (12×12 cyan circles with the marker's 1-indexed order number) render at each marker point. They share the same numbered cyan visual language as edit handles and draft markers — only the size changes as interaction depth grows (12 read-only → 16 edit handle → 18 draft).
+- The dots are NOT interactive outside edit mode (`interactive: false` on the L.Marker). Click on a dot does nothing. To manipulate vertices, enter edit mode (double-click polygon).
 
 ### 4.4 Element-detail sections
 
@@ -362,9 +362,9 @@ When the selected element is a Zone, element-detail mounts in middle pane with t
 - Hint text: "Visuals are stored locally and not synced to the API."
 
 **Markers**:
-- For each marker (sorted by order): row with order # + (x, y) readout + "pan to" button + delete trash icon.
-- "Edit zone shape" button at the top — enters edit mode (§3).
-- "Add marker" button — enters single-marker-insert mode (click next on canvas places one marker at end-of-order; exits insert mode after).
+- For each marker (sorted by order): row with 1-indexed order # + (x, y) readout + "pan to" button + delete trash icon. Multi-map zones group markers under per-map sub-headers.
+- "Edit shape" button at the top — enters edit mode (§3). Flips to "Done editing" + a Cancel ✗ button while editing.
+- No "Add marker" button shipped — segment-click insertion (during edit mode) covers single-marker addition naturally. Standalone insert-mode was scoped out as redundant.
 
 When the selected element is a Marker (rare — atlas excludes pin/marker/zone from elements-sidebar but a marker can be reached via the parent zone's Markers list):
 - Standard schema editor.
@@ -376,9 +376,9 @@ DESIGN_MAPS.md §13 owns the chip-strip docking. Zone-specific chip rendering:
 - Shape glyph: `⬡` for polygon, `╱` for line, prefix on the chip.
 - Color dot: small filled circle showing `atlas_color ?? '#22d3ee'`.
 - Name: truncated to ~20 chars.
-- Click → selectedElementId = zone.id, navigates to element-detail.
-- Right-click → context menu: Rename, Duplicate, Delete, Edit shape.
-- Drag-to-trash zone → delete (cascades markers per §6).
+- Click → selectedElementId = zone.id, navigates to element-detail. sidebarMode is left alone — the route change drives sidebar.syncModeFromRoute as the single source.
+- Right-click → context menu: Rename, Delete. (Duplicate + Edit-shape entries omitted from v1 — duplicate is rarely needed standalone; edit-shape is reachable via double-click polygon or the element-detail button.)
+- Drag-to-trash zone (when over the canvas trash hot-zone): not wired on the chip strip in v1 (pin chip-drag uses the trash hot-zone; zones use the `×` per-chip and the element-detail delete button).
 
 Filter: only zones returned by `listZonesOnMap(activeMapId, markers, zones)`. Re-derived on every elements change.
 

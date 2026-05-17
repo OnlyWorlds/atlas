@@ -9,6 +9,29 @@
 
 import type { Element, Marker, Zone } from '../../core/types';
 
+export type ZoneShape = 'polygon' | 'line';
+
+/**
+ * Resolve a zone's shape (polygon vs line). Reads the local-only extension
+ * field `atlas_shape` (preferred) and falls back to legacy `supertype` for
+ * zones created before ZD6 — old atlas builds stored 'polygon' / 'line'
+ * directly in supertype, conflating shape with OW's free-text taxonomy.
+ * Defaults to 'polygon' for anything ambiguous.
+ *
+ * NEVER use `zone.supertype` directly to decide rendering. Always go through
+ * this helper so new zones (with user-meaningful supertype text) render
+ * correctly without false-matching the legacy values.
+ */
+export function getZoneShape(zone: Zone | undefined | null): ZoneShape {
+  if (!zone) return 'polygon';
+  const atlasShape = (zone as { atlas_shape?: string }).atlas_shape;
+  if (atlasShape === 'line' || atlasShape === 'polygon') return atlasShape;
+  // Legacy fallback: pre-ZD6 zones stored shape in supertype.
+  const legacy = (zone as { supertype?: string }).supertype;
+  if (legacy === 'line') return 'line';
+  return 'polygon';
+}
+
 /**
  * Zones that appear on a given map.
  *

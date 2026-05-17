@@ -15,6 +15,8 @@ import { pinVisualFor } from './pin-visuals';
 import { getAssociatedMaps } from './auto-open-map';
 import { enablePinDrag } from './map-tab-pin-drag';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
+import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
+import type { PinLabels } from '../../core/map-view-prefs';
 
 export function syncPins(entry: MapTabCacheEntry): void {
   const elements = getState().data.elements;
@@ -31,6 +33,11 @@ export function syncPins(entry: MapTabCacheEntry): void {
   // Refresh the chip strip on every sync — type set may have changed if a
   // pin was added/removed/element type changed.
   refreshChipStrip(entry, allMinePins);
+
+  // Read per-map visual prefs once. Pins inherit the active map's tint setting
+  // so all pins on a single map look coherent; switching tint via the visual
+  // settings popover triggers a syncPins re-call → all pins re-skin live.
+  const prefs = getEffectiveMapPrefs(entry.mapId);
 
   for (const existing of entry.manager.getAllPins()) {
     if (!mineIds.has(existing.id)) entry.manager.removePin(existing.id);
@@ -49,7 +56,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
       // next subscriber tick after sync settles will re-resolve cleanly.
       if (el) {
         const hasMapBadge = getAssociatedMaps(el.id, elements).length > 0;
-        const visual = pinVisualFor(el.type, hasMapBadge);
+        const visual = pinVisualFor(el.type, hasMapBadge, prefs.pin_tint);
         entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y, name: el.name, icon: visual.iconUrl });
       } else {
         entry.manager.updatePin(pin.id, { x: pin.x, y: pin.y });
@@ -60,7 +67,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
       const name = el?.name ?? '(loading…)';
       const type = el?.type ?? 'object';
       const hasMapBadge = el ? getAssociatedMaps(el.id, elements).length > 0 : false;
-      const visual = pinVisualFor(type, hasMapBadge);
+      const visual = pinVisualFor(type, hasMapBadge, prefs.pin_tint);
       const added = entry.manager.addPin({
         id: pin.id,
         name,
@@ -72,6 +79,44 @@ export function syncPins(entry: MapTabCacheEntry): void {
       });
       enablePinDrag(entry, added.marker, pin.id);
     }
+  }
+
+  // Apply label visibility AFTER the pin set is reconciled so we count the
+  // post-sync set (relevant for threshold mode).
+  applyLabelVisibility(entry, prefs.pin_labels, prefs.pin_label_threshold, minePins.length);
+}
+
+/**
+ * Toggle per-pin label visibility per the active prefs mode.
+ *
+ *  - 'always':    every label visible (Leaflet default).
+ *  - 'hover':     all permanent labels hidden — atlas's custom .atlas-pin-tooltip
+ *                 already covers hover-time naming, so this collapses to "off"
+ *                 for the static label layer.
+ *  - 'threshold': visible iff total pins on this map (after type filter) ≤ N.
+ *  - 'never':     all labels hidden.
+ *
+ * Implementation reads each pin's `.label` Leaflet marker (created by
+ * Leaflet2DManager.addPin when showLabels is true) and toggles its DOM-level
+ * `display`. Cheaper than add/remove on the layer — survives pin updates.
+ */
+function applyLabelVisibility(
+  entry: MapTabCacheEntry,
+  mode: PinLabels,
+  threshold: number,
+  visiblePinCount: number,
+): void {
+  let show: boolean;
+  if (mode === 'always') show = true;
+  else if (mode === 'never') show = false;
+  else if (mode === 'hover') show = false; // hover handled by custom tooltip
+  else if (mode === 'threshold') show = visiblePinCount <= threshold;
+  else show = true;
+
+  for (const p of entry.manager.getAllPins()) {
+    const el = p.label?.getElement();
+    if (!el) continue;
+    (el as HTMLElement).style.display = show ? '' : 'none';
   }
 }
 
