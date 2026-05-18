@@ -4,15 +4,22 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-05-18)
+## CURRENT STATE (handover snapshot, 2026-05-18 session 223)
 
-Tool is in a tight, healthy state. **553/553 vitest + 93 Playwright e2e green.** Bundle 488 KB JS / 137 KB gzipped. Typecheck clean. Conventions list 1-30 (full text in DESIGN.md).
+Tool is in a tight, healthy state. **572 vitest green + 93 Playwright green.** Bundle 516 KB JS / 146 KB gzipped (+28 KB this session for rooms + timeline-bar). Typecheck clean. Conventions list 1-36 (full text in DESIGN.md).
 
-All phases (0 → 6 + 3.5) shipped. Foundation + sync engine + map subsystem + zone subsystem + UI polish all stable.
+**Rooms model landed.** The middle pane is now a flex column with a persistent room nav strip + room content. World Home is the default landing for active worlds. See `DESIGN_HOME.md` + `DESIGN_WRITING.md` + `DESIGN_PUBLISHING.md` for the new room-specific docs.
 
 **Recent invariants worth knowing**:
+- Middle pane: `shell.middleRoomNav` + `shell.middleContent` (renderers MUST target `middleContent`, never `middle` — convention #31)
+- Default route bare `#/w/<id>` → home room (was timeline)
+- Esc + click-selected-row clear selection + nav home (convention #32)
+- Writing labels customizable in Settings → Writing (`registry.writing_labels`, convention #33), default Book/Chapter/Scene
+- Writing depth cap = 3 levels (convention #34)
+- Showcase config supports `atlas_*` extensions (convention #35)
+- Showcases immutable; republish creates new (convention #36)
 - Sentence case throughout, slug-prefix filenames (`<slug>--<uuid>.json`)
-- Hotkeys MVP wired (`Ctrl/Cmd+E`, `S`, `K`, `?`, map-tab `F`/`Z`/`L`)
+- Hotkeys MVP wired (`Ctrl/Cmd+E`, `S`, `K`, `?`, `Esc` deselect-to-home, map-tab `F`/`Z`/`L`)
 - Map view persists per-map (`{center, zoom}` saved on `moveend`, restored at mount)
 - Pin badge accurate (only on Locations that have a sub-map)
 - Sync pill shows "synced 3m ago" live (30s tick)
@@ -22,13 +29,18 @@ All phases (0 → 6 + 3.5) shipped. Foundation + sync engine + map subsystem + z
 
 ---
 
-## Three big projects ahead
+## Three big projects ahead — session 223 update
 
-Each needs its own design conversation upfront. Don't start coding without one.
+Foundation landed for all three this session via the rooms model. Each still has its own bigger build ahead.
 
-- **Timeline** — Event date-axis viewer exists in middle pane (`src/middle/timeline.ts`); the bigger timeline experience is undesigned
-- **Writing** — long-form text creation/editing flow (surface undefined)
-- **Data import** — bringing external content into a world
+- **Writing** — `src/middle/writing.ts` shell + Book/Chapter/Scene tree shipped; richtext editor + autolinking + word count + outline mode all deferred. See `DESIGN_WRITING.md` "Deferred design questions" for the next set of decisions.
+- **Timeline** — `src/visualization/timeline/timeline-bar.ts` ported from little-element-viewer with multi-row dot binning. Compact mode on World Home, expanded mode in `#/w/<id>/timeline`. Narrative bars, zoom/pan, filter toggles, expand-collapse all deferred.
+- **Publish** — `src/middle/publish-room.ts` stub. write-tool's `/showcase/publish/` API documented in `DESIGN_PUBLISHING.md`. Atlas extension model (`atlas_*` config keys) locked in convention #35. Actual publish flow + per-element button + showcase modal all deferred.
+
+Also new this session (smaller):
+- **World Home** — `src/middle/world-home.ts` shipped. Identity + stats + timeline preview + recent + quick actions. See `DESIGN_HOME.md`.
+- **Search room** — `src/middle/search.ts` shipped. Searches name/description/supertype/subtype. Subtle "search everywhere" icon next to the elements-sidebar search input.
+- **Import / Templates rooms** — stubs only.
 
 ---
 
@@ -38,7 +50,92 @@ Per-world conflict policy override, email per-world, zone-targets-map, cross-ele
 
 ---
 
-## Last session — Validation + tuneup (2026-05-18)
+## Last session — Rooms model + decoupling + close-out polish (2026-05-18 session 223)
+
+Long autonomous session + on-return polish round + close-out feature bouts with Captain. ~15 bouts total. All green.
+
+### Close-out features (final hour)
+
+- **Writing room modal** (`src/ui/writing-create-modal.ts`): replaced `window.prompt` in writing.ts with a proper BaseModal subclass. Name input + Enter/Esc + inline error. Used for "+ new book/chapter/scene" flows.
+- **Empty-world onboarding** (world-home.ts): when `totalElements === 0`, home shows a CTA card with 4 quick-create tiles (character / location / event / narrative) wired to `ElementCreateModal` with `initialType` preselected.
+- **Click-to-edit world name + description** on home identity strip — uses the existing `field-edit-popover` pattern. Persists via `FolderStore.writeWorldMeta` + mirrors in `state.active.meta`. Placeholder text "add a description…" when description is empty.
+- **Notes overlay** (`src/ui/notes-overlay.ts`): per-world freeform notes, atlas-local (never synced). Lives on `WorldRegistryEntry.notes`. Modal with auto-saving textarea, ~600ms debounce, save-on-blur. Accessible via sidebar footer button (sticky_note_2 icon) and `N` hotkey.
+
+### Decoupling polish (post-autonomous)
+
+Captain identified inconsistency: room nav highlight + sidebar mode were coupled to the URL via `syncModeFromRoute`. Some room icons would auto-flip sidebar; others wouldn't — depending on whether their route was tagged "contenty". Decoupled the two dimensions:
+
+- `state.ui.sidebarMode` is now pure UI state, persisted via new `core/ui-prefs.ts` → `localStorage["atlas_ui_prefs"]`
+- Toggle clicks update state directly — no URL navigation
+- `syncModeFromRoute` removed from sidebar.ts
+- `activateWorld` navigates to `worldHash(id)` (home) instead of `elementsHash(id)`
+- `element-detail` delete navigates to `homeHash` instead of `elementsHash`
+- `link-world-modal` post-link navigates to `homeHash`
+- `rightTabHashFor` falls back to home (not elements) when no selection
+- Home icon in room nav matches `elements` route as well as `home` (legacy /elements URL still resolves to middle=home)
+- Sidebar mountBody falls back to worlds when mode='elements' but no active world
+- Element header bumped 40 → 48px; "char1" felt cramped under the room nav strip
+- Convention #37 added
+
+Test updates (5 specs touched):
+- `phase-bout-cc.spec.ts:62, 109` — gear-toggle + sidebar-toggle no longer dictate URL
+- `phase4-elements.spec.ts:53, 192` — toggle/delete navigation
+- `phase2-ui.spec.ts:151` — activation doesn't auto-flip sidebar
+
+### Original autonomous session (10 bouts)
+
+Long autonomous session (Captain swimming). 10 bouts. All landed cleanly.
+
+**Foundation**:
+- Middle pane split into `[middleRoomNav | middleContent]` flex column. Convention #31.
+- `MiddleMode` extended: `welcome | home | element | writing | timeline | search | publish | publish-detail | import | templates | settings`.
+- Router additions: `homeHash`, `writingHash`, `searchHash`, `publishHash`, `publishDetailHash`, `importHash`, `templatesHash`. Full route parsing for nested writing/publish paths.
+- Default landing for bare `#/w/<id>` flipped from `timeline` → `home`.
+- Esc + click-already-selected-row both clear `selectedElementId` + navigate home. Convention #32.
+
+**World Home (`src/middle/world-home.ts`)**:
+- Identity strip (world name + description + state badge + total elements count)
+- Stats spread (element type icons + counts, click → flip sidebar to elements + filter)
+- Compact timeline-bar embedded (canvas-based, multi-row dot binning)
+- Recent activity (last 5 by `local_updated_at`)
+- Quick actions row (+ new element, open writing, settings)
+
+**Writing room (`src/middle/writing.ts`)**:
+- Tree (left) + element-detail (right) layout
+- Book/Chapter/Scene labels customizable in Settings → Writing (`registry.writing_labels`)
+- Three-level depth cap enforced via UI. Convention #34.
+- Contextual "+ new X" buttons based on selected node depth.
+- Reuses existing element-detail for the editor surface (no new richtext yet).
+
+**Timeline (`src/middle/timeline.ts` + `src/visualization/timeline/`)**:
+- Lifted core algorithm from `tools/little-element-viewer`: `temporal-fields`, `axis-calculator`, `data-normalizer`, `timeline-bar`.
+- Multi-row dot binning; click → element nav; hover → tooltip with name + type + date range.
+- Two modes: compact (~100px, World Home) + expanded (~240px, full timeline room).
+- Deferred: narrative bars, narrative filter, zoom/pan, expand/collapse toggle, narrative-aware row affinity.
+
+**Search room (`src/middle/search.ts`)**:
+- Search across name + description + supertype + subtype for all elements
+- 200ms debounce, query in URL, match excerpt with highlight, click → element room
+- "Search everywhere" icon in elements-sidebar opens the room with the sidebar's current query
+
+**Publish (`src/middle/publish-room.ts` + `publish-detail.ts`)**:
+- Stub home page lists `registry.worlds[i].showcases` (empty list → explanation copy).
+- Per-showcase detail route with public URL display + back nav.
+- Atlas extension model documented in `DESIGN_PUBLISHING.md`. Conventions #35, #36.
+
+**Import + Templates stubs** — explanatory copy, "coming soon".
+
+**Tests**: 572 vitest green (+12 timeline-axis + 7 deselect-conventions added). 93 Playwright green after 3 spec updates for new default route + canvas-based timeline.
+
+**Lessons (durable)**:
+- Foundation-laying via rooms model worked cleanly in one big session because the existing `MiddleMode` switch architecture was already in place — the refactor was extension, not rewrite.
+- Reusing element-detail as the writing editor surface bought us a working writing room without a new editor library decision. Real richtext lands later; the data model + tree are stable.
+- Timeline-bar port reused the multi-row binning algorithm directly and deferred narrative-aware affinity — that complexity is worth its own bout when narrative bars land.
+- `.atlas-search-row` class collision (sidebar search input vs search-room results) caught early — namespace room-specific styles with `atlas-{room}-{element}` to keep CSS isolated.
+
+---
+
+## Earlier session — Validation + tuneup (2026-05-18 morning)
 
 Five planned bouts + 6 follow-ups + atlas_shape leak fix. Three rounds of Captain validation feedback landed cleanly.
 

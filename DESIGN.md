@@ -516,44 +516,74 @@ Even for api-linked worlds, media lives ONLY in the folder. No upload to OW.
 
 ---
 
-## UI — Three-Pane Shell
-
-(Port from `atlas-deprecated/src/layout/app-shell.ts` — the layout, state shape, and conventions are unchanged.)
+## UI — Three-Pane Shell + Room Model
 
 ```
-┌─────────┬────────────────────────┬─────────────────────────┐
-│ 18%     │ 52%                    │ 30%                     │
-│ SIDEBAR │ MIDDLE                 │ RIGHT                   │
-│         │                        │                         │
-│ [Worlds │ Welcome / Timeline /   │ Map Index / open maps / │
-│  Elements] mode toggle           │ Graph (placeholder)     │
-│         │                        │                         │
-│ Worlds  │ — or —                 │                         │
-│ tree    │                        │                         │
-│  OR     │ Element detail         │                         │
-│ Elements│ (schema-driven)        │                         │
-│ list    │                        │                         │
-│         │ — or —                 │                         │
-│ ⚙       │ Settings               │                         │
-└─────────┴────────────────────────┴─────────────────────────┘
+┌─────────┬─────────────────────────────────┬─────────────────────────┐
+│ 18%     │ 52%                             │ 30%                     │
+│ SIDEBAR │ MIDDLE                          │ RIGHT                   │
+│         │ ┌─────────────────────────────┐ │                         │
+│ [Worlds │ │ 🏠 ✎ 🕓 ⌕ ⬆ ⬇ 🧩 ⚙       │ │ [Maps | <map tabs>]    │
+│  Elem]  │ │ ← room nav strip (~32px)   │ │                         │
+│         │ ├─────────────────────────────┤ │ leaflet canvas per map  │
+│ filter  │ │                             │ │ with lifecycle cache    │
+│ chips   │ │   <room content>            │ │                         │
+│ search  │ │                             │ │                         │
+│ list    │ │   home / element / writing  │ │                         │
+│         │ │   timeline / search /       │ │                         │
+│         │ │   publish / import /        │ │                         │
+│         │ │   templates / settings      │ │                         │
+│ ⚙       │ │                             │ │                         │
+└─────────┴─└─────────────────────────────┘─┴─────────────────────────┘
 ```
 
-**Sidebar (~18%)**:
-- Top toggle: `[OW · WorldName | Elements]`
-- Body: world tree (Worlds mode) OR filter chips + search + element list (Elements mode)
-- Footer: gear icon → Settings
+**Sidebar (~18%)**: 2 modes (Worlds | Elements). Top toggle, footer gear → settings.
 
-**Middle (~52%)**:
-- Modes: `empty` | `timeline` | `element` | `settings`
-- Element detail: schema-driven; popover field edit; sections from SDK `ELEMENT_SECTIONS`
+**Middle (~52%)**: split into two stacked regions —
+- **Room nav strip** (~32px, top): persistent icon strip when a world is active. Click any icon → navigate to that room. Hidden on the welcome screen (no world).
+- **Room content** (flex 1, below): the active room renders here.
 
-**Right (~30%)**:
-- Tab bar: Map Index (pinned) + per-map tabs + Graph (placeholder)
-- Leaflet canvas per map tab with lifecycle cache
+**Right (~30%)**: tab bar (Map Index pinned + per-map tabs) + leaflet canvas.
 
 **Ratios** persisted to `localStorage.atlas_shell_ratios_v2`.
 
-(All conventions about pane styling, force-render idiom, etc. — see "Critical Conventions" below.)
+---
+
+## Rooms
+
+A **room** is a top-level mode of the middle pane. The room nav strip is always visible when a world is active; clicking an icon navigates to that room.
+
+| Room | Route | Content | Status |
+|---|---|---|---|
+| `welcome` | `#/` | First-launch atlas-root setup CTA | shipped |
+| `home` | `#/w/<id>` | World home — identity, stats, timeline preview, recent, quick actions. **Default landing for active worlds.** | shipped this session |
+| `element` | `#/w/<id>/element/<eid>` | Schema-driven element detail | shipped |
+| `writing` | `#/w/<id>/writing[/book/<id>[/chapter/<id>[/scene/<id>]]]` | Book/chapter/scene authorship. See `DESIGN_WRITING.md` | shell shipped this session |
+| `timeline` | `#/w/<id>/timeline` | Full timeline view | basic shipped; expanded version this session |
+| `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | shipped this session |
+| `publish` | `#/w/<id>/publish` | Showcase home — manage publications. See `DESIGN_PUBLISHING.md` | stub this session |
+| `publish-detail` | `#/w/<id>/publish/<showcase_id>` | Specific showcase config + preview | stub this session |
+| `import` | `#/w/<id>/import` | Explanation + reference to base-tool import; mechanics deferred | stub this session |
+| `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | stub this session |
+| `settings` | `#/w/<id>/settings[/<tab>]` | Identity / atlas / sync / maps / world / about tabs | shipped |
+
+**Default route**: bare `#/w/<id>` resolves to `home` (was `timeline` pre-session-223). Welcome stays at root `#/` with no active world.
+
+**Room nav strip** (`src/middle/room-nav.ts`) reads `state.active` + parsed route, highlights the active room icon. Hover → tooltip with sentence-case room name.
+
+**Element selection lives WITHIN the element room** — selecting an element navigates to `#/w/<id>/element/<eid>` (the element room). The element header appears BELOW the room nav strip with element-specific actions (delete, publish, pin, etc.).
+
+**Deselect conventions**:
+- **Esc**: clears `selectedElementId` and navigates to home (when an element is selected and no modal is open).
+- **Click selected sidebar row again**: toggles off — same effect.
+- Both routes are equivalent.
+
+Per-room design docs:
+- World Home: `DESIGN_HOME.md`
+- Writing: `DESIGN_WRITING.md`
+- Publishing: `DESIGN_PUBLISHING.md`
+- Maps (right pane): `DESIGN_MAPS.md`
+- Zones (right pane): `DESIGN_ZONES.md`
 
 ---
 
@@ -607,17 +637,53 @@ Navigation state (active world, selection, open maps) → URL hash.
 
 ## Routing (URL hash)
 
-Same scheme as legacy, no server rewrites needed (Cloudflare Pages friendly):
+Hash-based, no server rewrites needed (Cloudflare Pages friendly).
 
+**Sidebar mode routes** (worlds | elements):
 ```
-#/
-#/w/<worldId>/worlds
-#/w/<worldId>/elements
-#/w/<worldId>/element/<elementId>
-#/w/<worldId>/settings
-#/w/<worldId>/map/<mapId>
-#/w/<worldId>/map/<mapId>/element/<eid>
+#/                                          → no world (welcome)
+#/w/<worldId>/worlds                        → Worlds sidebar mode
+#/w/<worldId>/elements                      → Elements sidebar mode
 ```
+
+**Room routes** (active room = mode of middle pane):
+```
+#/w/<worldId>                               → home room (DEFAULT for active world)
+#/w/<worldId>/element/<elementId>           → element room
+#/w/<worldId>/writing                       → writing room (no narrative selected)
+#/w/<worldId>/writing/book/<bookId>         → book selected
+#/w/<worldId>/writing/book/<bId>/chapter/<cId>          → chapter selected
+#/w/<worldId>/writing/book/<bId>/chapter/<cId>/scene/<sId> → scene selected
+#/w/<worldId>/timeline                      → full timeline room
+#/w/<worldId>/search?q=<query>              → search room
+#/w/<worldId>/publish                       → publish home (showcase list)
+#/w/<worldId>/publish/<showcaseId>          → showcase detail
+#/w/<worldId>/import                        → import room
+#/w/<worldId>/templates                     → templates room
+#/w/<worldId>/settings                      → settings (default tab)
+#/w/<worldId>/settings/<tab>                → settings deep-link (identity/atlas/sync/maps/world/writing/about)
+```
+
+**Right-pane map composition** (orthogonal to room — maps live in the right pane, room lives in middle):
+```
+#/w/<worldId>/map/<mapId>                   → opens map tab in right pane; middle stays on home/last room
+#/w/<worldId>/map/<mapId>/element/<eid>     → map open + element selected (element room in middle)
+```
+
+**Deep-link helpers** in `core/router.ts`:
+- `homeHash(worldId)`
+- `elementHash(worldId, elementId)`
+- `elementsHash(worldId)` (sidebar mode)
+- `worldsHash(worldId)` (sidebar mode)
+- `writingHash(worldId, bookId?, chapterId?, sceneId?)`
+- `timelineHash(worldId)`
+- `searchHash(worldId, query?)`
+- `publishHash(worldId)`
+- `publishDetailHash(worldId, showcaseId)`
+- `importHash(worldId)`
+- `templatesHash(worldId)`
+- `settingsHash(worldId, tab?)`
+- `mapHash(worldId, mapId)` / `mapElementHash(worldId, mapId, elementId)`
 
 ---
 
@@ -663,7 +729,23 @@ Inherited from legacy (hard-won; preserve in new code):
 
 26. **Engine preserves `last_sync_at` across pause/resume.** `pause()` transitions to a `paused` state that doesn't carry the timestamp; without preservation, `resume()` would emit `{kind:'idle', last_sync_at: null}` and the pill's "synced X min ago" tooltip would briefly read "never synced" between resume and the post-resume push completing. The engine keeps a private `lastSyncAt` field updated by `setState` on every idle transition with a non-null timestamp; `resume()` reads it back so the brief idle window post-resume carries the prior value. A successful sync afterwards stamps a fresher value normally. Verified by `tests/integration/sync-engine.resumePreservesLastSyncAt.test.ts`.
 
-27. **Sidebar mode toggle reads URL + registry, NOT `state.active`.** The right-tab label is the active world's name. `state.active` only fills in AFTER the slow FS work in `activateWorld` (handle resolve, permission re-grant, `store.open`, `listElements`); during that window the registry entry exists but `state.active` is still null or stale. Reading `state.active.meta.name` in the toggle would lag the UI ~500ms behind the click. Reading `registry.worlds.find(w => w.id === route.worldId).name` flips the label synchronously in the same frame as the click — the "instant-feel world switch" depends on it. The same principle applies to any UI whose visible identity should match the URL: source from registry+URL, not from store state that catches up async. `activateWorld` clears `data.elements` + `selectedElementId` and navigates synchronously BEFORE the FS work for the same reason; failure paths revert URL to the priorHash.
+27. **Sidebar mode toggle label reads URL + registry, NOT `state.active`.** The right-tab label is the active world's name. `state.active` only fills in AFTER the slow FS work in `activateWorld` (handle resolve, permission re-grant, `store.open`, `listElements`); during that window the registry entry exists but `state.active` is still null or stale. Reading `state.active.meta.name` in the toggle would lag the UI ~500ms behind the click. Reading `registry.worlds.find(w => w.id === route.worldId).name` flips the label synchronously in the same frame as the click — the "instant-feel world switch" depends on it. The same principle applies to any UI whose visible identity should match the URL: source from registry+URL, not from store state that catches up async. `activateWorld` clears `data.elements` + `selectedElementId` and navigates synchronously BEFORE the FS work for the same reason; failure paths revert URL to the priorHash.
+
+    **Note (session 223 decoupling)**: the *active state* of the sidebar mode buttons reads from `state.ui.sidebarMode` (not URL). The toggle's *label* still comes from URL+registry. Two independent reads — that's intentional.
+
+31. **Middle pane is a flex column with room nav strip + content.** `app-shell.middle` is split into `shell.middleRoomNav` (~32px, top, fixed) and `shell.middleContent` (flex 1, bottom). Room nav strip mounts to `middleRoomNav`; every room component (welcome, home, element-detail, writing, timeline, search, publish, import, templates, settings) mounts to `middleContent`. The room nav strip is hidden (display:none via data-active="false") when no world is active — welcome owns the full middle pane during first launch. **Renderers must NEVER touch `shell.middle` directly** (would break the column flex) — always target `shell.middleContent`. This extends convention #3 (shell pane non-mutation) to the new sub-structure.
+
+32. **Esc clears element selection + navigates to home.** When an element is selected (`state.ui.selectedElementId` is set) and no modal/popover/inline-editor is open, pressing Esc clears the selection and navigates to `homeHash(worldId)`. This makes "exit element detail back to my world overview" a one-key operation and matches the room model's "element is a room you enter, home is the room you exit to." The Esc handler must check `!hasOpenModal()` AND no non-modal overlay (field-edit popover, visual settings popover, shortcuts popover) is active so it doesn't steal Esc from those handlers. **Click-row-toggle was considered + dropped (session 223 e2e fallout)** — re-clicking the selected row toggling off conflicts with common UX/test patterns where re-clicking a row is meant to refocus. Esc is the canonical deselect.
+
+33. **Writing tree labels read from `registry.worlds[i].writing_labels`** — never hardcoded in UI. Defaults `{l1: 'Book', l2: 'Chapter', l3: 'Scene'}`. User overrides in Settings → Writing. Code can use Book/Chapter/Scene as variable names and comments by convention — that's *naming*, not display. Display reads via `getWritingLabels(worldId)`.
+
+34. **Atlas writing depth cap is 3 (Book → Chapter → Scene).** UI prevents creating a 4th-level child Narrative via the writing room's "+ new" buttons. The OW schema doesn't enforce this — atlas does, as a UX guardrail. Users wanting deeper nesting use element-detail directly; the writing room ignores Narratives nested below depth 3.
+
+35. **Atlas extensions to showcase_config use `atlas_*` prefix.** Other OW tools opening a showcase ignore the `atlas_*` keys gracefully — they see the canonical OW data in `element_data` and render that. Atlas-published showcases viewed from another tool degrade to plain-field rendering. Examples: `atlas_field_richtext`, `atlas_layout`, `atlas_bundle_ids`, `atlas_theme`, `atlas_cover_image_url`. See `DESIGN_PUBLISHING.md`.
+
+36. **Showcases are immutable. "Republish" creates new, doesn't mutate old.** The OW write-tool backend treats each `POST /showcase/publish/` as a fresh snapshot with a new `showcase_id`. Atlas's local registry tracks ALL published showcases for a world (`registry.worlds[i].showcases?: ShowcaseEntry[]`) — republishing optionally archives the prior one but never overwrites server-side. This matches user intent (a published thing is a snapshot in time) and avoids the conflict-with-server-state class entirely.
+
+37. **Sidebar mode and room are independent dimensions** (session 223 decoupling). `state.ui.sidebarMode` is pure UI state, persisted to localStorage via `core/ui-prefs.ts`. Toggle clicks update state directly — no URL navigation. Room navigation (top-of-middle nav strip + room URLs) is orthogonal. Previously the URL's "elements" route forced sidebar to elements mode via `syncModeFromRoute`; that auto-coupling was removed because it caused inconsistent behavior across room transitions ("some top tabs open the worlds part, others open elements"). The two dimensions now move independently — user picks sidebar mode via the toggle, picks room via the top strip. `activateWorld` navigates to `worldHash(id)` (home), not `elementsHash(id)`, so sidebar mode is not perturbed on world switch. The `/elements` route still exists for backward compat (rare bookmarks, test code) — it resolves to middle=home with the Home icon highlighted in room nav.
 
 ---
 

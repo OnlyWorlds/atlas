@@ -309,6 +309,43 @@ export interface WorldRegistryEntry {
    * `[{kind:'map-index'}]` + active index 0.
    */
   right_tabs?: RightTabsSnapshot;
+  /**
+   * Customizable labels for the writing room's three-layer hierarchy
+   * (DESIGN_WRITING.md). Defaults: Book / Chapter / Scene. UI reads via
+   * `getWritingLabels(worldId)`. Stored per-world; atlas-local (never synced).
+   */
+  writing_labels?: {
+    l1: string;
+    l2: string;
+    l3: string;
+  };
+  /**
+   * Per-world freeform notes — atlas-local (never synced). Accessed via the
+   * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it
+   * survives reloads without depending on the world's folder being granted
+   * permission. Captain mentioned wanting "a random notes modal/page that is
+   * persistent in app, just overlays and for random dumps" — this is it.
+   */
+  notes?: string;
+  /**
+   * Atlas-local cache of published showcases for this world. Backend is the
+   * truth (POST /showcase/publish/ + GET /showcase/<id>/); this list is the
+   * offline-tolerant index. See DESIGN_PUBLISHING.md.
+   */
+  showcases?: ShowcaseEntry[];
+}
+
+export interface ShowcaseEntry {
+  showcase_id: string;
+  element_id: string;
+  element_type: ElementType;
+  published_at: string;
+  public_url: string;
+  hidden_fields?: string[];
+  /** Atlas extensions to showcase_config — see DESIGN_PUBLISHING.md "Atlas extensions". */
+  atlas_bundle_ids?: string[];
+  atlas_layout?: 'card' | 'page' | 'book' | string;
+  atlas_cover_image_url?: string;
 }
 
 export interface WorldsRegistry {

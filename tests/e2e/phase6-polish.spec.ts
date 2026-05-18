@@ -23,7 +23,9 @@ async function setupAtlasRoot(page: Page, dirName: string = 'polish-test-root') 
     const sub = await root.getDirectoryHandle(name, { create: true });
     api.setNextDirectory(sub);
   }, dirName);
-  await page.click('.atlas-sidebar [data-action="setup-atlas"]');
+  // Session 222 W2: setup-atlas button moved off the sidebar — welcome panel
+  // is the single CTA. Drop the .atlas-sidebar prefix to find the button.
+  await page.click('[data-action="setup-atlas"]');
   await page.waitForSelector('[data-action="create-local"]');
 }
 
@@ -34,25 +36,30 @@ async function createWorld(page: Page, name: string) {
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
 }
 
-test('timeline renders empty state when no events exist', async ({ page }) => {
+test('timeline route renders the canvas-based timeline-bar', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'world a');
 
-  // After activation, the middle pane defaults to timeline (the "no element
-  // selected" landing for an active world). The deprecated [data-action="open-
-  // timeline"] button only ever rendered on the welcome panel and is no longer
-  // part of the active-world flow.
-  await expect(page.locator('.atlas-timeline')).toBeVisible();
-  await expect(page.locator('.atlas-timeline-empty')).toContainText(/no events yet/i);
+  // Session 223: default landing for active world is now `home`, not
+  // `timeline`. Navigate explicitly to the timeline room.
+  await page.evaluate(() => {
+    const m = window.location.hash.match(/#\/w\/([^/]+)/);
+    if (m) window.location.hash = `#/w/${m[1]}/timeline`;
+  });
+  await expect(page.locator('.atlas-timeline-room')).toBeVisible();
+  // Canvas-based timeline-bar in expanded mode.
+  await expect(page.locator('.atlas-timeline-bar[data-mode="expanded"]')).toBeVisible();
 });
 
-test('timeline route renders a dot per event element', async ({ page }) => {
+test('timeline canvas renders for worlds with temporal data', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'world b');
 
-  // Create three events via the elements sidebar.
+  // Create three events via the elements sidebar. Dot rendering is canvas-
+  // based now (session 223 timeline-bar port); we verify the canvas mounts
+  // and the data plumbing reaches it via the test API instead of DOM dots.
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
   for (const name of ['first event', 'second event', 'third event']) {
     await page.click('[data-action="create-element"]');
@@ -62,16 +69,20 @@ test('timeline route renders a dot per event element', async ({ page }) => {
     await expect(page.locator('.atlas-row[data-element-id]', { hasText: name })).toBeVisible();
   }
 
-  // The middle defaults to timeline for an active world with no selection;
-  // navigate to the bare worldId hash to clear any element selection and
-  // confirm three event dots render.
+  // Navigate to timeline room.
   await page.evaluate(() => {
-    const hash = window.location.hash;
-    const m = hash.match(/#\/w\/([^/]+)/);
-    if (m) window.location.hash = `#/w/${m[1]}`;
+    const m = window.location.hash.match(/#\/w\/([^/]+)/);
+    if (m) window.location.hash = `#/w/${m[1]}/timeline`;
   });
-  await expect(page.locator('.atlas-timeline')).toBeVisible();
-  await expect(page.locator('.atlas-timeline-dot')).toHaveCount(3);
+  await expect(page.locator('.atlas-timeline-bar[data-mode="expanded"]')).toBeVisible();
+  // Verify three event elements exist in state (the timeline-bar's
+  // multi-row binning algorithm is exercised by unit tests in
+  // tests/unit/timeline-axis.test.ts).
+  const eventCount = await page.evaluate(() => {
+    const state = (window as any).__atlasTestApi.getState();
+    return state.data.elements.filter((e: any) => e.type === 'event').length;
+  });
+  expect(eventCount).toBe(3);
 });
 
 test('sync pill shows "local" for a local-only world', async ({ page }) => {
@@ -130,8 +141,13 @@ test('timeline + event create from timeline header', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'world c');
-  // Middle defaults to timeline post-activation; the [+ Event] button lives
-  // in the timeline header (timeline.ts), so it's already on-page.
+  // Session 223: default landing is home, not timeline. Navigate to the
+  // timeline room explicitly to access the [+ Event] header button.
+  await page.evaluate(() => {
+    const m = window.location.hash.match(/#\/w\/([^/]+)/);
+    if (m) window.location.hash = `#/w/${m[1]}/timeline`;
+  });
+  await page.waitForSelector('.atlas-timeline-room');
 
   await page.click('[data-action="new-event"]');
   await expect(page.locator('[data-modal="create-element"]')).toBeVisible();

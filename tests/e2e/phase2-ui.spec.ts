@@ -164,12 +164,11 @@ test('two worlds created in root share parent folder', async ({ page }) => {
   // Beta is the most-recently-created so it's active.
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Beta' })).toHaveClass(/selected/);
 
-  // Switch to Alpha. Clicking a world flips the sidebar to elements mode
-  // (legacy behavior: "open the world's contents immediately").
+  // Switch to Alpha. Session 223 decoupling: clicking a world activates it
+  // and navigates to its home URL, but sidebar mode is now independent state
+  // (no auto-flip to elements). User stays in worlds mode and sees Alpha
+  // become the selected entry in the worlds list.
   await page.click('.atlas-row[data-world-id]:has-text("Alpha")');
-  await expect(page.locator('[data-action="mode-elements"].active')).toBeVisible();
-  // Toggle back to worlds mode to verify which one is selected.
-  await page.click('[data-action="mode-worlds"]');
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Alpha' })).toHaveClass(/selected/);
 
   // Both worlds live as subfolders inside the wrapped atlas-worlds/ folder.
@@ -277,12 +276,10 @@ test('reload → atlas root + world both persist, click re-activates', async ({ 
   await expect(row).toBeVisible();
   await expect(row).not.toHaveClass(/selected/);
 
-  // Click → activates and flips sidebar to elements mode.
+  // Click → activates. activateWorld navigates to `#/w/<id>/elements` so the
+  // sidebar flips to elements mode. The right tab label reflects the active
+  // world's name; that's the durable signal for "world is now active."
   await row.click();
-  await expect(page.locator('[data-action="mode-elements"].active')).toBeVisible();
-  // Toggle back to worlds mode to confirm which world is now selected.
-  await page.click('[data-action="mode-worlds"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Persistent' })).toHaveClass(/selected/);
   await expect(page.locator('[data-action="mode-elements"] .atlas-mode-btn-label')).toContainText('Persistent');
 });
 

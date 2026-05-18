@@ -204,7 +204,60 @@ export function defaultBindings(): HotkeyBinding[] {
       // INTENTIONALLY allowed in text input — that's the whole point.
       action: () => { dispatchSaveRequest(); },
     },
+    {
+      id: 'deselect-to-home',
+      description: 'Deselect element / return to home',
+      scope: 'Global',
+      key: 'Escape',
+      modifier: 'none',
+      disabledInModal: true,
+      disabledInTextInput: true,
+      // Skip when ANY overlay/popover is active (each owns its Esc behavior).
+      // Also requires an element to be selected — otherwise we'd be navigating
+      // home from home, which is confusing.
+      when: () => {
+        if (!getCallbacks().hasSelectedElement?.()) return false;
+        if (isAnyOverlayActive()) return false;
+        return true;
+      },
+      action: () => { getCallbacks().deselectToHome?.(); },
+    },
+    {
+      id: 'open-notes',
+      description: 'Open notes overlay',
+      scope: 'Global',
+      key: 'n',
+      modifier: 'none',
+      disabledInModal: true,
+      disabledInTextInput: true,
+      when: () => Boolean(getCallbacks().getActiveWorldId?.()),
+      action: () => { getCallbacks().openNotes?.(); },
+    },
   ];
+}
+
+/**
+ * Returns true if any popover/overlay (other than modals — those use
+ * `disabledInModal`) is currently active. The deselect-to-home hotkey gates on
+ * this so it doesn't steal Esc from active editors.
+ *
+ * Modal overlay is excluded here because `disabledInModal` already handles it
+ * via `isModalOpen()`. The classes below cover the non-modal overlays.
+ */
+function isAnyOverlayActive(): boolean {
+  // Field-edit popover, visual settings popover, shortcuts popover, zone
+  // edit/drawing handles — all DOM-driven. Pin placement + zone editing also
+  // use Esc (within map-tab keydown). Both are tracked in state.ui.
+  const popoverSelectors = [
+    '.atlas-edit-popover-backdrop',
+    '.atlas-field-inline-edit',
+    '.atlas-visual-settings-popover',
+    '.atlas-shortcuts-popover',
+  ];
+  for (const sel of popoverSelectors) {
+    if (document.querySelector(sel)) return true;
+  }
+  return false;
 }
 
 // ---- Wiring (callbacks-from-app pattern) ----
@@ -221,6 +274,12 @@ export interface HotkeyCallbacks {
   openCreateElement?: () => void;
   /** Focus the sidebar search input; flip sidebar mode to 'elements' if needed. */
   focusSearch?: () => void;
+  /** True when state.ui.selectedElementId is set — gates the deselect hotkey. */
+  hasSelectedElement?: () => boolean;
+  /** Clear selection + navigate to home (DESIGN convention #32). */
+  deselectToHome?: () => void;
+  /** Open the per-world notes overlay (session 223). */
+  openNotes?: () => void;
 }
 
 let callbacks: HotkeyCallbacks = {};

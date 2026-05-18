@@ -9,7 +9,7 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
-import { onHashChange, parseHash, navigate, elementsHash } from '../core/router';
+import { onHashChange, parseHash, navigate, worldHash } from '../core/router';
 import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused, deleteWorldEntry } from '../registry/registry';
 import { loadHandle, ensureWritable, queryWritable, deleteHandle } from '../store/handle-vault';
 import { FsFolderStore } from '../store/folder-store-fs';
@@ -316,7 +316,9 @@ export async function activateWorld(
     patchSlice('ui', { ...getState().ui, selectedElementId: null });
     const currentRoute = parseHash(window.location.hash);
     if (currentRoute.worldId !== worldId) {
-      navigate(elementsHash(worldId));
+      // Session 223: activate → home, not /elements. Sidebar mode is
+      // independent UI state now; activation doesn't force a sidebar flip.
+      navigate(worldHash(worldId));
     }
   }
 
@@ -418,7 +420,9 @@ function navigateAfterActivate(worldId: string): void {
     // URL is already on this world (possibly deep route) — re-fire hashchange.
     navigate(window.location.hash);
   } else {
-    navigate(elementsHash(worldId));
+    // Session 223: navigate to home, not /elements. Sidebar mode is now
+    // independent state — activation doesn't dictate sidebar mode.
+    navigate(worldHash(worldId));
   }
 }
 

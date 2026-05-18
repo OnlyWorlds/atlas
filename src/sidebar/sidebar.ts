@@ -2,14 +2,20 @@
  * Sidebar driver — owns the mode toggle (in shell.sidebarToggle), dispatches
  * the body (worlds vs elements), and renders the footer gear.
  *
- * The active mode comes from the URL hash (`#/w/<id>` → worlds;
- * `#/w/<id>/elements` or `#/w/<id>/element/<eid>` → elements). State mirrors
- * the route for components that prefer reading state. Settings sub-routes
- * keep the current sidebar mode they came from.
+ * Session 223 decoupling: sidebar mode is now pure UI state (state.ui.sidebarMode,
+ * persisted to localStorage via ui-prefs), NO LONGER derived from the URL.
+ * Clicking the Worlds / Elements toggle updates state directly without
+ * navigating. Room nav (top of middle pane) handles middle-pane navigation
+ * independently. This matches Captain's "don't auto-switch" intent —
+ * sidebar mode and room are orthogonal dimensions the user controls
+ * independently.
  */
 
 import { getState, patchSlice, subscribe, type SidebarMode } from '../core/state';
-import { onHashChange, parseHash, navigate, worldHash, elementsHash, elementHash, settingsHash } from '../core/router';
+import { onHashChange, parseHash, navigate, elementHash, settingsHash } from '../core/router';
+// elementsHash removed from imports — session 223 decoupling no longer routes
+// through the /elements URL on toggle clicks or gear-toggle exit.
+import { setSidebarModePref } from '../core/ui-prefs';
 import type { ActiveWorldRef } from '../core/state';
 import { mountWorldsBody } from './worlds-sidebar';
 import { mountElementsBody } from './elements-sidebar';
@@ -17,20 +23,23 @@ import { ToastManager } from '../ui/toast-manager';
 import { buildShortcutsContent } from '../ui/shortcuts-content';
 
 /**
- * Right-tab destination given an active world: if a selection survives in
- * `ui.selectedElementId` AND that element still exists in the active world's
- * cache, return the element URL; otherwise return the bare elements-list URL.
+ * Return-to-context destination given an active world: if a selection
+ * survives in `ui.selectedElementId` AND that element still exists in the
+ * active world's cache, return the element URL; otherwise return the world's
+ * home URL.
  *
  * Used by:
- *   - sidebar mode toggle (clicking the right tab restores selection)
  *   - gear-as-toggle (clicking gear while on Settings returns to the right
- *     context, which is the selected element if any)
- *   - worlds-sidebar.activateWorld (instant-feel navigation)
+ *     context, which is the selected element if any, else home)
+ *   - worlds-sidebar re-clicking the already-active world
+ *
+ * Session 223 change: previously fell back to `elementsHash` (sidebar elements
+ * mode); after the sidebar-mode-from-URL decoupling, sidebar mode is its own
+ * state and the URL fallback is the world's home room.
  *
  * The "still exists" check matters because the cache may be empty (we just
  * cleared it for an instant-feel world switch) — in that case fall back to
- * the elements list rather than navigating to a URL that would render the
- * "element not found" empty state.
+ * home rather than navigating to a URL that would render "element not found".
  */
 export function rightTabHashFor(active: ActiveWorldRef): string {
   const state = getState();
@@ -38,7 +47,7 @@ export function rightTabHashFor(active: ActiveWorldRef): string {
   if (sel && state.data.elements.some(e => e.id === sel)) {
     return elementHash(active.worldId, sel);
   }
-  return elementsHash(active.worldId);
+  return `#/w/${active.worldId}`;
 }
 
 function escapeText(s: string): string {
@@ -64,13 +73,16 @@ export function mountSidebar(mount: SidebarMount): () => void {
 
   // ----- Mode toggle: [ worlds | <world-name> ] -----
   //
-  // Reads URL + registry rather than `state.active` so the right-tab label
-  // flips synchronously when a world is activated (the registry has the entry
-  // immediately; state.active only fills in after FS work completes). This is
-  // the lever that makes world-switch feel instant.
+  // Reads state.ui.sidebarMode (pure UI state, persisted to localStorage).
+  // Toggle clicks update state directly — no URL navigation. Room nav owns
+  // middle-pane routing independently.
   //
-  // Right tab is hidden entirely when no world is active — there's nothing
-  // meaningful to switch to. The Worlds tab is always present.
+  // The right toggle's label reads from registry + URL (NOT state.active) so
+  // the label flips synchronously on activation — state.active fills in
+  // asynchronously after FS work, but the registry entry exists immediately.
+  //
+  // Right toggle is hidden when no world is active — there's nothing
+  // meaningful to switch to. The Worlds toggle is always present.
   function renderToggle(): void {
     toggle.innerHTML = '';
     const route = parseHash(window.location.hash);
@@ -103,22 +115,9 @@ export function mountSidebar(mount: SidebarMount): () => void {
   }
 
   function switchMode(target: SidebarMode): void {
-    const state = getState();
-    const active = state.active;
-    if (target === 'worlds') {
-      // Worlds tab works even without an active world: lands on the welcome
-      // root. If a world IS active, navigating to its worldHash keeps the
-      // sidebar in worlds mode and the middle in welcome.
-      if (active) navigate(worldHash(active.worldId));
-      else navigate('#/');
-      return;
-    }
-    // target === 'elements'. Right tab navigates to the element if a selection
-    // survives in state.ui (Q3 — selection-aware switch). Falls back to the
-    // elements list if there's no selection or the selected element no longer
-    // exists in the cache.
-    if (!active) return;
-    navigate(rightTabHashFor(active));
+    if (getState().ui.sidebarMode === target) return;
+    patchSlice('ui', { ...getState().ui, sidebarMode: target });
+    setSidebarModePref(target);
   }
 
   // ----- Footer gear: toggles Settings open/closed -----
@@ -160,6 +159,22 @@ export function mountSidebar(mount: SidebarMount): () => void {
   footer.appendChild(resetLayoutBtn);
   resetLayoutBtn.addEventListener('click', () => onResetLayout());
 
+  // ----- Footer notes button — opens the per-world notes overlay (session 223) -----
+  // Per-world freeform notes, atlas-local (never synced). Captain's "random
+  // notes modal" — available from any room. Disabled when no world is active.
+  const notesBtn = document.createElement('button');
+  notesBtn.className = 'atlas-icon-btn';
+  notesBtn.setAttribute('data-action', 'open-notes');
+  notesBtn.setAttribute('aria-label', 'Notes');
+  notesBtn.title = 'Notes for this world (N)';
+  notesBtn.innerHTML = '<span class="material-symbols-outlined">sticky_note_2</span>';
+  footer.appendChild(notesBtn);
+  notesBtn.addEventListener('click', async () => {
+    if (!getState().active) return;
+    const mod = await import('../ui/notes-overlay');
+    mod.openNotesOverlay();
+  });
+
   // ----- Footer ? button — keyboard shortcut reference (session 219) -----
   // Tiny inline popover listing implemented gestures + a "more coming"
   // footer. Discoverability for the bindings that exist TODAY (Esc, F,
@@ -178,7 +193,14 @@ export function mountSidebar(mount: SidebarMount): () => void {
   let currentBodyMode: SidebarMode | null = null;
 
   function mountBody(): void {
-    const mode = getState().ui.sidebarMode;
+    // Resolve effective mode — elements requires a world in the URL (entry
+    // exists). Without one, the elements toggle isn't even rendered, so
+    // falling back to worlds keeps the UI coherent.
+    const route = parseHash(window.location.hash);
+    const reg = getState().registry;
+    const entry = route.worldId ? reg.worlds.find(w => w.id === route.worldId) : undefined;
+    let mode = getState().ui.sidebarMode;
+    if (mode === 'elements' && !entry) mode = 'worlds';
     if (mode === currentBodyMode) return;
     unmountBody?.();
     currentBodyMode = mode;
@@ -189,22 +211,12 @@ export function mountSidebar(mount: SidebarMount): () => void {
     }
   }
 
-  // Keep state.ui.sidebarMode in sync with the URL. Routes that are
-  // "content-y" (element, elements list, map, timeline) all imply the user
-  // is browsing inside a world — keep the sidebar on the elements list.
-  // Only fall back to worlds-mode for purely navigation/setup routes.
-  function syncModeFromRoute(): void {
-    const route = parseHash(window.location.hash);
-    const contenty =
-      route.mode === 'elements' ||
-      route.mode === 'element' ||
-      route.mode === 'map' ||
-      route.mode === 'timeline';
-    const want: SidebarMode = contenty ? 'elements' : 'worlds';
-    if (getState().ui.sidebarMode !== want) {
-      patchSlice('ui', { ...getState().ui, sidebarMode: want });
-    }
-  }
+  // Session 223: sidebar mode is no longer derived from the URL — it's a
+  // user preference (state.ui.sidebarMode, persisted via ui-prefs). Toggle
+  // clicks are the only thing that change it. The room (middle pane) and
+  // sidebar mode are now independent dimensions of navigation.
+  //
+  // The previous `syncModeFromRoute` lived here; removed for decoupling.
 
   function renderGearState(): void {
     const route = parseHash(window.location.hash);
@@ -212,7 +224,6 @@ export function mountSidebar(mount: SidebarMount): () => void {
   }
 
   function render(): void {
-    syncModeFromRoute();
     renderToggle();
     renderGearState();
     mountBody();

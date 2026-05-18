@@ -58,8 +58,8 @@ test('elements mode becomes enabled and toggles when a world is active', async (
 
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
 
-  // URL flipped; elements body rendered.
-  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/elements$/);
+  // Session 223 decoupling: toggle clicks change sidebar mode (state), NOT
+  // the URL. URL stays on the active world. Elements body renders.
   await expect(page.locator('.atlas-mode-btn[data-action="mode-elements"]')).toHaveClass(/active/);
   await expect(page.locator('.atlas-sidebar .atlas-list')).toBeVisible();
   await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toContainText('No elements yet');
@@ -189,7 +189,7 @@ test('edit element description via field popover (textarea)', async ({ page }) =
   await expect(descRow.locator('.atlas-field-value')).toContainText('Bagginses of Bag End');
 });
 
-test('delete element returns to elements list and removes the row', async ({ page }) => {
+test('delete element returns to home and removes the row', async ({ page }) => {
   await setupWorldA(page);
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
   await page.click('[data-action="create-element"]');
@@ -199,9 +199,10 @@ test('delete element returns to elements list and removes the row', async ({ pag
   page.on('dialog', d => d.accept());
   await page.click('[data-action="delete-element"]');
 
-  // Row gone, URL back to elements list.
+  // Row gone, URL back to home (session 223: delete navigates to home, not
+  // /elements, since sidebar mode is independent of URL now).
   await expect(page.locator('.atlas-row[data-element-id]', { hasText: 'Doomed' })).toHaveCount(0);
-  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/elements$/);
+  expect(await page.evaluate(() => window.location.hash)).toMatch(/#\/w\/[0-9a-f-]+$/);
 });
 
 test('reload preserves elements via FolderStore (cache rehydrates on activate)', async ({ page }) => {

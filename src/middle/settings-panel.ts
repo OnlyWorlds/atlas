@@ -162,9 +162,43 @@ function renderTab(
       return renderMapsTab(reg);
     case 'world':
       return activeWorld ? renderWorldTab(activeWorld) : '<p class="atlas-settings-hint">No world is active.</p>';
+    case 'writing':
+      return activeWorld ? renderWritingTab(activeWorld) : '<p class="atlas-settings-hint">No world is active.</p>';
     case 'about':
       return renderAboutTab();
   }
+}
+
+// ---- Writing settings (DESIGN_WRITING.md) ----
+
+function renderWritingTab(entry: WorldRegistryEntry): string {
+  const labels = entry.writing_labels ?? { l1: 'Book', l2: 'Chapter', l3: 'Scene' };
+  return `
+    <section class="atlas-settings-section">
+      <h3>Writing</h3>
+      <p class="atlas-settings-hint">
+        Customize the three-level hierarchy labels used in the writing room.
+        Defaults: Book / Chapter / Scene. The data underneath stays as nested
+        Narratives — only the display labels change.
+      </p>
+      <div class="atlas-settings-row">
+        <label class="atlas-settings-label">Level 1 (top)</label>
+        <input class="atlas-input" data-setting="writing_l1" value="${escapeAttr(labels.l1)}" placeholder="Book" />
+      </div>
+      <div class="atlas-settings-row">
+        <label class="atlas-settings-label">Level 2 (middle)</label>
+        <input class="atlas-input" data-setting="writing_l2" value="${escapeAttr(labels.l2)}" placeholder="Chapter" />
+      </div>
+      <div class="atlas-settings-row">
+        <label class="atlas-settings-label">Level 3 (deepest)</label>
+        <input class="atlas-input" data-setting="writing_l3" value="${escapeAttr(labels.l3)}" placeholder="Scene" />
+      </div>
+      <p class="atlas-settings-hint">
+        Examples: Story / Substory / Scene · Volume / Book / Chapter · Campaign / Arc / Session.
+        Changes apply on focus-out; reload the writing room to see updated labels.
+      </p>
+    </section>
+  `;
 }
 
 // ---- Maps subsystem settings (DESIGN_MAPS.md §3.5) ----
@@ -413,8 +447,35 @@ function wireTabHandlers(
     case 'world':
       if (activeWorld) wireWorldTab(activeWorld, toasts);
       break;
+    case 'writing':
+      if (activeWorld) wireWritingTab(activeWorld, toasts);
+      break;
     case 'about':
       break;
+  }
+}
+
+function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager): void {
+  const save = (key: 'l1' | 'l2' | 'l3', value: string): void => {
+    const trimmed = value.trim();
+    if (!trimmed) return; // refuse empty — keeps the default visible
+    const reg = getState().registry;
+    const idx = reg.worlds.findIndex(w => w.id === entry.id);
+    if (idx < 0) return;
+    const current = reg.worlds[idx].writing_labels ?? { l1: 'Book', l2: 'Chapter', l3: 'Scene' };
+    if (current[key] === trimmed) return;
+    const updated: WorldRegistryEntry = {
+      ...reg.worlds[idx],
+      writing_labels: { ...current, [key]: trimmed },
+    };
+    const next = { ...reg, worlds: reg.worlds.map((w, i) => (i === idx ? updated : w)) };
+    saveRegistry(next);
+    patchSlice('registry', next);
+    toasts.info(`${key.toUpperCase()} label saved`);
+  };
+  for (const k of ['l1', 'l2', 'l3'] as const) {
+    const el = document.querySelector<HTMLInputElement>(`.atlas-settings input[data-setting="writing_${k}"]`);
+    el?.addEventListener('change', () => save(k, el.value));
   }
 }
 

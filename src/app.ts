@@ -1,6 +1,12 @@
 /**
- * App orchestration — mounts the shell, sidebar driver, middle panel, and
- * routes between welcome / settings / element based on the URL hash.
+ * App orchestration — mounts the shell, sidebar driver, middle pane (room nav
+ * strip + active room), and right pane. Routes between rooms via the URL hash.
+ *
+ * Room model (DESIGN.md "Rooms"): the middle pane is a flex column with a
+ * persistent room nav strip on top (when a world is active) and the active
+ * room's content below. Rooms: welcome, home (default for active worlds),
+ * element, writing, timeline, search, publish, publish-detail, import,
+ * templates, settings.
  */
 
 import { mountAppShell, AppShell } from './layout/app-shell';
@@ -9,13 +15,22 @@ import { mountWelcomePanel } from './middle/welcome-panel';
 import { mountSettingsPanel } from './middle/settings-panel';
 import { mountElementDetail } from './middle/element-detail';
 import { mountTimeline } from './middle/timeline';
+import { mountWorldHome } from './middle/world-home';
+import { mountWriting } from './middle/writing';
+import { mountSearch } from './middle/search';
+import { mountPublishRoom } from './middle/publish-room';
+import { mountPublishDetail } from './middle/publish-detail';
+import { mountImportRoom } from './middle/import-room';
+import { mountTemplatesRoom } from './middle/templates-room';
+import { mountRoomNav } from './middle/room-nav';
 import { mountRightPane } from './tabs/right/right-pane';
 import { openMapTab } from './tabs/right/map-index-tab';
 import { loadPersistedRightTabs } from './tabs/right/right-tabs-persistence';
 import { toastManager, ToastManager } from './ui/toast-manager';
 import { loadRegistry } from './registry/registry';
 import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
-import { onHashChange, parseHash, navigate, elementsHash } from './core/router';
+import { loadUiPrefs, setSidebarModePref } from './core/ui-prefs';
+import { onHashChange, parseHash, navigate, homeHash } from './core/router';
 import { hydrateAtlasRoot } from './setup/atlas-root-flow';
 import { activateWorld } from './sidebar/worlds-sidebar';
 import { initAutoPullScheduler } from './sync/auto-pull-scheduler';
@@ -32,6 +47,10 @@ export interface AppHandle {
 export function startApp(container: HTMLElement): AppHandle {
   // Hydrate registry from localStorage into observable state.
   patchSlice('registry', loadRegistry());
+  // Hydrate UI prefs (sidebar mode is state-driven since session 223 —
+  // decoupled from URL routing; persists across reloads as a user preference).
+  const prefs = loadUiPrefs();
+  patchSlice('ui', { ...getState().ui, sidebarMode: prefs.sidebarMode });
   // Restore right-pane tabs from localStorage so map tabs survive a page
   // reload. Stale tabs from worlds not currently active will surface as
   // darkened-and-click-to-close per the §5 design (their mapId isn't in
@@ -74,6 +93,10 @@ export function startApp(container: HTMLElement): AppHandle {
     onResetLayout: () => shell.resetRatios(),
   });
 
+  // Room nav strip mounts to its dedicated middle-top region. Stays installed
+  // for the life of the app — it manages its own visibility based on state.
+  const unsubRoomNav = mountRoomNav({ target: shell.middleRoomNav });
+
   // Right pane (tab bar + active tab body).
   const unsubRight = mountRightPane({
     tabBar: shell.rightTabBar,
@@ -89,33 +112,66 @@ export function startApp(container: HTMLElement): AppHandle {
     const route = parseHash(window.location.hash);
     const active = getState().active;
 
+    // Resolve the room (middleMode) from the route + active state.
     let nextMode: MiddleMode;
-    if (route.mode === 'settings') nextMode = 'settings';
-    else if (route.mode === 'element') nextMode = 'element';
-    else if (route.mode === 'timeline') nextMode = 'timeline';
-    else if (route.mode === 'map') {
-      if (route.mapId) ensureMapTabOpen(route.mapId);
-      // Map route with no element selection → timeline is the better default
-      // than the welcome stat-panel (DESIGN_MAPS.md §10c session 210 smoke
-      // note from Captain). Welcome lives ONLY at the "no active world" root.
-      nextMode = route.elementId ? 'element' : (active ? 'timeline' : 'welcome');
+    if (!active) {
+      // No active world → either welcome (root) or settings (no-world settings).
+      nextMode = route.mode === 'settings' ? 'settings' : 'welcome';
+    } else {
+      switch (route.mode) {
+        case 'settings':
+          nextMode = 'settings';
+          break;
+        case 'element':
+          nextMode = 'element';
+          break;
+        case 'timeline':
+          nextMode = 'timeline';
+          break;
+        case 'writing':
+          nextMode = 'writing';
+          break;
+        case 'search':
+          nextMode = 'search';
+          break;
+        case 'publish':
+          nextMode = 'publish';
+          break;
+        case 'publish-detail':
+          nextMode = 'publish-detail';
+          break;
+        case 'import':
+          nextMode = 'import';
+          break;
+        case 'templates':
+          nextMode = 'templates';
+          break;
+        case 'map':
+          if (route.mapId) ensureMapTabOpen(route.mapId);
+          // Map composes with the room — element selection wins over home if
+          // present in the URL (matches the right-pane map convention).
+          nextMode = route.elementId ? 'element' : 'home';
+          break;
+        case 'elements':
+        case 'welcome':
+        case 'home':
+        default:
+          // Bare /w/<id>, /w/<id>/elements, or any unrecognised route with an
+          // active world → home (the world's identity room).
+          nextMode = 'home';
+          break;
+      }
     }
-    // Bare `/w/<id>` or any other unrecognised route while a world is active
-    // → timeline. Pure root (`/`) with no active world stays on welcome.
-    else nextMode = active ? 'timeline' : 'welcome';
+
+    // Toggle the room nav strip's visibility — active when world is active and
+    // we're NOT on welcome. Welcome owns the full middle pane during onboarding.
+    const navActive = active != null && nextMode !== 'welcome';
+    shell.middleRoomNav.setAttribute('data-active', navActive ? 'true' : 'false');
 
     if (nextMode !== currentMode) {
       unmountMiddle?.();
       currentMode = nextMode;
-      if (nextMode === 'settings') {
-        unmountMiddle = mountSettingsPanel({ target: shell.middle, toasts });
-      } else if (nextMode === 'element') {
-        unmountMiddle = mountElementDetail(shell.middle);
-      } else if (nextMode === 'timeline') {
-        unmountMiddle = mountTimeline(shell.middle, toasts);
-      } else {
-        unmountMiddle = mountWelcomePanel(shell.middle);
-      }
+      unmountMiddle = mountRoom(nextMode, shell.middleContent, toasts);
       patchSliceIfChanged('middleMode', nextMode);
     }
 
@@ -151,8 +207,12 @@ export function startApp(container: HTMLElement): AppHandle {
       const active = getState().active;
       if (!active) return;
       // Flip to elements mode if needed (search lives in the elements body).
+      // Session 223 decoupling: sidebar mode is pure state, set directly +
+      // persist as a user preference. No URL navigation here.
       if (getState().ui.sidebarMode !== 'elements') {
-        navigate(elementsHash(active.worldId));
+        patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
+        // Persist the preference so the user's choice survives reload.
+        setSidebarModePref('elements');
       }
       // Defer focus to after the elements body mounts.
       queueMicrotask(() => {
@@ -163,6 +223,19 @@ export function startApp(container: HTMLElement): AppHandle {
         }
       });
     },
+    hasSelectedElement: () => Boolean(getState().ui.selectedElementId),
+    deselectToHome: () => {
+      const active = getState().active;
+      if (!active) return;
+      // Clear selection + nav home — DESIGN convention #32.
+      patchSlice('ui', { ...getState().ui, selectedElementId: null });
+      navigate(homeHash(active.worldId));
+    },
+    openNotes: () => {
+      const active = getState().active;
+      if (!active) return;
+      void import('./ui/notes-overlay').then(m => m.openNotesOverlay());
+    },
   });
   const uninstallHotkeys = installHotkeys();
 
@@ -171,6 +244,7 @@ export function startApp(container: HTMLElement): AppHandle {
     toasts,
     destroy() {
       unsubSidebar();
+      unsubRoomNav();
       unsubRight();
       unsubHash();
       unsubState();
@@ -178,6 +252,37 @@ export function startApp(container: HTMLElement): AppHandle {
       uninstallHotkeys();
     },
   };
+}
+
+/**
+ * Mount the active room's component into the given target. Returns a teardown
+ * function the caller invokes on next room switch.
+ */
+function mountRoom(mode: MiddleMode, target: HTMLElement, toasts: ToastManager): () => void {
+  switch (mode) {
+    case 'welcome':
+      return mountWelcomePanel(target);
+    case 'home':
+      return mountWorldHome(target, toasts);
+    case 'element':
+      return mountElementDetail(target);
+    case 'writing':
+      return mountWriting(target, toasts);
+    case 'timeline':
+      return mountTimeline(target, toasts);
+    case 'search':
+      return mountSearch(target);
+    case 'publish':
+      return mountPublishRoom(target);
+    case 'publish-detail':
+      return mountPublishDetail(target);
+    case 'import':
+      return mountImportRoom(target);
+    case 'templates':
+      return mountTemplatesRoom(target);
+    case 'settings':
+      return mountSettingsPanel({ target, toasts });
+  }
 }
 
 function ensureMapTabOpen(mapId: string): void {

@@ -21,7 +21,31 @@ import { defaultRegistry } from './types';
 // dependency cycle.
 export type { RightTabRef };
 
-export type MiddleMode = 'welcome' | 'settings' | 'element' | 'timeline';
+/**
+ * Middle pane mode = "room". See DESIGN.md "Rooms" section.
+ * - welcome: pre-world first-launch CTA
+ * - home: world home base (default for active worlds)
+ * - element: schema-driven element detail
+ * - writing: book/chapter/scene authorship (see DESIGN_WRITING.md)
+ * - timeline: full timeline view
+ * - search: cross-world search
+ * - publish / publish-detail: showcase management (see DESIGN_PUBLISHING.md)
+ * - import: data import (stub — mechanics in base-tool)
+ * - templates: element creation templates (atlas-local)
+ * - settings: settings room
+ */
+export type MiddleMode =
+  | 'welcome'
+  | 'home'
+  | 'settings'
+  | 'element'
+  | 'timeline'
+  | 'writing'
+  | 'search'
+  | 'publish'
+  | 'publish-detail'
+  | 'import'
+  | 'templates';
 export type SidebarMode = 'worlds' | 'elements';
 
 export interface ActiveWorldRef {

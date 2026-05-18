@@ -17,7 +17,7 @@
  */
 
 import { getState, patchSlice, subscribe } from '../core/state';
-import { onHashChange, parseHash, navigate, elementsHash, elementHash } from '../core/router';
+import { onHashChange, parseHash, navigate, homeHash, elementHash } from '../core/router';
 import type { Element, ElementType, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { getActiveStore } from '../ui/create-world-modal';
@@ -1214,7 +1214,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
       requestPushIfLinked();
       toastManager.success(`Deleted ${el.name || 'element'}`);
       const worldId = getState().active?.worldId;
-      if (worldId) navigate(elementsHash(worldId));
+      if (worldId) navigate(homeHash(worldId));
     } catch (err) {
       console.error('[element-detail] delete failed:', err);
       toastManager.error(err instanceof Error ? err.message : String(err));

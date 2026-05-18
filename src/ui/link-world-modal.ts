@@ -19,7 +19,7 @@
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getState } from '../core/state';
-import { navigate, elementsHash } from '../core/router';
+import { navigate, homeHash } from '../core/router';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
 import type { InitialDownloadProgress } from '../sync/initial-download';
 
@@ -127,7 +127,7 @@ export class LinkWorldModal extends BaseModal {
           this.toasts.success(`Linked ${result.entry.name} — ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
         }
         this.hide();
-        navigate(elementsHash(result.entry.id));
+        navigate(homeHash(result.entry.id));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         errorBox.textContent = message;

@@ -1,14 +1,19 @@
 /**
  * AppShell — three-pane layout: sidebar | middle | right.
  *
- * Sidebar (~18%): mode toggle area (empty until Phase 4), content, gear at bottom.
- * Middle  (~52%): welcome / element / settings / empty (mode controlled by caller).
- * Right   (~30%): tab bar + pane. Empty until Phase 5.
+ * Sidebar (~18%): mode toggle area, content, gear at bottom.
+ * Middle  (~52%): flex column with [room nav strip | room content].
+ *                 Room nav strip is persistent across rooms when a world is
+ *                 active (see DESIGN.md "Rooms"). Room content holds the
+ *                 active room (welcome / home / element / writing / timeline /
+ *                 search / publish / import / templates / settings).
+ * Right   (~30%): tab bar (Map Index + per-map tabs) + leaflet canvas.
  *
- * Two draggable dividers. Ratios persist to localStorage.
+ * Two draggable dividers between panes. Ratios persist to localStorage.
  *
- * Ported nearly verbatim from `atlas-deprecated/src/layout/app-shell.ts`.
- * Only adaptation: constant rename (`SHELL_RATIO_KEY` → `SHELL_RATIOS_STORAGE_KEY`).
+ * Originally ported verbatim from `atlas-deprecated/src/layout/app-shell.ts`;
+ * session 223 split the middle pane into roomNav + content to support the
+ * rooms model. Convention #31.
  */
 
 import { SHELL_RATIOS_STORAGE_KEY } from '../core/constants';
@@ -19,7 +24,12 @@ export interface AppShell {
   sidebarToggle: HTMLElement;
   sidebarContent: HTMLElement;
   sidebarFooter: HTMLElement;
+  /** Middle pane container — DO NOT mount into directly. Use middleContent. */
   middle: HTMLElement;
+  /** Room nav strip (~32px, top of middle). Persistent when world is active. */
+  middleRoomNav: HTMLElement;
+  /** Room content target — mount the active room here. */
+  middleContent: HTMLElement;
   right: HTMLElement;
   rightTabBar: HTMLElement;
   rightPane: HTMLElement;
@@ -82,8 +92,20 @@ export function mountAppShell(container: HTMLElement): AppShell {
   const divider1 = document.createElement('div');
   divider1.className = 'atlas-divider';
 
+  // Middle pane: flex column. Top = room nav strip (~32px), bottom = room content.
+  // Renderers MUST mount to middleContent, never to middle directly (would break
+  // the column flex). See DESIGN convention #31.
   const middle = document.createElement('section');
   middle.className = 'atlas-middle';
+
+  const middleRoomNav = document.createElement('div');
+  middleRoomNav.className = 'atlas-middle-room-nav';
+  middleRoomNav.setAttribute('data-active', 'false');
+  middle.appendChild(middleRoomNav);
+
+  const middleContent = document.createElement('div');
+  middleContent.className = 'atlas-middle-content';
+  middle.appendChild(middleContent);
 
   const divider2 = document.createElement('div');
   divider2.className = 'atlas-divider';
@@ -138,7 +160,20 @@ export function mountAppShell(container: HTMLElement): AppShell {
     window.dispatchEvent(new Event('resize'));
   }
 
-  return { root: shell, sidebar, sidebarToggle, sidebarContent, sidebarFooter, middle, right, rightTabBar, rightPane, resetRatios };
+  return {
+    root: shell,
+    sidebar,
+    sidebarToggle,
+    sidebarContent,
+    sidebarFooter,
+    middle,
+    middleRoomNav,
+    middleContent,
+    right,
+    rightTabBar,
+    rightPane,
+    resetRatios,
+  };
 }
 
 function attachDivider(

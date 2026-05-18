@@ -10,7 +10,7 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
-import { onHashChange, navigate, elementHash } from '../core/router';
+import { onHashChange, navigate, elementHash, searchHash } from '../core/router';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { ToastManager } from '../ui/toast-manager';
@@ -89,6 +89,21 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   searchInput.style.flex = '1 1 auto';
   searchRow.appendChild(searchInput);
 
+  // "Search everywhere" — opens the global search room with the current
+  // sidebar search query preserved. Subtle icon next to the input.
+  const globalSearchBtn = document.createElement('button');
+  globalSearchBtn.type = 'button';
+  globalSearchBtn.className = 'atlas-create-btn atlas-search-everywhere-btn';
+  globalSearchBtn.setAttribute('data-action', 'open-search-room');
+  globalSearchBtn.title = 'Search everywhere (name, description, supertype, subtype)';
+  globalSearchBtn.innerHTML = '<span class="material-symbols-outlined">search</span>';
+  globalSearchBtn.addEventListener('click', () => {
+    const worldId = getState().active?.worldId;
+    if (!worldId) return;
+    navigate(searchHash(worldId, searchInput.value));
+  });
+  searchRow.appendChild(globalSearchBtn);
+
   const createBtn = document.createElement('button');
   createBtn.type = 'button';
   createBtn.className = 'atlas-create-btn';
@@ -120,6 +135,9 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // Sidebar-click no longer auto-opens an associated map (DESIGN_MAPS.md
     // §3.6 revised session 209). Auto-open from pin-click stays; the top-bar
     // affordances from MW will be the explicit path from element detail.
+    // Convention #32: deselection happens via Esc, NOT via re-click of the
+    // selected row. Re-click would conflict with common test/UX patterns
+    // (re-clicking a row to refresh focus). Esc is the canonical exit.
   });
 
   // Drag-onto-map: rows are draggable; payload is {id, type}. Map tabs accept
