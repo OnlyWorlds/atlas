@@ -813,19 +813,9 @@ tools/atlas/
 
 ---
 
-## Phased Build Plan
+## Build History
 
-All phases shipped as of session 221. Operational state lives in `PROGRESS.md`; this section is retained for historical reference.
-
-- **Phase 0 — Foundation** (session 197) — package skeleton, DESIGN.md, SyncEngine + FolderStore interfaces.
-- **Phase 1 — Core sync foundation** (sessions 197-198) — FsFolderStore (FS Access API), handle vault, registry, integration tests.
-- **Phase 2 — Minimal UI** (session 198) — app shell, worlds sidebar, settings panel, sync indicator, welcome panel.
-- **Phase 3 — Upload flows** (session 199) — Link Existing, Make-Online Route 1 + Route 2, autosave debounce.
-- **Phase 3.5 — Local-first hardening** (sessions 201-206) — pullNow, auto-pull scheduler, conflict review modal, server-delete review, two-policy conflict model, double-link block, atlas-extension field overlay, pagination guard, id-swap UI propagation, resetSyncBaseline, world_name cache, resume flush, last_sync_at preservation.
-- **Phase 4-6 — Content/spatial/polish UI** (sessions 199-218) — schema-driven element detail, picker, map tabs + Leaflet, pin placement, timeline, zone subsystem (drawing, editing, modal, visual prefs).
-- **Phase 7 — Smoke + cutover** — pending. Smoke partly complete through T2.x; remaining is Tier 3-4 + maps flow + final force-push to atlas GitHub repo + archive atlas-deprecated.
-
-Post-cutover candidates (3.6+) live in `SYNC_NOTES.md` "Known soft-edges" — none are blocking.
+All phases (0 → 6 + 3.5) shipped by session 221. Cutover (force-push to atlas GitHub + archive `atlas-deprecated/`) is the remaining operational step. See `docs-archive/PROGRESS-history.md` for session-by-session detail. Post-cutover soft-edges live in `SYNC_NOTES.md`.
 
 ---
 
@@ -841,13 +831,7 @@ Post-cutover candidates (3.6+) live in `SYNC_NOTES.md` "Known soft-edges" — no
 
 ## Open Questions
 
-1. **Server-side DELETE detection on pull** — if a server element disappears (someone deleted it on the web app), how do we surface that? Currently the algorithm above suggests "ask user." Worth designing the UX for Phase 1 or deferring to 3.5?
-2. **Email persistence scope** — global in Settings (single user identity) vs per-world (different OW accounts for different worlds)?
-3. **`api-linked` → `local-only` detachment UX** — Settings → "Unlink from API"? Confirmation? Does the server entry get deleted (probably not — separate concern)?
-4. **Pagination on initial download** — `fetchAllPages` cap at 50×200 = 10k per bucket. Document; design "load more" UX if real worlds exceed this.
-5. **Conflict log review UI** — Phase 1 logs to `sync-state.json`. When do we surface this list? Phase 3.5 polish.
-6. **Multi-image API support** — defer until OW schema supports it (current model has one `image_url`).
-7. **Per-world sync policy override** — default global; expose per-world override when?
+1. **Multi-image API support** — deferred until OW schema supports it (current model has one `image_url`). When schema lands, design a media-grid → primary-image UX. Open implementation candidates (server-delete-on-pull UX, unlink confirmation, conflict log review, etc.) are tracked in `PROGRESS.md`. Per-world conflict policy override was explicitly dropped session 221.
 
 ---
 

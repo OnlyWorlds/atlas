@@ -1,7 +1,7 @@
 # Atlas — Zones Subsystem Design
 
 **Version**: 1.0 (2026-05-16) — foundation design
-**Status**: Design phase. No code yet. Bout plan in §11.
+**Status**: All foundation + visual bouts (F0-F5, V1-V5, Z + ZC1-ZC10 + ZD1-ZD6) shipped sessions 213-218. Bout history archived to `docs-archive/PROGRESS-history.md`.
 **Scope**: The zone/marker subsystem — domain model (zone vs marker, OW-canonical), drawing flow, edit flow, UI surfaces, atlas-extension visual prefs, cascade rules, hit-testing, test fixtures, deferred work.
 **Companion**: `DESIGN_MAPS.md` owns map-level surfaces (canvas toolbar, visual settings popover, chip-strip docking). This doc owns zone-specific behavior. Cross-reference where needed.
 
@@ -31,7 +31,7 @@ Cramming this into the maps doc would conflate two clean models. Separate file.
 8. [Sync semantics](#8-sync-semantics)
 9. [Test world fixtures](#9-test-world-fixtures)
 10. [Out of scope](#10-out-of-scope)
-11. [Bout sequence](#11-bout-sequence)
+11. (Bout sequence — archived to `docs-archive/PROGRESS-history.md`)
 
 ---
 
@@ -599,62 +599,6 @@ For v1. Parked for later consideration.
 - **Map subtype filtering on zones** (show only "road" subtype). Filter chips on zone strip. Defer.
 - **Cross-map zone visualization aggregation**. A zone spanning maps currently shows independently on each; no consolidated "zone X spans maps A and B" view. Defer.
 - **Zone z-index ordering** (which zone renders on top when overlapping). Use a stable per-zone `atlas_z_order` extension field later. v1: insertion order via Leaflet's layer ordering.
-
----
-
-## 11. Bout sequence
-
-Foundation BEFORE features. Each bout ends at typecheck-green + vitest-green + build-green seam.
-
-### Bout F0 — Zone type cleanup (foundation)
-
-Remove `map_id` and `coordinates` from `Zone` interface in `core/types.ts`. Add `zone_id`, `z`, `order` to `Marker` interface. Update `folder-store-fs.ts` cascade logic at `findDependents:271+` so that delete-map dependents are pins+markers (not zones). Update any consumer code that referenced `Zone.map_id` (probably the existing cascade test fixtures). Update `MockFolderStore` if it had any zone-with-map_id paths.
-
-**Deliverable**: types align with OW canon. Existing tests pass after fixture adjustments.
-
-### Bout F1 — Cascade + CRUD tests for zones/markers
-
-Per task description. End at vitest green.
-
-### Bout F2 — Marker SDK adapter bypass
-
-Per task description. End at vitest green + new regression tests in place.
-
-### Bout F3 — Leaflet2DManager polygon/polyline + pure helpers
-
-Per task description. End at typecheck-green + unit tests for ZoneGeometry helpers.
-
-### Bout F4 — map_view_prefs storage
-
-Per task description.
-
-### Bout F5 — Canvas toolbar DOM scaffold
-
-Per task description.
-
-### Bout V1 — Visual settings popover
-
-Per task description.
-
-### Bout V2 — Zone drawing on canvas
-
-Per task description. References F3 helpers + zoner-audited patterns (CoordinateUtils, marker DivIcon).
-
-### Bout V3 — Zone chip strip + drag-to-trash
-
-Per task description.
-
-### Bout V4 — Element-detail Zone visuals + Markers section
-
-Per task description. Includes edit-shape entry + HistoryManager-backed cancel.
-
-### Bout V5 — Toolbar behavior
-
-Show/hide zones, show/hide pins, fit-to-image.
-
-### Bout Z — Pokeable smoke + PROGRESS.md update
-
-Final wrap.
 
 ---
 

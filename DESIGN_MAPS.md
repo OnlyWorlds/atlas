@@ -1,7 +1,7 @@
 # Atlas — Maps Subsystem Design
 
-**Version**: 1.0 (2026-05-15) — foundation design
-**Status**: Design phase. No code yet. Bout plan in §10.
+**Version**: 1.1 (2026-05-18) — foundation design; bout-sequence history archived to `docs-archive/PROGRESS-history.md`.
+**Status**: All M1-M7 + N1/N2/MR + L0/S/MW/NPM bouts shipped (sessions 208-210). XR (ghost pins) dropped session 221.
 **Supersedes**: the "Map Images in API Mode" section in `DESIGN.md` (image precedence has changed — `image_url` now wins).
 **Scope**: The map subsystem — domain model, tree organization, UI surfaces, image sources, test fixtures, and the deferred-work pile. Does not cover pin styling (a later pass), zone semantics beyond deferral notes, or marker work.
 
@@ -26,7 +26,12 @@ The same pattern fits future subsystems (`DESIGN_TIMELINES.md`, `DESIGN_WRITING.
 7. [Schema-updates pile](#7-schema-updates-pile)
 8. [Open extensions](#8-open-extensions)
 9. [Out of scope](#9-out-of-scope)
-10. [Bout sequence](#10-bout-sequence)
+
+(Section numbers §10/§10b/§10c — the original bout sequence — are vacant; content archived to `docs-archive/PROGRESS-history.md`. Renumbering would break ~25 cross-references in `src/`; numbering retained for stability.)
+
+11. [Map visual settings](#11-map-visual-settings-per-map-prefs-popover)
+12. [Canvas toolbar](#12-canvas-toolbar-always-visible-above-the-leaflet-canvas)
+13. [Zone chip strip → toolbar dropdown](#13-zone-chip-strip--toolbar-dropdown-revised-session-217-zc9)
 
 ---
 
@@ -450,27 +455,6 @@ Pins anchor to the map's image coordinate system. To prevent the "pins-placed-on
 
 ---
 
-## 5-deprecated. Legacy per-world plan (kept for archaeology)
-
-(Foundational fix needed before the map index UI work — see Issue C from the design conversation.)
-
-**Current state** (broken): `state.ui.rightTabs` is global. Switching worlds carries stale tab references; the right pane goes blank because `lastTabKey` short-circuits remount when the world changes but the active tab key doesn't.
-
-**Fix shape**:
-
-1. Make `rightTabs` and `rightActiveIndex` per-world. Persist via `WorldRegistryEntry.right_tabs?: { tabs: RightTabRef[]; activeIndex: number }`. Restored from registry on world activation, snapshotted to registry when leaving a world.
-2. In `activateWorld` (`worlds-sidebar.ts`), after the existing data-clear logic:
-   - Snapshot current world's `ui.rightTabs` + `ui.rightActiveIndex` to its registry entry.
-   - Save registry.
-   - On the new world's activation, hydrate `ui.rightTabs` + `ui.rightActiveIndex` from its registry entry, defaulting to `[{kind:'map-index'}]` + `0` if absent.
-3. In `right-pane.ts`, when `lastWorldId !== worldId`, reset `lastTabKey = null` BEFORE the early-return check so the body remounts.
-4. On `mountMapTab`, if the map id doesn't exist in current `data.elements`, render a friendly "this map was deleted in another world / no longer here" state — not the silent black we ship today.
-5. Cascade-delete cleanup: when a map is deleted, scrub its id from the active world's `rightTabs` (handled in `map-index-tab.ts` already) — no cross-world cleanup needed because each world has its own tab list.
-
-This is foundation-grade work and gets done in Bout 2 before any map-index tree rendering.
-
----
-
 ## 6. Test world fixtures
 
 Three OW worlds. Skeld creates them via API after this doc lands. Each is a self-contained test case for the tree-builder.
@@ -571,7 +555,7 @@ Pure documentation pass — no field changes, no schema breakage. Council briefi
 
 ## 8. Open extensions
 
-These are explicitly OUT of v1 scope but parked for later consideration. Not foundation work, not required for the bouts in §10.
+These are explicitly OUT of v1 scope but parked for later consideration. Not foundation work.
 
 - ~~**Drag-to-reorder hierarchy**~~ — **Shipped session 212** as Bout DR. Same-sibling-group only; drop above/below computed from cursor-Y vs row midpoint.
 - ~~**Pin styling pass for map-having elements**~~ — **Shipped sessions 219+221**: map glyph on pins whose linked element has a sub-map. Session 221 fixed an over-eager match (was firing on all pinned elements; now correctly Locations-with-submap only).
@@ -600,143 +584,6 @@ For total clarity, the following are NOT covered by this design and have separat
 - Sync behavior of map fields (handled by the generic sync engine — no map-specific sync logic needed).
 - Background-image upload to third-party hosting (out of scope; user pastes URL).
 - Multi-floor 3D maps (`depth` field stays unused for now).
-
----
-
-## 10. Bout sequence
-
-Foundation work BEFORE feature work, per Captain's instruction. Each bout ends at a typecheck-green, vitest-green, build-green, manually-pokeable seam.
-
-### Bout M1 — Schema-honesty foundation (small, low risk)
-
-- Extend `WorldMap` interface in `core/types.ts` with `hierarchy`, `parent_map`, `depth`, `background_color` (`image_url` already lives on `Element` via the index signature; type it explicitly here too for autocomplete).
-- Add `field-descriptions.ts` entries for the newly-typed fields (sourced from §1.1 + §7).
-- No UI change. Just type coverage so all subsequent bouts have autocomplete and the tree-build can use field names.
-
-**Deliverable**: type-level coverage of all Map schema fields. Tests: just typecheck.
-
-### Bout M2 — Bug-fix triplet (Issues A + B + C)
-
-Three independent fixes that don't depend on each other but ship together.
-
-- **Issue A** — element-create map post-modal. After `store.createElement` succeeds with `type='map'`, open `MapCreateModal` in configure-existing mode (modal extension: support "update an existing map" alongside "create new"). Cancel = the bare map stays (already works); submit = location/image fields apply.
-- **Issue B** — image precedence swap. In `map-tab.ts`, prefer `image_url` over `image_media_id`. Update the maps tab row title/badge to signal which is rendering. Add the precedence hint in the create modal per §3.2.
-- **Issue C** — per-world tab persistence + `lastTabKey` reset, per §5.
-- **Quiet hygiene** — `Math.round` pin coordinates on create/update/drag (SDK requires integers; out-of-scope item from §9).
-
-**Deliverable**: bugs gone. Regression tests for each (mock-folder-store scenarios for tab persistence; unit test for image precedence; integration test for element-create → map-modal handoff).
-
-### Bout M3 — Tree-builder as pure function
-
-Implement `buildMapTree(maps, locations)` per §2 in `tabs/right/map-tree.ts` as a pure function. No UI integration yet.
-
-- Unit tests for World A, World B, World C fixtures (§6) — full structural assertion of root order, children, dangling/orphan handling.
-- Skeld receives the fixture spec via `/message` and creates the three test worlds via API (parallel work; doesn't block).
-
-**Deliverable**: 100% test-covered tree-builder, fixtures locked.
-
-### Bout M4 — Map index tree rendering
-
-Replace the alpha-sorted flat list in `map-index-tab.ts` with a tree renderer driven by `buildMapTree`.
-
-- Per-row affordances per §3.1 (indent, location chip, badges, delete).
-- Collapse/expand state persisted per-world (atlas-extension on registry).
-- Visual polish to match the OW dark glass aesthetic.
-
-Manual test against all three test worlds (Skeld's API worlds should be live by this bout).
-
-**Deliverable**: maps tab as a tree. The first user-visible foundation win.
-
-### Bout M5 — Simplified create modal
-
-Rebuild `map-create-modal.ts` per §3.2 — collapsed advanced section, image-source hint dynamics, hierarchy/parent_map override fields. Modal extension from Bout M2 stays compatible (configure-existing mode is the same fields, different submit handler).
-
-**Deliverable**: minimum-setup map creation.
-
-### Bout M6 — Lock toggle + pin click-through unified rule
-
-- Add lock icon to map tab headers per §3.4.
-- Refactor pin click and sidebar selection into a single `selectElement(elementId, source)` handler per §3.6.
-- Picker overlay for N≥2 case.
-
-**Deliverable**: smart map-following behavior with explicit user control.
-
-### Bout M7 — Inline "map presence" widget
-
-Add the §3.5 widget to element-detail middle pane. Type-aware content: Location vs other. Tested against the three fixture worlds.
-
-**Deliverable**: map-related context surfaces during element browsing.
-
-### Bout M8 — Schema description council motion
-
-After M1-M7 ship and feel stable in real use, draft and submit the §7 council motion. Likely a single bundled motion.
-
----
-
-## 10b. Smoke-driven follow-on bouts (session 209)
-
-After M1-M7 landed, Captain's smoke against the live test worlds (Skeld's AAARGAAAA/BBBB/CCC) surfaced a substantial pile of bugs and design adjustments. Triaged below.
-
-### Bout N1 — Safe knock-outs batch (this session)
-
-Mechanical fixes, no design ambiguity:
-
-1. **Picker → sidebar mode**: when `MapPickerModal` resolves and `openMapTab` navigates to a map hash, sidebar mode must stay `elements` (the mode the user was in when they triggered the pick). Currently flips to `worlds` on map navigation.
-2. **Map tab id-swap propagation**: after make-online, server reassigns ids; `applyIdSwapToUi` in `sync-attach.ts` migrates `selectedElementId` + URL but NOT `rightTabs[*].mapId`. Extend it to walk `rightTabs` and rewrite map ids. Symptom this fixes: "map not found" panel after make-online with open map tab(s).
-3. **Map tab refresh on image edit**: when a map element's `image_url` / `image_media_id` changes (via field editing), the cached map tab doesn't re-apply the background. Subscribe to data.elements changes inside `map-tab.ts` cache and diff the image-source fields per cached entry.
-4. **Disable sidebar Location auto-open** (§3.6 revision): remove the `maybeAutoOpenMapFor` call from `elements-sidebar.ts`. Pin-click path retains auto-open.
-5. **Sidebar Location row indicator**: small map icon anchored right (left of the category label) on Location rows whose maps include any anchored to them. Affordance "this place has maps."
-
-Deliverable: typecheck/vitest/build green. Some new unit tests for the id-swap migration.
-
-### Bout MR — Map tab system refresh refactor (this session)
-
-Cache invalidation and tab lifecycle, subsumes a few smaller items:
-
-- Subscribe to `data.elements` per cached map entry; diff `name`, `image_url`, `image_media_id`, `width`, `height`. Reapply background and re-label tab on change.
-- Stale-tab handling: tabs whose `mapId` isn't in current `data.elements` (because the map was deleted in another world OR id-swapped without migration before N1's fix) get a darkened visual and a "click to close" affordance — click anywhere in the panel area closes the tab.
-- World-switch cleanup gets tighter: dispose all cache entries on world change (already done), but ALSO scrub stale entries that managed to leak.
-- One pass through the `map-tab.ts` module to clean up the `subscribe` hot path (currently runs on every notification, even for unrelated state changes).
-
-Deliverable: a sturdier map tab subsystem. No new visible features.
-
-### Bout N2 — Lock UX rework (this session)
-
-Per §3.4 revision: hide lock icon by default, hover-reveal, single-locked-at-a-time, click-anywhere-on-tab to toggle. Auto-unlock-others on new lock.
-
-Deliverable: cleaner tab strip. Lock retains its purpose (suppresses pin-click auto-open) per the revised §3.6.
-
----
-
-## 10c. Session 210 work
-
-### Doc reconciliation + lock cleanup (Bout L0)
-
-Strike §3.4 (lock toggle was tied to auto-open, which is gone). Strike auto-open logic from §3.6. Delete dormant lock code (`RightTabRef.locked`, `isActiveMapTabLocked`, lock CSS, `MapPickerModal`, `maybeAutoOpenMapFor`). Update §10c with reality.
-
-### Bout S — Maps Settings tab
-
-New `'maps'` entry in `SETTINGS_TABS`. First toggle: "Show map names alongside map icons in element header" (default OFF). Registry helper. Future map-behavior toggles accumulate here.
-
-### Bout MW — Map affordances in element-detail top bar
-
-Per §3.5. Add map+pin clusters to the element-detail header. Delete the M7 inline body widget (`renderMapPresence`). Reads Maps Settings for the name-label toggle. Implements `[+map]` for Locations (opens MapCreateModal with location pre-filled).
-
-### Bout NPM — New-pin modal with TAB-autocomplete
-
-Per §3.7. Extends contextual `ElementCreateModal` (right-click on map) with ghost-line name autocomplete against existing elements of selected category. TAB accepts → button flips Create → Place. Multi-match tiebreaker = latest `local_updated_at`.
-
-### Bout XR — Ghost pins (cross-element rendering)
-
-Per §3.8. Right-click on a real pin → spawn ghost pins around it for elements sharing the same `location`. Right-click again → toggle off. Click ghost = select element. Right-click ghost = prune. Ephemeral, in-memory per map tab.
-
-### Pin coord origin council motion (deferred)
-
-Now closed as investigation — session 208's dispose-and-remount + §4.1 invariant fixed the underlying bug. Only paperwork remaining: clarify pin coord origin (top-left, x→right, y→down) in OW `Pin.x`/`Pin.y` field descriptions. Bundles with M8.
-
-### Bout M8 — Schema description council motion (after MW/NPM/XR stable)
-
-Bundle: §7 map field description updates + pin coord origin clarification + any prose discrepancies surfaced during use.
 
 ---
 
