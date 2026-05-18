@@ -16,11 +16,18 @@
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getCurrentSyncEngine, getCurrentSyncFolder } from '../sync/sync-attach';
-import { patchSlice } from '../core/state';
+import { patchSlice, getState } from '../core/state';
+import { surfaceSyncUnavailable } from './sync-toasts';
 import type { ServerDeleteRecord } from '../core/types';
 
 export class ServerDeleteReviewModal extends BaseModal {
   private records: ServerDeleteRecord[] = [];
+  /**
+   * worldId at modal open time. Validated before each resolve so a mid-modal
+   * world switch can't apply destructive actions to a different world.
+   * (SYNC_NOTES M5.)
+   */
+  private capturedWorldId: string | null = null;
 
   constructor(private toasts: ToastManager) {
     super();
@@ -29,9 +36,10 @@ export class ServerDeleteReviewModal extends BaseModal {
   async open(): Promise<void> {
     const engine = getCurrentSyncEngine();
     if (!engine) {
-      this.toasts.error('Engine not ready');
+      surfaceSyncUnavailable(this.toasts);
       return;
     }
+    this.capturedWorldId = getState().active?.worldId ?? null;
     try {
       this.records = await engine.listServerDeletes();
     } catch (err) {
@@ -86,6 +94,15 @@ export class ServerDeleteReviewModal extends BaseModal {
     row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const action = btn.dataset.action as 'delete-locally' | 'keep';
+        // World-switch guard: bail if active world changed since the modal
+        // opened. Both actions are destructive/local; applying them to the
+        // wrong world would surprise the user (and could lose data in the
+        // "delete locally" case).
+        if (getState().active?.worldId !== this.capturedWorldId) {
+          this.toasts.info('World changed — close and reopen to review');
+          this.hide();
+          return;
+        }
         row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = true));
         try {
           const engine = getCurrentSyncEngine();

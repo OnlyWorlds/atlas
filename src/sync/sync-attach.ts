@@ -41,7 +41,7 @@ let currentWorldId: string | null = null;
  *   - If `registry.sync_pull_on_activate` is true AND not paused, fires a
  *     one-shot `pullNow()` after attach to catch up.
  *   - Default conflict policy comes from `registry.sync_default_policy` (or
- *     `drain-blind` if not set).
+ *     `local-wins` if not set).
  */
 export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore): SyncEngine | null {
   // Always detach the previous engine first — at most one active at a time.
@@ -80,7 +80,7 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
     world: entry.name,
     worldId: entry.id,
     apiWorldId: entry.api.world_id,
-    policy: reg.sync_default_policy ?? 'drain-blind',
+    policy: reg.sync_default_policy ?? 'local-wins',
     pullOnActivate: !!reg.sync_pull_on_activate,
     cadenceMs: reg.sync_cadence_ms ?? null,
     globalPaused: !!reg.sync_pause_all,
@@ -222,6 +222,39 @@ export function getCurrentSyncWorldId(): string | null {
 let currentFolder: FolderStore | null = null;
 export function getCurrentSyncFolder(): FolderStore | null {
   return currentFolder;
+}
+
+/**
+ * Diagnose why the sync engine isn't available right now. UI surfaces use
+ * this when a sync action (pull, refresh, conflict resolve, etc.) would no-op
+ * because `getCurrentSyncEngine()` returns null. The original toasts were
+ * generic ("Engine not ready" / "Refresh is only available on API-linked
+ * worlds") which misled users — by far the most common cause is a missing
+ * PIN on an otherwise-valid api-linked world. This helper returns a
+ * structured reason so callers can pick the right toast and (if applicable)
+ * deep-link the user to the right settings tab.
+ *
+ * Returns null if the engine should be considered ready by any UI surface
+ * (i.e. an engine is attached). Callers should still gate on the engine
+ * pointer itself; this helper only diagnoses the absence.
+ */
+export type SyncUnavailableReason =
+  | { kind: 'no-active-world' }
+  | { kind: 'local-only'; worldId: string }
+  | { kind: 'pin-missing'; worldId: string }
+  | { kind: 'attached-but-paused' }
+  | { kind: 'engine-not-ready' };
+
+export function diagnoseSyncUnavailable(): SyncUnavailableReason | null {
+  if (currentEngine) return null;
+  const state = getState();
+  const worldId = state.active?.worldId;
+  if (!worldId) return { kind: 'no-active-world' };
+  const entry = state.registry.worlds.find((w) => w.id === worldId);
+  if (!entry) return { kind: 'engine-not-ready' };
+  if (entry.state !== 'api-linked') return { kind: 'local-only', worldId };
+  if (!state.registry.pin) return { kind: 'pin-missing', worldId };
+  return { kind: 'engine-not-ready' };
 }
 
 /**
@@ -370,6 +403,17 @@ function emitConflictToasts(
     // Fall through — there might be conflicts to surface too.
   }
 
+  // Dispatch a non-bubbling CustomEvent listing the ids the pull just applied
+  // to local. The elements sidebar listens and briefly flashes matching rows
+  // (P3) so the user sees that something changed under their nose. Decoupling
+  // via a DOM event keeps sync-attach from importing UI modules. No-op when
+  // there's nothing to flash.
+  if (result.pulled_ids && result.pulled_ids.length > 0) {
+    document.dispatchEvent(new CustomEvent('atlas:pulled-ids', {
+      detail: { ids: result.pulled_ids.slice() },
+    }));
+  }
+
   if (result.conflicts.length === 0) return;
   const reg = getState().registry;
   const policy = reg.sync_default_policy ?? 'local-wins';
@@ -468,13 +512,43 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
       }
       return t;
     });
+    // Migrate the saved camera state too. Without this, a user who panned a
+    // local map (save under v4 id), then linked online (Make-Online assigns
+    // v7 id and rewrites local refs), then refreshed the page — the camera
+    // state would be looked up under the v7 id and miss (returning the
+    // fit-to-image default) because the actual save was under v4. Session
+    // 221 W6 follow-up: migrate camera state in lock-step with the id swap.
+    void import('../core/map-camera-persist').then(({ getCameraState, saveCameraState, clearCameraState }) => {
+      const saved = getCameraState(swap.old_id);
+      if (saved) {
+        saveCameraState(swap.new_id, saved);
+        clearCameraState(swap.old_id);
+      }
+    }).catch((err) => console.warn('[sync-attach] camera-state migration failed:', err));
   }
 
-  const baseUi =
-    current.ui.selectedElementId === swap.old_id
-      ? { ...current.ui, selectedElementId: swap.new_id }
-      : current.ui;
-  const nextUi = tabsChanged ? { ...baseUi, rightTabs: nextRightTabs } : baseUi;
+  // Migrate active pin-placement targeting. Reachable when the user has a
+  // pin-placement banner active for a freshly-created element while
+  // Make-Online Route 1 (or first push) swaps that element's id. Without
+  // this, clicking the map after the swap would silently no-op (the
+  // referenced element_id no longer exists in data.elements).
+  let nextPinPlacement = current.ui.pinPlacement;
+  let placementChanged = false;
+  if (current.ui.pinPlacement && current.ui.pinPlacement.elementId === swap.old_id) {
+    nextPinPlacement = { elementId: swap.new_id };
+    placementChanged = true;
+  }
+
+  let nextUi = current.ui;
+  if (current.ui.selectedElementId === swap.old_id) {
+    nextUi = { ...nextUi, selectedElementId: swap.new_id };
+  }
+  if (tabsChanged) {
+    nextUi = { ...nextUi, rightTabs: nextRightTabs };
+  }
+  if (placementChanged) {
+    nextUi = { ...nextUi, pinPlacement: nextPinPlacement };
+  }
 
   // Only setState if at least one slice actually changed — avoids a spurious
   // render when the swap doesn't intersect anything the UI is showing.

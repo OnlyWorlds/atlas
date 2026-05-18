@@ -573,15 +573,18 @@ Pure documentation pass — no field changes, no schema breakage. Council briefi
 
 These are explicitly OUT of v1 scope but parked for later consideration. Not foundation work, not required for the bouts in §10.
 
-- **Zone-targets-map**: revisit using zones to express "this region of the parent map IS sub-map X." Requires either a schema field on Zone (`target_map`) or atlas-extension fields. Decision deferred until the map foundation has shipped and the use case sharpens.
-- **Pin styling pass for map-having elements**: small icon decoration on pins whose target element has maps. Visual cue that clicking will offer to open a map.
-- **"Maps within" inverse search performance**: for very large worlds, the inline widget's descendant-map search could get slow. Cache by location-id if needed. Profile first.
-- **Map locking via URL / shareable**: locked map state should not be URL-encoded yet — it's local UX preference. Reconsider if "share this view" becomes a feature.
-- **Picker keyboard shortcut**: Shift-click to skip the picker on multi-map elements. Wait for user feedback to decide if needed.
-- ~~**Drag-to-reorder hierarchy**: dragging map rows in the index to set hierarchy values.~~ **Shipped session 212 (2026-05-16) as Bout DR.** Same-sibling-group only (cross-parent drag refused with toast; use the create modal's parent_map override to reparent). Drop above/below computed from cursor-Y vs row midpoint. Hierarchy re-stamped 0,1,2,... on all affected siblings.
-- **Map subtype as visual filter** (e.g. "show only political maps"): filter chips on the maps tab. Defer.
-- **Cross-element rendering on maps** (session 209 backlog): "show all Characters/Objects/Creatures at this location on its map" toggle. The old maptool had a button that spawned ephemeral pins (not stored) for any element whose `location` field matched the map's location. Worth designing properly — touches the boundary between persistent pins and computed-display markers. Needs its own design session.
-- **Pin coord council motion**: separate paperwork — document the origin convention (top-left, x grows right, y grows down) and canvas-anchored semantics (pin coords are absolute against the map's `width × height`) in the OW `Pin.x` / `Pin.y` field descriptions. Bundle with §7's map-field description updates.
+- ~~**Drag-to-reorder hierarchy**~~ — **Shipped session 212** as Bout DR. Same-sibling-group only; drop above/below computed from cursor-Y vs row midpoint.
+- ~~**Pin styling pass for map-having elements**~~ — **Shipped sessions 219+221**: map glyph on pins whose linked element has a sub-map. Session 221 fixed an over-eager match (was firing on all pinned elements; now correctly Locations-with-submap only).
+
+The following were considered and explicitly dropped by Captain (session 221) — kept here for historical context, do NOT re-add to the backlog without a fresh design conversation:
+
+- ~~**Zone-targets-map**~~ — dropped. Captain: bring up again if the use case ever sharpens.
+- ~~**Map subtype as visual filter**~~ — dropped.
+- ~~**Cross-element rendering on maps**~~ — dropped (ambient/ephemeral pins of "all Characters at this location"; out of scope for v1).
+- ~~**Map locking via URL / shareable**~~ — dropped. Map state stays local UX pref.
+- ~~**"Maps within" inverse search performance**~~ — dropped. Profile first if a real perf problem ever surfaces.
+- ~~**Picker keyboard shortcut**~~ — dropped.
+- ~~**Pin coord council motion**~~ — dropped (origin convention is already documented in the OW Pin schema field descriptions).
 
 ---
 

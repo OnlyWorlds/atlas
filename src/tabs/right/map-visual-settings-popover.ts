@@ -1,14 +1,15 @@
 /**
  * Map visual settings popover (DESIGN_MAPS.md §11).
  *
- * Left-anchored floating panel over the canvas. Reads + writes map_view_prefs
- * for the current map. Changes apply live where consumers exist:
- *   - grid (show/hide + spacing) — wired here via Leaflet2DManager
- *   - pin drag lock — wired here via Leaflet marker.dragging
+ * Docks at the right edge of the middle panel (session 219). Reads + writes
+ * map_view_prefs for the current map. Re-targets on map-tab switch so it
+ * stays open as the user moves between maps (P-bout U1).
  *
- * Pin-style / pin-labels / pin-tint / zone visual fields are persisted but
- * their consumers are deferred to follow-up bouts (V1.5 / V3). Prefs are
- * stored regardless so the popover UX feels real today.
+ * Live-wired consumers (all flow through `applyLivePrefs` below):
+ *   - grid (show/hide + spacing) via Leaflet2DManager
+ *   - pin drag lock via Leaflet marker.dragging
+ *   - pin tint, labels, style (icon / round-icon / pin-shape) via syncPins
+ *   - zone fill opacity + label mode (always/hover/never) via syncZones
  */
 
 import {
@@ -31,7 +32,12 @@ import type { MapTabCacheEntry } from './map-tab-cache';
 import { syncPins } from './map-tab-pins';
 import { syncZones } from './map-tab-zones';
 
-let openPopover: { wrapper: HTMLDivElement; entry: MapTabCacheEntry } | null = null;
+interface OpenPopover {
+  wrapper: HTMLDivElement;
+  entry: MapTabCacheEntry;
+  render: () => void;
+}
+let openPopover: OpenPopover | null = null;
 
 /**
  * Toggle the popover. If already open for this map, close it. Otherwise
@@ -44,6 +50,25 @@ export function toggleVisualSettingsPopover(entry: MapTabCacheEntry, anchor: HTM
   }
   closeVisualSettingsPopover();
   openVisualSettingsPopover(entry, anchor);
+}
+
+/**
+ * Re-target the open popover at a new map tab without close+reopen. Called
+ * by right-pane when the active right-tab switches: keeps the popover on
+ * screen, swaps its `entry` reference, re-renders with the new map's prefs,
+ * and re-applies live prefs to the new map. No-op if no popover is open or
+ * if the target map's tab entry isn't ready yet (caller can retry on the
+ * next render once the cache populates).
+ */
+export function retargetVisualSettingsPopover(entry: MapTabCacheEntry): void {
+  if (!openPopover) return;
+  if (openPopover.entry.mapId === entry.mapId) return;
+  openPopover.entry = entry;
+  // Re-render with the new map's prefs.
+  openPopover.render();
+  // Make sure the new map's canvas reflects whatever the popover currently
+  // shows (visual prefs may differ if the new map has its own override).
+  try { applyLivePrefs(entry, getEffectiveMapPrefs(entry.mapId)); } catch { /* noop */ }
 }
 
 export function closeVisualSettingsPopover(): void {
@@ -65,10 +90,15 @@ function outsideClickListener(e: MouseEvent): void {
   const target = e.target as Node | null;
   if (!target) return;
   if (openPopover.wrapper.contains(target)) return;
+  const targetEl = target as HTMLElement;
   // Outside the popover. Don't close if the click is on the originating
   // toolbar button — let its toggle handler decide.
-  const onButton = (target as HTMLElement).closest?.('[data-action="map-visual-settings"]');
-  if (onButton) return;
+  if (targetEl.closest?.('[data-action="map-visual-settings"]')) return;
+  // W1: also bail when the click lands on the right-pane tab bar (switching
+  // map tabs). The right-pane subscriber retargets the popover at the new
+  // map; without this guard the outside-click handler closes it first and
+  // the retarget no-ops because openPopover is already null.
+  if (targetEl.closest?.('.atlas-tab')) return;
   closeVisualSettingsPopover();
 }
 
@@ -81,9 +111,14 @@ function openVisualSettingsPopover(entry: MapTabCacheEntry, _anchor: HTMLElement
   wrapper.setAttribute('aria-label', 'Map visual settings');
 
   const render = () => {
-    const prefs = getEffectiveMapPrefs(mapId);
-    wrapper.innerHTML = template(prefs, !!getMapOverride(mapId));
-    wireControls(wrapper, entry, render);
+    // Always read from the CURRENT openPopover.entry — when retarget swaps
+    // entry to a new map, subsequent renders pick up the new mapId without
+    // having to rebuild closures.
+    const liveEntry = openPopover?.entry ?? entry;
+    const liveMapId = liveEntry.mapId;
+    const prefs = getEffectiveMapPrefs(liveMapId);
+    wrapper.innerHTML = template(prefs, !!getMapOverride(liveMapId));
+    wireControls(wrapper, liveEntry, render);
   };
 
   render();
@@ -110,7 +145,7 @@ function openVisualSettingsPopover(entry: MapTabCacheEntry, _anchor: HTMLElement
     ro?.disconnect();
   };
 
-  openPopover = { wrapper, entry };
+  openPopover = { wrapper, entry, render };
 
   // Defer registration until next tick so the originating click doesn't
   // immediately bubble up and close us.
@@ -342,13 +377,13 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
 }
 
 /**
- * Apply effective prefs to live consumers.
+ * Apply effective prefs to live consumers. Single integration point —
+ * additional consumers attach here when they ship.
  *
- * Wired today (session 216): grid, pin drag lock, pin tint, pin labels.
- * Pin style variants ('icon' vs 'round-icon' vs 'pin-shape') and zone
- * visual fields beyond fill_opacity are persisted but consumers TBD.
- * This function is the single integration point — additional consumers
- * attach here when they ship.
+ * Wired: grid (Leaflet2DManager), pin drag lock (marker.dragging), pin tint,
+ * pin labels, pin style ('icon' / 'round-icon' / 'pin-shape' via syncPins +
+ * pin-visuals), zone fill opacity, zone label mode (always/hover/never via
+ * syncZones).
  */
 export function applyLivePrefs(entry: MapTabCacheEntry, prefs: MapViewPrefs): void {
   // Grid

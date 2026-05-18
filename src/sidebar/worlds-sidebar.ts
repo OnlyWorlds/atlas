@@ -15,8 +15,9 @@ import { loadHandle, ensureWritable, queryWritable, deleteHandle } from '../stor
 import { FsFolderStore } from '../store/folder-store-fs';
 import { setActiveStore, getActiveStore, CreateWorldModal } from '../ui/create-world-modal';
 import { LinkWorldModal } from '../ui/link-world-modal';
-import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
+// setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
+import { surfaceSyncUnavailable } from '../ui/sync-toasts';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
 import { rightTabHashFor } from './sidebar';
 import { ToastManager } from '../ui/toast-manager';
@@ -58,14 +59,15 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           <span class="material-symbols-outlined">link</span>
         </button>
       `;
-    } else if (recoverable) {
-      header.innerHTML = `
-        <button class="atlas-btn-ghost" data-action="recover-atlas" title="Re-grant access to your existing atlas folder (${escapeAttr(recoverable.folderName)}) and rebuild the world list from disk">↻ Recover atlas folder</button>
-      `;
     } else {
-      header.innerHTML = `
-        <button class="atlas-btn-ghost" data-action="setup-atlas" title="Pick the folder atlas will use for all your worlds">+ Set up atlas</button>
-      `;
+      // No atlas root (recoverable or first-launch): the sidebar header has
+      // no actions. The welcome panel in the middle pane is the single CTA
+      // for both "+ Set up atlas folder" and "↻ Recover atlas folder."
+      // Captain session 221: the sidebar's lone single-glyph button felt
+      // orphaned against the column of compound-icon create buttons that
+      // appear when a root IS set. Dropping it removes the visual mismatch
+      // and consolidates the first-launch path to one place.
+      header.innerHTML = '';
     }
     const createBtn = header.querySelector<HTMLButtonElement>('[data-action="create-local"]');
     createBtn?.addEventListener('click', () => new CreateWorldModal(toasts).open());
@@ -77,42 +79,9 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     });
     const linkBtn = header.querySelector<HTMLButtonElement>('[data-action="link-api"]');
     linkBtn?.addEventListener('click', () => new LinkWorldModal(toasts).open());
-    const setupBtn = header.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]');
-    setupBtn?.addEventListener('click', async () => {
-      setupBtn.disabled = true;
-      try {
-        const result = await setupAtlasRoot();
-        if (result) {
-          toasts.success(
-            result.imported > 0
-              ? `Atlas folder set up — found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
-              : 'Atlas folder is set up'
-          );
-        }
-      } catch (err) {
-        toasts.error(err instanceof Error ? err.message : String(err));
-      } finally {
-        setupBtn.disabled = false;
-      }
-    });
-    const recoverBtn = header.querySelector<HTMLButtonElement>('[data-action="recover-atlas"]');
-    recoverBtn?.addEventListener('click', async () => {
-      recoverBtn.disabled = true;
-      try {
-        const result = await recoverAtlasRoot();
-        if (result) {
-          toasts.success(
-            result.imported > 0
-              ? `Recovered atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
-              : 'Recovered atlas folder (no worlds found inside)'
-          );
-        }
-      } catch (err) {
-        toasts.error(err instanceof Error ? err.message : String(err));
-      } finally {
-        recoverBtn.disabled = false;
-      }
-    });
+    // Setup/recover-atlas buttons moved exclusively to the welcome panel
+    // (session 221 W2). The sidebar no longer renders them; their handlers
+    // were dropped along with the markup.
   }
 
   // List body
@@ -167,7 +136,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       }
       try {
         const result = await pullNowAndRefresh();
-        if (!result) { toasts.info('Engine not ready'); return; }
+        if (!result) { surfaceSyncUnavailable(toasts); return; }
         const total = result.pulled.creates + result.pulled.updates;
         toasts.success(total === 0 ? 'Already up to date' : `Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
       } catch (err) {
@@ -192,9 +161,9 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       if (state.atlasRoot) {
         listEl.innerHTML = `<div class="atlas-pane-empty">No worlds yet — create one to start.</div>`;
       } else if (state.atlasRootRecoverable) {
-        listEl.innerHTML = `<div class="atlas-pane-empty">Click <strong>Recover atlas folder</strong> above to restore your worlds from disk.</div>`;
+        listEl.innerHTML = `<div class="atlas-pane-empty">Use the welcome panel to recover your atlas folder.</div>`;
       } else {
-        listEl.innerHTML = `<div class="atlas-pane-empty">Set up your atlas folder above to begin.</div>`;
+        listEl.innerHTML = `<div class="atlas-pane-empty">Use the welcome panel to set up your atlas folder.</div>`;
       }
       return;
     }

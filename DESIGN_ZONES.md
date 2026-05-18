@@ -155,7 +155,11 @@ Both are pure functions over `state.data.elements`. No new store API needed beyo
 
 OW Zone schema does NOT carry a "polygon vs line" field directly. Pre-ZD6 convention (inherited from zoner) put it in `Zone.supertype`, but that conflated shape with OW's free-text taxonomy field.
 
-**As of session 218 (ZD6)** atlas stores shape in a local-only extension field `atlas_shape: 'polygon' | 'line'`. The field is never pushed to the OW API (atlas-local convention) but persists on disk so reloads see it. `Zone.supertype` is now free user-meaningful text again (e.g. "regions", "districts", "biomes"), as is `subtype` ("forest", "road", "plaza").
+**As of session 218 (ZD6)** atlas stores shape in a local-only extension field `atlas_shape: 'polygon' | 'line'`. The field persists on disk so reloads see it. `Zone.supertype` is now free user-meaningful text again (e.g. "regions", "districts", "biomes"), as is `subtype` ("forest", "road", "plaza").
+
+**Session 221 fix**: `atlas_shape` was originally treated as a "convention" — atlas wrote it locally, but the wire-strip set in `OwClientAdapter.toWireShape` didn't filter it. Real OW rejects unknown fields with 400, so live zone CREATEs failed silently and dependent markers FK-failed (Captain's smoke). The field is now part of `ATLAS_LOCAL_EXTENSION_FIELDS` in `src/core/constants.ts` — same machinery that strips `atlas_color`, `atlas_opacity`, `atlas_label_visible`, `image_media_id` on write and preserves them on pull. The fakes (`statefulOwHandlers` + `FakeOwApiClient`) now mirror real OW's strict-unknown-field validator so regressions of this class surface in tests.
+
+**Cross-tool consequence**: because `atlas_shape` doesn't reach the server, other OW tools (zoner, web app) have no way to know whether a zone is polygon vs line and will guess. A canonical OW schema field is the proper long-term fix (council motion deferred per Captain session 221). For atlas-internal rendering, this is moot — `getZoneShape(zone)` returns the correct value from the local file.
 
 Reads go through `getZoneShape(zone)` (in `tabs/right/zone-derived.ts`) which checks `atlas_shape` first and falls back to legacy `supertype === 'polygon'|'line'` for zones created before ZD6. Default for ambiguous: `'polygon'`. **Never read `zone.supertype` directly to decide rendering** — go through the helper.
 

@@ -224,6 +224,13 @@ export interface SyncResult {
   /** Per-element failures during push (4xx, validation, etc.) — non-fatal. */
   failures: PerElementFailure[];
   /**
+   * Element ids that pull just APPLIED to local — i.e. CREATEs (downloaded
+   * fresh) plus UPDATEs (overwritten locally). Used by the UI to flash
+   * recently-pulled rows non-obtrusively (P3). Empty array on push-only
+   * rounds.
+   */
+  pulled_ids?: string[];
+  /**
    * Set when the round was aborted by an authentication failure (HTTP 401/403).
    * Distinct from per-element `failures` because auth-failed pushes/pulls bail
    * early — every subsequent op would fail the same way, so the engine stops

@@ -489,38 +489,23 @@ Fix: capture `currentWorldId` at schedule time, compare to current at fire time.
 
 ## Known soft-edges to revisit (3.6+)
 
-Updated through session 206. Listed by surface — none are cutover blockers.
+Updated through session 221. Listed by surface — none are cutover blockers.
 
 ### Sync engine internals
 - **Concurrent-edit race on autosave**: applying server response post-push would catch normalization but risks overwriting user's mid-push edit. Today we stamp-only (eventually consistent via next pull).
 - **`pushPhase` UPDATE doesn't apply server response back to local**: refuted-by-design from session-205 pressure-test (push asserts local is correct). Revisit only if OW server starts normalizing fields server-side.
-- **User edit during pullPhase race-overwrites** (pressure-test M3): single-`await` window (~1-5ms). Fix is ~10 LOC re-reading element before `applyServerRecord`. Defer unless smoke surfaces.
 - **`resolveConflict` CREATE path id-swap**: corner case — resolve-conflict on never-synced element doesn't swap if server returns a different id. Not tripped in practice.
 - **`rewriteIdReferences` bumps `local_updated_at`**: causes harmless re-push on next sync after id-swap. Add a "rewrite without bumping" mode if the trailing-push cost ever shows up in profiling.
-
-### Pagination
-- **Pagination (full)**: `listElements` reads the first page only. Bout V added a SAFETY guard so server-delete detection doesn't run on paginated types — but atlas still only sees first-page data. Implement load-more / page-cursor for worlds >200 elements per type.
-
-### UI surfacing of UI-state during transient pushes
-- **Map id-swap doesn't migrate `state.ui.rightTabs[].mapId` / `state.ui.pinPlacement.elementId`** (pressure-test H3): Bout X covered `selectedElementId` + URL but not those slices. Only reachable if user has a map tab open during Make-Online Route 1 or first push of a locally-created map. ~8 LOC in `sync-attach.handleIdSwap`.
-- **Pill click during debounced push toasts misleadingly** (pressure-test M2): returns push-shaped result; "already up to date" reads wrong when push actually moved 0 records. ~3 LOC: gate the toast on `result.pushed.* > 0`. Benign for single-user smoke.
-- **Stale conflicts persist after policy flip to local-wins** (pressure-test M4): if user had `pause-and-review` conflicts pending then switched policy, the badge stays. ~5 LOC: settings-panel policy-change clears persisted conflicts. Easy fix.
-- **Modal actions silent no-op on world switch mid-modal** (pressure-test M5): reachability low (modal overlay blocks worlds-sidebar). ~3 LOC: capture worldId at modal open, validate before resolving.
-- ~~**L7 leftover** — `engine.resume()` erases `last_sync_at` (pressure-test M7)~~ — closed by Bout BB.
 
 ### Reliability edges
 - **Cascade-delete loop crash leaves inconsistent state** (pressure-test Path 10): FS Access API has no transactions. Pre-collect tombstones into one write before unlinking files would harden. Worst case today: "confusing server-delete modal on next sync."
 - **Stuck-pin auto-cleanup**: repeated `Map not found` 404s when a pin's map was deleted server-side currently require manual delete. Auto-clear after N failures would help.
 
 ### Polish
-- **Per-element refresh button**: useful escape hatch for "force pull this one element" especially around the m2m gotcha if the server fix regresses.
-- **Per-world conflict policy override**: global only today. Settings → Sync sets default for everyone.
-- **Server-delete confirm setting wiring**: setting exists, auto-modal exists, but a checkbox + UI to control might benefit from a "review later" affordance (currently just hides the modal but doesn't clear the badge).
-- **"Last synced X min ago" on the pill**: currently only in title attribute. Prominent display would be polish.
-- **Visual indicator on auto-pulled elements**: toast covers the count; per-element flash on the row would make it feel live.
+- **Per-element refresh API method**: today's per-type refresh (right-click filter chip) is the workaround. A dedicated single-element refresh would be a precise escape hatch.
 - **Drag-from-element-list pin drop**: right-click + create covers primary spatial flow.
-- **`getElement` O(types) probe**: walks 22 directories per lookup. Cache id→type in FsFolderStore for hot-path operations.
-- **L1-L6 cosmetic** — log inconsistencies (e.g. `'drain-blind'` vs `'local-wins'` in one log line), 1-frame "not found" flash on delete, etc.
+- **`getElement` O(types) probe**: walks 22 directories per lookup. Cache id→type in FsFolderStore for hot-path operations. (Partly mitigated by session-220's `fileIndex` cache; cross-type cold lookups still iterate.)
+- **Conflict log review UI for resolved/historical conflicts**: today's modal handles only active conflicts.
 
 ### Closed during sessions 205-207 (kept here for searchability)
 - **H1+H2** — field-clear propagation → fixed by Bout S (`null`/`''` sentinels, fakes encode JSON-wire semantics).
@@ -533,6 +518,65 @@ Updated through session 206. Listed by surface — none are cutover blockers.
 - **Api-vs-local name divergence invisible** → fixed by Bout Z (`api.world_name` cached + Settings row).
 - **Pre-T2-smoke F1** — flush-on-attach raced pull-on-activate via shared inFlight lock, silently no-op'd → fixed by Bout BB (sequence flush BEFORE pull via single async IIFE in `attachSyncEngine`). Convention #25.
 - **M7** — `engine.resume()` reset `last_sync_at` to null, pill briefly read "never synced" → fixed by Bout BB (engine tracks `lastSyncAt` privately, `resume()` restores). Convention #26.
+
+### Closed during session 221
+- **M2** — pill-click during debounced push toasted "already up to date" misleadingly → fixed by gating the toast on both `pulled.*` AND `pushed.*` counts.
+- **M3** — user edit during pull race-overwrites → fixed by re-reading element before `applyServerRecord` in `pullPhase`.
+- **M4** — stale conflicts persist after policy flip to local-wins → fixed by clearing persisted conflicts in the settings-panel policy-change handler.
+- **M5** — modal actions silent no-op on world switch mid-modal → fixed by `capturedWorldId` snapshot in `ConflictReviewModal` and `ServerDeleteReviewModal`.
+- **H3** — `pinPlacement.elementId` not migrated on id-swap → fixed in `handleIdSwap`. (rightTabs[].mapId migration was already in place.)
+- **Pagination** — `listElements` now walks DRF pages by `?offset=N` until `count` is reached; safety cap at 100 pages.
+- **L1-L6 cosmetic** — `'drain-blind'` references in `sync-attach.ts` default-policy fallback replaced with `'local-wins'`. Other legacy strings stay in registry-load migration paths intentionally.
+
+### Engine-unavailable diagnosis (Bout 6 W3)
+
+When a UI surface tries to run a sync action and `getCurrentSyncEngine()` returns null, the user needs an actionable message — generic "Engine not ready" misled Captain into thinking the bug was the api-link itself when the actual cause was a missing PIN.
+
+`diagnoseSyncUnavailable()` in `sync-attach.ts` returns a structured reason:
+- `'no-active-world'` — sidebar should pick a world
+- `'local-only'` — sync isn't applicable
+- `'pin-missing'` — api-linked world, PIN field empty in registry → user fixes in settings
+- `'attached-but-paused'` — reserved for future use
+- `'engine-not-ready'` — fallback (attach in flight, race during world switch, etc.)
+
+`surfaceSyncUnavailable(toasts)` in `src/ui/sync-toasts.ts` consumes the reason and emits the right toast. For `pin-missing` it also `navigate(settingsHash(worldId, 'identity'))` to deep-link the user to the fix.
+
+**Convention**: every UI surface that gates on `getCurrentSyncEngine()` should call `surfaceSyncUnavailable(toasts)` on the null path. Don't toast inline. Sites today: pill, worlds-sidebar refresh, settings refresh-from-API, conflict-review-modal open, server-delete-modal open, elements-sidebar filter-chip right-click.
+
+### Atlas-local fields must be stripped on the wire (session 221 live bug)
+
+Captain's bug: fresh world, drew zones, made online, push failed:
+```
+POST /marker/ 500 (Internal Server Error)
+Failed to create Marker: (1452, '...foreign key constraint fails (`zone_id`)...')
+```
+
+Root cause: zone push was sending `atlas_shape: 'polygon'` to the server. Real OW has a strict field validator and rejected the body with 400. The zone failed silently (recorded in `result.failures`, but the CREATE never landed server-side). Markers then attempted CREATE with `zone_id` pointing at a zone that didn't exist on the server → MySQL FK constraint 1452.
+
+Why tests didn't catch it: the fakes (FakeOwApiClient + MSW handlers) silently spread unknown fields into their in-memory bucket. atlas_shape leaked through, was stored, and FK lookups against the local server bucket succeeded. The bug only surfaced against real OW's strict validation.
+
+**The contract**:
+1. `ATLAS_LOCAL_EXTENSION_FIELDS` in `src/core/constants.ts` lists every field atlas stores locally but never sends to the server.
+2. `OwClientAdapter.toWireShape` strips them via the `ATLAS_LOCAL_FIELDS` set (which includes the extension list).
+3. The fakes (`statefulOwHandlers` LIST/CREATE/PATCH + `FakeOwApiClient`) MUST reject these fields with 400 — mirrors real OW so any new atlas-local field forgotten in the extension list fails its tests immediately.
+4. Same on `applyServerRecord`: the extension fields must survive overlay on pull (the local file's stored value is preserved when server gives an update on that element).
+
+When adding a new atlas-only field: append it to `ATLAS_LOCAL_EXTENSION_FIELDS`. Both ends (write-strip + pull-preserve) pick it up automatically. The fake guards (`rejectAtlasLocalFields` in `fake-ow-client.ts`, the ATLAS_LOCAL list in `msw-handlers.ts`) also need the field name added so regressions surface in tests.
+
+Verified by `tests/integration/ow-client-adapter.atlasLocal.test.ts` (4 tests).
+
+### FK constraint on CREATE → server-delete routing (session 221)
+
+Real OW returns `500 (1452, 'Cannot add or update a child row: a foreign key constraint fails ... FOREIGN KEY (\`zone_id\`)...')` on a marker/pin CREATE whose FK targets an element the server doesn't have anymore. Atlas's topo-sort can't help — the peer has `server_updated_at` locally (was synced previously) and is therefore NOT in the CREATE batch.
+
+`parseFkConstraintError(err)` extracts the FK field name and the referenced element type. On match:
+1. Look up the orphan peer in the local folder by the FK value.
+2. If the peer has `server_updated_at` set, route to `server_deletes` (same UX as Bout 8 UPDATE-404 routing).
+3. Record the child element as a `failure` with a clearer message so the user knows why it didn't land.
+
+User picks `keep + re-push` → peer re-CREATEs next round → child element succeeds. Or picks `delete locally` → orphan cleaned up. Symmetric with UPDATE-404 detection.
+
+Verified by `tests/integration/sync-engine.fkConstraint.test.ts` (3 tests).
 
 ---
 

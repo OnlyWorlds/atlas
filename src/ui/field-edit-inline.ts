@@ -124,8 +124,10 @@ export function openFieldEditInline(opts: FieldEditInlineOptions): void {
     }
     if (e.key === 'Enter') {
       if (isMulti) {
-        // Ctrl/Cmd+Enter saves. Plain Enter inserts a newline (textarea default).
-        if (e.ctrlKey || e.metaKey) {
+        // Ctrl/Cmd+Enter OR Shift+Enter saves. Plain Enter inserts a newline
+        // (textarea default). Shift is the conventional editor shortcut; ctrl
+        // stays as an alias for muscle-memory across platforms.
+        if (e.ctrlKey || e.metaKey || e.shiftKey) {
           e.preventDefault();
           void save();
         }

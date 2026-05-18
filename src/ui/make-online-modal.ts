@@ -221,6 +221,24 @@ export class MakeOnlineModal extends BaseModal {
     const email = (form.querySelector<HTMLInputElement>('input[name="create-email"]')!).value.trim();
     const pin = (form.querySelector<HTMLInputElement>('input[name="create-pin"]')!).value.trim();
 
+    // Pre-validate all three required fields BEFORE disabling inputs or
+    // calling the server. Without this gate, createApiWorld throws "Email is
+    // required" (etc.) and the user sees the error in the modal — but only
+    // AFTER the submit button shows "Creating…" which feels like the partial
+    // state went out. Session 221 W7: validate up front, focus the empty
+    // field, leave inputs editable.
+    const missing = !name ? 'Name' : !email ? 'Email' : !pin ? 'PIN' : null;
+    if (missing) {
+      errorBox.textContent = `${missing} is required`;
+      errorBox.hidden = false;
+      // Focus the first empty input so the user knows what to type next.
+      const target = !name ? form.querySelector<HTMLInputElement>('input[name="create-name"]')
+        : !email ? form.querySelector<HTMLInputElement>('input[name="create-email"]')
+        : form.querySelector<HTMLInputElement>('input[name="create-pin"]');
+      target?.focus();
+      return;
+    }
+
     inputs.forEach((i) => (i.disabled = true));
     submitBtn.disabled = true;
     submitBtn.textContent = 'Creating…';

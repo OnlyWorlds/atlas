@@ -42,6 +42,15 @@ export interface StatefulServerOptions {
    * the flag mid-test without rebuilding handlers.
    */
   authState?: { blocked: boolean };
+  /**
+   * Per-type page size for the LIST handler. When set for a type, the handler
+   * returns DRF-style `{ count, next, previous, results }` envelopes instead
+   * of raw arrays, honoring `?offset=N` to walk pages. Used by adapter
+   * pagination tests; real-OW caps page size at 200.
+   *
+   * Example: `paginate: { event: 3 }` → LIST /event/ pages of 3.
+   */
+  paginate?: Partial<Record<string, number>>;
 }
 
 export function statefulOwHandlers(options: StatefulServerOptions = {}): {
@@ -118,12 +127,33 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
     }),
 
     // LIST
-    http.get(`${base}/:type/`, ({ params }) => {
+    http.get(`${base}/:type/`, ({ params, request }) => {
       const blocked = authBlocked();
       if (blocked) return blocked;
       const type = String(params.type);
-      const records = Array.from(bucket(type).values()).map(maybeNestRelations);
-      return HttpResponse.json(records);
+      const allRecords = Array.from(bucket(type).values()).map(maybeNestRelations);
+
+      // If a per-type page size is configured, return a DRF-style envelope
+      // honoring `?offset=N`. Lets adapter pagination tests exercise the
+      // multi-page walk loop without standing up a real OW dev server.
+      const pageSize = options.paginate?.[type];
+      if (typeof pageSize === 'number' && pageSize > 0) {
+        const url = new URL(request.url);
+        const offset = Math.max(0, parseInt(url.searchParams.get('offset') ?? '0', 10) || 0);
+        const slice = allRecords.slice(offset, offset + pageSize);
+        const nextOffset = offset + slice.length;
+        const next = nextOffset < allRecords.length
+          ? `${base}/${type}/?offset=${nextOffset}`
+          : null;
+        return HttpResponse.json({
+          count: allRecords.length,
+          next,
+          previous: offset > 0 ? `${base}/${type}/?offset=${Math.max(0, offset - pageSize)}` : null,
+          results: slice,
+        });
+      }
+
+      return HttpResponse.json(allRecords);
     }),
     // GET single
     http.get(`${base}/:type/:id/`, ({ params }) => {
@@ -162,6 +192,18 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
           );
         }
       }
+      // Captain session 221: atlas-local fields (atlas_shape on zone, etc.)
+      // were leaking to live OW which rejects unknown fields with 400. Mirror
+      // here so tests catch any new field that needs adding to
+      // ATLAS_LOCAL_EXTENSION_FIELDS.
+      const ATLAS_LOCAL = ['image_media_id', 'atlas_color', 'atlas_opacity', 'atlas_label_visible', 'atlas_shape', 'local_updated_at', 'server_updated_at'];
+      const bannedLocal = Object.keys(body).find(k => ATLAS_LOCAL.includes(k));
+      if (bannedLocal) {
+        return HttpResponse.json(
+          { error: `body contains atlas-local field "${bannedLocal}" which the server rejects` },
+          { status: 400 },
+        );
+      }
       // Marker.order is a valid write field (Anchor migration 2026-05-16).
       // assignsServerIds: ignore client id entirely (real OW behavior with v4 input).
       const id = options.assignsServerIds
@@ -188,6 +230,14 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
             { status: 400 },
           );
         }
+      }
+      const ATLAS_LOCAL_UPD = ['image_media_id', 'atlas_color', 'atlas_opacity', 'atlas_label_visible', 'atlas_shape', 'local_updated_at', 'server_updated_at'];
+      const bannedLocalUpd = Object.keys(body).find(k => ATLAS_LOCAL_UPD.includes(k));
+      if (bannedLocalUpd) {
+        return HttpResponse.json(
+          { error: `body contains atlas-local field "${bannedLocalUpd}" which the server rejects` },
+          { status: 400 },
+        );
       }
       // No `order` rejection on PATCH (Anchor migration 2026-05-16).
       const next: ServerRecord = { ...existing, ...body, id, updated_at: clock() };

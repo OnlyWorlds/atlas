@@ -12,7 +12,7 @@ import type { Pin } from '../../core/types';
 import { getState } from '../../core/state';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../../core/constants';
 import { pinVisualFor } from './pin-visuals';
-import { getAssociatedMaps } from './auto-open-map';
+import { hasLinkedSubMap } from './auto-open-map';
 import { enablePinDrag } from './map-tab-pin-drag';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
@@ -55,7 +55,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
       // on reload. Keep the prior label and icon when lookup misses; the
       // next subscriber tick after sync settles will re-resolve cleanly.
       if (el) {
-        const hasMapBadge = getAssociatedMaps(el.id, elements).length > 0;
+        const hasMapBadge = hasLinkedSubMap(el.id, elements);
         const visual = pinVisualFor(el.type, hasMapBadge, prefs.pin_tint, prefs.pin_style);
         // pin-shape's visible tip should align with the latlng (bottom-tip
         // anchor); icon + round-icon are symmetric and stay centered.
@@ -69,7 +69,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
       // data is still resolving (vs the raw '(element)' string).
       const name = el?.name ?? '(loading…)';
       const type = el?.type ?? 'object';
-      const hasMapBadge = el ? getAssociatedMaps(el.id, elements).length > 0 : false;
+      const hasMapBadge = el ? hasLinkedSubMap(el.id, elements) : false;
       const visual = pinVisualFor(type, hasMapBadge, prefs.pin_tint, prefs.pin_style);
       const anchor: 'center' | 'bottom-tip' = prefs.pin_style === 'pin-shape' ? 'bottom-tip' : 'center';
       const added = entry.manager.addPin({

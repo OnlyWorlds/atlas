@@ -39,12 +39,15 @@ import { getActiveStore, setActiveStore } from '../ui/create-world-modal';
 import { setupAtlasRoot, deleteWorldFolderUnderRoot } from '../setup/atlas-root-flow';
 import { MakeOnlineModal } from '../ui/make-online-modal';
 import { ToastManager } from '../ui/toast-manager';
+import { surfaceSyncUnavailable } from '../ui/sync-toasts';
 import { navigate, parseHash, settingsHash, SETTINGS_TABS, onHashChange, type SettingsTab } from '../core/router';
 import {
   attachSyncEngine,
   detachSyncEngine,
   getCurrentSyncEngine,
+  getCurrentSyncFolder,
   pullNowAndRefresh,
+  refreshConflictsCount,
 } from '../sync/sync-attach';
 import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import type { WorldRegistryEntry } from '../core/types';
@@ -520,12 +523,26 @@ function wireSyncTab(toasts: ToastManager): void {
     input.addEventListener('change', () => {
       if (!input.checked) return;
       const v = input.value as 'local-wins' | 'pause-and-review';
+      const prior = getState().registry.sync_default_policy;
       const next = setSyncDefaultPolicy(getState().registry, v);
       saveRegistry(next);
       patchSlice('registry', next);
       // Apply to the running engine immediately — no detach/re-attach needed.
       const engine = getCurrentSyncEngine();
       if (engine) engine.setPolicy(v);
+      // Flipping pause-and-review → local-wins clears any persisted conflicts
+      // for the active world. Under local-wins, divergence is auto-resolved
+      // on the next sync round (local pushes anyway, server overwritten), so
+      // a stale conflict badge from the prior policy would lie. (SYNC_NOTES
+      // M4.) Only fire when the flip direction actually changes the semantic.
+      if (prior === 'pause-and-review' && v === 'local-wins') {
+        const folder = getCurrentSyncFolder();
+        if (folder) {
+          void folder.writeSyncState({ conflicts: [] })
+            .then(() => refreshConflictsCount())
+            .catch((err) => console.warn('[settings] clear conflicts failed:', err));
+        }
+      }
     });
   });
 
@@ -585,7 +602,7 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
     refreshBtn.disabled = true;
     try {
       const result = await pullNowAndRefresh();
-      if (!result) { toasts.info('Engine not ready'); return; }
+      if (!result) { surfaceSyncUnavailable(toasts); return; }
       const total = result.pulled.creates + result.pulled.updates;
       toasts.success(total === 0 ? 'Already up to date' : `Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
     } catch (err) {
@@ -640,9 +657,31 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
 
   const unlinkBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="unlink-from-api"]');
   unlinkBtn?.addEventListener('click', async () => {
-    const ok = window.confirm(
-      `Unlink "${world.name}" from API?\n\nLocal files stay where they are. The world stops syncing. You can re-link later from settings or via "+ link api".\n\nThe API world on onlyworlds.com is NOT deleted.`
-    );
+    // Count local elements so the dialog can be specific about what stays.
+    let elementCount = 0;
+    try {
+      const store = getActiveStore();
+      if (store) {
+        const all = await store.listElements();
+        elementCount = all.length;
+      }
+    } catch {
+      // Best-effort; missing count just means the dialog is less specific.
+    }
+    const lines = [
+      `Unlink "${world.name}" from API?`,
+      '',
+      `WHAT HAPPENS:`,
+      `  • Local folder${elementCount > 0 ? ` (${elementCount} element${elementCount === 1 ? '' : 's'})` : ''} stays exactly where it is`,
+      `  • Sync stops immediately — no more push or pull`,
+      `  • Local sync history is cleared (server timestamps, pending tombstones)`,
+      `  • The world on onlyworlds.com is NOT deleted`,
+      '',
+      `REVERSIBLE: you can re-link later from settings or via "+ link api".`,
+      '',
+      `Continue?`,
+    ];
+    const ok = window.confirm(lines.join('\n'));
     if (!ok) return;
     // Order matters:
     //   1. Detach the engine FIRST so no in-flight sync round mutates files

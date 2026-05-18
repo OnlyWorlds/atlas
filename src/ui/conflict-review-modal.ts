@@ -13,11 +13,18 @@
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getCurrentSyncEngine, getCurrentSyncFolder, refreshConflictsCount } from '../sync/sync-attach';
+import { surfaceSyncUnavailable } from './sync-toasts';
 import { patchSlice, getState } from '../core/state';
 import type { Conflict } from '../core/types';
 
 export class ConflictReviewModal extends BaseModal {
   private conflicts: Conflict[] = [];
+  /**
+   * worldId at modal open time. Validated before every resolve action so a
+   * mid-modal world switch can't apply the user's choice to a different
+   * world's engine. (SYNC_NOTES M5.)
+   */
+  private capturedWorldId: string | null = null;
 
   constructor(private toasts: ToastManager) {
     super();
@@ -26,9 +33,10 @@ export class ConflictReviewModal extends BaseModal {
   async open(): Promise<void> {
     const engine = getCurrentSyncEngine();
     if (!engine) {
-      this.toasts.error('Engine not ready');
+      surfaceSyncUnavailable(this.toasts);
       return;
     }
+    this.capturedWorldId = getState().active?.worldId ?? null;
     try {
       this.conflicts = await engine.listConflicts();
     } catch (err) {
@@ -79,6 +87,15 @@ export class ConflictReviewModal extends BaseModal {
     row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const action = btn.dataset.action as 'overwrite-mine' | 'pull-theirs';
+        // World-switch guard: bail if the active world changed since the modal
+        // opened. resolveConflict acts on the current engine; without the
+        // guard, a mid-modal world switch would apply the user's choice to
+        // the wrong world's local files.
+        if (getState().active?.worldId !== this.capturedWorldId) {
+          this.toasts.info('World changed — close and reopen to review conflicts');
+          this.hide();
+          return;
+        }
         row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = true));
         try {
           const engine = getCurrentSyncEngine();

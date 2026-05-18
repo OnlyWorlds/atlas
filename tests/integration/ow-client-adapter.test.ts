@@ -142,6 +142,27 @@ describe('OwClientAdapter — round-trip via MSW', () => {
     expect(list.every(r => r.type === 'location')).toBe(true);
   });
 
+  it('listElements walks paginated pages until count reached (P4)', async () => {
+    // Force a small page size so 5 records require 3 pages.
+    const { handlers } = statefulOwHandlers({
+      baseUrl: TEST_BASE,
+      clock: clock.next,
+      paginate: { event: 2 },
+    });
+    mswServer.use(...handlers);
+
+    for (let i = 0; i < 5; i++) {
+      await adapter.createElement('event', { id: `e${i}`, name: `Event ${i}` });
+    }
+
+    const list = await adapter.listElements('event');
+    expect(list).toHaveLength(5);
+    expect(list.map(r => r.id).sort()).toEqual(['e0', 'e1', 'e2', 'e3', 'e4']);
+    // After fetching everything via pagination, the type should NOT be flagged
+    // as paginated (we got it all — server-delete detection runs normally).
+    expect(adapter.getPaginatedTypes().has('event')).toBe(false);
+  });
+
   it('listElements unwraps nested relations on read', async () => {
     const { handlers } = statefulOwHandlers({
       baseUrl: TEST_BASE,

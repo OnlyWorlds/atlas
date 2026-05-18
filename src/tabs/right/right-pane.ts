@@ -18,8 +18,11 @@ import type { WorldMap } from '../../core/types';
 import { ToastManager } from '../../ui/toast-manager';
 import { mountMapIndexTab } from './map-index-tab';
 import { mountMapTab, disposeMapTab, disposeAllMapTabs } from './map-tab';
+import { mapTabCache } from './map-tab-cache';
+import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { navigate, parseHash, worldHash, elementHash } from '../../core/router';
 import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount } from '../../sync/sync-attach';
+import { surfaceSyncUnavailable } from '../../ui/sync-toasts';
 import { ConflictReviewModal } from '../../ui/conflict-review-modal';
 import { savePersistedRightTabs } from './right-tabs-persistence';
 
@@ -125,10 +128,22 @@ export function mountRightPane(mount: RightPaneMount): () => void {
 
     const t = ui.rightTabs[ui.rightActiveIndex];
     if (!t || t.kind === 'map-index') {
+      // Leaving any map context — close the visual-settings popover since
+      // it represents a specific map's prefs and has nothing to target.
+      closeVisualSettingsPopover();
       unmountActive = mountMapIndexTab(pane, toasts);
     } else {
       // mountMapTab is non-returning (manages its own lifecycle via cache).
       mountMapTab(pane, t.mapId, toasts);
+      // If the visual settings popover is open, re-target it at the newly-
+      // active map so the user sees the new map's prefs without having to
+      // close + reopen. Deferred to a microtask so the new map-tab's mount
+      // (which creates the cache entry asynchronously via `entry.ready`)
+      // has a chance to register before we read mapTabCache.
+      queueMicrotask(() => {
+        const newEntry = mapTabCache.get(t.mapId);
+        if (newEntry) retargetVisualSettingsPopover(newEntry);
+      });
     }
   }
 
@@ -263,6 +278,10 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     const target = document.querySelector('.atlas-sidebar-footer') ?? document.body;
     target.appendChild(pill);
   }
+  // Schedule a periodic tick so "synced 3m ago" ages naturally. State doesn't
+  // re-render on its own; we just re-run this function from a 30s interval.
+  // Idempotent — only one timer at a time.
+  ensureSyncPillTicker(toasts);
   const active = state.active;
   if (!active) {
     pill.dataset.state = 'none';
@@ -321,7 +340,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   pill.onclick = async () => {
     const eng = getCurrentSyncEngine();
     if (!eng) {
-      toasts.info('Engine not ready');
+      surfaceSyncUnavailable(toasts);
       return;
     }
     const cur = state.sync.activeSync;
@@ -339,12 +358,19 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
         toasts.info('Engine not ready');
         return;
       }
-      const totalUpdates = result.pulled.creates + result.pulled.updates;
+      const totalPulled = result.pulled.creates + result.pulled.updates + result.pulled.deletes;
+      const totalPushed = result.pushed.creates + result.pushed.updates + result.pushed.deletes;
       // pullNowAndRefresh fires the "pulled N" toast itself (so cadence /
       // pull-on-activate / catch-up pulls also surface). Pill-click adds ONLY
       // the "already up to date" affordance — it's a manual-only signal that
       // would spam if it fired on every cadence tick.
-      if (totalUpdates === 0 && result.conflicts.length === 0) {
+      //
+      // Gate on BOTH push and pull counts: the engine's inFlight dedup means a
+      // pillClick that fires during a debounced push round returns the push's
+      // shared promise (push-shaped result, pulled.* all zero). Without the
+      // pushed.* check, "already up to date" would fire after a push that
+      // actually moved N records, misleading the user. (SYNC_NOTES M2.)
+      if (totalPulled === 0 && totalPushed === 0 && result.conflicts.length === 0) {
         toasts.info('Already up to date');
       }
     } catch (err) {
@@ -364,12 +390,18 @@ function mapEngineStateToPill(
     };
   }
   switch (engine.kind) {
-    case 'idle':
+    case 'idle': {
+      // Surface "synced 3m ago" inline on the pill — the timestamp used to
+      // live only in the tooltip, hiding the most useful signal (is sync
+      // recent?) behind a hover. Relative-time helper falls back to a
+      // wall-clock label once entries age past the hour.
+      const rel = engine.last_sync_at ? formatRelative(engine.last_sync_at) : null;
       return {
         dataState: 'synced',
-        label: 'Synced',
+        label: rel ? `Synced ${rel}` : 'Synced',
         title: engine.last_sync_at ? `Last synced ${formatTime(engine.last_sync_at)}` : 'Idle — no sync yet',
       };
+    }
     case 'syncing':
       return {
         dataState: 'saving',
@@ -395,12 +427,54 @@ function mapEngineStateToPill(
   }
 }
 
+/**
+ * Single-shared interval to age the pill's "synced X ago" label without
+ * needing the state to mutate. Kept module-scoped so re-mounts (world switch,
+ * shell reset) don't multiply timers. Tick every 30s — fine resolution for
+ * minute-level ages; cheap enough that the wall-clock interval doesn't
+ * contend with anything.
+ */
+let syncPillTickerHandle: ReturnType<typeof setInterval> | null = null;
+function ensureSyncPillTicker(toasts: ToastManager): void {
+  if (syncPillTickerHandle !== null) return;
+  syncPillTickerHandle = setInterval(() => {
+    // Only re-render when there is a pill mounted; otherwise the tick is a
+    // no-op (cheap).
+    if (!document.querySelector('[data-role="sync-pill"]')) return;
+    try { renderSyncIndicator(getState(), toasts); } catch { /* defensive */ }
+  }, 30_000);
+}
+
 function formatTime(iso: string): string {
   try {
     const d = new Date(iso);
     return d.toLocaleTimeString();
   } catch {
     return iso;
+  }
+}
+
+/**
+ * Human-readable "X seconds/minutes/hours ago" for the sync pill label.
+ * Returns `null` if the timestamp is unparseable or in the future (don't
+ * surface confusing negative ages — fall back to the static label).
+ *
+ * Buckets: <10s → "just now", <60s → "Ns ago", <60m → "Nm ago",
+ * <24h → "Nh ago", otherwise local date.
+ */
+function formatRelative(iso: string): string | null {
+  try {
+    const then = new Date(iso).getTime();
+    if (!Number.isFinite(then)) return null;
+    const deltaMs = Date.now() - then;
+    if (deltaMs < 0) return null;
+    if (deltaMs < 10_000) return 'just now';
+    if (deltaMs < 60_000) return `${Math.floor(deltaMs / 1000)}s ago`;
+    if (deltaMs < 3_600_000) return `${Math.floor(deltaMs / 60_000)}m ago`;
+    if (deltaMs < 86_400_000) return `${Math.floor(deltaMs / 3_600_000)}h ago`;
+    return new Date(then).toLocaleDateString();
+  } catch {
+    return null;
   }
 }
 

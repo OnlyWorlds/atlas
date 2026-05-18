@@ -73,6 +73,13 @@ export class FakeOwApiClient implements OwApiClient {
     if (type === 'pin' && wireBody.element_id && !wireBody.element_type) {
       throw new Error('API Error 400: element_type must be provided when element_id is specified');
     }
+    // Mirror real OW field-validator: unknown / atlas-local fields trigger
+    // 400 on the wire. Captain session 221 hit this with `atlas_shape` on
+    // zone — the field was stored locally but never stripped, so live OW
+    // rejected the zone CREATE and dependent markers FK-failed. Tests
+    // silently passed because the prior fake spread unknown fields into
+    // its store.
+    rejectAtlasLocalFields(type, wireBody, 'create');
     // Convention #8 invariant: spatial element bodies (pin, marker) carry
     // wire-shape relation fields directly (map_id, zone_id, element_id).
     // Running them through prepareRelations double-suffixes the field to
@@ -98,6 +105,7 @@ export class FakeOwApiClient implements OwApiClient {
     this.calls.push({ method: 'update', type, id, body: { ...wireBody } });
     this.throwIfInjected('update', id);
     rejectDoubleSuffix(type, wireBody, 'update');
+    rejectAtlasLocalFields(type, wireBody, 'update');
     const m = this.bucket(type);
     const existing = m.get(id);
     // Mirror real OW: PATCH on a deleted/unknown id returns 404 with the
@@ -247,4 +255,29 @@ function rejectDoubleSuffix(
   }
   // Marker.order is write-allowed as of 2026-05-16 (Anchor migration).
   // No rejection rule here.
+}
+
+/**
+ * Reject atlas-local fields appearing in write bodies — these are stored
+ * locally only; the OW server doesn't know them and rejects the request 400.
+ *
+ * Captain session 221: zone CREATE was carrying `atlas_shape: 'polygon'` to
+ * live OW, which 400'd; markers then FK-failed against the absent zone. The
+ * existing fake silently spread unknown fields so the bug only surfaced in
+ * production. This guard catches the regression in tests.
+ */
+function rejectAtlasLocalFields(
+  type: ElementType,
+  body: Record<string, unknown>,
+  op: 'create' | 'update',
+): void {
+  const ATLAS_LOCAL = ['image_media_id', 'atlas_color', 'atlas_opacity', 'atlas_label_visible', 'atlas_shape', 'local_updated_at', 'server_updated_at'];
+  for (const k of Object.keys(body)) {
+    if (ATLAS_LOCAL.includes(k)) {
+      throw new Error(
+        `API Error 400: ${op} ${type} body contains atlas-local field "${k}" which the server rejects. ` +
+          `Add to ATLAS_LOCAL_EXTENSION_FIELDS in core/constants.ts so toWireShape strips it.`,
+      );
+    }
+  }
 }

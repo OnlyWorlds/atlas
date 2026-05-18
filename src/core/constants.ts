@@ -101,9 +101,25 @@ export const ATLAS_LOCAL_EXTENSION_FIELDS = [
   'atlas_color',
   'atlas_opacity',
   'atlas_label_visible',
+  // Zone shape kind (ZD6) — 'polygon' | 'line'. Local-only; the OW server's
+  // Zone schema doesn't include it and rejects writes that carry it with a 400.
+  // Without this strip, every zone CREATE fails server-side, which cascades to
+  // FK failures on marker CREATEs that reference the (now-orphan) zone.
+  // (Bug surfaced session 221 against live OW; fakes silently accepted the
+  // unknown field so it slipped past the existing test coverage.)
+  'atlas_shape',
 ] as const;
 export type AtlasLocalExtensionField = typeof ATLAS_LOCAL_EXTENSION_FIELDS[number];
 
 // Map visual prefs storage keys (DESIGN_MAPS.md §11).
 export const MAP_VIEW_PREFS_DEFAULTS_KEY = 'atlas_map_view_defaults';
 export const MAP_VIEW_PREFS_BY_MAP_KEY = 'atlas_map_view_prefs';
+
+/**
+ * Per-map camera state (zoom + pan center). Saved as the user pans/zooms so
+ * a reload or tab-switch lands back where they left off. Falls back to
+ * fitToCanvas when no entry exists for the map.
+ *
+ * Schema: `Record<mapId, { center: [lat, lng], zoom: number }>`.
+ */
+export const MAP_CAMERA_STATE_KEY = 'atlas_map_camera_state';

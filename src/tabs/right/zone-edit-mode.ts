@@ -71,17 +71,24 @@ let active: EditSession | null = null;
 let escListenerInstalled = false;
 
 /**
- * localStorage key for the in-flight edit snapshot. Survives page reload so
- * we can revert on next world activation. Only one snapshot exists at a time
- * (matches the singleton edit-session invariant).
+ * localStorage key for in-flight edit snapshots. One slot PER WORLD so multi-
+ * world edit attempts don't clobber each other.
  *
  * Captain smoke session 219: "if i refresh page in edit mode; it seems to
  * store the changes, instead of reverting them, after reload." Root cause:
  * autosave-during-edit + in-memory-only snapshot = refresh loses the snapshot
- * before the user can Cancel. Fix below: persist the snapshot to localStorage
- * on enter, clear on exit; on world activation, replay revert if found.
+ * before the user can Cancel. Fix: persist the snapshot to localStorage on
+ * enter, clear on exit; on world activation, replay revert if found.
+ *
+ * Captain session 221: keying by world means switching mid-edit doesn't
+ * destroy world A's snapshot when world B starts an edit. Each world's
+ * activation picks up its own pending snapshot independently.
+ *
+ * Schema: `Record<worldId, { zoneId, mapId, snapshot: MarkerSnapshot[] }>`.
  */
-const EDIT_SNAPSHOT_KEY = 'atlas_zone_edit_snapshot_v1';
+const EDIT_SNAPSHOT_KEY = 'atlas_zone_edit_snapshot_v2';
+/** Legacy single-slot key from session 219. Migrated to per-world on read. */
+const EDIT_SNAPSHOT_KEY_V1 = 'atlas_zone_edit_snapshot_v1';
 
 interface PersistedSnapshot {
   worldId: string;
@@ -90,23 +97,64 @@ interface PersistedSnapshot {
   snapshot: MarkerSnapshot[];
 }
 
-function writePersistedSnapshot(p: PersistedSnapshot): void {
-  try { localStorage.setItem(EDIT_SNAPSHOT_KEY, JSON.stringify(p)); }
-  catch { /* quota — non-fatal; recovery just won't work this session */ }
-}
+type SnapshotsByWorld = Record<string, Omit<PersistedSnapshot, 'worldId'>>;
 
-function readPersistedSnapshot(): PersistedSnapshot | null {
+function readSnapshotsByWorld(): SnapshotsByWorld {
+  // Read v2 first.
   try {
     const raw = localStorage.getItem(EDIT_SNAPSHOT_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as PersistedSnapshot;
-    if (!parsed.worldId || !parsed.zoneId || !parsed.mapId || !Array.isArray(parsed.snapshot)) return null;
-    return parsed;
-  } catch { return null; }
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as SnapshotsByWorld;
+      }
+    }
+  } catch { /* fall through to v1 migration */ }
+  // Legacy migration: read v1 (single-slot), seed the v2 map under its worldId.
+  try {
+    const legacyRaw = localStorage.getItem(EDIT_SNAPSHOT_KEY_V1);
+    if (!legacyRaw) return {};
+    const legacy = JSON.parse(legacyRaw) as PersistedSnapshot;
+    if (!legacy.worldId || !legacy.zoneId || !legacy.mapId || !Array.isArray(legacy.snapshot)) return {};
+    const migrated: SnapshotsByWorld = {
+      [legacy.worldId]: { zoneId: legacy.zoneId, mapId: legacy.mapId, snapshot: legacy.snapshot },
+    };
+    try {
+      localStorage.setItem(EDIT_SNAPSHOT_KEY, JSON.stringify(migrated));
+      localStorage.removeItem(EDIT_SNAPSHOT_KEY_V1);
+    } catch { /* quota — keep legacy in place, return migrated for this session */ }
+    return migrated;
+  } catch { return {}; }
 }
 
-function clearPersistedSnapshot(): void {
-  try { localStorage.removeItem(EDIT_SNAPSHOT_KEY); } catch { /* noop */ }
+function writeSnapshotsByWorld(map: SnapshotsByWorld): void {
+  try {
+    if (Object.keys(map).length === 0) {
+      localStorage.removeItem(EDIT_SNAPSHOT_KEY);
+    } else {
+      localStorage.setItem(EDIT_SNAPSHOT_KEY, JSON.stringify(map));
+    }
+  } catch { /* quota — non-fatal; recovery just won't work this session */ }
+}
+
+function writePersistedSnapshot(p: PersistedSnapshot): void {
+  const all = readSnapshotsByWorld();
+  all[p.worldId] = { zoneId: p.zoneId, mapId: p.mapId, snapshot: p.snapshot };
+  writeSnapshotsByWorld(all);
+}
+
+function readPersistedSnapshot(worldId: string): PersistedSnapshot | null {
+  const all = readSnapshotsByWorld();
+  const entry = all[worldId];
+  if (!entry || !entry.zoneId || !entry.mapId || !Array.isArray(entry.snapshot)) return null;
+  return { worldId, ...entry };
+}
+
+function clearPersistedSnapshot(worldId: string): void {
+  const all = readSnapshotsByWorld();
+  if (!(worldId in all)) return;
+  delete all[worldId];
+  writeSnapshotsByWorld(all);
 }
 
 /**
@@ -825,9 +873,10 @@ export function exitEditMode(mode: 'commit' | 'cancel'): void {
   }
 
   // Persisted snapshot is no longer needed — both commit and cancel
-  // resolve the in-flight edit. Clear so the recovery path doesn't
-  // re-revert on the next world activation.
-  clearPersistedSnapshot();
+  // resolve the in-flight edit. Clear under the world this session belonged
+  // to (snapshots are now keyed per-world; multi-world edits don't clobber).
+  const finishingWorldId = getState().active?.worldId;
+  if (finishingWorldId) clearPersistedSnapshot(finishingWorldId);
 
   // Tear down primitives.
   try {
@@ -861,14 +910,8 @@ export function exitEditMode(mode: 'commit' | 'cancel'): void {
  * store the changes, instead of reverting them, after reload."
  */
 export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts?: ToastManager): Promise<void> {
-  const persisted = readPersistedSnapshot();
+  const persisted = readPersistedSnapshot(activatedWorldId);
   if (!persisted) return;
-  if (persisted.worldId !== activatedWorldId) {
-    // Snapshot belongs to a different world. Leave it alone — that world's
-    // activation will pick it up. (Multi-world edit isn't supported but a
-    // mid-edit world-switch shouldn't nuke the snapshot.)
-    return;
-  }
   // Build a temporary session shape just enough for restoreFromSnapshot.
   const fakeSession: EditSession = {
     zoneId: persisted.zoneId,
@@ -888,7 +931,7 @@ export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts
   } catch (err) {
     console.warn('[zone-edit] orphan-snapshot recovery failed:', err);
   } finally {
-    clearPersistedSnapshot();
+    clearPersistedSnapshot(activatedWorldId);
   }
 }
 

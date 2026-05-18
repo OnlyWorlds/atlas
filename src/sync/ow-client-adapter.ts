@@ -81,29 +81,63 @@ export class OwClientAdapter implements OwApiClient {
 
   async listElements(type: ElementType): Promise<ServerRecord[]> {
     // Clear prior pagination flag for this type — every listElements call
-    // re-decides per-type whether the response was paginated.
+    // re-decides per-type whether truncation actually happened.
     this.paginatedTypes.delete(type);
 
-    const response = await this.client.request<unknown>('GET', `/${type}/`);
-    // Backend may return a raw array or paginated { count, results } envelope.
-    let records: unknown[] = [];
-    if (Array.isArray(response)) {
-      records = response;
-    } else if (response && typeof response === 'object') {
-      const env = response as { results?: unknown[]; count?: number };
-      records = env.results ?? [];
-      // Pagination detection: if the envelope reports more elements than this
-      // page returned, mark the type as paginated. The engine will skip
-      // server-delete detection on paginated types to avoid silent data loss
-      // on page-2+ elements. A "load more" UX is deferred to 3.6+.
-      if (typeof env.count === 'number' && env.count > records.length) {
-        this.paginatedTypes.add(type);
-        console.warn(
-          `[ow-adapter] pagination cap hit on ${type}: server has ${env.count}, page returned ${records.length}. atlas only sees the first page until pagination is wired; server-delete detection suppressed for this type until then.`
-        );
+    // Loop through pages until we have everything or hit the safety cap.
+    // OW pagination shape (DRF): `{ count, next, previous, results }`. The
+    // server caps page size at 200; we walk by `offset` until reaching count.
+    //
+    // Backwards-compatible: legacy/test endpoints that return a raw array
+    // skip the loop after the first response.
+    const SAFETY_CAP_PAGES = 100; // 100 * 200 = 20,000 elements per type, generous.
+    const all: unknown[] = [];
+    let total: number | undefined;
+    let offset = 0;
+
+    for (let pageIdx = 0; pageIdx < SAFETY_CAP_PAGES; pageIdx++) {
+      const params = pageIdx === 0 ? undefined : { offset };
+      const response = await this.client.request<unknown>('GET', `/${type}/`, params ? { params } : undefined);
+      let pageRecords: unknown[] = [];
+      let envelopeCount: number | undefined;
+      let envelopeNext: string | null | undefined;
+      if (Array.isArray(response)) {
+        // Raw array — no envelope, all records on this single page.
+        pageRecords = response;
+      } else if (response && typeof response === 'object') {
+        const env = response as { results?: unknown[]; count?: number; next?: string | null };
+        pageRecords = env.results ?? [];
+        envelopeCount = env.count;
+        envelopeNext = env.next;
+        if (typeof envelopeCount === 'number') total = envelopeCount;
       }
+      all.push(...pageRecords);
+
+      // Stop conditions:
+      //  - No more records returned (empty page).
+      //  - We have all of `count`.
+      //  - No `next` URL AND response was raw array (no pagination metadata).
+      const reachedTotal = typeof total === 'number' && all.length >= total;
+      const noNext = envelopeNext === null || envelopeNext === undefined;
+      if (pageRecords.length === 0) break;
+      if (reachedTotal) break;
+      if (noNext && !Array.isArray(response)) break;
+      if (Array.isArray(response)) break;
+
+      offset = all.length;
     }
-    return records.map(r => adaptRecord(r, type));
+
+    // Safety cap hit means we truncated — fall back to the prior behavior of
+    // flagging the type so server-delete detection skips it. Normal callers
+    // never reach this with real OW data.
+    if (typeof total === 'number' && all.length < total) {
+      this.paginatedTypes.add(type);
+      console.warn(
+        `[ow-adapter] pagination safety cap on ${type}: server has ${total}, fetched ${all.length}. server-delete detection suppressed for this type.`
+      );
+    }
+
+    return all.map(r => adaptRecord(r, type));
   }
 
   async getElement(type: ElementType, id: string): Promise<ServerRecord | null> {

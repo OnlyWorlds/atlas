@@ -815,57 +815,17 @@ tools/atlas/
 
 ## Phased Build Plan
 
-**Phase 0 — Foundation (this session)**
-- Package skeleton ✅
-- DESIGN.md ✅ (this file)
-- SyncEngine + FolderStore interfaces + first integration test (Bout 4)
+All phases shipped as of session 221. Operational state lives in `PROGRESS.md`; this section is retained for historical reference.
 
-**Phase 1 — Core sync foundation**
-- FolderStore implementation (File System Access API + fs-utils)
-- Mock FolderStore for tests
-- SyncEngine implementation (push, pull, diff, drain-blind policy)
-- Handle vault (IDB)
-- Registry (localStorage)
-- Tests across all units + integration
+- **Phase 0 — Foundation** (session 197) — package skeleton, DESIGN.md, SyncEngine + FolderStore interfaces.
+- **Phase 1 — Core sync foundation** (sessions 197-198) — FsFolderStore (FS Access API), handle vault, registry, integration tests.
+- **Phase 2 — Minimal UI** (session 198) — app shell, worlds sidebar, settings panel, sync indicator, welcome panel.
+- **Phase 3 — Upload flows** (session 199) — Link Existing, Make-Online Route 1 + Route 2, autosave debounce.
+- **Phase 3.5 — Local-first hardening** (sessions 201-206) — pullNow, auto-pull scheduler, conflict review modal, server-delete review, two-policy conflict model, double-link block, atlas-extension field overlay, pagination guard, id-swap UI propagation, resetSyncBaseline, world_name cache, resume flush, last_sync_at preservation.
+- **Phase 4-6 — Content/spatial/polish UI** (sessions 199-218) — schema-driven element detail, picker, map tabs + Leaflet, pin placement, timeline, zone subsystem (drawing, editing, modal, visual prefs).
+- **Phase 7 — Smoke + cutover** — pending. Smoke partly complete through T2.x; remaining is Tier 3-4 + maps flow + final force-push to atlas GitHub repo + archive atlas-deprecated.
 
-**Phase 2 — Minimal UI to test foundation**
-- App shell (port from legacy)
-- Worlds sidebar (simplified)
-- Settings panel with PIN + email
-- Sync indicator (rewrite, attached to SyncEngine)
-- Welcome panel with "+ Create Local" / "+ Link API" / "Make Online"
-
-**Phase 3 — Upload flows**
-- Link existing API world (initial download)
-- Make Online Route 1 (create new api world)
-- Make Online Route 2 (link existing with merge policy)
-- E2E specs for each
-
-**Phase 4 — Port content UI**
-- Elements sidebar
-- Element detail with schema editor + popover
-- Element create modal
-- Element picker
-
-**Phase 5 — Port spatial UI**
-- Maps + Leaflet manager
-- Pins (place, drag, contextual create)
-- Map index + tabs
-- Edge color + pin visuals
-
-**Phase 6 — Media + timeline + polish**
-- Media section
-- Timeline v1
-- Stay-offline toggle
-- Conflict policy setting
-- Pre-flight cache warm (no longer needed — folder IS the cache)
-- Autosave vs manual save (deferred from legacy session, optional)
-
-**Phase 7 — Smoke + cutover**
-- Smoke against real OW world (`5474990854`)
-- Big push to existing atlas GitHub repo, overwrite legacy code
-- Move `tools/atlas-deprecated/` → `tools/_archive_atlas-v3.x/`
-- Cloudflare Pages auto-redeploys
+Post-cutover candidates (3.6+) live in `SYNC_NOTES.md` "Known soft-edges" — none are blocking.
 
 ---
 

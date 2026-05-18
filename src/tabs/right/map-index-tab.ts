@@ -22,6 +22,7 @@ import { navigate, mapHash, elementHash } from '../../core/router';
 import { getActiveStore } from '../../ui/create-world-modal';
 import { requestPushIfLinked } from '../../sync/sync-attach';
 import { buildMapTree, filterTreeByName, type MapTreeNode, type LocationLike } from './map-tree';
+import { clearCameraState } from '../../core/map-camera-persist';
 
 // ---- Collapsed tree-node state ----
 
@@ -556,6 +557,10 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
   if (!confirm(`Delete map "${m.name}"?${cascadeNote}`)) return;
   try {
     await store.deleteMap(m.id);
+    // Drop the saved camera state for this map — no point retaining a view
+    // for a map that no longer exists. If the map id happens to be reused
+    // later (re-link of an api world), the view falls back to fit-to-image.
+    clearCameraState(m.id);
     const elements = await store.listElements();
     patchSlice('data', { elements });
     requestPushIfLinked();

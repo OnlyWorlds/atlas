@@ -496,6 +496,7 @@ export class SyncEngine {
       pulled: pullResult.pulled,
       conflicts: pullResult.conflicts,
       failures: pullResult.failures,
+      pulled_ids: pullResult.pulled_ids,
       auth_blocked: pullResult.auth_blocked,
     };
     this.onSyncResult('pull', result);
@@ -542,6 +543,7 @@ export class SyncEngine {
       pulled: pullResult.pulled,
       conflicts: [...pushResult.conflicts, ...pullResult.conflicts],
       failures: [...pushResult.failures, ...pullResult.failures],
+      pulled_ids: pullResult.pulled_ids,
       auth_blocked: pushResult.auth_blocked || pullResult.auth_blocked,
     };
     if (pullResult.auth_blocked) {
@@ -896,6 +898,60 @@ export class SyncEngine {
           console.info('[atlas:sync] push UPDATE 404 — routing to server-delete review', {
             id: elem.id, type: elem.type,
           });
+        }
+        // FK constraint failure on CREATE means a peer this element references
+        // (zone, map, parent, etc.) was deleted server-side while atlas still
+        // has it as "synced" locally. The topo-sort can't help — the peer
+        // isn't in this CREATE batch. Surface the orphan peer for review:
+        // user picks keep + re-push (peer re-CREATEs next round, this element
+        // succeeds), or delete-locally (this element will keep failing until
+        // it's also cleaned up, but that's the user's explicit choice).
+        //
+        // Record the CURRENT element as a failure with a clearer message so
+        // the user knows why it didn't land, AND queue the missing peer for
+        // the server-delete review modal.
+        else if (isCreate && parseFkConstraintError(err)) {
+          const parsed = parseFkConstraintError(err)!;
+          // The body we just sent has the FK value — look it up by the parsed
+          // field name. (We re-fetched `current` from disk before sending, so
+          // its fields are the truth.)
+          const fkValue = (elem as Record<string, unknown>)[parsed.field];
+          const refId = typeof fkValue === 'string' ? fkValue : null;
+          let routedPeer = false;
+          if (refId) {
+            const peer = await this.folder.getElement(refId);
+            if (peer && peer.server_updated_at) {
+              // Peer existed server-side at some past point; was deleted out-
+              // of-band. Route to the same modal the UPDATE-404 path uses.
+              serverDeletesDetected.push({
+                id: peer.id,
+                type: peer.type,
+                detected_at: nowIso(),
+                name: peer.name,
+              });
+              console.warn('[atlas:sync] push CREATE hit FK constraint — peer was deleted server-side; routing peer to server-delete review', {
+                child_id: elem.id, child_type: elem.type,
+                peer_id: peer.id, peer_type: peer.type,
+                fk_field: parsed.field,
+              });
+              routedPeer = true;
+            }
+          }
+          if (!routedPeer) {
+            console.warn('[atlas:sync] push CREATE hit FK constraint but could not resolve missing peer locally', {
+              id: elem.id, type: elem.type, fk_field: parsed.field, ref_id: refId,
+            });
+          }
+          // Record the child failure regardless so the user sees one
+          // explanatory message per FK error rather than a silent skip.
+          failures.push({
+            element_id: elem.id,
+            type: elem.type,
+            operation: 'create',
+            message: routedPeer
+              ? `referenced ${parsed.refType} was deleted on the server — review in sync panel`
+              : `referenced ${parsed.refType} not found on the server`,
+          });
         } else {
           // Per-element failure (4xx, validation, transient network) is non-fatal:
           // record and continue. Caller inspects result.failures to decide what
@@ -999,6 +1055,12 @@ export class SyncEngine {
     const conflicts: Conflict[] = [];
     const newServerDeletes: import('../core/types').ServerDeleteRecord[] = [];
     /**
+     * Element ids the pull actually applied to local (creates + updates).
+     * Surfaced in SyncResult.pulled_ids so the UI can flash recently-changed
+     * rows. Conflicts and skipped-due-to-local-edit do NOT land here.
+     */
+    const pulledIds: string[] = [];
+    /**
      * Set if any listElements throws 401/403. Bail the rest of the round;
      * a half-pulled view would let server-delete detection falsely flag
      * the un-pulled types as "vanished from server."
@@ -1044,6 +1106,7 @@ export class SyncEngine {
           // New on server → write locally with both timestamps = server's.
           await this.folder.applyServerRecord(type, remoteBody, remote.updated_at);
           creates++;
+          pulledIds.push(remote.id);
           console.info(`[atlas:sync] pull create ${type}/${remote.id} (server: ${remote.updated_at})`);
           continue;
         }
@@ -1084,8 +1147,22 @@ export class SyncEngine {
         }
 
         // Server newer, local untouched → overwrite locally.
+        //
+        // Race guard (SYNC_NOTES M3): between the getElement() above and
+        // this applyServerRecord, the user could have typed into the field
+        // (UI save path runs through FolderStore.updateElement, bumping
+        // local_updated_at). Without re-checking, the overwrite would clobber
+        // the in-flight edit and the user's keystroke would silently vanish.
+        // Re-read and bail if local has moved; the next pull (or autosave-
+        // triggered push) reconciles cleanly.
+        const fresh = await this.folder.getElement(remote.id);
+        if (fresh && fresh.local_updated_at !== local.local_updated_at) {
+          console.info(`[atlas:sync] pull skip ${type}/${remote.id} — local edited during round, deferring to next sync`);
+          continue;
+        }
         await this.folder.applyServerRecord(type, remoteBody, remote.updated_at);
         updates++;
+        pulledIds.push(remote.id);
         console.info(`[atlas:sync] pull update ${type}/${remote.id}`, {
           before: localBaseline,
           after: remote.updated_at,
@@ -1154,7 +1231,7 @@ export class SyncEngine {
       server_deletes: [...existingServerDeletes, ...freshServerDeletes],
     });
 
-    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures: [] };
+    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures: [], pulled_ids: pulledIds };
   }
 
   // ---- Internals ----
@@ -1286,4 +1363,36 @@ export function isAuthError(err: unknown): boolean {
     || /\b403\b/.test(err.message)
     || /unauthor/i.test(err.message)
     || /forbidden/i.test(err.message);
+}
+
+/**
+ * Detect a server-side FK constraint failure on CREATE. Real OW returns 500
+ * with a MySQL 1452 error of the form:
+ *
+ *   API Error 500: Failed to create Marker: (1452, 'Cannot add or update a
+ *   child row: a foreign key constraint fails (...FOREIGN KEY (`zone_id`)
+ *   REFERENCES `elements_zone` (`id`))') refs={"map_id":"...","zone_id":"..."}
+ *
+ * Atlas hits this when an element references a peer (zone, map, etc.) that
+ * existed server-side at some prior point (so locally has `server_updated_at`)
+ * but was deleted out-of-band (zoner, web app, admin). The topo-sort doesn't
+ * help — the peer isn't in the CREATE batch, atlas thinks it's already synced.
+ *
+ * Returns `{ field, refType }` on match — caller looks up `body[field]` to
+ * find the orphan id, then routes that element to server_deletes review so
+ * the user can pick `keep + re-push` (which clears baseline, re-CREATEs the
+ * peer next round) or `delete locally` (which removes the orphan).
+ */
+function parseFkConstraintError(
+  err: unknown,
+): { field: string; refType: string } | null {
+  if (!(err instanceof Error)) return null;
+  if (!/foreign key constraint fails/i.test(err.message)) return null;
+  // Capture the FK field name and the referenced table (e.g., `zone_id` and
+  // `elements_zone`). Both shapes are matched independently because real OW
+  // sometimes returns either piece in a slightly different layout.
+  const fieldMatch = err.message.match(/FOREIGN KEY \(`([a-z_]+)`\)/i);
+  const refMatch = err.message.match(/REFERENCES `?elements_([a-z_]+)`?/i);
+  if (!fieldMatch || !refMatch) return null;
+  return { field: fieldMatch[1], refType: refMatch[1] };
 }

@@ -17,6 +17,25 @@
 import type { Element, Pin, Marker, WorldMap } from '../../core/types';
 
 /**
+ * Whether an element has a Map element anchored to it via `map.location`.
+ * Today only Locations can own sub-maps (the OW schema lets `map.location`
+ * point at a Location id). Used by pin rendering to decide if the small
+ * map-badge glyph should overlay the pin — the badge means "this element
+ * has its own map" (i.e. clicking opens a sub-map), not "this element
+ * appears on a map" (which would always be true if it has a pin).
+ */
+export function hasLinkedSubMap(
+  elementId: string,
+  elements: readonly Element[],
+): boolean {
+  const el = elements.find(e => e.id === elementId);
+  if (!el || el.type !== 'location') return false;
+  return elements.some(
+    m => m.type === 'map' && m.location === elementId,
+  );
+}
+
+/**
  * Maps associated with an element, sorted by hierarchy DESC then alpha:
  *   - Location element  → maps where `map.location === element.id`
  *   - Zone element      → distinct maps that have a marker with

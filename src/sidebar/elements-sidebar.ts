@@ -15,9 +15,54 @@ import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/t
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { ToastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
+import { getCurrentSyncEngine, pullNowAndRefresh } from '../sync/sync-attach';
+import { surfaceSyncUnavailable } from '../ui/sync-toasts';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
 const FILTER_TYPES_WITH_MAP: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
+
+/**
+ * Single-flight lock for the right-click filter-chip refresh. Prevents
+ * spam-clicks from stacking pulls and overlapping toasts (W4).
+ */
+let refreshInFlight = false;
+
+/**
+ * Element ids currently flashing in the sidebar (P3 / W5). A module-level
+ * Set rather than DOM attributes because the element row is rebuilt on
+ * every render — `pullNowAndRefresh` patches `data.elements` AFTER
+ * dispatching `atlas:pulled-ids`, so an attribute set on the DOM during
+ * the event would be wiped by the very next render. Storing the ids
+ * out-of-DOM lets `renderElementRow` re-emit `data-flash="true"` on each
+ * render until the timer clears the id.
+ *
+ * Set of id → cleanup timer handle.
+ */
+const flashingIds = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** All currently-mounted elements bodies (re-render hooks for the flash set). */
+const mountedRerenders = new Set<() => void>();
+
+/**
+ * Public: trigger a flash for these ids. Called from the document-level
+ * `atlas:pulled-ids` listener installed by every mounted body. Idempotent —
+ * subsequent calls for the same id reset the timer.
+ */
+function triggerFlashForIds(ids: readonly string[]): void {
+  if (ids.length === 0) return;
+  for (const id of ids) {
+    const existing = flashingIds.get(id);
+    if (existing) clearTimeout(existing);
+    const handle = setTimeout(() => {
+      flashingIds.delete(id);
+      // Re-render every mounted body to drop the data-flash attribute.
+      for (const fn of mountedRerenders) fn();
+    }, 1400);
+    flashingIds.set(id, handle);
+  }
+  // Re-render now so newly-flashing rows pick up the attribute.
+  for (const fn of mountedRerenders) fn();
+}
 
 export interface ElementsBodyMount {
   content: HTMLElement;
@@ -142,6 +187,49 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
         if (next.has(type)) next.delete(type); else next.add(type);
         patchSlice('ui', { ...getState().ui, elementFilters: next });
       });
+
+      // Right-click → "refresh from API" surfaced as a per-type intent.
+      // Today the engine's pull is global (no per-type variant); we fire a
+      // full pull and toast feedback in the chip's type so the user sees the
+      // result for their intent. Cheap on small worlds; users who right-click
+      // are signaling "I want fresh" anyway.
+      //
+      // W4: lock to one in-flight refresh at a time. Without the lock, spam-
+      // right-clicking the same chip stacks pulls and overlapping toasts.
+      btn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const engine = getCurrentSyncEngine();
+        if (!engine) {
+          surfaceSyncUnavailable(toasts);
+          return;
+        }
+        if (refreshInFlight) {
+          toasts.info('Refresh already in progress…');
+          return;
+        }
+        refreshInFlight = true;
+        const label = ELEMENT_LABELS[type].plural;
+        void pullNowAndRefresh()
+          .then((result) => {
+            if (!result) return;
+            // Count what changed for THIS type by sampling the cache before
+            // and after. The engine's result doesn't break counts down per
+            // type, so we approximate via a re-list comparison.
+            const totalPulled = result.pulled.creates + result.pulled.updates;
+            if (totalPulled > 0) {
+              toasts.success(`Refreshed (${totalPulled} change${totalPulled === 1 ? '' : 's'} pulled — ${label} may be among them)`);
+            } else {
+              toasts.info(`${label} are up to date`);
+            }
+          })
+          .catch((err) => {
+            toasts.error(err instanceof Error ? err.message : String(err));
+          })
+          .finally(() => {
+            refreshInFlight = false;
+          });
+      });
+
       strip.appendChild(btn);
     });
   }
@@ -151,7 +239,20 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     if (!state.active) {
       strip.innerHTML = '';
-      listEl.innerHTML = `<div class="atlas-pane-empty">No active world. Pick one from the Worlds tab.</div>`;
+      // Empty-state copy depends on what action the user can actually take.
+      // (Session 221 W2 follow-up: the sidebar's old "pick one from Worlds tab"
+      // message lied when there were no worlds because no atlas root existed.)
+      let msg: string;
+      if (!state.atlasRoot && state.atlasRootRecoverable) {
+        msg = 'Use the welcome panel to recover your atlas folder.';
+      } else if (!state.atlasRoot) {
+        msg = 'Use the welcome panel to set up your atlas folder.';
+      } else if (state.registry.worlds.length === 0) {
+        msg = 'No worlds yet — create one from the Worlds tab.';
+      } else {
+        msg = 'No active world — pick one from the Worlds tab.';
+      }
+      listEl.innerHTML = `<div class="atlas-pane-empty">${msg}</div>`;
       return;
     }
 
@@ -229,15 +330,34 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
           el.id === selectedId,
           locationsWithMaps.has(el.id),
           elementsOnActiveMap.has(el.id),
+          flashingIds.has(el.id),
         ),
       )
       .join('');
   }
 
+  // Auto-pull flash (W5): the document-level listener delegates to the
+  // module-scoped `triggerFlashForIds`. Storing flashing ids out of DOM lets
+  // the next render (triggered by pullNowAndRefresh's patchSlice) re-emit
+  // the attribute, so the animation isn't wiped mid-flight.
+  function handlePulledIds(ev: Event): void {
+    const detail = (ev as CustomEvent<{ ids?: string[] }>).detail;
+    const ids = detail?.ids;
+    if (!ids || ids.length === 0) return;
+    triggerFlashForIds(ids);
+  }
+  document.addEventListener('atlas:pulled-ids', handlePulledIds);
+  mountedRerenders.add(render);
+
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
   render();
-  return () => { unsubState(); unsubHash(); };
+  return () => {
+    unsubState();
+    unsubHash();
+    mountedRerenders.delete(render);
+    document.removeEventListener('atlas:pulled-ids', handlePulledIds);
+  };
 }
 
 function renderElementRow(
@@ -245,9 +365,11 @@ function renderElementRow(
   selected: boolean,
   hasMap: boolean,
   onActiveMap: boolean,
+  flash: boolean,
 ): string {
   const icon = ELEMENT_ICONS[el.type] ?? 'category';
   const cls = ['atlas-row', selected ? 'selected' : ''].filter(Boolean).join(' ');
+  const flashAttr = flash ? ' data-flash="true"' : '';
   // hasMap is set only for Location rows that have at least one map anchored.
   // Renders a small cyan-tinted map glyph between the name and the type chip.
   const mapBadge = hasMap
@@ -267,7 +389,7 @@ function renderElementRow(
   // the attribute selectively avoids even the start gesture.
   const draggable = (el.type !== 'map' && el.type !== 'zone') ? 'draggable="true"' : '';
   return `
-    <div class="${cls}" ${draggable} data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}" role="button" tabindex="0">
+    <div class="${cls}" ${draggable} data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}"${flashAttr} role="button" tabindex="0">
       <span class="material-symbols-outlined">${icon}</span>
       <span class="atlas-row-main">${escapeText(el.name || '(unnamed)')}</span>
       ${mapBadge}

@@ -50,9 +50,9 @@ export const FACTORY_DEFAULTS: MapViewPrefs = {
   grid_spacing: 100,
   lock_pin_drag: false,
   zone_fill_opacity: 0.4,
-  // 'always' by default so labels appear out of the box. 'hover' mode is
-  // currently TBD — behaves identically to 'never' until the canvas-hover
-  // tooltip wires up (Bout H deliverable).
+  // 'always' = labels always visible. 'hover' (wired session 219 via
+  // ZoneOverlay) = labels fade in only when the zone is hovered. 'never' =
+  // never shown. Default 'always' so users see them out of the box.
   zone_labels: 'always',
 };
 

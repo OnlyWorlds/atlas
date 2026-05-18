@@ -5,19 +5,24 @@ Architecture lives in **DESIGN.md**. This file is operational — read it to kno
 
 ---
 
-## CURRENT STATE (handover snapshot, session 220 close)
+## CURRENT STATE (handover snapshot, session 221 close)
 
-Tool is in a tight, healthy state. 532 vitest + 93 Playwright e2e, all green. Bundle 481 KB JS / 135 KB gzipped. Sentence case throughout. Slug-prefix filenames on disk. Hotkeys MVP wired. Modal styling unified. No accidental `.only`/`.skip` left in tests. Obsolete docs archived to `docs-archive/`.
+Tool is in a tight, healthy state. 553 vitest + 93 Playwright e2e, all green. Bundle 488 KB JS / 137 KB gzipped. Sentence case throughout. Slug-prefix filenames. Hotkeys MVP. Map view persists per-map. Pin badge accurate. Sync pill shows "synced 3m ago" live. atlas_shape stripped on wire. All "engine not ready" toasts route through `surfaceSyncUnavailable` (`src/ui/sync-toasts.ts`) for PIN-aware messages + deep-links. Welcome panel is the single CTA for atlas-root setup/recover (sidebar version dropped session 221 W2). Sentence case throughout. Slug-prefix filenames on disk. Hotkeys MVP wired. Modal styling unified. Per-map camera state persists across reloads. Pin badge accurate. Sync pill shows "synced 3m ago" live.
+
+Session 221 was a 5-bout validation+strengthening pass. Live FK bug surfaced + handled. Map view preserve done. Pin badge bug fixed. Soft-edges cleaned. Polish UX landed. No new features beyond what the work list required.
 
 **Open candidates (none blocking)**:
-- Pin STYLE visual specs (V1.5 STYLE deferred from session 216)
-- Snap-to-existing-vertex during draw/edit (polish)
+- Pin STYLE visual specs (V1.5 STYLE deferred from session 216) — not pressing per Captain
 - A11y keyboard-only walkthrough (explicitly deferred)
-- Map view preserve on reload (currently resets zoom — should fit-to-image instead)
-- Hotkeys grow: `Ctrl/Cmd+Backspace` delete, Tab nav in modals, conflict-modal hotkeys
-- Bundle audit (could check what's heavy in the 481 KB)
+- Hotkeys grow: `Ctrl/Cmd+M` new map, `Ctrl/Cmd+Backspace` delete, Tab nav in modals — design discussion needed
+- Cascade-delete crash recovery (FS Access API has no transactions; worst case is recoverable today)
+- Stuck-pin auto-cleanup after N failures (low-frequency edge case)
+- Per-element refresh API method (per-type is the workaround today via right-click filter chip)
+- Conflict log review UI for resolved/historical conflicts (active conflicts already have a modal)
 
 **Major subsystems**: foundation + sync + map + zone all shipped and working. Phase 3.5 + zones era closed. No "phase brief" docs active.
+
+**Items dropped from backlog (Captain session 221)**: per-world conflict policy override, email per-world, zone-targets-map, cross-element pin rendering, map subtype visual filter, map locking via URL, "maps within" inverse search perf, picker keyboard shortcut, pin coord council motion (already in schema), snap-to-existing-vertex for pins (only relevant for markers, already done), repair pre-migration server markers, hotkey undo/redo (too complex for now).
 
 ---
 
@@ -90,6 +95,164 @@ Captain will re-paste the full list next chat. Themes that emerged:
 ### Sync/API smoke (Captain's tasks, still open)
 - Repair pre-migration server markers (manual: enter edit, nudge a marker, release).
 - Verify zoner cross-tool render of atlas-pushed zones.
+
+---
+
+## Session 221 Bout 6 (2026-05-18) — Validation feedback repairs
+
+After Captain re-tested the Bout 4 polish UX items, six items needed fixing or refining. All landed in ~1 hour.
+
+### W1: Popover survives map tab switch
+
+Real cause: `outsideClickListener` in `map-visual-settings-popover.ts` closed the popover when the click target was a different map tab button (because the click was "outside" the popover wrapper). The right-pane subscriber's retarget code then no-op'd because `openPopover` was already null.
+
+Fix: added `.atlas-tab` to the bail-out list inside `outsideClickListener`. The right-pane subscriber retains responsibility for retarget/close; the outside-click listener defers when the click is on a tab.
+
+### W2: Sidebar setup/recover-atlas buttons removed
+
+The sidebar header's single-icon button for `setup-atlas` / `recover-atlas` looked orphaned vs. the compound-icon column it sits in once an atlas root is set. Welcome panel (middle pane) is now the sole CTA for both. Sidebar empty-state copy updated to "Use the welcome panel to ..." instead of "above".
+
+Dropped: ~20 lines of header markup + click handlers + `setupAtlasRoot` / `recoverAtlasRoot` imports in `worlds-sidebar.ts`. Welcome panel (`welcome-panel.ts`) handles both paths unchanged.
+
+### W3: Toast sweep — engine-not-ready → PIN guidance
+
+Captain hit "Refresh is only available on API-linked worlds" on an api-linked world that simply had no PIN configured. Multiple sites had the same mis-diagnosed toast.
+
+Consolidated into a single helper:
+
+- `sync-attach.ts`: new `diagnoseSyncUnavailable()` returns a structured reason (`'no-active-world' | 'local-only' | 'pin-missing' | 'attached-but-paused' | 'engine-not-ready'`).
+- `src/ui/sync-toasts.ts` (new): `surfaceSyncUnavailable(toasts)` emits the right toast for each reason. For `pin-missing` it also `navigate(settingsHash(worldId, 'identity'))` to deep-link the user.
+
+Call sites updated:
+- `right-pane.ts` pill click (refactor of the B4 inline logic into the helper)
+- `worlds-sidebar.ts` refresh button
+- `settings-panel.ts` refresh-from-API
+- `conflict-review-modal.ts` open
+- `server-delete-modal.ts` open
+- `elements-sidebar.ts` filter-chip right-click refresh
+
+### W4: Right-click refresh in-flight lock
+
+`elements-sidebar.ts` gained a module-level `refreshInFlight` flag. Spam right-clicks now toast `"Refresh already in progress…"` instead of stacking pulls.
+
+### W5: Flash survives sidebar re-render
+
+Captain reported: manual pulls didn't flash the affected element. Root cause: `pullNowAndRefresh` dispatches `atlas:pulled-ids` (sidebar adds `data-flash`), then `patchSlice('data', { elements })` triggers a re-render via `listEl.innerHTML = ...` — which blows away the `data-flash` attribute before CSS animation completes.
+
+Fix: track flashing ids in a module-level `Map<string, timeoutHandle>` keyed at `triggerFlashForIds`. `renderElementRow` reads from the Map and emits `data-flash="true"` on each render. When the timer fires, the id is removed from the Map AND the body re-renders to drop the attribute. Flash now survives any number of intervening re-renders.
+
+Bonus: works across MULTIPLE mounted elements bodies via `mountedRerenders: Set<() => void>` (in case of split-pane futures). Each mount adds + removes itself from the Set in mount/unmount.
+
+### W6: Camera persist on page refresh + diagnostic logs
+
+Captain reported the camera state restored on tab switch (already worked via cached entry) but NOT on page refresh. Investigation showed the code was correct in principle but lacked observability — added `console.info('[atlas:map] camera restored', { mapId, savedAtMount })` on successful restore and `console.info('[atlas:map] no saved camera for', mapId, '— using fit-to-image')` when no state exists. Also added a microtask-debounced save (idempotent for rapid moveends from a single gesture).
+
+If the issue persists on Captain's next test, the console log will pinpoint whether the bug is on the save side (no entry in localStorage) or the restore side (entry exists but setView doesn't take). Defer further work until evidence arrives.
+
+### Tests + bundle
+
+553/553 vitest still green (no new tests for this bout — all changes are wiring/cosmetic). Bundle 487.51 KB JS / 137.40 KB gzipped (essentially flat from session 221 main).
+
+### Post-Bout-6 follow-ups
+
+After Captain re-tested Bout 6, three small things needed a final pass:
+
+- **W2 follow-up — context-aware empty state**: the elements-sidebar empty-state message said "No active world. Pick one from the Worlds tab." even when no atlas root existed (no worlds list to pick from). Branched the message on `(atlasRoot, atlasRootRecoverable, worlds.length)` so users see "Use the welcome panel to recover/set up your atlas folder" when that's the actual next step.
+- **W3 follow-up — Make-Online modal pre-validates email + PIN**: the modal previously let `createApiWorld({name, email, pin})` throw "Email is required" after the submit button changed to "Creating…". Now the submit handler validates all three required fields up front, focuses the first empty one, and bails before any server call. Matches the discipline already in `new-api-world-modal.ts`.
+- **W6 follow-up — camera state migrated on map id-swap**: the saved camera state is keyed by `mapId`. When a map is id-swapped server-side (Make-Online assigns v7 IDs), the save remained under the pre-swap v4 id. After page refresh, the lookup used the post-swap v7 id and missed. `handleIdSwap` in `sync-attach.ts` now migrates camera state in lock-step with the rightTabs + selectedElementId + URL migration that was already there. Dynamic import to avoid a top-level dep cycle.
+- **W6 round 2 — fitToCanvas at end of mount was overwriting restore**: Captain reported "zooms to old state, then zooms out" — diagnostic: a `manager.fitToCanvas(20)` call at the END of `entry.ready` (added session 218→219 to fix half-screen-on-refresh) was running AFTER my W6 setView restore, blowing it away. Gated the fit-to-canvas behind `!savedAtMount` so it only runs when no saved view exists. `invalidateSize` still runs unconditionally to force a Leaflet re-measure of the container without changing the view.
+
+553/553 still green.
+
+---
+
+## Session 221 follow-up (2026-05-18) — `atlas_shape` leak fix
+
+After Bout 1 shipped the marker-FK detection + server-delete routing path, Captain re-tested with a fresh world: same FK error still firing. Re-investigation surfaced the **actual** root cause: `atlas_shape` was being sent to real OW on zone CREATEs, which rejects unknown fields with 400. Zone push failed silently → markers then FK-failed against the absent server zone.
+
+The B1 fix (FK detection + routing) still has value as a safety net for the previously-synced-then-deleted-peer scenario, but Captain's smoke was actually the "zone push silently rejected" class. Two follow-ups:
+
+1. **Added `atlas_shape` to `ATLAS_LOCAL_EXTENSION_FIELDS`** in `src/core/constants.ts`. Both the write-strip path (`toWireShape`) and the pull-preserve path (`applyServerRecord`) now handle it. Symmetric with the existing atlas_color / atlas_opacity / atlas_label_visible / image_media_id treatment.
+2. **Strict-field validation in fakes** (`statefulOwHandlers` + `FakeOwApiClient`). Both now 400 on atlas-local fields in write bodies. Tests pre-empt the "fakes silently accept unknown fields" gap that hid this bug. Pattern matches the existing `rejectDoubleSuffix` discipline (Convention #20 — encode real-OW validation in fakes).
+
++4 regression tests in `tests/integration/ow-client-adapter.atlasLocal.test.ts`. Total: 553 vitest green.
+
+This is the same lesson SYNC_NOTES already captured under "Encode real-server validation rules in fakes BEFORE fixing the caller" — applied again, but in reverse: the caller was already buggy in production, fakes get the rule retroactively so it can't regress.
+
+---
+
+## Session 221 (2026-05-18) — Validation, strengthening, fix-it bouts
+
+**Headline**: Five-bout pass to verify and shore up everything that had accreted concerns since session 219+220. 546/546 vitest green (+14 new tests across the bouts). Bundle 488 KB JS / 137 KB gzipped. Live marker FK push bug surfaced AND wired through to the existing server-delete review modal. No new features beyond the work list.
+
+### Bout 1 — Live bugs
+
+- **Marker FK push fail** (live, from Captain smoke): real OW returns 500 MySQL 1452 when a marker references a zone the server deleted out-of-band. Pre-existing topo-sort handles in-batch FK ordering but can't help when the peer has `server_updated_at` and is therefore already "synced" locally. Added `parseFkConstraintError(err)` + a CREATE-catch branch in `pushPhase`: detect the error, look up the orphan peer locally, route to `server_deletes` review. User clicks `keep + re-push` → peer re-CREATEs next round → marker succeeds. Conventions land via 3 regression tests in `tests/integration/sync-engine.fkConstraint.test.ts`.
+- **F hotkey wrong fit semantics**: was calling `manager.fitBounds(40)` which fits to visible pins (silent no-op with 0 pins, max-zoom with 1). Changed to `manager.fitToCanvas()` to match the toolbar button.
+- **Pin badge appears on all pins**: `getAssociatedMaps()` returns the maps an element appears on via pins, which is always ≥1 if we're rendering a pin of it. Wrong semantic for the badge — should mean "this element has a sub-map." Added `hasLinkedSubMap(elementId, elements)` helper (only true for Locations with `map.location === el.id`) and updated all 3 pin-render sites.
+- **"Engine not ready" toast on pill click without PIN**: now detects the api-linked-no-PIN case specifically and emits "Enter your PIN in settings to enable sync" + deep-links to `settings/identity`.
+
+### Bout 2 — Small UX
+
+- **Visual settings popover persists across map switch**: added `retargetVisualSettingsPopover(entry)` so the popover keeps its open state and re-renders with the new map's prefs on tab switch. Closes automatically when leaving any map context (map-index tab).
+- **Map view preserve on reload/switch**: new `src/core/map-camera-persist.ts` (~85 LOC + 8 unit tests). Saves `{center, zoom}` per mapId on every settled `moveend`. Restores in `applyLivePrefs` mount path; falls back to fit-to-image when no saved view exists. Cleared when a map is deleted.
+- **Pin tooltip categories capitalized**: `map-tab-tooltip.ts` runs supertype/subtype/type through a tiny `sentenceCase` helper.
+- **Shift+Enter saves in inline-multi field-edit**: `field-edit-inline.ts` accepts `Shift+Enter` as a save trigger alongside Ctrl/Cmd+Enter. Plain Enter still inserts a newline.
+- **Recover/setup-atlas sidebar buttons → compound icon style**: replaced `atlas-btn-ghost` text buttons with `atlas-create-icon-btn` housing single Material Symbols glyphs (`restart_alt` for recover, `create_new_folder` for setup). Visual coherence with the rest of the sidebar header.
+
+### Bout 3 — Soft-edges
+
+- **F1: pinPlacement id-swap migration**: `handleIdSwap` now migrates `ui.pinPlacement.elementId` alongside `selectedElementId` and rightTabs[].mapId. +2 regression tests.
+- **F2: stale conflicts cleared on policy flip**: settings-panel detects `pause-and-review → local-wins` transition and writes `sync-state.conflicts: []` so the badge doesn't lie.
+- **F3: pill click toast gated on push+pull deltas**: when `pullNowAndRefresh` returns a push-shaped result (in-flight dedup race), "Already up to date" no longer fires if `pushed.*` moved records.
+- **F4: modal worldId capture**: `ConflictReviewModal` and `ServerDeleteReviewModal` capture `worldId` at open and validate on each resolve action; bail with an info toast if user switched mid-modal.
+- **F5: user edit during pull race**: `pullPhase` re-reads each element via `getElement` just before `applyServerRecord` and skips the overwrite if `local_updated_at` advanced; next pull picks it up cleanly.
+- **F7: snapshot recovery per-world**: zone-edit snapshots migrated from a single-slot key (`atlas_zone_edit_snapshot_v1`) to a per-world map (`atlas_zone_edit_snapshot_v2`). Legacy v1 entries migrate automatically on first read. Each world's activation picks up its own pending snapshot independently — switching worlds no longer destroys an in-flight edit elsewhere.
+- **P4: pagination beyond 200/page**: `OwClientAdapter.listElements` now walks DRF pages by `?offset=N` until `count` is reached. Safety cap at 100 pages (20,000 elements per type). When the cap is hit, the type stays flagged paginated (server-delete detection skipped). MSW gained a `paginate: { type: pageSize }` option for tests. +1 regression test.
+
+### Bout 4 — Polish UX
+
+- **F9: stronger unlink-from-API confirmation**: the confirm dialog now spells out the consequences (element count, sync stops, sync history cleared, server world untouched, reversibility).
+- **P2: "Synced X ago" prominent on pill**: `mapEngineStateToPill` renders relative time inline (just now / Ns / Nm / Nh / date). A module-level 30s interval re-renders the pill so the timestamp ages naturally without state churn.
+- **P1: per-type refresh via right-click filter chip**: right-click on a filter-strip chip in the elements sidebar fires a pull and toasts a type-scoped result. Engine still pulls globally; framing is by user intent.
+- **P3: auto-pulled element flash**: `SyncResult.pulled_ids` carries the ids `pullPhase` actually applied to local. `sync-attach.emitConflictToasts` dispatches `atlas:pulled-ids` CustomEvent; the elements-sidebar listens and adds `data-flash="true"` to matching rows for ~1.4s. CSS adds a brief cyan ring with `atlas-row-pulled-flash` animation. Decoupling via CustomEvent keeps sync-attach from importing UI modules.
+
+### Bout 5 — Stale state + docs cleanup
+
+- **Stale TBD comments**: `map-view-prefs.ts` zone_labels:hover and `map-visual-settings-popover.ts` pin_style consumers — both wired in session 219 but comments still claimed TBD. Updated to reflect actual state.
+- **Cosmetic log cleanup**: `sync-attach.ts` default policy fallback was logging `'drain-blind'` (legacy name) when the registry had no policy set. Replaced with `'local-wins'` (current name) in both the doc-comment and the log line. The migration code in `registry.ts` that converts legacy values stays.
+- **Bundle audit recon**: 488 KB JS / 137 KB gzipped is healthy. Leaflet (~150 KB) and SDK (~70 KB tree-shaken) are the heavyweights. No quick wins.
+- **PROGRESS doc cleanup**: drop-list explicitly captured in CURRENT STATE so it doesn't ghost-haunt the backlog.
+
+### Files touched (high level)
+
+- New: `src/core/map-camera-persist.ts`, `tests/unit/map-camera-persist.test.ts`, `tests/integration/sync-engine.fkConstraint.test.ts`.
+- Modified (sync): `src/sync/sync-engine.ts` (+FK parser, +pulled_ids tracking, +pull race guard, +pagination loop), `src/sync/ow-client-adapter.ts` (pagination walk), `src/sync/sync-attach.ts` (pinPlacement migration, default policy log, pulled-ids CustomEvent dispatch).
+- Modified (UI): `src/tabs/right/right-pane.ts` (pill toast gating, sync engine no-PIN guidance, retarget popover, relative-time pill, syncPillTicker), `src/tabs/right/map-tab.ts` (F hotkey → fitToCanvas, camera persist mount), `src/tabs/right/map-visual-settings-popover.ts` (retargetVisualSettingsPopover), `src/tabs/right/map-tab-pins.ts` + `auto-open-map.ts` + `map-tab-tooltip.ts` (badge logic + capitalization), `src/sidebar/elements-sidebar.ts` (right-click refresh, atlas:pulled-ids listener), `src/sidebar/worlds-sidebar.ts` (recover/setup compound icons), `src/ui/conflict-review-modal.ts` + `src/ui/server-delete-modal.ts` (worldId capture), `src/ui/field-edit-inline.ts` (Shift+Enter), `src/middle/settings-panel.ts` (stronger unlink + clear-conflicts on policy flip).
+- Modified (state/store): `src/core/types.ts` (+pulled_ids), `src/core/constants.ts` (+MAP_CAMERA_STATE_KEY), `src/tabs/right/zone-edit-mode.ts` (per-world snapshot store + v1 migration), `src/tabs/right/map-index-tab.ts` (clearCameraState on delete).
+- Tests: 14 new tests across FK constraint (3), camera persist (8), pinPlacement migration (2), pagination (1).
+
+### Pokeable for next smoke
+
+1. **Marker FK fix**: trigger the original error condition — delete a zone server-side, draw new markers locally referencing it, push. Expect: server-delete modal opens for the zone with `keep + re-push` / `delete locally` choices. `keep + re-push` should make markers succeed on the subsequent round.
+2. **F hotkey**: focus the map canvas, press F. View fits to the image. Repeat — idempotent.
+3. **Pin badge**: pin a Character (or any non-Location) on a map. Pin renders without the map-corner glyph. Pin a Location that HAS a sub-map. Pin renders WITH the glyph.
+4. **No-PIN pill click**: api-linked world without PIN set; click the pill. Toast says "Enter your PIN in settings to enable sync" and lands on the identity tab.
+5. **Visual popover persistence**: open the visual settings popover on map A, click map B's tab. Popover stays open, shows map B's prefs.
+6. **Map view preserve**: pan + zoom map A, reload page. Map reopens at the same view.
+7. **Sync pill timestamp**: pill reads "Synced just now" right after a pull; "Synced 3m ago" three minutes later (timestamp ticks every 30s).
+8. **Right-click filter chip**: right-click on the Character icon in the sidebar filter strip; pull fires, toast scoped to "Characters" (or the equivalent type).
+9. **Auto-pull flash**: cause a pull to apply a remote change; the affected element row briefly glows cyan.
+10. **Unlink confirmation**: settings → world → unlink. Confirm dialog shows element count + spelled-out consequences.
+11. **Snapshot recovery**: enter zone-edit on world A, refresh mid-edit, choose Cancel from the next session — revert applies. Repeat with world B for an independent edit; world A's snapshot survives across world B's edit.
+12. **Pagination**: worlds with >200 of any type now download all pages on link/refresh (verify against your largest type — could be Events or Locations).
+
+### Process notes
+
+- The five-bout structure (live bugs → small UX → soft-edges → polish UX → cleanup) held all session. Each bout had tests run between items; full vitest at end of each bout.
+- The fakes-mirror-real discipline kept working: the FK test needed only the MSW handler's verbatim 1452 message + an existing `__inject_failure` to trigger the regression test.
+- CustomEvent decoupling for `atlas:pulled-ids` (P3) mirrors the existing `atlas:save-request` pattern from hotkeys — modules emit, UI listens, no cross-layer imports.
+- Camera persist + visual settings popover retarget are both keyed on the map-tab cache entry; the persistence and the popover both live in the right-pane subsystem so they evolve together.
 
 ---
 

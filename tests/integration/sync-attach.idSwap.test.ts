@@ -140,6 +140,32 @@ describe('sync-attach: id-swap migrates UI state', () => {
     expect(getState().ui.selectedElementId).toBe('new-id');
   });
 
+  it('migrates pinPlacement.elementId when it matches old_id', () => {
+    // Reachable when the user has a pin-placement banner active for a
+    // freshly-created element that hasn't been pushed yet. First push
+    // triggers an id-swap; without migration, subsequent map clicks would
+    // silently no-op because pinPlacement.elementId no longer resolves.
+    patchSlice('ui', {
+      ...getState().ui,
+      pinPlacement: { elementId: 'old-id' },
+    });
+
+    __test_handleIdSwap({ old_id: 'old-id', new_id: 'new-id', type: 'character' });
+
+    expect(getState().ui.pinPlacement?.elementId).toBe('new-id');
+  });
+
+  it('leaves pinPlacement alone when it targets a different element', () => {
+    patchSlice('ui', {
+      ...getState().ui,
+      pinPlacement: { elementId: 'other-id' },
+    });
+
+    __test_handleIdSwap({ old_id: 'old-id', new_id: 'new-id', type: 'character' });
+
+    expect(getState().ui.pinPlacement?.elementId).toBe('other-id');
+  });
+
   it('leaves data.elements alone when the swap does not match a cached entry', () => {
     patchSlice('data', {
       elements: [{ id: 'other', type: 'location', name: 'X', local_updated_at: 't' } as any],

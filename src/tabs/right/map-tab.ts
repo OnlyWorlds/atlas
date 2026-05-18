@@ -22,7 +22,7 @@ import { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManage
 import { leafletToStorage, storageToLeaflet } from '../../visualization/leaflet-2d/CoordinateUtils';
 import type { Element, Pin, WorldMap } from '../../core/types';
 import { pinVisualFor, onPinVisualsReady } from './pin-visuals';
-import { getAssociatedMaps } from './auto-open-map';
+import { hasLinkedSubMap } from './auto-open-map';
 import { toggleGhostsAtSourcePin, disposeGhostsForMap } from './ghost-pins';
 import { ToastManager } from '../../ui/toast-manager';
 import { ElementCreateModal } from '../../ui/element-create-modal';
@@ -37,6 +37,7 @@ import { buildPinTooltipHtml, escapeHtml } from './map-tab-tooltip';
 import { buildCanvasToolbar } from './map-tab-toolbar';
 import { toggleVisualSettingsPopover, applyLivePrefs, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
+import { saveCameraState, getCameraState } from '../../core/map-camera-persist';
 import { startDrawing, placeMarkerAt, getActiveDraft, cancelDrawing, disposeDraftForMap } from './zone-drawing';
 import { ZoneOverlay } from '../../visualization/leaflet-2d/ZoneOverlay';
 import { syncZones, wireChipStrip, refreshActiveMapZones } from './map-tab-zones';
@@ -295,6 +296,13 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   entry.ready = (async () => {
     await manager.init();
 
+    // Snapshot any previously-saved camera state BEFORE running the rest of
+    // the mount chain. applyMapBackground will fitBounds, which would
+    // overwrite the in-memory view, and we want the PRIOR session's saved
+    // state as our restore target. Reading from localStorage here is safe;
+    // no in-session moveend has fired yet.
+    const savedAtMount = getCameraState(mapId);
+
     // Background source precedence (DESIGN_MAPS.md §4): image_url > image_media_id > grid.
     await applyMapBackground(entry, map, width, height);
 
@@ -302,6 +310,42 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     // Idempotent — re-applying does no harm and lets the prefs system act as
     // the single integration point for live consumers.
     try { applyLivePrefs(entry, getEffectiveMapPrefs(mapId)); } catch { /* noop */ }
+
+    const lMapForRestore = manager.getMap();
+    if (lMapForRestore) {
+      // Restore the saved camera state — overrides applyMapBackground's
+      // fit-to-image landing. First-time visits with no saved state fall
+      // through to the fit-to-image view.
+      if (savedAtMount) {
+        try {
+          lMapForRestore.setView(savedAtMount.center, savedAtMount.zoom, { animate: false });
+          console.info('[atlas:map] camera restored', { mapId, savedAtMount });
+        } catch (err) {
+          console.warn('[atlas:map] camera restore failed:', err);
+        }
+      } else {
+        console.info('[atlas:map] no saved camera for', mapId, '— using fit-to-image');
+      }
+      // Persist on every settled pan/zoom. moveend covers both pan AND zoom
+      // (Leaflet fires it after zoomend). Cheap to write — localStorage and
+      // the read+merge happens at human time scales.
+      //
+      // Debounced via a microtask flag so a single user gesture that fires
+      // multiple moveends (zoom + slide-stop) only writes once. Throttling
+      // also prevents the setView-during-restore from triggering an extra
+      // save with the just-restored values (idempotent but noisy in logs).
+      let savePending = false;
+      lMapForRestore.on('moveend', () => {
+        if (savePending) return;
+        savePending = true;
+        queueMicrotask(() => {
+          savePending = false;
+          const center = lMapForRestore.getCenter();
+          const zoom = lMapForRestore.getZoom();
+          saveCameraState(mapId, { center: [center.lat, center.lng], zoom });
+        });
+      });
+    }
 
     // Mount the zone overlay (polygon/polyline rendering). Construct after
     // manager.init so the underlying L.Map handle is ready. Wire click to
@@ -546,7 +590,10 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       switch (e.key.toLowerCase()) {
         case 'f':
           e.preventDefault();
-          manager.fitBounds(40);
+          // Match the toolbar's fit-to-image button: fit the whole canvas, not
+          // visible pins. fitBounds() fits pins → silent no-op with 0 pins,
+          // max-zoom with 1 pin.
+          manager.fitToCanvas();
           break;
         case 'z':
           e.preventDefault();
@@ -631,12 +678,22 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     // Seed pins from state.
     syncPins(entry);
 
-    // Always fit the canvas image bounds on mount so the image fills the
-    // visible viewport. Previously: fit-to-pins only when ≥2 pins existed;
-    // without pins users saw the default zoom which often left the image
-    // at half-screen on page refresh (Captain smoke session 218→219).
-    manager.getMap()?.invalidateSize();
-    manager.fitToCanvas(20);
+    // Final size sync — Leaflet might have measured the container before it
+    // settled at flex size. invalidateSize forces a re-measure without
+    // changing the view (preserves whatever setView resolved to).
+    //
+    // fit-to-canvas runs only when NO saved camera state existed at mount
+    // (session 218→219 added the always-fit to fix the half-screen-on-refresh
+    // case; session 221 W6 added camera restore — if a user has a saved view,
+    // restoring it MUST win over fit-to-canvas, otherwise the restore flashes
+    // briefly then gets overwritten by the fit call here).
+    const lMapFinal = manager.getMap();
+    if (lMapFinal) {
+      lMapFinal.invalidateSize();
+      if (!savedAtMount) {
+        manager.fitToCanvas(20);
+      }
+    }
   })();
 
   entry.ready.catch(err => console.error('[map-tab] init failed:', err));
@@ -717,9 +774,7 @@ onPinVisualsReady(() => {
         if (!pin) continue;
         const pinnedEl = elements.find((e: Element) => e.id === pin.element_id);
         const type = pinnedEl?.type ?? 'object';
-        const hasMapBadge = pinnedEl
-          ? getAssociatedMaps(pinnedEl.id, elements).length > 0
-          : false;
+        const hasMapBadge = pinnedEl ? hasLinkedSubMap(pinnedEl.id, elements) : false;
         const visual = pinVisualFor(type, hasMapBadge, prefs.pin_tint, prefs.pin_style);
         const anchor: 'center' | 'bottom-tip' = prefs.pin_style === 'pin-shape' ? 'bottom-tip' : 'center';
         entry.manager.updatePin(existing.id, { icon: visual.iconUrl, anchor });
