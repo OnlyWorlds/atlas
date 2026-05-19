@@ -20,7 +20,7 @@
 
 import L from 'leaflet';
 import { getState, patchSlice } from '../../core/state';
-import { getActiveStore } from '../../ui/create-world-modal';
+import { getActiveStore } from '../../core/active-store';
 import { requestPushIfLinked } from '../../sync/sync-attach';
 import { storageToLeaflet, leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import { snapToAxis, findClosestSegment, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';

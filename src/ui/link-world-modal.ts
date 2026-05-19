@@ -22,6 +22,7 @@ import { getState } from '../core/state';
 import { navigate, homeHash } from '../core/router';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
 import type { InitialDownloadProgress } from '../sync/initial-download';
+import { escapeAttr } from '../core/dom-utils';
 
 export class LinkWorldModal extends BaseModal {
   private toasts: ToastManager;
@@ -144,6 +145,4 @@ export class LinkWorldModal extends BaseModal {
   }
 }
 
-function escapeAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+

@@ -320,6 +320,13 @@ export interface WorldRegistryEntry {
     l3: string;
   };
   /**
+   * Writing room — IDs of nodes the user has collapsed in the tree. Default
+   * is expanded (a node is collapsed iff its id appears in this array).
+   * Atlas-local; never synced. Persisted in registry so collapse state
+   * survives reloads.
+   */
+  writing_tree_collapsed?: string[];
+  /**
    * Per-world freeform notes — atlas-local (never synced). Accessed via the
    * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it
    * survives reloads without depending on the world's folder being granted

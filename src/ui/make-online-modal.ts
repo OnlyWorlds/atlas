@@ -25,7 +25,7 @@ import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { attachApi, saveRegistry, setPin, setEmail, findLinkedWorld } from '../registry/registry';
-import { getActiveStore } from './create-world-modal';
+import { getActiveStore } from '../core/active-store';
 import { attachSyncEngine, detachSyncEngine, applyIdSwapToUi } from '../sync/sync-attach';
 import { SyncEngine } from '../sync/sync-engine';
 import { OwClientAdapter } from '../sync/ow-client-adapter';
@@ -36,6 +36,7 @@ import {
   type MergePolicy,
   type MergeProgress,
 } from '../sync/make-online';
+import { escapeAttr } from '../core/dom-utils';
 
 type Route = 'create' | 'link';
 
@@ -480,6 +481,4 @@ export class MakeOnlineModal extends BaseModal {
   }
 }
 
-function escapeAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+

@@ -9,10 +9,11 @@
  */
 
 import { getState, subscribe } from '../core/state';
-import { getActiveStore } from '../ui/create-world-modal';
+import { getActiveStore } from '../core/active-store';
 import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
 import { toastManager } from '../ui/toast-manager';
 import { navigate, timelineHash } from '../core/router';
+import { escapeText } from '../core/dom-utils';
 
 export function mountWelcomePanel(target: HTMLElement): () => void {
   target.innerHTML = '';
@@ -144,6 +145,4 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
   return unsub;
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+

@@ -16,6 +16,7 @@ import { getCurrentSyncEngine, getCurrentSyncFolder, refreshConflictsCount } fro
 import { surfaceSyncUnavailable } from './sync-toasts';
 import { patchSlice, getState } from '../core/state';
 import type { Conflict } from '../core/types';
+import { escapeText } from '../core/dom-utils';
 
 export class ConflictReviewModal extends BaseModal {
   private conflicts: Conflict[] = [];
@@ -157,6 +158,4 @@ function lookupName(id: string): string | null {
   return el?.name ?? null;
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+

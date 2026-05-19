@@ -16,7 +16,8 @@ import { saveRegistry, attachApi, setPin, setEmail } from '../registry/registry'
 import { createWorldInRoot } from '../setup/atlas-root-flow';
 import { createApiWorld, buildOwClient } from '../sync/make-online';
 import { attachSyncEngine } from '../sync/sync-attach';
-import { getActiveStore } from './create-world-modal';
+import { getActiveStore } from '../core/active-store';
+import { escapeAttr } from '../core/dom-utils';
 
 export class NewApiWorldModal extends BaseModal {
   constructor(private toasts: ToastManager) {
@@ -151,6 +152,4 @@ export class NewApiWorldModal extends BaseModal {
   }
 }
 
-function escapeAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+

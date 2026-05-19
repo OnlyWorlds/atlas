@@ -5,10 +5,16 @@
  * resolves the current hash → middle panel renders for the active mode.
  */
 
+// Self-host the Material Symbols icon font (vs Google Fonts CDN) so the app
+// works offline. The CSS rule references the woff2 shipped by the package;
+// Vite copies it into the bundle and the @font-face URL resolves locally.
+import 'material-symbols/outlined.css';
+
 import { FsFolderStore, ELockHeld } from './store/folder-store-fs';
 import { startApp } from './app';
 import { getState as _getState, patchSlice as _patchSlice } from './core/state';
-import { getActiveStore as _getActiveStore } from './ui/create-world-modal';
+import { getActiveStore as _getActiveStore } from './core/active-store';
+import { registerServiceWorker } from './core/offline';
 
 function isFolderModeSupported(): boolean {
   return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
@@ -60,6 +66,11 @@ if (document.readyState === 'loading') {
 } else {
   boot();
 }
+
+// Register the PWA service worker (production builds only — vite-plugin-pwa
+// emits a no-op SW in dev unless explicitly enabled). The SW precaches the
+// app shell so atlas works offline after first load.
+registerServiceWorker();
 
 // ---- Dev-only test harness ----
 //

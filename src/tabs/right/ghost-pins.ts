@@ -21,6 +21,7 @@ import { storageToLeaflet } from '../../visualization/leaflet-2d/CoordinateUtils
 import { pinVisualFor } from './pin-visuals';
 import { getState, patchSlice } from '../../core/state';
 import { navigate, elementHash } from '../../core/router';
+import { escapeText } from '../../core/dom-utils';
 
 /** Pixel radius for ghost ring around the source pin. Tightened in session
  * 211 smoke after Captain feedback that 70px felt "too far away" — 45 keeps
@@ -342,9 +343,6 @@ export function toggleGhostsAtSourcePin(args: ToggleArgs): number {
   return entries.length;
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 /** Remove a single ghost by ghostId. No-op if not found. */
 export function pruneSingleGhost(mapId: string, ghostId: string): void {

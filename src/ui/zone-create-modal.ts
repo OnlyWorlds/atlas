@@ -14,6 +14,7 @@
  */
 
 import { BaseModal } from './modal-base';
+import { escapeAttr } from '../core/dom-utils';
 
 export type ZoneShape = 'polygon' | 'line';
 
@@ -159,6 +160,4 @@ export function openZoneCreateModal(opts: ZoneCreateOpts): Promise<ZoneCreateVal
   return new ZoneCreateModal().open(opts);
 }
 
-function escapeAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+

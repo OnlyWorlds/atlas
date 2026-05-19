@@ -19,11 +19,12 @@ import { BaseModal } from './modal-base';
 import { pickElement } from './element-picker-modal';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
-import { getActiveStore } from './create-world-modal';
+import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { readImageDimsFromFile, readImageDimsFromUrl } from './image-dims';
 import { openMapTab } from '../tabs/right/map-index-tab';
 import type { WorldMap } from '../core/types';
+import { escapeText, escapeAttr } from '../core/dom-utils';
 
 export interface MapCreateResult {
   map: WorldMap;
@@ -450,10 +451,4 @@ class MapCreateModal extends BaseModal {
 // Image-dim helpers live in ui/image-dims.ts (shared with element-detail's
 // image_url field-edit hook). Import below.
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
-function escapeAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}

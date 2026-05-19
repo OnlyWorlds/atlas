@@ -20,7 +20,7 @@ import { getState, patchSlice, subscribe } from '../core/state';
 import { onHashChange, parseHash, navigate, homeHash, elementHash } from '../core/router';
 import type { Element, ElementType, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
-import { getActiveStore } from '../ui/create-world-modal';
+import { getActiveStore } from '../core/active-store';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { openFieldEditInline } from '../ui/field-edit-inline';
 import { toastManager } from '../ui/toast-manager';
@@ -36,6 +36,7 @@ import { readImageDimsFromUrl } from '../ui/image-dims';
 import { getMapsSettings, getEditorSettings } from '../registry/registry';
 import { mapHash } from '../core/router';
 import { buildZoneSections } from './element-detail-zone-sections';
+import { escapeText, escapeAttr } from '../core/dom-utils';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */
 const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
@@ -1298,10 +1299,4 @@ function forceRerender(): void {
   patchSlice('data', { elements: [...data.elements] });
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
-function escapeAttr(s: string): string {
-  return escapeText(s).replace(/"/g, '&quot;');
-}

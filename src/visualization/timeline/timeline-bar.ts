@@ -15,6 +15,7 @@ import type { Element } from '../../core/types';
 import type { PlacedDot, TimelineNode } from './types';
 import { calculateTicks, calculateTimeRange, createDateToX } from './axis-calculator';
 import { extractTemporalNodes } from './data-normalizer';
+import { escapeText } from '../../core/dom-utils';
 
 const DOT_RADIUS = 4;
 const DOT_RADIUS_HOVER = 6;
@@ -341,9 +342,6 @@ function showTooltip(state: BarState, dot: PlacedDot, clientX: number, canvasRec
   void clientX;
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 function applyAlpha(hex: string, alpha: number): string {
   // Accept hex (#rgb / #rrggbb) and produce rgba(). Fall back to the input if

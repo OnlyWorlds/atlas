@@ -26,7 +26,7 @@ import { hasLinkedSubMap } from './auto-open-map';
 import { toggleGhostsAtSourcePin, disposeGhostsForMap } from './ghost-pins';
 import { ToastManager } from '../../ui/toast-manager';
 import { ElementCreateModal } from '../../ui/element-create-modal';
-import { getActiveStore } from '../../ui/create-world-modal';
+import { getActiveStore } from '../../core/active-store';
 import { navigate, elementHash } from '../../core/router';
 import { requestPushIfLinked } from '../../sync/sync-attach';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';

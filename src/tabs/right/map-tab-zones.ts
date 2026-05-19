@@ -21,7 +21,7 @@ import {
 } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import type { Zone } from '../../core/types';
-import { getActiveStore } from '../../ui/create-world-modal';
+import { getActiveStore } from '../../core/active-store';
 import { requestPushIfLinked } from '../../sync/sync-attach';
 import type { ToastManager } from '../../ui/toast-manager';
 

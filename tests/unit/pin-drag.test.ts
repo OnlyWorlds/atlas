@@ -34,8 +34,9 @@ vi.mock('../../src/sync/sync-attach', () => ({
   refreshConflictsCount: async () => {},
 }));
 
-vi.mock('../../src/ui/create-world-modal', () => ({
+vi.mock('../../src/core/active-store', () => ({
   getActiveStore: () => ({ updatePin: spies.updatePin, listElements: spies.listElements }),
+  setActiveStore: () => {},
 }));
 
 vi.mock('../../src/core/state', () => ({

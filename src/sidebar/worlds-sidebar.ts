@@ -13,8 +13,10 @@ import { onHashChange, parseHash, navigate, worldHash } from '../core/router';
 import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused, deleteWorldEntry } from '../registry/registry';
 import { loadHandle, ensureWritable, queryWritable, deleteHandle } from '../store/handle-vault';
 import { FsFolderStore } from '../store/folder-store-fs';
-import { setActiveStore, getActiveStore, CreateWorldModal } from '../ui/create-world-modal';
+import { CreateWorldModal } from '../ui/create-world-modal';
+import { setActiveStore, getActiveStore } from '../core/active-store';
 import { LinkWorldModal } from '../ui/link-world-modal';
+import { escapeText, escapeAttr } from '../core/dom-utils';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
@@ -441,15 +443,3 @@ function isFolderMissing(err: unknown): boolean {
   return typeof e.message === 'string' && /not\s*found|no such (file|directory)/i.test(e.message);
 }
 
-// ---- Escapes ----
-
-function escapeText(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function escapeAttr(s: string): string {
-  return escapeText(s).replace(/"/g, '&quot;');
-}

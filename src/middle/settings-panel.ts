@@ -35,7 +35,7 @@ import {
   type FieldEditMode,
 } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
-import { getActiveStore, setActiveStore } from '../ui/create-world-modal';
+import { getActiveStore, setActiveStore } from '../core/active-store';
 import { setupAtlasRoot, deleteWorldFolderUnderRoot } from '../setup/atlas-root-flow';
 import { MakeOnlineModal } from '../ui/make-online-modal';
 import { ToastManager } from '../ui/toast-manager';
@@ -51,6 +51,7 @@ import {
 } from '../sync/sync-attach';
 import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import type { WorldRegistryEntry } from '../core/types';
+import { escapeText, escapeAttr } from '../core/dom-utils';
 
 export interface SettingsMount {
   target: HTMLElement;
@@ -834,9 +835,4 @@ function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
   });
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-function escapeAttr(s: string): string {
-  return escapeText(s).replace(/"/g, '&quot;');
-}
+

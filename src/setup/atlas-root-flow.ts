@@ -32,7 +32,7 @@ import {
 import { FsFolderStore } from '../store/folder-store-fs';
 import { newId } from '../store/folder-store';
 import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-utils';
-import { getActiveStore, setActiveStore } from '../ui/create-world-modal';
+import { getActiveStore, setActiveStore } from '../core/active-store';
 import { attachSyncEngine } from '../sync/sync-attach';
 import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { OwClientAdapter } from '../sync/ow-client-adapter';

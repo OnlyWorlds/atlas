@@ -14,7 +14,7 @@
 
 import { getState, patchSlice } from '../../core/state';
 import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
-import { getActiveStore } from '../../ui/create-world-modal';
+import { getActiveStore } from '../../core/active-store';
 import { requestPushIfLinked } from '../../sync/sync-attach';
 import type { MapTabCacheEntry } from './map-tab-cache';
 

@@ -14,11 +14,11 @@
 
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
-import { FsFolderStore } from '../store/folder-store-fs';
 import { nowIso } from '../store/folder-store';
 import { getState } from '../core/state';
 import { navigate, worldHash } from '../core/router';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
+import { escapeText } from '../core/dom-utils';
 import type { WorldRegistryEntry } from '../core/types';
 
 export interface CreateWorldResult {
@@ -112,16 +112,6 @@ export class CreateWorldModal extends BaseModal {
     box.hidden = false;
   }
 }
-
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-// ---- Active-store cache (avoid re-opening per render) ----
-
-let activeStore: FsFolderStore | null = null;
-export function setActiveStore(store: FsFolderStore | null): void { activeStore = store; }
-export function getActiveStore(): FsFolderStore | null { return activeStore; }
 
 // Re-exported timestamp helper for test code paths.
 export { nowIso };

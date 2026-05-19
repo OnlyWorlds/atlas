@@ -21,6 +21,7 @@ import { mountWorldsBody } from './worlds-sidebar';
 import { mountElementsBody } from './elements-sidebar';
 import { ToastManager } from '../ui/toast-manager';
 import { buildShortcutsContent } from '../ui/shortcuts-content';
+import { escapeText } from '../core/dom-utils';
 
 /**
  * Return-to-context destination given an active world: if a selection
@@ -50,9 +51,6 @@ export function rightTabHashFor(active: ActiveWorldRef): string {
   return `#/w/${active.worldId}`;
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 export interface SidebarMount {
   toggle: HTMLElement;

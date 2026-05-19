@@ -286,6 +286,29 @@ export function setFavorite(
   };
 }
 
+/**
+ * Toggle a node's collapsed state in a world's writing tree. Collapsed = node
+ * id appears in `writing_tree_collapsed`; expanded = absent. Returns a NEW
+ * registry — caller is responsible for `saveRegistry` + `patchSlice`.
+ */
+export function toggleWritingTreeCollapsed(
+  reg: WorldsRegistry,
+  worldId: string,
+  nodeId: string,
+): WorldsRegistry {
+  return {
+    ...reg,
+    worlds: reg.worlds.map(w => {
+      if (w.id !== worldId) return w;
+      const current = w.writing_tree_collapsed ?? [];
+      const next = current.includes(nodeId)
+        ? current.filter(id => id !== nodeId)
+        : [...current, nodeId];
+      return { ...w, writing_tree_collapsed: next };
+    }),
+  };
+}
+
 // ---- Right-pane tab persistence (per-world) ----
 
 /**

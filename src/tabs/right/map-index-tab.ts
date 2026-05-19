@@ -19,10 +19,11 @@ import type { WorldMap, Pin, Element } from '../../core/types';
 import { ToastManager, toastManager } from '../../ui/toast-manager';
 import { createMapDialog } from '../../ui/map-create-modal';
 import { navigate, mapHash, elementHash } from '../../core/router';
-import { getActiveStore } from '../../ui/create-world-modal';
+import { getActiveStore } from '../../core/active-store';
 import { requestPushIfLinked } from '../../sync/sync-attach';
 import { buildMapTree, filterTreeByName, type MapTreeNode, type LocationLike } from './map-tree';
 import { clearCameraState } from '../../core/map-camera-persist';
+import { escapeText } from '../../core/dom-utils';
 
 // ---- Collapsed tree-node state ----
 
@@ -643,6 +644,4 @@ export function openMapTab(m: WorldMap, preserveElementId?: string): void {
   }
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+

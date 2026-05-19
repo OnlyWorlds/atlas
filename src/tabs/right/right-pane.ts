@@ -25,6 +25,7 @@ import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount } from '
 import { surfaceSyncUnavailable } from '../../ui/sync-toasts';
 import { ConflictReviewModal } from '../../ui/conflict-review-modal';
 import { savePersistedRightTabs } from './right-tabs-persistence';
+import { escapeText } from '../../core/dom-utils';
 
 export interface RightPaneMount {
   tabBar: HTMLElement;
@@ -478,6 +479,4 @@ function formatRelative(iso: string): string | null {
   }
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+

@@ -14,7 +14,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
-import { getActiveStore } from '../ui/create-world-modal';
+import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import type { Zone, Marker, WorldMap } from '../core/types';
 import { openMapTab } from '../tabs/right/map-index-tab';

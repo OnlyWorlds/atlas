@@ -11,6 +11,7 @@ import { getState, subscribe } from '../core/state';
 import { onHashChange, parseHash, navigate, searchHash, elementHash } from '../core/router';
 import { ELEMENT_ICONS } from '../core/constants';
 import type { Element } from '../core/types';
+import { escapeText } from '../core/dom-utils';
 
 const SEARCH_FIELDS = ['name', 'description', 'supertype', 'subtype'];
 
@@ -67,6 +68,14 @@ export function mountSearch(target: HTMLElement): () => void {
   list.className = 'atlas-search-results';
   root.appendChild(list);
 
+  // Memo: skip the full scan when neither the query nor the elements array
+  // reference has changed since the last render. `subscribe(render)` fires on
+  // every state tick (e.g. sync engine state changes) — most don't touch the
+  // elements set, so this avoids the O(elements × fields) scan for them.
+  let lastQuery: string | null = null;
+  let lastElements: Element[] | null = null;
+  let lastHits: Hit[] = [];
+
   function render(): void {
     const active = getState().active;
     if (!active) {
@@ -82,9 +91,23 @@ export function mountSearch(target: HTMLElement): () => void {
     if (!query) {
       status.textContent = `Search across ${elements.length} elements (name, description, supertype, subtype).`;
       list.innerHTML = '';
+      lastQuery = null;
+      lastElements = null;
+      lastHits = [];
       return;
     }
-    const hits = runSearch(elements, query);
+
+    // Reuse the previous scan if both inputs match by reference / value.
+    let hits: Hit[];
+    if (query === lastQuery && elements === lastElements) {
+      hits = lastHits;
+    } else {
+      hits = runSearch(elements, query);
+      lastQuery = query;
+      lastElements = elements;
+      lastHits = hits;
+    }
+
     status.textContent = hits.length === 0
       ? `No results for "${query}".`
       : `${hits.length} result${hits.length === 1 ? '' : 's'} for "${query}".`;
@@ -133,9 +156,6 @@ export function mountSearch(target: HTMLElement): () => void {
   };
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 function highlightMatch(excerpt: string, query: string): string {
   const escaped = escapeText(excerpt);

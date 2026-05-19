@@ -4855,14 +4855,13 @@ svg .atlas-zone-selected {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: 2px;
+  padding: 2px 4px;
   background: transparent;
   border: none;
   border-radius: 3px;
   color: var(--atlas-text);
   text-align: left;
-  cursor: pointer;
 }
 .atlas-writing-tree-row:hover {
   background: var(--atlas-bg-hover);
@@ -4871,9 +4870,49 @@ svg .atlas-zone-selected {
   background: var(--atlas-cyan-tint);
   color: var(--atlas-cyan);
 }
+.atlas-writing-tree-chevron {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.atlas-writing-tree-chevron:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--atlas-text);
+}
+.atlas-writing-tree-chevron .material-symbols-outlined {
+  font-size: 16px;
+}
+.atlas-writing-tree-chevron-empty {
+  cursor: default;
+  visibility: hidden;
+}
+.atlas-writing-tree-row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .atlas-writing-tree-icon {
   font-size: 16px;
   color: var(--atlas-text-muted);
+  flex: 0 0 auto;
 }
 .atlas-writing-tree-row.active .atlas-writing-tree-icon {
   color: var(--atlas-cyan);

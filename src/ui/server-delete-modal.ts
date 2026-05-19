@@ -19,6 +19,7 @@ import { getCurrentSyncEngine, getCurrentSyncFolder } from '../sync/sync-attach'
 import { patchSlice, getState } from '../core/state';
 import { surfaceSyncUnavailable } from './sync-toasts';
 import type { ServerDeleteRecord } from '../core/types';
+import { escapeText } from '../core/dom-utils';
 
 export class ServerDeleteReviewModal extends BaseModal {
   private records: ServerDeleteRecord[] = [];
@@ -167,6 +168,4 @@ export class ServerDeleteReviewModal extends BaseModal {
   }
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+

@@ -18,9 +18,11 @@ import { onHashChange, parseHash, navigate, writingHash } from '../core/router';
 import { mountElementDetail } from './element-detail';
 import { ToastManager } from '../ui/toast-manager';
 import { WritingCreateModal } from '../ui/writing-create-modal';
-import { getActiveStore } from '../ui/create-world-modal';
+import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
+import { saveRegistry, toggleWritingTreeCollapsed } from '../registry/registry';
 import type { Element } from '../core/types';
+import { escapeText } from '../core/dom-utils';
 
 export function getWritingLabels(worldId: string): { l1: string; l2: string; l3: string } {
   const entry = getState().registry.worlds.find(w => w.id === worldId);
@@ -78,6 +80,20 @@ function buildNarrativeIndex(elements: Element[]): NarrativeIndex {
   };
   sortTree(roots);
   return { roots, byId };
+}
+
+/** List ancestor node ids of `id` (excludes `id` itself). */
+function ancestorIds(idx: NarrativeIndex, id: string): string[] {
+  const out: string[] = [];
+  let cur = idx.byId.get(id);
+  let parentId = cur ? (cur.el as Element & { parent_narrative?: string }).parent_narrative : undefined;
+  while (parentId) {
+    out.push(parentId);
+    const parent = idx.byId.get(parentId);
+    if (!parent) break;
+    parentId = (parent.el as Element & { parent_narrative?: string }).parent_narrative;
+  }
+  return out;
 }
 
 /** Walk parent_narrative up to find {bookId, chapterId, sceneId} for navigation. */
@@ -165,6 +181,16 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
     const route = parseHash(window.location.hash);
     const activeId = route.sceneId ?? route.chapterId ?? route.bookId ?? null;
     const activeNode = activeId ? idx.byId.get(activeId) : null;
+    const entry = getState().registry.worlds.find(w => w.id === active.worldId);
+    const collapsed = new Set(entry?.writing_tree_collapsed ?? []);
+    // If the URL targets a descendant of a collapsed node, force its ancestors
+    // open so the active selection is visible. The user explicitly navigated
+    // there — collapse shouldn't hide it.
+    if (activeId) {
+      for (const ancestorId of ancestorIds(idx, activeId)) {
+        collapsed.delete(ancestorId);
+      }
+    }
 
     // --- Tree column ---
     treeCol.innerHTML = '';
@@ -182,7 +208,7 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
       treeList.appendChild(empty);
     } else {
       for (const node of idx.roots) {
-        renderNode(node, treeList, labels, active.worldId, activeId, idx, toasts);
+        renderNode(node, treeList, labels, active.worldId, activeId, idx, collapsed);
       }
     }
     treeCol.appendChild(treeList);
@@ -265,29 +291,62 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
     worldId: string,
     activeId: string | null,
     idx: NarrativeIndex,
-    _toasts: ToastManager,
+    collapsed: Set<string>,
   ): void {
-    const row = document.createElement('button');
-    row.type = 'button';
+    const hasChildren = node.children.length > 0 && node.depth < 2;
+    const isCollapsed = hasChildren && collapsed.has(node.el.id);
+
+    const row = document.createElement('div');
     row.className = 'atlas-writing-tree-row';
-    row.style.paddingLeft = `${node.depth * 16 + 8}px`;
     if (node.el.id === activeId) row.classList.add('active');
+    row.style.paddingLeft = `${node.depth * 16 + 4}px`;
+
     const label = node.depth === 0 ? labels.l1 : node.depth === 1 ? labels.l2 : labels.l3;
     const icon = node.depth === 0 ? 'menu_book' : node.depth === 1 ? 'article' : 'short_text';
-    row.innerHTML = `
+
+    // Chevron (separate clickable; only when the node has children to hide).
+    const chevron = document.createElement('button');
+    chevron.type = 'button';
+    chevron.className = 'atlas-writing-tree-chevron';
+    chevron.tabIndex = -1;
+    chevron.setAttribute('aria-label', isCollapsed ? 'expand' : 'collapse');
+    if (hasChildren) {
+      chevron.innerHTML = `<span class="material-symbols-outlined">${isCollapsed ? 'chevron_right' : 'expand_more'}</span>`;
+      chevron.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const next = toggleWritingTreeCollapsed(getState().registry, worldId, node.el.id);
+        patchSlice('registry', next);
+        saveRegistry(next);
+      });
+    } else {
+      // Reserved spacer so all rows align regardless of children.
+      chevron.classList.add('atlas-writing-tree-chevron-empty');
+      chevron.disabled = true;
+      chevron.innerHTML = '';
+    }
+    row.appendChild(chevron);
+
+    // The body of the row (icon + name) navigates to the node.
+    const body = document.createElement('button');
+    body.type = 'button';
+    body.className = 'atlas-writing-tree-row-body';
+    body.innerHTML = `
       <span class="material-symbols-outlined atlas-writing-tree-icon">${icon}</span>
       <span class="atlas-writing-tree-name">${escapeText(node.el.name || `(unnamed ${label.toLowerCase()})`)}</span>
     `;
-    row.addEventListener('click', () => {
+    body.addEventListener('click', () => {
       const path = findAncestry(idx, node.el.id);
       navigate(writingHash(worldId, path.bookId, path.chapterId, path.sceneId));
     });
+    row.appendChild(body);
+
     parent.appendChild(row);
 
     // Render children up to depth 2 (scene). Scenes have no children.
-    if (node.depth < 2) {
+    // Skip when collapsed.
+    if (hasChildren && !isCollapsed) {
       for (const child of node.children) {
-        renderNode(child, parent, labels, worldId, activeId, idx, _toasts);
+        renderNode(child, parent, labels, worldId, activeId, idx, collapsed);
       }
     }
   }
@@ -303,9 +362,6 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
   };
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 function pluralize(word: string): string {
   if (word.endsWith('s')) return word;

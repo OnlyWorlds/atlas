@@ -7,6 +7,7 @@
 
 import { getState, subscribe } from '../core/state';
 import { onHashChange, parseHash, navigate, publishHash } from '../core/router';
+import { escapeText } from '../core/dom-utils';
 
 export function mountPublishDetail(target: HTMLElement): () => void {
   target.innerHTML = '';
@@ -74,6 +75,4 @@ export function mountPublishDetail(target: HTMLElement): () => void {
   };
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+

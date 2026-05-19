@@ -16,6 +16,7 @@ import { getState } from '../core/state';
 import type { Element, ElementType } from '../core/types';
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { escapeText } from '../core/dom-utils';
 
 export interface PickElementOptions {
   restrictToType?: ElementType;
@@ -218,6 +219,4 @@ class ElementPickerModal extends BaseModal {
   }
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+

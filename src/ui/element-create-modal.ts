@@ -16,12 +16,13 @@ import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
-import { getActiveStore } from './create-world-modal';
+import { getActiveStore } from '../core/active-store';
 import { CONTENT_ELEMENT_TYPES, type ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { createMapDialog } from './map-create-modal';
 import { findExistingNameMatch } from './element-name-match';
+import { escapeAttr } from '../core/dom-utils';
 
 /**
  * Types offered in the create modal.
@@ -453,6 +454,4 @@ function matchCategory(input: string, candidates: ElementType[] = CREATE_TYPES):
   return exact ?? starts ?? contains;
 }
 
-function escapeAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+

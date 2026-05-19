@@ -12,7 +12,7 @@
 
 import L from 'leaflet';
 import { getState, patchSlice } from '../../core/state';
-import { getActiveStore } from '../../ui/create-world-modal';
+import { getActiveStore } from '../../core/active-store';
 import type { WorldMap } from '../../core/types';
 import { pickMapImageSource } from './map-image-source';
 import { extractEdgeColor } from './edge-color';
