@@ -20,7 +20,7 @@ import { ToastManager, toastManager } from '../../ui/toast-manager';
 import { createMapDialog } from '../../ui/map-create-modal';
 import { navigate, mapHash, elementHash } from '../../core/router';
 import { getActiveStore } from '../../core/active-store';
-import { requestPushIfLinked } from '../../sync/sync-attach';
+import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { buildMapTree, filterTreeByName, type MapTreeNode, type LocationLike } from './map-tree';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText } from '../../core/dom-utils';
@@ -207,9 +207,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     if (writes.length === 0) return;
     try {
       await Promise.all(writes);
-      const elements = await store.listElements();
-      patchSlice('data', { elements });
-      requestPushIfLinked();
+      const elements = await refreshElementsAfterWrite(store);
       toasts.success(`Reordered ${writes.length} map${writes.length === 1 ? '' : 's'}`);
     } catch (err) {
       console.error('[map-index] reorder failed:', err);
@@ -562,9 +560,7 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
     // for a map that no longer exists. If the map id happens to be reused
     // later (re-link of an api world), the view falls back to fit-to-image.
     clearCameraState(m.id);
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
-    requestPushIfLinked();
+    const elements = await refreshElementsAfterWrite(store);
 
     const ui = getState().ui;
     const tabIdx = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === m.id);

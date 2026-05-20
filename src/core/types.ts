@@ -434,6 +434,15 @@ export interface WorldsRegistry {
   /** Master kill switch — pauses every engine if true. Default: false. */
   sync_pause_all?: boolean;
 
+  /**
+   * Autosave debounce window for pushes (ms). After a local write, the
+   * SyncEngine waits this long before pushing — coalesces bursts of edits
+   * into one round-trip. Default 5000. Settable via Settings → Sync.
+   * Null/undefined → engine default (5000). The sync pill renders a decay
+   * ring during this window.
+   */
+  sync_debounce_ms?: number | null;
+
   // ---- Maps subsystem settings (DESIGN_MAPS.md §3.5) ----
   /**
    * Atlas-level map behavior toggles. All default OFF. Stored at the registry

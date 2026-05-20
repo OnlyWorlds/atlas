@@ -391,6 +391,10 @@ export function setSyncCadenceMs(reg: WorldsRegistry, ms: number | null): Worlds
   return { ...reg, sync_cadence_ms: ms };
 }
 
+export function setSyncDebounceMs(reg: WorldsRegistry, ms: number | null): WorldsRegistry {
+  return { ...reg, sync_debounce_ms: ms };
+}
+
 export function setSyncDefaultPolicy(
   reg: WorldsRegistry,
   policy: 'local-wins' | 'pause-and-review'

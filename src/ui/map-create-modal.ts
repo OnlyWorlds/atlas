@@ -20,7 +20,7 @@ import { pickElement } from './element-picker-modal';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { getActiveStore } from '../core/active-store';
-import { requestPushIfLinked } from '../sync/sync-attach';
+import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { readImageDimsFromFile, readImageDimsFromUrl } from './image-dims';
 import { openMapTab } from '../tabs/right/map-index-tab';
 import type { WorldMap } from '../core/types';
@@ -214,11 +214,18 @@ class MapCreateModal extends BaseModal {
           <span>Image URL (optional)</span>
           <input class="atlas-input" type="text" name="map-image-url" placeholder="https://..." autocomplete="off" spellcheck="false" value="${escapeAttr(initialUrl)}" />
         </label>
-        <label class="atlas-modal-field">
+        <div class="atlas-modal-field">
           <span>Local image (optional)</span>
-          <input type="file" name="map-image-file" accept="image/*" />
+          <div class="atlas-file-picker">
+            <button type="button" class="atlas-btn-ghost atlas-file-picker-btn" data-role="file-pick-btn">
+              <span class="material-symbols-outlined">attach_file</span>
+              <span>Choose file</span>
+            </button>
+            <span class="atlas-file-picker-name" data-role="file-pick-name">No file chosen</span>
+            <input type="file" name="map-image-file" accept="image/*" hidden />
+          </div>
           <span class="atlas-modal-hint" data-role="local-image-hint">Used as fallback when image URL is empty. Stored locally, never uploaded.</span>
-        </label>
+        </div>
 
         <button type="button" class="atlas-modal-advanced-toggle" data-role="advanced-toggle" aria-expanded="${this.advancedOpen}">
           <span class="material-symbols-outlined atlas-modal-advanced-chevron">${this.advancedOpen ? 'expand_more' : 'chevron_right'}</span>
@@ -277,7 +284,20 @@ class MapCreateModal extends BaseModal {
     // and shouldn't trigger any warning.
     const urlField = body.querySelector<HTMLInputElement>('input[name="map-image-url"]')!;
     const fileField = body.querySelector<HTMLInputElement>('input[name="map-image-file"]')!;
+    const filePickBtn = body.querySelector<HTMLButtonElement>('[data-role="file-pick-btn"]')!;
+    const filePickName = body.querySelector<HTMLElement>('[data-role="file-pick-name"]')!;
     const hintEl = body.querySelector<HTMLElement>('[data-role="local-image-hint"]')!;
+    filePickBtn.addEventListener('click', () => fileField.click());
+    const updateFilePickName = (): void => {
+      const f = fileField.files?.[0];
+      if (f) {
+        filePickName.textContent = f.name;
+        filePickName.classList.add('atlas-file-picker-name-set');
+      } else {
+        filePickName.textContent = 'No file chosen';
+        filePickName.classList.remove('atlas-file-picker-name-set');
+      }
+    };
     const updateHint = (): void => {
       const hasFile = !!fileField.files?.length;
       const hasUrl = !!urlField.value.trim();
@@ -290,7 +310,8 @@ class MapCreateModal extends BaseModal {
       }
     };
     urlField.addEventListener('input', updateHint);
-    fileField.addEventListener('change', updateHint);
+    fileField.addEventListener('change', () => { updateFilePickName(); updateHint(); });
+    updateFilePickName();
     updateHint();
 
     const form = body.querySelector<HTMLFormElement>('form')!;
@@ -364,9 +385,7 @@ class MapCreateModal extends BaseModal {
           map = await store.updateMap(map.id, { image_media_id: media.id });
         }
 
-        const elements = await store.listElements();
-        patchSlice('data', { elements });
-        requestPushIfLinked();
+        const elements = await refreshElementsAfterWrite(store);
 
         this.toasts.success(isConfigure ? `Updated map "${name}"` : `Created map "${name}"`);
         this.resolved = true;

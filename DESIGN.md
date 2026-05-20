@@ -520,7 +520,7 @@ Even for api-linked worlds, media lives ONLY in the folder. No upload to OW.
 
 ```
 ┌─────────┬─────────────────────────────────┬─────────────────────────┐
-│ 18%     │ 52%                             │ 30%                     │
+│ 19%     │ 51%                             │ 30%                     │
 │ SIDEBAR │ MIDDLE                          │ RIGHT                   │
 │         │ ┌─────────────────────────────┐ │                         │
 │ [Worlds │ │ 🏠 ✎ 🕓 ⌕ ⬆ ⬇ 🧩 ⚙       │ │ [Maps | <map tabs>]    │
@@ -537,9 +537,9 @@ Even for api-linked worlds, media lives ONLY in the folder. No upload to OW.
 └─────────┴─└─────────────────────────────┘─┴─────────────────────────┘
 ```
 
-**Sidebar (~18%)**: 2 modes (Worlds | Elements). Top toggle, footer gear → settings.
+**Sidebar (~19%)**: 2 modes (Worlds | Elements). Top toggle, footer gear → settings.
 
-**Middle (~52%)**: split into two stacked regions —
+**Middle (~51%)**: split into two stacked regions —
 - **Room nav strip** (~32px, top): persistent icon strip when a world is active. Click any icon → navigate to that room. Hidden on the welcome screen (no world).
 - **Room content** (flex 1, below): the active room renders here.
 
@@ -696,7 +696,7 @@ Inherited from legacy (hard-won; preserve in new code):
 3. **Shell pane non-mutation** — renderers must wrap content in a child div, never set `.atlas-middle` / `.atlas-right` cssText or className. Touching the shell pane wipes its `flex: 0 0 X%` and breaks the layout.
 4. **`min-width: 0` on flex children** — without it, wide content forces parent past flex-basis.
 5. **SDK-shape-agnostic relationships** — scan all array fields whose items have `id`; don't hardcode `_ids` suffix detection (SDK may rewrite field names).
-6. **Acronym-aware field labels** — `humanizeFieldName('image_url')` → `Image URL` via ACRONYMS set (URL, ID, API, UI, IP, HTML, HTTP, DNS, UUID, SDK).
+6. **Acronym-aware field labels** — `humanizeFieldName('image_url')` → `Image URL` via ACRONYMS set (URL, ID, API, UI, IP, HTML, HTTP, DNS, UUID, SDK, PIN, GPS).
 7. **ui-prefs vs URL state** — UX preferences in localStorage; navigation state in URL hash. Don't conflate.
 8. **Pin write SDK bypass** — `prepareRelations` mis-handles `element_id` (would convert to `element_id_id`). Use `client.request('POST'|'PATCH', '/pin/...')` directly with the wire-shape body.
 9. **CSS class + data-active for visibility** — never inline `display: none` toggled by JS. Use opacity transition on a class. Debug-hostile otherwise.
@@ -753,7 +753,7 @@ Inherited from legacy (hard-won; preserve in new code):
 
 40. **Writing-room sidebar takeover** (session 224). When the route is `writing` and `state.ui.sidebarWritingOverride === false`, the sidebar body shows the writing tree (`mountWritingBody` in `src/sidebar/writing-sidebar.ts`) instead of worlds/elements. Clicking the worlds/world-name toggle while in writing sets `sidebarWritingOverride: true` — that escape sticks until the route leaves+re-enters writing OR the user clicks the writing icon in the room nav (which clears it). The two-band sidebar header mirrors the elements-sidebar layout EXACTLY (filter-strip slot becomes create row, search-row slot reused with tune in the `+` position). Middle pane in writing mode is single-column — just element-detail. Bands and tree are appended directly to `.atlas-sidebar-content` (no wrapping flex div) so the shell-level scrollbar gutter aligns between writing and elements sidebars.
 
-41. **`.atlas-middle-header` is locked at 45px.** Every height channel — `height`, `min-height`, `max-height`, `flex: 0 0 45px` — set with `!important`. Plus `overflow: hidden; flex-wrap: nowrap`. Plus defensive `.atlas-middle-header > * { max-height: 100%; flex-shrink: 0 }` so no descendant can grow the band. Tier badge + child-create buttons for writing-tree narratives live inside this header (no separate toolbar slot above element-detail). One stable band across all elements and rooms.
+41. **`.atlas-middle-header` is locked at 36px.** Every height channel — `height`, `min-height`, `max-height`, `flex: 0 0 36px` — set with `!important`. Plus `overflow: hidden; flex-wrap: nowrap`. Plus defensive `.atlas-middle-header > * { max-height: 100%; flex-shrink: 0 }` so no descendant can grow the band. Tier badge + child-create buttons for writing-tree narratives live inside this header (no separate toolbar slot above element-detail). One stable band across all elements and rooms. (Iterated 64 → 48 → 46 → 36 across session 224's polish day; 36 is final.)
 
 42. **Optimistic close on `openFieldEditPopover` saves.** The overlay calls `cleanup()` BEFORE awaiting `opts.onSave`, then catches any rejection and surfaces it via toast. UI stays interactive during persistence (sidebar clicks, chevrons, navigation all responsive). Pattern: saves whose failure is rare and survivable should not block the UI. Convention #42 is the popover-level expression; same principle drives the "save registry first, then promote" ordering in `writing-setup.ts`.
 

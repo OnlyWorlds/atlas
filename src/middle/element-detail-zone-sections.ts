@@ -15,7 +15,7 @@
 
 import { getState, patchSlice } from '../core/state';
 import { getActiveStore } from '../core/active-store';
-import { requestPushIfLinked } from '../sync/sync-attach';
+import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import type { Zone, Marker, WorldMap } from '../core/types';
 import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
@@ -74,9 +74,7 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
     if (!store) return;
     try {
       await store.updateZone(zone.id, patch);
-      const elements = await store.listElements();
-      patchSlice('data', { elements });
-      requestPushIfLinked();
+      const elements = await refreshElementsAfterWrite(store);
     } catch (err) {
       console.error('[zone-visuals] update failed:', err);
       toasts.error('Failed to update zone visual');
@@ -271,9 +269,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
       if (!store) return;
       try {
         await store.deleteMarker(markerId);
-        const updated = await store.listElements();
-        patchSlice('data', { elements: updated });
-        requestPushIfLinked();
+        const updated = await refreshElementsAfterWrite(store);
       } catch (err) {
         console.error('[zone-markers] delete marker failed:', err);
         toasts.error('Failed to delete marker');

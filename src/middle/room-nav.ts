@@ -26,6 +26,9 @@ import {
   type RouteMode,
 } from '../core/router';
 import { writingHashForNarrative } from './writing-helpers';
+import { ELEMENT_ICONS } from '../core/constants';
+import { elementHash } from '../core/router';
+import { escapeText } from '../core/dom-utils';
 
 interface RoomDef {
   id: RouteMode | 'home' | 'writing' | 'timeline' | 'search' | 'publish' | 'import' | 'templates' | 'settings';
@@ -105,6 +108,47 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       });
       strip.appendChild(btn);
     }
+
+    // Selected-element chip (far right). Visible whenever a selection exists;
+    // gives a persistent "you have X selected, click to return" affordance
+    // and ensures the strip always has *something* highlighted when route
+    // mode is 'element' (the room buttons themselves never match it).
+    const selectedId = getState().ui.selectedElementId;
+    if (selectedId) {
+      const el = getState().data.elements.find(e => e.id === selectedId);
+      if (el) {
+        const spacer = document.createElement('div');
+        spacer.className = 'atlas-room-nav-spacer';
+        strip.appendChild(spacer);
+
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'atlas-room-nav-selected';
+        if (route.mode === 'element') chip.classList.add('active');
+        chip.title = `${el.name || '(unnamed)'} — click to view`;
+        const truncatedName = truncateName(el.name || '(unnamed)', 22);
+        chip.innerHTML = `
+          <span class="material-symbols-outlined atlas-room-nav-selected-icon">${ELEMENT_ICONS[el.type] ?? 'category'}</span>
+          <span class="atlas-room-nav-selected-name">${escapeText(truncatedName)}</span>
+          <span class="material-symbols-outlined atlas-room-nav-selected-close" data-action="clear-selection" title="Clear selection">close</span>
+        `;
+        chip.addEventListener('click', (e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('[data-action="clear-selection"]')) {
+            e.stopPropagation();
+            patchSlice('ui', { ...getState().ui, selectedElementId: null });
+            return;
+          }
+          navigate(elementHash(worldId, selectedId));
+        });
+        strip.appendChild(chip);
+      }
+    }
+  }
+
+  function truncateName(name: string, max: number): string {
+    if (name.length <= max) return name;
+    return name.slice(0, max - 1).trimEnd() + '…';
   }
 
   const unsubState = subscribe(render);

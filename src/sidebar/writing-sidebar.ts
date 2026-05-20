@@ -14,111 +14,22 @@ import { onHashChange, parseHash, navigate, writingHash, searchHash } from '../c
 import { ToastManager } from '../ui/toast-manager';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import { getActiveStore } from '../core/active-store';
-import { requestPushIfLinked } from '../sync/sync-attach';
+import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { saveRegistry, toggleWritingTreeCollapsed } from '../registry/registry';
 import {
   getWritingLabels,
-  getTierForNarrative,
-  isWritingNarrative,
   iconForTier,
   supertypeForTier,
+  buildNarrativeIndex,
+  ancestorIds,
+  findAncestry,
+  nextOrder,
   type WritingLabels,
-  type WritingTier,
+  type NarrativeNode,
+  type NarrativeIndex,
 } from '../middle/writing-helpers';
 import type { Element } from '../core/types';
 import { escapeText } from '../core/dom-utils';
-
-interface NarrativeNode {
-  el: Element;
-  tier: WritingTier;
-  children: NarrativeNode[];
-  depth: number;
-}
-
-interface NarrativeIndex {
-  roots: NarrativeNode[];
-  byId: Map<string, NarrativeNode>;
-}
-
-function buildNarrativeIndex(elements: Element[], worldId: string): NarrativeIndex {
-  const writingNarratives = elements.filter(e => isWritingNarrative(e, worldId));
-  const byId = new Map<string, NarrativeNode>();
-  for (const el of writingNarratives) {
-    byId.set(el.id, { el, tier: getTierForNarrative(el, worldId), children: [], depth: 0 });
-  }
-  const roots: NarrativeNode[] = [];
-  for (const node of byId.values()) {
-    const parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
-    if (parentId && byId.has(parentId)) {
-      byId.get(parentId)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-  const queue: NarrativeNode[] = roots.map(r => { r.depth = 0; return r; });
-  while (queue.length > 0) {
-    const n = queue.shift()!;
-    for (const child of n.children) {
-      child.depth = n.depth + 1;
-      queue.push(child);
-    }
-  }
-  const orderFn = (a: NarrativeNode, b: NarrativeNode) => {
-    const ao = (a.el as Element & { order?: number }).order ?? 0;
-    const bo = (b.el as Element & { order?: number }).order ?? 0;
-    if (ao !== bo) return ao - bo;
-    return (a.el.name ?? '').localeCompare(b.el.name ?? '');
-  };
-  const sortTree = (nodes: NarrativeNode[]): void => {
-    nodes.sort(orderFn);
-    for (const n of nodes) sortTree(n.children);
-  };
-  sortTree(roots);
-  return { roots, byId };
-}
-
-function ancestorIds(idx: NarrativeIndex, id: string): string[] {
-  const out: string[] = [];
-  const cur = idx.byId.get(id);
-  let parentId = cur ? (cur.el as Element & { parent_narrative?: string }).parent_narrative : undefined;
-  while (parentId) {
-    out.push(parentId);
-    const parent = idx.byId.get(parentId);
-    if (!parent) break;
-    parentId = (parent.el as Element & { parent_narrative?: string }).parent_narrative;
-  }
-  return out;
-}
-
-function findAncestry(idx: NarrativeIndex, id: string): { bookId?: string; chapterId?: string; sceneId?: string } {
-  const node = idx.byId.get(id);
-  if (!node) return {};
-  const chain: NarrativeNode[] = [node];
-  let parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
-  while (parentId) {
-    const parent = idx.byId.get(parentId);
-    if (!parent) break;
-    chain.unshift(parent);
-    parentId = (parent.el as Element & { parent_narrative?: string }).parent_narrative;
-  }
-  return {
-    bookId: chain[0]?.el.id,
-    chapterId: chain[1]?.el.id,
-    sceneId: chain[2]?.el.id,
-  };
-}
-
-function nextOrder(idx: NarrativeIndex, parentId: string | null): number {
-  const siblings = parentId
-    ? (idx.byId.get(parentId)?.children ?? [])
-    : idx.roots;
-  let max = -1;
-  for (const s of siblings) {
-    const o = (s.el as Element & { order?: number }).order ?? 0;
-    if (o > max) max = o;
-  }
-  return max + 1;
-}
 
 async function createNarrativeAtTier(
   tier: 'l1' | 'l2' | 'l3' | 'l4',
@@ -140,9 +51,7 @@ async function createNarrativeAtTier(
     ...(parentId ? { parent_narrative: parentId } : {}),
     order: nextOrder(idx, parentId),
   } as Partial<Element>);
-  const all = await folder.listElements();
-  patchSlice('data', { elements: all });
-  requestPushIfLinked();
+  const all = await refreshElementsAfterWrite(folder);
   return created;
 }
 
@@ -223,9 +132,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
         await folder.updateElement(siblings[i].id, { order: i } as Partial<Element>);
       }
     }
-    const fresh = await folder.listElements();
-    patchSlice('data', { elements: fresh });
-    requestPushIfLinked();
+    const fresh = await refreshElementsAfterWrite(folder);
   }
 
   // Track the activeId from the LAST navigation. We force-expand ancestors

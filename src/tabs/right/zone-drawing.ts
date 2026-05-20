@@ -21,7 +21,7 @@
 import L from 'leaflet';
 import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../core/active-store';
-import { requestPushIfLinked } from '../../sync/sync-attach';
+import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { storageToLeaflet, leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import { snapToAxis, findClosestSegment, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
 import { clampToCanvas } from './map-tab-pin-drag';
@@ -288,9 +288,7 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
     }
 
     // 3. Refresh element cache + sync.
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
-    requestPushIfLinked();
+    const elements = await refreshElementsAfterWrite(store);
 
     draft.toasts.success(`${draft.mode.charAt(0).toUpperCase()}${draft.mode.slice(1)} created: ${values.name}`);
 

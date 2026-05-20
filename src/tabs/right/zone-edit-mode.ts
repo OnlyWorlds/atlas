@@ -30,9 +30,9 @@
 import L from 'leaflet';
 import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../core/active-store';
-import { requestPushIfLinked } from '../../sync/sync-attach';
+import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { storageToLeaflet, leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
-import { findClosestSegment, polygonCentroid, polylineLabelAnchor, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
+import { polygonCentroid, polylineLabelAnchor, type Point } from '../../visualization/leaflet-2d/ZoneGeometry';
 import { getZoneSvgRendererForMap } from '../../visualization/leaflet-2d/ZoneOverlay';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { markersForZoneOnMap, partitionZonesAndMarkers, getZoneShape } from './zone-derived';
@@ -160,14 +160,15 @@ function clearPersistedSnapshot(worldId: string): void {
 /**
  * Module-level "just-dragged" guard. Vertex / centroid drag handlers set this
  * to `Date.now()` on dragstart and clear-by-timeout on dragend. The map-click
- * handler in map-tab.ts (via insertMarkerAtClick) checks `isMidDragSuppression()`
- * before inserting — without this, the mouseup that ENDS a drag can also fire
- * a map-click event (Leaflet's marker drag doesn't always swallow click
- * propagation), spawning a stray marker right under the drag-released handle.
+ * handler in map-tab.ts checks `isMidDragSuppression()` before treating a
+ * canvas click as a deselect — without this, the mouseup that ENDS a drag
+ * can also fire a map-click event (Leaflet's marker drag doesn't always
+ * swallow click propagation), which would deselect the zone right after the
+ * user finished moving a vertex.
  *
- * Captain smoke session 219: "sometimes ANOTHER marker gets created when I
- * move one. hard to recreate. but happens sometimes." The race window is
- * tiny but real.
+ * Captain smoke session 219 originally surfaced this for an old
+ * click-anywhere-to-insert flow; session 226 removed that flow but the
+ * suppression remains relevant for the deselect-on-background-click path.
  */
 let dragSuppressUntil = 0;
 const DRAG_SUPPRESS_MS = 150;
@@ -256,50 +257,6 @@ export function getEditingZoneId(): string | null {
 
 export function getEditingMapId(): string | null {
   return active?.mapId ?? null;
-}
-
-/**
- * Click-anywhere-on-canvas insertion (ZC8). Called from map-tab.ts's map-click
- * handler when an edit session is active on this map AND the click did NOT
- * hit a segment overlay or vertex handle (those have their own listeners).
- *
- * Finds the nearest segment (polygon includes wrap segment; line does not),
- * inserts a marker AT the click point (not the projection foot — Captain
- * wants "places the marker exactly there"), and renumbers subsequent markers.
- */
-export async function insertMarkerAtClick(clickPoint: Point): Promise<void> {
-  if (!active) return;
-  const store = getActiveStore();
-  if (!store) return;
-  const state = getState();
-  const { markers } = partitionZonesAndMarkers(state.data.elements);
-  const zoneMarkers = markersForZoneOnMap(active.zoneId, active.mapId, markers);
-  if (zoneMarkers.length < 2) return;
-
-  const zone = state.data.elements.find(
-    (e): e is Zone => e.type === 'zone' && e.id === active!.zoneId,
-  );
-  const isPolygon = getZoneShape(zone) === 'polygon';
-
-  const closest = findClosestSegment(
-    clickPoint,
-    zoneMarkers.map(m => ({ x: m.x, y: m.y })),
-    isPolygon,
-  );
-  if (!closest) return;
-
-  // Insert AT click point (rounded + clamped to canvas), with order =
-  // segmentIndex + 1. Renumber bumps every existing marker with order ≥ that
-  // by one. Same flow as segment-click midpoint insert, just with the click
-  // point as the position.
-  const entry = mapTabCache.get(active.mapId);
-  const cfg = entry?.manager.getConfig();
-  const w = cfg?.canvasWidth ?? 2000;
-  const h = cfg?.canvasHeight ?? 2000;
-  const x = clamp(Math.round(clickPoint.x), 0, w);
-  const y = clamp(Math.round(clickPoint.y), 0, h);
-  const newOrder = closest.index + 1;
-  await optimisticInsertMarker({ x, y, order: newOrder, zoneMarkers });
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -477,9 +434,13 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   const latlng = storageToLeaflet({ x: marker.x, y: marker.y }, canvasHeight);
   // 1-indexed display; matches zoner muscle memory ("marker 1, 2, 3...").
   const displayOrder = (marker.order ?? 0) + 1;
+  // Tooltip via native title — surfaces the two affordances (drag-to-move /
+  // drag-to-trash / right-click-delete) on hover. No layout cost, no
+  // dependency on a popover lib.
+  const tooltip = 'drag to move · drop on trash to delete · right-click to delete';
   const icon = L.divIcon({
     className: 'atlas-zone-edit-handle',
-    html: `<span class="atlas-zone-edit-handle-num">${displayOrder}</span>`,
+    html: `<span class="atlas-zone-edit-handle-num" title="${tooltip}">${displayOrder}</span>`,
     iconSize: [16, 16],
     iconAnchor: [8, 8],
   });
@@ -489,11 +450,20 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
     keyboard: false,
   });
 
-  // Drag handlers — dragstart blocks map clicks; drag is visual; dragend commits.
+  // Drag handlers — dragstart blocks map clicks; drag is visual; dragend
+  // commits. The trash-zone affordance mirrors pins (map-tab-pin-drag.ts):
+  // reveal on dragstart, live-track hover during drag, on drop test against
+  // the trash-zone rect and either delete or persist position. Reuses
+  // entry.trashZone — same DOM element pins use.
   let suppressClick = false;
   handle.on('dragstart', () => {
     suppressClick = true;
     markDragInProgress();
+    const entry = active ? mapTabCache.get(active.mapId) : null;
+    if (entry) {
+      entry.trashZone.setAttribute('data-active', 'true');
+      entry.trashZone.setAttribute('data-hover', 'false');
+    }
   });
   // Live outline update (ZD4): on every drag frame, update the ZoneOverlay
   // polygon/polyline via setZonePointsLive. We rebuild the points list from
@@ -506,6 +476,18 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
     // happens in rAF, OUT of the paint-blocking path. The marker's CSS
     // transform commits immediately; the polygon catches up one frame later.
     scheduleLiveOutlineRefresh(canvasHeight);
+    // Update trash-zone hover state (cheap — just reads two bounding rects).
+    const entry = mapTabCache.get(active.mapId);
+    if (entry && entry.trashZone.getAttribute('data-active') === 'true') {
+      const lMap = entry.manager.getMap();
+      if (lMap) {
+        const markerScreen = lMap.latLngToContainerPoint(handle.getLatLng());
+        entry.trashZone.setAttribute(
+          'data-hover',
+          String(isInsideTrashZone(entry, markerScreen)),
+        );
+      }
+    }
   });
   handle.on('dragend', async () => {
     setTimeout(() => { suppressClick = false; }, 50);
@@ -513,6 +495,27 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
     // Flush any pending rAF live-point update so the final position is the
     // committed one, not a stale-frame snapshot.
     cancelPendingLivePoints();
+    // Determine drop target: trash zone (delete) vs anywhere else (move).
+    let droppedOnTrash = false;
+    const entry = active ? mapTabCache.get(active.mapId) : null;
+    if (entry) {
+      const lMap = entry.manager.getMap();
+      if (lMap) {
+        const markerScreen = lMap.latLngToContainerPoint(handle.getLatLng());
+        droppedOnTrash = isInsideTrashZone(entry, markerScreen);
+      }
+      entry.trashZone.setAttribute('data-active', 'false');
+      entry.trashZone.setAttribute('data-hover', 'false');
+    }
+    if (droppedOnTrash) {
+      // deleteMarkerInEdit handles min-vertex check + toast + renumber + rebuild.
+      // If at floor, the marker snaps back via rebuildHandles inside the
+      // refusal path of deleteMarkerInEdit (no — it returns early; we need
+      // to rebuild ourselves so the visual snaps back).
+      await deleteMarkerInEdit(marker.id);
+      rebuildHandles();
+      return;
+    }
     const newLatLng = handle.getLatLng();
     const pt = leafletToStorage(newLatLng, canvasHeight);
     const x = Math.round(pt.x);
@@ -521,9 +524,7 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
     if (!store) return;
     try {
       await store.updateMarker(marker.id, { x, y });
-      const elements = await store.listElements();
-      patchSlice('data', { elements });
-      requestPushIfLinked();
+      const elements = await refreshElementsAfterWrite(store);
       rebuildHandles(); // re-render so segment overlays follow the new position
     } catch (err) {
       console.error('[zone-edit] update marker failed:', err);
@@ -541,6 +542,27 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   });
 
   return handle;
+}
+
+/**
+ * Check whether a marker's container-point lies inside the map tab's trash
+ * zone rect. Mirrors `isInsideZone` in map-tab-pin-drag.ts; kept local to
+ * avoid coupling the two drag flows through a shared helper.
+ */
+function isInsideTrashZone(
+  entry: MapTabCacheEntry,
+  markerScreen: { x: number; y: number },
+): boolean {
+  const containerRect = entry.container.getBoundingClientRect();
+  const zoneRect = entry.trashZone.getBoundingClientRect();
+  const mx = containerRect.left + markerScreen.x;
+  const my = containerRect.top + markerScreen.y;
+  return (
+    mx >= zoneRect.left &&
+    mx <= zoneRect.right &&
+    my >= zoneRect.top &&
+    my <= zoneRect.bottom
+  );
 }
 
 /**
@@ -635,9 +657,7 @@ function buildCentroidHandle(center: Point, canvasHeight: number): L.Marker {
         const ny = clamp(origPos.y + dy, 0, h);
         await store.updateMarker(markerId, { x: nx, y: ny });
       }
-      const elements = await store.listElements();
-      patchSlice('data', { elements });
-      requestPushIfLinked();
+      const elements = await refreshElementsAfterWrite(store);
       rebuildHandles();
     } catch (err) {
       console.error('[zone-edit] centroid drag commit failed:', err);
@@ -852,9 +872,7 @@ async function deleteMarkerInEdit(markerId: string): Promise<void> {
         await store.updateMarker(remaining[i].id, { order: i });
       }
     }
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
-    requestPushIfLinked();
+    const elements = await refreshElementsAfterWrite(store);
     rebuildHandles();
   } catch (err) {
     console.error('[zone-edit] delete marker failed:', err);
@@ -978,9 +996,7 @@ async function restoreFromSnapshot(session: EditSession): Promise<void> {
         await store.updateMarker(id, patch);
       }
     }
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
-    requestPushIfLinked();
+    const elements = await refreshElementsAfterWrite(store);
     session.toasts.info('Edit cancelled');
   } catch (err) {
     console.error('[zone-edit] restore from snapshot failed:', err);

@@ -2056,6 +2056,26 @@
   border-radius: 50%;
   background: #37b56a;
   flex-shrink: 0;
+  position: relative;
+}
+
+/* Decay ring around the sync-pill dot during a pending debounced push.
+   Driven by --decay-fraction (0 → just scheduled, 1 → about to fire).
+   The conic-gradient renders a cyan arc from 12 o'clock; the rest of the
+   ring is faintly visible so the user sees the full "track" even at 0. */
+.atlas-sync-pill[data-pending="true"] .atlas-sync-pill-dot::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--atlas-cyan) calc(var(--decay-fraction, 0) * 360deg),
+    rgba(34, 211, 238, 0.18) 0
+  );
+  /* Mask the center so only a thin ring shows. */
+  -webkit-mask: radial-gradient(closest-side, transparent 64%, #000 66%);
+          mask: radial-gradient(closest-side, transparent 64%, #000 66%);
+  pointer-events: none;
 }
 
 .atlas-sync-pill[data-state="synced"] .atlas-sync-pill-dot {
@@ -2645,6 +2665,28 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
+.atlas-settings-debounce-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-settings-debounce-input {
+  width: 80px;
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-settings-debounce-unit {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
+.atlas-settings-hint-sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.40);
+  line-height: 1.4;
+}
+
 .atlas-settings-meta {
   display: grid;
   grid-template-columns: 90px 1fr;
@@ -2870,6 +2912,43 @@
 .atlas-modal-hint.atlas-modal-hint-warn {
   color: #f6b26b;
 }
+
+/* Custom file-picker (atlas styled replacement for native <input type="file">).
+   Used by map-create-modal §3 local image field. */
+.atlas-file-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.atlas-file-picker-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.atlas-file-picker-btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.atlas-file-picker-name {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.atlas-file-picker-name.atlas-file-picker-name-set {
+  color: rgba(255, 255, 255, 0.85);
+  font-style: normal;
+}
+
 
 /* Collapsible "advanced" section inside modals. Used by map-create-modal §3.2. */
 .atlas-modal-advanced-toggle {
@@ -3880,8 +3959,17 @@
   transform: translateX(-50%);
   display: flex;
   align-items: center;
+  /* Wrap onto a second row when the map pane is narrower than the overlay's
+     intrinsic width — Captain's smoke 2026-05-20: overlay was cut off in
+     narrow panes. row-gap controls vertical spacing between wrapped rows. */
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
+  row-gap: 6px;
   padding: 6px 14px;
+  /* Cap width to the pane (minus a small inset so the rounded corners breathe).
+     Without this, the overlay extends past the map container at narrow widths. */
+  max-width: calc(100% - 32px);
   background: rgba(10, 10, 10, 0.92);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(34, 211, 238, 0.35);
@@ -4732,6 +4820,79 @@ svg .atlas-zone-selected {
 
 .atlas-room-nav-btn .material-symbols-outlined {
   font-size: 18px;
+}
+
+/* Flex spacer pushes the selected-element chip to the far right of the strip. */
+.atlas-room-nav-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+
+/* Selected-element chip — lives at the far right of the room-nav strip when
+   state.ui.selectedElementId is set. Click body → navigate to element room;
+   click × → clear selection. Rounded pill shape always; only gains the cyan
+   border + tint when the current room IS 'element' (i.e. the chip's own
+   destination is the active room — gives the always-something-highlighted
+   invariant Captain wanted). */
+.atlas-room-nav-selected {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 260px;
+  height: 26px;
+  padding: 0 4px 0 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 80ms ease, background 80ms ease, border-color 80ms ease;
+  min-width: 0;
+}
+
+.atlas-room-nav-selected:hover {
+  color: var(--atlas-text);
+  background: var(--atlas-bg-hover);
+}
+
+.atlas-room-nav-selected.active {
+  color: var(--atlas-cyan);
+  background: var(--atlas-cyan-tint);
+  border-color: var(--atlas-cyan-soft);
+}
+
+/* Scope under .atlas-room-nav-selected so we outrank the material-symbols
+   package's own `.material-symbols-outlined { font-size: 24px }` rule
+   (single-class specificity ties tend to favor whatever loads last; rather
+   than depend on order, force-win via a two-class selector). */
+.atlas-room-nav-selected .atlas-room-nav-selected-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.atlas-room-nav-selected-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  letter-spacing: 0.01em;
+}
+
+.atlas-room-nav-selected .atlas-room-nav-selected-close {
+  font-size: 15px;
+  padding: 1px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 80ms ease, background 80ms ease, color 80ms ease;
+}
+
+.atlas-room-nav-selected-close:hover {
+  opacity: 1;
+  color: var(--atlas-danger, #ef4444);
+  background: rgba(239, 68, 68, 0.15);
 }
 
 /* Middle pane content area — fills the rest of the middle pane below the

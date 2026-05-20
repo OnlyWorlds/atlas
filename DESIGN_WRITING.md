@@ -193,13 +193,13 @@ Session 224 moved the writing tree from a left column in the middle pane INTO th
 **Middle pane** (`src/middle/writing.ts`):
 - Single column. No tree, no separate toolbar.
 - Renders the active narrative's element-detail.
-- Tier badge ("Book" / "Chapter" / "Scene" / "Draft") and child-create buttons live in the **element-detail header** (so all elements share the same 45px header band). See "Header unification" below.
+- Tier badge ("Book" / "Chapter" / "Scene" / "Draft") and child-create buttons live in the **element-detail header** (so all elements share the same 36px header band). See "Header unification" below.
 - Empty state when no narrative selected:
   - Tree has narratives → "Pick a {l1}, {l2}, {l3}, or {l4} from the sidebar to begin."
   - Tree is empty → centered create buttons (New {l1} + New {l4}) for fast first-touch.
 
 **Header unification** (`.atlas-middle-header`):
-- Locked at 45px (`height` + `min-height` + `max-height` + `flex: 0 0 45px`, all `!important`).
+- Locked at 36px (`height` + `min-height` + `max-height` + `flex: 0 0 36px`, all `!important`).
 - `overflow: hidden; flex-wrap: nowrap` — content never grows the band.
 - Defensive `.atlas-middle-header > * { max-height: 100%; flex-shrink: 0 }` — no descendant can push the band taller.
 - For writing-tree narratives, header renders: `[icon] [name] [spacer] [tier pill] [+ child icons] [pin clusters] [sync dot] [delete]`. For other element types: same minus the tier pill and child-create buttons.
@@ -239,7 +239,7 @@ Note: the URL path names reflect the *default* labels for readability. They aren
 - Element-detail supertype autocomplete (suggestion chips + Tab complete)
 - Settings → Writing l4 input + change-event triggers migration
 - **Sidebar takeover** — writing tree moved from middle pane into the sidebar (`src/sidebar/writing-sidebar.ts`), middle pane single-column
-- **Header unification** — tier badge + child-create buttons moved INTO `.atlas-middle-header`, header height locked at 45px across all rooms
+- **Header unification** — tier badge + child-create buttons moved INTO `.atlas-middle-header`, header height locked at 36px across all rooms
 - **Drag-reorder** — sibling-only, sequential `order` writes, cyan drop indicator
 - **Cascade delete** — deleting a book/chapter cascades all descendant narratives (and their pins) per `findDependents` extension in folder-store-fs.ts + mock-folder-store.ts
 - **Last-narrative memory** — `registry.worlds[i].last_writing_narrative_id`, room-nav writing icon restores it
@@ -295,7 +295,7 @@ Note: the URL path names reflect the *default* labels for readability. They aren
 
 - **#40** (new session 224): The writing tree lives in the sidebar (`src/sidebar/writing-sidebar.ts`) when the route is `writing`. The middle pane in writing mode is single-column (just element-detail of the active narrative). Takeover is implicit — `state.ui.sidebarWritingOverride: boolean` controls whether the user has explicitly toggled out. Override clears on route in/out of writing.
 
-- **#41** (new session 224): `.atlas-middle-header` is locked at 45px — `height`, `min-height`, `max-height`, and `flex: 0 0 45px` all set with `!important`, plus `overflow: hidden; flex-wrap: nowrap`, plus defensive `.atlas-middle-header > * { max-height: 100%; flex-shrink: 0 }`. The header is a stable band across all element types and all rooms; tier badge + writing actions for narratives live inside it (no separate toolbar slot).
+- **#41** (new session 224): `.atlas-middle-header` is locked at 36px — `height`, `min-height`, `max-height`, and `flex: 0 0 36px` all set with `!important`, plus `overflow: hidden; flex-wrap: nowrap`, plus defensive `.atlas-middle-header > * { max-height: 100%; flex-shrink: 0 }`. The header is a stable band across all element types and all rooms; tier badge + writing actions for narratives live inside it (no separate toolbar slot).
 
 - **#42** (new session 224): Field edits via `openFieldEditPopover` close optimistically — the overlay tears down BEFORE awaiting `opts.onSave`, so the rest of the UI stays interactive during persistence. Failures surface via toast. Pattern applies generally to saves whose failure mode is rare and survivable.
 

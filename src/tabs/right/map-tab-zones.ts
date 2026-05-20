@@ -22,7 +22,7 @@ import {
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import type { Zone } from '../../core/types';
 import { getActiveStore } from '../../core/active-store';
-import { requestPushIfLinked } from '../../sync/sync-attach';
+import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import type { ToastManager } from '../../ui/toast-manager';
 
 /**
@@ -281,9 +281,7 @@ async function renameZone(zoneId: string, toasts: ToastManager): Promise<void> {
   if (next === null || next.trim() === '' || next === zone.name) return;
   try {
     await store.updateZone(zoneId, { name: next.trim() });
-    const elements = await store.listElements();
-    patchSlice('data', { elements });
-    requestPushIfLinked();
+    const elements = await refreshElementsAfterWrite(store);
   } catch (err) {
     console.error('[zone-chip] rename failed:', err);
     toasts.error('Failed to rename zone');

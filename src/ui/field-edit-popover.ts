@@ -131,12 +131,13 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
 
   positionPopover(panel, opts.anchor);
 
-  // Focus + select after layout
-  setTimeout(() => {
+  // Focus + select after layout. queueMicrotask matches the idiom used for
+  // the scroll-restore path elsewhere in this codebase.
+  queueMicrotask(() => {
     input.focus();
     if (input instanceof HTMLInputElement) input.select();
     else input.setSelectionRange(input.value.length, input.value.length);
-  }, 0);
+  });
 
   function cleanup(): void {
     document.removeEventListener('keydown', keyHandler);
@@ -214,11 +215,34 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
 /**
  * Anchor the popover near the given element. Try above first, then below;
  * constrain horizontally to the viewport.
+ *
+ * Width matches the anchor's width (clamped to MIN_WIDTH / viewport), so the
+ * editor surface aligns with the field the user clicked. CSS supplies the
+ * fallback min/max; the inline width here overrides them so the popover
+ * adapts to wide fields (description, story).
  */
 function positionPopover(panel: HTMLElement, anchor: HTMLElement): void {
   const anchorRect = anchor.getBoundingClientRect();
-  const panelRect = panel.getBoundingClientRect();
   const margin = 8;
+  const MIN_WIDTH = 280;
+
+  // Width = anchor width minus a small inset so the popover visually sits
+  // inside the field row instead of running edge-to-edge with it. Captain's
+  // smoke 2026-05-20: edge-to-edge looked "slightly too big" — 24px inset
+  // gives breathing room without losing the "matches the field" effect.
+  const INSET = 24;
+  const maxViewportWidth = window.innerWidth - margin * 2;
+  const targetWidth = Math.max(
+    MIN_WIDTH,
+    Math.min(anchorRect.width - INSET, maxViewportWidth),
+  );
+  panel.style.width = `${targetWidth}px`;
+  // Override CSS max-width so the inline width wins when the field is wide.
+  panel.style.maxWidth = `${maxViewportWidth}px`;
+
+  // Re-read dimensions AFTER width is applied so vertical-fit calc uses the
+  // post-resize height.
+  const panelRect = panel.getBoundingClientRect();
 
   // Horizontal: align panel's left with anchor's left, but clamp to viewport
   let left = anchorRect.left;

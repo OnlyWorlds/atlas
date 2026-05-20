@@ -46,8 +46,8 @@ The legacy atlas defaulted to a Timeline view for active worlds (with no events 
 │                                                              │
 │  ─────────────────────────────────────────────────           │
 │                                                              │
-│  [+ new element]  [open writing]  [open map]                 │
-│  [refresh from API]  [settings]          ← Quick actions    │
+│  [+ new element]  [open writing]  [settings]                 │
+│                                          ← Quick actions    │
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -65,7 +65,7 @@ Reads `state.active.meta` and renders:
 - **Description** (text-long, multi-line)
 - **World type** / **age** / **tags** (whatever metadata exists on `world.json`)
 
-v1: read-only. Click-to-edit deferred — user navigates to settings to edit world meta. Inline-edit is a polish bout.
+**Click-to-edit shipped (session 223)**: name + description are inline-editable via `openFieldEditPopover` (`world-home.ts:openIdentityEdit`). Persists via `FolderStore.writeWorldMeta` + mirrors in `state.active.meta`. Placeholder text "add a description…" when description is empty. World type / age / tags remain read-only — edit via Settings → World.
 
 ### 2. Stats spread
 
@@ -93,14 +93,18 @@ Excludes pins/markers/zones (less useful for "what was I working on" UX).
 
 ### 5. Quick actions row
 
-Buttons:
+**Shipped** (3 buttons):
 - **+ new element** → opens `ElementCreateModal`
 - **open writing** → navigates to `#/w/<id>/writing`
-- **open map** → if any maps exist, opens the first one as a right-pane tab; else opens map-create modal
-- **refresh from API** → visible only if world is api-linked, calls `engine.pullNow()`
 - **settings** → navigates to `#/w/<id>/settings`
 
 Visual: row of compound icon buttons (icon + label), matches existing button patterns.
+
+**Considered but dropped during build**:
+- **open map** — discoverable via the right pane's map index tab; redundant on home.
+- **refresh from API** — surfaced on the sync pill instead (always visible); didn't earn a slot on home.
+
+If either becomes wanted later, both are ~10 lines to restore.
 
 ---
 

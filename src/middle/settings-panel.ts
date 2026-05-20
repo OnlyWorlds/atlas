@@ -25,6 +25,7 @@ import {
   setApiWorldName,
   setSyncPullOnActivate,
   setSyncCadenceMs,
+  setSyncDebounceMs,
   setSyncDefaultPolicy,
   setSyncConfirmServerDeletes,
   setSyncPauseAll,
@@ -326,6 +327,10 @@ function renderSyncTab(reg: ReturnType<typeof getState>['registry']): string {
   const pullOnActivate = !!reg.sync_pull_on_activate;
   const confirmServerDel = reg.sync_confirm_server_deletes !== false; // default true
   const pauseAll = !!reg.sync_pause_all;
+  const debounceMs = typeof reg.sync_debounce_ms === 'number' && reg.sync_debounce_ms >= 0
+    ? reg.sync_debounce_ms
+    : 5000;
+  const debounceSec = Math.round(debounceMs / 1000);
   return `
     <section class="atlas-settings-section">
       <h3>Sync — global</h3>
@@ -345,6 +350,14 @@ function renderSyncTab(reg: ReturnType<typeof getState>['registry']): string {
             `<option value="${o.ms ?? ''}" ${o.ms === cadenceMs ? 'selected' : ''}>${o.label}</option>`
           ).join('')}
         </select>
+      </label>
+      <label class="atlas-settings-field">
+        <span>Autosave delay</span>
+        <span class="atlas-settings-debounce-row">
+          <input class="atlas-input atlas-settings-debounce-input" type="number" name="debounce-sec" min="1" max="3600" step="1" value="${debounceSec}" ${pauseAll ? 'disabled' : ''} />
+          <span class="atlas-settings-debounce-unit">seconds</span>
+        </span>
+        <span class="atlas-settings-hint-sub">After a local edit, atlas waits this long before pushing to the API. The sync pill shows a decay ring during the wait — click it to push now.</span>
       </label>
       <fieldset class="atlas-settings-fieldset" ${pauseAll ? 'disabled' : ''}>
         <legend>Default conflict policy</legend>
@@ -627,6 +640,27 @@ function wireSyncTab(toasts: ToastManager): void {
     saveRegistry(next);
     patchSlice('registry', next);
   });
+
+  const debounceInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="debounce-sec"]');
+  // Persist on `change` (commit) so we don't write to localStorage on every
+  // keystroke. Live `input` events update the engine's debounce so the next
+  // requestPush picks up the new value immediately — feels like the setting
+  // takes effect as soon as you type a digit.
+  const commitDebounce = (): void => {
+    if (!debounceInput) return;
+    const raw = Number(debounceInput.value);
+    if (!Number.isFinite(raw) || raw < 1) return;
+    const sec = Math.min(3600, Math.max(1, Math.floor(raw)));
+    if (sec !== raw) debounceInput.value = String(sec);
+    const ms = sec * 1000;
+    const next = setSyncDebounceMs(getState().registry, ms);
+    saveRegistry(next);
+    patchSlice('registry', next);
+    const engine = getCurrentSyncEngine();
+    if (engine) engine.setDebounceMs(ms);
+  };
+  debounceInput?.addEventListener('change', commitDebounce);
+  debounceInput?.addEventListener('blur', commitDebounce);
 
   policyInputs.forEach((input) => {
     input.addEventListener('change', () => {

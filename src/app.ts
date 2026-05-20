@@ -175,10 +175,10 @@ export function startApp(container: HTMLElement): AppHandle {
       patchSliceIfChanged('middleMode', nextMode);
     }
 
-    // Light-touch: if the hash names a world but state.active doesn't match,
-    // try to silently activate. Skip if no handle in vault (sidebar click is
-    // the explicit-permission path).
-    void maybeAutoActivate(route.worldId, active?.worldId);
+    // Mid-session activation is intentionally NOT automatic — without a fresh
+    // user gesture, requestPermission would fail and we'd downgrade the URL to
+    // a confusing "welcome" view. Sidebar click is the explicit permission
+    // path. Boot-time silent activation is handled by `tryAutoActivateFromUrl`.
 
     // If the route names an element id, mirror it in selection.
     if (route.elementId && getState().ui.selectedElementId !== route.elementId) {
@@ -300,14 +300,6 @@ function patchSliceIfChanged<K extends keyof ReturnType<typeof getState>>(
 ): void {
   if (getState()[key] === value) return;
   patchSlice(key, value);
-}
-
-async function maybeAutoActivate(routeWorldId: string | null, activeWorldId: string | undefined): Promise<void> {
-  if (!routeWorldId || routeWorldId === activeWorldId) return;
-  // Mid-session activation is intentionally NOT automatic — without a fresh
-  // user gesture, requestPermission would fail and we'd downgrade the URL to a
-  // confusing "welcome" view. Sidebar click is the explicit permission path.
-  // Boot-time silent activation is handled separately by `tryAutoActivateFromUrl`.
 }
 
 /**

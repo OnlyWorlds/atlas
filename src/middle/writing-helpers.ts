@@ -171,6 +171,115 @@ export function tierConstraints(tier: 'l1' | 'l2' | 'l3' | 'l4'): {
   }
 }
 
+// ====== Tree building (consolidated from writing-sidebar / writing) ======
+
+export interface NarrativeNode {
+  el: Element;
+  tier: WritingTier;
+  children: NarrativeNode[];
+  depth: number;
+}
+
+export interface NarrativeIndex {
+  roots: NarrativeNode[];
+  byId: Map<string, NarrativeNode>;
+}
+
+/**
+ * Build the writing tree from a flat list of elements. Filters to narratives
+ * whose supertype matches one of the writing labels (`isWritingNarrative`),
+ * links them by `parent_narrative`, assigns depth via BFS, and sorts every
+ * sibling group by `order` then name.
+ *
+ * Used by both the sidebar tree and the writing-room dispatcher.
+ */
+export function buildNarrativeIndex(elements: Element[], worldId: string): NarrativeIndex {
+  const writingNarratives = elements.filter(e => isWritingNarrative(e, worldId));
+  const byId = new Map<string, NarrativeNode>();
+  for (const el of writingNarratives) {
+    byId.set(el.id, { el, tier: getTierForNarrative(el, worldId), children: [], depth: 0 });
+  }
+  const roots: NarrativeNode[] = [];
+  for (const node of byId.values()) {
+    const parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
+    if (parentId && byId.has(parentId)) {
+      byId.get(parentId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  const queue: NarrativeNode[] = roots.map(r => { r.depth = 0; return r; });
+  while (queue.length > 0) {
+    const n = queue.shift()!;
+    for (const child of n.children) {
+      child.depth = n.depth + 1;
+      queue.push(child);
+    }
+  }
+  const orderFn = (a: NarrativeNode, b: NarrativeNode) => {
+    const ao = (a.el as Element & { order?: number }).order ?? 0;
+    const bo = (b.el as Element & { order?: number }).order ?? 0;
+    if (ao !== bo) return ao - bo;
+    return (a.el.name ?? '').localeCompare(b.el.name ?? '');
+  };
+  const sortTree = (nodes: NarrativeNode[]): void => {
+    nodes.sort(orderFn);
+    for (const n of nodes) sortTree(n.children);
+  };
+  sortTree(roots);
+  return { roots, byId };
+}
+
+/** Walk up `parent_narrative` from `id`, returning ancestor ids closest-first. */
+export function ancestorIds(idx: NarrativeIndex, id: string): string[] {
+  const out: string[] = [];
+  const cur = idx.byId.get(id);
+  let parentId = cur ? (cur.el as Element & { parent_narrative?: string }).parent_narrative : undefined;
+  while (parentId) {
+    out.push(parentId);
+    const parent = idx.byId.get(parentId);
+    if (!parent) break;
+    parentId = (parent.el as Element & { parent_narrative?: string }).parent_narrative;
+  }
+  return out;
+}
+
+/**
+ * Resolve the ancestry of a narrative as a {bookId, chapterId, sceneId} trio.
+ * Walks `parent_narrative` to the root and assigns slots by depth. Returns an
+ * empty object if the narrative isn't in the index.
+ */
+export function findAncestry(idx: NarrativeIndex, id: string): { bookId?: string; chapterId?: string; sceneId?: string } {
+  const node = idx.byId.get(id);
+  if (!node) return {};
+  const chain: NarrativeNode[] = [node];
+  let parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
+  while (parentId) {
+    const parent = idx.byId.get(parentId);
+    if (!parent) break;
+    chain.unshift(parent);
+    parentId = (parent.el as Element & { parent_narrative?: string }).parent_narrative;
+  }
+  return {
+    bookId: chain[0]?.el.id,
+    chapterId: chain[1]?.el.id,
+    sceneId: chain[2]?.el.id,
+  };
+}
+
+/** Next `order` value for a new sibling under `parentId` (null = root). */
+export function nextOrder(idx: NarrativeIndex, parentId: string | null): number {
+  const siblings = parentId
+    ? (idx.byId.get(parentId)?.children ?? [])
+    : idx.roots;
+  let max = -1;
+  for (const s of siblings) {
+    const o = (s.el as Element & { order?: number }).order ?? 0;
+    if (o > max) max = o;
+  }
+  return max + 1;
+}
+
 /**
  * Resolve `writing_initialized` with smart-default semantics. A world is
  * effectively initialized when either:

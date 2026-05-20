@@ -136,8 +136,15 @@ export class SyncEngine {
   private inFlight: Promise<SyncResult> | null = null;
   /** Debounce timer for `requestPush()` autosave. Reset on each write. */
   private debouncePushTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Debounce window for autosave pushes. ms. Configurable later. */
+  /** Debounce window for autosave pushes. ms. Configurable via setDebounceMs. */
   private debouncePushMs = 5000;
+  /**
+   * When the currently-scheduled push will fire (epoch ms), null when no
+   * debounce is armed. Exposed via `getPendingPush()` and broadcast via the
+   * `atlas:pending-push` CustomEvent so the sync pill can render a decay
+   * ring around the dot during the debounce window.
+   */
+  private pendingPushScheduledAt: number | null = null;
   /**
    * Most recent `last_sync_at` we've reported via state. Survives pause/resume
    * so the pill's "synced X min ago" tooltip doesn't reset to "never synced"
@@ -245,6 +252,7 @@ export class SyncEngine {
     if (this.debouncePushTimer) clearTimeout(this.debouncePushTimer);
     this.debouncePushTimer = setTimeout(() => {
       this.debouncePushTimer = null;
+      this.setPendingPush(null);
       console.info('[atlas:sync] debounce fired → pushOnce');
       void this.pushOnce().then(r => {
         console.info('[atlas:sync] push complete', {
@@ -261,12 +269,65 @@ export class SyncEngine {
         console.error('[atlas:sync] push errored:', err);
       });
     }, this.debouncePushMs);
+    this.setPendingPush(Date.now() + this.debouncePushMs);
     console.info('[atlas:sync] push scheduled (debounce', this.debouncePushMs, 'ms)');
   }
 
-  /** Test seam — override the debounce window. */
+  /**
+   * Live debounce window setter. Settings → Sync's "Autosave delay" slider
+   * calls this on change; sync-attach also calls it after constructing the
+   * engine using the user's persisted preference. Does NOT re-arm any
+   * in-flight debounce — the new value applies to the NEXT `requestPush()`.
+   */
   setDebounceMs(ms: number): void {
-    this.debouncePushMs = ms;
+    this.debouncePushMs = Math.max(0, Math.floor(ms));
+  }
+
+  /** Current debounce window (ms). Used by Settings UI to render the slider value. */
+  getDebounceMs(): number {
+    return this.debouncePushMs;
+  }
+
+  /**
+   * Returns the current pending-push window, or null when no debounce timer
+   * is armed. Caller can compute `scheduledAt - Date.now()` for time-left.
+   * Used by the sync pill to render its decay ring.
+   */
+  getPendingPush(): { scheduledAt: number; debounceMs: number } | null {
+    if (this.pendingPushScheduledAt === null) return null;
+    return { scheduledAt: this.pendingPushScheduledAt, debounceMs: this.debouncePushMs };
+  }
+
+  /**
+   * Cancel the pending debounce timer and fire `pushOnce()` immediately.
+   * The sync pill calls this when the user clicks during a pending window
+   * ("push now, don't wait"). No-op if no debounce is armed or while paused.
+   */
+  flushPendingPush(): Promise<SyncResult> | null {
+    if (this.paused) return null;
+    if (!this.debouncePushTimer) return null;
+    clearTimeout(this.debouncePushTimer);
+    this.debouncePushTimer = null;
+    this.setPendingPush(null);
+    return this.pushOnce();
+  }
+
+  /**
+   * Update pendingPushScheduledAt and broadcast via a DOM event so the sync
+   * pill (which subscribes to `state.sync.activeSync` for kind-level changes,
+   * not millisecond updates) can react without polluting the engine state
+   * union with timestamps.
+   */
+  private setPendingPush(scheduledAt: number | null): void {
+    this.pendingPushScheduledAt = scheduledAt;
+    if (typeof document === 'undefined') return;
+    try {
+      document.dispatchEvent(new CustomEvent('atlas:pending-push', {
+        detail: scheduledAt === null
+          ? { scheduledAt: null, debounceMs: this.debouncePushMs }
+          : { scheduledAt, debounceMs: this.debouncePushMs },
+      }));
+    } catch { /* document not available in some test environments */ }
   }
 
   /** Stop the engine: cancel pending debounced push, pause. Used on detach. */
@@ -275,6 +336,7 @@ export class SyncEngine {
       clearTimeout(this.debouncePushTimer);
       this.debouncePushTimer = null;
     }
+    this.setPendingPush(null);
     this.paused = true;
     this.pauseReason = 'manual';
   }

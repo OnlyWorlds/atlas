@@ -283,6 +283,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   // re-render on its own; we just re-run this function from a 30s interval.
   // Idempotent — only one timer at a time.
   ensureSyncPillTicker(toasts);
+  ensurePendingPushListener(toasts);
   const active = state.active;
   if (!active) {
     pill.dataset.state = 'none';
@@ -330,6 +331,22 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from API">refresh</span>
   `;
 
+  // Pending-push decay ring: if the engine has a debounced push scheduled,
+  // surface it via a `data-pending="true"` attribute + `--decay-fraction` CSS
+  // var. The conic-gradient ring around the dot fills as time elapses; the
+  // rAF tick (ensurePendingPushListener) keeps the var updated smoothly.
+  if (currentPendingPush) {
+    pill.dataset.pending = 'true';
+    const remaining = currentPendingPush.scheduledAt - Date.now();
+    const debounceMs = Math.max(1, currentPendingPush.debounceMs);
+    const elapsed = Math.max(0, Math.min(debounceMs, debounceMs - remaining));
+    pill.style.setProperty('--decay-fraction', String(elapsed / debounceMs));
+    pill.title = `Saving in ${Math.max(0, Math.ceil(remaining / 1000))}s · click to push now`;
+  } else {
+    pill.dataset.pending = 'false';
+    pill.style.removeProperty('--decay-fraction');
+  }
+
   // Conflict badge click — open the review modal. Caller stops propagation
   // so the pill's parent click handler doesn't fire a refresh.
   pill.querySelector<HTMLElement>('[data-role="review-conflicts"]')?.addEventListener('click', (e) => {
@@ -338,10 +355,20 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   });
 
   // Click anywhere on the pill triggers a manual pull (when not already syncing).
+  // Special case: during a pending push, click flushes the debounce instead —
+  // the user is saying "push now, don't wait" rather than "fetch from server."
   pill.onclick = async () => {
     const eng = getCurrentSyncEngine();
     if (!eng) {
       surfaceSyncUnavailable(toasts);
+      return;
+    }
+    if (currentPendingPush) {
+      try {
+        await eng.flushPendingPush();
+      } catch (err) {
+        toasts.error(err instanceof Error ? err.message : String(err));
+      }
       return;
     }
     const cur = state.sync.activeSync;
@@ -444,6 +471,58 @@ function ensureSyncPillTicker(toasts: ToastManager): void {
     if (!document.querySelector('[data-role="sync-pill"]')) return;
     try { renderSyncIndicator(getState(), toasts); } catch { /* defensive */ }
   }, 30_000);
+}
+
+/**
+ * Pending-push state mirrored from `atlas:pending-push` CustomEvent. Pill
+ * renders a decay ring around its dot while this is non-null; ring fill is
+ * driven by `--decay-fraction` updated each animation frame.
+ */
+let currentPendingPush: { scheduledAt: number; debounceMs: number } | null = null;
+let pendingPushRafHandle: number | null = null;
+let pendingPushListenerInstalled = false;
+
+function ensurePendingPushListener(toasts: ToastManager): void {
+  if (pendingPushListenerInstalled) return;
+  pendingPushListenerInstalled = true;
+  document.addEventListener('atlas:pending-push', ((e: CustomEvent) => {
+    const detail = e.detail as { scheduledAt: number | null; debounceMs: number };
+    currentPendingPush = detail.scheduledAt === null
+      ? null
+      : { scheduledAt: detail.scheduledAt, debounceMs: detail.debounceMs };
+    try { renderSyncIndicator(getState(), toasts); } catch { /* defensive */ }
+    if (currentPendingPush) startDecayTick(toasts);
+    else stopDecayTick();
+  }) as EventListener);
+}
+
+function startDecayTick(toasts: ToastManager): void {
+  if (pendingPushRafHandle !== null) return;
+  const tick = (): void => {
+    if (!currentPendingPush) {
+      pendingPushRafHandle = null;
+      return;
+    }
+    const pill = document.querySelector<HTMLElement>('[data-role="sync-pill"]');
+    if (pill) {
+      const remaining = currentPendingPush.scheduledAt - Date.now();
+      const debounceMs = Math.max(1, currentPendingPush.debounceMs);
+      const elapsed = Math.max(0, Math.min(debounceMs, debounceMs - remaining));
+      pill.style.setProperty('--decay-fraction', String(elapsed / debounceMs));
+      // Update the time-left tooltip — rounded to nearest second so it
+      // doesn't flicker every frame.
+      pill.title = `Saving in ${Math.max(0, Math.ceil(remaining / 1000))}s · click to push now`;
+    }
+    pendingPushRafHandle = requestAnimationFrame(tick);
+  };
+  pendingPushRafHandle = requestAnimationFrame(tick);
+}
+
+function stopDecayTick(): void {
+  if (pendingPushRafHandle !== null) {
+    cancelAnimationFrame(pendingPushRafHandle);
+    pendingPushRafHandle = null;
+  }
 }
 
 function formatTime(iso: string): string {

@@ -22,7 +22,7 @@ import { patchSlice, getState, setState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
 import { navigate, elementHash, parseHash } from '../core/router';
 import type { FolderStore } from '../store/folder-store';
-import type { WorldRegistryEntry, SyncEngineState, ElementType } from '../core/types';
+import type { Element, WorldRegistryEntry, SyncEngineState, ElementType } from '../core/types';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
@@ -71,6 +71,11 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
     onSyncResult: (phase, result) => emitConflictToasts(phase, result),
     onIdSwap: (swap) => handleIdSwap(swap),
   });
+  // Apply persisted debounce preference if the user configured one. Engine
+  // default (5000ms) stands when registry has no value.
+  if (typeof reg.sync_debounce_ms === 'number' && reg.sync_debounce_ms >= 0) {
+    engine.setDebounceMs(reg.sync_debounce_ms);
+  }
 
   currentEngine = engine;
   currentWorldId = entry.id;
@@ -206,6 +211,23 @@ export function detachSyncEngine(): void {
  */
 export function requestPushIfLinked(): void {
   currentEngine?.requestPush();
+}
+
+/**
+ * Refresh `state.data.elements` from disk + schedule a debounced push.
+ *
+ * Standard post-write pattern: after `store.createElement` / `updateElement` /
+ * `deleteElement`, the caller wants the in-memory cache to reflect the new
+ * state AND wants the change to flow to the server (for api-linked worlds).
+ * This three-liner used to appear at ~25 call sites — see SWEEP-2026-05-20.md
+ * F8. Returns the fresh element list so callers that need it (e.g. for
+ * building a writingHash from the new state) can chain.
+ */
+export async function refreshElementsAfterWrite(store: FolderStore): Promise<Element[]> {
+  const elements = await store.listElements();
+  patchSlice('data', { elements });
+  requestPushIfLinked();
+  return elements;
 }
 
 /** Currently-attached engine, or null. Used by element-edit autosave wiring. */

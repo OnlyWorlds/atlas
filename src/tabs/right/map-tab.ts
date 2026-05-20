@@ -28,7 +28,7 @@ import { ToastManager } from '../../ui/toast-manager';
 import { ElementCreateModal } from '../../ui/element-create-modal';
 import { getActiveStore } from '../../core/active-store';
 import { navigate, elementHash } from '../../core/router';
-import { requestPushIfLinked } from '../../sync/sync-attach';
+import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { syncPins, refreshActiveMapPins } from './map-tab-pins';
 import { enablePinDrag, clampToCanvas } from './map-tab-pin-drag';
@@ -41,7 +41,7 @@ import { saveCameraState, getCameraState } from '../../core/map-camera-persist';
 import { startDrawing, placeMarkerAt, getActiveDraft, cancelDrawing, disposeDraftForMap } from './zone-drawing';
 import { ZoneOverlay } from '../../visualization/leaflet-2d/ZoneOverlay';
 import { syncZones, wireChipStrip, refreshActiveMapZones } from './map-tab-zones';
-import { enterEditMode, isEditing, getEditingZoneId, getEditingMapId, abortEditModeForMap, syncEditMode, insertMarkerAtClick, isMidDragSuppression } from './zone-edit-mode';
+import { enterEditMode, isEditing, getEditingZoneId, getEditingMapId, abortEditModeForMap, syncEditMode, isMidDragSuppression } from './zone-edit-mode';
 
 let containerSeq = 0;
 
@@ -265,7 +265,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     initialZoom: -1,
     showLabels: true,
     defaultIconSize: 32,
-    defaultLabelOffset: 12,
+    defaultLabelOffset: 7,
     // Constrain pan/click to canvas bounds (DESIGN_MAPS.md §4.1 pin coord
     // discipline). Without this, Leaflet's CRS.Simple lets the user pan and
     // click anywhere in infinite 2D space — pin coords then end up outside
@@ -392,19 +392,22 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
         placeMarkerAt(ev.point, width, height);
         return;
       }
-      // Edit-mode click-anywhere insert: only fires for clicks that didn't hit
-      // a vertex handle (marker click doesn't bubble to map-click in Leaflet)
-      // or a segment overlay (its handler calls L.DomEvent.stop). So a stray
-      // canvas click while editing safely lands here without double-firing —
-      // EXCEPT for the brief window right after a vertex/centroid dragend,
-      // where the mouseup that ended the drag can also trigger a map-click
-      // (Captain smoke session 219: "another marker gets created when I move
-      // one. hard to recreate."). The dragend handlers in zone-edit-mode arm
-      // a 150ms suppression window; check that here so post-drag clicks are
-      // swallowed cleanly.
+      // Edit-mode click on map background → deselect, which causes
+      // syncEditMode (state subscriber) to commit + tear down the edit
+      // session. Inserts on a segment now come exclusively from the segment
+      // overlay's own click handler — clicking outside any segment means
+      // "exit edit," matching the click-outside-to-deselect mental model.
+      // (Pre-session-226: clicked anywhere → inserted near nearest segment.
+      // That surprised users trying to deselect by clicking the canvas.)
+      // Drag-suppression check still applies: the mouseup that ENDS a drag
+      // can fire as a map-click; swallow it so dragging doesn't accidentally
+      // deselect.
       if (isEditing() && getEditingMapId() === mapId) {
         if (isMidDragSuppression()) return;
-        await insertMarkerAtClick(ev.point);
+        const ui = getState().ui;
+        if (ui.selectedElementId) {
+          patchSlice('ui', { ...ui, selectedElementId: null });
+        }
         return;
       }
       const placement = getState().ui.pinPlacement;
@@ -533,9 +536,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
           x: clampToCanvas(Math.round(point.x), width),
           y: clampToCanvas(Math.round(point.y), height),
         });
-        const elements = await store.listElements();
-        patchSlice('data', { elements });
-        requestPushIfLinked();
+        const elements = await refreshElementsAfterWrite(store);
       };
 
       const modal = new ElementCreateModal(toasts, {
@@ -665,9 +666,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
           x: clampToCanvas(Math.round(point.x), width),
           y: clampToCanvas(Math.round(point.y), height),
         });
-        const elements = await store.listElements();
-        patchSlice('data', { elements });
-        requestPushIfLinked();
+        const elements = await refreshElementsAfterWrite(store);
         toasts.success('Pin placed');
       } catch (err) {
         console.error('[map-tab] drag-drop create pin failed:', err);

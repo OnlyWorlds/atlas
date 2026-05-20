@@ -20,49 +20,20 @@ import { mountElementDetail } from './element-detail';
 import { ToastManager } from '../ui/toast-manager';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import { getActiveStore } from '../core/active-store';
-import { requestPushIfLinked } from '../sync/sync-attach';
+import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { mountWritingSetup } from './writing-setup';
 import { saveRegistry } from '../registry/registry';
 import {
   getWritingLabels,
-  getTierForNarrative,
-  isWritingNarrative,
   isWritingInitialized,
   supertypeForTier,
-  type WritingLabels,
-  type WritingTier,
+  buildNarrativeIndex,
 } from './writing-helpers';
 import type { Element } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 
 // Re-export for backward compat with any callers still importing from writing.
 export { getWritingLabels } from './writing-helpers';
-
-interface NarrativeNode {
-  el: Element;
-  tier: WritingTier;
-  children: NarrativeNode[];
-  depth: number;
-}
-
-interface NarrativeIndex {
-  byId: Map<string, NarrativeNode>;
-}
-
-function buildNarrativeIndex(elements: Element[], worldId: string): NarrativeIndex {
-  const writingNarratives = elements.filter(e => isWritingNarrative(e, worldId));
-  const byId = new Map<string, NarrativeNode>();
-  for (const el of writingNarratives) {
-    byId.set(el.id, { el, tier: getTierForNarrative(el, worldId), children: [], depth: 0 });
-  }
-  for (const node of byId.values()) {
-    const parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
-    if (parentId && byId.has(parentId)) {
-      byId.get(parentId)!.children.push(node);
-    }
-  }
-  return { byId };
-}
 
 export function mountWriting(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -134,9 +105,7 @@ async function createNarrativeAtRoot(
     supertype,
     order: 0,
   } as Partial<Element>);
-  const all = await folder.listElements();
-  patchSlice('data', { elements: all });
-  requestPushIfLinked();
+  const all = await refreshElementsAfterWrite(folder);
   return created;
 }
 
@@ -239,17 +208,14 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
       return;
     }
 
-    // Mirror selection into ui state so element-detail renders this narrative.
-    // Deferred to avoid recursive render mid-flight (see bug fix from earlier
-    // in this session — patchSlice synchronously fires subscribers).
+    // NOTE (decoupling, session 226): we deliberately do NOT mirror the
+    // active narrative into state.ui.selectedElementId. element-detail
+    // derives its target element from URL segments when route.mode ===
+    // 'writing', so the global selection persists across writing visits.
+    // This way the room-nav chip continues to point at whatever the user
+    // had selected before entering writing — switching to writing no longer
+    // clobbers selection.
     const targetId = activeNode.el.id;
-    if (getState().ui.selectedElementId !== targetId) {
-      queueMicrotask(() => {
-        if (getState().ui.selectedElementId !== targetId) {
-          patchSlice('ui', { ...getState().ui, selectedElementId: targetId });
-        }
-      });
-    }
 
     // Remember the selected narrative for this world so the writing icon in
     // the room nav can restore this view when the user returns from another

@@ -15,7 +15,7 @@
 import { getState, patchSlice } from '../../core/state';
 import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import { getActiveStore } from '../../core/active-store';
-import { requestPushIfLinked } from '../../sync/sync-attach';
+import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import type { MapTabCacheEntry } from './map-tab-cache';
 
 /**
@@ -81,9 +81,7 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
 
       if (droppedOnTrash) {
         await store.deletePin(pinId);
-        const elements = await store.listElements();
-        patchSlice('data', { elements });
-        requestPushIfLinked();
+        const elements = await refreshElementsAfterWrite(store);
         // No toast — the visual zone + the disappearance of the marker are
         // the feedback. Could surface "pin deleted" via toastManager if
         // Captain wants extra confirmation, but the action is its own UX.
