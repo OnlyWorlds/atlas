@@ -33,6 +33,20 @@
   --atlas-cyan-tint: rgba(34, 211, 238, 0.08);
   --atlas-danger: #ef4444;
   --atlas-warn: #f59e0b;
+  /* Accent alias — historical usage in some places writes `--atlas-accent`. */
+  --atlas-accent: var(--atlas-cyan);
+  /* Tell the OS we're dark — affects scrollbars, native form chrome (select
+     dropdowns, date pickers). Modern Chromium + Firefox respect this. */
+  color-scheme: dark;
+
+  /* Writing-room prose surface — softer than the rest of the chrome.
+     These are isolated as their own variables so the future light-mode
+     toggle can swap them without touching the chrome theme. */
+  --atlas-prose-text: #e0ddd6;          /* warm off-white, easier on the eyes for long sessions */
+  --atlas-prose-text-soft: rgba(224, 221, 214, 0.78);
+  --atlas-prose-bg: transparent;        /* page-like container; subtle wash applied via gradient below */
+  --atlas-prose-link: var(--atlas-cyan);
+  --atlas-prose-link-underline: rgba(34, 211, 238, 0.55);
 }
 
 /* ============================================================
@@ -720,11 +734,30 @@
 .atlas-select {
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23999' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-color: rgba(0, 0, 0, 0.3);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2322d3ee' d='M0 0l5 6 5-6z' opacity='0.7'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 9px center;
-  padding-right: 26px;
+  background-position: right 10px center;
+  padding-right: 28px;
   cursor: pointer;
+}
+
+/* Native <option> styling — the OS-rendered dropdown list. Coverage:
+     - Firefox: respects background + color reliably
+     - Chromium (Windows/macOS): respects bg/color in recent versions
+     - Safari: most limited; mostly relies on color-scheme: dark above
+   Combined with color-scheme: dark on :root, this gives a passable dark
+   dropdown across browsers without rolling a custom select. */
+.atlas-select option {
+  background: #111;
+  color: var(--atlas-text);
+  padding: 4px 8px;
+}
+
+.atlas-select option:checked,
+.atlas-select option:hover {
+  background: rgba(34, 211, 238, 0.18);
+  color: var(--atlas-text);
 }
 
 /* ============================================================
@@ -1386,23 +1419,33 @@
   margin-top: 6px;
 }
 
-/* Link chip */
+/* Link chip — subtle inline reference to a linked element. */
 .atlas-link-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 4px 2px 8px;
-  font-size: 12px;
-  background: var(--atlas-cyan-tint);
-  border: 1px solid rgba(34, 211, 238, 0.25);
+  gap: 3px;
+  padding: 3px 8px 3px 7px;
+  font-size: 11.5px;
+  line-height: 1.2;
+  background: rgba(34, 211, 238, 0.04);
+  border: 1px solid rgba(34, 211, 238, 0.16);
   border-radius: 3px;
-  color: var(--atlas-text);
+  color: var(--atlas-text-soft);
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+/* Chips with a remove (×) button still need a little right padding for the X
+   icon to breathe — but less than read-only chips, because the X itself
+   provides visual termination. */
+.atlas-link-chip:has(.atlas-link-chip-remove) {
+  padding-right: 4px;
 }
 
 .atlas-link-chip:hover {
-  background: rgba(34, 211, 238, 0.14);
+  background: rgba(34, 211, 238, 0.10);
+  border-color: rgba(34, 211, 238, 0.3);
+  color: var(--atlas-text);
 }
 
 .atlas-link-chip-unresolved {
@@ -1411,14 +1454,27 @@
   border-color: var(--atlas-divider-strong);
 }
 
-.atlas-link-chip-remove {
-  font-size: 14px;
+/* Two-class specificity (0,2,0) — beats the `material-symbols` package's
+   single-class `.material-symbols-outlined { font-size: 24px }` rule (0,1,0).
+   Without scoping under the chip parent, load-order decides the tie. Same
+   pattern as the room-nav chip fix in session 226 (convention rationale). */
+.atlas-link-chip .atlas-link-chip-remove {
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 1px;
   color: var(--atlas-text-muted);
   cursor: pointer;
+  opacity: 0.65;
+  align-self: center;
+  /* Material-symbols glyphs are top-heavy in their bounding box; nudge down
+     a hair so the × visually centers against the chip's text baseline. */
+  transform: translateY(1px);
+  transition: color 120ms ease, opacity 120ms ease;
 }
 
-.atlas-link-chip-remove:hover {
+.atlas-link-chip .atlas-link-chip-remove:hover {
   color: var(--atlas-text);
+  opacity: 1;
 }
 
 .atlas-link-row {
@@ -5261,6 +5317,628 @@ svg .atlas-zone-selected {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* ============================================================================
+   Writing workspace v3.0 (DESIGN_WRITING.md §The writing workspace)
+   ============================================================================ */
+
+.atlas-writing-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.atlas-writing-workspace-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  /* Reserve the scrollbar gutter so opening a disclosure never shifts the
+     centered prose surface horizontally. */
+  scrollbar-gutter: stable;
+  padding: 18px 24px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* Single source of truth for the centered content width — used by prose,
+     details disclosure, references disclosure. They share this so opening
+     one never visually shifts another. */
+  --atlas-writing-content-width: 760px;
+}
+
+/* Breadcrumb + date row directly below the 36px header. */
+.atlas-writing-workspace-crumb {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-writing-workspace-crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  line-height: 1.6;
+}
+
+.atlas-writing-workspace-crumb-seg {
+  color: var(--atlas-text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.atlas-writing-workspace-crumb-seg.is-current {
+  color: var(--atlas-text-soft);
+}
+
+a.atlas-writing-workspace-crumb-seg:hover {
+  color: var(--atlas-accent);
+  text-decoration: underline;
+}
+
+.atlas-writing-workspace-crumb-sep {
+  color: var(--atlas-text-muted);
+  opacity: 0.55;
+  margin: 0 4px;
+}
+
+.atlas-writing-workspace-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-writing-workspace-date .material-symbols-outlined {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+/* Prose surface — TipTap mounts inside this host.
+   The host gets a subtle warm wash (faint linear gradient) so the prose
+   container reads as a "page" against the cooler dark chrome around it.
+   Variables are scoped to prose so a future lightmode toggle only swaps
+   these without touching the rest of the app theme. */
+.atlas-writing-workspace-prose {
+  /* `flex: 0 0 auto` keeps the prose surface from being squeezed by sibling
+     content (Details / References disclosures). Min-height of 60vh gives a
+     generous writing area regardless of disclosure state — opening Details
+     extends the scrollable body instead of shrinking the prose. */
+  flex: 0 0 auto;
+  max-width: var(--atlas-writing-content-width, 760px);
+  width: 100%;
+  margin: 0 auto;
+  min-height: 60vh;
+  /* Faint warm vignette — feels like dim paper on a dark desk. */
+  background:
+    radial-gradient(ellipse at top, rgba(255, 246, 230, 0.018), transparent 70%),
+    linear-gradient(180deg, rgba(255, 248, 235, 0.012), rgba(255, 248, 235, 0.006));
+  border-radius: 4px;
+  padding: 12px 32px 24px;
+}
+
+.atlas-writing-workspace-prose .ProseMirror {
+  outline: none;
+  /* Default 15px; can be overridden per-world via --atlas-prose-font-size
+     (see writing-workspace.ts which sets it from registry pref). */
+  font-size: var(--atlas-prose-font-size, 15px);
+  line-height: 1.72;
+  letter-spacing: 0.005em;
+  color: var(--atlas-prose-text);
+  min-height: 320px;
+  padding: 4px 0 24px;
+}
+
+.atlas-writing-workspace-prose .ProseMirror p {
+  margin: 0 0 1em;
+}
+
+.atlas-writing-workspace-prose .ProseMirror h1,
+.atlas-writing-workspace-prose .ProseMirror h2,
+.atlas-writing-workspace-prose .ProseMirror h3,
+.atlas-writing-workspace-prose .ProseMirror h4 {
+  margin: 1.2em 0 0.5em;
+  color: var(--atlas-text);
+  line-height: 1.3;
+}
+
+.atlas-writing-workspace-prose .ProseMirror h1 { font-size: 22px; }
+.atlas-writing-workspace-prose .ProseMirror h2 { font-size: 19px; }
+.atlas-writing-workspace-prose .ProseMirror h3 { font-size: 16px; }
+
+.atlas-writing-workspace-prose .ProseMirror blockquote {
+  border-left: 3px solid var(--atlas-divider);
+  margin: 0.6em 0;
+  padding: 0 0 0 14px;
+  color: var(--atlas-text-soft);
+}
+
+.atlas-writing-workspace-prose .ProseMirror ul,
+.atlas-writing-workspace-prose .ProseMirror ol {
+  padding-left: 22px;
+  margin: 0 0 1em;
+}
+
+.atlas-writing-workspace-prose .ProseMirror li {
+  margin: 0.2em 0;
+}
+
+.atlas-writing-workspace-prose .ProseMirror code {
+  font-family: var(--atlas-font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.92em;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.atlas-writing-workspace-prose .ProseMirror pre {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 10px 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0 0 1em;
+}
+
+.atlas-writing-workspace-prose .ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.atlas-writing-workspace-prose .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--atlas-divider);
+  margin: 1.4em 0;
+}
+
+/* Empty placeholder when ProseMirror has no content (TipTap shows .is-empty
+   on the first paragraph; we use ::before to show a hint). */
+.atlas-writing-workspace-prose .ProseMirror p.is-editor-empty:first-child::before {
+  content: 'Begin writing…';
+  color: var(--atlas-text-muted);
+  opacity: 0.5;
+  pointer-events: none;
+  position: absolute;
+}
+
+/* Element chip — inline cyan reference to a linked OW element.
+   Strikes a middle ground between "invisible underline" and "loud pill":
+   - Cyan text (matches the OW accent family used elsewhere in atlas)
+   - Solid 1px underline, slightly muted, sits 2px below the baseline
+   - No padding / background / border at rest — flows with the prose
+   - Hover firms the underline + adds a subtle cyan bg tint */
+.atlas-element-chip {
+  color: var(--atlas-prose-link);
+  text-decoration: underline solid var(--atlas-prose-link-underline);
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+  font-size: inherit;
+  line-height: inherit;
+  padding: 0 1px;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  transition: background 120ms ease, text-decoration-color 120ms ease, color 120ms ease;
+}
+
+.atlas-element-chip:hover {
+  background: rgba(34, 211, 238, 0.09);
+  text-decoration-color: var(--atlas-cyan);
+  color: var(--atlas-cyan);
+}
+
+/* Disclosures — Details + References. Match prose container width via the
+   shared --atlas-writing-content-width var so toggling a disclosure never
+   shifts the prose horizontally. */
+.atlas-writing-workspace-details,
+.atlas-writing-workspace-refs {
+  max-width: var(--atlas-writing-content-width, 760px);
+  width: 100%;
+  margin: 0 auto;
+  border-top: 1px solid var(--atlas-divider);
+  padding-top: 12px;
+}
+
+.atlas-writing-workspace-disclosure-summary {
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--atlas-text-muted);
+  padding: 4px 0;
+  list-style: none;
+  user-select: none;
+}
+
+.atlas-writing-workspace-disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+
+.atlas-writing-workspace-disclosure-summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 10px;
+  transition: transform 120ms ease;
+}
+
+.atlas-writing-workspace-details[open] > .atlas-writing-workspace-disclosure-summary::before,
+.atlas-writing-workspace-refs[open] > .atlas-writing-workspace-disclosure-summary::before {
+  transform: rotate(90deg);
+}
+
+.atlas-writing-workspace-disclosure-body {
+  padding-top: 8px;
+}
+
+.atlas-pane-empty-inline {
+  color: var(--atlas-text-muted);
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+/* Footer — word count + reading time + save state + open-as-element. */
+.atlas-writing-workspace-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 24px;
+  border-top: 1px solid var(--atlas-divider);
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  flex-shrink: 0;
+}
+
+.atlas-writing-workspace-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-writing-workspace-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.atlas-writing-workspace-sep {
+  opacity: 0.4;
+}
+
+.atlas-writing-workspace-save[data-state='pending'] {
+  color: var(--atlas-text-soft);
+}
+
+.atlas-writing-workspace-save[data-state='error'] {
+  color: #ff8a80;
+}
+
+.atlas-writing-workspace-open-link {
+  color: var(--atlas-text-muted);
+  text-decoration: none;
+  margin-left: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.atlas-writing-workspace-open-link:hover {
+  color: var(--atlas-accent);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+/* Reading mode — applied to .atlas-writing-workspace.is-reading-mode */
+.atlas-writing-workspace.is-reading-mode .atlas-middle-header,
+.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-crumb,
+.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-details,
+.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-refs {
+  display: none;
+}
+
+.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-prose {
+  max-width: 680px;
+  padding-top: 40px;
+}
+
+.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-prose .ProseMirror {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 16.5px;
+  line-height: 1.85;
+}
+
+/* Focus mode (Cmd+Shift+F) — hides ALL chrome including sibling panes via
+   :has() projection. Modern Chromium/Firefox/Safari support :has(); atlas
+   ships Chromium-only so this is safe. Esc returns to normal layout. */
+.atlas-shell:has(.atlas-writing-workspace.is-focus-mode) .atlas-sidebar,
+.atlas-shell:has(.atlas-writing-workspace.is-focus-mode) .atlas-right,
+.atlas-shell:has(.atlas-writing-workspace.is-focus-mode) .atlas-divider,
+.atlas-writing-workspace.is-focus-mode .atlas-middle-header,
+.atlas-writing-workspace.is-focus-mode .atlas-middle-room-nav,
+.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-crumb,
+.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-details,
+.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-refs,
+.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-footer {
+  display: none !important;
+}
+
+/* The middle pane uses inline `style="flex: 0 0 X%"` based on persisted shell
+   ratios, which means hiding siblings leaves dead space. Override here so
+   the middle fills the viewport in focus mode. !important beats the inline
+   style. */
+.atlas-shell:has(.atlas-writing-workspace.is-focus-mode) .atlas-middle {
+  flex: 1 1 100% !important;
+}
+
+.atlas-writing-workspace.is-focus-mode {
+  background: #050505;
+}
+
+.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-body {
+  padding: 60px 24px 60px;
+}
+
+.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-prose {
+  max-width: 720px;
+  padding: 12px 40px 24px;
+}
+
+.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-prose .ProseMirror {
+  min-height: 80vh;
+}
+
+/* ============================================================
+   Aliases field — display chips + dedicated edit modal
+   ============================================================ */
+
+.atlas-aliases-display {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 120ms ease;
+  min-height: 22px;
+}
+
+.atlas-aliases-display:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.atlas-aliases-display-empty {
+  color: var(--atlas-text-dim);
+  font-style: italic;
+  font-size: 13px;
+  transition: color 120ms ease;
+}
+
+.atlas-aliases-display:hover .atlas-aliases-display-empty {
+  color: var(--atlas-text-muted);
+}
+
+.atlas-aliases-display-chip {
+  display: inline-flex;
+  align-items: center;
+  /* Asymmetric padding: descender-glyphs (j, p, g, y) push the text's visual
+     mass higher in the line-box than its geometric center, so equal vertical
+     padding reads as "text too low". Less top, more bottom corrects the
+     optical centering. */
+  padding: 2px 10px 4px;
+  font-size: 11.5px;
+  line-height: 1;
+  background: rgba(34, 211, 238, 0.05);
+  color: var(--atlas-text-soft);
+  border: 1px solid rgba(34, 211, 238, 0.16);
+  border-radius: 11px;
+  white-space: nowrap;
+}
+
+/* Aliases edit modal — list of inputs, one per alias. */
+.atlas-aliases-modal {
+  min-width: 380px;
+  max-width: 500px;
+}
+
+.atlas-aliases-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 6px;
+}
+
+.atlas-aliases-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.atlas-aliases-row > .atlas-input {
+  flex: 1 1 auto;
+}
+
+.atlas-aliases-add-link {
+  display: inline-block;
+  background: transparent;
+  border: none;
+  padding: 4px 0 12px;
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.atlas-aliases-add-link:hover {
+  color: var(--atlas-cyan);
+}
+
+/* Chip preview card — hover-to-peek + click-to-stick floating card. */
+.atlas-chip-preview {
+  position: fixed;
+  z-index: 9500;
+  min-width: 280px;
+  max-width: 340px;
+  background: rgba(10, 10, 10, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--atlas-divider-strong);
+  border-radius: 6px;
+  padding: 10px 12px 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+  font-size: 12.5px;
+  color: var(--atlas-text);
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.atlas-chip-preview[data-state='shown'] {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.atlas-chip-preview[data-mode='sticky'] {
+  border-color: var(--atlas-cyan-soft);
+}
+
+.atlas-chip-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.atlas-chip-preview-icon {
+  font-size: 16px;
+  color: var(--atlas-cyan);
+}
+
+.atlas-chip-preview-name {
+  font-weight: 600;
+  color: var(--atlas-text);
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atlas-chip-preview-type {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--atlas-text-muted);
+  flex-shrink: 0;
+}
+
+.atlas-chip-preview-image {
+  display: block;
+  width: 100%;
+  max-height: 110px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin: 4px 0 6px;
+}
+
+.atlas-chip-preview-desc {
+  margin: 0 0 8px;
+  color: var(--atlas-text-soft);
+  line-height: 1.45;
+  font-size: 12.5px;
+}
+
+.atlas-chip-preview-desc-empty {
+  font-style: italic;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-chip-preview-open {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--atlas-cyan);
+  text-decoration: none;
+  padding: 3px 6px;
+  margin-left: -6px;
+  border-radius: 3px;
+  transition: background 120ms ease;
+}
+
+.atlas-chip-preview-open:hover {
+  background: rgba(34, 211, 238, 0.10);
+}
+
+.atlas-chip-preview-empty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+  padding: 6px 0;
+}
+
+/* Mention picker popover — element @ autocomplete. */
+.atlas-mention-popover {
+  position: fixed;
+  z-index: 9000;
+  min-width: 280px;
+  max-width: 360px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--atlas-divider);
+  border-radius: 6px;
+  padding: 4px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  font-size: 13px;
+}
+
+.atlas-mention-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--atlas-text);
+  white-space: nowrap;
+}
+
+.atlas-mention-item:hover,
+.atlas-mention-item.is-selected {
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.atlas-mention-item-icon {
+  font-size: 16px;
+  color: var(--atlas-text-muted);
+  flex-shrink: 0;
+}
+
+.atlas-mention-item-name {
+  color: var(--atlas-text);
+  flex-shrink: 0;
+}
+
+.atlas-mention-item-meta {
+  color: var(--atlas-text-muted);
+  font-size: 11px;
+  margin-left: auto;
+  opacity: 0.85;
+}
+
+.atlas-mention-empty {
+  padding: 10px 14px;
+  color: var(--atlas-text-muted);
+  font-style: italic;
+  font-size: 12px;
 }
 
 /* Writing sidebar body — the tree lives here (session 224 takeover).

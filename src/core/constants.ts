@@ -108,6 +108,16 @@ export const ATLAS_LOCAL_EXTENSION_FIELDS = [
   // (Bug surfaced session 221 against live OW; fakes silently accepted the
   // unknown field so it slipped past the existing test coverage.)
   'atlas_shape',
+  // Writing workspace richtext payload (DESIGN_WRITING.md §Storage model, convention #47).
+  // TipTap JSON document for Narrative elements. The canonical `story` field
+  // holds markdown serialization for OW-tool interop; this field holds the
+  // high-fidelity richtext for atlas-only features. Stripped on API push.
+  'atlas_richtext_json',
+  // Name aliases for any element (DESIGN_WRITING.md §Linking, convention #49).
+  // string[] of alternate names that the @ picker and first-mention auto-link
+  // match against in addition to the canonical `name` field. Atlas-local;
+  // stripped on API push. Council-motion candidate (DESIGN.md tracking section).
+  'atlas_aliases',
 ] as const;
 export type AtlasLocalExtensionField = typeof ATLAS_LOCAL_EXTENSION_FIELDS[number];
 

@@ -16,7 +16,7 @@
 
 import { getState, patchSlice, subscribe } from '../core/state';
 import { onHashChange, parseHash, navigate, writingHash } from '../core/router';
-import { mountElementDetail } from './element-detail';
+import { mountWritingWorkspace } from './writing-workspace';
 import { ToastManager } from '../ui/toast-manager';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import { getActiveStore } from '../core/active-store';
@@ -138,7 +138,7 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
     const elements = getState().data.elements;
     const idx = buildNarrativeIndex(elements, active.worldId);
     const route = parseHash(window.location.hash);
-    const activeId = route.sceneId ?? route.chapterId ?? route.bookId ?? null;
+    const activeId = route.narrativeId ?? null;
     const activeNode = activeId ? idx.byId.get(activeId) : null;
 
     if (!activeNode) {
@@ -233,20 +233,18 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
       queueMicrotask(() => patchSlice('registry', nextReg));
     }
 
-    // Tier badge + child-create buttons live in the element-detail header
-    // itself (session 224 header unification). No separate toolbar here.
-
-    // --- Element detail ---
-    // Mount once per selected narrative; element-detail has its own state
-    // subscription that re-renders when the underlying element changes.
-    // Only remount when the selection actually changes id.
+    // --- Writing workspace ---
+    // v3.0 redesign (session 227+): the workspace replaces the schema-driven
+    // element-detail entirely for active narratives in writing mode
+    // (convention #51). Mount once per selection; the workspace owns its own
+    // state subscription and editor lifecycle.
     if (mountedDetailForId !== targetId) {
       unmountDetail?.();
       detailSlot.innerHTML = '';
       const detailMount = document.createElement('div');
       detailMount.className = 'atlas-writing-editor-detail-mount';
       detailSlot.appendChild(detailMount);
-      unmountDetail = mountElementDetail(detailMount);
+      unmountDetail = mountWritingWorkspace(detailMount);
       mountedDetailForId = targetId;
     }
   }

@@ -24,6 +24,7 @@ import { ELEMENT_ICONS } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { openFieldEditInline } from '../ui/field-edit-inline';
+import { AliasesEditModal } from '../ui/aliases-edit-modal';
 import { toastManager } from '../ui/toast-manager';
 import type { FieldMeta, SectionLayout } from '../editor/field-schema';
 import { getFieldDescription } from '../editor/field-descriptions';
@@ -108,10 +109,10 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   label.classList.add('atlas-field-label-clickable');
   label.addEventListener('click', (e) => {
     // Don't double-fire if user clicked the value (would bubble up otherwise).
-    if ((e.target as HTMLElement).closest('.atlas-field-value, .atlas-link-pick, .atlas-link-chip')) return;
+    if ((e.target as HTMLElement).closest('.atlas-field-value, .atlas-link-pick, .atlas-link-chip, .atlas-aliases-display')) return;
     // Forward to whichever affordance lives in this row.
     const target = wrap.querySelector<HTMLElement>(
-      '.atlas-field-value, .atlas-link-pick'
+      '.atlas-field-value, .atlas-link-pick, .atlas-aliases-display'
     );
     target?.click();
   });
@@ -123,6 +124,12 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   }
   if (meta.widget === 'multi-link') {
     wrap.appendChild(renderMultiLink(meta, el));
+    return wrap;
+  }
+  if (meta.name === 'atlas_aliases') {
+    // Custom widget — chip strip + dedicated modal (one row per alias).
+    // The CSV-in-a-text-input approach was unintuitive (Captain feedback).
+    wrap.appendChild(renderAliasesRow(el));
     return wrap;
   }
 
@@ -227,6 +234,53 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   });
   wrap.appendChild(valueEl);
   return wrap;
+}
+
+/**
+ * Render the atlas_aliases row: a chip strip showing each alias, plus an
+ * inline edit button that opens the dedicated AliasesEditModal. Clicking
+ * anywhere on the empty value also opens the modal (matches the rest of
+ * the row-click affordances in element-detail).
+ */
+function renderAliasesRow(el: Element): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'atlas-aliases-display';
+  row.title = 'Click to edit aliases';
+
+  const rawAliases = (el as Record<string, unknown>)['atlas_aliases'];
+  const aliases: string[] = Array.isArray(rawAliases)
+    ? rawAliases.filter((s): s is string => typeof s === 'string' && s.length > 0)
+    : [];
+
+  const openModal = (): void => {
+    new AliasesEditModal({
+      elementName: el.name || '(unnamed)',
+      current: aliases,
+      onSave: async (next) => {
+        await persistFieldPatch(el, 'atlas_aliases', next.length === 0 ? null : next);
+      },
+    }).open();
+  };
+
+  if (aliases.length === 0) {
+    const empty = document.createElement('span');
+    empty.className = 'atlas-aliases-display-empty';
+    empty.textContent = 'Add aliases…';
+    row.appendChild(empty);
+  } else {
+    for (const alias of aliases) {
+      const chip = document.createElement('span');
+      chip.className = 'atlas-aliases-display-chip';
+      chip.textContent = alias;
+      row.appendChild(chip);
+    }
+  }
+
+  // Whole-row click opens the modal — matches the row-click affordance of
+  // every other field in element-detail. No separate edit button needed.
+  row.addEventListener('click', openModal);
+
+  return row;
 }
 
 function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
@@ -361,8 +415,24 @@ async function persistFieldPatch(el: Element, fieldName: string, nextValue: unkn
     toastManager.error('No active store');
     return;
   }
+  // atlas_aliases edit comes in as a CSV string from the popover; parse to
+  // string[] before persisting so the on-disk shape matches the type contract.
+  let valueToPersist: unknown = nextValue;
+  if (fieldName === 'atlas_aliases') {
+    if (typeof nextValue === 'string') {
+      const parts = nextValue
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      valueToPersist = parts.length === 0 ? null : parts;
+    } else if (Array.isArray(nextValue)) {
+      valueToPersist = nextValue;
+    } else {
+      valueToPersist = null;
+    }
+  }
   try {
-    await store.updateElement(el.id, { [fieldName]: nextValue } as Partial<Element>);
+    await store.updateElement(el.id, { [fieldName]: valueToPersist } as Partial<Element>);
     const elements = await store.listElements();
     patchSlice('data', { elements });
     // Local write succeeded — schedule a debounced push. No-op for local-only.
@@ -408,7 +478,11 @@ async function autoUpdateMapDims(mapId: string, url: string): Promise<void> {
 
 /** "image_url" → "Image URL" via the ACRONYMS set. */
 export function humanizeFieldName(name: string): string {
-  return name
+  // Drop the `atlas_` prefix on atlas-local extension fields when surfacing
+  // them in the UI — keeps labels clean. The on-disk field name still uses
+  // the prefix (DESIGN.md atlas-specific tracking section).
+  const cleaned = name.startsWith('atlas_') ? name.slice('atlas_'.length) : name;
+  return cleaned
     .split('_')
     .map(word => {
       const lower = word.toLowerCase();

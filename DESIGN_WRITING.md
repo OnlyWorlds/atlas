@@ -1,20 +1,36 @@
 # Atlas — Writing Design
 
-**Version**: 2.1 (2026-05-20) — sidebar takeover + unified header
-**Status**: Core model + sidebar takeover + drag-reorder + last-narrative restore all shipped. Real richtext editor still deferred.
-**Related**: `DESIGN.md` (Rooms model), `DESIGN_HOME.md`, `DESIGN_PUBLISHING.md`
+**Version**: 3.0 (2026-05-20) — writing workspace redesign locked
+**Status**: v1 design locked from session 226 research swarm + Captain decisions. Implementation begins immediately after this doc lands.
+**Related**: `DESIGN.md` (Rooms model, atlas-specific fields), `DESIGN_HOME.md`, `DESIGN_PUBLISHING.md`
 
 ---
 
 ## Vision
 
-Atlas as a primary writing tool. Books, chapters, scenes — long-form fiction or campaign prep written *inside* the world it describes. Element references one click away. World-aware autocomplete and back-references. Eventually richtext, autolinking, word counts, presentation mode.
+Atlas as a primary writing tool. Books, chapters, scenes — long-form fiction or campaign prep written *inside* the world it describes.
 
-The user can move to another OW tool and keep their content (prose lives in OW Narrative fields). They lose atlas-only affordances (richtext styling, outline mode, notes) but never their words.
+**The differentiator**: your world is one keystroke away while you write. Characters, locations, objects — connected, navigable, never far. Other tools either prioritize prose with the world bolted on (Scrivener, Ulysses) or prioritize the world database with prose as an afterthought (World Anvil, Campfire). Atlas keeps both in one runtime, with the prose surface as the first-class citizen.
+
+The user can move to another OW tool and keep their content (prose lives in the OW Narrative `story` field as markdown). They lose atlas-only affordances (richtext styling, atlas-specific node types, auto-derived relations) but never their words.
 
 ---
 
-## The model — supertype-tier
+## User Stories (the writing workspace serves these, in priority order)
+
+1. **The drafting writer**: opens atlas, jumps to where they left off, cursor lands in prose. Large surface, minimal chrome. Writes for 40 minutes. Word count updates in the footer. Nothing interrupts.
+2. **The connecting writer**: mid-sentence wants to mention a Character. Types `@halloway`, picker finds Halloway via name or alias, Enter inserts a cyan chip. Later, the chip can be clicked to open the element in the right pane without leaving the prose.
+3. **The world-consistency writer**: writing a scene in a known Location. Hovers a chip to see the linked element's name and type. Clicks through if more detail is needed. Returns to prose with no context lost.
+4. **The structuring writer**: wants to see book/chapter/scene shape. The sidebar tree shows it. Drag-reorder shuffles scenes. Breadcrumb in the workspace shows position.
+5. **The exploratory writer**: has an idea but doesn't know where it fits. Creates a Draft (tier l4 — flexible parent). Lower stakes. Promotes it to a scene later when it crystallizes.
+6. **The reviewing writer**: wants to read their own chapter as a reader would. Toggles reading mode — no chrome, serif type, generous line height.
+7. **The portable writer**: moves to another OW tool. Sees their prose as clean markdown in the `story` field. Loses the atlas richtext styling, keeps every word and every link.
+
+The workspace solves stories 1–3 directly; the sidebar handles 4; tier model handles 5; reading mode handles 6; markdown serialization handles 7.
+
+---
+
+## The model — supertype-tier (unchanged from v2.1)
 
 A Narrative belongs to the writing tree iff its `supertype` matches one of the four configured tier labels for the world. The supertype value IS the tier — atlas writes it directly, no canonical/display split.
 
@@ -24,15 +40,10 @@ A Narrative belongs to the writing tree iff its `supertype` matches one of the f
 |---|---|---|---|
 | `l1` | **Book** | No parent | Top of the tree |
 | `l2` | **Chapter** | Parent must be l1 | Children of books |
-| `l3` | **Scene** | Parent must be l2 | Children of chapters; no children of their own (in atlas's create flow) |
+| `l3` | **Scene** | Parent must be l2 | Children of chapters; no children from atlas's create flow |
 | `l4` | **Draft** | No parent constraint | Flexible — root, under any tier, or under another draft |
 
-Tier `l4` (Draft) is the flexible joker:
-- Lives anywhere in the tree
-- No required parent, no required position
-- Distinct icon
-- Use case: side material, alt versions, deleted scenes, scratch ideas, research notes
-- **Atlas doesn't offer "+ new draft" as a child of an existing draft** (no nesting from UI) — Captain's call session 224: keeps the affordance set small and consistent. Drafts can still be re-parented manually via element-detail; the data model doesn't forbid it.
+Tier `l4` (Draft) is the flexible joker. See v2.1 history for full constraints discussion.
 
 ### Storage shape
 
@@ -44,270 +55,299 @@ Atlas's create flow writes a Narrative with these fields:
 | `subtype` | Not set — **always left empty for the user** |
 | `parent_narrative` | Required for chapters and scenes; optional for books and drafts |
 | `order` | Sequential integer within sibling group |
-| `story` | Empty on create — the primary writing surface (text-long) |
-
-`subtype` is the user's freeform classification surface — they can put "flashback", "vision", "research-note", anything. Atlas reads only `supertype` for tree membership; `subtype` is invisible to the writing tree.
-
-### Why supertype, not a separate atlas-local field
-
-- **Self-documenting** to other OW tools: opening a Narrative anywhere shows `supertype: "Book"`. No magic.
-- **Searchable** via the existing search room (which scans supertype + subtype).
-- **No translation layer**: storage matches display 1:1.
-- Cost: when the user renames a label, supertype values get migrated — see "Label-rename migration".
+| `story` | Empty on create — the primary writing surface (text-long), markdown serialization of the richtext document |
+| `atlas_richtext_json` | High-fidelity TipTap JSON document (atlas-local extension field; stripped on API push) |
+| `atlas_aliases` | Optional `string[]` of name aliases — feeds the link picker (atlas-local extension field) |
 
 ---
 
-## Customizable labels
+## Customizable labels, setup, promote, label-rename migration
 
-User picks labels in **Settings → Writing** or on first writing-room visit via the setup screen.
+Unchanged from v2.1. See git history for full text if needed (these flows are shipped + stable). Brief summary:
 
-```json
-{
-  "writing_labels": {
-    "l1": "Book",
-    "l2": "Chapter",
-    "l3": "Scene",
-    "l4": "Draft"
-  }
-}
-```
-
-Examples:
-- Story / Substory / Scene / Note
-- Volume / Book / Chapter / Sketch
-- Campaign / Arc / Session / Idea (TTRPG / DM)
-- Tome / Part / Chapter / Margin (formal)
-
-**Constraint**: all four labels must be distinct. Empty labels reject — atlas refuses to save without a value.
+- User picks l1-l4 labels in Settings → Writing or via the writing-room setup screen.
+- `isWritingInitialized` smart-detects when setup is needed; setup screen offers detect/adopt + promote-existing-narratives.
+- Renaming a label triggers `applyLabelRenameMigration` to rewrite supertype values on existing narratives.
 
 ---
 
-## Setup screen
+## Element-detail integration (unchanged from v2.1)
 
-When `isWritingInitialized` returns false for the active world, the writing-room route shows a setup screen instead of the tree. The flag goes true once the user saves.
-
-`isWritingInitialized` smart-defaults:
-- `entry.writing_initialized === true` → initialized
-- No narratives in the world → initialized (defaults apply silently; user can later open Settings → Writing or the writing-room gear to change labels)
-- Narratives exist but none have parent chains → initialized (no decision to make)
-- Structured narratives exist but none match the writing labels yet → **NOT initialized** — show setup
-
-The setup screen surfaces:
-
-1. **Label inputs** (l1-l4) pre-filled with current values or defaults
-2. **Adopt-detected suggestions** when promote candidates share a single supertype value at a depth (e.g. "Adopt detected: Plot Arc")
-3. **Promote preview** when candidates exist — grouped by depth, showing sample names and the current→new supertype mapping
-4. **Promote toggle** (pre-checked) — opt out per-row not supported in v1; whole batch promotes or none
-5. **Save** (primary) or **Skip — use defaults, don't promote** (secondary, only shown when promote section exists)
-
-The writing-room tree header has a `tune` icon that clears the initialized flag and re-opens setup. Re-running setup mid-life uses the rename-migration path automatically when labels change.
+When the user edits a Narrative's `supertype` in element-detail, the field-edit popover surfaces the four tier labels as suggestion chips. Free-text override removes the narrative from the writing tree (still visible elsewhere).
 
 ---
 
-## Promote (initial migration)
+## Sidebar (unchanged from v2.1)
 
-`buildPromoteCandidates(elements, labels)`:
-- Filters to narratives that participate in a parent chain (either has a parent_narrative pointing at another narrative, or is the parent of another narrative)
-- BFS from roots to assign depth (0/1/2/3+)
-- Proposes supertype by depth: 0 → l1, 1 → l2, 2 → l3, 3+ → l4 (drafts)
-- Detects whether each candidate needs `order` assignment
-
-`applyPromote(store, candidates)`:
-- Iterates candidates and writes `supertype` + `order` via FolderStore.updateElement
-- Idempotent — skips candidates whose current supertype matches proposed AND order is already set
-- Returns count of writes
-
-`detectExistingLabels(candidates)`:
-- For each depth (0-3), if all candidates share a single `currentSupertype`, returns that value
-- Used by the setup screen's "adopt detected" suggestion buttons
+The writing tree lives in `src/sidebar/writing-sidebar.ts`. Two-band header (create row, search row), tree with tier-aware icons, chevron expand/collapse, drag-reorder (sibling-only). See v2.1 for layout details. Sidebar takeover via `state.ui.sidebarWritingOverride`.
 
 ---
 
-## Label-rename migration
+## The writing workspace (v1 — NEW in v3.0)
 
-When the user renames a label (e.g. Book → Volume) via the writing settings:
+This is the redesign. The middle pane in writing mode stops being a generic element-detail and becomes a dedicated prose-centric writing surface.
 
-1. Atlas detects which labels changed
-2. `applyLabelRenameMigration(store, elements, oldLabels, newLabels)` walks all narratives
-3. For each narrative whose `supertype` matches an old label value, rewrites to the new value
-4. Idempotent — no-op when labels unchanged
+### File
 
-This keeps storage and display consistent. After migration, a narrative previously stored as `supertype: "Book"` reads as `supertype: "Volume"`. No hidden canonical / display split.
+`src/middle/writing-workspace.ts` — new module, parallel to `element-detail.ts`. Mounts when `route.mode === 'writing'` AND an active narrative exists in the URL hierarchy. Falls back to the empty state in `writing.ts` when no narrative is selected.
 
-Triggered from two surfaces:
-- **Settings → Writing**: change-event on any label input → migration runs immediately
-- **Re-running setup** mid-life: if writing was already initialized and labels changed in the setup screen → migration runs on save
-
----
-
-## Element-detail integration
-
-When the user edits a Narrative's `supertype` in element-detail, the field-edit popover surfaces the four tier labels as suggestion chips:
-
-- Click chip → fills input
-- Tab → autocompletes to longest-prefix match among suggestions
-- Free-text override always allowed — typing "flashback" sets supertype to "flashback" (loses writing-tree membership; the narrative becomes a regular Narrative element)
-
-This is the escape hatch for users who want to remove a narrative from the writing tree without deleting it. Equivalently, setting supertype to one of the four labels via element-detail PROMOTES that narrative into the tree.
-
----
-
-## Room layout (sidebar takeover, single-pane editor)
-
-Session 224 moved the writing tree from a left column in the middle pane INTO the sidebar. The middle pane in writing mode is a single column with just the element-detail of the selected narrative. Tier badge + child-create buttons live in the element-detail header. No separate toolbar.
+### Layout (single column, prose-centered)
 
 ```
-┌─────────────────┬────────────────────────────────────────┐
-│  [Worlds | W..] │ 🏠 ✎ 🕓 ⌕ ⬆ ⬇ 🧩 ⚙   ← room nav     │
-│  ┌───────────┐  ├────────────────────────────────────────┤
-│  │+ new book │  │ [icon] Joint Expedition Departs        │
-│  │+ new draft│  │           [SCENE] (no child buttons)   │
-│  └───────────┘  │                                        │
-│  Search... 🔍⚙ ├────────────────────────────────────────┤
-│  ▼ 📖 Drip St   │                                        │
-│    ▶ Three W…   │   <active narrative — element detail>  │
-│    ▼ Chapter 4  │                                        │
-│      • Scene 1  │   name, description, story, etc.       │
-│      • Scene 2  │                                        │
-│    ▼ Chapter 5  │                                        │
-│  ▶ 📖 Failing   │                                        │
-│  ✎ Loose Draft  │                                        │
-└─────────────────┴────────────────────────────────────────┘
+┌─ 36px header (reuse element-detail-header.ts unchanged) ───────────────┐
+│ [icon] Narrative name  [TIER]  [+ child]  [pin]  [sync]  [delete]     │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│   Narrative name                  ← inline editable (click to edit)    │
+│   ─────────────────────                                                │
+│   Book › Chapter › Scene name     ← breadcrumb, each segment clickable │
+│   📅 Date label                   ← inline start_date (or date range)  │
+│                                                                        │
+│   ┌─ TipTap editor ──────────────────────────────────────────────┐    │
+│   │                                                              │    │
+│   │   [generous prose surface, max-width 800px on contents]      │    │
+│   │   [autogrowing; pane fills vertically]                       │    │
+│   │   [chips render inline as styled cyan spans]                 │    │
+│   │                                                              │    │
+│   └──────────────────────────────────────────────────────────────┘    │
+│                                                                        │
+│   ▶ Details (description, subtype, characters, locations, …)           │
+│   ▶ References (3 elements link to this narrative)                     │
+│                                                                        │
+│            [📖 reading mode]  1,247 words · 5 min · saved 12s ago      │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Sidebar** (`src/sidebar/writing-sidebar.ts`):
-- Layout matches the elements sidebar exactly — two-band header (filter-strip slot, search-row slot), then list. Same pixel positions so switching between Worlds/Elements/Writing feels like the same surface.
-- Band 1 — create row: two stacked compact buttons `+ new <l1>` / `+ new <l4>` (top-level creates).
-- Band 2 — search row: `[input] [magnifier opens search room] [tune opens writing settings]`.
-- Tree: built from narratives where `supertype ∈ {l1, l2, l3, l4}`, tier-aware icons (`menu_book` / `article` / `short_text` / `edit_note`).
-- Drafts get italic name + slightly muted styling.
-- Chevron expand/collapse for any node with children. State persists in `registry.worlds[i].writing_tree_collapsed`.
-- **Drag-reorder**: every row is draggable. Drop above/below another row (same `parent_narrative` only) to reorder. Sequential `order` values written to all affected siblings. Re-parenting deferred.
-- Search input filters the tree by narrative name (case-insensitive substring). Ancestors of matches are force-expanded so the path is visible.
+### Why one column, not three-pane
 
-**Sidebar takeover rules**:
-- When the route is `writing` and the user hasn't explicitly toggled to worlds/elements during this writing session, the sidebar shows the writing tree.
-- Clicking the Worlds or `<world-name>` toggle while in writing sets `state.ui.sidebarWritingOverride = true` — the chosen mode wins until either the route leaves+re-enters writing OR the user clicks the writing icon in the room nav (which clears the override).
-- The toggle never shows a third "Writing" button. The takeover is implicit, not a toggle.
+Cross-tool research showed the three-pane shell is the genre default (Scrivener, World Anvil, NovelCrafter) — and also the genre's primary complaint surface. Writers describe feeling overwhelmed by always-visible chrome. Atlas's sidebar already handles structural navigation; an always-visible third panel for "world context" duplicates work that hover preview + the element room can handle on demand.
 
-**Middle pane** (`src/middle/writing.ts`):
-- Single column. No tree, no separate toolbar.
-- Renders the active narrative's element-detail.
-- Tier badge ("Book" / "Chapter" / "Scene" / "Draft") and child-create buttons live in the **element-detail header** (so all elements share the same 36px header band). See "Header unification" below.
-- Empty state when no narrative selected:
-  - Tree has narratives → "Pick a {l1}, {l2}, {l3}, or {l4} from the sidebar to begin."
-  - Tree is empty → centered create buttons (New {l1} + New {l4}) for fast first-touch.
+The collapsibles below the prose (Details + References) keep the full schema editor reachable without it competing for the writer's eyes.
 
-**Header unification** (`.atlas-middle-header`):
-- Locked at 36px (`height` + `min-height` + `max-height` + `flex: 0 0 36px`, all `!important`).
-- `overflow: hidden; flex-wrap: nowrap` — content never grows the band.
-- Defensive `.atlas-middle-header > * { max-height: 100%; flex-shrink: 0 }` — no descendant can push the band taller.
-- For writing-tree narratives, header renders: `[icon] [name] [spacer] [tier pill] [+ child icons] [pin clusters] [sync dot] [delete]`. For other element types: same minus the tier pill and child-create buttons.
-- Child-create buttons are icon-only (`.atlas-icon-btn-sm`) with tooltip — saves horizontal space, no text-collision risk.
+### The 10 v1 essentials
 
-**Last-narrative memory**:
-- `WorldRegistryEntry.last_writing_narrative_id?: string` — persists the narrative the user was last editing.
-- Saved on every narrative selection change (debounced via `queueMicrotask` to avoid render thrash).
-- The writing icon in the room nav reads this on click: if a remembered narrative exists and is still present, navigate straight to its writing URL. Otherwise default to the bare writing path (empty state).
-- Combined with element-detail's module-level `scrollMemory` (keyed by element id), returning to writing restores not just selection but also scroll position within the narrative's story field.
+1. **Reuse `element-detail-header.ts`** for the 36px band — tier badge, child-create buttons, pin/sync/delete affordances. Already extracted in session 225.
+2. **Inline editable title** — large, click-to-edit. Port from element-detail.
+3. **Breadcrumb** — Book › Chapter › Scene with clickable segments.
+4. **Inline date row** — `start_date` (and `end_date` if present) shown as a single tidy line.
+5. **TipTap editor** — mounted in the prose slot. `prose` class, max-width 800px on contents, generous vertical space, autogrowing.
+6. **`@` element picker** — see Linking Model below.
+7. **Dynamic chip rendering** — chip display text resolves from the store by UUID on every render, so renames propagate without touching markdown.
+8. **Collapsible "Details"** — wraps `element-detail-fields.ts` unchanged. Collapsed by default.
+9. **Collapsible "References"** — wraps `element-detail-refs.ts` unchanged. Collapsed by default.
+10. **Footer** — live word count, reading-time estimate (words / 250), save state derived from sync pill state, "Open as element →" link.
 
----
+### Storage model
 
-## Routes
+Two fields on every Narrative:
 
-```
-#/w/<id>/writing                                  → writing room, no selection
-#/w/<id>/writing/book/<bookId>                    → l1 selected
-#/w/<id>/writing/book/<bookId>/chapter/<chapId>   → l2 selected
-#/w/<id>/writing/book/<bookId>/chapter/<chapId>/scene/<scnId>  → l3 selected
-```
+- **`story`** (canonical OW text-long field) — markdown serialization of the document. Source of truth for OW interop. Other OW tools see this.
+- **`atlas_richtext_json`** (atlas-local extension field, added to `ATLAS_LOCAL_EXTENSION_FIELDS` in `core/constants.ts`) — full TipTap JSON document, preserves atlas-only formatting and custom node types. Stripped on API push; persists in folder storage.
 
-Note: the URL path names reflect the *default* labels for readability. They aren't authoritative — the actual semantic is `parent_narrative` chain. Selecting a draft uses the same route format with the draft's id in whichever slot matches its depth.
+**On load**: atlas reads `atlas_richtext_json` if present; otherwise parses `story` markdown into a TipTap doc. The "no sidecar, only markdown" case is the migration path for narratives already in the world (AtlasMoppetopia, others).
 
-`writingHash(worldId, bookId?, chapterId?, sceneId?)` in `core/router.ts`.
+**On save** (debounced via existing sync debounce window):
+1. TipTap doc → markdown serializer → write to `story` field.
+2. TipTap doc → JSON → write to `atlas_richtext_json` field.
+3. Auto-derive relation fields (see below).
+4. Single `folder.updateElement` call. Sync push fires via existing `requestPushIfLinked()` pipeline.
 
----
+**Coherence**: the two representations are atomically updated in the same write. If another OW tool edits `story` while atlas isn't running, atlas detects `server_updated_at` newer than the recorded local timestamp on next pull, re-parses markdown, regenerates `atlas_richtext_json`. Atlas-only features (callouts, footnotes when added) would be lost in this edge case. Acceptable tradeoff for portability.
 
-## Cumulative scope (through session 224)
+### TipTap stack (the library decision)
 
-**Shipped**:
-- supertype-tier model + four-tier labels (l1-l4)
-- Setup screen (`writing-setup.ts`) with detect/adopt + promote
-- Promote logic (`writing-promote.ts`) + label-rename migration
-- Writing tree filter on `isWritingNarrative` (supertype matches one of l1-l4)
-- Tier-aware tree rendering (icons, drafts italic, contextual create)
-- Element-detail supertype autocomplete (suggestion chips + Tab complete)
-- Settings → Writing l4 input + change-event triggers migration
-- **Sidebar takeover** — writing tree moved from middle pane into the sidebar (`src/sidebar/writing-sidebar.ts`), middle pane single-column
-- **Header unification** — tier badge + child-create buttons moved INTO `.atlas-middle-header`, header height locked at 36px across all rooms
-- **Drag-reorder** — sibling-only, sequential `order` writes, cyan drop indicator
-- **Cascade delete** — deleting a book/chapter cascades all descendant narratives (and their pins) per `findDependents` extension in folder-store-fs.ts + mock-folder-store.ts
-- **Last-narrative memory** — `registry.worlds[i].last_writing_narrative_id`, room-nav writing icon restores it
-- **Stay-in-room after delete** — element-detail's `onDelete` checks route mode, navigates to `writingHash` when in writing instead of always going to home
-- **Pin nav respects current room** — pin affordance in element-detail header doesn't change URL when in writing
-- **Non-blocking saves** — `field-edit-popover` closes optimistically before awaiting persistence
+Library: **TipTap 3.x** (ProseMirror-based, framework-agnostic, MIT-licensed).
 
-**Defer (still)**:
-- Richtext editor (TipTap / ProseMirror / Lexical — library decision not made)
-- Element autolinking (`[[name]]` syntax or autodetect)
-- Element preview popover on hover
-- Inline element creation from selected prose
-- Word count / progress tracking
-- Outline mode (markdown-per-book sidecar)
+Packages:
+- `@tiptap/core` + `@tiptap/pm` — editor runtime
+- `@tiptap/starter-kit` — paragraph, bold, italic, headings, lists, blockquote, horizontal rule, strike
+- `@tiptap/extension-mention` + `@tiptap/suggestion` — `@` trigger state machine
+- `@tiptap/markdown` — bidirectional markdown serialization (official, MIT, currently in beta — pin version; round-trip-test every custom node)
+
+Bundle estimate: **~70-80 KB gzipped**. Atlas currently sits at 155 KB gzipped JS. Total post-integration: ~225-235 KB gzipped. Within our ~100 KB headroom budget.
+
+Rejected alternatives (research-backed):
+- **Lexical** — memory leak benchmark (3.9 GB crash at 23 min in sustained-session stress test). Wrong shape for atlas writing sessions.
+- **Slate** — React-only. Atlas is vanilla DOM.
+- **Quill v2** — Delta format awkward for tree-shaped content; markdown is community plugin, not first-class.
+- **Editor.js** — block-based, slow on paste at long-doc scale (10s lag on 100+ line paste).
+- **CKEditor 5** — ~150-300 KB gzipped even tree-shaken. Over budget.
+
+Fallback if TipTap's markdown beta bites us: drop to raw ProseMirror + `prosemirror-markdown` (same engine, full control, ~15 KB savings). Same TipTap doc model, so no rewrite of the workspace.
+
+### Linking model (the full picture)
+
+**Writer experience — explicit `@` trigger (v1 primary)**:
+1. Writer types `@` in prose.
+2. Picker popover appears at cursor (TipTap suggestion extension provides trigger + state machine; we build the popover UI to match atlas's glass aesthetic).
+3. Writer types `dri` — picker filters by fuzzy match against element **name + atlas_aliases** across all 22 element types in the active world.
+4. Picker rows show: `[type icon] Element name · Type · disambiguating subtitle`. Recents-first when query is empty; then fuzzy score.
+5. Writer hits Enter (or clicks).
+6. The `@dri` text in the prose is replaced with a styled cyan chip showing the element's current name.
+7. Markdown serialization: `[Display Name](ow://<type>/<uuid>)`.
+
+**Writer experience — first-mention auto-link (v1 stretch, see Bout H)**:
+1. Writer types "Drizzle did not own a calendar" — no trigger.
+2. Background tokenizer matches "Drizzle" against the element name+alias index for the active world.
+3. Atlas shows a subtle ghost underline + Tab hint under the word.
+4. Writer presses Tab → suggestion accepted, word becomes a chip. OR keeps typing → suggestion fades, word stays plain text.
+5. Once Drizzle is linked once in this narrative, atlas does NOT suggest linking subsequent mentions. First-mention rule (Loreteller's universal pattern).
+6. For ambiguous names (2+ matches), suggestion is suppressed — writer must use `@` to pick explicitly.
+
+**Aliases**:
+- Each element gets an atlas-local `atlas_aliases: string[]` field.
+- Editable in element-detail — the schema-driven editor surfaces it like any other field.
+- Stored as e.g. `["Hal", "Lady Vareth", "the duchess"]`.
+- Both the `@` picker AND the auto-link tokenizer match against `name` ∪ `atlas_aliases`.
+- Critical feature per research — without aliases, writers stop linking after 2-3 mentions because matching the canonical name breaks flow.
+
+**Same-name handling**:
+- Two Characters named "John" both have distinct UUIDs.
+- Picker shows both with disambiguating subtitle (element type + parent context where available, falls back to description first 30 chars).
+- Writer picks one explicitly — that UUID is what's stored.
+- Stored markdown: `[John](ow://character/uuid1)` and `[John](ow://character/uuid2)` — distinct, never ambiguous in data.
+- Both chips render as "John" but point to different elements; hover/click resolves to each individual element.
+- Auto-link with ambiguous names: suppresses ghost suggestion entirely.
+
+**Renames**:
+- Markdown stores `[Drizzle](ow://character/abc-123)`.
+- On render: TipTap parses markdown → for each link node, look up element by UUID in atlas store → chip displays element's **current** name.
+- Rename "Drizzle" to "Drizzleton" via element-detail → all chips re-render as "Drizzleton" immediately.
+- Save serializes back with updated display text.
+- **Manual display text override**: if writer types `@hal` and then edits the chip text manually (v1: no UI to do this; v2 will likely add), atlas detects `displayText !== element.name` and preserves the manual text. Punt on the UI for v1.
+
+**Click + hover (v1)**:
+- Hover → cursor pointer + tooltip showing `<element name> · <type>`.
+- Click → opens the element in the right pane (existing pattern via `openMapTab` and the right-pane tab system). Does NOT navigate URL away from writing — stays in writing mode.
+
+**v2 hover**: rich preview card with image + description + "Open" button.
+
+### Auto-derive relation fields on save
+
+- Triggered after debounce, after markdown is computed.
+- Scan markdown for `ow://(\w+)/([a-f0-9-]+)` matches.
+- Group by element_type → `{character: [uuid1, uuid2], location: [uuid3], event: [uuid4]}`.
+- For each relation field on Narrative (`characters`, `locations`, `events`, `objects`, etc.): compute UNION of (prose-derived UUIDs) ∪ (existing field value).
+- Manual additions to relation fields stay; prose mentions get auto-populated; nothing is silently dropped.
+- Edge case: a character mentioned only in deleted draft prose stays linked. This is fine — manual edit in element-detail can remove if needed.
+
+### Reading mode
+
+- Toggle button in footer (icon: `chrome_reader_mode` or similar).
+- Adds a CSS class to the workspace root.
+- That class: hides collapsibles, hides footer chrome, applies serif font to prose, increases line height to ~1.7, centers content at 70ch.
+- Esc returns to write mode.
+- Persisted per-world atlas-local pref (so reading mode in one world doesn't bleed into another).
+
+### What v1 does NOT do (deferred to v2+ — protected, see Roadmap)
+
+- Hover preview card on chips
+- Focus / distraction-free fullscreen
+- Outline / corkboard view of writing tree
+- Backlinks pane within the writing room (lives on element-detail when that feature lands)
+- Per-narrative atlas-local notes scratchpad
+- Per-session word count goal with progress ring
 - Find/replace
-- Reading mode / presentation mode
-- Export to PDF/EPUB/HTML/markdown (lives in publish room)
-- Per-row promote opt-out in setup (whole-batch in v1)
-- **Re-parenting via drag** — currently sibling-only; dropping into a different parent's children area is the natural next move
-- **Writing sidebar scroll memory** — sidebar tree scroll position not preserved across room toggles (element-detail scroll IS preserved)
+- Inline element creation from selected prose
+- Element embeds, footnotes, callouts as richtext blocks
+- Bidirectional consistency check (the long-term differentiator)
+- Prose-first extraction (parse manuscript → propose elements)
+- Visual narrative graph
+- Compare view
+- Export to PDF/EPUB (publish room)
 
 ---
 
-## Deferred design questions
+## Routes (v3.0 — shortened in session 227)
 
-1. **Richtext editor library** — TipTap, ProseMirror, Lexical, custom? Atlas-only features (footnotes, callouts, element embeds) need rich extension surface. Markdown serialization for OW description portability.
+```
+#/w/<id>/writing                  → writing room, no selection
+#/w/<id>/writing/<narrativeId>    → narrative selected (any tier)
+```
 
-2. **Where richtext lives** — atlas-local sidecar alongside Narrative, or future atlas-extension field on Narrative (`atlas_richtext_html`?). Decide when editor lands.
+Ancestry is NOT encoded in the URL — it's derived at render time from the `parent_narrative` chain via `buildNarrativeIndex` + `ancestorIds`. Atlas always has the world's narratives in memory by the time the writing room mounts, so deriving on render has no real cost.
 
-3. **Autolinking algorithm** — full-text scan on save? Background worker? Inline as typed? `[[name]]` syntax vs auto-detect both?
+**Legacy form back-compat**: URLs from before the shortening (sessions 223-226) still parse. The parser picks the deepest segment as `narrativeId` and re-emits the short form on next navigation:
 
-4. **Element creation from prose** — select text → "create Character" → modal pre-filled with selected name.
+```
+LEGACY: #/w/<id>/writing/book/<bId>/chapter/<cId>/scene/<sId>
+        → parseHash sets narrativeId = sId
+        → next writingHash() call emits #/w/<id>/writing/<sId>
+```
 
-5. **Word count UX** — chapter footer? Sidebar of tree? Per-session goal?
+The URL is the source of truth for which narrative is active (convention #46). Writing-workspace reads the route's `narrativeId`, never mirrors into `state.ui.selectedElementId`.
 
-6. **Outline mode** — separate file per book, plain markdown, used for planning.
-
-7. **Reading mode** — clean reading view, no editor chrome.
-
-8. **Draft state field** — separate from draft tier: should any tier narrative be markable as "WIP"? Likely an `atlas_writing_state: 'wip' | 'final'` atlas-local field. Not v1.
-
----
-
-## Conventions
-
-- **#33** (updated session 224): Writing tier labels live in `registry.worlds[i].writing_labels` (l1-l4). The label IS the `supertype` storage value on each Narrative. UI reads via `getWritingLabels(worldId)`. **No canonical/display split** — storage matches display.
-
-- **#34** (updated session 224): Atlas writing has three structured tiers + one flexible (Draft). Tier l1 forbids parent; l2 requires l1 parent; l3 requires l2 parent; l4 has no parent constraints. Child-create affordances in the header surface only where they make sense: l1 → {l2, l4}, l2 → {l3, l4}, l3 → nothing (scenes are leaves), l4 → nothing (drafts don't nest — root creates remain available from the sidebar footer). The writing-room create flow enforces these; element-detail edits don't (user can override at their own discretion).
-
-- **#38** (new session 224): A Narrative belongs to the writing tree iff its `supertype` matches one of the four labels for the world. Detection via `isWritingNarrative(el, worldId)`. Setting supertype to anything outside the four labels removes the narrative from the writing tree (still visible elsewhere).
-
-- **#39** (new session 224): Label changes trigger immediate supertype migration on existing narratives. Run via `applyLabelRenameMigration` from both Settings → Writing change events and the setup screen on save.
-
-- **#40** (new session 224): The writing tree lives in the sidebar (`src/sidebar/writing-sidebar.ts`) when the route is `writing`. The middle pane in writing mode is single-column (just element-detail of the active narrative). Takeover is implicit — `state.ui.sidebarWritingOverride: boolean` controls whether the user has explicitly toggled out. Override clears on route in/out of writing.
-
-- **#41** (new session 224): `.atlas-middle-header` is locked at 36px — `height`, `min-height`, `max-height`, and `flex: 0 0 36px` all set with `!important`, plus `overflow: hidden; flex-wrap: nowrap`, plus defensive `.atlas-middle-header > * { max-height: 100%; flex-shrink: 0 }`. The header is a stable band across all element types and all rooms; tier badge + writing actions for narratives live inside it (no separate toolbar slot).
-
-- **#42** (new session 224): Field edits via `openFieldEditPopover` close optimistically — the overlay tears down BEFORE awaiting `opts.onSave`, so the rest of the UI stays interactive during persistence. Failures surface via toast. Pattern applies generally to saves whose failure mode is rare and survivable.
-
-- **#43** (new session 224): Deleting a Narrative cascades through `parent_narrative` chains. `findDependents('narrative')` BFS-walks descendant narratives + collects pins referencing them; `deleteElement` tombstones all in dependency-safe order. Captain confirmed: orphaning chapters with a dangling `parent_narrative` FK was the worse alternative.
-
-- **#44** (new session 224): The writing icon in the room nav restores the last-edited narrative via `WorldRegistryEntry.last_writing_narrative_id`. Saved on every narrative selection change (deferred via `queueMicrotask` to avoid render thrash); read on writing-icon click and navigated via `writingHashForNarrative` (the helper that walks parent_narrative to build the full book/chapter/scene URL).
+`writingHash(worldId, narrativeId?)` in `core/router.ts`.
 
 ---
 
-## What writing is NOT
+## v2+ Roadmap (named-and-protected)
+
+These are NOT v1, but they are tracked so we don't forget. Order roughly by user value × ease.
+
+1. **Hover preview card on chips** — element image + type badge + one-line description + "Open" button. Highest-leverage v2 feature per research.
+2. **Focus / distraction-free mode** — Cmd+Shift+F. Collapses sidebar + header + footer; prose only.
+3. **Element aliases editor UX polish** — alias chips in element-detail, drag to reorder, "merge into" affordance.
+4. **First-mention auto-link** if not landed in v1.
+5. **Backlinks pane on element-detail** — "narratives that link to this element" / "elements that link to this narrative" — cross-cutting feature, lives on the element page per research.
+6. **Outline / corkboard view** of writing tree — index cards, drag to reorder, alternate to the linear sidebar tree. Scrivener's most-loved feature.
+7. **Per-narrative atlas-local notes scratchpad** — like world notes overlay, but per-narrative.
+8. **Per-session word count goal** — set target, footer shows progress ring.
+9. **Find/replace** within current narrative + across whole book.
+10. **Inline element creation from selected text** — highlight "Mira Halloway" → "Create Character?" → modal pre-filled with selected name.
+11. **Element embeds** in richtext — render element card inline within prose (TipTap node extension). Powerful for TTRPG handouts.
+12. **Footnotes + callouts** as richtext blocks (TipTap node extensions).
+13. **Bidirectional consistency check** — "you wrote 'green eyes' but Lyra's element record says brown". Atlas's strongest long-term differentiator per research; no competitor does this.
+14. **Prose-first extraction** — parse existing manuscript via OW SDK → propose Characters, Locations, Objects. Fits OnlyWorlds parsing skill heritage.
+15. **Visual narrative graph** at `#/w/<id>/writing/graph` — nodes for narratives sized by word count, edges for parent_narrative + shared elements + explicit references.
+16. **Compare view** — two narratives side-by-side for revision.
+17. **Export book/chapter to markdown/PDF/EPUB** — lives in publish room per `DESIGN_PUBLISHING.md`. Writing room provides the "publish this book" affordance.
+
+---
+
+## Deferred design questions (slim — most v2.1 questions are now answered in v3.0)
+
+1. **Aliases at OW schema level** — currently atlas-local via `atlas_aliases`. Whether/when to propose council motion to add to OW core schema. See DESIGN.md "Atlas-Specific Fields & Features" tracking section.
+2. **Per-narrative atlas-local notes** — separate field (`atlas_notes`?) or hook into the existing per-world notes overlay scoped by narrative?
+3. **Word count rollup** — current narrative only in v1. Chapter / book aggregate is v2.
+4. **Reading-mode pagination** — v1 ships scrolling reading mode; pagination is a v2 polish question.
+
+---
+
+## Conventions added in v3.0
+
+- **#47**: `atlas_richtext_json` lives on Narrative elements as an atlas-local extension field. Holds the full TipTap JSON document. Stripped on API push. The canonical `story` field on the same element holds the markdown serialization for OW-tool interop. Both representations are written atomically on every workspace save; load prefers `atlas_richtext_json` and falls back to parsing `story` markdown.
+
+- **#48**: Element references in narrative prose are stored as markdown links with the OW URL scheme: `[Display Name](ow://<element-type>/<uuid>)`. Display text is resolved dynamically from the atlas store at render time (so renames propagate). Manual display-text overrides (where `displayText !== element.name`) are preserved on save.
+
+- **#49**: Atlas elements have an optional atlas-local `atlas_aliases: string[]` field. Both the `@` picker and the first-mention auto-link tokenizer match against `name` ∪ `atlas_aliases` when resolving an element by string. Aliases are stripped on API push (atlas-local extension field).
+
+- **#50**: On every workspace save, the auto-derive pass scans the markdown for `ow://` links, groups UUIDs by element type, and writes the UNION of (prose-derived) ∪ (existing relation field value) into each Narrative relation field. Manual relation field entries are preserved. Single `folder.updateElement` call per save.
+
+- **#51**: The writing workspace replaces element-detail entirely as the middle-pane renderer when `route.mode === 'writing'` AND a narrative is active in the URL hierarchy. Empty-state (no active narrative) stays in `writing.ts`.
+
+- **#52** (v1.5 polish): Any override of `.material-symbols-outlined` (font-size, color, etc.) MUST be scoped under a parent class for two-class specificity (0,2,0). The package's `.material-symbols-outlined { font-size: 24px }` rule is single-class (0,1,0) and load-order decides the tie — non-deterministic. Pattern: `.atlas-foo-parent .my-icon { font-size: Npx }` (e.g. `.atlas-link-chip .atlas-link-chip-remove`). Bitten twice (session 226 room-nav chip + session 227 link-chip-remove); locking in as a hard rule.
+
+---
+
+## What writing is NOT (unchanged from v2.1)
 
 - Not a replacement for prose tools at scale (Scrivener, Word) — atlas is *world-aware* writing, optimized for connection
 - Not a markdown power-user surface — atlas is a structured editor first, markdown is a serialization choice for portability
 - Not a publishing platform — that's the publish room (`DESIGN_PUBLISHING.md`)
 - Not a wiki — element descriptions are the wiki; writing is narrative authorship
+
+---
+
+## Research foundations (informing v3.0)
+
+v3.0 incorporates findings from a 6-agent research swarm (session 226):
+
+- **Differentiator scout** across Scrivener, Ulysses, World Anvil, NovelCrafter, Campfire, Plottr, Obsidian, Notion — confirmed three-pane shell is genre default AND genre's primary complaint surface; identified "bolted-on editor" as the trap World Anvil falls into.
+- **Reddit fiction-writer friction** — confirmed sync-state-invisibility, compile-as-black-box, setup-tax, and chrome-competes-with-page as universal pain points to avoid.
+- **Reddit worldbuilder needs** — confirmed unidirectional linking (prose→wiki only) is the universal failure mode; identified prose-first extraction and bidirectional consistency check as Atlas's unique opportunities.
+- **Reddit connected-notes power users** — surfaced first-mention rule, alias necessity, and "block references / transclusion aren't for fiction" anti-patterns.
+- **Linking UX deep-dive** — established ID-stable links with dynamic display text, type-icon + breadcrumb in picker, and "explicit insertion only in v1" (no NovelCrafter-style auto-detect without trigger).
+- **Richtext library evaluation** — TipTap 3.x recommended; Lexical eliminated by long-session memory leak benchmark.
+
+Full agent outputs not stored in repo (would bloat docs); the synthesized findings live in this document as design decisions.

@@ -931,6 +931,67 @@ All phases (0 → 6 + 3.5) shipped by session 221. Cutover (force-push to atlas 
 
 ---
 
+## Atlas-Specific Fields & Features
+
+Atlas extends OnlyWorlds with capabilities that don't (yet) live in the OW schema. This section catalogs them so we can take stock once the tool is mature — some may warrant council motions to migrate into core schema; others stay atlas-only forever (visual prefs, UI state).
+
+**Strip discipline**: all element-level atlas-only fields are listed in `ATLAS_LOCAL_EXTENSION_FIELDS` (in `core/constants.ts`). The adapter strips them on API push; `applyServerRecord` preserves them when overlaying server responses. Both fakes (FakeOwApiClient + MSW handler) reject them in write bodies to lock in the discipline (convention #20).
+
+### Element-level atlas-only fields (candidates for future schema discussion)
+
+| Field | On element types | Purpose | Council-motion candidate? |
+|---|---|---|---|
+| `image_media_id` | Any element with `image_url` | Local binding to atlas media folder for non-URL image sources | Maybe — if OW adds local-media support to schema |
+| `atlas_color` | Zone | Hex color override for zone fill | Probably not — visual pref |
+| `atlas_opacity` | Zone | 0..1 fill opacity | Probably not — visual pref |
+| `atlas_label_visible` | Zone | Whether zone label renders on map | Probably not — visual pref |
+| `atlas_shape` | Zone | `'polygon' \| 'line'` shape kind | **Yes** — fundamental zone geometry data |
+| `atlas_richtext_json` | Narrative | TipTap JSON for the richtext story body | Maybe — if OW adds richtext-on-story support |
+| `atlas_aliases` | Any element | `string[]` of name aliases for linking | **Yes** — broadly useful (writers want it; pickers want it; search wants it) |
+
+### Showcase-config extensions (planned, per DESIGN_PUBLISHING.md)
+
+Atlas writes these inside `showcase_config` when publishing; backend stores them opaquely; atlas reads them on retrieve. Other OW tools ignore.
+
+- `atlas_field_richtext` — per-field richtext payload (HTML or TipTap JSON) for atlas-published showcases
+- `atlas_layout` — `'card' | 'page' | 'book'`
+- `atlas_bundle_ids` — multi-element bundle pointer (e.g. all chapters in a book)
+- `atlas_theme` — atlas-published theme key
+- `atlas_cover_image_url`
+
+### World-level / per-world atlas-only state (atlas-only forever)
+
+Stored in atlas's localStorage `WorldRegistryEntry`, not in any element file:
+
+- `writing_labels` (l1-l4 tier label config)
+- `writing_initialized` (whether setup flow was completed)
+- `writing_tree_collapsed[]` (sidebar tree expand state)
+- `last_writing_narrative_id` (room-nav restore target)
+- `notes` (per-world freeform notes, accessible via overlay)
+- `showcases[]` (per-world published showcase registry)
+- `sync_debounce_ms` (autosave delay, per-world preference)
+- Various sync state (last_pull_at, last_push_at, pending baselines)
+
+### Per-tool / per-browser atlas-only state
+
+- `atlas_ui_prefs` — sidebarMode etc.
+- `atlas_shell_ratios_v2` — three-pane resize ratios
+- `atlas_right_tabs` — right-pane open tabs and active index
+- `atlas_map_view_defaults`, `atlas_map_view_prefs` — map visual prefs
+- `atlas_map_camera_state` — per-map camera (center + zoom)
+
+### Why track this
+
+Atlas is a primary OnlyWorlds tool, and the boundary between "atlas innovates" and "OnlyWorlds standardizes" should be a conscious decision, not an accident. Periodically we should:
+
+1. Review the `ATLAS_LOCAL_EXTENSION_FIELDS` list and ask: which of these would benefit other OW tools if they migrated into the OW schema?
+2. Draft council motions for the strong candidates (currently `atlas_shape` and `atlas_aliases`).
+3. After motion + amendment, plan a migration: stop stripping the field on push, ensure schema validation passes server-side, migrate existing local data into the canonical field name (drop the `atlas_` prefix if the council chose a different name).
+
+Atlas innovating is healthy. Atlas innovating *and* feeding learnings back to OnlyWorlds is the design intent.
+
+---
+
 ## Open Questions
 
 1. **Multi-image API support** — deferred until OW schema supports it (current model has one `image_url`). When schema lands, design a media-grid → primary-image UX. Open implementation candidates (server-delete-on-pull UX, unlink confirmation, conflict log review, etc.) are tracked in `PROGRESS.md`. Per-world conflict policy override was explicitly dropped session 221.

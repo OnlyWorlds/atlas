@@ -10,8 +10,15 @@
  */
 
 import { http, HttpResponse, type HttpHandler } from 'msw';
+import { ATLAS_LOCAL_EXTENSION_FIELDS } from '../src/core/constants';
 
 const DEFAULT_BASE = 'https://www.onlyworlds.com/api/worldapi';
+/** Single source of truth list — keep in lockstep with constants.ts. */
+const ATLAS_LOCAL_ALL = [
+  ...ATLAS_LOCAL_EXTENSION_FIELDS,
+  'local_updated_at',
+  'server_updated_at',
+];
 
 interface ServerRecord {
   id: string;
@@ -196,8 +203,7 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
       // were leaking to live OW which rejects unknown fields with 400. Mirror
       // here so tests catch any new field that needs adding to
       // ATLAS_LOCAL_EXTENSION_FIELDS.
-      const ATLAS_LOCAL = ['image_media_id', 'atlas_color', 'atlas_opacity', 'atlas_label_visible', 'atlas_shape', 'local_updated_at', 'server_updated_at'];
-      const bannedLocal = Object.keys(body).find(k => ATLAS_LOCAL.includes(k));
+      const bannedLocal = Object.keys(body).find(k => ATLAS_LOCAL_ALL.includes(k as any));
       if (bannedLocal) {
         return HttpResponse.json(
           { error: `body contains atlas-local field "${bannedLocal}" which the server rejects` },
@@ -231,8 +237,7 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
           );
         }
       }
-      const ATLAS_LOCAL_UPD = ['image_media_id', 'atlas_color', 'atlas_opacity', 'atlas_label_visible', 'atlas_shape', 'local_updated_at', 'server_updated_at'];
-      const bannedLocalUpd = Object.keys(body).find(k => ATLAS_LOCAL_UPD.includes(k));
+      const bannedLocalUpd = Object.keys(body).find(k => ATLAS_LOCAL_ALL.includes(k as any));
       if (bannedLocalUpd) {
         return HttpResponse.json(
           { error: `body contains atlas-local field "${bannedLocalUpd}" which the server rejects` },

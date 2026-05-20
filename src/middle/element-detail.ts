@@ -60,7 +60,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // active narrative into selectedElementId on every navigation, which
     // clobbers the user's prior selection.
     const writingId = route.mode === 'writing'
-      ? (route.sceneId ?? route.chapterId ?? route.bookId ?? null)
+      ? (route.narrativeId ?? null)
       : null;
     const id = writingId ?? route.elementId ?? state.ui.selectedElementId;
     if (!id) return null;

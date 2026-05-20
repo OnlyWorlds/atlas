@@ -4,11 +4,24 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-05-20 session 226)
+## CURRENT STATE (handover snapshot, 2026-05-20 session 227 close)
 
-Tool is in a tight, healthy state. **634 vitest green + 93 Playwright green.** Typecheck clean. Conventions list 1-46 (full text in DESIGN.md). PWA + offline cache; bundle ~548 KB JS / 155 KB gzipped + 4 MB Material Symbols woff2 (precached by SW, 17 entries / ~4.93 MiB).
+Tool has a working writing workspace v1 + v1.5 polish. **672 vitest green + 93 Playwright green.** Typecheck clean. Conventions list 1-52 (full text in DESIGN.md + DESIGN_WRITING.md). PWA + offline cache; bundle ~988 KB JS / 295 KB gzipped — +140 KB gzipped from TipTap/ProseMirror integration. Code-splitting deferred (see Open follow-ups).
 
-**Writing tool matured + decoupled.** Supertype-tier model + sidebar takeover + unified element-detail header + drag-reorder + cascade delete + last-narrative restore + non-blocking saves. Session 226: writing-room navigation now derives target element from URL hierarchy (book/chapter/scene), NOT from `state.ui.selectedElementId`. The global selection persists across writing visits. DESIGN_WRITING.md v2.1 + new convention #46 capture the contract. The richtext editor is the only major writing pillar still ahead.
+**Writing workspace v1 landed** — new `src/middle/writing-workspace.ts` module replaces the schema-driven element-detail when route mode is `writing` AND an active narrative exists in the URL hierarchy (convention #51). TipTap richtext editor (StarterKit + Markdown + custom ElementChip extension). Layout: 36px header (reused element-detail-header.ts) → breadcrumb + date row → prose surface → collapsible Details (wraps element-detail-fields, story field filtered out) → collapsible References → footer (reading-mode toggle + word count + reading time + save state + open-as-element link). Storage: `atlas_richtext_json` (TipTap JSON, atlas-local) + `story` field (markdown serialization, OW interop) atomically updated on debounced save. Linking: `@` picker with fuzzy match on name + `atlas_aliases`, inserted as `[Display Name](ow://<type>/<uuid>)` markdown, rendered as cyan chip. Auto-derive: every save unions prose-mentioned UUIDs into Narrative's multi-link relation fields. Reading mode toggle via CSS class. **First-mention auto-link deferred to v2** (deliberate scope guard).
+
+**Recent invariants worth knowing** (most-recent-first):
+- **Writing room mounts writing-workspace, NOT element-detail** when narrative selected (convention #51). element-detail's writing-mode branch (in `getSelectedElement`) is still reachable via the global selection chip flow but is no longer the writing-room renderer.
+- **Two new atlas-local extension fields**: `atlas_richtext_json` (TipTap JSON per Narrative) and `atlas_aliases` (string[] per any element). Both in `ATLAS_LOCAL_EXTENSION_FIELDS`; both stripped on API push; both fakes (FakeOwApiClient + MSW handlers) now consume the canonical list from constants.ts so future field additions don't drift.
+- **OW URL scheme for prose links** (convention #48): `[Display Name](ow://<element-type>/<uuid>)`. Chip display text resolves dynamically from store at render-time so renames propagate without touching markdown.
+- **Auto-derive on save** (convention #50): scans markdown for `ow://` matches, UNIONs into the matching multi-link relation field on Narrative. Manual entries preserved.
+- **JSON → markdown serializer is custom** (handles chips as ow:// links); markdown → JSON parse uses `@tiptap/markdown` then post-processes ow:// link marks into ElementChip nodes via `convertLinkMarksToChips`.
+- **DESIGN.md atlas-specific tracking section** added — catalogs every atlas-local field, world-level state, and per-tool config. Flags `atlas_shape` and `atlas_aliases` as candidates for future OW council motions.
+
+(Prior session-226 invariants preserved below.)
+
+- **Writing room reads URL for active narrative, not selectedElementId** (convention #46). Element-detail's `getSelectedElement` branches on `route.mode === 'writing'`. Global selection chip stays pinned to whatever was selected before writing was opened.
+- **Selected-element chip on far right of room-nav-strip** (convention #45). Persistent affordance showing icon + name + ×. Click body → navigate to element room; click × → clear. Highlights cyan when route mode is 'element'.
 
 **Recent invariants worth knowing** (most-recent-first):
 - **Writing room reads URL for active narrative, not selectedElementId** (convention #46). Element-detail's `getSelectedElement` branches on `route.mode === 'writing'`. Global selection chip stays pinned to whatever was selected before writing was opened.
@@ -40,9 +53,135 @@ Tool is in a tight, healthy state. **634 vitest green + 93 Playwright green.** T
 
 ---
 
-## Three big projects ahead — session 226 update
+## Session 227 (2026-05-20) — Writing workspace v1
 
-- **Writing-workspace redesign** — the next major design conversation. Session 224-226 work matured the tree, the model, and the surface decoupling, but the writing room's middle pane is still a single-column element-detail. The next move is Option A (locked in session 225 handover): new `src/middle/writing-workspace.ts` module parallel to element-detail, reusing the extracted `element-detail-header.ts`. Prose-first layout, story field as primary surface, richtext editor (TipTap / ProseMirror / Lexical — undecided), word count, outline. Open design questions live in `DESIGN_WRITING.md` v2.1 "Deferred design questions".
+Long autonomous session after the design conversation. 9 planned bouts; 8 landed, 1 deferred. Research swarm + locked design + full v1 build + tests, end-to-end.
+
+### Research swarm (pre-build)
+
+Six parallel agents fed v3.0 design: differentiator scout across writing tools, two Reddit friction/needs sweeps (fiction-writer + worldbuilder + power-user-notes), linking UX deep-dive across 9 tools, richtext library evaluation. Synthesis informed:
+- **TipTap chosen** over Lexical (Lexical eliminated by memory-leak benchmark in long sessions), ProseMirror (more boilerplate), Quill/Editor.js (poor long-doc + markdown), CKEditor (too big).
+- **`@` trigger, no `[[`** — explicit insertion only; no NovelCrafter-style passive auto-detect (false positives).
+- **Aliases as first-class** — universal friction in Obsidian/Roam without them.
+- **First-mention rule** — link once per narrative, not every mention.
+- **One pane, not three** — counter to genre default (Scrivener/World Anvil/NovelCrafter all three-pane); cross-tool research showed the three-pane shell is ALSO the genre's primary complaint surface ("chrome competes with the page").
+- **Backlinks live on the element, not the writing surface** — Obsidian power-user pattern.
+
+### DESIGN_WRITING.md v3.0 + DESIGN.md tracking section
+
+- Complete rewrite of DESIGN_WRITING.md (v2.1 → v3.0). New user-stories section, full linking model, storage model, library choice with rationale, v2+ roadmap (17 named-and-protected features so they don't get lost), research foundations.
+- New DESIGN.md section "Atlas-Specific Fields & Features" catalogs every atlas-local extension, world-level state, per-tool config. Flags `atlas_shape` and `atlas_aliases` as council-motion candidates for OW schema migration.
+
+### Code shipped
+
+- `src/middle/writing-workspace.ts` (588 lines) — orchestrator: mount/teardown, debounced save, header reuse, breadcrumb, date row, prose host, collapsibles, footer, reading-mode toggle, mention items provider with name+alias fuzzy match.
+- `src/middle/writing-workspace-editor.ts` (164 lines) — TipTap configuration: StarterKit + Markdown + custom ElementChip + chip-click delegation + initial-content post-processing.
+- `src/middle/writing-workspace-element-chip.ts` (94 lines) — custom Mention extension extending the stock one with a `type` attribute; renders as `span.atlas-element-chip` with data-id/data-type/data-label.
+- `src/middle/writing-workspace-mention.ts` (151 lines) — @ picker popover UI: glass aesthetic, type icon + name + meta, keyboard nav, recents-first rank pending (TODO).
+- `src/middle/writing-workspace-markdown.ts` (177 lines) — custom JSON → markdown serializer handling chips as `ow://` links; supports paragraphs, headings, bold/italic/strike/code marks, blockquotes, lists, hr, code blocks, links.
+- `src/middle/writing-workspace-load.ts` (60 lines) — markdown → JSON post-processor converting standard link marks with `ow://` href into ElementChip nodes.
+- `src/middle/writing-workspace-derive.ts` (115 lines) — `extractProseLinks` + `computeRelationPatch` (UNION semantics).
+- Updates to: `writing.ts` (dispatches to workspace), `core/constants.ts` (+`atlas_richtext_json`, +`atlas_aliases` in `ATLAS_LOCAL_EXTENSION_FIELDS`), test fixtures (consume canonical list from constants instead of hardcoding).
+- CSS additions: ~280 lines covering workspace shell, prose styles (paragraph/heading/list/blockquote/code), element chip, disclosures, footer, reading mode, @ picker popover.
+
+### Test infrastructure
+
+- 32 new unit tests in `writing-workspace-derive.test.ts` + `writing-workspace-markdown.test.ts` (6 + 26 tests):
+  - extractProseLinks: empty/single/multiple/dedup/case-insensitive
+  - computeRelationPatch: empty narrative, UNION with manual entries, no-op when no diff, multi-type grouping, ignored types
+  - NARRATIVE_RELATION_FIELDS map completeness
+  - serializeDocToMarkdown: paragraphs, headings, marks, chips (with closing-bracket escape), lists, blockquote, hr
+  - convertLinkMarksToChips: pass-through, conversion, https:// not touched, preserves other marks, multi-chip paragraphs
+  - Round-trip: serialized chips re-detectable by auto-derive regex
+- Test fakes (FakeOwApiClient + MSW handlers) now consume `ATLAS_LOCAL_EXTENSION_FIELDS` from constants.ts as the single source of truth — future strip-discipline additions land in lockstep.
+- All 661 vitest green (629 → 661). Typecheck clean. Production build clean.
+
+### What's deliberately NOT in v1 (v2 backlog)
+
+Per DESIGN_WRITING.md §v2+ Roadmap — hover preview card on chips, focus mode, first-mention auto-link, backlinks pane on element-detail, outline/corkboard view, per-narrative atlas-local notes, per-session word count goal, find/replace, inline element creation from prose, element embeds / footnotes / callouts (TipTap extensions), bidirectional consistency check, prose-first extraction, visual narrative graph, compare view, export to PDF/EPUB.
+
+### URL scheme shortened (post-Bout I)
+
+Captain flagged the workspace URL as too long (three UUIDs = ~110 chars). Refactored:
+- **New form**: `#/w/<worldId>/writing/<narrativeId>` (one UUID).
+- **Legacy form** still parses (`/writing/book/.../chapter/.../scene/...`) — parseHash picks the deepest segment as `narrativeId`. Re-emitting from a parsed legacy URL produces the short form (silent migration on copy/paste).
+- Route shape: added `narrativeId?: string` to `Route`; removed `bookId/chapterId/sceneId`. Callers updated: `writing.ts`, `writing-workspace.ts`, `element-detail.ts`, `writing-sidebar.ts`. `writingHash(worldId, narrativeId?)` signature simplified. `writingHashForNarrative` reduced to a trivial wrapper (kept on signature for back-compat; ancestry no longer encoded in URL).
+- Ancestry is derived at render time from `parent_narrative` chain via `buildNarrativeIndex` + `ancestorIds` (no extra cost — atlas always has the world's narratives in memory by the time the writing room mounts).
+- 11 new tests in `router-writing.test.ts` covering short-form parse, legacy-form parse, emit, and round-trip migration.
+- Total tests: 672 (was 661). Typecheck + production build clean.
+
+### v1.5 polish pass (post-build, same day, Captain feedback driven)
+
+Long iterative refinement after first dev-server look. Roughly 12 rounds of feedback → fix → screenshot → reiterate. All shipped same session.
+
+**Chip preview card** (`src/middle/writing-workspace-chip-preview.ts`, ~190 lines): hover-to-peek + click-to-stick floating card. 220ms hover delay; sticky mode on click stays until click-outside or Esc. Card shows type icon + name + description excerpt + image_url + "Open as element →" link. Writers stay in writing — chip click no longer navigates away.
+
+**Aliases editor — proper modal** (`src/ui/aliases-edit-modal.ts`): replaced CSV-in-a-text-input with a dedicated modal. One row per alias, "+ add alias" link, Enter creates next row, × removes, case-insensitive dedup on save, empty → persists `null` for clean clear. Element-detail renders aliases as chip strip; clicking the row OR the label opens the modal.
+
+**Recents tracker for @ picker** (`src/middle/writing-workspace-recents.ts`): per-world localStorage key tracks last 8 elements picked via @. Empty-query picker shows: (1) explicit picker recents, then (2) recently-edited elements by `local_updated_at` desc, padded up to 8. Matches the natural writer workflow ("I just touched Drizzle, now I'm writing about them"). PICKER_EXCLUDED_TYPES filters narrative/pin/marker/map out — they aren't narrative-linkable.
+
+**Focus mode** (Cmd+Shift+F): new hotkey binding dispatches `atlas:writing-focus-toggle`. Workspace toggles `.is-focus-mode` class; CSS uses `:has()` to project the effect onto the shell — `.atlas-sidebar`, `.atlas-right`, `.atlas-divider` collapse; middle pane gets `flex: 1 1 100% !important` override to fill viewport (beats the inline `style="flex: 0 0 X%"` set from persisted shell ratios). Workspace hides its own chrome too. Esc returns.
+
+**Settings tab persistence**: `atlas_settings_last_tab` localStorage key + tab-changed save on every render. Initial fix had a bug — `parseHash().settingsTab` defaults to `'identity'` so the "no tab in URL" check never triggered. Fix: compare `window.location.hash` against `settingsHash(wid)` (the bare form) directly.
+
+**Per-world prose font size**: `WorldRegistryEntry.writing_font_size_px` (atlas-local). Settings → Writing has a 5-step selector (13/14/15/16/18). Applied via `--atlas-prose-font-size` CSS var on workspace root. Live update on subscribe tick.
+
+**Native select styling**: dropdown classes were misclassed as `atlas-input` instead of `atlas-select`. Fixed. Added `color-scheme: dark` on root + option styling for OS-rendered menus. Documented pattern for future selects.
+
+**Layout shift gone**: prose container + Details + References disclosure now share `--atlas-writing-content-width: 760px`; body has `scrollbar-gutter: stable`. Toggling disclosures no longer shifts content horizontally. Prose uses `flex: 0 0 auto; min-height: 60vh` — never squeezed by disclosure content; opening Details just extends scrollable body.
+
+**Chip + visual polish** (many small rounds):
+- Element chips (cyan dotted underline in prose): had a bug where `var(--atlas-accent)` was never defined — chips read invisible. Aliased `--atlas-accent: var(--atlas-cyan)` in root. Then iterated visual weight several times until landing on cyan-text + cyan-soft-dotted-underline at rest, solid + faint bg on hover.
+- Element link chips (multi-link references in element-detail): dialed down. Iterated 4 times to get sizing right: smaller text (11.5px), subtle border, 3px vertical padding, `:has(.atlas-link-chip-remove)` tighter right padding. The × button hit a classic specificity tie with the `material-symbols` package — `.material-symbols-outlined { font-size: 24px }` (specificity 0,1,0) tied with `.atlas-link-chip-remove`. Fixed by scoping under `.atlas-link-chip .atlas-link-chip-remove` (0,2,0). **This pattern needs to be a convention** — see Lessons.
+- Alias chips: matched the link-chip aesthetic but kept pill shape (border-radius 11px) for distinction; tuned padding asymmetric (`2px top / 4px bottom`) to correct optical centering against descender glyphs (j, p) which push visual mass upward.
+
+**Writing area aesthetic improvements**:
+- Warm off-white prose text (`#e0ddd6`) instead of pure white — easier on the eyes for long sessions
+- Subtle warm vignette on the prose container (faint radial + linear gradient at ~1-2% opacity) — feels like "page on a desk"
+- Slightly larger + airier prose (15px default, line-height 1.72, letter-spacing 0.005em)
+- All these new colors go through `--atlas-prose-*` CSS variables — explicit foundation for a future light-mode toggle (swap the variables, chrome unchanged)
+
+**DESIGN.md atlas-specific tracking section**: catalogs every atlas-local field, world-level state, and per-tool config so we can take stock later for potential schema migrations. Flagged `atlas_shape` and `atlas_aliases` as council-motion candidates.
+
+**humanizeFieldName drops `atlas_` prefix**: clean labels everywhere (`atlas_aliases` → "Aliases"). Element-detail-zone-sections uses its own labels so no impact there.
+
+### What's still queued for next chat (v2 batch)
+
+Captain's "knock all of that out" combo:
+1. **Backlinks pane on element-detail** — "narratives that link to this element" + "elements that link to this narrative". Cross-cutting feature, highest leverage per research.
+2. **First-mention auto-link** — TipTap extension; passive tokenizer + ghost-underline + Tab-to-accept. The original Bout H deferred.
+3. **Code-split TipTap dynamically** — bundle is ~140 KB gzipped over budget for non-writing-room users. Lazy-load workspace from writing.ts via dynamic import.
+
+Plus the smaller v2 candidates (Bidirectional consistency check, Outline/corkboard, Element embeds, Footnotes/callouts, Find/replace, Visual narrative graph, Prose-first extraction, Compare view, Export, Per-narrative notes, Per-session word goal) — these need either design conversations or focused build sessions of their own.
+
+### Lessons (durable, added this session)
+
+- **Always scope material-symbols icon overrides under a parent class.** `.material-symbols-outlined` ships with `font-size: 24px` at single-class specificity (0,1,0). Any of our `.atlas-foo-icon { font-size: 12px }` rules will TIE and load-order decides — non-deterministic. The fix is two-class scoping: `.atlas-foo-parent .atlas-foo-icon` (0,2,0) wins regardless of load order. This is the SECOND time this has bitten us (session 226 room-nav chip + session 227 link-chip-remove). **Convention worth locking in.**
+- **Visual centering ≠ geometric centering for chip text with descenders.** Glyphs like j/p/g/y push the text's visual mass upward in the line-box, so symmetric vertical padding reads as "text too low". Asymmetric padding (less top, more bottom) corrects the optical center. Apply to any small pill-style chip.
+- **`:has()` is now production-viable** in Chromium-only contexts like atlas. Used to project workspace-class state onto sibling shell elements (focus mode hides sidebar + right pane from a workspace-rooted toggle). Saved building a global state slice for what is essentially a UI mode.
+- **Beware inline flex styles when overriding via CSS.** Atlas shell sets `style="flex: 0 0 X%"` on panes from persisted ratios; `display: none` siblings doesn't reclaim that fixed flex space. Need `flex: 1 1 100% !important` (the !important is essential) to beat the inline declaration in focus mode.
+- **CSS variable typo surfaces silently.** `var(--atlas-accent)` was used in three places but never defined; values fell through to inherited text color. Atlas-cyan was the actual var name. Added `--atlas-accent: var(--atlas-cyan)` as alias. **Worth adding a CI check** that flags `var(--atlas-...)` usages with no matching definition.
+- **`parseHash().settingsTab` always returns a truthy value** (defaults to `'identity'`) — can't be used to detect "no tab in URL". Compare to the bare hash string instead.
+
+### Open follow-ups (carried forward to next chat)
+
+1. **Playwright e2e specs for the workspace** — happy path (open narrative → see prose → type @ → pick element → see chip → save → verify markdown + atlas_richtext_json + relation field). Reading-mode toggle. Empty-narrative initial state. Focus mode entry/exit. Estimate: 1 hour.
+2. **Smoke-test against real AtlasMoppetopia** — load Skeld's filled world, open a narrative with existing markdown in `story`, verify markdown → chips conversion (convertLinkMarksToChips), edit + save round-trip.
+3. **Lock in the material-symbols-scoping convention** — add as convention #52 in DESIGN.md and create a tiny grep-based pre-commit check.
+4. **Lock in the CSS-var-existence check** — script that scans for `var(--atlas-...)` usages and warns on undefined refs.
+
+### Lessons (durable)
+
+- **Custom markdown serializer beats fighting library plugin APIs.** I tried to extend @tiptap/markdown's parseMarkdown/renderMarkdown hooks but the contract proved harder to satisfy than just walking the JSON ourselves. Writing a focused JSON → markdown walker (~180 lines) gave full control over chip serialization with no library-internal coupling. We still use @tiptap/markdown for PARSE (markdown → JSON on load) where the standard library is good enough, then post-process with `convertLinkMarksToChips` to upgrade ow:// link marks into ElementChip nodes.
+- **Single source of truth for strip discipline pays off in test fakes too.** Both fakes consume `ATLAS_LOCAL_EXTENSION_FIELDS` from constants.ts now. Adding new atlas-local fields no longer requires updating three places (constants, fake-ow-client, msw-handlers).
+- **Loose UUID regex (`[\w-]+`) over strict hex.** Tests use short symbolic ids like `c-1`/`l-1`; tightening the regex to `[a-f0-9-]+` would force test rewrites. The server-side authority validates UUIDs; our client-side regex only needs to be permissive enough to match what the server emits AND what tests use.
+- **Two-representation storage works.** `story` (markdown for OW interop) + `atlas_richtext_json` (TipTap JSON for atlas fidelity) feels heavier than one field but the alternative — losing all atlas-only formatting whenever another tool touches the narrative — would be worse. The two are atomically updated; load prefers JSON, falls back to parsing markdown.
+
+---
+
+## Three big projects ahead — session 227 update
+
+- **Writing workspace v1 — SHIPPED** (session 227). Major v2 follow-ups: code-split TipTap, e2e specs, alias editor row in element-detail, first-mention auto-link extension, hover preview card on chips, focus mode, backlinks pane on element-detail. Full v2 roadmap in DESIGN_WRITING.md.
 - **Timeline** — `src/visualization/timeline/timeline-bar.ts` ported. Compact mode on Home, expanded mode in `#/w/<id>/timeline`. Narrative bars, zoom/pan, filter toggles, expand-collapse all deferred.
 - **Publish** — `src/middle/publish-room.ts` stub. Backend already exposes `POST /showcase/publish/`; atlas-extension model (`atlas_*` config keys) locked in convention #35. Showcase config modal, element-detail publish button, list rendering, bundle UX for books, richtext piping — all deferred.
 

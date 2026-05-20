@@ -9,6 +9,7 @@
 
 import type { OwApiClient } from '../../src/sync/sync-engine';
 import type { ElementType } from '../../src/core/types';
+import { ATLAS_LOCAL_EXTENSION_FIELDS } from '../../src/core/constants';
 
 interface ServerRecord {
   id: string;
@@ -271,9 +272,10 @@ function rejectAtlasLocalFields(
   body: Record<string, unknown>,
   op: 'create' | 'update',
 ): void {
-  const ATLAS_LOCAL = ['image_media_id', 'atlas_color', 'atlas_opacity', 'atlas_label_visible', 'atlas_shape', 'local_updated_at', 'server_updated_at'];
+  // Single source of truth — keep in lockstep with constants.ts via spread.
+  const ATLAS_LOCAL = [...ATLAS_LOCAL_EXTENSION_FIELDS, 'local_updated_at', 'server_updated_at'];
   for (const k of Object.keys(body)) {
-    if (ATLAS_LOCAL.includes(k)) {
+    if (ATLAS_LOCAL.includes(k as any)) {
       throw new Error(
         `API Error 400: ${op} ${type} body contains atlas-local field "${k}" which the server rejects. ` +
           `Add to ATLAS_LOCAL_EXTENSION_FIELDS in core/constants.ts so toWireShape strips it.`,

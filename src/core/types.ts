@@ -353,6 +353,13 @@ export interface WorldRegistryEntry {
    */
   last_writing_narrative_id?: string;
   /**
+   * Writing workspace prose font size in CSS px (DESIGN_WRITING.md §The
+   * writing workspace). Atlas-local pref; persists per-world. Range: 12–20.
+   * Defaults to 15 when missing. Applied via the
+   * `--atlas-prose-font-size` CSS variable on the workspace root.
+   */
+  writing_font_size_px?: number;
+  /**
    * Per-world freeform notes — atlas-local (never synced). Accessed via the
    * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it
    * survives reloads without depending on the world's folder being granted

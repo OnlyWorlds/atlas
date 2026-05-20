@@ -36,7 +36,7 @@ export interface HotkeyBinding {
   /** Human-readable description, shown in the reference modal. */
   description: string;
   /** Scope label for grouping in the reference modal. */
-  scope: 'Global' | 'Editor' | 'Sidebar' | 'Map';
+  scope: 'Global' | 'Editor' | 'Sidebar' | 'Map' | 'Writing';
   /** Key match (case-insensitive). Use the value of KeyboardEvent.key. */
   key: string;
   /** Modifier requirement. `mod` = Cmd on Mac, Ctrl elsewhere. */
@@ -156,6 +156,18 @@ export function dispatchSaveRequest(): void {
   document.dispatchEvent(new CustomEvent(SAVE_REQUEST_EVENT));
 }
 
+/**
+ * Dispatched on `document` when the user invokes the writing focus toggle
+ * (`Ctrl/Cmd+Shift+F`). The writing workspace listens while mounted and
+ * toggles its focus-mode class. Decoupled from the hotkey table so this file
+ * never imports workspace modules.
+ */
+export const WRITING_FOCUS_TOGGLE_EVENT = 'atlas:writing-focus-toggle';
+
+export function dispatchWritingFocusToggle(): void {
+  document.dispatchEvent(new CustomEvent(WRITING_FOCUS_TOGGLE_EVENT));
+}
+
 // ---- Default bindings ----
 
 /**
@@ -238,6 +250,20 @@ export function defaultBindings(): HotkeyBinding[] {
       disabledInTextInput: true,
       when: () => Boolean(getCallbacks().getActiveWorldId?.()),
       action: () => { getCallbacks().openNotes?.(); },
+    },
+    {
+      id: 'writing-focus-toggle',
+      description: 'Toggle focus mode (writing)',
+      scope: 'Writing',
+      key: 'f',
+      modifier: 'mod+shift',
+      // INTENTIONALLY allowed in text input — writers will be in the editor
+      // when they want to toggle focus.
+      when: () => {
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        return hash.includes('/writing/');
+      },
+      action: () => { dispatchWritingFocusToggle(); },
     },
   ];
 }

@@ -92,35 +92,18 @@ export function supertypeForTier(tier: 'l1' | 'l2' | 'l3' | 'l4', worldId: strin
  * Use when navigating within writing mode after creating/selecting a
  * narrative — keeps the user in the writing room.
  */
+/**
+ * Emit the writing-room URL for a specific narrative. After the URL scheme
+ * shortening (session 227), this is a trivial wrapper around `writingHash`
+ * — ancestry is no longer encoded in the URL. The `elements` arg is kept on
+ * the signature for caller back-compat but is unused.
+ */
 export function writingHashForNarrative(
   worldId: string,
   narrativeId: string,
-  elements: Element[],
+  _elements?: Element[],
 ): string {
-  // Build a quick id → element map for chain walking.
-  const byId = new Map<string, Element>();
-  for (const e of elements) {
-    if (e.type === 'narrative') byId.set(e.id, e);
-  }
-  // Walk up from this narrative to its root.
-  const chain: string[] = [narrativeId];
-  let cur = byId.get(narrativeId);
-  let parent = cur ? (cur as Element & { parent_narrative?: string }).parent_narrative : undefined;
-  while (parent && byId.has(parent)) {
-    chain.unshift(parent);
-    const next = byId.get(parent)!;
-    parent = (next as Element & { parent_narrative?: string }).parent_narrative;
-  }
-  const [bookId, chapterId, sceneId] = chain;
-  let path = `#/w/${worldId}/writing`;
-  if (bookId) {
-    path += `/book/${bookId}`;
-    if (chapterId) {
-      path += `/chapter/${chapterId}`;
-      if (sceneId) path += `/scene/${sceneId}`;
-    }
-  }
-  return path;
+  return `#/w/${worldId}/writing/${narrativeId}`;
 }
 
 /**

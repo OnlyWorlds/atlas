@@ -93,13 +93,44 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
   root.className = 'atlas-middle-body atlas-settings';
   target.appendChild(root);
 
+  // Restore the last-visited Settings subtab when the URL doesn't specify
+  // one. Persists across world switches and reloads via localStorage.
+  // Without this, opening Settings always lands on Identity, even if the
+  // user was just on Writing five seconds ago.
+  const SETTINGS_LAST_TAB_KEY = 'atlas_settings_last_tab';
+  (function maybeRestoreTab(): void {
+    const route = parseHash(window.location.hash);
+    if (route.mode !== 'settings') return;
+    // parseSettingsTab() defaults to 'identity' when the URL has no tab
+    // segment, so route.settingsTab is always truthy — we can't use it to
+    // detect "no tab in URL". Compare against the bare settings hash
+    // instead: matches → URL has no tab → restore from storage.
+    const wid = getState().active?.worldId ?? null;
+    const bareSettings = settingsHash(wid);
+    if (window.location.hash !== bareSettings) return;
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(SETTINGS_LAST_TAB_KEY); } catch { /* private mode */ }
+    if (!stored || stored === 'identity' || !(SETTINGS_TABS as string[]).includes(stored)) return;
+    // Replace history entry so back-button doesn't bounce through the
+    // intermediate /settings URL.
+    window.location.replace(settingsHash(wid, stored as SettingsTab));
+  })();
+
   function activeTab(): SettingsTab {
     return parseHash(window.location.hash).settingsTab ?? 'identity';
+  }
+
+  function rememberActiveTab(t: SettingsTab): void {
+    try { localStorage.setItem(SETTINGS_LAST_TAB_KEY, t); } catch { /* private mode */ }
   }
 
   function render(): void {
     const state = getState();
     const tab = activeTab();
+    // Keep the persisted "last visited" tab in sync with whatever the URL
+    // says. Covers hash-driven nav (back/forward, direct links, etc.) — not
+    // just our tab-click handler.
+    rememberActiveTab(tab);
     const reg = state.registry;
     const activeWorldId = state.active?.worldId;
     const activeWorld = activeWorldId ? reg.worlds.find((w) => w.id === activeWorldId) : undefined;
@@ -136,6 +167,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
       btn.addEventListener('click', () => {
         if (btn.disabled) return;
         const t = btn.dataset.settingsTab as SettingsTab;
+        rememberActiveTab(t);
         const wid = getState().active?.worldId ?? null;
         navigate(settingsHash(wid, t));
       });
@@ -209,6 +241,20 @@ function renderWritingTab(entry: WorldRegistryEntry): string {
         Examples: Story / Substory / Scene / Note · Volume / Book / Chapter / Sketch.
         Existing narratives' supertype is migrated on label change.
       </p>
+    </section>
+    <section class="atlas-settings-section">
+      <h3>Writing workspace</h3>
+      <p class="atlas-settings-hint">Prose font size for the writing room. Applies live.</p>
+      <div class="atlas-settings-row">
+        <label class="atlas-settings-label">Font size</label>
+        <select class="atlas-select" data-setting="writing_font_size_px">
+          <option value="13" ${entry.writing_font_size_px === 13 ? 'selected' : ''}>13 (compact)</option>
+          <option value="14" ${entry.writing_font_size_px === 14 ? 'selected' : ''}>14 (small)</option>
+          <option value="15" ${(entry.writing_font_size_px ?? 15) === 15 ? 'selected' : ''}>15 (default)</option>
+          <option value="16" ${entry.writing_font_size_px === 16 ? 'selected' : ''}>16 (large)</option>
+          <option value="18" ${entry.writing_font_size_px === 18 ? 'selected' : ''}>18 (extra large)</option>
+        </select>
+      </div>
     </section>
   `;
 }
@@ -345,7 +391,7 @@ function renderSyncTab(reg: ReturnType<typeof getState>['registry']): string {
       </label>
       <label class="atlas-settings-field">
         <span>Auto-refresh cadence</span>
-        <select class="atlas-input" name="cadence" ${pauseAll ? 'disabled' : ''}>
+        <select class="atlas-select" name="cadence" ${pauseAll ? 'disabled' : ''}>
           ${CADENCE_OPTIONS.map(o =>
             `<option value="${o.ms ?? ''}" ${o.ms === cadenceMs ? 'selected' : ''}>${o.label}</option>`
           ).join('')}
@@ -538,6 +584,22 @@ function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager): void {
     const el = document.querySelector<HTMLInputElement>(`.atlas-settings input[data-setting="writing_${k}"]`);
     el?.addEventListener('change', () => { void save(k, el.value); });
   }
+
+  // Font size selector — atlas-local pref, applies live to the workspace
+  // via the --atlas-prose-font-size CSS var (read in writing-workspace.ts).
+  const fontSel = document.querySelector<HTMLSelectElement>(`.atlas-settings select[data-setting="writing_font_size_px"]`);
+  fontSel?.addEventListener('change', () => {
+    const px = Number(fontSel.value);
+    if (!Number.isFinite(px) || px < 12 || px > 22) return;
+    const reg = getState().registry;
+    const idx = reg.worlds.findIndex(w => w.id === entry.id);
+    if (idx < 0) return;
+    const updated: WorldRegistryEntry = { ...reg.worlds[idx], writing_font_size_px: px };
+    const next = { ...reg, worlds: reg.worlds.map((w, i) => (i === idx ? updated : w)) };
+    saveRegistry(next);
+    patchSlice('registry', next);
+    toasts.info(`Writing font size set to ${px}px`);
+  });
 }
 
 function wireIdentityTab(toasts: ToastManager): void {

@@ -22,7 +22,6 @@ import {
   supertypeForTier,
   buildNarrativeIndex,
   ancestorIds,
-  findAncestry,
   nextOrder,
   type WritingLabels,
   type NarrativeNode,
@@ -153,7 +152,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     const elements = getState().data.elements;
     const idx = buildNarrativeIndex(elements, active.worldId);
     const route = parseHash(window.location.hash);
-    const activeId = route.sceneId ?? route.chapterId ?? route.bookId ?? null;
+    const activeId = route.narrativeId ?? null;
     const entry = getState().registry.worlds.find(w => w.id === active.worldId);
     const collapsed = new Set(entry?.writing_tree_collapsed ?? []);
     // Force-expand ancestors only on activeId CHANGE — first render after
@@ -453,8 +452,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
       <span class="atlas-writing-tree-name">${escapeText(node.el.name || `(unnamed ${tierLabel.toLowerCase()})`)}</span>
     `;
     body.addEventListener('click', () => {
-      const path = findAncestry(idx, node.el.id);
-      navigate(writingHash(worldId, path.bookId, path.chapterId, path.sceneId));
+      navigate(writingHash(worldId, node.el.id));
     });
     row.appendChild(body);
 

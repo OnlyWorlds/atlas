@@ -27,13 +27,20 @@ export interface SectionLayout {
   fields: FieldMeta[];
 }
 
-/** Always-visible base fields (same for every element type). */
+/** Always-visible base fields (same for every element type).
+ *
+ * `atlas_aliases` is an atlas-local extension (stripped on API push) that
+ * holds alternate names for linking from prose (see DESIGN_WRITING.md §Aliases,
+ * convention #49). Rendered as a text-short with comma-separated input;
+ * the array ↔ CSV conversion lives in element-detail-fields.ts.
+ */
 const BASE_FIELDS: Array<{ name: string; widget: WidgetKind; required?: boolean }> = [
   { name: 'name', widget: 'text-short', required: true },
   { name: 'description', widget: 'text-long' },
   { name: 'supertype', widget: 'text-short' },
   { name: 'subtype', widget: 'text-short' },
   { name: 'image_url', widget: 'text-short' },
+  { name: 'atlas_aliases', widget: 'text-short' },
 ];
 
 /** Field names that should use a short text input even when type is `text`. */

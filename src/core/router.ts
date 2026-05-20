@@ -11,9 +11,11 @@
  *   Room routes (middle pane):
  *     #/w/<id>/element/<eid>                      → element room
  *     #/w/<id>/writing                            → writing room (no narrative)
- *     #/w/<id>/writing/book/<bId>                 → book
- *     #/w/<id>/writing/book/<bId>/chapter/<cId>   → chapter
- *     #/w/<id>/writing/book/<bId>/chapter/<cId>/scene/<sId>  → scene
+ *     #/w/<id>/writing/<narrativeId>              → writing room with active narrative
+ *                                                   (any tier — book / chapter / scene / draft.
+ *                                                    Ancestry derived from parent_narrative chain at render time.)
+ *     LEGACY (still parsed for back-compat, no longer emitted):
+ *     #/w/<id>/writing/book/<bId>[/chapter/<cId>[/scene/<sId>]]
  *     #/w/<id>/timeline                           → full timeline room
  *     #/w/<id>/search?q=<query>                   → search room
  *     #/w/<id>/publish                            → publish home
@@ -59,10 +61,13 @@ export interface Route {
   mapId?: string;
   /** Active settings tab when mode === 'settings'. Defaults to 'identity'. */
   settingsTab?: SettingsTab;
-  /** Writing room hierarchy ids. */
-  bookId?: string;
-  chapterId?: string;
-  sceneId?: string;
+  /**
+   * Writing room active narrative id (any tier — book/chapter/scene/draft).
+   * Ancestry is derived at render time by walking `parent_narrative`.
+   * Legacy long-form URLs (`/writing/book/.../chapter/.../scene/...`) still
+   * parse — parseHash picks the deepest segment as narrativeId.
+   */
+  narrativeId?: string;
   /** Publish detail room. */
   showcaseId?: string;
   /** Search room query string. */
@@ -129,16 +134,17 @@ export function parseHash(hash: string): Route {
     }
 
     if (sub === 'writing') {
-      // /writing[/book/<bId>[/chapter/<cId>[/scene/<sId>]]]
+      // New form: /writing/<narrativeId>
+      // Legacy form: /writing/book/<bId>[/chapter/<cId>[/scene/<sId>]]
       const out: Route = { worldId, mode: 'writing' };
       if (parts[3] === 'book' && parts[4]) {
-        out.bookId = parts[4];
-        if (parts[5] === 'chapter' && parts[6]) {
-          out.chapterId = parts[6];
-          if (parts[7] === 'scene' && parts[8]) {
-            out.sceneId = parts[8];
-          }
-        }
+        // Legacy form — pick the deepest segment as narrativeId.
+        if (parts[7] === 'scene' && parts[8]) out.narrativeId = parts[8];
+        else if (parts[5] === 'chapter' && parts[6]) out.narrativeId = parts[6];
+        else out.narrativeId = parts[4];
+      } else if (parts[3]) {
+        // New short form.
+        out.narrativeId = parts[3];
       }
       return out;
     }
@@ -204,23 +210,17 @@ export function timelineHash(worldId: string): string {
   return `#/w/${worldId}/timeline`;
 }
 
-export function writingHash(
-  worldId: string,
-  bookId?: string,
-  chapterId?: string,
-  sceneId?: string,
-): string {
-  let path = `#/w/${worldId}/writing`;
-  if (bookId) {
-    path += `/book/${bookId}`;
-    if (chapterId) {
-      path += `/chapter/${chapterId}`;
-      if (sceneId) {
-        path += `/scene/${sceneId}`;
-      }
-    }
-  }
-  return path;
+/**
+ * Emit the short writing-room URL: `#/w/<worldId>/writing[/<narrativeId>]`.
+ *
+ * Replaces the legacy `/writing/book/.../chapter/.../scene/...` form (still
+ * parsed for back-compat in parseHash, but never emitted by atlas). Ancestry
+ * is derived at render time from the parent_narrative chain.
+ */
+export function writingHash(worldId: string, narrativeId?: string): string {
+  return narrativeId
+    ? `#/w/${worldId}/writing/${narrativeId}`
+    : `#/w/${worldId}/writing`;
 }
 
 export function searchHash(worldId: string, query?: string): string {
