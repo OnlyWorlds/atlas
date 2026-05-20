@@ -37,6 +37,7 @@ import { getMapsSettings, getEditorSettings } from '../registry/registry';
 import { mapHash } from '../core/router';
 import { buildZoneSections } from './element-detail-zone-sections';
 import { escapeText, escapeAttr } from '../core/dom-utils';
+import { getWritingLabels } from './writing-helpers';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */
 const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
@@ -923,11 +924,13 @@ export function mountElementDetail(target: HTMLElement): () => void {
         return;
       }
       // mode === 'modal' (default)
+      const suggestions = suggestionsForField(el, meta.name);
       openFieldEditPopover({
         anchor: valueEl,
         label: humanizeFieldName(meta.name),
         value: initialValue,
         widget: editWidget,
+        ...(suggestions ? { suggestions } : {}),
         onSave: async (nextValue) => {
           await persistFieldPatch(el, meta.name, nextValue);
         },
@@ -1291,6 +1294,23 @@ function formatValue(raw: unknown): string {
 function pickIconFor(target: ElementType | undefined): string {
   if (target && ELEMENT_ICONS[target]) return ELEMENT_ICONS[target];
   return 'add_link';
+}
+
+/**
+ * Suggestion strings to surface in the field-edit popover for the given
+ * element + field. Returns null if no suggestions apply.
+ *
+ * Currently used for `supertype` on Narratives — surfaces the four writing
+ * tier labels so users can drop a narrative in/out of the writing tree with
+ * tab-to-complete instead of typing the exact label.
+ */
+function suggestionsForField(el: Element, fieldName: string): string[] | null {
+  if (el.type !== 'narrative') return null;
+  if (fieldName !== 'supertype') return null;
+  const active = getState().active;
+  if (!active) return null;
+  const labels = getWritingLabels(active.worldId);
+  return [labels.l1, labels.l2, labels.l3, labels.l4];
 }
 
 function forceRerender(): void {

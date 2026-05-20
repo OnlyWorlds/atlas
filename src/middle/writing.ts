@@ -1,16 +1,18 @@
 /**
- * Writing room — Book / Chapter / Scene authorship.
+ * Writing room — book / chapter / scene / draft authorship.
  *
- * See DESIGN_WRITING.md for full spec. v1 shell:
- *   - Left sub-column: book/chapter/scene tree (built from Narratives via
- *     parent_narrative + order)
- *   - Right sub-column: active Narrative as element-detail (reused)
+ * See DESIGN_WRITING.md for the full spec. The model (session 224):
  *
- * Three-level depth cap. Labels customizable via registry.writing_labels.
+ *   - Narratives belong to the writing tree iff `supertype` matches one of
+ *     the world's four configured labels (`writing_labels.l1`–`l4`).
+ *   - Tier (l1/l2/l3/l4) is determined directly by supertype value.
+ *   - `subtype` is FREE for the user (vision, flashback, etc.) — atlas never
+ *     sets it during writing-create.
+ *   - Drafts (l4) are flexible-parent: any parent or none.
  *
- * v1 scope: tree + element-detail reuse for the editor surface. Real richtext
- * editor + autolinking + word count + outline mode all deferred — see
- * DESIGN_WRITING.md "Deferred design questions".
+ * When `isWritingInitialized` returns false, the setup screen replaces the
+ * tree until the user confirms labels + optionally promotes existing
+ * structured narratives.
  */
 
 import { getState, patchSlice, subscribe } from '../core/state';
@@ -21,20 +23,27 @@ import { WritingCreateModal } from '../ui/writing-create-modal';
 import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { saveRegistry, toggleWritingTreeCollapsed } from '../registry/registry';
+import { mountWritingSetup } from './writing-setup';
+import {
+  getWritingLabels,
+  getTierForNarrative,
+  isWritingNarrative,
+  isWritingInitialized,
+  iconForTier,
+  tierConstraints,
+  supertypeForTier,
+  type WritingLabels,
+  type WritingTier,
+} from './writing-helpers';
 import type { Element } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 
-export function getWritingLabels(worldId: string): { l1: string; l2: string; l3: string } {
-  const entry = getState().registry.worlds.find(w => w.id === worldId);
-  return {
-    l1: entry?.writing_labels?.l1 ?? 'Book',
-    l2: entry?.writing_labels?.l2 ?? 'Chapter',
-    l3: entry?.writing_labels?.l3 ?? 'Scene',
-  };
-}
+// Re-export for backward compat with any callers still importing from writing.
+export { getWritingLabels } from './writing-helpers';
 
 interface NarrativeNode {
   el: Element;
+  tier: WritingTier; // non-null for every node in the tree (filtered upstream)
   children: NarrativeNode[];
   depth: number;
 }
@@ -44,11 +53,11 @@ interface NarrativeIndex {
   byId: Map<string, NarrativeNode>;
 }
 
-function buildNarrativeIndex(elements: Element[]): NarrativeIndex {
-  const narratives = elements.filter(e => e.type === 'narrative');
+function buildNarrativeIndex(elements: Element[], worldId: string): NarrativeIndex {
+  const writingNarratives = elements.filter(e => isWritingNarrative(e, worldId));
   const byId = new Map<string, NarrativeNode>();
-  for (const el of narratives) {
-    byId.set(el.id, { el, children: [], depth: 0 });
+  for (const el of writingNarratives) {
+    byId.set(el.id, { el, tier: getTierForNarrative(el, worldId), children: [], depth: 0 });
   }
   const roots: NarrativeNode[] = [];
   for (const node of byId.values()) {
@@ -59,7 +68,7 @@ function buildNarrativeIndex(elements: Element[]): NarrativeIndex {
       roots.push(node);
     }
   }
-  // Compute depth via BFS from roots
+  // Compute depth via BFS from roots.
   const queue: NarrativeNode[] = roots.map(r => { r.depth = 0; return r; });
   while (queue.length > 0) {
     const n = queue.shift()!;
@@ -85,7 +94,7 @@ function buildNarrativeIndex(elements: Element[]): NarrativeIndex {
 /** List ancestor node ids of `id` (excludes `id` itself). */
 function ancestorIds(idx: NarrativeIndex, id: string): string[] {
   const out: string[] = [];
-  let cur = idx.byId.get(id);
+  const cur = idx.byId.get(id);
   let parentId = cur ? (cur.el as Element & { parent_narrative?: string }).parent_narrative : undefined;
   while (parentId) {
     out.push(parentId);
@@ -96,11 +105,10 @@ function ancestorIds(idx: NarrativeIndex, id: string): string[] {
   return out;
 }
 
-/** Walk parent_narrative up to find {bookId, chapterId, sceneId} for navigation. */
+/** Walk parent_narrative up to find {bookId, chapterId, sceneId} for routing. */
 function findAncestry(idx: NarrativeIndex, id: string): { bookId?: string; chapterId?: string; sceneId?: string } {
   const node = idx.byId.get(id);
   if (!node) return {};
-  // Build the chain from this node up to root
   const chain: NarrativeNode[] = [node];
   let parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
   while (parentId) {
@@ -109,7 +117,6 @@ function findAncestry(idx: NarrativeIndex, id: string): { bookId?: string; chapt
     chain.unshift(parent);
     parentId = (parent.el as Element & { parent_narrative?: string }).parent_narrative;
   }
-  // chain[0] = book, chain[1] = chapter, chain[2] = scene (if present)
   return {
     bookId: chain[0]?.el.id,
     chapterId: chain[1]?.el.id,
@@ -130,9 +137,11 @@ function nextOrder(idx: NarrativeIndex, parentId: string | null): number {
   return max + 1;
 }
 
-async function createNarrative(
+async function createNarrativeAtTier(
+  tier: 'l1' | 'l2' | 'l3' | 'l4',
   parentId: string | null,
   name: string,
+  worldId: string,
   toasts: ToastManager,
 ): Promise<Element | null> {
   const folder = getActiveStore();
@@ -140,9 +149,11 @@ async function createNarrative(
     toasts.error('No active world.');
     return null;
   }
-  const idx = buildNarrativeIndex(getState().data.elements);
+  const idx = buildNarrativeIndex(getState().data.elements, worldId);
+  const supertype = supertypeForTier(tier, worldId);
   const created = await folder.createElement('narrative', {
     name,
+    supertype,
     ...(parentId ? { parent_narrative: parentId } : {}),
     order: nextOrder(idx, parentId),
   } as Partial<Element>);
@@ -154,9 +165,71 @@ async function createNarrative(
 
 export function mountWriting(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
+  const container = document.createElement('div');
+  container.className = 'atlas-writing-room-container';
+  target.appendChild(container);
+
+  let unmountInner: (() => void) | null = null;
+  let lastMode: 'setup' | 'tree' | 'empty' | null = null;
+
+  function render(): void {
+    const active = getState().active;
+    if (!active) {
+      mountMode('empty');
+      return;
+    }
+    const entry = getState().registry.worlds.find(w => w.id === active.worldId);
+    const inited = isWritingInitialized(entry, getState().data.elements);
+    mountMode(inited ? 'tree' : 'setup');
+  }
+
+  function mountMode(mode: 'setup' | 'tree' | 'empty'): void {
+    if (mode === lastMode) {
+      // Inner component owns its own subscriptions for live updates.
+      return;
+    }
+    unmountInner?.();
+    unmountInner = null;
+    container.innerHTML = '';
+    lastMode = mode;
+    if (mode === 'empty') {
+      container.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
+      return;
+    }
+    if (mode === 'setup') {
+      unmountInner = mountWritingSetup(container, toasts, () => {
+        // On finish/skip, fall through to tree.
+        lastMode = null;
+        render();
+      });
+      return;
+    }
+    unmountInner = mountTree(container, toasts);
+  }
+
+  // Outer subscription re-evaluates mode on every state tick. mountMode
+  // early-returns when mode is unchanged, so this is cheap. Doing it always
+  // (not just for setup/empty modes) is what makes the gear-click flow work:
+  // clicking gear flips `writing_initialized` to false in the registry, and
+  // we need to react by switching tree → setup. If we filtered on lastMode,
+  // tree-mode would be stuck.
+  const unsub = subscribe(render);
+  const unsubHash = onHashChange(() => {
+    // Hash changes don't change mode; the mounted component handles routing.
+  });
+  render();
+
+  return () => {
+    unsub();
+    unsubHash();
+    unmountInner?.();
+  };
+}
+
+function mountTree(container: HTMLElement, toasts: ToastManager): () => void {
   const root = document.createElement('div');
   root.className = 'atlas-writing-room';
-  target.appendChild(root);
+  container.appendChild(root);
 
   const treeCol = document.createElement('div');
   treeCol.className = 'atlas-writing-tree';
@@ -177,15 +250,12 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
     }
     const labels = getWritingLabels(active.worldId);
     const elements = getState().data.elements;
-    const idx = buildNarrativeIndex(elements);
+    const idx = buildNarrativeIndex(elements, active.worldId);
     const route = parseHash(window.location.hash);
     const activeId = route.sceneId ?? route.chapterId ?? route.bookId ?? null;
     const activeNode = activeId ? idx.byId.get(activeId) : null;
     const entry = getState().registry.worlds.find(w => w.id === active.worldId);
     const collapsed = new Set(entry?.writing_tree_collapsed ?? []);
-    // If the URL targets a descendant of a collapsed node, force its ancestors
-    // open so the active selection is visible. The user explicitly navigated
-    // there — collapse shouldn't hide it.
     if (activeId) {
       for (const ancestorId of ancestorIds(idx, activeId)) {
         collapsed.delete(ancestorId);
@@ -194,10 +264,25 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
 
     // --- Tree column ---
     treeCol.innerHTML = '';
-    const treeHeader = document.createElement('div');
-    treeHeader.className = 'atlas-writing-tree-header';
-    treeHeader.textContent = pluralize(labels.l1);
-    treeCol.appendChild(treeHeader);
+    const headerRow = document.createElement('div');
+    headerRow.className = 'atlas-writing-tree-header';
+    headerRow.innerHTML = `
+      <span class="atlas-writing-tree-header-title">${escapeText(pluralize(labels.l1))}</span>
+      <button class="atlas-writing-tree-header-settings" data-action="writing-settings" title="writing settings" aria-label="writing settings">
+        <span class="material-symbols-outlined">tune</span>
+      </button>
+    `;
+    headerRow.querySelector('[data-action="writing-settings"]')?.addEventListener('click', () => {
+      // Re-open setup screen by clearing the flag in-memory + re-rendering.
+      // Persisted on save inside the setup component.
+      const reg = getState().registry;
+      const nextWorlds = reg.worlds.map(w =>
+        w.id === active.worldId ? { ...w, writing_initialized: false } : w,
+      );
+      patchSlice('registry', { ...reg, worlds: nextWorlds });
+      saveRegistry({ ...reg, worlds: nextWorlds });
+    });
+    treeCol.appendChild(headerRow);
 
     const treeList = document.createElement('div');
     treeList.className = 'atlas-writing-tree-list';
@@ -213,7 +298,9 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
     }
     treeCol.appendChild(treeList);
 
-    // "+ new book" at bottom (top-level create)
+    // "+ new book" + "+ new draft" at bottom.
+    const createRow = document.createElement('div');
+    createRow.className = 'atlas-writing-tree-create-row';
     const newBookBtn = document.createElement('button');
     newBookBtn.type = 'button';
     newBookBtn.className = 'atlas-btn-ghost atlas-writing-new-book';
@@ -222,7 +309,7 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
       new WritingCreateModal({
         label: labels.l1,
         onCreate: async (name) => {
-          const created = await createNarrative(null, name, toasts);
+          const created = await createNarrativeAtTier('l1', null, name, active.worldId, toasts);
           if (created) {
             navigate(writingHash(active.worldId, created.id));
             toasts.info(`${labels.l1} created`);
@@ -230,43 +317,85 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
         },
       }).open();
     });
-    treeCol.appendChild(newBookBtn);
+    createRow.appendChild(newBookBtn);
+
+    const newDraftBtn = document.createElement('button');
+    newDraftBtn.type = 'button';
+    newDraftBtn.className = 'atlas-btn-ghost atlas-writing-new-draft';
+    newDraftBtn.innerHTML = `<span class="material-symbols-outlined">edit_note</span><span>new ${labels.l4.toLowerCase()}</span>`;
+    newDraftBtn.addEventListener('click', () => {
+      new WritingCreateModal({
+        label: labels.l4,
+        onCreate: async (name) => {
+          const created = await createNarrativeAtTier('l4', null, name, active.worldId, toasts);
+          if (created) {
+            navigate(writingHash(active.worldId, created.id));
+            toasts.info(`${labels.l4} created`);
+          }
+        },
+      }).open();
+    });
+    createRow.appendChild(newDraftBtn);
+
+    treeCol.appendChild(createRow);
 
     // --- Detail column ---
     unmountDetail?.();
     unmountDetail = null;
     detailCol.innerHTML = '';
     if (activeNode) {
-      // Mirror selection so element-detail renders this narrative.
-      if (getState().ui.selectedElementId !== activeNode.el.id) {
-        patchSlice('ui', { ...getState().ui, selectedElementId: activeNode.el.id });
+      // Mirror selection into ui state so element-detail can render this
+      // narrative. DEFERRED via queueMicrotask: patchSlice fires subscribers
+      // synchronously, and our own subscribe would recurse into render()
+      // mid-flight if we patched inline — causing detailCol to grow a second
+      // detailMount before the outer render finishes. Deferring schedules the
+      // patch after this render completes; if it changes state, a single
+      // clean re-render follows. Idempotent re-checks the value inside.
+      const targetId = activeNode.el.id;
+      if (getState().ui.selectedElementId !== targetId) {
+        queueMicrotask(() => {
+          if (getState().ui.selectedElementId !== targetId) {
+            patchSlice('ui', { ...getState().ui, selectedElementId: targetId });
+          }
+        });
       }
 
-      // Contextual "+ new child" toolbar — depth 0 lets you add a chapter,
-      // depth 1 lets you add a scene, depth 2 (scene) has no children.
-      if (activeNode.depth < 2) {
-        const childLabel = activeNode.depth === 0 ? labels.l2 : labels.l3;
+      // Contextual "+ new child" buttons based on active tier:
+      //   l1 (Book)    → + Chapter, + Draft
+      //   l2 (Chapter) → + Scene, + Draft
+      //   l3 (Scene)   → + Draft
+      //   l4 (Draft)   → + Draft (drafts nest drafts)
+      const childTiers: Array<'l1' | 'l2' | 'l3' | 'l4'> = [];
+      if (activeNode.tier === 'l1') childTiers.push('l2', 'l4');
+      else if (activeNode.tier === 'l2') childTiers.push('l3', 'l4');
+      else if (activeNode.tier === 'l3') childTiers.push('l4');
+      else if (activeNode.tier === 'l4') childTiers.push('l4');
+
+      if (childTiers.length > 0) {
         const toolbar = document.createElement('div');
         toolbar.className = 'atlas-writing-context-toolbar';
-        const addChildBtn = document.createElement('button');
-        addChildBtn.type = 'button';
-        addChildBtn.className = 'atlas-btn-ghost';
-        addChildBtn.innerHTML = `<span class="material-symbols-outlined">add</span><span>new ${childLabel.toLowerCase()}</span>`;
-        addChildBtn.addEventListener('click', () => {
-          new WritingCreateModal({
-            label: childLabel,
-            parentId: activeNode.el.id,
-            onCreate: async (name) => {
-              const created = await createNarrative(activeNode.el.id, name, toasts);
-              if (created) {
-                const path = findAncestry(buildNarrativeIndex(getState().data.elements), created.id);
-                navigate(writingHash(active.worldId, path.bookId, path.chapterId, path.sceneId));
-                toasts.info(`${childLabel} created`);
-              }
-            },
-          }).open();
-        });
-        toolbar.appendChild(addChildBtn);
+        for (const childTier of childTiers) {
+          const childLabel = labels[childTier];
+          const addChildBtn = document.createElement('button');
+          addChildBtn.type = 'button';
+          addChildBtn.className = 'atlas-btn-ghost';
+          addChildBtn.innerHTML = `<span class="material-symbols-outlined">add</span><span>new ${childLabel.toLowerCase()}</span>`;
+          addChildBtn.addEventListener('click', () => {
+            new WritingCreateModal({
+              label: childLabel,
+              parentId: activeNode.el.id,
+              onCreate: async (name) => {
+                const created = await createNarrativeAtTier(childTier, activeNode.el.id, name, active.worldId, toasts);
+                if (created) {
+                  const path = findAncestry(buildNarrativeIndex(getState().data.elements, active.worldId), created.id);
+                  navigate(writingHash(active.worldId, path.bookId, path.chapterId, path.sceneId));
+                  toasts.info(`${childLabel} created`);
+                }
+              },
+            }).open();
+          });
+          toolbar.appendChild(addChildBtn);
+        }
         detailCol.appendChild(toolbar);
       }
 
@@ -278,7 +407,7 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
       const empty = document.createElement('div');
       empty.className = 'atlas-pane-empty';
       empty.innerHTML = `
-        <p>Select a ${labels.l1.toLowerCase()} to begin, or create one.</p>
+        <p>Select a ${labels.l1.toLowerCase()} or ${labels.l4.toLowerCase()} to begin, or create one.</p>
       `;
       detailCol.appendChild(empty);
     }
@@ -287,13 +416,13 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
   function renderNode(
     node: NarrativeNode,
     parent: HTMLElement,
-    labels: { l1: string; l2: string; l3: string },
+    labels: WritingLabels,
     worldId: string,
     activeId: string | null,
     idx: NarrativeIndex,
     collapsed: Set<string>,
   ): void {
-    const hasChildren = node.children.length > 0 && node.depth < 2;
+    const hasChildren = node.children.length > 0;
     const isCollapsed = hasChildren && collapsed.has(node.el.id);
 
     const row = document.createElement('div');
@@ -301,10 +430,14 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
     if (node.el.id === activeId) row.classList.add('active');
     row.style.paddingLeft = `${node.depth * 16 + 4}px`;
 
-    const label = node.depth === 0 ? labels.l1 : node.depth === 1 ? labels.l2 : labels.l3;
-    const icon = node.depth === 0 ? 'menu_book' : node.depth === 1 ? 'article' : 'short_text';
+    // Tier-aware label + icon (drafts get distinct icon regardless of depth).
+    const tierLabel =
+      node.tier === 'l1' ? labels.l1
+      : node.tier === 'l2' ? labels.l2
+      : node.tier === 'l3' ? labels.l3
+      : labels.l4;
+    const icon = iconForTier(node.tier);
 
-    // Chevron (separate clickable; only when the node has children to hide).
     const chevron = document.createElement('button');
     chevron.type = 'button';
     chevron.className = 'atlas-writing-tree-chevron';
@@ -319,20 +452,19 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
         saveRegistry(next);
       });
     } else {
-      // Reserved spacer so all rows align regardless of children.
       chevron.classList.add('atlas-writing-tree-chevron-empty');
       chevron.disabled = true;
       chevron.innerHTML = '';
     }
     row.appendChild(chevron);
 
-    // The body of the row (icon + name) navigates to the node.
     const body = document.createElement('button');
     body.type = 'button';
     body.className = 'atlas-writing-tree-row-body';
+    if (node.tier === 'l4') body.classList.add('atlas-writing-tree-row-body-draft');
     body.innerHTML = `
       <span class="material-symbols-outlined atlas-writing-tree-icon">${icon}</span>
-      <span class="atlas-writing-tree-name">${escapeText(node.el.name || `(unnamed ${label.toLowerCase()})`)}</span>
+      <span class="atlas-writing-tree-name">${escapeText(node.el.name || `(unnamed ${tierLabel.toLowerCase()})`)}</span>
     `;
     body.addEventListener('click', () => {
       const path = findAncestry(idx, node.el.id);
@@ -342,14 +474,17 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
 
     parent.appendChild(row);
 
-    // Render children up to depth 2 (scene). Scenes have no children.
-    // Skip when collapsed.
+    // Render children for ANY tier (including drafts — they can nest).
     if (hasChildren && !isCollapsed) {
       for (const child of node.children) {
         renderNode(child, parent, labels, worldId, activeId, idx, collapsed);
       }
     }
   }
+
+  // Suppress unused warning — tierConstraints is reserved for future Refactor
+  // (e.g. validating parent at create time). Keep import-friendly.
+  void tierConstraints;
 
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
@@ -361,7 +496,6 @@ export function mountWriting(target: HTMLElement, toasts: ToastManager): () => v
     unmountDetail?.();
   };
 }
-
 
 function pluralize(word: string): string {
   if (word.endsWith('s')) return word;

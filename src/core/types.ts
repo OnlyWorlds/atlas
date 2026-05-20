@@ -310,15 +310,34 @@ export interface WorldRegistryEntry {
    */
   right_tabs?: RightTabsSnapshot;
   /**
-   * Customizable labels for the writing room's three-layer hierarchy
-   * (DESIGN_WRITING.md). Defaults: Book / Chapter / Scene. UI reads via
-   * `getWritingLabels(worldId)`. Stored per-world; atlas-local (never synced).
+   * Customizable labels for the writing room's four tier hierarchy
+   * (DESIGN_WRITING.md). Defaults: Book / Chapter / Scene / Draft. The label
+   * IS the storage value for `Narrative.supertype` — atlas writes
+   * `supertype = labels.l1` when creating a Book, etc. Filter is reversed:
+   * narratives whose supertype matches one of l1-l4 are in the writing tree.
+   *
+   * Labels are atlas-local (never synced as a registry field) but the supertype
+   * value on each Narrative IS synced (it's a core OW field).
+   *
+   * Renaming a label triggers a migration offer that updates existing
+   * narratives' supertype to the new value (so display + storage stay
+   * consistent, no canonical/display split).
    */
   writing_labels?: {
     l1: string;
     l2: string;
     l3: string;
+    l4: string;
   };
+  /**
+   * One-time flag set after the user completes the writing-setup flow for
+   * this world (confirms labels, optionally promotes existing structured
+   * narratives). When false/missing, opening the writing room shows the setup
+   * screen INSTEAD of the tree — but only if there's a meaningful decision to
+   * make (existing narrative structure detected, or non-default candidates).
+   * Fresh worlds with no narratives default to initialized + default labels.
+   */
+  writing_initialized?: boolean;
   /**
    * Writing room — IDs of nodes the user has collapsed in the tree. Default
    * is expanded (a node is collapsed iff its id appears in this array).

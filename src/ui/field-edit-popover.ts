@@ -28,6 +28,12 @@ export interface FieldEditOptions {
   onSave: (nextValue: any) => Promise<void> | void;
   /** Optional cancel callback. */
   onCancel?: () => void;
+  /**
+   * Optional suggestion strip rendered below the input. Click a chip to fill
+   * the input. Tab autocompletes the longest-prefix match. Used by writing
+   * supertype editing to surface the four tier labels.
+   */
+  suggestions?: string[];
 }
 
 export function openFieldEditPopover(opts: FieldEditOptions): void {
@@ -54,6 +60,38 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
   else input.type = 'text';
   input.value = opts.value;
   panel.appendChild(input);
+
+  // Suggestion strip (optional; shown when opts.suggestions is non-empty).
+  if (opts.suggestions && opts.suggestions.length > 0 && !isLong) {
+    const strip = document.createElement('div');
+    strip.className = 'atlas-edit-popover-suggestions';
+    for (const sug of opts.suggestions) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'atlas-edit-popover-suggestion';
+      chip.textContent = sug;
+      chip.addEventListener('click', (e) => {
+        e.preventDefault();
+        input.value = sug;
+        input.focus();
+      });
+      strip.appendChild(chip);
+    }
+    panel.appendChild(strip);
+
+    // Tab autocompletes to the longest prefix match among suggestions.
+    input.addEventListener('keydown', ((e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const current = input.value;
+      const match = opts.suggestions!.find(s =>
+        s.toLowerCase().startsWith(current.toLowerCase()) && s !== current,
+      );
+      if (match) {
+        e.preventDefault();
+        input.value = match;
+      }
+    }) as EventListener);
+  }
 
   // Footer (hint + actions)
   const footer = document.createElement('div');

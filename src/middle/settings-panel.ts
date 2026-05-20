@@ -173,14 +173,20 @@ function renderTab(
 // ---- Writing settings (DESIGN_WRITING.md) ----
 
 function renderWritingTab(entry: WorldRegistryEntry): string {
-  const labels = entry.writing_labels ?? { l1: 'Book', l2: 'Chapter', l3: 'Scene' };
+  const labels = {
+    l1: entry.writing_labels?.l1 ?? 'Book',
+    l2: entry.writing_labels?.l2 ?? 'Chapter',
+    l3: entry.writing_labels?.l3 ?? 'Scene',
+    l4: entry.writing_labels?.l4 ?? 'Draft',
+  };
   return `
     <section class="atlas-settings-section">
       <h3>Writing</h3>
       <p class="atlas-settings-hint">
-        Customize the three-level hierarchy labels used in the writing room.
-        Defaults: Book / Chapter / Scene. The data underneath stays as nested
-        Narratives — only the display labels change.
+        Four tier labels for the writing room. The label IS the
+        <code>supertype</code> stored on each Narrative — renaming a label
+        rewrites existing narratives' supertype so display and storage stay
+        consistent.
       </p>
       <div class="atlas-settings-row">
         <label class="atlas-settings-label">Level 1 (top)</label>
@@ -194,9 +200,13 @@ function renderWritingTab(entry: WorldRegistryEntry): string {
         <label class="atlas-settings-label">Level 3 (deepest)</label>
         <input class="atlas-input" data-setting="writing_l3" value="${escapeAttr(labels.l3)}" placeholder="Scene" />
       </div>
+      <div class="atlas-settings-row">
+        <label class="atlas-settings-label">Level 4 (flexible / draft)</label>
+        <input class="atlas-input" data-setting="writing_l4" value="${escapeAttr(labels.l4)}" placeholder="Draft" />
+      </div>
       <p class="atlas-settings-hint">
-        Examples: Story / Substory / Scene · Volume / Book / Chapter · Campaign / Arc / Session.
-        Changes apply on focus-out; reload the writing room to see updated labels.
+        Examples: Story / Substory / Scene / Note · Volume / Book / Chapter / Sketch.
+        Existing narratives' supertype is migrated on label change.
       </p>
     </section>
   `;
@@ -457,26 +467,63 @@ function wireTabHandlers(
 }
 
 function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager): void {
-  const save = (key: 'l1' | 'l2' | 'l3', value: string): void => {
+  const save = async (key: 'l1' | 'l2' | 'l3' | 'l4', value: string): Promise<void> => {
     const trimmed = value.trim();
-    if (!trimmed) return; // refuse empty — keeps the default visible
+    if (!trimmed) return;
     const reg = getState().registry;
     const idx = reg.worlds.findIndex(w => w.id === entry.id);
     if (idx < 0) return;
-    const current = reg.worlds[idx].writing_labels ?? { l1: 'Book', l2: 'Chapter', l3: 'Scene' };
+    const current = {
+      l1: reg.worlds[idx].writing_labels?.l1 ?? 'Book',
+      l2: reg.worlds[idx].writing_labels?.l2 ?? 'Chapter',
+      l3: reg.worlds[idx].writing_labels?.l3 ?? 'Scene',
+      l4: reg.worlds[idx].writing_labels?.l4 ?? 'Draft',
+    };
     if (current[key] === trimmed) return;
+    const nextLabels = { ...current, [key]: trimmed };
+    // Reject duplicate tier labels.
+    const values = [nextLabels.l1, nextLabels.l2, nextLabels.l3, nextLabels.l4];
+    if (new Set(values).size !== 4) {
+      toasts.error('Tier labels must be distinct.');
+      // Revert input value.
+      const el = document.querySelector<HTMLInputElement>(`.atlas-settings input[data-setting="writing_${key}"]`);
+      if (el) el.value = current[key];
+      return;
+    }
     const updated: WorldRegistryEntry = {
       ...reg.worlds[idx],
-      writing_labels: { ...current, [key]: trimmed },
+      writing_labels: nextLabels,
     };
     const next = { ...reg, worlds: reg.worlds.map((w, i) => (i === idx ? updated : w)) };
     saveRegistry(next);
     patchSlice('registry', next);
+
+    // Run rename migration: rewrite supertype on every narrative carrying the
+    // old label value.
+    const { applyLabelRenameMigration } = await import('./writing-promote');
+    const { getActiveStore } = await import('../core/active-store');
+    const folder = getActiveStore();
+    if (folder) {
+      const renamed = await applyLabelRenameMigration(
+        folder,
+        getState().data.elements,
+        current,
+        nextLabels,
+      );
+      if (renamed > 0) {
+        const fresh = await folder.listElements();
+        patchSlice('data', { elements: fresh });
+        toasts.success(`${key.toUpperCase()} label saved (${renamed} narrative${renamed === 1 ? '' : 's'} migrated)`);
+        const { requestPushIfLinked } = await import('../sync/sync-attach');
+        requestPushIfLinked();
+        return;
+      }
+    }
     toasts.info(`${key.toUpperCase()} label saved`);
   };
-  for (const k of ['l1', 'l2', 'l3'] as const) {
+  for (const k of ['l1', 'l2', 'l3', 'l4'] as const) {
     const el = document.querySelector<HTMLInputElement>(`.atlas-settings input[data-setting="writing_${k}"]`);
-    el?.addEventListener('change', () => save(k, el.value));
+    el?.addEventListener('change', () => { void save(k, el.value); });
   }
 }
 

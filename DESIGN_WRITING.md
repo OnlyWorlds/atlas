@@ -1,7 +1,7 @@
 # Atlas — Writing Design
 
-**Version**: 1.0 (2026-05-18)
-**Status**: Foundation locked. v1 shell building this session. Editor deferred.
+**Version**: 2.0 (2026-05-19) — supertype-tier model
+**Status**: Core model implemented (setup, promote, four-tier filter, label-rename migration). Real richtext editor still deferred.
 **Related**: `DESIGN.md` (Rooms model), `DESIGN_HOME.md`, `DESIGN_PUBLISHING.md`
 
 ---
@@ -14,181 +14,259 @@ The user can move to another OW tool and keep their content (prose lives in OW N
 
 ---
 
-## Terminology
+## The model — supertype-tier
 
-Writer-friendly labels on top of OW's Narrative element. The three-layer hierarchy is canonical; the labels are customizable per-world.
+A Narrative belongs to the writing tree iff its `supertype` matches one of the four configured tier labels for the world. The supertype value IS the tier — atlas writes it directly, no canonical/display split.
 
-### Defaults
+### Four tiers
 
-| Atlas UI label | OW data |
+| Tier key | Default label | Constraints | Tree role |
+|---|---|---|---|
+| `l1` | **Book** | No parent | Top of the tree |
+| `l2` | **Chapter** | Parent must be l1 | Children of books |
+| `l3` | **Scene** | Parent must be l2 | Children of chapters; no children of their own (in atlas's create flow) |
+| `l4` | **Draft** | No parent constraint | Flexible — root, under any tier, or under another draft |
+
+Tier `l4` (Draft) is the flexible joker:
+- Lives anywhere in the tree
+- No required parent, no required position
+- Can nest other drafts
+- Distinct icon
+- Use case: side material, alt versions, deleted scenes, scratch ideas, research notes, anything the writer wants in their writing tree but doesn't fit the spine
+
+### Storage shape
+
+Atlas's create flow writes a Narrative with these fields:
+
+| Field | Value |
 |---|---|
-| **Book** | `Narrative` with no `parent_narrative_id` |
-| **Chapter** | `Narrative` with `parent_narrative_id` → Book |
-| **Scene** | `Narrative` with `parent_narrative_id` → Chapter |
+| `supertype` | `labels.l<n>` for the chosen tier (e.g. "Book") |
+| `subtype` | Not set — **always left empty for the user** |
+| `parent_narrative` | Required for chapters and scenes; optional for books and drafts |
+| `order` | Sequential integer within sibling group |
+| `story` | Empty on create — the primary writing surface (text-long) |
 
-### Customization
+`subtype` is the user's freeform classification surface — they can put "flashback", "vision", "research-note", anything. Atlas reads only `supertype` for tree membership; `subtype` is invisible to the writing tree.
 
-User can rename the three labels in **Settings → Writing**. Stored per-world in the registry entry as:
+### Why supertype, not a separate atlas-local field
+
+- **Self-documenting** to other OW tools: opening a Narrative anywhere shows `supertype: "Book"`. No magic.
+- **Searchable** via the existing search room (which scans supertype + subtype).
+- **No translation layer**: storage matches display 1:1.
+- Cost: when the user renames a label, supertype values get migrated — see "Label-rename migration".
+
+---
+
+## Customizable labels
+
+User picks labels in **Settings → Writing** or on first writing-room visit via the setup screen.
 
 ```json
 {
   "writing_labels": {
     "l1": "Book",
     "l2": "Chapter",
-    "l3": "Scene"
+    "l3": "Scene",
+    "l4": "Draft"
   }
 }
 ```
 
-Examples that work:
-- Story / Substory / Scene
-- Volume / Book / Chapter
-- Campaign / Arc / Session  (TTRPG/DM)
-- Tome / Part / Chapter
+Examples:
+- Story / Substory / Scene / Note
+- Volume / Book / Chapter / Sketch
+- Campaign / Arc / Session / Idea (TTRPG / DM)
+- Tome / Part / Chapter / Margin (formal)
 
-**Constraint**: no hardcoded "book"/"chapter"/"scene" strings in UI code. Every label reads from `getWritingLabels(worldId)`. Atlas-internal docs and code can still say "Book"/"Chapter"/"Scene" by convention — that's *naming*, not user-facing display.
-
-### Three-level constraint
-
-Hard cap at three levels deep. The UI prevents creating a 4th-level child Narrative via the writing room (the OW schema doesn't care, but writing UI does). Users who need deeper structure use the existing element-detail surface to create nested Narratives, which then surface in the writing room only down to depth 3.
+**Constraint**: all four labels must be distinct. Empty labels reject — atlas refuses to save without a value.
 
 ---
 
-## OW data mapping
+## Setup screen
 
-Narrative element fields used by the writing room:
+When `isWritingInitialized` returns false for the active world, the writing-room route shows a setup screen instead of the tree. The flag goes true once the user saves.
 
-| Field | Purpose |
-|---|---|
-| `name` | Title shown in tree + editor |
-| `description` | Short summary / blurb |
-| `story` | Long-form prose body — the **primary writing surface** |
-| `consequences` | Story outcomes (optional, surfaced in advanced view) |
-| `parent_narrative` | Hierarchy pointer |
-| `order` | Sibling sequence (integer) |
-| `start_date` / `end_date` | Timeline placement |
-| `protagonist` / `antagonist` / `narrator` | Character links surfaced in sidebar info |
-| `events` / `characters` / `locations` / ... | Multi-link relations for "what this references" |
+`isWritingInitialized` smart-defaults:
+- `entry.writing_initialized === true` → initialized
+- No narratives in the world → initialized (defaults apply silently; user can later open Settings → Writing or the writing-room gear to change labels)
+- Narratives exist but none have parent chains → initialized (no decision to make)
+- Structured narratives exist but none match the writing labels yet → **NOT initialized** — show setup
 
-Sorting: `order ASC`, then `name ASC` for siblings with equal/missing order.
+The setup screen surfaces:
+
+1. **Label inputs** (l1-l4) pre-filled with current values or defaults
+2. **Adopt-detected suggestions** when promote candidates share a single supertype value at a depth (e.g. "Adopt detected: Plot Arc")
+3. **Promote preview** when candidates exist — grouped by depth, showing sample names and the current→new supertype mapping
+4. **Promote toggle** (pre-checked) — opt out per-row not supported in v1; whole batch promotes or none
+5. **Save** (primary) or **Skip — use defaults, don't promote** (secondary, only shown when promote section exists)
+
+The writing-room tree header has a `tune` icon that clears the initialized flag and re-opens setup. Re-running setup mid-life uses the rename-migration path automatically when labels change.
 
 ---
 
-## Room layout (v1 shell)
+## Promote (initial migration)
 
-Inside the writing room middle pane:
+`buildPromoteCandidates(elements, labels)`:
+- Filters to narratives that participate in a parent chain (either has a parent_narrative pointing at another narrative, or is the parent of another narrative)
+- BFS from roots to assign depth (0/1/2/3+)
+- Proposes supertype by depth: 0 → l1, 1 → l2, 2 → l3, 3+ → l4 (drafts)
+- Detects whether each candidate needs `order` assignment
+
+`applyPromote(store, candidates)`:
+- Iterates candidates and writes `supertype` + `order` via FolderStore.updateElement
+- Idempotent — skips candidates whose current supertype matches proposed AND order is already set
+- Returns count of writes
+
+`detectExistingLabels(candidates)`:
+- For each depth (0-3), if all candidates share a single `currentSupertype`, returns that value
+- Used by the setup screen's "adopt detected" suggestion buttons
+
+---
+
+## Label-rename migration
+
+When the user renames a label (e.g. Book → Volume) via the writing settings:
+
+1. Atlas detects which labels changed
+2. `applyLabelRenameMigration(store, elements, oldLabels, newLabels)` walks all narratives
+3. For each narrative whose `supertype` matches an old label value, rewrites to the new value
+4. Idempotent — no-op when labels unchanged
+
+This keeps storage and display consistent. After migration, a narrative previously stored as `supertype: "Book"` reads as `supertype: "Volume"`. No hidden canonical / display split.
+
+Triggered from two surfaces:
+- **Settings → Writing**: change-event on any label input → migration runs immediately
+- **Re-running setup** mid-life: if writing was already initialized and labels changed in the setup screen → migration runs on save
+
+---
+
+## Element-detail integration
+
+When the user edits a Narrative's `supertype` in element-detail, the field-edit popover surfaces the four tier labels as suggestion chips:
+
+- Click chip → fills input
+- Tab → autocompletes to longest-prefix match among suggestions
+- Free-text override always allowed — typing "flashback" sets supertype to "flashback" (loses writing-tree membership; the narrative becomes a regular Narrative element)
+
+This is the escape hatch for users who want to remove a narrative from the writing tree without deleting it. Equivalently, setting supertype to one of the four labels via element-detail PROMOTES that narrative into the tree.
+
+---
+
+## Room layout
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │ 🏠 ✎ 🕓 ⌕ ⬆ ⬇ 🧩 ⚙        ← room nav                  │
 ├────────────────┬─────────────────────────────────────────┤
-│  Books         │                                         │
+│  BOOKS    ⚙    │                                         │
 │  ▼ 📖 Book 1   │   <active narrative — element detail>   │
 │    ▼ Ch 1      │                                         │
 │      • Sc 1    │   name, description, story, etc.        │
 │      • Sc 2    │                                         │
-│    ▶ Ch 2      │   (reuses existing element-detail       │
-│  ▶ 📖 Book 2   │    rendering for v1 — no new editor)    │
+│      ✎ Draft   │                                         │
+│    ▶ Ch 2      │                                         │
+│  ▶ 📖 Book 2   │                                         │
+│    ✎ Draft     │                                         │
+│  ✎ Loose Draft │                                         │
 │                │                                         │
 │  + new book    │                                         │
+│  + new draft   │                                         │
 ├────────────────┴─────────────────────────────────────────┤
 ```
 
-**Left sub-column** (~28% of middle pane):
-- Book/Chapter/Scene tree
-- Chevron expand/collapse per node
-- Active node highlighted
-- Inline "+ new chapter" / "+ new scene" buttons contextual on parent node
-- "+ new book" at bottom
-- Drag-reorder DEFERRED (uses `order` field write directly)
+**Left sub-column**:
+- Tree built from narratives where `supertype ∈ {l1, l2, l3, l4}`
+- Tier-aware icons: `menu_book` (l1), `article` (l2), `short_text` (l3), `edit_note` (l4)
+- Drafts get italic name + slightly muted styling
+- Chevron expand/collapse for any node with children (state persists in `registry.worlds[i].writing_tree_collapsed`)
+- Header gear → re-opens setup screen for label changes / re-promote
+- Footer: "+ new book" + "+ new draft" (top-level creates)
 
-**Right sub-column** (~72%):
+**Right sub-column**:
 - Renders the active Narrative as the existing element-detail view
-- This is the **v1 shortcut**: we reuse the schema-driven editor instead of building a new richtext one. Story field edits via popover/inline like any text-long field today.
-- When no narrative is selected (e.g. landing on `#/w/<id>/writing` with no active book): empty state "select a book or create one to begin"
+- Contextual "+ new child" toolbar above element-detail based on active tier:
+  - l1 (Book) → + Chapter, + Draft
+  - l2 (Chapter) → + Scene, + Draft
+  - l3 (Scene) → + Draft only
+  - l4 (Draft) → + Draft only (drafts nest drafts)
+- When no narrative selected: empty state copy
 
 ---
 
 ## Routes
 
 ```
-#/w/<id>/writing                                  → writing room, no active narrative
-#/w/<id>/writing/book/<bookId>                    → book selected
-#/w/<id>/writing/book/<bookId>/chapter/<chapId>   → chapter selected
-#/w/<id>/writing/book/<bookId>/chapter/<chapId>/scene/<scnId>  → scene selected
+#/w/<id>/writing                                  → writing room, no selection
+#/w/<id>/writing/book/<bookId>                    → l1 selected
+#/w/<id>/writing/book/<bookId>/chapter/<chapId>   → l2 selected
+#/w/<id>/writing/book/<bookId>/chapter/<chapId>/scene/<scnId>  → l3 selected
 ```
 
-`writingHash(worldId, bookId?, chapterId?, sceneId?)` helper in `core/router.ts`.
+Note: the URL path names reflect the *default* labels for readability. They aren't authoritative — the actual semantic is `parent_narrative` chain. Selecting a draft uses the same route format with the draft's id in whichever slot matches its depth.
 
-The route is sticky: refreshing on `/writing/book/B/chapter/C` reopens the same active narrative.
-
----
-
-## Sidebar mode interaction
-
-The sidebar remains 2-mode (Worlds | Elements). Writing room does NOT add a third sidebar mode in v1.
-
-Reasoning: writers benefit from keeping the elements list visible in the sidebar while writing — easier to find characters/locations to link. The book/chapter/scene tree lives inside the writing room itself.
-
-**Future setting**: "Use sidebar as writing tree" toggle in Settings → Writing. When enabled, sidebar becomes a 3-mode toggle `[Worlds | Elements | Writing]` and the writing room's left sub-column collapses. Deferred — not building this session.
+`writingHash(worldId, bookId?, chapterId?, sceneId?)` in `core/router.ts`.
 
 ---
 
-## v1 scope (this session)
+## v1 scope (this session — session 224)
 
-**Build**:
-- Writing room shell (left tree + right element-detail)
-- Routes
-- Book/chapter/scene tree from Narratives
-- "+ new book/chapter/scene" creation flows (creates Narrative with correct `parent_narrative_id` + `order`)
-- Settings → Writing tab with label customization
-- `getWritingLabels(worldId)` helper
+**Shipped**:
+- supertype-tier model + four-tier labels (l1-l4)
+- Setup screen (`writing-setup.ts`) with detect/adopt + promote
+- Promote logic (`writing-promote.ts`) + label-rename migration
+- Writing tree filter on `isWritingNarrative` (supertype matches one of l1-l4)
+- Tier-aware tree rendering (icons, drafts italic, contextual create)
+- Element-detail supertype autocomplete (suggestion chips + Tab complete)
+- Settings → Writing l4 input + change-event triggers migration
 
-**Defer**:
-- Richtext editor (TipTap / ProseMirror — library decision not made)
+**Defer (unchanged from v1)**:
+- Richtext editor (TipTap / ProseMirror / Lexical — library decision not made)
 - Element autolinking (`[[name]]` syntax or autodetect)
 - Element preview popover on hover
 - Inline element creation from selected prose
 - Word count / progress tracking
 - Outline mode (markdown-per-book sidecar)
-- Notes overlay (random thoughts modal)
 - Find/replace
 - Reading mode / presentation mode
 - Drag-to-reorder chapters
 - Export to PDF/EPUB/HTML/markdown (lives in publish room)
+- Per-row promote opt-out in setup (whole-batch in v1)
 
 ---
 
 ## Deferred design questions
 
-These need their own design conversations before building:
-
 1. **Richtext editor library** — TipTap, ProseMirror, Lexical, custom? Atlas-only features (footnotes, callouts, element embeds) need rich extension surface. Markdown serialization for OW description portability.
 
-2. **Where richtext lives** — Captain's call this session was: don't put markdown in OW description fields yet, keep it simple. So richtext is either: (a) atlas-local sidecar files alongside the Narrative, or (b) future atlas-extension field on Narrative (`atlas_richtext_html`?). Decide when editor lands.
+2. **Where richtext lives** — atlas-local sidecar alongside Narrative, or future atlas-extension field on Narrative (`atlas_richtext_html`?). Decide when editor lands.
 
-3. **Autolinking algorithm** — full-text scan on save? Background worker? Inline as typed? `[[name]]` syntax vs. auto-detect both? Performance at large worlds.
+3. **Autolinking algorithm** — full-text scan on save? Background worker? Inline as typed? `[[name]]` syntax vs auto-detect both?
 
-4. **Element creation from prose** — select text → "create Character" → modal pre-filled with selected name. Where in the editor toolbar? Keyboard shortcut?
+4. **Element creation from prose** — select text → "create Character" → modal pre-filled with selected name.
 
-5. **Word count UX** — chapter footer? Sidebar of tree? Per-session goal? Global vs. per-book.
+5. **Word count UX** — chapter footer? Sidebar of tree? Per-session goal?
 
-6. **Outline mode** — a separate file per book, plain markdown, used for planning. Where to surface in UI — toggle, separate route, sidecar?
+6. **Outline mode** — separate file per book, plain markdown, used for planning.
 
-7. **Notes overlay** — Captain mentioned "random notes modal/page persistent in app." Per-world notes? Global notes? Both? Storage layer.
+7. **Reading mode** — clean reading view, no editor chrome.
 
-8. **Reading mode** — render the active book/chapter as a clean reading view, no editor chrome. Could be a presentation route or a toggle.
-
----
-
-## Conventions added
-
-- **#33**: Writing tree labels read from `registry.worlds[i].writing_labels` — never hardcoded in UI.
-- **#34**: Atlas writing depth cap is 3 (Book → Chapter → Scene). UI enforces via "+ new X" button visibility on parent depth.
+8. **Draft state field** — separate from draft tier: should any tier narrative be markable as "WIP"? Likely an `atlas_writing_state: 'wip' | 'final'` atlas-local field. Not v1.
 
 ---
 
-## What writing is NOT (this tool)
+## Conventions
+
+- **#33** (updated session 224): Writing tier labels live in `registry.worlds[i].writing_labels` (l1-l4). The label IS the `supertype` storage value on each Narrative. UI reads via `getWritingLabels(worldId)`. **No canonical/display split** — storage matches display.
+
+- **#34** (updated session 224): Atlas writing has three structured tiers + one flexible (Draft). Tier l1 forbids parent; l2 requires l1 parent; l3 requires l2 parent; l4 has no parent constraints. The writing-room create flow enforces these; element-detail edits don't (user can override at their own discretion).
+
+- **#38** (new session 224): A Narrative belongs to the writing tree iff its `supertype` matches one of the four labels for the world. Detection via `isWritingNarrative(el, worldId)`. Setting supertype to anything outside the four labels removes the narrative from the writing tree (still visible elsewhere).
+
+- **#39** (new session 224): Label changes trigger immediate supertype migration on existing narratives. Run via `applyLabelRenameMigration` from both Settings → Writing change events and the setup screen on save.
+
+---
+
+## What writing is NOT
 
 - Not a replacement for prose tools at scale (Scrivener, Word) — atlas is *world-aware* writing, optimized for connection
 - Not a markdown power-user surface — atlas is a structured editor first, markdown is a serialization choice for portability

@@ -4,20 +4,22 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-05-18 session 223)
+## CURRENT STATE (handover snapshot, 2026-05-19 session 224)
 
-Tool is in a tight, healthy state. **572 vitest green + 93 Playwright green.** Bundle 516 KB JS / 146 KB gzipped (+28 KB this session for rooms + timeline-bar). Typecheck clean. Conventions list 1-36 (full text in DESIGN.md).
+Tool is in a tight, healthy state. **589 vitest green + 93 Playwright green.** Typecheck clean. Conventions list 1-39 (full text in DESIGN.md). PWA + offline cache shipped; bundle 521 KB JS / 147 KB gzipped + 4 MB Material Symbols woff2 (precached by SW).
 
-**Rooms model landed.** The middle pane is now a flex column with a persistent room nav strip + room content. World Home is the default landing for active worlds. See `DESIGN_HOME.md` + `DESIGN_WRITING.md` + `DESIGN_PUBLISHING.md` for the new room-specific docs.
+**Writing system redesigned (supertype-tier model).** A Narrative is in the writing tree iff its `supertype` matches one of the four configured tier labels (l1-l4, defaults Book/Chapter/Scene/Draft). Subtype is FREE for user classification. Storage matches display (no canonical/display split); label renames migrate via `applyLabelRenameMigration`. New `writing-setup.ts` setup screen + `writing-promote.ts` migration helpers. See DESIGN_WRITING.md v2.0 for the full model.
 
 **Recent invariants worth knowing**:
 - Middle pane: `shell.middleRoomNav` + `shell.middleContent` (renderers MUST target `middleContent`, never `middle` — convention #31)
 - Default route bare `#/w/<id>` → home room (was timeline)
 - Esc + click-selected-row clear selection + nav home (convention #32)
-- Writing labels customizable in Settings → Writing (`registry.writing_labels`, convention #33), default Book/Chapter/Scene
-- Writing depth cap = 3 levels (convention #34)
+- Writing supertype = tier label storage (convention #33 v2). Tier semantics: l1/l2/l3/l4 = Book/Chapter/Scene/Draft. Drafts flexible-parent. Convention #34 v2.
+- Writing tree membership filter: `isWritingNarrative(el, worldId)` reads `supertype` against `writing_labels` (convention #38).
+- Label rename triggers immediate supertype migration on existing narratives (convention #39).
 - Showcase config supports `atlas_*` extensions (convention #35)
 - Showcases immutable; republish creates new (convention #36)
+- Sidebar mode + room are independent dimensions (convention #37)
 - Sentence case throughout, slug-prefix filenames (`<slug>--<uuid>.json`)
 - Hotkeys MVP wired (`Ctrl/Cmd+E`, `S`, `K`, `?`, `Esc` deselect-to-home, map-tab `F`/`Z`/`L`)
 - Map view persists per-map (`{center, zoom}` saved on `moveend`, restored at mount)
@@ -26,21 +28,53 @@ Tool is in a tight, healthy state. **572 vitest green + 93 Playwright green.** B
 - `atlas_shape` stripped on wire; both fakes (FakeOwApiClient + MSW) strictly reject atlas-local fields in write bodies
 - Welcome panel is single CTA for atlas-root setup/recover
 - All "engine not ready" toasts route through `surfaceSyncUnavailable` for PIN-aware messages + deep-links
+- Self-hosted Material Symbols (npm package) + Vite-PWA service worker for offline-first cold load
+- DOM helpers consolidated in `core/dom-utils.ts` (escapeText/escapeAttr/relativeTime); active-store lives in `core/active-store.ts`
 
 ---
 
-## Three big projects ahead — session 223 update
+## Three big projects ahead — session 224 update
 
-Foundation landed for all three this session via the rooms model. Each still has its own bigger build ahead.
-
-- **Writing** — `src/middle/writing.ts` shell + Book/Chapter/Scene tree shipped; richtext editor + autolinking + word count + outline mode all deferred. See `DESIGN_WRITING.md` "Deferred design questions" for the next set of decisions.
-- **Timeline** — `src/visualization/timeline/timeline-bar.ts` ported from little-element-viewer with multi-row dot binning. Compact mode on World Home, expanded mode in `#/w/<id>/timeline`. Narrative bars, zoom/pan, filter toggles, expand-collapse all deferred.
+- **Writing** — model rebuilt this session (supertype-tier). Tree filter / setup / promote / migration all shipped. **Richtext editor** is now the biggest pillar — TipTap / ProseMirror / Lexical decision still open. See `DESIGN_WRITING.md` v2 "Deferred design questions".
+- **Timeline** — `src/visualization/timeline/timeline-bar.ts` ported. Compact mode on Home, expanded mode in `#/w/<id>/timeline`. Narrative bars, zoom/pan, filter toggles, expand-collapse all deferred.
 - **Publish** — `src/middle/publish-room.ts` stub. write-tool's `/showcase/publish/` API documented in `DESIGN_PUBLISHING.md`. Atlas extension model (`atlas_*` config keys) locked in convention #35. Actual publish flow + per-element button + showcase modal all deferred.
 
-Also new this session (smaller):
-- **World Home** — `src/middle/world-home.ts` shipped. Identity + stats + timeline preview + recent + quick actions. See `DESIGN_HOME.md`.
-- **Search room** — `src/middle/search.ts` shipped. Searches name/description/supertype/subtype. Subtle "search everywhere" icon next to the elements-sidebar search input.
-- **Import / Templates rooms** — stubs only.
+## Session 224 — Writing system redesign + offline + tidying
+
+Long autonomous session covering:
+
+### Writing redesign (the big one)
+- **Model**: Narrative belongs to writing tree iff `supertype ∈ {l1, l2, l3, l4}`. Tier = supertype value. Subtype is FREE (user classification like "flashback", "vision"). No canonical/display split.
+- **Helpers**: `src/middle/writing-helpers.ts` — `getWritingLabels`, `isWritingNarrative`, `getTierForNarrative`, `isWritingInitialized` (smart detection), tier constraints + icons.
+- **Setup screen**: `src/middle/writing-setup.ts` — shown when `isWritingInitialized` is false. Configures labels, detects existing supertype groupings ("Adopt detected: Plot Arc"), offers pre-checked promote.
+- **Promote**: `src/middle/writing-promote.ts` — BFS from parent-chain roots, assigns supertype by depth, fills missing `order`. Idempotent. Depth-3+ become Drafts (l4).
+- **Label-rename migration**: `applyLabelRenameMigration` rewrites old supertype values to new. Triggered from Settings → Writing change-event AND setup screen on save.
+- **Drafts (l4)**: flexible-parent joker tier. Can root, sit under any tier, nest other drafts. Italic in tree. Always enabled.
+- **Element-detail autocomplete**: supertype field on Narratives shows the four labels as suggestion chips + Tab autocomplete. Free-text override still allowed (escape hatch).
+- **Writing room**: 1) Tree filtered by `isWritingNarrative`. 2) Tier-aware icons (l1=book, l2=article, l3=short_text, l4=edit_note). 3) Contextual create per tier (l1→l2+l4, l2→l3+l4, l3→l4, l4→l4). 4) Footer adds "+ new book" + "+ new draft". 5) Header gear re-opens setup. 6) Setup screen shown via mode-switching mount.
+- **DESIGN_WRITING.md v2.0** completely rewritten. Conventions #33, #34 updated; #38, #39 added.
+
+### Offline polish (Bout D from earlier in session)
+- Self-hosted Material Symbols via `material-symbols` npm package (no Google CDN)
+- `vite-plugin-pwa` configured — generates `sw.js` + `manifest.webmanifest`, precaches 17 entries (~4.9 MiB)
+- New `src/core/offline.ts` registers SW in production
+- Atlas is now installable as a PWA on Chromium
+
+### Code tidying (Bouts A-C from earlier)
+- `core/dom-utils.ts` — `escapeText`, `escapeAttr`, `relativeTime` deduped from 20+ files
+- `core/active-store.ts` — relocated from `ui/create-world-modal.ts`; 19 files updated
+- World Home: timeline-bar mounts ONCE per world activation (was destroy+recreate per render)
+- Search room: memoizes runSearch by `(query, elements ref)`
+- Writing tree: per-node chevron collapse persisted in `registry.worlds[i].writing_tree_collapsed`
+
+### Test infrastructure
+- 17 new unit tests in `tests/unit/writing-helpers.test.ts` covering `isWritingInitialized`, `buildPromoteCandidates`, `detectExistingLabels`, `applyPromote`, `applyLabelRenameMigration`, and supertype-based classification.
+- Total: 589 vitest + 93 Playwright. All green.
+
+### What changed in registry/types
+- `writing_labels` expanded to include `l4` (Draft)
+- New `writing_initialized: boolean` flag
+- `writing_tree_collapsed: string[]` unchanged from session 223
 
 ---
 

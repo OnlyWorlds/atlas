@@ -80,7 +80,7 @@ export class ToastManager {
 
     const icon = this.getIcon(toast.type);
     toastEl.innerHTML = `
-      <span class="material-icons ow-toast-icon">${icon}</span>
+      <span class="material-symbols-outlined ow-toast-icon">${icon}</span>
       <span class="ow-toast-message">${this.escapeHtml(toast.message)}</span>
     `;
 
