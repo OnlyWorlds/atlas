@@ -10,8 +10,7 @@
  */
 
 import type { JSONContent } from '@tiptap/core';
-
-const OW_LINK_RE = /^ow:\/\/([a-z_]+)\/([\w-]+)$/i;
+import { OW_LINK_HREF_RE } from './writing-workspace-element-chip';
 
 export function convertLinkMarksToChips(doc: JSONContent): JSONContent {
   return walk(doc);
@@ -31,7 +30,7 @@ function walk(node: JSONContent): JSONContent {
       ) {
         const linkMark = child.marks.find(m => m.type === 'link');
         const href = linkMark?.attrs?.href as string;
-        const match = OW_LINK_RE.exec(href);
+        const match = OW_LINK_HREF_RE.exec(href);
         if (match) {
           newContent.push({
             type: 'elementChip',
@@ -55,5 +54,5 @@ function walk(node: JSONContent): JSONContent {
 }
 
 function isOwLink(href: unknown): boolean {
-  return typeof href === 'string' && OW_LINK_RE.test(href);
+  return typeof href === 'string' && OW_LINK_HREF_RE.test(href);
 }

@@ -29,6 +29,13 @@ export type ElementType = typeof ALL_ELEMENT_TYPES[number];
  *
  * - `local_updated_at` is stamped by FolderStore on every write
  * - `server_updated_at` is stamped by SyncEngine on successful sync; absent if never synced
+ *
+ * The named optional fields below cover (a) common SDK fields that atlas reads
+ * across element types (description, image_url, story, dates) and (b) the
+ * atlas-local extension fields (atlas_richtext_json, atlas_aliases) — see
+ * `ATLAS_LOCAL_EXTENSION_FIELDS` in core/constants.ts for the strip-discipline
+ * contract. Listed here so readers don't need `(el as any).field` to access
+ * them safely; the index signature still covers the long tail of SDK fields.
  */
 export interface Element {
   id: string;
@@ -36,6 +43,22 @@ export interface Element {
   name: string;
   local_updated_at: string;
   server_updated_at?: string;
+  // Common SDK fields read in multiple places (no narrowing without these
+  // explicit declarations because the index signature returns `unknown`).
+  description?: string;
+  image_url?: string;
+  /** Long-form prose / narrative body. Markdown serialization. */
+  story?: string;
+  /** Display date for events, narratives, etc. Date string OR numeric stamp. */
+  start_date?: string | number;
+  end_date?: string | number;
+  // Atlas-local extension fields (see DESIGN.md "Atlas-Specific Fields"
+  // tracking section and ATLAS_LOCAL_EXTENSION_FIELDS in core/constants.ts).
+  // Stripped on API push; preserved on pull overlay.
+  /** TipTap JSON document for Narrative richtext (convention #47). */
+  atlas_richtext_json?: unknown;
+  /** Alternate names matched by @ picker + auto-link (convention #49). */
+  atlas_aliases?: string[];
   [field: string]: unknown;
 }
 
@@ -359,6 +382,20 @@ export interface WorldRegistryEntry {
    * `--atlas-prose-font-size` CSS variable on the workspace root.
    */
   writing_font_size_px?: number;
+  /**
+   * Writing workspace prose font family — picks a system-font stack via the
+   * `--atlas-prose-font-family` CSS variable. System fonts only (no webfont
+   * download). Reading mode and writing mode share this choice; reading mode
+   * adds its own size + line-height + max-width on top. Atlas-local pref.
+   * Defaults to 'sans' when missing.
+   */
+  writing_font_family?: 'sans' | 'serif' | 'slab' | 'mono';
+  /**
+   * Writing workspace — last-selected tab on the character-cast strip
+   * (DESIGN_WRITING.md §Cast strip). Persists per-world so a TTRPG writer
+   * who lives in Creatures lands on Creatures by default. Atlas-local.
+   */
+  writing_cast_tab?: 'characters' | 'locations' | 'objects' | 'events' | 'creatures';
   /**
    * Per-world freeform notes — atlas-local (never synced). Accessed via the
    * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it

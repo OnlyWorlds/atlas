@@ -168,6 +168,29 @@ export function dispatchWritingFocusToggle(): void {
   document.dispatchEvent(new CustomEvent(WRITING_FOCUS_TOGGLE_EVENT));
 }
 
+/**
+ * Dispatched on `document` when the writing workspace's inline-create hotkey
+ * fires (`Ctrl/Cmd+Shift+E`). The workspace listens while mounted and opens
+ * ElementCreateModal pre-filled with the current text selection.
+ */
+export const WRITING_INLINE_CREATE_EVENT = 'atlas:writing-inline-create';
+
+export function dispatchWritingInlineCreate(): void {
+  document.dispatchEvent(new CustomEvent(WRITING_INLINE_CREATE_EVENT));
+}
+
+/**
+ * Dispatched on `document` when the writing workspace's "split at cursor"
+ * hotkey fires (`Ctrl/Cmd+Shift+D`). The workspace listens while mounted and
+ * opens the split confirm dialog — the prose after cursor moves to a new
+ * sibling narrative.
+ */
+export const WRITING_SPLIT_EVENT = 'atlas:writing-split';
+
+export function dispatchWritingSplit(): void {
+  document.dispatchEvent(new CustomEvent(WRITING_SPLIT_EVENT));
+}
+
 // ---- Default bindings ----
 
 /**
@@ -264,6 +287,34 @@ export function defaultBindings(): HotkeyBinding[] {
         return hash.includes('/writing/');
       },
       action: () => { dispatchWritingFocusToggle(); },
+    },
+    {
+      id: 'writing-inline-create',
+      description: 'Create element from selection (writing)',
+      scope: 'Writing',
+      key: 'e',
+      modifier: 'mod+shift',
+      // INTENTIONALLY allowed in text input — the writer's selection is
+      // in the prose surface; we want this to fire while they're typing.
+      when: () => {
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        return hash.includes('/writing/');
+      },
+      action: () => { dispatchWritingInlineCreate(); },
+    },
+    {
+      id: 'writing-split-at-cursor',
+      description: 'Split into sibling at cursor (writing)',
+      scope: 'Writing',
+      key: 'd',
+      modifier: 'mod+shift',
+      // INTENTIONALLY allowed in text input — the writer's cursor IS in
+      // the editor when invoking.
+      when: () => {
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        return hash.includes('/writing/');
+      },
+      action: () => { dispatchWritingSplit(); },
     },
   ];
 }

@@ -13,6 +13,7 @@
  */
 
 import type { Element, ElementType } from '../core/types';
+import { createOwLinkScanner } from './writing-workspace-element-chip';
 
 /**
  * Multi-link relation fields on Narrative (per SDK ELEMENT_SECTIONS.narrative
@@ -45,17 +46,16 @@ export const NARRATIVE_RELATION_FIELDS: Record<ElementType, string | null> = {
   marker: null,
 };
 
-const OW_LINK_RE = /ow:\/\/([a-z_]+)\/([\w-]+)/gi;
-
 /**
  * Parse markdown for `ow://<type>/<uuid>` links and group UUIDs by element type.
  * Duplicates within the same type are deduped.
  */
 export function extractProseLinks(markdown: string): Record<string, string[]> {
   const out: Record<string, Set<string>> = {};
+  // Fresh scanner per call — never share a /g regex (lastIndex is stateful).
+  const scanner = createOwLinkScanner();
   let match: RegExpExecArray | null;
-  OW_LINK_RE.lastIndex = 0;
-  while ((match = OW_LINK_RE.exec(markdown)) !== null) {
+  while ((match = scanner.exec(markdown)) !== null) {
     const type = match[1].toLowerCase();
     const id = match[2];
     if (!out[type]) out[type] = new Set();
@@ -87,11 +87,14 @@ export function computeRelationPatch(
   for (const [type, ids] of Object.entries(linksByType)) {
     const field = NARRATIVE_RELATION_FIELDS[type as ElementType];
     if (!field) continue;
-    const existing = (narrative as any)[field];
+    // Dynamic field access (field name is a string key). Element's index
+    // signature returns `unknown`; cast through Record so we don't widen
+    // to `any` — TS still catches misuse downstream.
+    const existing = (narrative as Record<string, unknown>)[field];
     const existingArr: string[] = Array.isArray(existing) ? existing.filter(x => typeof x === 'string') : [];
     const merged = unionPreserveOrder(existingArr, ids);
     if (!arraysEqual(existingArr, merged)) {
-      (patch as any)[field] = merged;
+      (patch as Record<string, unknown>)[field] = merged;
     }
   }
 

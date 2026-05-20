@@ -5329,6 +5329,8 @@ svg .atlas-zone-selected {
   height: 100%;
   overflow: hidden;
   background: transparent;
+  /* Positioning context for absolute children like the find-bar. */
+  position: relative;
 }
 
 .atlas-writing-workspace-body {
@@ -5403,6 +5405,97 @@ a.atlas-writing-workspace-crumb-seg:hover {
    container reads as a "page" against the cooler dark chrome around it.
    Variables are scoped to prose so a future lightmode toggle only swaps
    these without touching the rest of the app theme. */
+/* Loading placeholder while the writing workspace's TipTap chunk dynamic-
+   imports on first visit. Centered, quiet, brief. */
+.atlas-writing-workspace-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  color: var(--atlas-text-muted);
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.6;
+}
+
+/* Cast strip — type pivot + linked element chips, sits between breadcrumb
+   and prose. Hidden in reading + focus modes via CSS rules further below. */
+.atlas-writing-workspace-cast {
+  margin: 6px 0 14px;
+  width: var(--atlas-writing-content-width, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.atlas-writing-workspace-cast-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0;
+}
+.atlas-writing-workspace-cast-tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--atlas-text-muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px 6px;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  margin-bottom: -1px;
+  letter-spacing: 0.01em;
+}
+.atlas-writing-workspace-cast-tab:hover {
+  color: var(--atlas-text);
+}
+.atlas-writing-workspace-cast-tab.is-active {
+  color: var(--atlas-cyan);
+  border-bottom-color: var(--atlas-cyan);
+}
+.atlas-writing-workspace-cast-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+  align-items: center;
+}
+.atlas-writing-workspace-cast-empty {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  font-style: italic;
+  opacity: 0.7;
+}
+.atlas-writing-workspace-cast-chip {
+  appearance: none;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  color: var(--atlas-cyan);
+  border-radius: 11px;
+  padding: 2px 9px 3px;
+  font-size: 11.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.atlas-writing-workspace-cast-chip:hover {
+  background: rgba(34, 211, 238, 0.18);
+  border-color: rgba(34, 211, 238, 0.35);
+}
+/* Scope the icon override under the chip class for two-class specificity
+   (convention #52). */
+.atlas-writing-workspace-cast-chip .atlas-writing-workspace-cast-chip-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+.atlas-writing-workspace-cast-chip-name {
+  white-space: nowrap;
+}
+
 .atlas-writing-workspace-prose {
   /* `flex: 0 0 auto` keeps the prose surface from being squeezed by sibling
      content (Details / References disclosures). Min-height of 60vh gives a
@@ -5423,9 +5516,13 @@ a.atlas-writing-workspace-crumb-seg:hover {
 
 .atlas-writing-workspace-prose .ProseMirror {
   outline: none;
-  /* Default 15px; can be overridden per-world via --atlas-prose-font-size
-     (see writing-workspace.ts which sets it from registry pref). */
+  /* Defaults overridable per-world via CSS custom properties set by
+     writing-workspace.ts:applyProseFontSize from registry prefs. */
   font-size: var(--atlas-prose-font-size, 15px);
+  font-family: var(
+    --atlas-prose-font-family,
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
+  );
   line-height: 1.72;
   letter-spacing: 0.005em;
   color: var(--atlas-prose-text);
@@ -5611,6 +5708,94 @@ a.atlas-writing-workspace-crumb-seg:hover {
   opacity: 0.4;
 }
 
+/* Word-count button — clickable for session-goal popover.
+   Stays visually quiet (looks like a span) until hover. */
+.atlas-writing-workspace-wc-btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 1px 4px;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1;
+}
+.atlas-writing-workspace-wc-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.atlas-writing-workspace-wc-btn:focus-visible {
+  outline: 1px solid var(--atlas-cyan);
+  outline-offset: 1px;
+}
+
+/* Progress ring — conic-gradient masked into a thin ring. The CSS variable
+   --progress (0..1) drives the fill arc. Cyan default; green-tinted at
+   completion to give the user a quiet "you made it" cue. */
+.atlas-writing-workspace-wc-ring {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--atlas-cyan) calc(var(--progress, 0) * 360deg),
+    rgba(255, 255, 255, 0.12) 0
+  );
+  -webkit-mask: radial-gradient(circle, transparent 3.5px, black 4.2px);
+  mask: radial-gradient(circle, transparent 3.5px, black 4.2px);
+  transition: background 200ms ease;
+}
+.atlas-writing-workspace-wc-ring[data-complete='true'] {
+  background: conic-gradient(
+    #4ade80 calc(var(--progress, 0) * 360deg),
+    rgba(255, 255, 255, 0.12) 0
+  );
+  filter: drop-shadow(0 0 4px rgba(74, 222, 128, 0.35));
+}
+
+/* `/ 500` suffix when a goal is set. Muted vs the live word count. */
+.atlas-writing-workspace-wc-goal {
+  color: var(--atlas-text-muted);
+  opacity: 0.8;
+}
+
+/* Goal popover — anchored above the footer's word-count button.
+   Glass aesthetic to match the rest of the workspace chrome. */
+.atlas-wc-goal-popover {
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 12px 12px 10px;
+  z-index: 1000;
+  width: 240px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.atlas-wc-goal-label {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  letter-spacing: 0.02em;
+}
+.atlas-wc-goal-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.atlas-wc-goal-row .atlas-input {
+  flex: 1;
+  min-width: 0;
+}
+.atlas-wc-goal-clear {
+  width: 100%;
+}
+
 .atlas-writing-workspace-save[data-state='pending'] {
   color: var(--atlas-text-soft);
 }
@@ -5632,9 +5817,136 @@ a.atlas-writing-workspace-crumb-seg:hover {
   background: rgba(34, 211, 238, 0.08);
 }
 
+/* Autolink hint — subtle dotted underline beneath a candidate name in prose,
+   prompting the writer to press Tab to convert it into an element chip.
+   Quiet by design: should NOT compete with the cyan element chip itself. */
+.atlas-writing-workspace-prose .ProseMirror .atlas-autolink-hint {
+  text-decoration: underline dotted rgba(34, 211, 238, 0.5);
+  text-underline-offset: 3px;
+  cursor: help;
+}
+.atlas-writing-workspace-prose .ProseMirror .atlas-autolink-hint:hover {
+  text-decoration-color: rgba(34, 211, 238, 0.85);
+}
+
+/* Search-match highlight inside the prose surface.
+   The plugin paints .atlas-search-match on every match; the active match
+   gets the .is-current modifier. */
+.atlas-writing-workspace-prose .ProseMirror .atlas-search-match {
+  background: rgba(34, 211, 238, 0.15);
+  border-radius: 2px;
+}
+.atlas-writing-workspace-prose .ProseMirror .atlas-search-match.is-current {
+  background: rgba(34, 211, 238, 0.4);
+  outline: 1px solid rgba(34, 211, 238, 0.7);
+}
+
+/* Tiny right-click context menu for the prose surface — single-item menu
+   that surfaces inline element creation from the current text selection.
+   Browser native menu shows for non-prose / no-selection contexts. */
+.atlas-prose-context-menu {
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  padding: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  min-width: 220px;
+}
+.atlas-prose-context-menu-item {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--atlas-text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.atlas-prose-context-menu-item:hover {
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--atlas-cyan);
+}
+.atlas-prose-context-menu-item .material-symbols-outlined {
+  font-size: 16px;
+}
+
+/* Split confirm modal — single-line preview of what'll move. */
+.atlas-split-preview {
+  margin: 0;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid var(--atlas-cyan);
+  border-radius: 0 4px 4px 0;
+  color: var(--atlas-text-muted);
+  font-size: 12.5px;
+  font-style: italic;
+  line-height: 1.5;
+  max-height: 4.5em;
+  overflow: hidden;
+}
+
+/* Find/replace bar — anchored to the top-right of the workspace. */
+.atlas-find-bar {
+  position: absolute;
+  top: 44px; /* sits below the 36px header + a hair of breathing room */
+  right: 12px;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  min-width: 360px;
+}
+.atlas-find-bar[data-state='hidden'] {
+  display: none;
+}
+.atlas-find-bar[data-mode='find'] .atlas-find-bar-replace-row {
+  display: none;
+}
+.atlas-find-bar-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.atlas-find-bar-input {
+  flex: 1;
+  min-width: 0;
+}
+.atlas-find-bar-count {
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  min-width: 60px;
+  text-align: right;
+  white-space: nowrap;
+}
+.atlas-find-bar-toggle {
+  font-size: 11px;
+  font-family: var(--atlas-mono, ui-monospace, monospace);
+  padding: 2px 6px;
+  min-width: 24px;
+}
+.atlas-find-bar-toggle.is-active {
+  background: rgba(34, 211, 238, 0.18);
+  color: var(--atlas-cyan);
+  border-color: rgba(34, 211, 238, 0.4);
+}
+
 /* Reading mode — applied to .atlas-writing-workspace.is-reading-mode */
 .atlas-writing-workspace.is-reading-mode .atlas-middle-header,
 .atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-crumb,
+.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-cast,
 .atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-details,
 .atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-refs {
   display: none;
@@ -5660,6 +5972,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-writing-workspace.is-focus-mode .atlas-middle-header,
 .atlas-writing-workspace.is-focus-mode .atlas-middle-room-nav,
 .atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-crumb,
+.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-cast,
 .atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-details,
 .atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-refs,
 .atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-footer {

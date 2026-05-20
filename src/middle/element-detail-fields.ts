@@ -247,9 +247,8 @@ function renderAliasesRow(el: Element): HTMLElement {
   row.className = 'atlas-aliases-display';
   row.title = 'Click to edit aliases';
 
-  const rawAliases = (el as Record<string, unknown>)['atlas_aliases'];
-  const aliases: string[] = Array.isArray(rawAliases)
-    ? rawAliases.filter((s): s is string => typeof s === 'string' && s.length > 0)
+  const aliases: string[] = Array.isArray(el.atlas_aliases)
+    ? el.atlas_aliases.filter((s): s is string => typeof s === 'string' && s.length > 0)
     : [];
 
   const openModal = (): void => {

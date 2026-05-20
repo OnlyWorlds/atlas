@@ -65,9 +65,9 @@ export function createChipPreview(workspaceRoot: HTMLElement): ChipPreviewContro
     }
     const icon = ELEMENT_ICONS[el.type] ?? 'category';
     const typeLabel = ELEMENT_LABELS[el.type]?.singular ?? fallbackType;
-    const desc = (el as any).description as string | undefined;
+    const desc = el.description;
     const excerpt = desc ? excerptOf(desc, 220) : '';
-    const imageUrl = (el as any).image_url as string | undefined;
+    const imageUrl = el.image_url;
 
     const active = getState().active;
     const worldId = active?.worldId ?? '';

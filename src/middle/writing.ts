@@ -16,7 +16,6 @@
 
 import { getState, patchSlice, subscribe } from '../core/state';
 import { onHashChange, parseHash, navigate, writingHash } from '../core/router';
-import { mountWritingWorkspace } from './writing-workspace';
 import { ToastManager } from '../ui/toast-manager';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import { getActiveStore } from '../core/active-store';
@@ -34,6 +33,26 @@ import { escapeText } from '../core/dom-utils';
 
 // Re-export for backward compat with any callers still importing from writing.
 export { getWritingLabels } from './writing-helpers';
+
+/**
+ * Type-only import of the workspace module so we can describe its shape at
+ * the writing.ts boundary without bundling its contents. The runtime path
+ * uses a dynamic `import()` to keep TipTap + ProseMirror out of the main
+ * bundle until the user actually opens a writing room. See `loadWorkspace`.
+ */
+type WorkspaceModule = typeof import('./writing-workspace');
+
+/**
+ * Lazily-imported workspace module. Cached after first successful load so
+ * subsequent narrative switches don't refetch the chunk.
+ */
+let workspaceModulePromise: Promise<WorkspaceModule> | null = null;
+function loadWorkspace(): Promise<WorkspaceModule> {
+  if (!workspaceModulePromise) {
+    workspaceModulePromise = import('./writing-workspace');
+  }
+  return workspaceModulePromise;
+}
 
 export function mountWriting(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -127,6 +146,11 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
 
   let unmountDetail: (() => void) | null = null;
   let mountedDetailForId: string | null = null;
+  // Bumped on every mountEditor unmount. The async workspace-load .then()
+  // captures the value at schedule time and bails if it differs at fire time
+  // — prevents a stale async mount from landing into a detached DOM after
+  // the user has navigated away from the writing room entirely.
+  let mountGeneration = 0;
 
   function render(): void {
     const active = getState().active;
@@ -233,19 +257,41 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
       queueMicrotask(() => patchSlice('registry', nextReg));
     }
 
-    // --- Writing workspace ---
+    // --- Writing workspace (code-split) ---
     // v3.0 redesign (session 227+): the workspace replaces the schema-driven
     // element-detail entirely for active narratives in writing mode
-    // (convention #51). Mount once per selection; the workspace owns its own
-    // state subscription and editor lifecycle.
+    // (convention #51).
+    //
+    // Bout 10: TipTap + ProseMirror are heavyweight (~140 KB gzipped) and
+    // only matter when the writer actually opens a narrative. We dynamic-
+    // import the workspace module the first time we need it; subsequent
+    // narrative switches hit the cached promise. A loading placeholder
+    // fills the slot synchronously so the user never sees a blank pane.
     if (mountedDetailForId !== targetId) {
       unmountDetail?.();
       detailSlot.innerHTML = '';
       const detailMount = document.createElement('div');
       detailMount.className = 'atlas-writing-editor-detail-mount';
+      detailMount.innerHTML = '<div class="atlas-writing-workspace-loading">Loading editor…</div>';
       detailSlot.appendChild(detailMount);
-      unmountDetail = mountWritingWorkspace(detailMount);
       mountedDetailForId = targetId;
+      const mountTargetId = targetId; // capture for race-guard
+      const mountGen = mountGeneration; // capture generation
+      void loadWorkspace().then((mod) => {
+        // Race-guards: (a) user switched narratives during the chunk load,
+        // (b) user navigated away from writing entirely (mountEditor's
+        // cleanup ran and bumped mountGeneration). Either case → drop this
+        // mount; the new target (if any) will trigger its own load.
+        if (mountGen !== mountGeneration) return;
+        if (mountedDetailForId !== mountTargetId) return;
+        detailMount.innerHTML = '';
+        unmountDetail = mod.mountWritingWorkspace(detailMount);
+      }).catch((err) => {
+        console.error('[writing] workspace chunk failed to load', err);
+        if (mountGen === mountGeneration && mountedDetailForId === mountTargetId) {
+          detailMount.innerHTML = '<div class="atlas-pane-empty">Editor failed to load. Reload the page to try again.</div>';
+        }
+      });
     }
   }
 
@@ -254,9 +300,15 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
   render();
 
   return () => {
+    // Bump the mount generation FIRST so any in-flight async workspace load
+    // bails its post-load mount step. unmountDetail handles the case where
+    // the workspace already mounted.
+    mountGeneration++;
+    mountedDetailForId = null;
     unsubState();
     unsubHash();
     unmountDetail?.();
+    unmountDetail = null;
   };
 }
 

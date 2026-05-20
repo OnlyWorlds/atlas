@@ -11,54 +11,109 @@
  */
 
 import { getState, patchSlice } from '../core/state';
-import { navigate, elementHash } from '../core/router';
+import { navigate, elementHash, writingHash } from '../core/router';
 import type { Element, ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 
+/**
+ * Render the "incoming references" panel for an element.
+ *
+ * Narratives are surfaced separately as "Mentioned in" — they're the highest-
+ * signal incoming reference for writers ("what scenes does this character
+ * appear in?") and they route to the writing room on click (not element-detail),
+ * matching the writer's intent. Other element types render in the standard
+ * "Referenced by" section below.
+ *
+ * Auto-derive (convention #50) pushes every prose `ow://` mention into the
+ * narrative's relation fields on save, so this single reverse-scan catches
+ * prose-linked AND manually-linked narratives uniformly. See DESIGN_WRITING.md.
+ */
 export function renderReferencedBy(el: Element): HTMLElement | null {
   const incoming = findIncomingReferences(el.id);
   if (incoming.length === 0) return null;
 
+  const narratives = incoming.filter(src => src.type === 'narrative');
+  const others = incoming.filter(src => src.type !== 'narrative');
+
   const wrap = document.createElement('div');
-  wrap.className = 'atlas-detail-section';
+  wrap.className = 'atlas-detail-refs-wrap';
+
+  if (narratives.length > 0) {
+    wrap.appendChild(buildSection({
+      headerLabel: 'Mentioned in',
+      count: narratives.length,
+      sources: narratives,
+      // Narratives have their own room — open the writing surface so the
+      // reader can drop into the prose context, not the schema editor.
+      navigateTo: 'writing',
+      sectionClass: 'atlas-detail-section atlas-detail-refs-mentioned',
+    }));
+  }
+
+  if (others.length > 0) {
+    wrap.appendChild(buildSection({
+      headerLabel: 'Referenced by',
+      count: others.length,
+      sources: others,
+      navigateTo: 'element',
+      sectionClass: 'atlas-detail-section',
+    }));
+  }
+
+  return wrap;
+}
+
+interface SectionOpts {
+  headerLabel: string;
+  count: number;
+  sources: Element[];
+  navigateTo: 'element' | 'writing';
+  sectionClass: string;
+}
+
+function buildSection(opts: SectionOpts): HTMLElement {
+  const { headerLabel, count, sources, navigateTo, sectionClass } = opts;
+  const section = document.createElement('div');
+  section.className = sectionClass;
 
   const header = document.createElement('div');
   header.className = 'atlas-detail-section-header no-toggle';
-  header.innerHTML = `<span>Referenced By</span><span class="atlas-refs-count">${incoming.length}</span>`;
-  wrap.appendChild(header);
+  header.innerHTML = `<span>${headerLabel}</span><span class="atlas-refs-count">${count}</span>`;
+  section.appendChild(header);
 
   const body = document.createElement('div');
   body.className = 'atlas-detail-section-body atlas-detail-refs';
-  wrap.appendChild(body);
+  section.appendChild(body);
 
-  // Group by source type for readability.
+  // Group by source type for readability. (For the Mentioned-in section this
+  // always single-type — narrative — but the by-type grouping is harmless.)
   const byType = new Map<ElementType, Element[]>();
-  for (const src of incoming) {
+  for (const src of sources) {
     const arr = byType.get(src.type) ?? [];
     arr.push(src);
     byType.set(src.type, arr);
   }
 
-  for (const [type, sources] of byType.entries()) {
-    const group = document.createElement('div');
-    group.className = 'atlas-field';
+  for (const [type, group] of byType.entries()) {
+    const wrap = document.createElement('div');
+    wrap.className = 'atlas-field';
     const label = document.createElement('div');
     label.className = 'atlas-field-label';
     label.textContent = ELEMENT_LABELS[type]?.plural ?? type;
-    group.appendChild(label);
+    wrap.appendChild(label);
     const chips = document.createElement('div');
     chips.className = 'atlas-link-row';
-    sources.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-    for (const src of sources) {
-      chips.appendChild(buildRefChip(src));
+    group.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    for (const src of group) {
+      chips.appendChild(buildRefChip(src, navigateTo));
     }
-    group.appendChild(chips);
-    body.appendChild(group);
+    wrap.appendChild(chips);
+    body.appendChild(wrap);
   }
-  return wrap;
+  return section;
 }
 
-function buildRefChip(src: Element): HTMLElement {
+function buildRefChip(src: Element, navigateTo: 'element' | 'writing'): HTMLElement {
   const chip = document.createElement('span');
   chip.className = 'atlas-link-chip';
   chip.title = `${src.type} · id ${src.id}`;
@@ -71,7 +126,12 @@ function buildRefChip(src: Element): HTMLElement {
   chip.appendChild(name);
   chip.addEventListener('click', () => {
     const worldId = getState().active?.worldId;
-    if (worldId) {
+    if (!worldId) return;
+    if (navigateTo === 'writing') {
+      // Don't mirror selectedElementId — writing room's URL is the source of
+      // truth (convention #46). The global selection stays where it was.
+      navigate(writingHash(worldId, src.id));
+    } else {
       patchSlice('ui', { ...getState().ui, selectedElementId: src.id });
       navigate(elementHash(worldId, src.id));
     }

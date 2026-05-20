@@ -244,7 +244,7 @@ function renderWritingTab(entry: WorldRegistryEntry): string {
     </section>
     <section class="atlas-settings-section">
       <h3>Writing workspace</h3>
-      <p class="atlas-settings-hint">Prose font size for the writing room. Applies live.</p>
+      <p class="atlas-settings-hint">Prose font size + family for the writing room. Applies live to both writing and reading mode.</p>
       <div class="atlas-settings-row">
         <label class="atlas-settings-label">Font size</label>
         <select class="atlas-select" data-setting="writing_font_size_px">
@@ -253,6 +253,15 @@ function renderWritingTab(entry: WorldRegistryEntry): string {
           <option value="15" ${(entry.writing_font_size_px ?? 15) === 15 ? 'selected' : ''}>15 (default)</option>
           <option value="16" ${entry.writing_font_size_px === 16 ? 'selected' : ''}>16 (large)</option>
           <option value="18" ${entry.writing_font_size_px === 18 ? 'selected' : ''}>18 (extra large)</option>
+        </select>
+      </div>
+      <div class="atlas-settings-row">
+        <label class="atlas-settings-label">Font family</label>
+        <select class="atlas-select" data-setting="writing_font_family">
+          <option value="sans"  ${(entry.writing_font_family ?? 'sans') === 'sans' ? 'selected' : ''}>Sans (default)</option>
+          <option value="serif" ${entry.writing_font_family === 'serif' ? 'selected' : ''}>Serif (Georgia)</option>
+          <option value="slab"  ${entry.writing_font_family === 'slab' ? 'selected' : ''}>Slab</option>
+          <option value="mono"  ${entry.writing_font_family === 'mono' ? 'selected' : ''}>Mono</option>
         </select>
       </div>
     </section>
@@ -599,6 +608,22 @@ function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager): void {
     saveRegistry(next);
     patchSlice('registry', next);
     toasts.info(`Writing font size set to ${px}px`);
+  });
+
+  // Font-family selector — picks one of four system-font stacks via the
+  // --atlas-prose-font-family CSS var.
+  const famSel = document.querySelector<HTMLSelectElement>(`.atlas-settings select[data-setting="writing_font_family"]`);
+  famSel?.addEventListener('change', () => {
+    const v = famSel.value;
+    if (v !== 'sans' && v !== 'serif' && v !== 'slab' && v !== 'mono') return;
+    const reg = getState().registry;
+    const idx = reg.worlds.findIndex(w => w.id === entry.id);
+    if (idx < 0) return;
+    const updated: WorldRegistryEntry = { ...reg.worlds[idx], writing_font_family: v };
+    const next = { ...reg, worlds: reg.worlds.map((w, i) => (i === idx ? updated : w)) };
+    saveRegistry(next);
+    patchSlice('registry', next);
+    toasts.info(`Writing font set to ${v}`);
   });
 }
 

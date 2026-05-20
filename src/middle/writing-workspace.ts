@@ -35,12 +35,27 @@ import {
   buildNarrativeIndex,
   ancestorIds,
 } from './writing-helpers';
-import { mountWorkspaceEditor, type WorkspaceEditorHandle } from './writing-workspace-editor';
+import { mountWorkspaceEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
+import { createFindBar, type FindBarHandle } from './writing-workspace-find-bar';
+import { renderCastStrip } from './writing-workspace-cast-strip';
+import { ElementCreateModal } from '../ui/element-create-modal';
+import { openSplitDialog } from './writing-workspace-split';
 import { type MentionSuggestionItem } from './writing-workspace-mention';
 import { computeRelationPatch } from './writing-workspace-derive';
 import { createChipPreview, type ChipPreviewController } from './writing-workspace-chip-preview';
 import { getRecents, pushRecent } from './writing-workspace-recents';
-import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
+import {
+  getWordGoal,
+  setWordGoal,
+  clearWordGoal,
+  openWordGoalPopover,
+  goalProgress,
+} from './writing-workspace-word-goal';
+import {
+  WRITING_FOCUS_TOGGLE_EVENT,
+  WRITING_INLINE_CREATE_EVENT,
+  WRITING_SPLIT_EVENT,
+} from '../core/hotkeys';
 import type { JSONContent } from '@tiptap/core';
 
 /**
@@ -59,6 +74,18 @@ export function resetWritingWorkspaceMemory(): void {
   referencesCollapsed.clear();
 }
 
+/**
+ * System-font stacks for the writing workspace. Sans is the default; the
+ * others provide stylistic variety without webfont download. Slab gracefully
+ * degrades to serif on systems without a true slab face installed.
+ */
+const PROSE_FONT_STACKS: Record<'sans' | 'serif' | 'slab' | 'mono', string> = {
+  sans: `system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
+  serif: `Georgia, 'Iowan Old Style', 'Times New Roman', 'Source Serif Pro', serif`,
+  slab: `'Rockwell', 'Roboto Slab', 'Slabo 27px', Georgia, serif`,
+  mono: `ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', Consolas, 'Liberation Mono', monospace`,
+};
+
 export function mountWritingWorkspace(target: HTMLElement): () => void {
   target.innerHTML = '';
   const root = document.createElement('div');
@@ -73,9 +100,210 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   let lastSavedMarkdown: string | null = null;
   let pendingSaveTimer: number | null = null;
   let pendingSnapshot: { markdown: string; json: JSONContent } | null = null;
+  // Track last-seen elements array reference so we only rebuild the autolink
+  // index (and dispatch a tx) when state.data.elements actually swaps.
+  let lastSeenElementsRef: Element[] | null = null;
   // Singleton chip preview controller for this workspace mount — hover +
   // sticky-on-click peek of linked elements (DESIGN_WRITING.md §Click + hover).
   const chipPreview: ChipPreviewController = createChipPreview(root);
+
+  // Find-bar controller proxies onto the CURRENT editor handle's search
+  // controller. Editor handles get recreated on narrative switch, so we
+  // can't keep a direct reference — the proxy stays valid across switches.
+  const findBarSearchProxy: SearchController = {
+    setQuery: (opts) => editorHandle?.search.setQuery(opts),
+    next: () => editorHandle?.search.next(),
+    prev: () => editorHandle?.search.prev(),
+    replaceCurrent: (text) => editorHandle?.search.replaceCurrent(text) ?? false,
+    replaceAll: (text) => editorHandle?.search.replaceAll(text) ?? 0,
+    clear: () => editorHandle?.search.clear(),
+    getInfo: () => editorHandle?.search.getInfo() ?? {
+      total: 0, currentIndex: 0, query: '', caseSensitive: false, wholeWord: false,
+    },
+  };
+  let findBar: FindBarHandle | null = null;
+  function ensureFindBar(): FindBarHandle {
+    if (findBar) return findBar;
+    findBar = createFindBar(root, {
+      search: findBarSearchProxy,
+      onClose: () => {
+        // Editor regains focus so typing resumes immediately.
+        editorHandle?.editor.commands.focus();
+      },
+    });
+    return findBar;
+  }
+
+  /**
+   * Workspace-scoped find/replace hotkeys (Ctrl+F / Ctrl+H). Listened on the
+   * root so they don't conflict with browser-level Ctrl+F outside the writing
+   * room. Inline-create (Ctrl+Shift+E) flows through the central hotkey
+   * dispatcher and arrives as a custom event — see onInlineCreateEvent below.
+   */
+  const onWorkspaceHotkey = (e: KeyboardEvent): void => {
+    const isMeta = e.ctrlKey || e.metaKey;
+    if (!isMeta) return;
+    if (e.key === 'f' || e.key === 'F') {
+      e.preventDefault();
+      ensureFindBar().open('find');
+    } else if (e.key === 'h' || e.key === 'H') {
+      e.preventDefault();
+      ensureFindBar().open('replace');
+    }
+  };
+  root.addEventListener('keydown', onWorkspaceHotkey);
+
+  const onInlineCreateEvent = (): void => {
+    openInlineCreate();
+  };
+  document.addEventListener(WRITING_INLINE_CREATE_EVENT, onInlineCreateEvent);
+
+  const onSplitEvent = (): void => {
+    openSplitForCurrentCursor();
+  };
+  document.addEventListener(WRITING_SPLIT_EVENT, onSplitEvent);
+
+  /**
+   * Open the split-into-sibling confirm dialog for the current narrative,
+   * splitting at the editor's cursor position. Bails (with toast) if no
+   * editor / no narrative.
+   */
+  function openSplitForCurrentCursor(): void {
+    const editor = editorHandle?.editor;
+    const el = getActiveNarrative();
+    const worldId = getState().active?.worldId;
+    if (!editor || !el || !worldId) return;
+    openSplitDialog({ narrative: el, editor, worldId });
+  }
+  // contextmenu attaches at root — survives editor remounts on narrative
+  // switch. Delegated check inside the handler bails out if the target
+  // isn't inside the prose surface.
+
+  /**
+   * Inline element creation — opens ElementCreateModal pre-filled with the
+   * currently-selected prose text. After create, replaces the selection with
+   * an ow:// chip pointing at the new element. Navigation stays in the writing
+   * room (suppressNavigate=true). No-op when there's no text selection.
+   */
+  function openInlineCreate(): void {
+    const editor = editorHandle?.editor;
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    if (from === to) {
+      toastManager.info('Select some text first, then Ctrl+Shift+E');
+      return;
+    }
+    const selectedText = editor.state.doc.textBetween(from, to, ' ', ' ').trim();
+    if (!selectedText) {
+      toastManager.info('Selection is empty');
+      return;
+    }
+    new ElementCreateModal(toastManager, {
+      initialName: selectedText,
+      suppressNavigate: true,
+      title: 'Create element from selection',
+      onCreated: (id, type) => {
+        // Replace the original selected range with an ow:// chip + trailing space.
+        if (!editorHandle) return;
+        editorHandle.editor
+          .chain()
+          .focus()
+          .insertContentAt({ from, to }, [
+            { type: 'elementChip', attrs: { id, type, label: selectedText } },
+            { type: 'text', text: ' ' },
+          ])
+          .run();
+      },
+    }).open();
+  }
+
+  /**
+   * Right-click context menu — when there's a text selection, offers a single
+   * action: "Create element from selection". Otherwise lets the browser's
+   * native menu show. The menu is a tiny floating div anchored at the click
+   * position; click-outside / Esc closes.
+   */
+  let activeContextMenu: HTMLElement | null = null;
+  function dismissContextMenu(): void {
+    if (!activeContextMenu) return;
+    activeContextMenu.remove();
+    activeContextMenu = null;
+    document.removeEventListener('mousedown', onContextMenuOutside, true);
+    document.removeEventListener('keydown', onContextMenuKey, true);
+  }
+  const onContextMenuOutside = (e: MouseEvent): void => {
+    if (!activeContextMenu) return;
+    if (activeContextMenu.contains(e.target as Node)) return;
+    dismissContextMenu();
+  };
+  const onContextMenuKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') dismissContextMenu();
+  };
+  const onProseContextMenu = (e: MouseEvent): void => {
+    // Only fire for events that originated inside the prose surface — the
+    // header, sidebar, etc. keep their native menus.
+    const target = e.target as HTMLElement | null;
+    if (!target?.closest('.atlas-writing-workspace-prose .ProseMirror')) return;
+    const editor = editorHandle?.editor;
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const hasSelection = from !== to;
+    const cursorPos = from;
+    const docSize = editor.state.doc.content.size;
+    const cursorIsMidDoc = cursorPos > 0 && cursorPos < docSize;
+
+    // If there's neither a selection nor a mid-doc cursor, our menu offers
+    // nothing — let the browser show its native menu (copy, paste, etc.).
+    if (!hasSelection && !cursorIsMidDoc) return;
+
+    e.preventDefault();
+    dismissContextMenu();
+
+    const items: string[] = [];
+    if (hasSelection) {
+      items.push(`
+        <button type="button" class="atlas-prose-context-menu-item" data-role="create">
+          <span class="material-symbols-outlined">add</span>
+          <span>Create element from selection</span>
+        </button>
+      `);
+    }
+    if (cursorIsMidDoc) {
+      items.push(`
+        <button type="button" class="atlas-prose-context-menu-item" data-role="split">
+          <span class="material-symbols-outlined">content_cut</span>
+          <span>Split here into new sibling</span>
+        </button>
+      `);
+    }
+
+    const menu = document.createElement('div');
+    menu.className = 'atlas-prose-context-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = items.join('');
+    menu.style.position = 'fixed';
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+    menu.style.zIndex = '1000';
+    document.body.appendChild(menu);
+    activeContextMenu = menu;
+
+    menu.querySelector<HTMLElement>('[data-role="create"]')?.addEventListener('click', () => {
+      dismissContextMenu();
+      openInlineCreate();
+    });
+    menu.querySelector<HTMLElement>('[data-role="split"]')?.addEventListener('click', () => {
+      dismissContextMenu();
+      openSplitForCurrentCursor();
+    });
+    // Defer the outside-click listener so the contextmenu event that opened
+    // us doesn't immediately close.
+    queueMicrotask(() => {
+      document.addEventListener('mousedown', onContextMenuOutside, true);
+      document.addEventListener('keydown', onContextMenuKey, true);
+    });
+  };
+  root.addEventListener('contextmenu', onProseContextMenu);
 
   // Focus mode (Cmd+Shift+F via hotkeys.ts) — toggles a class on the workspace
   // root. Sibling chrome (sidebar, room-nav) hides via `.atlas-shell:has(...)`
@@ -104,8 +332,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
 
   /** Match the existing sync debounce window — same UX as inline field edits. */
   function getSaveDebounceMs(): number {
-    const reg = getState().registry;
-    const ms = (reg as any).sync_debounce_ms;
+    const ms = getState().registry.sync_debounce_ms;
     return typeof ms === 'number' && ms >= 200 ? ms : 1000;
   }
 
@@ -135,6 +362,48 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     }
   }
 
+  /**
+   * Page-unload safety net. Browsers fire `pagehide` on tab close, navigation
+   * away, and reload — including (unlike `unload`) the back/forward cache
+   * lifecycle. We fire the pending save synchronously-ish; if the browser
+   * gives the FS Access API enough time to flush, the user's last keystroke
+   * lands. Best effort — there is no fully-synchronous file-system write API
+   * in the browser, so any guarantee weaker than "we tried" is a lie.
+   */
+  function onPageHide(): void {
+    // Capture latest editor state if onUpdate hasn't fired yet for the most
+    // recent transaction (defensive — onUpdate is synchronous from TipTap's
+    // dispatchTransaction, so this is rarely a no-op, but cheap insurance).
+    if (editorHandle && mountedForId !== null && !pendingSnapshot) {
+      const markdown = editorHandle.getMarkdown();
+      if (lastSavedMarkdown !== null && markdown !== lastSavedMarkdown) {
+        pendingSnapshot = { markdown, json: editorHandle.getJson() };
+      }
+    }
+    void flushPendingSave();
+  }
+  window.addEventListener('pagehide', onPageHide);
+
+  /**
+   * Silent relation-only save. Used by the mount-time self-heal pass to bring
+   * stale narrative.<relation> fields current with prose mentions, without
+   * touching `story` or `atlas_richtext_json` (those are still the user's
+   * canonical writing surface). No save-indicator flash; no toast on failure
+   * beyond the console — self-heal is best-effort housekeeping, not a user op.
+   */
+  async function selfHealRelations(elementId: string, patch: Partial<Element>): Promise<void> {
+    const folder = getActiveStore();
+    if (!folder) return;
+    if (mountedForId !== elementId) return; // workspace tore down or switched
+    try {
+      await folder.updateElement(elementId, patch);
+      await refreshElementsAfterWrite(folder);
+      requestPushIfLinked();
+    } catch (err) {
+      console.error('[writing-workspace] self-heal failed', err);
+    }
+  }
+
   async function persistSnapshot(snap: { markdown: string; json: JSONContent }): Promise<void> {
     const el = getActiveNarrative();
     if (!el || el.id !== mountedForId) return;
@@ -147,12 +416,12 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     const relationPatch = computeRelationPatch(el, snap.markdown);
     const patch: Partial<Element> = {
       story: snap.markdown,
-      atlas_richtext_json: snap.json as any,
+      atlas_richtext_json: snap.json,
       ...relationPatch,
     };
 
     try {
-      await folder.updateElement(el.id, patch as any);
+      await folder.updateElement(el.id, patch);
       lastSavedMarkdown = snap.markdown;
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
@@ -201,6 +470,12 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       const byId = new Map<string, string>();
       for (const e of elements) byId.set(e.id, e.name || '');
       editorHandle.syncChipLabels((id) => byId.get(id) ?? null);
+      // Refresh autolink index only when the elements array reference swaps —
+      // skip the no-op tx on ticks where only e.g. UI state changed.
+      if (elements !== lastSeenElementsRef) {
+        editorHandle.refreshAutolink(elements);
+        lastSeenElementsRef = elements;
+      }
     }
   }
 
@@ -208,7 +483,22 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     teardownEditor();
     root.innerHTML = '';
     mountedForId = el.id;
-    lastSavedMarkdown = (el as any).story ?? null;
+    lastSavedMarkdown = el.story ?? null;
+
+    // Self-heal pass: if this narrative's `story` markdown contains ow:// links
+    // whose UUIDs aren't reflected in the multi-link relation fields yet
+    // (convention #50), bring relations current with one quiet save. Covers
+    // legacy markdown-only narratives loaded from another OW tool, and any
+    // narrative whose relations drifted from the prose. No-op when relations
+    // already match. Deferred to a microtask so the editor mounts first.
+    if (typeof el.story === 'string' && el.story.length > 0) {
+      const initialPatch = computeRelationPatch(el, el.story);
+      if (Object.keys(initialPatch).length > 0) {
+        queueMicrotask(() => {
+          void selfHealRelations(el.id, initialPatch);
+        });
+      }
+    }
 
     // 1. Header (reuse element-detail-header for visual + behavioral consistency).
     root.appendChild(renderHeader(el));
@@ -222,18 +512,27 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // 3. Breadcrumb + date row.
     body.appendChild(renderBreadcrumbAndDate(el));
 
+    // 3a. Character-cast strip — pivot of linked elements by type. Click a
+    // chip to insert at cursor. Hidden in reading + focus modes via CSS.
+    body.appendChild(renderCastStrip({
+      narrative: el,
+      worldId: getState().active!.worldId,
+      getEditor: () => editorHandle?.editor ?? null,
+    }));
+
     // 4. Prose surface (TipTap mounts here).
     const proseHost = document.createElement('div');
     proseHost.className = 'atlas-writing-workspace-prose';
     body.appendChild(proseHost);
 
-    const initialJson = parseRichtextJson((el as any).atlas_richtext_json);
-    const initialMarkdown = typeof (el as any).story === 'string' ? (el as any).story : '';
+    const initialJson = parseRichtextJson(el.atlas_richtext_json);
+    const initialMarkdown = typeof el.story === 'string' ? el.story : '';
 
     editorHandle = mountWorkspaceEditor({
       target: proseHost,
       initialJson,
       initialMarkdown,
+      autolinkSeed: { elements: getState().data.elements },
       onUpdate: (snap) => {
         scheduleSave({ markdown: snap.markdown, json: snap.json });
         updateWordCountIndicator(snap.wordCount);
@@ -291,6 +590,15 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     const oldCrumb = body.querySelector<HTMLElement>('.atlas-writing-workspace-crumb');
     const newCrumb = renderBreadcrumbAndDate(el);
     if (oldCrumb) oldCrumb.replaceWith(newCrumb);
+
+    // Replace cast strip (reflects current relation field on every state tick).
+    const oldCast = body.querySelector<HTMLElement>('.atlas-writing-workspace-cast');
+    const newCast = renderCastStrip({
+      narrative: el,
+      worldId: getState().active!.worldId,
+      getEditor: () => editorHandle?.editor ?? null,
+    });
+    if (oldCast) oldCast.replaceWith(newCast);
 
     // Replace Details disclosure (re-renders the schema fields with current values).
     const oldDetails = body.querySelector<HTMLElement>('.atlas-writing-workspace-details');
@@ -363,8 +671,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     wrap.appendChild(crumbsRow);
 
     // Date row — show start_date / end_date if present.
-    const start = (el as any).start_date;
-    const end = (el as any).end_date;
+    const start = el.start_date;
+    const end = el.end_date;
     if (start != null || end != null) {
       const dateRow = document.createElement('div');
       dateRow.className = 'atlas-writing-workspace-date';
@@ -481,11 +789,38 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
 
     const wordCount = editorHandle?.getWordCount() ?? 0;
     const readingMin = Math.max(1, Math.round(wordCount / 250));
+    const worldId = getState().active!.worldId;
+    const goal = getWordGoal(worldId, el.id);
 
-    const wcSpan = document.createElement('span');
-    wcSpan.className = 'atlas-writing-workspace-wc';
-    wcSpan.textContent = `${wordCount.toLocaleString()} words`;
-    right.appendChild(wcSpan);
+    // Word count is a clickable button — opens the session-goal popover.
+    // When a goal is set, prepends a tiny progress ring and shows `/ goal`.
+    const wcBtn = document.createElement('button');
+    wcBtn.type = 'button';
+    wcBtn.className = 'atlas-writing-workspace-wc-btn';
+    wcBtn.title = goal != null
+      ? `${wordCount.toLocaleString()} / ${goal.toLocaleString()} words — click to change goal`
+      : 'Click to set session word goal';
+    if (goal != null) wcBtn.dataset.hasGoal = 'true';
+    renderWordCountInto(wcBtn, wordCount, goal);
+    wcBtn.addEventListener('click', () => {
+      openWordGoalPopover({
+        anchor: wcBtn,
+        currentGoal: getWordGoal(worldId, el.id),
+        onSet: (next) => {
+          setWordGoal(worldId, el.id, next);
+          const liveCount = editorHandle?.getWordCount() ?? 0;
+          renderWordCountInto(wcBtn, liveCount, next);
+          wcBtn.dataset.hasGoal = 'true';
+        },
+        onClear: () => {
+          clearWordGoal(worldId, el.id);
+          const liveCount = editorHandle?.getWordCount() ?? 0;
+          renderWordCountInto(wcBtn, liveCount, null);
+          delete wcBtn.dataset.hasGoal;
+        },
+      });
+    });
+    right.appendChild(wcBtn);
 
     const dot = document.createElement('span');
     dot.className = 'atlas-writing-workspace-sep';
@@ -529,9 +864,31 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   }
 
   function updateWordCountIndicator(wordCount: number): void {
-    const span = root.querySelector<HTMLElement>('.atlas-writing-workspace-wc');
-    if (!span) return;
-    span.textContent = `${wordCount.toLocaleString()} words`;
+    const btn = root.querySelector<HTMLElement>('.atlas-writing-workspace-wc-btn');
+    if (!btn) return;
+    const worldId = getState().active?.worldId;
+    const narrId = mountedForId;
+    const goal = worldId && narrId ? getWordGoal(worldId, narrId) : null;
+    renderWordCountInto(btn, wordCount, goal);
+  }
+
+  /**
+   * Paint the word-count button's contents — optional progress ring + count
+   * + optional `/ goal` suffix. Pure DOM write, doesn't read state, so the
+   * caller controls whether the goal is current.
+   */
+  function renderWordCountInto(btn: HTMLElement, wordCount: number, goal: number | null): void {
+    const formatted = wordCount.toLocaleString();
+    const goalText = goal != null ? ` / ${goal.toLocaleString()}` : '';
+    const fraction = goalProgress(wordCount, goal);
+    const ringHtml = goal != null
+      ? `<span class="atlas-writing-workspace-wc-ring" style="--progress: ${fraction.toFixed(3)};" data-complete="${fraction >= 1 ? 'true' : 'false'}"></span>`
+      : '';
+    btn.innerHTML = `
+      ${ringHtml}
+      <span class="atlas-writing-workspace-wc">${formatted} words</span>
+      ${goal != null ? `<span class="atlas-writing-workspace-wc-goal">${goalText}</span>` : ''}
+    `;
   }
 
   // ============================================================================
@@ -576,8 +933,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
           .filter(e => !PICKER_EXCLUDED_TYPES.has(e.type) && !seen.has(e.id))
           .slice()
           .sort((a, b) => {
-            const aT = (a as any).local_updated_at ?? '';
-            const bT = (b as any).local_updated_at ?? '';
+            const aT = a.local_updated_at ?? '';
+            const bT = b.local_updated_at ?? '';
             return aT < bT ? 1 : aT > bT ? -1 : 0;
           });
         for (const el of byMtime) {
@@ -591,7 +948,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     const scored: Array<{ score: number; item: MentionSuggestionItem }> = [];
     for (const el of elements) {
       if (PICKER_EXCLUDED_TYPES.has(el.type)) continue;
-      const aliases = (el as any).atlas_aliases as string[] | undefined;
+      const aliases = el.atlas_aliases;
       const name = (el.name || '').toLowerCase();
       const aliasMatches = Array.isArray(aliases) ? aliases.map(a => a.toLowerCase()) : [];
 
@@ -631,9 +988,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   }
 
   /**
-   * Read the per-world writing font-size preference and set it as a CSS
-   * custom property on the workspace root. Called once at mount and again
-   * via state subscription so Settings → Writing changes take effect live.
+   * Read the per-world writing font preferences (size + family) and set them
+   * as CSS custom properties on the workspace root. Called once at mount and
+   * again via state subscription so Settings → Writing changes take effect
+   * live. The font-family map is centralized here so adding a new preset
+   * is one tiny edit.
    */
   function applyProseFontSize(workspaceRoot: HTMLElement): void {
     const state = getState();
@@ -643,6 +1002,9 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     const raw = entry?.writing_font_size_px;
     const px = typeof raw === 'number' && raw >= 12 && raw <= 22 ? raw : 15;
     workspaceRoot.style.setProperty('--atlas-prose-font-size', `${px}px`);
+
+    const fam = entry?.writing_font_family ?? 'sans';
+    workspaceRoot.style.setProperty('--atlas-prose-font-family', PROSE_FONT_STACKS[fam] ?? PROSE_FONT_STACKS.sans);
   }
 
   function parseRichtextJson(raw: unknown): JSONContent | null {
@@ -667,14 +1029,35 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   render();
 
   return () => {
-    // Flush pending save before tearing down (best effort — fire and forget;
-    // the unmount path is rarely awaited).
+    // Cleanup contract is synchronous, but the folder write inside
+    // persistSnapshot is async. We initiate the write FIRST (with a defensive
+    // snapshot capture in case onUpdate hasn't run for the latest transaction),
+    // then run the rest of the teardown. persistSnapshot reads its inputs
+    // through closure-captured locals (folder, lastSavedMarkdown), so the
+    // write itself completes after teardown without depending on still-alive
+    // workspace state. teardownEditor nulls `mountedForId`, but that check in
+    // persistSnapshot runs BEFORE the first `await`, so the in-flight write
+    // proceeds even though new persists won't.
+    if (editorHandle && mountedForId !== null && !pendingSnapshot) {
+      const markdown = editorHandle.getMarkdown();
+      if (lastSavedMarkdown !== null && markdown !== lastSavedMarkdown) {
+        pendingSnapshot = { markdown, json: editorHandle.getJson() };
+      }
+    }
     void flushPendingSave();
+    window.removeEventListener('pagehide', onPageHide);
     unsubState();
     unsubHash();
+    root.removeEventListener('keydown', onWorkspaceHotkey);
+    document.removeEventListener(WRITING_INLINE_CREATE_EVENT, onInlineCreateEvent);
+    document.removeEventListener(WRITING_SPLIT_EVENT, onSplitEvent);
+    root.removeEventListener('contextmenu', onProseContextMenu);
+    dismissContextMenu();
     document.removeEventListener(WRITING_FOCUS_TOGGLE_EVENT, onFocusToggle);
     document.removeEventListener('keydown', onFocusEsc, true);
     chipPreview.destroy();
+    findBar?.destroy();
+    findBar = null;
     teardownEditor();
   };
 }

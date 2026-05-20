@@ -67,6 +67,13 @@ export interface ElementCreateOptions {
   onPlaceExisting?: (id: string, type: ElementType) => void;
   /** Override the modal title. Default: 'New element'. */
   title?: string;
+  /**
+   * Skip the post-create `navigate(elementHash(...))` jump. Used by flows
+   * that want to stay in their current view after creation — e.g. the writing
+   * workspace's inline element creation, which replaces selected prose with
+   * an ow:// chip and shouldn't navigate the user out of the room.
+   */
+  suppressNavigate?: boolean;
 }
 
 export class ElementCreateModal extends BaseModal {
@@ -298,8 +305,10 @@ export class ElementCreateModal extends BaseModal {
         this.opts.onCreated?.(el.id, this.selected);
         requestPushIfLinked();
 
-        const worldId = getState().active?.worldId;
-        if (worldId) navigate(elementHash(worldId, el.id));
+        if (!this.opts.suppressNavigate) {
+          const worldId = getState().active?.worldId;
+          if (worldId) navigate(elementHash(worldId, el.id));
+        }
       } catch (err) {
         console.error('[element-create] failed:', err);
         errorBox.textContent = err instanceof Error ? err.message : String(err);

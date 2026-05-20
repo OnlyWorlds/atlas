@@ -4,9 +4,11 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-05-20 session 227 close)
+## CURRENT STATE (handover snapshot, 2026-05-20 session 228 close)
 
-Tool has a working writing workspace v1 + v1.5 polish. **672 vitest green + 93 Playwright green.** Typecheck clean. Conventions list 1-52 (full text in DESIGN.md + DESIGN_WRITING.md). PWA + offline cache; bundle ~988 KB JS / 295 KB gzipped — +140 KB gzipped from TipTap/ProseMirror integration. Code-splitting deferred (see Open follow-ups).
+Writing workspace v2 batch shipped — backlinks polish, code-split, word goal, find/replace, font picker, character cast strip, inline element creation from selection, split-into-sibling, **and first-mention auto-link**. **693 vitest green + 110 Playwright green.** Typecheck clean. **Main bundle 156.87 KB gzipped (was 298 KB)**; writing workspace chunk 148.85 KB gzipped, lazy-loaded on first writing-room entry. Conventions list 1-53 (full text in DESIGN.md + DESIGN_WRITING.md). PWA + offline cache intact.
+
+(Prior session-227 state preserved below.)
 
 **Writing workspace v1 landed** — new `src/middle/writing-workspace.ts` module replaces the schema-driven element-detail when route mode is `writing` AND an active narrative exists in the URL hierarchy (convention #51). TipTap richtext editor (StarterKit + Markdown + custom ElementChip extension). Layout: 36px header (reused element-detail-header.ts) → breadcrumb + date row → prose surface → collapsible Details (wraps element-detail-fields, story field filtered out) → collapsible References → footer (reading-mode toggle + word count + reading time + save state + open-as-element link). Storage: `atlas_richtext_json` (TipTap JSON, atlas-local) + `story` field (markdown serialization, OW interop) atomically updated on debounced save. Linking: `@` picker with fuzzy match on name + `atlas_aliases`, inserted as `[Display Name](ow://<type>/<uuid>)` markdown, rendered as cyan chip. Auto-derive: every save unions prose-mentioned UUIDs into Narrative's multi-link relation fields. Reading mode toggle via CSS class. **First-mention auto-link deferred to v2** (deliberate scope guard).
 

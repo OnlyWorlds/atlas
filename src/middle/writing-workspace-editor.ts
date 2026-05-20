@@ -10,13 +10,28 @@
  * this module only deals with editor lifecycle + content conversion.
  */
 
-import { Editor } from '@tiptap/core';
+import { Editor, Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import { renderMentionSuggestion, type MentionSuggestionItem } from './writing-workspace-mention';
 import { ElementChip } from './writing-workspace-element-chip';
 import { serializeDocToMarkdown } from './writing-workspace-markdown';
 import { convertLinkMarksToChips } from './writing-workspace-load';
+import {
+  createSearchPlugin,
+  setSearchQuery,
+  stepSearch,
+  clearSearch,
+  getSearchState,
+  type SearchSetOptions,
+} from './writing-workspace-search';
+import {
+  createAutolinkPlugin,
+  buildAutolinkIndex,
+  refreshAutolinkIndex,
+  type AutolinkIndex,
+} from './writing-workspace-autolink';
+import type { Element } from '../core/types';
 import type { JSONContent } from '@tiptap/core';
 
 export interface WorkspaceEditorOptions {
@@ -47,6 +62,38 @@ export interface WorkspaceEditorOptions {
   onChipClick?: (chip: HTMLElement, id: string, type: string) => void;
   /** Called when the @ picker commits a new chip. Workspace pushes to recents. */
   onMentionInserted?: (id: string, type: string) => void;
+  /**
+   * Initial seed for the autolink plugin's name+alias index. When provided,
+   * autolink hints render immediately on mount; otherwise the editor starts
+   * with an empty index and the workspace can {@link WorkspaceEditorHandle.refreshAutolink}
+   * to populate it.
+   */
+  autolinkSeed?: AutolinkSeed;
+}
+
+export interface SearchMatchInfo {
+  total: number;
+  currentIndex: number; // 1-based for display; 0 when nothing matched.
+  query: string;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+}
+
+export interface SearchController {
+  /** Set/update the search query + flags. Empty query clears the highlight. */
+  setQuery(opts: SearchSetOptions): void;
+  /** Move to the next match (wraps). No-op when zero matches. */
+  next(): void;
+  /** Move to the previous match (wraps). No-op when zero matches. */
+  prev(): void;
+  /** Replace the currently-highlighted match with `text`. Returns true if a match was replaced. */
+  replaceCurrent(text: string): boolean;
+  /** Replace every match with `text`. Returns the number of replacements. */
+  replaceAll(text: string): number;
+  /** Drop the highlight + clear plugin state. */
+  clear(): void;
+  /** Current snapshot of match counts for UI display. */
+  getInfo(): SearchMatchInfo;
 }
 
 export interface WorkspaceEditorHandle {
@@ -67,8 +114,20 @@ export interface WorkspaceEditorHandle {
    * changed. Called on every state.data.elements change.
    */
   syncChipLabels: (lookupName: (id: string) => string | null) => number;
+  /** Find/replace controller — see {@link SearchController}. */
+  search: SearchController;
+  /** Rebuild the autolink name+alias index from a fresh elements list. */
+  refreshAutolink: (elements: Element[]) => void;
   /** Tear down the editor and detach DOM listeners. */
   destroy: () => void;
+}
+
+/**
+ * Optional initial autolink seed. Workspace caller passes the world's elements
+ * so the editor can decorate already-present matches on mount.
+ */
+export interface AutolinkSeed {
+  elements: Element[];
 }
 
 /**
@@ -101,6 +160,21 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
         // only carries genuine outbound URLs.
       }) as any,
       Markdown,
+      // Search/find-replace plugin — exposed through editorHandle.search.
+      Extension.create({
+        name: 'atlasSearch',
+        addProseMirrorPlugins: () => [createSearchPlugin()],
+      }) as any,
+      // Autolink plugin — Tab-to-link hints over name/alias matches.
+      Extension.create({
+        name: 'atlasAutolink',
+        addProseMirrorPlugins: () => {
+          const initialIndex: AutolinkIndex = opts.autolinkSeed
+            ? buildAutolinkIndex(opts.autolinkSeed.elements)
+            : { byName: new Map(), scanner: null };
+          return [createAutolinkPlugin(initialIndex)];
+        },
+      }) as any,
       ElementChip.configure({
         HTMLAttributes: {
           class: 'atlas-element-chip',
@@ -190,6 +264,55 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
     }
   }
 
+  const search: SearchController = {
+    setQuery(opts) {
+      setSearchQuery(editor.view, opts);
+    },
+    next() {
+      stepSearch(editor.view, 1);
+    },
+    prev() {
+      stepSearch(editor.view, -1);
+    },
+    replaceCurrent(text) {
+      const s = getSearchState(editor.state);
+      if (!s || s.currentIndex < 0 || s.matches.length === 0) return false;
+      const match = s.matches[s.currentIndex];
+      editor.chain().focus().insertContentAt({ from: match.from, to: match.to }, text).run();
+      // After the replacement, the plugin's `apply` runs against the post-doc
+      // transaction and rebuilds matches. The current index maps forward.
+      return true;
+    },
+    replaceAll(text) {
+      const s = getSearchState(editor.state);
+      if (!s || s.matches.length === 0) return 0;
+      // Replace from end → start to keep earlier offsets stable.
+      const ordered = [...s.matches].sort((a, b) => b.from - a.from);
+      const tr = editor.state.tr;
+      for (const m of ordered) {
+        tr.insertText(text, m.from, m.to);
+      }
+      editor.view.dispatch(tr);
+      return ordered.length;
+    },
+    clear() {
+      clearSearch(editor.view);
+    },
+    getInfo() {
+      const s = getSearchState(editor.state);
+      if (!s) {
+        return { total: 0, currentIndex: 0, query: '', caseSensitive: false, wholeWord: false };
+      }
+      return {
+        total: s.matches.length,
+        currentIndex: s.matches.length > 0 ? s.currentIndex + 1 : 0,
+        query: s.query,
+        caseSensitive: s.caseSensitive,
+        wholeWord: s.wholeWord,
+      };
+    },
+  };
+
   return {
     editor,
     getMarkdown: () => serializeDocToMarkdown(editor.getJSON()),
@@ -208,6 +331,8 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
     },
     getWordCount: () => computeWordCount(editor.getText()),
     syncChipLabels: (lookupName) => syncChipLabelsImpl(editor, lookupName),
+    search,
+    refreshAutolink: (elements) => refreshAutolinkIndex(editor.view, elements),
     destroy: () => editor.destroy(),
   };
 }
