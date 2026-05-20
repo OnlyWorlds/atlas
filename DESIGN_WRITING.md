@@ -1,7 +1,7 @@
 # Atlas — Writing Design
 
-**Version**: 2.0 (2026-05-19) — supertype-tier model
-**Status**: Core model implemented (setup, promote, four-tier filter, label-rename migration). Real richtext editor still deferred.
+**Version**: 2.1 (2026-05-20) — sidebar takeover + unified header
+**Status**: Core model + sidebar takeover + drag-reorder + last-narrative restore all shipped. Real richtext editor still deferred.
 **Related**: `DESIGN.md` (Rooms model), `DESIGN_HOME.md`, `DESIGN_PUBLISHING.md`
 
 ---
@@ -30,9 +30,9 @@ A Narrative belongs to the writing tree iff its `supertype` matches one of the f
 Tier `l4` (Draft) is the flexible joker:
 - Lives anywhere in the tree
 - No required parent, no required position
-- Can nest other drafts
 - Distinct icon
-- Use case: side material, alt versions, deleted scenes, scratch ideas, research notes, anything the writer wants in their writing tree but doesn't fit the spine
+- Use case: side material, alt versions, deleted scenes, scratch ideas, research notes
+- **Atlas doesn't offer "+ new draft" as a child of an existing draft** (no nesting from UI) — Captain's call session 224: keeps the affordance set small and consistent. Drafts can still be re-parented manually via element-detail; the data model doesn't forbid it.
 
 ### Storage shape
 
@@ -152,44 +152,64 @@ This is the escape hatch for users who want to remove a narrative from the writi
 
 ---
 
-## Room layout
+## Room layout (sidebar takeover, single-pane editor)
+
+Session 224 moved the writing tree from a left column in the middle pane INTO the sidebar. The middle pane in writing mode is a single column with just the element-detail of the selected narrative. Tier badge + child-create buttons live in the element-detail header. No separate toolbar.
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ 🏠 ✎ 🕓 ⌕ ⬆ ⬇ 🧩 ⚙        ← room nav                  │
-├────────────────┬─────────────────────────────────────────┤
-│  BOOKS    ⚙    │                                         │
-│  ▼ 📖 Book 1   │   <active narrative — element detail>   │
-│    ▼ Ch 1      │                                         │
-│      • Sc 1    │   name, description, story, etc.        │
-│      • Sc 2    │                                         │
-│      ✎ Draft   │                                         │
-│    ▶ Ch 2      │                                         │
-│  ▶ 📖 Book 2   │                                         │
-│    ✎ Draft     │                                         │
-│  ✎ Loose Draft │                                         │
-│                │                                         │
-│  + new book    │                                         │
-│  + new draft   │                                         │
-├────────────────┴─────────────────────────────────────────┤
+┌─────────────────┬────────────────────────────────────────┐
+│  [Worlds | W..] │ 🏠 ✎ 🕓 ⌕ ⬆ ⬇ 🧩 ⚙   ← room nav     │
+│  ┌───────────┐  ├────────────────────────────────────────┤
+│  │+ new book │  │ [icon] Joint Expedition Departs        │
+│  │+ new draft│  │           [SCENE] (no child buttons)   │
+│  └───────────┘  │                                        │
+│  Search... 🔍⚙ ├────────────────────────────────────────┤
+│  ▼ 📖 Drip St   │                                        │
+│    ▶ Three W…   │   <active narrative — element detail>  │
+│    ▼ Chapter 4  │                                        │
+│      • Scene 1  │   name, description, story, etc.       │
+│      • Scene 2  │                                        │
+│    ▼ Chapter 5  │                                        │
+│  ▶ 📖 Failing   │                                        │
+│  ✎ Loose Draft  │                                        │
+└─────────────────┴────────────────────────────────────────┘
 ```
 
-**Left sub-column**:
-- Tree built from narratives where `supertype ∈ {l1, l2, l3, l4}`
-- Tier-aware icons: `menu_book` (l1), `article` (l2), `short_text` (l3), `edit_note` (l4)
-- Drafts get italic name + slightly muted styling
-- Chevron expand/collapse for any node with children (state persists in `registry.worlds[i].writing_tree_collapsed`)
-- Header gear → re-opens setup screen for label changes / re-promote
-- Footer: "+ new book" + "+ new draft" (top-level creates)
+**Sidebar** (`src/sidebar/writing-sidebar.ts`):
+- Layout matches the elements sidebar exactly — two-band header (filter-strip slot, search-row slot), then list. Same pixel positions so switching between Worlds/Elements/Writing feels like the same surface.
+- Band 1 — create row: two stacked compact buttons `+ new <l1>` / `+ new <l4>` (top-level creates).
+- Band 2 — search row: `[input] [magnifier opens search room] [tune opens writing settings]`.
+- Tree: built from narratives where `supertype ∈ {l1, l2, l3, l4}`, tier-aware icons (`menu_book` / `article` / `short_text` / `edit_note`).
+- Drafts get italic name + slightly muted styling.
+- Chevron expand/collapse for any node with children. State persists in `registry.worlds[i].writing_tree_collapsed`.
+- **Drag-reorder**: every row is draggable. Drop above/below another row (same `parent_narrative` only) to reorder. Sequential `order` values written to all affected siblings. Re-parenting deferred.
+- Search input filters the tree by narrative name (case-insensitive substring). Ancestors of matches are force-expanded so the path is visible.
 
-**Right sub-column**:
-- Renders the active Narrative as the existing element-detail view
-- Contextual "+ new child" toolbar above element-detail based on active tier:
-  - l1 (Book) → + Chapter, + Draft
-  - l2 (Chapter) → + Scene, + Draft
-  - l3 (Scene) → + Draft only
-  - l4 (Draft) → + Draft only (drafts nest drafts)
-- When no narrative selected: empty state copy
+**Sidebar takeover rules**:
+- When the route is `writing` and the user hasn't explicitly toggled to worlds/elements during this writing session, the sidebar shows the writing tree.
+- Clicking the Worlds or `<world-name>` toggle while in writing sets `state.ui.sidebarWritingOverride = true` — the chosen mode wins until either the route leaves+re-enters writing OR the user clicks the writing icon in the room nav (which clears the override).
+- The toggle never shows a third "Writing" button. The takeover is implicit, not a toggle.
+
+**Middle pane** (`src/middle/writing.ts`):
+- Single column. No tree, no separate toolbar.
+- Renders the active narrative's element-detail.
+- Tier badge ("Book" / "Chapter" / "Scene" / "Draft") and child-create buttons live in the **element-detail header** (so all elements share the same 45px header band). See "Header unification" below.
+- Empty state when no narrative selected:
+  - Tree has narratives → "Pick a {l1}, {l2}, {l3}, or {l4} from the sidebar to begin."
+  - Tree is empty → centered create buttons (New {l1} + New {l4}) for fast first-touch.
+
+**Header unification** (`.atlas-middle-header`):
+- Locked at 45px (`height` + `min-height` + `max-height` + `flex: 0 0 45px`, all `!important`).
+- `overflow: hidden; flex-wrap: nowrap` — content never grows the band.
+- Defensive `.atlas-middle-header > * { max-height: 100%; flex-shrink: 0 }` — no descendant can push the band taller.
+- For writing-tree narratives, header renders: `[icon] [name] [spacer] [tier pill] [+ child icons] [pin clusters] [sync dot] [delete]`. For other element types: same minus the tier pill and child-create buttons.
+- Child-create buttons are icon-only (`.atlas-icon-btn-sm`) with tooltip — saves horizontal space, no text-collision risk.
+
+**Last-narrative memory**:
+- `WorldRegistryEntry.last_writing_narrative_id?: string` — persists the narrative the user was last editing.
+- Saved on every narrative selection change (debounced via `queueMicrotask` to avoid render thrash).
+- The writing icon in the room nav reads this on click: if a remembered narrative exists and is still present, navigate straight to its writing URL. Otherwise default to the bare writing path (empty state).
+- Combined with element-detail's module-level `scrollMemory` (keyed by element id), returning to writing restores not just selection but also scroll position within the narrative's story field.
 
 ---
 
@@ -208,7 +228,7 @@ Note: the URL path names reflect the *default* labels for readability. They aren
 
 ---
 
-## v1 scope (this session — session 224)
+## Cumulative scope (through session 224)
 
 **Shipped**:
 - supertype-tier model + four-tier labels (l1-l4)
@@ -218,8 +238,16 @@ Note: the URL path names reflect the *default* labels for readability. They aren
 - Tier-aware tree rendering (icons, drafts italic, contextual create)
 - Element-detail supertype autocomplete (suggestion chips + Tab complete)
 - Settings → Writing l4 input + change-event triggers migration
+- **Sidebar takeover** — writing tree moved from middle pane into the sidebar (`src/sidebar/writing-sidebar.ts`), middle pane single-column
+- **Header unification** — tier badge + child-create buttons moved INTO `.atlas-middle-header`, header height locked at 45px across all rooms
+- **Drag-reorder** — sibling-only, sequential `order` writes, cyan drop indicator
+- **Cascade delete** — deleting a book/chapter cascades all descendant narratives (and their pins) per `findDependents` extension in folder-store-fs.ts + mock-folder-store.ts
+- **Last-narrative memory** — `registry.worlds[i].last_writing_narrative_id`, room-nav writing icon restores it
+- **Stay-in-room after delete** — element-detail's `onDelete` checks route mode, navigates to `writingHash` when in writing instead of always going to home
+- **Pin nav respects current room** — pin affordance in element-detail header doesn't change URL when in writing
+- **Non-blocking saves** — `field-edit-popover` closes optimistically before awaiting persistence
 
-**Defer (unchanged from v1)**:
+**Defer (still)**:
 - Richtext editor (TipTap / ProseMirror / Lexical — library decision not made)
 - Element autolinking (`[[name]]` syntax or autodetect)
 - Element preview popover on hover
@@ -228,9 +256,10 @@ Note: the URL path names reflect the *default* labels for readability. They aren
 - Outline mode (markdown-per-book sidecar)
 - Find/replace
 - Reading mode / presentation mode
-- Drag-to-reorder chapters
 - Export to PDF/EPUB/HTML/markdown (lives in publish room)
 - Per-row promote opt-out in setup (whole-batch in v1)
+- **Re-parenting via drag** — currently sibling-only; dropping into a different parent's children area is the natural next move
+- **Writing sidebar scroll memory** — sidebar tree scroll position not preserved across room toggles (element-detail scroll IS preserved)
 
 ---
 
@@ -263,6 +292,16 @@ Note: the URL path names reflect the *default* labels for readability. They aren
 - **#38** (new session 224): A Narrative belongs to the writing tree iff its `supertype` matches one of the four labels for the world. Detection via `isWritingNarrative(el, worldId)`. Setting supertype to anything outside the four labels removes the narrative from the writing tree (still visible elsewhere).
 
 - **#39** (new session 224): Label changes trigger immediate supertype migration on existing narratives. Run via `applyLabelRenameMigration` from both Settings → Writing change events and the setup screen on save.
+
+- **#40** (new session 224): The writing tree lives in the sidebar (`src/sidebar/writing-sidebar.ts`) when the route is `writing`. The middle pane in writing mode is single-column (just element-detail of the active narrative). Takeover is implicit — `state.ui.sidebarWritingOverride: boolean` controls whether the user has explicitly toggled out. Override clears on route in/out of writing.
+
+- **#41** (new session 224): `.atlas-middle-header` is locked at 45px — `height`, `min-height`, `max-height`, and `flex: 0 0 45px` all set with `!important`, plus `overflow: hidden; flex-wrap: nowrap`, plus defensive `.atlas-middle-header > * { max-height: 100%; flex-shrink: 0 }`. The header is a stable band across all element types and all rooms; tier badge + writing actions for narratives live inside it (no separate toolbar slot).
+
+- **#42** (new session 224): Field edits via `openFieldEditPopover` close optimistically — the overlay tears down BEFORE awaiting `opts.onSave`, so the rest of the UI stays interactive during persistence. Failures surface via toast. Pattern applies generally to saves whose failure mode is rare and survivable.
+
+- **#43** (new session 224): Deleting a Narrative cascades through `parent_narrative` chains. `findDependents('narrative')` BFS-walks descendant narratives + collects pins referencing them; `deleteElement` tombstones all in dependency-safe order. Captain confirmed: orphaning chapters with a dangling `parent_narrative` FK was the worse alternative.
+
+- **#44** (new session 224): The writing icon in the room nav restores the last-edited narrative via `WorldRegistryEntry.last_writing_narrative_id`. Saved on every narrative selection change (deferred via `queueMicrotask` to avoid render thrash); read on writing-icon click and navigated via `writingHashForNarrative` (the helper that walks parent_narrative to build the full book/chapter/scene URL).
 
 ---
 

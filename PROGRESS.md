@@ -4,11 +4,11 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-05-19 session 224)
+## CURRENT STATE (handover snapshot, 2026-05-20 session 224 continued)
 
-Tool is in a tight, healthy state. **589 vitest green + 93 Playwright green.** Typecheck clean. Conventions list 1-39 (full text in DESIGN.md). PWA + offline cache shipped; bundle 521 KB JS / 147 KB gzipped + 4 MB Material Symbols woff2 (precached by SW).
+Tool is in a tight, healthy state. **594 vitest green + 93 Playwright green.** Typecheck clean. Conventions list 1-44 (full text in DESIGN.md). PWA + offline cache shipped; bundle 521 KB JS / 147 KB gzipped + 4 MB Material Symbols woff2 (precached by SW, 17 entries / ~4.93 MiB).
 
-**Writing system redesigned (supertype-tier model).** A Narrative is in the writing tree iff its `supertype` matches one of the four configured tier labels (l1-l4, defaults Book/Chapter/Scene/Draft). Subtype is FREE for user classification. Storage matches display (no canonical/display split); label renames migrate via `applyLabelRenameMigration`. New `writing-setup.ts` setup screen + `writing-promote.ts` migration helpers. See DESIGN_WRITING.md v2.0 for the full model.
+**Writing tool fully matured.** Supertype-tier model + sidebar takeover + unified element-detail header + drag-reorder + cascade delete + last-narrative restore + non-blocking saves. DESIGN_WRITING.md v2.1 has the full picture. The richtext editor is the only major writing pillar still ahead.
 
 **Recent invariants worth knowing**:
 - Middle pane: `shell.middleRoomNav` + `shell.middleContent` (renderers MUST target `middleContent`, never `middle` — convention #31)
@@ -17,6 +17,11 @@ Tool is in a tight, healthy state. **589 vitest green + 93 Playwright green.** T
 - Writing supertype = tier label storage (convention #33 v2). Tier semantics: l1/l2/l3/l4 = Book/Chapter/Scene/Draft. Drafts flexible-parent. Convention #34 v2.
 - Writing tree membership filter: `isWritingNarrative(el, worldId)` reads `supertype` against `writing_labels` (convention #38).
 - Label rename triggers immediate supertype migration on existing narratives (convention #39).
+- **Writing tree lives in sidebar** (convention #40). Middle pane single-column in writing mode. Sidebar takeover yields to explicit toggle via `state.ui.sidebarWritingOverride`; clears on route in/out of writing.
+- **Element-detail header locked at 45px** (convention #41). Tier badge + writing actions live inside it — no separate toolbar. All elements, all rooms, same band.
+- **Field edits close optimistically** (convention #42). Popover overlay tears down before awaiting persistence. Toast on failure. UI stays interactive throughout.
+- **Narrative deletes cascade descendants** (convention #43). `findDependents` BFS-walks `parent_narrative` chain + collects pin references.
+- **Last-narrative restore from writing icon** (convention #44). `WorldRegistryEntry.last_writing_narrative_id` + `writingHashForNarrative` helper.
 - Showcase config supports `atlas_*` extensions (convention #35)
 - Showcases immutable; republish creates new (convention #36)
 - Sidebar mode + room are independent dimensions (convention #37)
@@ -24,6 +29,7 @@ Tool is in a tight, healthy state. **589 vitest green + 93 Playwright green.** T
 - Hotkeys MVP wired (`Ctrl/Cmd+E`, `S`, `K`, `?`, `Esc` deselect-to-home, map-tab `F`/`Z`/`L`)
 - Map view persists per-map (`{center, zoom}` saved on `moveend`, restored at mount)
 - Pin badge accurate (only on Locations that have a sub-map)
+- Pin-nav from element-detail header respects current room — stays in writing if in writing, navigates element URL otherwise
 - Sync pill shows "synced 3m ago" live (30s tick)
 - `atlas_shape` stripped on wire; both fakes (FakeOwApiClient + MSW) strictly reject atlas-local fields in write bodies
 - Welcome panel is single CTA for atlas-root setup/recover
@@ -38,6 +44,49 @@ Tool is in a tight, healthy state. **589 vitest green + 93 Playwright green.** T
 - **Writing** — model rebuilt this session (supertype-tier). Tree filter / setup / promote / migration all shipped. **Richtext editor** is now the biggest pillar — TipTap / ProseMirror / Lexical decision still open. See `DESIGN_WRITING.md` v2 "Deferred design questions".
 - **Timeline** — `src/visualization/timeline/timeline-bar.ts` ported. Compact mode on Home, expanded mode in `#/w/<id>/timeline`. Narrative bars, zoom/pan, filter toggles, expand-collapse all deferred.
 - **Publish** — `src/middle/publish-room.ts` stub. write-tool's `/showcase/publish/` API documented in `DESIGN_PUBLISHING.md`. Atlas extension model (`atlas_*` config keys) locked in convention #35. Actual publish flow + per-element button + showcase modal all deferred.
+
+## Session 224 continued (2026-05-20) — Sidebar takeover + header unification + drag-reorder
+
+Continuation of the writing-pillar work after Skeld's fill on AtlasMoppetopia validated the new model with real data. Conversation-heavy day with iterative polish.
+
+### Sidebar takeover
+- New `src/sidebar/writing-sidebar.ts` — the writing tree, mounted into `.atlas-sidebar-content` when route is `writing`. Bands and tree append directly (no wrapping flex div) so the shell-level scrollbar gutter aligns with the elements sidebar pixel-perfectly.
+- Two-band header mirrors elements sidebar exactly: create-row in filter-strip slot (stacked `+ new <l1>` / `+ new <l4>` buttons, height-locked to 67px to match), then search-row reusing `.atlas-search-row` (`[input] [magnifier] [tune]`).
+- Override mechanism: `state.ui.sidebarWritingOverride: boolean`. Set when user toggles to Worlds/Elements while in writing. Clears on route in/out of writing OR on writing-icon re-click.
+- Middle pane in writing mode dropped its tree column — now single-column, just element-detail.
+- Drag-reorder: every tree row `draggable=true`, sibling-only (same `parent_narrative`), sequential `order` writes, cyan inset box-shadow drop indicator (top or bottom edge based on mouse y vs row midpoint).
+
+### Header unification
+- Tier badge + child-create buttons moved INTO `.atlas-middle-header` (icon-only, `.atlas-icon-btn-sm`-style). New helper `renderWritingTierActions(el, header)` in element-detail.
+- Header locked at 45px with `!important` on every height channel + defensive child rule. Captain reported variable heights in prior bouts — investigation showed it was likely visual-weight misperception, but the lock makes it impossible by construction.
+- Tier rule final (Captain): l1 → {l2, l4}, l2 → {l3, l4}, l3 → nothing, l4 → nothing (drafts don't nest from UI).
+
+### Narrative cascade delete
+- Extended `findDependents` for `narrative` type in both `folder-store-fs.ts` and `mock-folder-store.ts`.
+- BFS-walks `parent_narrative` chain → collects descendants + pins referencing target or descendants.
+- Confirm dialog shows total count.
+- Delete from writing room stays in writing (route check in `onDelete`).
+
+### Polish trio
+- **Pin nav respects room**: `buildPinAffordance` click handler checks current route mode. In writing → `openMapTab(m)` no URL change; elsewhere → `openMapTab(m, sourceElementId)` with element-preserved URL.
+- **Optimistic save**: `field-edit-popover.ts` calls `cleanup()` BEFORE awaiting `opts.onSave`. UI stays interactive during save. Failures surface via toast.
+- **Last-narrative restore**: `WorldRegistryEntry.last_writing_narrative_id` writes on every selection change (deferred via `queueMicrotask`). Writing icon in room nav reads it on click and navigates via new `writingHashForNarrative` helper.
+
+### Bug fixes
+- **Duplicated detail panel** (recursive render): `patchSlice('ui')` mid-render was firing subscribers synchronously → recursive render → two detailMounts in detailCol. Fixed by deferring the selection patchSlice via `queueMicrotask`.
+- **Supertype field unclickable**: I'd used `require('./writing-helpers')` in element-detail.ts — `require` doesn't exist in browser ESM. Replaced with static import.
+- **Gear icon does nothing**: outer mountWriting subscribe was a no-op in tree mode. Now calls `render()` unconditionally; `mountMode` early-returns when mode unchanged.
+- **Book chevron not folding when chapter selected**: `render()` was force-expanding ancestors on EVERY render. Now tracks `lastExpandedForActiveId` and only force-expands on activeId change. User's explicit chevron toggle wins on subsequent renders.
+
+### Code tidying (cleanup pass before reflect)
+- Removed dead `findAncestry` and `createNarrativeAtTier` in writing.ts (orphaned by the toolbar→header move).
+- Dropped dead CSS: `.atlas-writing-tree-list`, `.atlas-writing-detail`, `.atlas-writing-detail-mount`, `.atlas-writing-context-toolbar`.
+- Added 5 unit tests for `writingHashForNarrative` covering all depth levels + broken parent chains.
+
+### Test count
+- 589 → 594 vitest (5 new for `writingHashForNarrative`)
+- 93 Playwright e2e unchanged
+- Production build clean
 
 ## Session 224 — Writing system redesign + offline + tidying
 

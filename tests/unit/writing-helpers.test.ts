@@ -11,6 +11,7 @@ import {
   isWritingInitialized,
   getTierForNarrative,
   isWritingNarrative,
+  writingHashForNarrative,
 } from '../../src/middle/writing-helpers';
 import {
   buildPromoteCandidates,
@@ -200,6 +201,44 @@ describe('applyLabelRenameMigration', () => {
     const written = await applyLabelRenameMigration(store as never, elements, labels, labels);
     expect(written).toBe(0);
     expect(store.updateElement).not.toHaveBeenCalled();
+  });
+});
+
+describe('writingHashForNarrative', () => {
+  it('builds the hash for a top-level book', () => {
+    const elements = [n('b', 'Book A', { supertype: 'Book' })];
+    expect(writingHashForNarrative('w1', 'b', elements)).toBe('#/w/w1/writing/book/b');
+  });
+
+  it('builds the hash for a chapter under a book', () => {
+    const elements = [
+      n('b', 'Book A', { supertype: 'Book' }),
+      n('c', 'Chapter 1', { supertype: 'Chapter', parent_narrative: 'b' }),
+    ];
+    expect(writingHashForNarrative('w1', 'c', elements)).toBe('#/w/w1/writing/book/b/chapter/c');
+  });
+
+  it('builds the hash for a scene under a chapter under a book', () => {
+    const elements = [
+      n('b', 'Book A', { supertype: 'Book' }),
+      n('c', 'Chapter 1', { supertype: 'Chapter', parent_narrative: 'b' }),
+      n('s', 'Scene 1', { supertype: 'Scene', parent_narrative: 'c' }),
+    ];
+    expect(writingHashForNarrative('w1', 's', elements)).toBe('#/w/w1/writing/book/b/chapter/c/scene/s');
+  });
+
+  it('handles narratives with a broken parent chain by truncating', () => {
+    const elements = [
+      // chapter pointing at a missing book id
+      n('c', 'Orphan Chapter', { supertype: 'Chapter', parent_narrative: 'ghost' }),
+    ];
+    // Walks up, finds no valid ancestor → treats c as a root.
+    expect(writingHashForNarrative('w1', 'c', elements)).toBe('#/w/w1/writing/book/c');
+  });
+
+  it('returns the base writing path when the narrative is absent', () => {
+    const elements = [n('b', 'Book A', { supertype: 'Book' })];
+    expect(writingHashForNarrative('w1', 'nonexistent', elements)).toBe('#/w/w1/writing/book/nonexistent');
   });
 });
 

@@ -64,61 +64,6 @@ function buildNarrativeIndex(elements: Element[], worldId: string): NarrativeInd
   return { byId };
 }
 
-function findAncestry(idx: NarrativeIndex, id: string): { bookId?: string; chapterId?: string; sceneId?: string } {
-  const node = idx.byId.get(id);
-  if (!node) return {};
-  const chain: NarrativeNode[] = [node];
-  let parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
-  while (parentId) {
-    const parent = idx.byId.get(parentId);
-    if (!parent) break;
-    chain.unshift(parent);
-    parentId = (parent.el as Element & { parent_narrative?: string }).parent_narrative;
-  }
-  return {
-    bookId: chain[0]?.el.id,
-    chapterId: chain[1]?.el.id,
-    sceneId: chain[2]?.el.id,
-  };
-}
-
-function nextOrder(idx: NarrativeIndex, parentId: string): number {
-  const parent = idx.byId.get(parentId);
-  const siblings = parent?.children ?? [];
-  let max = -1;
-  for (const s of siblings) {
-    const o = (s.el as Element & { order?: number }).order ?? 0;
-    if (o > max) max = o;
-  }
-  return max + 1;
-}
-
-async function createNarrativeAtTier(
-  tier: 'l1' | 'l2' | 'l3' | 'l4',
-  parentId: string,
-  name: string,
-  worldId: string,
-  toasts: ToastManager,
-): Promise<Element | null> {
-  const folder = getActiveStore();
-  if (!folder) {
-    toasts.error('No active world.');
-    return null;
-  }
-  const idx = buildNarrativeIndex(getState().data.elements, worldId);
-  const supertype = supertypeForTier(tier, worldId);
-  const created = await folder.createElement('narrative', {
-    name,
-    supertype,
-    parent_narrative: parentId,
-    order: nextOrder(idx, parentId),
-  } as Partial<Element>);
-  const all = await folder.listElements();
-  patchSlice('data', { elements: all });
-  requestPushIfLinked();
-  return created;
-}
-
 export function mountWriting(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
   const container = document.createElement('div');
