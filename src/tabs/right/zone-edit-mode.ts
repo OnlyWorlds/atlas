@@ -455,15 +455,35 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   // reveal on dragstart, live-track hover during drag, on drop test against
   // the trash-zone rect and either delete or persist position. Reuses
   // entry.trashZone — same DOM element pins use.
+  //
+  // Floor guard: zones have a minimum vertex count (3 polygon / 2 line). If
+  // we're already AT that floor, the trash drop would be refused by
+  // `deleteMarkerInEdit` with a toast — visually that's a "drop succeeds
+  // then snaps back" jank. Compute the floor at dragstart and suppress
+  // trash-zone arming + the delete path while at floor. The user can still
+  // move the marker; they just can't delete it via drag-to-trash.
   let suppressClick = false;
+  let canDeleteThisDrag = false;
   handle.on('dragstart', () => {
     suppressClick = true;
     markDragInProgress();
-    const entry = active ? mapTabCache.get(active.mapId) : null;
-    if (entry) {
+    if (!active) return;
+    const entry = mapTabCache.get(active.mapId);
+    if (!entry) return;
+    const state = getState();
+    const { markers } = partitionZonesAndMarkers(state.data.elements);
+    const zoneMarkers = markersForZoneOnMap(active.zoneId, active.mapId, markers);
+    const zone = state.data.elements.find(
+      (e): e is Zone => e.type === 'zone' && e.id === active!.zoneId,
+    );
+    const isPolygon = getZoneShape(zone) === 'polygon';
+    const minVertices = isPolygon ? 3 : 2;
+    canDeleteThisDrag = zoneMarkers.length > minVertices;
+    if (canDeleteThisDrag) {
       entry.trashZone.setAttribute('data-active', 'true');
       entry.trashZone.setAttribute('data-hover', 'false');
     }
+    // At-floor: trash zone stays hidden; drag is pure move.
   });
   // Live outline update (ZD4): on every drag frame, update the ZoneOverlay
   // polygon/polyline via setZonePointsLive. We rebuild the points list from
@@ -476,6 +496,7 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
     // happens in rAF, OUT of the paint-blocking path. The marker's CSS
     // transform commits immediately; the polygon catches up one frame later.
     scheduleLiveOutlineRefresh(canvasHeight);
+    if (!canDeleteThisDrag) return;
     // Update trash-zone hover state (cheap — just reads two bounding rects).
     const entry = mapTabCache.get(active.mapId);
     if (entry && entry.trashZone.getAttribute('data-active') === 'true') {
@@ -499,20 +520,21 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
     let droppedOnTrash = false;
     const entry = active ? mapTabCache.get(active.mapId) : null;
     if (entry) {
-      const lMap = entry.manager.getMap();
-      if (lMap) {
-        const markerScreen = lMap.latLngToContainerPoint(handle.getLatLng());
-        droppedOnTrash = isInsideTrashZone(entry, markerScreen);
+      if (canDeleteThisDrag) {
+        const lMap = entry.manager.getMap();
+        if (lMap) {
+          const markerScreen = lMap.latLngToContainerPoint(handle.getLatLng());
+          droppedOnTrash = isInsideTrashZone(entry, markerScreen);
+        }
       }
       entry.trashZone.setAttribute('data-active', 'false');
       entry.trashZone.setAttribute('data-hover', 'false');
     }
     if (droppedOnTrash) {
-      // deleteMarkerInEdit handles min-vertex check + toast + renumber + rebuild.
-      // If at floor, the marker snaps back via rebuildHandles inside the
-      // refusal path of deleteMarkerInEdit (no — it returns early; we need
-      // to rebuild ourselves so the visual snaps back).
       await deleteMarkerInEdit(marker.id);
+      // deleteMarkerInEdit calls rebuildHandles internally on success; on
+      // any unexpected refusal (shouldn't happen since canDeleteThisDrag
+      // was guarded) we rebuild to snap the marker visual back.
       rebuildHandles();
       return;
     }

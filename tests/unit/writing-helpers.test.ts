@@ -12,6 +12,10 @@ import {
   getTierForNarrative,
   isWritingNarrative,
   writingHashForNarrative,
+  buildNarrativeIndex,
+  ancestorIds,
+  findAncestry,
+  nextOrder,
 } from '../../src/middle/writing-helpers';
 import {
   buildPromoteCandidates,
@@ -274,5 +278,231 @@ describe('isWritingNarrative + getTierForNarrative', () => {
 
     expect(isWritingNarrative(n('a', 'A', { supertype: 'Book' }), 'w1')).toBe(true);
     expect(isWritingNarrative(n('a', 'A', { supertype: 'Vision' }), 'w1')).toBe(false);
+  });
+});
+
+// ====== Tree building (F24 — locks behavior before writing-workspace redesign) ======
+
+describe('buildNarrativeIndex', () => {
+  beforeEach(() => {
+    vi.spyOn(stateMod, 'getState').mockReturnValue({
+      registry: {
+        version: 1,
+        worlds: [{
+          id: 'w1',
+          name: 'World',
+          state: 'local-only',
+          writing_labels: { l1: 'Book', l2: 'Chapter', l3: 'Scene', l4: 'Draft' },
+        }],
+      },
+      data: { elements: [] },
+      ui: {} as never,
+      sync: { byWorld: {}, activeSync: null },
+      atlasRoot: undefined,
+      active: null,
+    } as never);
+  });
+
+  it('filters out narratives without a writing supertype', () => {
+    const elements = [
+      n('a', 'In tree', { supertype: 'Book' }),
+      n('b', 'Free narrative'),                  // no supertype → excluded
+      n('c', 'Vision', { supertype: 'Vision' }), // non-writing supertype → excluded
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    expect(idx.byId.size).toBe(1);
+    expect(idx.byId.has('a')).toBe(true);
+    expect(idx.byId.has('b')).toBe(false);
+    expect(idx.byId.has('c')).toBe(false);
+    expect(idx.roots).toHaveLength(1);
+    expect(idx.roots[0].el.id).toBe('a');
+  });
+
+  it('builds parent → child links and assigns depth via BFS', () => {
+    const elements = [
+      n('book', 'B', { supertype: 'Book' }),
+      n('ch1', 'C1', { supertype: 'Chapter', parent_narrative: 'book', order: 0 }),
+      n('ch2', 'C2', { supertype: 'Chapter', parent_narrative: 'book', order: 1 }),
+      n('sc1', 'S1', { supertype: 'Scene', parent_narrative: 'ch1' }),
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    const book = idx.byId.get('book')!;
+    expect(book.depth).toBe(0);
+    expect(book.children.map(c => c.el.id)).toEqual(['ch1', 'ch2']);
+    expect(idx.byId.get('ch1')!.depth).toBe(1);
+    expect(idx.byId.get('sc1')!.depth).toBe(2);
+    expect(idx.byId.get('ch1')!.children[0].el.id).toBe('sc1');
+  });
+
+  it('sorts siblings by order then by name', () => {
+    const elements = [
+      n('book', 'B', { supertype: 'Book' }),
+      // Intentionally out of order on input; sort should reorder.
+      n('ch3', 'Gamma', { supertype: 'Chapter', parent_narrative: 'book', order: 2 }),
+      n('ch1', 'Alpha', { supertype: 'Chapter', parent_narrative: 'book', order: 0 }),
+      n('ch2', 'Beta',  { supertype: 'Chapter', parent_narrative: 'book', order: 1 }),
+      // Order ties → fall back to name ascending.
+      n('ch4', 'Aardvark', { supertype: 'Chapter', parent_narrative: 'book', order: 0 }),
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    const children = idx.byId.get('book')!.children.map(c => c.el.id);
+    // ch4 (order 0, name 'Aardvark') comes before ch1 (order 0, name 'Alpha') by name.
+    expect(children).toEqual(['ch4', 'ch1', 'ch2', 'ch3']);
+  });
+
+  it('treats narratives with a missing parent as roots (broken-parent recovery)', () => {
+    const elements = [
+      n('orphan', 'Orphan', { supertype: 'Scene', parent_narrative: 'gone' }),
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    // Even though parent_narrative is set, the parent isn't in the index;
+    // the node should fall back to root rather than be dropped.
+    expect(idx.roots.map(r => r.el.id)).toEqual(['orphan']);
+    expect(idx.byId.get('orphan')!.depth).toBe(0);
+  });
+
+  it('handles drafts as roots OR nested children depending on parent_narrative', () => {
+    const elements = [
+      n('book', 'B', { supertype: 'Book' }),
+      n('rootDraft', 'Root draft', { supertype: 'Draft' }),                              // root l4
+      n('childDraft', 'Child draft', { supertype: 'Draft', parent_narrative: 'book' }),  // nested l4
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    expect(idx.roots.map(r => r.el.id).sort()).toEqual(['book', 'rootDraft']);
+    expect(idx.byId.get('book')!.children.map(c => c.el.id)).toEqual(['childDraft']);
+    expect(idx.byId.get('childDraft')!.tier).toBe('l4');
+  });
+});
+
+describe('ancestorIds', () => {
+  beforeEach(() => {
+    vi.spyOn(stateMod, 'getState').mockReturnValue({
+      registry: {
+        version: 1,
+        worlds: [{
+          id: 'w1', name: 'World', state: 'local-only',
+          writing_labels: { l1: 'Book', l2: 'Chapter', l3: 'Scene', l4: 'Draft' },
+        }],
+      },
+      data: { elements: [] },
+      ui: {} as never,
+      sync: { byWorld: {}, activeSync: null },
+      atlasRoot: undefined,
+      active: null,
+    } as never);
+  });
+
+  it('returns empty for a root narrative', () => {
+    const idx = buildNarrativeIndex([n('book', 'B', { supertype: 'Book' })], 'w1');
+    expect(ancestorIds(idx, 'book')).toEqual([]);
+  });
+
+  it('walks parent chain closest-first', () => {
+    const elements = [
+      n('book', 'B', { supertype: 'Book' }),
+      n('ch1', 'C1', { supertype: 'Chapter', parent_narrative: 'book' }),
+      n('sc1', 'S1', { supertype: 'Scene', parent_narrative: 'ch1' }),
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    expect(ancestorIds(idx, 'sc1')).toEqual(['ch1', 'book']);
+    expect(ancestorIds(idx, 'ch1')).toEqual(['book']);
+  });
+
+  it('stops walking when parent leaves the index', () => {
+    const elements = [
+      n('orphan', 'O', { supertype: 'Scene', parent_narrative: 'gone' }),
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    // parent_narrative='gone' is in the orphan, but 'gone' isn't in the
+    // index. The walker pushes 'gone' then breaks.
+    expect(ancestorIds(idx, 'orphan')).toEqual(['gone']);
+  });
+
+  it('returns empty for unknown id', () => {
+    const idx = buildNarrativeIndex([], 'w1');
+    expect(ancestorIds(idx, 'does-not-exist')).toEqual([]);
+  });
+});
+
+describe('findAncestry', () => {
+  beforeEach(() => {
+    vi.spyOn(stateMod, 'getState').mockReturnValue({
+      registry: {
+        version: 1,
+        worlds: [{
+          id: 'w1', name: 'World', state: 'local-only',
+          writing_labels: { l1: 'Book', l2: 'Chapter', l3: 'Scene', l4: 'Draft' },
+        }],
+      },
+      data: { elements: [] },
+      ui: {} as never,
+      sync: { byWorld: {}, activeSync: null },
+      atlasRoot: undefined,
+      active: null,
+    } as never);
+  });
+
+  it('assigns book/chapter/scene by depth', () => {
+    const elements = [
+      n('book', 'B', { supertype: 'Book' }),
+      n('ch1', 'C1', { supertype: 'Chapter', parent_narrative: 'book' }),
+      n('sc1', 'S1', { supertype: 'Scene', parent_narrative: 'ch1' }),
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    expect(findAncestry(idx, 'sc1')).toEqual({ bookId: 'book', chapterId: 'ch1', sceneId: 'sc1' });
+    expect(findAncestry(idx, 'ch1')).toEqual({ bookId: 'book', chapterId: 'ch1' });
+    expect(findAncestry(idx, 'book')).toEqual({ bookId: 'book' });
+  });
+
+  it('returns empty object for unknown id', () => {
+    const idx = buildNarrativeIndex([], 'w1');
+    expect(findAncestry(idx, 'nope')).toEqual({});
+  });
+});
+
+describe('nextOrder', () => {
+  beforeEach(() => {
+    vi.spyOn(stateMod, 'getState').mockReturnValue({
+      registry: {
+        version: 1,
+        worlds: [{
+          id: 'w1', name: 'World', state: 'local-only',
+          writing_labels: { l1: 'Book', l2: 'Chapter', l3: 'Scene', l4: 'Draft' },
+        }],
+      },
+      data: { elements: [] },
+      ui: {} as never,
+      sync: { byWorld: {}, activeSync: null },
+      atlasRoot: undefined,
+      active: null,
+    } as never);
+  });
+
+  it('returns 0 when no siblings exist', () => {
+    const idx = buildNarrativeIndex([], 'w1');
+    expect(nextOrder(idx, null)).toBe(0);
+  });
+
+  it('returns max(existing) + 1 among root siblings', () => {
+    const elements = [
+      n('a', 'A', { supertype: 'Book', order: 0 }),
+      n('b', 'B', { supertype: 'Book', order: 1 }),
+      n('c', 'C', { supertype: 'Book', order: 5 }),
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    expect(nextOrder(idx, null)).toBe(6);
+  });
+
+  it('scopes by parentId when provided', () => {
+    const elements = [
+      n('book', 'B', { supertype: 'Book', order: 0 }),
+      n('ch1', 'C1', { supertype: 'Chapter', parent_narrative: 'book', order: 0 }),
+      n('ch2', 'C2', { supertype: 'Chapter', parent_narrative: 'book', order: 2 }),
+    ];
+    const idx = buildNarrativeIndex(elements, 'w1');
+    // Among book's children, the highest order is 2 → next is 3.
+    expect(nextOrder(idx, 'book')).toBe(3);
+    // Root sibling group has just 'book' at order 0 → next is 1.
+    expect(nextOrder(idx, null)).toBe(1);
   });
 });

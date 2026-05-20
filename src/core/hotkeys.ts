@@ -215,9 +215,15 @@ export function defaultBindings(): HotkeyBinding[] {
       // Skip when ANY overlay/popover is active (each owns its Esc behavior).
       // Also requires an element to be selected — otherwise we'd be navigating
       // home from home, which is confusing.
+      // Skip in writing room: after the URL/selection decoupling (conv. #46),
+      // writing-room navigation is owned by the URL hierarchy; Esc pulling
+      // the user out of writing AND clearing their persisted global selection
+      // surprised more than it helped. Writing room exits via room-nav click.
       when: () => {
         if (!getCallbacks().hasSelectedElement?.()) return false;
         if (isAnyOverlayActive()) return false;
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        if (hash.includes('/writing')) return false;
         return true;
       },
       action: () => { getCallbacks().deselectToHome?.(); },

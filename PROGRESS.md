@@ -4,46 +4,131 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-05-20 session 224 continued)
+## CURRENT STATE (handover snapshot, 2026-05-20 session 226)
 
-Tool is in a tight, healthy state. **594 vitest green + 93 Playwright green.** Typecheck clean. Conventions list 1-44 (full text in DESIGN.md). PWA + offline cache shipped; bundle 521 KB JS / 147 KB gzipped + 4 MB Material Symbols woff2 (precached by SW, 17 entries / ~4.93 MiB).
+Tool is in a tight, healthy state. **634 vitest green + 93 Playwright green.** Typecheck clean. Conventions list 1-46 (full text in DESIGN.md). PWA + offline cache; bundle ~548 KB JS / 155 KB gzipped + 4 MB Material Symbols woff2 (precached by SW, 17 entries / ~4.93 MiB).
 
-**Writing tool fully matured.** Supertype-tier model + sidebar takeover + unified element-detail header + drag-reorder + cascade delete + last-narrative restore + non-blocking saves. DESIGN_WRITING.md v2.1 has the full picture. The richtext editor is the only major writing pillar still ahead.
+**Writing tool matured + decoupled.** Supertype-tier model + sidebar takeover + unified element-detail header + drag-reorder + cascade delete + last-narrative restore + non-blocking saves. Session 226: writing-room navigation now derives target element from URL hierarchy (book/chapter/scene), NOT from `state.ui.selectedElementId`. The global selection persists across writing visits. DESIGN_WRITING.md v2.1 + new convention #46 capture the contract. The richtext editor is the only major writing pillar still ahead.
 
-**Recent invariants worth knowing**:
-- Middle pane: `shell.middleRoomNav` + `shell.middleContent` (renderers MUST target `middleContent`, never `middle` — convention #31)
-- Default route bare `#/w/<id>` → home room (was timeline)
-- Esc + click-selected-row clear selection + nav home (convention #32)
+**Recent invariants worth knowing** (most-recent-first):
+- **Writing room reads URL for active narrative, not selectedElementId** (convention #46). Element-detail's `getSelectedElement` branches on `route.mode === 'writing'`. Global selection chip stays pinned to whatever was selected before writing was opened.
+- **Selected-element chip on far right of room-nav-strip** (convention #45). Persistent affordance showing icon + name + ×. Click body → navigate to element room; click × → clear. Highlights cyan when route mode is 'element'.
+- **Esc in writing room is a no-op** (convention #32 amendment). Esc only clears selection + navigates home when NOT in writing — writing room owns its own keyboard.
+- **Marker delete via drag-to-trash** (zone-edit). Vertex handle drags onto the per-tab trash zone → `deleteMarkerInEdit`. Floor-guarded: at the polygon min (3) / line min (2) the trash zone stays disarmed; user can still right-click delete (which surfaces the floor toast).
+- **Click outside zone in edit mode deselects** (no more click-anywhere insert). Inserts happen only via segment-overlay clicks. Click on map background → clear `selectedElementId` → `syncEditMode` exits edit cleanly.
+- **Sync pill renders a decay ring during pending debounce.** `SyncEngine.getPendingPush()` + `atlas:pending-push` CustomEvent. Click during pending → `flushPendingPush()`. Window configurable via Settings → Sync → Autosave delay (number input, 1–3600s, persisted as `registry.sync_debounce_ms`).
+- Middle pane: `shell.middleRoomNav` + `shell.middleContent` (renderers MUST target `middleContent` — convention #31)
+- Default route bare `#/w/<id>` → home room
 - Writing supertype = tier label storage (convention #33 v2). Tier semantics: l1/l2/l3/l4 = Book/Chapter/Scene/Draft. Drafts flexible-parent. Convention #34 v2.
 - Writing tree membership filter: `isWritingNarrative(el, worldId)` reads `supertype` against `writing_labels` (convention #38).
 - Label rename triggers immediate supertype migration on existing narratives (convention #39).
-- **Writing tree lives in sidebar** (convention #40). Middle pane single-column in writing mode. Sidebar takeover yields to explicit toggle via `state.ui.sidebarWritingOverride`; clears on route in/out of writing.
-- **Element-detail header locked at 45px** (convention #41). Tier badge + writing actions live inside it — no separate toolbar. All elements, all rooms, same band.
-- **Field edits close optimistically** (convention #42). Popover overlay tears down before awaiting persistence. Toast on failure. UI stays interactive throughout.
-- **Narrative deletes cascade descendants** (convention #43). `findDependents` BFS-walks `parent_narrative` chain + collects pin references.
+- **Writing tree lives in sidebar** (convention #40). Middle pane single-column in writing mode. Override via `state.ui.sidebarWritingOverride`.
+- **Element-detail header locked at 36px** (convention #41). Tier badge + writing actions live inside it.
+- **Field edits close optimistically** (convention #42). Popover tears down before awaiting persistence. Width now matches anchor field width with a small inset.
+- **Narrative deletes cascade descendants** (convention #43). `findDependents` BFS-walks `parent_narrative` chain.
 - **Last-narrative restore from writing icon** (convention #44). `WorldRegistryEntry.last_writing_narrative_id` + `writingHashForNarrative` helper.
-- Showcase config supports `atlas_*` extensions (convention #35)
-- Showcases immutable; republish creates new (convention #36)
+- Showcase config supports `atlas_*` extensions (convention #35); showcases immutable, republish creates new (convention #36)
 - Sidebar mode + room are independent dimensions (convention #37)
 - Sentence case throughout, slug-prefix filenames (`<slug>--<uuid>.json`)
-- Hotkeys MVP wired (`Ctrl/Cmd+E`, `S`, `K`, `?`, `Esc` deselect-to-home, map-tab `F`/`Z`/`L`)
-- Map view persists per-map (`{center, zoom}` saved on `moveend`, restored at mount)
-- Pin badge accurate (only on Locations that have a sub-map)
-- Pin-nav from element-detail header respects current room — stays in writing if in writing, navigates element URL otherwise
-- Sync pill shows "synced 3m ago" live (30s tick)
-- `atlas_shape` stripped on wire; both fakes (FakeOwApiClient + MSW) strictly reject atlas-local fields in write bodies
-- Welcome panel is single CTA for atlas-root setup/recover
-- All "engine not ready" toasts route through `surfaceSyncUnavailable` for PIN-aware messages + deep-links
-- Self-hosted Material Symbols (npm package) + Vite-PWA service worker for offline-first cold load
-- DOM helpers consolidated in `core/dom-utils.ts` (escapeText/escapeAttr/relativeTime); active-store lives in `core/active-store.ts`
+- Hotkeys MVP wired (`Ctrl/Cmd+E`, `S`, `K`, `?`, `Esc` deselect-to-home (except writing), map-tab `F`/`Z`/`L`)
+- Map view persists per-map; pin badge accurate; pin label offset 7px (tightened session 226)
+- Sync pill shows "synced 3m ago" live (30s tick); pending-push decay ring on the dot
+- `atlas_shape` stripped on wire; both fakes strictly reject atlas-local fields in write bodies
+- Welcome panel single CTA for atlas-root setup/recover; "engine not ready" toasts route through `surfaceSyncUnavailable`
+- Self-hosted Material Symbols + Vite-PWA service worker
+- DOM helpers in `core/dom-utils.ts`; active-store in `core/active-store.ts`
 
 ---
 
-## Three big projects ahead — session 224 update
+## Three big projects ahead — session 226 update
 
-- **Writing** — model rebuilt this session (supertype-tier). Tree filter / setup / promote / migration all shipped. **Richtext editor** is now the biggest pillar — TipTap / ProseMirror / Lexical decision still open. See `DESIGN_WRITING.md` v2 "Deferred design questions".
+- **Writing-workspace redesign** — the next major design conversation. Session 224-226 work matured the tree, the model, and the surface decoupling, but the writing room's middle pane is still a single-column element-detail. The next move is Option A (locked in session 225 handover): new `src/middle/writing-workspace.ts` module parallel to element-detail, reusing the extracted `element-detail-header.ts`. Prose-first layout, story field as primary surface, richtext editor (TipTap / ProseMirror / Lexical — undecided), word count, outline. Open design questions live in `DESIGN_WRITING.md` v2.1 "Deferred design questions".
 - **Timeline** — `src/visualization/timeline/timeline-bar.ts` ported. Compact mode on Home, expanded mode in `#/w/<id>/timeline`. Narrative bars, zoom/pan, filter toggles, expand-collapse all deferred.
-- **Publish** — `src/middle/publish-room.ts` stub. write-tool's `/showcase/publish/` API documented in `DESIGN_PUBLISHING.md`. Atlas extension model (`atlas_*` config keys) locked in convention #35. Actual publish flow + per-element button + showcase modal all deferred.
+- **Publish** — `src/middle/publish-room.ts` stub. Backend already exposes `POST /showcase/publish/`; atlas-extension model (`atlas_*` config keys) locked in convention #35. Showcase config modal, element-detail publish button, list rendering, bundle UX for books, richtext piping — all deferred.
+
+## Session 226 (2026-05-20) — Polish day: chip + decay ring + writing/selection decoupling
+
+Captain-driven polish day across the whole tool. 8 items from his fix list, then 5 follow-ups from his eye-on-it review, then a writing/selection decoupling that came out of the chip work.
+
+### The 8 from the fix list
+
+- **#1 File-picker styled** — `map-create-modal.ts` raw `<input type="file">` replaced with a custom button + hidden input + filename text (`.atlas-file-picker`).
+- **#2 Pin label tightened** — `defaultLabelOffset: 12 → 7` in `map-tab.ts`.
+- **#3 Hold-Alt label cluster** — attempted, then reverted same session (Captain: "labels overlapping, no real need"). `src/ui/hold-labels.ts` deleted.
+- **#4 Field-edit popover matches field width** — `field-edit-popover.ts:positionPopover` sets inline `width` from `anchorRect.width` (with 24px inset for breathing room and `MIN_WIDTH=280` floor); overrides CSS `max-width` to allow wide fields.
+- **#5 Selected-element chip in room-nav-strip** — `src/middle/room-nav.ts`. Far-right chip showing icon + truncated name + ×. Click → element room; × → clear. Highlights when route mode is 'element'. Style mirrors `.atlas-room-nav-btn` (transparent default, cyan-tint active). **Convention #45.**
+- **#6 Sync pill decay ring + customizable autosave** — `SyncEngine.getPendingPush()` / `flushPendingPush()`, emits `atlas:pending-push` CustomEvent on arm/cancel/fire. Pill renders conic-gradient ring via `--decay-fraction` driven by rAF. Settings → Sync gets a number input (1–3600s, persisted as `registry.sync_debounce_ms`); engine reads at attach and live via `setDebounceMs`.
+- **#7 Marker delete: tooltip + drag-to-trash** — vertex handle gets a native `title` ("drag to move · drop on trash to delete · right-click to delete"). Trash-zone affordance ported from `map-tab-pin-drag.ts`. Floor guard added on revisit (see follow-ups below).
+- **#8 Click-anywhere marker insert removed** — `zone-edit-mode.ts` `insertMarkerAtClick` deleted along with the call site in `map-tab.ts`. Map background click in edit now clears `selectedElementId` (→ `syncEditMode` exits edit). Inserts only via segment-overlay clicks.
+
+### 5 follow-ups from Captain feedback
+
+- **Hold-Alt reverted** (see above).
+- **Popover narrowed** by 24px inset so it sits inside the field row instead of edge-to-edge.
+- **Chip visuals tightened then re-rounded** — three rounds of dialing. Final: 26px height, 13px border-radius (rounded pill), transparent default chrome, cyan-tint active. Icon 16px + × 15px, scoped with two-class specificity to outrank the `material-symbols` package's 24px default.
+- **Autosave delay swapped slider → number input** (1–3600s). Captain wanted values past 30s.
+- **Zone-draft overlay wraps on narrow panes** — `flex-wrap: wrap` + `max-width: calc(100% - 32px)` so the create-zone widget reflows into multiple rows instead of being clipped.
+
+### Writing / selection decoupling
+
+Tracked the chip work to its conclusion: writing room's `mountEditor` was mirroring the active narrative into `state.ui.selectedElementId` on every URL change, which clobbered any prior global selection. Fixed:
+
+- `writing.ts` no longer patches `selectedElementId` when entering writing or navigating between narratives.
+- `element-detail.ts:getSelectedElement` derives the target element from the URL hierarchy (`route.sceneId ?? chapterId ?? bookId`) when `route.mode === 'writing'`. Otherwise unchanged.
+- Result: select a Character → go to writing → chip still shows the Character → click chip → return to Character. Writing tree still highlights the active narrative (it always read URL, never `selectedElementId`). **Convention #46.**
+
+### Esc refinement (convention #32 amendment)
+
+Esc was firing `deselectToHome` from anywhere with a selection — after decoupling, Esc would pull the user out of writing AND clear the persisted global selection. Now gated: `hotkeys.ts` skips the deselect hotkey when `hash.includes('/writing')`. Writing room owns its keyboard.
+
+### Marker drag-to-trash floor guard
+
+Originally the drag-to-trash always armed the trash zone, deferring to `deleteMarkerInEdit`'s min-vertex toast on refusal — which looked like "drop succeeds then snaps back" jank. Now `buildVertexHandle` computes the floor at dragstart (3 polygon / 2 line) and suppresses trash-zone arming when at floor. User can still move the marker; right-click still deletes (and surfaces the floor toast for that path).
+
+### Tests + bundle
+
+- 615 → 634 vitest (19 new in `writing-helpers.test.ts` covering `buildNarrativeIndex` / `ancestorIds` / `findAncestry` / `nextOrder` — F24 from session 225's sweep)
+- 93 Playwright unchanged
+- Typecheck + production build clean
+- Bundle 548 KB JS / 102 KB CSS / 155 KB gzipped (slight shrink from removing hold-labels CSS, slight grow from chip + decay ring + settings input)
+
+### Lessons (durable)
+
+- **`material-symbols` package's `.material-symbols-outlined` rule is single-class specificity (0,1,0).** Single-class overrides from atlas.css tied on specificity, so load-order decided which won — not deterministic. Two-class scoping (`.atlas-room-nav-selected .atlas-room-nav-selected-icon`) forces a win.
+- **URL is the source of truth for room navigation.** When writing room tried to MIRROR its URL state into a global UI slice, the mirror became the bug. The fix was to read the URL directly where needed, not propagate.
+- **Iteration-rhythm bouts benefit from Captain in the loop.** Visual fixes need his eye — three rounds on the chip ("works but too cyan" → "works but icons too big" → "works but icons still big" → "looks right") landed faster than any single-shot guess.
+
+---
+
+## Session 225 (2026-05-20) — Stewardship pass
+
+Audit + four targeted refactors. See `SWEEP-2026-05-20.md` for the full triage (26 findings, 0 high / 6 med / 20 low).
+
+### Refactors landed
+
+- **`element-detail.ts` split 1444 → 162 + 789 + 450 + 117 lines** across `element-detail.ts` (dispatcher), `-header.ts`, `-fields.ts`, `-refs.ts` (and the pre-existing `-zone-sections.ts`). Clears the path for the writing-workspace redesign.
+- **Writing tree helpers consolidated** into `writing-helpers.ts` (`buildNarrativeIndex`, `NarrativeNode`, `NarrativeIndex`, `ancestorIds`, `findAncestry`, `nextOrder`). Previously duplicated between `writing.ts` and `writing-sidebar.ts` with subtle differences.
+- **`refreshElementsAfterWrite(store)` helper** added to `sync-attach.ts`, applied to 19 sites across 11 files. Replaces the 3-line `await store.listElements(); patchSlice('data', { elements }); requestPushIfLinked();` pattern.
+- **Small follow-ups**: removed `maybeAutoActivate` no-op stub, replaced `setTimeout(0)` with `queueMicrotask` in field-edit-popover, added 21 unit tests for the newly-extracted pure helpers.
+
+### Docs synced
+
+- `DESIGN.md`: ACRONYMS additions (PIN, GPS), convention #41 (45px → 36px), shell ratio ASCII (18/52/30 → 19/51/30).
+- `DESIGN_WRITING.md`: 45px → 36px references.
+- `DESIGN_HOME.md`: identity click-to-edit marked shipped, quick-actions list reduced to shipped 3 buttons.
+
+### Tests
+
+- 594 → 615 vitest (21 new for pure helpers in `element-detail-helpers.test.ts`)
+- 93 Playwright unchanged
+
+### Decisions made
+
+- **Writing workspace redesign will use Option A**: new `writing-workspace.ts` module parallel to element-detail, NOT a writing-mode branch inside element-detail. The split was prep for this.
+- **`element-detail.ts` split landed BEFORE workspace redesign** so the new workspace can import a clean `renderHeader`.
+- **`refreshElementsAfterWrite` lives in `sync-attach.ts`**, co-located with `requestPushIfLinked` rather than a new file.
+
+---
 
 ## Session 224 continued (2026-05-20) — Sidebar takeover + header unification + drag-reorder
 
@@ -133,7 +218,7 @@ Per-world conflict policy override, email per-world, zone-targets-map, cross-ele
 
 ---
 
-## Last session — Rooms model + decoupling + close-out polish (2026-05-18 session 223)
+## Session 223 (2026-05-18) — Rooms model + decoupling + close-out polish
 
 Long autonomous session + on-return polish round + close-out feature bouts with Captain. ~15 bouts total. All green.
 
@@ -218,47 +303,4 @@ Long autonomous session (Captain swimming). 10 bouts. All landed cleanly.
 
 ---
 
-## Earlier session — Validation + tuneup (2026-05-18 morning)
-
-Five planned bouts + 6 follow-ups + atlas_shape leak fix. Three rounds of Captain validation feedback landed cleanly.
-
-**Live bugs**:
-- **Marker FK push fail**: `parseFkConstraintError` + CREATE-catch routes orphan peer to `server_deletes` review modal. +3 tests in `sync-engine.fkConstraint.test.ts`.
-- **`atlas_shape` leak** (the real cause of Captain's smoke FK error — discovered after B1 fix didn't take): `atlas_shape` added to `ATLAS_LOCAL_EXTENSION_FIELDS`; both fakes now strictly reject atlas-local fields in write bodies. Convention #20 applied retroactively. +4 tests in `ow-client-adapter.atlasLocal.test.ts`.
-- F hotkey: `fitBounds` → `fitToCanvas`
-- Pin badge: `getAssociatedMaps` → `hasLinkedSubMap` (only Locations with sub-maps)
-- "Engine not ready" → PIN-aware via `surfaceSyncUnavailable`
-
-**Maps + camera**:
-- Visual settings popover persists across map switch (`retargetVisualSettingsPopover`)
-- Map view preserve via `src/core/map-camera-persist.ts` — saves `{center, zoom}` per mapId; restored at mount before fit-to-canvas
-- **fitToCanvas-after-restore gate** (W6 round 2): `manager.fitToCanvas(20)` at end of `entry.ready` was overwriting the W6 setView restore. Gated behind `!savedAtMount`.
-- Camera state migrates on map id-swap (lives alongside rightTabs + selectedElementId + URL migration)
-
-**UX polish**:
-- "Synced 3m ago" live on pill (30s tick interval)
-- Right-click filter chip → type-scoped pull
-- Auto-pulled element flash via `atlas:pulled-ids` CustomEvent + `data-flash` survives sidebar re-render
-- Sidebar setup/recover-atlas buttons removed; welcome panel is single CTA
-- Make-Online modal pre-validates email + PIN before any server call
-- Stronger unlink-from-API confirmation with element count
-- Context-aware empty state in elements-sidebar
-
-**Sync hardening (M-series + pagination)**:
-- M2: pill click toast gated on push+pull deltas
-- M3: pull race-overwrite — re-read element before `applyServerRecord`
-- M4: stale conflicts cleared on `pause-and-review → local-wins` flip
-- M5: modal `worldId` captured at open
-- H3: `pinPlacement.elementId` migrated on id-swap
-- P4: full pagination (`?offset=N` until count reached, 100-page cap)
-
-**Lessons (durable)**:
-- Wrong-root-cause fixes feel like real fixes. Tests passing for a fake scenario that doesn't match production = misleading. **When the test passes but production behavior doesn't change, the test is the suspect.**
-- When adding a new step to an existing async chain, **audit everything AFTER your insertion point**. Finalizers can silently override earlier steps.
-- Three rounds of Captain validation feedback isn't a failure — it's the system working. Each round caught something self-assessment couldn't.
-
----
-
-## Previous session — Tuneup (2026-05-17)
-
-Slug-prefix filenames (`<slug>--<uuid>.json`), hotkeys MVP dispatcher, sentence-case scrub (~250 user-visible strings), 14 stale Playwright tests fixed, docs hygiene (4 transitional docs archived). Conventions #28-30 added. See git log + `docs-archive/PROGRESS-history.md` for detail.
+Earlier sessions (217-222) archived to [`docs-archive/PROGRESS-history.md`](docs-archive/PROGRESS-history.md) — sync hardening, FK-constraint detection, atlas_shape leak fix, sentence-case scrub, slug-prefix filenames, hotkeys MVP, map camera persistence, and the rest of the Phase 3.5+ work. Architectural rules from those sessions live in DESIGN.md conventions; sync lessons in SYNC_NOTES.md.
