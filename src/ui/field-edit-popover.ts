@@ -13,7 +13,15 @@
  *   - Short input: Enter = Save, Escape = Cancel
  *   - Long textarea: Ctrl/Cmd+Enter = Save, Escape = Cancel
  *   - Click outside (on backdrop) = Cancel
+ *
+ * Save semantics (session 224): the popover closes OPTIMISTICALLY on submit —
+ * the overlay tears down before awaiting `opts.onSave`. The rest of the UI
+ * stays interactive while persistence happens in the background. On failure,
+ * a toast surfaces the error. This matches the optimistic-UI pattern atlas
+ * uses elsewhere (craft #39).
  */
+
+import { toastManager } from './toast-manager';
 
 export interface FieldEditOptions {
   /** Element whose bounding rect anchors the popover. */
@@ -161,15 +169,16 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
       // undefined — that would silently drop the clear via JSON.stringify.)
       // Convention #21 in DESIGN.md.
     }
-    saveBtn.textContent = 'Saving…';
-    saveBtn.setAttribute('disabled', 'true');
-    try {
-      await opts.onSave(nextValue);
-      cleanup();
-    } catch {
-      saveBtn.textContent = 'Save';
-      saveBtn.removeAttribute('disabled');
-    }
+    // Optimistic close: tear down the overlay before awaiting onSave so the
+    // user can interact with the rest of the UI (sidebar clicks, chevrons,
+    // navigation) without waiting for disk/sync. If onSave throws, the error
+    // surfaces via toast rather than reopening the popover — keeps the flow
+    // forward-moving.
+    cleanup();
+    void Promise.resolve(opts.onSave(nextValue)).catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      toastManager.error(`Could not save: ${msg}`);
+    });
   }
 
   cancelBtn.addEventListener('click', cancel);

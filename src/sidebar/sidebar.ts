@@ -19,9 +19,33 @@ import { setSidebarModePref } from '../core/ui-prefs';
 import type { ActiveWorldRef } from '../core/state';
 import { mountWorldsBody } from './worlds-sidebar';
 import { mountElementsBody } from './elements-sidebar';
+import { mountWritingBody } from './writing-sidebar';
 import { ToastManager } from '../ui/toast-manager';
 import { buildShortcutsContent } from '../ui/shortcuts-content';
 import { escapeText } from '../core/dom-utils';
+
+/**
+ * Effective sidebar body — accounts for the writing-room takeover. When the
+ * route is `writing` and the user hasn't toggled to a specific mode during
+ * this writing session, the writing tree replaces the worlds/elements body.
+ * Toggle clicks set `sidebarWritingOverride` to escape the takeover; the
+ * override clears when the URL leaves writing (handled in the sidebar's hash
+ * watcher).
+ */
+type EffectiveSidebarBody = 'worlds' | 'elements' | 'writing';
+
+function resolveEffectiveBody(): EffectiveSidebarBody {
+  const route = parseHash(window.location.hash);
+  const ui = getState().ui;
+  const reg = getState().registry;
+  const entry = route.worldId ? reg.worlds.find(w => w.id === route.worldId) : undefined;
+  if (route.mode === 'writing' && entry && !ui.sidebarWritingOverride) {
+    return 'writing';
+  }
+  let mode: EffectiveSidebarBody = ui.sidebarMode;
+  if (mode === 'elements' && !entry) mode = 'worlds';
+  return mode;
+}
 
 /**
  * Return-to-context destination given an active world: if a selection
@@ -88,8 +112,11 @@ export function mountSidebar(mount: SidebarMount): () => void {
     const reg = getState().registry;
     const worldId = route.worldId;
     const entry = worldId ? reg.worlds.find(w => w.id === worldId) : undefined;
-    const worldsActive = mode === 'worlds';
-    const elementsActive = mode === 'elements';
+    // When the writing-room takeover is active, neither toggle button is lit —
+    // the body is the writing tree, the toggle is an escape hatch.
+    const effective = resolveEffectiveBody();
+    const worldsActive = mode === 'worlds' && effective !== 'writing';
+    const elementsActive = mode === 'elements' && effective !== 'writing';
 
     const worldsBtn = document.createElement('button');
     worldsBtn.type = 'button';
@@ -112,9 +139,22 @@ export function mountSidebar(mount: SidebarMount): () => void {
     }
   }
 
+  /**
+   * Switch sidebar mode. If we're currently in the writing room takeover,
+   * setting the override marks the user's explicit choice — the takeover
+   * yields to it until the user leaves and re-enters writing.
+   */
   function switchMode(target: SidebarMode): void {
-    if (getState().ui.sidebarMode === target) return;
-    patchSlice('ui', { ...getState().ui, sidebarMode: target });
+    const route = parseHash(window.location.hash);
+    const inWriting = route.mode === 'writing';
+    const ui = getState().ui;
+    const needsOverride = inWriting && !ui.sidebarWritingOverride;
+    if (ui.sidebarMode === target && !needsOverride) return;
+    patchSlice('ui', {
+      ...ui,
+      sidebarMode: target,
+      sidebarWritingOverride: inWriting ? true : ui.sidebarWritingOverride,
+    });
     setSidebarModePref(target);
   }
 
@@ -186,27 +226,38 @@ export function mountSidebar(mount: SidebarMount): () => void {
   footer.appendChild(helpBtn);
   helpBtn.addEventListener('click', () => openShortcutsPopover(helpBtn));
 
-  // ----- Body mount/unmount as mode changes -----
+  // ----- Body mount/unmount as effective body changes -----
   let unmountBody: (() => void) | null = null;
-  let currentBodyMode: SidebarMode | null = null;
+  let currentBody: EffectiveSidebarBody | null = null;
 
   function mountBody(): void {
-    // Resolve effective mode — elements requires a world in the URL (entry
-    // exists). Without one, the elements toggle isn't even rendered, so
-    // falling back to worlds keeps the UI coherent.
-    const route = parseHash(window.location.hash);
-    const reg = getState().registry;
-    const entry = route.worldId ? reg.worlds.find(w => w.id === route.worldId) : undefined;
-    let mode = getState().ui.sidebarMode;
-    if (mode === 'elements' && !entry) mode = 'worlds';
-    if (mode === currentBodyMode) return;
+    const effective = resolveEffectiveBody();
+    if (effective === currentBody) return;
     unmountBody?.();
-    currentBodyMode = mode;
-    if (mode === 'worlds') {
+    currentBody = effective;
+    if (effective === 'worlds') {
       unmountBody = mountWorldsBody({ content, toasts });
-    } else {
+    } else if (effective === 'elements') {
       unmountBody = mountElementsBody({ content, toasts });
+    } else {
+      unmountBody = mountWritingBody({ content, toasts });
     }
+  }
+
+  // ----- Writing-takeover override: clear on entering/leaving writing route -----
+  // The override is a per-writing-session flag. When the URL leaves writing
+  // (user nav to another room), clear it so the next visit to writing starts
+  // with the tree visible. When ENTERING writing, also clear — covers the
+  // "leave then come back" case where the user expects the tree by default.
+  let prevRouteMode: string | null = null;
+  function handleRouteTransition(): void {
+    const route = parseHash(window.location.hash);
+    const enteringWriting = route.mode === 'writing' && prevRouteMode !== 'writing';
+    const leavingWriting = prevRouteMode === 'writing' && route.mode !== 'writing';
+    if ((enteringWriting || leavingWriting) && getState().ui.sidebarWritingOverride) {
+      patchSlice('ui', { ...getState().ui, sidebarWritingOverride: false });
+    }
+    prevRouteMode = route.mode;
   }
 
   // Session 223: sidebar mode is no longer derived from the URL — it's a
@@ -222,6 +273,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
   }
 
   function render(): void {
+    handleRouteTransition();
     renderToggle();
     renderGearState();
     mountBody();

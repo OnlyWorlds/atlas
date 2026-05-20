@@ -124,6 +124,29 @@ export class MockFolderStore implements FolderStore {
     if (target.type === 'pin' || target.type === 'marker') {
       return [];
     }
+    if (target.type === 'narrative') {
+      // Narratives cascade their parent_narrative chain — see same branch in
+      // folder-store-fs.ts for the rationale (writing tree integrity).
+      const descendantIds = new Set<string>();
+      const queue: string[] = [id];
+      while (queue.length > 0) {
+        const cur = queue.shift()!;
+        for (const n of all) {
+          if (n.type !== 'narrative') continue;
+          if ((n as { parent_narrative?: string }).parent_narrative === cur && n.id !== id && !descendantIds.has(n.id)) {
+            descendantIds.add(n.id);
+            queue.push(n.id);
+          }
+        }
+      }
+      const descendants = all.filter(n => descendantIds.has(n.id));
+      const targetIds = new Set([id, ...descendantIds]);
+      const pins = all.filter(e =>
+        e.type === 'pin' && (e as { element_id?: string }).element_id != null &&
+        targetIds.has((e as { element_id?: string }).element_id as string)
+      );
+      return [...descendants, ...pins];
+    }
     // Content element: pins point at it via element_id.
     return all.filter(e => e.type === 'pin' && (e as { element_id?: string }).element_id === id);
   }

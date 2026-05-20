@@ -422,6 +422,29 @@ export class FsFolderStore implements FolderStore {
       }
       return out;
     }
+    if (target.type === 'narrative') {
+      // Narratives form a parent_narrative chain (writing tree). Deleting a
+      // book/chapter must cascade-delete its descendant narratives too —
+      // otherwise children become orphaned with a dangling parent_narrative
+      // FK and re-surface as loose roots in the writing tree. Plus pins.
+      const allNarratives = (await this.listElements('narrative')) as Array<Element & { parent_narrative?: string }>;
+      const descendantIds = new Set<string>();
+      const queue: string[] = [id];
+      while (queue.length > 0) {
+        const cur = queue.shift()!;
+        for (const n of allNarratives) {
+          if (n.parent_narrative === cur && n.id !== id && !descendantIds.has(n.id)) {
+            descendantIds.add(n.id);
+            queue.push(n.id);
+          }
+        }
+      }
+      const descendants = allNarratives.filter(n => descendantIds.has(n.id));
+      const pins = (await this.listElements('pin')) as Array<Element & { element_id?: string }>;
+      const targetIds = new Set([id, ...descendantIds]);
+      const pinsForCascade = pins.filter(p => p.element_id != null && targetIds.has(p.element_id));
+      return [...descendants, ...pinsForCascade];
+    }
     // Content element: pins that reference it
     const pins = (await this.listElements('pin')) as Array<Element & { element_id?: string }>;
     return pins.filter(p => p.element_id === id);

@@ -87,6 +87,43 @@ export function supertypeForTier(tier: 'l1' | 'l2' | 'l3' | 'l4', worldId: strin
 }
 
 /**
+ * Build the writing-room URL hash for a given narrative by walking its
+ * parent_narrative chain to recover the (bookId, chapterId, sceneId) trio.
+ * Use when navigating within writing mode after creating/selecting a
+ * narrative — keeps the user in the writing room.
+ */
+export function writingHashForNarrative(
+  worldId: string,
+  narrativeId: string,
+  elements: Element[],
+): string {
+  // Build a quick id → element map for chain walking.
+  const byId = new Map<string, Element>();
+  for (const e of elements) {
+    if (e.type === 'narrative') byId.set(e.id, e);
+  }
+  // Walk up from this narrative to its root.
+  const chain: string[] = [narrativeId];
+  let cur = byId.get(narrativeId);
+  let parent = cur ? (cur as Element & { parent_narrative?: string }).parent_narrative : undefined;
+  while (parent && byId.has(parent)) {
+    chain.unshift(parent);
+    const next = byId.get(parent)!;
+    parent = (next as Element & { parent_narrative?: string }).parent_narrative;
+  }
+  const [bookId, chapterId, sceneId] = chain;
+  let path = `#/w/${worldId}/writing`;
+  if (bookId) {
+    path += `/book/${bookId}`;
+    if (chapterId) {
+      path += `/chapter/${chapterId}`;
+      if (sceneId) path += `/scene/${sceneId}`;
+    }
+  }
+  return path;
+}
+
+/**
  * Icon to render for a tier. Drafts (l4) get a distinct icon to signal their
  * flexible nature.
  */

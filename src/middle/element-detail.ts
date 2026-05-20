@@ -17,7 +17,14 @@
  */
 
 import { getState, patchSlice, subscribe } from '../core/state';
-import { onHashChange, parseHash, navigate, homeHash, elementHash } from '../core/router';
+import { onHashChange, parseHash, navigate, homeHash, elementHash, writingHash } from '../core/router';
+import {
+  getTierForNarrative,
+  getWritingLabels,
+  supertypeForTier,
+  writingHashForNarrative,
+} from './writing-helpers';
+import { WritingCreateModal } from '../ui/writing-create-modal';
 import type { Element, ElementType, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
@@ -37,7 +44,6 @@ import { getMapsSettings, getEditorSettings } from '../registry/registry';
 import { mapHash } from '../core/router';
 import { buildZoneSections } from './element-detail-zone-sections';
 import { escapeText, escapeAttr } from '../core/dom-utils';
-import { getWritingLabels } from './writing-helpers';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */
 const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
@@ -325,6 +331,13 @@ export function mountElementDetail(target: HTMLElement): () => void {
     spacer.className = 'atlas-middle-spacer';
     header.appendChild(spacer);
 
+    // Writing-tier badge + child-create buttons (session 224 header unification).
+    // For narratives that belong to the writing tree, show a small tier pill
+    // (Book / Chapter / Scene / Draft) and the relevant "+ new child" buttons
+    // here in the header — so the writing-mode editor uses the same header as
+    // every other element room (no separate toolbar slot above element-detail).
+    renderWritingTierActions(el, header);
+
     // Map/pin affordances cluster (DESIGN_MAPS.md §3.5). Replaces the M7
     // inline body widget. Visual ordering left → right:
     //   - For Locations: [map][map] | [pin][pin] | [+map] [+pin] [sync] [trash]
@@ -358,6 +371,97 @@ export function mountElementDetail(target: HTMLElement): () => void {
    * [+pin] button. For non-Locations: existing-pins cluster, [+pin] button.
    * Dividers render only between non-empty clusters.
    */
+  /**
+   * Render the writing-tier badge + "+ new child" buttons for narratives that
+   * belong to the writing tree. No-op for non-writing elements. Defines the
+   * tier-specific child-create rules:
+   *   l1 (Book)    → + Chapter, + Draft
+   *   l2 (Chapter) → + Scene, + Draft
+   *   l3 (Scene)   → none (leaf — write inside it)
+   *   l4 (Draft)   → none (drafts stand alone; no nesting)
+   */
+  function renderWritingTierActions(el: Element, header: HTMLElement): void {
+    if (el.type !== 'narrative') return;
+    const active = getState().active;
+    if (!active) return;
+    const tier = getTierForNarrative(el, active.worldId);
+    if (!tier) return;
+    const labels = getWritingLabels(active.worldId);
+    const tierLabel =
+      tier === 'l1' ? labels.l1
+      : tier === 'l2' ? labels.l2
+      : tier === 'l3' ? labels.l3
+      : labels.l4;
+
+    const cluster = document.createElement('div');
+    cluster.className = 'atlas-header-cluster atlas-header-writing';
+
+    const badge = document.createElement('span');
+    badge.className = 'atlas-header-writing-tier';
+    badge.textContent = tierLabel;
+    cluster.appendChild(badge);
+
+    const childTiers: Array<'l1' | 'l2' | 'l3' | 'l4'> = [];
+    if (tier === 'l1') childTiers.push('l2', 'l4');
+    else if (tier === 'l2') childTiers.push('l3', 'l4');
+    // l3 + l4: no child creation.
+
+    for (const childTier of childTiers) {
+      const childLabel = labels[childTier];
+      // Icon-only buttons matching the existing header affordance style
+      // (.atlas-icon-btn-sm) — same dimensions as the pin / delete buttons,
+      // so the cluster lays out predictably with no overlap risk. The tier
+      // pill on the left labels the current tier; tooltip on the button
+      // names the child action.
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'atlas-icon-btn-sm atlas-header-writing-create';
+      btn.title = `New ${childLabel.toLowerCase()}`;
+      const iconName = childTier === 'l4' ? 'edit_note' : 'add';
+      btn.innerHTML = `<span class="material-symbols-outlined">${iconName}</span>`;
+      btn.addEventListener('click', () => {
+        new WritingCreateModal({
+          label: childLabel,
+          parentId: el.id,
+          onCreate: async (name) => {
+            const store = getActiveStore();
+            if (!store) return;
+            const supertype = supertypeForTier(childTier, active.worldId);
+            // Find next order under this parent.
+            const siblings = getState().data.elements.filter(
+              e => e.type === 'narrative' && (e as Element & { parent_narrative?: string }).parent_narrative === el.id,
+            );
+            let maxOrder = -1;
+            for (const s of siblings) {
+              const o = (s as Element & { order?: number }).order ?? 0;
+              if (o > maxOrder) maxOrder = o;
+            }
+            const created = await store.createElement('narrative', {
+              name,
+              supertype,
+              parent_narrative: el.id,
+              order: maxOrder + 1,
+            } as Partial<Element>);
+            const all = await store.listElements();
+            patchSlice('data', { elements: all });
+            requestPushIfLinked();
+            // Navigate to the created narrative — stay in the current room.
+            const currentRoute = parseHash(window.location.hash);
+            if (currentRoute.mode === 'writing') {
+              navigate(writingHashForNarrative(active.worldId, created.id, all));
+            } else {
+              navigate(elementHash(active.worldId, created.id));
+            }
+            toastManager.info(`${childLabel} created`);
+          },
+        }).open();
+      });
+      cluster.appendChild(btn);
+    }
+
+    header.appendChild(cluster);
+  }
+
   function renderMapPinClusters(el: Element, header: HTMLElement): void {
     const state = getState();
     const elements = state.data.elements;
@@ -715,8 +819,16 @@ export function mountElementDetail(target: HTMLElement): () => void {
     }
     btn.addEventListener('click', () => {
       if (!m) return;
-      // Preserve the element selection — same chained-URL trick.
-      openMapTab(m, sourceElementId);
+      // Open the map tab in the right pane. In writing mode, don't navigate
+      // the URL — keep the user in writing. In other rooms, navigate to the
+      // chained map+element URL so element selection is preserved.
+      const currentRoute = parseHash(window.location.hash);
+      const inWriting = currentRoute.mode === 'writing';
+      if (inWriting) {
+        openMapTab(m);
+      } else {
+        openMapTab(m, sourceElementId);
+      }
       // panMapTabTo waits on entry.ready, so a freshly opened tab settles
       // before the camera moves.
       panMapTabTo(pin.map_id, pin.x, pin.y);
@@ -1218,7 +1330,17 @@ export function mountElementDetail(target: HTMLElement): () => void {
       requestPushIfLinked();
       toastManager.success(`Deleted ${el.name || 'element'}`);
       const worldId = getState().active?.worldId;
-      if (worldId) navigate(homeHash(worldId));
+      if (worldId) {
+        // If the delete happened from the writing room, stay there — drop the
+        // narrative selection but keep the user in writing. Otherwise, go to
+        // the world home as before.
+        const currentRoute = parseHash(window.location.hash);
+        if (currentRoute.mode === 'writing') {
+          navigate(writingHash(worldId));
+        } else {
+          navigate(homeHash(worldId));
+        }
+      }
     } catch (err) {
       console.error('[element-detail] delete failed:', err);
       toastManager.error(err instanceof Error ? err.message : String(err));

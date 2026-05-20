@@ -1,0 +1,577 @@
+/**
+ * Writing-mode sidebar body — the writing tree.
+ *
+ * Mounted into the shared sidebar body slot when the route is `writing` and
+ * the user hasn't explicitly toggled to worlds/elements during this writing
+ * session. The middle pane in writing mode becomes a single-pane element
+ * detail; this sidebar is the navigation surface.
+ *
+ * Body-only — the parent sidebar driver owns the mode toggle and footer gear.
+ */
+
+import { getState, patchSlice, subscribe } from '../core/state';
+import { onHashChange, parseHash, navigate, writingHash, searchHash } from '../core/router';
+import { ToastManager } from '../ui/toast-manager';
+import { WritingCreateModal } from '../ui/writing-create-modal';
+import { getActiveStore } from '../core/active-store';
+import { requestPushIfLinked } from '../sync/sync-attach';
+import { saveRegistry, toggleWritingTreeCollapsed } from '../registry/registry';
+import {
+  getWritingLabels,
+  getTierForNarrative,
+  isWritingNarrative,
+  iconForTier,
+  supertypeForTier,
+  type WritingLabels,
+  type WritingTier,
+} from '../middle/writing-helpers';
+import type { Element } from '../core/types';
+import { escapeText } from '../core/dom-utils';
+
+interface NarrativeNode {
+  el: Element;
+  tier: WritingTier;
+  children: NarrativeNode[];
+  depth: number;
+}
+
+interface NarrativeIndex {
+  roots: NarrativeNode[];
+  byId: Map<string, NarrativeNode>;
+}
+
+function buildNarrativeIndex(elements: Element[], worldId: string): NarrativeIndex {
+  const writingNarratives = elements.filter(e => isWritingNarrative(e, worldId));
+  const byId = new Map<string, NarrativeNode>();
+  for (const el of writingNarratives) {
+    byId.set(el.id, { el, tier: getTierForNarrative(el, worldId), children: [], depth: 0 });
+  }
+  const roots: NarrativeNode[] = [];
+  for (const node of byId.values()) {
+    const parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
+    if (parentId && byId.has(parentId)) {
+      byId.get(parentId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  const queue: NarrativeNode[] = roots.map(r => { r.depth = 0; return r; });
+  while (queue.length > 0) {
+    const n = queue.shift()!;
+    for (const child of n.children) {
+      child.depth = n.depth + 1;
+      queue.push(child);
+    }
+  }
+  const orderFn = (a: NarrativeNode, b: NarrativeNode) => {
+    const ao = (a.el as Element & { order?: number }).order ?? 0;
+    const bo = (b.el as Element & { order?: number }).order ?? 0;
+    if (ao !== bo) return ao - bo;
+    return (a.el.name ?? '').localeCompare(b.el.name ?? '');
+  };
+  const sortTree = (nodes: NarrativeNode[]): void => {
+    nodes.sort(orderFn);
+    for (const n of nodes) sortTree(n.children);
+  };
+  sortTree(roots);
+  return { roots, byId };
+}
+
+function ancestorIds(idx: NarrativeIndex, id: string): string[] {
+  const out: string[] = [];
+  const cur = idx.byId.get(id);
+  let parentId = cur ? (cur.el as Element & { parent_narrative?: string }).parent_narrative : undefined;
+  while (parentId) {
+    out.push(parentId);
+    const parent = idx.byId.get(parentId);
+    if (!parent) break;
+    parentId = (parent.el as Element & { parent_narrative?: string }).parent_narrative;
+  }
+  return out;
+}
+
+function findAncestry(idx: NarrativeIndex, id: string): { bookId?: string; chapterId?: string; sceneId?: string } {
+  const node = idx.byId.get(id);
+  if (!node) return {};
+  const chain: NarrativeNode[] = [node];
+  let parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
+  while (parentId) {
+    const parent = idx.byId.get(parentId);
+    if (!parent) break;
+    chain.unshift(parent);
+    parentId = (parent.el as Element & { parent_narrative?: string }).parent_narrative;
+  }
+  return {
+    bookId: chain[0]?.el.id,
+    chapterId: chain[1]?.el.id,
+    sceneId: chain[2]?.el.id,
+  };
+}
+
+function nextOrder(idx: NarrativeIndex, parentId: string | null): number {
+  const siblings = parentId
+    ? (idx.byId.get(parentId)?.children ?? [])
+    : idx.roots;
+  let max = -1;
+  for (const s of siblings) {
+    const o = (s.el as Element & { order?: number }).order ?? 0;
+    if (o > max) max = o;
+  }
+  return max + 1;
+}
+
+async function createNarrativeAtTier(
+  tier: 'l1' | 'l2' | 'l3' | 'l4',
+  parentId: string | null,
+  name: string,
+  worldId: string,
+  toasts: ToastManager,
+): Promise<Element | null> {
+  const folder = getActiveStore();
+  if (!folder) {
+    toasts.error('No active world.');
+    return null;
+  }
+  const idx = buildNarrativeIndex(getState().data.elements, worldId);
+  const supertype = supertypeForTier(tier, worldId);
+  const created = await folder.createElement('narrative', {
+    name,
+    supertype,
+    ...(parentId ? { parent_narrative: parentId } : {}),
+    order: nextOrder(idx, parentId),
+  } as Partial<Element>);
+  const all = await folder.listElements();
+  patchSlice('data', { elements: all });
+  requestPushIfLinked();
+  return created;
+}
+
+export interface WritingBodyMount {
+  content: HTMLElement;
+  toasts: ToastManager;
+}
+
+export function mountWritingBody(mount: WritingBodyMount): () => void {
+  const { content, toasts } = mount;
+  content.innerHTML = '';
+
+  // Match the elements-sidebar structure exactly: append the bands and the
+  // list DIRECTLY to `content` (which is the shell-level `.atlas-sidebar-content`
+  // with `overflow-y: auto`). This makes the sidebar-level scrollbar work
+  // identically — when the tree overflows, the scrollbar gutter (~14px)
+  // reserves space across the whole sidebar including the search row, so
+  // the search-row icons sit at exactly the same x-coordinate as the
+  // elements sidebar's. No wrapping flex div, no internal scroll layer.
+  const root = content;
+
+  // Closure-scoped query — independent of state.ui.search (which is shared
+  // with the elements sidebar) so toggling between sidebars doesn't drag a
+  // half-typed elements query into writing or vice versa.
+  let searchQuery = '';
+
+  // Drag-and-drop state — module-scoped to the mount so dragover handlers
+  // on sibling rows can read the dragging narrative's parent without going
+  // through dataTransfer (which is unreadable during dragover for security).
+  let draggingId: string | null = null;
+  let draggingParent: string | null = null;
+
+  /**
+   * Reorder sibling narratives by writing new `order` values. Only operates
+   * within the same `parent_narrative` group — re-parenting deferred.
+   * Persists via FolderStore.updateElement for each affected sibling; sync
+   * push fires after.
+   */
+  async function reorderSiblings(
+    draggedId: string,
+    targetId: string,
+    insertAbove: boolean,
+  ): Promise<void> {
+    if (draggedId === targetId) return;
+    const folder = getActiveStore();
+    if (!folder) return;
+    const els = getState().data.elements;
+    const dragged = els.find(e => e.id === draggedId);
+    const target = els.find(e => e.id === targetId);
+    if (!dragged || !target) return;
+    if (dragged.type !== 'narrative' || target.type !== 'narrative') return;
+    const dParent = (dragged as Element & { parent_narrative?: string }).parent_narrative ?? null;
+    const tParent = (target as Element & { parent_narrative?: string }).parent_narrative ?? null;
+    if (dParent !== tParent) return; // same parent only — re-parent not in v1
+
+    // Build sorted sibling list, exclude dragged, insert at new position.
+    let siblings = els.filter(e =>
+      e.type === 'narrative' &&
+      ((e as Element & { parent_narrative?: string }).parent_narrative ?? null) === dParent,
+    );
+    siblings.sort((a, b) => {
+      const ao = (a as Element & { order?: number }).order ?? 0;
+      const bo = (b as Element & { order?: number }).order ?? 0;
+      if (ao !== bo) return ao - bo;
+      return (a.name ?? '').localeCompare(b.name ?? '');
+    });
+    siblings = siblings.filter(s => s.id !== draggedId);
+    const targetIdx = siblings.findIndex(s => s.id === targetId);
+    if (targetIdx < 0) return;
+    const insertIdx = insertAbove ? targetIdx : targetIdx + 1;
+    siblings.splice(insertIdx, 0, dragged);
+
+    // Write new sequential order to every sibling whose value actually changes.
+    // Sequential integers (0..N-1) keep the order field clean — no fractions.
+    for (let i = 0; i < siblings.length; i++) {
+      const current = (siblings[i] as Element & { order?: number }).order;
+      if (current !== i) {
+        await folder.updateElement(siblings[i].id, { order: i } as Partial<Element>);
+      }
+    }
+    const fresh = await folder.listElements();
+    patchSlice('data', { elements: fresh });
+    requestPushIfLinked();
+  }
+
+  // Track the activeId from the LAST navigation. We force-expand ancestors
+  // only when the active narrative just changed (so a newly selected scene
+  // is visible in its book/chapter chain). Subsequent renders for the SAME
+  // active narrative skip the auto-expand — so the user can collapse the
+  // book even if a chapter under it is selected. Without this, the chevron
+  // toggle would be silently re-overridden on the next render.
+  let lastExpandedForActiveId: string | null = null;
+
+  function render(): void {
+    const active = getState().active;
+    if (!active) {
+      root.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
+      return;
+    }
+    const labels = getWritingLabels(active.worldId);
+    const elements = getState().data.elements;
+    const idx = buildNarrativeIndex(elements, active.worldId);
+    const route = parseHash(window.location.hash);
+    const activeId = route.sceneId ?? route.chapterId ?? route.bookId ?? null;
+    const entry = getState().registry.worlds.find(w => w.id === active.worldId);
+    const collapsed = new Set(entry?.writing_tree_collapsed ?? []);
+    // Force-expand ancestors only on activeId CHANGE — first render after
+    // navigation. After that, respect user's collapse toggles even if the
+    // selection's parent is in the collapsed set. (Fixes: book chevron not
+    // folding when a child chapter is selected.)
+    if (activeId && activeId !== lastExpandedForActiveId) {
+      const ancestors = ancestorIds(idx, activeId);
+      if (ancestors.length > 0) {
+        const current = entry?.writing_tree_collapsed ?? [];
+        const filtered = current.filter(id => !ancestors.includes(id));
+        if (filtered.length !== current.length) {
+          // Persist the auto-expand so subsequent renders + reloads see it.
+          const reg = getState().registry;
+          const nextWorlds = reg.worlds.map(w =>
+            w.id === active.worldId ? { ...w, writing_tree_collapsed: filtered } : w,
+          );
+          const nextReg = { ...reg, worlds: nextWorlds };
+          saveRegistry(nextReg);
+          patchSlice('registry', nextReg);
+          // The patchSlice will trigger a re-render with the updated set.
+          // Mark this id as already expanded so we don't recurse.
+          lastExpandedForActiveId = activeId;
+          return;
+        }
+      }
+      lastExpandedForActiveId = activeId;
+    }
+    const q = searchQuery.trim().toLowerCase();
+    const matchingIds = q ? collectMatchingIds(idx, q) : null;
+    // When filtering, force-open every ancestor of a match so the path is
+    // visible. The collapsed set becomes effectively empty within the
+    // filter result subset.
+    if (matchingIds) {
+      for (const id of matchingIds) {
+        for (const ancestorId of ancestorIds(idx, id)) {
+          collapsed.delete(ancestorId);
+        }
+      }
+    }
+
+    root.innerHTML = '';
+
+    // Band 1 — create row (mirrors the elements sidebar's filter-strip slot).
+    // Two stacked buttons fill the same vertical height as the filter strip.
+    const createRow = document.createElement('div');
+    createRow.className = 'atlas-writing-sidebar-create-row';
+    const newBookBtn = document.createElement('button');
+    newBookBtn.type = 'button';
+    newBookBtn.className = 'atlas-writing-sidebar-create-btn';
+    newBookBtn.title = `New ${labels.l1.toLowerCase()}`;
+    newBookBtn.innerHTML = `<span class="material-symbols-outlined">add</span><span>new ${escapeText(labels.l1.toLowerCase())}</span>`;
+    newBookBtn.addEventListener('click', () => {
+      new WritingCreateModal({
+        label: labels.l1,
+        onCreate: async (name) => {
+          const created = await createNarrativeAtTier('l1', null, name, active.worldId, toasts);
+          if (created) {
+            navigate(writingHash(active.worldId, created.id));
+            toasts.info(`${labels.l1} created`);
+          }
+        },
+      }).open();
+    });
+    createRow.appendChild(newBookBtn);
+
+    const newDraftBtn = document.createElement('button');
+    newDraftBtn.type = 'button';
+    newDraftBtn.className = 'atlas-writing-sidebar-create-btn atlas-writing-sidebar-create-btn-draft';
+    newDraftBtn.title = `New ${labels.l4.toLowerCase()}`;
+    newDraftBtn.innerHTML = `<span class="material-symbols-outlined">add</span><span>new ${escapeText(labels.l4.toLowerCase())}</span>`;
+    newDraftBtn.addEventListener('click', () => {
+      new WritingCreateModal({
+        label: labels.l4,
+        onCreate: async (name) => {
+          const created = await createNarrativeAtTier('l4', null, name, active.worldId, toasts);
+          if (created) {
+            navigate(writingHash(active.worldId, created.id));
+            toasts.info(`${labels.l4} created`);
+          }
+        },
+      }).open();
+    });
+    createRow.appendChild(newDraftBtn);
+
+    root.appendChild(createRow);
+
+    // Band 2 — search row (mirrors the elements sidebar's search row exactly).
+    // [input] [magnifier opens search room] [tune opens writing settings].
+    // Same three-cell layout as elements; magnifier slot identical, the third
+    // slot carries writing-specific tune instead of elements' "+".
+    const searchRow = document.createElement('div');
+    searchRow.className = 'atlas-search-row';
+
+    const searchInput = document.createElement('input');
+    searchInput.className = 'atlas-input';
+    searchInput.type = 'text';
+    searchInput.placeholder = `Search ${labels.l1.toLowerCase()}s...`;
+    searchInput.setAttribute('data-role', 'writing-search');
+    searchInput.style.flex = '1 1 auto';
+    searchInput.value = searchQuery;
+    searchInput.addEventListener('input', () => {
+      searchQuery = searchInput.value;
+      render();
+      // Restore focus + caret to the end after re-render (innerHTML wiped it).
+      queueMicrotask(() => {
+        const fresh = root.querySelector<HTMLInputElement>('[data-role="writing-search"]');
+        if (fresh) {
+          fresh.focus();
+          fresh.setSelectionRange(searchQuery.length, searchQuery.length);
+        }
+      });
+    });
+    searchRow.appendChild(searchInput);
+
+    const globalSearchBtn = document.createElement('button');
+    globalSearchBtn.type = 'button';
+    globalSearchBtn.className = 'atlas-create-btn atlas-search-everywhere-btn';
+    globalSearchBtn.title = 'Search everywhere (all elements)';
+    globalSearchBtn.innerHTML = '<span class="material-symbols-outlined">search</span>';
+    globalSearchBtn.addEventListener('click', () => {
+      navigate(searchHash(active.worldId, searchQuery));
+    });
+    searchRow.appendChild(globalSearchBtn);
+
+    const tuneBtn = document.createElement('button');
+    tuneBtn.type = 'button';
+    tuneBtn.className = 'atlas-create-btn atlas-writing-settings-btn';
+    tuneBtn.setAttribute('data-action', 'writing-settings');
+    tuneBtn.title = 'Writing settings';
+    tuneBtn.innerHTML = '<span class="material-symbols-outlined">tune</span>';
+    tuneBtn.addEventListener('click', () => {
+      const reg = getState().registry;
+      const nextWorlds = reg.worlds.map(w =>
+        w.id === active.worldId ? { ...w, writing_initialized: false } : w,
+      );
+      const nextReg = { ...reg, worlds: nextWorlds };
+      saveRegistry(nextReg);
+      patchSlice('registry', nextReg);
+    });
+    searchRow.appendChild(tuneBtn);
+
+    root.appendChild(searchRow);
+
+    // Tree list.
+    const list = document.createElement('div');
+    list.className = 'atlas-writing-sidebar-list';
+    if (idx.roots.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'atlas-pane-empty atlas-writing-sidebar-empty';
+      empty.textContent = `No ${labels.l1.toLowerCase()}s yet. Use the buttons above to create one.`;
+      list.appendChild(empty);
+    } else {
+      // Render only nodes that match the filter (when active) or all of them.
+      const visibleRoots = matchingIds
+        ? idx.roots.filter(r => containsAnyMatch(r, matchingIds))
+        : idx.roots;
+      if (matchingIds && visibleRoots.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'atlas-pane-empty atlas-writing-sidebar-empty';
+        empty.textContent = `No matches for "${searchQuery.trim()}".`;
+        list.appendChild(empty);
+      } else {
+        for (const node of visibleRoots) {
+          renderNode(node, list, labels, active.worldId, activeId, idx, collapsed, matchingIds);
+        }
+      }
+    }
+    root.appendChild(list);
+  }
+
+  /**
+   * Walk the tree and return the set of nodes whose name (or descendant's
+   * name) matches the query. Used to filter the visible tree without
+   * collapsing the structure entirely.
+   */
+  function collectMatchingIds(idx: NarrativeIndex, q: string): Set<string> {
+    const matches = new Set<string>();
+    for (const node of idx.byId.values()) {
+      if ((node.el.name ?? '').toLowerCase().includes(q)) {
+        matches.add(node.el.id);
+      }
+    }
+    return matches;
+  }
+
+  function containsAnyMatch(node: NarrativeNode, matches: Set<string>): boolean {
+    if (matches.has(node.el.id)) return true;
+    return node.children.some(c => containsAnyMatch(c, matches));
+  }
+
+  function renderNode(
+    node: NarrativeNode,
+    parent: HTMLElement,
+    labels: WritingLabels,
+    worldId: string,
+    activeId: string | null,
+    idx: NarrativeIndex,
+    collapsed: Set<string>,
+    matchingIds: Set<string> | null,
+  ): void {
+    // When filtering, only render this node if it matches or contains a match.
+    if (matchingIds && !containsAnyMatch(node, matchingIds)) return;
+    const hasChildren = node.children.length > 0;
+    const isCollapsed = hasChildren && collapsed.has(node.el.id);
+
+    const row = document.createElement('div');
+    row.className = 'atlas-writing-tree-row';
+    if (node.el.id === activeId) row.classList.add('active');
+    row.style.paddingLeft = `${node.depth * 14 + 4}px`;
+
+    // Drag-and-drop for sibling reorder (session 224). Each row is draggable;
+    // dragover/drop on a sibling row inserts above or below based on mouse y.
+    // Same parent_narrative only — re-parenting deferred.
+    row.draggable = true;
+    const myParent = (node.el as Element & { parent_narrative?: string }).parent_narrative ?? null;
+
+    row.addEventListener('dragstart', (e) => {
+      draggingId = node.el.id;
+      draggingParent = myParent;
+      e.dataTransfer?.setData('text/atlas-narrative', node.el.id);
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      row.classList.add('dragging');
+    });
+    row.addEventListener('dragend', () => {
+      draggingId = null;
+      draggingParent = null;
+      row.classList.remove('dragging');
+      // Belt-and-braces — clear any lingering indicators.
+      document.querySelectorAll('.atlas-writing-tree-row.drop-above, .atlas-writing-tree-row.drop-below')
+        .forEach(el => el.classList.remove('drop-above', 'drop-below'));
+    });
+    row.addEventListener('dragover', (e) => {
+      if (!draggingId || draggingId === node.el.id) return;
+      if (draggingParent !== myParent) return; // sibling-only
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      const rect = row.getBoundingClientRect();
+      const above = e.clientY < rect.top + rect.height / 2;
+      // Single indicator at a time.
+      document.querySelectorAll('.atlas-writing-tree-row.drop-above, .atlas-writing-tree-row.drop-below')
+        .forEach(el => {
+          if (el !== row) el.classList.remove('drop-above', 'drop-below');
+        });
+      row.classList.toggle('drop-above', above);
+      row.classList.toggle('drop-below', !above);
+    });
+    row.addEventListener('dragleave', (e) => {
+      if (!row.contains(e.relatedTarget as Node)) {
+        row.classList.remove('drop-above', 'drop-below');
+      }
+    });
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (!draggingId || draggingId === node.el.id) return;
+      if (draggingParent !== myParent) return;
+      const rect = row.getBoundingClientRect();
+      const above = e.clientY < rect.top + rect.height / 2;
+      const dragged = draggingId;
+      row.classList.remove('drop-above', 'drop-below');
+      void reorderSiblings(dragged, node.el.id, above);
+    });
+
+    const tierLabel =
+      node.tier === 'l1' ? labels.l1
+      : node.tier === 'l2' ? labels.l2
+      : node.tier === 'l3' ? labels.l3
+      : labels.l4;
+    const icon = iconForTier(node.tier);
+
+    const chevron = document.createElement('button');
+    chevron.type = 'button';
+    chevron.className = 'atlas-writing-tree-chevron';
+    chevron.tabIndex = -1;
+    chevron.setAttribute('aria-label', isCollapsed ? 'expand' : 'collapse');
+    if (hasChildren) {
+      chevron.innerHTML = `<span class="material-symbols-outlined">${isCollapsed ? 'chevron_right' : 'expand_more'}</span>`;
+      chevron.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const next = toggleWritingTreeCollapsed(getState().registry, worldId, node.el.id);
+        saveRegistry(next);
+        patchSlice('registry', next);
+      });
+    } else {
+      chevron.classList.add('atlas-writing-tree-chevron-empty');
+      chevron.disabled = true;
+      chevron.innerHTML = '';
+    }
+    row.appendChild(chevron);
+
+    const body = document.createElement('button');
+    body.type = 'button';
+    body.className = 'atlas-writing-tree-row-body';
+    if (node.tier === 'l4') body.classList.add('atlas-writing-tree-row-body-draft');
+    body.innerHTML = `
+      <span class="material-symbols-outlined atlas-writing-tree-icon">${icon}</span>
+      <span class="atlas-writing-tree-name">${escapeText(node.el.name || `(unnamed ${tierLabel.toLowerCase()})`)}</span>
+    `;
+    body.addEventListener('click', () => {
+      const path = findAncestry(idx, node.el.id);
+      navigate(writingHash(worldId, path.bookId, path.chapterId, path.sceneId));
+    });
+    row.appendChild(body);
+
+    parent.appendChild(row);
+
+    if (hasChildren && !isCollapsed) {
+      for (const child of node.children) {
+        renderNode(child, parent, labels, worldId, activeId, idx, collapsed, matchingIds);
+      }
+    }
+  }
+
+  const unsubState = subscribe(render);
+  const unsubHash = onHashChange(render);
+  render();
+
+  return () => {
+    unsubState();
+    unsubHash();
+  };
+}
+
+function pluralize(word: string): string {
+  if (word.endsWith('s')) return word;
+  if (word.endsWith('y')) return word.slice(0, -1) + 'ies';
+  return word + 's';
+}

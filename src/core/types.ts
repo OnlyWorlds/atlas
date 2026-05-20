@@ -346,6 +346,13 @@ export interface WorldRegistryEntry {
    */
   writing_tree_collapsed?: string[];
   /**
+   * Writing room — the last narrative the user had selected. Used by the
+   * room-nav writing icon to restore the previous editing context when the
+   * user returns to writing after navigating elsewhere. Atlas-local; never
+   * synced. Cleared if the narrative no longer exists (handled at read time).
+   */
+  last_writing_narrative_id?: string;
+  /**
    * Per-world freeform notes — atlas-local (never synced). Accessed via the
    * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it
    * survives reloads without depending on the world's folder being granted

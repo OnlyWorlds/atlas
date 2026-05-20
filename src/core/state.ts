@@ -119,6 +119,14 @@ export interface UiState {
    * (no-op since autosave). See zone-edit-mode.ts.
    */
   zoneEditing: { zoneId: string; mapId: string } | null;
+  /**
+   * Transient flag: when in the writing room, the sidebar defaults to the
+   * writing tree body instead of worlds/elements. Clicking Worlds or the
+   * world-name toggle while in writing flips this to true so the sidebar
+   * honors the explicit choice until the user leaves and re-enters writing
+   * (which resets it). Never persisted — purely in-session.
+   */
+  sidebarWritingOverride: boolean;
 }
 
 export interface AppState {
@@ -151,6 +159,7 @@ let state: AppState = {
     rightActiveIndex: 0,
     pinPlacement: null,
     zoneEditing: null,
+    sidebarWritingOverride: false,
   },
   sync: {
     byWorld: {},

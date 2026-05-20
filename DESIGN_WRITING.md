@@ -258,7 +258,7 @@ Note: the URL path names reflect the *default* labels for readability. They aren
 
 - **#33** (updated session 224): Writing tier labels live in `registry.worlds[i].writing_labels` (l1-l4). The label IS the `supertype` storage value on each Narrative. UI reads via `getWritingLabels(worldId)`. **No canonical/display split** — storage matches display.
 
-- **#34** (updated session 224): Atlas writing has three structured tiers + one flexible (Draft). Tier l1 forbids parent; l2 requires l1 parent; l3 requires l2 parent; l4 has no parent constraints. The writing-room create flow enforces these; element-detail edits don't (user can override at their own discretion).
+- **#34** (updated session 224): Atlas writing has three structured tiers + one flexible (Draft). Tier l1 forbids parent; l2 requires l1 parent; l3 requires l2 parent; l4 has no parent constraints. Child-create affordances in the header surface only where they make sense: l1 → {l2, l4}, l2 → {l3, l4}, l3 → nothing (scenes are leaves), l4 → nothing (drafts don't nest — root creates remain available from the sidebar footer). The writing-room create flow enforces these; element-detail edits don't (user can override at their own discretion).
 
 - **#38** (new session 224): A Narrative belongs to the writing tree iff its `supertype` matches one of the four labels for the world. Detection via `isWritingNarrative(el, worldId)`. Setting supertype to anything outside the four labels removes the narrative from the writing tree (still visible elsewhere).
 

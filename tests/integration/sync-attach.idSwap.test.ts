@@ -39,6 +39,7 @@ beforeEach(() => {
     rightActiveIndex: 0,
     pinPlacement: null,
     zoneEditing: null,
+    sidebarWritingOverride: false,
   });
   window.location.hash = '#/';
 });

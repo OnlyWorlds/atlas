@@ -10,7 +10,7 @@
  * Stub for Bout 2 — fleshed out properly in Bout 3.
  */
 
-import { getState, subscribe } from '../core/state';
+import { getState, patchSlice, subscribe } from '../core/state';
 import {
   onHashChange,
   parseHash,
@@ -25,6 +25,7 @@ import {
   settingsHash,
   type RouteMode,
 } from '../core/router';
+import { writingHashForNarrative } from './writing-helpers';
 
 interface RoomDef {
   id: RouteMode | 'home' | 'writing' | 'timeline' | 'search' | 'publish' | 'import' | 'templates' | 'settings';
@@ -77,7 +78,31 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
         btn.classList.add('active');
       }
       btn.innerHTML = `<span class="material-symbols-outlined">${room.icon}</span>`;
-      btn.addEventListener('click', () => navigate(room.hashFor(worldId)));
+      btn.addEventListener('click', () => {
+        // Special case for writing: clicking the writing icon clears the
+        // sidebar writing-takeover override so the tree comes back even if
+        // the user previously toggled to worlds/elements within this writing
+        // session. Other rooms just navigate.
+        if (room.id === 'writing' && getState().ui.sidebarWritingOverride) {
+          patchSlice('ui', { ...getState().ui, sidebarWritingOverride: false });
+        }
+        // Writing icon special: if the user has a remembered last narrative
+        // for this world, restore that view. Falls back to the base writing
+        // path (empty state) when no memory or the remembered narrative no
+        // longer exists.
+        if (room.id === 'writing') {
+          const entry = getState().registry.worlds.find(w => w.id === worldId);
+          const lastId = entry?.last_writing_narrative_id;
+          if (lastId) {
+            const exists = getState().data.elements.some(e => e.id === lastId && e.type === 'narrative');
+            if (exists) {
+              navigate(writingHashForNarrative(worldId, lastId, getState().data.elements));
+              return;
+            }
+          }
+        }
+        navigate(room.hashFor(worldId));
+      });
       strip.appendChild(btn);
     }
   }
