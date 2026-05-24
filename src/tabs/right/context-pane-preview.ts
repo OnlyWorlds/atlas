@@ -1,20 +1,24 @@
 /**
- * Element preview slide-in for the writing-context pane.
+ * Element preview slide-in for the context pane.
  *
- * When the user clicks anywhere — graph node, cast row, suggested row, or a
- * chip in prose — the preview takes the lists' slot in the pane. Lists hide
- * temporarily; preview fits snug against the graph's bottom edge. No scroll
- * required to see the preview content.
+ * Shows a compact card with the element's type icon, name, description excerpt,
+ * backlinks ("Appears in: …"), and action buttons. Used in two modes:
  *
- * Content: type icon + name, 3-5 key fields (description excerpt, primary
- * image, one or two top relation summaries), "Appears in: …" (backlinks).
- * Two action buttons:
- *   - [open in detail] — navigates to element-detail (leaves writing room)
- *   - [+ add to cast] — inserts a chip at the editor cursor OR wraps the
- *     current selection (alias unification — see task #12 build).
+ *   - **Writing mode** (subject is a narrative): preview slides in OVER the
+ *     Cast + Potentials lists when the writer picks an element (graph node,
+ *     list row, or in-prose chip click). Lists hide; preview takes the slot.
+ *     Footer shows "+ add to story" for elements that are NOT yet Featured
+ *     (where Featured = in the field AND in prose).
  *
- * Dismissal: × button, Esc key, or clicking outside the preview restores
- * the lists.
+ *   - **Element mode** (subject is the focused element): preview is the
+ *     primary content of the details slot — always visible. Shows the subject
+ *     by default; swaps to whichever node the user clicks in the graph. The
+ *     "open in detail" action hides when the previewed element IS the subject
+ *     (the user is already on its detail page in the middle pane).
+ *
+ * Dismissal: × button, Esc key. The `onClose` callback's behavior depends on
+ * caller — in writing mode it hides the preview; in element mode it reverts
+ * to showing the subject.
  */
 
 import type { Element } from '../../core/types';
@@ -28,15 +32,22 @@ export interface ContextPreviewHandle {
   destroy(): void;
 }
 
+export type ContextPreviewMode = 'writing' | 'element';
+
 export interface ContextPreviewOpts {
   host: HTMLElement;
-  /** The writing-room narrative — used to compute Featured/Planned state. */
-  narrative: Element;
+  /**
+   * The pane's subject element — drives Featured/add-to-story logic (writing
+   * mode) and "is this the focus we're already viewing" logic (element mode).
+   */
+  subject: Element;
+  /** Which renderer mode the orchestrator is in. */
+  mode: ContextPreviewMode;
   onClose: () => void;
 }
 
 export function mountContextPreview(opts: ContextPreviewOpts): ContextPreviewHandle {
-  const { host, narrative, onClose } = opts;
+  const { host, subject, mode, onClose } = opts;
   host.innerHTML = '';
 
   let currentEl: Element | null = null;
@@ -54,7 +65,7 @@ export function mountContextPreview(opts: ContextPreviewOpts): ContextPreviewHan
       currentEl = el;
       host.innerHTML = '';
       host.dataset.state = 'visible';
-      host.appendChild(buildPreview(el, narrative, onClose));
+      host.appendChild(buildPreview(el, subject, mode, onClose));
     },
     hide(): void {
       currentEl = null;
@@ -69,23 +80,17 @@ export function mountContextPreview(opts: ContextPreviewOpts): ContextPreviewHan
   };
 }
 
-// Compute whether this element is Featured in the narrative — meaning the
-// narrative's prose contains a chip (or text mention via alias) for it.
-//
-// Used to hide the "+ add to story" button: Featured elements are already
-// fully integrated, no action needed.
+// Compute whether this element is Featured in the writing-room narrative —
+// meaning the narrative's prose contains a chip (or text mention via alias)
+// for it. Only meaningful in writing mode; callers gate on mode.
 //
 // Match rule: scan narrative.story for either an ow:// chip link with this
 // id OR a word-boundary text match of the element's name / any alias.
 function isElementFeatured(el: Element, narrative: Element): boolean {
   const story = typeof narrative.story === 'string' ? narrative.story : '';
   if (story.length === 0) return false;
-  // Detect ow:// chip with this id present — look for the markdown link tail
-  // ending in /uuid). Plain substring match.
   const chipTail = '/' + el.id + ')';
   if (story.indexOf(chipTail) !== -1) return true;
-  // Text mention of name or alias (word-bounded, case-sensitive — matches
-  // the autolink convention).
   const candidates: string[] = [];
   if (el.name) candidates.push(el.name);
   if (Array.isArray(el.atlas_aliases)) {
@@ -95,7 +100,6 @@ function isElementFeatured(el: Element, narrative: Element): boolean {
   }
   for (const cand of candidates) {
     if (cand.length < 2) continue;
-    // Escape regex metacharacters so cand becomes a literal substring match.
     const escaped = escapeRegex(cand);
     const re = new RegExp('\\b' + escaped + '\\b');
     if (re.test(story)) return true;
@@ -103,7 +107,12 @@ function isElementFeatured(el: Element, narrative: Element): boolean {
   return false;
 }
 
-function buildPreview(el: Element, narrative: Element, onClose: () => void): HTMLElement {
+function buildPreview(
+  el: Element,
+  subject: Element,
+  mode: ContextPreviewMode,
+  onClose: () => void,
+): HTMLElement {
   const card = document.createElement('div');
   card.className = 'atlas-context-preview';
 
@@ -138,7 +147,7 @@ function buildPreview(el: Element, narrative: Element, onClose: () => void): HTM
 
   card.appendChild(header);
 
-  // Body — description + image (when present) + key fields.
+  // Body — description + backlinks.
   const body = document.createElement('div');
   body.className = 'atlas-context-preview-body';
 
@@ -184,42 +193,41 @@ function buildPreview(el: Element, narrative: Element, onClose: () => void): HTM
 
   card.appendChild(body);
 
-  // Footer — action buttons. The "+ add to story" button hides when the
-  // element is already Featured (in field AND in prose / name-mentioned).
-  // Featured elements are fully integrated; no add affordance needed.
+  // Footer — action buttons.
   const footer = document.createElement('div');
   footer.className = 'atlas-context-preview-actions';
 
-  const openBtn = document.createElement('button');
-  openBtn.type = 'button';
-  openBtn.className = 'atlas-btn-secondary';
-  openBtn.textContent = 'open in detail';
-  openBtn.addEventListener('click', () => {
-    const worldId = getState().active?.worldId;
-    if (worldId) navigate(elementHash(worldId, el.id));
-  });
-  footer.appendChild(openBtn);
+  const isSubject = el.id === subject.id;
+  const isWriting = mode === 'writing';
+  // Featured only meaningful in writing mode (subject is a narrative).
+  const featured = !isSubject && isWriting && isElementFeatured(el, subject);
 
-  // Self-preview (the narrative itself in graph center) — never useful to
-  // "add to story" yourself.
-  const isSelf = el.id === narrative.id;
-  const featured = !isSelf && isElementFeatured(el, narrative);
+  // "open in detail" hides when in element mode AND previewing the subject —
+  // the user is already on this element's detail page in the middle pane.
+  const hideOpenInDetail = mode === 'element' && isSubject;
+  if (!hideOpenInDetail) {
+    const openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.className = 'atlas-btn-secondary';
+    openBtn.textContent = 'open in detail';
+    openBtn.addEventListener('click', () => {
+      const worldId = getState().active?.worldId;
+      if (worldId) navigate(elementHash(worldId, el.id));
+    });
+    footer.appendChild(openBtn);
+  }
 
-  if (!isSelf && !featured) {
+  // "+ add to story" only in writing mode, only for non-subject + non-featured.
+  if (isWriting && !isSubject && !featured) {
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'atlas-btn-primary';
     addBtn.textContent = '+ add to story';
     addBtn.title = 'Insert at cursor, or wrap selected prose as a chip';
     addBtn.addEventListener('click', () => {
-      // Dispatched event consumed by writing-workspace.ts which has the editor
-      // handle. Decoupling keeps the preview pane reusable in non-writing contexts.
       document.dispatchEvent(new CustomEvent('atlas:context-add-to-cast', {
         detail: { id: el.id, type: el.type, name: el.name ?? '' },
       }));
-      // Close the preview so lists return to view — the writer should land
-      // back in the chip-they-just-inserted's prose context, not stuck on
-      // the preview card with no obvious next action.
       onClose();
     });
     footer.appendChild(addBtn);

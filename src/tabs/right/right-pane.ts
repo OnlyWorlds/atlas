@@ -18,7 +18,7 @@ import type { WorldMap } from '../../core/types';
 import { ToastManager } from '../../ui/toast-manager';
 import { mountMapIndexTab } from './map-index-tab';
 import { mountMapTab, disposeMapTab, disposeAllMapTabs } from './map-tab';
-import { mountWritingContextTab } from './writing-context-tab';
+import { mountContextTab } from './context-tab';
 import { mapTabCache } from './map-tab-cache';
 import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { navigate, parseHash, worldHash, elementHash } from '../../core/router';
@@ -52,7 +52,7 @@ export function mountRightPane(mount: RightPaneMount): () => void {
     const t = ui.rightTabs[ui.rightActiveIndex];
     if (!t) return 'map-index';
     if (t.kind === 'map') return `map:${t.mapId}`;
-    if (t.kind === 'writing-context') return `writing-context:${t.narrativeId}`;
+    if (t.kind === 'context') return 'context';
     return 'map-index';
   }
 
@@ -136,13 +136,9 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       // it represents a specific map's prefs and has nothing to target.
       closeVisualSettingsPopover();
       unmountActive = mountMapIndexTab(pane, toasts);
-    } else if (t.kind === 'writing-context') {
+    } else if (t.kind === 'context') {
       closeVisualSettingsPopover();
-      unmountActive = mountWritingContextTab({
-        pane,
-        narrativeId: t.narrativeId,
-        toasts,
-      });
+      unmountActive = mountContextTab({ pane, toasts });
     } else {
       // mountMapTab is non-returning (manages its own lifecycle via cache).
       mountMapTab(pane, t.mapId, toasts);
@@ -174,10 +170,10 @@ export function mountRightPane(mount: RightPaneMount): () => void {
         tabBar.appendChild(btn);
         return;
       }
-      if (tab.kind === 'writing-context') {
-        btn.setAttribute('data-tab-kind', 'writing-context');
+      if (tab.kind === 'context') {
+        btn.setAttribute('data-tab-kind', 'context');
         btn.innerHTML = `<span class="material-symbols-outlined">hub</span><span>Context</span>`;
-        btn.title = 'Context for the active narrative — cast, suggested, graph';
+        btn.title = 'Context — graph + details for the active element or narrative';
         btn.addEventListener('click', () => {
           patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
         });

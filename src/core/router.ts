@@ -50,9 +50,9 @@ export type RouteMode =
   | 'import'
   | 'templates';
 
-export type SettingsTab = 'identity' | 'atlas' | 'sync' | 'maps' | 'world' | 'writing' | 'about';
+export type SettingsTab = 'identity' | 'atlas' | 'sync' | 'maps' | 'world' | 'writing' | 'context' | 'about';
 
-export const SETTINGS_TABS: SettingsTab[] = ['identity', 'atlas', 'sync', 'maps', 'world', 'writing', 'about'];
+export const SETTINGS_TABS: SettingsTab[] = ['identity', 'atlas', 'sync', 'maps', 'world', 'writing', 'context', 'about'];
 
 export interface Route {
   worldId: string | null;

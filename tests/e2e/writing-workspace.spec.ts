@@ -486,6 +486,10 @@ test('context pane Cast shows Featured/Planned distinction by prose content', as
   await gotoWriting(page, narrId);
   await waitForEditor(page);
 
+  // Session 231: context tab no longer auto-opens on writing-mode entry.
+  // Click it explicitly to surface the pane.
+  await page.locator('.atlas-tab[data-tab-kind="context"]').click();
+
   const pane = page.locator('.atlas-context-pane');
   await expect(pane).toBeVisible();
   const castCol = pane.locator('.atlas-context-pane-list-cast');

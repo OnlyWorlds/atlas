@@ -294,16 +294,16 @@ export type WorldState = 'local-only' | 'api-linked';
  * owning world from active state.
  */
 export type RightTabRef =
-  | { kind: 'map-index' }
-  | { kind: 'map'; mapId: string; label: string; worldId?: string }
   /**
-   * Writing-context tab — present only while the writing room is open on a
-   * narrative. Anchored leftmost in the tab bar. Managed by
-   * `writing-context-lifecycle.ts`: created on entering writing mode, removed
-   * on leaving. `narrativeId` updates as the user navigates between narratives
-   * within writing mode (same tab, refreshed content).
+   * Context tab — permanent leftmost tab per world. Shows a graph + details
+   * area whose contents derive from the current route (route.mode + relevant
+   * id). Managed by `context-tab-lifecycle.ts`: ensured to exist at index 0
+   * whenever an active world is loaded. Never carries a subject id on the ref
+   * — subject is always read from the URL.
    */
-  | { kind: 'writing-context'; narrativeId: string };
+  | { kind: 'context' }
+  | { kind: 'map-index' }
+  | { kind: 'map'; mapId: string; label: string; worldId?: string };
 
 /**
  * Per-world right-pane tab snapshot. Persisted on WorldRegistryEntry so the
@@ -420,17 +420,41 @@ export interface WorldRegistryEntry {
    */
   writing_spellcheck?: boolean;
   /**
-   * Writing-context pane — auto-open on first entry to writing mode per
-   * session. When true (default), the context tab in the right pane is
-   * activated on entry; subsequent manual tab switches are respected and the
-   * auto-activation does NOT re-fire while writing mode stays open. When false,
-   * the tab still appears in the bar but isn't auto-focused.
-   *
-   * Default semantics: stored ABSENT in the registry → defaults to true at
-   * read-time, so existing worlds upgrade with the helpful behavior. Explicit
-   * false opts out.
+   * @deprecated Session 231: dropped when the context tab became permanent +
+   * tool-global. Field is still tolerated on load for backward-compat with
+   * existing registry entries but no code reads it. Safe to remove once
+   * persisted registries have rolled over.
    */
   writing_context_auto_open?: boolean;
+  /**
+   * Context pane: element types the user has hidden from the graph + below-
+   * graph lists. Persisted per-world; survives page reload. Empty/absent =
+   * all types shown. Set via the context-pane toolbar's type chips.
+   */
+  context_filters_off?: ElementType[];
+  /**
+   * Context pane: graph hop depth (number of rings outward from the subject).
+   * 1 = direct cast only; 2 = cast + adjacent; 3-4 = wider exploration with
+   * per-ring caps. Absent = tier-derived default (narrative subjects at
+   * scene/draft default to 2; at chapter/book default to 1; non-narratives
+   * default to 2). Set via the context-pane toolbar's hop pill or
+   * Settings → Context.
+   */
+  context_hop_depth?: 1 | 2 | 3 | 4;
+  /**
+   * Context pane: lock the graph layout when toggling type filters. When
+   * true, hiding a type just visibility-toggles the existing nodes/edges
+   * instead of re-running the physics sim — surviving nodes don't jump.
+   * When false/absent (default), filter toggles re-run the sim so the
+   * remaining nodes use the available space.
+   */
+  context_lock_layout?: boolean;
+  /**
+   * Context pane: tint graph edges by the non-center node's element type
+   * (using the shared ELEMENT_TYPE_COLORS palette). When false/absent
+   * (default), all edges render in the neutral cyan accent.
+   */
+  context_edge_color?: boolean;
   /**
    * Per-world freeform notes — atlas-local (never synced). Accessed via the
    * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it

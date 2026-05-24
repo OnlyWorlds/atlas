@@ -6,6 +6,12 @@
  *       Debounced via a microtask to coalesce bursts.
  * Load: invoked once on app boot, returns the persisted snapshot or null.
  *
+ * Invariants enforced on load:
+ *   - At most one `context` tab; if missing, prepended at index 0.
+ *   - Legacy `writing-context` entries (ephemeral before session 231) are
+ *     dropped silently — context is now permanent and route-driven, so any
+ *     persisted narrativeId is meaningless.
+ *
  * Cleanup: tabs whose mapId no longer exists in any world's data render as
  * stale via the existing right-pane stale-tab treatment — no eager pruning
  * here.
@@ -27,9 +33,12 @@ export function loadPersistedRightTabs(): PersistedRightTabs | null {
     const parsed = JSON.parse(raw) as Partial<PersistedRightTabs>;
     if (!parsed || !Array.isArray(parsed.tabs)) return null;
     if (typeof parsed.activeIndex !== 'number') return null;
-    // Filter malformed tab entries — single tab dropping shouldn't break boot.
+    // Filter to known kinds. Legacy 'writing-context' entries are dropped:
+    // the new context tab is permanent + route-driven, narrativeId on the
+    // ref is no longer meaningful.
     const tabs = parsed.tabs.filter((t): t is RightTabRef => {
       if (!t || typeof t !== 'object') return false;
+      if (t.kind === 'context') return true;
       if (t.kind === 'map-index') return true;
       return (
         t.kind === 'map' &&
@@ -37,14 +46,40 @@ export function loadPersistedRightTabs(): PersistedRightTabs | null {
         typeof (t as { label?: unknown }).label === 'string'
       );
     });
-    if (tabs.length === 0) return null;
-    // Ensure map-index is first (invariant: always present). If missing,
-    // prepend; if elsewhere, leave alone (legacy data).
-    if (!tabs.some(t => t.kind === 'map-index')) {
-      tabs.unshift({ kind: 'map-index' });
+    // Track how many entries were dropped at or before the active index so
+    // we can shift it left accordingly.
+    let droppedBeforeActive = 0;
+    for (let i = 0; i <= parsed.activeIndex && i < parsed.tabs.length; i++) {
+      const t = parsed.tabs[i];
+      if (!t || typeof t !== 'object') { droppedBeforeActive++; continue; }
+      if (t.kind === 'context' || t.kind === 'map-index') continue;
+      if (t.kind === 'map' && typeof (t as { mapId?: unknown }).mapId === 'string') continue;
+      droppedBeforeActive++;
     }
-    const activeIndex = Math.max(0, Math.min(parsed.activeIndex, tabs.length - 1));
-    return { tabs, activeIndex };
+
+    // Ensure invariants: map-index present, context at index 0.
+    let next = tabs;
+    if (!next.some(t => t.kind === 'map-index')) {
+      next = [{ kind: 'map-index' }, ...next];
+    }
+    const ctxIdx = next.findIndex(t => t.kind === 'context');
+    if (ctxIdx === -1) {
+      next = [{ kind: 'context' }, ...next];
+    } else if (ctxIdx !== 0) {
+      // Move context to index 0.
+      const ctx = next[ctxIdx];
+      next = [ctx, ...next.filter((_, i) => i !== ctxIdx)];
+    }
+    if (next.length === 0) return null;
+
+    // Adjust activeIndex through (a) the drop-shift then (b) any context
+    // prepend. The prepend always shifts everything right by 1 unless the
+    // context tab existed already.
+    let activeIndex = parsed.activeIndex - droppedBeforeActive;
+    const prepended = ctxIdx === -1;
+    if (prepended) activeIndex += 1;
+    activeIndex = Math.max(0, Math.min(activeIndex, next.length - 1));
+    return { tabs: next, activeIndex };
   } catch (err) {
     console.warn('[right-tabs-persistence] load failed:', err);
     return null;
@@ -54,22 +89,10 @@ export function loadPersistedRightTabs(): PersistedRightTabs | null {
 /** Save the snapshot to localStorage. Idempotent; safe to spam. */
 export function savePersistedRightTabs(tabs: readonly RightTabRef[], activeIndex: number): void {
   try {
-    // Writing-context tabs are ephemeral — never persisted. Strip before save
-    // so a reload comes back without a stale context tab. Active index adjusts
-    // accordingly to avoid pointing past the end.
-    const filtered = tabs.filter(t => t.kind !== 'writing-context');
-    let adjustedIndex = activeIndex;
-    if (filtered.length !== tabs.length) {
-      // Count writing-context tabs at or before the active index so we shift
-      // the active index left by that many.
-      const droppedBeforeActive = tabs
-        .slice(0, activeIndex + 1)
-        .filter(t => t.kind === 'writing-context').length;
-      adjustedIndex = Math.max(0, Math.min(activeIndex - droppedBeforeActive, filtered.length - 1));
-    }
+    // Context is permanent now — persist as-is. No more stripping.
     const payload: PersistedRightTabs = {
-      tabs: filtered,
-      activeIndex: adjustedIndex,
+      tabs: [...tabs],
+      activeIndex,
     };
     localStorage.setItem(RIGHT_TABS_STORAGE_KEY, JSON.stringify(payload));
   } catch (err) {

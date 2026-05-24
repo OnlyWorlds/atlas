@@ -8,6 +8,41 @@ import type { ElementType } from './types';
 /** Material Symbol name per element type (re-exported from SDK with strict typing). */
 export const ELEMENT_ICONS = SDK_ELEMENT_ICONS as Record<ElementType, string>;
 
+/**
+ * Element-type color palette — used by the context-pane graph for optional
+ * edge tinting (per the non-center node's type). Reused from the
+ * dcc-viewer / element-viewer-trial palettes; tuned for the dark cyan-leaning
+ * atlas background. Picks tend toward higher saturation so the colors stay
+ * legible at low alpha when used for edges.
+ *
+ * Spatial types (map / pin / marker / zone) get a neutral fallback — they
+ * don't appear as graph nodes in the context pane anyway.
+ */
+export const ELEMENT_TYPE_COLORS: Record<ElementType, string> = {
+  character:   '#ffd700',
+  creature:    '#e8653a',
+  species:     '#34d399',
+  family:      '#f59e0b',
+  collective:  '#8b5cf6',
+  institution: '#818cf8',
+  location:    '#14b8a6',
+  object:      '#c0c0c0',
+  construct:   '#64748b',
+  ability:     '#a3e635',
+  trait:       '#a855f7',
+  title:       '#ec4899',
+  language:    '#06b6d4',
+  law:         '#78716c',
+  event:       '#3b82f6',
+  narrative:   '#f97316',
+  phenomenon:  '#f43f5e',
+  relation:    '#f472b6',
+  map:         '#94a3b8',
+  pin:         '#94a3b8',
+  marker:      '#94a3b8',
+  zone:        '#94a3b8',
+};
+
 /** Friendly singular/plural per element type. */
 export const ELEMENT_LABELS: Record<ElementType, { singular: string; plural: string }> = {
   character: { singular: 'character', plural: 'characters' },

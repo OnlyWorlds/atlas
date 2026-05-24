@@ -324,12 +324,13 @@ export function getWorldRightTabs(
   if (!entry?.right_tabs) return null;
   const snap = entry.right_tabs;
   if (!Array.isArray(snap.tabs) || typeof snap.activeIndex !== 'number') return null;
-  // Filter out any malformed tab entries defensively.
+  // Filter out any malformed tab entries defensively. Legacy 'writing-context'
+  // entries (ephemeral before session 231) are dropped — context is now a
+  // permanent route-driven tab and narrativeId is irrelevant.
   const tabs = snap.tabs.filter((t): t is RightTabRef => {
     if (!t || typeof t !== 'object') return false;
+    if (t.kind === 'context') return true;
     if (t.kind === 'map-index') return true;
-    // Writing-context tabs are ephemeral — strip on registry load too.
-    if (t.kind === 'writing-context') return false;
     return t.kind === 'map' && typeof (t as { mapId?: unknown }).mapId === 'string';
   });
   const activeIndex = Math.max(0, Math.min(snap.activeIndex, tabs.length - 1));

@@ -7028,9 +7028,132 @@ a.atlas-writing-workspace-crumb-seg:hover {
   background: transparent;
 }
 
-/* Top strip removed in session 230 — graph extends to the pane's top edge.
-   Tier zoom + filter controls deferred to v2; we'll bring the strip back
-   when there's actual content to put in it. */
+/* Top strip restored in session 231 as the context toolbar — type filter
+   chips + 1/2-hop pill. Hidden when there's no subject (empty state). */
+.atlas-context-pane-toolbar-host {
+  flex: 0 0 auto;
+}
+.atlas-context-pane-toolbar-host[data-state="hidden"] {
+  display: none;
+}
+.atlas-context-pane-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--atlas-divider);
+  background: rgba(0, 0, 0, 0.25);
+  min-height: 30px;
+}
+.atlas-context-pane-toolbar-chips {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.atlas-context-pane-toolbar-chips::-webkit-scrollbar { height: 4px; }
+.atlas-context-pane-toolbar-chips::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+.atlas-context-pane-toolbar-chip {
+  appearance: none;
+  border: 1px solid rgba(34, 211, 238, 0.32);
+  background: rgba(34, 211, 238, 0.08);
+  color: var(--atlas-cyan);
+  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 100ms ease, border-color 100ms ease, opacity 100ms ease;
+}
+.atlas-context-pane-toolbar-chip:hover {
+  background: rgba(34, 211, 238, 0.2);
+  border-color: rgba(34, 211, 238, 0.6);
+}
+.atlas-context-pane-toolbar-chip.is-off {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.32);
+  opacity: 0.7;
+}
+.atlas-context-pane-toolbar-chip .material-symbols-outlined {
+  font-size: 14px;
+  pointer-events: none;
+}
+.atlas-context-pane-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.atlas-context-pane-toolbar-lock {
+  display: flex;
+  align-items: center;
+}
+.atlas-context-pane-toolbar-lock-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+}
+.atlas-context-pane-toolbar-lock-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.atlas-context-pane-toolbar-lock-btn.is-on {
+  background: rgba(34, 211, 238, 0.2);
+  border-color: rgba(34, 211, 238, 0.5);
+  color: var(--atlas-cyan);
+}
+.atlas-context-pane-toolbar-lock-btn .material-symbols-outlined {
+  font-size: 14px;
+  pointer-events: none;
+}
+.atlas-context-pane-toolbar-hop {
+  flex: 0 0 auto;
+}
+.atlas-context-pane-toolbar-hop-pill {
+  display: inline-flex;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1;
+}
+.atlas-context-pane-toolbar-hop-seg {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font: inherit;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+.atlas-context-pane-toolbar-hop-seg:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+.atlas-context-pane-toolbar-hop-seg.is-active {
+  background: rgba(34, 211, 238, 0.2);
+  color: var(--atlas-cyan);
+}
 
 .atlas-context-pane-empty {
   height: 100%;
@@ -7058,6 +7181,46 @@ a.atlas-writing-workspace-crumb-seg:hover {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+/* Fit-to-view button — appears in the bottom-right of the graph host only
+   when the user has applied a non-identity zoom/pan transform (session 231
+   Bout 5). Click to reset. */
+.atlas-context-graph-fit {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 5;
+  appearance: none;
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  color: var(--atlas-cyan);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.atlas-context-graph-fit:hover {
+  background: rgba(34, 211, 238, 0.2);
+  border-color: rgba(34, 211, 238, 0.6);
+}
+.atlas-context-graph-fit .material-symbols-outlined {
+  font-size: 16px;
+  pointer-events: none;
+}
+
+/* Graph host: 'grab' cursor over empty background to telegraph drag-pan.
+   The grabbing state is set inline by the drag handler. */
+.atlas-context-pane-graph {
+  cursor: grab;
+}
+.atlas-context-pane-graph .atlas-context-graph-node {
+  cursor: pointer;
 }
 
 .atlas-context-graph-node {
@@ -7107,13 +7270,28 @@ a.atlas-writing-workspace-crumb-seg:hover {
   opacity: 0.4;
 }
 
-/* "← back to {narrative}" pill — only renders when graph is recentered on
-   a non-home element. Pinned to the top-left of the graph host. */
-.atlas-context-graph-back {
+/* Recent-centers breadcrumb (session 231 — replaces the back pill).
+   Pinned to the top of the graph host as a horizontal chip strip:
+   [home] › [recent] › current. Home chip + earlier stack entries are
+   clickable pill chips; the current center renders as plain text. */
+.atlas-context-graph-trail {
   position: absolute;
   top: 6px;
   left: 8px;
+  right: 8px;
   z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  line-height: 1.2;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none; /* chip children re-enable */
+}
+.atlas-context-graph-trail-chip {
+  pointer-events: auto;
   appearance: none;
   border: 1px solid rgba(34, 211, 238, 0.35);
   background: rgba(0, 0, 0, 0.75);
@@ -7127,23 +7305,76 @@ a.atlas-writing-workspace-crumb-seg:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  max-width: calc(100% - 16px);
+  max-width: 140px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   transition: background 120ms ease, border-color 120ms ease;
 }
-.atlas-context-graph-back:hover {
+.atlas-context-graph-trail-chip:hover {
   background: rgba(34, 211, 238, 0.18);
   border-color: rgba(34, 211, 238, 0.55);
 }
-.atlas-context-graph-back .material-symbols-outlined {
+.atlas-context-graph-trail-chip .material-symbols-outlined {
   font-size: 14px;
+  flex-shrink: 0;
 }
-.atlas-context-graph-back > span:last-child {
+.atlas-context-graph-trail-chip > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.atlas-context-graph-trail-sep {
+  color: rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+}
+.atlas-context-graph-trail-current {
+  color: rgba(255, 255, 255, 0.85);
+  padding: 3px 4px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Right-click context menu on a graph node (session 231). Floating; pinned
+   at the cursor; clipped to viewport via JS. Items are icon + label rows. */
+.atlas-context-graph-node-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 160px;
+  background: rgba(8, 12, 16, 0.96);
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.atlas-context-graph-node-menu-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.86);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  transition: background 100ms ease;
+}
+.atlas-context-graph-node-menu-item:hover {
+  background: rgba(34, 211, 238, 0.15);
+  color: var(--atlas-cyan);
+}
+.atlas-context-graph-node-menu-item .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--atlas-cyan);
+  opacity: 0.8;
 }
 .atlas-context-graph-node .material-symbols-outlined {
   font-size: 18px;
