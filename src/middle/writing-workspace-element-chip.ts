@@ -80,6 +80,34 @@ export const ElementChip = Mention.extend({
     return node.attrs.label ?? node.attrs.id ?? '';
   },
 
+  /**
+   * Backspace when the cursor is immediately after a chip → "unlink"
+   * (replace the chip with its plain-text label). Subsequent Backspace
+   * deletes characters normally. Without this override, Backspace would
+   * delete the whole chip in one keystroke, which surprises writers who
+   * typed the word and just want to remove the link, not the text.
+   */
+  addKeyboardShortcuts() {
+    return {
+      Backspace: ({ editor }: any): boolean => {
+        const { selection } = editor.state;
+        if (!selection.empty) return false;
+        const pos = selection.from;
+        if (pos <= 0) return false;
+        const $pos = editor.state.doc.resolve(pos);
+        const nodeBefore = $pos.nodeBefore;
+        if (!nodeBefore || nodeBefore.type.name !== 'elementChip') return false;
+        const label = (nodeBefore.attrs?.label ?? '') as string;
+        const chipStart = pos - nodeBefore.nodeSize;
+        editor
+          .chain()
+          .insertContentAt({ from: chipStart, to: pos }, label || nodeBefore.attrs?.id || '')
+          .run();
+        return true;
+      },
+    };
+  },
+
   // ----- Markdown extension hooks -----
 
   addStorage() {

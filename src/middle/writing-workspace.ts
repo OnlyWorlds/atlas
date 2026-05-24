@@ -17,28 +17,25 @@
  * See DESIGN_WRITING.md v3.0 for full design.
  */
 
-import { getState, patchSlice, subscribe } from '../core/state';
+import { getState, subscribe } from '../core/state';
 import { onHashChange, parseHash, writingHash, elementHash, navigate } from '../core/router';
-import type { Element, ElementType } from '../core/types';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import type { Element } from '../core/types';
+import { ELEMENT_LABELS } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
-import { escapeText } from '../core/dom-utils';
 import { renderHeader } from './element-detail-header';
-import { renderSection } from './element-detail-fields';
-import { renderReferencedBy } from './element-detail-refs';
-import { sectionsFor } from '../editor/field-schema';
 import {
-  getWritingLabels,
-  getTierForNarrative,
   buildNarrativeIndex,
   ancestorIds,
 } from './writing-helpers';
 import { mountWorkspaceEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
 import { createFindBar, type FindBarHandle } from './writing-workspace-find-bar';
-import { renderCastStrip } from './writing-workspace-cast-strip';
 import { ElementCreateModal } from '../ui/element-create-modal';
+import { mountCompiledView, narrativeHasChildren } from './writing-compiled';
+import { handleAddToCast, type AddToCastDetail } from './writing-workspace-add-to-cast';
+import { findAutolinkCandidateAt, convertAutolinkAt } from './writing-workspace-autolink';
+import { NARRATIVE_RELATION_FIELDS } from './writing-workspace-derive';
 import { openSplitDialog } from './writing-workspace-split';
 import { type MentionSuggestionItem } from './writing-workspace-mention';
 import { computeRelationPatch } from './writing-workspace-derive';
@@ -59,19 +56,32 @@ import {
 import type { JSONContent } from '@tiptap/core';
 
 /**
- * Per-narrative collapsed state for the Details / References disclosures.
- * Persists across re-renders (same module-level pattern as element-detail's
- * scrollMemory). Keyed by narrative id; cleared on world switch.
+ * Public reset (was used to clear per-narrative disclosure state). Disclosures
+ * are gone now; this stays as a tiny no-op so existing call-sites don't need
+ * to be hunted down. Drop entirely once we're certain there are no callers.
  */
-const detailsCollapsed = new Map<string, boolean>();
-const referencesCollapsed = new Map<string, boolean>();
-// Default collapsed state for newly-visited narratives — see openDisclosure.
-const DEFAULT_DETAILS_COLLAPSED = true;
-const DEFAULT_REFERENCES_COLLAPSED = true;
-
 export function resetWritingWorkspaceMemory(): void {
-  detailsCollapsed.clear();
-  referencesCollapsed.clear();
+  viewModeByNarrative.clear();
+}
+
+/**
+ * Writing view mode — selectable when a narrative has children.
+ *   - this-level: edit the narrative's own `story` field (default for leaves)
+ *   - compiled:   read-only assembly of self + all descendants (default for
+ *                 parents — see DESIGN_WRITING.md compiled-view section)
+ *
+ * Module-level state — ephemeral, resets on world switch via
+ * resetWritingWorkspaceMemory. Persisting to registry would couple the model
+ * tighter than needed; the default (compiled when has children) already
+ * matches the expected behavior for most users.
+ */
+type WritingViewMode = 'this-level' | 'compiled';
+const viewModeByNarrative = new Map<string, WritingViewMode>();
+
+function resolveViewMode(el: Element, allElements: readonly Element[]): WritingViewMode {
+  const stored = viewModeByNarrative.get(el.id);
+  if (stored) return stored;
+  return narrativeHasChildren(el, allElements) ? 'compiled' : 'this-level';
 }
 
 /**
@@ -103,6 +113,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   // Track last-seen elements array reference so we only rebuild the autolink
   // index (and dispatch a tx) when state.data.elements actually swaps.
   let lastSeenElementsRef: Element[] | null = null;
+  // Track inputs to refreshNonEditorSurfaces so UI-only state ticks (popover
+  // open, sidebar toggle, hover, etc.) skip the whole 6-replacement cascade.
+  // Set by mountForNarrative on first paint; updated after each refresh.
+  let lastRefreshEl: Element | null = null;
+  let lastRefreshElementsRef: Element[] | null = null;
   // Singleton chip preview controller for this workspace mount — hover +
   // sticky-on-click peek of linked elements (DESIGN_WRITING.md §Click + hover).
   const chipPreview: ChipPreviewController = createChipPreview(root);
@@ -163,6 +178,17 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   };
   document.addEventListener(WRITING_SPLIT_EVENT, onSplitEvent);
 
+  // "Add to cast" event from the writing-context pane's element preview.
+  // Implementation lives in writing-workspace-add-to-cast.ts; this listener
+  // just forwards the detail + current editor instance.
+  const onAddToCast = (e: Event): void => {
+    void handleAddToCast(
+      (e as CustomEvent).detail as AddToCastDetail,
+      editorHandle?.editor ?? null,
+    );
+  };
+  document.addEventListener('atlas:context-add-to-cast', onAddToCast);
+
   /**
    * Open the split-into-sibling confirm dialog for the current narrative,
    * splitting at the editor's cursor position. Bails (with toast) if no
@@ -203,14 +229,14 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       suppressNavigate: true,
       title: 'Create element from selection',
       onCreated: (id, type) => {
-        // Replace the original selected range with an ow:// chip + trailing space.
+        // Replace the original selected range with an ow:// chip. No trailing
+        // space — cursor naturally lands after the chip.
         if (!editorHandle) return;
         editorHandle.editor
           .chain()
           .focus()
           .insertContentAt({ from, to }, [
             { type: 'elementChip', attrs: { id, type, label: selectedText } },
-            { type: 'text', text: ' ' },
           ])
           .run();
       },
@@ -252,14 +278,77 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     const docSize = editor.state.doc.content.size;
     const cursorIsMidDoc = cursorPos > 0 && cursorPos < docSize;
 
-    // If there's neither a selection nor a mid-doc cursor, our menu offers
-    // nothing — let the browser show its native menu (copy, paste, etc.).
-    if (!hasSelection && !cursorIsMidDoc) return;
+    // Detect right-click on an autolink hint — surface a "Link to {name}"
+    // action as the mouse-only alternative to Tab. We probe the doc position
+    // at the click coordinates so multiple-word matches resolve correctly.
+    const onHint = target.closest('.atlas-autolink-hint') !== null;
+    let autolinkHit: { name: string; docPos: number } | null = null;
+    if (onHint) {
+      const probe = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+      if (probe) {
+        const found = findAutolinkCandidateAt(editor.view, probe.pos);
+        if (found) {
+          autolinkHit = { name: found.candidate.displayName, docPos: probe.pos };
+        }
+      }
+    }
+
+    // Detect right-click on a linked chip — surface an "Unlink" action.
+    // Locate the chip node at the click coords and capture its range.
+    const chipDom = target.closest<HTMLElement>('.atlas-element-chip');
+    let chipHit: { id: string; label: string; from: number; to: number } | null = null;
+    if (chipDom) {
+      const probe = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+      if (probe) {
+        const $pos = editor.state.doc.resolve(probe.pos);
+        const nodeAfter = $pos.nodeAfter;
+        const nodeBefore = $pos.nodeBefore;
+        // Inline chip nodes occupy 1 position. The cursor at the click coord
+        // may resolve to either side of the chip; check both.
+        let chipNode: any = null;
+        let chipStart = -1;
+        if (nodeAfter && nodeAfter.type.name === 'elementChip') {
+          chipNode = nodeAfter;
+          chipStart = probe.pos;
+        } else if (nodeBefore && nodeBefore.type.name === 'elementChip') {
+          chipNode = nodeBefore;
+          chipStart = probe.pos - nodeBefore.nodeSize;
+        }
+        if (chipNode) {
+          chipHit = {
+            id: chipNode.attrs?.id as string,
+            label: (chipNode.attrs?.label as string) || '',
+            from: chipStart,
+            to: chipStart + chipNode.nodeSize,
+          };
+        }
+      }
+    }
+
+    // If we have nothing to offer (no selection, not mid-doc, no autolink, no chip),
+    // let the browser show its native menu (copy, paste, etc.).
+    if (!hasSelection && !cursorIsMidDoc && !autolinkHit && !chipHit) return;
 
     e.preventDefault();
     dismissContextMenu();
 
     const items: string[] = [];
+    if (chipHit) {
+      items.push(`
+        <button type="button" class="atlas-prose-context-menu-item" data-role="unlink-chip">
+          <span class="material-symbols-outlined">link_off</span>
+          <span>Unlink ${escapeMenuText(chipHit.label || 'chip')}</span>
+        </button>
+      `);
+    }
+    if (autolinkHit) {
+      items.push(`
+        <button type="button" class="atlas-prose-context-menu-item" data-role="link-autolink">
+          <span class="material-symbols-outlined">link</span>
+          <span>Link to ${escapeMenuText(autolinkHit.name)}</span>
+        </button>
+      `);
+    }
     if (hasSelection) {
       items.push(`
         <button type="button" class="atlas-prose-context-menu-item" data-role="create">
@@ -296,6 +385,18 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       dismissContextMenu();
       openSplitForCurrentCursor();
     });
+    menu.querySelector<HTMLElement>('[data-role="link-autolink"]')?.addEventListener('click', () => {
+      dismissContextMenu();
+      if (autolinkHit && editorHandle) {
+        convertAutolinkAt(editorHandle.editor.view, autolinkHit.docPos);
+      }
+    });
+    menu.querySelector<HTMLElement>('[data-role="unlink-chip"]')?.addEventListener('click', () => {
+      dismissContextMenu();
+      if (chipHit && editorHandle) {
+        void unlinkChipAndMaybeRemoveFromCast(chipHit);
+      }
+    });
     // Defer the outside-click listener so the contextmenu event that opened
     // us doesn't immediately close.
     queueMicrotask(() => {
@@ -303,6 +404,88 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       document.addEventListener('keydown', onContextMenuKey, true);
     });
   };
+
+  /** Cheap HTML escape for menu labels — chip names can contain &<>". */
+  function escapeMenuText(s: string): string {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /**
+   * Right-click "Unlink" handler. Replaces the chip with its label text
+   * (preserves visible reading). Then scans the rest of the prose for any
+   * OTHER mentions of the same element id — other chips, or text matches
+   * against the element's name + aliases. If none remain AND the id is in
+   * the narrative's matching link field, also remove it from that field —
+   * stronger "no longer in the cast" gesture than a chip deletion.
+   */
+  async function unlinkChipAndMaybeRemoveFromCast(
+    chip: { id: string; label: string; from: number; to: number },
+  ): Promise<void> {
+    if (!editorHandle) return;
+    const editor = editorHandle.editor;
+    // 1. Replace the chip with its plain label text.
+    editor
+      .chain()
+      .focus()
+      .insertContentAt({ from: chip.from, to: chip.to }, chip.label || '')
+      .run();
+
+    // 2. Scan remaining prose for any other mention of this element id.
+    // After the replacement, the doc no longer has THIS chip but may still
+    // have other chips with the same id, or text matches via name/aliases.
+    const state = getState();
+    const targetEl = state.data.elements.find(e => e.id === chip.id);
+    if (!targetEl) return;
+
+    // Re-read the editor's current markdown to check for ow://type/id chips.
+    const markdown = editorHandle.getMarkdown();
+    const otherChipMatch = markdown.includes('/' + chip.id + ')');
+
+    // Text-mention scan: any of the element's surface forms (name + aliases)
+    // appearing as a word-bounded match in the prose-as-plain-text view.
+    const plainText = editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n');
+    const surfaceForms: string[] = [];
+    if (targetEl.name) surfaceForms.push(targetEl.name);
+    if (Array.isArray(targetEl.atlas_aliases)) {
+      for (const a of targetEl.atlas_aliases) {
+        if (typeof a === 'string') surfaceForms.push(a);
+      }
+    }
+    let textMentionFound = false;
+    for (const form of surfaceForms) {
+      if (form.length < 2) continue;
+      const escaped = form.replace(/[\\^$.*+?()\[\]{}|]/g, '\\$&');
+      const re = new RegExp('\\b' + escaped + '\\b');
+      if (re.test(plainText)) { textMentionFound = true; break; }
+    }
+
+    if (otherChipMatch || textMentionFound) return; // Still mentioned — leave the field alone.
+
+    // 3. Remove the id from the narrative's matching link field.
+    const narrative = getActiveNarrative();
+    if (!narrative) return;
+    const field = NARRATIVE_RELATION_FIELDS[targetEl.type];
+    if (!field) return;
+    const existing = (narrative as Record<string, unknown>)[field];
+    if (!Array.isArray(existing)) return;
+    const filtered = existing.filter((v): v is string => typeof v === 'string' && v !== chip.id);
+    if (filtered.length === existing.length) return; // wasn't there anyway
+    const folder = getActiveStore();
+    if (!folder) return;
+    try {
+      await folder.updateElement(narrative.id, {
+        [field]: filtered,
+      } as Partial<Element>);
+      await refreshElementsAfterWrite(folder);
+      requestPushIfLinked();
+    } catch (err) {
+      console.error('[writing-workspace] unlink: field write failed', err);
+    }
+  }
   root.addEventListener('contextmenu', onProseContextMenu);
 
   // Focus mode (Cmd+Shift+F via hotkeys.ts) — toggles a class on the workspace
@@ -312,10 +495,24 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     root.classList.toggle('is-focus-mode');
   };
   const onFocusEsc = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' && root.classList.contains('is-focus-mode')) {
+    if (e.key !== 'Escape') return;
+    // Esc exits focus mode OR reading mode (whichever is active). Focus mode
+    // takes priority — the user is more visually buried in it.
+    if (root.classList.contains('is-focus-mode')) {
       e.preventDefault();
       e.stopPropagation();
       root.classList.remove('is-focus-mode');
+      // Sync the action button's aria-pressed state with the class change.
+      const focusBtn = root.querySelector<HTMLButtonElement>('.atlas-writing-workspace-action[data-action="focus"]');
+      if (focusBtn) focusBtn.setAttribute('aria-pressed', 'false');
+      return;
+    }
+    if (root.classList.contains('is-reading-mode')) {
+      e.preventDefault();
+      e.stopPropagation();
+      root.classList.remove('is-reading-mode');
+      const readBtn = root.querySelector<HTMLButtonElement>('.atlas-writing-workspace-action[data-action="reading"]');
+      if (readBtn) readBtn.setAttribute('aria-pressed', 'false');
     }
   };
   document.addEventListener(WRITING_FOCUS_TOGGLE_EVENT, onFocusToggle);
@@ -425,11 +622,12 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       lastSavedMarkdown = snap.markdown;
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
-      updateSaveStateIndicator('saved');
+      // Save-state indicator no longer rendered here — the element-header's
+      // sync dot (sets data-state via local_updated_at vs server_updated_at)
+      // is now the single source of truth for save/sync visual feedback.
     } catch (err: any) {
       console.error('[writing-workspace] save failed', err);
       toastManager.error('Save failed: ' + (err?.message ?? 'unknown error'));
-      updateSaveStateIndicator('error');
     }
   }
 
@@ -462,13 +660,19 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
 
     // Live-apply prose font size in case Settings → Writing changed it.
     applyProseFontSize(root);
+    applySpellcheck();
 
     // Live chip label sync — propagate any element renames into the editor's
     // chip nodes. No-op when nothing changed; a single state-driven tick.
     if (editorHandle) {
       const elements = getState().data.elements;
-      const byId = new Map<string, string>();
-      for (const e of elements) byId.set(e.id, e.name || '');
+      const byId = new Map<string, { name: string; aliases: string[] }>();
+      for (const e of elements) {
+        byId.set(e.id, {
+          name: e.name || '',
+          aliases: Array.isArray(e.atlas_aliases) ? e.atlas_aliases : [],
+        });
+      }
       editorHandle.syncChipLabels((id) => byId.get(id) ?? null);
       // Refresh autolink index only when the elements array reference swaps —
       // skip the no-op tx on ticks where only e.g. UI state changed.
@@ -503,82 +707,118 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // 1. Header (reuse element-detail-header for visual + behavioral consistency).
     root.appendChild(renderHeader(el));
 
-    // 2. Body wrapper — scrollable, with section spacing.
+    // 2. Sticky bar — breadcrumb + date + action icons. Chrome-level sibling
+    // of the scrollable body so it's always visible without needing
+    // position:sticky on the body's first child.
+    root.appendChild(renderBreadcrumbAndDate(el));
+
+    // 3. Body wrapper — scrollable, with section spacing.
     const body = document.createElement('div');
     body.className = 'atlas-writing-workspace-body';
     body.dataset.elementId = el.id;
     root.appendChild(body);
 
-    // 3. Breadcrumb + date row.
-    body.appendChild(renderBreadcrumbAndDate(el));
+    // Cast strip / Details disclosure / References disclosure moved to the
+    // right-pane writing-context tab (session 229). The writing room is now
+    // prose-pure: sticky bar above, prose, ambient word count. Anything else
+    // lives in the context pane (right) or element-detail (open-as-element).
 
-    // 3a. Character-cast strip — pivot of linked elements by type. Click a
-    // chip to insert at cursor. Hidden in reading + focus modes via CSS.
-    body.appendChild(renderCastStrip({
-      narrative: el,
-      worldId: getState().active!.worldId,
-      getEditor: () => editorHandle?.editor ?? null,
-    }));
-
-    // 4. Prose surface (TipTap mounts here).
+    // 4. Prose surface — either TipTap editor (this-level mode) or compiled
+    // view (parents in compiled mode). The compiled view is read-only and
+    // assembles self + descendants in order.
     const proseHost = document.createElement('div');
     proseHost.className = 'atlas-writing-workspace-prose';
     body.appendChild(proseHost);
 
-    const initialJson = parseRichtextJson(el.atlas_richtext_json);
-    const initialMarkdown = typeof el.story === 'string' ? el.story : '';
+    const viewMode = resolveViewMode(el, getState().data.elements);
+    if (viewMode === 'compiled') {
+      // Compiled view — read-only assembly. No editor handle; save paths and
+      // mention picker stay dormant. Auto-revert to this-level if a structure
+      // change leaves the narrative with no children.
+      mountCompiledView(proseHost, el);
+    } else {
+      const initialJson = parseRichtextJson(el.atlas_richtext_json);
+      const initialMarkdown = typeof el.story === 'string' ? el.story : '';
 
-    editorHandle = mountWorkspaceEditor({
-      target: proseHost,
-      initialJson,
-      initialMarkdown,
-      autolinkSeed: { elements: getState().data.elements },
-      onUpdate: (snap) => {
-        scheduleSave({ markdown: snap.markdown, json: snap.json });
-        updateWordCountIndicator(snap.wordCount);
-        updateSaveStateIndicator('pending');
-      },
-      mentionItems: (query) => buildMentionItems(query),
-      onChipHover: (chip, id, type) => chipPreview.scheduleHoverShow(chip, id, type),
-      onChipUnhover: () => chipPreview.scheduleHoverHide(),
-      onChipClick: (chip, id, type) => {
-        // Sticky preview: card stays open until click-outside or Esc. The
-        // card has an explicit "Open as element →" link for full navigation
-        // — writers stay in writing mode unless they choose to leave.
-        chipPreview.showSticky(chip, id, type);
-      },
-      onMentionInserted: (id) => {
-        const worldId = getState().active?.worldId;
-        if (worldId) pushRecent(worldId, id);
-      },
-    });
+      editorHandle = mountWorkspaceEditor({
+        target: proseHost,
+        initialJson,
+        initialMarkdown,
+        autolinkSeed: { elements: getState().data.elements },
+        onUpdate: (snap) => {
+          scheduleSave({ markdown: snap.markdown, json: snap.json });
+          updateWordCountIndicator(snap.wordCount);
+          // Save-state indicator no longer rendered; element-header sync dot
+          // handles dirty/synced feedback via local_updated_at vs server_updated_at.
+        },
+        mentionItems: (query) => buildMentionItems(query),
+        onChipHover: (chip, id, type) => chipPreview.scheduleHoverShow(chip, id, type),
+        onChipUnhover: () => chipPreview.scheduleHoverHide(),
+        onChipClick: (_chip, id, _type) => {
+          // Route chip clicks to the context pane — select the clicked
+          // element there (preview slides in, lists highlight, graph
+          // highlights). The hover preview popover stays for quick peeks;
+          // click is the "commit to looking at this in detail" gesture and
+          // belongs in the unified selection surface (the context pane).
+          chipPreview.hideNow();
+          document.dispatchEvent(new CustomEvent('atlas:context-select-element', {
+            detail: { id },
+          }));
+        },
+        onMentionInserted: (id) => {
+          const worldId = getState().active?.worldId;
+          if (worldId) pushRecent(worldId, id);
+        },
+      });
 
-    // Sync chip labels to current element names immediately on mount — covers
-    // the case where atlas_richtext_json was stored when elements had different
-    // names. The synchronous sync triggers onUpdate (transaction = docChange),
-    // which schedules a save; that save persists the now-fresh labels.
-    const elements = getState().data.elements;
-    const byId = new Map<string, string>();
-    for (const e of elements) byId.set(e.id, e.name || '');
-    editorHandle.syncChipLabels((id) => byId.get(id) ?? null);
+      // Sync chip labels to current element names immediately on mount —
+      // covers the case where atlas_richtext_json was stored when elements
+      // had different names. The synchronous sync triggers onUpdate (tx =
+      // docChange), which schedules a save that persists the fresh labels.
+      const elements = getState().data.elements;
+      const byId = new Map<string, { name: string; aliases: string[] }>();
+      for (const e of elements) {
+        byId.set(e.id, {
+          name: e.name || '',
+          aliases: Array.isArray(e.atlas_aliases) ? e.atlas_aliases : [],
+        });
+      }
+      editorHandle.syncChipLabels((id) => byId.get(id) ?? null);
+      // Apply per-world spellcheck preference to the contenteditable.
+      applySpellcheck();
+    }
 
-    // 5. Details (collapsed) — wraps schema-driven fields, story excluded.
-    body.appendChild(renderDetailsDisclosure(el));
+    // 5/6 — disclosures removed (moved to context pane).
 
-    // 6. References (collapsed) — wraps element-detail-refs output.
-    body.appendChild(renderReferencesDisclosure(el));
+    // 7. Ambient word-count widget — anchored bottom-right corner of the
+    // workspace root (NOT inside the scrollable body, so it stays visible
+    // across long narratives without scroll). Click → goal popover.
+    root.appendChild(renderWordCountWidget(el));
 
-    // 7. Footer — word count + reading time + save state + open-as-element.
-    body.appendChild(renderFooter(el));
+    // Prime the refresh-cache so the next render() tick is a no-op until
+    // either the active narrative or the elements array reference changes.
+    lastRefreshEl = el;
+    lastRefreshElementsRef = getState().data.elements;
   }
 
   function refreshNonEditorSurfaces(el: Element): void {
-    // Update header, breadcrumb, disclosures — but DON'T touch the editor.
-    // For v1 simplicity, we replace everything except the prose host. The
-    // editor's DOM remains because we never wipe `.atlas-writing-workspace-prose`'s
-    // contents — the editor instance owns that subtree.
+    // Update header, breadcrumb, disclosures, ambient word count — but DON'T
+    // touch the editor. The editor's DOM stays because we never wipe
+    // `.atlas-writing-workspace-prose`'s contents — the editor instance owns
+    // that subtree.
     const body = root.querySelector<HTMLElement>('.atlas-writing-workspace-body');
     if (!body) return;
+
+    // Skip the cascade entirely when nothing relevant changed since the last
+    // refresh. UI-only state ticks (popover open/close, sidebar mode toggle,
+    // chip hover, find-bar interactions) re-enter render() but mutate neither
+    // the active narrative nor the elements array — those should be no-ops
+    // here. Typing ticks DO swap state.data.elements (debounced save → store
+    // patch), so they fall through and refresh.
+    const elementsRef = getState().data.elements;
+    if (el === lastRefreshEl && elementsRef === lastRefreshElementsRef) return;
+    lastRefreshEl = el;
+    lastRefreshElementsRef = elementsRef;
 
     // Replace header (cheap — the renderHeader function is the same one
     // element-detail uses; works fine to re-render on every state change).
@@ -586,34 +826,19 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     const newHeader = renderHeader(el);
     if (oldHeader) oldHeader.replaceWith(newHeader);
 
-    // Replace breadcrumb/date row.
-    const oldCrumb = body.querySelector<HTMLElement>('.atlas-writing-workspace-crumb');
+    // Replace sticky bar (breadcrumb + date + action icons).
+    const oldCrumb = root.querySelector<HTMLElement>(':scope > .atlas-writing-workspace-crumb');
     const newCrumb = renderBreadcrumbAndDate(el);
     if (oldCrumb) oldCrumb.replaceWith(newCrumb);
 
-    // Replace cast strip (reflects current relation field on every state tick).
-    const oldCast = body.querySelector<HTMLElement>('.atlas-writing-workspace-cast');
-    const newCast = renderCastStrip({
-      narrative: el,
-      worldId: getState().active!.worldId,
-      getEditor: () => editorHandle?.editor ?? null,
-    });
-    if (oldCast) oldCast.replaceWith(newCast);
+    // Cast / Details / References surfaces moved to the context pane (right
+    // pane writing-context tab). No replacements needed here anymore.
 
-    // Replace Details disclosure (re-renders the schema fields with current values).
-    const oldDetails = body.querySelector<HTMLElement>('.atlas-writing-workspace-details');
-    const newDetails = renderDetailsDisclosure(el);
-    if (oldDetails) oldDetails.replaceWith(newDetails);
-
-    // Replace References disclosure.
-    const oldRefs = body.querySelector<HTMLElement>('.atlas-writing-workspace-refs');
-    const newRefs = renderReferencesDisclosure(el);
-    if (oldRefs) oldRefs.replaceWith(newRefs);
-
-    // Replace footer.
-    const oldFooter = body.querySelector<HTMLElement>('.atlas-writing-workspace-footer');
-    const newFooter = renderFooter(el);
-    if (oldFooter) oldFooter.replaceWith(newFooter);
+    // Replace ambient word-count widget (anchored on workspace root, not body).
+    const oldWc = root.querySelector<HTMLElement>(':scope > .atlas-writing-workspace-wc-corner');
+    const newWc = renderWordCountWidget(el);
+    if (oldWc) oldWc.replaceWith(newWc);
+    else root.appendChild(newWc);
   }
 
   function teardownEditor(): void {
@@ -623,6 +848,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     }
     mountedForId = null;
     lastSavedMarkdown = null;
+    lastRefreshEl = null;
+    lastRefreshElementsRef = null;
   }
 
   // ============================================================================
@@ -630,14 +857,21 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   // ============================================================================
 
   function renderBreadcrumbAndDate(el: Element): HTMLElement {
+    // Sticky bar below the 36px element header. Single horizontal row:
+    //   [crumb › crumb › current  📅 dates]              [focus][read][open]
+    // Crumbs + date on the left (ellipsize as needed), action icons on right.
+    // position: sticky in CSS so it pins to the top of the scrollable body.
     const wrap = document.createElement('div');
     wrap.className = 'atlas-writing-workspace-crumb';
 
     const state = getState();
     const worldId = state.active!.worldId;
-    const labels = getWritingLabels(worldId);
     const idx = buildNarrativeIndex(state.data.elements, worldId);
     const chain = ancestorIds(idx, el.id);
+
+    const left = document.createElement('div');
+    left.className = 'atlas-writing-workspace-crumb-left';
+    wrap.appendChild(left);
 
     const crumbs: Array<{ id: string; name: string }> = [];
     for (const ancestorId of chain) {
@@ -664,22 +898,23 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       if (!isLast) {
         const sep = document.createElement('span');
         sep.className = 'atlas-writing-workspace-crumb-sep';
-        sep.textContent = ' › ';
+        sep.textContent = '›';
         crumbsRow.appendChild(sep);
       }
     });
-    wrap.appendChild(crumbsRow);
+    left.appendChild(crumbsRow);
 
-    // Date row — show start_date / end_date if present.
+    // Date pill — inline next to the breadcrumb. Only renders when at least
+    // one bound is set. Small event icon + range/single-value text.
     const start = el.start_date;
     const end = el.end_date;
     if (start != null || end != null) {
-      const dateRow = document.createElement('div');
-      dateRow.className = 'atlas-writing-workspace-date';
+      const dateBadge = document.createElement('span');
+      dateBadge.className = 'atlas-writing-workspace-date';
       const icon = document.createElement('span');
       icon.className = 'material-symbols-outlined';
       icon.textContent = 'event';
-      dateRow.appendChild(icon);
+      dateBadge.appendChild(icon);
       const dateText = document.createElement('span');
       if (start != null && end != null) {
         dateText.textContent = `${start} → ${end}`;
@@ -688,9 +923,94 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       } else {
         dateText.textContent = `→ ${end}`;
       }
-      dateRow.appendChild(dateText);
-      wrap.appendChild(dateRow);
+      dateBadge.appendChild(dateText);
+      left.appendChild(dateBadge);
     }
+
+    // Right cluster — view-mode toggle (when narrative has children) + action
+    // icons. Save state already lives in the element header's sync dot.
+    const right = document.createElement('div');
+    right.className = 'atlas-writing-workspace-crumb-actions';
+
+    // View-mode toggle — only when this narrative has descendants. Lets the
+    // user switch between editing THIS narrative's prose and a read-only
+    // compiled view of self + descendants.
+    if (narrativeHasChildren(el, state.data.elements)) {
+      const mode = resolveViewMode(el, state.data.elements);
+      const toggle = document.createElement('div');
+      toggle.className = 'atlas-writing-workspace-viewmode';
+      toggle.setAttribute('role', 'tablist');
+
+      const thisBtn = document.createElement('button');
+      thisBtn.type = 'button';
+      thisBtn.className = 'atlas-writing-workspace-viewmode-btn';
+      thisBtn.setAttribute('role', 'tab');
+      thisBtn.dataset.mode = 'this-level';
+      thisBtn.textContent = 'This level';
+      thisBtn.setAttribute('aria-selected', mode === 'this-level' ? 'true' : 'false');
+      thisBtn.addEventListener('click', () => {
+        if (resolveViewMode(el, getState().data.elements) === 'this-level') return;
+        viewModeByNarrative.set(el.id, 'this-level');
+        void flushPendingSave().then(() => mountForNarrative(el));
+      });
+      toggle.appendChild(thisBtn);
+
+      const compiledBtn = document.createElement('button');
+      compiledBtn.type = 'button';
+      compiledBtn.className = 'atlas-writing-workspace-viewmode-btn';
+      compiledBtn.setAttribute('role', 'tab');
+      compiledBtn.dataset.mode = 'compiled';
+      compiledBtn.textContent = 'Compiled';
+      compiledBtn.setAttribute('aria-selected', mode === 'compiled' ? 'true' : 'false');
+      compiledBtn.addEventListener('click', () => {
+        if (resolveViewMode(el, getState().data.elements) === 'compiled') return;
+        viewModeByNarrative.set(el.id, 'compiled');
+        void flushPendingSave().then(() => mountForNarrative(el));
+      });
+      toggle.appendChild(compiledBtn);
+
+      right.appendChild(toggle);
+    }
+
+    const focusBtn = document.createElement('button');
+    focusBtn.type = 'button';
+    focusBtn.className = 'atlas-icon-btn-sm atlas-writing-workspace-action';
+    focusBtn.dataset.action = 'focus';
+    focusBtn.title = 'Focus mode (Ctrl+Shift+F)';
+    focusBtn.setAttribute('aria-pressed', root.classList.contains('is-focus-mode') ? 'true' : 'false');
+    focusBtn.innerHTML = '<span class="material-symbols-outlined">center_focus_strong</span>';
+    focusBtn.addEventListener('click', () => {
+      document.dispatchEvent(new CustomEvent(WRITING_FOCUS_TOGGLE_EVENT));
+      focusBtn.setAttribute('aria-pressed', root.classList.contains('is-focus-mode') ? 'true' : 'false');
+    });
+    right.appendChild(focusBtn);
+
+    const readBtn = document.createElement('button');
+    readBtn.type = 'button';
+    readBtn.className = 'atlas-icon-btn-sm atlas-writing-workspace-action';
+    readBtn.dataset.action = 'reading';
+    readBtn.title = 'Reading mode';
+    readBtn.setAttribute('aria-pressed', root.classList.contains('is-reading-mode') ? 'true' : 'false');
+    readBtn.innerHTML = '<span class="material-symbols-outlined">menu_book</span>';
+    readBtn.addEventListener('click', () => {
+      const isOn = root.classList.toggle('is-reading-mode');
+      readBtn.setAttribute('aria-pressed', String(isOn));
+    });
+    right.appendChild(readBtn);
+
+    const openBtn = document.createElement('a');
+    openBtn.className = 'atlas-icon-btn-sm atlas-writing-workspace-action';
+    openBtn.dataset.action = 'open-as-element';
+    openBtn.title = 'Open as element';
+    openBtn.href = '#' + elementHash(worldId, el.id);
+    openBtn.innerHTML = '<span class="material-symbols-outlined">open_in_new</span>';
+    openBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigate(elementHash(worldId, el.id));
+    });
+    right.appendChild(openBtn);
+
+    wrap.appendChild(right);
 
     return wrap;
   }
@@ -702,98 +1022,23 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     return writingHash(worldId, narrativeId);
   }
 
-  function renderDetailsDisclosure(el: Element): HTMLElement {
-    const wrap = document.createElement('details');
-    wrap.className = 'atlas-writing-workspace-details';
-    const collapsed = detailsCollapsed.get(el.id) ?? DEFAULT_DETAILS_COLLAPSED;
-    if (!collapsed) wrap.setAttribute('open', '');
-
-    const summary = document.createElement('summary');
-    summary.className = 'atlas-writing-workspace-disclosure-summary';
-    summary.textContent = 'Details';
-    wrap.appendChild(summary);
-
-    wrap.addEventListener('toggle', () => {
-      detailsCollapsed.set(el.id, !wrap.open);
-    });
-
-    const body = document.createElement('div');
-    body.className = 'atlas-writing-workspace-disclosure-body';
-    wrap.appendChild(body);
-
-    // Render every section, with story field filtered out (it's the prose surface).
-    const sections = sectionsFor(el.type);
-    sections.forEach((section, idx) => {
-      const filtered = {
-        ...section,
-        fields: section.fields.filter(f => f.name !== 'story'),
-      };
-      if (filtered.fields.length === 0) return;
-      const sectionEl = renderSection(filtered, el, false);
-      if (sectionEl) body.appendChild(sectionEl);
-    });
-
-    return wrap;
-  }
-
-  function renderReferencesDisclosure(el: Element): HTMLElement {
-    const wrap = document.createElement('details');
-    wrap.className = 'atlas-writing-workspace-refs';
-    const collapsed = referencesCollapsed.get(el.id) ?? DEFAULT_REFERENCES_COLLAPSED;
-    if (!collapsed) wrap.setAttribute('open', '');
-
-    const summary = document.createElement('summary');
-    summary.className = 'atlas-writing-workspace-disclosure-summary';
-    summary.textContent = 'References';
-    wrap.appendChild(summary);
-
-    wrap.addEventListener('toggle', () => {
-      referencesCollapsed.set(el.id, !wrap.open);
-    });
-
-    const refsBody = renderReferencedBy(el);
-    if (refsBody) {
-      wrap.appendChild(refsBody);
-    } else {
-      const empty = document.createElement('div');
-      empty.className = 'atlas-writing-workspace-disclosure-body';
-      empty.innerHTML = '<p class="atlas-pane-empty-inline">No other elements link to this narrative.</p>';
-      wrap.appendChild(empty);
-    }
-
-    return wrap;
-  }
-
-  function renderFooter(el: Element): HTMLElement {
-    const footer = document.createElement('div');
-    footer.className = 'atlas-writing-workspace-footer';
-
-    const left = document.createElement('div');
-    left.className = 'atlas-writing-workspace-footer-left';
-    // Reading-mode toggle (placeholder — wires up in Bout G).
-    const readBtn = document.createElement('button');
-    readBtn.type = 'button';
-    readBtn.className = 'atlas-icon-btn-sm';
-    readBtn.title = 'Reading mode';
-    readBtn.setAttribute('aria-pressed', 'false');
-    readBtn.innerHTML = '<span class="material-symbols-outlined">menu_book</span>';
-    readBtn.addEventListener('click', () => {
-      const isOn = root.classList.toggle('is-reading-mode');
-      readBtn.setAttribute('aria-pressed', String(isOn));
-    });
-    left.appendChild(readBtn);
-    footer.appendChild(left);
-
-    const right = document.createElement('div');
-    right.className = 'atlas-writing-workspace-footer-right';
+  /**
+   * Ambient word-count widget. Position-absolute on the workspace root,
+   * bottom-right corner. Always visible regardless of scroll. Click opens
+   * the session word-goal popover.
+   *
+   * Replaces the legacy footer entirely. Reading time, save-state, and
+   * open-as-element moved to the sticky bar (or, in save-state's case,
+   * the element-header sync dot — convention #5 follow-through).
+   */
+  function renderWordCountWidget(el: Element): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'atlas-writing-workspace-wc-corner';
 
     const wordCount = editorHandle?.getWordCount() ?? 0;
-    const readingMin = Math.max(1, Math.round(wordCount / 250));
     const worldId = getState().active!.worldId;
     const goal = getWordGoal(worldId, el.id);
 
-    // Word count is a clickable button — opens the session-goal popover.
-    // When a goal is set, prepends a tiny progress ring and shows `/ goal`.
     const wcBtn = document.createElement('button');
     wcBtn.type = 'button';
     wcBtn.className = 'atlas-writing-workspace-wc-btn';
@@ -820,47 +1065,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         },
       });
     });
-    right.appendChild(wcBtn);
-
-    const dot = document.createElement('span');
-    dot.className = 'atlas-writing-workspace-sep';
-    dot.textContent = '·';
-    right.appendChild(dot);
-
-    const rmSpan = document.createElement('span');
-    rmSpan.textContent = `${readingMin} min read`;
-    right.appendChild(rmSpan);
-
-    const dot2 = document.createElement('span');
-    dot2.className = 'atlas-writing-workspace-sep';
-    dot2.textContent = '·';
-    right.appendChild(dot2);
-
-    const saveSpan = document.createElement('span');
-    saveSpan.className = 'atlas-writing-workspace-save';
-    saveSpan.dataset.state = 'idle';
-    saveSpan.textContent = 'saved';
-    right.appendChild(saveSpan);
-
-    const openLink = document.createElement('a');
-    openLink.className = 'atlas-writing-workspace-open-link';
-    openLink.href = '#' + elementHash(getState().active!.worldId, el.id);
-    openLink.textContent = 'Open as element →';
-    openLink.addEventListener('click', (e) => {
-      e.preventDefault();
-      navigate(elementHash(getState().active!.worldId, el.id));
-    });
-    right.appendChild(openLink);
-
-    footer.appendChild(right);
-    return footer;
-  }
-
-  function updateSaveStateIndicator(state: 'pending' | 'saved' | 'error'): void {
-    const span = root.querySelector<HTMLElement>('.atlas-writing-workspace-save');
-    if (!span) return;
-    span.dataset.state = state;
-    span.textContent = state === 'pending' ? 'saving…' : state === 'error' ? 'save failed' : 'saved';
+    wrap.appendChild(wcBtn);
+    return wrap;
   }
 
   function updateWordCountIndicator(wordCount: number): void {
@@ -971,7 +1177,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   }
 
   function toItem(el: Element): MentionSuggestionItem {
-    const aliases = (el as any).atlas_aliases as string[] | undefined;
+    const aliases = el.atlas_aliases;
     return {
       id: el.id,
       type: el.type,
@@ -994,6 +1200,22 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
    * live. The font-family map is centralized here so adding a new preset
    * is one tiny edit.
    */
+  /**
+   * Apply the per-world spellcheck preference to the editor's contenteditable.
+   * Reads writing_spellcheck (default true) from the world's registry entry
+   * and sets the attribute. Runs on every render() so toggling Settings →
+   * Writing → Spellcheck takes effect live.
+   */
+  function applySpellcheck(): void {
+    if (!editorHandle) return;
+    const state = getState();
+    const active = state.active;
+    if (!active) return;
+    const entry = state.registry.worlds.find(w => w.id === active.worldId);
+    const enabled = entry?.writing_spellcheck !== false;
+    editorHandle.editor.view.dom.setAttribute('spellcheck', enabled ? 'true' : 'false');
+  }
+
   function applyProseFontSize(workspaceRoot: HTMLElement): void {
     const state = getState();
     const active = state.active;
@@ -1051,6 +1273,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     root.removeEventListener('keydown', onWorkspaceHotkey);
     document.removeEventListener(WRITING_INLINE_CREATE_EVENT, onInlineCreateEvent);
     document.removeEventListener(WRITING_SPLIT_EVENT, onSplitEvent);
+    document.removeEventListener('atlas:context-add-to-cast', onAddToCast);
     root.removeEventListener('contextmenu', onProseContextMenu);
     dismissContextMenu();
     document.removeEventListener(WRITING_FOCUS_TOGGLE_EVENT, onFocusToggle);

@@ -118,6 +118,11 @@ export const ATLAS_LOCAL_EXTENSION_FIELDS = [
   // match against in addition to the canonical `name` field. Atlas-local;
   // stripped on API push. Council-motion candidate (DESIGN.md tracking section).
   'atlas_aliases',
+  // Per-narrative suggestion dismissals for the writing-context pane. Writer
+  // ×-dismisses a suggested element in the Suggested list → its id is added
+  // to this array on the narrative. Surfaces NOT to suggest again for this
+  // narrative. Atlas-local; never pushed.
+  'atlas_dismissed_suggestions',
 ] as const;
 export type AtlasLocalExtensionField = typeof ATLAS_LOCAL_EXTENSION_FIELDS[number];
 

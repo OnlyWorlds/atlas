@@ -328,6 +328,8 @@ export function getWorldRightTabs(
   const tabs = snap.tabs.filter((t): t is RightTabRef => {
     if (!t || typeof t !== 'object') return false;
     if (t.kind === 'map-index') return true;
+    // Writing-context tabs are ephemeral — strip on registry load too.
+    if (t.kind === 'writing-context') return false;
     return t.kind === 'map' && typeof (t as { mapId?: unknown }).mapId === 'string';
   });
   const activeIndex = Math.max(0, Math.min(snap.activeIndex, tabs.length - 1));

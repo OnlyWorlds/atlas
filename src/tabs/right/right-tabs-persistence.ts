@@ -54,9 +54,22 @@ export function loadPersistedRightTabs(): PersistedRightTabs | null {
 /** Save the snapshot to localStorage. Idempotent; safe to spam. */
 export function savePersistedRightTabs(tabs: readonly RightTabRef[], activeIndex: number): void {
   try {
+    // Writing-context tabs are ephemeral — never persisted. Strip before save
+    // so a reload comes back without a stale context tab. Active index adjusts
+    // accordingly to avoid pointing past the end.
+    const filtered = tabs.filter(t => t.kind !== 'writing-context');
+    let adjustedIndex = activeIndex;
+    if (filtered.length !== tabs.length) {
+      // Count writing-context tabs at or before the active index so we shift
+      // the active index left by that many.
+      const droppedBeforeActive = tabs
+        .slice(0, activeIndex + 1)
+        .filter(t => t.kind === 'writing-context').length;
+      adjustedIndex = Math.max(0, Math.min(activeIndex - droppedBeforeActive, filtered.length - 1));
+    }
     const payload: PersistedRightTabs = {
-      tabs: tabs.slice(),
-      activeIndex,
+      tabs: filtered,
+      activeIndex: adjustedIndex,
     };
     localStorage.setItem(RIGHT_TABS_STORAGE_KEY, JSON.stringify(payload));
   } catch (err) {

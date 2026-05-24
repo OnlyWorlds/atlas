@@ -1,7 +1,7 @@
 # Atlas — Writing Design
 
-**Version**: 3.0 (2026-05-20) — writing workspace redesign locked
-**Status**: v1 design locked from session 226 research swarm + Captain decisions. Implementation begins immediately after this doc lands.
+**Version**: 3.1 (2026-05-20) — v2 batch shipped (session 228)
+**Status**: v1 + v1.5 + v2 batch all shipped. Tool is feature-complete for primary writing flows; subsequent work is UI polish + the long-tail roadmap items still flagged below.
 **Related**: `DESIGN.md` (Rooms model, atlas-specific fields), `DESIGN_HOME.md`, `DESIGN_PUBLISHING.md`
 
 ---
@@ -281,27 +281,60 @@ The URL is the source of truth for which narrative is active (convention #46). W
 
 ---
 
-## v2+ Roadmap (named-and-protected)
+## Roadmap status (session 230 update)
 
-These are NOT v1, but they are tracked so we don't forget. Order roughly by user value × ease.
+### Shipped through session 230 (writing room redesign + context pane)
 
-1. **Hover preview card on chips** — element image + type badge + one-line description + "Open" button. Highest-leverage v2 feature per research.
-2. **Focus / distraction-free mode** — Cmd+Shift+F. Collapses sidebar + header + footer; prose only.
-3. **Element aliases editor UX polish** — alias chips in element-detail, drag to reorder, "merge into" affordance.
-4. **First-mention auto-link** if not landed in v1.
-5. **Backlinks pane on element-detail** — "narratives that link to this element" / "elements that link to this narrative" — cross-cutting feature, lives on the element page per research.
-6. **Outline / corkboard view** of writing tree — index cards, drag to reorder, alternate to the linear sidebar tree. Scrivener's most-loved feature.
-7. **Per-narrative atlas-local notes scratchpad** — like world notes overlay, but per-narrative.
-8. **Per-session word count goal** — set target, footer shows progress ring.
-9. **Find/replace** within current narrative + across whole book.
-10. **Inline element creation from selected text** — highlight "Mira Halloway" → "Create Character?" → modal pre-filled with selected name.
-11. **Element embeds** in richtext — render element card inline within prose (TipTap node extension). Powerful for TTRPG handouts.
-12. **Footnotes + callouts** as richtext blocks (TipTap node extensions).
-13. **Bidirectional consistency check** — "you wrote 'green eyes' but Lyra's element record says brown". Atlas's strongest long-term differentiator per research; no competitor does this.
-14. **Prose-first extraction** — parse existing manuscript via OW SDK → propose Characters, Locations, Objects. Fits OnlyWorlds parsing skill heritage.
-15. **Visual narrative graph** at `#/w/<id>/writing/graph` — nodes for narratives sized by word count, edges for parent_narrative + shared elements + explicit references.
-16. **Compare view** — two narratives side-by-side for revision.
-17. **Export book/chapter to markdown/PDF/EPUB** — lives in publish room per `DESIGN_PUBLISHING.md`. Writing room provides the "publish this book" affordance.
+- ✅ **Writing-context tab in right pane** — graph + Cast + Suggested + element preview, session 229
+- ✅ **Force-directed graph** ported from cos-browser, session 229
+- ✅ **Featured/Planned distinction** in Cast — Featured = in field AND in prose (chip or name/alias text match), Planned = in field only, session 229-230
+- ✅ **Compiled view for parent narratives** — read-only assembly + clickable section markers + collapsible chevrons + tier-specific icons, session 229-230
+- ✅ **Sticky bar below element header** — breadcrumb + date + focus/reading/open action icons, session 229
+- ✅ **Ambient word-count widget** — bottom-right corner, replaces legacy footer, session 229
+- ✅ **Graph: click recenters + Ctrl/Cmd+click navigates** — endless click-through exploration inside the context pane without leaving the writing room, session 230
+- ✅ **Graph: hover-fade non-connected** — visual isolation on hover, session 230
+- ✅ **Graph: resize on pane drag** — ResizeObserver re-projects layout without re-running sim, session 230
+- ✅ **Graph: tier-aware density** — scene/draft show 1-hop cap 12; chapter shows direct cast only cap 6; book shows direct cast only cap 4, session 230
+- ✅ **Right-click on autolink hint → Link to X** — mouse alternative to Tab, session 230
+- ✅ **Spellcheck toggle per world** + autolink hints excluded from spellcheck always, session 230
+- ✅ **Reading mode redesign** — hides right pane (intermediate between normal and focus), disables link visuals, keeps writer's font choice, session 230
+- ✅ **Featured/Planned semantics + alias-preserving chip sync** — aliases survive syncChipLabels rounds, session 230
+
+### Shipped through session 228
+
+- ✅ **Hover preview card on chips** (v1.5)
+- ✅ **Focus / distraction-free mode** — Cmd+Shift+F (v1.5)
+- ✅ **Element aliases editor UX polish** — modal with one row per alias (v1.5)
+- ✅ **First-mention auto-link** — convention #53, session 228 (Bout 9)
+- ✅ **Backlinks pane on element-detail** — "Mentioned in" section, session 228 (Bout 2)
+- ✅ **Per-session word count goal** — sessionStorage + progress ring, session 228 (Bout 3)
+- ✅ **Find/replace** — Ctrl+F / Ctrl+H bar, session 228 (Bout 4)
+- ✅ **Inline element creation from selected text** — Ctrl+Shift+E + right-click, session 228 (Bout 7)
+- ✅ **Split-into-sibling at cursor** — Ctrl+Shift+D + right-click, session 228 (Bout 8)
+- ✅ **Per-world font family** — sans/serif/slab/mono, session 228 (Bout 5)
+- ✅ **Character cast strip** — 5-type pivot, click-to-insert, session 228 (Bout 6)
+- ✅ **Code-split TipTap** — main bundle 156.87 KB gzipped, session 228 (Bout 10)
+
+### Still on the roadmap
+
+#### Graph (writing-context pane)
+- **(c) Hierarchical tier-zoom** — at book level, chapter nodes cluster around the book; click a chapter to expand its scene clusters. Replaces the current "no 1-hop at higher tiers" fallback with a true drill-down hierarchy.
+- **(d) Zoom + pan** — mouse-wheel zoom + drag pan inside the graph host. Most useful for very dense narratives where current cap-and-spread doesn't suffice.
+- **(e) Filter by element type** — toggle chips in the graph's top strip to hide characters/locations/objects/etc. Lets writers focus on a particular axis.
+- **(f) Search/highlight by name** — type-ahead input that highlights matching nodes in the graph. Find a specific element without scrolling lists.
+
+#### Writing room
+
+1. **In-narrative outline disclosure** — H1/H2/H3 jumps within the current narrative's prose. Recommended placement: collapsible disclosure between breadcrumb and prose.
+2. **Outline / corkboard view** of writing tree — index cards, drag to reorder, alternate to the linear sidebar tree. Scrivener's most-loved feature.
+3. **Per-narrative atlas-local notes scratchpad** — like world notes overlay, but per-narrative.
+4. **Element embeds** in richtext — render element card inline within prose (TipTap node extension). Powerful for TTRPG handouts.
+5. **Footnotes + callouts** as richtext blocks (TipTap node extensions).
+6. **Bidirectional consistency check** — "you wrote 'green eyes' but Lyra's element record says brown". Atlas's strongest long-term differentiator per research; no competitor does this. Needs its own design conversation.
+7. **Prose-first extraction** — parse existing manuscript via OW SDK → propose Characters, Locations, Objects. Fits OnlyWorlds parsing skill heritage.
+8. **Visual narrative graph** at `#/w/<id>/writing/graph` — nodes for narratives sized by word count, edges for parent_narrative + shared elements + explicit references.
+9. **Compare view** — two narratives side-by-side for revision.
+10. **Export book/chapter to markdown/PDF/EPUB** — lives in publish room per `DESIGN_PUBLISHING.md`. Writing room provides the "publish this book" affordance.
 
 ---
 
@@ -327,6 +360,36 @@ These are NOT v1, but they are tracked so we don't forget. Order roughly by user
 - **#51**: The writing workspace replaces element-detail entirely as the middle-pane renderer when `route.mode === 'writing'` AND a narrative is active in the URL hierarchy. Empty-state (no active narrative) stays in `writing.ts`.
 
 - **#52** (v1.5 polish): Any override of `.material-symbols-outlined` (font-size, color, etc.) MUST be scoped under a parent class for two-class specificity (0,2,0). The package's `.material-symbols-outlined { font-size: 24px }` rule is single-class (0,1,0) and load-order decides the tie — non-deterministic. Pattern: `.atlas-foo-parent .my-icon { font-size: Npx }` (e.g. `.atlas-link-chip .atlas-link-chip-remove`). Bitten twice (session 226 room-nav chip + session 227 link-chip-remove); locking in as a hard rule.
+
+- **#53** (v2 batch, session 228): First-mention auto-link decorations are CASE-SENSITIVE matches against a name + alias index, with `\\b...\\b` word boundaries. Suppression rules stack: minimum 3 characters per key, ambiguous names (≥2 candidates for the same key) suppressed entirely, candidate ids already chipped in the doc skipped (first-mention rule), and the `@` mention picker takes priority (decorations don't gate Tab handling while the picker is visible). The index is rebuilt only when `state.data.elements` reference swaps — no per-tick re-build. See `writing-workspace-autolink.ts` and tests/unit/writing-workspace-autolink.test.ts.
+
+## Autolink design (session 228, Bout 9)
+
+The autolink plugin is a ProseMirror plugin that watches the prose for prose-level mentions of elements that the writer hasn't explicitly chipped yet. It is the COMPANION to the `@` picker, not its replacement — `@` remains the explicit, deliberate path for inserting a chip, with no ambiguity about intent.
+
+### What the writer sees
+
+Writer types: `"the goblin Drizzle waved cheerfully"`.
+
+If "Drizzle" matches an element (case-sensitive, ≥3 chars, unambiguous, not yet chipped in this doc, `@` picker not open), the word gets a **subtle dotted cyan underline**. Hovering the underline reveals "Tab to link as character" (or whatever type). Pressing Tab with the cursor adjacent → text becomes a real ElementChip and the underline disappears.
+
+Subsequent mentions of "Drizzle" in the same narrative get NO underline (first-mention rule).
+
+### Why these rules
+
+- **Case-sensitive**: proper nouns are uppercase; common nouns aren't. Without this, "the" matching an element named "The" would underline every "the".
+- **Min 3 chars**: kills "Al", "Bo", "Jo" — short names are too noisy without context.
+- **Ambiguity suppression**: if two characters share a name, the writer needs to pick explicitly with `@`. No silent default.
+- **First-mention only**: per-narrative rule, matches Loreteller's universal pattern from research. Re-decoration on every mention would be visual noise.
+- **`@` picker priority**: when the picker is open, Tab is owned by the suggestion list. The autolink's Tab handler checks `document.querySelector('.atlas-mention-popover')` and bails.
+
+### Performance
+
+The index is a `Map<string, AutolinkCandidate[]>` from name/alias → candidates. A combined `\\b(key1|key2|...)\\b` regex is compiled once; keys sorted longest-first so multi-word names ("Mira Halloway") greedy-match before their sub-words.
+
+Doc walk on every transaction is cheap at OW scale (~hundreds of elements, ~thousands of words). One regex pass per text node. Already-chipped ids collected in a single descendants walk per re-decoration.
+
+If a world grows to tens of thousands of elements, switch to Aho-Corasick or a trie. Not needed in v1.
 
 ---
 

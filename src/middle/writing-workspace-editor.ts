@@ -108,12 +108,15 @@ export interface WorkspaceEditorHandle {
   /** Approximate live word count (whitespace-split, ignores chip labels). */
   getWordCount: () => number;
   /**
-   * Walk the editor doc, update any elementChip's `label` attr whose live
-   * element name has changed (rename propagation, convention #48). Returns
-   * the count of nodes updated so callers can skip the save when nothing
-   * changed. Called on every state.data.elements change.
+   * Walk the editor doc, update any elementChip's `label` attr whose stored
+   * label is no longer a valid surface form for the element (rename
+   * propagation, convention #48). A valid surface form is either the
+   * element's canonical name OR one of its `atlas_aliases`. Aliases like
+   * "annoying guy" for John are preserved — only stale names get rewritten.
+   * Returns the count of nodes updated so callers can skip the save when
+   * nothing changed.
    */
-  syncChipLabels: (lookupName: (id: string) => string | null) => number;
+  syncChipLabels: (lookupSurface: (id: string) => { name: string; aliases: string[] } | null) => number;
   /** Find/replace controller — see {@link SearchController}. */
   search: SearchController;
   /** Rebuild the autolink name+alias index from a fresh elements list. */
@@ -198,7 +201,6 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
                   type: 'elementChip',
                   attrs: { id, type, label },
                 },
-                { type: 'text', text: ' ' },
               ])
               .run();
             // Notify upstream so the workspace can update its picker-recents
@@ -330,7 +332,7 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
       }
     },
     getWordCount: () => computeWordCount(editor.getText()),
-    syncChipLabels: (lookupName) => syncChipLabelsImpl(editor, lookupName),
+    syncChipLabels: (lookupSurface) => syncChipLabelsImpl(editor, lookupSurface),
     search,
     refreshAutolink: (elements) => refreshAutolinkIndex(editor.view, elements),
     destroy: () => editor.destroy(),
@@ -348,17 +350,25 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
  */
 function syncChipLabelsImpl(
   editor: Editor,
-  lookupName: (id: string) => string | null,
+  lookupSurface: (id: string) => { name: string; aliases: string[] } | null,
 ): number {
   const updates: Array<{ pos: number; newLabel: string }> = [];
   editor.state.doc.descendants((node, pos) => {
     if (node.type.name !== 'elementChip') return;
     const id = node.attrs.id as string | null;
     if (!id) return;
-    const liveName = lookupName(id);
-    if (!liveName) return; // Element deleted — leave the stale label; chip still serializes correctly.
-    if (node.attrs.label === liveName) return;
-    updates.push({ pos, newLabel: liveName });
+    const surface = lookupSurface(id);
+    if (!surface) return; // Element deleted — leave the stale label; chip still serializes correctly.
+    const currentLabel = node.attrs.label;
+    // A chip label is "valid" if it matches the canonical name OR any alias.
+    // Aliases like "annoying guy" for John are how writers preserve in-prose
+    // surface forms — clobbering them with the canonical name would defeat
+    // the whole alias system. Only update when the current label is BOTH
+    // not the name AND not in the alias list (i.e., a stale name from
+    // before a rename).
+    if (currentLabel === surface.name) return;
+    if (typeof currentLabel === 'string' && surface.aliases.includes(currentLabel)) return;
+    updates.push({ pos, newLabel: surface.name });
   });
 
   if (updates.length === 0) return 0;

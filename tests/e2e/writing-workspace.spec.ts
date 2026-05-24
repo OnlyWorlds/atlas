@@ -99,13 +99,13 @@ test('workspace mounts when a narrative is selected', async ({ page }) => {
 
   // Header reuses element-detail-header — narrative name appears in it.
   await expect(page.locator('.atlas-middle-header')).toContainText('first scene');
-  // Body sections all present.
-  await expect(page.locator('.atlas-writing-workspace-details')).toBeVisible();
-  await expect(page.locator('.atlas-writing-workspace-refs')).toBeVisible();
-  await expect(page.locator('.atlas-writing-workspace-footer')).toBeVisible();
-  // Footer has live word count + save state.
+  // Sticky bar with breadcrumb + action icons sits below the header.
+  await expect(page.locator('.atlas-writing-workspace-crumb')).toBeVisible();
+  // Prose surface (TipTap) is the body's main content.
+  await expect(page.locator('.atlas-writing-workspace-prose')).toBeVisible();
+  // Ambient word-count widget shows live count in bottom-right corner.
+  await expect(page.locator('.atlas-writing-workspace-wc-corner')).toBeVisible();
   await expect(page.locator('.atlas-writing-workspace-wc')).toContainText('0 words');
-  await expect(page.locator('.atlas-writing-workspace-save')).toContainText('saved');
 });
 
 test('typed prose persists as markdown + richtext JSON', async ({ page }) => {
@@ -127,11 +127,14 @@ test('typed prose persists as markdown + richtext JSON', async ({ page }) => {
   // Word count updates live (no debounce on display).
   await expect(page.locator('.atlas-writing-workspace-wc')).toContainText('5 words');
 
-  // Wait for the debounced save (default 1s) to land.
-  await expect(page.locator('.atlas-writing-workspace-save')).toContainText('saved', {
+  // Wait for the debounced save (default 1s) to flush into the folder. Poll
+  // the narrative file directly rather than a visual indicator — the legacy
+  // save-state span was removed when the footer collapsed into the ambient
+  // word-count corner. The element-header sync dot reflects dirty/synced
+  // for api-linked worlds but is always 'local' here.
+  await expect.poll(async () => (await getNarrative(page, id))?.story ?? '', {
     timeout: 5000,
-  });
-  // The "saving…" → "saved" cycle means the persist completed.
+  }).toContain('the goblin rolled the dice');
 
   const narr = await getNarrative(page, id);
   expect(narr.story).toContain('the goblin rolled the dice');
@@ -171,10 +174,10 @@ test('@ picker inserts a chip and auto-derives the relation field', async ({ pag
   await expect(chip).toHaveAttribute('data-id', charId);
   await expect(chip).toHaveAttribute('data-type', 'character');
 
-  // Wait for debounced save.
-  await expect(page.locator('.atlas-writing-workspace-save')).toContainText('saved', {
+  // Wait for debounced save — poll the narrative file directly.
+  await expect.poll(async () => (await getNarrative(page, narrId))?.story ?? '', {
     timeout: 5000,
-  });
+  }).toContain(`[Drizzle](ow://character/${charId})`);
 
   // Verify markdown serialization, atlas_richtext_json shape, and auto-derived
   // characters relation.
@@ -199,8 +202,8 @@ test('reading mode toggle adds is-reading-mode class', async ({ page }) => {
   const workspace = page.locator('.atlas-writing-workspace');
   await expect(workspace).not.toHaveClass(/is-reading-mode/);
 
-  // Click reading mode button in footer.
-  const readBtn = page.locator('.atlas-writing-workspace-footer-left button').first();
+  // Click reading-mode button in the sticky bar.
+  const readBtn = page.locator('.atlas-writing-workspace-action[data-action="reading"]');
   await readBtn.click();
   await expect(workspace).toHaveClass(/is-reading-mode/);
   await expect(readBtn).toHaveAttribute('aria-pressed', 'true');
@@ -418,10 +421,10 @@ test('find bar: Ctrl+H replace-all updates prose and triggers save', async ({ pa
   // Count drops to 0 of 0 since "orc" no longer appears.
   await expect(page.locator('[data-role="count"]')).toContainText(/0 of 0|No matches/);
 
-  // Wait for the autosave to flush.
-  await expect(page.locator('.atlas-writing-workspace-save')).toContainText('saved', {
+  // Wait for the autosave to flush — poll the narrative file.
+  await expect.poll(async () => (await getNarrative(page, id))?.story ?? '', {
     timeout: 5000,
-  });
+  }).toContain('the goblin met the goblin and another goblin joined them');
   const narr = await getNarrative(page, id);
   expect(narr.story).toContain('the goblin met the goblin and another goblin joined them');
 });
@@ -464,7 +467,7 @@ test('font family setting applies live to the workspace', async ({ page }) => {
   ).toContain('Georgia');
 });
 
-test('cast strip shows linked elements and inserts chip on click', async ({ page }) => {
+test('context pane Cast shows Featured/Planned distinction by prose content', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'wrk world');
@@ -476,25 +479,67 @@ test('cast strip shows linked elements and inserts chip on click', async ({ page
     supertype: 'Book',
     characters: [charId],
     locations: [locId],
+    // Prose mentions only Drizzle. The Tower is in the link field but not
+    // in the prose — Featured for Drizzle, Planned for The Tower.
+    story: `Hello [Drizzle](ow://character/${charId}) is here.`,
   });
   await gotoWriting(page, narrId);
   await waitForEditor(page);
 
-  // Default tab is characters — strip shows Drizzle.
-  const strip = page.locator('.atlas-writing-workspace-cast');
-  await expect(strip).toBeVisible();
-  await expect(strip.locator('.atlas-writing-workspace-cast-chip', { hasText: 'Drizzle' })).toBeVisible();
+  const pane = page.locator('.atlas-context-pane');
+  await expect(pane).toBeVisible();
+  const castCol = pane.locator('.atlas-context-pane-list-cast');
+  const drizzleRow = castCol.locator('.atlas-context-pane-row', { hasText: 'Drizzle' });
+  const towerRow = castCol.locator('.atlas-context-pane-row', { hasText: 'The Tower' });
+  await expect(drizzleRow).toBeVisible();
+  await expect(towerRow).toBeVisible();
 
-  // Click chip → ow:// chip inserted into the editor.
-  await strip.locator('.atlas-writing-workspace-cast-chip', { hasText: 'Drizzle' }).click();
-  const editorChip = page.locator('.atlas-writing-workspace-prose .atlas-element-chip', { hasText: 'Drizzle' });
-  await expect(editorChip).toBeVisible();
-  await expect(editorChip).toHaveAttribute('data-id', charId);
+  // Drizzle = Featured (in prose). The Tower = Planned (only in field).
+  await expect(drizzleRow).toHaveClass(/is-featured/);
+  await expect(towerRow).toHaveClass(/is-planned/);
+  await expect(drizzleRow.locator('.atlas-context-pane-row-status-featured')).toBeVisible();
+  await expect(towerRow.locator('.atlas-context-pane-row-status-planned')).toBeVisible();
+});
 
-  // Switch to locations tab — strip shows The Tower.
-  await strip.locator('[data-tab="locations"]').click();
-  await expect(strip).toHaveAttribute('data-active-tab', 'locations');
-  await expect(strip.locator('.atlas-writing-workspace-cast-chip', { hasText: 'The Tower' })).toBeVisible();
+test('add-to-cast with no selection inserts chip at cursor (session 230 semantic)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page);
+  await createWorld(page, 'wrk world');
+
+  const charId = await createElement(page, 'character', { name: 'NewChar' });
+  const narrId = await createElement(page, 'narrative', {
+    name: 'target scene',
+    supertype: 'Book',
+  });
+  await gotoWriting(page, narrId);
+  await waitForEditor(page);
+
+  // Fire the add-to-cast event programmatically. With no selection, the
+  // session 230 semantic is: insert chip at cursor (no separate Planned-
+  // only path — UNION-on-save handles the field side).
+  await page.locator('.atlas-writing-workspace-prose .ProseMirror').click();
+  await page.evaluate(
+    ({ id }) => {
+      document.dispatchEvent(new CustomEvent('atlas:context-add-to-cast', {
+        detail: { id, type: 'character', name: 'NewChar' },
+      }));
+    },
+    { id: charId },
+  );
+
+  // Chip is inserted into prose with the canonical name.
+  const chip = page.locator('.atlas-writing-workspace-prose .atlas-element-chip', { hasText: 'NewChar' });
+  await expect(chip).toBeVisible();
+  await expect(chip).toHaveAttribute('data-id', charId);
+
+  // UNION-on-save adds the id to narrative.characters after the debounced save.
+  await expect.poll(async () => {
+    const narr = await page.evaluate((id) => {
+      const state = (window as any).__atlasTestApi.getState();
+      return state.data.elements.find((e: any) => e.id === id) ?? null;
+    }, narrId);
+    return narr?.characters ?? [];
+  }, { timeout: 5000 }).toContain(charId);
 });
 
 test('inline create from selection — modal pre-fills, suppresses navigate, replaces with chip', async ({ page }) => {
@@ -582,7 +627,9 @@ test('inline create from selection — modal pre-fills, suppresses navigate, rep
 
   // Wait for autosave; verify story contains the ow:// link and characters
   // relation got auto-derived to include the new id.
-  await expect(page.locator('.atlas-writing-workspace-save')).toContainText('saved', { timeout: 5000 });
+  await expect.poll(async () => (await getNarrative(page, id))?.story ?? '', {
+    timeout: 5000,
+  }).toContain(`ow://character/${newCharId}`);
   const narr = await getNarrative(page, id);
   expect(narr.story).toContain(`ow://character/${newCharId}`);
   expect(Array.isArray(narr.characters)).toBe(true);

@@ -5349,55 +5349,150 @@ svg .atlas-zone-selected {
   --atlas-writing-content-width: 760px;
 }
 
-/* Breadcrumb + date row directly below the 36px header. */
+/* Sticky bar directly below the 36px element header. Single horizontal row:
+   [crumb › crumb › current  · date]                    [focus][read][open]
+   Always visible. Brighter text than the prior muted gray for legibility. */
 .atlas-writing-workspace-crumb {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--atlas-text-muted);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0 16px;
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid var(--atlas-divider);
+  font-size: 12.5px;
+  color: var(--atlas-text-soft);
+}
+
+.atlas-writing-workspace-crumb-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .atlas-writing-workspace-crumbs {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0;
-  line-height: 1.6;
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .atlas-writing-workspace-crumb-seg {
-  color: var(--atlas-text-muted);
+  color: var(--atlas-text-soft);
   text-decoration: none;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  flex-shrink: 1;
+  border-radius: 3px;
+  padding: 1px 4px;
+  transition: background 120ms ease, color 120ms ease;
 }
 
 .atlas-writing-workspace-crumb-seg.is-current {
-  color: var(--atlas-text-soft);
+  color: var(--atlas-text);
+  font-weight: 500;
 }
 
 a.atlas-writing-workspace-crumb-seg:hover {
-  color: var(--atlas-accent);
-  text-decoration: underline;
+  color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.08);
 }
 
 .atlas-writing-workspace-crumb-sep {
   color: var(--atlas-text-muted);
-  opacity: 0.55;
-  margin: 0 4px;
+  opacity: 0.5;
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .atlas-writing-workspace-date {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 4px;
+  font-size: 11.5px;
   color: var(--atlas-text-muted);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .atlas-writing-workspace-date .material-symbols-outlined {
-  font-size: 14px;
-  opacity: 0.8;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.atlas-writing-workspace-crumb-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* View-mode toggle — pill segmented control, [This level | Compiled].
+   Renders only when narrative has descendants. */
+.atlas-writing-workspace-viewmode {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  padding: 1px;
+  margin-right: 4px;
+}
+.atlas-writing-workspace-viewmode-btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--atlas-text-muted);
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.atlas-writing-workspace-viewmode-btn:hover {
+  color: var(--atlas-text);
+}
+.atlas-writing-workspace-viewmode-btn[aria-selected='true'] {
+  background: rgba(34, 211, 238, 0.22);
+  color: var(--atlas-cyan);
+}
+
+/* Action icons (focus, reading, open-as-element). Use two-class specificity
+   to win over the material-symbols package's default 24px (convention #52). */
+.atlas-writing-workspace-action {
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--atlas-text-muted);
+  border-radius: 3px;
+  text-decoration: none;
+  transition: color 120ms ease, background 120ms ease;
+}
+.atlas-writing-workspace-action:hover {
+  color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.08);
+}
+.atlas-writing-workspace-action[aria-pressed='true'] {
+  color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.12);
+}
+.atlas-writing-workspace-action .material-symbols-outlined {
+  font-size: 16px;
 }
 
 /* Prose surface — TipTap mounts inside this host.
@@ -5419,82 +5514,9 @@ a.atlas-writing-workspace-crumb-seg:hover {
   opacity: 0.6;
 }
 
-/* Cast strip — type pivot + linked element chips, sits between breadcrumb
-   and prose. Hidden in reading + focus modes via CSS rules further below. */
-.atlas-writing-workspace-cast {
-  margin: 6px 0 14px;
-  width: var(--atlas-writing-content-width, 760px);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.atlas-writing-workspace-cast-tabs {
-  display: flex;
-  gap: 2px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 0;
-}
-.atlas-writing-workspace-cast-tab {
-  appearance: none;
-  background: transparent;
-  border: none;
-  color: var(--atlas-text-muted);
-  font: inherit;
-  font-size: 12px;
-  padding: 4px 10px 6px;
-  cursor: pointer;
-  border-bottom: 1px solid transparent;
-  margin-bottom: -1px;
-  letter-spacing: 0.01em;
-}
-.atlas-writing-workspace-cast-tab:hover {
-  color: var(--atlas-text);
-}
-.atlas-writing-workspace-cast-tab.is-active {
-  color: var(--atlas-cyan);
-  border-bottom-color: var(--atlas-cyan);
-}
-.atlas-writing-workspace-cast-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-height: 24px;
-  align-items: center;
-}
-.atlas-writing-workspace-cast-empty {
-  font-size: 12px;
-  color: var(--atlas-text-muted);
-  font-style: italic;
-  opacity: 0.7;
-}
-.atlas-writing-workspace-cast-chip {
-  appearance: none;
-  background: rgba(34, 211, 238, 0.08);
-  border: 1px solid rgba(34, 211, 238, 0.18);
-  color: var(--atlas-cyan);
-  border-radius: 11px;
-  padding: 2px 9px 3px;
-  font-size: 11.5px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  line-height: 1;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-.atlas-writing-workspace-cast-chip:hover {
-  background: rgba(34, 211, 238, 0.18);
-  border-color: rgba(34, 211, 238, 0.35);
-}
-/* Scope the icon override under the chip class for two-class specificity
-   (convention #52). */
-.atlas-writing-workspace-cast-chip .atlas-writing-workspace-cast-chip-icon {
-  font-size: 14px;
-  line-height: 1;
-}
-.atlas-writing-workspace-cast-chip-name {
-  white-space: nowrap;
-}
+/* Cast strip / Details / References disclosures REMOVED — moved to the
+   right-pane writing-context tab (session 229). Their CSS lived here; safe
+   to delete with the corresponding render functions in writing-workspace.ts. */
 
 .atlas-writing-workspace-prose {
   /* `flex: 0 0 auto` keeps the prose surface from being squeezed by sibling
@@ -5629,49 +5651,10 @@ a.atlas-writing-workspace-crumb-seg:hover {
   color: var(--atlas-cyan);
 }
 
-/* Disclosures — Details + References. Match prose container width via the
-   shared --atlas-writing-content-width var so toggling a disclosure never
-   shifts the prose horizontally. */
-.atlas-writing-workspace-details,
-.atlas-writing-workspace-refs {
-  max-width: var(--atlas-writing-content-width, 760px);
-  width: 100%;
-  margin: 0 auto;
-  border-top: 1px solid var(--atlas-divider);
-  padding-top: 12px;
-}
-
-.atlas-writing-workspace-disclosure-summary {
-  cursor: pointer;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--atlas-text-muted);
-  padding: 4px 0;
-  list-style: none;
-  user-select: none;
-}
-
-.atlas-writing-workspace-disclosure-summary::-webkit-details-marker {
-  display: none;
-}
-
-.atlas-writing-workspace-disclosure-summary::before {
-  content: '▸';
-  display: inline-block;
-  margin-right: 6px;
-  font-size: 10px;
-  transition: transform 120ms ease;
-}
-
-.atlas-writing-workspace-details[open] > .atlas-writing-workspace-disclosure-summary::before,
-.atlas-writing-workspace-refs[open] > .atlas-writing-workspace-disclosure-summary::before {
-  transform: rotate(90deg);
-}
-
-.atlas-writing-workspace-disclosure-body {
-  padding-top: 8px;
-}
+/* Details / References disclosures REMOVED (session 229) — their content
+   lives in the context pane (right). The selectors below are kept only for
+   reading-mode and focus-mode hide rules further down the file; deleting
+   them would leave dangling selectors. */
 
 .atlas-pane-empty-inline {
   color: var(--atlas-text-muted);
@@ -5679,58 +5662,54 @@ a.atlas-writing-workspace-crumb-seg:hover {
   margin: 8px 0;
 }
 
-/* Footer — word count + reading time + save state + open-as-element. */
-.atlas-writing-workspace-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 24px;
-  border-top: 1px solid var(--atlas-divider);
-  background: rgba(0, 0, 0, 0.25);
-  font-size: 12px;
-  color: var(--atlas-text-muted);
-  flex-shrink: 0;
+/* Ambient word-count widget — anchored bottom-right of the workspace root.
+   Sibling of header / sticky-bar / body. Always visible regardless of body
+   scroll. Click → session word-goal popover. Replaces the legacy footer
+   entirely; reading-time / save-state / open-as-element moved elsewhere
+   (sticky bar action icons + element-header sync dot). */
+.atlas-writing-workspace-wc-corner {
+  position: absolute;
+  bottom: 14px;
+  right: 18px;
+  z-index: 4;
+  pointer-events: none;
+}
+.atlas-writing-workspace-wc-corner > * {
+  pointer-events: auto;
 }
 
-.atlas-writing-workspace-footer-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.atlas-writing-workspace-footer-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.atlas-writing-workspace-sep {
-  opacity: 0.4;
-}
-
-/* Word-count button — clickable for session-goal popover.
-   Stays visually quiet (looks like a span) until hover. */
+/* Word-count button — quiet at rest, slightly more present than the legacy
+   footer treatment since it now stands alone in the corner. Click opens the
+   session-goal popover. */
 .atlas-writing-workspace-wc-btn {
   appearance: none;
-  background: transparent;
-  border: none;
-  padding: 1px 4px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 10px;
   margin: 0;
-  color: inherit;
+  color: var(--atlas-text-muted);
   font: inherit;
+  font-size: 11.5px;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 14px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   line-height: 1;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 .atlas-writing-workspace-wc-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.75);
+  border-color: rgba(34, 211, 238, 0.3);
+  color: var(--atlas-text);
 }
 .atlas-writing-workspace-wc-btn:focus-visible {
   outline: 1px solid var(--atlas-cyan);
   outline-offset: 1px;
+}
+.atlas-writing-workspace-wc-btn[data-has-goal='true'] {
+  border-color: rgba(34, 211, 238, 0.25);
 }
 
 /* Progress ring — conic-gradient masked into a thin ring. The CSS variable
@@ -5794,27 +5773,6 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 .atlas-wc-goal-clear {
   width: 100%;
-}
-
-.atlas-writing-workspace-save[data-state='pending'] {
-  color: var(--atlas-text-soft);
-}
-
-.atlas-writing-workspace-save[data-state='error'] {
-  color: #ff8a80;
-}
-
-.atlas-writing-workspace-open-link {
-  color: var(--atlas-text-muted);
-  text-decoration: none;
-  margin-left: 10px;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-
-.atlas-writing-workspace-open-link:hover {
-  color: var(--atlas-accent);
-  background: rgba(34, 211, 238, 0.08);
 }
 
 /* Autolink hint — subtle dotted underline beneath a candidate name in prose,
@@ -5943,24 +5901,55 @@ a.atlas-writing-workspace-crumb-seg:hover {
   border-color: rgba(34, 211, 238, 0.4);
 }
 
-/* Reading mode — applied to .atlas-writing-workspace.is-reading-mode */
-.atlas-writing-workspace.is-reading-mode .atlas-middle-header,
-.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-crumb,
-.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-cast,
-.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-details,
-.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-refs {
+/* Reading mode — intermediate between normal and focus modes (session 230).
+   Goal: clean reading surface for the writer to absorb their own prose
+   without link-system visual noise. Specifically:
+     - Hides the element header
+     - Hides the WHOLE right pane (graph + lists + preview)
+     - Hides autolink hints (so dotted underlines disappear)
+     - Mutes element chips to plain underline (drops cyan accent)
+     - Sticky bar's breadcrumb half fades; action icons stay crisp so
+       the writer can toggle reading mode back off
+   Sidebar stays visible — navigation through the writing tree still useful.
+   Esc also exits (handled in writing-workspace.ts). */
+
+.atlas-writing-workspace.is-reading-mode .atlas-middle-header {
   display: none;
 }
+.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-crumb-left {
+  opacity: 0.35;
+}
+/* Hide the whole right pane via :has() projection from the workspace root.
+   Same mechanism focus mode uses for sidebar; here scoped to right side only. */
+.atlas-shell:has(.atlas-writing-workspace.is-reading-mode) .atlas-right,
+.atlas-shell:has(.atlas-writing-workspace.is-reading-mode) .atlas-divider {
+  display: none !important;
+}
+.atlas-shell:has(.atlas-writing-workspace.is-reading-mode) .atlas-middle {
+  flex: 1 1 100% !important;
+}
+/* Suppress autolink hint underlines — reading, not writing. */
+.atlas-writing-workspace.is-reading-mode .atlas-autolink-hint {
+  text-decoration: none !important;
+  cursor: default !important;
+}
+/* Mute element chips to plain underline (drop cyan + hover bg). */
+.atlas-writing-workspace.is-reading-mode .atlas-element-chip {
+  color: var(--atlas-prose-text);
+  text-decoration: underline solid rgba(255, 255, 255, 0.15);
+  background: transparent !important;
+}
+.atlas-writing-workspace.is-reading-mode .atlas-element-chip:hover {
+  background: transparent !important;
+  color: var(--atlas-prose-text);
+  text-decoration-color: rgba(255, 255, 255, 0.25);
+}
 
+/* Reading mode prose — narrower max-width for comfortable line length, but
+   no font override (writer's chosen font carries through). */
 .atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-prose {
   max-width: 680px;
   padding-top: 40px;
-}
-
-.atlas-writing-workspace.is-reading-mode .atlas-writing-workspace-prose .ProseMirror {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 16.5px;
-  line-height: 1.85;
 }
 
 /* Focus mode (Cmd+Shift+F) — hides ALL chrome including sibling panes via
@@ -5972,10 +5961,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-writing-workspace.is-focus-mode .atlas-middle-header,
 .atlas-writing-workspace.is-focus-mode .atlas-middle-room-nav,
 .atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-crumb,
-.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-cast,
-.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-details,
-.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-refs,
-.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-footer {
+.atlas-writing-workspace.is-focus-mode .atlas-writing-workspace-wc-corner {
   display: none !important;
 }
 
@@ -7022,4 +7008,690 @@ a.atlas-writing-workspace-crumb-seg:hover {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+}
+
+/* ============================================================================
+ * Writing-context pane — right pane tab body for the writing room.
+ *
+ * Layout (top to bottom): top strip + graph slot + below-graph container
+ * (holds Cast/Suggested lists OR the element preview slide-in).
+ * Graph height is fixed via flex-basis; lists below scroll within their band.
+ * Preview replaces the lists in the same DOM slot when active — no overlay
+ * positioning, so the seam against the graph stays perfectly snug.
+ * ========================================================================= */
+
+.atlas-context-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* Top strip removed in session 230 — graph extends to the pane's top edge.
+   Tier zoom + filter controls deferred to v2; we'll bring the strip back
+   when there's actual content to put in it. */
+
+.atlas-context-pane-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  font-style: italic;
+  opacity: 0.7;
+  padding: 24px;
+  text-align: center;
+}
+
+.atlas-context-pane-graph {
+  flex: 0 0 55%;
+  min-height: 180px;
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.015);
+  border-bottom: 1px solid var(--atlas-divider);
+}
+
+.atlas-context-graph-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.atlas-context-graph-node {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.16);
+  color: var(--atlas-cyan);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.atlas-context-graph-node:hover {
+  transform: scale(1.12);
+  background: rgba(34, 211, 238, 0.3);
+  z-index: 3;
+}
+.atlas-context-graph-node.is-center {
+  width: 44px;
+  height: 44px;
+  background: rgba(34, 211, 238, 0.35);
+  border-width: 2px;
+}
+.atlas-context-graph-node.is-cast {
+  background: rgba(34, 211, 238, 0.18);
+}
+.atlas-context-graph-node.is-adjacent {
+  background: transparent;
+  border-style: dashed;
+  border-color: rgba(34, 211, 238, 0.5);
+}
+.atlas-context-graph-node.is-highlighted {
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.35);
+  z-index: 2;
+}
+/* Hover-fade — nodes that don't share an edge with the hovered get dimmed.
+   Applied via JS toggle on mouseenter / cleared on mouseleave. */
+.atlas-context-graph-node.is-faded {
+  opacity: 0.18;
+}
+.atlas-context-graph-node.is-faded .atlas-context-graph-node-label {
+  opacity: 0.4;
+}
+
+/* "← back to {narrative}" pill — only renders when graph is recentered on
+   a non-home element. Pinned to the top-left of the graph host. */
+.atlas-context-graph-back {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 4;
+  appearance: none;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  color: var(--atlas-cyan);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 3px 9px 3px 6px;
+  border-radius: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.atlas-context-graph-back:hover {
+  background: rgba(34, 211, 238, 0.18);
+  border-color: rgba(34, 211, 238, 0.55);
+}
+.atlas-context-graph-back .material-symbols-outlined {
+  font-size: 14px;
+}
+.atlas-context-graph-back > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atlas-context-graph-node .material-symbols-outlined {
+  font-size: 18px;
+}
+.atlas-context-graph-node.is-center .material-symbols-outlined {
+  font-size: 22px;
+}
+
+/* Node label — name floating below each node. Positioned absolutely so it
+   doesn't expand the button's circular hit target. Generous max-width with
+   ellipsis cap for genuinely-long names; typical names show in full. */
+.atlas-context-graph-node-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.15;
+  color: var(--atlas-text-soft);
+  white-space: nowrap;
+  pointer-events: none;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.6);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atlas-context-graph-node.is-center .atlas-context-graph-node-label {
+  font-size: 10.5px;
+  color: var(--atlas-cyan);
+  font-weight: 500;
+}
+.atlas-context-graph-node.is-adjacent .atlas-context-graph-node-label {
+  opacity: 0.75;
+}
+.atlas-context-graph-node:hover .atlas-context-graph-node-label {
+  color: var(--atlas-cyan);
+  opacity: 1;
+}
+
+.atlas-context-pane-below {
+  flex: 1 1 auto;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.atlas-context-pane-lists-host {
+  flex: 1 1 auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Preview host — position-absolute over the lists. Filling the parent
+   .atlas-context-pane-below exactly via inset:0 guarantees the card has a
+   definite height so its inner header + scrollable body + fixed-footer
+   actions lay out correctly. Sibling positioning via flex previously left
+   the action buttons clipped on shorter panes. */
+.atlas-context-pane-preview-host {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: none;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.5);
+}
+.atlas-context-pane-preview-host[data-state='visible'] {
+  display: flex;
+}
+
+/* Cast + Suggested lists — side-by-side. 60/40 split via flex-basis; on
+   narrow panes columns stack vertically (responsive collapse). */
+.atlas-context-pane-lists {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  overflow: hidden;
+}
+
+.atlas-context-pane-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--atlas-divider);
+}
+.atlas-context-pane-list:last-child {
+  border-right: none;
+}
+.atlas-context-pane-list-cast {
+  flex: 1 1 50%;
+}
+.atlas-context-pane-list-suggested {
+  flex: 1 1 50%;
+}
+
+@media (max-width: 360px) {
+  .atlas-context-pane-lists {
+    flex-direction: column;
+  }
+  .atlas-context-pane-list {
+    border-right: none;
+    border-bottom: 1px solid var(--atlas-divider);
+    flex: 1 1 50%;
+  }
+}
+
+.atlas-context-pane-list-header {
+  flex-shrink: 0;
+  padding: 6px 12px 4px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--atlas-text-muted);
+  border-bottom: 1px solid var(--atlas-divider);
+}
+
+.atlas-context-pane-list-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 4px 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.atlas-context-pane-empty {
+  padding: 12px;
+  font-size: 11.5px;
+  color: var(--atlas-text-muted);
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.atlas-context-pane-row {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--atlas-text-soft);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.atlas-context-pane-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--atlas-text);
+}
+.atlas-context-pane-row.is-highlighted {
+  background: rgba(34, 211, 238, 0.1);
+  border-color: rgba(34, 211, 238, 0.25);
+  color: var(--atlas-cyan);
+}
+
+.atlas-context-pane-row .atlas-context-pane-row-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* Cast row status — Featured (filled) vs Planned (outlined). 6px dot before
+   the icon. Planned rows also fade their content slightly so the writer's
+   eye prioritizes Featured at a glance. */
+.atlas-context-pane-row-status {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin: 0 1px 0 -2px;
+}
+.atlas-context-pane-row-status-featured {
+  background: var(--atlas-cyan);
+}
+.atlas-context-pane-row-status-planned {
+  background: transparent;
+  border: 1px solid rgba(34, 211, 238, 0.6);
+}
+.atlas-context-pane-row.is-planned .atlas-context-pane-row-name {
+  color: var(--atlas-text-muted);
+}
+.atlas-context-pane-row.is-planned .atlas-context-pane-row-icon {
+  opacity: 0.55;
+}
+.atlas-context-pane-row.is-planned:hover .atlas-context-pane-row-name {
+  color: var(--atlas-text);
+}
+
+.atlas-context-pane-row-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-context-pane-row-count {
+  font-size: 10.5px;
+  color: var(--atlas-text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.atlas-context-pane-row-reason {
+  font-size: 10.5px;
+  color: var(--atlas-text-muted);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: auto;
+  flex-shrink: 1;
+  max-width: 110px;
+}
+
+.atlas-context-pane-row-dismiss {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--atlas-text-muted);
+  opacity: 0.6;
+  cursor: pointer;
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+.atlas-context-pane-row-dismiss:hover {
+  opacity: 1;
+  color: #ff8a80;
+  background: rgba(255, 138, 128, 0.1);
+}
+
+/* Element preview — fills the post-graph slot when active.
+   Layout: header (flex-shrink:0) + body (scrollable) + actions (flex-shrink:0).
+   The body scrolls; header + actions stay pinned at top/bottom so the action
+   buttons never clip off-screen. */
+.atlas-context-preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 12px 16px;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.atlas-context-preview-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.atlas-context-preview-icon .material-symbols-outlined {
+  font-size: 22px;
+  color: var(--atlas-cyan);
+}
+
+.atlas-context-preview-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.atlas-context-preview-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--atlas-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atlas-context-preview-type {
+  font-size: 11px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  color: var(--atlas-text-muted);
+  margin-top: 1px;
+}
+
+.atlas-context-preview-close {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--atlas-text-muted);
+  font-size: 18px;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  border-radius: 3px;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+}
+.atlas-context-preview-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--atlas-text);
+}
+
+.atlas-context-preview-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atlas-context-preview-desc {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--atlas-text-soft);
+  margin: 0;
+}
+
+.atlas-context-preview-img {
+  width: 100%;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--atlas-divider);
+}
+
+.atlas-context-preview-backlinks {
+  font-size: 11.5px;
+  color: var(--atlas-text-soft);
+  line-height: 1.55;
+}
+.atlas-context-preview-backlinks-label {
+  color: var(--atlas-text-muted);
+}
+.atlas-context-preview-backlinks a {
+  color: var(--atlas-cyan);
+  text-decoration: none;
+}
+.atlas-context-preview-backlinks a:hover {
+  text-decoration: underline;
+}
+
+.atlas-context-preview-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--atlas-divider);
+  flex-shrink: 0;
+}
+.atlas-context-preview-actions .atlas-btn-primary,
+.atlas-context-preview-actions .atlas-btn-secondary {
+  flex: 1 1 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid var(--atlas-divider);
+  background: transparent;
+  color: var(--atlas-text-soft);
+}
+.atlas-context-preview-actions .atlas-btn-primary {
+  background: rgba(34, 211, 238, 0.18);
+  color: var(--atlas-cyan);
+  border-color: rgba(34, 211, 238, 0.35);
+}
+.atlas-context-preview-actions .atlas-btn-primary:hover {
+  background: rgba(34, 211, 238, 0.28);
+}
+.atlas-context-preview-actions .atlas-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--atlas-text);
+}
+
+/* ============================================================================
+ * Writing compiled view — read-only assembly of a parent narrative + its
+ * descendants. Replaces the TipTap editor in the prose slot when the user
+ * toggles view mode to "Compiled". Section markers between children navigate
+ * back to the child's own writing room for editing.
+ * ========================================================================= */
+
+.atlas-writing-compiled {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.atlas-writing-compiled-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atlas-writing-compiled-section[data-depth='0'] > .atlas-writing-compiled-section {
+  margin-top: 10px;
+}
+
+/* Section marker — two click targets: chevron (folds), title (navigates). */
+.atlas-writing-compiled-marker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid var(--atlas-divider);
+  padding: 10px 0 6px;
+  margin-top: 4px;
+}
+
+.atlas-writing-compiled-marker-chevron {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: var(--atlas-text-muted);
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+}
+.atlas-writing-compiled-marker-chevron:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--atlas-text);
+}
+
+.atlas-writing-compiled-marker-arrow {
+  font-size: 11px;
+  display: inline-block;
+  transition: transform 120ms ease;
+}
+/* When the section is collapsed, rotate the chevron 90° counterclockwise
+   so ▾ becomes ▸. Driven by the parent section's .is-collapsed class. */
+.atlas-writing-compiled-section.is-collapsed > .atlas-writing-compiled-marker .atlas-writing-compiled-marker-arrow {
+  transform: rotate(-90deg);
+}
+
+.atlas-writing-compiled-marker-title {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--atlas-text-muted);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  border-radius: 3px;
+  transition: color 120ms ease, background 120ms ease;
+}
+.atlas-writing-compiled-marker-title:hover {
+  color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.05);
+}
+
+.atlas-writing-compiled-marker-icon {
+  font-size: 16px !important;
+  opacity: 0.85;
+}
+
+.atlas-writing-compiled-marker-name {
+  font-weight: 500;
+  color: var(--atlas-text-soft);
+}
+.atlas-writing-compiled-marker-title:hover .atlas-writing-compiled-marker-name {
+  color: var(--atlas-cyan);
+}
+
+.atlas-writing-compiled-marker-tier {
+  font-size: 10.5px;
+  text-transform: lowercase;
+  color: var(--atlas-text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 5px;
+  border-radius: 7px;
+  margin-left: 4px;
+}
+
+/* Hide the section body when collapsed — the marker stays visible so the
+   writer can unfold by clicking the chevron again. */
+.atlas-writing-compiled-section.is-collapsed > .atlas-writing-compiled-section-body {
+  display: none;
+}
+
+/* Rendered prose — mirrors the live writing surface as closely as practical
+   so users see the same shape they'd type. Mini markdown renderer in
+   writing-compiled.ts handles paragraph / heading / list / blockquote /
+   bold / italic / code / link. */
+.atlas-writing-compiled-prose {
+  font-size: var(--atlas-prose-font-size, 15px);
+  font-family: var(
+    --atlas-prose-font-family,
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
+  );
+  line-height: 1.72;
+  letter-spacing: 0.005em;
+  color: var(--atlas-prose-text);
+}
+.atlas-writing-compiled-prose p {
+  margin: 0 0 1em;
+}
+.atlas-writing-compiled-prose h1,
+.atlas-writing-compiled-prose h2,
+.atlas-writing-compiled-prose h3,
+.atlas-writing-compiled-prose h4 {
+  margin: 1.2em 0 0.5em;
+  color: var(--atlas-text);
+  line-height: 1.3;
+}
+.atlas-writing-compiled-prose h1 { font-size: 22px; }
+.atlas-writing-compiled-prose h2 { font-size: 19px; }
+.atlas-writing-compiled-prose h3 { font-size: 16px; }
+.atlas-writing-compiled-prose blockquote {
+  border-left: 3px solid var(--atlas-divider);
+  margin: 0.6em 0;
+  padding: 0 0 0 14px;
+  color: var(--atlas-text-soft);
+}
+.atlas-writing-compiled-prose ul,
+.atlas-writing-compiled-prose ol {
+  padding-left: 22px;
+  margin: 0 0 1em;
+}
+.atlas-writing-compiled-prose li { margin: 0.2em 0; }
+.atlas-writing-compiled-prose code {
+  font-family: var(--atlas-font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.92em;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.atlas-writing-compiled-prose hr {
+  border: none;
+  border-top: 1px solid var(--atlas-divider);
+  margin: 1.4em 0;
+}
+
+.atlas-writing-compiled-empty {
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--atlas-text-muted);
+  opacity: 0.7;
 }

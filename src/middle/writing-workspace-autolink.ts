@@ -195,7 +195,14 @@ function buildDecorations(matches: ScanMatch[], doc: PmNode): DecorationSet {
       Decoration.inline(
         m.from,
         m.to,
-        { class: 'atlas-autolink-hint', title: `Tab to link as ${m.candidate.type}` },
+        // spellcheck=false on the hint span keeps browser spellcheck from
+        // underlining proper-noun element names with the red squiggle —
+        // they're known words from the writer's world, not misspellings.
+        {
+          class: 'atlas-autolink-hint',
+          title: `Tab to link as ${m.candidate.type}`,
+          spellcheck: 'false',
+        },
         { candidate: m.candidate },
       ),
     ),
@@ -286,7 +293,10 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
         const candidate = (found.spec as { candidate?: AutolinkCandidate }).candidate;
         if (!candidate) return false;
 
-        // Replace the decorated text with an ElementChip node + trailing space.
+        // Replace the decorated text with an ElementChip node. No trailing
+        // space inserted — the cursor naturally lands after the chip, and
+        // the user already has whatever whitespace was after the original
+        // word (autolink only matches up to the word boundary).
         const schema = view.state.schema;
         const chipType = schema.nodes.elementChip;
         if (!chipType) return false; // Editor schema doesn't include the chip — bail.
@@ -295,8 +305,7 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
           type: candidate.type,
           label: candidate.displayName,
         });
-        const space = schema.text(' ');
-        const tr = view.state.tr.replaceWith(found.from, found.to, [chip, space]);
+        const tr = view.state.tr.replaceWith(found.from, found.to, chip);
         view.dispatch(tr);
         event.preventDefault();
         return true;
@@ -313,4 +322,46 @@ export function refreshAutolinkIndex(view: EditorView, elements: Element[]): voi
   const index = buildAutolinkIndex(elements);
   const tr = view.state.tr.setMeta(AUTOLINK_INDEX_META, index);
   view.dispatch(tr);
+}
+
+/**
+ * Find the autolink candidate at a given doc position. Used by the right-
+ * click context menu to surface a "Link to X" action when the user clicks
+ * on an autolink hint. Returns null when no hint decoration intersects.
+ */
+export function findAutolinkCandidateAt(
+  view: EditorView,
+  docPos: number,
+): { candidate: AutolinkCandidate; from: number; to: number } | null {
+  const decos = AUTOLINK_PLUGIN_KEY.getState(view.state)?.decorations;
+  if (!decos) return null;
+  const hits = decos.find(Math.max(0, docPos - 1), docPos + 1);
+  for (const d of hits) {
+    if (docPos >= d.from && docPos <= d.to) {
+      const candidate = (d.spec as { candidate?: AutolinkCandidate }).candidate;
+      if (candidate) return { candidate, from: d.from, to: d.to };
+    }
+  }
+  return null;
+}
+
+/**
+ * Convert an autolink hint at the given doc position into a chip. Returns
+ * true if a conversion occurred. Mirrors the Tab handler's logic — used by
+ * the right-click context menu's "Link to X" action.
+ */
+export function convertAutolinkAt(view: EditorView, docPos: number): boolean {
+  const hit = findAutolinkCandidateAt(view, docPos);
+  if (!hit) return false;
+  const schema = view.state.schema;
+  const chipType = schema.nodes.elementChip;
+  if (!chipType) return false;
+  const chip = chipType.create({
+    id: hit.candidate.id,
+    type: hit.candidate.type,
+    label: hit.candidate.displayName,
+  });
+  const tr = view.state.tr.replaceWith(hit.from, hit.to, chip);
+  view.dispatch(tr);
+  return true;
 }

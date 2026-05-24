@@ -59,6 +59,14 @@ export interface Element {
   atlas_richtext_json?: unknown;
   /** Alternate names matched by @ picker + auto-link (convention #49). */
   atlas_aliases?: string[];
+  /**
+   * Per-narrative suggestion dismissals for the writing-context pane. When
+   * the writer × dismisses a suggested element in the Suggested list, its id
+   * is added here so it stops surfacing for THIS narrative. Other narratives
+   * (sibling chapters, the next book) compute suggestions independently.
+   * Atlas-local extension; never pushed to the API.
+   */
+  atlas_dismissed_suggestions?: string[];
   [field: string]: unknown;
 }
 
@@ -287,7 +295,15 @@ export type WorldState = 'local-only' | 'api-linked';
  */
 export type RightTabRef =
   | { kind: 'map-index' }
-  | { kind: 'map'; mapId: string; label: string; worldId?: string };
+  | { kind: 'map'; mapId: string; label: string; worldId?: string }
+  /**
+   * Writing-context tab — present only while the writing room is open on a
+   * narrative. Anchored leftmost in the tab bar. Managed by
+   * `writing-context-lifecycle.ts`: created on entering writing mode, removed
+   * on leaving. `narrativeId` updates as the user navigates between narratives
+   * within writing mode (same tab, refreshed content).
+   */
+  | { kind: 'writing-context'; narrativeId: string };
 
 /**
  * Per-world right-pane tab snapshot. Persisted on WorldRegistryEntry so the
@@ -396,6 +412,25 @@ export interface WorldRegistryEntry {
    * who lives in Creatures lands on Creatures by default. Atlas-local.
    */
   writing_cast_tab?: 'characters' | 'locations' | 'objects' | 'events' | 'creatures';
+  /**
+   * Browser-native spellcheck on the writing-workspace prose. Toggleable
+   * because element-name squiggles (proper nouns) annoy worldbuilders.
+   * Defaults to true when missing. Applied via the contenteditable's
+   * spellcheck attribute on editor mount + on registry change.
+   */
+  writing_spellcheck?: boolean;
+  /**
+   * Writing-context pane — auto-open on first entry to writing mode per
+   * session. When true (default), the context tab in the right pane is
+   * activated on entry; subsequent manual tab switches are respected and the
+   * auto-activation does NOT re-fire while writing mode stays open. When false,
+   * the tab still appears in the bar but isn't auto-focused.
+   *
+   * Default semantics: stored ABSENT in the registry → defaults to true at
+   * read-time, so existing worlds upgrade with the helpful behavior. Explicit
+   * false opts out.
+   */
+  writing_context_auto_open?: boolean;
   /**
    * Per-world freeform notes — atlas-local (never synced). Accessed via the
    * notes overlay (src/ui/notes-overlay.ts). Lives in the registry so it

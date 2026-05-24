@@ -264,6 +264,10 @@ function renderWritingTab(entry: WorldRegistryEntry): string {
           <option value="mono"  ${entry.writing_font_family === 'mono' ? 'selected' : ''}>Mono</option>
         </select>
       </div>
+      <label class="atlas-settings-toggle">
+        <input type="checkbox" data-setting="writing_spellcheck" ${entry.writing_spellcheck !== false ? 'checked' : ''} />
+        <span>Spellcheck prose (browser-native; uncheck to disable squiggle lines)</span>
+      </label>
     </section>
   `;
 }
@@ -624,6 +628,19 @@ function wireWritingTab(entry: WorldRegistryEntry, toasts: ToastManager): void {
     saveRegistry(next);
     patchSlice('registry', next);
     toasts.info(`Writing font set to ${v}`);
+  });
+
+  const spellCb = document.querySelector<HTMLInputElement>(`.atlas-settings input[data-setting="writing_spellcheck"]`);
+  spellCb?.addEventListener('change', () => {
+    const enabled = spellCb.checked;
+    const reg = getState().registry;
+    const idx = reg.worlds.findIndex(w => w.id === entry.id);
+    if (idx < 0) return;
+    const updated: WorldRegistryEntry = { ...reg.worlds[idx], writing_spellcheck: enabled };
+    const next = { ...reg, worlds: reg.worlds.map((w, i) => (i === idx ? updated : w)) };
+    saveRegistry(next);
+    patchSlice('registry', next);
+    toasts.info(`Spellcheck ${enabled ? 'on' : 'off'}`);
   });
 }
 

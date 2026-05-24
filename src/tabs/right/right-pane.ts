@@ -18,6 +18,7 @@ import type { WorldMap } from '../../core/types';
 import { ToastManager } from '../../ui/toast-manager';
 import { mountMapIndexTab } from './map-index-tab';
 import { mountMapTab, disposeMapTab, disposeAllMapTabs } from './map-tab';
+import { mountWritingContextTab } from './writing-context-tab';
 import { mapTabCache } from './map-tab-cache';
 import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { navigate, parseHash, worldHash, elementHash } from '../../core/router';
@@ -50,7 +51,9 @@ export function mountRightPane(mount: RightPaneMount): () => void {
     const ui = getState().ui;
     const t = ui.rightTabs[ui.rightActiveIndex];
     if (!t) return 'map-index';
-    return t.kind === 'map' ? `map:${t.mapId}` : 'map-index';
+    if (t.kind === 'map') return `map:${t.mapId}`;
+    if (t.kind === 'writing-context') return `writing-context:${t.narrativeId}`;
+    return 'map-index';
   }
 
   function activeTabIsStale(state: ReturnType<typeof getState>): boolean {
@@ -133,6 +136,13 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       // it represents a specific map's prefs and has nothing to target.
       closeVisualSettingsPopover();
       unmountActive = mountMapIndexTab(pane, toasts);
+    } else if (t.kind === 'writing-context') {
+      closeVisualSettingsPopover();
+      unmountActive = mountWritingContextTab({
+        pane,
+        narrativeId: t.narrativeId,
+        toasts,
+      });
     } else {
       // mountMapTab is non-returning (manages its own lifecycle via cache).
       mountMapTab(pane, t.mapId, toasts);
@@ -158,6 +168,16 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       if (tab.kind === 'map-index') {
         btn.setAttribute('data-tab-kind', 'map-index');
         btn.innerHTML = `<span class="material-symbols-outlined">view_list</span><span>Maps</span>`;
+        btn.addEventListener('click', () => {
+          patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
+        });
+        tabBar.appendChild(btn);
+        return;
+      }
+      if (tab.kind === 'writing-context') {
+        btn.setAttribute('data-tab-kind', 'writing-context');
+        btn.innerHTML = `<span class="material-symbols-outlined">hub</span><span>Context</span>`;
+        btn.title = 'Context for the active narrative — cast, suggested, graph';
         btn.addEventListener('click', () => {
           patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
         });

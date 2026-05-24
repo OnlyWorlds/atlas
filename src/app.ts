@@ -24,6 +24,7 @@ import { mountImportRoom } from './middle/import-room';
 import { mountTemplatesRoom } from './middle/templates-room';
 import { mountRoomNav } from './middle/room-nav';
 import { mountRightPane } from './tabs/right/right-pane';
+import { installWritingContextLifecycle } from './tabs/right/writing-context-lifecycle';
 import { openMapTab } from './tabs/right/map-index-tab';
 import { loadPersistedRightTabs } from './tabs/right/right-tabs-persistence';
 import { toastManager, ToastManager } from './ui/toast-manager';
@@ -103,6 +104,10 @@ export function startApp(container: HTMLElement): AppHandle {
     pane: shell.rightPane,
     toasts,
   });
+
+  // Writing-context tab lifecycle — inserts/removes the ephemeral context tab
+  // as the user enters and leaves writing mode. Listens on hash changes.
+  const unsubContextTab = installWritingContextLifecycle();
 
   // Middle pane — routed by hash mode + active world.
   let unmountMiddle: (() => void) | null = null;
@@ -246,6 +251,7 @@ export function startApp(container: HTMLElement): AppHandle {
       unsubSidebar();
       unsubRoomNav();
       unsubRight();
+      unsubContextTab();
       unsubHash();
       unsubState();
       unmountMiddle?.();
