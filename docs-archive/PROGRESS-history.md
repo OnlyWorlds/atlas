@@ -1808,3 +1808,61 @@ Long autonomous session covering:
 
 ---
 
+## Sessions 227–228 (archived from PROGRESS.md, 2026-05-24, session 231)
+
+These two sessions delivered the writing workspace from scratch — design + v1 + v1.5 polish (227) and the v2 batch (228). Architecture moved fast and largely held; the writing-context pane introduced in session 229 (kept in PROGRESS.md) and globalized in session 231 sits ON TOP of this foundation.
+
+## Session 227 (2026-05-20) — Writing workspace v1 + v1.5
+
+Long autonomous build after the design conversation. 9 planned bouts; 8 landed, 1 deferred. Followed by ~12 rounds of Captain-feedback polish (v1.5) the same day.
+
+**Core build**: TipTap-based writing workspace replacing element-detail when route is `writing` AND a narrative is active. New modules: `writing-workspace.ts` (orchestrator), `-editor.ts` (TipTap config), `-element-chip.ts` (custom Mention extension), `-mention.ts` (@ picker UI), `-markdown.ts` (custom JSON → markdown serializer), `-load.ts` (markdown → JSON post-processor), `-derive.ts` (UNION-on-save extract). Two-representation storage: `story` (markdown for OW interop) + `atlas_richtext_json` (TipTap JSON, atlas-local).
+
+**Library choice**: TipTap 3 chosen over Lexical (memory leak), ProseMirror raw (boilerplate), Quill/Editor.js/CKEditor (size/markdown issues).
+
+**Linking model** (conventions #47-50):
+- `atlas_richtext_json` on Narrative as atlas-local extension
+- Chips serialize as markdown `[Name](ow://<type>/<uuid>)` — display text resolved dynamically at render
+- `atlas_aliases: string[]` on any element; @ picker + autolink match `name` ∪ `atlas_aliases`
+- On save, auto-derive scans prose for `ow://` links and writes UNION into Narrative relation fields
+
+**URL shortened** (post-build): `#/w/<worldId>/writing/<narrativeId>` (one UUID instead of three). Legacy nested form still parses.
+
+**v1.5 polish** (Captain-driven): chip preview hover card, aliases editor modal, @ picker recents tracker, Cmd+Shift+F focus mode (`:has()`-driven shell collapse), per-world prose font-size + warm vignette + off-white text, settings tab persistence, layout-shift fix via shared `--atlas-writing-content-width: 760px`. Convention #52 (scope `.material-symbols-outlined` overrides under a parent class for two-class specificity) coined here after the second time it bit.
+
+Tests: 629 → 672 vitest (+43). Bundle: 298 KB gzipped single chunk (workspace was static-imported pre-v2 split).
+
+## Session 228 (2026-05-20) — Writing v2 batch: 10 autonomous bouts
+
+Long autonomous bout after a v2-roadmap conversation. Captain locked scope at 10 bouts; all 10 shipped with tests green at session close.
+
+| # | Bout | Approx LOC | Tests |
+|---|------|------------|-------|
+| 1 | Cleanup (e2e + Element type + OW_LINK_RE + flush) | ~120 | 6 e2e |
+| 2 | Backlinks polish (Mentioned-in + self-heal) | ~80 | 2 e2e |
+| 3 | Word goal (popover + progress ring) | ~200 | 12u + 1e |
+| 4 | Find/replace (Ctrl+F / Ctrl+H bar) | ~440 | 2 e2e |
+| 5 | Font picker (4 system stacks) | ~70 | 1 e2e |
+| 6 | Character cast strip (5-type pivot) | ~190 | 1 e2e |
+| 7 | Inline element creation (Ctrl+Shift+E + right-click) | ~140 | 1 e2e |
+| 8 | Split-into-sibling (Ctrl+Shift+D + modal) | ~290 | 1 e2e |
+| 9 | Autolink (TipTap plugin + Tab handler) — Convention #53 | ~280 | 9u + 2e |
+| 10 | Code-split TipTap (dynamic import + race guards) | ~50 | held |
+
+**Convention #53** (autolink): case-sensitive `\b...\b` matches against name + alias index, min 3 chars, ambiguity-suppressed, first-mention rule, `@` picker takes priority. Index rebuilt only when `state.data.elements` ref swaps.
+
+**Bundle impact**: code-split landed in Bout 10. Main JS gzipped dropped 298 KB → 157 KB (47% reduction). Writing-room visit now pays an extra ~149 KB chunk fetch once per session (cached after).
+
+Tests: 672 → 693 vitest, 93 → 110 Playwright. All green.
+
+**Durable lessons** (now in `.temper/grow/craft.md`):
+- ProseMirror's EditorState selection doesn't sync from DOM selection on demand — dispatch `selectionchange` event manually in e2e tests
+- Dynamic `import()` race guards are non-optional — generation counter + targetId capture minimum
+- `pagehide` is the modern `beforeunload` for save-before-close
+- `Element` type extension with named optional fields catches typos at compile time
+- One source of truth for regex patterns: factory function for `/g` regexes to avoid `lastIndex` state-share
+
+(Sessions 229-230 — writing-room redesign + initial context pane — kept in PROGRESS.md as proximate context for session 231's tool-global refactor.)
+
+---
+

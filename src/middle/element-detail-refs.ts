@@ -1,32 +1,45 @@
 /**
- * "Referenced By" section for element-detail.
+ * "Mentioned in" + "Referenced by" sections for element-detail.
  *
  * Scans `state.data.elements` for any element whose fields point back at the
  * target element's id. SDK-shape-agnostic (convention #5): walks all property
  * values whose item shape resembles an id (string, array of strings, array of
  * objects with an `id`, object with an `id`).
  *
- * Pure rendering + the reverse-link scan. No state mutation beyond the
- * navigation click handler.
+ * Two sections:
+ *   - "Mentioned in" — incoming narratives, grouped by writing tier (the
+ *     world's Book / Chapter / Scene / Draft labels; narratives outside the
+ *     writing tree fall under a generic "Narratives" group). Click routes to
+ *     the writing room — the writer's intent ("what scenes is this character
+ *     in?").
+ *   - "Referenced by" — every other incoming element. Grouped by element type
+ *     by default, or by the referencing relationship field ("Rival of…",
+ *     "Birthplace of…") when `editor_settings.refs_group_by_field` is on.
+ *
+ * Auto-derive (convention #50) pushes every prose mention into the narrative's
+ * relation fields on save, so this single reverse-scan catches prose-linked
+ * AND manually-linked references uniformly. See DESIGN_WRITING.md.
  */
 
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash, writingHash } from '../core/router';
 import type { Element, ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { getTierForNarrative, getWritingLabels, type WritingTier } from './writing-helpers';
+import { humanizeFieldName } from './element-detail-fields';
+import { getEditorSettings } from '../registry/registry';
+
+/** Field names that never encode a relationship — skipped by the reverse scan. */
+const META_KEYS = new Set(['id', 'name', 'description', 'type', 'local_updated_at', 'server_updated_at']);
+
+interface RefGroup {
+  label: string;
+  sources: Element[];
+}
 
 /**
- * Render the "incoming references" panel for an element.
- *
- * Narratives are surfaced separately as "Mentioned in" — they're the highest-
- * signal incoming reference for writers ("what scenes does this character
- * appear in?") and they route to the writing room on click (not element-detail),
- * matching the writer's intent. Other element types render in the standard
- * "Referenced by" section below.
- *
- * Auto-derive (convention #50) pushes every prose `ow://` mention into the
- * narrative's relation fields on save, so this single reverse-scan catches
- * prose-linked AND manually-linked narratives uniformly. See DESIGN_WRITING.md.
+ * Render the incoming-references panel for an element. Returns null when
+ * nothing references it.
  */
 export function renderReferencedBy(el: Element): HTMLElement | null {
   const incoming = findIncomingReferences(el.id);
@@ -42,19 +55,18 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
     wrap.appendChild(buildSection({
       headerLabel: 'Mentioned in',
       count: narratives.length,
-      sources: narratives,
-      // Narratives have their own room — open the writing surface so the
-      // reader can drop into the prose context, not the schema editor.
+      groups: groupNarrativesByTier(narratives),
       navigateTo: 'writing',
       sectionClass: 'atlas-detail-section atlas-detail-refs-mentioned',
     }));
   }
 
   if (others.length > 0) {
+    const groupByField = getEditorSettings(getState().registry).refs_group_by_field;
     wrap.appendChild(buildSection({
       headerLabel: 'Referenced by',
       count: others.length,
-      sources: others,
+      groups: groupByField ? groupOthersByField(el.id, others) : groupOthersByType(others),
       navigateTo: 'element',
       sectionClass: 'atlas-detail-section',
     }));
@@ -63,16 +75,83 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
   return wrap;
 }
 
+// ====== Grouping strategies ======
+
+/** Group incoming narratives by writing tier; tree order l1→l4, then non-tree. */
+function groupNarrativesByTier(narratives: Element[]): RefGroup[] {
+  const worldId = getState().active?.worldId ?? null;
+  const labels = worldId ? getWritingLabels(worldId) : null;
+  const buckets = new Map<WritingTier | 'other', Element[]>();
+  for (const n of narratives) {
+    const tier = worldId ? getTierForNarrative(n, worldId) : null;
+    const key: WritingTier | 'other' = tier ?? 'other';
+    const arr = buckets.get(key) ?? [];
+    arr.push(n);
+    buckets.set(key, arr);
+  }
+  const order: Array<WritingTier | 'other'> = ['l1', 'l2', 'l3', 'l4', 'other'];
+  const groups: RefGroup[] = [];
+  for (const key of order) {
+    const sources = buckets.get(key);
+    if (!sources || sources.length === 0) continue;
+    const label = key === 'other' || !labels || key === null
+      ? titleCaseFirst(ELEMENT_LABELS.narrative?.plural ?? 'narratives')
+      : pluralize(labels[key]);
+    groups.push({ label, sources });
+  }
+  return groups;
+}
+
+/** Group incoming elements by element type (title-cased plural label). */
+function groupOthersByType(others: Element[]): RefGroup[] {
+  const byType = new Map<ElementType, Element[]>();
+  for (const src of others) {
+    const arr = byType.get(src.type) ?? [];
+    arr.push(src);
+    byType.set(src.type, arr);
+  }
+  const groups: RefGroup[] = [];
+  for (const [type, sources] of byType.entries()) {
+    groups.push({ label: titleCaseFirst(ELEMENT_LABELS[type]?.plural ?? type), sources });
+  }
+  return groups;
+}
+
+/**
+ * Group incoming elements by the relationship field that points at the target,
+ * labelled "<Field> of" (a Character whose `rival` is the target lands under
+ * "Rival of"). A source referencing the target through multiple fields appears
+ * under each. Alphabetical by label for a stable read.
+ */
+function groupOthersByField(targetId: string, others: Element[]): RefGroup[] {
+  const byField = new Map<string, Element[]>();
+  for (const src of others) {
+    for (const field of matchingFields(src, targetId)) {
+      const arr = byField.get(field) ?? [];
+      arr.push(src);
+      byField.set(field, arr);
+    }
+  }
+  const groups: RefGroup[] = [];
+  for (const [field, sources] of byField.entries()) {
+    groups.push({ label: `${singularizeLabel(humanizeFieldName(field))} of`, sources });
+  }
+  groups.sort((a, b) => a.label.localeCompare(b.label));
+  return groups;
+}
+
+// ====== Rendering ======
+
 interface SectionOpts {
   headerLabel: string;
   count: number;
-  sources: Element[];
+  groups: RefGroup[];
   navigateTo: 'element' | 'writing';
   sectionClass: string;
 }
 
 function buildSection(opts: SectionOpts): HTMLElement {
-  const { headerLabel, count, sources, navigateTo, sectionClass } = opts;
+  const { headerLabel, count, groups, navigateTo, sectionClass } = opts;
   const section = document.createElement('div');
   section.className = sectionClass;
 
@@ -85,26 +164,17 @@ function buildSection(opts: SectionOpts): HTMLElement {
   body.className = 'atlas-detail-section-body atlas-detail-refs';
   section.appendChild(body);
 
-  // Group by source type for readability. (For the Mentioned-in section this
-  // always single-type — narrative — but the by-type grouping is harmless.)
-  const byType = new Map<ElementType, Element[]>();
-  for (const src of sources) {
-    const arr = byType.get(src.type) ?? [];
-    arr.push(src);
-    byType.set(src.type, arr);
-  }
-
-  for (const [type, group] of byType.entries()) {
+  for (const group of groups) {
     const wrap = document.createElement('div');
     wrap.className = 'atlas-field';
     const label = document.createElement('div');
     label.className = 'atlas-field-label';
-    label.textContent = ELEMENT_LABELS[type]?.plural ?? type;
+    label.textContent = group.label;
     wrap.appendChild(label);
     const chips = document.createElement('div');
     chips.className = 'atlas-link-row';
-    group.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-    for (const src of group) {
+    const sorted = group.sources.slice().sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    for (const src of sorted) {
       chips.appendChild(buildRefChip(src, navigateTo));
     }
     wrap.appendChild(chips);
@@ -139,12 +209,11 @@ function buildRefChip(src: Element, navigateTo: 'element' | 'writing'): HTMLElem
   return chip;
 }
 
+// ====== Scanning ======
+
 /**
  * Find all elements in `state.data.elements` that reference `targetId` somewhere
- * in their field values. Scans every property that looks like an id or array of
- * ids — no hardcoded field-name suffix detection (convention #5).
- *
- * Excludes the target itself. Exported for unit testing.
+ * in their field values. Excludes the target itself. Exported for unit testing.
  */
 export function findIncomingReferences(targetId: string): Element[] {
   const all = getState().data.elements;
@@ -159,19 +228,68 @@ export function findIncomingReferences(targetId: string): Element[] {
 /** True iff any field on `el` references `targetId`. Exported for unit testing. */
 export function refersTo(el: Element, targetId: string): boolean {
   for (const [key, value] of Object.entries(el)) {
-    // Skip the obvious non-id metadata.
-    if (key === 'id' || key === 'name' || key === 'description' || key === 'type'
-      || key === 'local_updated_at' || key === 'server_updated_at') continue;
-    if (typeof value === 'string') {
-      if (value === targetId) return true;
-    } else if (Array.isArray(value)) {
-      for (const item of value) {
-        if (typeof item === 'string' && item === targetId) return true;
-        if (item && typeof item === 'object' && (item as { id?: string }).id === targetId) return true;
-      }
-    } else if (value && typeof value === 'object') {
-      if ((value as { id?: string }).id === targetId) return true;
-    }
+    if (META_KEYS.has(key)) continue;
+    if (valueRefersTo(value, targetId)) return true;
   }
   return false;
+}
+
+/** Every field name on `el` whose value references `targetId`. */
+function matchingFields(el: Element, targetId: string): string[] {
+  const fields: string[] = [];
+  for (const [key, value] of Object.entries(el)) {
+    if (META_KEYS.has(key)) continue;
+    if (valueRefersTo(value, targetId)) fields.push(key);
+  }
+  return fields;
+}
+
+/** Whether a single field value (string / array / object) references `targetId`. */
+function valueRefersTo(value: unknown, targetId: string): boolean {
+  if (typeof value === 'string') return value === targetId;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (typeof item === 'string' && item === targetId) return true;
+      if (item && typeof item === 'object' && (item as { id?: string }).id === targetId) return true;
+    }
+    return false;
+  }
+  if (value && typeof value === 'object') {
+    return (value as { id?: string }).id === targetId;
+  }
+  return false;
+}
+
+// ====== Small label helpers ======
+
+function titleCaseFirst(s: string): string {
+  return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Naive English pluralization — good enough for tier labels (Book → Books). */
+function pluralize(s: string): string {
+  if (/[^aeiou]y$/i.test(s)) return s.slice(0, -1) + 'ies';
+  if (/(s|x|z|ch|sh)$/i.test(s)) return s + 'es';
+  return s + 's';
+}
+
+/**
+ * Singularize the last word of a "<Field> of" relationship label — we always
+ * view ONE element, so it reads "Friend of Bob", not "Friends of Bob". The
+ * field name on disk is plural for multi-links (`friends`, `rivals`); single-
+ * links are already singular and pass through unchanged.
+ */
+function singularizeLabel(label: string): string {
+  const parts = label.split(' ');
+  parts[parts.length - 1] = singularizeWord(parts[parts.length - 1]);
+  return parts.join(' ');
+}
+
+function singularizeWord(word: string): string {
+  if (/(species|series)$/i.test(word)) return word;          // invariant plurals
+  if (/ies$/i.test(word)) return word.slice(0, -3) + 'y';    // Abilities → Ability
+  if (/(sses|shes|ches|xes|zes)$/i.test(word)) return word.slice(0, -2); // Boxes → Box
+  if (/ss$/i.test(word)) return word;                         // Address stays
+  if (/s$/i.test(word)) return word.slice(0, -1);             // Friends → Friend
+  return word;
 }

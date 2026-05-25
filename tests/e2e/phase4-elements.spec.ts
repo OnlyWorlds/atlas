@@ -87,6 +87,28 @@ test('create element from elements sidebar → row + detail view', async ({ page
   await expect(page.locator('.atlas-middle-header h2')).toContainText('Aragorn');
 });
 
+test('default new-element type from settings preselects the create modal category', async ({ page }) => {
+  await setupWorldA(page);
+
+  // Set the default create type to 'location' via Settings → Editing.
+  await page.click('[data-action="open-settings"]');
+  await page.click('[data-settings-tab="editing"]');
+  await page.selectOption('.atlas-settings select[name="default-create-type"]', 'location');
+
+  // Persists to the ui-prefs localStorage object.
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('atlas_ui_prefs')!).defaultCreateType)
+  ).toBe('location');
+
+  // Open the create modal with no explicit type → it should preselect Location.
+  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
+  await page.click('[data-action="create-element"]');
+  await expect(page.locator('[data-modal="create-element"]')).toBeVisible();
+  await expect(page.locator('.atlas-create-type-btn[data-type="location"]')).toHaveClass(/active/);
+  // OnlyWorlds labels are lowercase throughout.
+  await expect(page.locator('input[name="element-type"]')).toHaveValue('location');
+});
+
 test('create multiple elements of different types and filter by type', async ({ page }) => {
   await setupWorldA(page);
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');

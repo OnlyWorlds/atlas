@@ -451,20 +451,22 @@ Same flow as W5, except:
 
 1. User flips "stay offline" toggle to off (or `online` event fires).
 2. SyncEngine `resume()` → state → `syncing`.
-3. Push phase runs: for each locally-changed element, push to server. Conflicts handled per policy (default drain-blind: local wins, toast fires).
-4. Pull phase runs: fetch updates from server since `last_pull_at`. Apply non-conflicting; record conflicting.
+3. Push phase runs: for each locally-changed element, push to server. Conflicts handled per policy (default `local-wins`: push overwrites server, one-shot toast).
+4. Pull phase runs: fetch updates from server since `last_pull_at`. Apply non-conflicting; conflicting handled per policy.
 5. Sync indicator returns to `synced` (or `error` if anything failed).
 
 ### W8 — Conflict surfacing
 
-For Phase 1 (drain-blind default):
-- Conflict detected during push (server changed since pre-edit baseline).
-- Local change pushed anyway.
-- Toast: "Server was updated externally — your save won. {N} field(s) overwritten."
-- Conflict logged in `sync-state.json` for later review (read-only audit; no UI yet).
+Two policies only (see "Sync policies" above; legacy `drain-blind`/`pause-on-conflict`/`ask` names are migrated on load). Symmetric across push and pull.
 
-For Phase 3.5 polish:
-- `ask` policy raises a modal with field-level diff + per-field keep-mine / keep-theirs / manual-merge.
+Under **`local-wins`** (default):
+- Conflict detected (both sides changed since the baseline).
+- Local wins — push overwrites the server; pull skips applying the server change for that element.
+- One-shot toast per round; no badge, no modal, no persisted conflict (the divergence is already resolved). A pull-time conflict triggers an immediate follow-up push to converge (SYNC_NOTES).
+
+Under **`pause-and-review`**:
+- Nothing auto-resolves — push skips, pull skips, the conflict is persisted to `sync-state.json`.
+- ⚠ badge fires on the sync pill; clicking opens the conflict-review modal with per-element `overwrite (mine wins)` / `pull (theirs wins)` actions. Closing without choosing = decide later; the badge persists.
 
 ### W9 — Delete element (cascade-aware)
 
@@ -565,7 +567,7 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 | `publish-detail` | `#/w/<id>/publish/<showcase_id>` | Specific showcase config + preview | stub this session |
 | `import` | `#/w/<id>/import` | Explanation + reference to base-tool import; mechanics deferred | stub this session |
 | `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | stub this session |
-| `settings` | `#/w/<id>/settings[/<tab>]` | Identity / atlas / sync / maps / world / about tabs | shipped |
+| `settings` | `#/w/<id>/settings[/<tab>]` | Account / storage / editing (atlas-wide) · world / writing / context (per-world) | shipped |
 
 **Default route**: bare `#/w/<id>` resolves to `home` (was `timeline` pre-session-223). Welcome stays at root `#/` with no active world.
 
@@ -589,26 +591,31 @@ Per-room design docs:
 
 ## State Shape
 
+`src/core/state.ts` is the source of truth — the shape below is a reference, kept high-level to avoid drift. `middleMode` is the room (rooms model, session 223+); navigational/world-specific prefs live on the registry or URL, app-level UI prefs in `ui-prefs.ts` (NOT in `UiState`).
+
 ```ts
 interface AppState {
-  registry: WorldsRegistry;          // localStorage-persisted
-  data: DataState;                   // elements/maps/pins/zones/markers in memory
-  ui: UiState;                       // mode toggles, selection, etc.
-  sync: SyncSummaryState;            // per-world sync engine summary for UI
+  registry: WorldsRegistry;              // localStorage-persisted
+  atlasRoot: AtlasRootRef | null;        // creation-default root container
+  atlasRootRecoverable: AtlasRootRecoverableRef | null;  // orphan-handle recovery
+  active: ActiveWorldRef | null;         // currently-open world
+  middleMode: MiddleMode;                // active room (home/element/writing/timeline/settings/…)
+  data: DataState;                       // elements/maps/pins/zones/markers in memory
+  ui: UiState;                           // selection, filters, right tabs, transient flags
+  sync: SyncSummaryState;                // per-world sync engine summary for UI
+  busy: boolean;
 }
 
 interface UiState {
   sidebarMode: 'worlds' | 'elements';
-  middleMode: 'timeline' | 'element' | 'settings' | 'empty';
-  rightTabs: RightTabRef[];
-  rightActiveIndex: number;
-  selectedElementId?: string;
-  elementFilters: Set<ElementType>;
+  selectedElementId: string | null;
+  elementFilters: Set<ElementType>;      // empty = show all
   search: string;
-  showcaseMode: boolean;
-  pinPlacement?: { elementId: string };
-  defaultCreateType: ElementType;
-  allowMultiPin: boolean;
+  rightTabs: RightTabRef[];              // [context, map-index, ...maps]
+  rightActiveIndex: number;
+  pinPlacement: { elementId: string } | null;
+  zoneEditing: { zoneId: string; mapId: string } | null;
+  sidebarWritingOverride: boolean;       // transient, in-session only
 }
 
 interface SyncSummaryState {
@@ -630,8 +637,8 @@ The `state.sync` slice is populated by `attachSyncEngine(entry, folder)` (single
 - `atlas-root-flow.linkExistingApiWorldInRoot` — after initial download.
 - `make-online-modal` — after registry transition to api-linked.
 
-UI prefs (sidebarMode default, showcaseMode, defaultCreateType, allowMultiPin) → `localStorage.atlas_ui_prefs`.
-Navigation state (active world, selection, open maps) → URL hash.
+UI prefs (`sidebarMode`, `defaultCreateType`) → `localStorage.atlas_ui_prefs` (see `core/ui-prefs.ts`).
+Navigation state (active world, selection, open maps, room) → URL hash.
 
 ---
 
@@ -661,7 +668,7 @@ Hash-based, no server rewrites needed (Cloudflare Pages friendly).
 #/w/<worldId>/import                        → import room
 #/w/<worldId>/templates                     → templates room
 #/w/<worldId>/settings                      → settings (default tab)
-#/w/<worldId>/settings/<tab>                → settings deep-link (identity/atlas/sync/maps/world/writing/about)
+#/w/<worldId>/settings/<tab>                → settings deep-link (account/storage/editing/world/writing/context; legacy keys alias)
 ```
 
 **Right-pane map composition** (orthogonal to room — maps live in the right pane, room lives in middle):
@@ -767,6 +774,87 @@ Inherited from legacy (hard-won; preserve in new code):
 
 Related: convention #32 (Esc clears selection + nav home) is **gated to NOT fire when route is `writing`** — writing room owns its keyboard; pulling the user out of writing AND clearing their persisted global selection on one Esc keystroke surprised more than it helped. `hotkeys.ts:'deselect-to-home'` skips when `window.location.hash.includes('/writing')`.
 
+47-57. **Writing conventions** — codified in `DESIGN_WRITING.md` (richtext storage, ow:// link scheme, atlas_aliases, UNION-on-save, workspace replacement gate, material-symbols scoping, autolink rules, sticky bar, ambient word count, add-to-cast unification, compiled view). See that doc for details. Numbering reserved for cross-doc consistency.
+
+58. **Context tab is permanent + route-driven** (session 231). The right-pane Context tab lives at index 0 of `state.ui.rightTabs` for every world, alongside Maps and per-map tabs. Its content is derived from the URL: writing route → narrative subject + Cast/Potentials lists; element route → element subject + preview card; any other route → empty state with helpful copy. The pane's content reacts to hash changes via `onHashChange`; in-pane click-to-recenter and graph-node selection stay pane-local (no URL change). Subject is NEVER stored on the RightTabRef — the tab is a stable shell, the URL is the focus source of truth. `context-tab-lifecycle.ts` enforces the at-index-0 invariant defensively.
+
+59. **Context pane prefs flow one direction**: registry → orchestrator → graph → toolbar (session 231). Toolbar callbacks ONLY persist via `patchWorldEntry`; never call graph methods directly. The orchestrator's `syncPrefsToGraph` watches state, diffs against last-applied prefs, and propagates changes to the graph + toolbar. Settings page edits land via the same path — same registry write, same propagation. Single source of truth (registry), single propagation channel, no duplicate-update races. Toolbar `onToggleType` / `onSetHop` / `onToggleLockLayout` callbacks fire `patchWorldEntry({...})` only — the subscriber takes it from there.
+
+60. **Diff-aware setter calls + ordering matter for graphs with sims** (session 231). When a setter has side effects beyond state mutation — `setHiddenTypes` calls `renderForCenter` which runs the physics sim — spurious "no-op" calls aren't no-ops. They wobble node positions by re-running the sim, breaking the lock-layout "no jumping" guarantee. `syncPrefsToGraph` compares each pref against `lastAppliedPrefs` and only calls the setter when the field actually changed. Setters with prerequisite flags (e.g. `setLockLayout` toggles the flag that subsequent `setHiddenTypes` reads to decide sim-vs-paint) MUST be called first in the propagation order.
+
+61. **Window-level capture phase for browser-default mouse buttons** (session 231). Mouse buttons 3 (back) and 4 (forward) trigger browser history navigation. To suppress: listen on `mousedown` AND `mouseup` AND `auxclick` at window level in capture phase (`{ capture: true }` or `addEventListener(t, fn, true)`). Bubble-phase listeners on a child element may run AFTER Chrome's gesture handler initiates `history.back()`. preventDefault on all three to maximize browser coverage. Scope the suppression with `host.contains(e.target)` — when cursor is outside the relevant pane, browser nav works normally. Trigger the in-pane action only on `mousedown` (avoid triple-firing).
+
+62. **Per-ring caps keep multi-hop graphs readable** (session 231). The context-pane graph supports hop depth 1-4. Ring 1 (direct cast) is uncapped; outer rings are score-and-capped: ring 2 = 12 (chapter 6 / book 4 under tier density), ring 3 = 8, ring 4 = 6. Each ring's candidates are scored by edges back to the PREVIOUS ring (mirrors the cast → adjacent scoring at ring 2). Without per-ring caps, hop=4 in a dense world produces 100+ nodes — unreadable in a small pane. Implementation in `context-pane-graph.ts:renderForCenter` ring-walk loop.
+
+63. **CSS-JS coupling needs a code-level reminder** (session 231). When CSS sets a variant size for a special node (e.g. `.atlas-context-graph-node.is-center { width: 44px }` overriding the default `36px`), the JS positioning code MUST use the matching diameter when computing the top-left offset for that node. Otherwise the variant sits off-center relative to other geometry (the center node sat 4px down-right of the edge crossings until fixed). Pattern: declare paired constants in the JS (`NODE_DIAMETER` + `CENTER_NODE_DIAMETER`) with a comment "MUST match CSS .is-center width/height"; provide a tiny `diameterFor(node)` helper used at every position-set site. Same principle: any time CSS and JS share a magic number, the JS side gets a constant with a comment pointing at the CSS rule.
+
+64. **Settings tabs are scope-grouped; `editor_settings` is the element-editor pref home** (session 232). `SETTINGS_TAB_GROUPS` (`router.ts`) splits the settings rail into ATLAS-wide (`account`, `storage`, `editing`) and per-world (`world`, `writing`, `context`) groups, each rendered with an icon + label header; per-world tabs disable when no world is active. `storage` merges the old atlas-folder + sync tabs (two sections within one tab); `editing` is the home for element-editor/detail display prefs stored in `registry.editor_settings` (`field_edit_mode`, `refs_group_by_field`, `confirm_before_delete`). When renaming or merging settings route keys, add old→new in `parseSettingsTab`'s `LEGACY_SETTINGS_TABS` so existing deep-links + the stored last-tab still resolve.
+
+65. **Settings tabs are per-tab `render*`/`wire*` module pairs; `settings-panel.ts` is a thin orchestrator** (session 233). Each tab lives in `src/middle/settings-<tab>.ts` (`settings-account`, `-storage`, `-editing`, `-world`, `-writing`, `-context`), exporting a `renderXTab(...) → string` and `wireXTab(...)`. `settings-panel.ts` owns only the shell: nav rail, last-tab restore, and dispatch via `renderTab`/`wireTabHandlers` switches. Public surface (`mountSettingsPanel`) is unchanged, so `app.ts` doesn't care. Flat `settings-*.ts` files (not a subfolder) match the established split convention (`writing-workspace-*.ts`, `map-tab-*.ts`) and keep import depth identical. Add a new tab = new module + two switch arms + a `SETTINGS_TABS`/`SETTINGS_TAB_GROUPS` entry. Per-world settings handlers use `updateWorldEntry(reg, worldId, patch)` (registry.ts) for one-off field merges rather than hand-rolling `findIndex` + `worlds.map`.
+
+66. **`defaultCreateType` is a `ui-prefs` pref, not URL/registry state** (session 233). The element-create modal preselects `loadUiPrefs().defaultCreateType` when opened without an explicit `initialType` (sidebar +, home, hotkey, writing inline-create, map contextual). It's an app-level persistent pref (localStorage via `core/ui-prefs.ts`), set from Settings → Editing. The DESIGN sketch once placed it on `UiState`; ui-prefs is the correct home (same migration as `sidebarMode` in session 223 — app-level + persistent, neither navigational nor world-specific). The modal re-validates the preselected type against the effective (post-`excludeTypes`) set in `buildModal`, so an excluded default (e.g. 'map' in the map contextual flow) can't stick — it falls back to the first offered type. `ui-prefs` setters must load-merge-save (`{ ...loadUiPrefs(), <field>: v }`) so adding a field doesn't clobber siblings.
+
+---
+
+## Context Pane (session 231 tool-global rewrite)
+
+The right-pane Context tab is a tool-global surface — graph + details, route-driven content. Replaces the writing-only ephemeral context tab introduced in session 229.
+
+### Tab structure
+
+| Index | Kind | Behavior |
+|---|---|---|
+| 0 | `context` (permanent) | Always present per world; never closed; toggled active by user |
+| 1 | `map-index` (permanent) | Maps overview |
+| 2..N | `map` (per opened map) | Each open map is its own closable tab |
+
+`context-tab-lifecycle.ts` ensures the invariant on boot + defensively on every state tick.
+
+### Content per route
+
+| Route | Subject | Details slot |
+|---|---|---|
+| `/writing/<narrativeId>` | the narrative | `context-pane-lists`: Cast + Potentials |
+| `/element/<elementId>` | the element | `context-pane-preview`: subject preview card (swaps to whichever node user clicks in graph) |
+| Anything else (home / timeline / settings / map / search) | none | Empty state with route-specific copy |
+
+The orchestrator's `resolveSubject(route, elements)` derives `{element, detailsMode}` from the URL. Subject-changes via URL trigger a full re-render (new graph mount); in-pane clicks (recenter, select) stay pane-local.
+
+### Graph capabilities
+
+- **Subject-centered force-directed layout** (synchronous sim → stable positions; ~290 LOC, no library)
+- **Click-to-recenter**: clicking a non-subject node re-runs sim with that node as center; pushes to breadcrumb stack
+- **Ctrl/Cmd+click**: navigates URL to that element → context pane re-renders with new subject
+- **Recent-centers breadcrumb** at top of graph: `[Home] › [Recent] › current` (clickable chips pop the stack)
+- **Mouse-back button** (over pane): pops breadcrumb; falls through to browser history when outside pane
+- **Free zoom + pan**: wheel zooms anchored at cursor, drag pans, double-click resets, fit-to-view button appears when transform is non-identity
+- **Hover-fade non-connected nodes**, **right-click node menu** (Open as element / Copy ID / Add to story in writing mode)
+- **Hop depth 1-4** with per-ring caps (Convention #62); tier-derived default (scene/draft = 2, chapter/book = 1)
+- **Type filter chips** at top of pane; persist per-world; chips persist even when their type is hidden
+- **Lock-layout mode**: when on, filter toggles hide via CSS without re-running sim (surviving nodes stay put)
+- **Edge type coloring** (opt-in): edges take the non-center node's element-type color at 0.45 alpha
+
+### Per-world registry fields
+
+- `context_filters_off?: ElementType[]`
+- `context_hop_depth?: 1 | 2 | 3 | 4` (absent = tier-derived)
+- `context_lock_layout?: boolean`
+- `context_edge_color?: boolean`
+
+Element-type palette (`ELEMENT_TYPE_COLORS` in `core/constants.ts`) shared with future cross-tool surfaces; sourced from the dcc-viewer / element-viewer-trial palette.
+
+### Module layout
+
+```
+src/tabs/right/
+├── context-tab.ts              # Orchestrator (route → subject, unified onSelect, syncPrefsToGraph)
+├── context-tab-lifecycle.ts    # Permanent-tab invariant
+├── context-pane-graph.ts       # Force-sim graph + breadcrumb + zoom/pan + right-click menu
+├── context-pane-toolbar.ts     # Type chips + lock + hop pill
+├── context-pane-lists.ts       # Writing-mode Cast + Potentials
+└── context-pane-preview.ts     # Element preview card (writing OR element mode)
+```
+
 ---
 
 ## Test Strategy
@@ -815,103 +903,30 @@ Smoke results recorded in a `tests/smoke-log.md` (date, what we ran, what we obs
 
 ---
 
-## File Layout (target)
+## File Layout
+
+The **live file map** (accurate per-module tree) lives in the `atlas-tool` skill's "Critical Code Locations" — it's the load-on-start reference and is kept current. High-level directory roles:
 
 ```
-tools/atlas/
-├── src/
-│   ├── core/
-│   │   ├── types.ts                # Element, WorldMap, Pin, UiState, Conflict, etc.
-│   │   ├── state.ts                # Observable store
-│   │   ├── constants.ts            # storage keys, element labels
-│   │   └── ui-prefs.ts             # localStorage UX prefs
-│   ├── store/
-│   │   ├── folder-store.ts         # THE store
-│   │   ├── fs-utils.ts             # path helpers, atomic write
-│   │   ├── handle-vault.ts         # FileSystemDirectoryHandle persistence (only IDB use)
-│   │   └── idb.ts                  # promise-wrapped IDB primitives (handle-vault only)
-│   ├── sync/
-│   │   ├── sync-engine.ts          # the engine
-│   │   ├── diff.ts                 # local↔server diff computation
-│   │   ├── policy.ts               # drain-blind | server-wins | ask
-│   │   └── ow-client-factory.ts    # per-(apiKey, pin) OnlyWorldsClient cache
-│   ├── registry/
-│   │   └── registry.ts             # localStorage registry + helpers
-│   ├── layout/
-│   │   ├── app-shell.ts            # 3-pane shell (port)
-│   │   └── tab-bar.ts              # generic tab bar (port)
-│   ├── sidebar/
-│   │   ├── worlds.ts               # Worlds mode (port + simplify)
-│   │   └── elements.ts             # Elements mode (port)
-│   ├── middle/
-│   │   ├── element-detail.ts       # schema-driven editor (port)
-│   │   ├── timeline.ts             # event axis (port)
-│   │   └── settings.ts             # PIN + email + sync section (rewrite parts)
-│   ├── tabs/right/
-│   │   ├── map-index-tab.ts        # (port)
-│   │   ├── map-tab.ts              # leaflet canvas (port)
-│   │   ├── pin-visuals.ts          # canvas icons (port)
-│   │   └── edge-color.ts           # image edge sampling (port)
-│   ├── visualization/leaflet-2d/
-│   │   └── Leaflet2DManager.ts     # (port)
-│   ├── media/
-│   │   └── media-section.ts        # grid + drag-drop (port)
-│   ├── editor/
-│   │   └── field-schema.ts         # SDK FIELD_SCHEMA adapter (port)
-│   ├── ui/
-│   │   ├── element-create-modal.ts # (port)
-│   │   ├── element-picker-modal.ts # (port)
-│   │   ├── field-edit-popover.ts   # (port)
-│   │   ├── map-create-modal.ts     # (port)
-│   │   ├── link-world-modal.ts     # REWRITE (initial download flow)
-│   │   ├── make-online-modal.ts    # NEW (Route 1 + Route 2)
-│   │   ├── sync-indicator.ts       # REWRITE (attached to SyncEngine)
-│   │   ├── modal-base.ts           # (port)
-│   │   └── toast-manager.ts        # (port)
-│   ├── styles/
-│   │   └── atlas.css               # (port)
-│   ├── router.ts                   # hash router (port)
-│   ├── app.ts                      # orchestration
-│   └── main.ts                     # boot + Chromium gate
-├── tests/
-│   ├── setup.ts                    # vitest + MSW + fake-idb
-│   ├── msw-handlers.ts             # reusable mock OW handlers
-│   ├── fixtures/
-│   │   ├── mock-folder-store.ts    # in-memory FolderStore for tests
-│   │   └── sample-worlds.ts        # sample data builders
-│   ├── unit/
-│   │   ├── diff.test.ts
-│   │   ├── tombstones.test.ts
-│   │   └── ...
-│   ├── integration/
-│   │   ├── sync-engine.push.test.ts
-│   │   ├── sync-engine.pull.test.ts
-│   │   ├── sync-engine.conflict.test.ts
-│   │   ├── sync-engine.resume.test.ts
-│   │   └── ...
-│   └── e2e/
-│       ├── create-local.spec.ts
-│       ├── link-api.spec.ts
-│       ├── make-online-route1.spec.ts
-│       ├── make-online-route2.spec.ts
-│       ├── edit-offline.spec.ts
-│       ├── conflict.spec.ts
-│       └── ...
-├── public/
-│   ├── favicon.ico
-│   ├── favicon.png
-│   └── owlogo.png
-├── DESIGN.md                       # this doc
-├── PROGRESS.md                     # operational log (created when build starts)
-├── PORTED.md                       # log of what was ported from atlas-deprecated and how
-├── README.md
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-├── vitest.config.ts
-├── playwright.config.ts
-└── index.html
+src/
+├── core/          # types, observable state, router, constants, ui-prefs, hotkeys, map-view/camera prefs, dom-utils, active-store
+├── store/         # FolderStore interface + FsFolderStore, fs-utils, handle-vault, idb (handle-vault only)
+├── sync/          # sync-engine, sync-attach (singleton), ow-client-adapter, make-online, auto-pull-scheduler
+├── registry/      # localStorage registry + per-world helpers
+├── layout/        # 3-pane app-shell
+├── sidebar/       # sidebar driver + worlds / elements / writing bodies
+├── middle/        # rooms: element-detail(+header/fields/refs), world-home, writing-workspace(+modules), timeline, search, settings-panel(+per-tab modules)
+├── tabs/right/    # map-index, map-tab(+concern modules), context-tab(+graph/toolbar/lists/preview), zone-drawing/edit, ghost-pins
+├── visualization/ # leaflet-2d (Leaflet2DManager, ZoneOverlay, ZoneGeometry) + timeline-bar
+├── editor/        # field-schema (SDK adapter) + field-descriptions
+├── ui/            # modals (create/picker/map-create/make-online/link/conflict/server-delete/zone-create), popovers, toast-manager, modal-base
+├── setup/         # atlas-root-flow
+├── styles/        # atlas.css (conventions #1-30 codified)
+├── app.ts         # orchestration   main.ts  # boot + Chromium gate
+tests/             # unit (vitest) · integration (vitest+MSW+mock store) · e2e (Playwright)
 ```
+
+Root: `DESIGN.md` (+ per-room `DESIGN_*.md`), `PROGRESS.md` (operational log), `SYNC_NOTES.md` (sync lessons), `PORTED.md` (port log), `README.md`, build config (`vite`/`vitest`/`playwright`/`tsconfig`), `index.html`.
 
 ---
 

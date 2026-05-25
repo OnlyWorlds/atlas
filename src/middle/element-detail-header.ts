@@ -19,6 +19,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { getEditorSettings } from '../registry/registry';
 import {
   parseHash, navigate, homeHash, elementHash, writingHash, mapHash,
 } from '../core/router';
@@ -748,14 +749,18 @@ async function deletePinFromHeader(pinId: string, mapName: string): Promise<void
 async function onDelete(el: Element): Promise<void> {
   const store = getActiveStore();
   if (!store) return;
-  let dependentCount = 0;
-  try {
-    const dependents = await store.findDependents(el.id);
-    dependentCount = dependents.length;
-  } catch { /* fall through with 0 */ }
-  const extra = dependentCount > 0 ? ` This will also remove ${dependentCount} dependent element${dependentCount === 1 ? '' : 's'}.` : '';
-  const ok = window.confirm(`Delete "${el.name || el.id}"?${extra}`);
-  if (!ok) return;
+  // Confirmation is gated by the Editing setting (default on). When on, the
+  // dialog also surfaces the cascade count so the cost is concrete.
+  if (getEditorSettings(getState().registry).confirm_before_delete) {
+    let dependentCount = 0;
+    try {
+      const dependents = await store.findDependents(el.id);
+      dependentCount = dependents.length;
+    } catch { /* fall through with 0 */ }
+    const extra = dependentCount > 0 ? ` This will also remove ${dependentCount} dependent element${dependentCount === 1 ? '' : 's'}.` : '';
+    const ok = window.confirm(`Delete "${el.name || el.id}"?${extra}`);
+    if (!ok) return;
+  }
   try {
     await store.deleteElement(el.id);
     const elements = await store.listElements();

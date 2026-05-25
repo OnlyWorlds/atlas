@@ -287,6 +287,26 @@ export function setFavorite(
 }
 
 /**
+ * Generic per-world field merge. Returns a NEW registry with `patch` shallow-
+ * merged into the matching world entry (no-op if the world isn't found).
+ * Caller is responsible for `saveRegistry` + `patchSlice`.
+ *
+ * Prefer this over hand-rolling `findIndex` + `worlds.map(...)` for one-off
+ * per-world settings that don't warrant their own named setter (e.g. the
+ * writing-font and context-pane prefs in the settings panel).
+ */
+export function updateWorldEntry(
+  reg: WorldsRegistry,
+  worldId: string,
+  patch: Partial<WorldRegistryEntry>
+): WorldsRegistry {
+  return {
+    ...reg,
+    worlds: reg.worlds.map(w => (w.id === worldId ? { ...w, ...patch } : w)),
+  };
+}
+
+/**
  * Toggle a node's collapsed state in a world's writing tree. Collapsed = node
  * id appears in `writing_tree_collapsed`; expanded = absent. Returns a NEW
  * registry — caller is responsible for `saveRegistry` + `patchSlice`.
@@ -504,8 +524,12 @@ export function setEditorSettings(
  */
 export function getEditorSettings(reg: WorldsRegistry): {
   field_edit_mode: FieldEditMode;
+  refs_group_by_field: boolean;
+  confirm_before_delete: boolean;
 } {
   return {
     field_edit_mode: reg.editor_settings?.field_edit_mode ?? 'modal',
+    refs_group_by_field: reg.editor_settings?.refs_group_by_field ?? false,
+    confirm_before_delete: reg.editor_settings?.confirm_before_delete ?? true,
   };
 }

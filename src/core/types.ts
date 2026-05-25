@@ -577,6 +577,14 @@ export interface WorldsRegistry {
    */
   editor_settings?: {
     field_edit_mode?: 'modal' | 'inline-single' | 'inline-multi';
+    /**
+     * Group element-detail "Referenced by" entries by the relationship field
+     * that points at the element ("Rival of…", "Birthplace of…") instead of by
+     * element type. Default off (group by type).
+     */
+    refs_group_by_field?: boolean;
+    /** Ask for confirmation before deleting an element. Default on. */
+    confirm_before_delete?: boolean;
   };
 }
 

@@ -1,15 +1,18 @@
 /**
  * Canvas toolbar above the leaflet map (DESIGN_MAPS.md §12).
  *
- * F5 scaffold: builds the DOM. Buttons mount with title tooltips and data
- * attributes; behavior is wired in later bouts:
- *   - ⚙ visual settings → V1
- *   - ⬡ draw polygon  → V2
- *   - ╱ draw line     → V2
- *   - 👁 zones        → V5
- *   - 👁 pins         → V5
- *   - ⤢ fit-to-image  → V5
+ * `buildCanvasToolbar` builds the DOM; `wireCanvasToolbar` attaches behavior
+ * to the buttons (visual-settings popover, zones/pins visibility toggles,
+ * fit-to-image, draw-polygon/line) and the right-anchored zones dropdown.
+ * Extracted from map-tab.ts in the session-233 re-trim — the wiring lives
+ * with the toolbar it drives. Button handlers look up the live cache entry by
+ * mapId at click time, so wiring before the entry exists is safe.
  */
+
+import { ToastManager } from '../../ui/toast-manager';
+import { mapTabCache } from './map-tab-cache';
+import { toggleVisualSettingsPopover } from './map-visual-settings-popover';
+import { startDrawing, getActiveDraft, cancelDrawing } from './zone-drawing';
 
 export interface CanvasToolbarRefs {
   root: HTMLDivElement;
@@ -97,6 +100,122 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
     fitToImageBtn,
     zonesDropdownBtn,
   };
+}
+
+/**
+ * Wire the toolbar buttons + zones dropdown for a freshly-mounted map.
+ * Handlers resolve the live `mapTabCache` entry by mapId at click time, so
+ * this runs before the cache entry is populated.
+ */
+export function wireCanvasToolbar(
+  refs: CanvasToolbarRefs,
+  zoneStrip: HTMLElement,
+  mapId: string,
+  toasts: ToastManager,
+): void {
+  // Settings cog → toggle the visual settings popover.
+  refs.settingsBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (e) toggleVisualSettingsPopover(e, refs.settingsBtn);
+  });
+
+  // Visibility toggles (transient, not persisted to prefs). State held in
+  // the button's `is-active` class; default = visible (button not active).
+  refs.toggleZonesBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (!e?.zoneOverlay) return;
+    const wasVisible = e.zoneOverlay.isLayerVisible();
+    e.zoneOverlay.setLayerVisible(!wasVisible);
+    refs.toggleZonesBtn.classList.toggle('is-active', wasVisible);
+    // Glyph swap: visibility ↔ visibility_off mirrors the state.
+    const icon = refs.toggleZonesBtn.querySelector('.material-symbols-outlined');
+    if (icon) icon.textContent = wasVisible ? 'visibility_off' : 'visibility';
+  });
+
+  refs.togglePinsBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (!e) return;
+    const currentlyActive = refs.togglePinsBtn.classList.contains('is-active');
+    // Active class indicates "pins hidden" — flip.
+    const nextHidden = !currentlyActive;
+    e.manager.setPinsLayerVisible(!nextHidden);
+    refs.togglePinsBtn.classList.toggle('is-active', nextHidden);
+    const icon = refs.togglePinsBtn.querySelector('.material-symbols-outlined');
+    if (icon) icon.textContent = nextHidden ? 'visibility_off' : 'visibility';
+  });
+
+  refs.fitToImageBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (!e) return;
+    e.manager.fitToCanvas();
+  });
+
+  // Draw buttons → toggle drawing mode for this map.
+  refs.drawPolygonBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (!e) return;
+    const active = getActiveDraft();
+    if (active && active.mode === 'polygon' && active.mapId === mapId) {
+      cancelDrawing();
+    } else {
+      startDrawing(e, 'polygon', toasts);
+    }
+  });
+  refs.drawLineBtn.addEventListener('click', () => {
+    const e = mapTabCache.get(mapId);
+    if (!e) return;
+    const active = getActiveDraft();
+    if (active && active.mode === 'line' && active.mapId === mapId) {
+      cancelDrawing();
+    } else {
+      startDrawing(e, 'line', toasts);
+    }
+  });
+
+  // Right-anchored zones dropdown trigger → toggle the panel.
+  wireZonesDropdown(refs.zonesDropdownBtn, zoneStrip);
+}
+
+/**
+ * Toggle behavior for the zones dropdown panel (ZC9). Click the button →
+ * open the panel + add outside-click + Escape listeners. Click again or
+ * outside → close. Defensive: clicks inside the panel don't close it.
+ */
+function wireZonesDropdown(btn: HTMLButtonElement, panel: HTMLElement): void {
+  let outsideListener: ((e: MouseEvent) => void) | null = null;
+  let escListener: ((e: KeyboardEvent) => void) | null = null;
+
+  const close = (): void => {
+    panel.classList.remove('is-open');
+    btn.classList.remove('is-open');
+    if (outsideListener) document.removeEventListener('mousedown', outsideListener);
+    if (escListener) document.removeEventListener('keydown', escListener);
+    outsideListener = null;
+    escListener = null;
+  };
+
+  const open = (): void => {
+    panel.classList.add('is-open');
+    btn.classList.add('is-open');
+    outsideListener = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (panel.contains(t) || btn.contains(t)) return;
+      close();
+    };
+    escListener = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    // Defer registration so the originating click doesn't immediately close.
+    setTimeout(() => {
+      if (outsideListener) document.addEventListener('mousedown', outsideListener);
+      if (escListener) document.addEventListener('keydown', escListener);
+    }, 0);
+  };
+
+  btn.addEventListener('click', () => {
+    if (panel.classList.contains('is-open')) close();
+    else open();
+  });
 }
 
 function makeButton(icon: string, title: string, dataAction: string): HTMLButtonElement {

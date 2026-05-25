@@ -27,6 +27,7 @@ import {
   setFavorite,
   setParent,
   setPin,
+  updateWorldEntry,
   setSyncPullOnActivate,
   setSyncCadenceMs,
   setSyncDefaultPolicy,
@@ -266,6 +267,28 @@ describe('registry — rename / delete / active / favorite', () => {
     expect(findWorld(r2, entry.id)?.favorite).toBe(true);
     const r3 = setFavorite(r2, entry.id, false);
     expect(findWorld(r3, entry.id)?.favorite).toBe(false);
+  });
+
+  it('updateWorldEntry merges a partial patch into the matching world', () => {
+    const { next, entry } = createLocalWorld(defaultRegistry(), { name: 'a', folderName: 'a', handleKey: 'h' });
+    const r2 = updateWorldEntry(next, entry.id, { writing_font_size_px: 16, context_hop_depth: 3 });
+    const w = findWorld(r2, entry.id)!;
+    expect(w.writing_font_size_px).toBe(16);
+    expect(w.context_hop_depth).toBe(3);
+    // Untouched fields survive the merge.
+    expect(w.name).toBe('a');
+  });
+
+  it('updateWorldEntry leaves other worlds untouched and is a no-op for unknown ids', () => {
+    const { next: r1, entry: a } = createLocalWorld(defaultRegistry(), { name: 'a', folderName: 'a', handleKey: 'h1' });
+    const { next: r2, entry: b } = createLocalWorld(r1, { name: 'b', folderName: 'b', handleKey: 'h2' });
+    const r3 = updateWorldEntry(r2, a.id, { context_edge_color: true });
+    expect(findWorld(r3, a.id)?.context_edge_color).toBe(true);
+    expect(findWorld(r3, b.id)?.context_edge_color).toBeUndefined();
+    // Unknown id: returns an equivalent registry, no throw, same world count.
+    const r4 = updateWorldEntry(r3, 'does-not-exist', { context_edge_color: false });
+    expect(r4.worlds).toHaveLength(2);
+    expect(findWorld(r4, a.id)?.context_edge_color).toBe(true);
   });
 });
 

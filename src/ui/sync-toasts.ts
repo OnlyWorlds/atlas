@@ -19,7 +19,7 @@ import type { ToastManager } from './toast-manager';
  * for caller logging/branching, or null if the engine is actually attached
  * (caller's gate failed for an unrelated reason).
  *
- * For the pin-missing case, also navigates to the settings identity tab
+ * For the pin-missing case, also navigates to the settings account tab
  * since that's where the fix lives.
  */
 export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof diagnoseSyncUnavailable> {
@@ -34,7 +34,7 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
       return reason;
     case 'pin-missing':
       toasts.info('Enter your PIN in settings to enable sync');
-      navigate(settingsHash(reason.worldId, 'identity'));
+      navigate(settingsHash(reason.worldId, 'account'));
       return reason;
     case 'attached-but-paused':
       toasts.info('Sync is paused — resume from settings');

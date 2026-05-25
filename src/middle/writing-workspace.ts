@@ -18,41 +18,24 @@
  */
 
 import { getState, subscribe } from '../core/state';
-import { onHashChange, parseHash, writingHash, elementHash, navigate } from '../core/router';
+import { onHashChange, parseHash } from '../core/router';
 import type { Element } from '../core/types';
-import { ELEMENT_LABELS } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
 import { renderHeader } from './element-detail-header';
-import {
-  buildNarrativeIndex,
-  ancestorIds,
-} from './writing-helpers';
 import { mountWorkspaceEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
 import { createFindBar, type FindBarHandle } from './writing-workspace-find-bar';
-import { ElementCreateModal } from '../ui/element-create-modal';
 import { mountCompiledView, narrativeHasChildren } from './writing-compiled';
 import { handleAddToCast, type AddToCastDetail } from './writing-workspace-add-to-cast';
-import { findAutolinkCandidateAt, convertAutolinkAt } from './writing-workspace-autolink';
-import { NARRATIVE_RELATION_FIELDS } from './writing-workspace-derive';
-import { openSplitDialog } from './writing-workspace-split';
-import { type MentionSuggestionItem } from './writing-workspace-mention';
 import { computeRelationPatch } from './writing-workspace-derive';
 import { createChipPreview, type ChipPreviewController } from './writing-workspace-chip-preview';
-import { getRecents, pushRecent } from './writing-workspace-recents';
-import {
-  getWordGoal,
-  setWordGoal,
-  clearWordGoal,
-  openWordGoalPopover,
-  goalProgress,
-} from './writing-workspace-word-goal';
-import {
-  WRITING_FOCUS_TOGGLE_EVENT,
-  WRITING_INLINE_CREATE_EVENT,
-  WRITING_SPLIT_EVENT,
-} from '../core/hotkeys';
+import { pushRecent } from './writing-workspace-recents';
+import { buildMentionItems } from './writing-workspace-mention-items';
+import { createWordCount } from './writing-workspace-word-count';
+import { createStickyBar } from './writing-workspace-sticky-bar';
+import { createProseContextMenu } from './writing-workspace-context-menu';
+import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { JSONContent } from '@tiptap/core';
 
 /**
@@ -75,7 +58,7 @@ export function resetWritingWorkspaceMemory(): void {
  * tighter than needed; the default (compiled when has children) already
  * matches the expected behavior for most users.
  */
-type WritingViewMode = 'this-level' | 'compiled';
+export type WritingViewMode = 'this-level' | 'compiled';
 const viewModeByNarrative = new Map<string, WritingViewMode>();
 
 function resolveViewMode(el: Element, allElements: readonly Element[]): WritingViewMode {
@@ -121,6 +104,33 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   // Singleton chip preview controller for this workspace mount — hover +
   // sticky-on-click peek of linked elements (DESIGN_WRITING.md §Click + hover).
   const chipPreview: ChipPreviewController = createChipPreview(root);
+
+  // Ambient word-count widget controller. The factory closes over root + the
+  // live editor handle so the indicator tracks edits without re-reading state.
+  const wordCount = createWordCount({
+    root,
+    getEditorHandle: () => editorHandle,
+    getMountedForId: () => mountedForId,
+  });
+
+  // Sticky bar (breadcrumb + date + action buttons + view-mode toggle).
+  // View-mode switching defers back here because it owns the editor remount.
+  const stickyBar = createStickyBar({
+    root,
+    getViewMode: (el) => resolveViewMode(el, getState().data.elements),
+    onSwitchViewMode: (el, mode) => {
+      viewModeByNarrative.set(el.id, mode);
+      void flushPendingSave().then(() => mountForNarrative(el));
+    },
+  });
+
+  // Prose right-click menu + inline-create / split / unlink-chip actions.
+  // Attaches its own contextmenu + hotkey-event listeners; torn down in cleanup.
+  const proseMenu = createProseContextMenu({
+    root,
+    getEditorHandle: () => editorHandle,
+    getActiveNarrative,
+  });
 
   // Find-bar controller proxies onto the CURRENT editor handle's search
   // controller. Editor handles get recreated on narrative switch, so we
@@ -168,16 +178,6 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   };
   root.addEventListener('keydown', onWorkspaceHotkey);
 
-  const onInlineCreateEvent = (): void => {
-    openInlineCreate();
-  };
-  document.addEventListener(WRITING_INLINE_CREATE_EVENT, onInlineCreateEvent);
-
-  const onSplitEvent = (): void => {
-    openSplitForCurrentCursor();
-  };
-  document.addEventListener(WRITING_SPLIT_EVENT, onSplitEvent);
-
   // "Add to cast" event from the writing-context pane's element preview.
   // Implementation lives in writing-workspace-add-to-cast.ts; this listener
   // just forwards the detail + current editor instance.
@@ -189,310 +189,40 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   };
   document.addEventListener('atlas:context-add-to-cast', onAddToCast);
 
-  /**
-   * Open the split-into-sibling confirm dialog for the current narrative,
-   * splitting at the editor's cursor position. Bails (with toast) if no
-   * editor / no narrative.
-   */
-  function openSplitForCurrentCursor(): void {
-    const editor = editorHandle?.editor;
-    const el = getActiveNarrative();
-    const worldId = getState().active?.worldId;
-    if (!editor || !el || !worldId) return;
-    openSplitDialog({ narrative: el, editor, worldId });
-  }
-  // contextmenu attaches at root — survives editor remounts on narrative
-  // switch. Delegated check inside the handler bails out if the target
-  // isn't inside the prose surface.
-
-  /**
-   * Inline element creation — opens ElementCreateModal pre-filled with the
-   * currently-selected prose text. After create, replaces the selection with
-   * an ow:// chip pointing at the new element. Navigation stays in the writing
-   * room (suppressNavigate=true). No-op when there's no text selection.
-   */
-  function openInlineCreate(): void {
-    const editor = editorHandle?.editor;
-    if (!editor) return;
-    const { from, to } = editor.state.selection;
-    if (from === to) {
-      toastManager.info('Select some text first, then Ctrl+Shift+E');
-      return;
-    }
-    const selectedText = editor.state.doc.textBetween(from, to, ' ', ' ').trim();
-    if (!selectedText) {
-      toastManager.info('Selection is empty');
-      return;
-    }
-    new ElementCreateModal(toastManager, {
-      initialName: selectedText,
-      suppressNavigate: true,
-      title: 'Create element from selection',
-      onCreated: (id, type) => {
-        // Replace the original selected range with an ow:// chip. No trailing
-        // space — cursor naturally lands after the chip.
-        if (!editorHandle) return;
-        editorHandle.editor
-          .chain()
-          .focus()
-          .insertContentAt({ from, to }, [
-            { type: 'elementChip', attrs: { id, type, label: selectedText } },
-          ])
-          .run();
-      },
-    }).open();
-  }
-
-  /**
-   * Right-click context menu — when there's a text selection, offers a single
-   * action: "Create element from selection". Otherwise lets the browser's
-   * native menu show. The menu is a tiny floating div anchored at the click
-   * position; click-outside / Esc closes.
-   */
-  let activeContextMenu: HTMLElement | null = null;
-  function dismissContextMenu(): void {
-    if (!activeContextMenu) return;
-    activeContextMenu.remove();
-    activeContextMenu = null;
-    document.removeEventListener('mousedown', onContextMenuOutside, true);
-    document.removeEventListener('keydown', onContextMenuKey, true);
-  }
-  const onContextMenuOutside = (e: MouseEvent): void => {
-    if (!activeContextMenu) return;
-    if (activeContextMenu.contains(e.target as Node)) return;
-    dismissContextMenu();
-  };
-  const onContextMenuKey = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') dismissContextMenu();
-  };
-  const onProseContextMenu = (e: MouseEvent): void => {
-    // Only fire for events that originated inside the prose surface — the
-    // header, sidebar, etc. keep their native menus.
-    const target = e.target as HTMLElement | null;
-    if (!target?.closest('.atlas-writing-workspace-prose .ProseMirror')) return;
-    const editor = editorHandle?.editor;
-    if (!editor) return;
-    const { from, to } = editor.state.selection;
-    const hasSelection = from !== to;
-    const cursorPos = from;
-    const docSize = editor.state.doc.content.size;
-    const cursorIsMidDoc = cursorPos > 0 && cursorPos < docSize;
-
-    // Detect right-click on an autolink hint — surface a "Link to {name}"
-    // action as the mouse-only alternative to Tab. We probe the doc position
-    // at the click coordinates so multiple-word matches resolve correctly.
-    const onHint = target.closest('.atlas-autolink-hint') !== null;
-    let autolinkHit: { name: string; docPos: number } | null = null;
-    if (onHint) {
-      const probe = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
-      if (probe) {
-        const found = findAutolinkCandidateAt(editor.view, probe.pos);
-        if (found) {
-          autolinkHit = { name: found.candidate.displayName, docPos: probe.pos };
-        }
-      }
-    }
-
-    // Detect right-click on a linked chip — surface an "Unlink" action.
-    // Locate the chip node at the click coords and capture its range.
-    const chipDom = target.closest<HTMLElement>('.atlas-element-chip');
-    let chipHit: { id: string; label: string; from: number; to: number } | null = null;
-    if (chipDom) {
-      const probe = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
-      if (probe) {
-        const $pos = editor.state.doc.resolve(probe.pos);
-        const nodeAfter = $pos.nodeAfter;
-        const nodeBefore = $pos.nodeBefore;
-        // Inline chip nodes occupy 1 position. The cursor at the click coord
-        // may resolve to either side of the chip; check both.
-        let chipNode: any = null;
-        let chipStart = -1;
-        if (nodeAfter && nodeAfter.type.name === 'elementChip') {
-          chipNode = nodeAfter;
-          chipStart = probe.pos;
-        } else if (nodeBefore && nodeBefore.type.name === 'elementChip') {
-          chipNode = nodeBefore;
-          chipStart = probe.pos - nodeBefore.nodeSize;
-        }
-        if (chipNode) {
-          chipHit = {
-            id: chipNode.attrs?.id as string,
-            label: (chipNode.attrs?.label as string) || '',
-            from: chipStart,
-            to: chipStart + chipNode.nodeSize,
-          };
-        }
-      }
-    }
-
-    // If we have nothing to offer (no selection, not mid-doc, no autolink, no chip),
-    // let the browser show its native menu (copy, paste, etc.).
-    if (!hasSelection && !cursorIsMidDoc && !autolinkHit && !chipHit) return;
-
-    e.preventDefault();
-    dismissContextMenu();
-
-    const items: string[] = [];
-    if (chipHit) {
-      items.push(`
-        <button type="button" class="atlas-prose-context-menu-item" data-role="unlink-chip">
-          <span class="material-symbols-outlined">link_off</span>
-          <span>Unlink ${escapeMenuText(chipHit.label || 'chip')}</span>
-        </button>
-      `);
-    }
-    if (autolinkHit) {
-      items.push(`
-        <button type="button" class="atlas-prose-context-menu-item" data-role="link-autolink">
-          <span class="material-symbols-outlined">link</span>
-          <span>Link to ${escapeMenuText(autolinkHit.name)}</span>
-        </button>
-      `);
-    }
-    if (hasSelection) {
-      items.push(`
-        <button type="button" class="atlas-prose-context-menu-item" data-role="create">
-          <span class="material-symbols-outlined">add</span>
-          <span>Create element from selection</span>
-        </button>
-      `);
-    }
-    if (cursorIsMidDoc) {
-      items.push(`
-        <button type="button" class="atlas-prose-context-menu-item" data-role="split">
-          <span class="material-symbols-outlined">content_cut</span>
-          <span>Split here into new sibling</span>
-        </button>
-      `);
-    }
-
-    const menu = document.createElement('div');
-    menu.className = 'atlas-prose-context-menu';
-    menu.setAttribute('role', 'menu');
-    menu.innerHTML = items.join('');
-    menu.style.position = 'fixed';
-    menu.style.left = `${e.clientX}px`;
-    menu.style.top = `${e.clientY}px`;
-    menu.style.zIndex = '1000';
-    document.body.appendChild(menu);
-    activeContextMenu = menu;
-
-    menu.querySelector<HTMLElement>('[data-role="create"]')?.addEventListener('click', () => {
-      dismissContextMenu();
-      openInlineCreate();
-    });
-    menu.querySelector<HTMLElement>('[data-role="split"]')?.addEventListener('click', () => {
-      dismissContextMenu();
-      openSplitForCurrentCursor();
-    });
-    menu.querySelector<HTMLElement>('[data-role="link-autolink"]')?.addEventListener('click', () => {
-      dismissContextMenu();
-      if (autolinkHit && editorHandle) {
-        convertAutolinkAt(editorHandle.editor.view, autolinkHit.docPos);
-      }
-    });
-    menu.querySelector<HTMLElement>('[data-role="unlink-chip"]')?.addEventListener('click', () => {
-      dismissContextMenu();
-      if (chipHit && editorHandle) {
-        void unlinkChipAndMaybeRemoveFromCast(chipHit);
-      }
-    });
-    // Defer the outside-click listener so the contextmenu event that opened
-    // us doesn't immediately close.
-    queueMicrotask(() => {
-      document.addEventListener('mousedown', onContextMenuOutside, true);
-      document.addEventListener('keydown', onContextMenuKey, true);
-    });
-  };
-
-  /** Cheap HTML escape for menu labels — chip names can contain &<>". */
-  function escapeMenuText(s: string): string {
-    return s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
-  /**
-   * Right-click "Unlink" handler. Replaces the chip with its label text
-   * (preserves visible reading). Then scans the rest of the prose for any
-   * OTHER mentions of the same element id — other chips, or text matches
-   * against the element's name + aliases. If none remain AND the id is in
-   * the narrative's matching link field, also remove it from that field —
-   * stronger "no longer in the cast" gesture than a chip deletion.
-   */
-  async function unlinkChipAndMaybeRemoveFromCast(
-    chip: { id: string; label: string; from: number; to: number },
-  ): Promise<void> {
-    if (!editorHandle) return;
-    const editor = editorHandle.editor;
-    // 1. Replace the chip with its plain label text.
-    editor
-      .chain()
-      .focus()
-      .insertContentAt({ from: chip.from, to: chip.to }, chip.label || '')
-      .run();
-
-    // 2. Scan remaining prose for any other mention of this element id.
-    // After the replacement, the doc no longer has THIS chip but may still
-    // have other chips with the same id, or text matches via name/aliases.
-    const state = getState();
-    const targetEl = state.data.elements.find(e => e.id === chip.id);
-    if (!targetEl) return;
-
-    // Re-read the editor's current markdown to check for ow://type/id chips.
-    const markdown = editorHandle.getMarkdown();
-    const otherChipMatch = markdown.includes('/' + chip.id + ')');
-
-    // Text-mention scan: any of the element's surface forms (name + aliases)
-    // appearing as a word-bounded match in the prose-as-plain-text view.
-    const plainText = editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n');
-    const surfaceForms: string[] = [];
-    if (targetEl.name) surfaceForms.push(targetEl.name);
-    if (Array.isArray(targetEl.atlas_aliases)) {
-      for (const a of targetEl.atlas_aliases) {
-        if (typeof a === 'string') surfaceForms.push(a);
-      }
-    }
-    let textMentionFound = false;
-    for (const form of surfaceForms) {
-      if (form.length < 2) continue;
-      const escaped = form.replace(/[\\^$.*+?()\[\]{}|]/g, '\\$&');
-      const re = new RegExp('\\b' + escaped + '\\b');
-      if (re.test(plainText)) { textMentionFound = true; break; }
-    }
-
-    if (otherChipMatch || textMentionFound) return; // Still mentioned — leave the field alone.
-
-    // 3. Remove the id from the narrative's matching link field.
-    const narrative = getActiveNarrative();
-    if (!narrative) return;
-    const field = NARRATIVE_RELATION_FIELDS[targetEl.type];
-    if (!field) return;
-    const existing = (narrative as Record<string, unknown>)[field];
-    if (!Array.isArray(existing)) return;
-    const filtered = existing.filter((v): v is string => typeof v === 'string' && v !== chip.id);
-    if (filtered.length === existing.length) return; // wasn't there anyway
-    const folder = getActiveStore();
-    if (!folder) return;
-    try {
-      await folder.updateElement(narrative.id, {
-        [field]: filtered,
-      } as Partial<Element>);
-      await refreshElementsAfterWrite(folder);
-      requestPushIfLinked();
-    } catch (err) {
-      console.error('[writing-workspace] unlink: field write failed', err);
-    }
-  }
-  root.addEventListener('contextmenu', onProseContextMenu);
-
   // Focus mode (Cmd+Shift+F via hotkeys.ts) — toggles a class on the workspace
-  // root. Sibling chrome (sidebar, room-nav) hides via `.atlas-shell:has(...)`
-  // selectors in atlas.css. Esc exits while in focus mode.
+  // root. Sibling chrome (sidebar, room-nav, sticky bar) hides via
+  // `.atlas-shell:has(...)` selectors in atlas.css. Because the sticky bar's
+  // focus button hides along with it, a small floating focus icon (top-right)
+  // is shown while focus mode is on so it's dismissable by mouse, not just Esc.
+  let focusExitBtn: HTMLButtonElement | null = null;
+  function showFocusExit(): void {
+    if (focusExitBtn) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'atlas-writing-focus-exit';
+    btn.title = 'Exit focus mode (Esc)';
+    btn.setAttribute('aria-label', 'Exit focus mode');
+    btn.innerHTML = '<span class="material-symbols-outlined">center_focus_strong</span>';
+    btn.addEventListener('click', () => exitFocusMode());
+    document.body.appendChild(btn);
+    focusExitBtn = btn;
+  }
+  function hideFocusExit(): void {
+    if (!focusExitBtn) return;
+    focusExitBtn.remove();
+    focusExitBtn = null;
+  }
+  function exitFocusMode(): void {
+    root.classList.remove('is-focus-mode');
+    hideFocusExit();
+    // Sync the (now-revealed) sticky-bar focus button's aria-pressed state.
+    const focusBtn = root.querySelector<HTMLButtonElement>('.atlas-writing-workspace-action[data-action="focus"]');
+    if (focusBtn) focusBtn.setAttribute('aria-pressed', 'false');
+  }
   const onFocusToggle = (): void => {
-    root.classList.toggle('is-focus-mode');
+    const nowOn = root.classList.toggle('is-focus-mode');
+    if (nowOn) showFocusExit();
+    else hideFocusExit();
   };
   const onFocusEsc = (e: KeyboardEvent): void => {
     if (e.key !== 'Escape') return;
@@ -501,10 +231,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     if (root.classList.contains('is-focus-mode')) {
       e.preventDefault();
       e.stopPropagation();
-      root.classList.remove('is-focus-mode');
-      // Sync the action button's aria-pressed state with the class change.
-      const focusBtn = root.querySelector<HTMLButtonElement>('.atlas-writing-workspace-action[data-action="focus"]');
-      if (focusBtn) focusBtn.setAttribute('aria-pressed', 'false');
+      exitFocusMode();
       return;
     }
     if (root.classList.contains('is-reading-mode')) {
@@ -710,7 +437,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // 2. Sticky bar — breadcrumb + date + action icons. Chrome-level sibling
     // of the scrollable body so it's always visible without needing
     // position:sticky on the body's first child.
-    root.appendChild(renderBreadcrumbAndDate(el));
+    root.appendChild(stickyBar.render(el));
 
     // 3. Body wrapper — scrollable, with section spacing.
     const body = document.createElement('div');
@@ -747,7 +474,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         autolinkSeed: { elements: getState().data.elements },
         onUpdate: (snap) => {
           scheduleSave({ markdown: snap.markdown, json: snap.json });
-          updateWordCountIndicator(snap.wordCount);
+          wordCount.updateIndicator(snap.wordCount);
           // Save-state indicator no longer rendered; element-header sync dot
           // handles dirty/synced feedback via local_updated_at vs server_updated_at.
         },
@@ -793,7 +520,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // 7. Ambient word-count widget — anchored bottom-right corner of the
     // workspace root (NOT inside the scrollable body, so it stays visible
     // across long narratives without scroll). Click → goal popover.
-    root.appendChild(renderWordCountWidget(el));
+    root.appendChild(wordCount.renderWidget(el));
 
     // Prime the refresh-cache so the next render() tick is a no-op until
     // either the active narrative or the elements array reference changes.
@@ -828,7 +555,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
 
     // Replace sticky bar (breadcrumb + date + action icons).
     const oldCrumb = root.querySelector<HTMLElement>(':scope > .atlas-writing-workspace-crumb');
-    const newCrumb = renderBreadcrumbAndDate(el);
+    const newCrumb = stickyBar.render(el);
     if (oldCrumb) oldCrumb.replaceWith(newCrumb);
 
     // Cast / Details / References surfaces moved to the context pane (right
@@ -836,7 +563,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
 
     // Replace ambient word-count widget (anchored on workspace root, not body).
     const oldWc = root.querySelector<HTMLElement>(':scope > .atlas-writing-workspace-wc-corner');
-    const newWc = renderWordCountWidget(el);
+    const newWc = wordCount.renderWidget(el);
     if (oldWc) oldWc.replaceWith(newWc);
     else root.appendChild(newWc);
   }
@@ -855,343 +582,6 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   // ============================================================================
   // Sub-renderers
   // ============================================================================
-
-  function renderBreadcrumbAndDate(el: Element): HTMLElement {
-    // Sticky bar below the 36px element header. Single horizontal row:
-    //   [crumb › crumb › current  📅 dates]              [focus][read][open]
-    // Crumbs + date on the left (ellipsize as needed), action icons on right.
-    // position: sticky in CSS so it pins to the top of the scrollable body.
-    const wrap = document.createElement('div');
-    wrap.className = 'atlas-writing-workspace-crumb';
-
-    const state = getState();
-    const worldId = state.active!.worldId;
-    const idx = buildNarrativeIndex(state.data.elements, worldId);
-    const chain = ancestorIds(idx, el.id);
-
-    const left = document.createElement('div');
-    left.className = 'atlas-writing-workspace-crumb-left';
-    wrap.appendChild(left);
-
-    const crumbs: Array<{ id: string; name: string }> = [];
-    for (const ancestorId of chain) {
-      const node = idx.byId.get(ancestorId);
-      if (node) crumbs.push({ id: ancestorId, name: node.el.name || '(unnamed)' });
-    }
-    crumbs.push({ id: el.id, name: el.name || '(unnamed)' });
-
-    const crumbsRow = document.createElement('div');
-    crumbsRow.className = 'atlas-writing-workspace-crumbs';
-    crumbs.forEach((c, i) => {
-      const isLast = i === crumbs.length - 1;
-      const seg = document.createElement(isLast ? 'span' : 'a');
-      seg.className = 'atlas-writing-workspace-crumb-seg' + (isLast ? ' is-current' : '');
-      seg.textContent = c.name;
-      if (!isLast) {
-        (seg as HTMLAnchorElement).href = '#' + buildCrumbHash(worldId, c.id);
-        seg.addEventListener('click', (e) => {
-          e.preventDefault();
-          navigate(buildCrumbHash(worldId, c.id));
-        });
-      }
-      crumbsRow.appendChild(seg);
-      if (!isLast) {
-        const sep = document.createElement('span');
-        sep.className = 'atlas-writing-workspace-crumb-sep';
-        sep.textContent = '›';
-        crumbsRow.appendChild(sep);
-      }
-    });
-    left.appendChild(crumbsRow);
-
-    // Date pill — inline next to the breadcrumb. Only renders when at least
-    // one bound is set. Small event icon + range/single-value text.
-    const start = el.start_date;
-    const end = el.end_date;
-    if (start != null || end != null) {
-      const dateBadge = document.createElement('span');
-      dateBadge.className = 'atlas-writing-workspace-date';
-      const icon = document.createElement('span');
-      icon.className = 'material-symbols-outlined';
-      icon.textContent = 'event';
-      dateBadge.appendChild(icon);
-      const dateText = document.createElement('span');
-      if (start != null && end != null) {
-        dateText.textContent = `${start} → ${end}`;
-      } else if (start != null) {
-        dateText.textContent = String(start);
-      } else {
-        dateText.textContent = `→ ${end}`;
-      }
-      dateBadge.appendChild(dateText);
-      left.appendChild(dateBadge);
-    }
-
-    // Right cluster — view-mode toggle (when narrative has children) + action
-    // icons. Save state already lives in the element header's sync dot.
-    const right = document.createElement('div');
-    right.className = 'atlas-writing-workspace-crumb-actions';
-
-    // View-mode toggle — only when this narrative has descendants. Lets the
-    // user switch between editing THIS narrative's prose and a read-only
-    // compiled view of self + descendants.
-    if (narrativeHasChildren(el, state.data.elements)) {
-      const mode = resolveViewMode(el, state.data.elements);
-      const toggle = document.createElement('div');
-      toggle.className = 'atlas-writing-workspace-viewmode';
-      toggle.setAttribute('role', 'tablist');
-
-      const thisBtn = document.createElement('button');
-      thisBtn.type = 'button';
-      thisBtn.className = 'atlas-writing-workspace-viewmode-btn';
-      thisBtn.setAttribute('role', 'tab');
-      thisBtn.dataset.mode = 'this-level';
-      thisBtn.textContent = 'This level';
-      thisBtn.setAttribute('aria-selected', mode === 'this-level' ? 'true' : 'false');
-      thisBtn.addEventListener('click', () => {
-        if (resolveViewMode(el, getState().data.elements) === 'this-level') return;
-        viewModeByNarrative.set(el.id, 'this-level');
-        void flushPendingSave().then(() => mountForNarrative(el));
-      });
-      toggle.appendChild(thisBtn);
-
-      const compiledBtn = document.createElement('button');
-      compiledBtn.type = 'button';
-      compiledBtn.className = 'atlas-writing-workspace-viewmode-btn';
-      compiledBtn.setAttribute('role', 'tab');
-      compiledBtn.dataset.mode = 'compiled';
-      compiledBtn.textContent = 'Compiled';
-      compiledBtn.setAttribute('aria-selected', mode === 'compiled' ? 'true' : 'false');
-      compiledBtn.addEventListener('click', () => {
-        if (resolveViewMode(el, getState().data.elements) === 'compiled') return;
-        viewModeByNarrative.set(el.id, 'compiled');
-        void flushPendingSave().then(() => mountForNarrative(el));
-      });
-      toggle.appendChild(compiledBtn);
-
-      right.appendChild(toggle);
-    }
-
-    const focusBtn = document.createElement('button');
-    focusBtn.type = 'button';
-    focusBtn.className = 'atlas-icon-btn-sm atlas-writing-workspace-action';
-    focusBtn.dataset.action = 'focus';
-    focusBtn.title = 'Focus mode (Ctrl+Shift+F)';
-    focusBtn.setAttribute('aria-pressed', root.classList.contains('is-focus-mode') ? 'true' : 'false');
-    focusBtn.innerHTML = '<span class="material-symbols-outlined">center_focus_strong</span>';
-    focusBtn.addEventListener('click', () => {
-      document.dispatchEvent(new CustomEvent(WRITING_FOCUS_TOGGLE_EVENT));
-      focusBtn.setAttribute('aria-pressed', root.classList.contains('is-focus-mode') ? 'true' : 'false');
-    });
-    right.appendChild(focusBtn);
-
-    const readBtn = document.createElement('button');
-    readBtn.type = 'button';
-    readBtn.className = 'atlas-icon-btn-sm atlas-writing-workspace-action';
-    readBtn.dataset.action = 'reading';
-    readBtn.title = 'Reading mode';
-    readBtn.setAttribute('aria-pressed', root.classList.contains('is-reading-mode') ? 'true' : 'false');
-    readBtn.innerHTML = '<span class="material-symbols-outlined">menu_book</span>';
-    readBtn.addEventListener('click', () => {
-      const isOn = root.classList.toggle('is-reading-mode');
-      readBtn.setAttribute('aria-pressed', String(isOn));
-    });
-    right.appendChild(readBtn);
-
-    const openBtn = document.createElement('a');
-    openBtn.className = 'atlas-icon-btn-sm atlas-writing-workspace-action';
-    openBtn.dataset.action = 'open-as-element';
-    openBtn.title = 'Open as element';
-    openBtn.href = '#' + elementHash(worldId, el.id);
-    openBtn.innerHTML = '<span class="material-symbols-outlined">open_in_new</span>';
-    openBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      navigate(elementHash(worldId, el.id));
-    });
-    right.appendChild(openBtn);
-
-    wrap.appendChild(right);
-
-    return wrap;
-  }
-
-  function buildCrumbHash(worldId: string, narrativeId: string): string {
-    // After URL-scheme shortening (session 227), each crumb segment is just a
-    // direct writing-room URL for that narrative. Ancestry is derived from
-    // parent_narrative at render time.
-    return writingHash(worldId, narrativeId);
-  }
-
-  /**
-   * Ambient word-count widget. Position-absolute on the workspace root,
-   * bottom-right corner. Always visible regardless of scroll. Click opens
-   * the session word-goal popover.
-   *
-   * Replaces the legacy footer entirely. Reading time, save-state, and
-   * open-as-element moved to the sticky bar (or, in save-state's case,
-   * the element-header sync dot — convention #5 follow-through).
-   */
-  function renderWordCountWidget(el: Element): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.className = 'atlas-writing-workspace-wc-corner';
-
-    const wordCount = editorHandle?.getWordCount() ?? 0;
-    const worldId = getState().active!.worldId;
-    const goal = getWordGoal(worldId, el.id);
-
-    const wcBtn = document.createElement('button');
-    wcBtn.type = 'button';
-    wcBtn.className = 'atlas-writing-workspace-wc-btn';
-    wcBtn.title = goal != null
-      ? `${wordCount.toLocaleString()} / ${goal.toLocaleString()} words — click to change goal`
-      : 'Click to set session word goal';
-    if (goal != null) wcBtn.dataset.hasGoal = 'true';
-    renderWordCountInto(wcBtn, wordCount, goal);
-    wcBtn.addEventListener('click', () => {
-      openWordGoalPopover({
-        anchor: wcBtn,
-        currentGoal: getWordGoal(worldId, el.id),
-        onSet: (next) => {
-          setWordGoal(worldId, el.id, next);
-          const liveCount = editorHandle?.getWordCount() ?? 0;
-          renderWordCountInto(wcBtn, liveCount, next);
-          wcBtn.dataset.hasGoal = 'true';
-        },
-        onClear: () => {
-          clearWordGoal(worldId, el.id);
-          const liveCount = editorHandle?.getWordCount() ?? 0;
-          renderWordCountInto(wcBtn, liveCount, null);
-          delete wcBtn.dataset.hasGoal;
-        },
-      });
-    });
-    wrap.appendChild(wcBtn);
-    return wrap;
-  }
-
-  function updateWordCountIndicator(wordCount: number): void {
-    const btn = root.querySelector<HTMLElement>('.atlas-writing-workspace-wc-btn');
-    if (!btn) return;
-    const worldId = getState().active?.worldId;
-    const narrId = mountedForId;
-    const goal = worldId && narrId ? getWordGoal(worldId, narrId) : null;
-    renderWordCountInto(btn, wordCount, goal);
-  }
-
-  /**
-   * Paint the word-count button's contents — optional progress ring + count
-   * + optional `/ goal` suffix. Pure DOM write, doesn't read state, so the
-   * caller controls whether the goal is current.
-   */
-  function renderWordCountInto(btn: HTMLElement, wordCount: number, goal: number | null): void {
-    const formatted = wordCount.toLocaleString();
-    const goalText = goal != null ? ` / ${goal.toLocaleString()}` : '';
-    const fraction = goalProgress(wordCount, goal);
-    const ringHtml = goal != null
-      ? `<span class="atlas-writing-workspace-wc-ring" style="--progress: ${fraction.toFixed(3)};" data-complete="${fraction >= 1 ? 'true' : 'false'}"></span>`
-      : '';
-    btn.innerHTML = `
-      ${ringHtml}
-      <span class="atlas-writing-workspace-wc">${formatted} words</span>
-      ${goal != null ? `<span class="atlas-writing-workspace-wc-goal">${goalText}</span>` : ''}
-    `;
-  }
-
-  // ============================================================================
-  // Mention items provider — alias-aware fuzzy match across the world
-  // ============================================================================
-
-  function buildMentionItems(query: string): MentionSuggestionItem[] {
-    const state = getState();
-    if (!state.active) return [];
-    const worldId = state.active.worldId;
-    const q = query.toLowerCase().trim();
-    const elements = state.data.elements;
-    const byId = new Map<string, Element>();
-    for (const e of elements) byId.set(e.id, e);
-
-    // Element types that shouldn't appear in the picker — they aren't
-    // narrative-linkable entities. Markers and pins are map-internal
-    // (anchors on maps, not story characters/places). Narratives can't
-    // link to themselves. Maps are debatable but excluded for v1 to keep
-    // the picker focused on world-building entities.
-    const PICKER_EXCLUDED_TYPES = new Set(['narrative', 'pin', 'marker', 'map']);
-
-    // Empty query → recently-edited elements (by local_updated_at desc),
-    // with picker recents promoted to the top. "Recently-edited" matches
-    // the writer's natural workflow ("I just touched X, now I'm writing
-    // about it"). Once the user types, fuzzy match takes over.
-    if (q === '') {
-      const out: MentionSuggestionItem[] = [];
-      const seen = new Set<string>();
-      // First: explicit picker recents (the writer's intentional history).
-      for (const id of getRecents(worldId)) {
-        const el = byId.get(id);
-        if (!el || PICKER_EXCLUDED_TYPES.has(el.type)) continue;
-        seen.add(id);
-        out.push(toItem(el));
-      }
-      // Then: recently-edited elements (whatever the writer touched lately
-      // in element-detail elsewhere — Drizzle's description, etc.). Sorted
-      // by local_updated_at desc. Pad up to 8.
-      if (out.length < 8) {
-        const byMtime = elements
-          .filter(e => !PICKER_EXCLUDED_TYPES.has(e.type) && !seen.has(e.id))
-          .slice()
-          .sort((a, b) => {
-            const aT = a.local_updated_at ?? '';
-            const bT = b.local_updated_at ?? '';
-            return aT < bT ? 1 : aT > bT ? -1 : 0;
-          });
-        for (const el of byMtime) {
-          if (out.length >= 8) break;
-          out.push(toItem(el));
-        }
-      }
-      return out;
-    }
-
-    const scored: Array<{ score: number; item: MentionSuggestionItem }> = [];
-    for (const el of elements) {
-      if (PICKER_EXCLUDED_TYPES.has(el.type)) continue;
-      const aliases = el.atlas_aliases;
-      const name = (el.name || '').toLowerCase();
-      const aliasMatches = Array.isArray(aliases) ? aliases.map(a => a.toLowerCase()) : [];
-
-      let score = 0;
-      if (name.startsWith(q)) {
-        score = 100;
-      } else if (name.includes(q)) {
-        score = 50;
-      } else if (aliasMatches.some(a => a.startsWith(q))) {
-        score = 80;
-      } else if (aliasMatches.some(a => a.includes(q))) {
-        score = 40;
-      }
-      if (score === 0) continue;
-
-      scored.push({ score, item: toItem(el) });
-    }
-    scored.sort((a, b) => b.score - a.score);
-    return scored.map(s => s.item).slice(0, 50);
-  }
-
-  function toItem(el: Element): MentionSuggestionItem {
-    const aliases = el.atlas_aliases;
-    return {
-      id: el.id,
-      type: el.type,
-      name: el.name || '(unnamed)',
-      subtitle: buildSubtitle(el),
-      aliases,
-    };
-  }
-
-  function buildSubtitle(el: Element): string | undefined {
-    // For v1 keep it light — just the element-type label. Disambiguation by
-    // parent location / family / etc. is a polish refinement.
-    return ELEMENT_LABELS[el.type]?.singular;
-  }
 
   /**
    * Read the per-world writing font preferences (size + family) and set them
@@ -1271,13 +661,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     unsubState();
     unsubHash();
     root.removeEventListener('keydown', onWorkspaceHotkey);
-    document.removeEventListener(WRITING_INLINE_CREATE_EVENT, onInlineCreateEvent);
-    document.removeEventListener(WRITING_SPLIT_EVENT, onSplitEvent);
     document.removeEventListener('atlas:context-add-to-cast', onAddToCast);
-    root.removeEventListener('contextmenu', onProseContextMenu);
-    dismissContextMenu();
+    proseMenu.destroy();
     document.removeEventListener(WRITING_FOCUS_TOGGLE_EVENT, onFocusToggle);
     document.removeEventListener('keydown', onFocusEsc, true);
+    hideFocusExit();
     chipPreview.destroy();
     findBar?.destroy();
     findBar = null;

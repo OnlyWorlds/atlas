@@ -1,8 +1,8 @@
 # Atlas — Writing Design
 
-**Version**: 3.1 (2026-05-20) — v2 batch shipped (session 228)
-**Status**: v1 + v1.5 + v2 batch all shipped. Tool is feature-complete for primary writing flows; subsequent work is UI polish + the long-tail roadmap items still flagged below.
-**Related**: `DESIGN.md` (Rooms model, atlas-specific fields), `DESIGN_HOME.md`, `DESIGN_PUBLISHING.md`
+**Version**: 3.2 (2026-05-24) — context pane promoted to tool-global (session 231)
+**Status**: v1 + v1.5 + v2 batch all shipped (sessions 227-228). Session 229 added the writing-context pane in the right tab. Session 230 polished it (Featured/Planned, click-recenter, reading-mode redesign). Session 231 promoted the context pane to a tool-global Context tab — see `DESIGN.md` "Context Pane" section for the cross-route architecture. Writing-mode behavior in the context pane (Cast + Potentials + chip-click selection + Featured/Planned semantics) is unchanged.
+**Related**: `DESIGN.md` (Rooms model, atlas-specific fields, **Context Pane**), `DESIGN_HOME.md`, `DESIGN_PUBLISHING.md`
 
 ---
 
@@ -239,22 +239,9 @@ Fallback if TipTap's markdown beta bites us: drop to raw ProseMirror + `prosemir
 - Esc returns to write mode.
 - Persisted per-world atlas-local pref (so reading mode in one world doesn't bleed into another).
 
-### What v1 does NOT do (deferred to v2+ — protected, see Roadmap)
+### What v1 does NOT do (now historical — many of these shipped through 228-231; see Roadmap status below)
 
-- Hover preview card on chips
-- Focus / distraction-free fullscreen
-- Outline / corkboard view of writing tree
-- Backlinks pane within the writing room (lives on element-detail when that feature lands)
-- Per-narrative atlas-local notes scratchpad
-- Per-session word count goal with progress ring
-- Find/replace
-- Inline element creation from selected prose
-- Element embeds, footnotes, callouts as richtext blocks
-- Bidirectional consistency check (the long-term differentiator)
-- Prose-first extraction (parse manuscript → propose elements)
-- Visual narrative graph
-- Compare view
-- Export to PDF/EPUB (publish room)
+The original v1 deferral list (hover preview, focus mode, outline view, backlinks, per-narrative notes, word goal, find/replace, inline element creation, element embeds, footnotes/callouts, bidirectional consistency, prose-first extraction, visual narrative graph, compare view, export) shipped piecemeal in sessions 227-231 OR moved to the "Still on the roadmap" / "Dropped" lists below. The unshipped items are tracked there.
 
 ---
 
@@ -281,60 +268,48 @@ The URL is the source of truth for which narrative is active (convention #46). W
 
 ---
 
-## Roadmap status (session 230 update)
+## Roadmap status (session 231 update)
 
-### Shipped through session 230 (writing room redesign + context pane)
+### Shipped through session 231 (context pane: writing-only → tool-global)
 
-- ✅ **Writing-context tab in right pane** — graph + Cast + Suggested + element preview, session 229
-- ✅ **Force-directed graph** ported from cos-browser, session 229
-- ✅ **Featured/Planned distinction** in Cast — Featured = in field AND in prose (chip or name/alias text match), Planned = in field only, session 229-230
-- ✅ **Compiled view for parent narratives** — read-only assembly + clickable section markers + collapsible chevrons + tier-specific icons, session 229-230
-- ✅ **Sticky bar below element header** — breadcrumb + date + focus/reading/open action icons, session 229
-- ✅ **Ambient word-count widget** — bottom-right corner, replaces legacy footer, session 229
-- ✅ **Graph: click recenters + Ctrl/Cmd+click navigates** — endless click-through exploration inside the context pane without leaving the writing room, session 230
-- ✅ **Graph: hover-fade non-connected** — visual isolation on hover, session 230
-- ✅ **Graph: resize on pane drag** — ResizeObserver re-projects layout without re-running sim, session 230
-- ✅ **Graph: tier-aware density** — scene/draft show 1-hop cap 12; chapter shows direct cast only cap 6; book shows direct cast only cap 4, session 230
-- ✅ **Right-click on autolink hint → Link to X** — mouse alternative to Tab, session 230
-- ✅ **Spellcheck toggle per world** + autolink hints excluded from spellcheck always, session 230
-- ✅ **Reading mode redesign** — hides right pane (intermediate between normal and focus), disables link visuals, keeps writer's font choice, session 230
-- ✅ **Featured/Planned semantics + alias-preserving chip sync** — aliases survive syncChipLabels rounds, session 230
+Big-picture context-pane work moved into `DESIGN.md` "Context Pane" — that's the authoritative architecture doc now. The writing-mode contributions to the pane (Cast + Potentials + Featured/Planned + chip-click selection + add-to-story button) stay specified here.
 
-### Shipped through session 228
-
-- ✅ **Hover preview card on chips** (v1.5)
-- ✅ **Focus / distraction-free mode** — Cmd+Shift+F (v1.5)
-- ✅ **Element aliases editor UX polish** — modal with one row per alias (v1.5)
-- ✅ **First-mention auto-link** — convention #53, session 228 (Bout 9)
-- ✅ **Backlinks pane on element-detail** — "Mentioned in" section, session 228 (Bout 2)
-- ✅ **Per-session word count goal** — sessionStorage + progress ring, session 228 (Bout 3)
-- ✅ **Find/replace** — Ctrl+F / Ctrl+H bar, session 228 (Bout 4)
-- ✅ **Inline element creation from selected text** — Ctrl+Shift+E + right-click, session 228 (Bout 7)
-- ✅ **Split-into-sibling at cursor** — Ctrl+Shift+D + right-click, session 228 (Bout 8)
-- ✅ **Per-world font family** — sans/serif/slab/mono, session 228 (Bout 5)
-- ✅ **Character cast strip** — 5-type pivot, click-to-insert, session 228 (Bout 6)
-- ✅ **Code-split TipTap** — main bundle 156.87 KB gzipped, session 228 (Bout 10)
+- ✅ **Context tab** — was writing-only ephemeral in session 229, now tool-global permanent (session 231). Writing route shows Cast + Potentials; element route shows element preview; other routes show empty state.
+- ✅ **Force-directed graph** with click-recenter, recent-centers breadcrumb, mouse-back intercept, right-click menu, free zoom/pan, fit-to-view button, hover-fade, hop-depth 1-4 with per-ring caps, element-type filter chips, lock-layout mode, optional element-type edge coloring (session 231).
+- ✅ **Featured/Planned distinction** in Cast — Featured = in field AND in prose (chip or name/alias text match), Planned = in field only (sessions 229-230).
+- ✅ **Compiled view for parent narratives** — read-only assembly + clickable section markers + collapsible chevrons + tier-specific icons (sessions 229-230).
+- ✅ **Sticky bar below element header** — breadcrumb + date + focus/reading/open action icons (session 229).
+- ✅ **Ambient word-count widget** — bottom-right corner, replaces legacy footer (session 229).
+- ✅ **Reading mode redesign** — hides right pane, disables link visuals, keeps writer's font (session 230).
+- ✅ **Spellcheck toggle per world** + autolink hints always-`spellcheck=false` (session 230).
+- ✅ **Backspace-on-chip unlinks**, **right-click chip → unlink**, **right-click autolink hint → Link to {name}** (session 230).
+- ✅ **Aliases editor modal, focus mode, hover preview, find/replace, word goal, inline element creation, split-into-sibling, character cast strip, per-world font family, first-mention autolink, TipTap code-split** — see session 228 batch in archive.
 
 ### Still on the roadmap
-
-#### Graph (writing-context pane)
-- **(c) Hierarchical tier-zoom** — at book level, chapter nodes cluster around the book; click a chapter to expand its scene clusters. Replaces the current "no 1-hop at higher tiers" fallback with a true drill-down hierarchy.
-- **(d) Zoom + pan** — mouse-wheel zoom + drag pan inside the graph host. Most useful for very dense narratives where current cap-and-spread doesn't suffice.
-- **(e) Filter by element type** — toggle chips in the graph's top strip to hide characters/locations/objects/etc. Lets writers focus on a particular axis.
-- **(f) Search/highlight by name** — type-ahead input that highlights matching nodes in the graph. Find a specific element without scrolling lists.
 
 #### Writing room
 
 1. **In-narrative outline disclosure** — H1/H2/H3 jumps within the current narrative's prose. Recommended placement: collapsible disclosure between breadcrumb and prose.
-2. **Outline / corkboard view** of writing tree — index cards, drag to reorder, alternate to the linear sidebar tree. Scrivener's most-loved feature.
+2. **Outline / corkboard view** of writing tree — index cards, drag to reorder, alternate to the linear sidebar tree.
 3. **Per-narrative atlas-local notes scratchpad** — like world notes overlay, but per-narrative.
 4. **Element embeds** in richtext — render element card inline within prose (TipTap node extension). Powerful for TTRPG handouts.
 5. **Footnotes + callouts** as richtext blocks (TipTap node extensions).
 6. **Bidirectional consistency check** — "you wrote 'green eyes' but Lyra's element record says brown". Atlas's strongest long-term differentiator per research; no competitor does this. Needs its own design conversation.
 7. **Prose-first extraction** — parse existing manuscript via OW SDK → propose Characters, Locations, Objects. Fits OnlyWorlds parsing skill heritage.
-8. **Visual narrative graph** at `#/w/<id>/writing/graph` — nodes for narratives sized by word count, edges for parent_narrative + shared elements + explicit references.
-9. **Compare view** — two narratives side-by-side for revision.
-10. **Export book/chapter to markdown/PDF/EPUB** — lives in publish room per `DESIGN_PUBLISHING.md`. Writing room provides the "publish this book" affordance.
+8. **Compare view** — two narratives side-by-side for revision.
+9. **Export book/chapter to markdown/PDF/EPUB** — lives in publish room per `DESIGN_PUBLISHING.md`. Writing room provides the "publish this book" affordance.
+
+#### Context pane (next from here, low priority)
+
+1. **Edge coloring by Relation subtype** — once we settle on a default palette per relation kind (rivalry red, friendship green, etc.); currently we color by node type instead.
+2. **Density slider** — per-ring caps tunable beyond tier defaults.
+3. **Compiled view editable** — range tracking from compiled text back to source narrative for in-place edits.
+
+#### Dropped (don't re-add without fresh design conversation)
+
+- **Hierarchical tier-zoom** — replaced by click-to-recenter which gives drill-down for free.
+- **Search/highlight by name in graph** — hover already shows names; navigation handles the find use case.
+- **Visual narrative graph at `/writing/graph`** — the context-pane graph subsumes this for the writing tree case.
 
 ---
 

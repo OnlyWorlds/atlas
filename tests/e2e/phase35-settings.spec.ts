@@ -51,12 +51,12 @@ test.beforeEach(async ({ page }) => {
   await freshBoot(page);
 });
 
-test('settings opens to identity tab; world tab disabled without active world', async ({ page }) => {
+test('settings opens to account tab; world tab disabled without active world', async ({ page }) => {
   await page.click('[data-action="open-settings"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
-  await expect(page.locator('[data-settings-tab="identity"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-settings-tab="account"]')).toHaveClass(/active/);
   await expect(page.locator('[data-settings-tab="world"]')).toBeDisabled();
-  // Identity tab fields are visible.
+  // Account tab fields are visible.
   await expect(page.locator('.atlas-settings input[name="email"]')).toBeVisible();
 });
 
@@ -64,19 +64,22 @@ test('clicking tabs updates url + visible content', async ({ page }) => {
   await setupAtlasRoot(page);
   await page.click('[data-action="open-settings"]');
 
-  await page.click('[data-settings-tab="atlas"]');
-  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings\/atlas$/);
+  // Storage tab: device folder + merged sync settings in one place.
+  await page.click('[data-settings-tab="storage"]');
+  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings\/storage$/);
   await expect(page.locator('.atlas-settings')).toContainText('phase35-root');
-
-  await page.click('[data-settings-tab="sync"]');
-  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings\/sync$/);
   await expect(page.locator('.atlas-settings input[name="pause-all"]')).toBeVisible();
+
+  // Editing tab: field-edit mode radios.
+  await page.click('[data-settings-tab="editing"]');
+  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings\/editing$/);
+  await expect(page.locator('.atlas-settings input[name="field-edit-mode"]').first()).toBeVisible();
 });
 
-test('sync tab — toggles persist to localStorage', async ({ page }) => {
+test('storage tab — sync toggles persist to localStorage', async ({ page }) => {
   await setupAtlasRoot(page);
   await page.click('[data-action="open-settings"]');
-  await page.click('[data-settings-tab="sync"]');
+  await page.click('[data-settings-tab="storage"]');
 
   await page.check('input[name="pause-all"]');
   let reg = await loadRegistry(page);

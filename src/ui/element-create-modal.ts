@@ -23,6 +23,7 @@ import { requestPushIfLinked } from '../sync/sync-attach';
 import { createMapDialog } from './map-create-modal';
 import { findExistingNameMatch } from './element-name-match';
 import { escapeAttr } from '../core/dom-utils';
+import { loadUiPrefs } from '../core/ui-prefs';
 
 /**
  * Types offered in the create modal.
@@ -99,7 +100,10 @@ export class ElementCreateModal extends BaseModal {
     super();
     this.toasts = toasts;
     this.opts = opts;
-    this.selected = opts.initialType ?? 'character';
+    // Explicit caller type wins; otherwise fall back to the user's default
+    // create type (settings → Editing). buildModal re-validates against the
+    // effective (post-exclude) type set so an excluded default can't stick.
+    this.selected = opts.initialType ?? loadUiPrefs().defaultCreateType;
   }
 
   /** Types this modal instance offers — CREATE_TYPES minus opts.excludeTypes. */
@@ -179,6 +183,15 @@ export class ElementCreateModal extends BaseModal {
     this.typeInput = body.querySelector<HTMLInputElement>('input[name="element-type"]')!;
     this.ghostTyped = body.querySelector<HTMLSpanElement>('.ghost-typed')!;
     this.ghostSuffix = body.querySelector<HTMLSpanElement>('.ghost-suffix')!;
+
+    // Guard: if the preselected type (from opts or the user default) isn't in
+    // the effective set — e.g. default is 'map' but this contextual flow
+    // excludes it — fall back to the first offered type so the grid + input
+    // always reflect a real, selectable category.
+    const effectiveForInit = this.effectiveTypes();
+    if (!effectiveForInit.includes(this.selected)) {
+      this.selected = effectiveForInit[0] ?? 'character';
+    }
 
     // Render the type grid + initial input value + initial ghost state.
     const grid = body.querySelector<HTMLElement>('[data-role="type-grid"]')!;

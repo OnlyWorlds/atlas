@@ -728,10 +728,31 @@ test('split: divides current narrative at cursor into a new sibling', async ({ p
   await page.keyboard.press('Enter');
   await page.keyboard.type('second half after the split');
 
-  // Move cursor to between the two paragraphs by stepping back through the
-  // second paragraph's text — exact step count = length of "second half
-  // after the split" (28 chars) + 1 for the paragraph boundary.
-  for (let i = 0; i < 28; i++) await page.keyboard.press('ArrowLeft');
+  // Place the cursor at the boundary between the two paragraphs (end of the
+  // first) by setting the DOM selection directly, NOT via keyboard presses.
+  // Caret-navigation keypresses (the historic 28×ArrowLeft) are unreliable in
+  // a contenteditable under load — Playwright "occasionally moves focus
+  // instead of dispatching to ProseMirror" (see the autolink test's Tab
+  // workaround above), leaving the cursor at the doc end where the split
+  // correctly bails ("nothing after the cursor") — the suite-only flake.
+  // Setting the selection programmatically + nudging ProseMirror's
+  // DOMObserver via `selectionchange` is deterministic and focus-safe.
+  await page.evaluate(() => {
+    const pm = document.querySelector('.atlas-writing-workspace-prose .ProseMirror') as HTMLElement | null;
+    if (!pm) return;
+    pm.focus();
+    const firstPara = pm.querySelector('p');
+    const node = firstPara?.firstChild;
+    if (!node) return;
+    const len = node.textContent?.length ?? 0;
+    const range = document.createRange();
+    range.setStart(node, len);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    document.dispatchEvent(new Event('selectionchange'));
+  });
 
   // Dispatch the split custom event.
   await page.evaluate(() => {

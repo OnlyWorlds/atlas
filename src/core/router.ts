@@ -50,16 +50,35 @@ export type RouteMode =
   | 'import'
   | 'templates';
 
-export type SettingsTab = 'identity' | 'atlas' | 'sync' | 'maps' | 'world' | 'writing' | 'context' | 'about';
+export type SettingsTab = 'account' | 'storage' | 'editing' | 'world' | 'writing' | 'context';
 
-export const SETTINGS_TABS: SettingsTab[] = ['identity', 'atlas', 'sync', 'maps', 'world', 'writing', 'context', 'about'];
+export const SETTINGS_TABS: SettingsTab[] = ['account', 'storage', 'editing', 'world', 'writing', 'context'];
+
+/**
+ * Settings tabs grouped by scope for the nav rail. 'atlas' scope applies to
+ * the whole tool / all worlds; 'world' scope follows the active world (those
+ * tabs disable when no world is active).
+ */
+export const SETTINGS_TAB_GROUPS: ReadonlyArray<{ scope: 'atlas' | 'world'; tabs: SettingsTab[] }> = [
+  { scope: 'atlas', tabs: ['account', 'storage', 'editing'] },
+  { scope: 'world', tabs: ['world', 'writing', 'context'] },
+];
+
+/** Legacy settings-tab keys → current keys (pre-session-232 deep links / stored last-tab). */
+const LEGACY_SETTINGS_TABS: Record<string, SettingsTab> = {
+  identity: 'account',
+  atlas: 'storage',
+  sync: 'storage',
+  maps: 'editing',
+  about: 'account',
+};
 
 export interface Route {
   worldId: string | null;
   mode: RouteMode;
   elementId?: string;
   mapId?: string;
-  /** Active settings tab when mode === 'settings'. Defaults to 'identity'. */
+  /** Active settings tab when mode === 'settings'. Defaults to 'account'. */
   settingsTab?: SettingsTab;
   /**
    * Writing room active narrative id (any tier — book/chapter/scene/draft).
@@ -76,7 +95,8 @@ export interface Route {
 
 function parseSettingsTab(s: string | undefined): SettingsTab {
   if (s && (SETTINGS_TABS as string[]).includes(s)) return s as SettingsTab;
-  return 'identity';
+  if (s && LEGACY_SETTINGS_TABS[s]) return LEGACY_SETTINGS_TABS[s];
+  return 'account';
 }
 
 function splitHashAndQuery(input: string): { path: string; query: string } {
