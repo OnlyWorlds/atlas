@@ -17,6 +17,7 @@ import {
   navigate,
   homeHash,
   writingHash,
+  knowledgeHash,
   timelineHash,
   searchHash,
   publishHash,
@@ -31,7 +32,7 @@ import { elementHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
 
 interface RoomDef {
-  id: RouteMode | 'home' | 'writing' | 'timeline' | 'search' | 'publish' | 'import' | 'templates' | 'settings';
+  id: RouteMode | 'home' | 'writing' | 'knowledge' | 'timeline' | 'search' | 'publish' | 'import' | 'templates' | 'settings';
   label: string;
   icon: string; // Material Symbols name
   hashFor: (worldId: string) => string;
@@ -44,6 +45,7 @@ const ROOMS: RoomDef[] = [
   // and 'welcome' (no-world case never reaches room nav, but defensive).
   { id: 'home',      label: 'Home',      icon: 'home',           hashFor: homeHash,      matches: ['home', 'elements'] },
   { id: 'writing',   label: 'Writing',   icon: 'edit_note',      hashFor: writingHash,   matches: ['writing'] },
+  { id: 'knowledge', label: 'Knowledge', icon: 'menu_book',      hashFor: knowledgeHash, matches: ['knowledge'] },
   { id: 'timeline',  label: 'Timeline',  icon: 'timeline',       hashFor: timelineHash,  matches: ['timeline'] },
   { id: 'search',    label: 'Search',    icon: 'search',         hashFor: (w) => searchHash(w), matches: ['search'] },
   { id: 'publish',   label: 'Publish',   icon: 'ios_share',      hashFor: publishHash,   matches: ['publish', 'publish-detail'] },

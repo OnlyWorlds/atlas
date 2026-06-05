@@ -1,7 +1,7 @@
 # Atlas — Design Document
 
 **Version**: 1.0 (2026-05-12) — folder-first rebuild
-**Status**: Foundation in progress. Package skeleton + this doc + SyncEngine contract are the first deliverables.
+**Status**: Feature-complete for v1 (phases 0–6 + 3.5 shipped). Active work is polish, code hygiene, and the long-tail roadmap. Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
 **Predecessor**: `tools/atlas-deprecated/` (IDB-cached architecture, retained as UI/UX reference)
 
 ---
@@ -298,7 +298,7 @@ interface SyncResult {
    - If server `updated_at > server_updated_at` AND `local_updated_at <= server_updated_at` → UPDATE locally (overwrite with server version).
    - If both sides changed (`local_updated_at > server_updated_at` AND server `updated_at > server_updated_at`) → CONFLICT (don't overwrite locally; record in sync state).
 3. For server elements missing locally that have NO tombstone → they were created on the server while we were offline; pull them.
-4. For folder elements missing on server that have NO tombstone AND `server_updated_at` is present (meaning they were synced before) → server deleted them; ask user (delete locally? restore on server? — Phase 3.5 polish, default behavior TBD).
+4. For folder elements missing on server that have NO tombstone AND `server_updated_at` is present (meaning they were synced before) → server deleted them; route to `sync_state.server_deletes` and surface the server-delete review modal (per-row `keep + re-push` / `delete locally`). Default `sync_confirm_server_deletes` is on (confirm before deleting locally). Pagination-aware: detection is suppressed for types whose list was paginated, to avoid falsely flagging page-2+ elements (SYNC_NOTES).
 
 ### Sync policies (Phase 3.5+, simplified to two)
 
@@ -403,7 +403,7 @@ Consequences:
    - Folder data is untouched. Files stay where they are. The world is now api-linked but the local layer is the SAME folder.
 4. Toast: "{name} is online."
 
-**Error handling**: if push fails mid-upload, the api world has partial data. Registry entry stays `local-only` until user retries or proceeds with partial state (a "finish upload" action would be Phase 3.5 polish).
+**Error handling**: if push fails mid-upload, the api world has partial data. Registry entry stays `local-only` until user retries or proceeds with partial state. (No dedicated "finish upload" action — retry re-runs the flow; per-element push resilience means a partial upload converges on the next sync round.)
 
 ### W4 — Make local online: Route 2 (link to existing api world)
 
@@ -558,15 +558,15 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 | Room | Route | Content | Status |
 |---|---|---|---|
 | `welcome` | `#/` | First-launch atlas-root setup CTA | shipped |
-| `home` | `#/w/<id>` | World home — identity, stats, timeline preview, recent, quick actions. **Default landing for active worlds.** | shipped this session |
+| `home` | `#/w/<id>` | World home — identity, stats, timeline preview, recent, quick actions. **Default landing for active worlds.** | shipped |
 | `element` | `#/w/<id>/element/<eid>` | Schema-driven element detail | shipped |
-| `writing` | `#/w/<id>/writing[/book/<id>[/chapter/<id>[/scene/<id>]]]` | Book/chapter/scene authorship. See `DESIGN_WRITING.md` | shell shipped this session |
-| `timeline` | `#/w/<id>/timeline` | Full timeline view | basic shipped; expanded version this session |
-| `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | shipped this session |
-| `publish` | `#/w/<id>/publish` | Showcase home — manage publications. See `DESIGN_PUBLISHING.md` | stub this session |
-| `publish-detail` | `#/w/<id>/publish/<showcase_id>` | Specific showcase config + preview | stub this session |
-| `import` | `#/w/<id>/import` | Explanation + reference to base-tool import; mechanics deferred | stub this session |
-| `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | stub this session |
+| `writing` | `#/w/<id>/writing[/<narrativeId>]` | Book/chapter/scene/draft authorship (any tier; ancestry derived from `parent_narrative`). See `DESIGN_WRITING.md`. Legacy long-form URL still parsed. | shipped |
+| `timeline` | `#/w/<id>/timeline` | Full timeline view | shipped |
+| `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | shipped |
+| `publish` | `#/w/<id>/publish` | Showcase home — manage publications. See `DESIGN_PUBLISHING.md` | stub |
+| `publish-detail` | `#/w/<id>/publish/<showcase_id>` | Specific showcase config + preview | stub |
+| `import` | `#/w/<id>/import` | Explanation + reference to base-tool import; mechanics deferred | stub |
+| `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | stub |
 | `settings` | `#/w/<id>/settings[/<tab>]` | Account / storage / editing (atlas-wide) · world / writing / context (per-world) | shipped |
 
 **Default route**: bare `#/w/<id>` resolves to `home` (was `timeline` pre-session-223). Welcome stays at root `#/` with no active world.

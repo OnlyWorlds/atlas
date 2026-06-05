@@ -28,6 +28,7 @@ export type { RightTabRef };
  * - element: schema-driven element detail
  * - writing: book/chapter/scene authorship (see DESIGN_WRITING.md)
  * - timeline: full timeline view
+ * - knowledge: who-knows-what room (see DESIGN_KNOWLEDGE.md)
  * - search: cross-world search
  * - publish / publish-detail: showcase management (see DESIGN_PUBLISHING.md)
  * - import: data import (stub — mechanics in base-tool)
@@ -41,6 +42,7 @@ export type MiddleMode =
   | 'element'
   | 'timeline'
   | 'writing'
+  | 'knowledge'
   | 'search'
   | 'publish'
   | 'publish-detail'

@@ -18,6 +18,7 @@ import { mountTimeline } from './middle/timeline';
 import { mountWorldHome } from './middle/world-home';
 import { mountWriting } from './middle/writing';
 import { mountSearch } from './middle/search';
+import { mountKnowledgeRoom } from './middle/knowledge-room';
 import { mountPublishRoom } from './middle/publish-room';
 import { mountPublishDetail } from './middle/publish-detail';
 import { mountImportRoom } from './middle/import-room';
@@ -135,6 +136,9 @@ export function startApp(container: HTMLElement): AppHandle {
           break;
         case 'writing':
           nextMode = 'writing';
+          break;
+        case 'knowledge':
+          nextMode = 'knowledge';
           break;
         case 'search':
           nextMode = 'search';
@@ -278,6 +282,8 @@ function mountRoom(mode: MiddleMode, target: HTMLElement, toasts: ToastManager):
       return mountTimeline(target, toasts);
     case 'search':
       return mountSearch(target);
+    case 'knowledge':
+      return mountKnowledgeRoom(target, toasts);
     case 'publish':
       return mountPublishRoom(target);
     case 'publish-detail':

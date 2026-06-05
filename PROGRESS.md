@@ -4,7 +4,11 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-05-25 session 233 close)
+## CURRENT STATE (handover snapshot, 2026-05-25 session 234 close)
+
+**Session 234** = Knowledge + Sharing **design** (two new docs + Build Map below) + **Knowledge phase-1 build**: K1 (room skeleton) · K2 (in-room detail + held-by editor) · K4-core (known-view scan functions + 15 unit tests). Atlas-only, pure-local. **728 vitest + 127 Playwright + typecheck + build green.** Full entry below the Build Map. Knowledge build continues at K3 (writing-editor embed) — collaborative. Pre-234 snapshot follows.
+
+
 
 **Session 233 (maintenance: settings split + map-tab re-trim + small feature + flake fix):** settings-panel.ts 1175→210 (orchestrator) + 6 per-tab modules (`settings-{account,storage,editing,world,writing,context}.ts`); new `updateWorldEntry` registry helper (DRY, +2 unit tests); **default new-element type** feature (`ui-prefs.defaultCreateType`, surfaced in Settings → Editing, +1 e2e); map-tab.ts 806→388 via 3 extracted modules (`map-tab-interactions` 335, toolbar-wiring folded into `map-tab-toolbar` 233, `map-tab-stale` 40); fixed the historic suite-only **split-test flake** (DOM-selection cursor placement, verified 6× stress). DESIGN conventions #65, #66 added. **713 vitest + 127 Playwright + typecheck + build green.** No behavior changes except the new default-create-type feature.
 
@@ -43,6 +47,66 @@ The right-pane writing-context tab from session 229 was promoted to a **tool-glo
 - Writing-workspace chunk gzipped: ~150 KB
 - Conventions list: 1-63 (DESIGN.md 1-46 + 58-63 added session 231; DESIGN_WRITING.md 47-57 unchanged)
 - Atlas-local fields list (`ATLAS_LOCAL_EXTENSION_FIELDS`) unchanged from session 230
+
+---
+
+## Knowledge + Sharing — Build Map (session 234)
+
+Designed session 234 (`DESIGN_KNOWLEDGE.md` + `DESIGN_SHARING.md`). Build order: **Knowledge first (atlas-only, no blockers), then Sharing (needs Anchor's Django backend + a new viewer tool).** Bout-level near-term; coarser downstream (firms with Anchor).
+
+**Critical path**: Knowledge phase 1 (atlas) → define atlas↔backend *page contract* with Anchor → parallel { Anchor: Django backend · Temper: viewer tool + atlas share-room/block-builder } → integrate → Circle block (needs Knowledge).
+
+### Track A — Knowledge (atlas-only, pure-local, buildable NOW, no blockers)
+- **K1 — Room skeleton**: `knowledge` route + `knowledgeHash` + parse + room-nav icon + `MiddleMode 'knowledge'`; `isKnowledgeNarrative()` classifier (subtype === 'knowledge'); bare room = list of knowledge entries + empty state + "new knowledge entry" (creates a Narrative w/ `subtype:'knowledge'`). Pokeable.
+- **K2 — Entry detail + held-by**: select entry → detail; **held-by** editor (narrator = solo Character · collectives = Circles · conservator = Institution, via pickers); about-links display.
+- **K3 — Authoring**: embed the writing-workspace editor component for knowledge prose so @-mentions populate the about-links.
+- **K4 — Known-view + knowers sidebar**: `whatDoesXKnow(knowerId)` + `knownViewOfElement(elementId, knowerId)` scans; sidebar filtered to knowers; pick knower → known-view.
+- **K5 — Graph + circles + lens**: context-graph "knowledge mode" (wiring surface, drag-to-assign); "+ new Circle" (creates a Collective, opt `subtype:'circle'`); known-view "lens"; react-to-atlas-selection.
+- **K6 — (phase 1.5)**: element-detail "known by: [circles]" surfacing.
+
+### Track B — Sharing, atlas-side (partly buildable now; publish blocked on backend)
+- **S1 — Share room shell**: rename `publish`→`share` route; page list/gallery (empty until backend); World Showcase slot.
+- **S2 — Block builder UI**: single-column stack + ~8 blocks + per-block layout menu — *prototypable locally with no backend* (renders from local config).
+- **S3 — Theme tokens UI**: the ~6 tokens + live preview.
+- **S4 — Publish flow**: POST → backend, return URL/slug. **BLOCKED on Anchor contract.**
+- **S5 — Circle block**: needs Track A done.
+
+### Track C — Viewer tool (new deployed tool, phase 2 — Temper)
+- New tool scaffold → `show.onlyworlds.com` (subdomain TBD). CF: `_redirects /* /index.html 200`, `_routes.json` (exclude `/assets/*`), Pages Function for OG-meta injection (unfurls).
+- Lift atlas renderers (element-detail, leaflet map, narrative reading, context graph) into portable/shared form.
+- Path-based routing; fetch page snapshot by id/slug; render the block model.
+
+### Track D — ow.com / Anchor backend (Django, phase 2 — Anchor, against our contract)
+- New page/showcase model: world, owner, **unique slug**, intent, composition/blocks payload, theme tokens, **snapshot payload**, live-vs-snapshot flag, view_count, published_at, revoked.
+- Endpoints: POST publish · GET public (no auth, cached) · PATCH republish · DELETE revoke · slug-uniqueness check · list-by-world. Quota enforcement. Snapshot-freeze at publish.
+- **The atlas↔backend contract is the coordination artifact** — define once Knowledge lands + we lock S-track page storage.
+
+**Status:** Track A — **K1 + K2 + K4-core shipped (session 234)**. Next: K3 (writing-editor embed), K4-UI (known-view render + knowers sidebar), K5 (graph mode + circles + lens) — all collaborative.
+
+---
+
+## Session 234 (2026-05-25) — Knowledge + Sharing design; Knowledge phase-1 build (K1, K2, K4-core)
+
+Long design conversation → two new docs (`DESIGN_KNOWLEDGE.md` + `DESIGN_SHARING.md`; `DESIGN_PUBLISHING.md` superseded to a pointer) + the Build Map above. Then three autonomous build bouts on the Knowledge foundation (atlas-only, pure-local), each typecheck+build gated, full suite at close.
+
+- **K1 — Knowledge room skeleton**: `knowledge` route (`#/w/<id>/knowledge[/<id>]`) + `knowledgeHash` + parse; `MiddleMode 'knowledge'`; room-nav icon (`psychology`, between Writing & Timeline); `src/core/knowledge.ts` (`KNOWLEDGE_SUBTYPE`, `isKnowledgeNarrative`, `listKnowledgeEntries`, `heldByOf`/`heldByCount`); `src/middle/knowledge-room.ts` — list of entries + "+ new knowledge entry" (mints a narrative w/ `subtype:'knowledge'`) + held-by summary + empty state.
+- **K2 — In-room editor (draft flow + held-by)**: three views — list (`/knowledge`), **draft** (`/knowledge/new`, in-memory, NOTHING persists until "create"), editor (`/knowledge/<id>`). In-room authoring surface: name input + **prose textarea** (`story`; rich @-mention prose deferred to K3) + **held-by** editor (Character via `narrator` single · Circles via `collectives` multi — **two channels only**) via `pickElement(restrictToType)`. About chips read-only (`aboutIdsOf`, excludes `collectives`). Build-once + surgical refresh (held-by/about re-render on same-view ticks; name/prose inputs never clobbered → focus/typing survive background sync). Saved-entry name/prose save on blur; held-by writes immediate.
+- **K4-core — Known-view scans + tests**: `isKnowerType` (character|collective), `circleMembers`, `characterKnowsEntry`, `knowledgeHeldBy` (dispatch: character = narrator|circle-member, collective = direct holder), `elementsKnownAboutBy`. +14 unit tests (`tests/unit/knowledge.test.ts`) covering direct/inherited holding, non-knowers, about-exclusion of collectives. +2 e2e (`tests/e2e/knowledge.spec.ts`): empty state + draft-no-premature-save.
+
+**Captain feedback iteration 1 (same session):** (a) nav icon `psychology`→**`menu_book`** (open book); (b) **dropped the conservator/institution held-by channel** — redundant with Circles; an institution holds via a Circle of its members (model + scans + tests + docs updated); (c) **draft create flow** replaces auto-create-then-edit (premature-save + jump was jarring); (d) **in-room prose textarea** replaces "bounce to element-detail" (kept a small "all fields →" link); (e) **empty-state layout fixed** (was centered + two-column via `atlas-pane-empty`; now top-anchored stacked block).
+
+**Captain feedback iteration 2 (same session):** (a) **held-by/about chips → cyan pills** (were drab gray blocks); (b) **id-swap migration for `/knowledge/<id>`** — the "create bounces to overview" was the push reassigning the entry's id on api-linked worlds; `handleIdSwap` (sync-attach) now migrates the knowledge route like it does `/element` and `/map`; (c) **About is now linkable in-room** — a "+ add subject" picker writes the subject to its matching `Involves` field via `NARRATIVE_RELATION_FIELDS` (collectives rejected — they're holders); works in draft (stored on `draft.aboutIds`, grouped into fields on create) + saved. Exported `ABOUT_FIELDS` from `core/knowledge`. Verified in-browser (Playwright): empty block top-anchored + stacked; draft persists nothing until create (`count===0`); chips computed `rgba(34,211,238,*)` cyan pill; create lands on the **saved entry** (not list) with `narrator`/`collectives`/`locations`(subject) all persisted; collective rejected as a subject.
+
+**Deferred (collaborative — coupled / feel-sensitive):** K3 (rich @-mention prose in-room + about-population), K4-UI (known-view render + knowers-filtered sidebar), K5 (graph knowledge-mode + "+ new circle" + known-view lens), K6 (element-detail "known by" surfacing).
+
+**727 vitest + 129 Playwright + typecheck + production build green.** No behavior changes outside the new room. Conventions #67–72 (in `DESIGN_KNOWLEDGE.md`; conservator dropped). Not committed (Captain's hand).
+
+### Smoke checklist (Captain — pending visual test)
+1. **Room + nav**: open a world → **Knowledge** open-book icon between Writing and Timeline → empty state sits cleanly under the header.
+2. **Draft flow**: "+ new knowledge entry" → draft editor (URL `/knowledge/new`). Fill name + prose, set Character/Circles — **nothing is saved yet** (no sync countdown). **cancel** → list still empty. **create** → persists once, opens the saved entry.
+3. **Held-by**: Character (narrator, single) + Circles (collectives, multi). No Institution row. Chips link out; × removes.
+4. **Saved-entry edit**: name/prose save on blur (no jarring re-render while typing); held-by edits apply immediately; **About "+ add subject"** picks any element (not a collective — those are holders) and links it as a subject; chips are cyan pills, click to open, × to remove; "all fields →" opens the full editor.
+5. **List**: entries show "held by N"; back link + nav return to list.
 
 ---
 

@@ -44,6 +44,7 @@ export type RouteMode =
   | 'map'
   | 'timeline'
   | 'writing'
+  | 'knowledge'
   | 'search'
   | 'publish'
   | 'publish-detail'
@@ -87,6 +88,8 @@ export interface Route {
    * parse — parseHash picks the deepest segment as narrativeId.
    */
   narrativeId?: string;
+  /** Knowledge room selected entry id (knowledge-subtype narrative). */
+  knowledgeId?: string;
   /** Publish detail room. */
   showcaseId?: string;
   /** Search room query string. */
@@ -143,6 +146,10 @@ export function parseHash(hash: string): Route {
     }
     if (sub === 'elements') return { worldId, mode: 'elements' };
     if (sub === 'timeline') return { worldId, mode: 'timeline' };
+    if (sub === 'knowledge') {
+      const knowledgeId = parts[3];
+      return knowledgeId ? { worldId, mode: 'knowledge', knowledgeId } : { worldId, mode: 'knowledge' };
+    }
     if (sub === 'search') return { worldId, mode: 'search', searchQuery: params.q ?? '' };
     if (sub === 'import') return { worldId, mode: 'import' };
     if (sub === 'templates') return { worldId, mode: 'templates' };
@@ -241,6 +248,13 @@ export function writingHash(worldId: string, narrativeId?: string): string {
   return narrativeId
     ? `#/w/${worldId}/writing/${narrativeId}`
     : `#/w/${worldId}/writing`;
+}
+
+/** Knowledge room: `#/w/<worldId>/knowledge[/<knowledgeId>]`. */
+export function knowledgeHash(worldId: string, knowledgeId?: string): string {
+  return knowledgeId
+    ? `#/w/${worldId}/knowledge/${knowledgeId}`
+    : `#/w/${worldId}/knowledge`;
 }
 
 export function searchHash(worldId: string, query?: string): string {

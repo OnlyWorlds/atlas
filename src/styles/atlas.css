@@ -6843,11 +6843,267 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-publish-room,
 .atlas-import-room,
 .atlas-templates-room,
+.atlas-knowledge-room,
 .atlas-publish-detail {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
 }
+
+/* Knowledge room (DESIGN_KNOWLEDGE.md — Track A skeleton) */
+.atlas-knowledge-new {
+  margin: 0 24px 4px 24px;
+  align-self: flex-start;
+}
+
+.atlas-knowledge-empty {
+  padding: 4px 24px 24px 24px;
+  max-width: 620px;
+}
+
+.atlas-knowledge-empty-title {
+  font-size: 13px;
+  color: var(--atlas-text);
+  margin: 0;
+}
+
+.atlas-knowledge-hint {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.atlas-knowledge-list {
+  padding: 8px 24px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atlas-knowledge-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--atlas-bg-panel);
+  border: 1px solid var(--atlas-divider);
+  border-radius: 4px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--atlas-text);
+}
+
+.atlas-knowledge-row:hover {
+  border-color: var(--atlas-cyan-soft);
+}
+
+.atlas-knowledge-row-icon {
+  font-size: 20px;
+  color: var(--atlas-text-muted);
+  flex-shrink: 0;
+}
+
+.atlas-knowledge-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.atlas-knowledge-row-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.atlas-knowledge-row-meta {
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+}
+
+/* Knowledge detail (K2) */
+.atlas-knowledge-back {
+  align-self: flex-start;
+  margin: 0 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.atlas-knowledge-detail-titlerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 24px;
+}
+
+.atlas-knowledge-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 12px 24px 28px 24px;
+  max-width: 760px;
+}
+
+.atlas-knowledge-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--atlas-text-muted);
+  margin: 0 0 2px 0;
+}
+
+.atlas-knowledge-section-hint {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  margin: 0 0 10px 0;
+}
+
+.atlas-knowledge-holder-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid var(--atlas-divider);
+}
+
+.atlas-knowledge-holder-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.atlas-knowledge-holder-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.atlas-knowledge-holder-hint {
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-knowledge-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.atlas-knowledge-chip {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid var(--atlas-cyan-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.atlas-knowledge-chip-body {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 10px;
+  color: var(--atlas-text);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.atlas-knowledge-chip-body .material-symbols-outlined {
+  font-size: 15px;
+  color: var(--atlas-cyan);
+}
+
+.atlas-knowledge-chip-body:hover { color: var(--atlas-cyan); }
+.atlas-knowledge-chip-body:disabled { cursor: default; opacity: 0.6; }
+
+.atlas-knowledge-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px 3px 3px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+}
+
+.atlas-knowledge-chip-remove .material-symbols-outlined { font-size: 13px; }
+.atlas-knowledge-chip-remove:hover { color: var(--atlas-danger, #e06c75); }
+
+.atlas-knowledge-add {
+  font-size: 12px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px dashed var(--atlas-divider);
+  border-radius: 4px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+}
+
+.atlas-knowledge-add:hover {
+  color: var(--atlas-cyan);
+  border-color: var(--atlas-cyan-soft);
+}
+
+.atlas-knowledge-none {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  margin: 0;
+}
+
+/* Editor form (K2 redesign): name input, prose textarea, draft actions, all-fields link */
+.atlas-knowledge-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.atlas-knowledge-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-knowledge-name {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.atlas-knowledge-prose {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--atlas-text);
+  background: var(--atlas-bg-panel);
+  border: 1px solid var(--atlas-divider);
+  border-radius: 4px;
+  padding: 12px 14px;
+}
+
+.atlas-knowledge-prose:focus {
+  outline: none;
+  border-color: var(--atlas-cyan-soft);
+}
+
+.atlas-knowledge-draft-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.atlas-knowledge-allfields {
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.atlas-knowledge-allfields:hover { color: var(--atlas-cyan); }
 
 .atlas-publish-empty,
 .atlas-import-body {
