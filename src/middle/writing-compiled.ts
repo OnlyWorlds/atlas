@@ -236,7 +236,24 @@ function buildSectionMarker(
  * Returns a single wrapping <div class="atlas-writing-compiled-prose">.
  * Anything not recognized falls through as escaped text — safe but visible.
  */
-export function renderProseFragment(markdown: string, elements: Map<string, Element>): HTMLElement {
+export interface ProseRenderOptions {
+  /**
+   * How to render an ow:// link whose target ISN'T in the elements map.
+   *   - 'chip' (default): label-fallback chip — the writing compiled view,
+   *     where a missing target means deleted-but-still-referenced.
+   *   - 'text': plain escaped text, no chip styling, no data-id — sharing
+   *     surfaces, where a missing target means NOT DISCLOSED (contract §5.1:
+   *     non-disclosure must leak nothing, not even styling).
+   */
+  unresolved?: 'chip' | 'text';
+}
+
+export function renderProseFragment(
+  markdown: string,
+  elements: Map<string, Element>,
+  opts: ProseRenderOptions = {},
+): HTMLElement {
+  const unresolved = opts.unresolved ?? 'chip';
   const wrap = document.createElement('div');
   wrap.className = 'atlas-writing-compiled-prose';
   if (markdown.trim().length === 0) return wrap;
@@ -253,7 +270,7 @@ export function renderProseFragment(markdown: string, elements: Map<string, Elem
       const level = heading[1].length;
       const hTag = `h${level}`;
       const el = document.createElement(hTag);
-      el.innerHTML = renderInline(heading[2], elements);
+      el.innerHTML = renderInline(heading[2], elements, unresolved);
       wrap.appendChild(el);
       continue;
     }
@@ -268,7 +285,7 @@ export function renderProseFragment(markdown: string, elements: Map<string, Elem
     if (block.startsWith('>')) {
       const bq = document.createElement('blockquote');
       const lines = block.split(/\r?\n/).map(l => l.replace(/^>\s?/, ''));
-      bq.innerHTML = renderInline(lines.join(' '), elements);
+      bq.innerHTML = renderInline(lines.join(' '), elements, unresolved);
       wrap.appendChild(bq);
       continue;
     }
@@ -279,7 +296,7 @@ export function renderProseFragment(markdown: string, elements: Map<string, Elem
       const items = block.split(/\r?\n/).filter(l => /^([-*+])\s+/.test(l));
       for (const line of items) {
         const li = document.createElement('li');
-        li.innerHTML = renderInline(line.replace(/^([-*+])\s+/, ''), elements);
+        li.innerHTML = renderInline(line.replace(/^([-*+])\s+/, ''), elements, unresolved);
         ul.appendChild(li);
       }
       wrap.appendChild(ul);
@@ -292,7 +309,7 @@ export function renderProseFragment(markdown: string, elements: Map<string, Elem
       const items = block.split(/\r?\n/).filter(l => /^\d+\.\s+/.test(l));
       for (const line of items) {
         const li = document.createElement('li');
-        li.innerHTML = renderInline(line.replace(/^\d+\.\s+/, ''), elements);
+        li.innerHTML = renderInline(line.replace(/^\d+\.\s+/, ''), elements, unresolved);
         ol.appendChild(li);
       }
       wrap.appendChild(ol);
@@ -301,7 +318,7 @@ export function renderProseFragment(markdown: string, elements: Map<string, Elem
 
     // Paragraph — collapse internal newlines into spaces for prose flow.
     const p = document.createElement('p');
-    p.innerHTML = renderInline(block.replace(/\r?\n/g, ' '), elements);
+    p.innerHTML = renderInline(block.replace(/\r?\n/g, ' '), elements, unresolved);
     wrap.appendChild(p);
   }
 
@@ -314,12 +331,22 @@ export function renderProseFragment(markdown: string, elements: Map<string, Elem
  * matters: ow:// links matched BEFORE generic links so chips render with the
  * .atlas-element-chip styling instead of as plain anchors.
  */
-function renderInline(raw: string, elements: Map<string, Element>): string {
+function renderInline(
+  raw: string,
+  elements: Map<string, Element>,
+  unresolved: 'chip' | 'text' = 'chip',
+): string {
   let s = escapeText(raw);
 
-  // ow:// chip links: [Label](ow://type/uuid)
+  // ow:// chip links: [Label](ow://type/uuid). Unresolved targets render per
+  // the caller's mode: 'chip' keeps a label-fallback chip (writing compiled
+  // view — missing = deleted-but-referenced); 'text' renders plain text with
+  // no styling and no data-id (sharing — missing = NOT DISCLOSED, contract
+  // §5.1: non-disclosure must leak nothing).
   s = s.replace(/\[([^\]]+?)\]\(ow:\/\/([a-z-]+)\/([\w-]+)\)/gi, (_, label, type, id) => {
     const el = elements.get(id);
+    // `label` was captured from the already-escaped string — return as-is.
+    if (!el && unresolved === 'text') return label;
     const displayLabel = el?.name ?? label;
     return `<span class="atlas-element-chip" data-id="${escapeAttr(id)}" data-type="${escapeAttr(type)}">${escapeText(displayLabel)}</span>`;
   });

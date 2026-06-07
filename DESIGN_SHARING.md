@@ -1,7 +1,7 @@
 # Atlas — Sharing Design
 
-**Version**: 1.1 (2026-06-07) — the 5 OPEN calls CLOSED (session 237); S1 + S2 built
-**Status**: Share room + block builder (heading / prose / element-card) + visitor preview SHIPPED (session 237, atlas-side, no backend). The atlas↔backend contract is drafted at **`SHARING_CONTRACT.md`** — route to Anchor via Captain. S4 (publish flow) deliberately unbuilt until the contract settles; S3 (theme tokens) + S5 (Circle block) + Track C (viewer tool) next.
+**Version**: 1.2 (2026-06-07, session 238) — contract v0.2 AGREED (Anchor review + Captain sign-off); payload builder + S4 publish flow BUILT fakes-first
+**Status**: S1+S2 shipped (237). Session 238: Anchor's feasibility review accepted in full — **v1 is FROZEN-ONLY (live World Showcase deferred to post ow.com rebuild)**, quota 10/account, slug immutable after publish, CF-edge-cached public reads (onlyworlds.com confirmed already CF-proxied). `SHARING_CONTRACT.md` v0.2 is the agreed shape. Atlas-side: **`buildPagePayload()`** (§5, test-locked) · visitor preview renders FROM the payload (disclosure-true) · copy-payload affordance · **S4 publish/republish/revoke UI built against MSW fakes that encode the contract** (`tests/msw-sharing-handlers.ts` + `src/sync/sharing-client.ts`) — integration with Anchor's slice = point `SHARING_BASE_URL` at her base path and run the suite. Next: S5 Circle block · CF mini-design (joint w/ Anchor) · Track C viewer scaffold · S3 themes.
 **Related**: `DESIGN_KNOWLEDGE.md` (the foundation Sharing consumes), `DESIGN.md` (rooms), `DESIGN_WRITING.md` (narrative authoring), `SHARING_CONTRACT.md` (backend contract draft)
 
 > **Supersedes `DESIGN_PUBLISHING.md`.** That doc was built on the dead write-tool prototype's assumptions (atlas = thin client, reuse the old showcase API as-is, one-showcase-per-element, opaque `showcase_config`). Nobody used the prototype; nothing to migrate. We start fresh — Anchor builds whatever Django model the design needs.
@@ -35,8 +35,8 @@ Everything is a **page**. Pages differ on one axis: **how they're sourced.**
 
 | Kind | Intent | Source | Live / snapshot |
 |---|---|---|---|
-| **World Showcase** | Publish | the world itself (curated front door) | **live**, auto-updates, **one per world** |
-| **Page** | Show / Reference / Publish | hand-composed blocks (elements, prose, map, narrative, **Circle**) | **snapshot** (frozen = safe), many per world, quota'd |
+| **World Showcase** | Publish | the world itself (curated front door) | **live**, auto-updates, **one per world** — ⚠ DEFERRED to post ow.com rebuild (Anchor review §3.1); v1 showcase = a frozen page you republish |
+| **Page** | Show / Reference / Publish | hand-composed blocks (elements, prose, map, narrative, **Circle**) | **snapshot** (frozen = safe), quota'd (10/account, contract v0.2) |
 
 - **Frozen = the safety feature.** A snapshot page never leaks the DM's later prep edits to players holding the link. The research is emphatic this matters.
 - **The Circle block collapses "Reference pages" into the general model.** "Publish for the party" = a Page containing a **Circle block** (a knower's compiled knowledge, from `DESIGN_KNOWLEDGE.md`). So there's no separate "Circle Reference" page kind — just a Page with a Circle block. Two page kinds, one block set.
@@ -136,7 +136,8 @@ Settled with Captain from `PHASE_SHARING_BRIEF.md` (kept as the decision record)
 
 - **Phase 2 (after Knowledge):** World Showcase + Pages, the block/token builder, snapshot publish → Anchor's Django model → clean URL + custom slug, the viewer tool, a Sharing room in atlas (list/manage, copy link, republish, revoke, preview-as-visitor).
   - **S1 + S2 SHIPPED (session 237)**: share room (`#/w/<id>/share[/<pageId>]`, legacy `/publish` aliases), page CRUD (create-with-unique-name, rename, intent, delete-with-confirm), block builder (heading + prose + element-card; one-block-at-a-time editing; reorder/delete; TipTap prose via lazy `share-editor` chunk; per-field disclosure checklist on full cards), **visitor preview** via the portable `share-page-render.ts` (the Track C seed), sync round-trip test-locked (`sharing-sync.test.ts`: id-swap heal + strip + pull-overlay).
-  - **Next**: contract to Anchor → S3 theme tokens · Track C viewer scaffold (after payload lock) · S4 publish flow (backend-blocked) · S5 Circle block.
+  - **PAYLOAD + S4 SHIPPED fakes-first (session 238)**: `core/share-payload.ts` (`buildPagePayload()` — §5 wire shape, schema_version, disclosure tokens, dangling-ref drop, refs-mirror healing; 9 unit tests) · visitor preview now renders **from the payload** (`renderPayloadPage` in share-page-render — author preview ≡ served page; prose `ow://` to non-included targets renders PLAIN TEXT via `renderProseFragment`'s `unresolved:'text'` mode) · copy-payload button (`data_object`) · **publish section** (slug input w/ `suggestSlug` + local validation · publish / republish / revoke · `atlas_page_pub` mirror field for offline display · gated: api-linked worlds only) · `src/sync/sharing-client.ts` (typed §4 client, error-code enum mapping) · `tests/msw-sharing-handlers.ts` (stateful fakes encoding contract v0.2: slug rules + reserved list, global uniqueness, own-tombstone revival, quota 10, slug immutability, 256KB cap, admin_locked) · 15 integration tests. **Backend integration = point `SHARING_BASE_URL` at Anchor's base path.**
+  - **Next**: S5 Circle block · CF mini-design (Temper half: viewer domain + Function meta-injection) · Track C viewer scaffold (renders §5 payloads — `renderPayloadPage` is the seed) · S3 theme tokens · reconcile-from-server list (share room currently trusts the local `atlas_page_pub` mirror; `listForWorld` exists for a future reconcile pass).
 - **Phase 2.5:** the Circle block + "publish for a Circle" bridge.
 - **Phase 3:** live reveal-by-group, graduated map reveal, depth-aware disclosure, theming polish.
 
@@ -148,7 +149,7 @@ Settled with Captain from `PHASE_SHARING_BRIEF.md` (kept as the decision record)
 - **#74 — Blocks are the page's source of truth; `story` is a derived mirror.** Every blocks save goes through `pageBlocksPatch()` which writes blocks + refs mirror + compiled story in one patch. Nothing else writes a page's `story`.
 - **#75 — The refs mirror keeps card bindings id-swap-safe.** `atlas_page_refs` = element-card ids in block order (flat array → handled by `rewriteIdReferences`); `blocksOf()` heals each card's nested id from the mirror positionally. Never read `atlas_page_blocks` raw for rendering — always via `blocksOf()`.
 - **#76 — Page prose never derives relations.** Mentions/chips in page prose are presentation; no Involves writes, no holder semantics. The page's element bindings are its element-card blocks (mirrored in refs).
-- **#77 — Page writes are serialized per room mount** (a promise chain): two rapid edits on the same element race inside FolderStore's read-merge-write and silently lose the first field otherwise.
+- **#77 — Page writes are serialized per room mount** (a promise chain): two rapid edits on the same element race inside FolderStore's read-merge-write and silently lose the first field otherwise. *(Session 238: the store now also serializes per-id at the boundary — convention #79 in DESIGN.md — covering every room. The room chain remains: its await discipline additionally guarantees whole-block-array patches are computed from post-write state, which a store-level chain can't provide. Page deletes route through the same room chain so queued writes land before the file disappears.)*
 - **#78 — `share-page-render.ts` stays store-free.** It takes resolved data (an elements Map) and returns DOM — the visitor preview and the future viewer tool share it. No imports from state/store/sync, ever.
 
 ---

@@ -1,80 +1,86 @@
 # Sharing Backend Contract — atlas ↔ onlyworlds.com
 
-**Status**: DRAFT v0.1 (2026-06-07, session 237) — for Captain review, then Anchor.
-**Owner pairing**: Temper (atlas + viewer tool) · Anchor (Django backend). Skeld is the present API expert for schema questions while Anchor is dormant.
-**Context docs**: `DESIGN_SHARING.md` (the design), `core/sharing.ts` (the block model as built and tested).
+**Status**: v0.2 (2026-06-07, session 238) — **AGREED SLICE**. v0.1 reviewed by Anchor (`SHARING_FEASIBILITY_ANCHOR.md`, ow.com repo); all four of her §3 calls + §4 answers accepted by Captain, plus one atlas-side addition (slug immutability). Remaining open items are §8 (small, Anchor's call).
+**Owner pairing**: Temper (atlas + viewer tool) · Anchor (Django backend).
+**Context docs**: `DESIGN_SHARING.md` (the design), `core/sharing.ts` (the block model as built and tested), Anchor's feasibility review (the deployment ground truth).
 
-This is the coordination artifact for Sharing Phase 2 (same data-contract pattern as the Skeld DCC collaboration: the contract IS the coordination). Everything atlas-side that this contract assumes is **already built and test-locked**; everything backend-side is **proposed** — Anchor owns the implementation shape and may push back on any of it.
+This is the coordination artifact for Sharing Phase 2. Everything atlas-side that this contract assumes is **built and test-locked**; the backend slice below is **agreed shape** — Anchor owns implementation detail and §8.
 
 ---
 
-## 1. What this enables (one paragraph)
+## 1. What v1 enables (one paragraph)
 
-Atlas users compose **pages** — ordered stacks of blocks (heading / prose / element-card; later map, collection, circle) — and publish them to a public URL: `show.onlyworlds.com/<slug>`. A published page is by default a **frozen snapshot** (safe: later world edits never leak to link-holders). One page per world may be flagged **live** (the World Showcase — auto-reflects current data). A lightweight read-only **viewer tool** (Temper builds it; CF Pages + a meta-injection Function) renders the payloads.
+Atlas users compose **pages** — ordered stacks of blocks (heading / prose / element-card; later map, collection, circle) — and publish them to a public URL: `show.onlyworlds.com/<slug>`. A published page is a **frozen snapshot** (safe: later world edits never leak to link-holders; **all of v1 is frozen-only** — see §6). Updating = republish, one button. A lightweight read-only **viewer tool** (Temper; CF Pages + a meta-injection Function) renders the payloads. Public reads are served from the **Cloudflare edge** (§7) so anonymous traffic never competes with members' API calls for PythonAnywhere workers.
 
-## 2. Decisions already locked (atlas-side, sessions 234–237)
+## 2. Decisions locked (v0.1 + Anchor review + Captain sign-off, sessions 234–238)
 
 | Decision | Value |
 |---|---|
 | Page storage in the world | prose/composition = a Narrative `subtype: "page"`; composition config in atlas-local fields (never hits worldapi); canonical `story` = derived plain-markdown mirror |
 | Block model v1 | `heading` / `prose` / `element-card` — extensible without migration |
-| Slug namespace | **global** (`show.onlyworlds.com/<slug>`), uniqueness enforced at publish |
-| Auth | `api_key` + PIN, identical to worldapi — no new auth concept |
-| Revoke | **tombstone** — content deleted, row + slug retained, public URL serves a 410-style "no longer shared"; prevents slug takeover |
-| Showcase ↔ Page | **one model** — a page flagged `is_live`, unique per world |
+| **Live pages** | **DEFERRED entirely — v1 is frozen-only** (Anchor §3.1). `is_live` stays in the schema as a reserved column, default false, unused. The "World Showcase" v1 = a frozen page you republish |
+| Slug namespace | **global** (`show.onlyworlds.com/<slug>`), uniqueness enforced at publish, **min length 4**, `[a-z0-9-]`, max 40, no leading/trailing `-` |
+| **Slug immutability** | **v1 disallows slug change after publish** (atlas D1). Renaming a page's URL = revoke + republish to a new slug; the old slug stays an owner-held tombstone. No silent release → no takeover surface. `PATCH` may change `title`/`intent`/`payload` only |
+| Auth | `api_key` + PIN, identical to worldapi (`world_api_auth`) — no new auth concept |
+| Revoke | **tombstone** — payload deleted, row + slug retained, public URL serves 410; owner may republish to their own tombstoned slug. **Plus `admin_locked`** (Anchor §3.3): admin takedown that also blocks owner republish — the slug is burned |
+| Quota | **10 active pages per ACCOUNT** (not per world — Anchor §4.2). Revoked don't count. Raise later is trivial |
+| Throttles | per-account publish limit (~10/hr, squatting + abuse) · **per-IP throttle on the public GET** (required in v1 — the endpoint is otherwise a DoS amplifier) |
+| Showcase ↔ Page | one model — `is_live` flag reserved for post-rebuild; one-live-per-world constraint ships in the schema, dormant |
 | Disclosure | snapshot contains ONLY chosen content; cross-references to non-included elements are pre-resolved to plain text (permission chaining for free) |
+| `view_count` | best-effort, inline `F()+1` on cache-miss only; CDN caching undercounts and that's accepted. No task queue |
+| World DELETE | hard-deletes its pages (CASCADE). Frees the slugs — acceptable for a rare, deliberate, destructive act |
+| Old showcase prototype | **frozen as-is** (Anchor §3.4a); eventual redirect-to-retired-notice; no migration (nobody used it) |
 
-## 3. Proposed Django model
+## 3. Django model (Anchor §5 — agreed)
 
 ```python
-class SharedPage(models.Model):
-    id           = models.UUIDField(primary_key=True, default=uuid7)
-    world        = models.ForeignKey(World, on_delete=models.CASCADE, related_name="shared_pages")
-    slug         = models.SlugField(max_length=40, unique=True)   # GLOBAL namespace
-    title        = models.CharField(max_length=200)
-    intent       = models.CharField(max_length=10, choices=[("show",)*2, ("reference",)*2, ("publish",)*2])
-    payload      = models.JSONField(null=True)    # §5; null after revoke (tombstone)
-    is_live      = models.BooleanField(default=False)             # World Showcase flag
-    revoked      = models.BooleanField(default=False)
-    view_count   = models.PositiveIntegerField(default=0)
-    published_at = models.DateTimeField(auto_now_add=True)
-    updated_at   = models.DateTimeField(auto_now=True)
+class SharedPage(AbstractBaseModel):           # base provides created_at/updated_at
+    id            = UUIDField(pk, default=uuid7)
+    world         = FK(World, on_delete=CASCADE, related_name="shared_pages")
+    slug          = SlugField(max_length=40, unique=True)      # global; min length 4 in API
+    title         = CharField(max_length=200)
+    intent        = CharField(max_length=10)                   # advisory metadata ONLY (§5)
+    payload       = JSONField(null=True)                       # §5; null after revoke (tombstone)
+    revoked       = BooleanField(default=False, db_index=True)
+    admin_locked  = BooleanField(default=False)                # takedown; blocks owner republish
+    view_count    = PositiveIntegerField(default=0)
+    is_live       = BooleanField(default=False)                # RESERVED, unused in v1
+    published_at  = DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            # At most one live page (the World Showcase) per world.
-            models.UniqueConstraint(fields=["world"], condition=Q(is_live=True, revoked=False),
-                                    name="one_live_page_per_world"),
-        ]
+        indexes = [Index(fields=["world", "-published_at"])]
+        constraints = [UniqueConstraint(fields=["world"],
+                       condition=Q(is_live=True, revoked=False),
+                       name="one_live_page_per_world")]
 ```
-
-**Quota**: max **20** active (non-revoked, non-live) pages per world, enforced at publish. Revoked rows don't count. The live showcase sits outside the quota. (Number negotiable.)
-
-**Slug rules**: `[a-z0-9-]`, 3–40 chars, no leading/trailing `-`. Reserved list (Anchor's call): `api`, `assets`, `admin`, `about`, `static`, … Owner keeps a revoked slug — republishing to it un-tombstones (sets `revoked=False`, new payload). Only non-owners are blocked from a taken slug, revoked or not.
 
 ## 4. Endpoints
 
-All under e.g. `/api/sharing/` (Anchor's call). Authenticated calls use the worldapi headers (`API-Key` + `API-Pin`); the world association derives from the key.
+Base path is Anchor's call (§8.1). Authenticated calls use the worldapi headers (`API-Key` + `API-Pin`); world association derives from the key.
 
 | Method + path | Auth | Behavior |
 |---|---|---|
-| `POST /pages/` | yes | Publish. Body: `{slug, title, intent, payload, is_live?}`. 201 → `{id, slug, url}`. 409 slug taken · 4xx quota exceeded (with `{"error": {"code": "quota_exceeded"}}`) · slug-format 400 |
-| `GET /pages/<slug>/` | **none** (public) | The viewer's fetch. Active → 200 payload envelope (§5). Revoked → **410** `{"error": {"code": "revoked"}}`. Unknown → 404. Increments `view_count` (best-effort; caching may batch). For `is_live` pages: resolve current data server-side (§6) |
-| `PATCH /pages/<id>/` | yes | Republish: replace `payload` / `title` / `intent` / `slug` (re-validated) / `is_live` |
+| `POST /pages/` | yes | Publish. Body: `{slug, title, intent, payload}`. 201 → `{id, slug, url}`. Errors: 409 `slug_taken` · 400 `slug_invalid` · 4xx `quota_exceeded` · 400 `payload_too_large` (256KB, measured on serialized JSON server-side) |
+| `GET /pages/<slug>/` | **none** (public) | The viewer's fetch. Active → 200 envelope (§5.2) with `Cache-Control: public, max-age=…` + ETag (§7). Revoked/admin-locked → **410** `{"error":{"code":"revoked"}}`. Unknown → 404. `view_count` increments best-effort on cache-miss |
+| `PATCH /pages/<id>/` | yes | Republish: replace `payload` / `title` / `intent`. **Slug NOT changeable** (§2). Rejected if `admin_locked` |
 | `DELETE /pages/<id>/` | yes | Revoke (tombstone): `payload=None, revoked=True`. 204. Idempotent |
 | `GET /pages/?world=<id>` | yes | List own pages incl. revoked (atlas's share-room management list) |
 | `GET /slug-check/?slug=` | yes | `{available: bool}` — pre-publish UX nicety |
 
+**Error shape everywhere**: `{"error": {"code": "<machine_code>", "detail": "<human text>"?}}`. Proposed code enum: `slug_taken`, `slug_invalid`, `quota_exceeded`, `payload_too_large`, `revoked`, `not_found`, `rate_limited`, `admin_locked`. (Confirm/edit: §8.3.)
+
 ## 5. The payload (the viewer's input contract)
 
-Produced by atlas at publish time from the page's block stack (`core/sharing.ts` shapes, as built). Self-contained: the viewer renders it with zero further fetches (frozen pages).
+Produced by atlas at publish time from the page's block stack (`core/sharing.ts` shapes, as built; builder function `buildPagePayload()` — session 238+). Self-contained: the viewer renders it with zero further fetches.
+
+### 5.1 Payload body
 
 ```jsonc
 {
-  "version": 1,
+  "schema_version": 1,               // the PAYLOAD schema version — viewer branches on this
   "title": "barovia primer",
-  "intent": "reference",
-  "theme": {},                       // reserved — ~6 tokens land with S3 (accent, font pair, light/dark, density, cover, width)
+  "intent": "reference",             // advisory only — drives viewer chrome + OG flavor, never server behavior
+  "theme": {},                       // reserved — ~6 tokens land with S3
   "blocks": [
     { "id": "…", "kind": "heading", "text": "The Domain", "level": 1 },
     { "id": "…", "kind": "prose",   "markdown": "The mists never lift. [Ireena](ow://character/<id>) hides." },
@@ -94,34 +100,81 @@ Produced by atlas at publish time from the page's block stack (`core/sharing.ts`
 }
 ```
 
-**Relation-value encoding rule** (the disclosure mechanic): inside `elements[*].fields`, relation values are arrays of tokens `{ "text": "<display name>", "ref": "<element-id>"? }`. `ref` is present **only when that element is itself included** in `elements` (viewer renders a link); otherwise the token is plain text — a non-included element leaks nothing but a name the author chose to show. Prose `ow://` links follow the same rule at render time: target in `elements` → link/chip, else plain text.
+**Relation-value encoding rule** (the disclosure mechanic — unchanged from v0.1, Anchor-approved): inside `elements[*].fields`, relation values are arrays of tokens `{ "text": "<display name>", "ref": "<element-id>"? }`. `ref` is present **only when that element is itself included** in `elements` (viewer renders a link); otherwise the token is plain text. Prose `ow://` links follow the same rule at render time: target in `elements` → link/chip, else **plain text** (no chip styling, no data-id — non-disclosure means non-disclosure).
 
-**Size guard**: payloads should stay small (text + refs; images are URLs, never binaries). Suggest a server-side cap (e.g. 256 KB) with a clear 400.
+### 5.1.1 Worked example (generated shape — locked by `tests/unit/share-payload.test.ts`)
 
-## 6. Live pages (the World Showcase)
+A page with one full Ireena card (fields: `description`, `birthplace`, `friends`) and one compact Ismark card, where Vallaki is NOT included:
 
-Same model, same endpoints — `is_live=True` changes the **sourcing** of `GET /pages/<slug>/`:
+```jsonc
+{
+  "schema_version": 1,
+  "title": "barovia primer",
+  "intent": "reference",
+  "theme": {},
+  "blocks": [
+    { "id": "b1", "kind": "element-card", "elementId": "<ireena>", "variant": "full",
+      "fields": ["description", "birthplace", "friends"] },
+    { "id": "b2", "kind": "element-card", "elementId": "<ismark>", "variant": "compact", "fields": [] }
+  ],
+  "elements": {
+    "<ireena>": {
+      "name": "Ireena", "type": "character", "image_url": "https://…",
+      "fields": {
+        "description": "The burgomaster's daughter.",
+        "birthplace": [ { "text": "Vallaki" } ],                   // NOT included → text only
+        "friends":    [ { "text": "Ismark", "ref": "<ismark>" } ]  // included → linkable
+      }
+    },
+    "<ismark>": { "name": "Ismark", "type": "character", "fields": {} }   // compact = identity only
+  }
+}
+```
 
-- The stored `payload` of a live page contains blocks + the element-card configs, but its `elements` map is treated as STALE.
-- At GET time the server re-resolves `elements` from current world data: for each element-card, fetch the element, project the chosen `fields`, apply the relation-encoding rule (§5) against the included-id set.
-- Response envelope is identical to the frozen case — **one viewer code path**.
+Builder guarantees (all test-locked): prose blocks ship markdown only (no TipTap JSON) · dangling relation ids are DROPPED (disclose nothing) · compact cards contribute no fields · chosen fields project only while still populated · meta/atlas-local fields never appear · card ids are healed from the refs mirror before building (id-swap safety). Atlas's visitor preview renders THIS payload — author preview ≡ served page.
 
-**Open for Anchor**: if server-side resolution is unwelcome (perf/complexity), the fallback is a second public endpoint (`GET /pages/<slug>/elements/`) and the viewer composes. Atlas/viewer can work with either; server-side keeps the viewer dumbest. Caching: live pages want a short TTL (30–60 s?); frozen pages can cache aggressively (invalidate on republish/revoke).
+### 5.2 GET response envelope
 
-## 7. Delivery (Temper's side, for context)
+```jsonc
+{
+  "slug": "barovia-primer",
+  "published_at": "2026-06-07T…",
+  "updated_at": "2026-06-07T…",      // viewer shows "last updated" for trust
+  "payload": { …§5.1… }
+}
+```
 
-- Viewer: new tool on a CF Pages subdomain (e.g. `show.onlyworlds.com`). `_redirects /* /index.html 200`; `_routes.json` excludes `/assets/*`; a Pages Function injects per-page OpenGraph meta (title + intent-flavored description) for unfurls. Verified feasible against current CF docs (session 234).
-- The viewer lifts atlas's portable renderer (`share-page-render.ts` + `renderProseFragment`) — already written store-free for exactly this.
+## 6. Live pages — DEFERRED (post ow.com rebuild)
 
-## 8. Open questions for Anchor
+v1 ships nothing live. When it lands (post-rebuild, with Redis / a real host): the **second-endpoint path** (`GET /pages/<slug>/elements/`, separately and briefly cached) — never inline re-resolution in the hot GET. The schema is already ready (`is_live` + the one-live-per-world constraint). The viewer's render path is identical either way (one envelope shape).
 
-1. §6 live-resolve: server-side projection vs. second endpoint — your call, see trade-off there.
-2. Quota number (20?) and whether it's per-world or per-account.
-3. Slug reserved list + whether you want slug rate-limiting (squatting).
-4. `view_count` semantics under caching (exact vs. best-effort).
-5. Does `DELETE` of the WORLD cascade to its shared pages (suggest: yes, hard-delete — world's gone, tombstones are moot)?
-6. Anything in the payload schema you'd reshape for Django/DRF comfort — the viewer doesn't exist yet, so the wire shape is still cheap to change.
+## 7. Delivery + caching (the piece that makes the economics work)
+
+**Confirmed 2026-06-07**: onlyworlds.com is already Cloudflare-proxied (`Server: cloudflare`, `cf-cache-status: DYNAMIC` — proxied, not yet caching). So:
+
+- **Frozen payloads are immutable between republishes** → Django sets `Cache-Control: public, max-age=<long>` + ETag on the public GET; a CF **Cache Rule** on the GET path caches it at the edge. Anonymous spike traffic (the Reddit moment) is served by Cloudflare and never reaches a PythonAnywhere worker.
+- **Invalidation**: preferred — Django holds a CF zone token and **purges by URL** on republish/revoke (exact + instant). Fallback — a modest TTL (5–15 min) and "updates appear within minutes" honesty. Anchor's call (§8.2).
+- **Viewer**: CF Pages at `show.onlyworlds.com` (same CF zone). `_redirects /* /index.html 200`; `_routes.json` excludes `/assets/*`; a Pages Function injects per-page OpenGraph meta — its server-side payload fetch rides the same edge cache.
+- **Per-IP throttle on the GET** at Django remains required (cache-miss path + cache-bypass attempts).
+- **Durability requirement**: the **public GET path + slug URLs survive the ow.com rebuild unchanged**. This is the contract's most durable line — the viewer and every shared link depend on it.
+
+## 8. Remaining open items (Anchor's call, none blocking atlas work)
+
+1. **Base path** for the endpoint set (`/api/sharing/` vs under worldapi versioning).
+2. **CF purge-by-URL vs TTL-only** invalidation (§7) — purge needs a zone token server-side; TTL needs nothing.
+3. **Error code enum** (§4) — confirm/edit the proposed set.
+4. **Reserved + blocklist** contents (you own it — §3.3 of your review).
+5. Anything in §5 that DRF wants reshaped — the wire is still cheap to change until S4 + the viewer fetch are built against fakes (atlas encodes this contract in MSW handlers first; convention #20).
 
 ---
 
-*Nothing here requires atlas-side rework to adjust — the payload is produced by one function at publish time, and S4 (the publish flow) is unbuilt by design until this contract settles.*
+## Sequence (from Anchor §7, Captain-approved)
+
+1. ✅ Captain decisions (defer-live · 10/account · CF-fronted reads · freeze prototype · slug immutability).
+2. **Anchor builds the §3–§5 slice** (model + migration + endpoints, frozen-only, throttles, cache headers).
+3. **CF mini-design** (Temper + Anchor): Cache Rule + headers + purge — short doc, spans both sides.
+4. **Temper**: payload builder + fakes-first S4 publish flow + viewer fetch locked against §5.
+5. Retire the prototype deliberately (freeze now, redirect later).
+6. **Post-rebuild**: light up `is_live` via the second-endpoint path; Phase-3 disclosure features.
+
+*Atlas-side adjustments for anything above are cheap — the payload is produced by one function at publish time, and S4 builds against fakes that encode THIS document, so a contract change is a fake change + a test run.*

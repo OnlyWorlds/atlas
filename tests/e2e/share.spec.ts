@@ -57,6 +57,11 @@ test('create page → detail; rename + revert both persist; intent change sticks
   await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
   await expect(page.locator('.atlas-share-detail-titlerow h1')).toHaveText('new page');
   await expect(page.locator('input.atlas-share-name')).toHaveValue('new page');
+  await expect(page.locator('[data-action="copy-payload"]')).toBeVisible();
+  // S4 gating: a local-only world can't publish — the section says why and
+  // offers no controls.
+  await expect(page.locator('.atlas-share-publish-hint')).toContainText('online world');
+  await expect(page.locator('[data-action="publish"]')).toHaveCount(0);
 
   // Rename → blur saves; title syncs on the data tick.
   await page.fill('input.atlas-share-name', 'barovia primer');
@@ -237,6 +242,14 @@ test('page prose mentions render chips but NEVER write element fields (no derive
   const pageEl = await getPage(page);
   expect(Array.isArray(pageEl.characters) ? pageEl.characters : []).toHaveLength(0);
   expect(pageEl.story).toContain(araliaId);
+
+  // And in the VISITOR preview (payload-true), the mention renders as plain
+  // text — Aralia isn't card-included, so the prose link discloses nothing
+  // (no chip element, no data-id; contract §5.1).
+  await page.click('.atlas-share-preview-toggle:not([data-action])');
+  const proseView = page.locator('.atlas-share-page-view .atlas-writing-compiled-prose');
+  await expect(proseView).toContainText('All hail Aralia');
+  await expect(proseView.locator('.atlas-element-chip')).toHaveCount(0);
 });
 
 test('element card: pick → compact card; full variant reveals chosen fields; preview renders the visitor view', async ({ page }) => {
@@ -290,16 +303,49 @@ test('element card: pick → compact card; full variant reveals chosen fields; p
   const pageEl = await getPage(page);
   expect(pageEl.atlas_page_refs).toEqual([ireenaId]);
 
-  // Preview: visitor view shows title + card, no builder controls.
-  await page.click('.atlas-share-preview-toggle');
+  // Preview: visitor view shows title + card, no builder controls. The
+  // preview renders FROM THE PUBLISH PAYLOAD (contract §5.1) — Vallaki is
+  // NOT card-included, so Ireena's birthplace renders as PLAIN TEXT (no chip,
+  // no styling: non-disclosure leaks nothing).
+  await page.click('.atlas-share-preview-toggle:not([data-action])');
   await expect(page.locator('.atlas-share-page-view-title')).toBeVisible();
   await expect(page.locator('.atlas-share-page-view .atlas-share-card-name')).toHaveText('Ireena');
   await expect(page.locator('.atlas-share-block-add')).toHaveCount(0);
   await expect(page.locator('.atlas-share-block-controls')).toHaveCount(0);
+  const birthplaceRow = page.locator('.atlas-share-page-view .atlas-share-card-field', { hasText: 'Birthplace' });
+  await expect(birthplaceRow).toContainText('Vallaki');
+  await expect(birthplaceRow.locator('.atlas-share-card-chip')).toHaveCount(0);
+
+  // Back to the builder; card Vallaki too → the disclosure flips: now the
+  // birthplace token carries a ref and renders as a chip.
+  await page.click('.atlas-share-preview-toggle:not([data-action])');
+  await expect(page.locator('.atlas-share-block-add')).toBeVisible();
+  await page.click('.atlas-share-block-add-btn:has-text("element card")');
+  await page.locator('.atlas-picker-row', { hasText: 'Vallaki' }).click();
+  await page.click('.atlas-share-block-done');
+  await page.click('.atlas-share-preview-toggle:not([data-action])');
+  await expect(
+    page.locator('.atlas-share-page-view .atlas-share-card-field', { hasText: 'Birthplace' })
+      .locator('.atlas-share-card-chip'),
+  ).toContainText('Vallaki');
 
   // Back to the builder.
-  await page.click('.atlas-share-preview-toggle');
+  await page.click('.atlas-share-preview-toggle:not([data-action])');
   await expect(page.locator('.atlas-share-block-add')).toBeVisible();
+
+  // "Featured in": the card binding reaches the reverse scan via the flat
+  // atlas_page_refs mirror — Ireena's element detail lists the page, and the
+  // chip routes back to the share room (not the writing room).
+  await page.evaluate((id) => {
+    const m = window.location.hash.match(/#\/w\/([^/]+)/);
+    if (!m) throw new Error('no active world in URL');
+    window.location.hash = `#/w/${m[1]}/element/${id}`;
+  }, ireenaId);
+  const featured = page.locator('.atlas-detail-refs-pages');
+  await expect(featured).toBeVisible();
+  await expect(featured.locator('.atlas-detail-section-header span').first()).toHaveText('Featured in');
+  await featured.locator('.atlas-link-chip', { hasText: 'new page' }).click();
+  await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
 });
 
 test('legacy /publish URL aliases into the share room', async ({ page }) => {

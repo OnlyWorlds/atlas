@@ -140,6 +140,25 @@ describe('refersTo', () => {
     } as unknown as Element;
     expect(refersTo(el, 'target-id')).toBe(false);
   });
+
+  it('detects a page\'s element-card binding via the atlas_page_refs mirror ("Featured in")', () => {
+    // The refs mirror (DESIGN_SHARING #75) is a flat string array on the page
+    // element, so the generic all-fields walk picks it up with zero
+    // page-specific code — a card-bound element shows its pages under
+    // "Featured in". Locked here so a future META_KEYS/scan change can't
+    // silently kill the section.
+    const page = {
+      id: 'p1',
+      type: 'narrative',
+      name: 'barovia primer',
+      subtype: 'page',
+      atlas_page_blocks: [
+        { id: 'b1', kind: 'element-card', elementId: 'target-id', variant: 'compact', fields: [] },
+      ],
+      atlas_page_refs: ['target-id'],
+    } as unknown as Element;
+    expect(refersTo(page, 'target-id')).toBe(true);
+  });
 });
 
 describe('findIncomingReferences', () => {

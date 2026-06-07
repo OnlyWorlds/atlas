@@ -31,10 +31,15 @@ import { escapeText } from '../core/dom-utils';
 import {
   PAGE_SUBTYPE, PAGE_INTENTS, PAGE_INTENT_HINTS, type PageIntent,
   isPageNarrative, listPages, pageIntentOf, blocksOf, blockSummary,
-  findUniquePageName, newBlockId, pageBlocksPatch,
+  findUniquePageName, newBlockId, pageBlocksPatch, pagePubOf,
   type PageBlock, type HeadingBlock, type ProseBlock, type ElementCardBlock,
 } from '../core/sharing';
-import { renderBlockView, renderPageView, populatedCardFields } from './share-page-render';
+import { renderBlockView, renderPayloadPage, populatedCardFields } from './share-page-render';
+import { buildPagePayload } from '../core/share-payload';
+import {
+  SharingClient, SharingApiError, sharingErrorMessage,
+  isValidSlug, suggestSlug, publicUrlFor,
+} from '../sync/sharing-client';
 import { humanizeFieldName } from './element-detail-fields';
 import { pickElement } from '../ui/element-picker-modal';
 import type { Element } from '../core/types';
@@ -138,15 +143,21 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     }
     teardownEditSession();
     navigate(shareHash(worldId));
-    try {
-      await folder.deleteElement(id);
-      await refreshElementsAfterWrite(folder);
-      requestPushIfLinked();
-      toasts.success(`Deleted ${el?.name || 'page'}`);
-    } catch (err) {
-      console.error('[share-room] delete failed', err);
-      toasts.error('Could not delete page');
-    }
+    // Route the delete through the same chain as page writes — a queued
+    // name/intent/block patch lands (or fails) before the file disappears,
+    // instead of throwing "element not found" into a misleading error toast.
+    writeChain = writeChain.then(async () => {
+      try {
+        await folder.deleteElement(id);
+        await refreshElementsAfterWrite(folder);
+        requestPushIfLinked();
+        toasts.success(`Deleted ${el?.name || 'page'}`);
+      } catch (err) {
+        console.error('[share-room] delete failed', err);
+        toasts.error('Could not delete page');
+      }
+    });
+    await writeChain;
   }
 
   // ---- block edit session -----------------------------------------------------
@@ -197,23 +208,31 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     await saveBlocks(pageId, blocks);
   }
 
+  /**
+   * Read an open heading editor's input (it lives in the DOM) and fold it
+   * into the block stack. Returns the save promise, or null when no heading
+   * edit is open. No teardown — callers decide.
+   */
+  function captureHeadingEdit(pageId: string): Promise<void> | null {
+    if (!editingBlockId) return null;
+    const headingInput = blocksHost?.querySelector<HTMLInputElement>('.atlas-share-heading-input');
+    if (!headingInput) return null;
+    const blockId = editingBlockId;
+    const level = headingInput.dataset.level === '2' ? 2 : 1;
+    const text = headingInput.value.trim();
+    const page = elOf(pageId);
+    if (!page) return null;
+    const blocks = blocksOf(page).map(b =>
+      b.id === blockId && b.kind === 'heading' ? { ...b, text: text || 'heading', level: level as 1 | 2 } : b,
+    );
+    return saveBlocks(pageId, blocks);
+  }
+
   /** Commit whatever's open (prose flush / heading input), then close the editor. */
   async function commitOpenEdit(pageId: string): Promise<void> {
     if (!editingBlockId) return;
-    // Heading commit: read the input value directly (it lives in the DOM).
-    const headingInput = blocksHost?.querySelector<HTMLInputElement>('.atlas-share-heading-input');
-    if (headingInput) {
-      const blockId = editingBlockId;
-      const level = headingInput.dataset.level === '2' ? 2 : 1;
-      const text = headingInput.value.trim();
-      const page = elOf(pageId);
-      if (page) {
-        const blocks = blocksOf(page).map(b =>
-          b.id === blockId && b.kind === 'heading' ? { ...b, text: text || 'heading', level: level as 1 | 2 } : b,
-        );
-        await saveBlocks(pageId, blocks);
-      }
-    }
+    const headingSave = captureHeadingEdit(pageId);
+    if (headingSave) await headingSave;
     if (proseMount && proseForBlockId) {
       // Capture the freshest content even if no transaction fired since the
       // last debounce reset.
@@ -237,25 +256,33 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   }
 
   /**
-   * Flush an open prose edit, then tear down. For paths that leave the detail
-   * view without an explicit commit (direct URL change, room unmount).
-   * `flushProseSave` reads its inputs before the first await, so the in-flight
-   * write completes correctly even though teardown follows synchronously.
+   * Flush an open edit (prose OR heading), then tear down. For paths that
+   * leave the detail view without an explicit commit (direct URL change, room
+   * unmount). `flushProseSave` / `captureHeadingEdit` read their inputs before
+   * the first await, so the in-flight write completes correctly even though
+   * teardown follows synchronously.
    */
   function flushAndTeardown(pageId: string | null): void {
-    if (pageId && pageId !== 'list' && proseMount && proseForBlockId) {
-      pendingProseSnap = { markdown: proseMount.getMarkdown(), json: proseMount.getJson() };
-      void flushProseSave(pageId);
+    if (pageId && pageId !== 'list') {
+      if (proseMount && proseForBlockId) {
+        pendingProseSnap = { markdown: proseMount.getMarkdown(), json: proseMount.getJson() };
+        void flushProseSave(pageId);
+      } else {
+        void captureHeadingEdit(pageId); // null when no heading edit is open
+      }
     }
     teardownEditSession();
   }
 
   const onPageHide = (): void => {
-    // Flush an in-flight prose edit on tab close/reload (same idiom as the
-    // knowledge room). The mountedView IS the pageId in detail view.
-    if (proseMount && proseForBlockId && mountedView && mountedView !== 'list') {
+    // Flush an in-flight edit (prose or heading) on tab close/reload — same
+    // idiom as the knowledge room. The mountedView IS the pageId in detail view.
+    if (!mountedView || mountedView === 'list') return;
+    if (proseMount && proseForBlockId) {
       pendingProseSnap = { markdown: proseMount.getMarkdown(), json: proseMount.getJson() };
       void flushProseSave(mountedView);
+    } else {
+      void captureHeadingEdit(mountedView); // best-effort, same as prose
     }
   };
   window.addEventListener('pagehide', onPageHide);
@@ -279,7 +306,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   /** "+ element card": pick the element first, then add + open for configuring. */
   async function addElementCard(pageId: string): Promise<void> {
     await commitOpenEdit(pageId);
-    const picked = await pickElement({ title: 'Add an element card' });
+    // A page can't card itself — exclude it from the pick.
+    const picked = await pickElement({ title: 'Add an element card', excludeIds: [pageId] });
     if (!picked) return;
     const page = elOf(pageId);
     if (!page) return;
@@ -478,7 +506,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     changeBtn.textContent = el ? `element: ${el.name || '(unnamed)'} — change…` : 'pick element…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
-        const picked = await pickElement({ title: 'Bind card to…' });
+        const picked = await pickElement({ title: 'Bind card to…', excludeIds: [pageId] });
         // Re-picking resets the field choice — the old element's fields
         // don't apply to the new one.
         if (picked) await patchCardBlock(pageId, block.id, { elementId: picked.id, fields: [] });
@@ -634,6 +662,214 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     return b;
   }
 
+  // ---- publish (S4 — SHARING_CONTRACT v0.2, fakes-first) ------------------------
+
+  /** The sharing client for the active world, or null when not api-linked. */
+  function sharingClientForActiveWorld(): SharingClient | null {
+    const worldId = wid();
+    const reg = getState().registry;
+    const entry = reg.worlds.find(w => w.id === worldId);
+    if (!entry?.api?.api_key || !reg.pin) return null;
+    return new SharingClient({ apiKey: entry.api.api_key, pin: reg.pin });
+  }
+
+  function surfaceSharingError(err: unknown, fallback: string): void {
+    if (err instanceof SharingApiError) toasts.error(sharingErrorMessage(err));
+    else toasts.error(fallback);
+    console.error('[share-room] sharing api', err);
+  }
+
+  /** Publish (or revive a tombstoned slug) → write the mirror → rebuild. */
+  async function publishPage(pageId: string, slug: string): Promise<void> {
+    const client = sharingClientForActiveWorld();
+    if (!client) return;
+    await commitOpenEdit(pageId);
+    const page = elOf(pageId);
+    if (!page) return;
+    try {
+      const res = await client.publish({
+        slug,
+        title: page.name || '(untitled)',
+        intent: pageIntentOf(page),
+        payload: buildPagePayload(page, getState().data.elements),
+      });
+      const stamp = new Date().toISOString();
+      await patchPage(pageId, {
+        atlas_page_pub: {
+          id: res.id, slug: res.slug, published_at: stamp, updated_at: stamp, revoked: false,
+        },
+      });
+      toasts.success(`Published — ${publicUrlFor(res.slug)}`);
+      buildDetail(pageId);
+    } catch (err) {
+      surfaceSharingError(err, 'Could not publish page');
+    }
+  }
+
+  /** Republish the current composition to the existing slug. */
+  async function republishPage(pageId: string): Promise<void> {
+    const client = sharingClientForActiveWorld();
+    if (!client) return;
+    await commitOpenEdit(pageId);
+    const page = elOf(pageId);
+    const pub = page ? pagePubOf(page) : null;
+    if (!page || !pub) return;
+    try {
+      await client.republish(pub.id, {
+        title: page.name || '(untitled)',
+        intent: pageIntentOf(page),
+        payload: buildPagePayload(page, getState().data.elements),
+      });
+      await patchPage(pageId, {
+        atlas_page_pub: { ...pub, updated_at: new Date().toISOString() },
+      });
+      toasts.success('Republished — the public page is up to date');
+      buildDetail(pageId);
+    } catch (err) {
+      surfaceSharingError(err, 'Could not republish page');
+    }
+  }
+
+  /** Revoke — tombstone on the server; the mirror keeps the slug for revival. */
+  async function revokePage(pageId: string): Promise<void> {
+    const client = sharingClientForActiveWorld();
+    if (!client) return;
+    const page = elOf(pageId);
+    const pub = page ? pagePubOf(page) : null;
+    if (!page || !pub) return;
+    if (!window.confirm(`Revoke "${page.name || 'this page'}"? The public link will show "no longer shared". You keep the slug and can republish it later.`)) return;
+    try {
+      await client.revoke(pub.id);
+      await patchPage(pageId, {
+        atlas_page_pub: { ...pub, revoked: true, updated_at: new Date().toISOString() },
+      });
+      toasts.success('Revoked — the link no longer serves this page');
+      buildDetail(pageId);
+    } catch (err) {
+      surfaceSharingError(err, 'Could not revoke page');
+    }
+  }
+
+  /** The Publish section of the detail view (three states; see DESIGN_SHARING). */
+  function buildPublishSection(page: Element): HTMLElement {
+    const section = document.createElement('section');
+    section.className = 'atlas-share-section atlas-share-publish';
+    section.innerHTML = `<h2 class="atlas-share-section-title">Publish</h2>`;
+
+    const worldId = wid();
+    const entry = getState().registry.worlds.find(w => w.id === worldId);
+    const pub = pagePubOf(page);
+
+    // State 1 — local-only world: publishing needs api credentials.
+    if (!entry?.api?.api_key) {
+      const hint = document.createElement('p');
+      hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
+      hint.textContent = 'Publishing to a public URL needs an online world — use "Make online" in Settings → World first.';
+      section.appendChild(hint);
+      return section;
+    }
+    if (!getState().registry.pin) {
+      const hint = document.createElement('p');
+      hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
+      hint.textContent = 'Set your PIN in Settings → Account to publish.';
+      section.appendChild(hint);
+      return section;
+    }
+
+    // State 3 — published and live.
+    if (pub && !pub.revoked) {
+      const row = document.createElement('div');
+      row.className = 'atlas-share-publish-row';
+      const url = publicUrlFor(pub.slug);
+      const link = document.createElement('a');
+      link.className = 'atlas-share-publish-url';
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = url;
+      row.appendChild(link);
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'atlas-share-block-ctrl';
+      copy.title = 'Copy public link';
+      copy.innerHTML = `<span class="material-symbols-outlined">content_copy</span>`;
+      copy.addEventListener('click', () => {
+        void navigator.clipboard.writeText(url)
+          .then(() => toasts.success('Link copied'))
+          .catch(() => toasts.info(url));
+      });
+      row.appendChild(copy);
+      section.appendChild(row);
+
+      const meta = document.createElement('p');
+      meta.className = 'atlas-share-section-hint';
+      const fmt = (iso: string) => iso ? new Date(iso).toLocaleString() : '?';
+      meta.textContent = `Frozen snapshot — published ${fmt(pub.published_at)} · updated ${fmt(pub.updated_at)}. World edits don't leak until you republish.`;
+      section.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'atlas-share-publish-actions';
+      const repub = document.createElement('button');
+      repub.type = 'button';
+      repub.className = 'atlas-btn-ghost';
+      repub.dataset.action = 'republish';
+      repub.textContent = 'republish';
+      repub.title = 'Push the current composition to the public URL';
+      repub.addEventListener('click', () => { void republishPage(page.id); });
+      actions.appendChild(repub);
+      const rev = document.createElement('button');
+      rev.type = 'button';
+      rev.className = 'atlas-btn-ghost';
+      rev.dataset.action = 'revoke';
+      rev.textContent = 'revoke';
+      rev.title = 'Take the page down — the link shows "no longer shared"; you keep the slug';
+      rev.addEventListener('click', () => { void revokePage(page.id); });
+      actions.appendChild(rev);
+      section.appendChild(actions);
+      return section;
+    }
+
+    // State 2 — not published yet (or revoked → revival path, slug locked in).
+    const hint = document.createElement('p');
+    hint.className = 'atlas-share-section-hint';
+    hint.textContent = pub?.revoked
+      ? 'Revoked — republishing restores this URL with the current composition.'
+      : 'Publish a frozen snapshot to a public URL. Only what the blocks include is shared.';
+    section.appendChild(hint);
+
+    const row = document.createElement('div');
+    row.className = 'atlas-share-publish-row';
+    const prefix = document.createElement('span');
+    prefix.className = 'atlas-share-publish-prefix';
+    prefix.textContent = 'show.onlyworlds.com/';
+    row.appendChild(prefix);
+    const slugInput = document.createElement('input');
+    slugInput.type = 'text';
+    slugInput.className = 'atlas-input atlas-share-slug';
+    slugInput.placeholder = 'your-page-url';
+    slugInput.value = pub?.revoked ? pub.slug : suggestSlug(page.name || '');
+    slugInput.disabled = Boolean(pub?.revoked); // revival reuses the owned slug
+    row.appendChild(slugInput);
+    const publishBtn = document.createElement('button');
+    publishBtn.type = 'button';
+    publishBtn.className = 'atlas-btn-primary atlas-share-publish-btn';
+    publishBtn.dataset.action = 'publish';
+    publishBtn.textContent = pub?.revoked ? 'republish' : 'publish';
+    publishBtn.addEventListener('click', () => {
+      const slug = slugInput.value.trim();
+      if (!isValidSlug(slug)) {
+        toasts.error('Slug must be 4–40 chars: a–z, 0–9, hyphens (not at the edges).');
+        slugInput.focus();
+        return;
+      }
+      publishBtn.disabled = true;
+      void publishPage(page.id, slug).finally(() => { publishBtn.disabled = false; });
+    });
+    row.appendChild(publishBtn);
+    section.appendChild(row);
+    return section;
+  }
+
   // ---- not-found interim ------------------------------------------------------
 
   function renderNotFound(): void {
@@ -774,6 +1010,30 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       })();
     });
     titleRow.appendChild(previewBtn);
+    // Copy the §5 publish payload — inspection/debugging affordance (and the
+    // concrete artifact for backend contract review).
+    const copyPayload = document.createElement('button');
+    copyPayload.type = 'button';
+    copyPayload.className = 'atlas-share-preview-toggle';
+    copyPayload.dataset.action = 'copy-payload';
+    copyPayload.title = 'Copy the publish payload (JSON) to the clipboard';
+    copyPayload.innerHTML = `<span class="material-symbols-outlined">data_object</span> payload`;
+    copyPayload.addEventListener('click', () => {
+      void (async () => {
+        await commitOpenEdit(pageId);
+        const current = elOf(pageId);
+        if (!current) return;
+        const json = JSON.stringify(buildPagePayload(current, getState().data.elements), null, 2);
+        try {
+          await navigator.clipboard.writeText(json);
+          toasts.success('Publish payload copied');
+        } catch {
+          console.info('[share-room] payload (clipboard unavailable):\n' + json);
+          toasts.info('Clipboard unavailable — payload logged to console');
+        }
+      })();
+    });
+    titleRow.appendChild(copyPayload);
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'atlas-share-delete';
@@ -784,14 +1044,12 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     header.appendChild(titleRow);
     root.appendChild(header);
 
-    // Preview mode: the reader's view, nothing else.
+    // Preview mode: the reader's view, rendered FROM THE PUBLISH PAYLOAD —
+    // disclosure-true (contract §5.1). What the author sees here is exactly
+    // what `GET /pages/<slug>/` will serve: non-included elements render as
+    // plain text, included ones chip/link.
     if (previewMode) {
-      const byId = new Map(getState().data.elements.map(e => [e.id, e]));
-      root.appendChild(renderPageView({
-        title: page.name || '(untitled)',
-        blocks: blocksOf(page),
-        elements: byId,
-      }));
+      root.appendChild(renderPayloadPage(buildPagePayload(page, getState().data.elements)));
       return;
     }
 
@@ -838,6 +1096,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     intentField.appendChild(intentSelect);
     body.appendChild(intentField);
 
+    // Publish — S4 (api-linked worlds; frozen-only per contract v0.2).
+    body.appendChild(buildPublishSection(page));
+
     // Blocks — the builder.
     const blocksSection = document.createElement('section');
     blocksSection.className = 'atlas-share-section';
@@ -880,7 +1141,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   function render(): void {
     if (!wid()) {
       root.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
-      teardownEditSession();
+      flushAndTeardown(mountedView); // best-effort flush, same as a view switch
       mountedView = null;
       return;
     }

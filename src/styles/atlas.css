@@ -7817,6 +7817,53 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
   font-size: 15px;
 }
 
+/* ---- Share room: publish section (S4) ---- */
+
+.atlas-share-publish-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.atlas-share-publish-prefix {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  white-space: nowrap;
+}
+
+.atlas-share-slug {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--atlas-mono, monospace);
+  font-size: 12px;
+}
+
+.atlas-share-publish-url {
+  font-family: var(--atlas-mono, monospace);
+  font-size: 12px;
+  color: var(--atlas-accent);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.atlas-share-publish-url:hover {
+  text-decoration: underline;
+}
+
+.atlas-share-publish-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.atlas-share-publish-btn {
+  white-space: nowrap;
+}
+
 /* ---- Notes overlay (src/ui/notes-overlay.ts) — per-world freeform notes ---- */
 
 .atlas-notes-panel {

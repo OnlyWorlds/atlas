@@ -172,6 +172,12 @@ export const ATLAS_LOCAL_EXTENSION_FIELDS = [
   'atlas_page_refs',
   'atlas_page_intent',
   'atlas_page_theme',
+  // Published-state mirror (S4, SHARING_CONTRACT v0.2): `{ id, slug,
+  // published_at, updated_at, revoked }` from the sharing backend, written
+  // after each publish/republish/revoke so the share room can display state
+  // offline. The sharing API rows are the truth; this is a display cache.
+  // Never reaches the OW worldapi.
+  'atlas_page_pub',
 ] as const;
 export type AtlasLocalExtensionField = typeof ATLAS_LOCAL_EXTENSION_FIELDS[number];
 

@@ -96,6 +96,28 @@ test('updateElement advances local_updated_at and persists patch fields', async 
   expect(result.t2 > result.t1).toBe(true);
 });
 
+test('concurrent updates to the same element serialize — both fields land (convention #79)', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+
+    const created = await store.createElement('character', { name: 'Alice' });
+    // Unserialized, the second read-merge-write's read predates the first's
+    // write and silently reverts its field (the session-237 lost-update class)
+    // — against the REAL store the gap is genuine disk I/O.
+    await Promise.all([
+      store.updateElement(created.id, { description: 'a hobbit' }),
+      store.updateElement(created.id, { physicality: 'short' }),
+    ]);
+    const after = await store.getElement(created.id);
+    return { desc: after?.description, phys: (after as any)?.physicality };
+  });
+  expect(result.desc).toBe('a hobbit');
+  expect(result.phys).toBe('short');
+});
+
 test('reopens the same folder and reads back persisted data', async ({ page }) => {
   const fetched = await page.evaluate(async () => {
     const api = window.__atlasTestApi;

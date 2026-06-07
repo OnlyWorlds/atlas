@@ -2,45 +2,32 @@
  * Portable page renderer — turns a page's block stack into display DOM
  * (DESIGN_SHARING.md, S2b).
  *
- * DELIBERATELY STORE-FREE: every function takes resolved data (an elements
- * Map), never reads app state, and never wires edit affordances. The share
- * room uses it for static block rendering + the visitor preview; the Track C
- * viewer tool will lift this module (plus `renderProseFragment`) more or
- * less verbatim — keep it that way: no imports from state/store/sync.
+ * DELIBERATELY STORE-FREE: every function takes resolved data, never reads
+ * app state, and never wires edit affordances. The Track C viewer tool will
+ * lift this module (plus `renderProseFragment` + `core/share-payload`) more
+ * or less verbatim — keep it that way: no imports from state/store/sync.
  *
- * The snapshot payload the viewer renders is exactly this module's input
- * shape: blocks + resolved element data (see SHARING_CONTRACT.md).
+ * TWO render paths, one look:
+ *   - WORLD-BACKED (`renderBlockView` / `renderElementCard` / `renderPageView`):
+ *     takes a full elements Map — the BUILDER's static block rendering, where
+ *     the author sees their world's data.
+ *   - PAYLOAD-BACKED (`renderPayloadPage` / `renderPayloadCard`): takes a
+ *     §5 publish payload (core/share-payload) — the VISITOR PREVIEW and the
+ *     viewer tool's path. Disclosure-true: only included elements link/chip;
+ *     everything else is plain text (contract §5.1). What authors preview is
+ *     byte-identical to what the backend will serve.
  */
 
 import type { Element } from '../core/types';
 import type { PageBlock, ElementCardBlock } from '../core/sharing';
+import {
+  isCardSkipField, isPopulatedValue as isPopulated,
+  type PagePayload, type PayloadElementEntry, type RelationToken,
+} from '../core/share-payload';
 import { renderProseFragment } from './writing-compiled';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { humanizeFieldName } from './element-detail-fields';
 import { escapeText } from '../core/dom-utils';
-
-/**
- * Field names that never belong on a card: identity/meta, sync stamps, and
- * the whole atlas-local extension family (presentation/config, not content).
- */
-const CARD_SKIP_FIELDS = new Set([
-  'id', 'type', 'name', 'local_updated_at', 'server_updated_at',
-  'image_url', // rendered as the card image, not as a field row
-]);
-
-function isCardSkipField(name: string): boolean {
-  return CARD_SKIP_FIELDS.has(name) || name.startsWith('atlas_') || name === 'image_media_id';
-}
-
-/** Does this value carry displayable content? */
-function isPopulated(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
-  if (typeof value === 'string') return value.trim().length > 0;
-  if (typeof value === 'number') return true;
-  if (typeof value === 'boolean') return true;
-  if (Array.isArray(value)) return value.length > 0;
-  return false;
-}
 
 /**
  * The element's populated, card-eligible field names (disk order). The field
@@ -180,8 +167,8 @@ export interface PageViewOptions {
 }
 
 /**
- * Render the whole page as a visitor sees it — title + the block stack.
- * This IS the preview, and (re-hosted) the viewer tool's render path.
+ * Render the whole page from WORLD data — the builder's static rendering.
+ * For the visitor view, use `renderPayloadPage` (disclosure-true).
  */
 export function renderPageView(opts: PageViewOptions): HTMLElement {
   const view = document.createElement('article');
@@ -196,6 +183,167 @@ export function renderPageView(opts: PageViewOptions): HTMLElement {
     view.appendChild(node);
   }
   if (opts.blocks.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'atlas-share-hint';
+    empty.textContent = 'This page has no content yet.';
+    view.appendChild(empty);
+  }
+  return view;
+}
+
+// ===========================================================================
+// PAYLOAD-BACKED rendering — the visitor preview + the viewer tool's path.
+// Input is a §5 publish payload; nothing here touches world data.
+// ===========================================================================
+
+/** Is this field value a relation-token array (projected at publish time)? */
+function isTokenArray(value: unknown): value is RelationToken[] {
+  return Array.isArray(value) && value.length > 0
+    && value.every(v => v && typeof v === 'object' && typeof (v as RelationToken).text === 'string');
+}
+
+/**
+ * Render one projected field value. Token arrays follow the disclosure rule:
+ * a token WITH `ref` renders as a chip (target is included — linkable in the
+ * viewer); a token WITHOUT `ref` renders as plain text (not disclosed).
+ * Raw values render as text.
+ */
+function renderPayloadFieldValue(
+  value: unknown,
+  entries: Record<string, PayloadElementEntry>,
+): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'atlas-share-card-field-value';
+  if (isTokenArray(value)) {
+    for (const token of value) {
+      if (token.ref && entries[token.ref]) {
+        const target = entries[token.ref];
+        const chip = document.createElement('span');
+        chip.className = 'atlas-share-card-chip';
+        chip.dataset.ref = token.ref;
+        chip.innerHTML = `<span class="material-symbols-outlined">${ELEMENT_ICONS[target.type as keyof typeof ELEMENT_ICONS] ?? 'category'}</span>${escapeText(token.text)}`;
+        wrap.appendChild(chip);
+      } else {
+        const span = document.createElement('span');
+        span.textContent = token.text;
+        wrap.appendChild(span);
+      }
+    }
+    return wrap;
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    wrap.textContent = String(value);
+    return wrap;
+  }
+  if (Array.isArray(value)) {
+    wrap.textContent = value.filter(v => typeof v === 'string').join(', ');
+    return wrap;
+  }
+  return wrap;
+}
+
+/** Render an element-card block from a payload entry. */
+export function renderPayloadCard(
+  block: ElementCardBlock,
+  entries: Record<string, PayloadElementEntry>,
+): HTMLElement {
+  const card = document.createElement('div');
+  card.className = `atlas-share-card is-${block.variant}`;
+  const entry = entries[block.elementId];
+
+  if (!entry) {
+    card.classList.add('is-missing');
+    card.innerHTML = `
+      <div class="atlas-share-card-head">
+        <span class="material-symbols-outlined">help</span>
+        <span class="atlas-share-card-name">(missing element)</span>
+      </div>
+    `;
+    return card;
+  }
+
+  const head = document.createElement('div');
+  head.className = 'atlas-share-card-head';
+  head.innerHTML = `
+    <span class="material-symbols-outlined atlas-share-card-icon">${ELEMENT_ICONS[entry.type as keyof typeof ELEMENT_ICONS] ?? 'category'}</span>
+    <span class="atlas-share-card-name">${escapeText(entry.name)}</span>
+    <span class="atlas-share-card-type">${escapeText(ELEMENT_LABELS[entry.type as keyof typeof ELEMENT_LABELS]?.singular ?? entry.type)}</span>
+  `;
+  card.appendChild(head);
+
+  if (entry.image_url) {
+    const img = document.createElement('img');
+    img.className = 'atlas-share-card-image';
+    img.src = entry.image_url;
+    img.alt = entry.name;
+    img.loading = 'lazy';
+    card.appendChild(img);
+  }
+
+  if (block.variant === 'full') {
+    const fieldNames = block.fields.filter(f => isPopulated(entry.fields[f]) || isTokenArray(entry.fields[f]));
+    if (fieldNames.length > 0) {
+      const fieldsWrap = document.createElement('div');
+      fieldsWrap.className = 'atlas-share-card-fields';
+      for (const field of fieldNames) {
+        const row = document.createElement('div');
+        row.className = 'atlas-share-card-field';
+        const label = document.createElement('div');
+        label.className = 'atlas-share-card-field-label';
+        label.textContent = humanizeFieldName(field);
+        row.appendChild(label);
+        row.appendChild(renderPayloadFieldValue(entry.fields[field], entries));
+        fieldsWrap.appendChild(row);
+      }
+      card.appendChild(fieldsWrap);
+    }
+  }
+
+  return card;
+}
+
+/**
+ * Render a full page from a §5 publish payload — title + block stack,
+ * disclosure-true. This IS the visitor preview, and (re-hosted) the viewer
+ * tool's render path: what this shows is exactly what a link-holder gets.
+ */
+export function renderPayloadPage(payload: PagePayload): HTMLElement {
+  // Minimal pseudo-elements for prose ow:// name resolution — membership in
+  // this map is exactly the payload's included set, so the prose renderer's
+  // 'text' mode implements the §5.1 rule (included → chip, else plain text).
+  const proseMap = new Map<string, Element>();
+  for (const [id, entry] of Object.entries(payload.elements)) {
+    proseMap.set(id, { id, type: entry.type, name: entry.name } as Element);
+  }
+
+  const view = document.createElement('article');
+  view.className = 'atlas-share-page-view';
+  const title = document.createElement('h1');
+  title.className = 'atlas-share-page-view-title';
+  title.textContent = payload.title;
+  view.appendChild(title);
+
+  for (const block of payload.blocks) {
+    let node: HTMLElement;
+    switch (block.kind) {
+      case 'heading': {
+        node = document.createElement(block.level === 2 ? 'h3' : 'h2');
+        node.className = 'atlas-share-block-heading';
+        node.textContent = block.text;
+        break;
+      }
+      case 'prose':
+        node = renderProseFragment(block.markdown, proseMap, { unresolved: 'text' });
+        break;
+      case 'element-card':
+        node = renderPayloadCard(block, payload.elements);
+        break;
+    }
+    node.classList.add('atlas-share-page-view-block');
+    view.appendChild(node);
+  }
+
+  if (payload.blocks.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'atlas-share-hint';
     empty.textContent = 'This page has no content yet.';

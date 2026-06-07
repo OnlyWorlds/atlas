@@ -217,6 +217,37 @@ export function blockSummary(blocks: readonly PageBlock[]): string {
   return `${blocks.length} block${blocks.length === 1 ? '' : 's'}`;
 }
 
+// ---------------------------------------------------------------------------
+// Published-state mirror (S4) — `atlas_page_pub` display cache.
+// The sharing API rows are the truth; this mirror lets the share room show
+// "published at <url>" offline and survives sync (it's an atlas-local field:
+// stripped on the worldapi wire, preserved on pull overlay).
+// ---------------------------------------------------------------------------
+
+export interface PagePubState {
+  /** SharedPage row id on the sharing backend. */
+  id: string;
+  slug: string;
+  published_at: string;
+  updated_at: string;
+  revoked: boolean;
+}
+
+/** Parse the page's `atlas_page_pub` mirror defensively; null = never published. */
+export function pagePubOf(el: Element): PagePubState | null {
+  const raw = (el as Record<string, unknown>).atlas_page_pub;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const p = raw as Record<string, unknown>;
+  if (typeof p.id !== 'string' || typeof p.slug !== 'string') return null;
+  return {
+    id: p.id,
+    slug: p.slug,
+    published_at: typeof p.published_at === 'string' ? p.published_at : '',
+    updated_at: typeof p.updated_at === 'string' ? p.updated_at : '',
+    revoked: p.revoked === true,
+  };
+}
+
 /** Unique default name for a new page: "new page", "new page (2)", ... */
 export function findUniquePageName(elements: Element[]): string {
   const names = new Set(listPages(elements).map(p => (p.name || '').toLowerCase()));

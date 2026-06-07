@@ -8,6 +8,7 @@
 
 import type { FolderStore } from '../../src/store/folder-store';
 import { newId, nowIso } from '../../src/store/folder-store';
+import { PerIdWriteChain } from '../../src/store/write-chain';
 import { ATLAS_LOCAL_EXTENSION_FIELDS } from '../../src/core/constants';
 import type {
   Element,
@@ -38,6 +39,8 @@ export class MockFolderStore implements FolderStore {
   private syncState: SyncState = { ...defaultSyncState };
   private mediaItems = new Map<string, MediaItem>();
   private mediaBlobs = new Map<string, Blob>();
+  /** Per-id serialization for update/delete — mirrors FsFolderStore (convention #79). */
+  private writeChain = new PerIdWriteChain();
 
   // Time injection for deterministic tests.
   private clock: () => string = nowIso;
@@ -87,19 +90,25 @@ export class MockFolderStore implements FolderStore {
   }
 
   async updateElement(id: string, patch: Partial<Element>): Promise<Element> {
-    const existing = this.elements.get(id);
-    if (!existing) throw new Error(`element ${id} not found`);
-    const next: Element = {
-      ...existing,
-      ...patch,
-      id: existing.id,
-      type: existing.type,
-      local_updated_at: this.clock(),
-      // Preserve server_updated_at unless patch explicitly sets it.
-      server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
-    };
-    this.elements.set(id, next);
-    return { ...next };
+    return this.writeChain.run(id, async () => {
+      const existing = this.elements.get(id);
+      if (!existing) throw new Error(`element ${id} not found`);
+      // Mirror the real store's read→write I/O gap (disk read, then disk
+      // write) so an UNSERIALIZED read-merge-write race manifests in vitest —
+      // fakes encode real-world failure modes (convention #20).
+      await Promise.resolve();
+      const next: Element = {
+        ...existing,
+        ...patch,
+        id: existing.id,
+        type: existing.type,
+        local_updated_at: this.clock(),
+        // Preserve server_updated_at unless patch explicitly sets it.
+        server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
+      };
+      this.elements.set(id, next);
+      return { ...next };
+    });
   }
 
   async findDependents(id: string): Promise<Element[]> {
@@ -152,28 +161,32 @@ export class MockFolderStore implements FolderStore {
   }
 
   async deleteElement(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
-    const silent = opts.silent ?? false;
-    const cascade = silent ? false : (opts.cascade ?? true);
-    const existing = this.elements.get(id);
-    if (!existing) return { tombstones: [] };
+    // Same chain as updateElement — an in-flight update lands before the
+    // element disappears (mirrors FsFolderStore, convention #79).
+    return this.writeChain.run(id, async () => {
+      const silent = opts.silent ?? false;
+      const cascade = silent ? false : (opts.cascade ?? true);
+      const existing = this.elements.get(id);
+      if (!existing) return { tombstones: [] };
 
-    const written: Tombstone[] = [];
-    if (cascade) {
-      const deps = await this.findDependents(id);
-      for (const dep of deps) {
-        const tomb: Tombstone = { id: dep.id, type: dep.type, deleted_at: this.clock() };
-        this.tombstones.push(tomb);
-        this.elements.delete(dep.id);
-        written.push(tomb);
+      const written: Tombstone[] = [];
+      if (cascade) {
+        const deps = await this.findDependents(id);
+        for (const dep of deps) {
+          const tomb: Tombstone = { id: dep.id, type: dep.type, deleted_at: this.clock() };
+          this.tombstones.push(tomb);
+          this.elements.delete(dep.id);
+          written.push(tomb);
+        }
       }
-    }
-    if (!silent) {
-      const primary: Tombstone = { id, type: existing.type, deleted_at: this.clock() };
-      this.tombstones.push(primary);
-      written.push(primary);
-    }
-    this.elements.delete(id);
-    return { tombstones: written };
+      if (!silent) {
+        const primary: Tombstone = { id, type: existing.type, deleted_at: this.clock() };
+        this.tombstones.push(primary);
+        written.push(primary);
+      }
+      this.elements.delete(id);
+      return { tombstones: written };
+    });
   }
 
   // ---- Spatial passthroughs — same store, typed accessors ----

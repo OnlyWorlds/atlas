@@ -50,6 +50,7 @@ import type {
 } from '../core/types';
 import type { FolderStore } from './folder-store';
 import { newId, nowIso } from './folder-store';
+import { PerIdWriteChain } from './write-chain';
 import {
   elementDirSegments,
   elementFilename,
@@ -119,6 +120,8 @@ export class FsFolderStore implements FolderStore {
   private fileIndex: Map<string, { type: ElementType; filename: string }> = new Map();
   /** Set of types whose dirs have been scanned into fileIndex. */
   private indexedTypes: Set<ElementType> = new Set();
+  /** Per-id serialization for update/delete (convention #79 — lost-update class). */
+  private writeChain = new PerIdWriteChain();
 
   constructor(opts: FsFolderStoreOptions = {}) {
     this.opts = opts;
@@ -358,6 +361,13 @@ export class FsFolderStore implements FolderStore {
   }
 
   async updateElement(id: string, patch: Partial<Element>): Promise<Element> {
+    // Per-id serialization (convention #79): two concurrent updates to the
+    // same element race the read-merge-write below — the second call's read
+    // predates the first call's write, silently reverting its fields.
+    return this.writeChain.run(id, () => this.updateElementUnchained(id, patch));
+  }
+
+  private async updateElementUnchained(id: string, patch: Partial<Element>): Promise<Element> {
     const existing = await this.getElement(id);
     if (!existing) throw new Error(`element ${id} not found`);
     const next: Element = {
@@ -451,6 +461,12 @@ export class FsFolderStore implements FolderStore {
   }
 
   async deleteElement(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
+    // Same chain as updateElement: an in-flight update to this id lands (or
+    // fails) before the file disappears — no "element not found" tail errors.
+    return this.writeChain.run(id, () => this.deleteElementUnchained(id, opts));
+  }
+
+  private async deleteElementUnchained(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
     const silent = opts.silent ?? false;
     const cascade = silent ? false : (opts.cascade ?? true);
     const existing = await this.getElement(id);
