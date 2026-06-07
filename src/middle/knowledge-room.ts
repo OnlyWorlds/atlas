@@ -29,7 +29,7 @@ import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { escapeText } from '../core/dom-utils';
 import {
-  KNOWLEDGE_SUBTYPE, CIRCLE_SUBTYPE, listKnowledgeEntries, heldByOf, heldByCount, aboutIdsOf,
+  KNOWLEDGE_SUBTYPE, CIRCLE_SUBTYPE, listKnowledgeEntries, heldByOf, aboutIdsOf,
   ABOUT_FIELDS, aboutFieldFor, isKnowerType, listKnowers, knowledgeHeldBy, elementsKnownAboutBy,
   circleMembers,
 } from '../core/knowledge';
@@ -506,7 +506,6 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const list = document.createElement('div');
     list.className = 'atlas-knowledge-list';
     for (const entry of entries) {
-      const holders = heldByCount(entry);
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'atlas-knowledge-row';
@@ -514,13 +513,22 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
         <span class="atlas-knowledge-row-main">
           <span class="atlas-knowledge-row-name">${escapeText(entry.name || '(untitled)')}</span>
-          <span class="atlas-knowledge-row-meta">${holders === 0 ? 'no holders yet' : `held by ${holders}`}</span>
+          <span class="atlas-knowledge-row-meta">${escapeText(holderSummary(entry))}</span>
         </span>
       `;
       row.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
       list.appendChild(row);
     }
     root.appendChild(list);
+  }
+
+  /** "held by Ireena", "held by the party +2", or "no holders yet". */
+  function holderSummary(entry: Element): string {
+    const held = heldByOf(entry);
+    const ids = [...(held.narrator ? [held.narrator] : []), ...held.collectives];
+    if (ids.length === 0) return 'no holders yet';
+    const first = elOf(ids[0])?.name || '(unnamed)';
+    return ids.length === 1 ? `held by ${first}` : `held by ${first} +${ids.length - 1}`;
   }
 
   function buildKnowersList(worldId: string): void {

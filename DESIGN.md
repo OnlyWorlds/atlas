@@ -1,7 +1,7 @@
 # Atlas — Design Document
 
-**Version**: 1.0 (2026-05-12) — folder-first rebuild
-**Status**: Feature-complete for v1 (phases 0–6 + 3.5 shipped). Active work is polish, code hygiene, and the long-tail roadmap. Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
+**Version**: 1.1 (2026-06-07) — folder-first rebuild
+**Status**: Feature-complete for v1 (phases 0–6 + 3.5 shipped) + Knowledge phase 1 (session 235, see `DESIGN_KNOWLEDGE.md`). Next arc: Sharing (`DESIGN_SHARING.md`). Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
 **Predecessor**: `tools/atlas-deprecated/` (IDB-cached architecture, retained as UI/UX reference)
 
 ---
@@ -69,10 +69,10 @@ No `api-only` mode. Every world has a folder. The folder is the truth. If you wa
 
 ## On-Disk Layout
 
-User picks a root folder once per world (persisted via `FileSystemDirectoryHandle` in IndexedDB; the only IDB use case in atlas). Atlas writes:
+User picks a root folder once per world (persisted via `FileSystemDirectoryHandle` in IndexedDB; the only IDB use case in atlas). Atlas writes (wrapper folder is `onlyworlds-atlas/` — `atlas-worlds/` is the recognized legacy name):
 
 ```
-<user-chosen-root>/atlas-worlds/
+<user-chosen-root>/onlyworlds-atlas/
   <world-name>-<uuid-prefix>/
     world.json                       ← metadata + api credentials (if linked)
     .atlas/                          ← atlas internal state
@@ -352,14 +352,13 @@ Push triggers are unchanged — autosave debounce is the only push trigger; user
 
 ## UUIDs
 
-**Client-side UUID generation. OW API accepts them.** Verified via `obsidian-plugin/Commands/CreateElementCommand.ts` which uses `uuidv7()` and passes the id through to the server.
+**Local creates use `crypto.randomUUID()` (v4). The OW server assigns its OWN UUID v7 on CREATE, overriding the client id** — this superseded the original "server accepts client ids" assumption (verified live; see SYNC_NOTES "Server-assigned ids").
 
 Consequences:
-- Local creates use `crypto.randomUUID()` (RFC 4122 v4) or `uuidv7`. We'll use `crypto.randomUUID()` (built-in, no dep).
-- On push (CREATE), the local UUID is sent in the request body. Server accepts and persists it.
-- Foreign key references (`species_ids`, `parent_id`, etc.) keep working through the local→server transition. No remap dance.
+- Every CREATE-push path runs the **id-swap**: re-key the local file to the server's id, rewrite FK references across all other local elements (`rewriteIdReferences`), silently delete the old file (no tombstone — the server never had the old id), and propagate to UI state + URL via `onIdSwap` → `handleIdSwap` (selection, `/element`, `/map`, `/knowledge`, `/knowledge/knower` routes).
+- Locally (offline / local-only), client v4 ids work indefinitely — the swap only happens at first push.
 
-**Implications for Make-Online Route 2** (link to existing api world): name+type matching is still the primary match key (because elements created independently on different machines will have different UUIDs), but ID matching catches re-uploads from the same machine cleanly.
+**Implications for Make-Online Route 2** (link to existing api world): name+type matching is the primary match key (elements created independently on different machines have different UUIDs); ID matching catches re-uploads from the same machine cleanly.
 
 ---
 
@@ -371,7 +370,7 @@ Consequences:
 2. Modal asks for name; "Pick Folder" button opens the OS folder picker.
 3. Atlas writes `world.json`, empty `elements/`, `spatial/`, `media/`, `.atlas/`.
 4. Registry entry added with `state: 'local-only'`, folder handle stored in handle-vault.
-5. World activated. Sidebar flips to elements mode. Middle shows timeline (empty state).
+5. World activated. Middle shows the world home room (sidebar mode is independent — convention #37).
 
 ### W2 — Link existing api world
 
@@ -487,7 +486,7 @@ Under **`pause-and-review`**:
 User opens the same world's folder on two machines (e.g., via Dropbox-synced folder, or two laptops with the same api credentials but separate folders).
 
 - **Same folder via Dropbox**: undefined behavior (file system race conditions). Lock file (`.atlas/lock`) detects concurrent access and warns the second tab. User accepts at their own risk. Document as "not officially supported."
-- **Separate folders, same api credentials**: each machine has its own FolderStore + SyncEngine. They reconcile through the api server. Standard distributed-edit semantics — last writer wins on conflicts unless policy is `ask`.
+- **Separate folders, same api credentials**: each machine has its own FolderStore + SyncEngine. They reconcile through the api server. Standard distributed-edit semantics — last writer wins on conflicts unless policy is `pause-and-review`.
 
 ### W11 — Snapshot / backup
 
@@ -576,10 +575,7 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 
 **Element selection lives WITHIN the element room** — selecting an element navigates to `#/w/<id>/element/<eid>` (the element room). The element header appears BELOW the room nav strip with element-specific actions (delete, publish, pin, etc.).
 
-**Deselect conventions**:
-- **Esc**: clears `selectedElementId` and navigates to home (when an element is selected and no modal is open).
-- **Click selected sidebar row again**: toggles off — same effect.
-- Both routes are equivalent.
+**Deselect convention**: **Esc** clears `selectedElementId` and navigates to home — when an element is selected, no modal/overlay is open, and the route is NOT `writing`/`knowledge` (those rooms own their keyboards; see convention #32 + #46). Click-row-toggle was considered and dropped (session 223) — Esc is the canonical deselect.
 
 Per-room design docs:
 - World Home: `DESIGN_HOME.md`
@@ -660,9 +656,8 @@ Hash-based, no server rewrites needed (Cloudflare Pages friendly).
 #/w/<worldId>                               → home room (DEFAULT for active world)
 #/w/<worldId>/element/<elementId>           → element room
 #/w/<worldId>/writing                       → writing room (no narrative selected)
-#/w/<worldId>/writing/book/<bookId>         → book selected
-#/w/<worldId>/writing/book/<bId>/chapter/<cId>          → chapter selected
-#/w/<worldId>/writing/book/<bId>/chapter/<cId>/scene/<sId> → scene selected
+#/w/<worldId>/writing/<narrativeId>         → narrative selected (any tier; ancestry derived from parent_narrative)
+                                              (legacy long form /writing/book/<b>[/chapter/<c>[/scene/<s>]] still parses)
 #/w/<worldId>/knowledge                     → knowledge room ([Entries | Knowers] tabs)
 #/w/<worldId>/knowledge/new                 → knowledge draft editor (nothing persists until create)
 #/w/<worldId>/knowledge/<entryId>           → knowledge entry editor (embedded TipTap prose)
@@ -688,7 +683,7 @@ Hash-based, no server rewrites needed (Cloudflare Pages friendly).
 - `elementHash(worldId, elementId)`
 - `elementsHash(worldId)` (sidebar mode)
 - `worldsHash(worldId)` (sidebar mode)
-- `writingHash(worldId, bookId?, chapterId?, sceneId?)`
+- `writingHash(worldId, narrativeId?)`
 - `knowledgeHash(worldId, knowledgeId?)` / `knowledgeKnowerHash(worldId, knowerId)`
 - `timelineHash(worldId)`
 - `searchHash(worldId, query?)`
@@ -779,7 +774,7 @@ Inherited from legacy (hard-won; preserve in new code):
 
 46. **Writing room derives target element from URL, NOT from `state.ui.selectedElementId`.** `element-detail.ts:getSelectedElement` branches: when `route.mode === 'writing'`, it returns `route.sceneId ?? route.chapterId ?? route.bookId` (each is a narrative id by URL contract). Otherwise it falls back to `route.elementId ?? state.ui.selectedElementId`. Writing room's `mountEditor` MUST NOT patch `state.ui.selectedElementId` on narrative navigation — that would clobber the user's persisted global selection. The URL is the single source of truth for writing-room navigation; `state.ui.selectedElementId` is the global selection that persists across rooms (and feeds the convention #45 chip). Writing tree highlighting in the sidebar also reads URL, not `selectedElementId`. Without this decoupling, opening writing erases whatever element you had selected — the chip would mirror the active narrative instead of preserving the prior context. Implemented session 226 alongside convention #45 chip; previously writing.ts mirrored the URL into `selectedElementId` for element-detail's benefit, which leaked the writing selection across rooms.
 
-Related: convention #32 (Esc clears selection + nav home) is **gated to NOT fire when route is `writing`** — writing room owns its keyboard; pulling the user out of writing AND clearing their persisted global selection on one Esc keystroke surprised more than it helped. `hotkeys.ts:'deselect-to-home'` skips when `window.location.hash.includes('/writing')`.
+Related: convention #32 (Esc clears selection + nav home) is **gated to NOT fire when route is `writing` OR `knowledge`** — those rooms own their keyboards (editing surfaces + URL-owned navigation); pulling the user out AND clearing their persisted global selection on one Esc keystroke surprised more than it helped. `hotkeys.ts:'deselect-to-home'` skips when the hash includes `/writing` or `/knowledge` (knowledge added session 235).
 
 47-57. **Writing conventions** — codified in `DESIGN_WRITING.md` (richtext storage, ow:// link scheme, atlas_aliases, UNION-on-save, workspace replacement gate, material-symbols scoping, autolink rules, sticky bar, ambient word count, add-to-cast unification, compiled view). See that doc for details. Numbering reserved for cross-doc consistency.
 
@@ -800,6 +795,8 @@ Related: convention #32 (Esc clears selection + nav home) is **gated to NOT fire
 65. **Settings tabs are per-tab `render*`/`wire*` module pairs; `settings-panel.ts` is a thin orchestrator** (session 233). Each tab lives in `src/middle/settings-<tab>.ts` (`settings-account`, `-storage`, `-editing`, `-world`, `-writing`, `-context`), exporting a `renderXTab(...) → string` and `wireXTab(...)`. `settings-panel.ts` owns only the shell: nav rail, last-tab restore, and dispatch via `renderTab`/`wireTabHandlers` switches. Public surface (`mountSettingsPanel`) is unchanged, so `app.ts` doesn't care. Flat `settings-*.ts` files (not a subfolder) match the established split convention (`writing-workspace-*.ts`, `map-tab-*.ts`) and keep import depth identical. Add a new tab = new module + two switch arms + a `SETTINGS_TABS`/`SETTINGS_TAB_GROUPS` entry. Per-world settings handlers use `updateWorldEntry(reg, worldId, patch)` (registry.ts) for one-off field merges rather than hand-rolling `findIndex` + `worlds.map`.
 
 66. **`defaultCreateType` is a `ui-prefs` pref, not URL/registry state** (session 233). The element-create modal preselects `loadUiPrefs().defaultCreateType` when opened without an explicit `initialType` (sidebar +, home, hotkey, writing inline-create, map contextual). It's an app-level persistent pref (localStorage via `core/ui-prefs.ts`), set from Settings → Editing. The DESIGN sketch once placed it on `UiState`; ui-prefs is the correct home (same migration as `sidebarMode` in session 223 — app-level + persistent, neither navigational nor world-specific). The modal re-validates the preselected type against the effective (post-`excludeTypes`) set in `buildModal`, so an excluded default (e.g. 'map' in the map contextual flow) can't stick — it falls back to the first offered type. `ui-prefs` setters must load-merge-save (`{ ...loadUiPrefs(), <field>: v }`) so adding a field doesn't clobber siblings.
+
+67-72. **Knowledge conventions** — codified in `DESIGN_KNOWLEDGE.md` (knowledge entry = Narrative subtype, about vs held-by field split + the mention-derive `collectives` exclusion, knowing is computed, the text is the knowledge, fidelity = separate entries, Circle = a Collective acting as knower). Numbering reserved for cross-doc consistency, same as 47-57.
 
 ---
 
@@ -830,6 +827,7 @@ The orchestrator's `resolveSubject(route, elements)` derives `{element, detailsM
 ### Graph capabilities
 
 - **Subject-centered force-directed layout** (synchronous sim → stable positions; ~290 LOC, no library)
+- **Neighbors = ALL outgoing links** — the Involves multi-links AND single-link fields (narrator, birthplace, protagonist, …) via a generic id-shaped scan, double-gated by element lookup; `parent_narrative` deliberately excluded (tree hierarchy ≠ graph material). Session 235 — single links were previously invisible.
 - **Click-to-recenter**: clicking a non-subject node re-runs sim with that node as center; pushes to breadcrumb stack
 - **Ctrl/Cmd+click**: navigates URL to that element → context pane re-renders with new subject
 - **Recent-centers breadcrumb** at top of graph: `[Home] › [Recent] › current` (clickable chips pop the stack)
@@ -865,6 +863,8 @@ src/tabs/right/
 ---
 
 ## Test Strategy
+
+**Run cadence** (Captain's call, session 235 — err sparse): per-edit = typecheck; per-bout = typecheck + full vitest (~3s) + only the AFFECTED e2e spec file(s); full Playwright suite ONCE at session close / pre-commit. The cost table + speedup experiments live in the `atlas-tool` skill ("Test Cadence").
 
 Four layers:
 
@@ -939,7 +939,7 @@ Root: `DESIGN.md` (+ per-room `DESIGN_*.md`), `PROGRESS.md` (operational log), `
 
 ## Build History
 
-All phases (0 → 6 + 3.5) shipped by session 221. Cutover (force-push to atlas GitHub + archive `atlas-deprecated/`) is the remaining operational step. See `docs-archive/PROGRESS-history.md` for session-by-session detail. Post-cutover soft-edges live in `SYNC_NOTES.md`.
+All phases (0 → 6 + 3.5) shipped by session 221; rooms model + writing system (223-228); context pane (229-231); maintenance splits (232-233); Knowledge phase 1 (234-235). Cutover happened — atlas lives at `github.com/OnlyWorlds/atlas`; `tools/atlas-deprecated/` is retained as UI/UX reference only. See `docs-archive/PROGRESS-history.md` for session-by-session detail. Sync soft-edges live in `SYNC_NOTES.md`.
 
 ---
 

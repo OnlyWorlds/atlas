@@ -175,6 +175,25 @@ function readMultiLink(el: Element, field: string): string[] {
   return out;
 }
 
+/**
+ * Fields whose string values are never treated as single-link neighbors:
+ * identity/sync metadata, and `parent_narrative` — the writing-tree hierarchy
+ * lives in the sidebar; pulling parents into the flat context graph just adds
+ * noise to every scene/chapter view.
+ */
+const SINGLE_LINK_SKIP_KEYS = new Set([
+  'id', 'local_updated_at', 'server_updated_at', 'parent_narrative',
+]);
+
+/**
+ * Plausible element-id shape — a 36-char hyphenated UUID. Keeps prose/text
+ * field values out of the candidate set; final validity is the caller's
+ * `byId.has` filter (same double-gate rationale as the engine's topo-sort).
+ */
+function looksLikeId(v: string): boolean {
+  return v.length === 36 && v.includes('-');
+}
+
 function collectDirectNeighbors(el: Element): string[] {
   const seen = new Set<string>();
   for (const field of MULTI_LINK_FIELDS) {
@@ -182,6 +201,20 @@ function collectDirectNeighbors(el: Element): string[] {
       if (!seen.has(id)) seen.add(id);
     }
   }
+  // Single-link fields too (narrator / protagonist / birthplace / location /
+  // …) — generic id-shaped scan (convention #5). Without this, a knowledge
+  // entry's narrator (its primary holder channel) and every other single-link
+  // relation was invisible to the graph (session 235 fix).
+  for (const [key, value] of Object.entries(el)) {
+    if (SINGLE_LINK_SKIP_KEYS.has(key)) continue;
+    if (typeof value === 'string') {
+      if (looksLikeId(value)) seen.add(value);
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const id = (value as { id?: unknown }).id;
+      if (typeof id === 'string' && looksLikeId(id)) seen.add(id);
+    }
+  }
+  seen.delete(el.id);
   return Array.from(seen);
 }
 

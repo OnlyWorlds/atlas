@@ -268,6 +268,33 @@ test('knowers tab lists holders; known-view compiles held entries per element', 
   await expect(page.locator('.atlas-knowledge-tab.is-active')).toHaveText('knowers');
 });
 
+test('context pane graphs an open entry: narrator + circle holders appear as neighbors', async ({ page }) => {
+  await setupWorld(page);
+  const ireenaId = await createElement(page, 'character', { name: 'Ireena' });
+  const partyId = await createElement(page, 'collective', {
+    name: 'the party', subtype: 'circle', characters: [ireenaId],
+  });
+  const baroviaId = await createElement(page, 'location', { name: 'Barovia' });
+  const entryId = await createElement(page, 'narrative', {
+    name: 'the curse', subtype: 'knowledge',
+    story: 'Barovia is cursed.', narrator: ireenaId, collectives: [partyId], locations: [baroviaId],
+  });
+
+  await openKnowledge(page);
+  await page.click(`.atlas-knowledge-row:has-text("the curse")`);
+  await expect(page).toHaveURL(new RegExp(`/knowledge/${entryId}$`));
+
+  // Right-pane context tab graphs the entry: holders (narrator single-link +
+  // circle multi-link) AND the subject all appear as neighbor nodes.
+  // (Regression: single-link fields were invisible to the graph.)
+  await page.locator('.atlas-tab[data-tab-kind="context"]').click();
+  const pane = page.locator('.atlas-context-pane');
+  await expect(pane.locator('.atlas-context-graph-node.is-center', { hasText: 'the curse' })).toBeVisible();
+  await expect(pane.locator('.atlas-context-graph-node', { hasText: 'Ireena' })).toBeVisible();
+  await expect(pane.locator('.atlas-context-graph-node', { hasText: 'the party' })).toBeVisible();
+  await expect(pane.locator('.atlas-context-graph-node', { hasText: 'Barovia' })).toBeVisible();
+});
+
 test('element detail surfaces Knowledge: known by + subject of (K6)', async ({ page }) => {
   await setupWorld(page);
   const ireenaId = await createElement(page, 'character', { name: 'Ireena' });
