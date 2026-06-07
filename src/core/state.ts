@@ -30,7 +30,7 @@ export type { RightTabRef };
  * - timeline: full timeline view
  * - knowledge: who-knows-what room (see DESIGN_KNOWLEDGE.md)
  * - search: cross-world search
- * - publish / publish-detail: showcase management (see DESIGN_PUBLISHING.md)
+ * - share: sharing pages — list + builder (see DESIGN_SHARING.md)
  * - import: data import (stub — mechanics in base-tool)
  * - templates: element creation templates (atlas-local)
  * - settings: settings room
@@ -44,8 +44,7 @@ export type MiddleMode =
   | 'writing'
   | 'knowledge'
   | 'search'
-  | 'publish'
-  | 'publish-detail'
+  | 'share'
   | 'import'
   | 'templates';
 export type SidebarMode = 'worlds' | 'elements';
@@ -129,6 +128,15 @@ export interface UiState {
    * (which resets it). Never persisted — purely in-session.
    */
   sidebarWritingOverride: boolean;
+  /**
+   * Knowledge lens (DESIGN_KNOWLEDGE.md "Known-view lens"): when set, the
+   * elements sidebar dims every element OUTSIDE this knower's knowledge —
+   * the world goes dark down to what they know. Toggled from the known-view;
+   * persists across rooms (exploring the dimmed world is the point); cleared
+   * by the sidebar banner ×, the known-view toggle, or world switch. Never
+   * persisted — purely in-session.
+   */
+  knowledgeLens: { knowerId: string } | null;
 }
 
 export interface AppState {
@@ -162,6 +170,7 @@ let state: AppState = {
     pinPlacement: null,
     zoneEditing: null,
     sidebarWritingOverride: false,
+    knowledgeLens: null,
   },
   sync: {
     byWorld: {},

@@ -1,7 +1,7 @@
 # Atlas — Knowledge Design
 
-**Version**: 1.2 (2026-06-07) — phase 1 SHIPPED
-**Status**: Built through session 235: K1 (room) + K2 (draft/editor + held-by/about) + **K3** (embedded TipTap editor w/ mentions + autolink + chips; `collectives` excluded from the derive) + **K4** (Knowers tab + known-view at `/knowledge/knower/<id>`) + **K6** (element-detail "Knowledge" section: Known by / Subject of / Holds) + a context-pane interim (entry/knower as graph subject). **K5 (graph knowledge-mode + drag-to-wire + lens) deferred past Sharing.**
+**Version**: 1.3 (2026-06-07) — phase 1 COMPLETE (functional)
+**Status**: Built through session 236: K1 (room) + K2 (draft/editor + held-by/about) + **K3** (embedded TipTap editor w/ mentions + autolink + chips; `collectives` excluded from the derive) + **K4** (Knowers tab + known-view at `/knowledge/knower/<id>`) + **K6** (element-detail "Knowledge" section: Known by / Subject of / Holds) + a context-pane interim (entry/knower as graph subject). Session 236 completed the lifecycle: **in-room entry delete**, not-found interims, **the known-view LENS** (sidebar world-dimming), sync round-trip locked by integration tests against the full adapter+MSW stack. **K5 (graph knowledge-mode + drag-to-wire) deferred past Sharing.**
 **Related**: `DESIGN.md` (rooms model), `DESIGN_WRITING.md` (narrative authoring, mentions/autolink), `DESIGN_SHARING.md` (consumes this foundation)
 
 ---
@@ -145,10 +145,11 @@ Route: `#/w/<id>/knowledge`. Room-nav icon added to the strip. A middle-pane roo
 
 **What you DO:** create knowledge entries (a draft editor — nothing persists until "create"); write the prose; wire held-by (assign a Character via `narrator`, Circles via `collectives`); add About subjects (a "+ add subject" picker → the matching `Involves` field; collectives excluded as they're holders — @-mention auto-population arrives with K3); create Circles proactively; toggle the known-view to verify what a knower sees; (Phase 2.5) "publish for this Circle" → jump to the Sharing room with a Circle block pre-filled.
 
+**Known-view lens** *(SHIPPED session 236 — v1 scope)*: a `lens` toggle in the known-view header sets transient `ui.knowledgeLens = { knowerId }`. The **elements sidebar** dims (opacity 0.22) every element outside `lensKnownSet(knowerId)` = the knower + their held entries + those entries' subjects — strictly knowledge-derived (circle co-membership grants nothing, convention #70). The lens **persists across rooms** (exploring the dimmed world is the point); a cyan sidebar banner ("world as X knows it" + ×) is the always-visible exit. Cleared on world switch; the knower id migrates on id-swap. **Map-pin dimming is deliberately NOT in v1** — graduated map reveal is a Later-phase feature (see Build Phases).
+
 **Locked UI ideas (future work):**
 - **React to selection** — pick the atlas-selected element (if a knower-capable type) → the room shows what it knows / its Circles.
-- **Known-view "lens"** — a toggle that dims/hides everything the knower *doesn't* know — watch the world go dark down to their knowledge. Visceral; great demo.
-- **Graph as the wiring tool** — drag a knowledge node onto a Circle node to assign held-by. The graph isn't just display, it's how relationships are built. (Part of the broader emerging direction: graphs as a show/organize/wire surface across rooms.)
+- **Graph as the wiring tool** — drag a knowledge node onto a Circle node to assign held-by. The graph isn't just display, it's how relationships are built. (Part of the broader emerging direction: graphs as a show/organize/wire surface across rooms.) (K5, deferred past Sharing.)
 
 ---
 
@@ -175,13 +176,14 @@ Route: `#/w/<id>/knowledge`. Room-nav icon added to the strip. A middle-pane roo
 - **Narrative** carries: `story`, base `supertype`/`subtype`; single-links `narrator`/`protagonist`/`antagonist` (Character), `conservator` (Institution), `parent_narrative`; and `Involves` multi-links to all element types (`characters`, `locations`, `collectives`, `constructs`, …). All held-by + about channels exist today.
 - **Collective** carries `characters`, `creatures`, `species` (membership — enables inheritance) and `operator` (an Institution — models "an institution's knowledge = its members"). It has **no** `narratives` field → confirms knowledge points at the Collective, knowing is computed.
 - **No schema additions required for the v1 model.** A future depth/fidelity feature, if it ever needs per-link data, would be reconsidered then (and would go to council) — but the current model deliberately avoids it.
-- **De-hiding path (intent, not v1 work).** The narrator/collectives *reinterpretation* is the v1 concession, not the endgame — the semantic shift (holder vs teller/subject) is invisible to other OW tools, even though the data is all canon fields and `subtype: "knowledge"` flags the convention. If Knowledge proves out, draft a **council motion for first-class holder fields on Narrative** (e.g. `held_by_characters` / `held_by_collectives`) and migrate off the reinterpretation. Matches DESIGN.md's "atlas innovates → OnlyWorlds standardizes" pipeline (same track as `atlas_shape` / `atlas_aliases`).
+- **De-hiding path (intent, not v1 work).** The narrator/collectives *reinterpretation* is the v1 concession, not the endgame — the semantic shift (holder vs teller/subject) is invisible to other OW tools, even though the data is all canon fields and `subtype: "knowledge"` flags the convention. If Knowledge proves out, draft a **council motion for first-class holder fields on Narrative** (e.g. `held_by_characters` / `held_by_collectives`) and migrate off the reinterpretation. Matches DESIGN.md's "atlas innovates → OnlyWorlds standardizes" pipeline (same track as `atlas_shape` / `atlas_aliases`). *Logged as a schema-requirement candidate in DESIGN.md's "Semantic reinterpretations" table (session 236).*
+- **Sync round-trip is locked by tests** (session 236, `tests/integration/knowledge-sync.test.ts`): first-push id-swap rewrites narrator/collectives/subjects + circle membership; `atlas_richtext_json` never reaches the wire but survives the id-swap and pull-overlays; server-side-created knowledge entries are recognized by the scans on pull with zero migration.
 
 ---
 
 ## Build Phases
 
-- **Phase 1 — Knowledge as pure-local worldbuilding** (no API, no sharing): the `knowledge` subtype, the Knowledge room, held-by wiring (`narrator` + `collectives`), the computed known-view. Ships standalone value. Syncs through the existing engine like any narrative/collective (these are plain OW elements + standard fields). *(SHIPPED — K1+K2+K4-core session 234; K3+K4-UI session 235. The graph "knowledge mode" moved to K5/deferred.)*
+- **Phase 1 — Knowledge as pure-local worldbuilding** (no API, no sharing): the `knowledge` subtype, the Knowledge room, held-by wiring (`narrator` + `collectives`), the computed known-view. Ships standalone value. Syncs through the existing engine like any narrative/collective (these are plain OW elements + standard fields). *(SHIPPED — K1+K2+K4-core session 234; K3+K4-UI session 235; lifecycle completion + lens + sync tests session 236. The graph "knowledge mode" moved to K5/deferred.)*
 - **Phase 1.5 — Cross-surfacing**: a normal element's detail view surfaces the knowledge dimension. *(SHIPPED session 235 — K6: "Knowledge" section with Known by / Subject of / Holds groups.)*
 - **Phase 2.5 — The sharing bridge**: "publish for this Circle" auto-derives a Reference page from a Circle's compiled knowledge (see `DESIGN_SHARING.md`).
 - **Later**: depth/fidelity refinements, graduated map reveal (which pins a Circle knows), live reveal-by-group.

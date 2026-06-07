@@ -33,6 +33,16 @@ export interface PickElementOptions {
 
 const ROW_CAP = 200;
 
+/**
+ * Map artifacts are never offered by the GENERIC picker — they're created by
+ * drawing/placement, not picked (the type strip already skipped them; the
+ * unfiltered "All" list now applies the same rule, so stray pins/markers
+ * can't leak into e.g. an element-card or knowledge-subject pick). An
+ * explicit `restrictToType: 'zone' | 'pin' | 'marker'` still works — schema
+ * fields that target those types keep their pickers.
+ */
+const GENERIC_PICK_EXCLUDED = new Set<ElementType>(['pin', 'marker', 'zone']);
+
 export function pickElement(opts: PickElementOptions = {}): Promise<Element | null> {
   return new Promise((resolve) => {
     const modal = new ElementPickerModal(opts, (el) => resolve(el));
@@ -143,8 +153,8 @@ class ElementPickerModal extends BaseModal {
     this.stripEl.innerHTML = '';
     this.stripEl.appendChild(this.typeChip('All', null, null));
     ALL_ELEMENT_TYPES.forEach(t => {
-      // Skip pin/marker/zone in the picker — those aren't normally picked.
-      if (t === 'pin' || t === 'marker' || t === 'zone') return;
+      // Map artifacts aren't normally picked — same rule as the list filter.
+      if (GENERIC_PICK_EXCLUDED.has(t)) return;
       this.stripEl!.appendChild(this.typeChip(ELEMENT_LABELS[t].singular, ELEMENT_ICONS[t], t));
     });
   }
@@ -178,6 +188,9 @@ class ElementPickerModal extends BaseModal {
     const items = all.filter(el => {
       if (exclude.has(el.id)) return false;
       if (restrict && !restrict.has(el.id)) return false;
+      // Generic picks never surface map artifacts — explicit restrictToType
+      // is the only door to them (mirrors the type strip).
+      if (!this.opts.restrictToType && GENERIC_PICK_EXCLUDED.has(el.type)) return false;
       if (this.typeFilter && el.type !== this.typeFilter) return false;
       if (this.search && !(el.name ?? '').toLowerCase().includes(this.search)) return false;
       return true;

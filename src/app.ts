@@ -5,8 +5,8 @@
  * Room model (DESIGN.md "Rooms"): the middle pane is a flex column with a
  * persistent room nav strip on top (when a world is active) and the active
  * room's content below. Rooms: welcome, home (default for active worlds),
- * element, writing, timeline, search, publish, publish-detail, import,
- * templates, settings.
+ * element, writing, knowledge, timeline, search, share, import, templates,
+ * settings.
  */
 
 import { mountAppShell, AppShell } from './layout/app-shell';
@@ -19,8 +19,7 @@ import { mountWorldHome } from './middle/world-home';
 import { mountWriting } from './middle/writing';
 import { mountSearch } from './middle/search';
 import { mountKnowledgeRoom } from './middle/knowledge-room';
-import { mountPublishRoom } from './middle/publish-room';
-import { mountPublishDetail } from './middle/publish-detail';
+import { mountShareRoom } from './middle/share-room';
 import { mountImportRoom } from './middle/import-room';
 import { mountTemplatesRoom } from './middle/templates-room';
 import { mountRoomNav } from './middle/room-nav';
@@ -143,11 +142,8 @@ export function startApp(container: HTMLElement): AppHandle {
         case 'search':
           nextMode = 'search';
           break;
-        case 'publish':
-          nextMode = 'publish';
-          break;
-        case 'publish-detail':
-          nextMode = 'publish-detail';
+        case 'share':
+          nextMode = 'share';
           break;
         case 'import':
           nextMode = 'import';
@@ -284,10 +280,8 @@ function mountRoom(mode: MiddleMode, target: HTMLElement, toasts: ToastManager):
       return mountSearch(target);
     case 'knowledge':
       return mountKnowledgeRoom(target, toasts);
-    case 'publish':
-      return mountPublishRoom(target);
-    case 'publish-detail':
-      return mountPublishDetail(target);
+    case 'share':
+      return mountShareRoom(target, toasts);
     case 'import':
       return mountImportRoom(target);
     case 'templates':

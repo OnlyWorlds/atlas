@@ -1,8 +1,8 @@
 # Atlas — Sharing Design
 
-**Version**: 1.0 (2026-05-25) — fresh design (supersedes `DESIGN_PUBLISHING.md`)
-**Status**: Direction locked through design conversation (session 234). Data-model + backend **provisional** — co-owned with Anchor (Django), finalized when we build. Sequenced **after** the Knowledge foundation.
-**Related**: `DESIGN_KNOWLEDGE.md` (the foundation Sharing consumes), `DESIGN.md` (rooms), `DESIGN_WRITING.md` (narrative authoring)
+**Version**: 1.1 (2026-06-07) — the 5 OPEN calls CLOSED (session 237); S1 + S2 built
+**Status**: Share room + block builder (heading / prose / element-card) + visitor preview SHIPPED (session 237, atlas-side, no backend). The atlas↔backend contract is drafted at **`SHARING_CONTRACT.md`** — route to Anchor via Captain. S4 (publish flow) deliberately unbuilt until the contract settles; S3 (theme tokens) + S5 (Circle block) + Track C (viewer tool) next.
+**Related**: `DESIGN_KNOWLEDGE.md` (the foundation Sharing consumes), `DESIGN.md` (rooms), `DESIGN_WRITING.md` (narrative authoring), `SHARING_CONTRACT.md` (backend contract draft)
 
 > **Supersedes `DESIGN_PUBLISHING.md`.** That doc was built on the dead write-tool prototype's assumptions (atlas = thin client, reuse the old showcase API as-is, one-showcase-per-element, opaque `showcase_config`). Nobody used the prototype; nothing to migrate. We start fresh — Anchor builds whatever Django model the design needs.
 
@@ -120,23 +120,36 @@ The **Circle block** is the bridge to the Knowledge foundation:
 
 ---
 
-## OPEN — to finalize with Anchor / as we build
+## Decisions — the 5 calls, CLOSED (session 237 design conversation)
 
-These are direction-set but not locked (the Knowledge foundation is the priority to build first):
+Settled with Captain from `PHASE_SHARING_BRIEF.md` (kept as the decision record); flexible if building proves any of them wrong, but all five survived the S1/S2 build:
 
-1. **How a Page is stored.** Lean: page *prose* = a Narrative (`subtype: "page"`); composition/theme/field-visibility = `atlas_*` config; the published artifact = a **frozen snapshot in a new Django model** Anchor builds. World stays clean for other tools; the public snapshot is self-contained. *(Needs Anchor.)*
-2. **v1 authoring mode.** Lean: start **prose-first** (page = narrative, cheapest, reuses the writing room, best for Show/Publish), blocks/composition-first follow (best for the DM Reference page). The biggest scoping call — revisit when we start building Sharing.
-3. **Backend model shape** — Anchor's domain. We hand her a contract (page record, snapshot payload, slug uniqueness, view counts, revoke, quota).
-4. **Revoke semantics** — does deleting a page remove the public snapshot, or just unlink it? Confirm with Anchor.
-5. **Showcase ↔ page exact boundary** — is the World Showcase a special live Page, or its own record? (Lean: a Page flagged live + singular per world.)
+1. **Page storage = lean hybrid.** A page is a Narrative `subtype: "page"`. Composition lives in atlas-local fields: `atlas_page_blocks` (the source of truth) + `atlas_page_refs` (flat element-id mirror — keeps element-card bindings id-swap-safe via the existing `rewriteIdReferences` contract; `blocksOf()` heals nested ids positionally) + `atlas_page_intent` + `atlas_page_theme` (reserved). The canonical `story` field carries a **derived plain-markdown compilation** regenerated on every blocks save — synced + readable on other devices/tools, never hand-edited. The published artifact = a frozen snapshot in Anchor's Django model (`SHARING_CONTRACT.md`). *(Resolves the call-1 wrinkle: an unpublished page's composition lives only in the local element file; the snapshot is born at first publish.)*
+2. **v1 authoring = minimal-blocks.** Builder UI from day one with three blocks (heading / prose / element-card); the architecture is block-shaped from the start, so the set grows without a prose→blocks migration. Page prose runs **NO mention-derive** — mentions render chips (presentation) but never write Involves fields; a page's element bindings are its element-card blocks. The third narrative kind is sealed via `core/narrative-kind.ts` (story / knowledge / page — writing tree, promote, and setup heuristics all exclude non-story kinds).
+3. **Backend contract** → `SHARING_CONTRACT.md` (global slug namespace, api_key+PIN auth, payload schema derived from the as-built block model).
+4. **Revoke = tombstone.** Content deleted, slug retained, URL serves "no longer shared". Owner can republish to their revoked slug.
+5. **Showcase = a Page flagged `is_live`, unique per world.** One model, one endpoint set, one viewer code path (live = server-side re-resolution of the same envelope).
 
 ---
 
 ## Build Phases
 
 - **Phase 2 (after Knowledge):** World Showcase + Pages, the block/token builder, snapshot publish → Anchor's Django model → clean URL + custom slug, the viewer tool, a Sharing room in atlas (list/manage, copy link, republish, revoke, preview-as-visitor).
+  - **S1 + S2 SHIPPED (session 237)**: share room (`#/w/<id>/share[/<pageId>]`, legacy `/publish` aliases), page CRUD (create-with-unique-name, rename, intent, delete-with-confirm), block builder (heading + prose + element-card; one-block-at-a-time editing; reorder/delete; TipTap prose via lazy `share-editor` chunk; per-field disclosure checklist on full cards), **visitor preview** via the portable `share-page-render.ts` (the Track C seed), sync round-trip test-locked (`sharing-sync.test.ts`: id-swap heal + strip + pull-overlay).
+  - **Next**: contract to Anchor → S3 theme tokens · Track C viewer scaffold (after payload lock) · S4 publish flow (backend-blocked) · S5 Circle block.
 - **Phase 2.5:** the Circle block + "publish for a Circle" bridge.
 - **Phase 3:** live reveal-by-group, graduated map reveal, depth-aware disclosure, theming polish.
+
+---
+
+## Conventions (extends the global list; continues from DESIGN_KNOWLEDGE's #72)
+
+- **#73 — Page = Narrative `subtype: "page"`, third narrative kind.** Classification is `core/narrative-kind.ts` (`story` / `knowledge` / `page`) — any surface consuming "narratives" decides which kinds it means through this seam, never ad-hoc subtype checks.
+- **#74 — Blocks are the page's source of truth; `story` is a derived mirror.** Every blocks save goes through `pageBlocksPatch()` which writes blocks + refs mirror + compiled story in one patch. Nothing else writes a page's `story`.
+- **#75 — The refs mirror keeps card bindings id-swap-safe.** `atlas_page_refs` = element-card ids in block order (flat array → handled by `rewriteIdReferences`); `blocksOf()` heals each card's nested id from the mirror positionally. Never read `atlas_page_blocks` raw for rendering — always via `blocksOf()`.
+- **#76 — Page prose never derives relations.** Mentions/chips in page prose are presentation; no Involves writes, no holder semantics. The page's element bindings are its element-card blocks (mirrored in refs).
+- **#77 — Page writes are serialized per room mount** (a promise chain): two rapid edits on the same element race inside FolderStore's read-merge-write and silently lose the first field otherwise.
+- **#78 — `share-page-render.ts` stays store-free.** It takes resolved data (an elements Map) and returns DOM — the visitor preview and the future viewer tool share it. No imports from state/store/sync, ever.
 
 ---
 

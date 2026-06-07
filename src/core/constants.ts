@@ -160,6 +160,18 @@ export const ATLAS_LOCAL_EXTENSION_FIELDS = [
   // to this array on the narrative. Surfaces NOT to suggest again for this
   // narrative. Atlas-local; never pushed.
   'atlas_dismissed_suggestions',
+  // Sharing page composition (DESIGN_SHARING.md, core/sharing.ts). Stored on
+  // Narrative elements with subtype 'page'. The blocks array is the page's
+  // source of truth; `atlas_page_refs` is the flat element-id mirror that
+  // keeps element-card bindings id-swap-safe (rewriteIdReferences handles
+  // flat arrays; blocksOf() heals nested ids from the mirror). Intent is the
+  // sharing axis (show/reference/publish); theme is reserved for the S3
+  // token work. The canonical `story` field carries a derived plain-markdown
+  // compilation (synced); these four never reach the OW API.
+  'atlas_page_blocks',
+  'atlas_page_refs',
+  'atlas_page_intent',
+  'atlas_page_theme',
 ] as const;
 export type AtlasLocalExtensionField = typeof ATLAS_LOCAL_EXTENSION_FIELDS[number];
 

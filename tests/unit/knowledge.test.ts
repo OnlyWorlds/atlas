@@ -25,6 +25,7 @@ import {
   elementsKnownAboutBy,
   listKnowers,
   knowersOfElement,
+  lensKnownSet,
 } from '../../src/core/knowledge';
 import type { Element } from '../../src/core/types';
 
@@ -176,6 +177,19 @@ describe('listKnowers (the Knowers tab)', () => {
   it('sorts collectives before characters', () => {
     const ids = listKnowers(world).map(e => e.id);
     expect(ids.indexOf('col1')).toBeLessThan(ids.indexOf('c2'));
+  });
+});
+
+describe('lensKnownSet (the known-view lens)', () => {
+  it('contains the knower + held entries + their subjects, nothing else', () => {
+    // Ireena holds k2 (party membership) → about [c2, loc1].
+    expect([...lensKnownSet('c1', world)].sort()).toEqual(['c1', 'c2', 'k2', 'loc1']);
+  });
+  it('a circle lens covers its directly-held entries + subjects', () => {
+    expect([...lensKnownSet('col1', world)].sort()).toEqual(['c2', 'col1', 'k2', 'loc1']);
+  });
+  it('non-knower → only themself (the rest of the world dims)', () => {
+    expect([...lensKnownSet('loc1', world)]).toEqual(['loc1']);
   });
 });
 

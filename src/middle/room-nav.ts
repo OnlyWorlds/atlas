@@ -20,7 +20,7 @@ import {
   knowledgeHash,
   timelineHash,
   searchHash,
-  publishHash,
+  shareHash,
   importHash,
   templatesHash,
   settingsHash,
@@ -32,11 +32,11 @@ import { elementHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
 
 interface RoomDef {
-  id: RouteMode | 'home' | 'writing' | 'knowledge' | 'timeline' | 'search' | 'publish' | 'import' | 'templates' | 'settings';
+  id: RouteMode | 'home' | 'writing' | 'knowledge' | 'timeline' | 'search' | 'share' | 'import' | 'templates' | 'settings';
   label: string;
   icon: string; // Material Symbols name
   hashFor: (worldId: string) => string;
-  /** Routes that count as "active" for this nav button (handles publish-detail too). */
+  /** Routes that count as "active" for this nav button. */
   matches: RouteMode[];
 }
 
@@ -48,7 +48,7 @@ const ROOMS: RoomDef[] = [
   { id: 'knowledge', label: 'Knowledge', icon: 'menu_book',      hashFor: knowledgeHash, matches: ['knowledge'] },
   { id: 'timeline',  label: 'Timeline',  icon: 'timeline',       hashFor: timelineHash,  matches: ['timeline'] },
   { id: 'search',    label: 'Search',    icon: 'search',         hashFor: (w) => searchHash(w), matches: ['search'] },
-  { id: 'publish',   label: 'Publish',   icon: 'ios_share',      hashFor: publishHash,   matches: ['publish', 'publish-detail'] },
+  { id: 'share',     label: 'Share',     icon: 'ios_share',      hashFor: (w) => shareHash(w), matches: ['share'] },
   { id: 'import',    label: 'Import',    icon: 'download',       hashFor: importHash,    matches: ['import'] },
   { id: 'templates', label: 'Templates', icon: 'extension',      hashFor: templatesHash, matches: ['templates'] },
   { id: 'settings',  label: 'Settings',  icon: 'settings',       hashFor: (w) => settingsHash(w), matches: ['settings'] },

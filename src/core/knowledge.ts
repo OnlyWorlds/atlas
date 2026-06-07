@@ -182,6 +182,22 @@ export function listKnowers(elements: Element[]): Element[] {
 }
 
 /**
+ * The element ids inside a knower's lens (the known-view lens — everything
+ * else dims): the knower themself, the knowledge entries they hold, and the
+ * elements those entries are about. Strictly derived from knowledge — circle
+ * co-membership or other relationships grant nothing (the text is the
+ * knowledge, convention #70).
+ */
+export function lensKnownSet(knowerId: string, elements: Element[]): Set<string> {
+  const known = new Set<string>([knowerId]);
+  for (const entry of knowledgeHeldBy(knowerId, elements)) {
+    known.add(entry.id);
+    for (const id of aboutIdsOf(entry)) known.add(id);
+  }
+  return known;
+}
+
+/**
  * The DIRECT holders (narrator Characters + Circles) of every knowledge entry
  * that is *about* the given element — "who knows about X, via what." Members
  * of holding circles are not expanded (the circle IS the answer). Used by the

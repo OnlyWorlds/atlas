@@ -16,7 +16,7 @@
  */
 
 import type { Element } from '../core/types';
-import { isKnowledgeNarrative } from '../core/knowledge';
+import { isStoryNarrative } from '../core/narrative-kind';
 import type { FsFolderStore } from '../store/folder-store-fs';
 import type { WritingLabels } from './writing-helpers';
 
@@ -42,11 +42,12 @@ export function buildPromoteCandidates(
   elements: Element[],
   labels: WritingLabels,
 ): PromoteCandidate[] {
-  // Knowledge entries (subtype 'knowledge') are excluded explicitly — they're
-  // flat by design (DESIGN_KNOWLEDGE.md) so today they'd be skipped as loose
-  // narratives anyway, but the writing tree and the knowledge system should
-  // stay separate even if either's shape changes.
-  const narratives = elements.filter(e => e.type === 'narrative' && !isKnowledgeNarrative(e));
+  // Only STORY narratives are tree material — knowledge entries and sharing
+  // pages are excluded explicitly (core/narrative-kind.ts). Both are flat by
+  // design so today they'd be skipped as loose narratives anyway, but the
+  // writing tree and the other narrative kinds should stay separate even if
+  // either's shape changes.
+  const narratives = elements.filter(e => isStoryNarrative(e));
   if (narratives.length === 0) return [];
 
   // Build parent → children map and depth via BFS from roots.

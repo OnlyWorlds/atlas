@@ -1,7 +1,7 @@
 # Atlas — Design Document
 
-**Version**: 1.1 (2026-06-07) — folder-first rebuild
-**Status**: Feature-complete for v1 (phases 0–6 + 3.5 shipped) + Knowledge phase 1 (session 235, see `DESIGN_KNOWLEDGE.md`). Next arc: Sharing (`DESIGN_SHARING.md`). Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
+**Version**: 1.2 (2026-06-07) — folder-first rebuild
+**Status**: Feature-complete for v1 (phases 0–6 + 3.5 shipped) + Knowledge phase 1 (sessions 235-236, `DESIGN_KNOWLEDGE.md`) + Sharing S1/S2 (session 237, `DESIGN_SHARING.md` — share room, block builder, visitor preview; publish flow awaits `SHARING_CONTRACT.md`). Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
 **Predecessor**: `tools/atlas-deprecated/` (IDB-cached architecture, retained as UI/UX reference)
 
 ---
@@ -563,8 +563,7 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 | `knowledge` | `#/w/<id>/knowledge[/<entryId>\|/new\|/knower/<id>]` | Knowledge entries — who knows what. [Entries \| Knowers] tabs, draft editor (persists nothing until create), embedded TipTap prose w/ mentions, known-view per knower. See `DESIGN_KNOWLEDGE.md` | shipped (phase 1) |
 | `timeline` | `#/w/<id>/timeline` | Full timeline view | shipped |
 | `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | shipped |
-| `publish` | `#/w/<id>/publish` | Sharing home (rename to `share` planned — S1). See `DESIGN_SHARING.md` | stub |
-| `publish-detail` | `#/w/<id>/publish/<showcase_id>` | Page/showcase detail (model per `DESIGN_SHARING.md`) | stub |
+| `share` | `#/w/<id>/share[/<pageId>]` | Sharing pages — list + block builder + visitor preview. Legacy `/publish` URLs alias here. See `DESIGN_SHARING.md` | shipped (S1+S2; publish flow awaits backend) |
 | `import` | `#/w/<id>/import` | Explanation + reference to base-tool import; mechanics deferred | stub |
 | `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | stub |
 | `settings` | `#/w/<id>/settings[/<tab>]` | Account / storage / editing (atlas-wide) · world / writing / context (per-world) | shipped |
@@ -664,8 +663,9 @@ Hash-based, no server rewrites needed (Cloudflare Pages friendly).
 #/w/<worldId>/knowledge/knower/<knowerId>   → known-view (the world as a character/circle knows it)
 #/w/<worldId>/timeline                      → full timeline room
 #/w/<worldId>/search?q=<query>              → search room
-#/w/<worldId>/publish                       → publish home (showcase list)
-#/w/<worldId>/publish/<showcaseId>          → showcase detail
+#/w/<worldId>/share                         → share room (page list)
+#/w/<worldId>/share/<pageId>                → share room, page builder
+                                              (legacy /publish[/<id>] still parses as an alias)
 #/w/<worldId>/import                        → import room
 #/w/<worldId>/templates                     → templates room
 #/w/<worldId>/settings                      → settings (default tab)
@@ -687,8 +687,7 @@ Hash-based, no server rewrites needed (Cloudflare Pages friendly).
 - `knowledgeHash(worldId, knowledgeId?)` / `knowledgeKnowerHash(worldId, knowerId)`
 - `timelineHash(worldId)`
 - `searchHash(worldId, query?)`
-- `publishHash(worldId)`
-- `publishDetailHash(worldId, showcaseId)`
+- `shareHash(worldId, pageId?)`
 - `importHash(worldId)`
 - `templatesHash(worldId)`
 - `settingsHash(worldId, tab?)`
@@ -774,7 +773,7 @@ Inherited from legacy (hard-won; preserve in new code):
 
 46. **Writing room derives target element from URL, NOT from `state.ui.selectedElementId`.** `element-detail.ts:getSelectedElement` branches: when `route.mode === 'writing'`, it returns `route.sceneId ?? route.chapterId ?? route.bookId` (each is a narrative id by URL contract). Otherwise it falls back to `route.elementId ?? state.ui.selectedElementId`. Writing room's `mountEditor` MUST NOT patch `state.ui.selectedElementId` on narrative navigation — that would clobber the user's persisted global selection. The URL is the single source of truth for writing-room navigation; `state.ui.selectedElementId` is the global selection that persists across rooms (and feeds the convention #45 chip). Writing tree highlighting in the sidebar also reads URL, not `selectedElementId`. Without this decoupling, opening writing erases whatever element you had selected — the chip would mirror the active narrative instead of preserving the prior context. Implemented session 226 alongside convention #45 chip; previously writing.ts mirrored the URL into `selectedElementId` for element-detail's benefit, which leaked the writing selection across rooms.
 
-Related: convention #32 (Esc clears selection + nav home) is **gated to NOT fire when route is `writing` OR `knowledge`** — those rooms own their keyboards (editing surfaces + URL-owned navigation); pulling the user out AND clearing their persisted global selection on one Esc keystroke surprised more than it helped. `hotkeys.ts:'deselect-to-home'` skips when the hash includes `/writing` or `/knowledge` (knowledge added session 235).
+Related: convention #32 (Esc clears selection + nav home) is **gated to NOT fire when route is `writing`, `knowledge`, OR `share`** — those rooms own their keyboards (editing surfaces + URL-owned navigation); pulling the user out AND clearing their persisted global selection on one Esc keystroke surprised more than it helped. `hotkeys.ts:'deselect-to-home'` skips when the hash includes `/writing`, `/knowledge`, or `/share` (knowledge added session 235; share added session 237).
 
 47-57. **Writing conventions** — codified in `DESIGN_WRITING.md` (richtext storage, ow:// link scheme, atlas_aliases, UNION-on-save, workspace replacement gate, material-symbols scoping, autolink rules, sticky bar, ambient word count, add-to-cast unification, compiled view). See that doc for details. Numbering reserved for cross-doc consistency.
 
@@ -797,6 +796,8 @@ Related: convention #32 (Esc clears selection + nav home) is **gated to NOT fire
 66. **`defaultCreateType` is a `ui-prefs` pref, not URL/registry state** (session 233). The element-create modal preselects `loadUiPrefs().defaultCreateType` when opened without an explicit `initialType` (sidebar +, home, hotkey, writing inline-create, map contextual). It's an app-level persistent pref (localStorage via `core/ui-prefs.ts`), set from Settings → Editing. The DESIGN sketch once placed it on `UiState`; ui-prefs is the correct home (same migration as `sidebarMode` in session 223 — app-level + persistent, neither navigational nor world-specific). The modal re-validates the preselected type against the effective (post-`excludeTypes`) set in `buildModal`, so an excluded default (e.g. 'map' in the map contextual flow) can't stick — it falls back to the first offered type. `ui-prefs` setters must load-merge-save (`{ ...loadUiPrefs(), <field>: v }`) so adding a field doesn't clobber siblings.
 
 67-72. **Knowledge conventions** — codified in `DESIGN_KNOWLEDGE.md` (knowledge entry = Narrative subtype, about vs held-by field split + the mention-derive `collectives` exclusion, knowing is computed, the text is the knowledge, fidelity = separate entries, Circle = a Collective acting as knower). Numbering reserved for cross-doc consistency, same as 47-57.
+
+73-78. **Sharing conventions** — codified in `DESIGN_SHARING.md` (page = Narrative subtype 'page' + the narrative-kind seam, blocks are truth / story is a derived mirror, the refs mirror for id-swap-safe card bindings, page prose never derives relations, per-room serialized page writes, `share-page-render.ts` stays store-free). Numbering reserved for cross-doc consistency.
 
 ---
 
@@ -922,7 +923,7 @@ src/
 ├── registry/      # localStorage registry + per-world helpers
 ├── layout/        # 3-pane app-shell
 ├── sidebar/       # sidebar driver + worlds / elements / writing bodies
-├── middle/        # rooms: element-detail(+header/fields/refs), world-home, writing-workspace(+modules), timeline, search, settings-panel(+per-tab modules)
+├── middle/        # rooms: element-detail(+header/fields/refs), world-home, writing-workspace(+modules), knowledge-room(+editor), share-room(+editor/+page-render), timeline, search, settings-panel(+per-tab modules)
 ├── tabs/right/    # map-index, map-tab(+concern modules), context-tab(+graph/toolbar/lists/preview), zone-drawing/edit, ghost-pins
 ├── visualization/ # leaflet-2d (Leaflet2DManager, ZoneOverlay, ZoneGeometry) + timeline-bar
 ├── editor/        # field-schema (SDK adapter) + field-descriptions
@@ -939,7 +940,7 @@ Root: `DESIGN.md` (+ per-room `DESIGN_*.md`), `PROGRESS.md` (operational log), `
 
 ## Build History
 
-All phases (0 → 6 + 3.5) shipped by session 221; rooms model + writing system (223-228); context pane (229-231); maintenance splits (232-233); Knowledge phase 1 (234-235). Cutover happened — atlas lives at `github.com/OnlyWorlds/atlas`; `tools/atlas-deprecated/` is retained as UI/UX reference only. See `docs-archive/PROGRESS-history.md` for session-by-session detail. Sync soft-edges live in `SYNC_NOTES.md`.
+All phases (0 → 6 + 3.5) shipped by session 221; rooms model + writing system (223-228); context pane (229-231); maintenance splits (232-233); Knowledge phase 1 (234-236); Sharing S1/S2 + backend contract draft (237). Cutover happened — atlas lives at `github.com/OnlyWorlds/atlas`; `tools/atlas-deprecated/` is retained as UI/UX reference only. See `docs-archive/PROGRESS-history.md` for session-by-session detail. Sync soft-edges live in `SYNC_NOTES.md`.
 
 ---
 
@@ -971,9 +972,26 @@ Atlas extends OnlyWorlds with capabilities that don't (yet) live in the OW schem
 | `atlas_richtext_json` | Narrative | TipTap JSON for the richtext story body | Maybe — if OW adds richtext-on-story support |
 | `atlas_aliases` | Any element | `string[]` of name aliases for linking | **Yes** — broadly useful (writers want it; pickers want it; search wants it) |
 
-### Sharing/page extensions (planned, per DESIGN_SHARING.md)
+### Semantic reinterpretations (candidates for first-class schema)
 
-The old showcase-config `atlas_*` extension list (richtext/layout/bundle/theme/cover) belonged to the superseded write-tool-prototype model (`DESIGN_PUBLISHING.md`). The sharing redesign stores page composition/theme as `atlas_*` config plus a frozen snapshot in a new Django model — exact field set is finalized with Anchor when the Sharing phase starts. See `DESIGN_SHARING.md` "OPEN" items.
+Beyond atlas-only *fields*, atlas also reinterprets canon fields in ways other OW tools can't see. These are tracked here as schema-requirement candidates — same pipeline as `atlas_shape`/`atlas_aliases`, but the motion would add new fields rather than promote an `atlas_*` one:
+
+| Reinterpretation | Where | Motion shape | Status |
+|---|---|---|---|
+| Narrative `narrator` + `collectives` read as **knowledge holders** when `subtype: "knowledge"` | `DESIGN_KNOWLEDGE.md` (conventions #67-72, "De-hiding path") | First-class `held_by_characters` / `held_by_collectives` on Narrative, then migrate off the reinterpretation | Logged 2026-06-07 (session 236). Draft the council motion once Knowledge proves out in real use. |
+
+### Sharing/page extensions (as built, session 237 — per DESIGN_SHARING.md)
+
+Stored on Narrative elements with `subtype: "page"`; all in `ATLAS_LOCAL_EXTENSION_FIELDS`:
+
+| Field | Purpose | Council-motion candidate? |
+|---|---|---|
+| `atlas_page_blocks` | The page's block stack (source of truth; heading/prose/element-card v1) | No — composition is presentation config |
+| `atlas_page_refs` | Flat element-id mirror of the element-card bindings (id-swap safety via `rewriteIdReferences`; `blocksOf()` heals nested ids) | No — internal mechanics |
+| `atlas_page_intent` | show / reference / publish | Probably not — sharing metadata |
+| `atlas_page_theme` | Reserved for the S3 theme tokens | Probably not — visual pref |
+
+The published artifact is a frozen snapshot in a new Django model — see `SHARING_CONTRACT.md` (drafted session 237, Anchor pending). The canonical `story` field on a page carries a derived plain-markdown compilation of the blocks (synced, readable by other tools, regenerated on every blocks save — never hand-edited).
 
 ### World-level / per-world atlas-only state (atlas-only forever)
 

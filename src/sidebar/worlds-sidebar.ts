@@ -315,7 +315,8 @@ export async function activateWorld(
   // is left in the registry helpers but not invoked here.
   if (!preserveSelection) {
     patchSlice('data', { elements: [] });
-    patchSlice('ui', { ...getState().ui, selectedElementId: null });
+    // knowledgeLens cleared too — it references a knower of the OLD world.
+    patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null });
     const currentRoute = parseHash(window.location.hash);
     if (currentRoute.worldId !== worldId) {
       // Session 223: activate → home, not /elements. Sidebar mode is

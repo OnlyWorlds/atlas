@@ -17,7 +17,7 @@ import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { getActiveStore } from '../core/active-store';
-import { CONTENT_ELEMENT_TYPES, type ElementType } from '../core/types';
+import { CONTENT_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { createMapDialog } from './map-create-modal';
@@ -68,6 +68,13 @@ export interface ElementCreateOptions {
   onPlaceExisting?: (id: string, type: ElementType) => void;
   /** Override the modal title. Default: 'New element'. */
   title?: string;
+  /**
+   * Extra fields merged into the created element body — e.g. the knowledge
+   * room's "+ new circle" passes `{ subtype: 'circle' }` so the tag lands in
+   * the same write as the create (no follow-up patch). The user-typed name
+   * wins over any collision. Ignored by the inline map-create delegate flow.
+   */
+  extraData?: Record<string, unknown>;
   /**
    * Skip the post-create `navigate(elementHash(...))` jump. Used by flows
    * that want to stay in their current view after creation — e.g. the writing
@@ -309,7 +316,7 @@ export class ElementCreateModal extends BaseModal {
         }
 
         const store = getActiveStore()!;
-        const el = await store.createElement(this.selected, { name });
+        const el = await store.createElement(this.selected, { ...this.opts.extraData, name } as Partial<Element>);
         const elements = await store.listElements();
         patchSlice('data', { elements });
         patchSlice('ui', { ...getState().ui, selectedElementId: el.id });

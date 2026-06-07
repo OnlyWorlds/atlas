@@ -23,9 +23,10 @@
  * (focus/typing survive background sync).
  */
 
-import { getState, subscribe } from '../core/state';
+import { getState, subscribe, patchSlice } from '../core/state';
 import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, parseHash, onHashChange } from '../core/router';
 import { getActiveStore } from '../core/active-store';
+import { getEditorSettings } from '../registry/registry';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { escapeText } from '../core/dom-utils';
 import {
@@ -141,6 +142,14 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   let draft: Draft | null = null;
   let heldByMount: HTMLElement | null = null;
   let aboutMount: HTMLElement | null = null;
+  // Whether the mounted view actually found its target. False = not-found
+  // interim (deep URL before elements load, id-swap transient, deleted entry)
+  // — same-view ticks retry a full build instead of a surgical refresh.
+  let mountedResolved = true;
+  // Elements ref at last list/knower build — same-view ticks skip the full
+  // rebuild when nothing in the data actually changed (hash-echo renders,
+  // ui-slice patches), so scroll position survives idle ticks.
+  let lastBuiltElementsRef: readonly Element[] | null = null;
 
   // ---- prose editor session (K3) --------------------------------------------
   let editorMount: KnowledgeEditorHandle | null = null;
@@ -207,6 +216,49 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const s = pendingSnapshot;
       pendingSnapshot = null;
       await persistEditorSnapshot(s);
+    }
+  }
+
+  /** Drop any debounced prose save without writing it (delete flow). */
+  function cancelPendingSave(): void {
+    if (pendingSaveTimer !== null) {
+      window.clearTimeout(pendingSaveTimer);
+      pendingSaveTimer = null;
+    }
+    pendingSnapshot = null;
+  }
+
+  /**
+   * Delete a saved entry. Confirm is gated by the Editing setting (same as
+   * element-detail); pending prose saves are cancelled (moot once deleted);
+   * navigate to the list BEFORE the data tick so the editor never renders a
+   * not-found state for its own deletion.
+   */
+  async function deleteEntry(id: string): Promise<void> {
+    const folder = getActiveStore();
+    const worldId = wid();
+    if (!folder || !worldId) return;
+    const el = elOf(id);
+    if (getEditorSettings(getState().registry).confirm_before_delete) {
+      let dependentCount = 0;
+      try {
+        dependentCount = (await folder.findDependents(id)).length;
+      } catch { /* fall through with 0 */ }
+      const extra = dependentCount > 0
+        ? ` This will also remove ${dependentCount} dependent element${dependentCount === 1 ? '' : 's'}.`
+        : '';
+      if (!window.confirm(`Delete "${el?.name || 'this knowledge entry'}"?${extra}`)) return;
+    }
+    cancelPendingSave();
+    navigate(knowledgeHash(worldId));
+    try {
+      await folder.deleteElement(id);
+      await refreshElementsAfterWrite(folder);
+      requestPushIfLinked();
+      toasts.success(`Deleted ${el?.name || 'knowledge entry'}`);
+    } catch (err) {
+      console.error('[knowledge-room] delete failed', err);
+      toasts.error('Could not delete knowledge entry');
     }
   }
 
@@ -405,12 +457,47 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     container.appendChild(chips);
   }
 
+  /**
+   * Honest interim when a view's target id isn't in the element cache —
+   * deep URL before elements load, an id-swap transient, or a genuinely
+   * deleted element. No navigation (the URL stays truthful), no per-tick
+   * teardown churn: `mountedResolved = false` makes the next data tick retry
+   * a full build, which resolves the transient cases automatically.
+   */
+  function renderNotFound(kind: 'entry' | 'knower'): void {
+    const worldId = wid()!;
+    root.innerHTML = '';
+    heldByMount = aboutMount = null;
+    mountedResolved = false;
+    const header = document.createElement('header');
+    header.className = 'atlas-room-header atlas-knowledge-detail-header';
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'atlas-btn-ghost atlas-knowledge-back';
+    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span> ${kind === 'knower' ? 'all knowers' : 'all knowledge'}`;
+    back.addEventListener('click', () => {
+      if (kind === 'knower') roomTab = 'knowers';
+      navigate(knowledgeHash(worldId));
+    });
+    header.appendChild(back);
+    root.appendChild(header);
+    const empty = document.createElement('div');
+    empty.className = 'atlas-knowledge-empty';
+    empty.innerHTML = `
+      <p class="atlas-knowledge-empty-title">${kind === 'knower' ? 'Knower not found.' : 'Knowledge entry not found.'}</p>
+      <p class="atlas-knowledge-hint">It may still be loading, or it no longer exists in this world.</p>
+    `;
+    root.appendChild(empty);
+  }
+
   // ---- home view (Entries | Knowers tabs) ------------------------------------
 
   function buildHome(): void {
     const worldId = wid()!;
     root.innerHTML = '';
     heldByMount = aboutMount = null;
+    mountedResolved = true;
+    lastBuiltElementsRef = getState().data.elements;
 
     const header = document.createElement('header');
     header.className = 'atlas-room-header';
@@ -470,10 +557,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           initialType: 'collective',
           suppressNavigate: true,
           title: 'New circle',
+          // Circle tag (organizational only — convention #72) lands in the
+          // same write as the create, so it surfaces in this list even before
+          // holding anything. Guarded: a user who flips the category in the
+          // modal shouldn't mint e.g. a circle-subtyped location.
+          extraData: { subtype: CIRCLE_SUBTYPE },
           onCreated: (id, type) => {
-            // Tag as a circle (organizational only — convention #72) so it
-            // surfaces in this list even before holding anything.
-            if (type === 'collective') void patchEntry(id, { subtype: CIRCLE_SUBTYPE });
+            if (type !== 'collective') void patchEntry(id, { subtype: '' });
           },
         }).open();
       });
@@ -582,13 +672,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const elements = getState().data.elements;
     const knower = elOf(knowerId);
     if (!knower || !isKnowerType(knower.type)) {
-      roomTab = 'knowers';
-      mountedView = 'list';
-      buildHome();
+      renderNotFound('knower');
       return;
     }
     root.innerHTML = '';
     heldByMount = aboutMount = null;
+    mountedResolved = true;
+    lastBuiltElementsRef = elements;
 
     const isCircle = knower.type === 'collective';
     const held = knowledgeHeldBy(knowerId, elements);
@@ -616,6 +706,24 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       <h1><span class="material-symbols-outlined atlas-knowledge-knower-icon">${isCircle ? 'groups' : (ELEMENT_ICONS[knower.type] ?? 'person')}</span>${escapeText(knower.name || '(unnamed)')}</h1>
       <span class="atlas-knowledge-knower-meta">${escapeText(metaBits.join(' · '))}</span>
     `;
+    // Lens toggle — dims everything this knower doesn't know in the elements
+    // sidebar (DESIGN_KNOWLEDGE.md "Known-view lens"). Persists across rooms;
+    // the sidebar banner carries the always-visible exit. Active-state class
+    // is also updated locally because a ui-only patch doesn't rebuild this
+    // view (the same-elements tick guard skips it).
+    const lensActive = () => getState().ui.knowledgeLens?.knowerId === knowerId;
+    const lensBtn = document.createElement('button');
+    lensBtn.type = 'button';
+    lensBtn.className = 'atlas-knowledge-lens-toggle' + (lensActive() ? ' is-active' : '');
+    lensBtn.title = 'Dim everything this knower doesn\'t know (elements sidebar)';
+    lensBtn.innerHTML = `<span class="material-symbols-outlined">visibility</span> lens`;
+    lensBtn.addEventListener('click', () => {
+      const next = lensActive() ? null : { knowerId };
+      patchSlice('ui', { ...getState().ui, knowledgeLens: next });
+      lensBtn.classList.toggle('is-active', next !== null);
+    });
+    titleRow.appendChild(lensBtn);
+
     const openEl = document.createElement('button');
     openEl.type = 'button';
     openEl.className = 'atlas-knowledge-allfields';
@@ -773,10 +881,10 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const isDraft = entryId === null;
     const entry = isDraft ? null : elOf(entryId!);
     if (!isDraft && (!entry || entry.type !== 'narrative')) {
-      mountedView = 'list';
-      buildHome();
+      renderNotFound('entry');
       return;
     }
+    mountedResolved = true;
     if (isDraft && !draft) {
       // Restore an abandoned draft from the per-world stash; fresh otherwise.
       draft = loadDraftStash(worldId)
@@ -804,6 +912,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       allFields.textContent = 'all fields →';
       allFields.addEventListener('click', () => navigate(elementHash(worldId, entry!.id)));
       titleRow.appendChild(allFields);
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'atlas-knowledge-delete';
+      del.title = 'Delete this knowledge entry';
+      del.innerHTML = `<span class="material-symbols-outlined">delete</span>`;
+      del.addEventListener('click', () => { void deleteEntry(entry!.id); });
+      titleRow.appendChild(del);
     }
     header.appendChild(titleRow);
     root.appendChild(header);
@@ -943,12 +1058,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           draft.story = snap.markdown;
           draft.richtextJson = snap.json;
           persistDraft();
+          // Holder toast is independent of the derived-key gate: a collective
+          // never changes the derived set (excluded from about), so an
+          // autolink-converted circle would otherwise miss the lesson.
+          if (proseMentionsCollective(snap.markdown)) maybeToastDroppedCollective();
           // Refresh the About chips only when the derived set actually changed.
           const key = derivedAboutIds(snap.markdown).slice().sort().join(',');
-          if (key !== lastDerivedKey) {
-            if (proseMentionsCollective(snap.markdown)) maybeToastDroppedCollective();
-            refreshDraftAbout(ctx);
-          }
+          if (key !== lastDerivedKey) refreshDraftAbout(ctx);
         } else {
           scheduleEditorSave(snap);
         }
@@ -959,7 +1075,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   /** Same-view tick (saved editor): refresh chips + title + editor decorations; leave inputs alone. */
   function refreshEditorData(entryId: string): void {
     const el = elOf(entryId);
-    if (!el) { mountedView = 'list'; buildHome(); return; }
+    if (!el) {
+      // Entry vanished from the cache mid-view (server delete pulled in, or
+      // an id-swap re-keyed it — the route migration follows momentarily).
+      destroyEditorSession();
+      renderNotFound('entry');
+      return;
+    }
     // Title is plain text (not an input) — safe to sync after renames/pulls.
     const h1 = root.querySelector('.atlas-knowledge-detail-titlerow h1');
     const title = el.name || '(untitled)';
@@ -994,9 +1116,26 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const tgt = knowerId ? `knower:${knowerId}` : (!kid ? 'list' : kid);
 
     if (tgt === mountedView) {
-      if (tgt === 'list') buildHome();
-      else if (tgt.startsWith('knower:')) buildKnower(knowerId!);
-      else if (tgt === NEW) refreshDraftData();
+      if (!mountedResolved) {
+        // Not-found interim — retry a full build (resolves once the element
+        // cache catches up; stays on the interim otherwise).
+        if (tgt === 'list') buildHome();
+        else if (tgt.startsWith('knower:')) buildKnower(knowerId!);
+        else if (tgt === NEW) buildEditor(null);
+        else buildEditor(tgt);
+        return;
+      }
+      if (tgt === 'list') {
+        if (getState().data.elements !== lastBuiltElementsRef) rebuildPreservingScroll(buildHome);
+      } else if (tgt.startsWith('knower:')) {
+        if (getState().data.elements !== lastBuiltElementsRef) rebuildPreservingScroll(() => buildKnower(knowerId!));
+        else {
+          // ui-only tick (e.g. lens cleared via the sidebar banner ×) — keep
+          // the toggle's active class honest without a rebuild.
+          const btn = root.querySelector('.atlas-knowledge-lens-toggle');
+          btn?.classList.toggle('is-active', getState().ui.knowledgeLens?.knowerId === knowerId);
+        }
+      } else if (tgt === NEW) refreshDraftData();
       else refreshEditorData(tgt);
       return;
     }
@@ -1008,6 +1147,18 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     else if (tgt.startsWith('knower:')) { draft = null; buildKnower(knowerId!); }
     else if (tgt === NEW) { buildEditor(null); }
     else { draft = null; buildEditor(tgt); }
+  }
+
+  /**
+   * Full rebuild that keeps the user's scroll position (the room root is the
+   * scroll container — `.atlas-knowledge-room { overflow-y: auto }`). Used on
+   * same-view data ticks; view SWITCHES rebuild without this so new content
+   * starts at the top.
+   */
+  function rebuildPreservingScroll(build: () => void): void {
+    const st = root.scrollTop;
+    build();
+    queueMicrotask(() => { root.scrollTop = st; });
   }
 
   function parseRichtextJson(raw: unknown): JSONContent | null {

@@ -4,9 +4,13 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-06-07 session 235 close)
+## CURRENT STATE (handover snapshot, 2026-06-07 session 237 close)
 
-**Session 235** = hygiene + doc alignment, THEN **Knowledge phase 1 COMPLETED**: **K3** (embedded TipTap editor — mentions/autolink/chips, draft parity, `collectives` excluded from the derive + toast), **K4** (Knowers tab + known-view `/knowledge/knower/<id>`), **K6** (element-detail "Knowledge" section), context-pane interim (entry/knower as graph subject), and a Captain-smoke fix (single-link fields were invisible to the context graph). New `core/ow-links.ts` + `core/narrative-fields.ts` canonical homes keep the derive TipTap-free; `knowledge-editor.ts` lazy chunk keeps TipTap code-split (verified: main bundle clean). **735 vitest + 136 Playwright + typecheck + build green.** Full entry below. **Knowledge is feature-complete for phase 1 — next arc: Sharing (Track B/C/D); K5 (graph knowledge-mode) deferred past Sharing.** Captain's visual smoke of the new surfaces still pending (checklist below).
+**Session 237** = **Sharing arc opened: the 5 calls CLOSED + S1/S2 BUILT + the Anchor contract DRAFTED.** Design conversation settled all five `PHASE_SHARING_BRIEF.md` calls (lean-hybrid page storage · minimal-blocks v1 · global slugs + api_key/PIN auth · tombstone revoke · showcase = live-flagged page) plus three build-decisions (blocks JSON is truth + derived `story` mirror · pages stay in the elements sidebar v1 · NO publish affordance until backend). Four bouts: **(1) Foundations + share room** — `core/sharing.ts` (block model v1: heading/prose/element-card; `blocksOf()` heals card ids from the flat `atlas_page_refs` mirror so id-swap can't strand bindings; `pageBlocksPatch` keeps blocks+refs+story in lockstep), `core/narrative-kind.ts` (story/knowledge/page seam — writing tree/promote/setup + element-detail refs all exclude non-story kinds), 4 new `ATLAS_LOCAL_EXTENSION_FIELDS` (blocks/refs/intent/theme — fakes reject automatically), route `publish`→`share` (legacy alias parses), share room (list + intent chips + create/rename/delete), `/share/<id>` id-swap migration, Esc-gate. **Lost-update race found & fixed**: rapid same-element writes race FolderStore's read-merge-write — page writes now serialize through a promise chain (convention #77). **(2) Block builder** — one-block-at-a-time editing, lazy `share-editor` TipTap chunk (mentions/chips, NO derive — convention #76), reorder/delete, derived story mirror. **(3) Element-card + preview** — picker-bound cards, compact/full, per-field disclosure checklist, `share-page-render.ts` (store-free, the Track C viewer seed) powering both static blocks AND the visitor preview toggle. **(4) `SHARING_CONTRACT.md` DRAFT** — Django model, endpoints, snapshot payload schema (from the as-built block model), slug/revoke/quota/live-resolve semantics, open questions for Anchor. **Captain SHIPPED the contract to Anchor at session close — she is investigating; expect her reply next session** (her answers to §8's six questions + any model pushback drive S4 + Track C timing). Conventions #73-78 in DESIGN_SHARING. Sync round-trip test-locked (`sharing-sync.test.ts`, full adapter+SDK+MSW stack). **760 vitest + 148 Playwright + typecheck + build green** (share-editor is its own lazy chunk; TipTap still absent from main). **Post-smoke fix**: the generic element picker's "All" list now excludes pin/marker/zone (the type strip already did — Captain's card picker showed stray pins; one rule at the picker boundary now covers every generic pick, knowledge subjects included; `restrictToType` still reaches those types). +1 e2e regression assert. **Next session opener**: (1) `/receive` or check for **Anchor's reply** to the contract — her answers reshape S4 + Track C timing; (2) backend-free build candidates, roughly in value order: **S5 Circle block** (the Knowledge bridge — the differentiator) · **map block** · "Featured in" real reverse-scan over `atlas_page_refs` (~20 lines, currently decorative) · element-collection block · S3 theme tokens · drag-reorder; (3) Track C viewer scaffold can start once the contract payload shape survives Anchor's review. Captain smoked all 10 items of the 237 checklist (one fix: generic picker map-artifact leak, closed same-session).
+
+**Session 236** = Knowledge **functionally complete** (critical review verdict → 4 gap-closing bouts): in-room **entry delete** (confirm + cascade count), honest **not-found interims** (no URL hijack, no tick churn), same-elements **tick guard** + scroll preservation for list/knower rebuilds, **known-view LENS v1** (sidebar world-dimming via transient `ui.knowledgeLens`, banner exit, id-swap migration; map reveal stays Later-phase), `extraData` on ElementCreateModal (circle tag in one write), and **sync round-trip locked by tests** (`knowledge-sync.test.ts` — full adapter+SDK+MSW stack: id-swap FK rewrites incl. circle membership, richtext stripped-on-wire + survives id-swap + pull-overlay, server-created entries recognized on pull). Holder-field reinterpretation **logged as schema-requirement candidate** (DESIGN.md "Semantic reinterpretations"). **741 vitest + 140 Playwright + typecheck + build green** (TipTap verified absent from main chunk; **e2e now runs `workers: 4` — full suite ~52s**, validated 2× + stress). Captain smoked 235's checklist + 236's five items (all passed). **Next arc: Sharing — open with `PHASE_SHARING_BRIEF.md`** (the 5 OPEN calls framed with options + recs → Anchor contract → S1+S2). K5 (graph knowledge-mode + drag-to-wire) deferred past Sharing.
+
+**Session 235** = hygiene + doc alignment, THEN **Knowledge phase 1 core**: **K3** (embedded TipTap editor — mentions/autolink/chips, draft parity, `collectives` excluded from the derive + toast), **K4** (Knowers tab + known-view `/knowledge/knower/<id>`), **K6** (element-detail "Knowledge" section), context-pane interim (entry/knower as graph subject), and a Captain-smoke fix (single-link fields were invisible to the context graph). New `core/ow-links.ts` + `core/narrative-fields.ts` canonical homes keep the derive TipTap-free; `knowledge-editor.ts` lazy chunk keeps TipTap code-split (verified: main bundle clean). Full entry below.
 
 **Session 234** = Knowledge + Sharing **design** (two new docs + Build Map below) + **Knowledge phase-1 build**: K1 (room skeleton) · K2 (in-room detail + held-by editor) · K4-core (known-view scan functions + unit tests). Atlas-only, pure-local. Full entry below the Build Map.
 
@@ -20,19 +24,20 @@ Designed session 234 (`DESIGN_KNOWLEDGE.md` + `DESIGN_SHARING.md`). Build order:
 
 **Critical path**: Knowledge phase 1 (atlas) → define atlas↔backend *page contract* with Anchor → parallel { Anchor: Django backend · Temper: viewer tool + atlas share-room/block-builder } → integrate → Circle block (needs Knowledge).
 
-### Track A — Knowledge (atlas-only, pure-local) — ✅ PHASE 1 COMPLETE (session 235)
+### Track A — Knowledge (atlas-only, pure-local) — ✅ PHASE 1 FUNCTIONALLY COMPLETE (session 236)
 - **K1 — Room skeleton** ✅ (234)
 - **K2 — Entry detail + held-by** ✅ (234) — narrator = solo Character · collectives = Circles, two channels only
 - **K3 — Authoring** ✅ (235) — embedded writing-editor component; @-mentions populate about-links with **`collectives` excluded from the derive** (mention ≠ holdership — DESIGN_KNOWLEDGE "Mention-derive exclusion")
 - **K4 — Known-view + knowers** ✅ (core 234, UI 235) — [Entries | Knowers] tabs + `/knowledge/knower/<id>`
-- **K5 — Graph knowledge-mode + drag-to-wire + lens** — **DEFERRED past Sharing** (delight feature, not load-bearing)
+- **K5 — Graph knowledge-mode + drag-to-wire** — **DEFERRED past Sharing** (delight feature, not load-bearing). The **lens** part of K5 shipped early (236) — sidebar world-dimming, see DESIGN_KNOWLEDGE "Known-view lens".
 - **K6 — Element-detail surfacing** ✅ (235) — "Knowledge" section: Known by / Subject of / Holds
+- **Lifecycle + lens + sync confidence** ✅ (236) — in-room delete, not-found interims, lens v1, knowledge-sync integration tests, schema-candidate logging
 
-### Track B — Sharing, atlas-side (partly buildable now; publish blocked on backend)
-- **S1 — Share room shell**: rename `publish`→`share` route; page list/gallery (empty until backend); World Showcase slot.
-- **S2 — Block builder UI**: single-column stack + ~8 blocks + per-block layout menu — *prototypable locally with no backend* (renders from local config).
-- **S3 — Theme tokens UI**: the ~6 tokens + live preview.
-- **S4 — Publish flow**: POST → backend, return URL/slug. **BLOCKED on Anchor contract.**
+### Track B — Sharing, atlas-side
+- **S1 — Share room shell** ✅ (237) — `share` route (legacy `publish` aliases), page list + intent chips, create/rename/intent/delete.
+- **S2 — Block builder UI** ✅ (237) — heading/prose/element-card, one-block-at-a-time editing, reorder/delete, per-field disclosure on full cards, visitor preview via portable `share-page-render.ts`. (~8-block set + per-block layout menus grow from here without migration.)
+- **S3 — Theme tokens UI**: the ~6 tokens + live preview. (`atlas_page_theme` field already registered.)
+- **S4 — Publish flow**: POST → backend, return URL/slug. **BLOCKED on Anchor contract** (`SHARING_CONTRACT.md` DRAFTED 237 — routing to Anchor is Captain's call).
 - **S5 — Circle block**: needs Track A done. ✅ unblocked.
 
 ### Track C — Viewer tool (new deployed tool, phase 2 — Temper)
@@ -46,6 +51,32 @@ Designed session 234 (`DESIGN_KNOWLEDGE.md` + `DESIGN_SHARING.md`). Build order:
 - **The atlas↔backend contract is the coordination artifact** — define when the Sharing arc starts (DESIGN_SHARING "OPEN" items 1-5).
 
 **Status:** Track A — **PHASE 1 COMPLETE (session 235)**. Next arc: **Sharing** — settle DESIGN_SHARING's OPEN calls (page storage model, v1 authoring mode) → write the Anchor contract → build S1 + S2 (no backend needed).
+
+---
+
+## Session 236 (2026-06-07) — Knowledge functionally complete: lifecycle gaps, lens v1, sync tests, schema candidate
+
+Same-day continuation. Captain's brief: "functional, feature-complete frontend AND backend for Knowledge" → critical review of design + code + tests produced a tiered gap list → 4 autonomous bouts, per-bout gated. Decisions locked up front: lens ships now (drag-to-wire/graph-mode stays K5-deferred); holder-field motion LOGGED not drafted; 235's smoke checklist considered passed (Captain tested informally).
+
+**Backend verdict from the review**: Knowledge needs NO new backend — entries are plain Narratives on canon fields; sync was already architecturally complete. What was missing was *verification*, now locked by tests (bout 2).
+
+### Bout 1 — functional completion
+- **In-room entry delete**: trash icon in the editor title row; confirm gated by `confirm_before_delete` (+ cascade count via `findDependents`, same pattern as element-detail); cancels pending debounced prose saves (moot once deleted); navigates to the list BEFORE the data tick so the editor never renders not-found for its own deletion. +1 e2e (dismiss-then-accept dialog flow — NOTE: the confirm fires async after an awaited findDependents; specs must `page.waitForEvent('dialog')`, not stack `once` handlers).
+- **Not-found interims**: missing entry/knower id now renders an honest "not found" block + back button — URL stays truthful (was: silent home render with stale URL for knowers, `mountedView` override causing per-tick teardown churn). `mountedResolved` flag makes data ticks retry a full build, which auto-resolves the deep-URL-before-load and id-swap transients. `refreshEditorData`'s vanished-entry path routes here too. +1 e2e.
+- **Same-elements tick guard**: list + knower views only rebuild when `data.elements` ref actually changed (`lastBuiltElementsRef`); rebuilds preserve scrollTop (`rebuildPreservingScroll` — room root is the scroll container). Ends sync-tick scroll resets on api-linked worlds.
+- **Draft autolink toast edge**: holder toast moved outside the derived-key gate (a collective never changes the derived set — excluded from about — so an autolink-converted circle missed the lesson).
+- **`ElementCreateModal.extraData`**: caller-supplied fields merged into the create body; "+ new circle" tags `subtype: 'circle'` in the same write (was create-then-patch). Defensive `onCreated` clears the tag if the user flips category in the modal.
+
+### Bout 2 — sync confidence
+- **`tests/integration/knowledge-sync.test.ts`** (3 tests, FULL production stack: engine → OwClientAdapter → real SDK → MSW strict validator + server-assigned ids): (1) first-push id-swap rewrites narrator/collectives/locations + circle membership, computed-knowing scans resolve on the post-swap set, `atlas_richtext_json` absent server-side but **survives the id-swap locally** (the swapped record carries it through `applyServerRecord` at a fresh id); (2) pull-overlay of a server-side story edit preserves local richtext (extension-field overlay contract); (3) server-created knowledge entries are recognized by the scans on pull — zero migration, the computed model's payoff.
+- **Unlink e2e**: locks the conservative rule — unlink replaces chip with plain text and RETAINS the field while the name still appears in prose; the About chip × is the explicit subject-removal path.
+
+### Bout 3 — known-view lens v1
+- `ui.knowledgeLens: { knowerId } | null` (transient, never persisted) + `lensKnownSet()` in core/knowledge (knower + held entries + their subjects — strictly knowledge-derived). Toggle in the known-view header; **elements sidebar** dims outside-set rows (opacity 0.22, hover 0.7) + cyan banner "world as X knows it" with the exit ×. Persists across rooms (exploration is the point); cleared on world switch; knower id migrates in `handleIdSwap` (same class as the pin-placement migration). Map-pin dimming deliberately NOT in v1 (graduated map reveal = Later phase, DESIGN_KNOWLEDGE Build Phases). +3 unit, +1 e2e.
+
+### Bout 4 — docs + close
+- DESIGN.md: new **"Semantic reinterpretations"** schema-candidate table (narrator/collectives-as-holders → future `held_by_*` motion). DESIGN_KNOWLEDGE v1.3: status, lens section, de-hiding cross-link, sync-tests note. This entry.
+- Full Playwright suite at close (see CURRENT STATE numbers).
 
 ---
 

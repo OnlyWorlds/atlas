@@ -254,14 +254,14 @@ export function defaultBindings(): HotkeyBinding[] {
       // writing-room navigation is owned by the URL hierarchy; Esc pulling
       // the user out of writing AND clearing their persisted global selection
       // surprised more than it helped. Writing room exits via room-nav click.
-      // Same gate for the knowledge room (session 235) — it has its own
-      // editing surfaces + URL-owned navigation; Esc yanking the user to home
-      // mid-entry is the identical trap.
+      // Same gate for the knowledge room (session 235) and the share room
+      // (Sharing arc) — both have their own editing surfaces + URL-owned
+      // navigation; Esc yanking the user to home mid-edit is the identical trap.
       when: () => {
         if (!getCallbacks().hasSelectedElement?.()) return false;
         if (isAnyOverlayActive()) return false;
         const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        if (hash.includes('/writing') || hash.includes('/knowledge')) return false;
+        if (hash.includes('/writing') || hash.includes('/knowledge') || hash.includes('/share')) return false;
         return true;
       },
       action: () => { getCallbacks().deselectToHome?.(); },

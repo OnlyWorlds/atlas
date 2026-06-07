@@ -295,6 +295,135 @@ test('context pane graphs an open entry: narrator + circle holders appear as nei
   await expect(pane.locator('.atlas-context-graph-node', { hasText: 'Barovia' })).toBeVisible();
 });
 
+test('unlink chip keeps prose text + field; About × is the explicit removal path', async ({ page }) => {
+  await setupWorld(page);
+  const baroviaId = await createElement(page, 'location', { name: 'Barovia' });
+  const entryId = await createElement(page, 'narrative', {
+    name: 'rumor', subtype: 'knowledge', story: '',
+  });
+
+  await openKnowledge(page);
+  await page.click('.atlas-knowledge-row:has-text("rumor")');
+  await waitForKnowledgeEditor(page);
+  await page.locator('.atlas-knowledge-prose-rich .ProseMirror').click();
+  await page.keyboard.type('All of @bar');
+  await expect(page.locator('.atlas-mention-popover')).toBeVisible();
+  await page.keyboard.press('Enter');
+  await page.keyboard.type(' suffers.');
+
+  // Debounced save derives the subject into `locations`.
+  await expect.poll(async () => {
+    const entry = await getElement(page, entryId);
+    return Array.isArray(entry?.locations) && entry.locations.includes(baroviaId);
+  }, { timeout: 5000 }).toBe(true);
+
+  // Right-click the chip → Unlink: chip becomes plain text. The field is
+  // RETAINED while the element's name still appears in the prose
+  // (conservative rule in unlinkChip — the text still references Barovia);
+  // explicit subject removal lives on the About chip ×.
+  await page.click('.atlas-knowledge-prose-rich .atlas-element-chip', { button: 'right' });
+  await page.click('.atlas-prose-context-menu [data-role="unlink-chip"]');
+  await expect(page.locator('.atlas-knowledge-prose-rich .atlas-element-chip')).toHaveCount(0);
+  await expect(page.locator('.atlas-knowledge-prose-rich .ProseMirror')).toContainText('Barovia');
+  const entry = await getElement(page, entryId);
+  expect(entry.locations).toContain(baroviaId);
+
+  // About × — removes the subject from the matching Involves field.
+  await page.locator('.atlas-knowledge-chip', { hasText: 'Barovia' })
+    .locator('.atlas-knowledge-chip-remove').click();
+  await expect.poll(async () => {
+    const e = await getElement(page, entryId);
+    return Array.isArray(e?.locations) ? e.locations.includes(baroviaId) : false;
+  }, { timeout: 5000 }).toBe(false);
+});
+
+test('in-room delete: confirm dialog, entry removed, lands on the list', async ({ page }) => {
+  await setupWorld(page);
+  const entryId = await createElement(page, 'narrative', {
+    name: 'doomed rumor', subtype: 'knowledge', story: 'Soon gone.',
+  });
+
+  await openKnowledge(page);
+  await page.click('.atlas-knowledge-row:has-text("doomed rumor")');
+  await expect(page).toHaveURL(new RegExp(`/knowledge/${entryId}$`));
+
+  // NOTE: the confirm fires AFTER an awaited findDependents, i.e. async to
+  // the click — await each dialog explicitly instead of stacking once-handlers.
+
+  // First attempt: dismiss the confirm — nothing happens.
+  const dismissed = page.waitForEvent('dialog').then(d => d.dismiss());
+  await page.click('.atlas-knowledge-delete');
+  await dismissed;
+  await expect(page.locator('.atlas-knowledge-detail-titlerow h1')).toHaveText('doomed rumor');
+
+  // Second attempt: accept — entry deleted, back on the (now empty) list.
+  const accepted = page.waitForEvent('dialog').then(d => d.accept());
+  await page.click('.atlas-knowledge-delete');
+  await accepted;
+  await expect(page).toHaveURL(/\/knowledge$/);
+  await expect(page.locator('.atlas-knowledge-empty')).toBeVisible();
+  await page.waitForFunction((eid) => {
+    const s = (window as any).__atlasTestApi.getState();
+    return !s.data.elements.some((e: any) => e.id === eid);
+  }, entryId);
+});
+
+test('missing entry id renders a not-found interim, not a hijacked URL', async ({ page }) => {
+  await setupWorld(page);
+  await openKnowledge(page);
+
+  // Navigate to a knowledge id that doesn't exist.
+  await page.evaluate(() => {
+    const m = window.location.hash.match(/#\/w\/([^/]+)/);
+    if (!m) throw new Error('no active world in URL');
+    window.location.hash = `#/w/${m[1]}/knowledge/00000000-0000-0000-0000-000000000000`;
+  });
+
+  // Honest interim: URL stays, not-found copy shows, back button works.
+  await expect(page.locator('.atlas-knowledge-empty-title')).toHaveText('Knowledge entry not found.');
+  await expect(page).toHaveURL(/\/knowledge\/00000000-0000-0000-0000-000000000000$/);
+  await page.click('.atlas-knowledge-back');
+  await expect(page).toHaveURL(/\/knowledge$/);
+});
+
+test('known-view lens dims unknown elements in the sidebar; banner × clears it', async ({ page }) => {
+  await setupWorld(page);
+  const ireenaId = await createElement(page, 'character', { name: 'Ireena' });
+  const baroviaId = await createElement(page, 'location', { name: 'Barovia' });
+  await createElement(page, 'location', { name: 'Vallaki' }); // Ireena knows nothing about it
+  await createElement(page, 'narrative', {
+    name: 'the curse', subtype: 'knowledge', story: 'Barovia is cursed.',
+    narrator: ireenaId, locations: [baroviaId],
+  });
+
+  // Sidebar → elements mode so the list is visible alongside the known-view.
+  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
+  await expect(page.locator('.atlas-row[data-element-id]').first()).toBeVisible();
+
+  // Open Ireena's known-view, toggle the lens on.
+  await openKnowledge(page);
+  await page.click('.atlas-knowledge-tab:has-text("knowers")');
+  await page.click('.atlas-knowledge-row:has-text("Ireena")');
+  await page.click('.atlas-knowledge-lens-toggle');
+  await expect(page.locator('.atlas-knowledge-lens-toggle')).toHaveClass(/is-active/);
+
+  // Banner names the knower; the unknown location dims, the known one doesn't.
+  await expect(page.locator('.atlas-lens-banner')).toBeVisible();
+  await expect(page.locator('.atlas-lens-banner-label')).toContainText('Ireena');
+  await expect(page.locator('.atlas-row.atlas-row-lens-dim[data-element-id]', { hasText: 'Vallaki' })).toBeVisible();
+  await expect(page.locator(`.atlas-row[data-element-id="${baroviaId}"]`)).not.toHaveClass(/atlas-row-lens-dim/);
+  await expect(page.locator(`.atlas-row[data-element-id="${ireenaId}"]`)).not.toHaveClass(/atlas-row-lens-dim/);
+
+  // The lens persists across rooms — navigate to an element, still dimmed.
+  await page.click(`.atlas-row[data-element-id="${baroviaId}"]`);
+  await expect(page.locator('.atlas-row.atlas-row-lens-dim', { hasText: 'Vallaki' })).toBeVisible();
+
+  // Banner × clears: dimming gone, banner hidden.
+  await page.click('.atlas-lens-banner-off');
+  await expect(page.locator('.atlas-row.atlas-row-lens-dim')).toHaveCount(0);
+  await expect(page.locator('.atlas-lens-banner')).toBeHidden();
+});
+
 test('element detail surfaces Knowledge: known by + subject of (K6)', async ({ page }) => {
   await setupWorld(page);
   const ireenaId = await createElement(page, 'character', { name: 'Ireena' });

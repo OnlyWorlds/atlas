@@ -16,6 +16,7 @@
  */
 
 import { getState } from '../core/state';
+import { isStoryNarrative } from '../core/narrative-kind';
 import type { Element, WorldRegistryEntry } from '../core/types';
 
 export type WritingTier = 'l1' | 'l2' | 'l3' | 'l4' | null;
@@ -282,8 +283,11 @@ export function isWritingInitialized(
   if (entry?.writing_initialized) return true;
   // Detect "writing-shaped" candidates: narratives in a parent_narrative
   // chain. If any exist without supertype matching a writing label, the
-  // setup screen should run.
-  const narratives = elements.filter(e => e.type === 'narrative');
+  // setup screen should run. Only STORY narratives count — knowledge entries
+  // and sharing pages have their own rooms and must not trip the writing
+  // setup heuristics (their subtypes never match writing labels, which would
+  // otherwise make `allInTree` false forever).
+  const narratives = elements.filter(e => isStoryNarrative(e));
   if (narratives.length === 0) return true; // nothing to decide
   // If every narrative already has a writing-tree supertype, treat as inited.
   // (Could be a world filled by another tool that happens to use Book/Chapter/Scene.)

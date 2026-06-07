@@ -22,11 +22,12 @@
  */
 
 import { getState, patchSlice } from '../core/state';
-import { navigate, elementHash, writingHash, knowledgeHash, knowledgeKnowerHash } from '../core/router';
+import { navigate, elementHash, writingHash, knowledgeHash, knowledgeKnowerHash, shareHash } from '../core/router';
 import type { Element, ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { getTierForNarrative, getWritingLabels, type WritingTier } from './writing-helpers';
 import { isKnowledgeNarrative, aboutIdsOf, heldByOf, knowersOfElement } from '../core/knowledge';
+import { isPageNarrative } from '../core/sharing';
 import { humanizeFieldName } from './element-detail-fields';
 import { getEditorSettings } from '../registry/registry';
 
@@ -34,7 +35,7 @@ import { getEditorSettings } from '../registry/registry';
 const META_KEYS = new Set(['id', 'name', 'description', 'type', 'local_updated_at', 'server_updated_at']);
 
 /** Where a ref chip navigates. Sections set a default; groups may override. */
-type NavTarget = 'element' | 'writing' | 'knowledge-entry' | 'knowledge-knower';
+type NavTarget = 'element' | 'writing' | 'knowledge-entry' | 'knowledge-knower' | 'share-page';
 
 interface RefGroup {
   label: string;
@@ -51,11 +52,15 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
   const incoming = findIncomingReferences(el.id);
   if (incoming.length === 0) return null;
 
-  // Knowledge entries are narratives, but their chips must route to the
-  // knowledge room (not the writing room) — partition them out (K6).
+  // Knowledge entries and sharing pages are narratives, but their chips must
+  // route to their own rooms (not the writing room) — partition both out
+  // (K6 for knowledge; the Sharing arc for pages). v1 pages don't populate
+  // Involves fields, so the pages bucket is normally empty — defensive
+  // against hand-edited fields or a future block-derive.
   const allNarratives = incoming.filter(src => src.type === 'narrative');
   const knowledgeEntries = allNarratives.filter(src => isKnowledgeNarrative(src));
-  const narratives = allNarratives.filter(src => !isKnowledgeNarrative(src));
+  const pages = allNarratives.filter(src => isPageNarrative(src));
+  const narratives = allNarratives.filter(src => !isKnowledgeNarrative(src) && !isPageNarrative(src));
   const others = incoming.filter(src => src.type !== 'narrative');
 
   const wrap = document.createElement('div');
@@ -94,6 +99,16 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
         sectionClass: 'atlas-detail-section atlas-detail-refs-knowledge',
       }));
     }
+  }
+
+  if (pages.length > 0) {
+    wrap.appendChild(buildSection({
+      headerLabel: 'Featured in',
+      count: pages.length,
+      groups: [{ label: 'Pages', sources: pages }],
+      navigateTo: 'share-page',
+      sectionClass: 'atlas-detail-section atlas-detail-refs-pages',
+    }));
   }
 
   if (others.length > 0) {
@@ -240,6 +255,8 @@ function buildRefChip(src: Element, navigateTo: NavTarget): HTMLElement {
       navigate(knowledgeHash(worldId, src.id));
     } else if (navigateTo === 'knowledge-knower') {
       navigate(knowledgeKnowerHash(worldId, src.id));
+    } else if (navigateTo === 'share-page') {
+      navigate(shareHash(worldId, src.id));
     } else {
       patchSlice('ui', { ...getState().ui, selectedElementId: src.id });
       navigate(elementHash(worldId, src.id));

@@ -18,8 +18,10 @@
  *     #/w/<id>/writing/book/<bId>[/chapter/<cId>[/scene/<sId>]]
  *     #/w/<id>/timeline                           → full timeline room
  *     #/w/<id>/search?q=<query>                   → search room
- *     #/w/<id>/publish                            → publish home
- *     #/w/<id>/publish/<showcaseId>               → publish detail
+ *     #/w/<id>/share                              → share room (page list)
+ *     #/w/<id>/share/<pageId>                     → share room, page detail
+ *     LEGACY (still parsed, no longer emitted):
+ *     #/w/<id>/publish[/<id>]                     → aliases to /share[/<id>]
  *     #/w/<id>/import                             → import room
  *     #/w/<id>/templates                          → templates room
  *     #/w/<id>/settings[/<tab>]                   → settings room
@@ -46,8 +48,7 @@ export type RouteMode =
   | 'writing'
   | 'knowledge'
   | 'search'
-  | 'publish'
-  | 'publish-detail'
+  | 'share'
   | 'import'
   | 'templates';
 
@@ -92,8 +93,8 @@ export interface Route {
   knowledgeId?: string;
   /** Knowledge room known-view knower id (a Character or Circle/Collective). */
   knowerId?: string;
-  /** Publish detail room. */
-  showcaseId?: string;
+  /** Share room selected page id (page-subtype narrative). */
+  pageId?: string;
   /** Search room query string. */
   searchQuery?: string;
 }
@@ -160,10 +161,12 @@ export function parseHash(hash: string): Route {
     if (sub === 'import') return { worldId, mode: 'import' };
     if (sub === 'templates') return { worldId, mode: 'templates' };
 
-    if (sub === 'publish') {
-      const showcaseId = parts[3];
-      if (showcaseId) return { worldId, mode: 'publish-detail', showcaseId };
-      return { worldId, mode: 'publish' };
+    if (sub === 'share' || sub === 'publish') {
+      // 'publish' is the legacy route name (pre-Sharing-arc stub) — parsed
+      // as an alias, never emitted. Old showcase deep links land on the
+      // share room's not-found interim, which is honest.
+      const pageId = parts[3];
+      return pageId ? { worldId, mode: 'share', pageId } : { worldId, mode: 'share' };
     }
 
     if (sub === 'writing') {
@@ -274,12 +277,9 @@ export function searchHash(worldId: string, query?: string): string {
   return `${base}?q=${encodeURIComponent(query)}`;
 }
 
-export function publishHash(worldId: string): string {
-  return `#/w/${worldId}/publish`;
-}
-
-export function publishDetailHash(worldId: string, showcaseId: string): string {
-  return `#/w/${worldId}/publish/${showcaseId}`;
+/** Share room: `#/w/<worldId>/share[/<pageId>]`. */
+export function shareHash(worldId: string, pageId?: string): string {
+  return pageId ? `#/w/${worldId}/share/${pageId}` : `#/w/${worldId}/share`;
 }
 
 export function importHash(worldId: string): string {

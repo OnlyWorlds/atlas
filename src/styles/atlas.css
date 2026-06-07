@@ -6838,13 +6838,12 @@ a.atlas-writing-workspace-crumb-seg:hover {
   margin-bottom: 8px;
 }
 
-/* ---- Publish / Import / Templates stubs ---- */
+/* ---- Share / Import / Templates rooms ---- */
 
-.atlas-publish-room,
+.atlas-share-room,
 .atlas-import-room,
 .atlas-templates-room,
-.atlas-knowledge-room,
-.atlas-publish-detail {
+.atlas-knowledge-room {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -7227,29 +7226,143 @@ a.atlas-writing-workspace-crumb-seg:hover {
 
 .atlas-knowledge-allfields:hover { color: var(--atlas-cyan); }
 
-.atlas-publish-empty,
+/* Entry delete (trash icon in the editor title row) — muted until hover. */
+.atlas-knowledge-delete {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 4px;
+  background: transparent;
+  border: none;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.atlas-knowledge-delete .material-symbols-outlined { font-size: 16px; }
+
+.atlas-knowledge-delete:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+}
+
+/* ---- Knowledge lens (DESIGN_KNOWLEDGE.md "Known-view lens") ---- */
+
+/* Known-view header toggle. */
+.atlas-knowledge-lens-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+}
+
+.atlas-knowledge-lens-toggle .material-symbols-outlined { font-size: 14px; }
+
+.atlas-knowledge-lens-toggle:hover { color: var(--atlas-cyan); }
+
+.atlas-knowledge-lens-toggle.is-active {
+  color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.12);
+}
+
+/* Sidebar banner — visible while the lens is on; carries the exit ×. */
+.atlas-lens-banner {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px 4px 8px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(34, 211, 238, 0.08);
+  color: var(--atlas-cyan);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.atlas-lens-banner[data-active="true"] { display: flex; }
+
+.atlas-lens-banner-icon { font-size: 14px; flex: 0 0 auto; }
+
+.atlas-lens-banner-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-lens-banner-off {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px;
+  background: transparent;
+  border: none;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.atlas-lens-banner-off:hover { color: var(--atlas-cyan); }
+
+.atlas-lens-banner-off .material-symbols-outlined { font-size: 13px; }
+
+/* The dimming itself — the world going dark outside the knower's knowledge.
+   Transition scoped to the lens class (NOT bare .atlas-row) so drag-dim
+   (.atlas-row-dragging, opacity 0.45) stays instant. */
+.atlas-row.atlas-row-lens-dim { opacity: 0.22; transition: opacity 0.25s ease; }
+
+.atlas-row.atlas-row-lens-dim:hover { opacity: 0.7; }
+
 .atlas-import-body {
   padding: 0 24px;
   max-width: 680px;
 }
 
-.atlas-publish-hint {
-  font-size: 12px;
-  color: var(--atlas-text-muted);
-  margin-top: 8px;
+/* ---- Share room (DESIGN_SHARING.md — Track B) ---- */
+
+.atlas-share-actions {
+  margin: 0 24px 4px 24px;
 }
 
-.atlas-publish-list {
+.atlas-share-new {
+  align-self: flex-start;
+}
+
+.atlas-share-empty {
+  padding: 4px 24px 24px 24px;
+  max-width: 620px;
+}
+
+.atlas-share-empty-title {
+  font-size: 13px;
+  color: var(--atlas-text);
+  margin: 0;
+}
+
+.atlas-share-hint {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.atlas-share-list {
   padding: 8px 24px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.atlas-publish-row {
+.atlas-share-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   padding: 10px 14px;
   background: var(--atlas-bg-panel);
   border: 1px solid var(--atlas-divider);
@@ -7259,43 +7372,449 @@ a.atlas-writing-workspace-crumb-seg:hover {
   color: var(--atlas-text);
 }
 
-.atlas-publish-row:hover {
+.atlas-share-row:hover {
   border-color: var(--atlas-cyan-soft);
 }
 
-.atlas-publish-row-main {
+.atlas-share-row-icon {
+  font-size: 18px;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-share-row-main {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
-.atlas-publish-row-name {
+.atlas-share-row-name {
   font-size: 13px;
   font-weight: 500;
 }
 
-.atlas-publish-row-meta {
+.atlas-share-row-meta {
   font-size: 11px;
   color: var(--atlas-text-muted);
 }
 
-.atlas-publish-row-url {
-  font-size: 11px;
-  color: var(--atlas-text-muted);
-  font-family: monospace;
+/* Intent chip — sharing axis. Show = cyan (social), reference = amber
+   (audience-specific disclosure), publish = violet (permanent destination). */
+.atlas-share-intent-chip {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--atlas-cyan, #22d3ee);
+  flex-shrink: 0;
 }
 
-.atlas-publish-detail-card {
-  margin: 0 24px;
-  padding: 16px;
-  background: var(--atlas-bg-panel);
+.atlas-share-intent-chip[data-intent="reference"] {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.atlas-share-intent-chip[data-intent="publish"] {
+  background: rgba(139, 92, 246, 0.14);
+  color: #a78bfa;
+}
+
+.atlas-share-detail-header .atlas-share-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.atlas-share-detail-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.atlas-share-detail-titlerow h1 {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-share-delete {
+  background: none;
+  border: none;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: inline-flex;
+}
+
+.atlas-share-delete:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.atlas-share-delete .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.atlas-share-detail {
+  padding: 4px 24px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.atlas-share-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.atlas-share-field-label {
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-share-name {
+  max-width: 420px;
+}
+
+.atlas-share-intent {
+  max-width: 420px;
+}
+
+.atlas-share-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--atlas-text);
+  margin: 0 0 4px 0;
+}
+
+.atlas-share-section-hint {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ---- Share block builder (S2) ---- */
+
+.atlas-share-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atlas-share-block {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 6px 88px 6px 10px; /* right space reserves the controls strip */
+}
+
+.atlas-share-block:hover {
+  border-color: var(--atlas-divider);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.atlas-share-block.is-editing {
+  border-color: var(--atlas-cyan-soft);
+  padding-right: 10px;
+}
+
+.atlas-share-block-content.is-editable {
+  cursor: pointer;
+}
+
+.atlas-share-block-heading {
+  margin: 0;
+  color: var(--atlas-text);
+}
+
+h2.atlas-share-block-heading { font-size: 17px; }
+h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); }
+
+.atlas-share-block-placeholder {
+  margin: 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--atlas-text-muted);
+}
+
+/* Element card — identity row (+ image / chosen fields when full). Rendered
+   by the portable share-page-render module: builder, preview, and the future
+   viewer all share this CSS shape. */
+.atlas-share-card {
+  border: 1px solid var(--atlas-divider);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.015);
+  max-width: 480px;
+}
+
+.atlas-share-card.is-missing {
+  border-style: dashed;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-share-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-share-card-icon {
+  font-size: 17px;
+  color: var(--atlas-cyan, #22d3ee);
+}
+
+.atlas-share-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--atlas-text);
+}
+
+.atlas-share-card-type {
+  font-size: 10px;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-share-card-image {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  border-radius: 4px;
+  margin-top: 8px;
+  object-fit: cover;
+}
+
+.atlas-share-card-fields {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atlas-share-card-field-label {
+  font-size: 10px;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-share-card-field-value {
+  font-size: 12px;
+  color: var(--atlas-text);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  line-height: 1.5;
+}
+
+.atlas-share-card-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(34, 211, 238, 0.1);
+  color: var(--atlas-cyan, #22d3ee);
+  font-size: 11px;
+}
+
+.atlas-share-card-chip .material-symbols-outlined {
+  font-size: 13px;
+}
+
+/* Card editor (builder). */
+.atlas-share-card-edit-preview {
+  margin-bottom: 10px;
+}
+
+.atlas-share-card-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.atlas-share-card-edit-variants {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.atlas-share-card-edit-fields {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.atlas-share-card-edit-fieldrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--atlas-text);
+  cursor: pointer;
+}
+
+/* Preview toggle + the visitor view. */
+.atlas-share-preview-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
   border: 1px solid var(--atlas-divider);
   border-radius: 4px;
+  color: var(--atlas-text-muted);
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
 }
 
-.atlas-publish-detail-card p {
-  margin: 6px 0;
-  font-size: 13px;
+.atlas-share-preview-toggle:hover {
+  border-color: var(--atlas-cyan-soft);
+  color: var(--atlas-text);
+}
+
+.atlas-share-preview-toggle.is-active {
+  border-color: var(--atlas-cyan-soft);
+  color: var(--atlas-cyan, #22d3ee);
+}
+
+.atlas-share-preview-toggle .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.atlas-share-page-view {
+  padding: 8px 32px 48px 32px;
+  max-width: 720px;
+}
+
+.atlas-share-page-view-title {
+  font-size: 24px;
+  color: var(--atlas-text);
+  margin: 0 0 16px 0;
+}
+
+.atlas-share-page-view-block {
+  margin-bottom: 14px;
+}
+
+.atlas-share-page-view h2.atlas-share-block-heading {
+  margin-top: 20px;
+  font-size: 18px;
+}
+
+.atlas-share-page-view h3.atlas-share-block-heading {
+  margin-top: 14px;
+}
+
+/* Hover-revealed per-block controls (move / delete). */
+.atlas-share-block-controls {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  display: none;
+  gap: 2px;
+}
+
+.atlas-share-block:hover .atlas-share-block-controls {
+  display: inline-flex;
+}
+
+.atlas-share-block-ctrl {
+  background: none;
+  border: none;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: inline-flex;
+}
+
+.atlas-share-block-ctrl:hover:not(:disabled) {
+  color: var(--atlas-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.atlas-share-block-ctrl:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.atlas-share-block-ctrl .material-symbols-outlined {
+  font-size: 16px;
+}
+
+/* Inline editors. */
+.atlas-share-heading-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-share-heading-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.atlas-share-heading-levels {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.atlas-share-heading-level {
+  background: none;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 3px;
+  color: var(--atlas-text-muted);
+  font-size: 10px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+
+.atlas-share-heading-level.is-active {
+  border-color: var(--atlas-cyan-soft);
+  color: var(--atlas-cyan, #22d3ee);
+}
+
+.atlas-share-prose-edit .atlas-share-prose-rich {
+  border: none;
+  padding: 0;
+}
+
+.atlas-share-prose-loading {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.atlas-share-block-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.atlas-share-block-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.atlas-share-block-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.atlas-share-block-add-btn .material-symbols-outlined {
+  font-size: 15px;
 }
 
 /* ---- Notes overlay (src/ui/notes-overlay.ts) — per-world freeform notes ---- */

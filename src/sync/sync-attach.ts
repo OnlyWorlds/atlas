@@ -20,7 +20,7 @@ import { OwClientAdapter } from './ow-client-adapter';
 import { SyncEngine } from './sync-engine';
 import { patchSlice, getState, setState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
-import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, parseHash } from '../core/router';
+import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, shareHash, parseHash } from '../core/router';
 import type { FolderStore } from '../store/folder-store';
 import type { Element, WorldRegistryEntry, SyncEngineState, ElementType } from '../core/types';
 
@@ -571,6 +571,11 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
   if (placementChanged) {
     nextUi = { ...nextUi, pinPlacement: nextPinPlacement };
   }
+  // Knowledge lens follows its knower across the swap (same class as the
+  // pin-placement migration — a transient ui ref to a swappable element id).
+  if (current.ui.knowledgeLens && current.ui.knowledgeLens.knowerId === swap.old_id) {
+    nextUi = { ...nextUi, knowledgeLens: { knowerId: swap.new_id } };
+  }
 
   // Only setState if at least one slice actually changed — avoids a spurious
   // render when the swap doesn't intersect anything the UI is showing.
@@ -606,6 +611,11 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
   // collectives — they id-swap like any element on first push).
   if (route.mode === 'knowledge' && route.knowerId === swap.old_id && route.worldId === worldId) {
     navigate(knowledgeKnowerHash(worldId, swap.new_id));
+  }
+  // Share room detail: `/share/<old-id>` → new id (pages are narratives —
+  // same class as the knowledge-entry migration above).
+  if (route.mode === 'share' && route.pageId === swap.old_id && route.worldId === worldId) {
+    navigate(shareHash(worldId, swap.new_id));
   }
 }
 

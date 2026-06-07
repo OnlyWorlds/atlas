@@ -40,6 +40,7 @@ beforeEach(() => {
     pinPlacement: null,
     zoneEditing: null,
     sidebarWritingOverride: false,
+    knowledgeLens: null,
   });
   window.location.hash = '#/';
 });

@@ -13,6 +13,7 @@ import { getState, subscribe, patchSlice } from '../core/state';
 import { onHashChange, navigate, elementHash, searchHash } from '../core/router';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { lensKnownSet } from '../core/knowledge';
 import { ToastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { getCurrentSyncEngine, pullNowAndRefresh } from '../sync/sync-attach';
@@ -119,6 +120,28 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   searchInput.addEventListener('input', () => {
     patchSlice('ui', { ...getState().ui, search: searchInput.value });
   });
+
+  // ----- Knowledge lens banner (hidden unless ui.knowledgeLens is set) -----
+  // Explains why the list is dimmed + offers the exit. The lens persists
+  // across rooms, so this is the always-visible affordance (the toggle that
+  // set it lives in the known-view, which the user may have left).
+  const lensBanner = document.createElement('div');
+  lensBanner.className = 'atlas-lens-banner';
+  lensBanner.setAttribute('data-active', 'false');
+  const lensLabel = document.createElement('span');
+  lensLabel.className = 'atlas-lens-banner-label';
+  const lensOff = document.createElement('button');
+  lensOff.type = 'button';
+  lensOff.className = 'atlas-lens-banner-off';
+  lensOff.title = 'Turn the knowledge lens off';
+  lensOff.innerHTML = '<span class="material-symbols-outlined">close</span>';
+  lensOff.addEventListener('click', () => {
+    patchSlice('ui', { ...getState().ui, knowledgeLens: null });
+  });
+  lensBanner.innerHTML = '<span class="material-symbols-outlined atlas-lens-banner-icon">visibility</span>';
+  lensBanner.appendChild(lensLabel);
+  lensBanner.appendChild(lensOff);
+  content.appendChild(lensBanner);
 
   // ----- List body -----
   const listEl = document.createElement('div');
@@ -258,6 +281,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     if (!state.active) {
       strip.innerHTML = '';
+      lensBanner.setAttribute('data-active', 'false');
       // Empty-state copy depends on what action the user can actually take.
       // (Session 221 W2 follow-up: the sidebar's old "pick one from Worlds tab"
       // message lied when there were no worlds because no atlas root existed.)
@@ -283,6 +307,14 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const filters = state.ui.elementFilters;
     const query = state.ui.search.trim().toLowerCase();
     const selectedId = state.ui.selectedElementId;
+
+    // Knowledge lens: rows OUTSIDE the knower's known set dim. The banner
+    // names the knower + offers the exit ×.
+    const lens = state.ui.knowledgeLens;
+    const knower = lens ? elements.find(e => e.id === lens.knowerId) : undefined;
+    const knownSet = lens && knower ? lensKnownSet(lens.knowerId, elements) : null;
+    lensBanner.setAttribute('data-active', knownSet ? 'true' : 'false');
+    if (knownSet) lensLabel.textContent = `world as ${knower!.name || '(unnamed)'} knows it`;
 
     // Pins + markers are truly map artifacts — created from map interactions,
     // accessible via their owning map's element. Zones, despite being spatial,
@@ -350,6 +382,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
           locationsWithMaps.has(el.id),
           elementsOnActiveMap.has(el.id),
           flashingIds.has(el.id),
+          knownSet ? !knownSet.has(el.id) : false,
         ),
       )
       .join('');
@@ -385,9 +418,11 @@ function renderElementRow(
   hasMap: boolean,
   onActiveMap: boolean,
   flash: boolean,
+  lensDimmed: boolean,
 ): string {
   const icon = ELEMENT_ICONS[el.type] ?? 'category';
-  const cls = ['atlas-row', selected ? 'selected' : ''].filter(Boolean).join(' ');
+  const cls = ['atlas-row', selected ? 'selected' : '', lensDimmed ? 'atlas-row-lens-dim' : '']
+    .filter(Boolean).join(' ');
   const flashAttr = flash ? ' data-flash="true"' : '';
   // hasMap is set only for Location rows that have at least one map anchored.
   // Renders a small cyan-tinted map glyph between the name and the type chip.
