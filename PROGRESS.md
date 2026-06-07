@@ -4,7 +4,9 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-05-25 session 234 close)
+## CURRENT STATE (handover snapshot, 2026-06-07 session 235 close)
+
+**Session 235** = hygiene + doc alignment, THEN **Knowledge phase 1 COMPLETED**: **K3** (embedded TipTap editor — mentions/autolink/chips, draft parity, `collectives` excluded from the derive + toast), **K4** (Knowers tab + known-view `/knowledge/knower/<id>`), **K6** (element-detail "Knowledge" section), context-pane interim (entry/knower as graph subject). New `core/ow-links.ts` + `core/narrative-fields.ts` canonical homes keep the derive TipTap-free; `knowledge-editor.ts` lazy chunk keeps TipTap code-split (verified: main bundle clean). **735 vitest + 135 Playwright + typecheck + build green.** Full entry below. **Knowledge is feature-complete for phase 1 — next arc: Sharing (Track B/C/D); K5 (graph knowledge-mode) deferred past Sharing.**
 
 **Session 234** = Knowledge + Sharing **design** (two new docs + Build Map below) + **Knowledge phase-1 build**: K1 (room skeleton) · K2 (in-room detail + held-by editor) · K4-core (known-view scan functions + 15 unit tests). Atlas-only, pure-local. **728 vitest + 127 Playwright + typecheck + build green.** Full entry below the Build Map. Knowledge build continues at K3 (writing-editor embed) — collaborative. Pre-234 snapshot follows.
 
@@ -58,8 +60,8 @@ Designed session 234 (`DESIGN_KNOWLEDGE.md` + `DESIGN_SHARING.md`). Build order:
 
 ### Track A — Knowledge (atlas-only, pure-local, buildable NOW, no blockers)
 - **K1 — Room skeleton**: `knowledge` route + `knowledgeHash` + parse + room-nav icon + `MiddleMode 'knowledge'`; `isKnowledgeNarrative()` classifier (subtype === 'knowledge'); bare room = list of knowledge entries + empty state + "new knowledge entry" (creates a Narrative w/ `subtype:'knowledge'`). Pokeable.
-- **K2 — Entry detail + held-by**: select entry → detail; **held-by** editor (narrator = solo Character · collectives = Circles · conservator = Institution, via pickers); about-links display.
-- **K3 — Authoring**: embed the writing-workspace editor component for knowledge prose so @-mentions populate the about-links.
+- **K2 — Entry detail + held-by**: select entry → detail; **held-by** editor (narrator = solo Character · collectives = Circles — two channels only, via pickers); about-links display.
+- **K3 — Authoring**: embed the writing-workspace editor component for knowledge prose so @-mentions populate the about-links. **Derive runs with `collectives` excluded** (mention ≠ holdership — DESIGN_KNOWLEDGE "Mention-derive exclusion").
 - **K4 — Known-view + knowers sidebar**: `whatDoesXKnow(knowerId)` + `knownViewOfElement(elementId, knowerId)` scans; sidebar filtered to knowers; pick knower → known-view.
 - **K5 — Graph + circles + lens**: context-graph "knowledge mode" (wiring surface, drag-to-assign); "+ new Circle" (creates a Collective, opt `subtype:'circle'`); known-view "lens"; react-to-atlas-selection.
 - **K6 — (phase 1.5)**: element-detail "known by: [circles]" surfacing.
@@ -81,9 +83,53 @@ Designed session 234 (`DESIGN_KNOWLEDGE.md` + `DESIGN_SHARING.md`). Build order:
 - Endpoints: POST publish · GET public (no auth, cached) · PATCH republish · DELETE revoke · slug-uniqueness check · list-by-world. Quota enforcement. Snapshot-freeze at publish.
 - **The atlas↔backend contract is the coordination artifact** — define once Knowledge lands + we lock S-track page storage.
 
-**Status:** Track A — **K1 + K2 + K4-core shipped (session 234)**. Next: K3 (writing-editor embed), K4-UI (known-view render + knowers sidebar), K5 (graph mode + circles + lens) — all collaborative.
+**Status:** Track A — **PHASE 1 COMPLETE (session 235)**: K1 + K2 + K3 + K4 + K6 shipped; **K5 (graph knowledge mode + drag-to-wire + lens) deferred past Sharing** — delight feature, not load-bearing. Next arc: **Sharing** — S1 (share room shell) + S2 (block builder, locally prototypable) buildable now; S4 publish blocked on the Anchor contract (Track D).
 
 ---
+
+## Session 235 (2026-06-07) — Knowledge phase 1 completed: hygiene, K3 editor embed, K4 known-view, K6 surfacing
+
+Re-grounding session after a 12-day gap → critical pass over K-phase code + docs (bouts 1-2), then a design conversation locked four calls (trimmed editor embed · draft parity · in-room knower tabs over a sidebar takeover · the known-view screen shape) and bout 3 built K3 + K4 + K6 + the context interim. All green-gated; full suite at close: **735 vitest + 135 Playwright + typecheck + production build.**
+
+### Bout 3 — K3 + K4 + K6 build
+
+- **Code-split groundwork**: `OW_LINK_HREF_RE`/`createOwLinkScanner` → new `core/ow-links.ts` (chip module re-exports), making `writing-workspace-derive` TipTap-free so knowledge-room imports `computeRelationPatch`/`extractProseLinks` statically. Verified post-build: TipTap absent from the main chunk; `knowledge-editor` is its own lazy chunk.
+- **K3 — `knowledge-editor.ts`** (lazy, mirrors the writing.ts → workspace boundary): wraps `mountWorkspaceEditor` with mentions (`buildMentionItems`) + autolink + chips + chip hover-preview + a TRIMMED right-click menu (create-from-selection / link-autolink / unlink — no split, no global hotkey events). Unlink never touches `collectives` (holders are wired only via Held-by). Chip click → `atlas:context-select-element` (same gesture as writing).
+- **K3 — knowledge-room editor session**: prose host carries `.atlas-writing-workspace-prose .atlas-knowledge-prose-rich` (inherits typography/chips/hints; compact-box overrides; writing `:has` chrome can't leak — no `.atlas-writing-workspace` ancestor). Saved entries: debounced save (registry `sync_debounce_ms`) → `story` + `atlas_richtext_json` + `computeRelationPatch` **with `collectives` deleted from the patch** + one-shot toast ("mentioning a circle doesn't make it a holder"); flush on view-switch/unmount/pagehide. **Draft parity**: same editor; `onSnapshot` → `draft.story`/`draft.richtextJson` → stash; prose-derived subjects render as non-removable `.is-derived` About chips and union into the Involves fields at create.
+- **K4 — Knowers + known-view**: home view gains **[Entries | Knowers]** tabs (ephemeral tab state; new-entry/`view as…`/`+ new circle` actions per tab). `listKnowers` = direct holders + `subtype:"circle"` collectives (members NOT expanded). Known-view at **`/knowledge/knower/<id>`** (router + `knowledgeKnowerHash` + id-swap migration in `handleIdSwap`): header w/ counts · **Held knowledge** rows · **Known world** — one card per known-about element, full text of every mentioning held entry with entry attribution (conventions #69/#70 made visible).
+- **K6 — element-detail "Knowledge" section** (`element-detail-refs.ts`): knowledge entries PARTITIONED OUT of "Mentioned in" (their chips were routing to the writing room) into a section with per-group nav targets — **Known by** (`knowersOfElement` → known-view) · **Subject of** (entries about this element) · **Holds** (entries this element holds).
+- **Context interim**: `resolveSubject` treats an open knowledge entry OR knower as an element-mode subject (graph shows entry ↔ holders ↔ subjects); routeKey + chip-select extended; knowledge empty-state copy. Full "knowledge mode" stays K5/deferred.
+- **New scans** (`core/knowledge.ts`): `listKnowers`, `knowersOfElement`, shared `aboutFieldFor`, `CIRCLE_SUBTYPE`. +8 unit tests. e2e rewritten for TipTap + 4 new specs (draft mention→subject · **mentioned circle never becomes holder** · knowers/known-view compile · K6 chips + routing): 8 knowledge specs total.
+
+### Bout 1 — code hygiene
+
+### Bout 1 — code hygiene
+- **F1 groundwork (the K3 trap, fix deferred to K3 itself)**: @-mentioning a Collective in knowledge prose would silently grant holdership — `NARRATIVE_RELATION_FIELDS.collective = 'collectives'` + UNION-on-save. Decision locked: K3's derive excludes `collectives` for knowledge entries + toasts. Documented in DESIGN_KNOWLEDGE (Authoring + convention #68).
+- **F2 — stale-baseline blur-saves fixed** (knowledge-room): name + prose blur handlers compared against build-time snapshots, so edit → save → revert-to-original → blur silently skipped the write. Both now compare against current state. +1 e2e regression spec (rename-revert).
+- **F3 — draft persists**: per-world localStorage stash (`atlas_knowledge_draft_<worldId>`, key prefix in constants.ts). Restored on returning to `/knowledge/new`; saved on every draft mutation; cleared on create + explicit cancel. +1 e2e spec. Replaces silent draft loss on navigate-away.
+- **F4 — stale conservator comments swept** (`core/knowledge.ts` header + known-view block, `tests/unit/knowledge.test.ts` header) — code was correct, comments described the dropped third channel.
+- **F6 — one canonical field map**: `NARRATIVE_RELATION_FIELDS` moved to `src/core/narrative-fields.ts` (derive re-exports for writing modules + tests); `ABOUT_FIELDS` now DERIVED from it (minus `collectives`) instead of a hand-maintained twin list.
+- **F7 — writing/knowledge separation hardened**: `buildPromoteCandidates` explicitly excludes knowledge-subtype narratives (was safe only by accident of their flat shape).
+- Polish: saved-entry title (h1) now syncs on same-view ticks (renames/pulls) — it's plain text, not an input.
+
+### Bout 2 — doc sweep
+- **DESIGN.md**: knowledge room added (rooms table, routes, `knowledgeHash` helper, shell diagram); per-room docs list gains Knowledge + Sharing; publish room rows point at `DESIGN_SHARING.md`; conventions **#35/#36 marked SUPERSEDED** (write-tool-prototype showcase model) → `DESIGN_SHARING.md`; "Showcase-config extensions" section replaced with a Sharing pointer.
+- **DESIGN_KNOWLEDGE.md**: status → v1.1 (phase-1 core shipped); **Mention-derive exclusion** locked into Authoring + convention #68; **de-hiding path** noted in the schema section (council motion for first-class holder fields once Knowledge proves out — same track as `atlas_shape`/`atlas_aliases`).
+- **PROGRESS.md**: Build Map K2/K3 lines de-staled (two channels; derive exclusion); Track A status updated with the agreed order — **K3 → K4-UI (lean in-room knower rail) → K6 → Sharing; K5 deferred**.
+
+### Smoke checklist (Captain)
+1. **Draft + persistence**: Knowledge → "+ new knowledge entry" → type name + rich prose → leave the room → return → "+ new" → draft restored (including formatting). Cancel → "+ new" → fresh.
+2. **Editor feel (saved entry)**: open an entry → type; `@`-mention a character → picker → chip; type an element's bare name → autolink hint → Tab converts; hover a chip → preview card; click a chip → context pane selects it; right-click selection → "Create element from selection"; right-click a chip → unlink.
+3. **The holder trap**: @-mention a circle/collective in prose → chip appears, toast explains, and Held by does NOT gain it. Add it properly via Held by → Circles.
+4. **About auto-population**: mention an element → it appears under About (draft: faded "from the text" chip; saved: real chip after the ~1s save).
+5. **Knowers tab**: [entries | knowers] tabs; knowers lists circles first w/ member + entry counts; `view as…` picks any character; `+ new circle` creates a circle-tagged collective.
+6. **Known-view**: click a knower → Held knowledge + Known world cards (full entry texts, source attribution, element names link to canon). A circle member inherits the circle's entries.
+7. **K6**: open an element some knowledge is about → "Knowledge" section: Known by chips → known-view; Subject of chips → entry editor. Knowledge entries no longer appear under "Mentioned in".
+8. **Context pane**: with an entry or knower open, the right-pane Context tab graphs it (holders + subjects as neighbors).
+9. **Rename-revert regression**: rename a saved entry → blur → rename back → blur → reload → original name held.
+10. **Writing setup**: knowledge entries never appear as promote candidates.
+
+
 
 ## Session 234 (2026-05-25) — Knowledge + Sharing design; Knowledge phase-1 build (K1, K2, K4-core)
 

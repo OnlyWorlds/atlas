@@ -16,6 +16,7 @@
  */
 
 import type { Element } from '../core/types';
+import { isKnowledgeNarrative } from '../core/knowledge';
 import type { FsFolderStore } from '../store/folder-store-fs';
 import type { WritingLabels } from './writing-helpers';
 
@@ -41,7 +42,11 @@ export function buildPromoteCandidates(
   elements: Element[],
   labels: WritingLabels,
 ): PromoteCandidate[] {
-  const narratives = elements.filter(e => e.type === 'narrative');
+  // Knowledge entries (subtype 'knowledge') are excluded explicitly — they're
+  // flat by design (DESIGN_KNOWLEDGE.md) so today they'd be skipped as loose
+  // narratives anyway, but the writing tree and the knowledge system should
+  // stay separate even if either's shape changes.
+  const narratives = elements.filter(e => e.type === 'narrative' && !isKnowledgeNarrative(e));
   if (narratives.length === 0) return [];
 
   // Build parent → children map and depth via BFS from roots.

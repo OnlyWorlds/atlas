@@ -7071,24 +7071,146 @@ a.atlas-writing-workspace-crumb-seg:hover {
   font-weight: 500;
 }
 
-.atlas-knowledge-prose {
-  width: 100%;
+/* Embedded TipTap prose surface (K3) — compact knowledge box, not the 60vh
+   writing canvas. Two-class specificity overrides the writing prose defaults
+   it inherits typography/chips/autolink styles from. */
+.atlas-writing-workspace-prose.atlas-knowledge-prose-rich {
   min-height: 160px;
-  resize: vertical;
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--atlas-text);
+  max-width: none;
+  margin: 0;
   background: var(--atlas-bg-panel);
   border: 1px solid var(--atlas-divider);
   border-radius: 4px;
-  padding: 12px 14px;
+  padding: 10px 14px;
 }
 
-.atlas-knowledge-prose:focus {
-  outline: none;
+.atlas-writing-workspace-prose.atlas-knowledge-prose-rich:focus-within {
   border-color: var(--atlas-cyan-soft);
 }
+
+.atlas-writing-workspace-prose.atlas-knowledge-prose-rich .ProseMirror {
+  min-height: 130px;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 2px 0 8px;
+}
+
+.atlas-knowledge-prose-loading {
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+  padding: 12px 0;
+}
+
+/* Home-view tabs: [entries | knowers] + right-aligned per-tab actions. */
+.atlas-knowledge-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--atlas-divider);
+  margin-bottom: 14px;
+}
+
+.atlas-knowledge-tab {
+  background: transparent;
+  border: none;
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.atlas-knowledge-tab:hover { color: var(--atlas-text); }
+
+.atlas-knowledge-tab.is-active {
+  color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.atlas-knowledge-tabs-spacer { flex: 1; }
+
+/* Prose-derived About chip — comes from the text, not removable here. */
+.atlas-knowledge-chip.is-derived { opacity: 0.75; }
+.atlas-knowledge-chip.is-derived .atlas-knowledge-chip-body { cursor: pointer; }
+
+/* Known-view (K4) — knower header + per-element compiled cards. */
+.atlas-knowledge-knower-icon {
+  font-size: 20px;
+  margin-right: 8px;
+  vertical-align: -3px;
+  color: var(--atlas-cyan);
+}
+
+.atlas-knowledge-knower-meta {
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-knowledge-known-card {
+  border: 1px solid var(--atlas-divider);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.atlas-knowledge-known-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--atlas-text);
+  text-align: left;
+}
+
+.atlas-knowledge-known-head .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--atlas-cyan);
+}
+
+.atlas-knowledge-known-head:hover .atlas-knowledge-known-name { color: var(--atlas-cyan); }
+
+.atlas-knowledge-known-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.atlas-knowledge-known-type {
+  font-size: 10px;
+  color: var(--atlas-text-muted);
+  margin-left: auto;
+}
+
+.atlas-knowledge-known-quote {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-left: 2px solid rgba(34, 211, 238, 0.35);
+}
+
+.atlas-knowledge-known-text {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--atlas-text-soft, var(--atlas-text));
+  white-space: pre-wrap;
+}
+
+.atlas-knowledge-known-src {
+  display: inline-block;
+  margin-top: 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+}
+
+.atlas-knowledge-known-src:hover { color: var(--atlas-cyan); }
 
 .atlas-knowledge-draft-actions {
   display: flex;

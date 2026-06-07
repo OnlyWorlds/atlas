@@ -20,7 +20,7 @@ import { OwClientAdapter } from './ow-client-adapter';
 import { SyncEngine } from './sync-engine';
 import { patchSlice, getState, setState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
-import { navigate, elementHash, knowledgeHash, parseHash } from '../core/router';
+import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, parseHash } from '../core/router';
 import type { FolderStore } from '../store/folder-store';
 import type { Element, WorldRegistryEntry, SyncEngineState, ElementType } from '../core/types';
 
@@ -601,6 +601,11 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
   // list when the push reassigns its id (DESIGN_KNOWLEDGE.md).
   if (route.mode === 'knowledge' && route.knowledgeId === swap.old_id && route.worldId === worldId) {
     navigate(knowledgeHash(worldId, swap.new_id));
+  }
+  // Known-view: `/knowledge/knower/<old-id>` → new id (knowers are characters /
+  // collectives — they id-swap like any element on first push).
+  if (route.mode === 'knowledge' && route.knowerId === swap.old_id && route.worldId === worldId) {
+    navigate(knowledgeKnowerHash(worldId, swap.new_id));
   }
 }
 

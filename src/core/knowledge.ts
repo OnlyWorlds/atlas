@@ -4,14 +4,15 @@
  * A **knowledge entry** is a Narrative with `subtype === 'knowledge'`. Its prose
  * (`story`) is the knowledge; its `Involves` links (auto-populated by @-mentions)
  * are the *about* subjects; and for knowledge-subtype narratives the fields
- * `narrator` (a solo Character), `collectives` (Circles) and `conservator`
- * (an Institution) are reinterpreted as **held-by** — the knowers.
+ * `narrator` (a solo Character) and `collectives` (Circles) are reinterpreted
+ * as **held-by** — the knowers. Two channels only.
  *
- * Phase 1 (this module): classification + held-by reading. The known-view scans
- * (`whatDoesXKnow` / `knownViewOfElement`) land in a later bout (K4).
+ * This module: classification + held-by reading + the known-view scans
+ * (`knowledgeHeldBy` / `elementsKnownAboutBy`) — knowing is computed, never stored.
  */
 
 import type { Element } from './types';
+import { NARRATIVE_RELATION_FIELDS } from './narrative-fields';
 
 /** Narrative subtype that marks a knowledge entry. Free-text subtype — no schema change. */
 export const KNOWLEDGE_SUBTYPE = 'knowledge';
@@ -60,16 +61,25 @@ export function heldByCount(el: Element): number {
 
 /**
  * Narrative `Involves` multi-link fields that count as *about* (subjects) for a
- * knowledge entry. Deliberately EXCLUDES `collectives` — for knowledge-subtype
+ * knowledge entry. Derived from `NARRATIVE_RELATION_FIELDS` so the two lists
+ * can't drift. Deliberately EXCLUDES `collectives` — for knowledge-subtype
  * narratives that field is reinterpreted as held-by Circles (DESIGN_KNOWLEDGE.md
  * conventions #68, #72; accepted limitation: a Collective can't be both subject
  * and holder on one entry).
  */
-export const ABOUT_FIELDS = [
-  'characters', 'objects', 'locations', 'species', 'creatures', 'institutions',
-  'traits', 'zones', 'abilities', 'phenomena', 'languages', 'families',
-  'relations', 'titles', 'constructs', 'laws', 'events',
-] as const;
+export const ABOUT_FIELDS: readonly string[] = Object.entries(NARRATIVE_RELATION_FIELDS)
+  .filter(([type, field]) => field !== null && type !== 'collective')
+  .map(([, field]) => field as string);
+
+/**
+ * The narrative `Involves` field a subject of this element type lands in.
+ * `null` = can't be an about-subject: collectives are HELD-BY (Circles), and
+ * map/pin/marker/narrative have no Involves field.
+ */
+export function aboutFieldFor(type: string): string | null {
+  if (type === 'collective') return null;
+  return NARRATIVE_RELATION_FIELDS[type as keyof typeof NARRATIVE_RELATION_FIELDS] ?? null;
+}
 
 /** Ids of the elements a knowledge entry is *about* (subjects), gathered from the about multi-links. */
 export function aboutIdsOf(el: Element): string[] {
@@ -85,8 +95,8 @@ export function aboutIdsOf(el: Element): string[] {
 // ---------------------------------------------------------------------------
 // Known-view scans (DESIGN_KNOWLEDGE.md — "knowing is computed, never stored").
 // Pure functions over the in-memory element set. Two paths to knowing:
-//   - direct  : you are the entry's narrator (Character) / conservator (Institution),
-//               or the entry lists you (a Collective) as a holder
+//   - direct   : you are the entry's narrator (a Character), or the entry
+//                lists you (a Collective) as a holder
 //   - inherited: you're a member of a holding Circle (Collective.characters)
 // ---------------------------------------------------------------------------
 
@@ -139,4 +149,51 @@ export function elementsKnownAboutBy(knowerId: string, elements: Element[]): str
   const ids = new Set<string>();
   for (const entry of held) for (const id of aboutIdsOf(entry)) ids.add(id);
   return [...ids];
+}
+
+/** Optional Circle marker subtype — purely organizational, never load-bearing (convention #72). */
+export const CIRCLE_SUBTYPE = 'circle';
+
+/**
+ * The world's knowers, for the Knowers list: every DIRECT holder (narrator
+ * Characters + holding Collectives) plus proactively-created Circles
+ * (Collectives tagged `subtype: 'circle'`, even when they hold nothing yet).
+ * Circle members are NOT expanded here — a 50-member circle lists as one
+ * circle, not 50 knowers; arbitrary characters are reachable via a picker.
+ * Sorted: collectives first, then characters, alphabetical within each.
+ */
+export function listKnowers(elements: Element[]): Element[] {
+  const ids = new Set<string>();
+  for (const entry of listKnowledgeEntries(elements)) {
+    const held = heldByOf(entry);
+    if (held.narrator) ids.add(held.narrator);
+    for (const cid of held.collectives) ids.add(cid);
+  }
+  const out = elements.filter(e => {
+    if (ids.has(e.id) && isKnowerType(e.type)) return true;
+    if (e.type !== 'collective') return false;
+    const subtype = (e as Record<string, unknown>).subtype;
+    return typeof subtype === 'string' && subtype.toLowerCase() === CIRCLE_SUBTYPE;
+  });
+  return out.sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'collective' ? -1 : 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+}
+
+/**
+ * The DIRECT holders (narrator Characters + Circles) of every knowledge entry
+ * that is *about* the given element — "who knows about X, via what." Members
+ * of holding circles are not expanded (the circle IS the answer). Used by the
+ * element-detail "Known by" surfacing (K6).
+ */
+export function knowersOfElement(elementId: string, elements: Element[]): Element[] {
+  const ids = new Set<string>();
+  for (const entry of listKnowledgeEntries(elements)) {
+    if (!aboutIdsOf(entry).includes(elementId)) continue;
+    const held = heldByOf(entry);
+    if (held.narrator) ids.add(held.narrator);
+    for (const cid of held.collectives) ids.add(cid);
+  }
+  return elements.filter(e => ids.has(e.id) && isKnowerType(e.type));
 }

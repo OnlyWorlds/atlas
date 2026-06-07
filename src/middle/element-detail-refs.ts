@@ -22,19 +22,25 @@
  */
 
 import { getState, patchSlice } from '../core/state';
-import { navigate, elementHash, writingHash } from '../core/router';
+import { navigate, elementHash, writingHash, knowledgeHash, knowledgeKnowerHash } from '../core/router';
 import type { Element, ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { getTierForNarrative, getWritingLabels, type WritingTier } from './writing-helpers';
+import { isKnowledgeNarrative, aboutIdsOf, heldByOf, knowersOfElement } from '../core/knowledge';
 import { humanizeFieldName } from './element-detail-fields';
 import { getEditorSettings } from '../registry/registry';
 
 /** Field names that never encode a relationship — skipped by the reverse scan. */
 const META_KEYS = new Set(['id', 'name', 'description', 'type', 'local_updated_at', 'server_updated_at']);
 
+/** Where a ref chip navigates. Sections set a default; groups may override. */
+type NavTarget = 'element' | 'writing' | 'knowledge-entry' | 'knowledge-knower';
+
 interface RefGroup {
   label: string;
   sources: Element[];
+  /** Per-group navigation override (knowledge groups mix targets). */
+  navigateTo?: NavTarget;
 }
 
 /**
@@ -45,7 +51,11 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
   const incoming = findIncomingReferences(el.id);
   if (incoming.length === 0) return null;
 
-  const narratives = incoming.filter(src => src.type === 'narrative');
+  // Knowledge entries are narratives, but their chips must route to the
+  // knowledge room (not the writing room) — partition them out (K6).
+  const allNarratives = incoming.filter(src => src.type === 'narrative');
+  const knowledgeEntries = allNarratives.filter(src => isKnowledgeNarrative(src));
+  const narratives = allNarratives.filter(src => !isKnowledgeNarrative(src));
   const others = incoming.filter(src => src.type !== 'narrative');
 
   const wrap = document.createElement('div');
@@ -59,6 +69,31 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
       navigateTo: 'writing',
       sectionClass: 'atlas-detail-section atlas-detail-refs-mentioned',
     }));
+  }
+
+  // Knowledge surfacing (K6): who knows about this element, via which entries
+  // — and, for knower-typed elements, what they directly hold.
+  if (knowledgeEntries.length > 0) {
+    const elements = getState().data.elements;
+    const subjectOf = knowledgeEntries.filter(k => aboutIdsOf(k).includes(el.id));
+    const holds = knowledgeEntries.filter(k => {
+      const h = heldByOf(k);
+      return h.narrator === el.id || h.collectives.includes(el.id);
+    });
+    const knowers = knowersOfElement(el.id, elements);
+    const kGroups: RefGroup[] = [];
+    if (knowers.length > 0) kGroups.push({ label: 'Known by', sources: knowers, navigateTo: 'knowledge-knower' });
+    if (subjectOf.length > 0) kGroups.push({ label: 'Subject of', sources: subjectOf, navigateTo: 'knowledge-entry' });
+    if (holds.length > 0) kGroups.push({ label: 'Holds', sources: holds, navigateTo: 'knowledge-entry' });
+    if (kGroups.length > 0) {
+      wrap.appendChild(buildSection({
+        headerLabel: 'Knowledge',
+        count: knowledgeEntries.length,
+        groups: kGroups,
+        navigateTo: 'knowledge-entry',
+        sectionClass: 'atlas-detail-section atlas-detail-refs-knowledge',
+      }));
+    }
   }
 
   if (others.length > 0) {
@@ -146,7 +181,7 @@ interface SectionOpts {
   headerLabel: string;
   count: number;
   groups: RefGroup[];
-  navigateTo: 'element' | 'writing';
+  navigateTo: NavTarget;
   sectionClass: string;
 }
 
@@ -175,7 +210,7 @@ function buildSection(opts: SectionOpts): HTMLElement {
     chips.className = 'atlas-link-row';
     const sorted = group.sources.slice().sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
     for (const src of sorted) {
-      chips.appendChild(buildRefChip(src, navigateTo));
+      chips.appendChild(buildRefChip(src, group.navigateTo ?? navigateTo));
     }
     wrap.appendChild(chips);
     body.appendChild(wrap);
@@ -183,7 +218,7 @@ function buildSection(opts: SectionOpts): HTMLElement {
   return section;
 }
 
-function buildRefChip(src: Element, navigateTo: 'element' | 'writing'): HTMLElement {
+function buildRefChip(src: Element, navigateTo: NavTarget): HTMLElement {
   const chip = document.createElement('span');
   chip.className = 'atlas-link-chip';
   chip.title = `${src.type} · id ${src.id}`;
@@ -201,6 +236,10 @@ function buildRefChip(src: Element, navigateTo: 'element' | 'writing'): HTMLElem
       // Don't mirror selectedElementId — writing room's URL is the source of
       // truth (convention #46). The global selection stays where it was.
       navigate(writingHash(worldId, src.id));
+    } else if (navigateTo === 'knowledge-entry') {
+      navigate(knowledgeHash(worldId, src.id));
+    } else if (navigateTo === 'knowledge-knower') {
+      navigate(knowledgeKnowerHash(worldId, src.id));
     } else {
       patchSlice('ui', { ...getState().ui, selectedElementId: src.id });
       navigate(elementHash(worldId, src.id));

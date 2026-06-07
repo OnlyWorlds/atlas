@@ -90,6 +90,8 @@ export interface Route {
   narrativeId?: string;
   /** Knowledge room selected entry id (knowledge-subtype narrative). */
   knowledgeId?: string;
+  /** Knowledge room known-view knower id (a Character or Circle/Collective). */
+  knowerId?: string;
   /** Publish detail room. */
   showcaseId?: string;
   /** Search room query string. */
@@ -147,6 +149,10 @@ export function parseHash(hash: string): Route {
     if (sub === 'elements') return { worldId, mode: 'elements' };
     if (sub === 'timeline') return { worldId, mode: 'timeline' };
     if (sub === 'knowledge') {
+      // /knowledge | /knowledge/new | /knowledge/<entryId> | /knowledge/knower/<knowerId>
+      if (parts[3] === 'knower' && parts[4]) {
+        return { worldId, mode: 'knowledge', knowerId: parts[4] };
+      }
       const knowledgeId = parts[3];
       return knowledgeId ? { worldId, mode: 'knowledge', knowledgeId } : { worldId, mode: 'knowledge' };
     }
@@ -255,6 +261,11 @@ export function knowledgeHash(worldId: string, knowledgeId?: string): string {
   return knowledgeId
     ? `#/w/${worldId}/knowledge/${knowledgeId}`
     : `#/w/${worldId}/knowledge`;
+}
+
+/** Knowledge known-view: `#/w/<worldId>/knowledge/knower/<knowerId>`. */
+export function knowledgeKnowerHash(worldId: string, knowerId: string): string {
+  return `#/w/${worldId}/knowledge/knower/${knowerId}`;
 }
 
 export function searchHash(worldId: string, query?: string): string {

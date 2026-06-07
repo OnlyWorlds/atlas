@@ -16,25 +16,12 @@
  */
 
 import { Mention } from '@tiptap/extension-mention';
+import { OW_LINK_HREF_RE, createOwLinkScanner } from '../core/ow-links';
 
-/**
- * Canonical OW link patterns. One source for atlas — both the chip module
- * (parsing a single href) and the load + derive modules (scanning markdown)
- * import from here. Two flavors are exposed because they serve different
- * use cases:
- *
- *   - {@link OW_LINK_HREF_RE} is anchored (`^…$`) for "does this href match
- *     the ow:// scheme?" predicates.
- *   - {@link createOwLinkScanner} returns a FRESH `/g` regex per call —
- *     never share a stateful global regex across scans (lastIndex bites).
- *
- * Match groups (both): `[1]` = element type, `[2]` = uuid.
- */
-export const OW_LINK_HREF_RE = /^ow:\/\/([a-z_]+)\/([\w-]+)$/i;
-
-export function createOwLinkScanner(): RegExp {
-  return /ow:\/\/([a-z_]+)\/([\w-]+)/gi;
-}
+// Canonical OW link patterns live in core/ow-links.ts (TipTap-free home so
+// the derive + knowledge modules can import them without pulling the editor
+// bundle). Re-exported here for the writing modules that already import them.
+export { OW_LINK_HREF_RE, createOwLinkScanner };
 
 export const ElementChip = Mention.extend({
   name: 'elementChip',

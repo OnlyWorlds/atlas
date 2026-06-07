@@ -532,9 +532,9 @@ Even for api-linked worlds, media lives ONLY in the folder. No upload to OW.
 │ chips   │ │   <room content>            │ │                         │
 │ search  │ │                             │ │                         │
 │ list    │ │   home / element / writing  │ │                         │
-│         │ │   timeline / search /       │ │                         │
-│         │ │   publish / import /        │ │                         │
-│         │ │   templates / settings      │ │                         │
+│         │ │   knowledge / timeline /    │ │                         │
+│         │ │   search / publish / import │ │                         │
+│         │ │   / templates / settings    │ │                         │
 │ ⚙       │ │                             │ │                         │
 └─────────┴─└─────────────────────────────┘─┴─────────────────────────┘
 ```
@@ -561,10 +561,11 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 | `home` | `#/w/<id>` | World home — identity, stats, timeline preview, recent, quick actions. **Default landing for active worlds.** | shipped |
 | `element` | `#/w/<id>/element/<eid>` | Schema-driven element detail | shipped |
 | `writing` | `#/w/<id>/writing[/<narrativeId>]` | Book/chapter/scene/draft authorship (any tier; ancestry derived from `parent_narrative`). See `DESIGN_WRITING.md`. Legacy long-form URL still parsed. | shipped |
+| `knowledge` | `#/w/<id>/knowledge[/<entryId>\|/new\|/knower/<id>]` | Knowledge entries — who knows what. [Entries \| Knowers] tabs, draft editor (persists nothing until create), embedded TipTap prose w/ mentions, known-view per knower. See `DESIGN_KNOWLEDGE.md` | shipped (phase 1) |
 | `timeline` | `#/w/<id>/timeline` | Full timeline view | shipped |
 | `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | shipped |
-| `publish` | `#/w/<id>/publish` | Showcase home — manage publications. See `DESIGN_PUBLISHING.md` | stub |
-| `publish-detail` | `#/w/<id>/publish/<showcase_id>` | Specific showcase config + preview | stub |
+| `publish` | `#/w/<id>/publish` | Sharing home (rename to `share` planned — S1). See `DESIGN_SHARING.md` | stub |
+| `publish-detail` | `#/w/<id>/publish/<showcase_id>` | Page/showcase detail (model per `DESIGN_SHARING.md`) | stub |
 | `import` | `#/w/<id>/import` | Explanation + reference to base-tool import; mechanics deferred | stub |
 | `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | stub |
 | `settings` | `#/w/<id>/settings[/<tab>]` | Account / storage / editing (atlas-wide) · world / writing / context (per-world) | shipped |
@@ -583,7 +584,8 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 Per-room design docs:
 - World Home: `DESIGN_HOME.md`
 - Writing: `DESIGN_WRITING.md`
-- Publishing: `DESIGN_PUBLISHING.md`
+- Knowledge: `DESIGN_KNOWLEDGE.md`
+- Sharing: `DESIGN_SHARING.md` (supersedes `DESIGN_PUBLISHING.md`)
 - Maps (right pane): `DESIGN_MAPS.md`
 - Zones (right pane): `DESIGN_ZONES.md`
 
@@ -661,6 +663,10 @@ Hash-based, no server rewrites needed (Cloudflare Pages friendly).
 #/w/<worldId>/writing/book/<bookId>         → book selected
 #/w/<worldId>/writing/book/<bId>/chapter/<cId>          → chapter selected
 #/w/<worldId>/writing/book/<bId>/chapter/<cId>/scene/<sId> → scene selected
+#/w/<worldId>/knowledge                     → knowledge room ([Entries | Knowers] tabs)
+#/w/<worldId>/knowledge/new                 → knowledge draft editor (nothing persists until create)
+#/w/<worldId>/knowledge/<entryId>           → knowledge entry editor (embedded TipTap prose)
+#/w/<worldId>/knowledge/knower/<knowerId>   → known-view (the world as a character/circle knows it)
 #/w/<worldId>/timeline                      → full timeline room
 #/w/<worldId>/search?q=<query>              → search room
 #/w/<worldId>/publish                       → publish home (showcase list)
@@ -683,6 +689,7 @@ Hash-based, no server rewrites needed (Cloudflare Pages friendly).
 - `elementsHash(worldId)` (sidebar mode)
 - `worldsHash(worldId)` (sidebar mode)
 - `writingHash(worldId, bookId?, chapterId?, sceneId?)`
+- `knowledgeHash(worldId, knowledgeId?)` / `knowledgeKnowerHash(worldId, knowerId)`
 - `timelineHash(worldId)`
 - `searchHash(worldId, query?)`
 - `publishHash(worldId)`
@@ -748,9 +755,9 @@ Inherited from legacy (hard-won; preserve in new code):
 
 34. **Atlas writing has three structured tiers (l1/l2/l3) + one flexible (l4=Draft).** l1 forbids parent; l2 requires l1 parent; l3 requires l2 parent; l4 has no parent constraints (drafts can root, sit under any tier, or nest other drafts). The writing-room create flow enforces these; element-detail field edits don't (user can override at their discretion). External narratives nested below depth 3 are PROMOTED to Draft tier (`l4`) during initial setup.
 
-35. **Atlas extensions to showcase_config use `atlas_*` prefix.** Other OW tools opening a showcase ignore the `atlas_*` keys gracefully — they see the canonical OW data in `element_data` and render that. Atlas-published showcases viewed from another tool degrade to plain-field rendering. Examples: `atlas_field_richtext`, `atlas_layout`, `atlas_bundle_ids`, `atlas_theme`, `atlas_cover_image_url`. See `DESIGN_PUBLISHING.md`.
+35. **SUPERSEDED (session 234).** Was: showcase_config `atlas_*` extensions — built on the dead write-tool-prototype publishing model. Sharing is redesigned in `DESIGN_SHARING.md` (pages + blocks + theme tokens; backend contract with Anchor pending). Number retained so cross-references stay stable.
 
-36. **Showcases are immutable. "Republish" creates new, doesn't mutate old.** The OW write-tool backend treats each `POST /showcase/publish/` as a fresh snapshot with a new `showcase_id`. Atlas's local registry tracks ALL published showcases for a world (`registry.worlds[i].showcases?: ShowcaseEntry[]`) — republishing optionally archives the prior one but never overwrites server-side. This matches user intent (a published thing is a snapshot in time) and avoids the conflict-with-server-state class entirely.
+36. **SUPERSEDED (session 234).** Was: "showcases are immutable, republish creates new." The current snapshot-vs-live model (Pages = frozen snapshot, World Showcase = live, republish semantics) lives in `DESIGN_SHARING.md`.
 
 37. **Sidebar mode and room are independent dimensions** (session 223 decoupling). `state.ui.sidebarMode` is pure UI state, persisted to localStorage via `core/ui-prefs.ts`. Toggle clicks update state directly — no URL navigation. Room navigation (top-of-middle nav strip + room URLs) is orthogonal. Previously the URL's "elements" route forced sidebar to elements mode via `syncModeFromRoute`; that auto-coupling was removed because it caused inconsistent behavior across room transitions ("some top tabs open the worlds part, others open elements"). The two dimensions now move independently — user picks sidebar mode via the toggle, picks room via the top strip. `activateWorld` navigates to `worldHash(id)` (home), not `elementsHash(id)`, so sidebar mode is not perturbed on world switch. The `/elements` route still exists for backward compat (rare bookmarks, test code) — it resolves to middle=home with the Home icon highlighted in room nav.
 
@@ -964,15 +971,9 @@ Atlas extends OnlyWorlds with capabilities that don't (yet) live in the OW schem
 | `atlas_richtext_json` | Narrative | TipTap JSON for the richtext story body | Maybe — if OW adds richtext-on-story support |
 | `atlas_aliases` | Any element | `string[]` of name aliases for linking | **Yes** — broadly useful (writers want it; pickers want it; search wants it) |
 
-### Showcase-config extensions (planned, per DESIGN_PUBLISHING.md)
+### Sharing/page extensions (planned, per DESIGN_SHARING.md)
 
-Atlas writes these inside `showcase_config` when publishing; backend stores them opaquely; atlas reads them on retrieve. Other OW tools ignore.
-
-- `atlas_field_richtext` — per-field richtext payload (HTML or TipTap JSON) for atlas-published showcases
-- `atlas_layout` — `'card' | 'page' | 'book'`
-- `atlas_bundle_ids` — multi-element bundle pointer (e.g. all chapters in a book)
-- `atlas_theme` — atlas-published theme key
-- `atlas_cover_image_url`
+The old showcase-config `atlas_*` extension list (richtext/layout/bundle/theme/cover) belonged to the superseded write-tool-prototype model (`DESIGN_PUBLISHING.md`). The sharing redesign stores page composition/theme as `atlas_*` config plus a frozen snapshot in a new Django model — exact field set is finalized with Anchor when the Sharing phase starts. See `DESIGN_SHARING.md` "OPEN" items.
 
 ### World-level / per-world atlas-only state (atlas-only forever)
 

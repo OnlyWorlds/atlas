@@ -13,38 +13,15 @@
  */
 
 import type { Element, ElementType } from '../core/types';
-import { createOwLinkScanner } from './writing-workspace-element-chip';
+import { NARRATIVE_RELATION_FIELDS } from '../core/narrative-fields';
+// Scanner from core/ow-links (NOT the chip module) — keeps this module
+// TipTap-free so the knowledge room can import it statically without
+// breaking the editor code-split.
+import { createOwLinkScanner } from '../core/ow-links';
 
-/**
- * Multi-link relation fields on Narrative (per SDK ELEMENT_SECTIONS.narrative
- * "Involves" section). One field per element type — atlas walks this map to
- * decide where each prose-derived UUID lands.
- */
-export const NARRATIVE_RELATION_FIELDS: Record<ElementType, string | null> = {
-  character: 'characters',
-  location: 'locations',
-  event: 'events',
-  object: 'objects',
-  species: 'species',
-  creature: 'creatures',
-  institution: 'institutions',
-  trait: 'traits',
-  collective: 'collectives',
-  zone: 'zones',
-  ability: 'abilities',
-  phenomenon: 'phenomena',
-  language: 'languages',
-  family: 'families',
-  relation: 'relations',
-  title: 'titles',
-  construct: 'constructs',
-  law: 'laws',
-  // Not relation targets from Narrative (no multi-link field):
-  narrative: null,
-  map: null,
-  pin: null,
-  marker: null,
-};
+// Canonical map lives in core/narrative-fields.ts (also consumed by
+// core/knowledge.ts). Re-exported here for the writing modules + tests.
+export { NARRATIVE_RELATION_FIELDS };
 
 /**
  * Parse markdown for `ow://<type>/<uuid>` links and group UUIDs by element type.

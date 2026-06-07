@@ -54,6 +54,17 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
     const el = elements.find(e => e.id === route.elementId) ?? null;
     return { element: el, detailsMode: 'element' };
   }
+  // Knowledge room: an open entry (or knower known-view) is the subject —
+  // entry ↔ holders ↔ subjects in the graph via the existing element mode.
+  // (The full "knowledge mode" graph is K5, deferred.)
+  if (route.mode === 'knowledge' && route.knowledgeId && route.knowledgeId !== 'new') {
+    const el = elements.find(e => e.id === route.knowledgeId) ?? null;
+    return { element: el, detailsMode: 'element' };
+  }
+  if (route.mode === 'knowledge' && route.knowerId) {
+    const el = elements.find(e => e.id === route.knowerId) ?? null;
+    return { element: el, detailsMode: 'element' };
+  }
   return { element: null, detailsMode: 'empty' };
 }
 
@@ -111,7 +122,7 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
   let lastAppliedPrefs: ReturnType<typeof getWorldContextPrefs> | null = null;
 
   function routeKey(route: Route): string {
-    return `${route.mode}|${route.narrativeId ?? ''}|${route.elementId ?? ''}`;
+    return `${route.mode}|${route.narrativeId ?? ''}|${route.elementId ?? ''}|${route.knowledgeId ?? ''}|${route.knowerId ?? ''}`;
   }
 
   function hiddenEquals(a: Set<ElementType>, b: Set<ElementType>): boolean {
@@ -410,7 +421,9 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
   const onChipSelectEvent = (e: Event): void => {
     const detail = (e as CustomEvent).detail as { id?: string } | null;
     if (!detail || typeof detail.id !== 'string') return;
-    if (currentRender.mode === 'writing') onSelect(detail.id);
+    // writing mode: preview slides over the lists. element mode (element room
+    // + knowledge entries): preview swaps content. Both via onSelect.
+    if (currentRender.mode === 'writing' || currentRender.mode === 'element') onSelect(detail.id);
   };
   document.addEventListener('atlas:context-select-element', onChipSelectEvent);
 
@@ -466,6 +479,8 @@ function emptyCopyForRoute(route: Route): string {
       return 'Element-focused view returns when you leave settings.';
     case 'search':
       return 'Pick a search result to see its context.';
+    case 'knowledge':
+      return 'Open a knowledge entry to see its holders and subjects.';
     case 'map':
       return 'Open an element or narrative to focus the graph.';
     default:

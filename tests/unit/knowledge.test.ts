@@ -3,7 +3,7 @@
  *
  * Covers classification, held-by reading, about-subject gathering (excluding the
  * collectives held-by field), circle membership, and the computed known-view:
- *   - direct holding (narrator / collective-as-holder / conservator)
+ *   - direct holding (narrator / collective-as-holder — two channels only)
  *   - inherited holding (a character via membership in a holding circle)
  *   - non-agents never hold knowledge
  *   - elementsKnownAboutBy = union of about-subjects across held entries
@@ -17,11 +17,14 @@ import {
   heldByOf,
   heldByCount,
   aboutIdsOf,
+  aboutFieldFor,
   isKnowerType,
   circleMembers,
   characterKnowsEntry,
   knowledgeHeldBy,
   elementsKnownAboutBy,
+  listKnowers,
+  knowersOfElement,
 } from '../../src/core/knowledge';
 import type { Element } from '../../src/core/types';
 
@@ -140,5 +143,55 @@ describe('elementsKnownAboutBy (the known-view subject set)', () => {
     expect(elementsKnownAboutBy('c2', world)).toEqual(['loc1']);
     // The Party (collective) holds k2 → about [c2, loc1]
     expect(elementsKnownAboutBy('col1', world).sort()).toEqual(['c2', 'loc1']);
+  });
+});
+
+describe('aboutFieldFor', () => {
+  it('maps subject types to their Involves field', () => {
+    expect(aboutFieldFor('character')).toBe('characters');
+    expect(aboutFieldFor('location')).toBe('locations');
+    expect(aboutFieldFor('phenomenon')).toBe('phenomena');
+  });
+  it('rejects collectives (held-by channel) and non-subject types', () => {
+    expect(aboutFieldFor('collective')).toBeNull();
+    expect(aboutFieldFor('narrative')).toBeNull();
+    expect(aboutFieldFor('map')).toBeNull();
+    expect(aboutFieldFor('pin')).toBeNull();
+  });
+});
+
+describe('listKnowers (the Knowers tab)', () => {
+  it('lists direct holders only — circle members are not expanded', () => {
+    // Direct holders: Strahd (narrator of k1) + The Party (holds k2).
+    // Ireena/Ismark know k2 via membership but are NOT listed as knowers.
+    expect(listKnowers(world).map(e => e.id).sort()).toEqual(['c2', 'col1']);
+  });
+  it('includes empty subtype-circle collectives (proactive circles)', () => {
+    const emptyCircle = el({ id: 'col2', type: 'collective', name: 'Inner Circle', subtype: 'circle' });
+    const plainCollective = el({ id: 'col3', type: 'collective', name: 'Mob' }); // no subtype, holds nothing
+    const ids = listKnowers([...world, emptyCircle, plainCollective]).map(e => e.id);
+    expect(ids).toContain('col2');
+    expect(ids).not.toContain('col3');
+  });
+  it('sorts collectives before characters', () => {
+    const ids = listKnowers(world).map(e => e.id);
+    expect(ids.indexOf('col1')).toBeLessThan(ids.indexOf('c2'));
+  });
+});
+
+describe('knowersOfElement (element-detail "Known by")', () => {
+  it('returns the direct holders of entries ABOUT the element', () => {
+    // loc1 is a subject of k1 (narrator Strahd), k2 (held by The Party), k3 (no holders).
+    expect(knowersOfElement('loc1', world).map(e => e.id).sort()).toEqual(['c2', 'col1']);
+  });
+  it('does not expand circle members', () => {
+    const ids = knowersOfElement('loc1', world).map(e => e.id);
+    expect(ids).not.toContain('c1');
+    expect(ids).not.toContain('c3');
+  });
+  it('empty for elements no knowledge is about', () => {
+    expect(knowersOfElement('i1', world)).toEqual([]);
+    // c1 (Ireena) is a member, not a subject — nothing is about her.
+    expect(knowersOfElement('c1', world)).toEqual([]);
   });
 });

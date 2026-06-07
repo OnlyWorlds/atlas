@@ -1,7 +1,7 @@
 # Atlas — Knowledge Design
 
-**Version**: 1.0 (2026-05-25) — initial model lock
-**Status**: Model locked through design conversation (session 234). Build = Phase 1 (pure-local, no API/sharing dependency). Implementation pending.
+**Version**: 1.2 (2026-06-07) — phase 1 SHIPPED
+**Status**: Built through session 235: K1 (room) + K2 (draft/editor + held-by/about) + **K3** (embedded TipTap editor w/ mentions + autolink + chips; `collectives` excluded from the derive) + **K4** (Knowers tab + known-view at `/knowledge/knower/<id>`) + **K6** (element-detail "Knowledge" section: Known by / Subject of / Holds) + a context-pane interim (entry/knower as graph subject). **K5 (graph knowledge-mode + drag-to-wire + lens) deferred past Sharing.**
 **Related**: `DESIGN.md` (rooms model), `DESIGN_WRITING.md` (narrative authoring, mentions/autolink), `DESIGN_SHARING.md` (consumes this foundation)
 
 ---
@@ -124,17 +124,22 @@ Knowledge prose is authored **in the Knowledge room**, reusing the **writing edi
 
 Shared infrastructure, separate homes. The two narrative *kinds* (story vs knowledge) stay visibly distinct, distinguished by `subtype`. The writing room only handles story-subtype narratives and ignores knowledge ones — so `narrator`'s dual meaning (teller for stories, holder for knowledge) causes no conflict.
 
+**Mention-derive exclusion (locked session 235).** The writing editor's UNION-on-save (convention #50) routes every @-mentioned element into its `NARRATIVE_RELATION_FIELDS` slot — including `collective → collectives`. For a knowledge entry that field means *held-by*, so the K3 embed MUST run the derive with `collectives` excluded: mentioning a Circle in knowledge prose renders a chip but never writes the field (otherwise a casual mention silently grants the group holdership). The UI toasts "circles are holders — add them under Held by" instead, matching the "+ add subject" picker's existing rejection.
+
 ---
 
 ## The Knowledge Room (UX)
 
 Route: `#/w/<id>/knowledge`. Room-nav icon added to the strip. A middle-pane room, with the right pane reused (no new surface type).
 
-**Layout** (respects atlas's pane semantics — sidebar nav · middle room content · right pane = maps/context only):
+**Layout** (revised session 235 — the room owns knower navigation; the original "sidebar filtered to knowers" idea was dropped: sidebar takeovers are expensive surface for a short list, see the writing-sidebar precedent):
 
-- **Sidebar** → the existing elements sidebar **filtered to knowers** (Circles + characters that hold knowledge) for quick selection. Light, no bespoke sidebar.
-- **Middle (the room)** → detail + the **known-view**. Pick a knower → the world as they know it. Pick a knowledge entry → edit its text + about-links + held-by. Pick any element → "known by whom, via which entries" (reverse view).
-- **Right pane** → the **context graph in a new "knowledge mode"** (a new subject for the tab that already exists — not a new surface). Center on a Circle → its knowledge entries + the elements they touch. Center on an element → who knows about it, via what.
+- **Sidebar** → unchanged (normal worlds/elements sidebar).
+- **Middle (the room)** → **[Entries | Knowers]** tabs in the room header (tab choice is ephemeral UI; views are URL-driven):
+  - *Entries* (`/knowledge`) → the entry list + "+ new knowledge entry".
+  - *Knowers* → direct holders (narrators + holding Circles) + proactive `subtype:"circle"` collectives — members are NOT expanded (a 50-member circle lists once). Actions: `view as…` (pick any character → their known-view) + `+ new circle`.
+  - *Known-view* (`/knowledge/knower/<id>`) → header (knower + counts) · **Held knowledge** (the entries) · **Known world** (one card per known-about element, compiled from every held entry text that mentions it — full texts with entry attribution, never excerpts, never the canonical record).
+- **Right pane** → interim (session 235): an open entry or knower is the context tab's subject via the existing element mode — entry ↔ holders ↔ subjects in the graph. The full **"knowledge mode"** graph (knower-centered compilation, drag-to-wire, lens) is K5 — deferred past Sharing.
 
 **What you SEE:** your Circles/knowers; each knower's held knowledge; the known-view ("the world as they know it"); the knowledge graph; reverse "who knows about this element."
 
@@ -150,7 +155,7 @@ Route: `#/w/<id>/knowledge`. Room-nav icon added to the strip. A middle-pane roo
 ## Conventions (extends the global list; continues from #66)
 
 - **#67 — Knowledge entry = Narrative `subtype: "knowledge"`.** Flat (no hierarchy). Distinguished from story-narratives by subtype; the writing room ignores knowledge-subtype narratives.
-- **#68 — `about` vs `held-by` never share a field.** `about` = the narrative's `Involves` multi-links (auto-populated by mentions). `held-by` = `narrator` (solo Character) + `collectives` (Circles) — **two channels only**. For knowledge-subtype narratives these fields are reinterpreted as *holders*. (No institution/conservator channel — institutions hold via a Circle.)
+- **#68 — `about` vs `held-by` never share a field.** `about` = the narrative's `Involves` multi-links (auto-populated by mentions). `held-by` = `narrator` (solo Character) + `collectives` (Circles) — **two channels only**. For knowledge-subtype narratives these fields are reinterpreted as *holders*. (No institution/conservator channel — institutions hold via a Circle.) Consequence: the mention-derive (convention #50) **excludes `collectives`** when saving knowledge prose, and `ABOUT_FIELDS` (`core/knowledge.ts`) is derived from `NARRATIVE_RELATION_FIELDS` minus `collectives` so the lists can't drift.
 - **#69 — Knowing is computed, never stored.** Scan knowledge for `narrator == X` or a `collectives` Collective whose `characters` includes X. No reverse-link persisted on the knower.
 - **#70 — The text is the knowledge.** No canonical fields are auto-pulled into a known-view; the prose is the disclosure surface.
 - **#71 — Fidelity = separate entries, not link metadata.** Different depths of a fact are different knowledge entries held by different Circles. Consequence: no Relation elements, no per-link qualifier fields.
@@ -170,13 +175,14 @@ Route: `#/w/<id>/knowledge`. Room-nav icon added to the strip. A middle-pane roo
 - **Narrative** carries: `story`, base `supertype`/`subtype`; single-links `narrator`/`protagonist`/`antagonist` (Character), `conservator` (Institution), `parent_narrative`; and `Involves` multi-links to all element types (`characters`, `locations`, `collectives`, `constructs`, …). All held-by + about channels exist today.
 - **Collective** carries `characters`, `creatures`, `species` (membership — enables inheritance) and `operator` (an Institution — models "an institution's knowledge = its members"). It has **no** `narratives` field → confirms knowledge points at the Collective, knowing is computed.
 - **No schema additions required for the v1 model.** A future depth/fidelity feature, if it ever needs per-link data, would be reconsidered then (and would go to council) — but the current model deliberately avoids it.
+- **De-hiding path (intent, not v1 work).** The narrator/collectives *reinterpretation* is the v1 concession, not the endgame — the semantic shift (holder vs teller/subject) is invisible to other OW tools, even though the data is all canon fields and `subtype: "knowledge"` flags the convention. If Knowledge proves out, draft a **council motion for first-class holder fields on Narrative** (e.g. `held_by_characters` / `held_by_collectives`) and migrate off the reinterpretation. Matches DESIGN.md's "atlas innovates → OnlyWorlds standardizes" pipeline (same track as `atlas_shape` / `atlas_aliases`).
 
 ---
 
 ## Build Phases
 
-- **Phase 1 — Knowledge as pure-local worldbuilding** (no API, no sharing): the `knowledge` subtype, the Knowledge room, held-by wiring (`narrator` + `collectives`), the computed known-view, the knowledge graph mode. Ships standalone value. Syncs through the existing engine like any narrative/collective (these are plain OW elements + standard fields). *(K1+K2+K4-core built session 234.)*
-- **Phase 1.5 — Cross-surfacing**: a normal element's detail view surfaces "known by: [circles]" (the knowledge dimension wherever you look at an element).
+- **Phase 1 — Knowledge as pure-local worldbuilding** (no API, no sharing): the `knowledge` subtype, the Knowledge room, held-by wiring (`narrator` + `collectives`), the computed known-view. Ships standalone value. Syncs through the existing engine like any narrative/collective (these are plain OW elements + standard fields). *(SHIPPED — K1+K2+K4-core session 234; K3+K4-UI session 235. The graph "knowledge mode" moved to K5/deferred.)*
+- **Phase 1.5 — Cross-surfacing**: a normal element's detail view surfaces the knowledge dimension. *(SHIPPED session 235 — K6: "Knowledge" section with Known by / Subject of / Holds groups.)*
 - **Phase 2.5 — The sharing bridge**: "publish for this Circle" auto-derives a Reference page from a Circle's compiled knowledge (see `DESIGN_SHARING.md`).
 - **Later**: depth/fidelity refinements, graduated map reveal (which pins a Circle knows), live reveal-by-group.
 
