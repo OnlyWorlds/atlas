@@ -24,7 +24,8 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
-import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, parseHash, onHashChange } from '../core/router';
+import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, shareHash, parseHash, onHashChange } from '../core/router';
+import { PAGE_SUBTYPE, newBlockId, pageBlocksPatch, type PageBlock } from '../core/sharing';
 import { getActiveStore } from '../core/active-store';
 import { getEditorSettings } from '../registry/registry';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
@@ -723,6 +724,38 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       lensBtn.classList.toggle('is-active', next !== null);
     });
     titleRow.appendChild(lensBtn);
+
+    // The Knowledge→Sharing bridge (DESIGN_SHARING "Knowledge Integration"):
+    // mint a page pre-filled with this knower's circle block, land in the
+    // share room ready to publish. The DM's core flow.
+    const makePage = document.createElement('button');
+    makePage.type = 'button';
+    makePage.className = 'atlas-knowledge-allfields';
+    makePage.title = 'Create a sharing page from this knowledge (a circle block, ready to publish)';
+    makePage.textContent = 'create page →';
+    makePage.addEventListener('click', () => {
+      void (async () => {
+        const folder = getActiveStore();
+        if (!folder) return;
+        const blocks: PageBlock[] = [{ id: newBlockId(), kind: 'circle', knowerId: knower.id }];
+        const resolveName = (id: string) => elOf(id)?.name || null;
+        try {
+          const created = await folder.createElement('narrative', {
+            name: `what ${knower.name || 'they'} know${knower.type === 'character' ? 's' : ''}`,
+            subtype: PAGE_SUBTYPE,
+            atlas_page_intent: 'reference',
+            ...pageBlocksPatch(blocks, resolveName),
+          } as Partial<Element>);
+          await refreshElementsAfterWrite(folder);
+          requestPushIfLinked();
+          navigate(shareHash(worldId, created.id));
+        } catch (err) {
+          console.error('[knowledge-room] create page failed', err);
+          toasts.error('Could not create the page');
+        }
+      })();
+    });
+    titleRow.appendChild(makePage);
 
     const openEl = document.createElement('button');
     openEl.type = 'button';

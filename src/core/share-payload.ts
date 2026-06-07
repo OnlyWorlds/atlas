@@ -25,8 +25,11 @@
 import { FIELD_SCHEMA } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import {
-  blocksOf, pageIntentOf, type PageBlock, type PageIntent, type ElementCardBlock,
+  blocksOf, pageIntentOf,
+  type PageBlock, type PageIntent, type ElementCardBlock, type CircleBlock,
+  type HeadingBlock, type ProseBlock,
 } from './sharing';
+import { knowledgeHeldBy } from './knowledge';
 
 // ---------------------------------------------------------------------------
 // Payload types (the §5 wire shape).
@@ -47,6 +50,28 @@ export interface PayloadElementEntry {
   fields: Record<string, unknown>;
 }
 
+/**
+ * The payload form of a circle block: the knower's compiled knowledge FROZEN
+ * at build time (the circle is the disclosure boundary — later knowledge
+ * edits never leak into a published snapshot). Entry markdown follows the
+ * prose disclosure rule at render time (ow:// targets resolve against the
+ * payload's included set — usually plain text, unless the subject is also
+ * carded on the page).
+ */
+export interface PayloadCircleBlock {
+  id: string;
+  kind: 'circle';
+  knowerId: string;
+  /** The knower's display name at publish time. */
+  title: string;
+  /** 'collective' (a circle) or 'character' (a lone knower). */
+  knowerType: string;
+  entries: Array<{ title: string; markdown: string }>;
+}
+
+/** A block as it appears in the PAYLOAD (circle blocks are frozen-compiled). */
+export type PayloadBlock = HeadingBlock | ProseBlock | ElementCardBlock | PayloadCircleBlock;
+
 export interface PagePayload {
   /** The PAYLOAD schema version — the viewer branches on this. */
   schema_version: 1;
@@ -55,7 +80,7 @@ export interface PagePayload {
   intent: PageIntent;
   /** Reserved — the ~6 theme tokens land with S3. */
   theme: Record<string, unknown>;
-  blocks: PageBlock[];
+  blocks: PayloadBlock[];
   elements: Record<string, PayloadElementEntry>;
 }
 
@@ -179,9 +204,13 @@ export function buildPagePayload(page: Element, elements: Element[]): PagePayloa
 
   // Prose blocks ship markdown only — richtextJson is an editing concern
   // (and the payload should stay lean; contract suggests a 256KB server cap).
-  const payloadBlocks: PageBlock[] = blocks.map(b =>
-    b.kind === 'prose' ? { id: b.id, kind: 'prose', markdown: b.markdown } : { ...b },
-  );
+  // Circle blocks FREEZE: the knower's compiled knowledge snapshots into the
+  // block (entries' names + texts) — the published page never re-resolves.
+  const payloadBlocks: PayloadBlock[] = blocks.map((b): PayloadBlock => {
+    if (b.kind === 'prose') return { id: b.id, kind: 'prose', markdown: b.markdown };
+    if (b.kind === 'circle') return freezeCircleBlock(b, elements, byId);
+    return { ...b };
+  });
 
   const rawTheme = (page as Record<string, unknown>).atlas_page_theme;
   return {
@@ -192,5 +221,36 @@ export function buildPagePayload(page: Element, elements: Element[]): PagePayloa
       ? rawTheme as Record<string, unknown> : {},
     blocks: payloadBlocks,
     elements: entries,
+  };
+}
+
+/**
+ * Compile a circle block's knower into the frozen payload form. Exported for
+ * the renderer: the builder's static view compiles live from world data, then
+ * renders through the same path the payload uses (one look, two sources).
+ */
+export function freezeCircleBlock(
+  block: CircleBlock,
+  elements: Element[],
+  byId: Map<string, Element>,
+): PayloadCircleBlock {
+  const knower = byId.get(block.knowerId);
+  if (!knower) {
+    return { id: block.id, kind: 'circle', knowerId: block.knowerId, title: '(missing knower)', knowerType: 'collective', entries: [] };
+  }
+  const held = knowledgeHeldBy(knower.id, elements)
+    .slice()
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return {
+    id: block.id,
+    kind: 'circle',
+    knowerId: knower.id,
+    title: knower.name || '(unnamed)',
+    knowerType: knower.type,
+    entries: held.map(entry => ({
+      title: entry.name || '(untitled)',
+      markdown: typeof (entry as Record<string, unknown>).story === 'string'
+        ? (entry as Record<string, unknown>).story as string : '',
+    })),
   };
 }

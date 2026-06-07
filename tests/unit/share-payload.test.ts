@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildPagePayload, type RelationToken } from '../../src/core/share-payload';
+import { buildPagePayload, type RelationToken, type PayloadCircleBlock } from '../../src/core/share-payload';
 import type { Element } from '../../src/core/types';
 
 // ---- fixtures ---------------------------------------------------------------
@@ -140,6 +140,51 @@ describe('buildPagePayload', () => {
     const themed = buildPagePayload(
       makePage([], { atlas_page_theme: { accent: '#22d3ee' } }), world());
     expect(themed.theme).toEqual({ accent: '#22d3ee' });
+  });
+
+  it('freezes a circle block: knower title + held entries (incl. circle-member inheritance)', () => {
+    const CIRCLE = 'c1000000-0000-0000-0000-000000000001';
+    const ENTRY = 'e1000000-0000-0000-0000-000000000001';
+    const ENTRY2 = 'e2000000-0000-0000-0000-000000000002';
+    const elements: Element[] = [
+      ...world(),
+      { id: CIRCLE, type: 'collective', name: 'the party', subtype: 'circle',
+        characters: [IREENA], local_updated_at: 't' } as unknown as Element,
+      { id: ENTRY, type: 'narrative', name: 'the mists', subtype: 'knowledge',
+        story: 'The mists never lift.', collectives: [CIRCLE], local_updated_at: 't' } as unknown as Element,
+      // Held by Ireena solo — inherited NOTHING by the circle (direct holders only).
+      { id: ENTRY2, type: 'narrative', name: 'her secret', subtype: 'knowledge',
+        story: 'Hers alone.', narrator: IREENA, local_updated_at: 't' } as unknown as Element,
+    ];
+
+    // Circle knower: direct holdings only.
+    const p = buildPagePayload(makePage([
+      { id: 'b1', kind: 'circle', knowerId: CIRCLE },
+    ]), elements);
+    const frozen = p.blocks[0] as PayloadCircleBlock;
+    expect(frozen.kind).toBe('circle');
+    expect(frozen.title).toBe('the party');
+    expect(frozen.knowerType).toBe('collective');
+    expect(frozen.entries).toEqual([{ title: 'the mists', markdown: 'The mists never lift.' }]);
+    // The knower itself is NOT auto-included in elements (cards decide inclusion).
+    expect(p.elements).toEqual({});
+
+    // Character knower: direct + inherited via circle membership.
+    const pc = buildPagePayload(makePage([
+      { id: 'b1', kind: 'circle', knowerId: IREENA },
+    ]), elements);
+    const frozenChar = pc.blocks[0] as PayloadCircleBlock;
+    expect(frozenChar.knowerType).toBe('character');
+    expect(frozenChar.entries.map(e => e.title).sort()).toEqual(['her secret', 'the mists']);
+  });
+
+  it('a circle block with a missing knower freezes to an honest empty', () => {
+    const p = buildPagePayload(makePage([
+      { id: 'b1', kind: 'circle', knowerId: GONE },
+    ]), world());
+    const frozen = p.blocks[0] as PayloadCircleBlock;
+    expect(frozen.title).toBe('(missing knower)');
+    expect(frozen.entries).toEqual([]);
   });
 
   it('heals card ids from the refs mirror before building (id-swap safety)', () => {

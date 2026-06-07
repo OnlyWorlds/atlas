@@ -7817,6 +7817,46 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
   font-size: 15px;
 }
 
+/* ---- Share room: circle block (S5 — compiled knowledge) ---- */
+
+.atlas-share-circle {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atlas-share-circle-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.atlas-share-circle-head .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--atlas-cyan);
+}
+
+.atlas-share-circle-name {
+  font-weight: 600;
+}
+
+.atlas-share-circle-tag {
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-share-circle-entry {
+  border-left: 2px solid rgba(34, 211, 238, 0.35);
+  padding: 2px 0 2px 10px;
+}
+
+.atlas-share-circle-entry-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--atlas-text-muted);
+  margin-bottom: 2px;
+}
+
 /* ---- Share room: publish section (S4) ---- */
 
 .atlas-share-publish-row {

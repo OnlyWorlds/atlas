@@ -21,9 +21,10 @@
 import type { Element } from '../core/types';
 import type { PageBlock, ElementCardBlock } from '../core/sharing';
 import {
-  isCardSkipField, isPopulatedValue as isPopulated,
-  type PagePayload, type PayloadElementEntry, type RelationToken,
+  isCardSkipField, isPopulatedValue as isPopulated, freezeCircleBlock,
+  type PagePayload, type PayloadElementEntry, type RelationToken, type PayloadCircleBlock,
 } from '../core/share-payload';
+import type { ProseRenderOptions } from './writing-compiled';
 import { renderProseFragment } from './writing-compiled';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { humanizeFieldName } from './element-detail-fields';
@@ -157,7 +158,60 @@ export function renderBlockView(block: PageBlock, elements: Map<string, Element>
       return renderProseFragment(block.markdown, elements);
     case 'element-card':
       return renderElementCard(block, elements);
+    case 'circle':
+      // Builder context: compile LIVE from world data, render through the
+      // same view the payload path uses (chips resolve against the world).
+      return renderCircleView(
+        freezeCircleBlock(block, [...elements.values()], elements),
+        elements,
+        { unresolved: 'chip' },
+      );
   }
+}
+
+/**
+ * Shared circle-knowledge view — head (knower + count) + held entries with
+ * full texts. One DOM shape for both sources: live compilation (builder) and
+ * the frozen payload (preview/viewer).
+ */
+function renderCircleView(
+  frozen: PayloadCircleBlock,
+  proseElements: Map<string, Element>,
+  proseOpts: ProseRenderOptions,
+): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'atlas-share-circle';
+
+  const head = document.createElement('div');
+  head.className = 'atlas-share-circle-head';
+  head.innerHTML = `
+    <span class="material-symbols-outlined">${frozen.knowerType === 'collective' ? 'groups' : 'person'}</span>
+    <span class="atlas-share-circle-name">${escapeText(frozen.title)}</span>
+    <span class="atlas-share-circle-tag">${frozen.entries.length === 1 ? '1 entry' : `${frozen.entries.length} entries`} of knowledge</span>
+  `;
+  wrap.appendChild(head);
+
+  if (frozen.entries.length === 0) {
+    const none = document.createElement('p');
+    none.className = 'atlas-share-hint';
+    none.textContent = 'Holds no knowledge yet.';
+    wrap.appendChild(none);
+    return wrap;
+  }
+
+  for (const entry of frozen.entries) {
+    const card = document.createElement('div');
+    card.className = 'atlas-share-circle-entry';
+    const title = document.createElement('div');
+    title.className = 'atlas-share-circle-entry-title';
+    title.textContent = entry.title;
+    card.appendChild(title);
+    if (entry.markdown.trim().length > 0) {
+      card.appendChild(renderProseFragment(entry.markdown, proseElements, proseOpts));
+    }
+    wrap.appendChild(card);
+  }
+  return wrap;
 }
 
 export interface PageViewOptions {
@@ -337,6 +391,10 @@ export function renderPayloadPage(payload: PagePayload): HTMLElement {
         break;
       case 'element-card':
         node = renderPayloadCard(block, payload.elements);
+        break;
+      case 'circle':
+        // Frozen at publish; entry prose follows the same disclosure rule.
+        node = renderCircleView(block, proseMap, { unresolved: 'text' });
         break;
     }
     node.classList.add('atlas-share-page-view-block');

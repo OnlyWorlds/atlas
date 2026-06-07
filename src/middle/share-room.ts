@@ -319,6 +319,26 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     renderBlocks(pageId);
   }
 
+  /**
+   * "+ circle": pick the knower first (Circles = Collectives; lone-character
+   * knowers arrive via the Knowledge room's "create page from this view"
+   * bridge), then add + open for review.
+   */
+  async function addCircleBlock(pageId: string): Promise<void> {
+    await commitOpenEdit(pageId);
+    const picked = await pickElement({
+      restrictToType: 'collective',
+      title: 'Whose knowledge? (a circle)',
+    });
+    if (!picked) return;
+    const page = elOf(pageId);
+    if (!page) return;
+    const block: PageBlock = { id: newBlockId(), kind: 'circle', knowerId: picked.id };
+    await saveBlocks(pageId, [...blocksOf(page), block]);
+    editingBlockId = block.id;
+    renderBlocks(pageId);
+  }
+
   async function moveBlock(pageId: string, blockId: string, dir: -1 | 1): Promise<void> {
     await commitOpenEdit(pageId);
     const page = elOf(pageId);
@@ -581,6 +601,57 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     return wrap;
   }
 
+  /** Inline editor for a circle block: live compiled preview + rebind. */
+  function renderCircleEditor(pageId: string, block: Extract<PageBlock, { kind: 'circle' }>): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'atlas-share-block-editing atlas-share-circle-edit';
+    const knower = elOf(block.knowerId);
+
+    // Live preview of the compiled knowledge as configured.
+    const byId = new Map(getState().data.elements.map(e => [e.id, e]));
+    const preview = renderBlockView(block, byId);
+    preview.classList.add('atlas-share-card-edit-preview');
+    wrap.appendChild(preview);
+
+    const bindRow = document.createElement('div');
+    bindRow.className = 'atlas-share-card-edit-row';
+    const changeBtn = document.createElement('button');
+    changeBtn.type = 'button';
+    changeBtn.className = 'atlas-btn-ghost';
+    changeBtn.textContent = knower ? `circle: ${knower.name || '(unnamed)'} — change…` : 'pick circle…';
+    changeBtn.addEventListener('click', () => {
+      void (async () => {
+        const picked = await pickElement({ restrictToType: 'collective', title: 'Whose knowledge? (a circle)' });
+        if (!picked) return;
+        const page = elOf(pageId);
+        if (!page) return;
+        const blocks = blocksOf(page).map(b =>
+          b.id === block.id && b.kind === 'circle' ? { ...b, knowerId: picked.id } : b,
+        );
+        await saveBlocks(pageId, blocks);
+        renderBlocks(pageId);
+      })();
+    });
+    bindRow.appendChild(changeBtn);
+    wrap.appendChild(bindRow);
+
+    const hint = document.createElement('p');
+    hint.className = 'atlas-share-section-hint';
+    hint.textContent = 'Publishes a FROZEN copy of everything this circle holds — later knowledge edits never leak until you republish.';
+    wrap.appendChild(hint);
+
+    const doneRow = document.createElement('div');
+    doneRow.className = 'atlas-share-block-edit-actions';
+    const done = document.createElement('button');
+    done.type = 'button';
+    done.className = 'atlas-btn-ghost atlas-share-block-done';
+    done.textContent = 'done';
+    done.addEventListener('click', () => { void commitThenRender(pageId); });
+    doneRow.appendChild(done);
+    wrap.appendChild(doneRow);
+    return wrap;
+  }
+
   /** Rebuild the block stack UI (display + at most one inline editor). */
   function renderBlocks(pageId: string): void {
     if (!blocksHost) return;
@@ -606,6 +677,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       if (editingBlockId === block.id) {
         if (block.kind === 'heading') row.appendChild(renderHeadingEditor(pageId, block));
         else if (block.kind === 'prose') row.appendChild(renderProseEditor(pageId, block));
+        else if (block.kind === 'circle') row.appendChild(renderCircleEditor(pageId, block));
         else row.appendChild(renderCardEditor(pageId, block));
       } else {
         const content = renderStaticBlock(block);
@@ -640,6 +712,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     addRow.appendChild(addBtn('title', '+ heading', () => { void addBlock(pageId, 'heading'); }));
     addRow.appendChild(addBtn('notes', '+ text', () => { void addBlock(pageId, 'prose'); }));
     addRow.appendChild(addBtn('badge', '+ element card', () => { void addElementCard(pageId); }));
+    addRow.appendChild(addBtn('groups', '+ circle', () => { void addCircleBlock(pageId); }));
     blocksHost.appendChild(addRow);
   }
 

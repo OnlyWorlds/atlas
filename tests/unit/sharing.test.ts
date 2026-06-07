@@ -132,6 +132,30 @@ describe('blocksOf — refs-mirror heal (id-swap correctness)', () => {
     expect(pageRefsFor(blocks)).toEqual(['old-a', 'old-b']);
   });
 
+  it('circle blocks join the mirror: knowerId mirrored + healed positionally with cards', () => {
+    const mixed: PageBlock[] = [
+      { id: 'c1', kind: 'element-card', elementId: 'old-a', variant: 'compact', fields: [] },
+      { id: 'k1', kind: 'circle', knowerId: 'old-circle' },
+      { id: 'c2', kind: 'element-card', elementId: 'old-b', variant: 'compact', fields: [] },
+    ];
+    expect(pageRefsFor(mixed)).toEqual(['old-a', 'old-circle', 'old-b']);
+    const healed = blocksOf(el({
+      atlas_page_blocks: mixed,
+      atlas_page_refs: ['new-a', 'new-circle', 'new-b'],
+    }));
+    expect((healed[0] as { elementId: string }).elementId).toBe('new-a');
+    expect((healed[1] as { knowerId: string }).knowerId).toBe('new-circle');
+    expect((healed[2] as { elementId: string }).elementId).toBe('new-b');
+  });
+
+  it('parsePageBlocks accepts circle blocks; drops them without a knowerId', () => {
+    const blocks = parsePageBlocks([
+      { id: 'k1', kind: 'circle', knowerId: 'c-1' },
+      { id: 'k2', kind: 'circle' },
+    ]);
+    expect(blocks).toEqual([{ id: 'k1', kind: 'circle', knowerId: 'c-1' }]);
+  });
+
   it('pageBlocksPatch keeps blocks + refs + derived story in lockstep', () => {
     const patch = pageBlocksPatch(blocks, (id) => (id === 'old-a' ? 'Aralia' : null));
     expect(patch.atlas_page_blocks).toBe(blocks);

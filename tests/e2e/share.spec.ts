@@ -348,6 +348,62 @@ test('element card: pick → compact card; full variant reveals chosen fields; p
   await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
 });
 
+test('circle block: the Knowledge bridge mints a page; compiled entries render; preview is disclosure-true', async ({ page }) => {
+  await setupWorld(page);
+  // Knowledge fixtures: Ireena ∈ "the party" (a circle) which holds one entry
+  // whose prose mentions Ireena via an ow:// link.
+  const ireenaId = await createElement(page, 'character', { name: 'Ireena' });
+  const circleId = await createElement(page, 'collective', {
+    name: 'the party', subtype: 'circle', characters: [ireenaId],
+  });
+  await createElement(page, 'narrative', {
+    name: 'the mists', subtype: 'knowledge', collectives: [circleId],
+    story: `The mists never lift. [Ireena](ow://character/${ireenaId}) hides.`,
+  });
+
+  // Known-view → the bridge button mints a reference page with a circle block.
+  await page.evaluate((id) => {
+    const m = window.location.hash.match(/#\/w\/([^/]+)/);
+    if (!m) throw new Error('no active world in URL');
+    window.location.hash = `#/w/${m[1]}/knowledge/knower/${id}`;
+  }, circleId);
+  await expect(page.locator('.atlas-knowledge-detail-titlerow h1')).toContainText('the party');
+  await page.locator('.atlas-knowledge-allfields', { hasText: 'create page' }).click();
+
+  // Lands in the share room: circle block statically rendered with the
+  // compiled entry; story mirror names it; intent prefilled to reference.
+  await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
+  await expect(page.locator('.atlas-share-detail-titlerow h1')).toHaveText('what the party know');
+  const circleBlock = page.locator('.atlas-share-block[data-block-kind="circle"]');
+  await expect(circleBlock.locator('.atlas-share-circle-name')).toHaveText('the party');
+  await expect(circleBlock.locator('.atlas-share-circle-entry-title')).toHaveText('the mists');
+  await expect(circleBlock).toContainText('The mists never lift.');
+  await expect(page.locator('select.atlas-share-intent')).toHaveValue('reference');
+  await page.waitForFunction(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    const p = s.data.elements.find((e: any) => e.type === 'narrative' && e.subtype === 'page');
+    return p && typeof p.story === 'string' && p.story.includes('[ the party — circle knowledge ]');
+  });
+
+  // Visitor preview (payload-true): the FROZEN entry renders; the prose
+  // mention of Ireena is plain text — she isn't card-included (§5.1).
+  await page.click('.atlas-share-preview-toggle:not([data-action])');
+  const previewCircle = page.locator('.atlas-share-page-view .atlas-share-circle');
+  await expect(previewCircle.locator('.atlas-share-circle-entry-title')).toHaveText('the mists');
+  await expect(previewCircle).toContainText('Ireena hides.');
+  await expect(previewCircle.locator('.atlas-element-chip')).toHaveCount(0);
+  await page.click('.atlas-share-preview-toggle:not([data-action])');
+
+  // Builder "+ circle" flow: picker restricted to collectives → editor preview.
+  await page.click('.atlas-share-block-add-btn:has-text("circle")');
+  await expect(page.locator('.atlas-picker-search')).toBeVisible();
+  await expect(page.locator('.atlas-picker-row', { hasText: 'Ireena' })).toHaveCount(0);
+  await page.locator('.atlas-picker-row', { hasText: 'the party' }).click();
+  await expect(page.locator('.atlas-share-circle-edit .atlas-share-circle-name')).toHaveText('the party');
+  await page.click('.atlas-share-block-done');
+  await expect(page.locator('.atlas-share-block[data-block-kind="circle"]')).toHaveCount(2);
+});
+
 test('legacy /publish URL aliases into the share room', async ({ page }) => {
   await setupWorld(page);
 

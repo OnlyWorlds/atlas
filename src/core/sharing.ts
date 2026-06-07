@@ -96,7 +96,22 @@ export interface ElementCardBlock {
   fields: string[];
 }
 
-export type PageBlock = HeadingBlock | ProseBlock | ElementCardBlock;
+/**
+ * S5 — the Knowledge bridge (DESIGN_SHARING "Knowledge Integration"). Renders
+ * a knower's compiled knowledge: every entry they hold, full texts with
+ * attribution. The knower id participates in the refs mirror exactly like a
+ * card's element id (healed on id-swap). At publish the compilation FREEZES
+ * into the payload (entries snapshot) — the circle is the disclosure
+ * boundary; later knowledge edits never leak to link-holders.
+ */
+export interface CircleBlock {
+  id: string;
+  kind: 'circle';
+  /** The knower — a Circle (Collective) or a Character. Healed from the refs mirror. */
+  knowerId: string;
+}
+
+export type PageBlock = HeadingBlock | ProseBlock | ElementCardBlock | CircleBlock;
 
 export function newBlockId(): string {
   return crypto.randomUUID();
@@ -134,6 +149,10 @@ export function parsePageBlocks(raw: unknown): PageBlock[] {
           fields: Array.isArray(b.fields) ? b.fields.filter((f): f is string => typeof f === 'string') : [],
         });
         break;
+      case 'circle':
+        if (typeof b.knowerId !== 'string' || b.knowerId.length === 0) continue;
+        out.push({ id: b.id, kind: 'circle', knowerId: b.knowerId });
+        break;
       default:
         continue; // unknown kind — forward-compat drop
     }
@@ -142,11 +161,12 @@ export function parsePageBlocks(raw: unknown): PageBlock[] {
 }
 
 /**
- * The page's blocks, with element-card ids HEALED from the `atlas_page_refs`
- * mirror (positional: the i-th element-card pairs with refs[i]). After an
- * id-swap rewrites the flat refs array, this read adopts the fresh ids even
- * though the nested block copies are stale. Falls back to the block's own id
- * when the mirror is missing/short (out-of-band edits degrade gracefully).
+ * The page's blocks, with element-bearing ids HEALED from the
+ * `atlas_page_refs` mirror (positional: the i-th element-bearing block —
+ * element-card OR circle — pairs with refs[i]). After an id-swap rewrites the
+ * flat refs array, this read adopts the fresh ids even though the nested
+ * block copies are stale. Falls back to the block's own id when the mirror is
+ * missing/short (out-of-band edits degrade gracefully).
  */
 export function blocksOf(el: Element): PageBlock[] {
   const blocks = parsePageBlocks((el as Record<string, unknown>).atlas_page_blocks);
@@ -154,19 +174,29 @@ export function blocksOf(el: Element): PageBlock[] {
   const refs = Array.isArray(rawRefs)
     ? rawRefs.filter((v): v is string => typeof v === 'string')
     : [];
-  let cardIndex = 0;
+  let refIndex = 0;
   for (const b of blocks) {
-    if (b.kind !== 'element-card') continue;
-    const mirrored = refs[cardIndex];
-    if (mirrored && mirrored !== b.elementId) b.elementId = mirrored;
-    cardIndex++;
+    if (b.kind === 'element-card') {
+      const mirrored = refs[refIndex];
+      if (mirrored && mirrored !== b.elementId) b.elementId = mirrored;
+      refIndex++;
+    } else if (b.kind === 'circle') {
+      const mirrored = refs[refIndex];
+      if (mirrored && mirrored !== b.knowerId) b.knowerId = mirrored;
+      refIndex++;
+    }
   }
   return blocks;
 }
 
-/** The flat refs mirror for a block stack: element-card ids in block order. */
+/** The flat refs mirror for a block stack: element-bearing ids (cards + circles) in block order. */
 export function pageRefsFor(blocks: readonly PageBlock[]): string[] {
-  return blocks.filter((b): b is ElementCardBlock => b.kind === 'element-card').map(b => b.elementId);
+  const out: string[] = [];
+  for (const b of blocks) {
+    if (b.kind === 'element-card') out.push(b.elementId);
+    else if (b.kind === 'circle') out.push(b.knowerId);
+  }
+  return out;
 }
 
 /**
@@ -205,6 +235,9 @@ export function compilePageStory(
         break;
       case 'element-card':
         parts.push(`[ ${resolveName(b.elementId) ?? b.elementId} — element card ]`);
+        break;
+      case 'circle':
+        parts.push(`[ ${resolveName(b.knowerId) ?? b.knowerId} — circle knowledge ]`);
         break;
     }
   }
