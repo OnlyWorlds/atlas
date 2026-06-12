@@ -66,6 +66,75 @@ export function pageIntentOf(el: Element): PageIntent {
 }
 
 // ---------------------------------------------------------------------------
+// Theme tokens (S3) — curated values only, no raw CSS (DESIGN_SHARING).
+// Stored in `atlas_page_theme` (atlas-local), validated into the payload's
+// `theme` slot at build, applied by the preview AND the viewer. Validation is
+// allowlist-based: unknown keys/values DROP (a hand-edited theme can't inject
+// styles — payloads render for arbitrary public visitors).
+// ---------------------------------------------------------------------------
+
+export interface PageTheme {
+  /** Accent hex from PAGE_THEME_ACCENTS. Default: OW cyan. */
+  accent?: string;
+  /** Font pairing key from PAGE_THEME_FONTS. Default: 'clean'. */
+  font?: string;
+  mode?: 'dark' | 'light';
+  density?: 'compact' | 'cozy' | 'airy';
+  width?: 'narrow' | 'regular' | 'wide';
+  /** Cover image URL (https) rendered as a banner above the title. */
+  cover?: string;
+}
+
+/** Curated accent palette — name → hex (rendered as swatches in the builder). */
+export const PAGE_THEME_ACCENTS: ReadonlyArray<{ name: string; hex: string }> = [
+  { name: 'cyan', hex: '#22d3ee' },     // the OnlyWorlds default
+  { name: 'amber', hex: '#fbbf24' },
+  { name: 'emerald', hex: '#34d399' },
+  { name: 'violet', hex: '#a78bfa' },
+  { name: 'rose', hex: '#fb7185' },
+  { name: 'sky', hex: '#38bdf8' },
+  { name: 'stone', hex: '#a8a29e' },
+];
+
+/**
+ * Curated font pairings — system stacks only in v1 (no webfont loading: zero
+ * FOUT, zero network dependency in the public viewer).
+ */
+export const PAGE_THEME_FONTS: ReadonlyArray<{ key: string; label: string; heading: string; body: string }> = [
+  { key: 'clean', label: 'clean', heading: "system-ui, sans-serif", body: "system-ui, sans-serif" },
+  { key: 'literary', label: 'literary', heading: "Georgia, 'Times New Roman', serif", body: "system-ui, sans-serif" },
+  { key: 'archival', label: 'archival', heading: "Georgia, 'Times New Roman', serif", body: "Georgia, 'Times New Roman', serif" },
+  { key: 'terminal', label: 'terminal', heading: "ui-monospace, 'Cascadia Mono', monospace", body: "system-ui, sans-serif" },
+];
+
+const THEME_MODES = new Set(['dark', 'light']);
+const THEME_DENSITIES = new Set(['compact', 'cozy', 'airy']);
+const THEME_WIDTHS = new Set(['narrow', 'regular', 'wide']);
+
+/**
+ * Validate a raw theme value into the curated token set. Unknown keys and
+ * out-of-set values drop silently; an empty result means "all defaults".
+ * Shared by the builder UI, the payload builder, and (as a copy) the viewer.
+ */
+export function parsePageTheme(raw: unknown): PageTheme {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const t = raw as Record<string, unknown>;
+  const out: PageTheme = {};
+  if (typeof t.accent === 'string' && PAGE_THEME_ACCENTS.some(a => a.hex === t.accent)) out.accent = t.accent;
+  if (typeof t.font === 'string' && PAGE_THEME_FONTS.some(f => f.key === t.font)) out.font = t.font;
+  if (typeof t.mode === 'string' && THEME_MODES.has(t.mode)) out.mode = t.mode as PageTheme['mode'];
+  if (typeof t.density === 'string' && THEME_DENSITIES.has(t.density)) out.density = t.density as PageTheme['density'];
+  if (typeof t.width === 'string' && THEME_WIDTHS.has(t.width)) out.width = t.width as PageTheme['width'];
+  if (typeof t.cover === 'string' && /^https:\/\//i.test(t.cover.trim())) out.cover = t.cover.trim();
+  return out;
+}
+
+/** The page's validated theme; {} = all defaults. */
+export function pageThemeOf(el: Element): PageTheme {
+  return parsePageTheme((el as Record<string, unknown>).atlas_page_theme);
+}
+
+// ---------------------------------------------------------------------------
 // Block model v1.
 // ---------------------------------------------------------------------------
 
@@ -94,6 +163,14 @@ export interface ElementCardBlock {
   variant: 'compact' | 'full';
   /** Field names chosen as visible on the card (the disclosure primitive). */
   fields: string[];
+  /**
+   * Render the element's image on this card — small avatar on compact,
+   * banner on full. ABSENT = true (only an explicit false is stored, so
+   * pre-existing pages and equality tests stay untouched); per-card opt-out
+   * (session 239). When every card for an element opts out, its image_url
+   * stays out of the payload too.
+   */
+  showImage?: boolean;
 }
 
 /**
@@ -111,7 +188,37 @@ export interface CircleBlock {
   knowerId: string;
 }
 
-export type PageBlock = HeadingBlock | ProseBlock | ElementCardBlock | CircleBlock;
+/**
+ * S6 — a set of elements as an identity grid (compact mini-cards: avatar/icon
+ * + name + type). Members join the payload identity-only, exactly like
+ * compact cards. ALL member ids join the refs mirror (count-aware positional
+ * pairing — see pageRefsFor/blocksOf).
+ */
+export interface CollectionBlock {
+  id: string;
+  kind: 'collection';
+  elementIds: string[];
+}
+
+/**
+ * S7 — a world map as a published image + chosen pins (D3 resolved session
+ * 239: image_url-only — local media never leaves the folder; users host the
+ * image themselves). `pinIds` is an INCLUDE-list initialized to all the map's
+ * pins at block creation — new pins never auto-join a published page (chosen
+ * content only). mapId + every pinId join the refs mirror (count-aware).
+ * At publish the block FREEZES: image url + %-positioned pin tokens
+ * (name/type; ref only when the pinned element is itself included).
+ */
+export interface MapBlock {
+  id: string;
+  kind: 'map';
+  mapId: string;
+  pinIds: string[];
+  /** Always-visible pin labels. ABSENT = true (only explicit false stored). */
+  showLabels?: boolean;
+}
+
+export type PageBlock = HeadingBlock | ProseBlock | ElementCardBlock | CircleBlock | CollectionBlock | MapBlock;
 
 export function newBlockId(): string {
   return crypto.randomUUID();
@@ -141,18 +248,39 @@ export function parsePageBlocks(raw: unknown): PageBlock[] {
           richtextJson: b.richtextJson && typeof b.richtextJson === 'object' ? b.richtextJson : null,
         });
         break;
-      case 'element-card':
+      case 'element-card': {
         if (typeof b.elementId !== 'string' || b.elementId.length === 0) continue;
-        out.push({
+        const card: ElementCardBlock = {
           id: b.id, kind: 'element-card', elementId: b.elementId,
           variant: b.variant === 'full' ? 'full' : 'compact',
           fields: Array.isArray(b.fields) ? b.fields.filter((f): f is string => typeof f === 'string') : [],
-        });
+        };
+        if (b.showImage === false) card.showImage = false; // absent = true
+        out.push(card);
         break;
+      }
       case 'circle':
         if (typeof b.knowerId !== 'string' || b.knowerId.length === 0) continue;
         out.push({ id: b.id, kind: 'circle', knowerId: b.knowerId });
         break;
+      case 'collection':
+        if (!Array.isArray(b.elementIds)) continue;
+        out.push({
+          id: b.id, kind: 'collection',
+          elementIds: b.elementIds.filter((v): v is string => typeof v === 'string' && v.length > 0),
+        });
+        break;
+      case 'map': {
+        if (typeof b.mapId !== 'string' || b.mapId.length === 0) continue;
+        const mapBlock: MapBlock = {
+          id: b.id, kind: 'map', mapId: b.mapId,
+          pinIds: Array.isArray(b.pinIds)
+            ? b.pinIds.filter((v): v is string => typeof v === 'string' && v.length > 0) : [],
+        };
+        if (b.showLabels === false) mapBlock.showLabels = false; // absent = true
+        out.push(mapBlock);
+        break;
+      }
       default:
         continue; // unknown kind — forward-compat drop
     }
@@ -162,11 +290,12 @@ export function parsePageBlocks(raw: unknown): PageBlock[] {
 
 /**
  * The page's blocks, with element-bearing ids HEALED from the
- * `atlas_page_refs` mirror (positional: the i-th element-bearing block —
- * element-card OR circle — pairs with refs[i]). After an id-swap rewrites the
- * flat refs array, this read adopts the fresh ids even though the nested
- * block copies are stale. Falls back to the block's own id when the mirror is
- * missing/short (out-of-band edits degrade gracefully).
+ * `atlas_page_refs` mirror. Pairing is positional and COUNT-AWARE: cards and
+ * circles consume one ref each, collections consume elementIds.length refs —
+ * blocks and refs are always written in the same save (pageBlocksPatch), so
+ * the counts line up by construction; an id-swap rewrites VALUES in the flat
+ * array, never its length. Falls back to the block's own ids when the mirror
+ * is missing/short (out-of-band edits degrade gracefully).
  */
 export function blocksOf(el: Element): PageBlock[] {
   const blocks = parsePageBlocks((el as Record<string, unknown>).atlas_page_blocks);
@@ -184,17 +313,37 @@ export function blocksOf(el: Element): PageBlock[] {
       const mirrored = refs[refIndex];
       if (mirrored && mirrored !== b.knowerId) b.knowerId = mirrored;
       refIndex++;
+    } else if (b.kind === 'collection') {
+      for (let i = 0; i < b.elementIds.length; i++) {
+        const mirrored = refs[refIndex];
+        if (mirrored && mirrored !== b.elementIds[i]) b.elementIds[i] = mirrored;
+        refIndex++;
+      }
+    } else if (b.kind === 'map') {
+      const mirroredMap = refs[refIndex];
+      if (mirroredMap && mirroredMap !== b.mapId) b.mapId = mirroredMap;
+      refIndex++;
+      for (let i = 0; i < b.pinIds.length; i++) {
+        const mirrored = refs[refIndex];
+        if (mirrored && mirrored !== b.pinIds[i]) b.pinIds[i] = mirrored;
+        refIndex++;
+      }
     }
   }
   return blocks;
 }
 
-/** The flat refs mirror for a block stack: element-bearing ids (cards + circles) in block order. */
+/**
+ * The flat refs mirror for a block stack: every element-bearing id (cards +
+ * circles + collection members) in block order, count-aware.
+ */
 export function pageRefsFor(blocks: readonly PageBlock[]): string[] {
   const out: string[] = [];
   for (const b of blocks) {
     if (b.kind === 'element-card') out.push(b.elementId);
     else if (b.kind === 'circle') out.push(b.knowerId);
+    else if (b.kind === 'collection') out.push(...b.elementIds);
+    else if (b.kind === 'map') out.push(b.mapId, ...b.pinIds);
   }
   return out;
 }
@@ -238,6 +387,12 @@ export function compilePageStory(
         break;
       case 'circle':
         parts.push(`[ ${resolveName(b.knowerId) ?? b.knowerId} — circle knowledge ]`);
+        break;
+      case 'collection':
+        parts.push(`[ ${b.elementIds.map(id => resolveName(id) ?? id).join(', ')} — collection ]`);
+        break;
+      case 'map':
+        parts.push(`[ ${resolveName(b.mapId) ?? b.mapId} — map ]`);
         break;
     }
   }

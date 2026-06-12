@@ -585,6 +585,12 @@ export interface WorldsRegistry {
     refs_group_by_field?: boolean;
     /** Ask for confirmation before deleting an element. Default on. */
     confirm_before_delete?: boolean;
+    /**
+     * Render element images (image_url) in atlas chrome — detail banner +
+     * context-pane thumb. Default on. The banner's × and the header's
+     * icon-thumbnail flip this same setting in place (session 239).
+     */
+    show_element_images?: boolean;
   };
 }
 

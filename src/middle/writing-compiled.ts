@@ -352,9 +352,13 @@ function renderInline(
   });
 
   // Standard links: [text](url) — non-ow:// only (the above already consumed
-  // ow:// matches, so the remaining pattern matches plain URLs).
+  // ow:// matches, so the remaining pattern matches plain URLs). Scheme
+  // allowlist: markdown reaches public visitors via published payloads, so a
+  // javascript:/data: href would be click-to-execute XSS. Unsafe scheme →
+  // plain text (`text` was captured from the already-escaped string).
   s = s.replace(/\[([^\]]+?)\]\(([^)\s]+?)\)/g, (_, text, url) => {
-    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeText(text)}</a>`;
+    if (!SAFE_LINK_HREF_RE.test(url)) return text;
+    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
   });
 
   // Inline code (backticks) — done before bold/italic so backticks don't
@@ -371,6 +375,9 @@ function renderInline(
 
   return s;
 }
+
+/** Renderable link schemes — anything else renders as plain text. */
+const SAFE_LINK_HREF_RE = /^(https?:\/\/|mailto:|#)/i;
 
 function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');

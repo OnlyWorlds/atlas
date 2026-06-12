@@ -16,15 +16,17 @@
  * (scan all array fields whose items have `id` + all scalar id-like fields).
  */
 
-import { getState, subscribe } from '../core/state';
+import { getState, subscribe, patchSlice } from '../core/state';
 import { onHashChange, parseHash } from '../core/router';
 import type { Element } from '../core/types';
+import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/registry';
 import { toastManager } from '../ui/toast-manager';
 import { sectionsFor } from '../editor/field-schema';
 import { buildZoneSections } from './element-detail-zone-sections';
 import { renderReferencedBy } from './element-detail-refs';
 import { renderSection } from './element-detail-fields';
 import { renderHeader } from './element-detail-header';
+import { renderElementImage } from '../ui/element-image';
 import { escapeText } from '../core/dom-utils';
 
 /**
@@ -120,6 +122,33 @@ export function mountElementDetail(target: HTMLElement): () => void {
     const detail = document.createElement('div');
     detail.className = 'atlas-detail';
     body.appendChild(detail);
+
+    // The element's image, above the field sections — gated on the
+    // show_element_images setting. The banner's × flips the setting OFF in
+    // place; the header's type icon becomes a clickable thumbnail that flips
+    // it back ON (session 239).
+    if (getEditorSettings(getState().registry).show_element_images) {
+      const image = renderElementImage(el, 'banner');
+      if (image) {
+        const wrap = document.createElement('div');
+        wrap.className = 'atlas-element-image-wrap';
+        wrap.appendChild(image);
+        image.addEventListener('error', () => wrap.remove(), { once: true });
+        const hide = document.createElement('button');
+        hide.type = 'button';
+        hide.className = 'atlas-element-image-hide';
+        hide.title = 'Hide element images';
+        hide.textContent = '×';
+        hide.addEventListener('click', () => {
+          const next = setEditorSettings(getState().registry, { show_element_images: false });
+          saveRegistry(next);
+          patchSlice('registry', next);
+          toastManager.info('Element images hidden — click the type icon (or Settings → Editing) to show them again');
+        });
+        wrap.appendChild(hide);
+        detail.appendChild(wrap);
+      }
+    }
 
     const sections = sectionsFor(el.type);
     sections.forEach((section, idx) => {

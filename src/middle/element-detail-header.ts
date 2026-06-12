@@ -19,7 +19,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
-import { getEditorSettings } from '../registry/registry';
+import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/registry';
 import {
   parseHash, navigate, homeHash, elementHash, writingHash, mapHash,
 } from '../core/router';
@@ -58,11 +58,36 @@ export function renderHeader(el: Element): HTMLElement {
   const header = document.createElement('div');
   header.className = 'atlas-middle-header';
 
-  const icon = document.createElement('span');
-  icon.className = 'material-symbols-outlined';
-  icon.textContent = ELEMENT_ICONS[el.type] ?? 'category';
-  icon.title = ELEMENT_LABELS[el.type].singular;
-  header.appendChild(icon);
+  // Type icon — or, when element images are hidden AND this element has one,
+  // a mini-thumbnail of the image. Clicking the thumbnail re-enables element
+  // images (the inverse of the detail banner's ×; session 239).
+  const buildTypeIcon = (): HTMLElement => {
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined';
+    icon.textContent = ELEMENT_ICONS[el.type] ?? 'category';
+    icon.title = ELEMENT_LABELS[el.type].singular;
+    return icon;
+  };
+  const rawImageUrl = (el as Record<string, unknown>).image_url;
+  const imageUrl = typeof rawImageUrl === 'string' ? rawImageUrl.trim() : '';
+  const imagesHidden = !getEditorSettings(getState().registry).show_element_images;
+  if (imagesHidden && /^https?:\/\//i.test(imageUrl)) {
+    const thumb = document.createElement('img');
+    thumb.className = 'atlas-header-icon-thumb';
+    thumb.src = imageUrl;
+    thumb.alt = '';
+    thumb.loading = 'lazy';
+    thumb.title = `${ELEMENT_LABELS[el.type].singular} — click to show element images`;
+    thumb.addEventListener('click', () => {
+      const next = setEditorSettings(getState().registry, { show_element_images: true });
+      saveRegistry(next);
+      patchSlice('registry', next);
+    });
+    thumb.addEventListener('error', () => thumb.replaceWith(buildTypeIcon()), { once: true });
+    header.appendChild(thumb);
+  } else {
+    header.appendChild(buildTypeIcon());
+  }
 
   const title = document.createElement('h2');
   title.dataset.role = 'element-name';

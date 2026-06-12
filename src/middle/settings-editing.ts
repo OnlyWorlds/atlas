@@ -40,6 +40,7 @@ function renderEditingFieldModeSection(): string {
   const fieldMode = editor.field_edit_mode;
   const refsByField = editor.refs_group_by_field;
   const confirmDelete = editor.confirm_before_delete;
+  const showImages = editor.show_element_images;
   const defaultCreateType = loadUiPrefs().defaultCreateType;
   const createTypeOptions = CREATABLE_TYPES
     .map((t) => `<option value="${t}" ${t === defaultCreateType ? 'selected' : ''}>${ELEMENT_LABELS[t].singular}</option>`)
@@ -85,6 +86,10 @@ function renderEditingFieldModeSection(): string {
         <input type="checkbox" name="confirm-before-delete" ${confirmDelete ? 'checked' : ''} />
         <span>Ask for confirmation before deleting an element</span>
       </label>
+      <label class="atlas-settings-toggle">
+        <input type="checkbox" name="show-element-images" ${showImages ? 'checked' : ''} />
+        <span>Show element images (detail view banner + context pane thumbnail)</span>
+      </label>
     </section>
   `;
 }
@@ -124,6 +129,16 @@ function wireEditingFieldMode(toasts: ToastManager): void {
     saveRegistry(next);
     patchSlice('registry', next);
     toasts.info(`Delete confirmation ${confirmDeleteToggle.checked ? 'on' : 'off'}`);
+  });
+
+  // Element images toggle — also reachable from the detail banner's × and the
+  // header icon-thumbnail, which flip the same registry setting.
+  const showImagesToggle = document.querySelector<HTMLInputElement>('.atlas-settings input[name="show-element-images"]');
+  showImagesToggle?.addEventListener('change', () => {
+    const next = setEditorSettings(getState().registry, { show_element_images: showImagesToggle.checked });
+    saveRegistry(next);
+    patchSlice('registry', next);
+    toasts.info(`Element images ${showImagesToggle.checked ? 'shown' : 'hidden'}`);
   });
 
   // Default new-element type — an app-level UI pref (localStorage), read by

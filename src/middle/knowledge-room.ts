@@ -36,6 +36,7 @@ import {
   circleMembers,
 } from '../core/knowledge';
 import { computeRelationPatch, extractProseLinks } from './writing-workspace-derive';
+import { renderProseFragment } from './writing-compiled';
 import { ELEMENT_ICONS, ELEMENT_LABELS, KNOWLEDGE_DRAFT_STASH_PREFIX } from '../core/constants';
 import { pickElement } from '../ui/element-picker-modal';
 import { ElementCreateModal } from '../ui/element-create-modal';
@@ -839,10 +840,18 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           quote.className = 'atlas-knowledge-known-quote';
           const story = typeof (entry as Record<string, unknown>).story === 'string'
             ? (entry as Record<string, unknown>).story as string : '';
-          const text = document.createElement('div');
-          text.className = 'atlas-knowledge-known-text';
-          text.textContent = story.trim() || '(no text — the entry only references it)';
-          quote.appendChild(text);
+          // Entry text is markdown with ow:// mentions — render it (chips for
+          // mentions), never the raw `[Name](ow://…)` source (audit 239 #1).
+          if (story.trim()) {
+            const text = renderProseFragment(story, new Map(getState().data.elements.map(e => [e.id, e])));
+            text.classList.add('atlas-knowledge-known-text');
+            quote.appendChild(text);
+          } else {
+            const text = document.createElement('div');
+            text.className = 'atlas-knowledge-known-text';
+            text.textContent = '(no text — the entry only references it)';
+            quote.appendChild(text);
+          }
           const src = document.createElement('button');
           src.type = 'button';
           src.className = 'atlas-knowledge-known-src';

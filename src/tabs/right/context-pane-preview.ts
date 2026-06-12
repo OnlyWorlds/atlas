@@ -24,7 +24,9 @@
 import type { Element } from '../../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../../core/constants';
 import { getState } from '../../core/state';
+import { getEditorSettings } from '../../registry/registry';
 import { navigate, elementHash } from '../../core/router';
+import { renderElementImage } from '../../ui/element-image';
 
 export interface ContextPreviewHandle {
   show(el: Element): void;
@@ -147,9 +149,18 @@ function buildPreview(
 
   card.appendChild(header);
 
-  // Body — description + backlinks.
+  // Body — image + description + backlinks.
   const body = document.createElement('div');
   body.className = 'atlas-context-preview-body';
+
+  // Height-constrained thumb (object-fit: cover) — a free-height image
+  // crowded this narrow pane against the action buttons, which is why images
+  // were originally skipped here. The cover-crop keeps the layout stable.
+  // Honors the same show_element_images setting as the detail banner.
+  if (getEditorSettings(getState().registry).show_element_images) {
+    const thumb = renderElementImage(el, 'thumb');
+    if (thumb) body.appendChild(thumb);
+  }
 
   const description = typeof el.description === 'string' ? el.description : null;
   if (description && description.trim().length > 0) {
@@ -158,10 +169,6 @@ function buildPreview(
     descEl.textContent = description.length > 220 ? description.slice(0, 217) + '…' : description;
     body.appendChild(descEl);
   }
-
-  // Element images intentionally not rendered here — they don't lay out well
-  // at the preview's small width and crowded the action buttons against the
-  // bottom. The "open in detail" path shows the full image at proper size.
 
   // Backlinks — narratives that reference this element. Folded summary.
   const backlinks = findBacklinkingNarratives(el.id);

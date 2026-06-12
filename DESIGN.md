@@ -1,7 +1,7 @@
 # Atlas — Design Document
 
-**Version**: 1.2 (2026-06-07) — folder-first rebuild
-**Status**: Feature-complete for v1 (phases 0–6 + 3.5 shipped) + Knowledge phase 1 (sessions 235-236, `DESIGN_KNOWLEDGE.md`) + Sharing S1/S2 (session 237, `DESIGN_SHARING.md` — share room, block builder, visitor preview; publish flow awaits `SHARING_CONTRACT.md`). Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
+**Version**: 1.3 (2026-06-07) — folder-first rebuild
+**Status**: Feature-complete for v1 (phases 0–6 + 3.5 shipped) + Knowledge phase 1 (sessions 234-236, `DESIGN_KNOWLEDGE.md`) + Sharing built to the backend boundary (sessions 237-238, `DESIGN_SHARING.md` — share room, block builder incl. Circle block, payload-true visitor preview, fakes-first publish flow; goes live when Anchor's backend ships per `SHARING_CONTRACT.md` v0.2). Companion viewer tool scaffolded at `tools/show/`. Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
 **Predecessor**: `tools/atlas-deprecated/` (IDB-cached architecture, retained as UI/UX reference)
 
 ---
@@ -563,7 +563,7 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 | `knowledge` | `#/w/<id>/knowledge[/<entryId>\|/new\|/knower/<id>]` | Knowledge entries — who knows what. [Entries \| Knowers] tabs, draft editor (persists nothing until create), embedded TipTap prose w/ mentions, known-view per knower. See `DESIGN_KNOWLEDGE.md` | shipped (phase 1) |
 | `timeline` | `#/w/<id>/timeline` | Full timeline view | shipped |
 | `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | shipped |
-| `share` | `#/w/<id>/share[/<pageId>]` | Sharing pages — list + block builder + visitor preview. Legacy `/publish` URLs alias here. See `DESIGN_SHARING.md` | shipped (S1+S2; publish flow awaits backend) |
+| `share` | `#/w/<id>/share[/<pageId>]` | Sharing pages — list + block builder (heading/prose/element-card/circle) + payload-true visitor preview + publish section (fakes-first). Legacy `/publish` URLs alias here. See `DESIGN_SHARING.md` | shipped (S1+S2+S4+S5; live publishing awaits Anchor's backend) |
 | `import` | `#/w/<id>/import` | Explanation + reference to base-tool import; mechanics deferred | stub |
 | `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | stub |
 | `settings` | `#/w/<id>/settings[/<tab>]` | Account / storage / editing (atlas-wide) · world / writing / context (per-world) | shipped |
@@ -988,10 +988,11 @@ Stored on Narrative elements with `subtype: "page"`; all in `ATLAS_LOCAL_EXTENSI
 
 | Field | Purpose | Council-motion candidate? |
 |---|---|---|
-| `atlas_page_blocks` | The page's block stack (source of truth; heading/prose/element-card v1) | No — composition is presentation config |
-| `atlas_page_refs` | Flat element-id mirror of the element-card bindings (id-swap safety via `rewriteIdReferences`; `blocksOf()` heals nested ids) | No — internal mechanics |
+| `atlas_page_blocks` | The page's block stack (source of truth; heading/prose/element-card/circle) | No — composition is presentation config |
+| `atlas_page_refs` | Flat element-id mirror of the element-bearing block bindings (card elementIds + circle knowerIds; id-swap safety via `rewriteIdReferences`; `blocksOf()` heals nested ids) | No — internal mechanics |
 | `atlas_page_intent` | show / reference / publish | Probably not — sharing metadata |
 | `atlas_page_theme` | Reserved for the S3 theme tokens | Probably not — visual pref |
+| `atlas_page_pub` | Published-state mirror `{id, slug, published_at, updated_at, revoked}` from the sharing backend (display cache; the API rows are truth) | No — sharing metadata |
 
 The published artifact is a frozen snapshot in a new Django model — see `SHARING_CONTRACT.md` (drafted session 237, Anchor pending). The canonical `story` field on a page carries a derived plain-markdown compilation of the blocks (synced, readable by other tools, regenerated on every blocks save — never hand-edited).
 

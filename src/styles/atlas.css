@@ -7517,6 +7517,23 @@ a.atlas-writing-workspace-crumb-seg:hover {
   padding: 6px 88px 6px 10px; /* right space reserves the controls strip */
 }
 
+/* Published badge on list rows (session 239). */
+.atlas-share-row-pub {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  color: var(--atlas-cyan, #22d3ee);
+  flex-shrink: 0;
+}
+.atlas-share-row-pub .material-symbols-outlined { font-size: 13px; }
+.atlas-share-row-pub.is-revoked { color: var(--atlas-text-muted); }
+
+/* Drag-reorder states (session 239). */
+.atlas-share-block.is-dragging { opacity: 0.4; }
+.atlas-share-block.is-drop-above { box-shadow: 0 -2px 0 0 var(--atlas-cyan, #22d3ee); }
+.atlas-share-block.is-drop-below { box-shadow: 0 2px 0 0 var(--atlas-cyan, #22d3ee); }
+
 .atlas-share-block:hover {
   border-color: var(--atlas-divider);
   background: rgba(255, 255, 255, 0.015);
@@ -7571,6 +7588,268 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
 .atlas-share-card-icon {
   font-size: 17px;
   color: var(--atlas-cyan, #22d3ee);
+}
+
+/* ---- map block (S7) ---- */
+
+.atlas-share-map { margin: 0; }
+
+.atlas-share-map-frame {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0; /* no baseline gap under the image */
+}
+
+.atlas-share-map-image {
+  max-width: 100%;
+  display: block;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.atlas-share-map-pin {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--page-accent, var(--atlas-cyan, #22d3ee));
+  border: 2px solid rgba(0, 0, 0, 0.65);
+  transform: translate(-50%, -50%);
+  cursor: default;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+a.atlas-share-map-pin { cursor: pointer; }
+.atlas-share-map-pin:hover {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+  z-index: 2;
+}
+
+.atlas-share-map-pin.is-openable { cursor: pointer; }
+
+.atlas-share-map-pin-label {
+  display: none;
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.85);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+}
+.atlas-share-map-pin:hover .atlas-share-map-pin-label { display: block; }
+
+/* Always-visible labels (showLabels, default on) — lighter chrome than the
+ * hover tooltip; hover still brightens via the dot shadow. */
+.atlas-share-map-pin-label.is-static {
+  display: block;
+  background: rgba(0, 0, 0, 0.6);
+  border-color: transparent;
+  font-size: 10px;
+  padding: 2px 6px;
+}
+.atlas-share-map-pin:hover .atlas-share-map-pin-label.is-static {
+  background: rgba(0, 0, 0, 0.88);
+  z-index: 3;
+}
+
+/* Pin-click element modal. */
+.atlas-share-pin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.atlas-share-pin-modal {
+  position: relative;
+  width: min(380px, calc(100vw - 48px));
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  background: rgba(16, 16, 16, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.atlas-share-pin-modal-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--atlas-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  z-index: 1;
+}
+.atlas-share-pin-modal-close:hover { color: var(--atlas-text); background: rgba(255, 255, 255, 0.12); }
+
+.atlas-share-pin-modal-image {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 7px;
+  margin-bottom: 12px;
+}
+
+.atlas-share-pin-modal-desc {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--atlas-text-soft, rgba(255, 255, 255, 0.72));
+  margin: 10px 0 0;
+}
+
+.atlas-share-pin-modal .atlas-share-card-fields { margin-top: 12px; }
+
+.atlas-share-map-caption {
+  font-size: 11.5px;
+  color: var(--atlas-text-muted);
+  margin-top: 6px;
+}
+
+.atlas-share-map-pins-toggle {
+  border: none;
+  background: transparent;
+  color: var(--atlas-cyan, #22d3ee);
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 8px;
+  padding: 0;
+}
+
+/* ---- collection block (S6) ---- */
+
+.atlas-share-collection {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.atlas-share-collection-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  min-width: 0;
+}
+
+.atlas-share-collection-icon {
+  font-size: 18px;
+  color: var(--page-accent, var(--atlas-cyan, #22d3ee));
+  flex-shrink: 0;
+}
+
+.atlas-share-collection-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.atlas-share-collection-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-share-collection-type {
+  font-size: 10px;
+  color: var(--atlas-text-muted);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.atlas-share-collection-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.atlas-share-collection-member-x {
+  border: none;
+  background: transparent;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 0 0 4px;
+  line-height: 1;
+}
+.atlas-share-collection-member-x:hover { color: var(--atlas-text); }
+
+/* ---- theme section (S3) ---- */
+
+.atlas-share-theme-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atlas-share-theme-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.atlas-share-theme-row .atlas-share-field-label {
+  width: 56px;
+  flex-shrink: 0;
+}
+
+.atlas-share-theme-swatches { display: flex; gap: 6px; }
+
+.atlas-share-theme-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--swatch);
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.75;
+  transition: opacity 0.12s ease, border-color 0.12s ease;
+}
+.atlas-share-theme-swatch:hover { opacity: 1; }
+.atlas-share-theme-swatch.is-active {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
+.atlas-share-theme-options { display: flex; gap: 4px; }
+
+.atlas-share-theme-cover { flex: 1; min-width: 0; }
+
+/* Compact-card avatar — the image as identity (replaces the type icon). */
+.atlas-share-card-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .atlas-share-card-name {
@@ -7693,6 +7972,57 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
 .atlas-share-page-view {
   padding: 8px 32px 48px 32px;
   max-width: 720px;
+  /* Theme token vars (S3) — applyPageTheme overrides per page. */
+  --page-accent: var(--atlas-cyan, #22d3ee);
+  --page-font-heading: system-ui, sans-serif;
+  --page-font-body: system-ui, sans-serif;
+  --page-space: 14px;
+  font-family: var(--page-font-body);
+}
+
+/* Width token. */
+.atlas-share-page-view[data-width='narrow'] { max-width: 560px; }
+.atlas-share-page-view[data-width='wide'] { max-width: 920px; }
+
+/* Density token — one knob, all block spacing. */
+.atlas-share-page-view[data-density='compact'] { --page-space: 8px; }
+.atlas-share-page-view[data-density='airy'] { --page-space: 24px; }
+
+/* Light mode — page article only (the surrounding shell stays atlas-dark). */
+.atlas-share-page-view[data-mode='light'] {
+  background: #f6f5f2;
+  color: #1c1917;
+  border-radius: 8px;
+}
+.atlas-share-page-view[data-mode='light'] .atlas-share-page-view-title,
+.atlas-share-page-view[data-mode='light'] .atlas-share-block-heading,
+.atlas-share-page-view[data-mode='light'] .atlas-share-card-name {
+  color: #1c1917;
+}
+.atlas-share-page-view[data-mode='light'] .atlas-share-card {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Accent + font application inside the themed page. */
+.atlas-share-page-view .atlas-share-page-view-title,
+.atlas-share-page-view .atlas-share-block-heading {
+  font-family: var(--page-font-heading);
+}
+.atlas-share-page-view .atlas-share-card-icon,
+.atlas-share-page-view .atlas-share-card-chip .material-symbols-outlined,
+.atlas-share-page-view .atlas-share-circle-head .material-symbols-outlined {
+  color: var(--page-accent);
+}
+
+/* Cover banner (theme.cover). */
+.atlas-share-page-cover img {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 16px;
 }
 
 .atlas-share-page-view-title {
@@ -7702,7 +8032,7 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
 }
 
 .atlas-share-page-view-block {
-  margin-bottom: 14px;
+  margin-bottom: var(--page-space, 14px);
 }
 
 .atlas-share-page-view h2.atlas-share-block-heading {
@@ -8737,6 +9067,75 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
   background: rgba(255, 255, 255, 0.06);
   color: var(--atlas-text);
 }
+
+/* ---- shared element image (detail banner + context thumb; session 239) ---- */
+
+.atlas-element-image {
+  display: block;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Element detail: natural aspect, capped height, left-anchored. */
+.atlas-element-image.is-banner {
+  max-width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  object-position: left center;
+  margin: 2px 0 12px;
+}
+
+/* Context-pane preview: fixed-height cover crop — free-height images crowded
+ * this narrow pane (the original reason images were skipped here). */
+.atlas-element-image.is-thumb {
+  width: 100%;
+  max-height: 110px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+/* Detail banner wrapper — hosts the hover-revealed × that hides element
+ * images (flips the show_element_images setting). */
+.atlas-element-image-wrap {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin: 2px 0 12px;
+}
+.atlas-element-image-wrap .atlas-element-image.is-banner { margin: 0; }
+.atlas-element-image-hide {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--atlas-text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.atlas-element-image-wrap:hover .atlas-element-image-hide { opacity: 1; }
+.atlas-element-image-hide:hover { color: var(--atlas-text); background: rgba(0, 0, 0, 0.75); }
+
+/* Header type-icon-as-thumbnail (images hidden + element has one) — click
+ * re-enables element images. */
+.atlas-header-icon-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.atlas-header-icon-thumb:hover { border-color: var(--atlas-cyan, #22d3ee); }
 
 .atlas-context-preview-body {
   flex: 1 1 auto;

@@ -136,10 +136,21 @@ describe('buildPagePayload', () => {
     expect(Object.keys(p.elements[IREENA].fields)).toEqual(['description']);
   });
 
-  it('passes a stored theme object through; defaults to {}', () => {
+  it('VALIDATES the stored theme into curated tokens — unknown keys/values drop (S3)', () => {
     const themed = buildPagePayload(
-      makePage([], { atlas_page_theme: { accent: '#22d3ee' } }), world());
-    expect(themed.theme).toEqual({ accent: '#22d3ee' });
+      makePage([], { atlas_page_theme: { accent: '#22d3ee', mode: 'light', density: 'airy' } }), world());
+    expect(themed.theme).toEqual({ accent: '#22d3ee', mode: 'light', density: 'airy' });
+
+    // Out-of-set values + unknown keys + non-https cover never reach the wire.
+    const hostile = buildPagePayload(
+      makePage([], { atlas_page_theme: {
+        accent: 'red;background:url(javascript:x)', mode: 'rainbow',
+        font: '"; @import evil', custom_css: 'body{}', cover: 'javascript:alert(1)',
+      } }), world());
+    expect(hostile.theme).toEqual({});
+
+    // Missing theme → {}.
+    expect(buildPagePayload(makePage([]), world()).theme).toEqual({});
   });
 
   it('freezes a circle block: knower title + held entries (incl. circle-member inheritance)', () => {
@@ -185,6 +196,148 @@ describe('buildPagePayload', () => {
     const frozen = p.blocks[0] as PayloadCircleBlock;
     expect(frozen.title).toBe('(missing knower)');
     expect(frozen.entries).toEqual([]);
+  });
+
+  it('scrubs ow:// links to NON-included targets out of prose markdown (wire-level disclosure)', () => {
+    const p = buildPagePayload(makePage([
+      { id: 'b1', kind: 'prose',
+        markdown: `[Ireena](ow://character/${IREENA}) hides from [Vallaki](ow://location/${VALLAKI}). See ow://location/${VALLAKI} too.` },
+      { id: 'b2', kind: 'element-card', elementId: IREENA, variant: 'compact', fields: [] },
+    ]), world());
+    const prose = p.blocks[0] as { markdown: string };
+    // Included target keeps its link; non-included pre-resolves to the label;
+    // a bare hand-typed URI resolves to the element name.
+    expect(prose.markdown).toBe(`[Ireena](ow://character/${IREENA}) hides from Vallaki. See Vallaki too.`);
+    // The payload JSON itself must not carry the undisclosed uuid anywhere.
+    expect(JSON.stringify(p)).not.toContain(VALLAKI);
+  });
+
+  it('scrubs circle entry markdown the same way (frozen knowledge is public wire too)', () => {
+    const CIRCLE = 'c1000000-0000-0000-0000-000000000001';
+    const ENTRY = 'e1000000-0000-0000-0000-000000000001';
+    const elements: Element[] = [
+      ...world(),
+      { id: CIRCLE, type: 'collective', name: 'the party', subtype: 'circle',
+        characters: [], local_updated_at: 't' } as unknown as Element,
+      { id: ENTRY, type: 'narrative', name: 'the mists', subtype: 'knowledge',
+        story: `[Vallaki](ow://location/${VALLAKI}) is sealed.`, collectives: [CIRCLE],
+        local_updated_at: 't' } as unknown as Element,
+    ];
+    const p = buildPagePayload(makePage([{ id: 'b1', kind: 'circle', knowerId: CIRCLE }]), elements);
+    const frozen = p.blocks[0] as PayloadCircleBlock;
+    expect(frozen.entries[0].markdown).toBe('Vallaki is sealed.');
+    expect(JSON.stringify(p)).not.toContain(VALLAKI);
+  });
+
+  it('image_url ships per showImage (default ON, compact renders it as avatar); all-cards opt-out drops it from the wire', () => {
+    // Default: a lone compact card ships the image (rendered as a head avatar).
+    const def = buildPagePayload(makePage([
+      { id: 'b1', kind: 'element-card', elementId: IREENA, variant: 'compact', fields: [] },
+    ]), world());
+    expect(def.elements[IREENA].image_url).toBe('https://img.example/ireena.png');
+
+    // Every card for the element opts out → the url never reaches the payload.
+    const optedOut = buildPagePayload(makePage([
+      { id: 'b1', kind: 'element-card', elementId: IREENA, variant: 'compact', fields: [], showImage: false },
+      { id: 'b2', kind: 'element-card', elementId: IREENA, variant: 'full', fields: [], showImage: false },
+    ]), world());
+    expect(optedOut.elements[IREENA].image_url).toBeUndefined();
+
+    // Mixed: one card wanting it is enough (the entry is shared across cards).
+    const mixed = buildPagePayload(makePage([
+      { id: 'b1', kind: 'element-card', elementId: IREENA, variant: 'compact', fields: [], showImage: false },
+      { id: 'b2', kind: 'element-card', elementId: IREENA, variant: 'full', fields: [] },
+    ]), world());
+    expect(mixed.elements[IREENA].image_url).toBe('https://img.example/ireena.png');
+  });
+
+  it('collection members join the payload IDENTITY-ONLY (name/type/image, no fields); dangling members drop from the wire', () => {
+    const page = makePage([
+      { id: 'b1', kind: 'collection', elementIds: [IREENA, ISMARK, GONE] },
+    ]);
+    (page as unknown as Record<string, unknown>).atlas_page_refs = [IREENA, ISMARK, GONE];
+    const p = buildPagePayload(page, world());
+    // Members included, identity only — Ireena's populated fields stay out.
+    expect(Object.keys(p.elements).sort()).toEqual([IREENA, ISMARK].sort());
+    expect(p.elements[IREENA].fields).toEqual({});
+    expect(p.elements[IREENA].image_url).toBe('https://img.example/ireena.png'); // grid avatar
+    // Dangling member dropped from the wire block.
+    const col = p.blocks[0] as { elementIds: string[] };
+    expect(col.elementIds).toEqual([IREENA, ISMARK]);
+    expect(JSON.stringify(p)).not.toContain(GONE);
+  });
+
+  it('refs-mirror healing is COUNT-AWARE across collections (id-swap safety)', () => {
+    // A card, then a 2-member collection, then a circle — 4 refs total.
+    // All nested ids are stale; the flat mirror carries the fresh ones.
+    const CIRCLE = 'c1000000-0000-0000-0000-000000000001';
+    const elements: Element[] = [
+      ...world(),
+      { id: CIRCLE, type: 'collective', name: 'the party', characters: [],
+        local_updated_at: 't' } as unknown as Element,
+    ];
+    const page = makePage([
+      { id: 'b1', kind: 'element-card', elementId: 'stale-a', variant: 'compact', fields: [] },
+      { id: 'b2', kind: 'collection', elementIds: ['stale-b', 'stale-c'] },
+      { id: 'b3', kind: 'circle', knowerId: 'stale-d' },
+    ]);
+    (page as unknown as Record<string, unknown>).atlas_page_refs = [IREENA, ISMARK, VALLAKI, CIRCLE];
+    const p = buildPagePayload(page, elements);
+    expect((p.blocks[0] as { elementId: string }).elementId).toBe(IREENA);
+    expect((p.blocks[1] as { elementIds: string[] }).elementIds).toEqual([ISMARK, VALLAKI]);
+    expect((p.blocks[2] as { knowerId: string }).knowerId).toBe(CIRCLE);
+  });
+
+  it('map block freezes: %-coords, pinned elements DISCLOSED with full populated fields (pin checklist = the gate); no-image maps drop entirely', () => {
+    const MAP = 'm1000000-0000-0000-0000-000000000001';
+    const PIN1 = 'pin10000-0000-0000-0000-000000000001';
+    const PIN2 = 'pin20000-0000-0000-0000-000000000002';
+    const elements: Element[] = [
+      ...world(),
+      { id: MAP, type: 'map', name: 'barovia', image_url: 'https://img.example/map.png',
+        width: 1000, height: 500, local_updated_at: 't' } as unknown as Element,
+      { id: PIN1, type: 'pin', map_id: MAP, element_id: IREENA, x: 250, y: 125, local_updated_at: 't' } as unknown as Element,
+      { id: PIN2, type: 'pin', map_id: MAP, element_id: VALLAKI, x: 900, y: 450, local_updated_at: 't' } as unknown as Element,
+    ];
+    const page = makePage([
+      { id: 'b1', kind: 'map', mapId: MAP, pinIds: [PIN1, PIN2] },
+    ]);
+    (page as unknown as Record<string, unknown>).atlas_page_refs = [MAP, PIN1, PIN2];
+    const p = buildPagePayload(page, elements);
+    const frozen = p.blocks[0] as { kind: string; title: string; image_url: string; showLabels?: boolean;
+      pins: Array<{ xPct: number; yPct: number; name: string; ref?: string }> };
+    expect(frozen.kind).toBe('map');
+    expect(frozen.title).toBe('barovia');
+    expect(frozen.image_url).toBe('https://img.example/map.png');
+    expect(frozen.showLabels).toBeUndefined(); // absent = labels on
+    // 250/1000 = 25%, 125/500 = 25%; pinned elements are included → ref.
+    expect(frozen.pins[0]).toEqual({ xPct: 25, yPct: 25, name: 'Ireena', type: 'character', ref: IREENA });
+    expect(frozen.pins[1]).toEqual({ xPct: 90, yPct: 90, name: 'Vallaki', type: 'location', ref: VALLAKI });
+    // Pinned elements join `elements` with image + ALL populated fields
+    // (the pin-click modal's content); relations still tokenized — Ismark
+    // exists but isn't included → text-only token.
+    expect(Object.keys(p.elements).sort()).toEqual([IREENA, VALLAKI].sort());
+    const ireena = p.elements[IREENA];
+    expect(ireena.image_url).toBe('https://img.example/ireena.png');
+    expect(ireena.fields.description).toBe('The burgomaster\'s daughter.');
+    expect(tokens(ireena.fields.birthplace)).toEqual([{ text: 'Vallaki', ref: VALLAKI }]);
+    expect(tokens(ireena.fields.friends)).toEqual([{ text: 'Ismark' }]);
+    // Pin ids never reach the wire.
+    expect(JSON.stringify(p)).not.toContain(PIN1);
+
+    // showLabels: false survives the freeze.
+    const pageNoLabels = makePage([
+      { id: 'b1', kind: 'map', mapId: MAP, pinIds: [PIN1], showLabels: false },
+    ]);
+    (pageNoLabels as unknown as Record<string, unknown>).atlas_page_refs = [MAP, PIN1];
+    const frozenNoLabels = buildPagePayload(pageNoLabels, elements).blocks[0] as { showLabels?: boolean };
+    expect(frozenNoLabels.showLabels).toBe(false);
+
+    // A map without image_url (local media only) drops from the payload.
+    const noImg = elements.map(e => e.id === MAP
+      ? ({ ...e, image_url: undefined } as unknown as Element) : e);
+    const p2 = buildPagePayload(page, noImg);
+    expect(p2.blocks.find(b => (b as { kind: string }).kind === 'map')).toBeUndefined();
   });
 
   it('heals card ids from the refs mirror before building (id-swap safety)', () => {

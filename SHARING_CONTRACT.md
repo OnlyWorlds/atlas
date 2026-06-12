@@ -1,10 +1,10 @@
 # Sharing Backend Contract — atlas ↔ onlyworlds.com
 
-**Status**: v0.2 (2026-06-07, session 238) — **AGREED SLICE**. v0.1 reviewed by Anchor (`SHARING_FEASIBILITY_ANCHOR.md`, ow.com repo); all four of her §3 calls + §4 answers accepted by Captain, plus one atlas-side addition (slug immutability). Remaining open items are §8 (small, Anchor's call).
+**Status**: v0.3 (2026-06-12, session 239) — **AS-BUILT**. Anchor's `ow/sharing/` Django slice is implemented (83 backend tests, adversarial self-review, awaiting Captain's deploy); this version folds in her as-built calls from the 2026-06-07 message: **slug-addressed mutations**, the **locked error enum** (+`title_too_long`/`intent_invalid`, enveloped 401), **quota 20/account**, **purge-by-URL** invalidation, base path `/api/sharing/` confirmed, empty payloads are valid pages. Atlas fakes + client synced same day (session 239).
 **Owner pairing**: Temper (atlas + viewer tool) · Anchor (Django backend).
 **Context docs**: `DESIGN_SHARING.md` (the design), `core/sharing.ts` (the block model as built and tested), Anchor's feasibility review (the deployment ground truth).
 
-This is the coordination artifact for Sharing Phase 2. Everything atlas-side that this contract assumes is **built and test-locked**; the backend slice below is **agreed shape** — Anchor owns implementation detail and §8.
+This is the coordination artifact for Sharing Phase 2. Everything atlas-side that this contract assumes is **built and test-locked**; the backend slice below is **built** — integration smoke (both sides live) is the remaining step.
 
 ---
 
@@ -17,13 +17,13 @@ Atlas users compose **pages** — ordered stacks of blocks (heading / prose / el
 | Decision | Value |
 |---|---|
 | Page storage in the world | prose/composition = a Narrative `subtype: "page"`; composition config in atlas-local fields (never hits worldapi); canonical `story` = derived plain-markdown mirror |
-| Block model v1 | `heading` / `prose` / `element-card` — extensible without migration |
+| Block model v1 | `heading` / `prose` / `element-card` / `circle` (added session 238 — a knower's compiled knowledge, frozen into the payload at publish; backend-opaque like all blocks) — extensible without migration |
 | **Live pages** | **DEFERRED entirely — v1 is frozen-only** (Anchor §3.1). `is_live` stays in the schema as a reserved column, default false, unused. The "World Showcase" v1 = a frozen page you republish |
 | Slug namespace | **global** (`show.onlyworlds.com/<slug>`), uniqueness enforced at publish, **min length 4**, `[a-z0-9-]`, max 40, no leading/trailing `-` |
 | **Slug immutability** | **v1 disallows slug change after publish** (atlas D1). Renaming a page's URL = revoke + republish to a new slug; the old slug stays an owner-held tombstone. No silent release → no takeover surface. `PATCH` may change `title`/`intent`/`payload` only |
 | Auth | `api_key` + PIN, identical to worldapi (`world_api_auth`) — no new auth concept |
 | Revoke | **tombstone** — payload deleted, row + slug retained, public URL serves 410; owner may republish to their own tombstoned slug. **Plus `admin_locked`** (Anchor §3.3): admin takedown that also blocks owner republish — the slug is burned |
-| Quota | **10 active pages per ACCOUNT** (not per world — Anchor §4.2). Revoked don't count. Raise later is trivial |
+| Quota | **20 active pages per ACCOUNT** (not per world — Anchor §4.2; raised from 10 in her as-built slice). Revoked don't count. Raise later is trivial |
 | Throttles | per-account publish limit (~10/hr, squatting + abuse) · **per-IP throttle on the public GET** (required in v1 — the endpoint is otherwise a DoS amplifier) |
 | Showcase ↔ Page | one model — `is_live` flag reserved for post-rebuild; one-live-per-world constraint ships in the schema, dormant |
 | Disclosure | snapshot contains ONLY chosen content; cross-references to non-included elements are pre-resolved to plain text (permission chaining for free) |
@@ -56,18 +56,20 @@ class SharedPage(AbstractBaseModel):           # base provides created_at/update
 
 ## 4. Endpoints
 
-Base path is Anchor's call (§8.1). Authenticated calls use the worldapi headers (`API-Key` + `API-Pin`); world association derives from the key.
+Base path: **`/api/sharing/`** on `https://www.onlyworlds.com` (confirmed as-built; §8.1 closed). Authenticated calls use the worldapi headers (`API-Key` + `API-Pin`); world association derives from the key.
+
+**Mutations are SLUG-addressed** (as-built): django-ninja 1.3 emits no typed `<uuid>` path converter, so an id-path and the public `<slug>` GET would collapse into one Django pattern → 405s. The immutable, globally-unique slug (held from the publish response) addresses PATCH/DELETE; GET/PATCH/DELETE share one path with per-method dispatch. The publish response is unchanged: still `{id, slug, url}`.
 
 | Method + path | Auth | Behavior |
 |---|---|---|
-| `POST /pages/` | yes | Publish. Body: `{slug, title, intent, payload}`. 201 → `{id, slug, url}`. Errors: 409 `slug_taken` · 400 `slug_invalid` · 4xx `quota_exceeded` · 400 `payload_too_large` (256KB, measured on serialized JSON server-side) |
-| `GET /pages/<slug>/` | **none** (public) | The viewer's fetch. Active → 200 envelope (§5.2) with `Cache-Control: public, max-age=…` + ETag (§7). Revoked/admin-locked → **410** `{"error":{"code":"revoked"}}`. Unknown → 404. `view_count` increments best-effort on cache-miss |
-| `PATCH /pages/<id>/` | yes | Republish: replace `payload` / `title` / `intent`. **Slug NOT changeable** (§2). Rejected if `admin_locked` |
-| `DELETE /pages/<id>/` | yes | Revoke (tombstone): `payload=None, revoked=True`. 204. Idempotent |
+| `POST /pages/` | yes | Publish. Body: `{slug, title, intent, payload}`. 201 → `{id, slug, url}`. Errors: 409 `slug_taken` · 400 `slug_invalid` · 4xx `quota_exceeded` · 400 `payload_too_large` (256KB, measured on serialized JSON server-side) · 400 `title_too_long` (title ≤ 200) · 400 `intent_invalid` (intent ∈ {show, reference, publish}) |
+| `GET /pages/<slug>/` | **none** (public) | The viewer's fetch. Active → 200 envelope (§5.2) with `Cache-Control: public, max-age=…` + ETag (§7). **An empty payload (`{}`) is a valid active page → 200.** Revoked/admin-locked → **410** `{"error":{"code":"revoked"}}`. Unknown → 404. `view_count` increments best-effort on cache-miss |
+| `PATCH /pages/<slug>/` | yes | Republish: replace `payload` / `title` / `intent`. **Slug NOT changeable** (§2). Rejected if `admin_locked` |
+| `DELETE /pages/<slug>/` | yes | Revoke (tombstone): `payload=None, revoked=True`. 204. Idempotent |
 | `GET /pages/?world=<id>` | yes | List own pages incl. revoked (atlas's share-room management list) |
 | `GET /slug-check/?slug=` | yes | `{available: bool}` — pre-publish UX nicety |
 
-**Error shape everywhere**: `{"error": {"code": "<machine_code>", "detail": "<human text>"?}}`. Proposed code enum: `slug_taken`, `slug_invalid`, `quota_exceeded`, `payload_too_large`, `revoked`, `not_found`, `rate_limited`, `admin_locked`. (Confirm/edit: §8.3.)
+**Error shape everywhere**: `{"error": {"code": "<machine_code>", "detail": "<human text>"?}}`. **Locked enum (as-built, §8.3 closed)**: `slug_taken` · `slug_invalid` · `quota_exceeded` · `payload_too_large` · `title_too_long` · `intent_invalid` · `revoked` · `admin_locked` · `not_found` · `rate_limited` · `forbidden` · `unauthorized`. The 401 carries the envelope (`code: "unauthorized"`) via an additive global handler that ALSO keeps the legacy `{"detail": "Unauthorized"}` key, so worldapi/worldsync clients are unaffected.
 
 ## 5. The payload (the viewer's input contract)
 
@@ -131,7 +133,17 @@ A page with one full Ireena card (fields: `description`, `birthplace`, `friends`
 }
 ```
 
-Builder guarantees (all test-locked): prose blocks ship markdown only (no TipTap JSON) · dangling relation ids are DROPPED (disclose nothing) · compact cards contribute no fields · chosen fields project only while still populated · meta/atlas-local fields never appear · card ids are healed from the refs mirror before building (id-swap safety). Atlas's visitor preview renders THIS payload — author preview ≡ served page.
+Builder guarantees (all test-locked): prose blocks ship markdown only (no TipTap JSON) · **prose + circle markdown is disclosure-SCRUBBED at build** (`ow://` links to non-included targets pre-resolve to plain labels — the payload JSON never carries undisclosed ids; session 239) · dangling relation ids are DROPPED (disclose nothing) · compact cards contribute no fields · chosen fields project only while still populated · meta/atlas-local fields never appear · card ids are healed from the refs mirror before building (id-swap safety). Atlas's visitor preview renders THIS payload — author preview ≡ served page.
+
+**Card images** (session 239): card blocks carry `showImage` (default true; per-card author opt-out). `elements[*].image_url` ships only when at least one card for that element wants it. Renderers: full card → banner image, compact card → small head avatar in place of the type icon. Older payloads without `showImage` render as true.
+
+**Collection blocks** (session 239, S6 — backend-opaque like all blocks): `{ "id", "kind": "collection", "elementIds": [...] }` — an identity grid. Members join `elements` identity-only (name/type/image_url, empty `fields` unless they also have a full card); dangling member ids are dropped from the wire.
+
+**Map blocks** (session 239, S7 — backend-opaque): frozen at build to `{ "id", "kind": "map", "title", "image_url", "showLabels"?, "pins": [{ xPct, yPct, name, type, ref? }] }`. Image is `image_url`-only (D3: local media never leaves the folder); pins are %-positioned (top-left origin); labels render by default (`showLabels: false` → hover-only); maps without a web image or dimensions drop from the wire entirely; pin/map IDs never ship. **Pinned elements are disclosed BY INCLUSION** (Captain's call, same session): each included pin's element joins `elements` with image + description + ALL populated fields (relations tokenized per the standard rule) — the pin-click modal renders from it; the per-pin checklist is the disclosure gate for maps.
+
+**Theme** (session 239, S3 — live): the `theme` slot carries allowlist-validated tokens only — `accent` (curated hex set) · `font` (pairing key) · `mode` (dark/light) · `density` (compact/cozy/airy) · `width` (narrow/regular/wide) · `cover` (https URL). Unknown keys/values are dropped at build AND at viewer parse (no style injection path).
+
+**Circle blocks** (session 238, atlas+viewer concern — opaque to Django): in the payload a circle block carries its compilation FROZEN at build time: `{ "id", "kind": "circle", "knowerId", "title": "<knower name>", "knowerType": "collective"|"character", "entries": [ { "title", "markdown" } ] }`. Entry markdown follows the same prose disclosure rule at render time.
 
 ### 5.2 GET response envelope
 
@@ -153,18 +165,25 @@ v1 ships nothing live. When it lands (post-rebuild, with Redis / a real host): t
 **Confirmed 2026-06-07**: onlyworlds.com is already Cloudflare-proxied (`Server: cloudflare`, `cf-cache-status: DYNAMIC` — proxied, not yet caching). So:
 
 - **Frozen payloads are immutable between republishes** → Django sets `Cache-Control: public, max-age=<long>` + ETag on the public GET; a CF **Cache Rule** on the GET path caches it at the edge. Anonymous spike traffic (the Reddit moment) is served by Cloudflare and never reaches a PythonAnywhere worker.
-- **Invalidation**: preferred — Django holds a CF zone token and **purges by URL** on republish/revoke (exact + instant). Fallback — a modest TTL (5–15 min) and "updates appear within minutes" honesty. Anchor's call (§8.2).
+- **Invalidation (as-built, §8.2 closed): purge-by-URL.** Django holds a scoped Zone→Cache-Purge token (Captain mints it) and purges the exact public GET URL on republish/revoke; degrades to edge TTL if the token's absent. **The cache key is `https://www.onlyworlds.com/api/sharing/pages/<slug>/`** (configurable via `SHARING_API_ORIGIN`) — every payload fetcher (atlas client, viewer SPA, OG Function) must pin to that exact host or purges miss their cache entry.
 - **Viewer**: CF Pages at `show.onlyworlds.com` (same CF zone). `_redirects /* /index.html 200`; `_routes.json` excludes `/assets/*`; a Pages Function injects per-page OpenGraph meta — its server-side payload fetch rides the same edge cache.
 - **Per-IP throttle on the GET** at Django remains required (cache-miss path + cache-bypass attempts).
 - **Durability requirement**: the **public GET path + slug URLs survive the ow.com rebuild unchanged**. This is the contract's most durable line — the viewer and every shared link depend on it.
 
-## 8. Remaining open items (Anchor's call, none blocking atlas work)
+## 8. Open items — ALL CLOSED (Anchor's as-built calls, 2026-06-07)
 
-1. **Base path** for the endpoint set (`/api/sharing/` vs under worldapi versioning).
-2. **CF purge-by-URL vs TTL-only** invalidation (§7) — purge needs a zone token server-side; TTL needs nothing.
-3. **Error code enum** (§4) — confirm/edit the proposed set.
-4. **Reserved + blocklist** contents (you own it — §3.3 of your review).
-5. Anything in §5 that DRF wants reshaped — the wire is still cheap to change until S4 + the viewer fetch are built against fakes (atlas encodes this contract in MSW handlers first; convention #20).
+1. ~~Base path~~ → **`/api/sharing/`** ✅
+2. ~~Purge vs TTL~~ → **purge-by-URL** (scoped zone token, TTL degradation when absent) ✅
+3. ~~Error code enum~~ → **locked** (§4; +`title_too_long`, `intent_invalid`, `forbidden`, `unauthorized`) ✅
+4. ~~Reserved + blocklist~~ → implemented server-side (Anchor owns contents) ✅
+5. ~~§5 reshaping~~ → none needed; payload/envelope unchanged from v0.2 ✅
+
+**Verify-live residue — ALL CONFIRMED (Anchor, 2026-06-12; fakes exact):**
+- Cross-account PATCH/DELETE → **404 `not_found`** (existence-hiding: the queryset scopes by world; `403 forbidden` is reserved for demo-world writes).
+- PATCH with a payload on your own *revoked* slug → **200, it REVIVES** (a second legal revival path beside POST; quota-checked like any transition-to-active).
+- Revival at quota → **429 `quota_exceeded`** (ALL limit rejections are 429; 400 is validation-only). Reserved slugs → **409 `slug_taken`**, not 400.
+- **Status map (locked)**: 400 `slug_invalid`/`payload_too_large`/`title_too_long`/`intent_invalid` · 401 `unauthorized` (dual-shape) · 403 `forbidden` (demo world)/`admin_locked` · 404 `not_found` (missing OR cross-account) · 409 `slug_taken` (incl. reserved + own-active re-POST) · 429 `quota_exceeded`/`rate_limited`.
+- **CORS on the public GET**: verified live — the zone reflects origins (`Vary: origin`), `show.onlyworlds.com` + `localhost:3045/3046` all allowed; per-origin cache keys make cached-ACAO safe. Re-check on a cache HIT at the §7 joint pass (CF_DELIVERY §5 items 6–7).
 
 ---
 

@@ -1,6 +1,6 @@
 # Sharing — Cloudflare Delivery Design (Temper's half)
 
-**Status**: DRAFT (2026-06-07, session 238) — the joint mini-design from Anchor's review §7.3. This is the Temper/viewer half; Anchor owns the Django/cache-header half (§3 below names exactly what's hers).
+**Status**: MERGED (2026-06-12, session 239) — Anchor's half is BUILT: she chose **purge-by-URL** (scoped Zone→Cache-Purge token, Captain mints it; degrades to edge TTL when the token's absent). Cache key = `https://www.onlyworlds.com/api/sharing/pages/<slug>/` (configurable via her `SHARING_API_ORIGIN`); all three payload fetchers (atlas client, viewer SPA, OG Function) are pinned to that host. Remaining: the shared Cache Rule (§3) + the §5 deploy-time verify.
 **Context**: `SHARING_CONTRACT.md` v0.2 §7 · Anchor's `SHARING_FEASIBILITY_ANCHOR.md` §3.2 · the viewer at `tools/show/`.
 
 **The goal in one line**: anonymous page-view traffic (the Reddit spike) is served by Cloudflare's edge and never competes with members' API calls for PythonAnywhere's worker pool.
@@ -36,10 +36,9 @@ Frozen payloads are **immutable between republishes** — the ideal cacheable ob
 1. **Cache headers on the public GET** (active pages only):
    `Cache-Control: public, max-age=<TTL>, s-maxage=<TTL>` + `ETag` (payload hash or `updated_at`).
    Error/tombstone responses (404/410): `max-age=60` or no-store — short, so revokes propagate fast even without purge.
-2. **Invalidation — pick one** (§8.2 of the contract):
-   - **Purge-by-URL** (preferred): hold a CF API token (zone → purge scope only), fire `POST /zones/<id>/purge_cache` with the page URL on republish + revoke. Then the TTL can be LONG (hours+) — exact freshness, max cache efficiency. ~10 lines + a secret.
-   - **TTL-only** (fallback): no token, set `max-age=300–900`. "Updates appear within minutes" honesty. Fine for v1 if the token feels like scope creep.
+2. **Invalidation — DECIDED (as-built): purge-by-URL.** Django holds a CF API token (zone → purge scope only), fires the purge with the exact page URL on republish + revoke; degrades to edge TTL if the token's absent. Captain mints the token. TTL can be LONG (hours+) — exact freshness, max cache efficiency.
 3. **Per-IP throttle on the GET** stays at Django regardless (cache-miss path + cache-bypass attempts are still origin traffic).
+4. **CORS on the public GET** (flagged session 239): the viewer SPA fetches cross-origin (`show.onlyworlds.com` → `www.onlyworlds.com`). The response needs `Access-Control-Allow-Origin` — and because the response is edge-cached, it should be **`*` set statically**, NOT a per-request Origin reflection (a cached copy carrying `ACAO: <some-other-origin>` without `Vary: Origin` would be served to the viewer and blocked by the browser). Likely covered by ow.com's existing global CORS config — verify which mode it runs in at first deploy.
 
 ### Temper's half (done or owned)
 
@@ -60,7 +59,9 @@ A **Cache Rule** on the zone: `hostname eq www.onlyworlds.com AND starts_with(pa
 ## 5. Verify at first deploy (checklist)
 
 1. `curl -I` a published page URL twice → second response `cf-cache-status: HIT`.
-2. Republish in atlas → page URL serves the new payload (immediately with purge; within TTL without).
-3. Revoke → 410 within TTL (or immediately with purge).
+2. Republish in atlas → page URL serves the new payload (immediately — purge-by-URL is live).
+3. Revoke → 410 immediately (purge fires on revoke too).
 4. Curl a slug with a bot UA on `show.onlyworlds.com` → og:title carries the page title (Function works).
 5. A burst of GETs (e.g. `hey -n 200`) → Django access log shows ~1 origin hit.
+6. **CORS**: `curl -I` the public GET with an `Origin: https://show.onlyworlds.com` header → response carries `Access-Control-Allow-Origin` (`*` preferred — see §3.4); then load a published slug in the deployed viewer and confirm the browser fetch isn't CORS-blocked.
+7. **Cache HIT + CORS together**: repeat the Origin curl on a HIT response — the cached copy must still carry the ACAO header.

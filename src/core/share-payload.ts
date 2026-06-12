@@ -25,9 +25,9 @@
 import { FIELD_SCHEMA } from '@onlyworlds/sdk';
 import type { Element } from './types';
 import {
-  blocksOf, pageIntentOf,
+  blocksOf, pageIntentOf, parsePageTheme,
   type PageBlock, type PageIntent, type ElementCardBlock, type CircleBlock,
-  type HeadingBlock, type ProseBlock,
+  type CollectionBlock, type MapBlock, type HeadingBlock, type ProseBlock, type PageTheme,
 } from './sharing';
 import { knowledgeHeldBy } from './knowledge';
 
@@ -69,8 +69,26 @@ export interface PayloadCircleBlock {
   entries: Array<{ title: string; markdown: string }>;
 }
 
-/** A block as it appears in the PAYLOAD (circle blocks are frozen-compiled). */
-export type PayloadBlock = HeadingBlock | ProseBlock | ElementCardBlock | PayloadCircleBlock;
+/**
+ * The payload form of a map block — frozen at build: the image URL + the
+ * chosen pins as %-positioned identity tokens (top-left origin; pin storage
+ * coords are image pixels, normalized via the map's width/height). `ref` is
+ * present only when the pinned element is itself included (the standard
+ * disclosure rule — hover shows identity, click-through needs a card).
+ */
+export interface PayloadMapBlock {
+  id: string;
+  kind: 'map';
+  /** The map's display name at publish time. */
+  title: string;
+  image_url: string;
+  /** Always-visible pin labels (absent = true; hover-only when false). */
+  showLabels?: boolean;
+  pins: Array<{ xPct: number; yPct: number; name: string; type: string; ref?: string }>;
+}
+
+/** A block as it appears in the PAYLOAD (circle/map blocks are frozen-compiled). */
+export type PayloadBlock = HeadingBlock | ProseBlock | ElementCardBlock | PayloadCircleBlock | CollectionBlock | PayloadMapBlock;
 
 export interface PagePayload {
   /** The PAYLOAD schema version — the viewer branches on this. */
@@ -78,8 +96,8 @@ export interface PagePayload {
   title: string;
   /** Advisory metadata only (viewer chrome + OG flavor) — never server behavior. */
   intent: PageIntent;
-  /** Reserved — the ~6 theme tokens land with S3. */
-  theme: Record<string, unknown>;
+  /** The ~6 curated theme tokens (S3) — validated, allowlist-only. */
+  theme: PageTheme;
   blocks: PayloadBlock[];
   elements: Record<string, PayloadElementEntry>;
 }
@@ -112,6 +130,51 @@ export function isPopulatedValue(value: unknown): boolean {
   return false;
 }
 
+/** Every card-eligible, populated field name of an element (disk order). */
+export function populatedFieldNames(el: Element): string[] {
+  const out: string[] = [];
+  for (const [key, value] of Object.entries(el)) {
+    if (isCardSkipField(key)) continue;
+    if (isPopulatedValue(value)) out.push(key);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Disclosure scrub — the wire artifact must not carry undisclosed ids.
+// ---------------------------------------------------------------------------
+
+/** Markdown ow:// link: [label](ow://type/uuid) — the shape both renderers match. */
+const MD_OW_LINK_RE = /\[([^\]]+?)\]\(ow:\/\/([a-z_-]+)\/([\w-]+)\)/gi;
+
+/** Bare ow:// URI outside link syntax (hand-typed) — same leak, no label. */
+const BARE_OW_LINK_RE = /ow:\/\/([a-z_-]+)\/([\w-]+)/gi;
+
+/**
+ * Pre-resolve markdown for the payload (contract §2): ow:// links whose
+ * target is NOT included become plain label text BEFORE the payload ships.
+ * The render-time rule (§5.1) still strips them visually, but the payload
+ * JSON itself is served publicly — an `ow://character/<uuid>` in raw markdown
+ * would leak the element's type, uuid, and cross-page linkable identity even
+ * when no renderer ever shows it. Included targets keep their links (the
+ * viewer chips them). Bare hand-typed ow:// URIs resolve to the element's
+ * name when known, else drop.
+ */
+export function scrubMarkdownForPayload(
+  markdown: string,
+  includedIds: ReadonlySet<string>,
+  byId: Map<string, Element>,
+): string {
+  let out = markdown.replace(MD_OW_LINK_RE, (whole, label: string, _type: string, id: string) =>
+    includedIds.has(id) ? whole : label,
+  );
+  out = out.replace(BARE_OW_LINK_RE, (whole, _type: string, id: string) => {
+    if (includedIds.has(id)) return whole;
+    return byId.get(id)?.name ?? '';
+  });
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Relation detection (schema-driven — matches the editor's widget resolution).
 // ---------------------------------------------------------------------------
@@ -142,11 +205,17 @@ export function buildPagePayload(page: Element, elements: Element[]): PagePayloa
   const byId = new Map(elements.map(e => [e.id, e]));
   const blocks = blocksOf(page);
 
-  // Included set = card-bound elements that exist. Cards pointing at missing
-  // elements stay in the block list (the viewer renders an honest placeholder)
-  // but contribute nothing to `elements`.
+  // Included set = card-bound elements + collection members that exist.
+  // Blocks pointing at missing elements stay in the block list (the viewer
+  // renders honestly) but contribute nothing to `elements`.
   const cards = blocks.filter((b): b is ElementCardBlock => b.kind === 'element-card');
+  const collections = blocks.filter((b): b is CollectionBlock => b.kind === 'collection');
   const includedIds = new Set(cards.map(c => c.elementId).filter(id => byId.has(id)));
+  for (const col of collections) {
+    for (const id of col.elementIds) {
+      if (byId.has(id)) includedIds.add(id);
+    }
+  }
 
   // Chosen fields per included element: union across its FULL-variant cards
   // (compact cards are identity-only). Order: first-seen.
@@ -160,68 +229,186 @@ export function buildPagePayload(page: Element, elements: Element[]): PagePayloa
     chosenFields.set(card.elementId, list);
   }
 
-  const tokenFor = (id: string): RelationToken | null => {
-    const target = byId.get(id);
-    if (!target) return null; // dangling ref — discloses nothing, drop it
-    const token: RelationToken = { text: target.name || '(unnamed)' };
-    if (includedIds.has(id)) token.ref = id;
-    return token;
-  };
+  // Image inclusion: ships when ANY card for the element wants it (showImage,
+  // default true — compact renders it as an avatar, full as a banner). When
+  // every card opts out, the url stays off the wire entirely. Collection
+  // members always want it (the grid renders avatars).
+  const imageWanted = new Set(
+    cards.filter(c => includedIds.has(c.elementId) && c.showImage !== false).map(c => c.elementId),
+  );
+  for (const col of collections) {
+    for (const id of col.elementIds) {
+      if (byId.has(id)) imageWanted.add(id);
+    }
+  }
+
+  // Pinned elements are disclosed BY INCLUSION (session 239, Captain's call):
+  // the pin-click modal shows image + description + populated fields, so the
+  // pin checklist is the disclosure gate for maps. Their entries project ALL
+  // populated fields (relations still tokenized per the standard rule).
+  for (const mb of blocks.filter((b): b is MapBlock => b.kind === 'map')) {
+    for (const pinId of mb.pinIds) {
+      const pin = byId.get(pinId);
+      const targetId = pin ? (pin as Record<string, unknown>).element_id : null;
+      const target = typeof targetId === 'string' ? byId.get(targetId) : undefined;
+      if (!target) continue;
+      includedIds.add(target.id);
+      imageWanted.add(target.id);
+      const list = chosenFields.get(target.id) ?? [];
+      for (const f of populatedFieldNames(target)) {
+        if (!list.includes(f)) list.push(f);
+      }
+      chosenFields.set(target.id, list);
+    }
+  }
 
   const entries: Record<string, PayloadElementEntry> = {};
   for (const id of includedIds) {
-    const el = byId.get(id)!;
-    const rec = el as Record<string, unknown>;
-    const entry: PayloadElementEntry = {
-      name: el.name || '(unnamed)',
-      type: el.type,
-      fields: {},
-    };
-    const imageUrl = rec.image_url;
-    if (typeof imageUrl === 'string' && imageUrl.trim().length > 0) entry.image_url = imageUrl;
-
-    for (const field of chosenFields.get(id) ?? []) {
-      if (isCardSkipField(field)) continue; // defensive — UI never offers these
-      const raw = rec[field];
-      if (!isPopulatedValue(raw)) continue;
-      const kind = relationKindOf(el.type, field);
-      if (kind === null) {
-        entry.fields[field] = raw;
-        continue;
-      }
-      const rawIds = kind === 'single' ? [raw] : (Array.isArray(raw) ? raw : []);
-      const tokens: RelationToken[] = [];
-      for (const v of rawIds) {
-        const refId = relationId(v);
-        if (!refId) continue;
-        const token = tokenFor(refId);
-        if (token) tokens.push(token);
-      }
-      if (tokens.length > 0) entry.fields[field] = tokens;
-    }
-    entries[id] = entry;
+    entries[id] = projectElementEntry(
+      byId.get(id)!, byId, includedIds, chosenFields.get(id) ?? [], imageWanted.has(id));
   }
 
   // Prose blocks ship markdown only — richtextJson is an editing concern
   // (and the payload should stay lean; contract suggests a 256KB server cap).
-  // Circle blocks FREEZE: the knower's compiled knowledge snapshots into the
-  // block (entries' names + texts) — the published page never re-resolves.
-  const payloadBlocks: PayloadBlock[] = blocks.map((b): PayloadBlock => {
-    if (b.kind === 'prose') return { id: b.id, kind: 'prose', markdown: b.markdown };
-    if (b.kind === 'circle') return freezeCircleBlock(b, elements, byId);
+  // Markdown is disclosure-SCRUBBED at build: ow:// links to non-included
+  // targets pre-resolve to plain labels (the payload is public; see
+  // scrubMarkdownForPayload). Circle blocks FREEZE: the knower's compiled
+  // knowledge snapshots into the block (entries' names + texts, scrubbed the
+  // same way) — the published page never re-resolves.
+  const payloadBlocks: PayloadBlock[] = blocks.map((b): PayloadBlock | null => {
+    if (b.kind === 'prose') {
+      return { id: b.id, kind: 'prose', markdown: scrubMarkdownForPayload(b.markdown, includedIds, byId) };
+    }
+    if (b.kind === 'circle') {
+      const frozen = freezeCircleBlock(b, elements, byId);
+      return {
+        ...frozen,
+        entries: frozen.entries.map(e => ({
+          ...e, markdown: scrubMarkdownForPayload(e.markdown, includedIds, byId),
+        })),
+      };
+    }
+    if (b.kind === 'collection') {
+      // Dangling members drop from the wire (their ids disclose nothing).
+      return { id: b.id, kind: 'collection', elementIds: b.elementIds.filter(id => byId.has(id)) };
+    }
+    if (b.kind === 'map') return freezeMapBlock(b, byId, includedIds);
     return { ...b };
-  });
+  }).filter((b): b is PayloadBlock => b !== null);
 
-  const rawTheme = (page as Record<string, unknown>).atlas_page_theme;
   return {
     schema_version: 1,
     title: page.name || '(untitled)',
     intent: pageIntentOf(page),
-    theme: rawTheme && typeof rawTheme === 'object' && !Array.isArray(rawTheme)
-      ? rawTheme as Record<string, unknown> : {},
+    // Validated, never passthrough — the payload is public wire (S3).
+    theme: parsePageTheme((page as Record<string, unknown>).atlas_page_theme),
     blocks: payloadBlocks,
     elements: entries,
   };
+}
+
+/**
+ * Project one element into its payload entry form: identity + (optionally)
+ * image + the given fields, populated-only, relations tokenized per the
+ * disclosure rule (`ref` only when the target is itself included). Used by
+ * the payload builder AND by the builder-side pin modal (which synthesizes
+ * payload-true entries from world data on the fly).
+ */
+export function projectElementEntry(
+  el: Element,
+  byId: Map<string, Element>,
+  includedIds: ReadonlySet<string>,
+  fieldNames: readonly string[],
+  withImage: boolean,
+): PayloadElementEntry {
+  const rec = el as Record<string, unknown>;
+  const entry: PayloadElementEntry = {
+    name: el.name || '(unnamed)',
+    type: el.type,
+    fields: {},
+  };
+  const imageUrl = rec.image_url;
+  if (withImage && typeof imageUrl === 'string' && imageUrl.trim().length > 0) {
+    entry.image_url = imageUrl;
+  }
+  for (const field of fieldNames) {
+    if (isCardSkipField(field)) continue; // defensive — UI never offers these
+    const raw = rec[field];
+    if (!isPopulatedValue(raw)) continue;
+    const kind = relationKindOf(el.type, field);
+    if (kind === null) {
+      entry.fields[field] = raw;
+      continue;
+    }
+    const rawIds = kind === 'single' ? [raw] : (Array.isArray(raw) ? raw : []);
+    const tokens: RelationToken[] = [];
+    for (const v of rawIds) {
+      const refId = relationId(v);
+      if (!refId) continue;
+      const target = byId.get(refId);
+      if (!target) continue; // dangling ref — discloses nothing, drop it
+      const token: RelationToken = { text: target.name || '(unnamed)' };
+      if (includedIds.has(refId)) token.ref = refId;
+      tokens.push(token);
+    }
+    if (tokens.length > 0) entry.fields[field] = tokens;
+  }
+  return entry;
+}
+
+/**
+ * Freeze a map block: image URL + chosen pins normalized to percentages
+ * (top-left origin — pin storage coords ARE top-left image pixels; the map's
+ * width/height fields hold the image dimensions, auto-detected by atlas when
+ * image_url is set). Returns null — block drops from the wire — when the map
+ * is missing, has no published image (D3: image_url only, local media never
+ * leaves the folder), or has no usable dimensions. Pins drop individually
+ * when their pin/element is gone (disclose nothing) or out of bounds.
+ * Exported for the renderer (builder compiles live → same view).
+ */
+export function freezeMapBlock(
+  block: MapBlock,
+  byId: Map<string, Element>,
+  includedIds: ReadonlySet<string>,
+): PayloadMapBlock | null {
+  const map = byId.get(block.mapId);
+  if (!map) return null;
+  const rec = map as Record<string, unknown>;
+  const imageUrl = typeof rec.image_url === 'string' ? rec.image_url.trim() : '';
+  if (!/^https?:\/\//i.test(imageUrl)) return null;
+  const width = typeof rec.width === 'number' ? rec.width : 0;
+  const height = typeof rec.height === 'number' ? rec.height : 0;
+  if (width <= 0 || height <= 0) return null;
+
+  const pins: PayloadMapBlock['pins'] = [];
+  for (const pinId of block.pinIds) {
+    const pin = byId.get(pinId);
+    if (!pin) continue;
+    const p = pin as Record<string, unknown>;
+    const x = typeof p.x === 'number' ? p.x : NaN;
+    const y = typeof p.y === 'number' ? p.y : NaN;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const target = typeof p.element_id === 'string' ? byId.get(p.element_id) : undefined;
+    if (!target) continue; // pin without a live element discloses nothing
+    const token: PayloadMapBlock['pins'][number] = {
+      xPct: Math.round(Math.min(100, Math.max(0, (x / width) * 100)) * 100) / 100,
+      yPct: Math.round(Math.min(100, Math.max(0, (y / height) * 100)) * 100) / 100,
+      name: target.name || '(unnamed)',
+      type: target.type,
+    };
+    if (includedIds.has(target.id)) token.ref = target.id;
+    pins.push(token);
+  }
+
+  const frozen: PayloadMapBlock = {
+    id: block.id,
+    kind: 'map',
+    title: map.name || '(unnamed map)',
+    image_url: imageUrl,
+    pins,
+  };
+  if (block.showLabels === false) frozen.showLabels = false;
+  return frozen;
 }
 
 /**

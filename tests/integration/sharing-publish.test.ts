@@ -1,12 +1,15 @@
 /**
- * SharingClient ↔ the v0.2 contract — locked against the stateful sharing
- * fakes (tests/msw-sharing-handlers.ts) BEFORE Anchor's backend exists.
+ * SharingClient ↔ the v0.3 contract — locked against the stateful sharing
+ * fakes (tests/msw-sharing-handlers.ts), synced to Anchor's AS-BUILT slice
+ * (2026-06-07: slug-addressed mutations, locked error enum, quota 20,
+ * envelope-carrying 401, empty payloads are valid pages).
  *
  * What this suite proves: publish → public GET round-trip (the §5.2
  * envelope), slug rules + reserved list, global uniqueness with the
- * own-tombstone revival exception, quota 10/account, slug immutability on
- * PATCH, tombstone revoke → 410, idempotent DELETE, admin_locked, and the
- * error-code mapping the share room toasts from.
+ * own-tombstone revival exception, quota 20/account, slug-addressed
+ * PATCH/DELETE with slug immutability, title/intent server validation,
+ * tombstone revoke → 410, idempotent DELETE, admin_locked, cross-account
+ * forbidden, and the error-code mapping the share room toasts from.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -67,12 +70,13 @@ describe('publish → public GET round-trip', () => {
     expect(state.bySlug('barovia-primer')?.view_count).toBe(1);
   });
 
-  it('rejects invalid + reserved slugs with slug_invalid', async () => {
+  it('format-invalid slugs → 400 slug_invalid; RESERVED words → 409 slug_taken (as-built)', async () => {
     const c = client();
     await expect(c.publish({ slug: 'ab', title: 't', intent: 'show', payload: payload() }))
-      .rejects.toMatchObject({ code: 'slug_invalid' });
+      .rejects.toMatchObject({ code: 'slug_invalid', status: 400 });
     await expect(c.publish({ slug: 'admin', title: 't', intent: 'show', payload: payload() }))
-      .rejects.toMatchObject({ code: 'slug_invalid' });
+      .rejects.toMatchObject({ code: 'slug_taken', status: 409 });
+    expect(await c.slugCheck('admin')).toBe(false); // reserved reads as unavailable
   });
 
   it('enforces global slug uniqueness across accounts (slug_taken)', async () => {
@@ -81,37 +85,52 @@ describe('publish → public GET round-trip', () => {
       .rejects.toMatchObject({ code: 'slug_taken', status: 409 });
   });
 
-  it('unknown slug → not_found; missing auth on POST → auth_failed', async () => {
+  it('unknown slug → not_found; missing auth on POST → unauthorized (enveloped 401)', async () => {
     await expect(client().getPublic('never-was')).rejects.toMatchObject({ code: 'not_found', status: 404 });
     const bare = new SharingClient({ baseUrl: BASE, apiKey: '', pin: '' });
     await expect(bare.publish({ slug: 'abcd', title: 't', intent: 'show', payload: null }))
-      .rejects.toMatchObject({ code: 'auth_failed' });
+      .rejects.toMatchObject({ code: 'unauthorized', status: 401 });
+  });
+
+  it('server-validates title length and intent (title_too_long / intent_invalid)', async () => {
+    const c = client();
+    await expect(c.publish({ slug: 'long-title', title: 'x'.repeat(201), intent: 'show', payload: payload() }))
+      .rejects.toMatchObject({ code: 'title_too_long', status: 400 });
+    await expect(c.publish({ slug: 'bad-intent', title: 't', intent: 'shout', payload: payload() }))
+      .rejects.toMatchObject({ code: 'intent_invalid', status: 400 });
+  });
+
+  it('an empty payload is a valid active page — serves 200, not 410', async () => {
+    const c = client();
+    await c.publish({ slug: 'empty-page', title: 't', intent: 'show', payload: {} });
+    const envelope = await c.getPublic('empty-page');
+    expect(envelope.slug).toBe('empty-page');
+    expect(envelope.payload).toEqual({});
   });
 });
 
-describe('quota (10 active per account)', () => {
-  it('rejects the 11th active page; revoked pages do not count', async () => {
+describe('quota (20 active per account — as-built)', () => {
+  it('rejects the 21st active page; revoked pages do not count', async () => {
     const c = client();
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 20; i++) {
       await c.publish({ slug: `page-${String(i).padStart(4, '0')}`, title: `t${i}`, intent: 'show', payload: payload(i) });
     }
     await expect(c.publish({ slug: 'one-too-many', title: 't', intent: 'show', payload: payload() }))
-      .rejects.toMatchObject({ code: 'quota_exceeded' });
+      .rejects.toMatchObject({ code: 'quota_exceeded', status: 429 });
 
     // Revoke one → a new publish fits again.
-    const row = state.bySlug('page-0000')!;
-    await c.revoke(row.id);
+    await c.revoke('page-0000');
     await expect(c.publish({ slug: 'fits-now', title: 't', intent: 'show', payload: payload() }))
       .resolves.toMatchObject({ slug: 'fits-now' });
   });
 });
 
-describe('republish (PATCH) — slug immutable', () => {
-  it('updates payload/title; updated_at moves, published_at stays', async () => {
+describe('republish (PATCH) — slug-addressed, slug immutable', () => {
+  it('updates payload/title via the slug; updated_at moves, published_at stays', async () => {
     const c = client();
-    const pub = await c.publish({ slug: 'living-doc', title: 'v1', intent: 'show', payload: payload(1) });
+    await c.publish({ slug: 'living-doc', title: 'v1', intent: 'show', payload: payload(1) });
     const before = await c.getPublic('living-doc');
-    const row = await c.republish(pub.id, { title: 'v2', payload: payload(2) });
+    const row = await c.republish('living-doc', { title: 'v2', payload: payload(2) });
     expect(row.title).toBe('v2');
     const after = await c.getPublic('living-doc');
     expect(after.published_at).toBe(before.published_at);
@@ -121,9 +140,9 @@ describe('republish (PATCH) — slug immutable', () => {
 
   it('rejects a slug change attempt (immutable, contract §2)', async () => {
     const c = client();
-    const pub = await c.publish({ slug: 'fixed-name', title: 't', intent: 'show', payload: payload() });
+    await c.publish({ slug: 'fixed-name', title: 't', intent: 'show', payload: payload() });
     // The client never sends slug — simulate a raw caller to lock the server rule.
-    const res = await fetch(`${BASE}/pages/${pub.id}/`, {
+    const res = await fetch(`${BASE}/pages/fixed-name/`, {
       method: 'PATCH',
       headers: { 'API-Key': 'key-alpha', 'API-Pin': '1234', 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug: 'new-name' }),
@@ -132,21 +151,40 @@ describe('republish (PATCH) — slug immutable', () => {
     const body = await res.json();
     expect(body.error.code).toBe('slug_invalid');
   });
+
+  it("someone else's slug → 404 not_found (existence-hiding, confirmed live)", async () => {
+    await client('key-alpha').publish({ slug: 'alphas-page', title: 't', intent: 'show', payload: payload() });
+    await expect(client('key-beta').republish('alphas-page', { title: 'mine now' }))
+      .rejects.toMatchObject({ code: 'not_found', status: 404 });
+    await expect(client('key-beta').revoke('alphas-page'))
+      .rejects.toMatchObject({ code: 'not_found', status: 404 });
+  });
+
+  it('PATCH with a payload on your own REVOKED slug revives it (200 — second revival path)', async () => {
+    const c = client();
+    await c.publish({ slug: 'patch-revive', title: 't', intent: 'show', payload: payload(1) });
+    await c.revoke('patch-revive');
+    await expect(c.getPublic('patch-revive')).rejects.toMatchObject({ status: 410 });
+    const row = await c.republish('patch-revive', { payload: payload(2) });
+    expect(row.revoked).toBe(false);
+    const envelope = await c.getPublic('patch-revive');
+    expect((envelope.payload as { title: string }).title).toBe('p2');
+  });
 });
 
 describe('revoke (tombstone)', () => {
   it('revoked page serves 410 revoked; DELETE is idempotent', async () => {
     const c = client();
-    const pub = await c.publish({ slug: 'short-lived', title: 't', intent: 'show', payload: payload() });
-    await c.revoke(pub.id);
-    await c.revoke(pub.id); // idempotent — no throw
+    await c.publish({ slug: 'short-lived', title: 't', intent: 'show', payload: payload() });
+    await c.revoke('short-lived');
+    await c.revoke('short-lived'); // idempotent — no throw
     await expect(c.getPublic('short-lived')).rejects.toMatchObject({ code: 'revoked', status: 410 });
   });
 
   it('owner revives their own tombstoned slug via POST; others still blocked', async () => {
     const alpha = client('key-alpha');
     const pub = await alpha.publish({ slug: 'my-slug-back', title: 't', intent: 'show', payload: payload(1) });
-    await alpha.revoke(pub.id);
+    await alpha.revoke('my-slug-back');
 
     // Another account can't take it (anti-takeover).
     await expect(client('key-beta').publish({ slug: 'my-slug-back', title: 't', intent: 'show', payload: payload() }))
@@ -166,15 +204,31 @@ describe('revoke (tombstone)', () => {
     await expect(c.getPublic('taken-down')).rejects.toMatchObject({ code: 'revoked', status: 410 });
     await expect(c.publish({ slug: 'taken-down', title: 't', intent: 'show', payload: payload() }))
       .rejects.toMatchObject({ code: 'slug_taken' });
+    // PATCH on the locked slug tells the owner the truth: admin_locked, not not_found.
+    await expect(c.republish('taken-down', { title: 't2' }))
+      .rejects.toMatchObject({ code: 'admin_locked', status: 403 });
+  });
+
+  it('reviving a tombstone counts against the quota — 429, both revival paths (confirmed)', async () => {
+    const c = client();
+    for (let i = 0; i < 20; i++) {
+      await c.publish({ slug: `qpage-${String(i).padStart(4, '0')}`, title: 't', intent: 'show', payload: payload(i) });
+    }
+    await c.revoke('qpage-0000');             // 19 active + own tombstone
+    await c.publish({ slug: 'qfill-twenty', title: 't', intent: 'show', payload: payload() }); // back to 20
+    await expect(c.publish({ slug: 'qpage-0000', title: 't', intent: 'show', payload: payload() }))
+      .rejects.toMatchObject({ code: 'quota_exceeded', status: 429 });
+    await expect(c.republish('qpage-0000', { payload: payload() }))   // PATCH-revive checks too
+      .rejects.toMatchObject({ code: 'quota_exceeded', status: 429 });
   });
 });
 
 describe('list + slug-check', () => {
   it('lists own pages incl. revoked; slug-check reflects availability + own tombstones', async () => {
     const c = client();
-    const a = await c.publish({ slug: 'list-one', title: 'one', intent: 'show', payload: payload() });
+    await c.publish({ slug: 'list-one', title: 'one', intent: 'show', payload: payload() });
     await c.publish({ slug: 'list-two', title: 'two', intent: 'reference', payload: payload() });
-    await c.revoke(a.id);
+    await c.revoke('list-one');
 
     const rows = await c.listForWorld('w1');
     expect(rows).toHaveLength(2);

@@ -1,25 +1,25 @@
 /**
- * Sharing API client — SHARING_CONTRACT.md v0.2 §4.
+ * Sharing API client — SHARING_CONTRACT.md v0.3 §4 (as-built).
  *
  * Thin typed fetch wrapper over the sharing endpoints (publish / public GET /
  * republish / revoke / list / slug-check). Deliberately NOT the OW SDK: the
  * sharing endpoints are a separate surface with their own error contract
  * (machine codes in `{"error":{"code"}}` bodies — see SharingErrorCode).
  *
- * FAKES-FIRST: this client is built and test-locked against
- * `tests/msw-sharing-handlers.ts`, which encodes the v0.2 contract (slug
- * rules, quota, tombstone semantics, slug immutability) — the same
- * fakes-mirror-real discipline as the worldapi fakes (convention #20). When
- * Anchor's backend lands, integration is pointing `SHARING_BASE_URL` at the
- * real base path and running the suite.
+ * Built fakes-first and test-locked against `tests/msw-sharing-handlers.ts`
+ * (convention #20); the fakes were synced to Anchor's AS-BUILT `ow/sharing/`
+ * Django slice (2026-06-07): slug-addressed mutations, locked error enum,
+ * quota 20, enveloped 401. Residual fake assumptions are tagged VERIFY-LIVE.
  *
  * Auth: worldapi headers (`API-Key` + `API-Pin`); the world association
  * derives from the key server-side. The public GET sends no auth.
  */
 
 /**
- * Base URL for the sharing API. §8.1 of the contract leaves the path to
- * Anchor — this is the single place it changes.
+ * Base URL for the sharing API — CONFIRMED as-built (Anchor's `ow/sharing/`
+ * app, 2026-06-07). Must stay pinned to the www host: CF purge-by-URL keys on
+ * `https://www.onlyworlds.com/api/sharing/pages/<slug>/`, so a non-www fetch
+ * would miss the purged cache entry.
  */
 export const SHARING_BASE_URL = 'https://www.onlyworlds.com/api/sharing';
 
@@ -57,7 +57,9 @@ export function suggestSlug(name: string): string {
 
 export type SharingErrorCode =
   | 'slug_taken' | 'slug_invalid' | 'quota_exceeded' | 'payload_too_large'
+  | 'title_too_long' | 'intent_invalid'
   | 'revoked' | 'not_found' | 'rate_limited' | 'admin_locked'
+  | 'forbidden' | 'unauthorized'
   | 'auth_failed' | 'network' | 'unknown';
 
 export class SharingApiError extends Error {
@@ -75,13 +77,26 @@ export class SharingApiError extends Error {
 export function sharingErrorMessage(err: SharingApiError): string {
   switch (err.code) {
     case 'slug_taken': return 'That URL is already taken — pick another slug.';
-    case 'slug_invalid': return 'Slug must be 4–40 chars: a–z, 0–9, hyphens (not at the edges).';
+    case 'slug_invalid': {
+      // The server's detail beats the generic rule recital (e.g. a RESERVED
+      // slug passes the format rules — "must be 4–40 chars" would gaslight).
+      const detail = err.message && err.message !== 'slug_invalid' ? err.message : '';
+      return detail
+        ? `Slug rejected — ${detail}`
+        : 'Slug must be 4–40 chars: a–z, 0–9, hyphens (not at the edges). Some words are reserved.';
+    }
     case 'quota_exceeded': return 'Page limit reached — revoke an old page to publish a new one.';
     case 'payload_too_large': return 'This page is too large to publish (256KB limit).';
     case 'revoked': return 'This page has been revoked.';
     case 'not_found': return 'Page not found on the server.';
     case 'rate_limited': return 'Too many publishes — wait a bit and try again.';
     case 'admin_locked': return 'This slug has been locked by an administrator.';
+    case 'title_too_long': return 'Page name is too long to publish (200 characters max).';
+    case 'intent_invalid': return 'Page intent isn\'t valid — pick show, reference, or publish.';
+    // As-built: 403 forbidden fires only for demo-world writes (cross-account
+    // mutations are existence-hidden 404s).
+    case 'forbidden': return 'This world doesn\'t allow publishing.';
+    case 'unauthorized':
     case 'auth_failed': return 'Authentication failed — check the world\'s API key and PIN in settings.';
     case 'network': return 'Could not reach the sharing server.';
     default: return 'Publishing failed — try again.';
@@ -160,17 +175,23 @@ export class SharingClient {
     return this.request<PublicPageEnvelope>('GET', `/pages/${encodeURIComponent(slug)}/`, { auth: false });
   }
 
-  /** PATCH /pages/<id>/ — republish. Slug is IMMUTABLE (contract §2) — never sent. */
+  /**
+   * PATCH /pages/<slug>/ — republish. Mutations are SLUG-addressed (Anchor,
+   * as-built: django-ninja path-converter limits collapse GET/PATCH/DELETE
+   * onto one slug path with per-method dispatch; the slug is immutable +
+   * unique, so it's a stable address). Slug itself is IMMUTABLE (contract §2)
+   * — never sent in the body.
+   */
   async republish(
-    id: string,
+    slug: string,
     changes: { title?: string; intent?: string; payload?: unknown },
   ): Promise<SharedPageRow> {
-    return this.request<SharedPageRow>('PATCH', `/pages/${encodeURIComponent(id)}/`, { auth: true, body: changes });
+    return this.request<SharedPageRow>('PATCH', `/pages/${encodeURIComponent(slug)}/`, { auth: true, body: changes });
   }
 
-  /** DELETE /pages/<id>/ — revoke (tombstone). Idempotent. */
-  async revoke(id: string): Promise<void> {
-    await this.request<void>('DELETE', `/pages/${encodeURIComponent(id)}/`, { auth: true, allowEmpty: true });
+  /** DELETE /pages/<slug>/ — revoke (tombstone). Slug-addressed. Idempotent. */
+  async revoke(slug: string): Promise<void> {
+    await this.request<void>('DELETE', `/pages/${encodeURIComponent(slug)}/`, { auth: true, allowEmpty: true });
   }
 
   /** GET /pages/?world=<id> — own pages incl. revoked. */
@@ -212,7 +233,9 @@ export class SharingClient {
 
     if (res.ok) {
       if (opts.allowEmpty || res.status === 204) return undefined as T;
-      return await res.json() as T;
+      // Tolerate empty 200 bodies (the PATCH response shape isn't pinned by
+      // the contract — VERIFY-LIVE; callers treat the row as optional).
+      try { return await res.json() as T; } catch { return undefined as T; }
     }
 
     // Error path: prefer the contract's machine code; fall back by status.
@@ -234,9 +257,12 @@ export class SharingClient {
   }
 }
 
+/** The locked server enum (Anchor, as-built) + envelope-carried 401/403 codes. */
 const KNOWN_CODES: ReadonlySet<string> = new Set([
   'slug_taken', 'slug_invalid', 'quota_exceeded', 'payload_too_large',
+  'title_too_long', 'intent_invalid',
   'revoked', 'not_found', 'rate_limited', 'admin_locked',
+  'forbidden', 'unauthorized',
 ]);
 
 function isKnownCode(raw: string): raw is SharingErrorCode {
