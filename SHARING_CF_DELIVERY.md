@@ -56,12 +56,16 @@ A **Cache Rule** on the zone: `hostname eq www.onlyworlds.com AND starts_with(pa
 - **worldapi sync traffic** (atlas autosave/pull): authenticated, uncacheable by design. This is the actual worker-capacity question for the atlas LAUNCH, separate from sharing — flagged in PROGRESS 238 for Captain's timing call.
 - **Live pages**: deferred entirely (contract §6). When they return post-rebuild, they get the second endpoint with its own short TTL — the frozen hot path stays untouched.
 
-## 5. Verify at first deploy (checklist)
+## 5. Verify at first deploy (checklist — RUN 2026-06-12, deploy day)
 
-1. `curl -I` a published page URL twice → second response `cf-cache-status: HIT`.
-2. Republish in atlas → page URL serves the new payload (immediately — purge-by-URL is live).
-3. Revoke → 410 immediately (purge fires on revoke too).
-4. Curl a slug with a bot UA on `show.onlyworlds.com` → og:title carries the page title (Function works).
-5. A burst of GETs (e.g. `hey -n 200`) → Django access log shows ~1 origin hit.
-6. **CORS**: `curl -I` the public GET with an `Origin: https://show.onlyworlds.com` header → response carries `Access-Control-Allow-Origin` (`*` preferred — see §3.4); then load a published slug in the deployed viewer and confirm the browser fetch isn't CORS-blocked.
-7. **Cache HIT + CORS together**: repeat the Origin curl on a HIT response — the cached copy must still carry the ACAO header.
+1. ✅ `cf-cache-status: HIT` on second GET (Cache Rule live).
+2. ✅ Republish → purge fires → edge refreshed within seconds (verified twice: ETag flip + Age reset; Anchor's env vars `CLOUDFLARE_ZONE_ID`/`CLOUDFLARE_PURGE_TOKEN` are set).
+3. ⬜ Revoke → 410 immediately (not yet exercised live post-purge-wiring).
+4. ⬜ Bot-UA curl on `show.onlyworlds.com/<slug>` → og:title (OG Function unverified).
+5. ⬜ Burst test (~1 origin hit).
+6. ✅ CORS: origin-reflected ACAO with `Vary: origin` for show + localhost dev.
+7. ✅ Cache HIT + CORS: per-origin cache keys (`Vary: origin`) make this safe by construction.
+
+**Post-deploy residue (small, non-blocking):**
+- The Cache Rule was set with explicit TTLs (responses carry `max-age=14400`, overriding origin's 3600) — recommend flipping to **"respect origin headers"** so Anchor's header changes (incl. the suggested `max-age=0, s-maxage=3600` split) take effect.
+- Viewer-side browser staleness is already neutralized (`no-cache` fetch + ETag revalidation, show v0.2).

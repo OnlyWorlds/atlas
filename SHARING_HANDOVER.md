@@ -1,7 +1,7 @@
-# Sharing — Handover (next publish session starts here)
+# Sharing — Handover
 
-**Written**: 2026-06-07 21:35, session 238 close.
-**One line**: everything atlas-side and viewer-side that can exist without the backend EXISTS and is test-locked; the arc is paused on (a) Anchor building her slice and (b) Captain's smoke of the 238 checklist.
+**Written**: 2026-06-07 (session 238) · **CLOSED OUT 2026-06-12 (session 239)**: backend deployed, contract v0.3 as-built + fully confirmed, all blocks built, `show.onlyworlds.com` LIVE, CF cache + purge verified end-to-end. This doc is now historical reference; current truth lives in PROGRESS.md CURRENT STATE + `SHARING_CF_DELIVERY.md` §5 (the small delivery residue).
+**One line (as of 238)**: everything atlas-side and viewer-side that can exist without the backend EXISTS and is test-locked; the arc is paused on (a) Anchor building her slice and (b) Captain's smoke of the 238 checklist.
 
 ---
 

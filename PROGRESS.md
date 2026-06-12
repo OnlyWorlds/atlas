@@ -4,9 +4,11 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-06-12 session 239)
+## CURRENT STATE (handover snapshot, 2026-06-12 session 239 close)
 
-**Where atlas is**: feature-complete v1 core (phases 0-6 + 3.5: foundation, sync engine, maps/zones/markers, rooms, writing workspace, context pane) + **Knowledge phase 1 complete** (sessions 234-236) + **Sharing LIVE-CAPABLE** (sessions 237-239 — **Anchor's backend is built + deployed**, contract v0.3 as-built, fakes/client synced, critical pass closed). Conventions #1-79. **804 vitest + 150 Playwright + typecheck + both builds green** (TipTap code-split intact). For current counts always run the suites; for bundle size run `npm run build`.
+**Where atlas is**: feature-complete v1 core (phases 0-6 + 3.5) + **Knowledge phase 1 complete** (234-236) + **SHARING SHIPPED END-TO-END** (237-239): every designed v1 block built (heading/prose/card/circle/collection/**map** w/ labels + pin modals), S3 themes, publish/republish/revoke **live against Anchor's deployed backend** (contract v0.3, fakes exact), **`show.onlyworlds.com` DEPLOYED** (Boss, 2026-06-12), **CF edge cache + purge-by-URL VERIFIED live** (republish → purge → fresh within seconds). Full chain proven 2026-06-12 ~16:00: origin ✅ edge ✅ viewer ✅ — smoke-page-1 serves two themed maps with pin modals. Conventions #1-79. **808 vitest + 150 Playwright + typecheck + both builds green.** For current counts always run the suites.
+
+**Delivery residue (small)**: Cache Rule should flip to "respect origin headers" (currently overrides to 14400) · OG-Function unfurl unverified · revoke-purge + burst test unexercised · Anchor's `max-age=0, s-maxage=3600` split suggested (message sent). See `SHARING_CF_DELIVERY.md` §5.
 
 **Session 239** (full entry below) = Anchor's as-built message processed (slug-addressed mutations · locked error enum · quota 20 · purge-by-URL) → fakes + client + docs synced to **v0.3** → 3-agent critical pass → fixes: **build-time disclosure scrub** (non-included `ow://` ids never reach the public payload) · markdown href scheme allowlist (XSS) · compact cards identity-only · delete-while-published revokes first · stale-mirror recovery · in-flight guards · viewer hardening. **Live API probed green** (404/401 envelopes, CORS for show + localhost). ⚠ **Captain live smoke pending** — checklist in the session entry below (merges the 238 list).
 
