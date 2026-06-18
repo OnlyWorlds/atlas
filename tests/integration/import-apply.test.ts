@@ -10,6 +10,7 @@ import { MonotonicClock } from '../fixtures/monotonic-clock';
 import { parsePayload } from '../../src/import/parse';
 import { reconcile } from '../../src/import/reconcile';
 import { applyImportPlan } from '../../src/import/apply-import-plan';
+import { buildWorldExport } from '../../src/import/export-world';
 import type { ElementType } from '../../src/core/types';
 import type { ImportPlan } from '../../src/import/types';
 
@@ -150,5 +151,68 @@ describe('applyImportPlan — idempotency + resilience', () => {
     expect(res.failures[0].operation).toBe('update');
     expect(res.failures[0].element_id).toBe('missing-id');
     expect(await folder.getElement(U.kid)).toBeTruthy(); // good create still landed
+  });
+});
+
+describe('buildWorldExport — ow.com shape + round-trip', () => {
+  async function seedSource(): Promise<MockFolderStore> {
+    const clock = new MonotonicClock('2026-02-01T00:00:00.000Z');
+    const src = new MockFolderStore();
+    src.setClock(clock.next);
+    await src.open(null);
+    await src.writeWorldMeta({ id: 'w-src', name: 'Barovia', description: 'gothic', version: '0.30.00', time_current: 768 });
+    await src.createElement('location', { id: U.loc, name: 'Castle Ravenloft' });
+    await src.createElement('character', { id: U.kid, name: 'Strahd', birthplace: U.loc, objects: [] });
+    await src.createElement('map', { id: U.map, name: 'Overworld' });
+    await src.createElement('pin', { id: U.pin, name: 'pin', map_id: U.map, element_id: U.kid, element_type: 'character', x: 5, y: 6 });
+    return src;
+  }
+
+  it('emits the ow.com shape: no world id, bare spatial relations, atlas-local fields stripped', async () => {
+    const src = await seedSource();
+    const json = await buildWorldExport(src) as Record<string, unknown>;
+
+    const world = json.World as Record<string, unknown>;
+    expect(world.name).toBe('Barovia');
+    expect('id' in world).toBe(false);   // ow.com export carries no world id
+    expect('api_key' in world).toBe(false); // local-only world → no creds
+
+    // All 22 type buckets present (ow.com parity), PascalCase.
+    expect(Array.isArray(json.Character)).toBe(true);
+    expect(Array.isArray(json.Pin)).toBe(true);
+
+    const pin = (json.Pin as Record<string, unknown>[])[0];
+    expect(pin.map).toBe(U.map);          // disk map_id → bare map
+    expect('map_id' in pin).toBe(false);
+    expect('local_updated_at' in pin).toBe(false); // sync fields stripped
+  });
+
+  it('round-trips: export → re-import yields an equivalent world', async () => {
+    const src = await seedSource();
+    const json = await buildWorldExport(src);
+
+    const dst = new MockFolderStore();
+    dst.setClock(new MonotonicClock('2026-03-01T00:00:00.000Z').next);
+    await dst.open(null);
+    const plan = reconcile(parsePayload(json), [], { genId: genIdFactory() });
+    await applyImportPlan(dst, plan);
+
+    const els = await dst.listElements();
+    expect(els.length).toBe(4);
+    expect((await dst.getElement(U.kid))?.birthplace).toBe(U.loc); // relation preserved
+    const pin = els.find(e => e.type === 'pin');
+    expect(pin?.map_id).toBe(U.map);             // bare map → disk map_id again
+    expect(pin?.element_type).toBe('character'); // derived from referenced element
+    expect(plan.worldMeta?.name).toBe('Barovia');
+    expect(plan.worldMeta?.time_current).toBe(768);
+  });
+
+  it('exports only the requested subset of types', async () => {
+    const src = await seedSource();
+    const json = await buildWorldExport(src, { types: new Set(['character'] as ElementType[]) }) as Record<string, unknown>;
+    expect(Array.isArray(json.Character)).toBe(true);
+    expect((json.Character as unknown[]).length).toBe(1);
+    expect('Location' in json).toBe(false);
+    expect('Pin' in json).toBe(false);
   });
 });

@@ -283,7 +283,7 @@ function mountRoom(mode: MiddleMode, target: HTMLElement, toasts: ToastManager):
     case 'share':
       return mountShareRoom(target, toasts);
     case 'import':
-      return mountImportRoom(target);
+      return mountImportRoom(target, toasts);
     case 'templates':
       return mountTemplatesRoom(target);
     case 'settings':

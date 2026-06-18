@@ -262,9 +262,9 @@ The `import` room is already routed (`#/w/<id>/import`), nav-registered (downloa
 - **B0 — Grounding + design** ✅ (this doc).
 - **B1 — Reconcile core (pure, TDD)** ✅ — `parse` + `normalize` + `validate` (+ ChatGPT prompt) + `reconcile` → `ImportPlan`. 51 unit tests; adversarially reviewed (5 bugs fixed).
 - **B2 — Folder application** ✅ — `apply-import-plan.ts` (`applyImportPlan`) + `createWorldFromImportedData` (Mode A) + `importIntoActiveWorld` (Mode B), shared `scaffoldWorldInRoot`. 7 integration tests. 866 vitest green.
-- **B3 — Import room UI.** Single-panel flow; show drop/paste recipe; Playwright self-inspect. **Checkpoint: drop blood_meridian → new world; paste loose → merge.**
-- **B4 — Export.** Full-world + by-type subset; round-trip test. **Checkpoint: export → re-import clean.**
-- **B5 — E2e + hardening.** Playwright e2e across flows; full suite; smoke checklist for Captain.
+- **B3 — Import room UI** ✅ — single-panel `import-room.ts`. Self-inspected via Playwright; Mode A + Mode B verified end-to-end.
+- **B4 — Export** ✅ — `export-world.ts` (`buildWorldExport`): ow.com shape, bare spatial relations, no world id, by-type subset, include-credentials. Round-trip + subset integration tests.
+- **B5 — E2e + hardening** — Playwright e2e specs for the room; full suite; smoke checklist for Captain. (next)
 - **B6 (optional, separate) — Route 2 dedup.** Route `make-online` match phase through the shared matcher, sync suite as safety net. Only if clean.
 
 ---

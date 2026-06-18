@@ -49,8 +49,8 @@ const ROOMS: RoomDef[] = [
   // weakest search surface; the planned replacement is a Cmd+K command palette
   // (see DESIGN.md "Search"). The elements-sidebar name filter remains interim.
   // Route + search.ts stay dormant; re-add this entry to restore the room.
-  { id: 'share',     label: 'Share',     icon: 'ios_share',      hashFor: (w) => shareHash(w), matches: ['share'] },
-  { id: 'import',    label: 'Import',    icon: 'download',       hashFor: importHash,    matches: ['import'] },
+  { id: 'share',     label: 'Share',          icon: 'public',         hashFor: (w) => shareHash(w), matches: ['share'] },
+  { id: 'import',    label: 'Import & export', icon: 'import_export',  hashFor: importHash,    matches: ['import'] },
   // Templates hidden pre-release (not building it before launch). Route +
   // templates-room.ts stay dormant; re-add this entry to restore it to the nav.
   { id: 'settings',  label: 'Settings',  icon: 'settings',       hashFor: (w) => settingsHash(w), matches: ['settings'] },
