@@ -176,6 +176,8 @@ export interface WorldMeta {
   name: string;
   description?: string;
   version?: string;
+  /** World cover image URL. Preserved on import/export round-trip (DESIGN_IMPORT.md). */
+  image_url?: string;
   /** Present iff world is api-linked. */
   api?: {
     world_id: string;

@@ -98,3 +98,61 @@ export function knownFieldsFor(type: ElementType): Set<string> {
   if (schema) for (const k of Object.keys(schema)) names.add(k);
   return names;
 }
+
+/** A relation field of an element type, with both naming conventions. */
+export interface RelationField {
+  /**
+   * SDK FIELD_SCHEMA name = the BARE name used in OnlyWorlds API/export JSON and
+   * in atlas's disk shape for content/zone/map (`birthplace`, `map`, `linked_zones`).
+   */
+  schemaField: string;
+  /**
+   * Atlas on-disk field name. Same as `schemaField` for content/zone/map; pin
+   * and marker carry the `_id` / `_ids` suffix atlas stores (`map_id`, `zone_id`).
+   * Pin's `element_id` already has the suffix in the schema, so it's unchanged.
+   */
+  diskField: string;
+  kind: 'single' | 'multi';
+  /** Target element type, or null when polymorphic (pin.element_id → uses element_type). */
+  target: ElementType | null;
+}
+
+/** Spatial types whose disk shape suffixes relation fields with _id / _ids. */
+const WIRE_SHAPE_TYPES = new Set<ElementType>(['pin', 'marker']);
+
+/**
+ * Relation fields for an element type. Single source of relation introspection
+ * — derived from the SDK FIELD_SCHEMA `target`, never guessed from the field
+ * name (DESIGN_IMPORT.md convention #84). `schemaField` is the incoming
+ * (OW JSON) name; `diskField` is what atlas stores.
+ */
+export function relationFieldsFor(type: ElementType): RelationField[] {
+  const schema = (FIELD_SCHEMA as any)[type];
+  if (!schema) return [];
+  const wire = WIRE_SHAPE_TYPES.has(type);
+  const out: RelationField[] = [];
+  for (const [name, raw] of Object.entries(schema)) {
+    const meta = raw as { type?: string; target?: string };
+    if (meta?.type !== 'single_link' && meta?.type !== 'multi_link') continue;
+    const kind: 'single' | 'multi' = meta.type === 'multi_link' ? 'multi' : 'single';
+    let diskField = name;
+    if (wire && !name.endsWith('_id') && !name.endsWith('_ids')) {
+      diskField = kind === 'multi' ? `${name}_ids` : `${name}_id`;
+    }
+    const target = meta.target && meta.target !== 'any' ? (meta.target as ElementType) : null;
+    out.push({ schemaField: name, diskField, kind, target });
+  }
+  return out;
+}
+
+/** Field names whose SDK schema type is numeric (number / integer / integer_max). */
+export function numberFieldsFor(type: ElementType): Set<string> {
+  const schema = (FIELD_SCHEMA as any)[type];
+  const out = new Set<string>();
+  if (!schema) return out;
+  for (const [name, raw] of Object.entries(schema)) {
+    const t = (raw as { type?: string })?.type;
+    if (t === 'number' || t === 'integer' || t === 'integer_max') out.add(name);
+  }
+  return out;
+}

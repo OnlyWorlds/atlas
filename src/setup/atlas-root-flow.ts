@@ -33,10 +33,12 @@ import { FsFolderStore } from '../store/folder-store-fs';
 import { newId } from '../store/folder-store';
 import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-utils';
 import { getActiveStore, setActiveStore } from '../core/active-store';
-import { attachSyncEngine } from '../sync/sync-attach';
+import { attachSyncEngine, refreshElementsAfterWrite } from '../sync/sync-attach';
 import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { OwClientAdapter } from '../sync/ow-client-adapter';
 import { initialDownloadAll, type InitialDownloadProgress } from '../sync/initial-download';
+import { applyImportPlan, type ApplyProgress, type ApplyResult } from '../import/apply-import-plan';
+import type { ImportPlan } from '../import/types';
 import type { WorldRegistryEntry, PerElementFailure } from '../core/types';
 
 /**
@@ -336,7 +338,20 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
  *
  * Throws if no atlas root is configured.
  */
-export async function createWorldInRoot(name: string): Promise<{ entry: WorldRegistryEntry }> {
+/**
+ * Scaffold a fresh local world subfolder under the atlas root: validate the
+ * root, close the prior active store, create the subfolder + persist its handle,
+ * open an FsFolderStore. Returns the open store + identity bits; the caller
+ * writes world.json, registers, and activates. Shared by createWorldInRoot
+ * (empty world) and createWorldFromImportedData (populated from an import).
+ */
+async function scaffoldWorldInRoot(name: string): Promise<{
+  store: FsFolderStore;
+  worldUuid: string;
+  subName: string;
+  handleKey: string;
+  rootFolderName: string;
+}> {
   const reg = getState().registry;
   if (!reg.atlas_root) {
     throw new Error('Atlas root is not set up — pick a folder first');
@@ -361,24 +376,29 @@ export async function createWorldInRoot(name: string): Promise<{ entry: WorldReg
   const slug = slugify(trimmed);
   const subName = `${slug}-${worldUuid.slice(0, 8)}`;
 
-  // Create the subfolder under the root.
+  // Create the subfolder under the root + persist its own handle (so future
+  // opens don't depend on the root).
   const worldHandle = await rootHandle.getDirectoryHandle(subName, { create: true });
-
-  // Persist this world's own handle (so future opens don't depend on the root).
   const handleKey = `world-${worldUuid}`;
   await storeHandle(handleKey, worldHandle);
 
-  // Open the FolderStore, write meta.
   const store = new FsFolderStore();
   await store.open(worldHandle);
+
+  return { store, worldUuid, subName, handleKey, rootFolderName: reg.atlas_root.folder_name };
+}
+
+export async function createWorldInRoot(name: string): Promise<{ entry: WorldRegistryEntry }> {
+  const trimmed = name.trim() || 'Untitled world';
+  const { store, worldUuid, subName, handleKey, rootFolderName } = await scaffoldWorldInRoot(trimmed);
   await store.writeWorldMeta({ id: worldUuid, name: trimmed });
 
   // Register + activate.
-  const { next, entry } = createLocalWorld(reg, {
+  const { next, entry } = createLocalWorld(getState().registry, {
     name: trimmed,
     folderName: subName,
     handleKey,
-    pathHint: `${reg.atlas_root.folder_name}/${subName}`,
+    pathHint: `${rootFolderName}/${subName}`,
   });
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);
@@ -394,6 +414,63 @@ export async function createWorldInRoot(name: string): Promise<{ entry: WorldReg
   attachSyncEngine(entry, store);
 
   return { entry };
+}
+
+/**
+ * Import-as-new-world (DESIGN_IMPORT.md Mode A). Creates a fresh local world
+ * under the atlas root, populated from a reconciled ImportPlan. World metadata
+ * comes from the plan's worldMeta (api_key + world id deliberately absent — the
+ * world stays local-only; linking to the API is a separate, consent-gated step,
+ * convention #85). Returns the new entry + apply counts.
+ */
+export async function createWorldFromImportedData(
+  plan: ImportPlan,
+  opts: { name?: string; onProgress?: (p: ApplyProgress) => void } = {},
+): Promise<{ entry: WorldRegistryEntry; applied: ApplyResult }> {
+  const name = (plan.worldMeta?.name ?? opts.name ?? '').trim() || 'Imported world';
+  const { store, worldUuid, subName, handleKey, rootFolderName } = await scaffoldWorldInRoot(name);
+
+  // World metadata from the import; id/name forced (export carries no world id).
+  await store.writeWorldMeta({ ...(plan.worldMeta ?? {}), id: worldUuid, name });
+
+  // Apply the elements BEFORE the world goes active.
+  const applied = await applyImportPlan(store, plan, { onProgress: opts.onProgress });
+
+  const { next, entry } = createLocalWorld(getState().registry, {
+    name,
+    folderName: subName,
+    handleKey,
+    pathHint: `${rootFolderName}/${subName}`,
+  });
+  const activated = setActiveWorld(next, entry.id);
+  saveRegistry(activated);
+  patchSlice('registry', activated);
+  patchSlice('active', { worldId: entry.id, meta: { id: worldUuid, name }, opened: true });
+  setActiveStore(store);
+  const elements = await store.listElements();
+  patchSlice('data', { elements });
+  patchSlice('ui', { ...getState().ui, selectedElementId: null });
+
+  attachSyncEngine(entry, store); // local-only → no-op/detach
+
+  return { entry, applied };
+}
+
+/**
+ * Import-into-current-world (DESIGN_IMPORT.md Mode B merge). Applies a reconciled
+ * ImportPlan to the ACTIVE world's folder, then refreshes the elements cache +
+ * fires one debounced push (if the world is api-linked). Throws if no world is
+ * open. Returns apply counts.
+ */
+export async function importIntoActiveWorld(
+  plan: ImportPlan,
+  opts: { onProgress?: (p: ApplyProgress) => void } = {},
+): Promise<ApplyResult> {
+  const store = getActiveStore();
+  if (!store) throw new Error('No active world to import into');
+  const applied = await applyImportPlan(store, plan, { onProgress: opts.onProgress });
+  await refreshElementsAfterWrite(store); // re-prime state + requestPushIfLinked once
+  return applied;
 }
 
 /**
