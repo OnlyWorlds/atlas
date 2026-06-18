@@ -6817,7 +6817,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   margin: 0;
   font-size: 22px;
   font-weight: 600;
-  color: var(--atlas-cyan);
+  color: var(--atlas-text);
 }
 
 .atlas-room-subtitle {
@@ -6850,9 +6850,20 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 
 /* Knowledge room (DESIGN_KNOWLEDGE.md — Track A skeleton) */
+
+/* Buttons inherit the app font — the UA default leaks Arial otherwise. */
+.atlas-knowledge-row,
+.atlas-knowledge-chip-body,
+.atlas-knowledge-add,
+.atlas-knowledge-tab,
+.atlas-knowledge-known-head,
+.atlas-knowledge-known-src,
+.atlas-knowledge-lens-toggle {
+  font-family: inherit;
+}
+
 .atlas-knowledge-new {
-  margin: 0 24px 4px 24px;
-  align-self: flex-start;
+  margin: 0;
 }
 
 .atlas-knowledge-empty {
@@ -6891,10 +6902,12 @@ a.atlas-writing-workspace-crumb-seg:hover {
   text-align: left;
   cursor: pointer;
   color: var(--atlas-text);
+  transition: border-color 120ms ease, background 120ms ease;
 }
 
 .atlas-knowledge-row:hover {
   border-color: var(--atlas-cyan-soft);
+  background: var(--atlas-row-hover);
 }
 
 .atlas-knowledge-row-icon {
@@ -6932,10 +6945,12 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-knowledge-detail-titlerow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   padding: 0 24px;
 }
+
+.atlas-knowledge-detail-titlerow > h1 { margin-right: auto; }
 
 .atlas-knowledge-detail {
   display: flex;
@@ -6948,9 +6963,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-knowledge-section-title {
   font-size: 13px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--atlas-text-muted);
+  color: var(--atlas-text);
   margin: 0 0 2px 0;
 }
 
@@ -7037,6 +7050,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   border-radius: 4px;
   color: var(--atlas-text-muted);
   cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 
 .atlas-knowledge-add:hover {
@@ -7105,7 +7119,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 0 10px;
+  padding: 0 24px 10px;
   border-bottom: 1px solid var(--atlas-divider);
   margin-bottom: 14px;
 }
@@ -7118,6 +7132,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   padding: 4px 10px;
   border-radius: 3px;
   cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
 }
 
 .atlas-knowledge-tab:hover { color: var(--atlas-text); }
@@ -7128,6 +7143,16 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 
 .atlas-knowledge-tabs-spacer { flex: 1; }
+
+.atlas-knowledge-tabs-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.atlas-knowledge-empty-cta {
+  margin-top: 12px;
+}
 
 /* Prose-derived About chip — comes from the text, not removable here. */
 .atlas-knowledge-chip.is-derived { opacity: 0.75; }
@@ -7221,7 +7246,11 @@ a.atlas-writing-workspace-crumb-seg:hover {
   font-size: 11px;
   color: var(--atlas-text-muted);
   background: transparent;
+  border: none;
+  font-family: inherit;
+  padding: 2px 4px;
   cursor: pointer;
+  transition: color 120ms ease;
 }
 
 .atlas-knowledge-allfields:hover { color: var(--atlas-cyan); }
@@ -7259,6 +7288,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   border-radius: 10px;
   color: var(--atlas-text-muted);
   cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
 }
 
 .atlas-knowledge-lens-toggle .material-symbols-outlined { font-size: 14px; }

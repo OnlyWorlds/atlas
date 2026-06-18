@@ -492,6 +492,24 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     root.appendChild(empty);
   }
 
+  /** Open the "new circle" create modal (collective + circle tag). Shared by
+   *  the knowers-tab action and the empty-state CTA. */
+  function openNewCircle(): void {
+    new ElementCreateModal(toasts, {
+      initialType: 'collective',
+      suppressNavigate: true,
+      title: 'New circle',
+      // Circle tag (organizational only — convention #72) lands in the same
+      // write as the create, so it surfaces in this list even before holding
+      // anything. Guarded: a user who flips the category in the modal
+      // shouldn't mint e.g. a circle-subtyped location.
+      extraData: { subtype: CIRCLE_SUBTYPE },
+      onCreated: (id, type) => {
+        if (type !== 'collective') void patchEntry(id, { subtype: '' });
+      },
+    }).open();
+  }
+
   // ---- home view (Entries | Knowers tabs) ------------------------------------
 
   function buildHome(): void {
@@ -512,72 +530,75 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     `;
     root.appendChild(header);
 
-    // [Entries | Knowers] tabs + per-tab action on the right.
+    // [Entries | Knowers] tabs + per-tab action on the right. Switching tabs
+    // swaps only the action slot + the list body — the header and tab row are
+    // built once, so there's no flash or focus loss (audit 239 #18).
     const tabsRow = document.createElement('div');
     tabsRow.className = 'atlas-knowledge-tabs';
     const entriesBtn = document.createElement('button');
     entriesBtn.type = 'button';
-    entriesBtn.className = 'atlas-knowledge-tab' + (roomTab === 'entries' ? ' is-active' : '');
+    entriesBtn.className = 'atlas-knowledge-tab';
     entriesBtn.textContent = 'entries';
-    entriesBtn.addEventListener('click', () => { if (roomTab !== 'entries') { roomTab = 'entries'; buildHome(); } });
+    entriesBtn.setAttribute('role', 'tab');
     const knowersBtn = document.createElement('button');
     knowersBtn.type = 'button';
-    knowersBtn.className = 'atlas-knowledge-tab' + (roomTab === 'knowers' ? ' is-active' : '');
+    knowersBtn.className = 'atlas-knowledge-tab';
     knowersBtn.textContent = 'knowers';
-    knowersBtn.addEventListener('click', () => { if (roomTab !== 'knowers') { roomTab = 'knowers'; buildHome(); } });
-    tabsRow.appendChild(entriesBtn);
-    tabsRow.appendChild(knowersBtn);
+    knowersBtn.setAttribute('role', 'tab');
     const spacer = document.createElement('span');
     spacer.className = 'atlas-knowledge-tabs-spacer';
-    tabsRow.appendChild(spacer);
-    if (roomTab === 'entries') {
-      const newBtn = document.createElement('button');
-      newBtn.type = 'button';
-      newBtn.className = 'atlas-btn-ghost atlas-knowledge-new';
-      newBtn.title = 'Create a new knowledge entry';
-      newBtn.textContent = '+ new knowledge entry';
-      newBtn.addEventListener('click', () => navigate(knowledgeHash(worldId, NEW)));
-      tabsRow.appendChild(newBtn);
-    } else {
-      const viewAs = document.createElement('button');
-      viewAs.type = 'button';
-      viewAs.className = 'atlas-btn-ghost atlas-knowledge-viewas';
-      viewAs.title = 'See the world as any character knows it';
-      viewAs.textContent = 'view as…';
-      viewAs.addEventListener('click', async () => {
-        const p = await pickElement({ restrictToType: 'character', title: 'View the world as…' });
-        if (p) navigate(knowledgeKnowerHash(worldId, p.id));
-      });
-      tabsRow.appendChild(viewAs);
-      const newCircle = document.createElement('button');
-      newCircle.type = 'button';
-      newCircle.className = 'atlas-btn-ghost atlas-knowledge-newcircle';
-      newCircle.title = 'Create a circle (a collective acting as a knower-group)';
-      newCircle.textContent = '+ new circle';
-      newCircle.addEventListener('click', () => {
-        new ElementCreateModal(toasts, {
-          initialType: 'collective',
-          suppressNavigate: true,
-          title: 'New circle',
-          // Circle tag (organizational only — convention #72) lands in the
-          // same write as the create, so it surfaces in this list even before
-          // holding anything. Guarded: a user who flips the category in the
-          // modal shouldn't mint e.g. a circle-subtyped location.
-          extraData: { subtype: CIRCLE_SUBTYPE },
-          onCreated: (id, type) => {
-            if (type !== 'collective') void patchEntry(id, { subtype: '' });
-          },
-        }).open();
-      });
-      tabsRow.appendChild(newCircle);
-    }
+    const actionSlot = document.createElement('span');
+    actionSlot.className = 'atlas-knowledge-tabs-action';
+    tabsRow.append(entriesBtn, knowersBtn, spacer, actionSlot);
     root.appendChild(tabsRow);
 
-    if (roomTab === 'entries') buildEntriesList(worldId);
-    else buildKnowersList(worldId);
+    const listContainer = document.createElement('div');
+    listContainer.className = 'atlas-knowledge-home-body';
+    root.appendChild(listContainer);
+
+    const renderBody = (): void => {
+      entriesBtn.classList.toggle('is-active', roomTab === 'entries');
+      entriesBtn.setAttribute('aria-selected', String(roomTab === 'entries'));
+      knowersBtn.classList.toggle('is-active', roomTab === 'knowers');
+      knowersBtn.setAttribute('aria-selected', String(roomTab === 'knowers'));
+      actionSlot.innerHTML = '';
+      listContainer.innerHTML = '';
+      if (roomTab === 'entries') {
+        const newBtn = document.createElement('button');
+        newBtn.type = 'button';
+        newBtn.className = 'atlas-btn-ghost atlas-knowledge-new';
+        newBtn.title = 'Create a new knowledge entry';
+        newBtn.textContent = '+ new knowledge entry';
+        newBtn.addEventListener('click', () => navigate(knowledgeHash(worldId, NEW)));
+        actionSlot.appendChild(newBtn);
+        buildEntriesList(worldId, listContainer);
+      } else {
+        const viewAs = document.createElement('button');
+        viewAs.type = 'button';
+        viewAs.className = 'atlas-btn-ghost atlas-knowledge-viewas';
+        viewAs.title = 'See the world as any character knows it';
+        viewAs.textContent = 'view as…';
+        viewAs.addEventListener('click', async () => {
+          const p = await pickElement({ restrictToType: 'character', title: 'View the world as…' });
+          if (p) navigate(knowledgeKnowerHash(worldId, p.id));
+        });
+        const newCircle = document.createElement('button');
+        newCircle.type = 'button';
+        newCircle.className = 'atlas-btn-ghost atlas-knowledge-newcircle';
+        newCircle.title = 'Create a circle (a collective acting as a knower-group)';
+        newCircle.textContent = '+ new circle';
+        newCircle.addEventListener('click', openNewCircle);
+        actionSlot.append(viewAs, newCircle);
+        buildKnowersList(worldId, listContainer);
+      }
+    };
+
+    entriesBtn.addEventListener('click', () => { if (roomTab !== 'entries') { roomTab = 'entries'; renderBody(); } });
+    knowersBtn.addEventListener('click', () => { if (roomTab !== 'knowers') { roomTab = 'knowers'; renderBody(); } });
+    renderBody();
   }
 
-  function buildEntriesList(worldId: string): void {
+  function buildEntriesList(worldId: string, container: HTMLElement): void {
     const entries = listKnowledgeEntries(getState().data.elements)
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
@@ -591,7 +612,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           a fact — then assign who holds it (a character, or a circle).
         </p>
       `;
-      root.appendChild(empty);
+      const cta = document.createElement('button');
+      cta.type = 'button';
+      cta.className = 'atlas-btn-ghost atlas-knowledge-empty-cta';
+      cta.textContent = '+ new knowledge entry';
+      cta.addEventListener('click', () => navigate(knowledgeHash(worldId, NEW)));
+      empty.appendChild(cta);
+      container.appendChild(empty);
       return;
     }
 
@@ -601,6 +628,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'atlas-knowledge-row';
+      row.title = `Open ${entry.name || 'this entry'}`;
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
         <span class="atlas-knowledge-row-main">
@@ -611,7 +639,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       row.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
       list.appendChild(row);
     }
-    root.appendChild(list);
+    container.appendChild(list);
   }
 
   /** "held by Ireena", "held by the party +2", or "no holders yet". */
@@ -623,7 +651,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     return ids.length === 1 ? `held by ${first}` : `held by ${first} +${ids.length - 1}`;
   }
 
-  function buildKnowersList(worldId: string): void {
+  function buildKnowersList(worldId: string, container: HTMLElement): void {
     const elements = getState().data.elements;
     const knowers = listKnowers(elements);
 
@@ -637,7 +665,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           circle here to set one up before it holds anything.
         </p>
       `;
-      root.appendChild(empty);
+      const cta = document.createElement('button');
+      cta.type = 'button';
+      cta.className = 'atlas-btn-ghost atlas-knowledge-empty-cta';
+      cta.textContent = '+ new circle';
+      cta.addEventListener('click', openNewCircle);
+      empty.appendChild(cta);
+      container.appendChild(empty);
       return;
     }
 
@@ -650,10 +684,11 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const meta: string[] = [];
       if (isCircle) meta.push(`${circleMembers(k.id, elements).length} member${circleMembers(k.id, elements).length === 1 ? '' : 's'}`);
       meta.push(`holds ${held.length} ${held.length === 1 ? 'entry' : 'entries'}`);
-      if (knownCount > 0) meta.push(`knows about ${knownCount}`);
+      if (knownCount > 0) meta.push(`knows about ${knownCount} element${knownCount === 1 ? '' : 's'}`);
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'atlas-knowledge-row';
+      row.title = `View what ${k.name || 'this knower'} knows`;
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-knowledge-row-icon">${isCircle ? 'groups' : (ELEMENT_ICONS[k.type] ?? 'person')}</span>
         <span class="atlas-knowledge-row-main">
@@ -664,7 +699,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       row.addEventListener('click', () => navigate(knowledgeKnowerHash(worldId, k.id)));
       list.appendChild(row);
     }
-    root.appendChild(list);
+    container.appendChild(list);
   }
 
   // ---- known-view (K4) --------------------------------------------------------
@@ -718,11 +753,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     lensBtn.type = 'button';
     lensBtn.className = 'atlas-knowledge-lens-toggle' + (lensActive() ? ' is-active' : '');
     lensBtn.title = 'Dim everything this knower doesn\'t know (elements sidebar)';
+    lensBtn.setAttribute('aria-pressed', String(lensActive()));
     lensBtn.innerHTML = `<span class="material-symbols-outlined">visibility</span> lens`;
     lensBtn.addEventListener('click', () => {
       const next = lensActive() ? null : { knowerId };
       patchSlice('ui', { ...getState().ui, knowledgeLens: next });
       lensBtn.classList.toggle('is-active', next !== null);
+      lensBtn.setAttribute('aria-pressed', String(next !== null));
     });
     titleRow.appendChild(lensBtn);
 
@@ -789,6 +826,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const row = document.createElement('button');
         row.type = 'button';
         row.className = 'atlas-knowledge-row';
+        row.title = `Open ${entry.name || 'this entry'}`;
         row.innerHTML = `
           <span class="material-symbols-outlined atlas-knowledge-row-icon">menu_book</span>
           <span class="atlas-knowledge-row-main">
@@ -927,9 +965,15 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       return;
     }
     mountedResolved = true;
+    let draftRestored = false;
     if (isDraft && !draft) {
       // Restore an abandoned draft from the per-world stash; fresh otherwise.
-      draft = loadDraftStash(worldId)
+      const stashed = loadDraftStash(worldId);
+      if (stashed && (stashed.name || stashed.story || stashed.narrator
+        || stashed.collectives.length || stashed.aboutIds.length)) {
+        draftRestored = true;
+      }
+      draft = stashed
         ?? { name: '', story: '', richtextJson: null, narrator: null, collectives: [], aboutIds: [] };
     }
 
@@ -1054,6 +1098,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       actions.appendChild(cancel);
       body.appendChild(actions);
     }
+
+    if (draftRestored) toasts.info('Restored your unsaved draft.');
   }
 
   /**
@@ -1068,7 +1114,17 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       mod = await import('./knowledge-editor');
     } catch (err) {
       console.error('[knowledge-room] editor chunk failed to load', err);
-      host.innerHTML = '<div class="atlas-knowledge-prose-loading">editor failed to load — reload to retry</div>';
+      host.innerHTML = '';
+      const fail = document.createElement('div');
+      fail.className = 'atlas-knowledge-prose-loading';
+      fail.append('editor failed to load — ');
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'atlas-knowledge-allfields';
+      retry.textContent = 'try again';
+      retry.addEventListener('click', () => { void mountProseEditor(host, forId, ctx); });
+      fail.appendChild(retry);
+      host.appendChild(fail);
       return;
     }
     if (token !== editorMountToken || !root.contains(host)) return; // view moved on
@@ -1175,7 +1231,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           // ui-only tick (e.g. lens cleared via the sidebar banner ×) — keep
           // the toggle's active class honest without a rebuild.
           const btn = root.querySelector('.atlas-knowledge-lens-toggle');
-          btn?.classList.toggle('is-active', getState().ui.knowledgeLens?.knowerId === knowerId);
+          const lensOn = getState().ui.knowledgeLens?.knowerId === knowerId;
+          btn?.classList.toggle('is-active', lensOn);
+          btn?.setAttribute('aria-pressed', String(lensOn));
         }
       } else if (tgt === NEW) refreshDraftData();
       else refreshEditorData(tgt);

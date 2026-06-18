@@ -547,7 +547,17 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       proseMount.focus();
     }).catch(err => {
       console.error('[share-room] editor chunk failed to load', err);
-      host.innerHTML = '<div class="atlas-share-prose-loading">editor failed to load — reload to retry</div>';
+      host.innerHTML = '';
+      const fail = document.createElement('div');
+      fail.className = 'atlas-share-prose-loading';
+      fail.textContent = 'editor failed to load.';
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'atlas-btn-ghost';
+      retry.textContent = 'try again';
+      retry.addEventListener('click', () => renderBlocks(pageId));
+      host.appendChild(fail);
+      host.appendChild(retry);
     });
 
     return wrap;
@@ -594,7 +604,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     changeBtn.textContent = el ? `element: ${el.name || '(unnamed)'} — change…` : 'pick element…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
-        const picked = await pickElement({ title: 'Bind card to…', excludeIds: [pageId] });
+        const picked = await pickElement({ title: 'Change card to…', excludeIds: [pageId] });
         // Re-picking resets the field choice — the old element's fields
         // don't apply to the new one.
         if (picked) await patchCardBlock(pageId, block.id, { elementId: picked.id, fields: [] });
@@ -682,6 +692,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     done.type = 'button';
     done.className = 'atlas-btn-ghost atlas-share-block-done';
     done.textContent = 'done';
+    done.title = 'Save and close this block';
     done.addEventListener('click', () => { void commitThenRender(pageId); });
     doneRow.appendChild(done);
     wrap.appendChild(doneRow);
@@ -725,7 +736,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
 
     const hint = document.createElement('p');
     hint.className = 'atlas-share-section-hint';
-    hint.textContent = 'Publishes a FROZEN copy of everything this circle holds — later knowledge edits never leak until you republish.';
+    hint.textContent = 'Publishes a frozen copy of everything this circle holds — later knowledge edits never leak until you republish.';
     wrap.appendChild(hint);
 
     const doneRow = document.createElement('div');
@@ -734,6 +745,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     done.type = 'button';
     done.className = 'atlas-btn-ghost atlas-share-block-done';
     done.textContent = 'done';
+    done.title = 'Save and close this block';
     done.addEventListener('click', () => { void commitThenRender(pageId); });
     doneRow.appendChild(done);
     wrap.appendChild(doneRow);
@@ -875,6 +887,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     done.type = 'button';
     done.className = 'atlas-btn-ghost atlas-share-block-done';
     done.textContent = 'done';
+    done.title = 'Save and close this block';
     done.addEventListener('click', () => { void commitThenRender(pageId); });
     doneRow.appendChild(done);
     wrap.appendChild(doneRow);
@@ -947,6 +960,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     done.type = 'button';
     done.className = 'atlas-btn-ghost atlas-share-block-done';
     done.textContent = 'done';
+    done.title = 'Save and close this block';
     done.addEventListener('click', () => { void commitThenRender(pageId); });
     doneRow.appendChild(done);
     wrap.appendChild(doneRow);
@@ -965,7 +979,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (blocks.length === 0 && !editingBlockId) {
       const empty = document.createElement('p');
       empty.className = 'atlas-share-section-hint';
-      empty.textContent = 'No blocks yet — the page is an ordered stack. Add a heading or text below.';
+      empty.textContent = 'No blocks yet — the page is an ordered stack. Add a heading, text, card, collection, map, or circle below.';
       blocksHost.appendChild(empty);
     }
 
@@ -1066,12 +1080,12 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // Add-block menu.
     const addRow = document.createElement('div');
     addRow.className = 'atlas-share-block-add';
-    addRow.appendChild(addBtn('title', '+ heading', () => { void addBlock(pageId, 'heading'); }));
-    addRow.appendChild(addBtn('notes', '+ text', () => { void addBlock(pageId, 'prose'); }));
-    addRow.appendChild(addBtn('badge', '+ element card', () => { void addElementCard(pageId); }));
-    addRow.appendChild(addBtn('grid_view', '+ collection', () => { void addCollectionBlock(pageId); }));
-    addRow.appendChild(addBtn('map', '+ map', () => { void addMapBlock(pageId); }));
-    addRow.appendChild(addBtn('groups', '+ circle', () => { void addCircleBlock(pageId); }));
+    addRow.appendChild(addBtn('title', '+ heading', () => { void addBlock(pageId, 'heading'); }, 'A section or subsection heading'));
+    addRow.appendChild(addBtn('notes', '+ text', () => { void addBlock(pageId, 'prose'); }, 'A rich-text block with @-mentions'));
+    addRow.appendChild(addBtn('badge', '+ element card', () => { void addElementCard(pageId); }, 'A card for one element — identity plus the fields you choose'));
+    addRow.appendChild(addBtn('grid_view', '+ collection', () => { void addCollectionBlock(pageId); }, 'A grid of several elements (identity only)'));
+    addRow.appendChild(addBtn('map', '+ map', () => { void addMapBlock(pageId); }, 'A map image with the pins you include'));
+    addRow.appendChild(addBtn('groups', '+ circle', () => { void addCircleBlock(pageId); }, 'A frozen snapshot of what a circle knows'));
     blocksHost.appendChild(addRow);
   }
 
@@ -1085,10 +1099,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     return b;
   }
 
-  function addBtn(icon: string, label: string, onClick: () => void): HTMLButtonElement {
+  function addBtn(icon: string, label: string, onClick: () => void, title?: string): HTMLButtonElement {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'atlas-btn-ghost atlas-share-block-add-btn';
+    if (title) b.title = title;
     b.innerHTML = `<span class="material-symbols-outlined">${icon}</span> ${escapeText(label)}`;
     b.addEventListener('click', onClick);
     return b;
@@ -1142,7 +1157,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         // don't lose the URL.
         toasts.error(`Published at ${publicUrlFor(res.slug)} — but atlas couldn't record it locally. Keep that URL.`);
       }
-      if (mountedView === pageId) buildDetail(pageId);
+      if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
       surfaceSharingError(err, 'Could not publish page');
     }
@@ -1169,7 +1184,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         atlas_page_pub: { ...pub, updated_at: row?.updated_at ?? new Date().toISOString() },
       });
       toasts.success('Republished — the public page is up to date');
-      if (mountedView === pageId) buildDetail(pageId);
+      if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
       if (err instanceof SharingApiError && err.code === 'not_found') {
         // Stale mirror — the server no longer has the row (reset, takedown
@@ -1177,7 +1192,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         // state instead of a permanent dead-end.
         await patchPage(pageId, { atlas_page_pub: null });
         toasts.info('The sharing server no longer has this page — publish it again.');
-        if (mountedView === pageId) buildDetail(pageId);
+        if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
         return;
       }
       surfaceSharingError(err, 'Could not republish page');
@@ -1198,7 +1213,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         atlas_page_pub: { ...pub, revoked: true, updated_at: new Date().toISOString() },
       });
       toasts.success('Revoked — the link no longer serves this page');
-      if (mountedView === pageId) buildDetail(pageId);
+      if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
       if (err instanceof SharingApiError && err.code === 'not_found') {
         // Already gone server-side — the goal state is reached; record it.
@@ -1206,7 +1221,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           atlas_page_pub: { ...pub, revoked: true, updated_at: new Date().toISOString() },
         });
         toasts.info('Already gone on the server — marked revoked here.');
-        if (mountedView === pageId) buildDetail(pageId);
+        if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
         return;
       }
       surfaceSharingError(err, 'Could not revoke page');
@@ -1426,7 +1441,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     row.className = 'atlas-share-publish-row';
     const prefix = document.createElement('span');
     prefix.className = 'atlas-share-publish-prefix';
-    prefix.textContent = 'show.onlyworlds.com/';
+    prefix.textContent = publicUrlFor('').replace(/^https?:\/\//, '');
     row.appendChild(prefix);
     const slugInput = document.createElement('input');
     slugInput.type = 'text';
@@ -1748,7 +1763,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     for (const i of PAGE_INTENTS) {
       const opt = document.createElement('option');
       opt.value = i;
-      opt.textContent = `${i} — ${PAGE_INTENT_HINTS[i]}`;
+      opt.textContent = `${i}: ${PAGE_INTENT_HINTS[i]}`;
       intentSelect.appendChild(opt);
     }
     intentSelect.value = pageIntentOf(page);
@@ -1792,6 +1807,14 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const h1 = root.querySelector('.atlas-share-detail-titlerow h1');
     const title = page.name || '(untitled)';
     if (h1 && h1.textContent !== title) h1.textContent = title;
+
+    // Keep the name input honest after a rename pulled from another device —
+    // but never clobber what the user is actively typing.
+    const nameInput = root.querySelector<HTMLInputElement>('.atlas-share-name');
+    if (nameInput && document.activeElement !== nameInput) {
+      const current = page.name || '';
+      if (nameInput.value !== current) nameInput.value = current;
+    }
 
     if (previewMode) return; // static reader view — rebuilt on toggle, not per tick
     if (editingBlockId) {

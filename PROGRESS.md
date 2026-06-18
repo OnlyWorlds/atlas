@@ -4,7 +4,9 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (handover snapshot, 2026-06-12 session 239 close)
+## CURRENT STATE (handover snapshot, 2026-06-18 quick-wins bout close)
+
+**2026-06-18 (quick-wins bout + consolidation)**: 24 of the 26 audit quick wins shipped across knowledge room / share room / show viewer (button resets + font-family leak fix, 120ms hovers, title hints, empty-state CTAs, ARIA, editor-failure retry, publish scroll-preservation, name-input resync, viewer-host derivation, copy passes; show launch chrome + status next-steps + loading/scroll/overflow/focus polish + atlas-parity strings). Held: CSS delete-red token unification (needs a canonical-red design call). **Knowledge + Sharing are now CONSOLIDATED** — full state + the 19 parked design calls + feature candidates live in `Notes/2026-06-18-atlas-knowledge-sharing-consolidation.md`. Pre-release UI runthrough is a deliberate separate later session. Verified: typecheck + 808 vitest + 22 knowledge/share e2e + both builds green. Next domains: data import (greenfield) + timeline arcs.
 
 **Where atlas is**: feature-complete v1 core (phases 0-6 + 3.5) + **Knowledge phase 1 complete** (234-236) + **SHARING SHIPPED END-TO-END** (237-239): every designed v1 block built (heading/prose/card/circle/collection/**map** w/ labels + pin modals), S3 themes, publish/republish/revoke **live against Anchor's deployed backend** (contract v0.3, fakes exact), **`show.onlyworlds.com` DEPLOYED** (Boss, 2026-06-12), **CF edge cache + purge-by-URL VERIFIED live** (republish → purge → fresh within seconds). Full chain proven 2026-06-12 ~16:00: origin ✅ edge ✅ viewer ✅ — smoke-page-1 serves two themed maps with pin modals. Conventions #1-79. **808 vitest + 150 Playwright + typecheck + both builds green.** For current counts always run the suites.
 
