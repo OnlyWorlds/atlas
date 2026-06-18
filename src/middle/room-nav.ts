@@ -19,10 +19,8 @@ import {
   writingHash,
   knowledgeHash,
   timelineHash,
-  searchHash,
   shareHash,
   importHash,
-  templatesHash,
   settingsHash,
   type RouteMode,
 } from '../core/router';
@@ -47,10 +45,14 @@ const ROOMS: RoomDef[] = [
   { id: 'writing',   label: 'Writing',   icon: 'edit_note',      hashFor: writingHash,   matches: ['writing'] },
   { id: 'knowledge', label: 'Knowledge', icon: 'menu_book',      hashFor: knowledgeHash, matches: ['knowledge'] },
   { id: 'timeline',  label: 'Timeline',  icon: 'timeline',       hashFor: timelineHash,  matches: ['timeline'] },
-  { id: 'search',    label: 'Search',    icon: 'search',         hashFor: (w) => searchHash(w), matches: ['search'] },
+  // Search room removed pre-release (session 240) — the dedicated room was the
+  // weakest search surface; the planned replacement is a Cmd+K command palette
+  // (see DESIGN.md "Search"). The elements-sidebar name filter remains interim.
+  // Route + search.ts stay dormant; re-add this entry to restore the room.
   { id: 'share',     label: 'Share',     icon: 'ios_share',      hashFor: (w) => shareHash(w), matches: ['share'] },
   { id: 'import',    label: 'Import',    icon: 'download',       hashFor: importHash,    matches: ['import'] },
-  { id: 'templates', label: 'Templates', icon: 'extension',      hashFor: templatesHash, matches: ['templates'] },
+  // Templates hidden pre-release (not building it before launch). Route +
+  // templates-room.ts stay dormant; re-add this entry to restore it to the nav.
   { id: 'settings',  label: 'Settings',  icon: 'settings',       hashFor: (w) => settingsHash(w), matches: ['settings'] },
 ];
 

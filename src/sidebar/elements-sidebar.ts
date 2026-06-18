@@ -10,7 +10,7 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
-import { onHashChange, navigate, elementHash, searchHash } from '../core/router';
+import { onHashChange, navigate, elementHash } from '../core/router';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { lensKnownSet } from '../core/knowledge';
@@ -90,21 +90,6 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   searchInput.setAttribute('data-role', 'elements-search');
   searchInput.style.flex = '1 1 auto';
   searchRow.appendChild(searchInput);
-
-  // "Search everywhere" — opens the global search room with the current
-  // sidebar search query preserved. Subtle icon next to the input.
-  const globalSearchBtn = document.createElement('button');
-  globalSearchBtn.type = 'button';
-  globalSearchBtn.className = 'atlas-create-btn atlas-search-everywhere-btn';
-  globalSearchBtn.setAttribute('data-action', 'open-search-room');
-  globalSearchBtn.title = 'Search everywhere (name, description, supertype, subtype)';
-  globalSearchBtn.innerHTML = '<span class="material-symbols-outlined">search</span>';
-  globalSearchBtn.addEventListener('click', () => {
-    const worldId = getState().active?.worldId;
-    if (!worldId) return;
-    navigate(searchHash(worldId, searchInput.value));
-  });
-  searchRow.appendChild(globalSearchBtn);
 
   const createBtn = document.createElement('button');
   createBtn.type = 'button';

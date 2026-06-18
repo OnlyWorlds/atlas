@@ -83,8 +83,9 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
     const activeWorld = activeWorldId ? reg.worlds.find((w) => w.id === activeWorldId) : undefined;
 
     root.innerHTML = `
-      <header class="atlas-middle-header">
-        <h2>Settings</h2>
+      <header class="atlas-room-header">
+        <h1>Settings</h1>
+        <p class="atlas-room-subtitle">Atlas preferences and this world's configuration.</p>
       </header>
       <div class="atlas-settings-shell">
         <nav class="atlas-settings-tabs" role="tablist">

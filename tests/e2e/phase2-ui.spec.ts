@@ -356,7 +356,7 @@ test('settings gear opens panel without an active world', async ({ page }) => {
   // settings panel and let the user set up an atlas folder.
   await page.click('[data-action="open-settings"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
-  await expect(page.locator('.atlas-settings h2')).toContainText(/settings/i);
+  await expect(page.locator('.atlas-settings h1')).toContainText(/settings/i);
   // Click the storage tab to verify the "not set up" prompt is in there.
   await page.click('[data-settings-tab="storage"]');
   await expect(page.locator('.atlas-settings')).toContainText(/not set up yet/i);

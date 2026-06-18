@@ -44,6 +44,7 @@ import type { Element } from '../core/types';
 import { ToastManager } from '../ui/toast-manager';
 import type { JSONContent } from '@tiptap/core';
 import type { KnowledgeEditorHandle } from './knowledge-editor';
+import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 
 /** Sentinel knowledgeId for the unsaved draft editor (`/knowledge/new`). */
 const NEW = 'new';
@@ -144,6 +145,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   let draft: Draft | null = null;
   let heldByMount: HTMLElement | null = null;
   let aboutMount: HTMLElement | null = null;
+  let entryTitleHandle: EditableTitleHandle | null = null;  // editor header title (sync on tick)
   // Whether the mounted view actually found its target. False = not-found
   // interim (deep URL before elements load, id-swap transient, deleted entry)
   // — same-view ticks retry a full build instead of a surgical refresh.
@@ -312,12 +314,12 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   };
   window.addEventListener('pagehide', onPageHide);
 
-  async function createFromDraft(nameEl: HTMLInputElement): Promise<void> {
+  async function createFromDraft(): Promise<void> {
     const worldId = wid();
     const folder = getActiveStore();
     if (!worldId || !folder || !draft) return;
     const data: Record<string, unknown> = {
-      name: nameEl.value.trim() || 'untitled knowledge',
+      name: (draft.name || '').trim() || 'untitled knowledge',
       subtype: KNOWLEDGE_SUBTYPE,
       story: draft.story,
       narrator: draft.narrator,
@@ -721,17 +723,26 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const held = knowledgeHeldBy(knowerId, elements);
     const knownIds = elementsKnownAboutBy(knowerId, elements);
 
-    const header = document.createElement('header');
-    header.className = 'atlas-room-header atlas-knowledge-detail-header';
+    const header = document.createElement('div');
+    header.className = 'atlas-middle-header atlas-knowledge-knower-header';
     const back = document.createElement('button');
     back.type = 'button';
-    back.className = 'atlas-btn-ghost atlas-knowledge-back';
-    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span> all knowers`;
+    back.className = 'atlas-icon-btn-sm atlas-knowledge-back';
+    back.title = 'All knowers';
+    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span>`;
     back.addEventListener('click', () => { roomTab = 'knowers'; navigate(knowledgeHash(worldId)); });
     header.appendChild(back);
 
-    const titleRow = document.createElement('div');
-    titleRow.className = 'atlas-knowledge-detail-titlerow';
+    const kicon = document.createElement('span');
+    kicon.className = 'material-symbols-outlined atlas-knowledge-knower-icon';
+    kicon.textContent = isCircle ? 'groups' : (ELEMENT_ICONS[knower.type] ?? 'person');
+    header.appendChild(kicon);
+
+    const knowerTitle = document.createElement('h2');
+    knowerTitle.className = 'atlas-knowledge-knower-name';
+    knowerTitle.textContent = knower.name || '(unnamed)';
+    header.appendChild(knowerTitle);
+
     const metaBits: string[] = [];
     if (isCircle) {
       const members = circleMembers(knowerId, elements).length;
@@ -739,10 +750,14 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     }
     metaBits.push(`holds ${held.length} ${held.length === 1 ? 'entry' : 'entries'}`);
     if (knownIds.length > 0) metaBits.push(`knows about ${knownIds.length} element${knownIds.length === 1 ? '' : 's'}`);
-    titleRow.innerHTML = `
-      <h1><span class="material-symbols-outlined atlas-knowledge-knower-icon">${isCircle ? 'groups' : (ELEMENT_ICONS[knower.type] ?? 'person')}</span>${escapeText(knower.name || '(unnamed)')}</h1>
-      <span class="atlas-knowledge-knower-meta">${escapeText(metaBits.join(' · '))}</span>
-    `;
+    const meta = document.createElement('span');
+    meta.className = 'atlas-knowledge-knower-meta';
+    meta.textContent = metaBits.join(' · ');
+    header.appendChild(meta);
+
+    const spacer = document.createElement('div');
+    spacer.className = 'atlas-middle-spacer';
+    header.appendChild(spacer);
     // Lens toggle — dims everything this knower doesn't know in the elements
     // sidebar (DESIGN_KNOWLEDGE.md "Known-view lens"). Persists across rooms;
     // the sidebar banner carries the always-visible exit. Active-state class
@@ -761,7 +776,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       lensBtn.classList.toggle('is-active', next !== null);
       lensBtn.setAttribute('aria-pressed', String(next !== null));
     });
-    titleRow.appendChild(lensBtn);
+    header.appendChild(lensBtn);
 
     // The Knowledge→Sharing bridge (DESIGN_SHARING "Knowledge Integration"):
     // mint a page pre-filled with this knower's circle block, land in the
@@ -793,7 +808,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         }
       })();
     });
-    titleRow.appendChild(makePage);
+    header.appendChild(makePage);
 
     const openEl = document.createElement('button');
     openEl.type = 'button';
@@ -801,8 +816,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     openEl.title = 'Open in the full element editor';
     openEl.textContent = 'open element →';
     openEl.addEventListener('click', () => navigate(elementHash(worldId, knower.id)));
-    titleRow.appendChild(openEl);
-    header.appendChild(titleRow);
+    header.appendChild(openEl);
     root.appendChild(header);
 
     const body = document.createElement('div');
@@ -979,17 +993,43 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
 
     root.innerHTML = '';
 
-    const header = document.createElement('header');
-    header.className = 'atlas-room-header atlas-knowledge-detail-header';
+    // Unified entity header (canon): compact band + click-to-edit title, no
+    // separate Name field. Same `.atlas-middle-header` the element editor uses.
+    const header = document.createElement('div');
+    header.className = 'atlas-middle-header atlas-knowledge-entry-header';
     const back = document.createElement('button');
     back.type = 'button';
-    back.className = 'atlas-btn-ghost atlas-knowledge-back';
-    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span> all knowledge`;
+    back.className = 'atlas-icon-btn-sm atlas-knowledge-back';
+    back.title = 'All knowledge';
+    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span>`;
     back.addEventListener('click', () => navigate(knowledgeHash(worldId)));
     header.appendChild(back);
-    const titleRow = document.createElement('div');
-    titleRow.className = 'atlas-knowledge-detail-titlerow';
-    titleRow.innerHTML = `<h1>${isDraft ? 'New knowledge entry' : escapeText(entry!.name || '(untitled)')}</h1>`;
+
+    const kicon = document.createElement('span');
+    kicon.className = 'material-symbols-outlined';
+    kicon.textContent = 'menu_book';
+    kicon.title = 'Knowledge entry';
+    header.appendChild(kicon);
+
+    entryTitleHandle = makeEditableTitle({
+      initial: isDraft ? draft!.name : (entry!.name || ''),
+      placeholder: 'what is known…',
+      ariaLabel: 'Knowledge entry name',
+      onCommit: (next) => {
+        if (isDraft) { draft!.name = next; persistDraft(); }
+        else {
+          // Compare against CURRENT state, not the build-time snapshot.
+          const current = elOf(entryId!)?.name || '';
+          if (next && next !== current) void patchEntry(entryId!, { name: next });
+        }
+      },
+    });
+    header.appendChild(entryTitleHandle.el);
+
+    const spacer = document.createElement('div');
+    spacer.className = 'atlas-middle-spacer';
+    header.appendChild(spacer);
+
     if (!isDraft) {
       const allFields = document.createElement('button');
       allFields.type = 'button';
@@ -997,45 +1037,22 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       allFields.title = 'Open in the full element editor (all fields)';
       allFields.textContent = 'all fields →';
       allFields.addEventListener('click', () => navigate(elementHash(worldId, entry!.id)));
-      titleRow.appendChild(allFields);
+      header.appendChild(allFields);
       const del = document.createElement('button');
       del.type = 'button';
       del.className = 'atlas-knowledge-delete';
       del.title = 'Delete this knowledge entry';
       del.innerHTML = `<span class="material-symbols-outlined">delete</span>`;
       del.addEventListener('click', () => { void deleteEntry(entry!.id); });
-      titleRow.appendChild(del);
+      header.appendChild(del);
     }
-    header.appendChild(titleRow);
     root.appendChild(header);
 
     const body = document.createElement('div');
     body.className = 'atlas-knowledge-detail';
     root.appendChild(body);
 
-    // Name
-    const nameField = document.createElement('div');
-    nameField.className = 'atlas-knowledge-field';
-    nameField.innerHTML = `<label class="atlas-knowledge-field-label">Name</label>`;
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.className = 'atlas-input atlas-knowledge-name';
-    nameInput.placeholder = 'what is known…';
-    nameInput.value = isDraft ? draft!.name : (entry!.name || '');
-    if (isDraft) {
-      nameInput.addEventListener('input', () => { draft!.name = nameInput.value; persistDraft(); });
-    } else {
-      nameInput.addEventListener('blur', () => {
-        const v = nameInput.value.trim();
-        // Compare against CURRENT state, not the build-time snapshot — after a
-        // blur-save, the build-time value is stale and reverting to it would
-        // silently skip the write.
-        const current = elOf(entryId!)?.name || '';
-        if (v && v !== current) void patchEntry(entryId!, { name: v });
-      });
-    }
-    nameField.appendChild(nameInput);
-    body.appendChild(nameField);
+    // (Name lives in the header as the editable title — no separate field.)
 
     const ctx = makeCtx(entryId);
 
@@ -1084,7 +1101,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       create.type = 'button';
       create.className = 'atlas-btn-primary';
       create.textContent = 'create';
-      create.addEventListener('click', () => { void createFromDraft(nameInput); });
+      create.addEventListener('click', () => { void createFromDraft(); });
       const cancel = document.createElement('button');
       cancel.type = 'button';
       cancel.className = 'atlas-btn-ghost';
@@ -1180,10 +1197,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       renderNotFound('entry');
       return;
     }
-    // Title is plain text (not an input) — safe to sync after renames/pulls.
-    const h1 = root.querySelector('.atlas-knowledge-detail-titlerow h1');
-    const title = el.name || '(untitled)';
-    if (h1 && h1.textContent !== title) h1.textContent = title;
+    // Sync the header title (no-op while the user is editing it).
+    entryTitleHandle?.sync(el.name || '');
     const ctx = makeCtx(entryId);
     if (heldByMount) renderHeldBy(heldByMount, ctx);
     if (aboutMount) renderAbout(aboutMount, ctx);

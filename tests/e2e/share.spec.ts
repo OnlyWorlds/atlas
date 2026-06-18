@@ -48,6 +48,18 @@ test('share room: nav button opens the room with an empty state', async ({ page 
   await expect(page.locator('.atlas-share-row')).toHaveCount(0);
 });
 
+/** Set the page title via the unified header's click-to-edit name. */
+async function setPageTitle(page: Page, name: string) {
+  const title = page.locator('.atlas-share-detail-header .atlas-element-name');
+  await title.click();
+  const input = page.locator('.atlas-share-detail-header input.atlas-element-name-input');
+  await input.waitFor({ state: 'visible' });
+  await input.fill(name);
+  await input.press('Enter');
+  // Wait for the commit to reflect before returning (deterministic under load).
+  await expect(title).toHaveText(name);
+}
+
 test('create page → detail; rename + revert both persist; intent change sticks', async ({ page }) => {
   await setupWorld(page);
   await openShare(page);
@@ -55,25 +67,21 @@ test('create page → detail; rename + revert both persist; intent change sticks
   // "+ new page" creates immediately and lands on the detail view.
   await page.click('button.atlas-share-new');
   await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
-  await expect(page.locator('.atlas-share-detail-titlerow h1')).toHaveText('new page');
-  await expect(page.locator('input.atlas-share-name')).toHaveValue('new page');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
   await expect(page.locator('[data-action="copy-payload"]')).toBeVisible();
   // S4 gating: a local-only world can't publish — the section says why and
   // offers no controls.
   await expect(page.locator('.atlas-share-publish-hint')).toContainText('online world');
   await expect(page.locator('[data-action="publish"]')).toHaveCount(0);
 
-  // Rename → blur saves; title syncs on the data tick.
-  await page.fill('input.atlas-share-name', 'barovia primer');
-  await page.locator('input.atlas-share-name').blur();
-  await expect(page.locator('.atlas-share-detail-titlerow h1')).toHaveText('barovia primer');
+  // Rename → commit saves; title is the header's editable name.
+  await setPageTitle(page, 'barovia primer');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('barovia primer');
 
-  // Revert to the original → blur must ALSO save (rename-revert discipline).
-  await page.fill('input.atlas-share-name', 'new page');
-  await page.locator('input.atlas-share-name').blur();
-  await expect(page.locator('.atlas-share-detail-titlerow h1')).toHaveText('new page');
-  await page.fill('input.atlas-share-name', 'barovia primer');
-  await page.locator('input.atlas-share-name').blur();
+  // Revert to the original → commit must ALSO save (rename-revert discipline).
+  await setPageTitle(page, 'new page');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
+  await setPageTitle(page, 'barovia primer');
 
   // Intent: defaults to show; change to reference persists to the element.
   await expect(page.locator('select.atlas-share-intent')).toHaveValue('show');
@@ -94,7 +102,7 @@ test('create page → detail; rename + revert both persist; intent change sticks
 
   // A second create gets a unique default name.
   await page.click('button.atlas-share-new');
-  await expect(page.locator('.atlas-share-detail-titlerow h1')).toHaveText('new page');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
   await page.click('.atlas-share-back');
   await expect(page.locator('.atlas-share-row')).toHaveCount(2);
 });
@@ -110,7 +118,7 @@ test('delete page: dismiss keeps it; accept removes it and lands on the list', a
   const dismissed = page.waitForEvent('dialog').then(d => d.dismiss());
   await page.click('.atlas-share-delete');
   await dismissed;
-  await expect(page.locator('.atlas-share-detail-titlerow h1')).toHaveText('new page');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
 
   const accepted = page.waitForEvent('dialog').then(d => d.accept());
   await page.click('.atlas-share-delete');
@@ -367,13 +375,13 @@ test('circle block: the Knowledge bridge mints a page; compiled entries render; 
     if (!m) throw new Error('no active world in URL');
     window.location.hash = `#/w/${m[1]}/knowledge/knower/${id}`;
   }, circleId);
-  await expect(page.locator('.atlas-knowledge-detail-titlerow h1')).toContainText('the party');
+  await expect(page.locator('.atlas-knowledge-knower-header h2')).toContainText('the party');
   await page.locator('.atlas-knowledge-allfields', { hasText: 'create page' }).click();
 
   // Lands in the share room: circle block statically rendered with the
   // compiled entry; story mirror names it; intent prefilled to reference.
   await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
-  await expect(page.locator('.atlas-share-detail-titlerow h1')).toHaveText('what the party know');
+  await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('what the party know');
   const circleBlock = page.locator('.atlas-share-block[data-block-kind="circle"]');
   await expect(circleBlock.locator('.atlas-share-circle-name')).toHaveText('the party');
   await expect(circleBlock.locator('.atlas-share-circle-entry-title')).toHaveText('the mists');

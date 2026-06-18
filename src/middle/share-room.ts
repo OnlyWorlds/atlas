@@ -48,6 +48,7 @@ import type { Element } from '../core/types';
 import { ToastManager } from '../ui/toast-manager';
 import type { JSONContent } from '@tiptap/core';
 import type { ShareEditorHandle } from './share-editor';
+import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 
 export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -64,6 +65,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   // Elements ref at last build — same-view ticks skip work when the data
   // didn't change (hash-echo renders, ui-slice patches).
   let lastBuiltElementsRef: readonly Element[] | null = null;
+  let pageTitleHandle: EditableTitleHandle | null = null;  // detail header title (sync on tick)
 
   const wid = () => getState().active?.worldId ?? null;
   const elOf = (id: string): Element | undefined => getState().data.elements.find(e => e.id === id);
@@ -1656,20 +1658,40 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     mountedResolved = true;
     lastBuiltElementsRef = getState().data.elements;
 
-    const header = document.createElement('header');
-    header.className = 'atlas-room-header atlas-share-detail-header';
+    // Unified entity header (canon): compact band + click-to-edit title.
+    const header = document.createElement('div');
+    header.className = 'atlas-middle-header atlas-share-detail-header';
     const back = document.createElement('button');
     back.type = 'button';
-    back.className = 'atlas-btn-ghost atlas-share-back';
-    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span> all pages`;
+    back.className = 'atlas-icon-btn-sm atlas-share-back';
+    back.title = 'All pages';
+    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span>`;
     back.addEventListener('click', () => {
       void commitOpenEdit(pageId).then(() => navigate(shareHash(worldId)));
     });
     header.appendChild(back);
 
-    const titleRow = document.createElement('div');
-    titleRow.className = 'atlas-share-detail-titlerow';
-    titleRow.innerHTML = `<h1>${escapeText(page.name || '(untitled)')}</h1>`;
+    const picon = document.createElement('span');
+    picon.className = 'material-symbols-outlined';
+    picon.textContent = 'article';
+    picon.title = 'Page';
+    header.appendChild(picon);
+
+    pageTitleHandle = makeEditableTitle({
+      initial: page.name || '',
+      placeholder: 'page name…',
+      ariaLabel: 'Page name',
+      onCommit: (next) => {
+        const current = elOf(pageId)?.name || '';
+        if (next && next !== current) void patchPage(pageId, { name: next });
+      },
+    });
+    header.appendChild(pageTitleHandle.el);
+
+    const spacer = document.createElement('div');
+    spacer.className = 'atlas-middle-spacer';
+    header.appendChild(spacer);
+
     // Visitor preview toggle — render the page exactly as a reader would see
     // it (the portable renderer; same path the viewer tool will run).
     const previewBtn = document.createElement('button');
@@ -1686,7 +1708,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         buildDetail(pageId);
       })();
     });
-    titleRow.appendChild(previewBtn);
+    header.appendChild(previewBtn);
     // Copy the §5 publish payload — inspection/debugging affordance (and the
     // concrete artifact for backend contract review).
     const copyPayload = document.createElement('button');
@@ -1711,15 +1733,14 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         }
       })();
     });
-    titleRow.appendChild(copyPayload);
+    header.appendChild(copyPayload);
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'atlas-share-delete';
     del.title = 'Delete this page';
     del.innerHTML = `<span class="material-symbols-outlined">delete</span>`;
     del.addEventListener('click', () => { void deletePage(page.id); });
-    titleRow.appendChild(del);
-    header.appendChild(titleRow);
+    header.appendChild(del);
     root.appendChild(header);
 
     // Preview mode: the reader's view, rendered FROM THE PUBLISH PAYLOAD —
@@ -1735,24 +1756,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     body.className = 'atlas-share-detail';
     root.appendChild(body);
 
-    // Name
-    const nameField = document.createElement('div');
-    nameField.className = 'atlas-share-field';
-    nameField.innerHTML = `<label class="atlas-share-field-label">Name</label>`;
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.className = 'atlas-input atlas-share-name';
-    nameInput.placeholder = 'page name…';
-    nameInput.value = page.name || '';
-    nameInput.addEventListener('blur', () => {
-      const v = nameInput.value.trim();
-      // Compare against CURRENT state, not the build-time snapshot (the
-      // rename-revert lesson from the knowledge room).
-      const current = elOf(pageId)?.name || '';
-      if (v && v !== current) void patchPage(pageId, { name: v });
-    });
-    nameField.appendChild(nameInput);
-    body.appendChild(nameField);
+    // (Name lives in the header as the editable title — no separate field.)
 
     // Intent
     const intentField = document.createElement('div');
@@ -1804,17 +1808,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       renderNotFound();
       return;
     }
-    const h1 = root.querySelector('.atlas-share-detail-titlerow h1');
-    const title = page.name || '(untitled)';
-    if (h1 && h1.textContent !== title) h1.textContent = title;
-
-    // Keep the name input honest after a rename pulled from another device —
-    // but never clobber what the user is actively typing.
-    const nameInput = root.querySelector<HTMLInputElement>('.atlas-share-name');
-    if (nameInput && document.activeElement !== nameInput) {
-      const current = page.name || '';
-      if (nameInput.value !== current) nameInput.value = current;
-    }
+    // Sync the header title (no-op while the user is editing it).
+    pageTitleHandle?.sync(page.name || '');
 
     if (previewMode) return; // static reader view — rebuilt on toggle, not per tick
     if (editingBlockId) {

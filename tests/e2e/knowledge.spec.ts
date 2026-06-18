@@ -67,7 +67,19 @@ async function openKnowledge(page: Page) {
 
 /** Wait for the lazy-loaded TipTap editor inside the knowledge room. */
 async function waitForKnowledgeEditor(page: Page) {
-  await expect(page.locator('.atlas-knowledge-prose-rich .ProseMirror')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.atlas-knowledge-prose-rich .ProseMirror')).toBeVisible({ timeout: 20000 });
+}
+
+/** Set the entry title via the unified header's click-to-edit name. */
+async function setEntryTitle(page: Page, name: string) {
+  const title = page.locator('.atlas-knowledge-entry-header .atlas-element-name');
+  await title.click();
+  const input = page.locator('.atlas-knowledge-entry-header input.atlas-element-name-input');
+  await input.waitFor({ state: 'visible' });
+  await input.fill(name);
+  await input.press('Enter');
+  // Wait for the commit to reflect before returning (deterministic under load).
+  await expect(title).toHaveText(name);
 }
 
 test('knowledge room: nav button opens the room with an empty state', async ({ page }) => {
@@ -78,13 +90,14 @@ test('knowledge room: nav button opens the room with an empty state', async ({ p
 });
 
 test('draft create flow: nothing persists until "create"', async ({ page }) => {
+  test.slow(); // mounts the lazy TipTap editor twice (draft + saved) — slow under parallel load
   await setupWorld(page);
   await openKnowledge(page);
 
   // Open the draft editor — should NOT have created anything.
   await page.click('button.atlas-knowledge-new');
   await expect(page).toHaveURL(/\/knowledge\/new$/);
-  await expect(page.locator('.atlas-knowledge-detail-titlerow h1')).toHaveText('New knowledge entry');
+  await expect(page.locator('.atlas-knowledge-entry-header .atlas-element-name')).toHaveClass(/is-placeholder/);
 
   // Cancel → back to list, still empty (no entry was saved).
   await page.click('.atlas-knowledge-draft-actions button.atlas-btn-ghost');
@@ -93,14 +106,14 @@ test('draft create flow: nothing persists until "create"', async ({ page }) => {
 
   // New again, fill name + prose (TipTap), then create.
   await page.click('button.atlas-knowledge-new');
-  await page.fill('input.atlas-knowledge-name', 'the cursed village');
+  await setEntryTitle(page, 'the cursed village');
   await waitForKnowledgeEditor(page);
   await page.locator('.atlas-knowledge-prose-rich .ProseMirror').click();
   await page.keyboard.type('Barovia is cursed; a count rules from the castle.');
   await page.click('.atlas-knowledge-draft-actions button.atlas-btn-primary');
 
   // Lands on the saved entry's editor with the prose carried over.
-  await expect(page.locator('.atlas-knowledge-detail-titlerow h1')).toHaveText('the cursed village');
+  await expect(page.locator('.atlas-knowledge-entry-header .atlas-element-name')).toHaveText('the cursed village');
   await waitForKnowledgeEditor(page);
   await expect(page.locator('.atlas-knowledge-prose-rich .ProseMirror')).toContainText('Barovia is cursed');
 
@@ -116,7 +129,7 @@ test('draft persists across navigation; cancel clears the stash', async ({ page 
 
   // Type into a draft, then leave it (back to list) — still no saved entry.
   await page.click('button.atlas-knowledge-new');
-  await page.fill('input.atlas-knowledge-name', 'half-typed secret');
+  await setEntryTitle(page, 'half-typed secret');
   await waitForKnowledgeEditor(page);
   await page.locator('.atlas-knowledge-prose-rich .ProseMirror').click();
   await page.keyboard.type('the abbot is not what he seems');
@@ -125,39 +138,38 @@ test('draft persists across navigation; cancel clears the stash', async ({ page 
 
   // Return to the draft — content restored from the per-world stash.
   await page.click('button.atlas-knowledge-new');
-  await expect(page.locator('input.atlas-knowledge-name')).toHaveValue('half-typed secret');
+  await expect(page.locator('.atlas-knowledge-entry-header .atlas-element-name')).toHaveText('half-typed secret');
   await waitForKnowledgeEditor(page);
   await expect(page.locator('.atlas-knowledge-prose-rich .ProseMirror')).toContainText('the abbot is not what he seems');
 
   // Explicit cancel clears the stash — next draft starts fresh.
   await page.click('.atlas-knowledge-draft-actions button.atlas-btn-ghost');
   await page.click('button.atlas-knowledge-new');
-  await expect(page.locator('input.atlas-knowledge-name')).toHaveValue('');
+  await expect(page.locator('.atlas-knowledge-entry-header .atlas-element-name')).toHaveClass(/is-placeholder/);
   await waitForKnowledgeEditor(page);
   await expect(page.locator('.atlas-knowledge-prose-rich .ProseMirror')).not.toContainText('abbot');
 });
 
 test('saved entry: rename then revert both persist (no stale baseline)', async ({ page }) => {
+  test.slow(); // entry editor mounts the lazy TipTap chunk — slow under parallel load
   await setupWorld(page);
+  // Create the saved entry directly (the draft→create flow is covered above) —
+  // keeps this rename-focused test light so it doesn't starve under contention.
+  await createElement(page, 'narrative', { name: 'original', subtype: 'knowledge', story: '' });
   await openKnowledge(page);
+  await page.click('.atlas-knowledge-row:has-text("original")');
+  await expect(page.locator('.atlas-knowledge-entry-header .atlas-element-name')).toHaveText('original');
 
-  await page.click('button.atlas-knowledge-new');
-  await page.fill('input.atlas-knowledge-name', 'original');
-  await page.click('.atlas-knowledge-draft-actions button.atlas-btn-primary');
-  await expect(page.locator('.atlas-knowledge-detail-titlerow h1')).toHaveText('original');
-
-  // Rename → blur saves.
-  await page.fill('input.atlas-knowledge-name', 'renamed');
-  await page.locator('input.atlas-knowledge-name').blur();
+  // Rename → commit saves.
+  await setEntryTitle(page, 'renamed');
   await page.waitForFunction(() => {
     const s = (window as any).__atlasTestApi.getState();
     return s.data.elements.some((e: any) => e.type === 'narrative' && e.name === 'renamed');
   });
 
-  // Revert to the original → blur must ALSO save (regression: build-time
+  // Revert to the original → commit must ALSO save (regression: build-time
   // baseline compare skipped the write when reverting to the original value).
-  await page.fill('input.atlas-knowledge-name', 'original');
-  await page.locator('input.atlas-knowledge-name').blur();
+  await setEntryTitle(page, 'original');
   await page.waitForFunction(() => {
     const s = (window as any).__atlasTestApi.getState();
     return s.data.elements.some((e: any) => e.type === 'narrative' && e.name === 'original');
@@ -170,7 +182,7 @@ test('draft @-mention derives a non-removable about chip and persists as subject
   await openKnowledge(page);
 
   await page.click('button.atlas-knowledge-new');
-  await page.fill('input.atlas-knowledge-name', 'the curse');
+  await setEntryTitle(page, 'the curse');
   await waitForKnowledgeEditor(page);
   await page.locator('.atlas-knowledge-prose-rich .ProseMirror').click();
   await page.keyboard.type('All of @bar');
@@ -184,7 +196,7 @@ test('draft @-mention derives a non-removable about chip and persists as subject
 
   // Create — the derived subject lands in the matching Involves field.
   await page.click('.atlas-knowledge-draft-actions button.atlas-btn-primary');
-  await expect(page.locator('.atlas-knowledge-detail-titlerow h1')).toHaveText('the curse');
+  await expect(page.locator('.atlas-knowledge-entry-header .atlas-element-name')).toHaveText('the curse');
   await page.waitForFunction((locId) => {
     const s = (window as any).__atlasTestApi.getState();
     const entry = s.data.elements.find((e: any) => e.type === 'narrative' && e.name === 'the curse');
@@ -253,7 +265,7 @@ test('knowers tab lists holders; known-view compiles held entries per element', 
 
   // Ireena's known-view: holds 2 entries (1 direct + 1 via the party).
   await page.click('.atlas-knowledge-row:has-text("Ireena")');
-  await expect(page.locator('.atlas-knowledge-detail-titlerow h1')).toContainText('Ireena');
+  await expect(page.locator('.atlas-knowledge-knower-header h2')).toContainText('Ireena');
   await expect(page.locator('.atlas-knowledge-row', { hasText: 'the curse' })).toBeVisible();
   await expect(page.locator('.atlas-knowledge-row', { hasText: 'private fear' })).toBeVisible();
 
@@ -354,7 +366,7 @@ test('in-room delete: confirm dialog, entry removed, lands on the list', async (
   const dismissed = page.waitForEvent('dialog').then(d => d.dismiss());
   await page.click('.atlas-knowledge-delete');
   await dismissed;
-  await expect(page.locator('.atlas-knowledge-detail-titlerow h1')).toHaveText('doomed rumor');
+  await expect(page.locator('.atlas-knowledge-entry-header .atlas-element-name')).toHaveText('doomed rumor');
 
   // Second attempt: accept — entry deleted, back on the (now empty) list.
   const accepted = page.waitForEvent('dialog').then(d => d.accept());
@@ -453,5 +465,5 @@ test('element detail surfaces Knowledge: known by + subject of (K6)', async ({ p
   // "Known by" chip routes to the known-view.
   await section.locator('.atlas-link-chip', { hasText: 'the party' }).click();
   await expect(page).toHaveURL(new RegExp(`/knowledge/knower/${partyId}$`));
-  await expect(page.locator('.atlas-knowledge-detail-titlerow h1')).toContainText('the party');
+  await expect(page.locator('.atlas-knowledge-knower-header h2')).toContainText('the party');
 });

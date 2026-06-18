@@ -562,10 +562,10 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 | `writing` | `#/w/<id>/writing[/<narrativeId>]` | Book/chapter/scene/draft authorship (any tier; ancestry derived from `parent_narrative`). See `DESIGN_WRITING.md`. Legacy long-form URL still parsed. | shipped |
 | `knowledge` | `#/w/<id>/knowledge[/<entryId>\|/new\|/knower/<id>]` | Knowledge entries — who knows what. [Entries \| Knowers] tabs, draft editor (persists nothing until create), embedded TipTap prose w/ mentions, known-view per knower. See `DESIGN_KNOWLEDGE.md` | shipped (phase 1) |
 | `timeline` | `#/w/<id>/timeline` | Full timeline view | shipped |
-| `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | shipped |
+| `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | **removed from nav pre-release (240)** — route/file dormant; replacement = Cmd+K palette (see "Search" above) |
 | `share` | `#/w/<id>/share[/<pageId>]` | Sharing pages — list + block builder (heading/prose/element-card/circle) + payload-true visitor preview + publish section (fakes-first). Legacy `/publish` URLs alias here. See `DESIGN_SHARING.md` | shipped (S1+S2+S4+S5; live publishing awaits Anchor's backend) |
 | `import` | `#/w/<id>/import` | Explanation + reference to base-tool import; mechanics deferred | stub |
-| `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | stub |
+| `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | **removed from nav pre-release (240)** — route/file dormant |
 | `settings` | `#/w/<id>/settings[/<tab>]` | Account / storage / editing (atlas-wide) · world / writing / context (per-world) | shipped |
 
 **Default route**: bare `#/w/<id>` resolves to `home` (was `timeline` pre-session-223). Welcome stays at root `#/` with no active world.
@@ -575,6 +575,14 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 **Element selection lives WITHIN the element room** — selecting an element navigates to `#/w/<id>/element/<eid>` (the element room). The element header appears BELOW the room nav strip with element-specific actions (delete, publish, pin, etc.).
 
 **Deselect convention**: **Esc** clears `selectedElementId` and navigates to home — when an element is selected, no modal/overlay is open, and the route is NOT `writing`/`knowledge` (those rooms own their keyboards; see convention #32 + #46). Click-row-toggle was considered and dropped (session 223) — Esc is the canonical deselect.
+
+**Room header model — the two-tier rule (convention #80, session 240).** Every middle-pane view opens with ONE of two header shapes, chosen by level:
+- **Room landing** (home, knowledge list, share list, timeline, settings, import, writing-with-no-narrative) → `.atlas-room-header`: a **22px white** `<h1>` + optional `.atlas-room-subtitle`, with the primary action in an `.atlas-room-actions` row below. Section headings within are **sentence-case** (match the share room), never uppercase.
+- **A single named entity** (element, knowledge entry, share page, knower, an open writing narrative) → the compact 36px `.atlas-middle-header` band: `back · kind icon · 15px click-to-edit title · actions`. The title IS the editable name — there is **no separate "Name" field**. Click-to-edit is the shared `makeEditableTitle` helper (`src/middle/editable-title.ts`), used by element-detail-header + knowledge-room + share-room.
+
+Rule of thumb: **big title = you're in a room; compact band = you're looking at one thing.** Titles are white; cyan is for accents/links, not headings.
+
+**Search** (session 240): the dedicated search ROOM was removed pre-release — it was the weakest search surface. Interim search is the elements-sidebar name filter. The planned replacement is a **Cmd+K / "/" command palette**: an overlay summonable from any room that searches name + description + supertype + subtype and jumps to a result (with a "see all →" path). `search.ts` + the `/search` route stay dormant until the palette ships (re-add the `room-nav.ts` entry to restore the old room). **Templates** room likewise removed pre-release (not built before launch; route + `templates-room.ts` dormant).
 
 Per-room design docs:
 - World Home: `DESIGN_HOME.md`

@@ -175,6 +175,17 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
       mountedDetailForId = null;
       detailSlot.innerHTML = '';
 
+      // Room landing header — same big-title treatment as every other room.
+      // Only the no-selection state shows it; once a narrative is open the
+      // compact entity band (its name) takes over, like every other room.
+      const roomHeader = document.createElement('header');
+      roomHeader.className = 'atlas-room-header';
+      roomHeader.innerHTML = `
+        <h1>Writing</h1>
+        <p class="atlas-room-subtitle">Your world's long-form writing.</p>
+      `;
+      detailSlot.appendChild(roomHeader);
+
       const empty = document.createElement('div');
       empty.className = 'atlas-writing-editor-empty';
       if (idx.byId.size > 0) {

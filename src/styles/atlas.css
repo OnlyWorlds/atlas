@@ -1050,6 +1050,12 @@
   outline-offset: 1px;
 }
 
+/* Empty editable title (e.g. a fresh draft) shows its placeholder muted. */
+.atlas-element-name.is-placeholder {
+  color: var(--atlas-text-muted);
+  font-weight: 600;
+}
+
 /* The replacement input matches h2 typography so the visual swap is seamless. */
 .atlas-element-name-input {
   margin: 0;
@@ -5006,7 +5012,7 @@ svg .atlas-zone-selected {
 /* ---- World Home (src/middle/world-home.ts, DESIGN_HOME.md) ---- */
 
 .atlas-world-home {
-  padding: 24px 28px 32px 28px;
+  padding: 20px 24px 32px 24px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -5022,10 +5028,9 @@ svg .atlas-zone-selected {
 
 .atlas-home-world-name {
   margin: 0;
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 600;
-  color: var(--atlas-cyan);
-  letter-spacing: -0.01em;
+  color: var(--atlas-text);
 }
 
 .atlas-home-world-description {
@@ -6820,6 +6825,13 @@ a.atlas-writing-workspace-crumb-seg:hover {
   color: var(--atlas-text);
 }
 
+/* Standard primary-action row beneath a room header (Timeline + future rooms). */
+.atlas-room-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 24px 10px;
+}
+
 .atlas-room-subtitle {
   margin: 4px 0 0 0;
   font-size: 13px;
@@ -7169,6 +7181,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-knowledge-knower-meta {
   font-size: 11px;
   color: var(--atlas-text-muted);
+  white-space: nowrap;
 }
 
 .atlas-knowledge-known-card {

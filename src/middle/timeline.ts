@@ -20,18 +20,30 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   wrap.className = 'atlas-timeline-room';
   target.appendChild(wrap);
 
-  const header = document.createElement('div');
-  header.className = 'atlas-timeline-header';
+  // Room landing header — same big-title treatment as every other room
+  // (Knowledge / Share / Settings / Home), with the primary action in a
+  // standard room-actions row below.
+  const header = document.createElement('header');
+  header.className = 'atlas-room-header';
   header.innerHTML = `
-    <span class="material-symbols-outlined">timeline</span>
-    <h2>Timeline</h2>
-    <div style="flex:1 1 auto"></div>
-    <button class="atlas-btn-ghost" data-action="new-event" title="Create a new event">+ Event</button>
+    <h1>Timeline</h1>
+    <p class="atlas-room-subtitle">Your world's dated events, laid out in order.</p>
   `;
-  header.querySelector<HTMLButtonElement>('[data-action="new-event"]')!.addEventListener('click', () => {
+  wrap.appendChild(header);
+
+  const actions = document.createElement('div');
+  actions.className = 'atlas-room-actions';
+  const newEventBtn = document.createElement('button');
+  newEventBtn.type = 'button';
+  newEventBtn.className = 'atlas-btn-ghost';
+  newEventBtn.dataset.action = 'new-event';
+  newEventBtn.title = 'Create a new event';
+  newEventBtn.textContent = '+ Event';
+  newEventBtn.addEventListener('click', () => {
     new ElementCreateModal(toasts, { initialType: 'event' }).open();
   });
-  wrap.appendChild(header);
+  actions.appendChild(newEventBtn);
+  wrap.appendChild(actions);
 
   const barMount = document.createElement('div');
   barMount.className = 'atlas-timeline-bar-mount';
