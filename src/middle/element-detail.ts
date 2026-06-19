@@ -150,7 +150,11 @@ export function mountElementDetail(target: HTMLElement): () => void {
       }
     }
 
-    const sections = sectionsFor(el.type);
+    // The element NAME is the header's click-to-edit title (convention #80) — so
+    // drop the duplicate "Name" field from the schema-rendered Base section (F1).
+    const sections = sectionsFor(el.type)
+      .map(section => ({ ...section, fields: section.fields.filter(f => f.name !== 'name') }))
+      .filter(section => section.fields.length > 0);
     sections.forEach((section, idx) => {
       const sectionEl = renderSection(section, el, idx === 0);
       if (sectionEl) detail.appendChild(sectionEl);

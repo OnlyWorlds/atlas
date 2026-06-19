@@ -20,13 +20,22 @@ import type { LinkedRef, PlacedDot, TimelineNode } from './types';
 import { calculateTicks, calculateTimeRange, createDateToX } from './axis-calculator';
 import { escapeText } from '../../core/dom-utils';
 import { ELEMENT_ICONS } from '../../core/constants';
+import { rankAnchors } from './degree';
 
-const DOT_RADIUS = 4;
-const DOT_RADIUS_HOVER = 6;
-const DOT_RADIUS_SELECTED = 7;
+const DOT_RADIUS = 4;             // placement radius for binning + hit-test base
+const DOT_RADIUS_HOVER = 6;       // hit-test tolerance (px)
+// Node glyphs — type-tinted Material Symbols, sizes in px (Identity, chart #2).
+const ICON_BASE = 14;
+const ICON_HOVER = 18;
+const ICON_ANCHOR = 20;          // significance "anchor beats" — bigger glyph + halo
+const ICON_SELECTED = 22;
+const ANCHOR_CAP = 7;            // a handful of always-labelled landmarks (chart #2)
+const RUNG_MID = 1.5;            // LOD: above this zoom, non-anchor labels fill in
+const RUNG_CLOSE = 3;            // LOD: above this zoom, glyphs grow further
 const TOP_PAD = 20;
 const AXIS_LABEL_HEIGHT = 22;
-const ROW_HEIGHT = 30;
+const NODE_X_GAP = 42;           // density-fan: x-window within which nodes bloom vertically
+const NODE_Y_GAP = 34;           // density-fan: vertical step between stacked nodes (breathing room)
 const LABEL_MAX_CHARS = 24;
 const LABEL_NEAR_RADIUS = 150;   // px — cursor neighbourhood that gets labels
 const LABEL_NEAR_MAX = 9;        // most labels to reveal around the cursor
@@ -34,11 +43,10 @@ const ZOOM_MAX = 200;
 const ZOOM_STEP = 1.2;
 
 export interface TimelineViewOptions {
-  /** A dot was clicked → select it (room turns this into a route change). */
+  /** A dot or card chip was clicked → focus that element (unified select=focus;
+   *  the room turns this into a `/timeline/<id>` route change). Empty id clears. */
   onSelect: (elementId: string) => void;
-  /** The card's "focus" action → re-scope the chart to this element (D5). */
-  onFocus: (elementId: string) => void;
-  /** A chip / "open element" → jump to that element's room. */
+  /** The card's "Open" action → jump to that element's full room. */
   onOpenElement: (elementId: string) => void;
 }
 
@@ -62,6 +70,10 @@ interface ViewState {
   zoom: number;
   panCenter: number | null;   // date the view is centred on (null = base centre)
   baseRange: { min: number; max: number } | null;
+  // layout cache — the density-fan is deterministic per geometry; recompute only
+  // when size / range / node set changes, NOT on every mousemove redraw.
+  layoutSig: string | null;
+  layoutNodes: TimelineNode[] | null;
   // cursor (canvas coords; null when outside) — drives proximity labels
   mouseX: number | null;
   mouseY: number | null;
@@ -71,7 +83,6 @@ interface ViewState {
   dragStartCenter: number;
   dragMoved: boolean;
   onSelect: (id: string) => void;
-  onFocus: (id: string) => void;
   onOpenElement: (id: string) => void;
 }
 
@@ -95,10 +106,10 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
     container, canvas, card,
     nodes: [], placedDots: [], hoveredDot: null, selectedId: null,
     zoom: 1, panCenter: null, baseRange: null,
+    layoutSig: null, layoutNodes: null,
     mouseX: null, mouseY: null,
     dragging: false, dragStartX: 0, dragStartCenter: 0, dragMoved: false,
     onSelect: opts.onSelect,
-    onFocus: opts.onFocus,
     onOpenElement: opts.onOpenElement,
   };
 
@@ -116,9 +127,15 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
   const ro = new ResizeObserver(() => { draw(state); positionCard(state); });
   ro.observe(container);
 
+  // Material Symbols may not be in the FontFaceSet at first paint (the DOM card
+  // that also uses it starts hidden) — load it, then redraw so any first-frame
+  // fallback glyphs upgrade in place. (craft #89)
+  void ensureIconFont().then(() => draw(state));
+
   return {
     setNodes(nodes: TimelineNode[]): void {
       state.nodes = nodes;
+      state.layoutSig = null; // new node set → re-pack
       draw(state);
       renderCard(state);
     },
@@ -154,6 +171,54 @@ function effectiveRange(state: ViewState, base: { min: number; max: number }): {
   if (min < base.min - pad) { min = base.min - pad; max = min + effSpan; }
   if (max > base.max + pad) { max = base.max + pad; min = max - effSpan; }
   return { min, max };
+}
+
+/**
+ * Centered density-fan (beeswarm) vertical layout. X = date (the only meaningful
+ * axis); Y is anti-overlap. A node is placed at the axis midline unless that slot
+ * is taken by a near-in-time neighbour, in which case it steps up/down to the
+ * nearest free level — so crowded periods bloom to fill the height and sparse
+ * periods stay a thin spine. Anchors are laid FIRST so the significant beats hold
+ * the centre. Pure + deterministic (stable across redraws → no flicker).
+ */
+function computeBeeswarm(
+  nodes: TimelineNode[],
+  anchorIds: Set<string>,
+  dateToX: (d: number) => number,
+  w: number,
+  axisY: number,
+): PlacedDot[] {
+  const top = TOP_PAD;
+  const bottom = axisY - 8;
+  const centerY = (top + bottom) / 2;
+  const span = Math.max(1, bottom - top);
+  const order = [...nodes].sort((a, b) =>
+    (anchorIds.has(a.id) ? 0 : 1) - (anchorIds.has(b.id) ? 0 : 1)
+    || a.startDate - b.startDate
+    || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+  const placed: PlacedDot[] = [];
+  for (const node of order) {
+    const x = dateToX(node.startDate);
+    if (x < -40 || x > w + 40) continue;
+    const free = (cy: number): boolean =>
+      cy >= top && cy <= bottom
+      && !placed.some(p => Math.abs(p.x - x) < NODE_X_GAP && Math.abs(p.y - cy) < NODE_Y_GAP);
+    let y = centerY;
+    if (!free(y)) {
+      let found = false;
+      const maxK = Math.ceil(span / NODE_Y_GAP) + 1;
+      for (let k = 1; k <= maxK && !found; k++) {
+        const up = centerY - k * NODE_Y_GAP;
+        const down = centerY + k * NODE_Y_GAP;
+        if (free(up)) { y = up; found = true; }
+        else if (free(down)) { y = down; found = true; }
+      }
+      if (!found) y = top + ((placed.length * 37) % Math.round(span)); // overflow: stable spread
+    }
+    placed.push({ node, x, y, radius: DOT_RADIUS });
+  }
+  return placed;
 }
 
 // ====== Drawing ======
@@ -227,33 +292,22 @@ function draw(state: ViewState): void {
     ctx.fillText(String(Math.round(tick)), x, axisY + 15);
   }
 
-  // Place dots via multi-row binning across the full height.
-  const usableHeight = axisY - TOP_PAD - 8;
-  const numRows = Math.max(2, Math.floor(usableHeight / ROW_HEIGHT));
-  const sorted = [...state.nodes].sort((a, b) => a.startDate - b.startDate);
-  const placed: PlacedDot[] = [];
+  // Significance first — the most-connected nodes ("anchor beats") get a bigger
+  // glyph + halo + always-on label, AND claim the central spine in the layout.
+  const anchorIds = rankAnchors(state.nodes, ANCHOR_CAP);
 
-  for (const node of sorted) {
-    const x = dateToX(node.startDate);
-    if (x < -40 || x > w + 40) continue;
-
-    let bestY = TOP_PAD;
-    let bestDist = -1;
-    for (let row = 0; row < numRows; row++) {
-      const candidateY = TOP_PAD + row * ROW_HEIGHT + ROW_HEIGHT / 2;
-      let minXDist = Infinity;
-      for (const p of placed) {
-        if (Math.abs(p.y - candidateY) < ROW_HEIGHT * 0.8) {
-          const xd = Math.abs(p.x - x);
-          if (xd < minXDist) minXDist = xd;
-        }
-      }
-      if (minXDist > 30) { bestY = candidateY; bestDist = minXDist; break; }
-      if (minXDist > bestDist) { bestDist = minXDist; bestY = candidateY; }
-    }
-    placed.push({ node, x, y: bestY, radius: DOT_RADIUS });
+  // Vertical layout — a centered DENSITY FAN (beeswarm): nodes bloom up/down from
+  // the axis midline only as the local time-neighbourhood gets crowded, so dense
+  // periods use the full height while sparse periods stay a thin spine — instead
+  // of everything stacking at the top. Cached per geometry so the per-mousemove
+  // redraw (proximity labels) never re-runs the O(n·k) packing.
+  const layoutSig = `${w.toFixed(1)}|${axisY.toFixed(1)}|${range.min.toFixed(2)}|${range.max.toFixed(2)}`;
+  if (state.layoutSig !== layoutSig || state.layoutNodes !== state.nodes) {
+    state.placedDots = computeBeeswarm(state.nodes, anchorIds, dateToX, w, axisY);
+    state.layoutSig = layoutSig;
+    state.layoutNodes = state.nodes;
   }
-  state.placedDots = placed;
+  const placed = state.placedDots;
 
   // Range lines (endDate)
   for (const dot of placed) {
@@ -270,65 +324,119 @@ function draw(state: ViewState): void {
   // Labels — PROXIMITY REVEAL: selected + hovered always; otherwise only the
   // dots nearest the cursor. Dots-only at rest keeps a dense world legible
   // (the overlapping-wall fix). Collision-avoided within the labelled set.
-  drawLabels(ctx, state, placed, w);
+  drawLabels(ctx, state, placed, w, anchorIds);
 
-  // Dots (selected + hovered emphasised)
+  // Nodes → type-tinted category glyphs (selected + hovered emphasised).
+  // Identity over anonymity: a glance distinguishes event / character /
+  // location / narrative… instead of a wall of identical dots. Canvas
+  // Material Symbols per craft #18 (see pin-visuals.ts); chart #2 "The Landing".
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // LOD: glyphs grow a little as you zoom in (overview stays light, detail on
+  // demand). Anchors stay prominent at every rung.
+  const detail = state.zoom > RUNG_CLOSE ? 2 : state.zoom > RUNG_MID ? 1 : 0;
   for (const dot of placed) {
     const isSel = dot.node.id === state.selectedId;
     const isHover = dot === state.hoveredDot;
-    const radius = isSel ? DOT_RADIUS_SELECTED : isHover ? DOT_RADIUS_HOVER : DOT_RADIUS;
+    const isAnchor = anchorIds.has(dot.node.id);
+    const size = isSel ? ICON_SELECTED
+      : isAnchor ? ICON_ANCHOR + detail
+      : isHover ? ICON_HOVER
+      : ICON_BASE - 1 + detail * 2;   // 13 (overview) → 15 → 17 (close)
+    const ringR = size * 0.6;
+    // Anchor halo — two faint rings behind the glyph (reuses the selected-ring
+    // pattern). Skipped when selected so the two rings don't double up.
+    if (isAnchor && !isSel) {
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.y, ringR + 8, 0, Math.PI * 2);
+      ctx.strokeStyle = applyAlpha(dot.node.color, 0.16);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.y, ringR + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = applyAlpha(dot.node.color, 0.32);
+      ctx.stroke();
+    }
     if (isSel) {
       ctx.beginPath();
-      ctx.arc(dot.x, dot.y, radius + 5, 0, Math.PI * 2);
+      ctx.arc(dot.x, dot.y, ringR + 4, 0, Math.PI * 2);
       ctx.strokeStyle = applyAlpha(dot.node.color, 0.55);
       ctx.lineWidth = 2;
       ctx.stroke();
-    }
-    ctx.beginPath();
-    ctx.arc(dot.x, dot.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = dot.node.color;
-    ctx.fill();
-    if (isHover && !isSel) {
+    } else if (isHover) {
       ctx.beginPath();
-      ctx.arc(dot.x, dot.y, radius + 3, 0, Math.PI * 2);
+      ctx.arc(dot.x, dot.y, ringR + 3, 0, Math.PI * 2);
       ctx.strokeStyle = applyAlpha(dot.node.color, 0.4);
       ctx.lineWidth = 2;
       ctx.stroke();
     }
+    const icon = ELEMENT_ICONS[dot.node.elementType as ElementType] ?? 'category';
+    ctx.font = `${size}px "Material Symbols Outlined"`;
+    // Dark backing stroke keeps overlapping glyphs legible on the near-black canvas.
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.strokeText(icon, dot.x, dot.y);
+    ctx.fillStyle = dot.node.color;
+    ctx.fillText(icon, dot.x, dot.y);
   }
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
 
   positionCard(state);
 }
 
-function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: PlacedDot[], w: number): void {
-  const toLabel = new Set<string>();
-  if (state.selectedId) toLabel.add(state.selectedId);
-  if (state.hoveredDot) toLabel.add(state.hoveredDot.node.id);
+function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: PlacedDot[], w: number, anchorIds: Set<string>): void {
+  // Build label candidates in PRIORITY order, then place greedily: a higher-
+  // priority label claims its row-space first and any lower-priority label that
+  // would collide simply drops. This keeps anchors legible even when several
+  // cluster at the same dates (no overlapping-label smear) without forcing every
+  // anchor to draw on top of its neighbour.
+  const byId = new Map(placed.map(d => [d.node.id, d]));
+  const cands: { dot: PlacedDot; pri: number }[] = [];
+  const seen = new Set<string>();
+  const push = (dot: PlacedDot | undefined, pri: number): void => {
+    if (!dot || seen.has(dot.node.id)) return;
+    seen.add(dot.node.id);
+    cands.push({ dot, pri });
+  };
+  push(state.selectedId ? byId.get(state.selectedId) : undefined, 0);
+  push(state.hoveredDot ?? undefined, 0);
+  // anchors by degree desc (highest significance wins a contested row slot)
+  for (const d of placed.filter(d => anchorIds.has(d.node.id)).sort((a, b) => b.node.degree - a.node.degree)) push(d, 1);
+  // proximity reveal — the "explore the rest" layer, nearest first
   if (state.mouseX != null && state.mouseY != null) {
     const near = placed
       .map(d => ({ d, dist: Math.hypot(d.x - state.mouseX!, d.y - state.mouseY!) }))
       .filter(x => x.dist < LABEL_NEAR_RADIUS)
       .sort((a, b) => a.dist - b.dist)
       .slice(0, LABEL_NEAR_MAX);
-    for (const x of near) toLabel.add(x.d.node.id);
+    for (const x of near) push(x.d, 2);
   }
+  // Labels by default: offer EVERY on-screen node as a low-priority candidate;
+  // the per-row collision-avoider fills in as many names as fit (anchors +
+  // selection win contested slots). More become legible as you zoom because the
+  // density-fan spreads rows apart. (Captain: "labels in the default view too.")
+  for (const d of placed) push(d, 3);
+  cands.sort((a, b) => a.pri - b.pri);
 
-  ctx.font = '11px system-ui, sans-serif';
   ctx.textBaseline = 'middle';
-  const lastLabelXByRow: Record<number, number> = {};
-  for (const dot of placed) {
-    if (!toLabel.has(dot.node.id)) continue;
+  const occupiedByRow = new Map<number, number[]>();
+  for (const { dot } of cands) {
     const rowKey = Math.round(dot.y);
-    const last = lastLabelXByRow[rowKey];
-    if (last != null && dot.x - last < 70) continue; // collide-avoid within labelled set
+    const occ = occupiedByRow.get(rowKey) ?? [];
+    if (occ.some(x => Math.abs(x - dot.x) < 80)) continue; // collides with a higher-priority label
+    occ.push(dot.x);
+    occupiedByRow.set(rowKey, occ);
     const isSel = dot.node.id === state.selectedId;
-    ctx.fillStyle = isSel ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.62)';
+    const isAnchor = anchorIds.has(dot.node.id);
+    ctx.font = isAnchor ? '600 12px system-ui, sans-serif' : '11px system-ui, sans-serif';
+    ctx.fillStyle = isSel ? 'rgba(255,255,255,0.95)' : isAnchor ? 'rgba(255,255,255,0.86)' : 'rgba(255,255,255,0.6)';
     // Flip the label to the LEFT of the dot in the right third, so it never
     // clips the panel edge (self-inspection finding).
     const flip = dot.x > w * 0.66;
     ctx.textAlign = flip ? 'right' : 'left';
-    ctx.fillText(truncate(dot.node.name, LABEL_MAX_CHARS), dot.x + (flip ? -9 : 9), dot.y);
-    lastLabelXByRow[rowKey] = dot.x;
+    const off = isAnchor ? 12 : 9;
+    ctx.fillText(truncate(dot.node.name, LABEL_MAX_CHARS), dot.x + (flip ? -off : off), dot.y);
   }
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
@@ -360,49 +468,47 @@ function renderCard(state: ViewState): void {
   meta.textContent = `${node.elementType} · ${dateStr}`;
   card.appendChild(meta);
 
+  // Reverse links — elements that point AT this node (within the visible set; in
+  // focus mode that's the full neighbourhood). `node.links` is the wedge FROM the
+  // element; for link-TARGET elements (Locations, Species…) the story is who
+  // points at them — so an empty forward card isn't a dead end.
+  const reverse: LinkedRef[] = [];
+  const seenRev = new Set<string>();
+  for (const other of state.nodes) {
+    if (other.id === node.id) continue;
+    const l = other.links.find(x => x.id === node.id);
+    if (l && !seenRev.has(other.id)) {
+      seenRev.add(other.id);
+      reverse.push({ id: other.id, type: other.elementType, name: other.name, fieldLabel: l.fieldLabel });
+    }
+  }
+
   const links = node.links;
   const chipsWrap = document.createElement('div');
   chipsWrap.className = 'atlas-timeline-card-chips';
-  if (links.length === 0) {
+  if (links.length === 0 && reverse.length === 0) {
     const none = document.createElement('div');
     none.className = 'atlas-timeline-card-nolinks';
     none.textContent = 'No linked elements.';
     chipsWrap.appendChild(none);
   } else {
-    // Group chips by ROLE (fieldLabel), first-seen order — Simmer's molecule:
-    // the event is a hub, its links are spokes grouped by typed bond. 10 chips
-    // in 4 labeled clusters reads; 10 bare chips don't.
+    // Forward links grouped by ROLE (fieldLabel) — Simmer's molecule: the event
+    // is a hub, its links are spokes grouped by typed bond. 10 chips in 4 labeled
+    // clusters reads; 10 bare chips don't.
     const groups = new Map<string, LinkedRef[]>();
     for (const link of links) {
       const g = groups.get(link.fieldLabel);
       if (g) g.push(link);
       else groups.set(link.fieldLabel, [link]);
     }
-    for (const [label, refs] of groups) {
-      const group = document.createElement('div');
-      group.className = 'atlas-timeline-card-group';
-      const gl = document.createElement('div');
-      gl.className = 'atlas-timeline-card-grouplabel';
-      gl.textContent = label;
-      group.appendChild(gl);
-      const row = document.createElement('div');
-      row.className = 'atlas-timeline-card-chiprow';
-      for (const link of refs) row.appendChild(buildChip(state, link));
-      group.appendChild(row);
-      chipsWrap.appendChild(group);
-    }
+    for (const [label, refs] of groups) chipsWrap.appendChild(buildChipGroup(state, label, refs));
+    // Reverse links — one "Referenced by" group (who points at this node).
+    if (reverse.length > 0) chipsWrap.appendChild(buildChipGroup(state, 'Referenced by', reverse));
   }
   card.appendChild(chipsWrap);
 
   const actions = document.createElement('div');
   actions.className = 'atlas-timeline-card-actions';
-  const focusBtn = document.createElement('button');
-  focusBtn.type = 'button';
-  focusBtn.className = 'atlas-timeline-card-action';
-  focusBtn.innerHTML = '<span class="material-symbols-outlined">filter_center_focus</span><span>Focus</span>';
-  focusBtn.title = 'Focus the timeline on this element and what it touches';
-  focusBtn.addEventListener('click', () => state.onFocus(node.id));
-  actions.appendChild(focusBtn);
   const open = document.createElement('button');
   open.type = 'button';
   open.className = 'atlas-timeline-card-action';
@@ -416,16 +522,31 @@ function renderCard(state: ViewState): void {
   positionCard(state);
 }
 
+/** A labelled chip cluster (one role group) inside the card. */
+function buildChipGroup(state: ViewState, label: string, refs: LinkedRef[]): HTMLElement {
+  const group = document.createElement('div');
+  group.className = 'atlas-timeline-card-group';
+  const gl = document.createElement('div');
+  gl.className = 'atlas-timeline-card-grouplabel';
+  gl.textContent = label;
+  group.appendChild(gl);
+  const row = document.createElement('div');
+  row.className = 'atlas-timeline-card-chiprow';
+  for (const link of refs) row.appendChild(buildChip(state, link));
+  group.appendChild(row);
+  return group;
+}
+
 function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   const chip = document.createElement('button');
   chip.type = 'button';
   chip.className = 'atlas-timeline-chip';
-  chip.title = `${link.fieldLabel}: ${link.name} (${link.type}) — open`;
+  chip.title = `${link.fieldLabel}: ${link.name} (${link.type}) — focus`;
   const icon = ELEMENT_ICONS[link.type as ElementType] ?? 'category';
   chip.innerHTML =
     `<span class="material-symbols-outlined">${escapeText(icon)}</span>` +
     `<span class="atlas-timeline-chip-name">${escapeText(link.name)}</span>`;
-  chip.addEventListener('click', () => state.onOpenElement(link.id));
+  chip.addEventListener('click', () => state.onSelect(link.id));
   return chip;
 }
 
@@ -553,6 +674,31 @@ function handleWheel(state: ViewState, e: WheelEvent): void {
 
 function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max - 1) + '…';
+}
+
+// ---- icon font readiness ----
+
+let iconFontReady: Promise<void> | null = null;
+
+/**
+ * Material Symbols isn't guaranteed to be in the FontFaceSet when the canvas
+ * first paints (the DOM card that also uses it starts hidden), so glyphs would
+ * render as tofu. Load it once; callers redraw on resolve. Mirrors the proven
+ * pin-visuals.ts approach. Best-effort — falls back to empty until it lands.
+ */
+function ensureIconFont(): Promise<void> {
+  if (iconFontReady) return iconFontReady;
+  iconFontReady = (async () => {
+    try {
+      if ((document as any).fonts?.load) {
+        await (document as any).fonts.load('16px "Material Symbols Outlined"', 'category');
+        await (document as any).fonts.ready;
+      }
+    } catch {
+      // ignore — glyphs simply stay blank until the font is available
+    }
+  })();
+  return iconFontReady;
 }
 
 function applyAlpha(hex: string, alpha: number): string {

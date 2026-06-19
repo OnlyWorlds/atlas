@@ -14,6 +14,7 @@ import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from './temporal-fields';
 import type { LinkedRef, TimelineNode } from './types';
 import type { Element, ElementType } from '../../core/types';
 import { relationFieldsFor } from '../../editor/field-schema';
+import { computeDegrees } from './degree';
 
 /** Element type → dot color. Falls back to muted text if unknown. */
 const TYPE_COLOR: Record<string, string> = {
@@ -102,8 +103,14 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
       dateSpec: { kind: 'exact', value: startDate },
       color: TYPE_COLOR[el.type] ?? FALLBACK_COLOR,
       links: resolveLinks(el, byId),
+      degree: 0, // filled below once every node exists (bidirectional read)
     });
   }
+
+  // Significance = bidirectional dated-neighbour degree over the FULL dated set,
+  // computed once so a node's anchor-rank is stable across scope/zoom (degree.ts).
+  const degrees = computeDegrees(nodes);
+  for (const n of nodes) n.degree = degrees.get(n.id) ?? 0;
 
   return nodes;
 }

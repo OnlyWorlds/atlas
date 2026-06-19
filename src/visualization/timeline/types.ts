@@ -57,6 +57,13 @@ export interface TimelineNode {
    * the wedge: every competitor caps an event at one link; we surface them all.
    */
   links: LinkedRef[];
+  /**
+   * Bidirectional dated-neighbour graph degree — significance for "anchor
+   * beats" (chart #2). Computed once over the full dated set by the normalizer
+   * (see degree.ts); travels with the node through scope/zoom so significance is
+   * stable. A pure render cache, never serialized.
+   */
+  degree: number;
   /** Grouping key for swimlanes (narrative id etc.) — used by the lanes bout. */
   laneKey?: string;
 }

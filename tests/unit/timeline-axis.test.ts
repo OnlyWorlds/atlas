@@ -22,8 +22,8 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange pads min/max by 2%', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'event', name: 'A', startDate: 0, endDate: null, dateSpec: { kind: 'exact', value: 0 }, color: '#fff', links: [] },
-      { id: 'b', elementType: 'event', name: 'B', startDate: 100, endDate: null, dateSpec: { kind: 'exact', value: 100 }, color: '#fff', links: [] },
+      { id: 'a', elementType: 'event', name: 'A', startDate: 0, endDate: null, dateSpec: { kind: 'exact', value: 0 }, color: '#fff', links: [], degree: 0 },
+      { id: 'b', elementType: 'event', name: 'B', startDate: 100, endDate: null, dateSpec: { kind: 'exact', value: 100 }, color: '#fff', links: [], degree: 0 },
     ]);
     // span 100, padding 2 → [-2, 102]
     expect(r.min).toBeCloseTo(-2, 5);
@@ -32,7 +32,7 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange handles endDate', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'narrative', name: 'A', startDate: 10, endDate: 200, dateSpec: { kind: 'exact', value: 10 }, color: '#fff', links: [] },
+      { id: 'a', elementType: 'narrative', name: 'A', startDate: 10, endDate: 200, dateSpec: { kind: 'exact', value: 10 }, color: '#fff', links: [], degree: 0 },
     ]);
     // min 10, max 200, span 190, padding 3.8
     expect(r.min).toBeCloseTo(10 - 3.8, 4);
@@ -41,7 +41,7 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange expands single-point range', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'event', name: 'A', startDate: 42, endDate: null, dateSpec: { kind: 'exact', value: 42 }, color: '#fff', links: [] },
+      { id: 'a', elementType: 'event', name: 'A', startDate: 42, endDate: null, dateSpec: { kind: 'exact', value: 42 }, color: '#fff', links: [], degree: 0 },
     ]);
     // After max <= min fallback (max = min + 100) → padding kicks in too
     expect(r.max).toBeGreaterThan(r.min);

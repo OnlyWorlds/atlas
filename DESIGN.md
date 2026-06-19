@@ -557,11 +557,11 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 | Room | Route | Content | Status |
 |---|---|---|---|
 | `welcome` | `#/` | First-launch atlas-root setup CTA | shipped |
-| `home` | `#/w/<id>` | World home — identity, stats, timeline preview, recent, quick actions. **Default landing for active worlds.** | shipped |
+| `home` | `#/w/<id>` | World home — identity, stats, charts (timeline-bar) preview, recent, quick actions. **Default landing for active worlds.** | shipped |
 | `element` | `#/w/<id>/element/<eid>` | Schema-driven element detail | shipped |
 | `writing` | `#/w/<id>/writing[/<narrativeId>]` | Book/chapter/scene/draft authorship (any tier; ancestry derived from `parent_narrative`). See `DESIGN_WRITING.md`. Legacy long-form URL still parsed. | shipped |
 | `knowledge` | `#/w/<id>/knowledge[/<entryId>\|/new\|/knower/<id>]` | Knowledge entries — who knows what. [Entries \| Knowers] tabs, draft editor (persists nothing until create), embedded TipTap prose w/ mentions, known-view per knower. See `DESIGN_KNOWLEDGE.md` | shipped (phase 1) |
-| `timeline` | `#/w/<id>/timeline` | Full timeline view | shipped |
+| `timeline` (the **Charts** room) | `#/w/<id>/timeline[/<id>]` | **Charts** — chart views of the world along chosen axes (time first): type-icon identity, degree-ranked anchor beats, density-fan layout, LOD, unified select=focus (focus in the URL, Back walks the chain). Route key stays `timeline`; room title + nav read "Charts". See `DESIGN_CHARTS.md`. | shipped |
 | `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | **removed from nav pre-release (240)** — route/file dormant; replacement = Cmd+K palette (see "Search" above) |
 | `share` | `#/w/<id>/share[/<pageId>]` | Sharing pages — list + block builder (heading/prose/element-card/circle) + payload-true visitor preview + publish section (fakes-first). Legacy `/publish` URLs alias here. See `DESIGN_SHARING.md` | shipped (S1+S2+S4+S5; live publishing awaits Anchor's backend) |
 | `import` | `#/w/<id>/import` | Explanation + reference to base-tool import; mechanics deferred | stub |

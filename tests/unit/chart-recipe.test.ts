@@ -6,15 +6,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { pickDefaultChart, filterNodesByScope } from '../../src/visualization/timeline/chart-recipe';
+import { pickDefaultChart, filterNodesByScope, scopeFromFocus } from '../../src/visualization/timeline/chart-recipe';
 import type { TimelineNode } from '../../src/visualization/timeline/types';
-import type { Element } from '../../src/core/types';
+import type { Element, ElementType } from '../../src/core/types';
 
 function el(id: string, type: string, extra: Record<string, unknown> = {}): Element {
   return { id, type, name: id, local_updated_at: '2026-01-01', ...extra } as Element & Record<string, unknown>;
 }
 function node(id: string, elementType: string, links: { id: string; type: string; name: string; fieldLabel: string }[] = []): TimelineNode {
-  return { id, elementType, name: id, startDate: 0, endDate: null, dateSpec: { kind: 'exact', value: 0 }, color: '#fff', links };
+  return { id, elementType, name: id, startDate: 0, endDate: null, dateSpec: { kind: 'exact', value: 0 }, color: '#fff', links, degree: 0 };
 }
 
 describe('pickDefaultChart — ordered recipes', () => {
@@ -132,5 +132,22 @@ describe('filterNodesByScope', () => {
   it('unknown scope kind → empty (fail safe, never the whole-world wall)', () => {
     const r = filterNodesByScope(nodes, { kind: 'spatial' } as unknown as Parameters<typeof filterNodesByScope>[1]);
     expect(r).toEqual([]);
+  });
+});
+
+describe('scopeFromFocus — URL focus + broad-view type filter (chart #2 nav)', () => {
+  it('a focus id in the URL wins → focus scope (even with a type filter set)', () => {
+    expect(scopeFromFocus('lyra', null)).toEqual({ kind: 'focus', elementId: 'lyra' });
+    expect(scopeFromFocus('lyra', new Set<ElementType>(['event']))).toEqual({ kind: 'focus', elementId: 'lyra' });
+  });
+
+  it('no focus + a type filter → types scope', () => {
+    expect(scopeFromFocus(null, new Set<ElementType>(['event', 'narrative'])))
+      .toEqual({ kind: 'types', types: ['event', 'narrative'] });
+  });
+
+  it('no focus + no filter (or an empty one) → all', () => {
+    expect(scopeFromFocus(null, null)).toEqual({ kind: 'all' });
+    expect(scopeFromFocus(null, new Set<ElementType>())).toEqual({ kind: 'all' });
   });
 });

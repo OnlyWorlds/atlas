@@ -80,10 +80,14 @@ test('section collapse toggle keeps state across re-renders', async ({ page }) =
   await header.click();
   await expect(collapsible.locator('.atlas-detail-section-body')).toHaveCount(0);
 
-  // Edit name (causes re-render) — section should remain collapsed.
-  await page.click('.atlas-detail-section:first-child .atlas-field-value:not(.empty)');
-  await page.locator('.atlas-edit-popover .atlas-input').fill('Boromir of Gondor');
-  await page.click('.atlas-edit-popover .atlas-btn-primary');
+  // Edit the name via the header (causes a re-render) — the section should stay
+  // collapsed. Name lives in the header title now, not a Base field (F1, conv #80).
+  const title = page.locator('.atlas-middle-header h2.atlas-element-name');
+  await title.click();
+  const nameInput = page.locator('.atlas-middle-header input.atlas-element-name-input');
+  await nameInput.waitFor({ state: 'visible' });
+  await nameInput.fill('Boromir of Gondor');
+  await nameInput.press('Enter');
   await expect(page.locator('.atlas-middle-header h2')).toContainText('Boromir of Gondor');
   // Still collapsed?
   await expect(sections.nth(1).locator('.atlas-detail-section-body')).toHaveCount(0);

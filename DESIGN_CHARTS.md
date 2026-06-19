@@ -1,6 +1,6 @@
 # Atlas — Charts Design
 
-**Status**: Design + chart #1 in build (session 243, 2026-06-19). Supersedes `DESIGN_TIMELINE.md` (the "timeline" was one chart type; this is the general frame). Market evidence: `Forge/Notes/2026-06-18-timeline-market-analysis.md`.
+**Status**: Chart #1 + Chart #2 "The Landing" SHIPPED (2026-06-19) — identity, significance/anchors, LOD, unified select=focus nav, density-fan layout, labels-by-default. Supersedes `DESIGN_TIMELINE.md` (the "timeline" was one chart type; this is the general frame). Resume the arc from `CHARTS_HANDOVER.md`. Market evidence: `Forge/Notes/2026-06-18-timeline-market-analysis.md`.
 **Scope** (Captain's call): **maximum ambition, built outward from a small clear core.** A creative box for views of the world; ship one chart at a time so we never drown.
 
 ---
@@ -190,16 +190,29 @@ The Charts room is its own explorer — navigating elements STAYS in temporal fr
 ### C. Context graph default (kill the empty right pane)
 When nothing is focused, the right-pane context graph focuses the **chart's anchor** = the most-significant in-scope node (same degree metric as A2). Landing = broad timeline (middle) + the world-hub element's web (right). Never empty; orients you. Focus an element → both panes follow. Cheap (reuses the existing graph + the significance metric).
 
-### Build sequence (next session — keeper build; no adversarial gate needed: this is presentation + nav, not a new persisted data contract — ChartConfig is already gated)
-1. **Nav refactor** — scope/focus derives from the URL (`/timeline/<id>` = focus); select=focus; back-button. Foundational; everything renders on top.
-2. **Identity + significance** — degree ranking + canvas category icons + always-on anchor labels.
-3. **LOD** — zoom reveals icons/labels; anchor labels persist at overview.
-4. **Context-graph anchor default.**
-5. Self-inspect on a real-density world + verify suites.
+### D. Vertical layout — the density fan (the "what goes where" logic) ✅
+X is the only meaningful axis (date); Y is anti-overlap. The rule: **a node sits on the axis midline unless a near-in-time neighbour already holds that slot, in which case it steps up/down to the nearest free level** (a centered beeswarm). Consequences, all desirable:
+- **Vertical extent ∝ local time-density** — crowded periods bloom into a wide diamond that fills the height; sparse periods stay a thin central spine. (Fixes the old top-first row-binning that piled everything at the top with the bottom ~60% empty — Captain's real-world look.)
+- **Anchors are laid FIRST** → the significant beats hold the centre; minor nodes bloom around them.
+- **Deterministic** (sort: anchor-first → date → id) → stable across redraws, no flicker.
+- **Cached per geometry** (`layoutSig` = w · axisY · range) → the per-mousemove redraw (proximity labels) reuses the layout; only zoom / pan / resize / new-node-set re-packs.
+- Implementation: `computeBeeswarm` in `timeline-view.ts`; `NODE_X_GAP` (x-window that counts as "crowded") + `NODE_Y_GAP` (vertical step / breathing room) tuned via Playwright (42 / 34).
+- **Labels by default**: every on-screen node is a low-priority label candidate; a per-row collision-avoider fills as many as fit (anchors + selection win contested slots); more reveal on zoom as the fan spreads rows apart.
+
+### Build sequence — ✅ SHIPPED (2026-06-19, 6 bouts; keeper build, no gate — presentation + nav, not a new persisted contract; ChartConfig was already gated)
+1. **Identity** ✅ — type-tinted Material Symbols glyphs on canvas (`ensureIconFont` load-guard).
+2. **Significance** ✅ — `degree.ts` (`computeDegrees` bidirectional dated-neighbour + `rankAnchors`); `TimelineNode.degree` attached once over the full dated set; anchor beats = bigger glyph + halo + always-on label.
+3. **LOD** ✅ — 3 rungs off `state.zoom`: overview light, zoom grows glyphs + fills labels; proximity-reveal persists.
+4. **Nav** ✅ — unified select=focus; focus from the URL (`scopeFromFocus`); Back walks the focus chain; chips focus, "Open →" escapes; context-tab anchor-default (never-empty pane).
+5. **Layout (density fan) + labels-by-default** ✅ — section D above (post-Captain-review polish bout).
+6. Self-inspected on a real-density 80-element world + 902 vitest + 155 e2e green.
 
 (Then the earlier-queued additive bouts: save → gallery → chart-as-share-block → forward-half → now-line → Narrative lanes → fuzzy/relative → map-chart + scrubber → 3D.)
 
-### Done this session (essential fix): room-nav icon tooltip "Timeline" → "Charts" (the h1 was already "Charts").
+### Follow-ups — CLEARED (post-wrap, same session)
+- **Card "Referenced by"** ✅ — the card now shows a reverse-link group (who points AT this node) so focusing a link-target (Location) isn't an empty card. `buildChipGroup` + reverse-scan over the visible set.
+- **F1** ✅ — the duplicate "Name" field is dropped from the element-detail Base section; the header click-to-edit title is the canonical name (conv #80). Two e2e updated.
+- **Still open:** Cmd+K palette.
 
 ---
 

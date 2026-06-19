@@ -1,26 +1,30 @@
-# Charts — Next-Session Handover
+# Charts — Handover (Chart #1 + #2 "The Landing" ✅ DONE)
 
-*Running-start pickup for the Charts arc. Load this FIRST when resuming charts work, then `DESIGN_CHARTS.md` for the full design. Written end of session 243.*
+*Running-start pickup for the Charts arc. Load this FIRST when resuming charts work, then `DESIGN_CHARTS.md` for the full design. Updated end of the chart-#2 + layout-polish session (2026-06-19). **The Chart #2 plan is fully shipped — this section is now history; the live work is "Queued chart bouts" below.***
 
-## Where it stands
+## Where it stands — DONE
 
-**Chart #1 (the temporal chart) is SHIPPED, gated, and self-inspected.** A chart = a saveable/shareable view of the world along chosen axes (time first); the room is at `#/w/<id>/timeline` (room title "Charts"). 890 vitest + 154 e2e + typecheck + build green. Nothing committed (Captain's hand on git).
+**Chart #1 (temporal chart) AND Chart #2 "The Landing" (incl. the density-fan layout polish) are SHIPPED, gated, and self-inspected.** A chart = a saveable/shareable view of the world along chosen axes (time first); the room is at `#/w/<id>/timeline` (title "Charts"). **902 vitest + 155 e2e + typecheck green** (clean). Nothing committed (Captain's git).
 
-**What works now:** recipe-picked default scope (opens on the Story spine / Events / etc., not the full wall) · type-toggle control bar · click-event → role-grouped molecule card (chips by role) + right-pane context graph focuses the same element · card **Focus** = filter-by-element (re-scope + auto-fit) · proximity-reveal labels (dots at rest; reveal near cursor; flip left at the right edge) · wheel-zoom + drag-pan · compact home `timeline-bar.ts` untouched.
+**What works now:** recipe-picked default broad scope (Story / Events / Foundings) · **type-tinted Material Symbols glyphs** per element type (identity) · **anchor beats** — top-7 by graph degree get bigger glyph + halo + always-on label (hierarchy) · **centered density-fan layout** (`computeBeeswarm`) — nodes bloom up/down from the axis midline ∝ local time-density, anchors hold the centre, sparse periods stay a thin spine (no more top-pile) · **labels by default** (collision-limited; more on zoom) · **LOD** — overview light, zoom grows glyphs + reveals labels · **unified select=focus** — clicking a dot OR a card chip focuses that element (`/timeline/<id>`), **browser Back walks the focus chain**, focus pill clears to broad · **context-graph anchor-default** — the landing right-pane focuses the highest-degree node (never empty) · proximity-reveal labels · wheel-zoom + drag-pan · compact home `timeline-bar.ts` untouched.
 
-**What Captain saw needs work (→ chart #2, design LOCKED):** on a real-density world it's a *uniform scatter of identical blue dots, walled on the right edge, unlabelled* — no identity, no hierarchy. The fix is the **visual system + navigation model** (DESIGN_CHARTS "Chart #2 — The Landing").
+The layout logic ("what goes where") is documented in `DESIGN_CHARTS.md` §"D. Vertical layout — the density fan".
 
-## The locked plan for next session (DESIGN_CHARTS "Chart #2 — The Landing")
+Build-plan + research synthesis: `Forge/Notes/2026-06-19-chart2-build-plan.md`. Per-bout details in `PROGRESS.md` CURRENT STATE. Significance lives in `src/visualization/timeline/degree.ts`; scope derivation in `chart-recipe.ts` `scopeFromFocus`.
 
-Build, in order (keeper build — presentation + nav, NO adversarial gate needed; ChartConfig is already gated):
-1. **Nav refactor** — focus lives in the URL (`/timeline/<id>` = focus, derived each render, not room-local); **select = focus**; back-button walks the focus chain; "show all" → broad. (This is why chip→focus wasn't a quick fix — the back button needs URL-sourced scope.)
-2. **Identity + significance** — nodes become **category icons** (Material Symbols on canvas, craft #18); rank by **graph degree**; top-N "anchor beats" get bigger icon + **always-on label** + halo.
-3. **LOD** — overview = small marks + anchor labels only; zoom in → icons + more labels (dense right-edge spreads).
-4. **Context-graph anchor default** — when nothing focused, focus the most-significant in-scope node so the right pane is never empty.
-5. Self-inspect + verify.
+## Loose ends — both CLEARED (post-wrap, same session)
+- **Card "Referenced by"** ✅ — the selection card now shows a reverse-link group (who points AT this node), so focusing a link-target (e.g. a Location) is no longer an empty card. `buildChipGroup` + reverse-scan over the visible set in `timeline-view.ts`.
+- **F1** ✅ — the duplicate "Name" field is gone from the element-detail Base section (the header click-to-edit title is the name, conv #80); two e2e updated to rename via the header.
+- **Still open:** Cmd+K palette.
 
-## ⚠ ONE decision to get from Captain before building step B (nav)
-**Unified select=focus** (every click narrows to that element's neighbourhood, back-out-able) — recommended, makes it a true bounded explorer — **vs** keep "peek" (click selects/shows card without narrowing) + a separate explicit Focus (needs dual URL state). Confirm, then build the nav refactor.
+## Queued chart bouts (additive, no migration — pick up here)
+save charts → `.atlas/charts.json` → gallery → **chart-as-share-block** (the share-room block kind `{kind:'chart', chartId}`, reserved + gated) → **forward-half** render (Simmer's wedge: owed/coming/due, now-line as the seam) → now-line(s) + reconciler → Narrative lanes (`laneKey`) → fuzzy/relative dates (`DateSpec` already a tagged union) → map-chart + scrubber → 3D. And still open across atlas: the Cmd+K palette.
+
+## Decisions already locked (don't re-litigate)
+chart = block (referenced by `{kind:'chart', chartId}`) · storage `.atlas/charts.json` + share, never an OW element · **unified select=focus** (built) · maps-in-charts: embed real Map rendered static, **events inherit their location's pin (events are not pins)**, right pane stays the live spatial workshop · default = auto recipe, instantly switchable · ChartConfig is versioned (schema_version) because it persists + crosses the share/viewer version boundary. Captain's chart-#2 nav calls: anchor-default ignores type chips · fixed ~7 anchors · accept rapid-click history · leave the context-pane mouse-back handler as-is.
+
+## Bootstrap for self-inspection (the recipe that works)
+`npm run dev` (3045) → Playwright: `resetAll()` → **re-nav** (reload so welcome shows `setup-atlas` — resetAll alone doesn't re-render) → `setNextDirectory(OPFS dir)` → click `setup-atlas` + `create-local` + fill `world-name` + `pick` → `store.createElement(type, data)` with **bare relation field names** (`birthplace`, `species`, `location`, `parent_narrative` — NOT `_id`) → `api.patchData(await store.listElements())` → route via `location.hash` (NOT browser_navigate). A dense multi-type world (≈80 elements: events/chars/locations/narrative-tree/etc.) shows the wall + anchors. **The dev server gets evicted when heavy `npx vitest`/`playwright` spawn workers — restart it after the close-gate suites.** Edit source only when the inspection browser is idle (HMR collision).
 
 ## Key files (chart subsystem)
 - `src/visualization/timeline/types.ts` — `DateSpec`, `ChartConfig` (schema_version + tagged `ChartAxis` + `ChartScope`), `TimelineNode` (required `dateSpec`, `links`, `laneKey`).
@@ -37,4 +41,4 @@ Build, in order (keeper build — presentation + nav, NO adversarial gate needed
 chart = block (referenced by `{kind:'chart', chartId}`) · storage `.atlas/charts.json` + share, never an OW element · maps-in-charts: embed real Map rendered static, **events inherit their location's pin (events are not pins)**, right pane stays the live spatial workshop · default = auto recipe, instantly switchable, no wizard · ChartConfig is versioned (schema_version) because it persists + crosses the share/viewer version boundary.
 
 ## Other queued (after The Landing)
-save → gallery → chart-as-share-block → **forward-half** (Simmer's wedge-behind-the-wedge: render owed/coming/due, now-line as the seam) → now-line(s) + reconciler → Narrative lanes → fuzzy/relative dates → map-chart + scrubber → 3D. And still open across atlas: **F1** (element-detail duplicate Name field, conv #80 — approved, not done) + the Cmd+K palette.
+save → gallery → chart-as-share-block → **forward-half** (Simmer's wedge-behind-the-wedge: render owed/coming/due, now-line as the seam) → now-line(s) + reconciler → Narrative lanes → fuzzy/relative dates → map-chart + scrubber → 3D. And still open across atlas: the Cmd+K palette. (Card "Referenced by" + F1 dup-Name-field both CLEARED — see "Loose ends" above.)

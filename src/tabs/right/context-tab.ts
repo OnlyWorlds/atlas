@@ -30,6 +30,8 @@ import { mountContextGraph, type GraphHandle, type HopDepth } from './context-pa
 import { mountContextLists, type ContextListsHandle } from './context-pane-lists';
 import { mountContextPreview, type ContextPreviewHandle } from './context-pane-preview';
 import { mountContextToolbar, type ContextToolbarHandle } from './context-pane-toolbar';
+import { extractTemporalNodes } from '../../visualization/timeline/data-normalizer';
+import { rankAnchors } from '../../visualization/timeline/degree';
 
 export interface MountContextTabOpts {
   pane: HTMLElement;
@@ -54,12 +56,20 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
     const el = elements.find(e => e.id === route.elementId) ?? null;
     return { element: el, detailsMode: 'element' };
   }
-  // Timeline room: a selected event (/timeline/<elementId>) is the subject, so
-  // the context graph focuses the same element the timeline card shows —
-  // middle = WHEN, right pane = the relational WEB (DESIGN_TIMELINE.md).
-  if (route.mode === 'timeline' && route.elementId) {
-    const el = elements.find(e => e.id === route.elementId) ?? null;
-    return { element: el, detailsMode: 'element' };
+  // Charts room: a focused element (/timeline/<elementId>) is the subject, so
+  // the context graph focuses the same element the chart shows — middle = WHEN,
+  // right pane = the relational WEB (DESIGN_CHARTS.md). With NO focus, anchor the
+  // graph on the most-significant dated node (same degree metric as the chart's
+  // anchor beats) so the pane is never empty on the landing — globally-highest-
+  // degree, ignoring type chips (Captain's call, chart #2).
+  if (route.mode === 'timeline') {
+    if (route.elementId) {
+      const el = elements.find(e => e.id === route.elementId) ?? null;
+      return { element: el, detailsMode: 'element' };
+    }
+    const topId = [...rankAnchors(extractTemporalNodes([...elements]), 1)][0];
+    const el = topId ? (elements.find(e => e.id === topId) ?? null) : null;
+    return el ? { element: el, detailsMode: 'element' } : { element: null, detailsMode: 'empty' };
   }
   // Knowledge room: an open entry (or knower known-view) is the subject —
   // entry ↔ holders ↔ subjects in the graph via the existing element mode.
@@ -481,7 +491,7 @@ function emptyCopyForRoute(route: Route): string {
     case 'welcome':
       return 'Open an element or narrative to see its connections.';
     case 'timeline':
-      return 'Select an element to focus the graph.';
+      return 'Add dates to your elements to chart them here.';
     case 'settings':
       return 'Element-focused view returns when you leave settings.';
     case 'search':

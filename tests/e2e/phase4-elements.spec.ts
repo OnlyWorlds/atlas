@@ -169,25 +169,24 @@ test('search input filters element list', async ({ page }) => {
   await expect(page.locator('.atlas-row[data-element-id]')).toHaveCount(3);
 });
 
-test('edit element name via field popover persists to FolderStore', async ({ page }) => {
+test('edit element name via the header title persists to FolderStore', async ({ page }) => {
   await setupWorldA(page);
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
   await page.click('[data-action="create-element"]');
   await page.fill('input[name="element-name"]', 'Original');
   await page.click('[data-modal="create-element"] [data-action="create"]');
 
-  // Click the Name field value in the Base section to open popover.
-  const nameRow = page.locator('.atlas-field', { has: page.locator('.atlas-field-label', { hasText: 'Name' }) });
-  await nameRow.locator('.atlas-field-value').click();
-  await expect(page.locator('.atlas-edit-popover')).toBeVisible();
-
-  // Replace value, save.
-  const input = page.locator('.atlas-edit-popover .atlas-input');
+  // The name is edited via the header's click-to-edit title (convention #80) —
+  // there is NO separate Name field in the Base section (F1).
+  const title = page.locator('.atlas-middle-header h2.atlas-element-name');
+  await expect(title).toContainText('Original');
+  await title.click();
+  const input = page.locator('.atlas-middle-header input.atlas-element-name-input');
+  await input.waitFor({ state: 'visible' });
   await input.fill('Renamed');
-  await page.click('.atlas-edit-popover .atlas-btn-primary');
+  await input.press('Enter');
 
-  await expect(page.locator('.atlas-edit-popover')).toHaveCount(0);
-  await expect(page.locator('.atlas-middle-header h2')).toContainText('Renamed');
+  await expect(title).toContainText('Renamed');
   // Sidebar row reflects rename.
   await expect(page.locator('.atlas-row[data-element-id]', { hasText: 'Renamed' })).toBeVisible();
 });

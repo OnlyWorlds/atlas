@@ -118,6 +118,22 @@ export function pickDefaultChart(elements: Element[]): ChartConfig {
 }
 
 /**
+ * The effective chart scope from the URL focus + the broad-view type filter
+ * (chart #2 nav model). FOCUS (a `/timeline/<id>` in the URL) wins — it's the
+ * dominant lens; otherwise the broad-view type filter; otherwise all. Pure, so
+ * the "focus wins, else types, else all" rule is regression-locked independent
+ * of the room's wiring.
+ */
+export function scopeFromFocus(
+  focusId: string | null,
+  typeFilter: ReadonlySet<ElementType> | null,
+): ChartScope {
+  if (focusId) return { kind: 'focus', elementId: focusId };
+  if (typeFilter && typeFilter.size > 0) return { kind: 'types', types: [...typeFilter] };
+  return { kind: 'all' };
+}
+
+/**
  * Filter timeline nodes down to a chart's scope — pure, operates on the
  * already-normalized node set (so it reads each node's resolved `links`).
  *   - all       → every node
