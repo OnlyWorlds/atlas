@@ -1,18 +1,20 @@
 /**
- * Timeline room — full timeline view.
+ * Timeline room — the full, interactive timeline view.
  *
- * Session 223 swap: previous event-only DOM timeline replaced with the new
- * canvas-based timeline-bar (see src/visualization/timeline/), which renders
- * all temporal element types (events, narratives, characters w/ birth_date,
- * etc.) per the OW schema's temporal field mapping. See DESIGN_HOME.md and
- * the timeline-bar source for the layout algorithm and deferred features.
+ * Mounts the room-grade `timeline-view` (canvas + DOM card; see
+ * src/visualization/timeline/timeline-view.ts) — NOT the compact home bar.
+ * Selection round-trips through the URL: clicking an event navigates to
+ * `/timeline/<id>`, which (a) keeps this room mounted (mode stays 'timeline',
+ * app.ts only re-mounts on mode change) and (b) focuses the right-pane context
+ * graph on the same element (context-tab's timeline case). Chip clicks jump to
+ * the element room. See DESIGN_TIMELINE.md.
  */
 
 import { getState, subscribe } from '../core/state';
-import { navigate, elementHash } from '../core/router';
+import { navigate, elementHash, timelineHash, parseHash, onHashChange } from '../core/router';
 import { ToastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
-import { mountTimelineBar, type TimelineBarHandle } from '../visualization/timeline/timeline-bar';
+import { mountTimelineView, type TimelineViewHandle } from '../visualization/timeline/timeline-view';
 
 export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -20,14 +22,12 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   wrap.className = 'atlas-timeline-room';
   target.appendChild(wrap);
 
-  // Room landing header — same big-title treatment as every other room
-  // (Knowledge / Share / Settings / Home), with the primary action in a
-  // standard room-actions row below.
+  // Room landing header — big-title treatment, matching every other room.
   const header = document.createElement('header');
   header.className = 'atlas-room-header';
   header.innerHTML = `
     <h1>Timeline</h1>
-    <p class="atlas-room-subtitle">Your world's dated events, laid out in order.</p>
+    <p class="atlas-room-subtitle">Your world along a time axis — click any event to see everything it touches.</p>
   `;
   wrap.appendChild(header);
 
@@ -45,32 +45,45 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   actions.appendChild(newEventBtn);
   wrap.appendChild(actions);
 
-  const barMount = document.createElement('div');
-  barMount.className = 'atlas-timeline-bar-mount';
-  wrap.appendChild(barMount);
+  const viewMount = document.createElement('div');
+  viewMount.className = 'atlas-timeline-view-mount';
+  wrap.appendChild(viewMount);
 
-  const active = getState().active;
-  let handle: TimelineBarHandle | null = null;
+  let handle: TimelineViewHandle | null = null;
+
+  function currentWorldId(): string | null {
+    return getState().active?.worldId ?? null;
+  }
 
   function render(): void {
+    const worldId = currentWorldId();
+    if (!worldId) return;
     if (!handle) {
-      handle = mountTimelineBar(barMount, {
-        mode: 'expanded',
-        onNavigate: (elementId) => {
-          const a = getState().active;
-          if (!a) return;
-          navigate(elementHash(a.worldId, elementId));
+      handle = mountTimelineView(viewMount, {
+        onSelect: (elementId) => {
+          const wid = currentWorldId();
+          if (!wid) return;
+          // Empty id = the card's close button → clear selection.
+          navigate(elementId ? timelineHash(wid, elementId) : timelineHash(wid));
+        },
+        onNavigateToElement: (elementId) => {
+          const wid = currentWorldId();
+          if (wid) navigate(elementHash(wid, elementId));
         },
       });
     }
     handle.setElements(getState().data.elements);
+    const route = parseHash(window.location.hash);
+    handle.setSelection(route.mode === 'timeline' ? (route.elementId ?? null) : null);
   }
 
-  if (active) render();
-  const unsub = subscribe(render);
+  if (getState().active) render();
+  const unsubState = subscribe(render);
+  const unsubHash = onHashChange(render);
 
   return () => {
-    unsub();
+    unsubState();
+    unsubHash();
     handle?.destroy();
     handle = null;
   };

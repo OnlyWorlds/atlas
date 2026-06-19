@@ -148,7 +148,11 @@ export function parseHash(hash: string): Route {
       return { worldId, mode: 'settings', settingsTab: parseSettingsTab(parts[3]) };
     }
     if (sub === 'elements') return { worldId, mode: 'elements' };
-    if (sub === 'timeline') return { worldId, mode: 'timeline' };
+    if (sub === 'timeline') {
+      // /timeline | /timeline/<elementId> (a selected event — keeps the room
+      // mounted, focuses the right-pane context graph on the same element).
+      return parts[3] ? { worldId, mode: 'timeline', elementId: parts[3] } : { worldId, mode: 'timeline' };
+    }
     if (sub === 'knowledge') {
       // /knowledge | /knowledge/new | /knowledge/<entryId> | /knowledge/knower/<knowerId>
       if (parts[3] === 'knower' && parts[4]) {
@@ -242,8 +246,11 @@ export function mapHash(worldId: string, mapId: string, elementId?: string): str
   return elementId ? `${base}/element/${elementId}` : base;
 }
 
-export function timelineHash(worldId: string): string {
-  return `#/w/${worldId}/timeline`;
+/** Timeline room: `#/w/<worldId>/timeline[/<elementId>]` (selected event). */
+export function timelineHash(worldId: string, elementId?: string): string {
+  return elementId
+    ? `#/w/${worldId}/timeline/${elementId}`
+    : `#/w/${worldId}/timeline`;
 }
 
 /**

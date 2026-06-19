@@ -8664,6 +8664,157 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 
 /* ============================================================================
+ * Timeline VIEW — the room-grade interactive timeline (canvas + DOM card).
+ * Distinct from the compact home bar above. Fills the room; the card overlays
+ * the canvas and anchors near the selected event's dot. See DESIGN_TIMELINE.md.
+ * ========================================================================== */
+
+.atlas-timeline-view-mount {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px 20px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.atlas-timeline-view {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.atlas-timeline-view-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.atlas-timeline-card {
+  position: absolute;
+  z-index: 5;
+  width: 250px;
+  max-width: calc(100% - 16px);
+  background: rgba(10, 14, 20, 0.94);
+  border: 1px solid var(--atlas-divider);
+  border-radius: 8px;
+  padding: 10px 12px 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.atlas-timeline-card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.atlas-timeline-card-icon {
+  font-size: 18px;
+  color: var(--atlas-cyan);
+  flex-shrink: 0;
+}
+
+.atlas-timeline-card-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atlas-timeline-card-close {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  line-height: 18px;
+  text-align: center;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.atlas-timeline-card-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.atlas-timeline-card-meta {
+  margin: 2px 0 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.atlas-timeline-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.atlas-timeline-card-nolinks {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+}
+
+.atlas-timeline-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 8px 3px 6px;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.atlas-timeline-chip:hover {
+  background: rgba(34, 211, 238, 0.16);
+  border-color: rgba(34, 211, 238, 0.5);
+}
+
+.atlas-timeline-chip .material-symbols-outlined {
+  font-size: 13px;
+  color: var(--atlas-cyan);
+  flex-shrink: 0;
+}
+
+.atlas-timeline-chip-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atlas-timeline-card-open {
+  margin-top: 10px;
+  width: 100%;
+  padding: 5px 0;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--atlas-cyan);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.atlas-timeline-card-open:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ============================================================================
  * Writing-context pane — right pane tab body for the writing room.
  *
  * Layout (top to bottom): top strip + graph slot + below-graph container

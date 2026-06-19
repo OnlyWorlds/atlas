@@ -36,7 +36,7 @@ async function createWorld(page: Page, name: string) {
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
 }
 
-test('timeline route renders the canvas-based timeline-bar', async ({ page }) => {
+test('timeline route renders the interactive timeline-view', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);
   await createWorld(page, 'world a');
@@ -48,8 +48,10 @@ test('timeline route renders the canvas-based timeline-bar', async ({ page }) =>
     if (m) window.location.hash = `#/w/${m[1]}/timeline`;
   });
   await expect(page.locator('.atlas-timeline-room')).toBeVisible();
-  // Canvas-based timeline-bar in expanded mode.
-  await expect(page.locator('.atlas-timeline-bar[data-mode="expanded"]')).toBeVisible();
+  // Session 242: the room mounts the interactive canvas+DOM timeline-view
+  // (the compact timeline-bar stays on Home). See DESIGN_TIMELINE.md.
+  await expect(page.locator('.atlas-timeline-view')).toBeVisible();
+  await expect(page.locator('.atlas-timeline-view-canvas')).toBeVisible();
 });
 
 test('timeline canvas renders for worlds with temporal data', async ({ page }) => {
@@ -58,7 +60,7 @@ test('timeline canvas renders for worlds with temporal data', async ({ page }) =
   await createWorld(page, 'world b');
 
   // Create three events via the elements sidebar. Dot rendering is canvas-
-  // based now (session 223 timeline-bar port); we verify the canvas mounts
+  // based (session 242 interactive timeline-view); we verify the canvas mounts
   // and the data plumbing reaches it via the test API instead of DOM dots.
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
   for (const name of ['first event', 'second event', 'third event']) {
@@ -74,9 +76,9 @@ test('timeline canvas renders for worlds with temporal data', async ({ page }) =
     const m = window.location.hash.match(/#\/w\/([^/]+)/);
     if (m) window.location.hash = `#/w/${m[1]}/timeline`;
   });
-  await expect(page.locator('.atlas-timeline-bar[data-mode="expanded"]')).toBeVisible();
-  // Verify three event elements exist in state (the timeline-bar's
-  // multi-row binning algorithm is exercised by unit tests in
+  await expect(page.locator('.atlas-timeline-view-canvas')).toBeVisible();
+  // Verify three event elements exist in state (the timeline-view's
+  // multi-row binning + link resolution are exercised by unit tests in
   // tests/unit/timeline-axis.test.ts).
   const eventCount = await page.evaluate(() => {
     const state = (window as any).__atlasTestApi.getState();

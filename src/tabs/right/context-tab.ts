@@ -54,6 +54,13 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
     const el = elements.find(e => e.id === route.elementId) ?? null;
     return { element: el, detailsMode: 'element' };
   }
+  // Timeline room: a selected event (/timeline/<elementId>) is the subject, so
+  // the context graph focuses the same element the timeline card shows —
+  // middle = WHEN, right pane = the relational WEB (DESIGN_TIMELINE.md).
+  if (route.mode === 'timeline' && route.elementId) {
+    const el = elements.find(e => e.id === route.elementId) ?? null;
+    return { element: el, detailsMode: 'element' };
+  }
   // Knowledge room: an open entry (or knower known-view) is the subject —
   // entry ↔ holders ↔ subjects in the graph via the existing element mode.
   // (The full "knowledge mode" graph is K5, deferred.)

@@ -22,8 +22,8 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange pads min/max by 2%', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'event', name: 'A', startDate: 0, endDate: null, color: '#fff' },
-      { id: 'b', elementType: 'event', name: 'B', startDate: 100, endDate: null, color: '#fff' },
+      { id: 'a', elementType: 'event', name: 'A', startDate: 0, endDate: null, color: '#fff', links: [] },
+      { id: 'b', elementType: 'event', name: 'B', startDate: 100, endDate: null, color: '#fff', links: [] },
     ]);
     // span 100, padding 2 → [-2, 102]
     expect(r.min).toBeCloseTo(-2, 5);
@@ -32,7 +32,7 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange handles endDate', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'narrative', name: 'A', startDate: 10, endDate: 200, color: '#fff' },
+      { id: 'a', elementType: 'narrative', name: 'A', startDate: 10, endDate: 200, color: '#fff', links: [] },
     ]);
     // min 10, max 200, span 190, padding 3.8
     expect(r.min).toBeCloseTo(10 - 3.8, 4);
@@ -41,7 +41,7 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange expands single-point range', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'event', name: 'A', startDate: 42, endDate: null, color: '#fff' },
+      { id: 'a', elementType: 'event', name: 'A', startDate: 42, endDate: null, color: '#fff', links: [] },
     ]);
     // After max <= min fallback (max = min + 100) → padding kicks in too
     expect(r.max).toBeGreaterThan(r.min);
@@ -127,5 +127,45 @@ describe('timeline data-normalizer', () => {
       } as Element & { birth_date: string },
     ];
     expect(extractTemporalNodes(elements)).toHaveLength(0);
+  });
+});
+
+describe('timeline node links (the wedge data)', () => {
+  it('resolves single + multi relation fields to clickable refs', () => {
+    const elements: Element[] = [
+      { id: 'loc', type: 'location', name: 'Highspire', local_updated_at: '2026-01-01' },
+      { id: 'sp', type: 'species', name: 'Highborn', local_updated_at: '2026-01-01' },
+      {
+        id: 'c1', type: 'character', name: 'Lyra', local_updated_at: '2026-01-01',
+        birth_date: 1180, birthplace: 'loc', species: ['sp'],
+      } as Element & Record<string, unknown>,
+    ];
+    const nodes = extractTemporalNodes(elements);
+    const lyra = nodes.find(n => n.id === 'c1')!;
+    expect(lyra.links).toHaveLength(2);
+    const byId = Object.fromEntries(lyra.links.map(l => [l.id, l]));
+    expect(byId['loc']).toMatchObject({ type: 'location', name: 'Highspire', fieldLabel: 'Birthplace' });
+    expect(byId['sp']).toMatchObject({ type: 'species', name: 'Highborn', fieldLabel: 'Species' });
+  });
+
+  it('skips self-links, missing targets, and dedupes', () => {
+    const elements: Element[] = [
+      {
+        id: 'ev', type: 'event', name: 'Battle', local_updated_at: '2026-01-01',
+        start_date: 1185, location: 'ghost', characters: ['ev', 'real', 'real'],
+      } as Element & Record<string, unknown>,
+      { id: 'real', type: 'character', name: 'Oren', local_updated_at: '2026-01-01' },
+    ];
+    const [node] = extractTemporalNodes(elements);
+    // 'ghost' target missing, 'ev' is self, 'real' appears twice → only one ref
+    expect(node.links).toHaveLength(1);
+    expect(node.links[0]).toMatchObject({ id: 'real', name: 'Oren' });
+  });
+
+  it('gives a node with no relations an empty links array (graceful)', () => {
+    const elements: Element[] = [
+      { id: 'ev', type: 'event', name: 'Lone', local_updated_at: '2026-01-01', start_date: 5 } as Element & Record<string, unknown>,
+    ];
+    expect(extractTemporalNodes(elements)[0].links).toEqual([]);
   });
 });
