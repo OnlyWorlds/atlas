@@ -22,8 +22,8 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange pads min/max by 2%', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'event', name: 'A', startDate: 0, endDate: null, color: '#fff', links: [] },
-      { id: 'b', elementType: 'event', name: 'B', startDate: 100, endDate: null, color: '#fff', links: [] },
+      { id: 'a', elementType: 'event', name: 'A', startDate: 0, endDate: null, dateSpec: { kind: 'exact', value: 0 }, color: '#fff', links: [] },
+      { id: 'b', elementType: 'event', name: 'B', startDate: 100, endDate: null, dateSpec: { kind: 'exact', value: 100 }, color: '#fff', links: [] },
     ]);
     // span 100, padding 2 → [-2, 102]
     expect(r.min).toBeCloseTo(-2, 5);
@@ -32,7 +32,7 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange handles endDate', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'narrative', name: 'A', startDate: 10, endDate: 200, color: '#fff', links: [] },
+      { id: 'a', elementType: 'narrative', name: 'A', startDate: 10, endDate: 200, dateSpec: { kind: 'exact', value: 10 }, color: '#fff', links: [] },
     ]);
     // min 10, max 200, span 190, padding 3.8
     expect(r.min).toBeCloseTo(10 - 3.8, 4);
@@ -41,7 +41,7 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange expands single-point range', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'event', name: 'A', startDate: 42, endDate: null, color: '#fff', links: [] },
+      { id: 'a', elementType: 'event', name: 'A', startDate: 42, endDate: null, dateSpec: { kind: 'exact', value: 42 }, color: '#fff', links: [] },
     ]);
     // After max <= min fallback (max = min + 100) → padding kicks in too
     expect(r.max).toBeGreaterThan(r.min);
@@ -127,6 +127,25 @@ describe('timeline data-normalizer', () => {
       } as Element & { birth_date: string },
     ];
     expect(extractTemporalNodes(elements)).toHaveLength(0);
+  });
+
+  it('every emitted node carries dateSpec exact, with value === startDate (invariant)', () => {
+    const nodes = extractTemporalNodes([
+      { id: 'c1', type: 'character', name: 'A', local_updated_at: 'x', birth_date: 1200 } as Element & Record<string, unknown>,
+    ]);
+    expect(nodes[0].dateSpec).toEqual({ kind: 'exact', value: 1200 });
+    expect(nodes[0].dateSpec.kind === 'exact' && nodes[0].dateSpec.value).toBe(nodes[0].startDate);
+  });
+
+  it('rejects non-finite + non-scalar dates (Infinity / arrays / booleans drop the node)', () => {
+    const make = (v: unknown) =>
+      extractTemporalNodes([{ id: 'e', type: 'event', name: 'E', local_updated_at: 'x', start_date: v } as Element & Record<string, unknown>]);
+    expect(make(Infinity)).toHaveLength(0);
+    expect(make([120])).toHaveLength(0);
+    expect(make(true)).toHaveLength(0);
+    expect(make('that winter')).toHaveLength(0);
+    expect(make(120)).toHaveLength(1);
+    expect(make('120')).toHaveLength(1);
   });
 });
 

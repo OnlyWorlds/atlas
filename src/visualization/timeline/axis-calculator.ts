@@ -21,14 +21,20 @@ export function calculateTimeRange(nodes: TimelineNode[]): TimeRange {
   let max = -Infinity;
 
   for (const node of nodes) {
-    if (node.startDate < min) min = node.startDate;
-    if (node.startDate > max) max = node.startDate;
-    if (node.endDate != null) {
+    // Guard non-finite regardless of source (a future unresolved relative date
+    // could inject NaN; never let it poison the axis scale). Gate finding.
+    if (Number.isFinite(node.startDate)) {
+      if (node.startDate < min) min = node.startDate;
+      if (node.startDate > max) max = node.startDate;
+    }
+    if (node.endDate != null && Number.isFinite(node.endDate)) {
       if (node.endDate < min) min = node.endDate;
       if (node.endDate > max) max = node.endDate;
     }
   }
 
+  // All nodes non-finite (or none) → safe default range.
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: 0, max: 100 };
   if (max <= min) max = min + 100;
 
   const span = max - min;

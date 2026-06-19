@@ -44,7 +44,7 @@ const ROOMS: RoomDef[] = [
   { id: 'home',      label: 'Home',      icon: 'home',           hashFor: homeHash,      matches: ['home', 'elements'] },
   { id: 'writing',   label: 'Writing',   icon: 'edit_note',      hashFor: writingHash,   matches: ['writing'] },
   { id: 'knowledge', label: 'Knowledge', icon: 'menu_book',      hashFor: knowledgeHash, matches: ['knowledge'] },
-  { id: 'timeline',  label: 'Timeline',  icon: 'timeline',       hashFor: timelineHash,  matches: ['timeline'] },
+  { id: 'timeline',  label: 'Charts',    icon: 'timeline',       hashFor: timelineHash,  matches: ['timeline'] },
   // Search room removed pre-release (session 240) — the dedicated room was the
   // weakest search surface; the planned replacement is a Cmd+K command palette
   // (see DESIGN.md "Search"). The elements-sidebar name filter remains interim.

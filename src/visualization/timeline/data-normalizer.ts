@@ -10,7 +10,7 @@
  *   - We don't extract narrative bars in v1 (deferred — see DESIGN_HOME.md).
  */
 
-import { TEMPORAL_TYPE_FIELDS } from './temporal-fields';
+import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from './temporal-fields';
 import type { LinkedRef, TimelineNode } from './types';
 import type { Element, ElementType } from '../../core/types';
 import { relationFieldsFor } from '../../editor/field-schema';
@@ -85,19 +85,12 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
     const fields = TEMPORAL_TYPE_FIELDS[el.type];
     if (!fields) continue;
 
-    const rawStart = (el as Element & Record<string, unknown>)[fields.start];
-    if (rawStart == null || rawStart === '') continue;
-
-    const startDate = Number(rawStart);
-    if (Number.isNaN(startDate)) continue;
+    const startDate = parseTemporalValue((el as Record<string, unknown>)[fields.start]);
+    if (startDate === null) continue;
 
     let endDate: number | null = null;
     if (fields.end) {
-      const rawEnd = (el as Element & Record<string, unknown>)[fields.end];
-      if (rawEnd != null && rawEnd !== '') {
-        const parsed = Number(rawEnd);
-        if (!Number.isNaN(parsed)) endDate = parsed;
-      }
+      endDate = parseTemporalValue((el as Record<string, unknown>)[fields.end]);
     }
 
     nodes.push({
@@ -106,6 +99,7 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
       name: el.name || '(unnamed)',
       startDate,
       endDate,
+      dateSpec: { kind: 'exact', value: startDate },
       color: TYPE_COLOR[el.type] ?? FALLBACK_COLOR,
       links: resolveLinks(el, byId),
     });

@@ -1,24 +1,23 @@
 /**
- * Timeline view — the interactive, room-grade timeline (vs the compact home
- * bar in `timeline-bar.ts`). Canvas + DOM hybrid, the context-graph pattern:
+ * Timeline view — the interactive, room-grade chart renderer (vs the compact
+ * home bar in `timeline-bar.ts`). Canvas + DOM hybrid, the context-graph pattern:
  *
- *   - CANVAS layer: fill-space axis, ticks, grid, labeled dots, range-lines.
- *   - DOM overlay:  the selected-event CARD — date + type + its linked
- *                   elements as clickable chips (the wedge: every element an
- *                   event touches, surfaced from the graph, not capped at one).
+ *   - CANVAS layer: fill-space axis, ticks, grid, dots, range-lines, with
+ *     wheel-zoom + drag-pan and cursor-proximity labels (so a dense world reads
+ *     instead of becoming a wall of overlapping text).
+ *   - DOM overlay:  the selected-node CARD — date + role-grouped linked-element
+ *                   chips (the wedge), a "focus" action (re-scope the chart to
+ *                   this element = filter-by-element, D5), and "open element".
  *
- * Selection flows up via `onSelect`; the room turns that into a route change
- * (`/timeline/<id>`) so the right-pane context graph focuses the same event.
- * Chip clicks flow via `onNavigateToElement` (jump to the element room).
- *
- * Shares the DOMAIN (data-normalizer + axis-calculator pure functions) with
- * the compact bar; does NOT share the renderer. See DESIGN_TIMELINE.md.
+ * The room owns the ChartConfig/scope and passes already-scoped NODES in via
+ * `setNodes`; this renderer is a dumb projector. Selection round-trips through
+ * the URL (room → `/timeline/<id>`) so the right-pane context graph focuses the
+ * same element. See DESIGN_CHARTS.md.
  */
 
-import type { Element, ElementType } from '../../core/types';
+import type { ElementType } from '../../core/types';
 import type { LinkedRef, PlacedDot, TimelineNode } from './types';
 import { calculateTicks, calculateTimeRange, createDateToX } from './axis-calculator';
-import { extractTemporalNodes } from './data-normalizer';
 import { escapeText } from '../../core/dom-utils';
 import { ELEMENT_ICONS } from '../../core/constants';
 
@@ -28,17 +27,24 @@ const DOT_RADIUS_SELECTED = 7;
 const TOP_PAD = 20;
 const AXIS_LABEL_HEIGHT = 22;
 const ROW_HEIGHT = 30;
-const LABEL_MAX_CHARS = 22;
+const LABEL_MAX_CHARS = 24;
+const LABEL_NEAR_RADIUS = 150;   // px — cursor neighbourhood that gets labels
+const LABEL_NEAR_MAX = 9;        // most labels to reveal around the cursor
+const ZOOM_MAX = 200;
+const ZOOM_STEP = 1.2;
 
 export interface TimelineViewOptions {
   /** A dot was clicked → select it (room turns this into a route change). */
   onSelect: (elementId: string) => void;
-  /** A linked-element chip was clicked → jump to that element. */
-  onNavigateToElement: (elementId: string) => void;
+  /** The card's "focus" action → re-scope the chart to this element (D5). */
+  onFocus: (elementId: string) => void;
+  /** A chip / "open element" → jump to that element's room. */
+  onOpenElement: (elementId: string) => void;
 }
 
 export interface TimelineViewHandle {
-  setElements(elements: Element[]): void;
+  /** The room passes already-scoped nodes (it owns the ChartConfig/scope). */
+  setNodes(nodes: TimelineNode[]): void;
   setSelection(elementId: string | null): void;
   redraw(): void;
   destroy(): void;
@@ -52,8 +58,21 @@ interface ViewState {
   placedDots: PlacedDot[];
   hoveredDot: PlacedDot | null;
   selectedId: string | null;
+  // zoom/pan
+  zoom: number;
+  panCenter: number | null;   // date the view is centred on (null = base centre)
+  baseRange: { min: number; max: number } | null;
+  // cursor (canvas coords; null when outside) — drives proximity labels
+  mouseX: number | null;
+  mouseY: number | null;
+  // drag-pan
+  dragging: boolean;
+  dragStartX: number;
+  dragStartCenter: number;
+  dragMoved: boolean;
   onSelect: (id: string) => void;
-  onNavigateToElement: (id: string) => void;
+  onFocus: (id: string) => void;
+  onOpenElement: (id: string) => void;
 }
 
 export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions): TimelineViewHandle {
@@ -75,25 +94,31 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
   const state: ViewState = {
     container, canvas, card,
     nodes: [], placedDots: [], hoveredDot: null, selectedId: null,
+    zoom: 1, panCenter: null, baseRange: null,
+    mouseX: null, mouseY: null,
+    dragging: false, dragStartX: 0, dragStartCenter: 0, dragMoved: false,
     onSelect: opts.onSelect,
-    onNavigateToElement: opts.onNavigateToElement,
+    onFocus: opts.onFocus,
+    onOpenElement: opts.onOpenElement,
   };
 
   const onMove = (e: MouseEvent): void => handleMouseMove(state, e);
   const onLeave = (): void => handleMouseLeave(state);
-  const onClick = (): void => {
-    if (state.hoveredDot) state.onSelect(state.hoveredDot.node.id);
-  };
+  const onDown = (e: MouseEvent): void => handleMouseDown(state, e);
+  const onUp = (): void => handleMouseUp(state);
+  const onWheel = (e: WheelEvent): void => handleWheel(state, e);
   canvas.addEventListener('mousemove', onMove);
   canvas.addEventListener('mouseleave', onLeave);
-  canvas.addEventListener('click', onClick);
+  canvas.addEventListener('mousedown', onDown);
+  window.addEventListener('mouseup', onUp);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
 
   const ro = new ResizeObserver(() => { draw(state); positionCard(state); });
   ro.observe(container);
 
   return {
-    setElements(elements: Element[]): void {
-      state.nodes = extractTemporalNodes(elements);
+    setNodes(nodes: TimelineNode[]): void {
+      state.nodes = nodes;
       draw(state);
       renderCard(state);
     },
@@ -108,10 +133,27 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
       ro.disconnect();
       canvas.removeEventListener('mousemove', onMove);
       canvas.removeEventListener('mouseleave', onLeave);
-      canvas.removeEventListener('click', onClick);
+      canvas.removeEventListener('mousedown', onDown);
+      window.removeEventListener('mouseup', onUp);
+      canvas.removeEventListener('wheel', onWheel);
       target.innerHTML = '';
     },
   };
+}
+
+// ====== Zoom helpers ======
+
+function effectiveRange(state: ViewState, base: { min: number; max: number }): { min: number; max: number } {
+  const span = base.max - base.min;
+  if (span <= 0 || state.zoom <= 1) return base;
+  const effSpan = span / state.zoom;
+  const center = state.panCenter ?? (base.min + span / 2);
+  const pad = span * 0.05;
+  let min = center - effSpan / 2;
+  let max = center + effSpan / 2;
+  if (min < base.min - pad) { min = base.min - pad; max = min + effSpan; }
+  if (max > base.max + pad) { max = base.max + pad; min = max - effSpan; }
+  return { min, max };
 }
 
 // ====== Drawing ======
@@ -138,14 +180,17 @@ function draw(state: ViewState): void {
 
   if (state.nodes.length === 0) {
     state.placedDots = [];
+    state.baseRange = null;
     ctx.fillStyle = 'rgba(255,255,255,0.30)';
     ctx.font = '13px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('No elements with temporal data yet.', w / 2, h / 2);
+    ctx.fillText('Nothing dated in this view.', w / 2, h / 2);
     return;
   }
 
-  const range = calculateTimeRange(state.nodes);
+  const base = calculateTimeRange(state.nodes);
+  state.baseRange = base;
+  const range = effectiveRange(state, base);
   const dateToX = createDateToX(range, w);
   const ticks = calculateTicks(range, w);
   const axisY = h - AXIS_LABEL_HEIGHT;
@@ -179,7 +224,7 @@ function draw(state: ViewState): void {
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.30)';
-    ctx.fillText(String(tick), x, axisY + 15);
+    ctx.fillText(String(Math.round(tick)), x, axisY + 15);
   }
 
   // Place dots via multi-row binning across the full height.
@@ -208,6 +253,7 @@ function draw(state: ViewState): void {
     }
     placed.push({ node, x, y: bestY, radius: DOT_RADIUS });
   }
+  state.placedDots = placed;
 
   // Range lines (endDate)
   for (const dot of placed) {
@@ -221,24 +267,12 @@ function draw(state: ViewState): void {
     ctx.stroke();
   }
 
-  // Labels (room readability) — draw to the right of each dot, muted; skip if
-  // it would collide with a label already drawn on the same row.
-  const lastLabelXByRow: Record<number, number> = {};
-  ctx.font = '11px system-ui, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  for (const dot of placed) {
-    const rowKey = Math.round(dot.y);
-    const last = lastLabelXByRow[rowKey];
-    if (last != null && dot.x - last < 80) continue; // too close to prior label
-    const isSel = dot.node.id === state.selectedId;
-    ctx.fillStyle = isSel ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.45)';
-    ctx.fillText(truncate(dot.node.name, LABEL_MAX_CHARS), dot.x + 9, dot.y);
-    lastLabelXByRow[rowKey] = dot.x;
-  }
-  ctx.textBaseline = 'alphabetic';
+  // Labels — PROXIMITY REVEAL: selected + hovered always; otherwise only the
+  // dots nearest the cursor. Dots-only at rest keeps a dense world legible
+  // (the overlapping-wall fix). Collision-avoided within the labelled set.
+  drawLabels(ctx, state, placed, w);
 
-  // Dots (selected + hovered emphasized)
+  // Dots (selected + hovered emphasised)
   for (const dot of placed) {
     const isSel = dot.node.id === state.selectedId;
     const isHover = dot === state.hoveredDot;
@@ -263,8 +297,41 @@ function draw(state: ViewState): void {
     }
   }
 
-  state.placedDots = placed;
   positionCard(state);
+}
+
+function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: PlacedDot[], w: number): void {
+  const toLabel = new Set<string>();
+  if (state.selectedId) toLabel.add(state.selectedId);
+  if (state.hoveredDot) toLabel.add(state.hoveredDot.node.id);
+  if (state.mouseX != null && state.mouseY != null) {
+    const near = placed
+      .map(d => ({ d, dist: Math.hypot(d.x - state.mouseX!, d.y - state.mouseY!) }))
+      .filter(x => x.dist < LABEL_NEAR_RADIUS)
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, LABEL_NEAR_MAX);
+    for (const x of near) toLabel.add(x.d.node.id);
+  }
+
+  ctx.font = '11px system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  const lastLabelXByRow: Record<number, number> = {};
+  for (const dot of placed) {
+    if (!toLabel.has(dot.node.id)) continue;
+    const rowKey = Math.round(dot.y);
+    const last = lastLabelXByRow[rowKey];
+    if (last != null && dot.x - last < 70) continue; // collide-avoid within labelled set
+    const isSel = dot.node.id === state.selectedId;
+    ctx.fillStyle = isSel ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.62)';
+    // Flip the label to the LEFT of the dot in the right third, so it never
+    // clips the panel edge (self-inspection finding).
+    const flip = dot.x > w * 0.66;
+    ctx.textAlign = flip ? 'right' : 'left';
+    ctx.fillText(truncate(dot.node.name, LABEL_MAX_CHARS), dot.x + (flip ? -9 : 9), dot.y);
+    lastLabelXByRow[rowKey] = dot.x;
+  }
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
 }
 
 // ====== The DOM card (the wedge) ======
@@ -302,18 +369,48 @@ function renderCard(state: ViewState): void {
     none.textContent = 'No linked elements.';
     chipsWrap.appendChild(none);
   } else {
+    // Group chips by ROLE (fieldLabel), first-seen order — Simmer's molecule:
+    // the event is a hub, its links are spokes grouped by typed bond. 10 chips
+    // in 4 labeled clusters reads; 10 bare chips don't.
+    const groups = new Map<string, LinkedRef[]>();
     for (const link of links) {
-      chipsWrap.appendChild(buildChip(state, link));
+      const g = groups.get(link.fieldLabel);
+      if (g) g.push(link);
+      else groups.set(link.fieldLabel, [link]);
+    }
+    for (const [label, refs] of groups) {
+      const group = document.createElement('div');
+      group.className = 'atlas-timeline-card-group';
+      const gl = document.createElement('div');
+      gl.className = 'atlas-timeline-card-grouplabel';
+      gl.textContent = label;
+      group.appendChild(gl);
+      const row = document.createElement('div');
+      row.className = 'atlas-timeline-card-chiprow';
+      for (const link of refs) row.appendChild(buildChip(state, link));
+      group.appendChild(row);
+      chipsWrap.appendChild(group);
     }
   }
   card.appendChild(chipsWrap);
 
+  const actions = document.createElement('div');
+  actions.className = 'atlas-timeline-card-actions';
+  const focusBtn = document.createElement('button');
+  focusBtn.type = 'button';
+  focusBtn.className = 'atlas-timeline-card-action';
+  focusBtn.innerHTML = '<span class="material-symbols-outlined">filter_center_focus</span><span>Focus</span>';
+  focusBtn.title = 'Focus the timeline on this element and what it touches';
+  focusBtn.addEventListener('click', () => state.onFocus(node.id));
+  actions.appendChild(focusBtn);
   const open = document.createElement('button');
   open.type = 'button';
-  open.className = 'atlas-timeline-card-open';
-  open.textContent = 'Open element →';
-  open.addEventListener('click', () => state.onNavigateToElement(node.id));
-  card.appendChild(open);
+  open.className = 'atlas-timeline-card-action';
+  open.innerHTML = '<span>Open</span><span class="material-symbols-outlined">arrow_forward</span>';
+  open.title = 'Open this element';
+  open.addEventListener('click', () => state.onOpenElement(node.id));
+  actions.appendChild(open);
+  card.appendChild(actions);
 
   card.style.display = 'block';
   positionCard(state);
@@ -328,7 +425,7 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   chip.innerHTML =
     `<span class="material-symbols-outlined">${escapeText(icon)}</span>` +
     `<span class="atlas-timeline-chip-name">${escapeText(link.name)}</span>`;
-  chip.addEventListener('click', () => state.onNavigateToElement(link.id));
+  chip.addEventListener('click', () => state.onOpenElement(link.id));
   return chip;
 }
 
@@ -356,30 +453,100 @@ function positionCard(state: ViewState): void {
   state.card.style.top = `${Math.round(top)}px`;
 }
 
-// ====== Mouse ======
+// ====== Mouse / zoom / pan ======
+
+function hitTest(state: ViewState, mx: number, my: number): PlacedDot | null {
+  let found: PlacedDot | null = null;
+  let bestDist = Infinity;
+  for (const dot of state.placedDots) {
+    const dist = Math.hypot(dot.x - mx, dot.y - my);
+    if (dist < DOT_RADIUS_HOVER + 5 && dist < bestDist) { bestDist = dist; found = dot; }
+  }
+  return found;
+}
 
 function handleMouseMove(state: ViewState, e: MouseEvent): void {
   const rect = state.canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
-  let found: PlacedDot | null = null;
-  let bestDist = Infinity;
-  for (const dot of state.placedDots) {
-    const dx = dot.x - mx;
-    const dy = dot.y - my;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < DOT_RADIUS_HOVER + 5 && dist < bestDist) { bestDist = dist; found = dot; }
-  }
-  if (found !== state.hoveredDot) {
-    state.hoveredDot = found;
-    state.canvas.style.cursor = found ? 'pointer' : 'default';
+  state.mouseX = mx;
+  state.mouseY = my;
+
+  if (state.dragging && state.baseRange) {
+    const w = rect.width;
+    const range = effectiveRange(state, state.baseRange);
+    const dateToX = createDateToX(range, w);
+    const pxPerUnit = dateToX(range.min + 1) - dateToX(range.min);
+    if (pxPerUnit !== 0) {
+      const dx = mx - state.dragStartX;
+      if (Math.abs(dx) > 3) state.dragMoved = true;
+      state.panCenter = state.dragStartCenter - dx / pxPerUnit;
+    }
+    state.canvas.style.cursor = 'grabbing';
     draw(state);
+    return;
   }
+
+  const found = hitTest(state, mx, my);
+  state.hoveredDot = found;
+  state.canvas.style.cursor = found ? 'pointer' : (state.zoom > 1 ? 'grab' : 'default');
+  draw(state); // redraw for hover + proximity labels following the cursor
 }
 
 function handleMouseLeave(state: ViewState): void {
-  if (state.hoveredDot) { state.hoveredDot = null; draw(state); }
+  state.hoveredDot = null;
+  state.mouseX = null;
+  state.mouseY = null;
   state.canvas.style.cursor = 'default';
+  draw(state);
+}
+
+function handleMouseDown(state: ViewState, e: MouseEvent): void {
+  if (e.button !== 0) return;
+  const rect = state.canvas.getBoundingClientRect();
+  state.dragging = true;
+  state.dragMoved = false;
+  state.dragStartX = e.clientX - rect.left;
+  const base = state.baseRange;
+  state.dragStartCenter = state.panCenter ?? (base ? (base.min + base.max) / 2 : 0);
+}
+
+function handleMouseUp(state: ViewState): void {
+  if (!state.dragging) return;
+  state.dragging = false;
+  state.canvas.style.cursor = state.hoveredDot ? 'pointer' : (state.zoom > 1 ? 'grab' : 'default');
+  if (!state.dragMoved && state.hoveredDot) {
+    state.onSelect(state.hoveredDot.node.id); // a click (not a drag) selects
+  }
+}
+
+function handleWheel(state: ViewState, e: WheelEvent): void {
+  if (!state.baseRange) return;
+  e.preventDefault();
+  const rect = state.canvas.getBoundingClientRect();
+  const w = rect.width;
+  const mx = e.clientX - rect.left;
+  const base = state.baseRange;
+  const span = base.max - base.min;
+  if (span <= 0) return;
+
+  const range = effectiveRange(state, base);
+  const dateToX = createDateToX(range, w);
+  const pxPerUnit = dateToX(range.min + 1) - dateToX(range.min);
+  if (pxPerUnit === 0) return;
+  const dateAtCursor = range.min + (mx - dateToX(range.min)) / pxPerUnit;
+  const frac = (dateAtCursor - range.min) / (range.max - range.min);
+
+  const newZoom = Math.min(ZOOM_MAX, Math.max(1, state.zoom * (e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP)));
+  state.zoom = newZoom;
+  if (newZoom <= 1) {
+    state.panCenter = null; // back to full fit
+  } else {
+    const newEffSpan = span / newZoom;
+    const newMin = dateAtCursor - frac * newEffSpan;
+    state.panCenter = newMin + newEffSpan / 2; // effectiveRange will clamp
+  }
+  draw(state);
 }
 
 // ====== utils ======
