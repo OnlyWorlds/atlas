@@ -30,6 +30,8 @@ import {
   type CollectionBlock, type MapBlock, type HeadingBlock, type ProseBlock, type PageTheme,
 } from './sharing';
 import { knowledgeHeldBy } from './knowledge';
+import { freezeChartBlock, type PayloadChartBlock } from '../visualization/timeline/chart-freeze';
+import type { ChartConfig } from '../visualization/timeline/types';
 
 // ---------------------------------------------------------------------------
 // Payload types (the §5 wire shape).
@@ -88,7 +90,7 @@ export interface PayloadMapBlock {
 }
 
 /** A block as it appears in the PAYLOAD (circle/map blocks are frozen-compiled). */
-export type PayloadBlock = HeadingBlock | ProseBlock | ElementCardBlock | PayloadCircleBlock | CollectionBlock | PayloadMapBlock;
+export type PayloadBlock = HeadingBlock | ProseBlock | ElementCardBlock | PayloadCircleBlock | CollectionBlock | PayloadMapBlock | PayloadChartBlock;
 
 export interface PagePayload {
   /** The PAYLOAD schema version — the viewer branches on this. */
@@ -201,7 +203,7 @@ function relationId(value: unknown): string | null {
 // The builder.
 // ---------------------------------------------------------------------------
 
-export function buildPagePayload(page: Element, elements: Element[]): PagePayload {
+export function buildPagePayload(page: Element, elements: Element[], charts: ChartConfig[] = []): PagePayload {
   const byId = new Map(elements.map(e => [e.id, e]));
   const blocks = blocksOf(page);
 
@@ -293,6 +295,7 @@ export function buildPagePayload(page: Element, elements: Element[]): PagePayloa
       return { id: b.id, kind: 'collection', elementIds: b.elementIds.filter(id => byId.has(id)) };
     }
     if (b.kind === 'map') return freezeMapBlock(b, byId, includedIds);
+    if (b.kind === 'chart') return freezeChartBlock(b.chartId, b.id, charts, elements, includedIds);
     return { ...b };
   }).filter((b): b is PayloadBlock => b !== null);
 

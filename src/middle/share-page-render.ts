@@ -32,6 +32,15 @@ import { renderProseFragment } from './writing-compiled';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { humanizeFieldName } from './element-detail-fields';
 import { escapeText } from '../core/dom-utils';
+import { freezeChartBlock } from '../visualization/timeline/chart-freeze';
+import { renderChartView } from '../visualization/timeline/chart-static';
+import type { ChartConfig } from '../visualization/timeline/types';
+
+// The active world's saved charts — set by the share room so the BUILDER can
+// freeze chart blocks live for preview. The payload path carries pre-frozen
+// charts, so the lifted viewer never needs this (builder-only module state).
+let builderCharts: ChartConfig[] = [];
+export function setBuilderCharts(charts: ChartConfig[]): void { builderCharts = charts; }
 
 /**
  * The element's populated, card-eligible field names (disk order). The field
@@ -425,6 +434,20 @@ export function renderBlockView(block: PageBlock, elements: Map<string, Element>
         elements,
         { unresolved: 'chip' },
       );
+    case 'chart': {
+      // Builder context: freeze LIVE from the saved charts + world elements,
+      // render through the same static view the payload path uses.
+      const frozen = freezeChartBlock(
+        block.chartId, block.id, builderCharts, [...elements.values()], new Set(elements.keys()),
+      );
+      if (!frozen) {
+        const miss = document.createElement('div');
+        miss.className = 'atlas-share-hint';
+        miss.textContent = 'chart not found — it may have been deleted';
+        return miss;
+      }
+      return renderChartView(frozen);
+    }
   }
 }
 
@@ -697,6 +720,10 @@ export function renderPayloadPage(payload: PagePayload): HTMLElement {
       case 'circle':
         // Frozen at publish; entry prose follows the same disclosure rule.
         node = renderCircleView(block, proseMap, { unresolved: 'text' });
+        break;
+      case 'chart':
+        // Pre-frozen in the payload — render the snapshot directly.
+        node = renderChartView(block);
         break;
     }
     node.classList.add('atlas-share-page-view-block');

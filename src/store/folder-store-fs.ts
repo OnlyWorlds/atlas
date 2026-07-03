@@ -24,6 +24,7 @@
 import {
   ATLAS_INTERNAL_DIR,
   ATLAS_LOCAL_EXTENSION_FIELDS,
+  CHARTS_FILE,
   ELEMENTS_DIR,
   LOCK_FILE,
   LOCK_HEARTBEAT_MS,
@@ -49,6 +50,7 @@ import type {
   Zone,
 } from '../core/types';
 import type { FolderStore } from './folder-store';
+import type { ChartConfig } from '../visualization/timeline/types';
 import { newId, nowIso } from './folder-store';
 import { PerIdWriteChain } from './write-chain';
 import {
@@ -122,6 +124,18 @@ export class FsFolderStore implements FolderStore {
   private indexedTypes: Set<ElementType> = new Set();
   /** Per-id serialization for update/delete (convention #79 — lost-update class). */
   private writeChain = new PerIdWriteChain();
+  /**
+   * Store-global serialization for the single `tombstones.json` file. Append +
+   * clear both read-modify-write it, and concurrent deletes on DIFFERENT ids
+   * run on different per-id chains — without this they interleave and the
+   * second write clobbers the first's tombstone (a lost server DELETE).
+   */
+  private tombstoneChain: Promise<unknown> = Promise.resolve();
+  private runTombstoneOp<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.tombstoneChain.then(fn, fn); // run regardless of prior outcome
+    this.tombstoneChain = next.then(() => undefined, () => undefined);
+    return next;
+  }
 
   constructor(opts: FsFolderStoreOptions = {}) {
     this.opts = opts;
@@ -655,9 +669,11 @@ export class FsFolderStore implements FolderStore {
   }
 
   async clearTombstone(id: string): Promise<void> {
-    const all = await this.readTombstoneList();
-    const next = all.filter(t => t.id !== id);
-    await this.writeTombstoneList(next);
+    return this.runTombstoneOp(async () => {
+      const all = await this.readTombstoneList();
+      const next = all.filter(t => t.id !== id);
+      await this.writeTombstoneList(next);
+    });
   }
 
   async readSyncState(): Promise<SyncState> {
@@ -674,24 +690,42 @@ export class FsFolderStore implements FolderStore {
     return next;
   }
 
+  async readCharts(): Promise<ChartConfig[]> {
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    const payload = await readJson<{ charts: ChartConfig[] }>(atlasDir, CHARTS_FILE);
+    return payload?.charts ?? [];
+  }
+
+  async writeCharts(charts: ChartConfig[]): Promise<void> {
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    await writeJsonAtomic(atlasDir, CHARTS_FILE, { charts });
+  }
+
   async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string): Promise<void> {
-    const existing = await this.getElement(id);
-    if (!existing) return;
-    const next: Element = { ...existing, server_updated_at };
-    const entry = this.indexEntry(id);
-    const filename = entry?.filename ?? elementFilename(id, existing.name);
-    const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
-    await writeJsonAtomic(dir, filename, next);
+    // Serialize with update/delete on the same id (#79). The SyncEngine calls
+    // this after a push; without the chain a concurrent local edit could land
+    // between this read and write, and the stamp would revert it to a stale body.
+    return this.writeChain.run(id, async () => {
+      const existing = await this.getElement(id);
+      if (!existing) return;
+      const next: Element = { ...existing, server_updated_at };
+      const entry = this.indexEntry(id);
+      const filename = entry?.filename ?? elementFilename(id, existing.name);
+      const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
+      await writeJsonAtomic(dir, filename, next);
+    });
   }
 
   async clearServerBaseline(id: string): Promise<void> {
-    const existing = await this.getElement(id);
-    if (!existing) return;
-    const { server_updated_at: _drop, ...rest } = existing;
-    const entry = this.indexEntry(id);
-    const filename = entry?.filename ?? elementFilename(id, existing.name);
-    const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
-    await writeJsonAtomic(dir, filename, rest as Element);
+    return this.writeChain.run(id, async () => {
+      const existing = await this.getElement(id);
+      if (!existing) return;
+      const { server_updated_at: _drop, ...rest } = existing;
+      const entry = this.indexEntry(id);
+      const filename = entry?.filename ?? elementFilename(id, existing.name);
+      const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
+      await writeJsonAtomic(dir, filename, rest as Element);
+    });
   }
 
   async resetSyncBaseline(): Promise<void> {
@@ -809,10 +843,12 @@ export class FsFolderStore implements FolderStore {
     await writeJsonAtomic(atlasDir, TOMBSTONES_FILE, { deletions });
   }
 
-  private async appendTombstone(t: Tombstone): Promise<void> {
-    const existing = await this.readTombstoneList();
-    existing.push(t);
-    await this.writeTombstoneList(existing);
+  private appendTombstone(t: Tombstone): Promise<void> {
+    return this.runTombstoneOp(async () => {
+      const existing = await this.readTombstoneList();
+      existing.push(t);
+      await this.writeTombstoneList(existing);
+    });
   }
 
   // ---- Test introspection ----

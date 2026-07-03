@@ -22,6 +22,7 @@ import { patchSlice, getState, setState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
 import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, shareHash, parseHash } from '../core/router';
 import type { FolderStore } from '../store/folder-store';
+import { rewriteChartScopeIds } from '../visualization/timeline/charts-store';
 import type { Element, WorldRegistryEntry, SyncEngineState, ElementType } from '../core/types';
 
 let currentEngine: SyncEngine | null = null;
@@ -547,6 +548,28 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
         clearCameraState(swap.old_id);
       }
     }).catch((err) => console.warn('[sync-attach] camera-state migration failed:', err));
+  }
+
+  // Migrate saved chart SCOPES on disk. Charts (.atlas/charts.json) are
+  // atlas-local — NOT covered by the element-file id rewrite — so a focus /
+  // selection chart would keep a dead pre-swap id after make-online (mirrors
+  // the camera-state migration above; applies to ANY element type).
+  {
+    const folder = currentFolder;
+    if (folder) {
+      void (async () => {
+        try {
+          const charts = await folder.readCharts();
+          const { charts: nextCharts, changed } = rewriteChartScopeIds(charts, swap.old_id, swap.new_id);
+          if (changed) {
+            await folder.writeCharts(nextCharts);
+            window.dispatchEvent(new CustomEvent('atlas:charts-changed'));
+          }
+        } catch (err) {
+          console.warn('[sync-attach] chart-scope id migration failed:', err);
+        }
+      })();
+    }
   }
 
   // Migrate active pin-placement targeting. Reachable when the user has a

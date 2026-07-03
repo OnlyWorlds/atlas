@@ -14,6 +14,9 @@
 
 import type { TimelineNode } from './types';
 
+/** A handful of always-labelled "anchor beats" — the top-N by degree (chart #2). */
+export const ANCHOR_CAP = 7;
+
 /** id → bidirectional dated-neighbour degree, over the passed node set. */
 export function computeDegrees(nodes: TimelineNode[]): Map<string, number> {
   const dated = new Set(nodes.map(n => n.id));

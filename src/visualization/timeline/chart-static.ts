@@ -1,0 +1,210 @@
+/**
+ * Static chart renderer — draws a FROZEN chart (PayloadChartBlock) to a canvas.
+ * Shared by the atlas share-builder preview and (as a deliberate COPY, per the
+ * tools/show re-lift discipline) the public viewer. No interaction beyond an
+ * optional click-through on nodes that carry a `ref` (a carded element).
+ *
+ * It re-implements a SIMPLER centered density-fan than the interactive room
+ * view (timeline-view.ts): a published chart is a snapshot, not an explorer —
+ * no zoom/pan/proximity. Type-tinted Material Symbols glyphs (identity),
+ * anchors bigger + always-labelled (hierarchy), nodes bloom up/down from the
+ * axis midline by local time-density (the fan). Pure of store/state.
+ */
+
+import type { PayloadChartBlock } from './chart-freeze';
+import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
+import type { ElementType } from '../../core/types';
+import { applyAlpha, ensureIconFont } from './canvas-utils';
+
+const HEIGHT = 240;
+const PAD_X = 18;
+const PAD_TOP = 18;
+const PAD_BOTTOM = 30;       // room for the axis labels
+const X_GAP = 30;            // x-window (px) that counts as "crowded" → step a level
+const Y_STEP = 26;           // vertical breathing room between fan levels
+const ICON = 14;
+const ICON_ANCHOR = 19;
+
+interface Placed {
+  x: number;
+  y: number;
+  icon: string;
+  color: string;
+  name: string;
+  anchor: boolean;
+  ref?: string;
+  endX?: number;
+}
+
+/** Centered greedy beeswarm: level order 0, +1, -1, +2, -2 … nearest free wins. */
+function levelFor(x: number, lastXAtLevel: Map<number, number>, maxLevel: number): number {
+  for (let step = 0; step <= maxLevel; step++) {
+    for (const level of step === 0 ? [0] : [step, -step]) {
+      const last = lastXAtLevel.get(level);
+      if (last === undefined || x - last >= X_GAP) {
+        lastXAtLevel.set(level, x);
+        return level;
+      }
+    }
+  }
+  // Everything crowded — overflow onto the outermost level (rare).
+  lastXAtLevel.set(maxLevel, x);
+  return maxLevel;
+}
+
+export interface ChartViewOptions {
+  /** Called when a node with a `ref` (a carded element) is clicked. */
+  onRef?: (ref: string) => void;
+}
+
+/** Render a frozen chart block to a self-contained element. */
+export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions = {}): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'atlas-chart-static';
+
+  const title = document.createElement('div');
+  title.className = 'atlas-chart-static-title';
+  title.textContent = block.title || 'chart';
+  wrap.appendChild(title);
+
+  const canvasWrap = document.createElement('div');
+  canvasWrap.className = 'atlas-chart-static-canvas-wrap';
+  canvasWrap.style.height = `${HEIGHT}px`;
+  wrap.appendChild(canvasWrap);
+
+  if (block.nodes.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'atlas-chart-static-empty';
+    empty.textContent = 'No dated elements in this chart.';
+    canvasWrap.appendChild(empty);
+    return wrap;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvasWrap.appendChild(canvas);
+  let placed: Placed[] = [];
+
+  const draw = (): void => {
+    const cssW = canvasWrap.clientWidth || 600;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(HEIGHT * dpr);
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${HEIGHT}px`;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, HEIGHT);
+
+    const span = Math.max(1, block.axisMax - block.axisMin);
+    const plotW = cssW - 2 * PAD_X;
+    const midY = PAD_TOP + (HEIGHT - PAD_TOP - PAD_BOTTOM) / 2;
+    const maxLevel = Math.max(1, Math.floor((HEIGHT - PAD_TOP - PAD_BOTTOM) / 2 / Y_STEP));
+    const dateToX = (d: number): number => PAD_X + ((d - block.axisMin) / span) * plotW;
+
+    // Axis baseline.
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(PAD_X, HEIGHT - PAD_BOTTOM + 8);
+    ctx.lineTo(cssW - PAD_X, HEIGHT - PAD_BOTTOM + 8);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    ctx.fillText(String(block.axisMin), PAD_X, HEIGHT - 8);
+    if (block.axisMax !== block.axisMin) {
+      ctx.textAlign = 'right';
+      ctx.fillText(String(block.axisMax), cssW - PAD_X, HEIGHT - 8);
+    }
+
+    // Layout: anchors first (they hold the centre), then by date.
+    const ordered = block.nodes
+      .map((n, i) => ({ n, i }))
+      .sort((a, b) =>
+        (a.n.anchor === b.n.anchor ? 0 : a.n.anchor ? -1 : 1) ||
+        a.n.date - b.n.date ||
+        a.i - b.i,
+      );
+    const lastXAtLevel = new Map<number, number>();
+    placed = ordered.map(({ n }) => {
+      const x = dateToX(n.date);
+      const level = levelFor(x, lastXAtLevel, maxLevel);
+      const color = ELEMENT_TYPE_COLORS[n.type as ElementType] ?? '#94a3b8';
+      return {
+        x, y: midY + level * Y_STEP,
+        icon: ELEMENT_ICONS[n.type as ElementType] ?? 'category',
+        color, name: n.name, anchor: !!n.anchor, ref: n.ref,
+        endX: n.endDate != null ? dateToX(n.endDate) : undefined,
+      };
+    });
+
+    // Range lines first (under glyphs).
+    for (const p of placed) {
+      if (p.endX == null) continue;
+      ctx.strokeStyle = applyAlpha(p.color, 0.35);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.endX, p.y);
+      ctx.stroke();
+    }
+
+    // Glyphs + anchor labels.
+    ctx.textBaseline = 'middle';
+    for (const p of placed) {
+      const size = p.anchor ? ICON_ANCHOR : ICON;
+      if (p.anchor) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, size * 0.85, 0, Math.PI * 2);
+        ctx.fillStyle = applyAlpha(p.color, 0.12);
+        ctx.fill();
+      }
+      ctx.font = `${size}px "Material Symbols Outlined"`;
+      ctx.fillStyle = p.color;
+      ctx.textAlign = 'center';
+      ctx.fillText(p.icon, p.x, p.y);
+
+      if (p.anchor) {
+        ctx.font = "12px system-ui, sans-serif";
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        const lw = ctx.measureText(p.name).width;
+        const rightX = p.x + size * 0.7;
+        if (rightX + lw > cssW - PAD_X) {
+          // Flip to the left so an anchor near the right edge isn't clipped.
+          ctx.textAlign = 'right';
+          ctx.fillText(p.name, p.x - size * 0.7, p.y);
+        } else {
+          ctx.textAlign = 'left';
+          ctx.fillText(p.name, rightX, p.y);
+        }
+      }
+    }
+  };
+
+  // Click-through on ref'd nodes.
+  canvas.addEventListener('click', (e) => {
+    if (!opts.onRef) return;
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    let best: Placed | null = null;
+    let bestD = 16 * 16;
+    for (const p of placed) {
+      if (!p.ref) continue;
+      const d = (p.x - cx) ** 2 + (p.y - cy) ** 2;
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    if (best?.ref) opts.onRef(best.ref);
+  });
+
+  // Draw now, redraw on width changes + once the icon font lands.
+  draw();
+  void ensureIconFont().then(draw);
+  if (typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(() => draw());
+    ro.observe(canvasWrap);
+  }
+  return wrap;
+}

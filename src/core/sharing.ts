@@ -218,7 +218,25 @@ export interface MapBlock {
   showLabels?: boolean;
 }
 
-export type PageBlock = HeadingBlock | ProseBlock | ElementCardBlock | CircleBlock | CollectionBlock | MapBlock;
+/**
+ * A saved chart embedded as a block. References a chart in `.atlas/charts.json`
+ * by id — NOT an OW element (charts are atlas-local config). At publish the
+ * chart FREEZES into the payload (resolved nodes + axis bounds; identity only,
+ * ref when the element is otherwise carded) — see `freezeChartBlock`.
+ *
+ * Unlike every element-bearing block, a chart block contributes NOTHING to the
+ * refs mirror: `chartId` is an atlas-local id, never an OW element id, so it
+ * never id-swaps. The element ids INSIDE the referenced chart's scope are kept
+ * correct at the charts.json layer (`rewriteChartScopeIds` on id-swap), and
+ * frozen against the current elements at publish.
+ */
+export interface ChartBlock {
+  id: string;
+  kind: 'chart';
+  chartId: string;
+}
+
+export type PageBlock = HeadingBlock | ProseBlock | ElementCardBlock | CircleBlock | CollectionBlock | MapBlock | ChartBlock;
 
 export function newBlockId(): string {
   return crypto.randomUUID();
@@ -281,6 +299,10 @@ export function parsePageBlocks(raw: unknown): PageBlock[] {
         out.push(mapBlock);
         break;
       }
+      case 'chart':
+        if (typeof b.chartId !== 'string' || b.chartId.length === 0) continue;
+        out.push({ id: b.id, kind: 'chart', chartId: b.chartId });
+        break;
       default:
         continue; // unknown kind — forward-compat drop
     }
@@ -393,6 +415,9 @@ export function compilePageStory(
         break;
       case 'map':
         parts.push(`[ ${resolveName(b.mapId) ?? b.mapId} — map ]`);
+        break;
+      case 'chart':
+        parts.push('[ chart ]');
         break;
     }
   }

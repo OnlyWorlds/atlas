@@ -24,6 +24,7 @@ import type {
   SyncState,
   Tombstone,
 } from '../core/types';
+import type { ChartConfig } from '../visualization/timeline/types';
 
 export interface FolderStore {
   // ---- Lifecycle ----
@@ -144,6 +145,17 @@ export interface FolderStore {
 
   readSyncState(): Promise<SyncState>;
   writeSyncState(patch: Partial<SyncState>): Promise<SyncState>;
+
+  // ---- Charts (atlas-local saved chart configs; `.atlas/charts.json`) ----
+
+  /**
+   * Read saved chart configs. Atlas-local world config that travels with the
+   * folder (like sync-state) — NOT an OW element, NOT localStorage. Returns an
+   * empty array when no charts have been saved.
+   */
+  readCharts(): Promise<ChartConfig[]>;
+  /** Overwrite the saved chart list (whole-list write, mirrors writeSyncState). */
+  writeCharts(charts: ChartConfig[]): Promise<void>;
 
   /**
    * Direct write of `server_updated_at` (used by SyncEngine after a successful

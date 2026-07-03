@@ -8846,6 +8846,180 @@ a.atlas-share-map-pin { cursor: pointer; }
   font-size: 15px;
 }
 
+/* Charts room — action buttons carry icons; saved-chart gallery. */
+.atlas-room-actions .atlas-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.atlas-room-actions .atlas-btn-ghost .material-symbols-outlined {
+  font-size: 15px;
+}
+
+.atlas-chart-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 24px 10px;
+}
+.atlas-chart-gallery:empty {
+  display: none;
+}
+.atlas-chart-gallery-label {
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  margin-right: 2px;
+}
+
+.atlas-saved-chart {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 4px;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 999px;
+  background: transparent;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.atlas-saved-chart:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.atlas-saved-chart.active {
+  border-color: rgba(34, 211, 238, 0.5);
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.atlas-saved-chart-name {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 999px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atlas-saved-chart:hover .atlas-saved-chart-name,
+.atlas-saved-chart.active .atlas-saved-chart-name {
+  color: #fff;
+}
+
+/* Controls stay visible at low opacity (full on hover) — never hover-only. */
+.atlas-saved-chart-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0.35;
+  transition: opacity 120ms ease;
+}
+.atlas-saved-chart:hover .atlas-saved-chart-actions {
+  opacity: 1;
+}
+
+.atlas-saved-chart-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0;
+  transition: color 120ms ease, background 120ms ease;
+}
+.atlas-saved-chart-action .material-symbols-outlined {
+  font-size: 13px;
+}
+.atlas-saved-chart-action:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+.atlas-saved-chart-action:last-child:hover {
+  color: var(--atlas-danger);
+}
+
+.atlas-saved-chart-rename {
+  font-family: inherit;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--atlas-cyan-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+  width: 120px;
+  outline: none;
+}
+
+/* Static chart block — share builder preview + visitor preview. */
+.atlas-chart-static {
+  width: 100%;
+}
+.atlas-chart-static-title {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  margin-bottom: 4px;
+}
+.atlas-chart-static-canvas-wrap {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+.atlas-chart-static-canvas-wrap canvas {
+  display: block;
+}
+.atlas-chart-static-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+}
+
+/* Chart-block editor — the "which chart?" picker. */
+.atlas-share-editor-label {
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  margin-bottom: 6px;
+}
+.atlas-share-chart-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.atlas-share-chart-option {
+  border: 1px solid var(--atlas-divider);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.atlas-share-chart-option:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.atlas-share-chart-option.selected {
+  color: #fff;
+  border-color: rgba(34, 211, 238, 0.5);
+  background: rgba(34, 211, 238, 0.12);
+}
+
 /* Chart room control bar — type toggles + focus pill (the wall-killer). */
 .atlas-chart-controls {
   display: flex;

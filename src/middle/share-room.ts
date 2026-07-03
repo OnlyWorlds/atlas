@@ -36,7 +36,8 @@ import {
   pageThemeOf, PAGE_THEME_ACCENTS, PAGE_THEME_FONTS, type PageTheme,
   type PageBlock, type HeadingBlock, type ProseBlock, type ElementCardBlock,
 } from '../core/sharing';
-import { renderBlockView, renderPayloadPage, populatedCardFields } from './share-page-render';
+import { renderBlockView, renderPayloadPage, populatedCardFields, setBuilderCharts } from './share-page-render';
+import type { ChartConfig } from '../visualization/timeline/types';
 import { buildPagePayload } from '../core/share-payload';
 import {
   SharingClient, SharingApiError, sharingErrorMessage,
@@ -70,6 +71,20 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   const wid = () => getState().active?.worldId ?? null;
   const elOf = (id: string): Element | undefined => getState().data.elements.find(e => e.id === id);
   const resolveName = (id: string): string | null => elOf(id)?.name || null;
+
+  // The world's saved charts (.atlas/charts.json) — kept warm for chart blocks:
+  // the builder freezes them live (setBuilderCharts) and publish/preview pass
+  // them into buildPagePayload. Reloaded on mount + on the id-swap signal.
+  let pageCharts: ChartConfig[] = [];
+  async function refreshCharts(): Promise<void> {
+    const folder = getActiveStore();
+    pageCharts = folder ? await folder.readCharts() : [];
+    setBuilderCharts(pageCharts);
+    // Chart blocks freeze from pageCharts — force a block rebuild once warm so a
+    // page opened directly (URL) with a chart block doesn't stay "chart not
+    // found". renderBlocks bypasses render()'s same-elements skip-optimization.
+    if (mountedView && mountedView !== 'list') renderBlocks(mountedView);
+  }
 
   // ---- writes ---------------------------------------------------------------
 
@@ -404,6 +419,21 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const page = elOf(pageId);
     if (!page) return;
     const block: PageBlock = { id: newBlockId(), kind: 'collection', elementIds: [picked.id] };
+    await saveBlocks(pageId, [...blocksOf(page), block]);
+    editingBlockId = block.id;
+    renderBlocks(pageId);
+  }
+
+  /** "+ chart": add a saved chart as a block (pick which one in the editor). */
+  async function addChartBlock(pageId: string): Promise<void> {
+    await commitOpenEdit(pageId);
+    if (pageCharts.length === 0) {
+      toasts.show('Save a chart in the Charts room first, then add it here.', 'info');
+      return;
+    }
+    const page = elOf(pageId);
+    if (!page) return;
+    const block: PageBlock = { id: newBlockId(), kind: 'chart', chartId: pageCharts[0].id };
     await saveBlocks(pageId, [...blocksOf(page), block]);
     editingBlockId = block.id;
     renderBlocks(pageId);
@@ -897,6 +927,62 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   }
 
   /** Inline editor for a collection block: member chips + add/remove. */
+  function renderChartEditor(pageId: string, block: Extract<PageBlock, { kind: 'chart' }>): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'atlas-share-block-editing atlas-share-chart-edit';
+
+    const setChart = async (chartId: string): Promise<void> => {
+      const page = elOf(pageId);
+      if (!page) return;
+      const blocks = blocksOf(page).map(b =>
+        b.id === block.id && b.kind === 'chart' ? { ...b, chartId } : b,
+      );
+      await saveBlocks(pageId, blocks);
+      renderBlocks(pageId);
+    };
+
+    if (pageCharts.length === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'atlas-share-hint';
+      hint.textContent = 'No saved charts yet. Save one in the Charts room, then pick it here.';
+      wrap.appendChild(hint);
+    } else {
+      const label = document.createElement('div');
+      label.className = 'atlas-share-editor-label';
+      label.textContent = 'Which chart?';
+      wrap.appendChild(label);
+
+      const picker = document.createElement('div');
+      picker.className = 'atlas-share-chart-picker';
+      for (const c of pageCharts) {
+        const opt = document.createElement('button');
+        opt.type = 'button';
+        opt.className = 'atlas-share-chart-option' + (c.id === block.chartId ? ' selected' : '');
+        opt.textContent = c.name;
+        opt.addEventListener('click', () => { void setChart(c.id); });
+        picker.appendChild(opt);
+      }
+      wrap.appendChild(picker);
+
+      const byId = new Map(getState().data.elements.map(e => [e.id, e]));
+      const preview = renderBlockView(block, byId);
+      preview.classList.add('atlas-share-card-edit-preview');
+      wrap.appendChild(preview);
+    }
+
+    const doneRow = document.createElement('div');
+    doneRow.className = 'atlas-share-block-edit-actions';
+    const done = document.createElement('button');
+    done.type = 'button';
+    done.className = 'atlas-btn-ghost atlas-share-block-done';
+    done.textContent = 'done';
+    done.title = 'Save and close this block';
+    done.addEventListener('click', () => { void commitThenRender(pageId); });
+    doneRow.appendChild(done);
+    wrap.appendChild(doneRow);
+    return wrap;
+  }
+
   function renderCollectionEditor(pageId: string, block: Extract<PageBlock, { kind: 'collection' }>): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'atlas-share-block-editing atlas-share-collection-edit';
@@ -1038,6 +1124,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         else if (block.kind === 'circle') row.appendChild(renderCircleEditor(pageId, block));
         else if (block.kind === 'collection') row.appendChild(renderCollectionEditor(pageId, block));
         else if (block.kind === 'map') row.appendChild(renderMapEditor(pageId, block));
+        else if (block.kind === 'chart') row.appendChild(renderChartEditor(pageId, block));
         else row.appendChild(renderCardEditor(pageId, block));
       } else {
         const content = renderStaticBlock(block);
@@ -1087,6 +1174,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     addRow.appendChild(addBtn('badge', '+ element card', () => { void addElementCard(pageId); }, 'A card for one element — identity plus the fields you choose'));
     addRow.appendChild(addBtn('grid_view', '+ collection', () => { void addCollectionBlock(pageId); }, 'A grid of several elements (identity only)'));
     addRow.appendChild(addBtn('map', '+ map', () => { void addMapBlock(pageId); }, 'A map image with the pins you include'));
+    addRow.appendChild(addBtn('show_chart', '+ chart', () => { void addChartBlock(pageId); }, 'A saved chart from the Charts room'));
     addRow.appendChild(addBtn('groups', '+ circle', () => { void addCircleBlock(pageId); }, 'A frozen snapshot of what a circle knows'));
     blocksHost.appendChild(addRow);
   }
@@ -1144,7 +1232,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         slug,
         title: page.name || '(untitled)',
         intent: pageIntentOf(page),
-        payload: buildPagePayload(page, getState().data.elements),
+        payload: buildPagePayload(page, getState().data.elements, pageCharts),
       });
       const stamp = new Date().toISOString();
       const mirrored = await patchPage(pageId, {
@@ -1180,7 +1268,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const row = await client.republish(pub.slug, {
         title: page.name || '(untitled)',
         intent: pageIntentOf(page),
-        payload: buildPagePayload(page, getState().data.elements),
+        payload: buildPagePayload(page, getState().data.elements, pageCharts),
       });
       await patchPage(pageId, {
         atlas_page_pub: { ...pub, updated_at: row?.updated_at ?? new Date().toISOString() },
@@ -1723,7 +1811,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         await writeChain; // pending name/intent patches land before the snapshot
         const current = elOf(pageId);
         if (!current) return;
-        const json = JSON.stringify(buildPagePayload(current, getState().data.elements), null, 2);
+        const json = JSON.stringify(buildPagePayload(current, getState().data.elements, pageCharts), null, 2);
         try {
           await navigator.clipboard.writeText(json);
           toasts.success('Publish payload copied');
@@ -1748,7 +1836,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // what `GET /pages/<slug>/` will serve: non-included elements render as
     // plain text, included ones chip/link.
     if (previewMode) {
-      root.appendChild(renderPayloadPage(buildPagePayload(page, getState().data.elements)));
+      root.appendChild(renderPayloadPage(buildPagePayload(page, getState().data.elements, pageCharts)));
       return;
     }
 
@@ -1864,11 +1952,15 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     queueMicrotask(() => { root.scrollTop = st; });
   }
 
+  void refreshCharts();
+  const onChartsChanged = () => { void refreshCharts(); };
+  window.addEventListener('atlas:charts-changed', onChartsChanged);
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
   return () => {
     flushAndTeardown(mountedView);
     window.removeEventListener('pagehide', onPageHide);
+    window.removeEventListener('atlas:charts-changed', onChartsChanged);
     unsubState();
     unsubHash();
   };

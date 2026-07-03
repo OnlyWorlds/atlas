@@ -17,8 +17,14 @@ Build-plan + research synthesis: `Forge/Notes/2026-06-19-chart2-build-plan.md`. 
 - **F1** ✅ — the duplicate "Name" field is gone from the element-detail Base section (the header click-to-edit title is the name, conv #80); two e2e updated to rename via the header.
 - **Still open:** Cmd+K palette.
 
-## Queued chart bouts (additive, no migration — pick up here)
-save charts → `.atlas/charts.json` → gallery → **chart-as-share-block** (the share-room block kind `{kind:'chart', chartId}`, reserved + gated) → **forward-half** render (Simmer's wedge: owed/coming/due, now-line as the seam) → now-line(s) + reconciler → Narrative lanes (`laneKey`) → fuzzy/relative dates (`DateSpec` already a tagged union) → map-chart + scrubber → 3D. And still open across atlas: the Cmd+K palette.
+## SHIPPED since The Landing (2026-06-19, gated)
+- **Save → `.atlas/charts.json`** (FolderStore.readCharts/writeCharts; pure `charts-store.ts`) + a **saved-chart gallery** in the Charts room (load/rename/delete/active-highlight). "Save chart" action.
+- **Chart-as-share-block** `{kind:'chart', chartId}` — `chart-freeze.ts` `freezeChartBlock` (frozen identity nodes; scope = disclosure boundary; ref-when-carded), `chart-static.ts` `renderChartView` (static canvas, used by the atlas builder AND copied into the `show` viewer). share-room "+ chart" picker + chart editor + charts threaded into all 4 buildPagePayload sites. **3-lens gate ran** → fixed 2 blockers (show had no chart case → silent published hole; `rewriteChartScopeIds` was dead → wired into `handleIdSwap` + `atlas:charts-changed` event).
+
+## Queued chart bouts (pick up here — additive, no migration)
+**forward-half** render (Simmer's wedge: owed/coming/due, now-line as the seam; `ChartAxis.direction` already typed) → now-line(s) + reconciler → Narrative lanes (`laneKey`) → fuzzy/relative dates (`DateSpec` is a tagged union; freeze adds an OPTIONAL `dateSpec?`/band field — never reshape `date`) → map-chart + scrubber → 3D. And still open across atlas: the Cmd+K palette.
+
+**Design-calls to confirm with Captain** (gate-surfaced): a published chart's scope is a LIVE RULE — republish re-snapshots membership (a later-added element joins; a focus chart discloses the whole neighbourhood). Consistent with the circle block; documented in `chart-freeze.ts`. Confirm that's the intended boundary vs. freezing the id-set at first publish (like map pinIds).
 
 ## Decisions already locked (don't re-litigate)
 chart = block (referenced by `{kind:'chart', chartId}`) · storage `.atlas/charts.json` + share, never an OW element · **unified select=focus** (built) · maps-in-charts: embed real Map rendered static, **events inherit their location's pin (events are not pins)**, right pane stays the live spatial workshop · default = auto recipe, instantly switchable · ChartConfig is versioned (schema_version) because it persists + crosses the share/viewer version boundary. Captain's chart-#2 nav calls: anchor-default ignores type chips · fixed ~7 anchors · accept rapid-click history · leave the context-pane mouse-back handler as-is.

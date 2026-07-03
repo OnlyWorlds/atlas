@@ -22,6 +22,7 @@ import type {
   SyncState,
   Tombstone,
 } from '../../src/core/types';
+import type { ChartConfig } from '../../src/visualization/timeline/types';
 
 const defaultMeta: WorldMeta = { id: 'mock-world', name: 'mock world' };
 const defaultSyncState: SyncState = {
@@ -37,6 +38,7 @@ export class MockFolderStore implements FolderStore {
   private elements = new Map<string, Element>();
   private tombstones: Tombstone[] = [];
   private syncState: SyncState = { ...defaultSyncState };
+  private charts: ChartConfig[] = [];
   private mediaItems = new Map<string, MediaItem>();
   private mediaBlobs = new Map<string, Blob>();
   /** Per-id serialization for update/delete — mirrors FsFolderStore (convention #79). */
@@ -286,6 +288,14 @@ export class MockFolderStore implements FolderStore {
   async writeSyncState(patch: Partial<SyncState>): Promise<SyncState> {
     this.syncState = { ...this.syncState, ...patch };
     return { ...this.syncState };
+  }
+
+  async readCharts(): Promise<ChartConfig[]> {
+    return this.charts.map(c => ({ ...c }));
+  }
+
+  async writeCharts(charts: ChartConfig[]): Promise<void> {
+    this.charts = charts.map(c => ({ ...c }));
   }
 
   async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string): Promise<void> {

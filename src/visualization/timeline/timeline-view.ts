@@ -20,7 +20,8 @@ import type { LinkedRef, PlacedDot, TimelineNode } from './types';
 import { calculateTicks, calculateTimeRange, createDateToX } from './axis-calculator';
 import { escapeText } from '../../core/dom-utils';
 import { ELEMENT_ICONS } from '../../core/constants';
-import { rankAnchors } from './degree';
+import { rankAnchors, ANCHOR_CAP } from './degree';
+import { applyAlpha, ensureIconFont } from './canvas-utils';
 
 const DOT_RADIUS = 4;             // placement radius for binning + hit-test base
 const DOT_RADIUS_HOVER = 6;       // hit-test tolerance (px)
@@ -29,7 +30,6 @@ const ICON_BASE = 14;
 const ICON_HOVER = 18;
 const ICON_ANCHOR = 20;          // significance "anchor beats" — bigger glyph + halo
 const ICON_SELECTED = 22;
-const ANCHOR_CAP = 7;            // a handful of always-labelled landmarks (chart #2)
 const RUNG_MID = 1.5;            // LOD: above this zoom, non-anchor labels fill in
 const RUNG_CLOSE = 3;            // LOD: above this zoom, glyphs grow further
 const TOP_PAD = 20;
@@ -214,7 +214,15 @@ function computeBeeswarm(
         if (free(up)) { y = up; found = true; }
         else if (free(down)) { y = down; found = true; }
       }
-      if (!found) y = top + ((placed.length * 37) % Math.round(span)); // overflow: stable spread
+      if (!found) {
+        // Everything in this x-window is occupied (extreme local density) —
+        // overlap is unavoidable, so step out alternately from the centre,
+        // CLAMPED to the band. Deterministic + bounded (the old modulo spread
+        // could fling a node into otherwise-empty canvas).
+        const k = (placed.length % maxK) + 1;
+        const dir = placed.length % 2 === 0 ? -1 : 1;
+        y = Math.min(bottom, Math.max(top, centerY + dir * k * NODE_Y_GAP));
+      }
     }
     placed.push({ node, x, y, radius: DOT_RADIUS });
   }
@@ -413,30 +421,41 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
     for (const x of near) push(x.d, 2);
   }
   // Labels by default: offer EVERY on-screen node as a low-priority candidate;
-  // the per-row collision-avoider fills in as many names as fit (anchors +
-  // selection win contested slots). More become legible as you zoom because the
-  // density-fan spreads rows apart. (Captain: "labels in the default view too.")
+  // the collision-avoider below fills in as many names as actually fit. More
+  // become legible as you zoom because the density-fan spreads rows apart.
+  // (Captain: "labels in the default view too.")
   for (const d of placed) push(d, 3);
   cands.sort((a, b) => a.pri - b.pri);
 
+  // TRUE 2D placement: a label's bounding box must clear every already-placed
+  // label AND every node glyph (except its own). The old check only compared
+  // x within the same rounded y-row, so labels overprinted neighbouring glyphs
+  // and labels one fan-level up/down — the dense-band smear. Greedy in priority
+  // order: anchors + selection claim their space first, the rest fill the gaps.
+  const overlaps = (a: Box, b: Box): boolean => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+  const glyphHalf = (d: PlacedDot): number => (anchorIds.has(d.node.id) ? ICON_ANCHOR : ICON_BASE) * 0.5 + 2;
+  const glyphBoxes = placed.map(d => ({ id: d.node.id, box: boxAround(d.x, d.y, glyphHalf(d)) }));
+  const placedBoxes: Box[] = [];
+
   ctx.textBaseline = 'middle';
-  const occupiedByRow = new Map<number, number[]>();
   for (const { dot } of cands) {
-    const rowKey = Math.round(dot.y);
-    const occ = occupiedByRow.get(rowKey) ?? [];
-    if (occ.some(x => Math.abs(x - dot.x) < 80)) continue; // collides with a higher-priority label
-    occ.push(dot.x);
-    occupiedByRow.set(rowKey, occ);
     const isSel = dot.node.id === state.selectedId;
     const isAnchor = anchorIds.has(dot.node.id);
     ctx.font = isAnchor ? '600 12px system-ui, sans-serif' : '11px system-ui, sans-serif';
-    ctx.fillStyle = isSel ? 'rgba(255,255,255,0.95)' : isAnchor ? 'rgba(255,255,255,0.86)' : 'rgba(255,255,255,0.6)';
-    // Flip the label to the LEFT of the dot in the right third, so it never
-    // clips the panel edge (self-inspection finding).
+    const text = truncate(dot.node.name, LABEL_MAX_CHARS);
+    const tw = ctx.measureText(text).width;
+    // Flip the label to the LEFT of the dot in the right third so it never clips
+    // the panel edge (self-inspection finding).
     const flip = dot.x > w * 0.66;
-    ctx.textAlign = flip ? 'right' : 'left';
     const off = isAnchor ? 12 : 9;
-    ctx.fillText(truncate(dot.node.name, LABEL_MAX_CHARS), dot.x + (flip ? -off : off), dot.y);
+    const x0 = flip ? dot.x - off - tw : dot.x + off;
+    const box: Box = { x0, x1: x0 + tw, y0: dot.y - 7, y1: dot.y + 7 };
+    if (placedBoxes.some(b => overlaps(box, b))) continue;
+    if (glyphBoxes.some(g => g.id !== dot.node.id && overlaps(box, g.box))) continue;
+    placedBoxes.push(box);
+    ctx.fillStyle = isSel ? 'rgba(255,255,255,0.95)' : isAnchor ? 'rgba(255,255,255,0.86)' : 'rgba(255,255,255,0.6)';
+    ctx.textAlign = flip ? 'right' : 'left';
+    ctx.fillText(text, dot.x + (flip ? -off : off), dot.y);
   }
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
@@ -672,42 +691,16 @@ function handleWheel(state: ViewState, e: WheelEvent): void {
 
 // ====== utils ======
 
+/** An axis-aligned bounding box (label/glyph collision). */
+interface Box { x0: number; x1: number; y0: number; y1: number; }
+
+function boxAround(cx: number, cy: number, half: number): Box {
+  return { x0: cx - half, x1: cx + half, y0: cy - half, y1: cy + half };
+}
+
 function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max - 1) + '…';
 }
 
-// ---- icon font readiness ----
-
-let iconFontReady: Promise<void> | null = null;
-
-/**
- * Material Symbols isn't guaranteed to be in the FontFaceSet when the canvas
- * first paints (the DOM card that also uses it starts hidden), so glyphs would
- * render as tofu. Load it once; callers redraw on resolve. Mirrors the proven
- * pin-visuals.ts approach. Best-effort — falls back to empty until it lands.
- */
-function ensureIconFont(): Promise<void> {
-  if (iconFontReady) return iconFontReady;
-  iconFontReady = (async () => {
-    try {
-      if ((document as any).fonts?.load) {
-        await (document as any).fonts.load('16px "Material Symbols Outlined"', 'category');
-        await (document as any).fonts.ready;
-      }
-    } catch {
-      // ignore — glyphs simply stay blank until the font is available
-    }
-  })();
-  return iconFontReady;
-}
-
-function applyAlpha(hex: string, alpha: number): string {
-  if (!hex.startsWith('#')) return hex;
-  let h = hex.slice(1);
-  if (h.length === 3) h = h.split('').map(c => c + c).join('');
-  if (h.length !== 6) return hex;
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
+// icon-font readiness + applyAlpha now live in ./canvas-utils (shared with the
+// static share renderer). Imported above.

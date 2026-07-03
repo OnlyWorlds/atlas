@@ -17,7 +17,9 @@ import { ElementCreateModal } from '../ui/element-create-modal';
 import { mountTimelineView, type TimelineViewHandle } from '../visualization/timeline/timeline-view';
 import { extractTemporalNodes } from '../visualization/timeline/data-normalizer';
 import { pickDefaultChart, filterNodesByScope, scopeFromFocus } from '../visualization/timeline/chart-recipe';
-import type { ChartConfig, TimelineNode } from '../visualization/timeline/types';
+import type { ChartConfig, ChartScope, TimelineNode } from '../visualization/timeline/types';
+import { defaultChartName, upsertChart, removeChart, renameChart, sameScope } from '../visualization/timeline/charts-store';
+import { getActiveStore } from '../core/active-store';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
@@ -46,7 +48,21 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   newEventBtn.textContent = '+ Event';
   newEventBtn.addEventListener('click', () => new ElementCreateModal(toasts, { initialType: 'event' }).open());
   actions.appendChild(newEventBtn);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'atlas-btn-ghost';
+  saveBtn.dataset.action = 'save-chart';
+  saveBtn.title = 'Save the current view as a chart you can reopen or share';
+  saveBtn.innerHTML = `<span class="material-symbols-outlined">bookmark_add</span> Save chart`;
+  saveBtn.addEventListener('click', () => void saveCurrentChart());
+  actions.appendChild(saveBtn);
   wrap.appendChild(actions);
+
+  // Saved-chart gallery — hidden until at least one chart is saved.
+  const gallery = document.createElement('div');
+  gallery.className = 'atlas-chart-gallery';
+  wrap.appendChild(gallery);
 
   const controlBar = document.createElement('div');
   controlBar.className = 'atlas-chart-controls';
@@ -57,9 +73,11 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   wrap.appendChild(viewMount);
 
   let handle: TimelineViewHandle | null = null;
-  let config: ChartConfig | null = null;        // seeded once; the future save/share contract
+  let config: ChartConfig | null = null;        // seeded once; the save/share contract
   let typeFilter: Set<ElementType> | null = null; // broad-view filter (null = all); focus is URL-driven
   let seeded = false;
+  let savedCharts: ChartConfig[] = [];          // from .atlas/charts.json
+  let suppressGallery = false;                  // true while an inline rename input is open
 
   const worldId = (): string | null => getState().active?.worldId ?? null;
   const elementById = (id: string): Element | undefined =>
@@ -119,6 +137,145 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     }
   }
 
+  /** The scope the live view is currently showing (focus URL + type filter). */
+  function currentScope(): ChartScope {
+    const route = parseHash(window.location.hash);
+    return scopeFromFocus(route.elementId ?? null, typeFilter);
+  }
+
+  /** Save the current view as a named chart in `.atlas/charts.json`. */
+  async function saveCurrentChart(): Promise<void> {
+    const store = getActiveStore();
+    if (!store) { toasts.error('no active world to save into'); return; }
+    const all = getState().data.elements;
+    const scope = currentScope();
+    const axis = config?.axis ?? { kind: 'time' as const, direction: 'both' as const };
+    const chart: ChartConfig = {
+      schema_version: 1,
+      id: crypto.randomUUID(),
+      name: defaultChartName(scope, all),
+      axis,
+      scope,
+      render: '2d',
+    };
+    savedCharts = upsertChart(savedCharts, chart);
+    await store.writeCharts(savedCharts);
+    renderGallery();
+    toasts.success(`saved "${chart.name}"`);
+  }
+
+  /** Load a saved chart into the live view (restores its scope). */
+  function applyChart(chart: ChartConfig): void {
+    const w = worldId();
+    if (!w) return;
+    config = chart;
+    const route = parseHash(window.location.hash);
+    const scope = chart.scope;
+    if (scope.kind === 'focus') {
+      typeFilter = null;
+      navigate(timelineHash(w, scope.elementId));
+    } else if (scope.kind === 'types') {
+      typeFilter = new Set(scope.types);
+      if (route.elementId) navigate(timelineHash(w)); else render();
+    } else if (scope.kind === 'all') {
+      typeFilter = null;
+      if (route.elementId) navigate(timelineHash(w)); else render();
+    } else {
+      // selection / unknown — not creatable in this editor yet; lands in share.
+      toasts.show('this chart opens in the share view', 'info');
+    }
+  }
+
+  async function deleteChart(chart: ChartConfig): Promise<void> {
+    savedCharts = removeChart(savedCharts, chart.id);
+    const store = getActiveStore();
+    if (store) await store.writeCharts(savedCharts);
+    renderGallery();
+    toasts.show(`removed "${chart.name}"`, 'info');
+  }
+
+  /** Swap a saved-chart card's name for an inline rename input. */
+  function startRename(card: HTMLElement, chart: ChartConfig): void {
+    const nameEl = card.querySelector('.atlas-saved-chart-name');
+    if (!nameEl) return;
+    suppressGallery = true; // keep background re-renders from destroying the input
+    card.classList.add('renaming');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'atlas-saved-chart-rename';
+    input.value = chart.name;
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const commit = async (save: boolean): Promise<void> => {
+      if (done) return;
+      done = true;
+      suppressGallery = false;
+      if (save) {
+        const next = renameChart(savedCharts, chart.id, input.value);
+        if (next !== savedCharts) {
+          savedCharts = next;
+          const store = getActiveStore();
+          if (store) await store.writeCharts(savedCharts);
+        }
+      }
+      renderGallery();
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); void commit(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); void commit(false); }
+    });
+    input.addEventListener('blur', () => void commit(true));
+  }
+
+  function galleryActionBtn(icon: string, title: string, onClick: () => void): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'atlas-saved-chart-action';
+    b.title = title;
+    b.innerHTML = `<span class="material-symbols-outlined">${escapeText(icon)}</span>`;
+    b.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+    return b;
+  }
+
+  function renderGallery(): void {
+    gallery.innerHTML = '';
+    if (savedCharts.length === 0) return;
+    const label = document.createElement('span');
+    label.className = 'atlas-chart-gallery-label';
+    label.textContent = 'Saved charts';
+    gallery.appendChild(label);
+
+    const curScope = currentScope();
+    for (const chart of savedCharts) {
+      const card = document.createElement('div');
+      card.className = 'atlas-saved-chart' + (sameScope(chart.scope, curScope) ? ' active' : '');
+
+      const nameBtn = document.createElement('button');
+      nameBtn.type = 'button';
+      nameBtn.className = 'atlas-saved-chart-name';
+      nameBtn.title = 'Open this chart';
+      nameBtn.textContent = chart.name;
+      nameBtn.addEventListener('click', () => applyChart(chart));
+      card.appendChild(nameBtn);
+
+      const acts = document.createElement('div');
+      acts.className = 'atlas-saved-chart-actions';
+      acts.appendChild(galleryActionBtn('edit', 'Rename chart', () => startRename(card, chart)));
+      acts.appendChild(galleryActionBtn('close', 'Delete chart', () => void deleteChart(chart)));
+      card.appendChild(acts);
+
+      gallery.appendChild(card);
+    }
+  }
+
+  async function refreshGallery(): Promise<void> {
+    const store = getActiveStore();
+    savedCharts = store ? await store.readCharts() : [];
+    renderGallery();
+  }
+
   function render(): void {
     const wid = worldId();
     if (!wid) return;
@@ -148,13 +305,21 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const scoped = filterNodesByScope(allNodes, scopeFromFocus(route.elementId ?? null, typeFilter));
     handle.setNodes(scoped);
     handle.setSelection(route.mode === 'timeline' ? (route.elementId ?? null) : null);
+
+    if (!suppressGallery) renderGallery(); // keep the active-chart highlight in sync
   }
 
   if (getState().active) render();
+  void refreshGallery();
+  // charts.json can change out-of-band (id-swap migration on make-online) —
+  // re-read so the gallery never shows a stale saved scope.
+  const onChartsChanged = () => { void refreshGallery(); };
+  window.addEventListener('atlas:charts-changed', onChartsChanged);
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
 
   return () => {
+    window.removeEventListener('atlas:charts-changed', onChartsChanged);
     unsubState();
     unsubHash();
     handle?.destroy();

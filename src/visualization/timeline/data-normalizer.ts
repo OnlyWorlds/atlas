@@ -14,31 +14,14 @@ import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from './temporal-fields';
 import type { LinkedRef, TimelineNode } from './types';
 import type { Element, ElementType } from '../../core/types';
 import { relationFieldsFor } from '../../editor/field-schema';
+import { ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { computeDegrees } from './degree';
 
-/** Element type → dot color. Falls back to muted text if unknown. */
-const TYPE_COLOR: Record<string, string> = {
-  character:   '#22d3ee', // cyan
-  creature:    '#a78bfa', // violet
-  species:     '#a78bfa',
-  family:      '#fbbf24', // amber
-  collective:  '#fbbf24',
-  institution: '#f97316', // orange
-  location:    '#34d399', // emerald
-  object:      '#94a3b8', // slate
-  construct:   '#94a3b8',
-  ability:     '#ec4899', // pink
-  trait:       '#ec4899',
-  title:       '#fbbf24',
-  language:    '#a78bfa',
-  law:         '#f87171', // red
-  event:       '#22d3ee',
-  narrative:   '#22d3ee',
-  phenomenon:  '#a78bfa',
-  relation:    '#94a3b8',
-  zone:        '#34d399',
-};
-
+// Node colour is the ONE canonical per-type palette (`ELEMENT_TYPE_COLORS`),
+// shared with pins, the static share renderer (chart-static.ts) and the rest of
+// atlas. A former local map collapsed character/event/narrative all to one cyan
+// (defeating type identity) AND disagreed with the published renderer (breaking
+// "author preview ≡ served page"). One source: the room chart now matches both.
 const FALLBACK_COLOR = '#94a3b8';
 
 /** Humanise a relation field name into a chip label: "birthplace" → "Birthplace". */
@@ -101,7 +84,7 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
       startDate,
       endDate,
       dateSpec: { kind: 'exact', value: startDate },
-      color: TYPE_COLOR[el.type] ?? FALLBACK_COLOR,
+      color: ELEMENT_TYPE_COLORS[el.type as ElementType] ?? FALLBACK_COLOR,
       links: resolveLinks(el, byId),
       degree: 0, // filled below once every node exists (bidirectional read)
     });

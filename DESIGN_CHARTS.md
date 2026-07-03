@@ -17,10 +17,12 @@ The "timeline" is just the first chart type. The room (today `timeline`, becomin
 
 ## The architecture (three load-bearing decisions, all locked with Captain)
 
-### 1. A chart **is a block**
+### 1. A chart **is a block** — ✅ SHIPPED (Bout 3, 2026-06-19, 3-lens gated)
 The share room already has blocks (heading / prose / element-card / circle / collection / **map**). A chart is the next block kind. Lifecycle:
 **build in the Charts room → view it → save it (local) → drop it into a share page as a chart block (existing publish infra).**
 The **map block is the precedent**: a configured spatial view that renders static + clickable and publishes to ow.com. A chart block is the temporal/relational generalization. This is what makes "loads of views" tractable — they're all one shape (a `ChartConfig`) with one renderer family, not N bespoke features.
+
+**As built**: block `{ kind:'chart', chartId }` in `core/sharing.ts` — deliberately NOT in the refs mirror (chartId is atlas-local, never id-swaps; the chart's *scope* element ids migrate via `rewriteChartScopeIds` wired into `handleIdSwap`, firing `atlas:charts-changed`). `freezeChartBlock` (`visualization/timeline/chart-freeze.ts`) snapshots the scope → identity nodes (name/type/date/anchor; `ref` ONLY when the element is also carded — the scope IS the disclosure boundary) → `PayloadChartBlock`. `renderChartView` (`chart-static.ts`) draws a static density-fan, shared by the atlas builder + COPIED into the `show` viewer (`payload-types.ts` parse + `render.ts`). Freeze-at-publish + re-snapshot-on-republish — same as every share block (Captain-confirmed). The gate caught 2 blockers pre-build (show had no chart case → silent hole; the id-swap migration was unwired).
 
 ### 2. Storage: local in `.atlas/`, shared via the block
 - **Saved charts → `.atlas/charts.json`** — atlas-local world config, **travels with the folder** (like `map-view-prefs` / `sync-state`). **NOT** an OW element (a chart isn't a Character/Event — that's the "pollutey" instinct, correct). **NOT** localStorage (lost on folder move). **NOT** a new ow.com table.
