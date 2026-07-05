@@ -288,7 +288,7 @@ describe('buildPagePayload', () => {
     expect((p.blocks[2] as { knowerId: string }).knowerId).toBe(CIRCLE);
   });
 
-  it('map block freezes: %-coords, pinned elements DISCLOSED with full populated fields (pin checklist = the gate); no-image maps drop entirely', () => {
+  it('map block freezes: %-coords, pinned elements IDENTITY + description by default (B6); no-image maps drop entirely', () => {
     const MAP = 'm1000000-0000-0000-0000-000000000001';
     const PIN1 = 'pin10000-0000-0000-0000-000000000001';
     const PIN2 = 'pin20000-0000-0000-0000-000000000002';
@@ -313,17 +313,43 @@ describe('buildPagePayload', () => {
     // 250/1000 = 25%, 125/500 = 25%; pinned elements are included → ref.
     expect(frozen.pins[0]).toEqual({ xPct: 25, yPct: 25, name: 'Ireena', type: 'character', ref: IREENA });
     expect(frozen.pins[1]).toEqual({ xPct: 90, yPct: 90, name: 'Vallaki', type: 'location', ref: VALLAKI });
-    // Pinned elements join `elements` with image + ALL populated fields
-    // (the pin-click modal's content); relations still tokenized — Ismark
-    // exists but isn't included → text-only token.
+    // B6 (2026-07-03): pinned elements join `elements` as IDENTITY +
+    // description (+ image) ONLY — a DM's other fields never leak from a
+    // shared map without the per-pin full-profile opt-in.
     expect(Object.keys(p.elements).sort()).toEqual([IREENA, VALLAKI].sort());
     const ireena = p.elements[IREENA];
     expect(ireena.image_url).toBe('https://img.example/ireena.png');
     expect(ireena.fields.description).toBe('The burgomaster\'s daughter.');
-    expect(tokens(ireena.fields.birthplace)).toEqual([{ text: 'Vallaki', ref: VALLAKI }]);
-    expect(tokens(ireena.fields.friends)).toEqual([{ text: 'Ismark' }]);
+    expect(ireena.fields.birthplace).toBeUndefined();
+    expect(ireena.fields.friends).toBeUndefined();
     // Pin ids never reach the wire.
     expect(JSON.stringify(p)).not.toContain(PIN1);
+
+    // fullPinIds opt-in: PIN1 ships Ireena's FULL populated fields; the
+    // un-opted PIN2 stays identity + description.
+    const pageFull = makePage([
+      { id: 'b1', kind: 'map', mapId: MAP, pinIds: [PIN1, PIN2], fullPinIds: [PIN1] },
+    ]);
+    (pageFull as unknown as Record<string, unknown>).atlas_page_refs = [MAP, PIN1, PIN2];
+    const pFull = buildPagePayload(pageFull, elements);
+    const ireenaFull = pFull.elements[IREENA];
+    expect(ireenaFull.fields.description).toBe('The burgomaster\'s daughter.');
+    expect(tokens(ireenaFull.fields.birthplace)).toEqual([{ text: 'Vallaki', ref: VALLAKI }]);
+    expect(tokens(ireenaFull.fields.friends)).toEqual([{ text: 'Ismark' }]);
+    expect(pFull.elements[VALLAKI].fields.birthplace).toBeUndefined();
+
+    // A separate card's disclosure UNIONS in — the map default never
+    // downgrades a deliberate card choice.
+    const pageCard = makePage([
+      { id: 'b0', kind: 'element-card', elementId: IREENA, variant: 'full', fields: ['birthplace'] },
+      { id: 'b1', kind: 'map', mapId: MAP, pinIds: [PIN1] },
+    ]);
+    (pageCard as unknown as Record<string, unknown>).atlas_page_refs = [IREENA, MAP, PIN1];
+    const pCard = buildPagePayload(pageCard, elements);
+    // Vallaki isn't included on THIS page → text-only token, no ref.
+    expect(tokens(pCard.elements[IREENA].fields.birthplace)).toEqual([{ text: 'Vallaki' }]);
+    expect(pCard.elements[IREENA].fields.description).toBe('The burgomaster\'s daughter.');
+    expect(pCard.elements[IREENA].fields.friends).toBeUndefined();
 
     // showLabels: false survives the freeze.
     const pageNoLabels = makePage([
@@ -338,6 +364,26 @@ describe('buildPagePayload', () => {
       ? ({ ...e, image_url: undefined } as unknown as Element) : e);
     const p2 = buildPagePayload(page, noImg);
     expect(p2.blocks.find(b => (b as { kind: string }).kind === 'map')).toBeUndefined();
+  });
+
+  it('fullPinIds heals alongside pinIds on id-swap (opt-in follows its pin)', () => {
+    const MAP = 'm1000000-0000-0000-0000-000000000001';
+    const PIN1 = 'pin10000-0000-0000-0000-000000000001';
+    const elements: Element[] = [
+      ...world(),
+      { id: MAP, type: 'map', name: 'barovia', image_url: 'https://img.example/map.png',
+        width: 1000, height: 500, local_updated_at: 't' } as unknown as Element,
+      { id: PIN1, type: 'pin', map_id: MAP, element_id: IREENA, x: 250, y: 125, local_updated_at: 't' } as unknown as Element,
+    ];
+    // Nested block ids are STALE (pre-id-swap); the refs mirror is fresh.
+    const page = makePage([
+      { id: 'b1', kind: 'map', mapId: 'stale-map', pinIds: ['stale-pin'], fullPinIds: ['stale-pin'] },
+    ]);
+    (page as unknown as Record<string, unknown>).atlas_page_refs = [MAP, PIN1];
+    const p = buildPagePayload(page, elements);
+    // Full profile shipped → the fullPinIds entry followed its pin's heal.
+    // (Vallaki isn't included on this page → text-only token.)
+    expect(tokens(p.elements[IREENA].fields.birthplace)).toEqual([{ text: 'Vallaki' }]);
   });
 
   it('heals card ids from the refs mirror before building (id-swap safety)', () => {

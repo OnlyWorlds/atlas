@@ -116,7 +116,8 @@ function swapIconForAvatar(head: HTMLElement, url: string): void {
 /**
  * Render an element-card block. `compact` = identity row only; `full` adds
  * the block's chosen fields (those still populated on the element).
- * A missing element renders an honest placeholder, never throws.
+ * A missing element renders NOTHING (B3, 2026-07-03) — preview must match
+ * the served page; the author sees the dangling block in the edit rows.
  */
 export function renderElementCard(block: ElementCardBlock, elements: Map<string, Element>): HTMLElement {
   const card = document.createElement('div');
@@ -125,12 +126,7 @@ export function renderElementCard(block: ElementCardBlock, elements: Map<string,
 
   if (!el) {
     card.classList.add('is-missing');
-    card.innerHTML = `
-      <div class="atlas-share-card-head">
-        <span class="material-symbols-outlined">help</span>
-        <span class="atlas-share-card-name">(missing element)</span>
-      </div>
-    `;
+    card.hidden = true;
     return card;
   }
 
@@ -411,17 +407,26 @@ export function renderBlockView(block: PageBlock, elements: Map<string, Element>
       // Builder context: freeze live (every world element counts as
       // "included" so pins open in the builder; the PAYLOAD freeze applies
       // the real disclosure rule). Modal entries: identity map for chip
-      // resolution + full projection for the clicked pin's element.
+      // resolution + a PAYLOAD-TRUE projection for the clicked pin's element
+      // — identity + description by default, full profile only for pins
+      // opted in via fullPinIds (B6), so the preview matches the served page.
       const allIds = new Set(elements.keys());
       const identityEntries: Record<string, PayloadElementEntry> = {};
       for (const el of elements.values()) {
         identityEntries[el.id] = { name: el.name || '(unnamed)', type: el.type, fields: {} };
       }
+      const fullElementIds = new Set(
+        (block.fullPinIds ?? [])
+          .map(pid => (elements.get(pid) as Record<string, unknown> | undefined)?.element_id)
+          .filter((v): v is string => typeof v === 'string'),
+      );
       return renderMapView(
         freezeMapBlock(block, elements, allIds),
         (id) => {
           const el = elements.get(id);
-          return el ? projectElementEntry(el, elements, allIds, populatedFieldNames(el), true) : null;
+          if (!el) return null;
+          const fields = fullElementIds.has(id) ? populatedFieldNames(el) : ['description'];
+          return projectElementEntry(el, elements, allIds, fields, true);
         },
         identityEntries,
       );
@@ -588,13 +593,12 @@ export function renderPayloadCard(
   const entry = entries[block.elementId];
 
   if (!entry) {
+    // B3 (2026-07-03): a dangling card is author information, not visitor
+    // content — the public page (and the preview, which must match it)
+    // renders NOTHING. The author still sees the block in the builder's
+    // edit rows.
     card.classList.add('is-missing');
-    card.innerHTML = `
-      <div class="atlas-share-card-head">
-        <span class="material-symbols-outlined">help</span>
-        <span class="atlas-share-card-name">(missing element)</span>
-      </div>
-    `;
+    card.hidden = true;
     return card;
   }
 

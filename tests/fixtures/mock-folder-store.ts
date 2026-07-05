@@ -290,6 +290,14 @@ export class MockFolderStore implements FolderStore {
     return { ...this.syncState };
   }
 
+  async updateSyncState(mutate: (current: SyncState) => Partial<SyncState>): Promise<SyncState> {
+    // In-memory ops complete within one turn, so this is atomic by
+    // construction — but the mutator still receives the CURRENT state, so
+    // read-modify-write semantics match FsFolderStore's chained impl.
+    this.syncState = { ...this.syncState, ...mutate({ ...this.syncState }) };
+    return { ...this.syncState };
+  }
+
   async readCharts(): Promise<ChartConfig[]> {
     return this.charts.map(c => ({ ...c }));
   }

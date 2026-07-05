@@ -1,20 +1,30 @@
 /**
- * slugify + elementFilename + parseIdFromFilename — slug-prefix filename refactor.
+ * slugify + elementFilename + idTail + parseIdFromFilename — the Folder Format
+ * naming contract.
  *
  * Locks the file-naming contract for the FsFolderStore: every on-disk element
- * file is `<slug>--<uuid>.json` (or `<uuid>.json` when unnamed), and the
- * parser is the inverse — it recovers the uuid regardless of slug content,
- * length cap, or test-fixture id shape.
+ * file is `<slug>--<id-tail8>.json` (or `<full-id>.json` when unnamed). The
+ * filename is PRESENTATION — identity is the `id` INSIDE the file, and the
+ * store indexes by reading bodies. parseIdFromFilename therefore recovers an
+ * id FRAGMENT (full id only on legacy/unnamed files) for diagnostics, never
+ * for identity.
  */
 
 import { describe, it, expect } from 'vitest';
 import {
+  ID_TAIL_LEN,
   SLUG_MAX_LEN,
   elementFilename,
+  elementFilenameFullId,
   idFromFilename,
+  idTail,
   parseIdFromFilename,
+  sameFsName,
   slugify,
+  validElementFilenames,
 } from '../../src/store/fs-utils';
+
+const UUID = 'e4e6dc8e-4b1f-4d56-8d2d-aa6e0d2a8c2b';
 
 describe('slugify', () => {
   it('lowercases and joins spaces with hyphens', () => {
@@ -66,6 +76,12 @@ describe('slugify', () => {
     expect(slugify('---')).toBe('');
   });
 
+  it('returns empty for unsluggable NAMED input (CJK, emoji) — spec: bare full-id file', () => {
+    expect(slugify('日本語')).toBe('');
+    expect(slugify('🎉🎉')).toBe('');
+    expect(elementFilename(UUID, '日本語')).toBe(`${UUID}.json`);
+  });
+
   it('never produces a double-hyphen run (separator invariant)', () => {
     // The parseIdFromFilename split relies on this — runs collapse to one `-`.
     const probes = [
@@ -82,24 +98,99 @@ describe('slugify', () => {
   });
 });
 
-describe('elementFilename', () => {
-  it('slugifies the name when given', () => {
-    expect(elementFilename('uuid-123', 'Alice')).toBe('alice--uuid-123.json');
-    expect(elementFilename('uuid-123', 'Eldoria City')).toBe('eldoria-city--uuid-123.json');
+describe('idTail', () => {
+  it('returns the whole id when at or under the tail length', () => {
+    expect(idTail('char-1')).toBe('char-1');
+    expect(idTail('uuid-123')).toBe('uuid-123'); // exactly 8
   });
 
-  it('falls back to bare id when name is empty/missing', () => {
-    expect(elementFilename('uuid-123', '')).toBe('uuid-123.json');
+  it('returns the last 8 chars of a canonical uuid (never contains a hyphen)', () => {
+    expect(idTail(UUID)).toBe('0d2a8c2b');
+    expect(idTail(UUID)).toHaveLength(ID_TAIL_LEN);
+    expect(idTail(UUID)).not.toContain('-');
+  });
+
+  it('is deterministic — same id, same tail, no neighbors involved', () => {
+    expect(idTail(UUID)).toBe(idTail(UUID));
+  });
+
+  it('falls back to the hyphen-stripped tail when a raw slice would break the separator', () => {
+    // Raw slice(-8) of these fixture ids would contain `--` / start with `-`.
+    expect(idTail('fixture-id-foo--bar1')).not.toContain('--');
+    expect(idTail('ends-with-hyphen-abcdefg')).not.toMatch(/^-/);
+  });
+});
+
+describe('elementFilename', () => {
+  it('slugifies the name and appends the short tail', () => {
+    expect(elementFilename(UUID, 'Alice')).toBe('alice--0d2a8c2b.json');
+    expect(elementFilename(UUID, 'Eldoria City')).toBe('eldoria-city--0d2a8c2b.json');
+  });
+
+  it('keeps short fixture ids whole', () => {
+    expect(elementFilename('uuid-123', 'Alice')).toBe('alice--uuid-123.json');
+    expect(elementFilename('char-1', 'Bob')).toBe('bob--char-1.json');
+  });
+
+  it('falls back to bare FULL id when name is empty/missing', () => {
+    expect(elementFilename(UUID, '')).toBe(`${UUID}.json`);
     expect(elementFilename('uuid-123', undefined)).toBe('uuid-123.json');
     expect(elementFilename('uuid-123', null)).toBe('uuid-123.json');
     expect(elementFilename('uuid-123', '!!!')).toBe('uuid-123.json');
   });
 
-  it('uses double-hyphen separator between slug and id', () => {
+  it('uses double-hyphen separator between slug and tail', () => {
     const name = elementFilename('a-b-c', 'My Element');
     expect(name).toBe('my-element--a-b-c.json');
     // Verify the separator is recoverable by the parser.
     expect(parseIdFromFilename(name)).toBe('a-b-c');
+  });
+
+  it('parse of a tail-form filename yields the FRAGMENT, not the full id', () => {
+    // Contract note: identity comes from the body; the parser is diagnostics.
+    const name = elementFilename(UUID, 'Alice');
+    expect(parseIdFromFilename(name)).toBe('0d2a8c2b');
+    expect(UUID.endsWith(parseIdFromFilename(name)!)).toBe(true);
+  });
+});
+
+describe('elementFilenameFullId (collision fallback)', () => {
+  it('embeds the full id after the separator', () => {
+    expect(elementFilenameFullId(UUID, 'Alice')).toBe(`alice--${UUID}.json`);
+    expect(parseIdFromFilename(elementFilenameFullId(UUID, 'Alice'))).toBe(UUID);
+  });
+
+  it('matches elementFilename for unnamed elements', () => {
+    expect(elementFilenameFullId(UUID, '')).toBe(elementFilename(UUID, ''));
+  });
+});
+
+describe('validElementFilenames (the sticky-write forms)', () => {
+  it('named → short form then full-id form', () => {
+    expect(validElementFilenames(UUID, 'Alice')).toEqual([
+      'alice--0d2a8c2b.json',
+      `alice--${UUID}.json`,
+    ]);
+  });
+
+  it('unnamed / unsluggable → the single bare form', () => {
+    expect(validElementFilenames(UUID, '')).toEqual([`${UUID}.json`]);
+    expect(validElementFilenames(UUID, '日本語')).toEqual([`${UUID}.json`]);
+  });
+
+  it('short id → single form (short and full coincide)', () => {
+    expect(validElementFilenames('char-1', 'Bob')).toEqual(['bob--char-1.json']);
+  });
+});
+
+describe('sameFsName (case-folding equivalence)', () => {
+  it('case variants are the same filesystem name', () => {
+    expect(sameFsName('Alice--0d2a8c2b.json', 'alice--0d2a8c2b.json')).toBe(true);
+    expect(sameFsName('ALICE--X.JSON', 'alice--x.json')).toBe(true);
+  });
+
+  it('different names are different', () => {
+    expect(sameFsName('alice--a.json', 'alice--b.json')).toBe(false);
   });
 });
 

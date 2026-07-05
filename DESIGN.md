@@ -81,21 +81,21 @@ User picks a root folder once per world (persisted via `FileSystemDirectoryHandl
       lock                           ← presence indicates a writer is active
     elements/
       character/                     ← one subfolder per element type
-        <id>.json
+        <name-slug>--<id-tail8>.json   ← e.g. aragorn--0d2a8c2b.json (unnamed: <full-id>.json)
       location/
-        <id>.json
+        <name-slug>--<id-tail8>.json
       institution/
-        <id>.json
+        <name-slug>--<id-tail8>.json
       ... (18 content element types)
     spatial/                         ← map artifacts (one file per element, like content)
       map/
-        <id>.json
+        <name-slug>--<id-tail8>.json
       pin/
-        <id>.json
+        <name-slug>--<id-tail8>.json
       zone/
-        <id>.json
+        <name-slug>--<id-tail8>.json
       marker/
-        <id>.json
+        <name-slug>--<id-tail8>.json
     media/
       <element-id>/
         <folder-name>/
@@ -121,6 +121,29 @@ User picks a root folder once per world (persisted via `FileSystemDirectoryHandl
 - `local_updated_at` is the source of truth for "this changed locally at time T." Stamped by FolderStore on every save.
 - `server_updated_at` is the last value the server confirmed. Used to detect server-side changes (server `updated_at > server_updated_at` means someone else edited).
 - For `local-only` worlds, `server_updated_at` is omitted.
+
+### File naming (Folder Format spec source — settled 2026-07-03)
+
+**The invariant**: the filename is PRESENTATION; the `id` INSIDE the file is identity. A consumer MUST load every `*.json` in a type folder and key on the internal id — never parse a filename for meaning. This makes every legacy and foreign filename automatically valid, and keeps both id-minting models legal (atlas server-uuids; magelet-style deterministic uuid5-from-slug — how ids are minted is the implementation's business).
+
+**Canonical form atlas writes**: `<name-slug>--<id-tail8>.json`
+
+| Rule | Detail |
+|------|--------|
+| slug | lowercase; NFKD diacritic-strip to ASCII (José → jose); non-alphanumeric runs → single `-`; trimmed; capped at 40 chars |
+| separator | `--` (unambiguous: slugs can never contain a double hyphen) |
+| id-tail | LAST 8 chars of the element id (guards: a tail that would contain `--` or start with `-` falls back to the hyphen-stripped tail — canonical uuids never hit this) |
+| unnamed element | bare `<full-id>.json`; renamed to slug form on the first SLUGGABLE naming |
+| named but unsluggable (all-non-ASCII/emoji name → empty slug) | same bare `<full-id>.json`; stays bare until renamed to a sluggable name |
+| rename | renaming the element renames the file (write-new, delete-old; the crash window heals via dedupe at next open) |
+| stability (sticky runtime writes) | a write keeps the file's current name whenever that name is any valid form for the element's name — case-insensitively. Filenames never change because a sibling appeared/vanished, and never churn on body-only edits (keeps git-versioned world folders quiet). The ONE sanctioned sibling-dependent rename: open-time tidy converges a full-id fallback back to the short form once its collision has cleared |
+| case-folding filesystems | equivalence is by LOWERCASE comparison everywhere (NTFS/APFS resolve case variants to the same physical entry — writing one and deleting the other would destroy the file; canonical forms are pure lowercase ASCII, so ASCII folding is the whole space). A case-variant of a target form is that target: written in place under its existing name, never renamed to its lowercase twin. (A case-variant of a NON-target form still converges normally — the write+remove pair is safe whenever the two names differ case-insensitively) |
+| tail collision (same slug + same tail, different ids, ~2^-32) | the later writer falls back to `<slug>--<full-id>.json`; at open-time tidy the LOWER full id keeps the short form (deterministic — two machines produce identical layouts from the same data) |
+| Windows reserved names | non-issue by construction: the always-present `--<tail>` means the base name is never exactly `con`/`prn`/`aux`/… |
+| index & dedupe | the store indexes by reading file BODIES; rename-crash twins (same body id, two files) resolve to the latest `local_updated_at`, the loser is unlinked — grouping is by body id, so a same-named stranger can never be deleted |
+| tidy | non-canonical filenames (legacy full-uuid tails, hand-renamed files) converge to canonical form lazily at first index per type per open, processed id-sorted with a FULL occupancy view (a target name held by ANY other survivor — case-insensitively — forces the full-id fallback; both taken → the file is left alone). Unreadable/id-less files are skipped and never deleted or overwritten; a second open is a no-op |
+
+Implementation: `src/store/fs-utils.ts` (`slugify`, `idTail`, `elementFilename`, `elementFilenameFullId`) + `FsFolderStore.ensureIndexFor`/`resolveFilename`. Contract tests: `tests/unit/fs-utils.slug.test.ts`, `tests/e2e/folder-store-slug.spec.ts`.
 
 **Tombstones format** (`tombstones.json`):
 
@@ -808,6 +831,12 @@ Related: convention #32 (Esc clears selection + nav home) is **gated to NOT fire
 73-78. **Sharing conventions** — codified in `DESIGN_SHARING.md` (page = Narrative subtype 'page' + the narrative-kind seam, blocks are truth / story is a derived mirror, the refs mirror for id-swap-safe card bindings, page prose never derives relations, per-room serialized page writes, `share-page-render.ts` stays store-free). Numbering reserved for cross-doc consistency.
 
 79. **Element writes serialize per-id at the FolderStore boundary** (session 238). `updateElement` and `deleteElement` queue through a `PerIdWriteChain` (`src/store/write-chain.ts`) in BOTH stores (FsFolderStore + MockFolderStore, fixture parity): same-id operations run strictly in submission order; different ids stay concurrent. Kills the lost-update class — two read-merge-writes interleave, the second call's read predates the first call's write, and the merge silently reverts its fields (found live by the share e2e, session 237; knowledge-room's `patchEntry` was still exposed) — for EVERY caller instead of per-room defenses. A delete queued behind an update waits for it, so late writes never throw "element not found". **What the chain can't fix**: a patch COMPUTED from a stale in-memory snapshot (e.g. a whole blocks array built before a prior write refreshed state) — callers doing read-compute-write over arrays still need await discipline (share-room's chain, convention #77, stays for exactly this). The mock's updateElement carries a deliberate microtask yield between read and merge so an unserialized regression manifests in vitest (convention #20: fakes encode real failure modes). Verified by `tests/unit/write-chain.test.ts`, `tests/integration/folder-store.serializedWrites.test.ts`, and a real-FS concurrent-update e2e in `folder-store-fs.spec.ts`.
+
+*(#80 = the two-tier room-header model, documented in the Rooms section. #81-85 = import conventions, in `DESIGN_IMPORT.md`.)*
+
+86. **Sync-state mutations go through `updateSyncState(mutate)`** (2026-07-03). Every patch COMPUTED FROM the current sync-state (conflict/server-delete list edits, dedupe-appends) uses `FolderStore.updateSyncState(mutate)` — the mutator receives the CURRENT state inside a store-global chain and returns a partial patch. Never split into `readSyncState()` + `writeSyncState()`: the audit found resolveConflict/pushPhase/pullPhase computing whole-array patches from snapshots taken BEFORE network I/O, so a concurrent round's entries got silently clobbered. `writeSyncState(patch)` remains for whole-field replacement and rides the same chain. All five engine read-modify-write sites migrated; regression suite `tests/integration/folder-store.syncStateChain.test.ts`.
+
+87. **Filenames: sticky runtime writes, converging open-time tidy, lowercase equivalence** (2026-07-03, gate-hardened). The full contract is the "File naming" table in On-Disk Layout (the Folder Format spec source). The load-bearing halves: (a) a RUNTIME write keeps the file's current name whenever it's any valid form for the element's name, compared via `sameFsName` (lowercase) — case-folding filesystems (NTFS/APFS) make a case-variant pair the SAME physical entry, so write-new + delete-old self-destructs; OPFS-based tests cannot see this. (b) The open-time tidy is the ONLY converger: id-sorted (deterministic layouts), FULL occupancy view computed before any write (an incremental view lets an early id overwrite a later sibling's live file — 3-lens-convergent gate finding), never touches unreadable files. Index is built from file BODIES; `parseIdFromFilename` is diagnostics, never identity.
 
 ---
 

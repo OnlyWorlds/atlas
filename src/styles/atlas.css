@@ -10084,3 +10084,34 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-text-muted);
   opacity: 0.7;
 }
+/* ---- Publish staleness reminder (B1, 2026-07-03) ---- */
+.atlas-share-publish-stale { color: var(--atlas-warn, #f59e0b); }
+.atlas-share-stale-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--atlas-warn, #f59e0b);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* ---- Per-pin full-profile toggle in the map block editor (B6, 2026-07-03) ---- */
+.atlas-share-pin-full-toggle {
+  margin-left: auto;
+  padding: 1px 8px;
+  font-size: 11px;
+  border: none;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--atlas-text-dim, #9ca3af);
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.atlas-share-pin-full-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.atlas-share-pin-full-toggle.is-on {
+  background: rgba(34, 211, 238, 0.16);
+  color: var(--atlas-cyan, #22d3ee);
+}

@@ -244,10 +244,12 @@ export function buildPagePayload(page: Element, elements: Element[], charts: Cha
     }
   }
 
-  // Pinned elements are disclosed BY INCLUSION (session 239, Captain's call):
-  // the pin-click modal shows image + description + populated fields, so the
-  // pin checklist is the disclosure gate for maps. Their entries project ALL
-  // populated fields (relations still tokenized per the standard rule).
+  // Pinned elements are disclosed BY INCLUSION, identity-first (B6, settled
+  // 2026-07-03 — supersedes the session-239 full-fields default): an included
+  // pin ships its element as name/type/description (+ image); only pins the
+  // author explicitly opted in via `fullPinIds` ship every populated field.
+  // Fields another block (card/collection) separately disclosed still union
+  // in — a map can never DOWNGRADE a deliberate card disclosure.
   for (const mb of blocks.filter((b): b is MapBlock => b.kind === 'map')) {
     for (const pinId of mb.pinIds) {
       const pin = byId.get(pinId);
@@ -256,8 +258,10 @@ export function buildPagePayload(page: Element, elements: Element[], charts: Cha
       if (!target) continue;
       includedIds.add(target.id);
       imageWanted.add(target.id);
+      const full = (mb.fullPinIds ?? []).includes(pinId);
       const list = chosenFields.get(target.id) ?? [];
-      for (const f of populatedFieldNames(target)) {
+      const wanted = full ? populatedFieldNames(target) : ['description'];
+      for (const f of wanted) {
         if (!list.includes(f)) list.push(f);
       }
       chosenFields.set(target.id, list);

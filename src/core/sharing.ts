@@ -216,6 +216,16 @@ export interface MapBlock {
   pinIds: string[];
   /** Always-visible pin labels. ABSENT = true (only explicit false stored). */
   showLabels?: boolean;
+  /**
+   * Pins opted INTO full-profile disclosure (B6, settled 2026-07-03 —
+   * supersedes the session-239 full-fields-by-default call): an included pin
+   * ships its element as identity + description (+ image) only; pins listed
+   * here ship every populated field. Subset of `pinIds`. NOT part of the refs
+   * mirror — `blocksOf` rewrites entries alongside the paired `pinIds` heal,
+   * and an entry that no longer matches any pinId simply reads as not-full
+   * (fails toward LESS disclosure, never more).
+   */
+  fullPinIds?: string[];
 }
 
 /**
@@ -296,6 +306,10 @@ export function parsePageBlocks(raw: unknown): PageBlock[] {
             ? b.pinIds.filter((v): v is string => typeof v === 'string' && v.length > 0) : [],
         };
         if (b.showLabels === false) mapBlock.showLabels = false; // absent = true
+        if (Array.isArray(b.fullPinIds)) {
+          const full = b.fullPinIds.filter((v): v is string => typeof v === 'string' && v.length > 0);
+          if (full.length > 0) mapBlock.fullPinIds = full;
+        }
         out.push(mapBlock);
         break;
       }
@@ -347,7 +361,15 @@ export function blocksOf(el: Element): PageBlock[] {
       refIndex++;
       for (let i = 0; i < b.pinIds.length; i++) {
         const mirrored = refs[refIndex];
-        if (mirrored && mirrored !== b.pinIds[i]) b.pinIds[i] = mirrored;
+        if (mirrored && mirrored !== b.pinIds[i]) {
+          // Keep the full-profile opt-in paired with its pin across id-swaps.
+          // A missed rewrite fails toward LESS disclosure (entry stops
+          // matching → pin reads as identity-only), never more.
+          if (b.fullPinIds) {
+            b.fullPinIds = b.fullPinIds.map(id => (id === b.pinIds[i] ? mirrored : id));
+          }
+          b.pinIds[i] = mirrored;
+        }
         refIndex++;
       }
     }
@@ -444,6 +466,8 @@ export interface PagePubState {
   published_at: string;
   updated_at: string;
   revoked: boolean;
+  /** Content signature at last publish/republish — see pageContentSig. Absent on pre-B1 mirrors. */
+  content_sig?: string;
 }
 
 /** Parse the page's `atlas_page_pub` mirror defensively; null = never published. */
@@ -452,13 +476,38 @@ export function pagePubOf(el: Element): PagePubState | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const p = raw as Record<string, unknown>;
   if (typeof p.id !== 'string' || typeof p.slug !== 'string') return null;
-  return {
+  const out: PagePubState = {
     id: p.id,
     slug: p.slug,
     published_at: typeof p.published_at === 'string' ? p.published_at : '',
     updated_at: typeof p.updated_at === 'string' ? p.updated_at : '',
     revoked: p.revoked === true,
   };
+  if (typeof p.content_sig === 'string') out.content_sig = p.content_sig;
+  return out;
+}
+
+/**
+ * Cheap stable signature over a page's published-content-bearing fields
+ * (name, blocks, theme, intent). Stored on the pub mirror at publish and
+ * republish; the share room compares it against the live page to show the
+ * "edited since publish" reminder (B1, settled 2026-07-03). Deliberately NOT
+ * a timestamp comparison: writing the pub mirror itself bumps
+ * `local_updated_at`, which would read as "edited" forever.
+ */
+export function pageContentSig(el: Element): string {
+  const rec = el as Record<string, unknown>;
+  const material = JSON.stringify({
+    name: el.name ?? '',
+    blocks: rec.atlas_page_blocks ?? null,
+    theme: rec.atlas_page_theme ?? null,
+    intent: rec.atlas_page_intent ?? null,
+  });
+  let h = 5381;
+  for (let i = 0; i < material.length; i++) {
+    h = ((h << 5) + h + material.charCodeAt(i)) | 0;
+  }
+  return `${(h >>> 0).toString(36)}-${material.length.toString(36)}`;
 }
 
 /** Unique default name for a new page: "new page", "new page (2)", ... */

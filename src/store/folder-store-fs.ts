@@ -7,9 +7,14 @@
  *   <root>/
  *     world.json
  *     .atlas/{sync-state.json, tombstones.json, lock}
- *     elements/<content-type>/<id>.json
- *     spatial/<spatial-type>/<id>.json
+ *     elements/<content-type>/<name-slug>--<id-tail>.json   (unnamed: <id>.json)
+ *     spatial/<spatial-type>/<name-slug>--<id-tail>.json
  *     media/<element-id>/<folder>/<filename>
+ *
+ * Folder Format rule: the filename is PRESENTATION; the `id` inside the file
+ * is identity. Any `*.json` in a type folder loads regardless of its name —
+ * the index is built from file BODIES (see ensureIndexFor), and non-canonical
+ * filenames converge via the lazy tidy pass.
  *
  * Same contract as MockFolderStore (see folder-store.ts). All writes stamp
  * `local_updated_at`. Deletes cascade per the documented rules.
@@ -56,14 +61,16 @@ import { PerIdWriteChain } from './write-chain';
 import {
   elementDirSegments,
   elementFilename,
+  elementFilenameFullId,
   getDir,
   idFromFilename,
   isNotFound,
   listFiles,
-  parseIdFromFilename,
   readJson,
   removeFile,
+  sameFsName,
   tryGetDir,
+  validElementFilenames,
   writeJsonAtomic,
 } from './fs-utils';
 
@@ -134,6 +141,19 @@ export class FsFolderStore implements FolderStore {
   private runTombstoneOp<T>(fn: () => Promise<T>): Promise<T> {
     const next = this.tombstoneChain.then(fn, fn); // run regardless of prior outcome
     this.tombstoneChain = next.then(() => undefined, () => undefined);
+    return next;
+  }
+  /**
+   * Store-global serialization for the single `sync-state.json` file. Every
+   * mutation is a read-merge-write of one shared file; without the chain,
+   * concurrent rounds (auto-pull tick, resolveConflict after its network
+   * I/O, push-phase persistence) interleave and the second write clobbers
+   * the first's conflict/server-delete entries.
+   */
+  private syncStateChain: Promise<unknown> = Promise.resolve();
+  private runSyncStateOp<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.syncStateChain.then(fn, fn);
+    this.syncStateChain = next.then(() => undefined, () => undefined);
     return next;
   }
 
@@ -232,62 +252,125 @@ export class FsFolderStore implements FolderStore {
    * Ensure the in-memory filename index is populated for `type`. Idempotent —
    * subsequent calls for the same type return immediately.
    *
-   * Handles the rename-crash dedupe: if the directory contains multiple files
-   * for the same id (atlas crashed between writing the new filename and
-   * deleting the old), the survivor is the one whose body has the latest
-   * `local_updated_at`. Losers are removed from disk.
+   * Identity lives INSIDE the file (Folder Format rule): the index is built by
+   * reading every body and keying on `body.id` — filenames are never parsed
+   * for identity. Unreadable or id-less files are skipped and left on disk,
+   * never deleted.
+   *
+   * Two extra jobs ride the same pass:
+   * - Rename-crash dedupe: multiple files whose BODIES carry the same id
+   *   (atlas crashed between write-new and delete-old) — the survivor is the
+   *   latest `local_updated_at`, the rest are unlinked. Grouping is by body
+   *   id, so a same-named stranger can never be deleted as a "loser".
+   * - Lazy tidy: a survivor whose filename isn't the canonical
+   *   `<slug>--<tail>` form (legacy full-uuid files, hand-renamed files) is
+   *   rewritten to the canonical name, once per type per open.
    */
   private async ensureIndexFor(type: ElementType): Promise<void> {
     if (this.indexedTypes.has(type)) return;
     const dir = await tryGetDir(this.requireRoot(), elementDirSegments(type));
     if (!dir) { this.indexedTypes.add(type); return; }
     const files = await listFiles(dir);
-    // Group filenames by id; if multiple, dedupe by latest local_updated_at.
-    const grouped = new Map<string, string[]>();
-    for (const name of files) {
-      const id = parseIdFromFilename(name);
-      if (!id) continue;
-      const list = grouped.get(id);
-      if (list) list.push(name);
-      else grouped.set(id, [name]);
-    }
-    for (const [id, names] of grouped) {
-      if (names.length === 1) {
-        this.fileIndex.set(id, { type, filename: names[0] });
-      } else {
-        const survivor = await this.dedupeFilesForId(dir, names);
-        if (survivor) this.fileIndex.set(id, { type, filename: survivor });
+    type Rec = { filename: string; body: Element };
+    const grouped = new Map<string, Rec[]>();
+    const unreadable = new Set<string>();
+    for (const filename of files) {
+      if (!filename.endsWith('.json')) continue;
+      const body = await readJson<Element>(dir, filename);
+      if (!body || typeof body.id !== 'string' || !body.id) {
+        unreadable.add(filename);
+        console.warn(`[fs-folder-store] index(${type}): skipping unreadable/id-less file ${filename}`);
+        continue;
       }
+      const list = grouped.get(body.id);
+      if (list) list.push({ filename, body });
+      else grouped.set(body.id, [{ filename, body }]);
+    }
+    // Dedupe crash-twins FIRST for every group (grouping is by body id, so a
+    // same-named stranger can never be a "loser"), building the survivor set.
+    const survivors = new Map<string, Rec>();
+    for (const [id, recs] of grouped) {
+      recs.sort((a, b) =>
+        (a.body.local_updated_at ?? '') < (b.body.local_updated_at ?? '') ? 1
+        : (a.body.local_updated_at ?? '') > (b.body.local_updated_at ?? '') ? -1 : 0);
+      const [survivor, ...losers] = recs;
+      for (const loser of losers) {
+        await removeFile(dir, loser.filename).catch(() => {});
+      }
+      if (losers.length > 0) {
+        console.warn(`[fs-folder-store] dedupe(${type}): kept ${survivor.filename}, removed ${losers.map(l => l.filename).join(', ')}`);
+      }
+      survivors.set(id, survivor);
+    }
+
+    // FULL occupancy view before any tidy write (gate finding, 2026-07-03,
+    // 3-lens convergent): the tidy target must never be a name ANY other
+    // survivor currently holds — checking only already-processed ids lets an
+    // early id overwrite a later sibling's live file, then lose its own.
+    // Keys are LOWERCASED: case-folding filesystems (NTFS/APFS) treat case
+    // variants as the same physical entry, and OPFS-based tests can't see
+    // that — so equivalence is by lowercase throughout.
+    const occupied = new Map<string, string>(); // lc(filename) → id
+    for (const [id, rec] of survivors) {
+      if (!occupied.has(rec.filename.toLowerCase())) occupied.set(rec.filename.toLowerCase(), id);
+    }
+    const unreadableLc = new Set([...unreadable].map(n => n.toLowerCase()));
+    const isFree = (candidate: string, forId: string): boolean => {
+      const lc = candidate.toLowerCase();
+      const owner = occupied.get(lc);
+      return (owner === undefined || owner === forId) && !unreadableLc.has(lc);
+    };
+
+    // Converge toward the short canonical form, id-sorted so which of two
+    // colliding ids keeps the short name is DETERMINISTIC (lower id wins) —
+    // two machines produce the same layout from the same world data.
+    let tidied = 0;
+    for (const id of [...survivors.keys()].sort()) {
+      const survivor = survivors.get(id)!;
+      const filename = survivor.filename;
+      const short = elementFilename(id, survivor.body.name);
+      const fullForm = elementFilenameFullId(id, survivor.body.name);
+      // Pick the target: short when free; a file already on the full-id
+      // fallback keeps it while the short form is taken (and converges once
+      // the collision clears — the one sanctioned sibling-dependent rename).
+      const target = isFree(short, id) ? short
+        : sameFsName(filename, fullForm) || isFree(fullForm, id) ? fullForm
+        : filename; // both forms taken (pathological) — leave the file alone
+      if (!sameFsName(filename, target)) {
+        // Distinct entries by construction (target is free, and lc-equality
+        // was excluded above), so write-new + remove-old cannot self-delete
+        // on a case-folding filesystem.
+        await writeJsonAtomic(dir, target, survivor.body);
+        await removeFile(dir, filename).catch(() => {});
+        occupied.delete(filename.toLowerCase());
+        occupied.set(target.toLowerCase(), id);
+        survivor.filename = target;
+        tidied++;
+      } else {
+        occupied.set(filename.toLowerCase(), id);
+      }
+      this.fileIndex.set(id, { type, filename: survivor.filename });
+    }
+    if (tidied > 0) {
+      console.info(`[fs-folder-store] tidy(${type}): ${tidied} file(s) renamed to canonical form`);
     }
     this.indexedTypes.add(type);
   }
 
   /**
-   * Two-or-more files claim the same id. Read each body, keep the one with the
-   * latest `local_updated_at`, unlink the others. Returns the survivor name or
-   * null if every read failed.
+   * Filename for a NEW write of (id, name): the short canonical unless a
+   * DIFFERENT id of the same type already holds it (case-insensitively) —
+   * then the full-id fallback. Runtime stickiness for EXISTING files is
+   * handled by writeElementAndRename, not here.
    */
-  private async dedupeFilesForId(
-    dir: FileSystemDirectoryHandle,
-    names: string[],
-  ): Promise<string | null> {
-    type Candidate = { name: string; ts: string };
-    const candidates: Candidate[] = [];
-    for (const name of names) {
-      const body = await readJson<Element>(dir, name);
-      if (!body) continue;
-      candidates.push({ name, ts: body.local_updated_at ?? '' });
+  private resolveFilename(type: ElementType, id: string, name: string | null | undefined): string {
+    const candidate = elementFilename(id, name);
+    for (const [otherId, entry] of this.fileIndex) {
+      if (otherId !== id && entry.type === type && sameFsName(entry.filename, candidate)) {
+        return elementFilenameFullId(id, name);
+      }
     }
-    if (candidates.length === 0) return null;
-    candidates.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
-    const [survivor, ...losers] = candidates;
-    for (const loser of losers) {
-      await removeFile(dir, loser.name).catch(() => {});
-    }
-    if (losers.length > 0) {
-      console.warn(`[fs-folder-store] dedupe: kept ${survivor.name}, removed ${losers.map(l => l.name).join(', ')}`);
-    }
-    return survivor.name;
+    return candidate;
   }
 
   /** Resolve the on-disk filename for an id. Returns null if not indexed. */
@@ -368,7 +451,7 @@ export class FsFolderStore implements FolderStore {
     };
     await this.ensureIndexFor(type);
     const dir = await getDir(this.requireRoot(), elementDirSegments(type));
-    const filename = elementFilename(id, elem.name);
+    const filename = this.resolveFilename(type, id, elem.name);
     await writeJsonAtomic(dir, filename, elem);
     this.setIndex(id, type, filename);
     return elem;
@@ -397,9 +480,18 @@ export class FsFolderStore implements FolderStore {
   }
 
   /**
-   * Write an element body, renaming the file if the name (and therefore the
-   * slug) changed since the last write. Crash window between write-new and
-   * delete-old is covered by ensureIndexFor's dedupe pass on next open.
+   * Write an element body, renaming the file only when the name (and
+   * therefore the slug) genuinely changed since the last write.
+   *
+   * STICKY RULE (gate finding, 2026-07-03): the file keeps its current name
+   * whenever that name is any valid form for the NEW name, compared
+   * case-insensitively. This covers three hazards at once: (a) name
+   * unchanged — plain overwrite; (b) a foreign case-variant of a valid form —
+   * on a case-folding filesystem (NTFS/APFS) the lowercase twin IS the same
+   * physical entry, so write-new + delete-old would delete the file just
+   * written; (c) a full-id fallback file whose tail collision has since
+   * cleared — body-only edits must not churn it (filenames never change
+   * because a sibling vanished; convergence is the open-time tidy's job).
    */
   private async writeElementAndRename(
     type: ElementType,
@@ -410,15 +502,17 @@ export class FsFolderStore implements FolderStore {
     const dir = await getDir(this.requireRoot(), elementDirSegments(type));
     const entry = this.indexEntry(id);
     const currentFilename = entry?.filename ?? elementFilename(id, previousName);
-    const newFilename = elementFilename(id, next.name);
-    if (currentFilename === newFilename) {
-      await writeJsonAtomic(dir, newFilename, next);
-      this.setIndex(id, type, newFilename);
+    if (validElementFilenames(id, next.name).some(f => sameFsName(f, currentFilename))) {
+      await writeJsonAtomic(dir, currentFilename, next);
+      this.setIndex(id, type, currentFilename);
       return;
     }
-    // Name changed — write the new file first, then remove the old. If we
-    // crash between these two steps, ensureIndexFor's dedupe (latest
-    // local_updated_at wins) cleans it up on next open.
+    // Name genuinely changed — write the new file first, then remove the old.
+    // resolveFilename outputs are valid forms and lc-equality with the current
+    // name was excluded above, so old and new are DISTINCT physical entries
+    // even on case-folding filesystems. A crash between the two steps is
+    // covered by ensureIndexFor's dedupe (latest local_updated_at wins).
+    const newFilename = this.resolveFilename(type, id, next.name);
     await writeJsonAtomic(dir, newFilename, next);
     this.setIndex(id, type, newFilename);
     await removeFile(dir, currentFilename).catch(err => {
@@ -683,11 +777,17 @@ export class FsFolderStore implements FolderStore {
   }
 
   async writeSyncState(patch: Partial<SyncState>): Promise<SyncState> {
-    const current = await this.readSyncState();
-    const next: SyncState = { ...current, ...patch };
-    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
-    await writeJsonAtomic(atlasDir, SYNC_STATE_FILE, next);
-    return next;
+    return this.updateSyncState(() => patch);
+  }
+
+  async updateSyncState(mutate: (current: SyncState) => Partial<SyncState>): Promise<SyncState> {
+    return this.runSyncStateOp(async () => {
+      const current = await this.readSyncState();
+      const next: SyncState = { ...current, ...mutate(current) };
+      const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+      await writeJsonAtomic(atlasDir, SYNC_STATE_FILE, next);
+      return next;
+    });
   }
 
   async readCharts(): Promise<ChartConfig[]> {

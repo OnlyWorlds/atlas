@@ -25,7 +25,7 @@
 
 import { getState, subscribe, patchSlice } from '../core/state';
 import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, shareHash, parseHash, onHashChange } from '../core/router';
-import { PAGE_SUBTYPE, newBlockId, pageBlocksPatch, type PageBlock } from '../core/sharing';
+import { PAGE_SUBTYPE, blocksOf, listPages, newBlockId, pageBlocksPatch, type PageBlock } from '../core/sharing';
 import { getActiveStore } from '../core/active-store';
 import { getEditorSettings } from '../registry/registry';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
@@ -790,6 +790,16 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       void (async () => {
         const folder = getActiveStore();
         if (!folder) return;
+        // A page carrying this knower's circle block may already exist —
+        // open it instead of minting a duplicate every click (parked call
+        // #2, settled 2026-07-03).
+        const existing = listPages(getState().data.elements).find(p =>
+          blocksOf(p).some(b => b.kind === 'circle' && b.knowerId === knower.id));
+        if (existing) {
+          toasts.info(`Opened the existing page for this circle — "${existing.name || '(untitled)'}"`);
+          navigate(shareHash(worldId, existing.id));
+          return;
+        }
         const blocks: PageBlock[] = [{ id: newBlockId(), kind: 'circle', knowerId: knower.id }];
         const resolveName = (id: string) => elOf(id)?.name || null;
         try {

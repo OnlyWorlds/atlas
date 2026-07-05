@@ -32,7 +32,7 @@ import { escapeText } from '../core/dom-utils';
 import {
   PAGE_SUBTYPE, PAGE_INTENTS, PAGE_INTENT_HINTS, type PageIntent,
   isPageNarrative, listPages, pageIntentOf, blocksOf, blockSummary,
-  findUniquePageName, newBlockId, pageBlocksPatch, pagePubOf,
+  findUniquePageName, newBlockId, pageBlocksPatch, pagePubOf, pageContentSig,
   pageThemeOf, PAGE_THEME_ACCENTS, PAGE_THEME_FONTS, type PageTheme,
   type PageBlock, type HeadingBlock, type ProseBlock, type ElementCardBlock,
 } from '../core/sharing';
@@ -848,7 +848,6 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       await saveBlocks(pageId, blocks);
       renderBlocks(pageId);
     };
-    const savePins = (next: string[]): Promise<void> => patchMapBlock({ pinIds: next });
 
     // Labels toggle — always-visible pin labels (default on; off = hover-only).
     const labelsRow = document.createElement('label');
@@ -875,14 +874,17 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const labelRow = document.createElement('div');
       labelRow.className = 'atlas-share-field-label';
       labelRow.textContent = 'Visible pins';
-      labelRow.title = 'Included pins share their element on the published page — image, description, and populated fields show in the pin\'s click-modal.';
+      labelRow.title = 'Included pins share their element\'s name, type, description and image on the published page. Toggle "full" on a pin to share every populated field of that element.';
       const allBtn = document.createElement('button');
       allBtn.type = 'button';
       allBtn.className = 'atlas-share-map-pins-toggle';
       const allOn = mapPins.every(p => block.pinIds.includes(p.id));
       allBtn.textContent = allOn ? 'none' : 'all';
       allBtn.addEventListener('click', () => {
-        void savePins(allOn ? [] : mapPins.map(p => p.id));
+        // "none" also clears the full-profile opt-ins (B6 resting state).
+        void patchMapBlock(allOn
+          ? { pinIds: [], fullPinIds: [] }
+          : { pinIds: mapPins.map(p => p.id), fullPinIds: block.fullPinIds ?? [] });
       });
       labelRow.appendChild(allBtn);
       fieldsWrap.appendChild(labelRow);
@@ -890,19 +892,42 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         const target = elOf((pin as Record<string, unknown>).element_id as string);
         const row = document.createElement('label');
         row.className = 'atlas-share-card-edit-fieldrow';
+        const included = block.pinIds.includes(pin.id);
         const cb = document.createElement('input');
         cb.type = 'checkbox';
-        cb.checked = block.pinIds.includes(pin.id);
+        cb.checked = included;
         cb.addEventListener('change', () => {
           const next = cb.checked
             ? [...block.pinIds, pin.id]
             : block.pinIds.filter(id => id !== pin.id);
-          void savePins(next);
+          // Un-including a pin also clears its full-profile opt-in — the
+          // stricter default is the resting state (B6).
+          const nextFull = cb.checked
+            ? (block.fullPinIds ?? [])
+            : (block.fullPinIds ?? []).filter(id => id !== pin.id);
+          void patchMapBlock({ pinIds: next, fullPinIds: nextFull });
         });
         row.appendChild(cb);
         const name = document.createElement('span');
         name.textContent = target?.name || '(pin without element)';
         row.appendChild(name);
+        if (included) {
+          const isFull = (block.fullPinIds ?? []).includes(pin.id);
+          const fullBtn = document.createElement('button');
+          fullBtn.type = 'button';
+          fullBtn.className = 'atlas-share-pin-full-toggle' + (isFull ? ' is-on' : '');
+          fullBtn.textContent = 'full';
+          fullBtn.title = isFull
+            ? 'Sharing every populated field of this element — click to share only name, type, description and image'
+            : 'Sharing name, type, description and image — click to share every populated field of this element';
+          fullBtn.addEventListener('click', (e) => {
+            e.preventDefault(); // inside a <label> — don't toggle the checkbox
+            const curr = block.fullPinIds ?? [];
+            const nextFull = isFull ? curr.filter(id => id !== pin.id) : [...curr, pin.id];
+            void patchMapBlock({ fullPinIds: nextFull });
+          });
+          row.appendChild(fullBtn);
+        }
         fieldsWrap.appendChild(row);
       }
       wrap.appendChild(fieldsWrap);
@@ -1238,6 +1263,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const mirrored = await patchPage(pageId, {
         atlas_page_pub: {
           id: res.id, slug: res.slug, published_at: stamp, updated_at: stamp, revoked: false,
+          content_sig: pageContentSig(page),
         },
       });
       if (mirrored) {
@@ -1271,7 +1297,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         payload: buildPagePayload(page, getState().data.elements, pageCharts),
       });
       await patchPage(pageId, {
-        atlas_page_pub: { ...pub, updated_at: row?.updated_at ?? new Date().toISOString() },
+        atlas_page_pub: {
+          ...pub,
+          updated_at: row?.updated_at ?? new Date().toISOString(),
+          content_sig: pageContentSig(page),
+        },
       });
       toasts.success('Republished — the public page is up to date');
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
@@ -1490,6 +1520,20 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const fmt = (iso: string) => iso ? new Date(iso).toLocaleString() : '?';
       meta.textContent = `Frozen snapshot — published ${fmt(pub.published_at)} · updated ${fmt(pub.updated_at)}. World edits don't leak until you republish.`;
       section.appendChild(meta);
+
+      // B1 (2026-07-03): content-signature drift = the public copy is behind.
+      // A pre-B1 mirror has no sig and shows nothing — the next republish
+      // stamps one.
+      if (pub.content_sig && pageContentSig(page) !== pub.content_sig) {
+        const stale = document.createElement('p');
+        stale.className = 'atlas-share-section-hint atlas-share-publish-stale';
+        const dot = document.createElement('span');
+        dot.className = 'atlas-share-stale-dot';
+        stale.appendChild(dot);
+        stale.appendChild(document.createTextNode(
+          'edited since publish — republish to update the public copy'));
+        section.appendChild(stale);
+      }
 
       const actions = document.createElement('div');
       actions.className = 'atlas-share-publish-actions';

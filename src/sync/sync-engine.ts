@@ -386,13 +386,16 @@ export class SyncEngine {
           console.info('[atlas:sync] resolveConflict overwrite-mine: server has lost element — routing to server-delete review', {
             id, type: local.type,
           });
-          await this.folder.writeSyncState({
-            conflicts: syncState.conflicts.filter(c => c.element_id !== id),
+          // Fresh read inside the store's sync-state chain — the snapshot
+          // taken before our network I/O may be stale by now (a concurrent
+          // round can have added conflicts/server-deletes meanwhile).
+          await this.folder.updateSyncState(s => ({
+            conflicts: s.conflicts.filter(c => c.element_id !== id),
             server_deletes: [
-              ...(syncState.server_deletes ?? []),
+              ...(s.server_deletes ?? []),
               { id, type: local.type, detected_at: nowIso(), name: local.name },
             ],
-          });
+          }));
           return;
         }
         throw err;
@@ -415,10 +418,11 @@ export class SyncEngine {
       console.info(`[atlas:sync] resolveConflict pull-theirs: applied; local file now reflects server`);
     }
 
-    // Clear the conflict regardless of action.
-    await this.folder.writeSyncState({
-      conflicts: syncState.conflicts.filter(c => c.element_id !== id),
-    });
+    // Clear the conflict regardless of action. Computed from the CURRENT
+    // state inside the chain — not the pre-network snapshot above.
+    await this.folder.updateSyncState(s => ({
+      conflicts: s.conflicts.filter(c => c.element_id !== id),
+    }));
   }
 
   /** List currently-recorded conflicts. Reads from sync-state.json. */
@@ -459,9 +463,9 @@ export class SyncEngine {
       await this.folder.clearServerBaseline(id);
     }
 
-    await this.folder.writeSyncState({
-      server_deletes: list.filter(d => d.id !== id),
-    });
+    await this.folder.updateSyncState(s => ({
+      server_deletes: (s.server_deletes ?? []).filter(d => d.id !== id),
+    }));
   }
 
   /**
@@ -741,11 +745,12 @@ export class SyncEngine {
   /** Append new conflicts to sync-state.json (dedupe by element_id). */
   private async persistConflicts(conflicts: import('../core/types').Conflict[]): Promise<void> {
     if (conflicts.length === 0) return;
-    const curr = await this.folder.readSyncState();
-    const existingIds = new Set(curr.conflicts.map(c => c.element_id));
-    const fresh = conflicts.filter(c => !existingIds.has(c.element_id));
-    if (fresh.length === 0) return;
-    await this.folder.writeSyncState({ conflicts: [...curr.conflicts, ...fresh] });
+    await this.folder.updateSyncState(curr => {
+      const existingIds = new Set(curr.conflicts.map(c => c.element_id));
+      const fresh = conflicts.filter(c => !existingIds.has(c.element_id));
+      if (fresh.length === 0) return {};
+      return { conflicts: [...curr.conflicts, ...fresh] };
+    });
   }
 
   // ---- Phases ----
@@ -1089,18 +1094,13 @@ export class SyncEngine {
     // from a half-aborted round. The fresh engine post-recovery will detect
     // any real server-deletes via its first pull.
     if (!authBlocked) {
-      if (serverDeletesDetected.length > 0) {
-        const curr = await this.folder.readSyncState();
+      await this.folder.updateSyncState(curr => {
+        if (serverDeletesDetected.length === 0) return { last_push_at: nowIso() };
         const existing = curr.server_deletes ?? [];
         const existingIds = new Set(existing.map(d => d.id));
         const fresh = serverDeletesDetected.filter(d => !existingIds.has(d.id));
-        await this.folder.writeSyncState({
-          last_push_at: nowIso(),
-          server_deletes: [...existing, ...fresh],
-        });
-      } else {
-        await this.folder.writeSyncState({ last_push_at: nowIso() });
-      }
+        return { last_push_at: nowIso(), server_deletes: [...existing, ...fresh] };
+      });
     }
     return {
       pushed: { creates, updates, deletes },
@@ -1271,26 +1271,29 @@ export class SyncEngine {
       });
     }
 
-    const currentState = await this.folder.readSyncState();
-    const existingServerDeletes = currentState.server_deletes ?? [];
-    const existingDeleteIds = new Set(existingServerDeletes.map(d => d.id));
-    const freshServerDeletes = newServerDeletes.filter(d => !existingDeleteIds.has(d.id));
     // Persist pull-time conflicts to sync-state ONLY under pause-and-review.
     // Under local-wins, pull-conflicts are skipped silently; toast count is
     // surfaced by sync-attach via onSyncResult.
     //
     // Dedup by element_id — without this, repeated refreshes would append the
     // same conflict over and over (Captain caught this growing 1 → 2 → 3).
-    let persistedConflicts = currentState.conflicts;
-    if (this.policy === 'pause-and-review') {
-      const existingIds = new Set(currentState.conflicts.map(c => c.element_id));
-      const fresh = conflicts.filter(c => !existingIds.has(c.element_id));
-      persistedConflicts = [...currentState.conflicts, ...fresh];
-    }
-    await this.folder.writeSyncState({
-      last_pull_at: nowIso(),
-      conflicts: persistedConflicts,
-      server_deletes: [...existingServerDeletes, ...freshServerDeletes],
+    // Computed inside the store's sync-state chain so a concurrent round's
+    // entries survive this round's write.
+    await this.folder.updateSyncState(currentState => {
+      const existingServerDeletes = currentState.server_deletes ?? [];
+      const existingDeleteIds = new Set(existingServerDeletes.map(d => d.id));
+      const freshServerDeletes = newServerDeletes.filter(d => !existingDeleteIds.has(d.id));
+      let persistedConflicts = currentState.conflicts;
+      if (this.policy === 'pause-and-review') {
+        const existingIds = new Set(currentState.conflicts.map(c => c.element_id));
+        const fresh = conflicts.filter(c => !existingIds.has(c.element_id));
+        persistedConflicts = [...currentState.conflicts, ...fresh];
+      }
+      return {
+        last_pull_at: nowIso(),
+        conflicts: persistedConflicts,
+        server_deletes: [...existingServerDeletes, ...freshServerDeletes],
+      };
     });
 
     return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures: [], pulled_ids: pulledIds };

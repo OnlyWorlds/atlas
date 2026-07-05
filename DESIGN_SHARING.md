@@ -129,6 +129,14 @@ Settled with Captain from `PHASE_SHARING_BRIEF.md` (kept as the decision record)
 4. **Revoke = tombstone.** Content deleted, slug retained, URL serves "no longer shared". Owner can republish to their revoked slug.
 5. **Showcase = a Page flagged `is_live`, unique per world.** One model, one endpoint set, one viewer code path (live = server-side re-resolution of the same envelope).
 
+## Decisions — release sheet, CLOSED (2026-07-03 Comms session: Captain + Skeld + Temper)
+
+1. **B6 — pin disclosure is STRICT BY DEFAULT** (supersedes the session-239 full-fields call). An included map pin ships its element as name/type/description (+ image) only; the author opts specific pins into the full profile via the per-pin `full` toggle (`MapBlock.fullPinIds`, healed alongside `pinIds` on id-swap, fails toward LESS disclosure). Trust rationale (Skeld): a DM whose secret prep leaks once never comes back. A card/collection's separate disclosure still unions in — a map never downgrades a deliberate card choice.
+2. **B5 — republish re-snapshots EVERYTHING, charts included.** Pages never update without an explicit republish (already true); republish means "publish the current state of this page" uniformly across block kinds (prose, cards, circles, charts). Confirmed by Captain + Skeld.
+3. **B1 — edited-since-publish reminder.** `atlas_page_pub.content_sig` (cheap hash over name/blocks/theme/intent, stamped at publish + republish) vs the live page → amber dot in the Publish section. Signature, not timestamps — the pub-mirror write itself bumps `local_updated_at`.
+4. **B3 — a dangling block renders NOTHING on the public page** (and in the preview, which must match it). "(missing element)" was author-debug info; the author still sees the block in the builder's edit rows. Applied in both renderer copies (atlas share-page-render + show).
+5. Duplicate-page mint fixed: knowledge-room "create page →" opens the existing page carrying that knower's circle block instead of minting again.
+
 ---
 
 ## Build Phases

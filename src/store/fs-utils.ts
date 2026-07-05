@@ -28,27 +28,90 @@ export function elementDirSegments(type: ElementType): [string, string] {
 }
 
 /**
- * Filename for an element on disk.
+ * Filename for an element on disk — Folder Format naming rules.
  *
- * Default format: `<slug>--<uuid>.json` where slug is a normalized lowercase
- * version of the element name. Browsable-by-name in the OS file picker while
- * the UUID at the end keeps identity unambiguous.
+ * Canonical format: `<slug>--<id-tail>.json` where slug is a normalized
+ * lowercase version of the element name and id-tail is the LAST 8 characters
+ * of the element id. Browsable-by-name in the OS file picker; the short tail
+ * keeps twins apart without the visual weight of a full uuid.
+ *
+ * THE INVARIANT (Folder Format spec line): the filename is PRESENTATION; the
+ * `id` INSIDE the file is identity. Consumers MUST load every `*.json` in a
+ * type folder and key on the internal id — never parse a filename for
+ * meaning. `parseIdFromFilename` therefore recovers an id FRAGMENT (full id
+ * only on legacy files), used for diagnostics — never for identity.
  *
  * The double-hyphen separator is deliberate: slugify() collapses non-alphanumeric
- * runs to a single `-`, so slugs can never produce `--`. That gives
- * parseIdFromFilename a clean delimiter — split on the LAST `--` and the right
- * side is the id, regardless of whether the id is UUID-shaped or a short test
- * fixture string like `char-1`.
+ * runs to a single `-`, so slugs can never produce `--`.
  *
- * When `name` is empty/missing, we emit the bare `<uuid>.json` form. This is
- * the fallback for elements that haven't been named yet — they get renamed
- * to slug-prefix form on the first updateElement that supplies a name.
+ * Guards:
+ * - `name` empty or unsluggable (all non-ASCII/emoji → empty slug) → bare
+ *   `<full-id>.json`; renamed to slug form on the first update that supplies
+ *   a SLUGGABLE name.
+ * - A tail that would contain `--` or start with `-` (only possible with
+ *   non-uuid fixture ids) falls back to the hyphen-stripped tail.
+ * - Same-dir filename collision between DIFFERENT ids (two same-named twins
+ *   sharing a tail — ~2^-32 per pair) is handled by the store, which falls
+ *   back to `elementFilenameFullId`.
+ *
+ * Stability: RUNTIME writes are STICKY — a file keeps its current name
+ * whenever that name is any valid form for the element's (new) name,
+ * compared case-insensitively (case-folding filesystems treat `Alice--x` and
+ * `alice--x` as the SAME entry — renaming between them would delete the file
+ * just written). Only the open-time tidy pass converges files toward the
+ * short canonical form, with a full occupancy view and id-sorted determinism.
+ * Net effect: filenames never churn because a sibling appeared or vanished;
+ * version-controlled world folders stay quiet.
  */
 export const SLUG_ID_SEP = '--';
+export const ID_TAIL_LEN = 8;
+
+/** Last-8 fragment of an element id, safe to embed after the `--` separator. */
+export function idTail(id: string): string {
+  if (id.length <= ID_TAIL_LEN) return id;
+  const raw = id.slice(-ID_TAIL_LEN);
+  // Canonical uuids never hit this (their last hyphen sits 13 chars from the
+  // end) — this guards odd fixture ids so the separator stays unambiguous.
+  if (raw.includes(SLUG_ID_SEP) || raw.startsWith('-')) {
+    const compact = id.replace(/-/g, '');
+    return compact.length <= ID_TAIL_LEN ? compact : compact.slice(-ID_TAIL_LEN);
+  }
+  return raw;
+}
 
 export function elementFilename(id: string, name?: string | null): string {
   const slug = slugify(name ?? '');
+  return slug ? `${slug}${SLUG_ID_SEP}${idTail(id)}.json` : `${id}.json`;
+}
+
+/**
+ * Full-id variant, used by the store ONLY when the short-tail candidate is
+ * already owned by a different id in the same directory.
+ */
+export function elementFilenameFullId(id: string, name?: string | null): string {
+  const slug = slugify(name ?? '');
   return slug ? `${slug}${SLUG_ID_SEP}${id}.json` : `${id}.json`;
+}
+
+/**
+ * Every filename form that is "valid" for this (id, name) pair — the short
+ * canonical first, then the full-id collision fallback (identical to short
+ * when the name is unsluggable: both are the bare `<id>.json`). Used by the
+ * store's sticky-write rule: a file already sitting at ANY of these forms
+ * (case-insensitively) keeps its name on write.
+ */
+export function validElementFilenames(id: string, name?: string | null): string[] {
+  const short = elementFilename(id, name);
+  const full = elementFilenameFullId(id, name);
+  return short === full ? [short] : [short, full];
+}
+
+/** Case-insensitive filename equivalence — case-folding filesystems (NTFS,
+ * APFS) resolve these to the same physical entry, so the store must never
+ * write one and delete the other. Canonical forms are pure lowercase ASCII,
+ * so ASCII case-folding is the entire equivalence space. */
+export function sameFsName(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
 }
 
 /**

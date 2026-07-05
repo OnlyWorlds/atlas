@@ -145,6 +145,15 @@ export interface FolderStore {
 
   readSyncState(): Promise<SyncState>;
   writeSyncState(patch: Partial<SyncState>): Promise<SyncState>;
+  /**
+   * Serialized read-modify-write on sync-state. The mutator receives the
+   * CURRENT state (fresh read inside the store's sync-state chain) and
+   * returns a partial patch merged over it. Use this — never a separate
+   * readSyncState + writeSyncState — whenever the patch is computed FROM the
+   * current state (conflict/server-delete list edits): the split form races
+   * concurrent sync rounds and silently drops entries.
+   */
+  updateSyncState(mutate: (current: SyncState) => Partial<SyncState>): Promise<SyncState>;
 
   // ---- Charts (atlas-local saved chart configs; `.atlas/charts.json`) ----
 
