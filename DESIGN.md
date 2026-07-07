@@ -1,7 +1,7 @@
 # Atlas — Design Document
 
-**Version**: 1.3 (2026-06-07) — folder-first rebuild
-**Status**: Feature-complete for v1 (phases 0–6 + 3.5 shipped) + Knowledge phase 1 (sessions 234-236, `DESIGN_KNOWLEDGE.md`) + Sharing built to the backend boundary (sessions 237-238, `DESIGN_SHARING.md` — share room, block builder incl. Circle block, payload-true visitor preview, fakes-first publish flow; goes live when Anchor's backend ships per `SHARING_CONTRACT.md` v0.2). Companion viewer tool scaffolded at `tools/show/`. Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
+**Version**: 1.4 (2026-07-07) — folder-first rebuild
+**Status**: **Feature-complete, in v1 RELEASE PREP.** Phases 0–6 + 3.5 shipped · Knowledge phase 1 (234-236, `DESIGN_KNOWLEDGE.md`) · **Sharing LIVE end-to-end** (237-239, `DESIGN_SHARING.md` — all v1 blocks incl. circle/collection/map/chart, themes, publish/republish/revoke against the deployed backend, contract v0.3; public viewer at `tools/show/` deployed to show.onlyworlds.com) · Import & export room shipped (241, `DESIGN_IMPORT.md`) · Charts room shipped (242-245, `DESIGN_CHARTS.md`) · filename contract + sync-state serialization gated (246). **Current arc: UI/UX polish toward release** — decision base: `Forge/Notes/2026-07-05-atlas-ui-workplan.md`; execution pickup: `BUILD_BRIEF.md`; release decision record: `Forge/Notes/2026-07-03-atlas-release-plan.md`. Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
 **Predecessor**: `tools/atlas-deprecated/` (IDB-cached architecture, retained as UI/UX reference)
 
 ---
@@ -554,9 +554,9 @@ Even for api-linked worlds, media lives ONLY in the folder. No upload to OW.
 │ chips   │ │   <room content>            │ │                         │
 │ search  │ │                             │ │                         │
 │ list    │ │   home / element / writing  │ │                         │
-│         │ │   knowledge / timeline /    │ │                         │
-│         │ │   search / publish / import │ │                         │
-│         │ │   / templates / settings    │ │                         │
+│         │ │   knowledge / charts /      │ │                         │
+│         │ │   share / import / settings │ │                         │
+│         │ │   (search+templates dormant)│ │                         │
 │ ⚙       │ │                             │ │                         │
 └─────────┴─└─────────────────────────────┘─┴─────────────────────────┘
 ```
@@ -586,8 +586,8 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 | `knowledge` | `#/w/<id>/knowledge[/<entryId>\|/new\|/knower/<id>]` | Knowledge entries — who knows what. [Entries \| Knowers] tabs, draft editor (persists nothing until create), embedded TipTap prose w/ mentions, known-view per knower. See `DESIGN_KNOWLEDGE.md` | shipped (phase 1) |
 | `timeline` (the **Charts** room) | `#/w/<id>/timeline[/<id>]` | **Charts** — chart views of the world along chosen axes (time first): type-icon identity, degree-ranked anchor beats, density-fan layout, LOD, unified select=focus (focus in the URL, Back walks the chain). Route key stays `timeline`; room title + nav read "Charts". See `DESIGN_CHARTS.md`. | shipped |
 | `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | **removed from nav pre-release (240)** — route/file dormant; replacement = Cmd+K palette (see "Search" above) |
-| `share` | `#/w/<id>/share[/<pageId>]` | Sharing pages — list + block builder (heading/prose/element-card/circle) + payload-true visitor preview + publish section (fakes-first). Legacy `/publish` URLs alias here. See `DESIGN_SHARING.md` | shipped (S1+S2+S4+S5; live publishing awaits Anchor's backend) |
-| `import` | `#/w/<id>/import` | Explanation + reference to base-tool import; mechanics deferred | stub |
+| `share` | `#/w/<id>/share[/<pageId>]` | Sharing pages — list + block builder (heading/prose/element-card/circle/collection/map/chart) + themes + payload-true visitor preview + LIVE publish/republish/revoke (contract v0.3). Legacy `/publish` URLs alias here. See `DESIGN_SHARING.md` | shipped + live |
+| `import` | `#/w/<id>/import` | **Import & export room** — bring in (full-world/loose JSON → new world or merge, validation + fix-prompt) / take out (ow.com-shape export, by-type subset). See `DESIGN_IMPORT.md` | shipped (241) |
 | `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | **removed from nav pre-release (240)** — route/file dormant |
 | `settings` | `#/w/<id>/settings[/<tab>]` | Account / storage / editing (atlas-wide) · world / writing / context (per-world) | shipped |
 
@@ -979,7 +979,15 @@ Root: `DESIGN.md` (+ per-room `DESIGN_*.md`), `PROGRESS.md` (operational log), `
 
 ## Build History
 
-All phases (0 → 6 + 3.5) shipped by session 221; rooms model + writing system (223-228); context pane (229-231); maintenance splits (232-233); Knowledge phase 1 (234-236); Sharing S1/S2 + backend contract draft (237). Cutover happened — atlas lives at `github.com/OnlyWorlds/atlas`; `tools/atlas-deprecated/` is retained as UI/UX reference only. See `docs-archive/PROGRESS-history.md` for session-by-session detail. Sync soft-edges live in `SYNC_NOTES.md`.
+All phases (0 → 6 + 3.5) shipped by session 221; rooms model + writing system (223-228); context pane (229-231); maintenance splits (232-233); Knowledge phase 1 (234-236); Sharing S1-S7 + contract + LIVE backend + show viewer deployed (237-239); UI consistency + quick wins (240); **import & export** (241); **Charts** (timeline reframe, charts #1-#2, save/gallery/share-block, all gated; 242-245); **release-prep correctness** (filename contract conv #87, sync-state serialization conv #86, pin disclosure B6, edited-dot B1 — all gated; 246); **release design pass** (UI workplan D1-D12 all decided; 247, 2026-07-05→07). Cutover happened — atlas lives at `github.com/OnlyWorlds/atlas` (repo private for launch; D12); `tools/atlas-deprecated/` is retained as UI/UX reference only. See `docs-archive/PROGRESS-history.md` for session-by-session detail. Sync soft-edges live in `SYNC_NOTES.md`.
+
+### Release-prep decision layer (2026-07, pointers)
+
+The v1 launch shape was settled in two passes and lives OUTSIDE this doc (this doc stays architecture):
+- **`Forge/Notes/2026-07-03-atlas-release-plan.md`** — the Comms-session decision record (strategy, A/B/C batches, Captain's lane).
+- **`Forge/Notes/2026-07-05-atlas-ui-workplan.md`** — the full UI/UX design pass: D1 unification (Capitalized underline room-tabs + `‹ Room` drill-in prefix bands) · D2 home cover-page×study-desk hybrid (+ D2b protagonist/home favorites) · D3 context-pane rule ("graph of the focused thing + per-room details") · D4 knowledge WHO/WHAT/ABOUT · **D5 intent picker REMOVED for v1** (`atlas_page_intent` stays in the model, hidden) · D6 take-out list · D8 help layers + per-room `?` overlay · D9 custom fields = post-launch (D9b supertype/subtype program is v1) · D10 bundled sample world · D11 Settings→"OnlyWorlds" page + waypoints · D12 dev story (closed source for launch, open everything around it).
+- **`BUILD_BRIEF.md`** — the execution pickup for the build sessions.
+When these ship, fold the durable outcomes back into this doc's conventions (expect new conventions for: room-tab pattern, drill-in band, waypoint hooks, favorites registry fields).
 
 ---
 
@@ -1029,7 +1037,7 @@ Stored on Narrative elements with `subtype: "page"`; all in `ATLAS_LOCAL_EXTENSI
 | `atlas_page_refs` | Flat element-id mirror of the element-bearing block bindings (card elementIds + circle knowerIds; id-swap safety via `rewriteIdReferences`; `blocksOf()` heals nested ids) | No — internal mechanics |
 | `atlas_page_intent` | show / reference / publish | Probably not — sharing metadata |
 | `atlas_page_theme` | Reserved for the S3 theme tokens | Probably not — visual pref |
-| `atlas_page_pub` | Published-state mirror `{id, slug, published_at, updated_at, revoked}` from the sharing backend (display cache; the API rows are truth) | No — sharing metadata |
+| `atlas_page_pub` | Published-state mirror `{id, slug, published_at, updated_at, revoked, content_sig}` from the sharing backend (display cache; the API rows are truth; `content_sig` = hash at publish time driving the edited-since-publish dot, B1). Mirrors are per-folder — two atlas instances on copies of one world each keep their own (S2/V1b, 2026-07-05) | No — sharing metadata |
 
 The published artifact is a frozen snapshot in a new Django model — see `SHARING_CONTRACT.md` (drafted session 237, Anchor pending). The canonical `story` field on a page carries a derived plain-markdown compilation of the blocks (synced, readable by other tools, regenerated on every blocks save — never hand-edited).
 

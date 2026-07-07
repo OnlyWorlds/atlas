@@ -1,6 +1,6 @@
 # Atlas — v1 Release Handover
 
-**Written**: 2026-07-03 19:05 (session 246 close) · **Load this FIRST when resuming atlas work.**
+**Written**: 2026-07-03 19:05 (session 246 close) · **Updated 2026-07-07: execution moved to `BUILD_BRIEF.md`** — this doc remains the strategic frame (Comms decisions, launch story, cross-party lanes); the day-to-day build pickup is now **`BUILD_BRIEF.md`** + its spec source `Forge/Notes/2026-07-05-atlas-ui-workplan.md` (session 247's full design pass: D1-D12 all decided, incl. intent-picker removal, OW page + waypoints, sample world, taxonomy program, dev story). Captain's smoke (2026-07-05) PASSED — filename contract verified on real NTFS.
 **The decision record**: `Forge/Notes/2026-07-03-atlas-release-plan.md` — the settled sheet, bout statuses, banked-work specs, Captain's lane, smoke checklist. This doc is the running-start; that doc is the truth.
 
 ---
