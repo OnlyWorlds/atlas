@@ -45,9 +45,22 @@ import { ToastManager } from '../ui/toast-manager';
 import type { JSONContent } from '@tiptap/core';
 import type { KnowledgeEditorHandle } from './knowledge-editor';
 import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
+import { makeRoomTabs } from '../ui/room-tabs';
+import { makeDrillInPrefix } from '../ui/drill-in';
 
 /** Sentinel knowledgeId for the unsaved draft editor (`/knowledge/new`). */
 const NEW = 'new';
+
+// Home-view [Entries | Knowers] tab is ephemeral UI state, not URL-encoded
+// (see file header). The context pane (context-tab.ts) needs to know which
+// tab is active to pick the right empty-state copy for the home view (T-K11),
+// so we mirror it at module scope.
+let lastRoomTab: 'entries' | 'knowers' = 'entries';
+
+/** Which home-view tab (Entries/Knowers) is currently showing. */
+export function getKnowledgeRoomTab(): 'entries' | 'knowers' {
+  return lastRoomTab;
+}
 
 interface Draft {
   name: string;
@@ -146,6 +159,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   let heldByMount: HTMLElement | null = null;
   let aboutMount: HTMLElement | null = null;
   let entryTitleHandle: EditableTitleHandle | null = null;  // editor header title (sync on tick)
+  let knowerTitleHandle: EditableTitleHandle | null = null;  // knower header title (sync on tick)
   // Whether the mounted view actually found its target. False = not-found
   // interim (deep URL before elements load, id-swap transient, deleted entry)
   // — same-view ticks retry a full build instead of a surgical refresh.
@@ -176,7 +190,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   function maybeToastDroppedCollective(): void {
     if (collectiveToastShown) return;
     collectiveToastShown = true;
-    toasts.info('Mentioning a circle doesn\'t make it a holder — add it under "Held by".');
+    toasts.info('Mentioning a circle in the text doesn\'t add it as a holder. To share with the circle, use the "Held by" section below.');
   }
 
   // ---- writes ---------------------------------------------------------------
@@ -475,15 +489,11 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     mountedResolved = false;
     const header = document.createElement('header');
     header.className = 'atlas-room-header atlas-knowledge-detail-header';
-    const back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'atlas-btn-ghost atlas-knowledge-back';
-    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span> ${kind === 'knower' ? 'all knowers' : 'all knowledge'}`;
-    back.addEventListener('click', () => {
+    // D1 drill-in prefix — same affordance as the entity headers.
+    header.appendChild(makeDrillInPrefix('Knowledge', () => {
       if (kind === 'knower') roomTab = 'knowers';
       navigate(knowledgeHash(worldId));
-    });
-    header.appendChild(back);
+    }));
     root.appendChild(header);
     const empty = document.createElement('div');
     empty.className = 'atlas-knowledge-empty';
@@ -526,43 +536,34 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     header.innerHTML = `
       <h1>Knowledge</h1>
       <p class="atlas-room-subtitle">
-        What the characters and circles of your world know. Each entry is a piece
-        of information — its text is the knowledge; its holders are the knowers.
+        What the characters and circles of your world know.
       </p>
     `;
     root.appendChild(header);
 
-    // [Entries | Knowers] tabs + per-tab action on the right. Switching tabs
-    // swaps only the action slot + the list body — the header and tab row are
-    // built once, so there's no flash or focus loss (audit 239 #18).
-    const tabsRow = document.createElement('div');
-    tabsRow.className = 'atlas-knowledge-tabs';
-    const entriesBtn = document.createElement('button');
-    entriesBtn.type = 'button';
-    entriesBtn.className = 'atlas-knowledge-tab';
-    entriesBtn.textContent = 'entries';
-    entriesBtn.setAttribute('role', 'tab');
-    const knowersBtn = document.createElement('button');
-    knowersBtn.type = 'button';
-    knowersBtn.className = 'atlas-knowledge-tab';
-    knowersBtn.textContent = 'knowers';
-    knowersBtn.setAttribute('role', 'tab');
-    const spacer = document.createElement('span');
-    spacer.className = 'atlas-knowledge-tabs-spacer';
+    // [Entries | Knowers] room-section tabs (the shared D1 pattern) + per-tab
+    // action on the right. Switching tabs swaps only the action slot + the
+    // list body — the header and tab row are built once, so there's no flash
+    // or focus loss (audit 239 #18).
     const actionSlot = document.createElement('span');
-    actionSlot.className = 'atlas-knowledge-tabs-action';
-    tabsRow.append(entriesBtn, knowersBtn, spacer, actionSlot);
-    root.appendChild(tabsRow);
+    actionSlot.className = 'atlas-room-tabs-action';
+    const tabs = makeRoomTabs(
+      [
+        { key: 'entries', label: 'Entries', icon: 'article' },
+        { key: 'knowers', label: 'Knowers', icon: 'groups' },
+      ],
+      roomTab,
+      (key) => { roomTab = key as 'entries' | 'knowers'; lastRoomTab = roomTab; renderBody(); },
+      { trailing: actionSlot },
+    );
+    root.appendChild(tabs.el);
 
     const listContainer = document.createElement('div');
     listContainer.className = 'atlas-knowledge-home-body';
     root.appendChild(listContainer);
 
     const renderBody = (): void => {
-      entriesBtn.classList.toggle('is-active', roomTab === 'entries');
-      entriesBtn.setAttribute('aria-selected', String(roomTab === 'entries'));
-      knowersBtn.classList.toggle('is-active', roomTab === 'knowers');
-      knowersBtn.setAttribute('aria-selected', String(roomTab === 'knowers'));
+      tabs.set(roomTab);
       actionSlot.innerHTML = '';
       listContainer.innerHTML = '';
       if (roomTab === 'entries') {
@@ -595,8 +596,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       }
     };
 
-    entriesBtn.addEventListener('click', () => { if (roomTab !== 'entries') { roomTab = 'entries'; renderBody(); } });
-    knowersBtn.addEventListener('click', () => { if (roomTab !== 'knowers') { roomTab = 'knowers'; renderBody(); } });
+    lastRoomTab = roomTab;
     renderBody();
   }
 
@@ -725,23 +725,27 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
 
     const header = document.createElement('div');
     header.className = 'atlas-middle-header atlas-knowledge-knower-header';
-    const back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'atlas-icon-btn-sm atlas-knowledge-back';
-    back.title = 'All knowers';
-    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span>`;
-    back.addEventListener('click', () => { roomTab = 'knowers'; navigate(knowledgeHash(worldId)); });
-    header.appendChild(back);
+    // D1 drill-in: the clickable room-name prefix IS the back affordance.
+    header.appendChild(makeDrillInPrefix('Knowledge', () => {
+      roomTab = 'knowers';
+      navigate(knowledgeHash(worldId));
+    }));
 
     const kicon = document.createElement('span');
     kicon.className = 'material-symbols-outlined atlas-knowledge-knower-icon';
     kicon.textContent = isCircle ? 'groups' : (ELEMENT_ICONS[knower.type] ?? 'person');
     header.appendChild(kicon);
 
-    const knowerTitle = document.createElement('h2');
-    knowerTitle.className = 'atlas-knowledge-knower-name';
-    knowerTitle.textContent = knower.name || '(unnamed)';
-    header.appendChild(knowerTitle);
+    knowerTitleHandle = makeEditableTitle({
+      initial: knower.name || '',
+      placeholder: '(unnamed)',
+      ariaLabel: 'Knower name',
+      onCommit: (next) => {
+        const current = elOf(knowerId)?.name || '';
+        if (next && next !== current) void patchEntry(knowerId, { name: next });
+      },
+    });
+    header.appendChild(knowerTitleHandle.el);
 
     const metaBits: string[] = [];
     if (isCircle) {
@@ -1007,13 +1011,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     // separate Name field. Same `.atlas-middle-header` the element editor uses.
     const header = document.createElement('div');
     header.className = 'atlas-middle-header atlas-knowledge-entry-header';
-    const back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'atlas-icon-btn-sm atlas-knowledge-back';
-    back.title = 'All knowledge';
-    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span>`;
-    back.addEventListener('click', () => navigate(knowledgeHash(worldId)));
-    header.appendChild(back);
+    // D1 drill-in: the clickable room-name prefix IS the back affordance.
+    header.appendChild(makeDrillInPrefix('Knowledge', () => navigate(knowledgeHash(worldId))));
 
     const kicon = document.createElement('span');
     kicon.className = 'material-symbols-outlined';

@@ -82,6 +82,7 @@ interface ViewState {
   dragStartX: number;
   dragStartCenter: number;
   dragMoved: boolean;
+  destroyed: boolean;           // set on destroy(); guards late async redraws
   onSelect: (id: string) => void;
   onOpenElement: (id: string) => void;
 }
@@ -109,6 +110,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
     layoutSig: null, layoutNodes: null,
     mouseX: null, mouseY: null,
     dragging: false, dragStartX: 0, dragStartCenter: 0, dragMoved: false,
+    destroyed: false,
     onSelect: opts.onSelect,
     onOpenElement: opts.onOpenElement,
   };
@@ -140,13 +142,18 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
       renderCard(state);
     },
     setSelection(elementId: string | null): void {
-      if (elementId === state.selectedId) return;
-      state.selectedId = elementId;
+      // Normalize the clear sentinel: the card's close button routes through an
+      // empty-string id — coerce to null so hit-tests/labels have one no-selection
+      // value, not a mix of '' and null.
+      const next = elementId ? elementId : null;
+      if (next === state.selectedId) return;
+      state.selectedId = next;
       draw(state);
       renderCard(state);
     },
     redraw(): void { draw(state); },
     destroy(): void {
+      state.destroyed = true;
       ro.disconnect();
       canvas.removeEventListener('mousemove', onMove);
       canvas.removeEventListener('mouseleave', onLeave);
@@ -160,11 +167,15 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
 
 // ====== Zoom helpers ======
 
-function effectiveRange(state: ViewState, base: { min: number; max: number }): { min: number; max: number } {
+export function effectiveRange(
+  base: { min: number; max: number },
+  zoom: number,
+  panCenter: number | null,
+): { min: number; max: number } {
   const span = base.max - base.min;
-  if (span <= 0 || state.zoom <= 1) return base;
-  const effSpan = span / state.zoom;
-  const center = state.panCenter ?? (base.min + span / 2);
+  if (span <= 0 || zoom <= 1) return base;
+  const effSpan = span / zoom;
+  const center = panCenter ?? (base.min + span / 2);
   const pad = span * 0.05;
   let min = center - effSpan / 2;
   let max = center + effSpan / 2;
@@ -181,7 +192,7 @@ function effectiveRange(state: ViewState, base: { min: number; max: number }): {
  * periods stay a thin spine. Anchors are laid FIRST so the significant beats hold
  * the centre. Pure + deterministic (stable across redraws → no flicker).
  */
-function computeBeeswarm(
+export function computeBeeswarm(
   nodes: TimelineNode[],
   anchorIds: Set<string>,
   dateToX: (d: number) => number,
@@ -190,6 +201,10 @@ function computeBeeswarm(
 ): PlacedDot[] {
   const top = TOP_PAD;
   const bottom = axisY - 8;
+  // Degenerate band (container shorter than the top padding + axis strip) — no
+  // usable vertical room, so bail instead of stacking every node on one line
+  // (which draws an unusable, non-interactive chart).
+  if (bottom <= top) return [];
   const centerY = (top + bottom) / 2;
   const span = Math.max(1, bottom - top);
   const order = [...nodes].sort((a, b) =>
@@ -232,6 +247,7 @@ function computeBeeswarm(
 // ====== Drawing ======
 
 function draw(state: ViewState): void {
+  if (state.destroyed) return; // a late font-load/ResizeObserver tick after destroy()
   const { canvas, container } = state;
   const rect = container.getBoundingClientRect();
   const w = Math.max(0, rect.width);
@@ -263,7 +279,7 @@ function draw(state: ViewState): void {
 
   const base = calculateTimeRange(state.nodes);
   state.baseRange = base;
-  const range = effectiveRange(state, base);
+  const range = effectiveRange(base, state.zoom, state.panCenter);
   const dateToX = createDateToX(range, w);
   const ticks = calculateTicks(range, w);
   const axisY = h - AXIS_LABEL_HEIGHT;
@@ -309,7 +325,12 @@ function draw(state: ViewState): void {
   // periods use the full height while sparse periods stay a thin spine — instead
   // of everything stacking at the top. Cached per geometry so the per-mousemove
   // redraw (proximity labels) never re-runs the O(n·k) packing.
-  const layoutSig = `${w.toFixed(1)}|${axisY.toFixed(1)}|${range.min.toFixed(2)}|${range.max.toFixed(2)}`;
+  // Degree fingerprint guards a latent desync: if a node's degree mutates in
+  // place (same array ref) the geometry signature alone wouldn't re-pack, and
+  // the anchor set feeds the layout order.
+  let degreeHash = 0;
+  for (const n of state.nodes) degreeHash = (degreeHash * 31 + n.degree) | 0;
+  const layoutSig = `${w.toFixed(1)}|${axisY.toFixed(1)}|${range.min.toFixed(2)}|${range.max.toFixed(2)}|${state.nodes.length}|${degreeHash}`;
   if (state.layoutSig !== layoutSig || state.layoutNodes !== state.nodes) {
     state.placedDots = computeBeeswarm(state.nodes, anchorIds, dateToX, w, axisY);
     state.layoutSig = layoutSig;
@@ -614,7 +635,7 @@ function handleMouseMove(state: ViewState, e: MouseEvent): void {
 
   if (state.dragging && state.baseRange) {
     const w = rect.width;
-    const range = effectiveRange(state, state.baseRange);
+    const range = effectiveRange(state.baseRange, state.zoom, state.panCenter);
     const dateToX = createDateToX(range, w);
     const pxPerUnit = dateToX(range.min + 1) - dateToX(range.min);
     if (pxPerUnit !== 0) {
@@ -670,7 +691,7 @@ function handleWheel(state: ViewState, e: WheelEvent): void {
   const span = base.max - base.min;
   if (span <= 0) return;
 
-  const range = effectiveRange(state, base);
+  const range = effectiveRange(base, state.zoom, state.panCenter);
   const dateToX = createDateToX(range, w);
   const pxPerUnit = dateToX(range.min + 1) - dateToX(range.min);
   if (pxPerUnit === 0) return;

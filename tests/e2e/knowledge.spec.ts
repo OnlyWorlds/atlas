@@ -118,7 +118,7 @@ test('draft create flow: nothing persists until "create"', async ({ page }) => {
   await expect(page.locator('.atlas-knowledge-prose-rich .ProseMirror')).toContainText('Barovia is cursed');
 
   // Back to the list — the entry now appears.
-  await page.click('.atlas-knowledge-back');
+  await page.click('.atlas-drillin-prefix');
   await expect(page.locator('.atlas-knowledge-row', { hasText: 'the cursed village' })).toBeVisible();
   await expect(page.locator('.atlas-knowledge-row')).toHaveCount(1);
 });
@@ -133,7 +133,7 @@ test('draft persists across navigation; cancel clears the stash', async ({ page 
   await waitForKnowledgeEditor(page);
   await page.locator('.atlas-knowledge-prose-rich .ProseMirror').click();
   await page.keyboard.type('the abbot is not what he seems');
-  await page.click('.atlas-knowledge-back');
+  await page.click('.atlas-drillin-prefix');
   await expect(page.locator('.atlas-knowledge-row')).toHaveCount(0);
 
   // Return to the draft — content restored from the per-world stash.
@@ -259,7 +259,7 @@ test('knowers tab lists holders; known-view compiles held entries per element', 
   await openKnowledge(page);
 
   // Knowers tab lists the circle and the narrator.
-  await page.click('.atlas-knowledge-tab:has-text("knowers")');
+  await page.click('.atlas-room-tab:has-text("Knowers")');
   await expect(page.locator('.atlas-knowledge-row', { hasText: 'the party' })).toBeVisible();
   await expect(page.locator('.atlas-knowledge-row', { hasText: 'Ireena' })).toBeVisible();
 
@@ -276,8 +276,8 @@ test('knowers tab lists holders; known-view compiles held entries per element', 
   await expect(card).toContainText('The count watches her.');
 
   // Back returns to the knowers tab.
-  await page.click('.atlas-knowledge-back');
-  await expect(page.locator('.atlas-knowledge-tab.is-active')).toHaveText('knowers');
+  await page.click('.atlas-drillin-prefix');
+  await expect(page.locator('.atlas-room-tab.is-active')).toContainText('Knowers');
 });
 
 test('context pane graphs an open entry: narrator + circle holders appear as neighbors', async ({ page }) => {
@@ -394,7 +394,7 @@ test('missing entry id renders a not-found interim, not a hijacked URL', async (
   // Honest interim: URL stays, not-found copy shows, back button works.
   await expect(page.locator('.atlas-knowledge-empty-title')).toHaveText('Knowledge entry not found.');
   await expect(page).toHaveURL(/\/knowledge\/00000000-0000-0000-0000-000000000000$/);
-  await page.click('.atlas-knowledge-back');
+  await page.click('.atlas-drillin-prefix');
   await expect(page).toHaveURL(/\/knowledge$/);
 });
 
@@ -414,7 +414,7 @@ test('known-view lens dims unknown elements in the sidebar; banner × clears it'
 
   // Open Ireena's known-view, toggle the lens on.
   await openKnowledge(page);
-  await page.click('.atlas-knowledge-tab:has-text("knowers")');
+  await page.click('.atlas-room-tab:has-text("Knowers")');
   await page.click('.atlas-knowledge-row:has-text("Ireena")');
   await page.click('.atlas-knowledge-lens-toggle');
   await expect(page.locator('.atlas-knowledge-lens-toggle')).toHaveClass(/is-active/);

@@ -57,8 +57,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">cloud_upload</span>
         </button>
-        <button class="atlas-create-icon-btn" data-action="link-api" title="Link existing API world (downloads into atlas)">
-          <span class="material-symbols-outlined">link</span>
+        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="link-api" title="Link existing API world (downloads into atlas)">
+          <span class="material-symbols-outlined atlas-add-glyph-main">link</span>
         </button>
       `;
     } else {
@@ -163,7 +163,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       if (state.atlasRoot) {
         listEl.innerHTML = `<div class="atlas-pane-empty">No worlds yet — create one to start.</div>`;
       } else if (state.atlasRootRecoverable) {
-        listEl.innerHTML = `<div class="atlas-pane-empty">Use the welcome panel to recover your atlas folder.</div>`;
+        listEl.innerHTML = `<div class="atlas-pane-empty">Use the welcome panel to re-link your atlas folder.</div>`;
       } else {
         listEl.innerHTML = `<div class="atlas-pane-empty">Use the welcome panel to set up your atlas folder.</div>`;
       }
@@ -198,7 +198,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
     ? (isPaused ? 'cloud_off' : 'cloud')
     : 'folder';
   const stateChip = world.state === 'api-linked'
-    ? '<span class="atlas-world-state-chip api-linked">API</span>'
+    ? '<span class="atlas-world-state-chip api-linked">online</span>'
     : '';
   const favIcon = world.favorite ? 'star' : 'star_border';
   const favCls = world.favorite ? 'is-fav' : '';

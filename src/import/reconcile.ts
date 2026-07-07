@@ -73,6 +73,7 @@ export function reconcile(
   // --- pass 1: normalize + decide action + assign final ids + build id remap ---
   const incoming: Incoming[] = [];
   const incomingIdRemap = new Map<string, string>(); // discarded incoming uuid → finalId
+  const assignedIds = new Set<string>(); // final ids already claimed this batch (in-batch dup guard)
   for (const [type, records] of parsed.byType) {
     const claimed = new Set<string>(); // existing ids claimed by a name match this type
     for (const raw of records) {
@@ -108,11 +109,15 @@ export function reconcile(
         action = onConflict === 'overwrite' ? 'update' : 'skip';
       } else {
         // Insert. Keep the incoming uuid unless it collides with a DIFFERENT
-        // existing element — then mint a fresh one so we don't clobber it.
-        finalId = rawId && !existingById.has(rawId) ? rawId : genId();
+        // existing element OR another incoming record already claimed it this
+        // batch — then mint a fresh one. Without the in-batch guard, two records
+        // sharing a raw id would both resolve to it and the second would silently
+        // overwrite the first on apply.
+        finalId = rawId && !existingById.has(rawId) && !assignedIds.has(rawId) ? rawId : genId();
         targetId = finalId;
         action = 'insert';
       }
+      assignedIds.add(finalId);
       if (rawId && rawId !== finalId) incomingIdRemap.set(rawId, finalId);
       incoming.push({ type, record, name, finalId, action, targetId });
     }

@@ -91,7 +91,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
       if (worldId) pushRecent(worldId, id);
       if (type === 'collective' && !collectiveMentionToasted) {
         collectiveMentionToasted = true;
-        toasts.info('Mentioning a circle doesn\'t make it a holder — add it under "Held by".');
+        toasts.info('Mentioning a circle in the text doesn\'t add it as a holder. To share with the circle, use the "Held by" section below.');
       }
     },
   });

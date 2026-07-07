@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { mswServer } from '../setup';
 import { statefulOwHandlers } from '../msw-handlers';
@@ -80,18 +81,29 @@ describe('createApiWorld (Route 1)', () => {
     expect(serverState.worldCreations).toHaveLength(0);
   });
 
-  it('surfaces server-side 400 with the returned message', async () => {
-    // The MSW handler returns 400 if any of the required body fields is missing.
-    // Trim values to empty within createApiWorld → we hit our own check first.
-    // To force server-side rejection: override the handler temporarily.
-    mswServer.resetHandlers();
-    mswServer.use(...statefulOwHandlers({ baseUrl: TEST_BASE, clock: clock.next }).handlers);
-    // The default handler returns 400 only on missing fields; OK as-is for now.
-    // Make the URL itself reject by overriding base.
-    setMakeOnlineBaseUrl('https://unreachable.invalid/api/worldapi');
+  it('surfaces the server-side 400 message verbatim (not the generic PIN error)', async () => {
+    // Force a server 400 carrying a specific message. The bug this guards: the
+    // throw that reads data.message used to sit INSIDE the try around JSON.parse,
+    // so the catch swallowed it and re-threw the generic PIN string.
+    const worldsyncUrl = `${TEST_BASE.replace('/worldapi', '/worldsync')}/create-world-external/`;
+    mswServer.use(
+      http.post(worldsyncUrl, () =>
+        HttpResponse.json({ success: false, message: 'That email already owns a world' }, { status: 400 })
+      )
+    );
     await expect(
-      createApiWorld({ name: 'X', email: 'a@b.c', pin: '1' })
-    ).rejects.toThrow();
+      createApiWorld({ name: 'X', email: 'a@b.c', pin: '1234' })
+    ).rejects.toThrow('That email already owns a world');
+  });
+
+  it('falls back to the generic 400 message when the body is not JSON', async () => {
+    const worldsyncUrl = `${TEST_BASE.replace('/worldapi', '/worldsync')}/create-world-external/`;
+    mswServer.use(
+      http.post(worldsyncUrl, () => new HttpResponse('gateway boom', { status: 400 }))
+    );
+    await expect(
+      createApiWorld({ name: 'X', email: 'a@b.c', pin: '1234' })
+    ).rejects.toThrow(/Invalid email or PIN/i);
   });
 });
 

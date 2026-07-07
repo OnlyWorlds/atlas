@@ -8,7 +8,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildPagePayload, type RelationToken, type PayloadCircleBlock } from '../../src/core/share-payload';
+import { buildPagePayload, freezeMapBlock, type RelationToken, type PayloadCircleBlock } from '../../src/core/share-payload';
+import type { MapBlock } from '../../src/core/sharing';
 import type { Element } from '../../src/core/types';
 
 // ---- fixtures ---------------------------------------------------------------
@@ -398,5 +399,52 @@ describe('buildPagePayload', () => {
     expect(Object.keys(p.elements)).toEqual([IREENA]);
     const card = p.blocks.find(b => b.kind === 'element-card');
     expect((card as { elementId: string }).elementId).toBe(IREENA);
+  });
+});
+
+// ---- freezeMapBlock: published-image scheme guard (audit B-armor) -----------
+
+describe('freezeMapBlock — image URL scheme guard', () => {
+  const MAP = 'c1000000-0000-0000-0000-000000000001';
+  const PIN = 'd1000000-0000-0000-0000-000000000001';
+
+  function mapWorld(imageUrl: string, dims: { width?: number; height?: number } = { width: 1000, height: 800 }): Map<string, Element> {
+    const els: Element[] = [
+      { id: MAP, type: 'map', name: 'Barovia', image_url: imageUrl, ...dims, local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
+      { id: PIN, type: 'pin', name: 'Vallaki pin', x: 500, y: 400, element_id: VALLAKI, local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
+      { id: VALLAKI, type: 'location', name: 'Vallaki', local_updated_at: '2026-06-07T00:00:00Z' } as unknown as Element,
+    ];
+    return new Map(els.map(e => [e.id, e]));
+  }
+
+  const block: MapBlock = { id: 'blk1', kind: 'map', mapId: MAP, pinIds: [PIN] };
+
+  it('freezes a map served over https, projecting pins to percentages', () => {
+    const frozen = freezeMapBlock(block, mapWorld('https://img.example/barovia.png'), new Set());
+    expect(frozen).not.toBeNull();
+    expect(frozen!.image_url).toBe('https://img.example/barovia.png');
+    expect(frozen!.pins).toHaveLength(1);
+    expect(frozen!.pins[0].xPct).toBe(50);
+    expect(frozen!.pins[0].yPct).toBe(50);
+  });
+
+  it('allows plain http too', () => {
+    expect(freezeMapBlock(block, mapWorld('http://img.example/barovia.png'), new Set())).not.toBeNull();
+  });
+
+  it('drops a blob: image (local media never leaves the folder)', () => {
+    expect(freezeMapBlock(block, mapWorld('blob:https://app/abc-123'), new Set())).toBeNull();
+  });
+
+  it('drops a data: URI image', () => {
+    expect(freezeMapBlock(block, mapWorld('data:image/png;base64,AAAA'), new Set())).toBeNull();
+  });
+
+  it('drops a relative / scheme-less image path', () => {
+    expect(freezeMapBlock(block, mapWorld('maps/barovia.png'), new Set())).toBeNull();
+  });
+
+  it('drops a map with no usable dimensions', () => {
+    expect(freezeMapBlock(block, mapWorld('https://img.example/barovia.png', { width: 0, height: 0 }), new Set())).toBeNull();
   });
 });

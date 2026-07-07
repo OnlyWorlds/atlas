@@ -73,6 +73,25 @@ describe('reconcile — resolve-names (AI-parsed loose shape)', () => {
     expect(plan.creates[0].data.birthplace).toBe(U.loc);
   });
 
+  it('mints a fresh id for a second record sharing a raw uuid in the same batch', () => {
+    // Two Objects with the SAME incoming uuid but different names. Without the
+    // in-batch guard both resolve to that uuid and the second create silently
+    // clobbers the first when the plan is applied (one file, two writes).
+    const parsed = parsePayload({
+      Object: [
+        { id: U.obj1, name: 'Rifle' },
+        { id: U.obj1, name: 'Knife' },
+      ],
+    });
+    const plan = reconcile(parsed, [], { genId: genIdFactory() });
+
+    expect(plan.report.created).toBe(2);
+    const ids = plan.creates.map(c => c.data.id);
+    expect(new Set(ids).size).toBe(2); // distinct — collision broken
+    expect(plan.creates.find(c => c.data.name === 'Rifle')!.data.id).toBe(U.obj1); // first keeps it
+    expect(plan.creates.find(c => c.data.name === 'Knife')!.data.id).toBe('gen-1'); // second minted
+  });
+
   it('drops unresolvable name relations and reports them', () => {
     const parsed = parsePayload({ Character: [{ name: 'Aragorn', birthplace: 'Nowhere' }] });
     const plan = reconcile(parsed, [], { genId: genIdFactory() });

@@ -16,7 +16,7 @@ import {
   setSyncConfirmServerDeletes,
   setSyncPauseAll,
 } from '../registry/registry';
-import { setupAtlasRoot } from '../setup/atlas-root-flow';
+import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
 import { ToastManager } from '../ui/toast-manager';
 import {
   getCurrentSyncEngine,
@@ -68,7 +68,9 @@ export function wireStorageTab(toasts: ToastManager): void {
 // ---- On this device (atlas root) ----
 
 function renderStorageDeviceSection(): string {
-  const ar = getState().atlasRoot;
+  const state = getState();
+  const ar = state.atlasRoot;
+  const recoverable = state.atlasRootRecoverable;
   return `
     <section class="atlas-settings-section">
       <h3>On this device</h3>
@@ -80,10 +82,16 @@ function renderStorageDeviceSection(): string {
           <div class="atlas-settings-actions">
             <button class="atlas-btn-ghost" data-action="change-atlas-root">Change folder</button>
           </div>`
-        : `<p>Not set up yet.</p>
-           <div class="atlas-settings-actions">
-             <button class="atlas-btn-primary" data-action="change-atlas-root">Set up atlas folder</button>
-           </div>`}
+        : recoverable
+          ? `<p>A previous atlas folder can be re-linked: <code>${escapeText(recoverable.folderName)}</code>.</p>
+             <div class="atlas-settings-actions">
+               <button class="atlas-btn-primary" data-action="recover-atlas-root">Re-link folder</button>
+             </div>
+             <p class="atlas-settings-hint-sub"><button class="atlas-btn-link" data-action="change-atlas-root">Or set up a different folder</button></p>`
+          : `<p>Not set up yet.</p>
+             <div class="atlas-settings-actions">
+               <button class="atlas-btn-primary" data-action="change-atlas-root">Set up atlas folder</button>
+             </div>`}
     </section>
   `;
 }
@@ -105,6 +113,27 @@ function wireStorageDeviceActions(toasts: ToastManager): void {
       toasts.error(err instanceof Error ? err.message : String(err));
     } finally {
       btn.disabled = false;
+    }
+  });
+
+  const recoverBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="recover-atlas-root"]');
+  recoverBtn?.addEventListener('click', async () => {
+    recoverBtn.disabled = true;
+    recoverBtn.textContent = 'Re-linking…';
+    try {
+      const result = await recoverAtlasRoot();
+      if (result) {
+        toasts.success(
+          result.imported > 0
+            ? `Re-linked atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
+            : 'Re-linked atlas folder (no worlds found inside)'
+        );
+      }
+    } catch (err) {
+      toasts.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      recoverBtn.disabled = false;
+      recoverBtn.textContent = 'Re-link folder';
     }
   });
 }

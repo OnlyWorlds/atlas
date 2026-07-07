@@ -213,6 +213,13 @@ export function mountSidebar(mount: SidebarMount): () => void {
     mod.openNotesOverlay();
   });
 
+  function renderNotesButtonState(): void {
+    const active = !!getState().active;
+    notesBtn.disabled = !active;
+    notesBtn.classList.toggle('atlas-icon-btn-disabled', !active);
+    notesBtn.title = active ? 'Notes for this world (N)' : 'Open a world to use notes';
+  }
+
   // ----- Footer ? button — keyboard shortcut reference (session 219) -----
   // Tiny inline popover listing implemented gestures + a "more coming"
   // footer. Discoverability for the bindings that exist TODAY (Esc, F,
@@ -276,6 +283,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
     handleRouteTransition();
     renderToggle();
     renderGearState();
+    renderNotesButtonState();
     mountBody();
   }
 

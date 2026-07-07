@@ -79,6 +79,24 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       lastTabKey = null;
     }
 
+    // No active world → no tab chrome at all (G4/T-G10). Showing Context|Maps
+    // tabs (and whichever one happened to be "active" from persisted state)
+    // is noise on an empty app, and it previously surfaced an inconsistency
+    // (Maps rendered active while Context sat at index 0). One quiet
+    // placeholder replaces both.
+    if (!state.active) {
+      tabBar.innerHTML = '';
+      if (lastTabKey !== 'no-world') {
+        unmountActive?.();
+        unmountActive = null;
+        closeVisualSettingsPopover();
+        pane.innerHTML = '<div class="atlas-pane-empty">Open a world to see its context here.</div>';
+        lastTabKey = 'no-world';
+      }
+      renderSyncIndicator(state, toasts);
+      return;
+    }
+
     renderTabBar(ui.rightTabs, ui.rightActiveIndex);
     renderSyncIndicator(state, toasts);
 

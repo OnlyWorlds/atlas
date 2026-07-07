@@ -27,6 +27,7 @@ import { getState } from '../../core/state';
 import { getEditorSettings } from '../../registry/registry';
 import { navigate, elementHash } from '../../core/router';
 import { renderElementImage } from '../../ui/element-image';
+import { narrativeKindOf } from '../../core/narrative-kind';
 
 export interface ContextPreviewHandle {
   show(el: Element): void;
@@ -135,7 +136,7 @@ function buildPreview(
   titleWrap.appendChild(name);
   const typeLabel = document.createElement('div');
   typeLabel.className = 'atlas-context-preview-type';
-  typeLabel.textContent = ELEMENT_LABELS[el.type]?.singular ?? el.type;
+  typeLabel.textContent = previewTypeLabel(el);
   titleWrap.appendChild(typeLabel);
   header.appendChild(titleWrap);
 
@@ -243,6 +244,16 @@ function buildPreview(
   card.appendChild(footer);
 
   return card;
+}
+
+// The generic type label is right for every element type EXCEPT narrative,
+// which is reused for three distinct concepts (see narrative-kind.ts) — the
+// preview card should say which one this actually is (T-K10), not "narrative".
+function previewTypeLabel(el: Element): string {
+  const kind = narrativeKindOf(el);
+  if (kind === 'knowledge') return 'knowledge entry';
+  if (kind === 'page') return 'page';
+  return ELEMENT_LABELS[el.type]?.singular ?? el.type;
 }
 
 function escapeRegex(s: string): string {

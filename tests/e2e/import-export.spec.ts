@@ -96,10 +96,10 @@ test('tabs switch between bring in and take out', async ({ page }) => {
   await setupWorld(page);
   await openImport(page);
   await expect(page.locator('[data-panel="in"]')).toBeVisible();
-  await page.click('.atlas-import-tab[data-tab="out"]');
+  await page.click('.atlas-room-tab[data-tab="out"]');
   await expect(page.locator('[data-panel="out"]')).toBeVisible();
   await expect(page.locator('[data-panel="in"]')).toBeHidden();
-  await page.click('.atlas-import-tab[data-tab="in"]');
+  await page.click('.atlas-room-tab[data-tab="in"]');
   await expect(page.locator('[data-panel="in"]')).toBeVisible();
   await expect(page.locator('[data-panel="out"]')).toBeHidden();
 });
@@ -113,7 +113,7 @@ test('export downloads an ow.com-compatible JSON', async ({ page }) => {
     api.patchData(await store.listElements());
   });
   await openImport(page);
-  await page.click('.atlas-import-tab[data-tab="out"]');
+  await page.click('.atlas-room-tab[data-tab="out"]');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),

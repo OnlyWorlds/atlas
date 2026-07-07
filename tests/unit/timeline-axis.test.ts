@@ -105,6 +105,37 @@ describe('timeline data-normalizer', () => {
     expect(nodes[0].endDate).toBe(200);
   });
 
+  it('drops an inverted end_date (end before start) rather than drawing backwards', () => {
+    const elements: Element[] = [
+      {
+        id: 'n2',
+        type: 'narrative',
+        name: 'Backwards',
+        local_updated_at: '2026-01-01',
+        start_date: 200,
+        end_date: 100, // inverted
+      } as Element & { start_date: number; end_date: number },
+    ];
+    const nodes = extractTemporalNodes(elements);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].startDate).toBe(200);
+    expect(nodes[0].endDate).toBeNull(); // inverted range discarded
+  });
+
+  it('keeps an equal end_date (zero-length range is valid)', () => {
+    const elements: Element[] = [
+      {
+        id: 'n3',
+        type: 'narrative',
+        name: 'Instant',
+        local_updated_at: '2026-01-01',
+        start_date: 100,
+        end_date: 100,
+      } as Element & { start_date: number; end_date: number },
+    ];
+    expect(extractTemporalNodes(elements)[0].endDate).toBe(100);
+  });
+
   it('skips elements without a date field', () => {
     const elements: Element[] = [
       { id: 'c1', type: 'character', name: 'Alice', local_updated_at: '2026-01-01' },

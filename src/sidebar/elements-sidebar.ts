@@ -106,6 +106,84 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     patchSlice('ui', { ...getState().ui, search: searchInput.value });
   });
 
+  // ----- Taxonomy sub-filter row (D9b lever 3) -----
+  // Progressive disclosure: when the filter strip narrows to exactly ONE type,
+  // a second small chip row appears with that type's distinct supertypes
+  // (derived live from the loaded elements — never tracked). Picking one
+  // narrows the list and reveals its subtypes as a second chip tier. State is
+  // sidebar-local and resets whenever the single-type condition breaks.
+  const subFilterRow = document.createElement('div');
+  subFilterRow.className = 'atlas-subfilter-row';
+  subFilterRow.hidden = true;
+  content.appendChild(subFilterRow);
+  let subFilterType: ElementType | null = null;   // which type the row is showing
+  let superFilter: string | null = null;          // selected supertype (trimmed)
+  let subtypeFilter: string | null = null;        // selected subtype (trimmed)
+
+  function taxonomyValues(elements: readonly Element[], type: ElementType, field: 'supertype' | 'subtype', withinSupertype: string | null): string[] {
+    const counts = new Map<string, number>();
+    for (const el of elements) {
+      if (el.type !== type) continue;
+      if (withinSupertype && String((el as Record<string, unknown>).supertype ?? '').trim() !== withinSupertype) continue;
+      const v = (el as Record<string, unknown>)[field];
+      if (typeof v !== 'string') continue;
+      const t = v.trim();
+      if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    return [...counts.keys()]
+      .sort((a, b) => (counts.get(b)! - counts.get(a)!) || a.localeCompare(b))
+      .slice(0, 12);
+  }
+
+  function renderSubFilters(): void {
+    const state = getState();
+    const filters = state.ui.elementFilters;
+    const single = filters.size === 1 ? [...filters][0] : null;
+    if (!single) {
+      subFilterRow.hidden = true;
+      subFilterType = null; superFilter = null; subtypeFilter = null;
+      return;
+    }
+    if (subFilterType !== single) {
+      subFilterType = single; superFilter = null; subtypeFilter = null;
+    }
+    const supers = taxonomyValues(state.data.elements, single, 'supertype', null);
+    if (supers.length === 0 && !superFilter) {
+      subFilterRow.hidden = true;
+      return;
+    }
+    subFilterRow.hidden = false;
+    subFilterRow.innerHTML = '';
+    for (const v of supers) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'atlas-subfilter-chip' + (superFilter === v ? ' active' : '');
+      chip.textContent = v;
+      chip.title = `Show only ${single}s with supertype "${v}"`;
+      chip.addEventListener('click', () => {
+        superFilter = superFilter === v ? null : v;
+        subtypeFilter = null;
+        render();
+      });
+      subFilterRow.appendChild(chip);
+    }
+    // Second tier: subtypes within the chosen supertype.
+    if (superFilter) {
+      for (const v of taxonomyValues(state.data.elements, single, 'subtype', superFilter)) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'atlas-subfilter-chip sub' + (subtypeFilter === v ? ' active' : '');
+        chip.textContent = `· ${v}`;
+        chip.title = `Narrow to subtype "${v}"`;
+        chip.addEventListener('click', () => {
+          subtypeFilter = subtypeFilter === v ? null : v;
+          render();
+        });
+        subFilterRow.appendChild(chip);
+      }
+    }
+  }
+
   // ----- Knowledge lens banner (hidden unless ui.knowledgeLens is set) -----
   // Explains why the list is dimmed + offers the exit. The lens persists
   // across rooms, so this is the always-visible affordance (the toggle that
@@ -266,13 +344,15 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     if (!state.active) {
       strip.innerHTML = '';
+      subFilterRow.hidden = true;
+      subFilterType = null; superFilter = null; subtypeFilter = null;
       lensBanner.setAttribute('data-active', 'false');
       // Empty-state copy depends on what action the user can actually take.
       // (Session 221 W2 follow-up: the sidebar's old "pick one from Worlds tab"
       // message lied when there were no worlds because no atlas root existed.)
       let msg: string;
       if (!state.atlasRoot && state.atlasRootRecoverable) {
-        msg = 'Use the welcome panel to recover your atlas folder.';
+        msg = 'Use the welcome panel to re-link your atlas folder.';
       } else if (!state.atlasRoot) {
         msg = 'Use the welcome panel to set up your atlas folder.';
       } else if (state.registry.worlds.length === 0) {
@@ -285,6 +365,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     }
 
     renderFilters();
+    renderSubFilters();
 
     if (searchInput.value !== state.ui.search) searchInput.value = state.ui.search;
 
@@ -310,6 +391,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const filtered = elements
       .filter(el => el.type !== 'pin' && el.type !== 'marker')
       .filter(el => filters.size === 0 || filters.has(el.type))
+      .filter(el => !superFilter || String((el as Record<string, unknown>).supertype ?? '').trim() === superFilter)
+      .filter(el => !subtypeFilter || String((el as Record<string, unknown>).subtype ?? '').trim() === subtypeFilter)
       .filter(el => !query || el.name.toLowerCase().includes(query))
       .sort((a, b) => a.name.localeCompare(b.name));
 

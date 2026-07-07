@@ -42,12 +42,12 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       <h1>Import &amp; export</h1>
       <p class="atlas-room-subtitle">Bring OnlyWorlds data into atlas, or take a world out as a portable JSON file.</p>
     </header>
-    <div class="atlas-import-tabs" role="tablist">
-      <button type="button" class="atlas-import-tab is-active" data-tab="in" role="tab">
-        <span class="material-symbols-outlined">download</span> bring in
+    <div class="atlas-room-tabs" role="tablist">
+      <button type="button" class="atlas-room-tab is-active" data-tab="in" role="tab">
+        <span class="material-symbols-outlined">download</span> Bring in
       </button>
-      <button type="button" class="atlas-import-tab" data-tab="out" role="tab">
-        <span class="material-symbols-outlined">upload</span> take out
+      <button type="button" class="atlas-room-tab" data-tab="out" role="tab">
+        <span class="material-symbols-outlined">upload</span> Take out
       </button>
     </div>
     <div class="atlas-import-body">
@@ -82,7 +82,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   const clearBtn = root.querySelector<HTMLButtonElement>('[data-action="clear"]')!;
 
   // Tabs: bring in | take out.
-  const tabButtons = Array.from(root.querySelectorAll<HTMLButtonElement>('.atlas-import-tab'));
+  const tabButtons = Array.from(root.querySelectorAll<HTMLButtonElement>('.atlas-room-tab'));
   const panelIn = root.querySelector<HTMLElement>('[data-panel="in"]')!;
   const panelOut = root.querySelector<HTMLElement>('[data-panel="out"]')!;
   function setTab(t: 'in' | 'out'): void {
@@ -217,7 +217,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
             ${r.updated ? `<span class="atlas-import-stat"><b>${r.updated}</b> update</span>` : ''}
             ${r.skipped ? `<span class="atlas-import-stat is-dim"><b>${r.skipped}</b> skip</span>` : ''}
             ${r.invalidRecords ? `<span class="atlas-import-stat is-warn"><b>${r.invalidRecords}</b> invalid</span>` : ''}
-            ${r.droppedLinks.length ? `<span class="atlas-import-stat is-warn" title="relations whose target wasn't found">${r.droppedLinks.length} link${r.droppedLinks.length === 1 ? '' : 's'} dropped</span>` : ''}
+            ${r.droppedLinks.length ? `<span class="atlas-import-stat is-warn" title="Links to other elements not found in this import — the connection is dropped but each element is still created.">${r.droppedLinks.length} link${r.droppedLinks.length === 1 ? '' : 's'} dropped</span>` : ''}
           </div>
 
           <button type="button" class="atlas-btn-primary" data-action="import" ${importing ? 'disabled' : ''}>
@@ -246,7 +246,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           ${shown.map(i => `<li><code>${escapeText(i.path)}</code> — ${escapeText(i.issue)}</li>`).join('')}
           ${more > 0 ? `<li class="is-dim">+${more} more…</li>` : ''}
         </ul>
-        <p class="atlas-import-issues-note">Import still runs — invalid records are skipped and unresolved links dropped. Paste the fix prompt to your AI to repair the source.</p>
+        <p class="atlas-import-issues-note">Import still runs — invalid entries are skipped and broken links removed. Paste the fix prompt to your AI to repair the source.</p>
       </div>
     `;
   }
@@ -358,21 +358,29 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           <span>Include API key (needed to re-upload to onlyworlds.com)</span>
         </label>
       ` : ''}
-      <button type="button" class="atlas-btn-primary" data-action="export">export world</button>
+      <div class="atlas-import-export-actions">
+        <button type="button" class="atlas-btn-primary" data-action="export">Save to file</button>
+        <button type="button" class="atlas-btn-ghost" data-action="copy-json">Copy JSON</button>
+      </div>
     `;
 
     const credsBox = exportMount.querySelector<HTMLInputElement>('[data-role="creds"]');
     credsBox?.addEventListener('change', () => { includeCreds = credsBox.checked; });
     const exportBtn = exportMount.querySelector<HTMLButtonElement>('[data-action="export"]')!;
+    const copyJsonBtn = exportMount.querySelector<HTMLButtonElement>('[data-action="copy-json"]')!;
     const updateBtnLabel = () => {
       const all = exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type input');
       const checked = Array.from(all).filter(c => c.checked).length;
-      exportBtn.textContent = checked === all.length ? 'export world' : `export ${checked} type${checked === 1 ? '' : 's'}`;
+      const suffix = checked === all.length ? '' : ` ${checked} type${checked === 1 ? '' : 's'}`;
+      exportBtn.textContent = checked === all.length ? 'Save to file' : `Save${suffix} to file`;
+      copyJsonBtn.textContent = checked === all.length ? 'Copy JSON' : `Copy${suffix} as JSON`;
       exportBtn.disabled = checked === 0;
+      copyJsonBtn.disabled = checked === 0;
     };
     exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type input').forEach(c =>
       c.addEventListener('change', updateBtnLabel));
     exportBtn.addEventListener('click', () => void runExport());
+    copyJsonBtn.addEventListener('click', () => void runCopyJson());
   }
 
   async function runExport(): Promise<void> {
@@ -395,6 +403,28 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     } catch (err) {
       console.error('[export] failed', err);
       toasts.error('Export failed');
+    }
+  }
+
+  /** IE4: the clipboard twin of runExport — same subset, same shape, no download. */
+  async function runCopyJson(): Promise<void> {
+    const store = getActiveStore();
+    const aw = activeWorld();
+    if (!store || !aw) return;
+    const checked = Array.from(exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type input'))
+      .filter(c => c.checked).map(c => c.value as ElementType);
+    const all = exportMount.querySelectorAll('.atlas-import-type input').length;
+    try {
+      const data = await buildWorldExport(store, {
+        includeCredentials: includeCreds,
+        types: checked.length === all ? undefined : new Set(checked),
+      });
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      const n = checked.reduce((sum, t) => sum + (activeElements().filter(e => e.type === t).length), 0);
+      toasts.success(`Copied ${n} element${n === 1 ? '' : 's'} as JSON`);
+    } catch (err) {
+      console.error('[export] copy failed', err);
+      toasts.error('Could not copy to clipboard');
     }
   }
 

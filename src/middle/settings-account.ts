@@ -26,11 +26,14 @@ export function renderAccountTab(reg: WorldsRegistry): string {
       </label>
       <label class="atlas-settings-field">
         <span>PIN</span>
-        <input class="atlas-input" type="text" name="pin"
-               value="${escapeAttr(reg.pin ?? '')}"
-               placeholder="OnlyWorlds PIN (4 digits)"
-               inputmode="numeric"
-               maxlength="4" />
+        <div class="atlas-settings-pin-row">
+          <input class="atlas-input" type="password" name="pin"
+                 value="${escapeAttr(reg.pin ?? '')}"
+                 placeholder="OnlyWorlds PIN (4 digits)"
+                 inputmode="numeric"
+                 maxlength="4" />
+          <button type="button" class="atlas-btn-ghost atlas-settings-pin-toggle" data-shown="false">show</button>
+        </div>
       </label>
     </section>
   `;
@@ -39,6 +42,13 @@ export function renderAccountTab(reg: WorldsRegistry): string {
 export function wireAccountTab(toasts: ToastManager): void {
   const emailInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="email"]');
   const pinInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="pin"]');
+  const pinToggle = document.querySelector<HTMLButtonElement>('.atlas-settings-pin-toggle');
+  pinToggle?.addEventListener('click', () => {
+    const shown = pinToggle.dataset.shown === 'true';
+    if (pinInput) pinInput.type = shown ? 'password' : 'text';
+    pinToggle.dataset.shown = String(!shown);
+    pinToggle.textContent = shown ? 'show' : 'hide';
+  });
   emailInput?.addEventListener('change', () => {
     const next = setEmail(getState().registry, emailInput.value);
     saveRegistry(next);

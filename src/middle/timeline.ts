@@ -34,7 +34,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   header.className = 'atlas-room-header';
   header.innerHTML = `
     <h1>Charts</h1>
-    <p class="atlas-room-subtitle">Your world along a time axis — click any element to focus on what it touches.</p>
+    <p class="atlas-room-subtitle">See your world's events on a timeline and click any element to explore its connections.</p>
   `;
   wrap.appendChild(header);
 

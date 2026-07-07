@@ -75,13 +75,17 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
   });
 
   if (response.status === 400) {
+    // Parse OUTSIDE the throw: a `throw` inside the try lands in the catch, which
+    // would swallow the server's specific `message` and re-throw the generic one.
     const text = await response.text();
+    let serverMessage: string | undefined;
     try {
-      const data = JSON.parse(text);
-      throw new Error(data.message ?? 'Invalid email or PIN — verify your onlyworlds.com account');
+      const data = JSON.parse(text) as { message?: unknown };
+      if (typeof data.message === 'string' && data.message.trim()) serverMessage = data.message;
     } catch {
-      throw new Error('Invalid email or PIN — verify your onlyworlds.com account');
+      // Non-JSON body — fall through to the generic message.
     }
+    throw new Error(serverMessage ?? 'Invalid email or PIN — verify your onlyworlds.com account');
   }
   if (response.status === 429) {
     throw new Error('Too many requests — please try again later');

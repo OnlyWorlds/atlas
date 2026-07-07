@@ -32,7 +32,16 @@
   --atlas-cyan-soft: rgba(34, 211, 238, 0.5);
   --atlas-cyan-tint: rgba(34, 211, 238, 0.08);
   --atlas-danger: #ef4444;
+  --atlas-danger-hover: #f87171;
+  --atlas-danger-hover-tint: rgba(248, 113, 113, 0.08);
   --atlas-warn: #f59e0b;
+  --atlas-warn-soft: #f6b26b;
+  --atlas-warn-soft-tint: rgba(246, 178, 107, 0.08);
+  --atlas-warn-soft-border: rgba(246, 178, 107, 0.30);
+  --atlas-success: #10b981;
+  --atlas-success-light: #4ade80;
+  --atlas-success-light-glow: rgba(74, 222, 128, 0.35);
+  --atlas-bg-overlay: rgba(0, 0, 0, 0.7);
   /* Accent alias — historical usage in some places writes `--atlas-accent`. */
   --atlas-accent: var(--atlas-cyan);
   /* Tell the OS we're dark — affects scrollbars, native form chrome (select
@@ -194,6 +203,9 @@
   flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
+  /* G11: reserve the scrollbar gutter so the list overflowing never shifts
+     the filter-strip icons (siblings share this scroll container). */
+  scrollbar-gutter: stable;
 }
 
 .atlas-sidebar-footer {
@@ -228,6 +240,18 @@
 .atlas-sidebar-footer .atlas-icon-btn.active {
   color: var(--atlas-cyan);
   background: var(--atlas-cyan-tint);
+}
+
+/* G12: notes button when no world is active — disabled look, tooltip
+   explains why (set alongside the disabled attribute). */
+.atlas-sidebar-footer .atlas-icon-btn.atlas-icon-btn-disabled {
+  color: var(--atlas-text-soft);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.atlas-sidebar-footer .atlas-icon-btn.atlas-icon-btn-disabled:hover {
+  background: transparent;
 }
 
 .atlas-sidebar-footer .atlas-icon-btn .material-symbols-outlined {
@@ -603,11 +627,10 @@
 
 .atlas-section-title {
   font-size: 10px;
-  text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
   margin-bottom: 8px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* ============================================================
@@ -858,18 +881,18 @@
   color: inherit;
 }
 
+/* G8: bare-number variant — the badge previously outweighed the 15px filter
+   icon it decorates (13x9-1 pill). No pill background; a quiet small number
+   sitting at the icon's corner. */
 .atlas-filter-btn .atlas-filter-count {
   position: absolute;
   top: -4px;
   right: -4px;
-  min-width: 13px;
-  height: 13px;
-  padding: 0 3px;
-  font-size: 9px;
+  padding: 1px;
+  font-size: 8px;
   font-weight: 600;
-  background: var(--atlas-cyan);
-  color: #000;
-  border-radius: 6px;
+  background: transparent;
+  color: var(--atlas-cyan);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -877,8 +900,7 @@
 }
 
 .atlas-filter-btn:not(.active) .atlas-filter-count {
-  background: rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 /* Search row in sidebar */
@@ -1038,7 +1060,7 @@
   cursor: text;
   padding: 0 4px;
   border-radius: 3px;
-  transition: background 0.12s ease;
+  transition: background 120ms ease;
 }
 
 .atlas-element-name:hover {
@@ -1255,9 +1277,8 @@
   justify-content: space-between;
   padding: 7px 12px;
   font-size: 11px;
-  text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--atlas-text-soft);
   background: rgba(255, 255, 255, 0.015);
   cursor: pointer;
@@ -1782,9 +1803,9 @@
 }
 
 .atlas-row-chip-warn {
-  color: #f6b26b;
-  background: rgba(246, 178, 107, 0.08);
-  border: 1px solid rgba(246, 178, 107, 0.30);
+  color: var(--atlas-warn-soft);
+  background: var(--atlas-warn-soft-tint);
+  border: 1px solid var(--atlas-warn-soft-border);
 }
 
 /* ============================================================
@@ -2032,7 +2053,7 @@
 }
 
 .ow-toast-success {
-  border-left-color: #10b981;
+  border-left-color: var(--atlas-success);
 }
 
 .ow-toast-error {
@@ -2054,7 +2075,7 @@
 }
 
 .ow-toast-success .ow-toast-icon {
-  color: #10b981;
+  color: var(--atlas-success);
 }
 
 .ow-toast-error .ow-toast-icon {
@@ -2185,7 +2206,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--atlas-bg-overlay);
   backdrop-filter: blur(4px);
   z-index: 1000;
 }
@@ -2265,10 +2286,9 @@
 
 .atlas-edit-popover-header {
   font-size: 10px;
-  text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .atlas-edit-popover-footer {
@@ -2356,11 +2376,10 @@
 .atlas-create-modal-row label {
   display: block;
   font-size: 10px;
-  text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
   margin-bottom: 4px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .atlas-create-type-grid {
@@ -2727,6 +2746,20 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
+.atlas-settings-pin-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-settings-pin-row .atlas-input {
+  flex: 1;
+}
+
+.atlas-settings-pin-toggle {
+  flex-shrink: 0;
+}
+
 .atlas-settings-debounce-row {
   display: inline-flex;
   align-items: center;
@@ -2747,6 +2780,23 @@
   font-size: 11px;
   color: rgba(255, 255, 255, 0.40);
   line-height: 1.4;
+}
+
+/* G5: quiet secondary-path text link (e.g. "set up a different folder"
+   next to a primary recovery action). */
+.atlas-btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  color: var(--atlas-cyan);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.atlas-btn-link:hover {
+  color: var(--atlas-text);
 }
 
 .atlas-settings-meta {
@@ -2844,9 +2894,8 @@
   padding: 6px 18px 4px;
   margin-top: 12px;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: rgba(255, 255, 255, 0.34);
 }
 .atlas-settings-tab-group-label:first-child {
@@ -2990,7 +3039,7 @@
   background: rgba(34, 211, 238, 0.14);
   border: 1px solid rgba(34, 211, 238, 0.45);
   border-radius: 12px;
-  color: #22d3ee;
+  color: var(--atlas-cyan);
   font-size: 11px;
   letter-spacing: 0.04em;
   font-weight: 500;
@@ -3009,7 +3058,7 @@
 }
 
 .atlas-modal-hint.atlas-modal-hint-warn {
-  color: #f6b26b;
+  color: var(--atlas-warn-soft);
 }
 
 /* Custom file-picker (atlas styled replacement for native <input type="file">).
@@ -3139,7 +3188,7 @@
 }
 
 .atlas-policy-option>input[type="radio"] {
-  accent-color: #22d3ee;
+  accent-color: var(--atlas-cyan);
   margin-top: 3px;
   flex: 0 0 auto;
 }
@@ -3180,7 +3229,7 @@
 }
 
 .atlas-modal-checkbox-row>input[type="checkbox"] {
-  accent-color: #22d3ee;
+  accent-color: var(--atlas-cyan);
   margin-top: 3px;
   flex: 0 0 auto;
 }
@@ -3270,7 +3319,7 @@
 
 .atlas-picker-chip.is-active {
   background: rgba(34, 211, 238, 0.15);
-  color: #22d3ee;
+  color: var(--atlas-cyan);
   border-color: rgba(34, 211, 238, 0.4);
 }
 
@@ -3410,7 +3459,7 @@
 }
 
 .atlas-sync-pill[data-state="api"] .atlas-sync-pill-dot {
-  background: #22d3ee;
+  background: var(--atlas-cyan);
 }
 
 .atlas-sync-pill[data-state="none"] {
@@ -3557,7 +3606,6 @@
 
 .atlas-conflict-type {
   font-size: 11px;
-  text-transform: uppercase;
   letter-spacing: 0.05em;
   color: rgba(255, 255, 255, 0.45);
 }
@@ -3626,7 +3674,7 @@
 .atlas-icon-btn-sm.fav-btn .material-symbols-outlined {
   font-size: 16px;
   color: rgba(255, 255, 255, 0.35);
-  transition: color 0.12s ease;
+  transition: color 120ms ease;
 }
 
 .atlas-icon-btn-sm.fav-btn:hover .material-symbols-outlined {
@@ -3713,7 +3761,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
 .atlas-map-toolbar-btn:hover {
@@ -3724,7 +3772,7 @@
 
 .atlas-map-toolbar-btn.is-active {
   background: rgba(34, 211, 238, 0.18);
-  color: #22d3ee;
+  color: var(--atlas-cyan);
   border-color: rgba(34, 211, 238, 0.45);
 }
 
@@ -3878,10 +3926,9 @@
 
 .atlas-shortcuts-section-header {
   font-size: 10px;
-  text-transform: uppercase;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.45);
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: 2px;
 }
 
@@ -3895,7 +3942,7 @@
 
 .atlas-popover-header .material-symbols-outlined {
   font-size: 18px;
-  color: #22d3ee;
+  color: var(--atlas-cyan);
 }
 
 .atlas-popover-title {
@@ -3930,7 +3977,6 @@
   font-size: 10px;
   color: rgba(34, 211, 238, 0.55);
   letter-spacing: 0.08em;
-  text-transform: uppercase;
   border-top: 1px dashed rgba(34, 211, 238, 0.18);
   padding-top: 8px;
 }
@@ -3957,7 +4003,7 @@
   background: transparent;
   cursor: pointer;
   font-size: 11px;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .atlas-popover-radio input {
@@ -3972,7 +4018,7 @@
 .atlas-popover-radio.is-active {
   background: rgba(34, 211, 238, 0.18);
   border-color: rgba(34, 211, 238, 0.55);
-  color: #22d3ee;
+  color: var(--atlas-cyan);
 }
 
 .atlas-popover-radio-trailing {
@@ -3992,7 +4038,7 @@
 .atlas-popover-toggle-row input[type="checkbox"] {
   width: 14px;
   height: 14px;
-  accent-color: #22d3ee;
+  accent-color: var(--atlas-cyan);
   cursor: pointer;
 }
 
@@ -4022,13 +4068,13 @@
 
 .atlas-popover-slider {
   width: 100%;
-  accent-color: #22d3ee;
+  accent-color: var(--atlas-cyan);
   margin-bottom: 8px;
 }
 
 .atlas-popover-slider-val {
   margin-left: 4px;
-  color: #22d3ee;
+  color: var(--atlas-cyan);
   font-variant-numeric: tabular-nums;
 }
 
@@ -4081,7 +4127,7 @@
 }
 
 .atlas-zone-draft-mode {
-  color: #22d3ee;
+  color: var(--atlas-cyan);
   font-weight: 500;
   letter-spacing: 0.04em;
   padding-right: 8px;
@@ -4097,7 +4143,7 @@
 }
 
 .atlas-zone-draft-count-num {
-  color: #22d3ee;
+  color: var(--atlas-cyan);
   font-weight: 600;
 }
 
@@ -4128,7 +4174,7 @@
 /* Shift held during draft (ZC3): the hint goes bright cyan and its kbd lights
    up — the user can see the snap is active before clicking. */
 .atlas-zone-draft-overlay.shift-held .atlas-zone-draft-hint {
-  color: #22d3ee;
+  color: var(--atlas-cyan);
   font-weight: 600;
 }
 
@@ -4153,7 +4199,7 @@
   color: rgba(255, 255, 255, 0.85);
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
 .atlas-zone-draft-btn:hover:not(:disabled) {
@@ -4173,7 +4219,7 @@
 .atlas-zone-draft-btn-primary {
   background: rgba(34, 211, 238, 0.18);
   border-color: rgba(34, 211, 238, 0.55);
-  color: #22d3ee;
+  color: var(--atlas-cyan);
 }
 
 .atlas-zone-draft-btn-primary:hover:not(:disabled) {
@@ -4199,14 +4245,14 @@
    With pointer-events off, mousedown passes through to the leaflet map below
    and starts a pan instead of a marker drag. */
 .atlas-zone-draft-marker {
-  background: #22d3ee;
+  background: var(--atlas-cyan);
   border: 2px solid rgba(255, 255, 255, 0.95);
   border-radius: 50%;
   box-shadow: 0 0 8px rgba(34, 211, 238, 0.55);
   cursor: grab;
   /* Defeat Leaflet's default .leaflet-div-icon background/border that would
      otherwise compete with our cyan circle styling. */
-  background-color: #22d3ee;
+  background-color: var(--atlas-cyan);
   /* Explicit anchor so the inner number can absolute-center reliably across
      browsers — flex centering was losing to Leaflet's defaults in smoke. */
   position: relative;
@@ -4297,7 +4343,7 @@
 
 .atlas-zones-dropdown-btn.is-open {
   background: rgba(34, 211, 238, 0.18);
-  color: #22d3ee;
+  color: var(--atlas-cyan);
 }
 
 .atlas-zones-dropdown-btn.is-open .atlas-zones-dropdown-count {
@@ -4344,7 +4390,7 @@
   color: rgba(255, 255, 255, 0.85);
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background 120ms ease, border-color 120ms ease;
   flex-shrink: 0;
 }
 
@@ -4367,7 +4413,7 @@
 }
 
 .atlas-zone-chip.is-selected .atlas-zone-chip-shape {
-  color: #22d3ee;
+  color: var(--atlas-cyan);
 }
 
 .atlas-zone-chip-dot {
@@ -4399,7 +4445,7 @@
   border-radius: 50%;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
 }
 
 .atlas-zone-chip:hover .atlas-zone-chip-x {
@@ -4442,7 +4488,7 @@
 
 .atlas-zone-chip-context-item:hover {
   background: rgba(34, 211, 238, 0.1);
-  color: #22d3ee;
+  color: var(--atlas-cyan);
 }
 
 /* ============================================================
@@ -4512,12 +4558,12 @@
 
 .atlas-zone-visuals-opacity {
   flex: 1;
-  accent-color: #22d3ee;
+  accent-color: var(--atlas-cyan);
   max-width: 180px;
 }
 
 .atlas-zone-visuals-opacity-val {
-  color: #22d3ee;
+  color: var(--atlas-cyan);
   font-variant-numeric: tabular-nums;
   font-size: 11px;
   min-width: 36px;
@@ -4553,7 +4599,7 @@
   background: rgba(34, 211, 238, 0.15);
   border-radius: 8px;
   font-size: 10px;
-  color: #22d3ee;
+  color: var(--atlas-cyan);
 }
 
 .atlas-zone-markers-list {
@@ -4569,7 +4615,7 @@
   padding: 4px 6px;
   border-radius: 3px;
   font-size: 11px;
-  transition: background 0.12s ease;
+  transition: background 120ms ease;
 }
 
 .atlas-zone-markers-row:hover {
@@ -4584,7 +4630,7 @@
   height: 18px;
   background: rgba(34, 211, 238, 0.15);
   border-radius: 3px;
-  color: #22d3ee;
+  color: var(--atlas-cyan);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -4608,7 +4654,7 @@
   border-radius: 3px;
   color: rgba(255, 255, 255, 0.4);
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
 .atlas-zone-markers-row:hover .atlas-zone-markers-pan,
@@ -4618,7 +4664,7 @@
 
 .atlas-zone-markers-pan:hover {
   background: rgba(34, 211, 238, 0.12);
-  color: #22d3ee;
+  color: var(--atlas-cyan);
 }
 
 .atlas-zone-markers-del:hover {
@@ -4657,7 +4703,7 @@ svg .atlas-zone-selected {
    `className` on the DivIcon REPLACES the default `.leaflet-div-icon`
    class entirely — no fight with leaflet defaults to win. */
 .atlas-zone-edit-handle {
-  background: #22d3ee;
+  background: var(--atlas-cyan);
   border: 2px solid #ffffff;
   border-radius: 50%;
   box-shadow: 0 0 6px rgba(34, 211, 238, 0.7), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
@@ -4690,10 +4736,10 @@ svg .atlas-zone-selected {
   align-items: center;
   justify-content: center;
   background: rgba(34, 211, 238, 0.18);
-  border: 2px solid #22d3ee;
+  border: 2px solid var(--atlas-cyan);
   border-radius: 50%;
   box-shadow: 0 0 8px rgba(34, 211, 238, 0.75), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
-  color: #22d3ee;
+  color: var(--atlas-cyan);
   cursor: grab;
   box-sizing: border-box;
   /* NO transform transition — same reason as vertex handles above (Leaflet's
@@ -4740,7 +4786,7 @@ svg .atlas-zone-selected {
   color: rgba(34, 211, 238, 0.95);
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background 120ms ease, border-color 120ms ease;
 }
 
 .atlas-zone-edit-shape-btn:hover {
@@ -4751,7 +4797,7 @@ svg .atlas-zone-selected {
 .atlas-zone-edit-shape-btn.is-editing {
   background: rgba(34, 211, 238, 0.22);
   border-color: rgba(34, 211, 238, 0.6);
-  color: #22d3ee;
+  color: var(--atlas-cyan);
 }
 
 .atlas-zone-edit-shape-btn .material-symbols-outlined {
@@ -4771,7 +4817,7 @@ svg .atlas-zone-selected {
   border-radius: 50%;
   color: rgba(248, 113, 113, 0.95);
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 120ms ease, color 120ms ease;
 }
 
 .atlas-zone-edit-cancel-btn:hover {
@@ -4788,7 +4834,7 @@ svg .atlas-zone-selected {
    sub-pixel rendering between the two visual states — the dots "grow" cleanly
    into edit handles on edit entry, no positional drift. */
 .atlas-zone-vertex-dot {
-  background: #22d3ee;
+  background: var(--atlas-cyan);
   border: 1.5px solid #ffffff;
   border-radius: 50%;
   box-shadow: 0 0 4px rgba(34, 211, 238, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.2);
@@ -5078,8 +5124,7 @@ svg .atlas-zone-selected {
 .atlas-home-section-title {
   margin: 0 0 8px 0;
   font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
+  font-weight: 500;
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
 }
@@ -5772,10 +5817,10 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 .atlas-writing-workspace-wc-ring[data-complete='true'] {
   background: conic-gradient(
-    #4ade80 calc(var(--progress, 0) * 360deg),
+    var(--atlas-success-light) calc(var(--progress, 0) * 360deg),
     rgba(255, 255, 255, 0.12) 0
   );
-  filter: drop-shadow(0 0 4px rgba(74, 222, 128, 0.35));
+  filter: drop-shadow(0 0 4px var(--atlas-success-light-glow));
 }
 
 /* `/ 500` suffix when a goal is set. Muted vs the live word count. */
@@ -6056,8 +6101,8 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 .atlas-writing-focus-exit:hover {
   opacity: 1;
-  color: #22d3ee;
-  border-color: #22d3ee;
+  color: var(--atlas-cyan);
+  border-color: var(--atlas-cyan);
 }
 .atlas-writing-focus-exit .material-symbols-outlined {
   font-size: 18px;
@@ -6204,7 +6249,6 @@ a.atlas-writing-workspace-crumb-seg:hover {
 
 .atlas-chip-preview-type {
   font-size: 10.5px;
-  text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--atlas-text-muted);
   flex-shrink: 0;
@@ -6524,7 +6568,6 @@ a.atlas-writing-workspace-crumb-seg:hover {
   padding: 8px 12px;
   border-bottom: 1px solid var(--atlas-divider);
   font-size: 11px;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--atlas-text-muted);
   flex: 0 0 auto;
@@ -6606,7 +6649,6 @@ a.atlas-writing-workspace-crumb-seg:hover {
 
 .atlas-writing-setup-section-title {
   font-size: 12px;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--atlas-text-muted);
   margin: 0 0 12px 0;
@@ -6867,7 +6909,6 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-knowledge-row,
 .atlas-knowledge-chip-body,
 .atlas-knowledge-add,
-.atlas-knowledge-tab,
 .atlas-knowledge-known-head,
 .atlas-knowledge-known-src,
 .atlas-knowledge-lens-toggle {
@@ -7030,6 +7071,8 @@ a.atlas-writing-workspace-crumb-seg:hover {
   align-items: center;
   gap: 5px;
   padding: 3px 8px 3px 10px;
+  background: transparent;
+  border: none;
   color: var(--atlas-text);
   cursor: pointer;
   font-size: 12px;
@@ -7047,6 +7090,8 @@ a.atlas-writing-workspace-crumb-seg:hover {
   display: inline-flex;
   align-items: center;
   padding: 3px 7px 3px 3px;
+  background: transparent;
+  border: none;
   color: var(--atlas-text-muted);
   cursor: pointer;
 }
@@ -7085,8 +7130,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
 
 .atlas-knowledge-field-label {
   font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
+  font-weight: 500;
   letter-spacing: 0.04em;
   color: var(--atlas-text-muted);
 }
@@ -7126,41 +7170,8 @@ a.atlas-writing-workspace-crumb-seg:hover {
   padding: 12px 0;
 }
 
-/* Home-view tabs: [entries | knowers] + right-aligned per-tab actions. */
-.atlas-knowledge-tabs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 24px 10px;
-  border-bottom: 1px solid var(--atlas-divider);
-  margin-bottom: 14px;
-}
-
-.atlas-knowledge-tab {
-  background: transparent;
-  border: none;
-  color: var(--atlas-text-muted);
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: color 120ms ease, background 120ms ease;
-}
-
-.atlas-knowledge-tab:hover { color: var(--atlas-text); }
-
-.atlas-knowledge-tab.is-active {
-  color: var(--atlas-cyan);
-  background: rgba(34, 211, 238, 0.08);
-}
-
-.atlas-knowledge-tabs-spacer { flex: 1; }
-
-.atlas-knowledge-tabs-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
+/* Home-view tabs use the shared room-section tab pattern (.atlas-room-tabs,
+   D1) — see the Bout U block near the end of this file. */
 
 .atlas-knowledge-empty-cta {
   margin-top: 12px;
@@ -7283,8 +7294,8 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-knowledge-delete .material-symbols-outlined { font-size: 16px; }
 
 .atlas-knowledge-delete:hover {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.08);
+  color: var(--atlas-danger-hover);
+  background: var(--atlas-danger-hover-tint);
 }
 
 /* ---- Knowledge lens (DESIGN_KNOWLEDGE.md "Known-view lens") ---- */
@@ -7368,32 +7379,8 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 
 /* Bring in / take out tabs */
-.atlas-import-tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--atlas-divider);
-  margin-bottom: 16px;
-}
-.atlas-import-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--atlas-text-muted);
-  font-family: inherit;
-  font-size: 13px;
-  padding: 9px 12px;
-  margin-bottom: -1px;
-  cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease;
-}
-.atlas-import-tab .material-symbols-outlined { font-size: 17px; }
-.atlas-import-tab:hover { color: var(--atlas-text); }
-.atlas-import-tab.is-active { color: var(--atlas-cyan); border-bottom-color: var(--atlas-cyan); }
+/* Import tabs use the shared room-section tab pattern (.atlas-room-tabs, D1)
+   — see the Bout U block near the end of this file. */
 .atlas-import-panel[hidden] { display: none; }
 
 /* Drop zone */
@@ -7568,6 +7555,9 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-import-check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--atlas-text-soft); margin: 4px 0 12px; cursor: pointer; }
 .atlas-import-check input { accent-color: var(--atlas-cyan); }
 
+/* IE4: Save to file / Copy JSON side by side. */
+.atlas-import-export-actions { display: flex; gap: 8px; }
+
 /* Import progress bar (large worlds write sequentially) */
 .atlas-import-progress {
   position: relative;
@@ -7683,7 +7673,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
 
 .atlas-share-intent-chip[data-intent="reference"] {
   background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
+  color: var(--atlas-warn);
 }
 
 .atlas-share-intent-chip[data-intent="publish"] {
@@ -7724,8 +7714,8 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 
 .atlas-share-delete:hover {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.08);
+  color: var(--atlas-danger-hover);
+  background: var(--atlas-danger-hover-tint);
 }
 
 .atlas-share-delete .material-symbols-outlined {
@@ -7771,6 +7761,15 @@ a.atlas-writing-workspace-crumb-seg:hover {
   color: var(--atlas-text-muted);
   margin: 0;
   line-height: 1.5;
+}
+
+/* A6: publish-prerequisite hints link straight to the settings tab that fixes them. */
+.atlas-share-settings-link {
+  color: var(--atlas-cyan);
+  text-decoration: none;
+}
+.atlas-share-settings-link:hover {
+  text-decoration: underline;
 }
 
 /* ---- Share block builder (S2) ---- */
@@ -8101,7 +8100,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   cursor: pointer;
   padding: 0;
   opacity: 0.75;
-  transition: opacity 0.12s ease, border-color 0.12s ease;
+  transition: opacity 120ms ease, border-color 120ms ease;
 }
 .atlas-share-theme-swatch:hover { opacity: 1; }
 .atlas-share-theme-swatch.is-active {
@@ -8141,6 +8140,13 @@ a.atlas-share-map-pin { cursor: pointer; }
   border-radius: 4px;
   margin-top: 8px;
   object-fit: cover;
+}
+
+/* T-S8: builder rows only — landscape images no longer dominate the row.
+   Visitor preview / published payload keep the base 220px above. */
+.atlas-share-block-content .atlas-share-card-image,
+.atlas-share-card-edit-preview .atlas-share-card-image {
+  max-height: 160px;
 }
 
 .atlas-share-card-fields {
@@ -8315,17 +8321,21 @@ a.atlas-share-map-pin { cursor: pointer; }
   margin-top: 14px;
 }
 
-/* Hover-revealed per-block controls (move / delete). */
+/* B-B2: always-visible per-block controls (move / delete) at low opacity —
+   full opacity on row hover/focus. Discoverable without a hover-only reveal. */
 .atlas-share-block-controls {
   position: absolute;
   top: 4px;
   right: 6px;
-  display: none;
+  display: inline-flex;
   gap: 2px;
+  opacity: 0.35;
+  transition: opacity 120ms;
 }
 
-.atlas-share-block:hover .atlas-share-block-controls {
-  display: inline-flex;
+.atlas-share-block:hover .atlas-share-block-controls,
+.atlas-share-block-controls:focus-within {
+  opacity: 1;
 }
 
 .atlas-share-block-ctrl {
@@ -9577,7 +9587,6 @@ a.atlas-share-map-pin { cursor: pointer; }
   flex-shrink: 0;
   padding: 6px 12px 4px;
   font-size: 10.5px;
-  text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
   border-bottom: 1px solid var(--atlas-divider);
@@ -9826,7 +9835,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   cursor: pointer;
   padding: 0;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity 120ms ease;
 }
 .atlas-element-image-wrap:hover .atlas-element-image-hide { opacity: 1; }
 .atlas-element-image-hide:hover { color: var(--atlas-text); background: rgba(0, 0, 0, 0.75); }
@@ -10115,3 +10124,94 @@ a.atlas-share-map-pin { cursor: pointer; }
   background: rgba(34, 211, 238, 0.16);
   color: var(--atlas-cyan, #22d3ee);
 }
+/* ==== Bout U additions — paste into atlas.css once Q-A releases it ==== */
+
+/* Room-section tabs (D1) — THE pattern for major in-room sections.
+   Generalizes .atlas-import-tab, sized/weighted up so tabs read as main
+   sections (clearly bigger than filter chips). Old .atlas-import-tab /
+   .atlas-knowledge-tab rules are superseded at adoption. */
+.atlas-room-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--atlas-divider);
+  margin-bottom: 16px;
+}
+.atlas-room-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--atlas-text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.atlas-room-tab .material-symbols-outlined { font-size: 18px; }
+.atlas-room-tab:hover { color: var(--atlas-text); }
+.atlas-room-tab.is-active { color: var(--atlas-cyan); border-bottom-color: var(--atlas-cyan); }
+.atlas-room-tabs-spacer { flex: 1; }
+.atlas-room-tabs-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Drill-in prefix band (D1) — muted clickable room name before the entity
+   icon+title in .atlas-middle-header. */
+.atlas-drillin-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--atlas-text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 2px 6px 2px 2px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms ease;
+}
+.atlas-drillin-prefix:hover { color: var(--atlas-text); }
+.atlas-drillin-chevron { font-size: 16px; line-height: 1; }
+
+/* Reserved-value hint (D9b) — quiet cyan mark on taxonomy field labels. */
+.atlas-field-reserved-hint {
+  font-size: 12px !important;
+  color: var(--atlas-cyan);
+  opacity: 0.65;
+  cursor: help;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Sidebar sub-filter chips (D9b lever 3) — second small chip row when the
+   filter strip narrows to exactly one type. */
+.atlas-subfilter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 10px 2px;
+}
+.atlas-subfilter-chip {
+  background: transparent;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 9px;
+  color: var(--atlas-text-muted);
+  font-family: inherit;
+  font-size: 10px;
+  padding: 1px 7px;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.atlas-subfilter-chip:hover { color: var(--atlas-text); }
+.atlas-subfilter-chip.active { color: var(--atlas-cyan); border-color: var(--atlas-cyan); }
+.atlas-subfilter-chip.sub { font-size: 9px; opacity: 0.85; }

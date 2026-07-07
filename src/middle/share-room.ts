@@ -24,7 +24,7 @@
  */
 
 import { getState, subscribe } from '../core/state';
-import { navigate, shareHash, elementHash, parseHash, onHashChange } from '../core/router';
+import { navigate, shareHash, elementHash, settingsHash, parseHash, onHashChange } from '../core/router';
 import { getActiveStore } from '../core/active-store';
 import { getEditorSettings } from '../registry/registry';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
@@ -50,6 +50,7 @@ import { ToastManager } from '../ui/toast-manager';
 import type { JSONContent } from '@tiptap/core';
 import type { ShareEditorHandle } from './share-editor';
 import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
+import { makeDrillInPrefix } from '../ui/drill-in';
 
 export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -525,7 +526,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
 
     const commit = () => { void commitThenRender(pageId); };
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      // Escape commits (same semantics as Enter/blur) rather than leaving the
+      // edit hanging — no discard affordance exists elsewhere in the builder.
+      if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); commit(); }
     });
     input.addEventListener('blur', (e) => {
       // Level-toggle clicks preventDefault on mousedown so blur only fires
@@ -1185,7 +1188,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         if (i === blocks.length - 1) down.disabled = true;
         controls.appendChild(up);
         controls.appendChild(down);
-        controls.appendChild(controlBtn('close', 'Delete block', () => { void deleteBlock(pageId, block.id); }));
+        controls.appendChild(controlBtn('delete', 'Delete block', () => { void deleteBlock(pageId, block.id); }));
         row.appendChild(controls);
       }
       blocksHost!.appendChild(row);
@@ -1202,6 +1205,16 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     addRow.appendChild(addBtn('show_chart', '+ chart', () => { void addChartBlock(pageId); }, 'A saved chart from the Charts room'));
     addRow.appendChild(addBtn('groups', '+ circle', () => { void addCircleBlock(pageId); }, 'A frozen snapshot of what a circle knows'));
     blocksHost.appendChild(addRow);
+  }
+
+  /** Inline link to a Settings tab — used by the Publish prerequisite hints (A6). */
+  function settingsLink(worldId: string | null, tab: 'world' | 'account', label: string): HTMLAnchorElement {
+    const a = document.createElement('a');
+    a.href = settingsHash(worldId, tab);
+    a.className = 'atlas-share-settings-link';
+    a.textContent = label;
+    a.addEventListener('click', (e) => { e.preventDefault(); navigate(settingsHash(worldId, tab)); });
+    return a;
   }
 
   function controlBtn(icon: string, title: string, onClick: () => void): HTMLButtonElement {
@@ -1296,14 +1309,20 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         intent: pageIntentOf(page),
         payload: buildPagePayload(page, getState().data.elements, pageCharts),
       });
-      await patchPage(pageId, {
+      const mirrored = await patchPage(pageId, {
         atlas_page_pub: {
           ...pub,
           updated_at: row?.updated_at ?? new Date().toISOString(),
           content_sig: pageContentSig(page),
         },
       });
-      toasts.success('Republished — the public page is up to date');
+      if (mirrored) {
+        toasts.success('Republished — the public page is up to date');
+      } else {
+        // Same rule as publishPage: the public page IS updated; only the
+        // local record failed. Don't claim the mirror is current.
+        toasts.error('Republished — the public page is up to date, but atlas couldn\'t record it locally.');
+      }
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
       if (err instanceof SharingApiError && err.code === 'not_found') {
@@ -1478,14 +1497,18 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (!entry?.api?.api_key) {
       const hint = document.createElement('p');
       hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
-      hint.textContent = 'Publishing to a public URL needs an online world — use "Make online" in Settings → World first.';
+      hint.append('Publishing to a public URL needs an online world — use ');
+      hint.appendChild(settingsLink(worldId, 'world', '"Make online" in Settings → World'));
+      hint.append(' first.');
       section.appendChild(hint);
       return section;
     }
     if (!getState().registry.pin) {
       const hint = document.createElement('p');
       hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
-      hint.textContent = 'Set your PIN in Settings → Account to publish.';
+      hint.append('Set your PIN in ');
+      hint.appendChild(settingsLink(worldId, 'account', 'Settings → Account'));
+      hint.append(' to publish.');
       section.appendChild(hint);
       return section;
     }
@@ -1602,6 +1625,14 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     row.appendChild(publishBtn);
     section.appendChild(row);
 
+    // A5: slug rules as a standing hint, not only an error toast on submit.
+    if (!slugInput.disabled) {
+      const slugHint = document.createElement('p');
+      slugHint.className = 'atlas-share-section-hint atlas-share-slug-hint';
+      slugHint.textContent = '4–40 characters: lowercase letters, numbers, hyphens (not at the start or end).';
+      section.appendChild(slugHint);
+    }
+
     // Revival locks the input to the owned slug — but an admin-locked slug
     // (or a deliberate rename) needs an escape hatch to a fresh URL. The old
     // tombstone stays owned; the mirror adopts the new slug on success.
@@ -1676,12 +1707,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     mountedResolved = false;
     const header = document.createElement('header');
     header.className = 'atlas-room-header atlas-share-detail-header';
-    const back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'atlas-btn-ghost atlas-share-back';
-    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span> all pages`;
-    back.addEventListener('click', () => navigate(shareHash(worldId)));
-    header.appendChild(back);
+    // D1 drill-in prefix — same affordance as the entity headers.
+    header.appendChild(makeDrillInPrefix('Share', () => navigate(shareHash(worldId))));
     root.appendChild(header);
     const empty = document.createElement('div');
     empty.className = 'atlas-share-empty';
@@ -1711,12 +1738,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     header.className = 'atlas-room-header';
     header.innerHTML = `
       <h1>Share</h1>
-      <p class="atlas-room-subtitle">
-        Compose pages from your world — to show something off, hand a group
-        exactly what they know, or publish a curated destination. Published
-        pages are frozen snapshots at a public URL — world edits never leak
-        until you republish.
-      </p>
+      <p class="atlas-room-subtitle">Build pages from your world to share with a group or publish for anyone to see.</p>
     `;
     root.appendChild(header);
 
@@ -1793,15 +1815,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // Unified entity header (canon): compact band + click-to-edit title.
     const header = document.createElement('div');
     header.className = 'atlas-middle-header atlas-share-detail-header';
-    const back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'atlas-icon-btn-sm atlas-share-back';
-    back.title = 'All pages';
-    back.innerHTML = `<span class="material-symbols-outlined">arrow_back</span>`;
-    back.addEventListener('click', () => {
+    // D1 drill-in: the clickable room-name prefix IS the back affordance.
+    header.appendChild(makeDrillInPrefix('Share', () => {
       void commitOpenEdit(pageId).then(() => navigate(shareHash(worldId)));
-    });
-    header.appendChild(back);
+    }));
 
     const picon = document.createElement('span');
     picon.className = 'material-symbols-outlined';
@@ -1847,8 +1864,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     copyPayload.type = 'button';
     copyPayload.className = 'atlas-share-preview-toggle';
     copyPayload.dataset.action = 'copy-payload';
-    copyPayload.title = 'Copy the publish payload (JSON) to the clipboard';
-    copyPayload.innerHTML = `<span class="material-symbols-outlined">data_object</span> payload`;
+    copyPayload.title = 'Copy this page as JSON (for the show viewer or manual sharing)';
+    copyPayload.innerHTML = `<span class="material-symbols-outlined">data_object</span> copy JSON`;
     copyPayload.addEventListener('click', () => {
       void (async () => {
         await commitOpenEdit(pageId);
@@ -1858,10 +1875,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         const json = JSON.stringify(buildPagePayload(current, getState().data.elements, pageCharts), null, 2);
         try {
           await navigator.clipboard.writeText(json);
-          toasts.success('Publish payload copied');
+          toasts.success('Page JSON copied');
         } catch {
-          console.info('[share-room] payload (clipboard unavailable):\n' + json);
-          toasts.info('Clipboard unavailable — payload logged to console');
+          console.info('[share-room] page JSON (clipboard unavailable):\n' + json);
+          toasts.info('Clipboard unavailable — page JSON logged to console');
         }
       })();
     });

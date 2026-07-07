@@ -224,3 +224,84 @@ describe('findIncomingReferences', () => {
     expect(hits.map(e => e.id).sort()).toEqual(['c1', 'i1', 'p1']);
   });
 });
+
+// ---- D9b taxonomy helpers -------------------------------------------------
+
+import { suggestionsForField, reservedValueHint } from '../../src/middle/element-detail-fields';
+
+function chr(id: string, extra: Record<string, unknown> = {}): Element {
+  return { id, type: 'character', name: id, ...extra } as unknown as Element;
+}
+
+describe('suggestionsForField (D9b autocomplete — derive, never track)', () => {
+  beforeEach(() => {
+    patchSlice('active', null);
+    patchSlice('data', { elements: [] });
+  });
+
+  it('returns null for non-taxonomy fields', () => {
+    patchSlice('data', { elements: [chr('a', { supertype: 'hero' })] });
+    expect(suggestionsForField(chr('x'), 'description')).toBeNull();
+    expect(suggestionsForField(chr('x'), 'name')).toBeNull();
+  });
+
+  it('derives distinct same-type values, most-used first', () => {
+    patchSlice('data', {
+      elements: [
+        chr('a', { supertype: 'villain' }),
+        chr('b', { supertype: 'hero' }),
+        chr('c', { supertype: 'hero' }),
+        chr('d', { supertype: '  hero  ' }),           // trimmed + merged
+        { id: 'l1', type: 'location', name: 'l1', supertype: 'city' } as unknown as Element, // other type ignored
+      ],
+    });
+    expect(suggestionsForField(chr('x'), 'supertype')).toEqual(['hero', 'villain']);
+  });
+
+  it('returns null when the world has no values for the pair', () => {
+    patchSlice('data', { elements: [chr('a'), chr('b', { supertype: '' })] });
+    expect(suggestionsForField(chr('x'), 'subtype')).toBeNull();
+  });
+
+  it('pins the four writing-tier labels first for narrative supertype', () => {
+    patchSlice('active', { worldId: 'w-taxo', meta: { name: 'W' }, opened: true } as never);
+    patchSlice('data', {
+      elements: [
+        { id: 'n1', type: 'narrative', name: 'n1', supertype: 'Legend' } as unknown as Element,
+      ],
+    });
+    const got = suggestionsForField({ id: 'n', type: 'narrative', name: 'n' } as Element, 'supertype');
+    // Default labels Book/Chapter/Scene/Draft pinned in tier order, derived values after.
+    expect(got?.slice(0, 4)).toEqual(['Book', 'Chapter', 'Scene', 'Draft']);
+    expect(got).toContain('Legend');
+  });
+});
+
+describe('reservedValueHint (D9b reserved-value awareness)', () => {
+  beforeEach(() => {
+    patchSlice('active', { worldId: 'w-taxo', meta: { name: 'W' }, opened: true } as never);
+    patchSlice('data', { elements: [] });
+  });
+
+  it('flags writing-tier supertypes on narratives — case-SENSITIVE like tierFor', () => {
+    const n = (supertype: string) =>
+      ({ id: 'n', type: 'narrative', name: 'n', supertype }) as unknown as Element;
+    expect(reservedValueHint(n('Book'), 'supertype')).toMatch(/writing tree/);
+    expect(reservedValueHint(n('book'), 'supertype')).toBeNull(); // the tree would NOT match this
+  });
+
+  it('flags knowledge/page subtypes on narratives — case-insensitive like the predicates', () => {
+    const n = (subtype: string) =>
+      ({ id: 'n', type: 'narrative', name: 'n', subtype }) as unknown as Element;
+    expect(reservedValueHint(n('knowledge'), 'subtype')).toMatch(/knowledge entry/);
+    expect(reservedValueHint(n('Knowledge'), 'subtype')).toMatch(/knowledge entry/);
+    expect(reservedValueHint(n('page'), 'subtype')).toMatch(/share page/);
+  });
+
+  it('flags circle subtype on collectives, nothing on other types', () => {
+    const col = { id: 'c', type: 'collective', name: 'c', subtype: 'circle' } as unknown as Element;
+    expect(reservedValueHint(col, 'subtype')).toMatch(/knowledge circle/);
+    expect(reservedValueHint(chr('x', { subtype: 'circle' }), 'subtype')).toBeNull();
+    expect(reservedValueHint(chr('x', { supertype: 'Book' }), 'supertype')).toBeNull();
+  });
+});

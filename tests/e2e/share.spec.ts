@@ -93,7 +93,7 @@ test('create page → detail; rename + revert both persist; intent change sticks
   });
 
   // Back to the list — the page row shows name + intent chip + empty summary.
-  await page.click('.atlas-share-back');
+  await page.click('.atlas-drillin-prefix');
   await expect(page).toHaveURL(/\/share$/);
   const row = page.locator('.atlas-share-row', { hasText: 'barovia primer' });
   await expect(row).toBeVisible();
@@ -103,7 +103,7 @@ test('create page → detail; rename + revert both persist; intent change sticks
   // A second create gets a unique default name.
   await page.click('button.atlas-share-new');
   await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
-  await page.click('.atlas-share-back');
+  await page.click('.atlas-drillin-prefix');
   await expect(page.locator('.atlas-share-row')).toHaveCount(2);
 });
 
@@ -143,7 +143,7 @@ test('missing page id renders a not-found interim, not a hijacked URL', async ({
 
   await expect(page.locator('.atlas-share-empty-title')).toHaveText('Page not found.');
   await expect(page).toHaveURL(/\/share\/00000000-0000-0000-0000-000000000000$/);
-  await page.click('.atlas-share-back');
+  await page.click('.atlas-drillin-prefix');
   await expect(page).toHaveURL(/\/share$/);
 });
 
@@ -171,6 +171,28 @@ async function getPage(page: Page): Promise<any> {
     return s.data.elements.find((e: any) => e.type === 'narrative' && e.subtype === 'page') ?? null;
   });
 }
+
+test('block builder: Escape commits an open heading edit (same as Enter/blur) — B-B9', async ({ page }) => {
+  await setupWorld(page);
+  await openShare(page);
+  await page.click('button.atlas-share-new');
+  await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
+
+  await page.click('.atlas-share-block-add-btn:has-text("heading")');
+  await expect(page.locator('input.atlas-share-heading-input')).toBeVisible();
+  await page.fill('input.atlas-share-heading-input', 'Barovia');
+  await page.keyboard.press('Escape');
+
+  // Escape commits — the block leaves edit mode with the typed text saved,
+  // it does not discard back to the pre-edit value.
+  await expect(page.locator('input.atlas-share-heading-input')).toHaveCount(0);
+  await expect(page.locator('h2.atlas-share-block-heading')).toHaveText('Barovia');
+  await page.waitForFunction(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    const p = s.data.elements.find((e: any) => e.type === 'narrative' && e.subtype === 'page');
+    return p && typeof p.story === 'string' && p.story.includes('# Barovia');
+  });
+});
 
 test('block builder: heading + prose blocks compose; story mirror derives; reorder + delete work', async ({ page }) => {
   await setupWorld(page);
@@ -218,7 +240,7 @@ test('block builder: heading + prose blocks compose; story mirror derives; reord
   await expect(page.locator('.atlas-share-block')).toHaveCount(1);
 
   // List row reflects the block count.
-  await page.click('.atlas-share-back');
+  await page.click('.atlas-drillin-prefix');
   await expect(page.locator('.atlas-share-row-meta')).toHaveText('1 block');
 });
 

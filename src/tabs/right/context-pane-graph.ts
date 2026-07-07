@@ -190,11 +190,11 @@ const SINGLE_LINK_SKIP_KEYS = new Set([
  * field values out of the candidate set; final validity is the caller's
  * `byId.has` filter (same double-gate rationale as the engine's topo-sort).
  */
-function looksLikeId(v: string): boolean {
+export function looksLikeId(v: string): boolean {
   return v.length === 36 && v.includes('-');
 }
 
-function collectDirectNeighbors(el: Element): string[] {
+export function collectDirectNeighbors(el: Element): string[] {
   const seen = new Set<string>();
   for (const field of MULTI_LINK_FIELDS) {
     for (const id of readMultiLink(el, field)) {

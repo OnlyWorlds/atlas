@@ -30,33 +30,33 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // through to the standard first-launch CTA.
     if (!atlasRoot && atlasRootRecoverable) {
       root.innerHTML = `
-        <header class="atlas-middle-header"><h2>Welcome back</h2></header>
+        <header class="atlas-room-header"><h1>Welcome back</h1></header>
         <div class="atlas-welcome-empty">
           <p>Atlas detected a previously-set-up folder on this device: <code>${escapeText(atlasRootRecoverable.folderName)}</code>.</p>
-          <p class="atlas-welcome-hint">Your worlds are still on disk — click below to re-grant folder access and restore the world list. localStorage was cleared but the folder and your saved permission survived.</p>
+          <p class="atlas-welcome-hint">Your worlds are still on disk — click below to re-grant folder access and restore the world list.</p>
           <div class="atlas-welcome-actions">
-            <button class="atlas-btn-primary" data-action="recover-atlas">Recover atlas folder</button>
+            <button class="atlas-btn-primary" data-action="recover-atlas">Re-link atlas folder</button>
           </div>
         </div>
       `;
       const btn = root.querySelector<HTMLButtonElement>('[data-action="recover-atlas"]')!;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        btn.textContent = 'Recovering…';
+        btn.textContent = 'Re-linking…';
         try {
           const result = await recoverAtlasRoot();
           if (result) {
             toastManager.success(
               result.imported > 0
-                ? `Recovered atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
-                : 'Recovered atlas folder (no worlds found inside)'
+                ? `Re-linked atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
+                : 'Re-linked atlas folder (no worlds found inside)'
             );
           }
         } catch (err) {
           toastManager.error(err instanceof Error ? err.message : String(err));
         } finally {
           btn.disabled = false;
-          btn.textContent = 'Recover atlas folder';
+          btn.textContent = 'Re-link atlas folder';
         }
       });
       return;
@@ -65,7 +65,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // First-launch: no atlas folder yet.
     if (!atlasRoot) {
       root.innerHTML = `
-        <header class="atlas-middle-header"><h2>Welcome to Atlas</h2></header>
+        <header class="atlas-room-header"><h1>Welcome to Atlas</h1></header>
         <div class="atlas-welcome-empty">
           <p>Atlas keeps your worlds as folders on disk. One chosen folder holds all your worlds.</p>
           <p class="atlas-welcome-hint">Pick any folder — atlas will create an <code>onlyworlds-atlas/</code> subfolder inside it for your worlds. (If you pick a folder that's already an atlas root, atlas just re-uses it.)</p>
@@ -100,7 +100,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // Atlas root set but no world active.
     if (!active) {
       root.innerHTML = `
-        <header class="atlas-middle-header"><h2>Atlas</h2></header>
+        <header class="atlas-room-header"><h1>Atlas</h1></header>
         <div class="atlas-welcome-empty">
           <p>No world open.</p>
           <p class="atlas-welcome-hint">Use the sidebar to <strong>Create local</strong>, or pick an existing world from the list.</p>
@@ -124,8 +124,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       }
     }
     root.innerHTML = `
-      <header class="atlas-middle-header">
-        <h2>${escapeText(active.meta.name || 'Untitled world')}</h2>
+      <header class="atlas-room-header">
+        <h1>${escapeText(active.meta.name || 'Untitled world')}</h1>
       </header>
       <div class="atlas-welcome-body">
         <p>${counts.content} content element${counts.content === 1 ? '' : 's'},

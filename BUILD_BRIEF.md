@@ -18,7 +18,7 @@
 
 ## The bout order (sessions are elastic — take bouts in order, stop at green)
 
-### BUILD 1 — mechanics & unification
+### BUILD 1 — mechanics & unification ✅ DONE (session 248, 2026-07-07 — full suite green; screenshots in Notes/ui-snapshots/2026-07-07/b1-*.png; G9 rides Bout H)
 1. **S9 first** (15 min, trust-critical): `republishPage` honors `patchPage`'s boolean (share-room.ts:1299-1306; parity with `publishPage`'s failure toast). Regression test.
 2. **Bout Q — mechanical sweep** (agent-friendly: precise specs, file-scoped): G2 G3 G4/T-G10 G6 G7 G8 **G11** (`scrollbar-gutter: stable` on `.atlas-sidebar-content`, atlas.css:193-197) **G12** (disable+tooltip notes btn when `!active`) ST1 (PIN masking) T-ST2 (v1.0.0 + CHANGELOG.md) T-K10 T-K11 T-S8 IE4 K4 + Part 4: B-strings · B-B2 · B-B9 · B-tail · B-armor. Fleet strategy: 3-4 sonnet agents on non-overlapping file groups, I verify each diff + run gates.
 3. **Bout U — unification** (my hands on components, agents on sweeps):

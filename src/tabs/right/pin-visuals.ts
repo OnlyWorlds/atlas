@@ -14,6 +14,7 @@
 import type { ElementType } from '../../core/types';
 import { ELEMENT_ICONS } from '../../core/constants';
 import type { PinTint, PinStyle } from '../../core/map-view-prefs';
+import { ensureIconFont } from '../../visualization/timeline/canvas-utils';
 
 const ACCENT_COLOR = '#22d3ee';
 const MUTED_COLOR = '#6b7280';
@@ -53,7 +54,6 @@ const CATEGORY: Record<ElementType, string> = {
 };
 
 const cache = new Map<string, string>();
-let fontReady: Promise<void> | null = null;
 
 export interface PinVisual {
   color: string;
@@ -98,7 +98,7 @@ export function pinVisualFor(
   const fallback = svgCircleDataUrl(color);
 
   // Kick off async render once, then bulk-refresh pin visuals when ready.
-  ensureFontLoaded().then(() => {
+  ensureIconFont().then(() => {
     const url = renderIcon(iconName, color, hasMapBadge, style);
     cache.set(key, url);
     notifyReady();
@@ -132,21 +132,6 @@ function notifyReady(): void {
 }
 
 // ---- Rendering ----
-
-function ensureFontLoaded(): Promise<void> {
-  if (fontReady) return fontReady;
-  fontReady = (async () => {
-    try {
-      if ((document as any).fonts?.load) {
-        await (document as any).fonts.load('24px "Material Symbols Outlined"', '\ue55f');
-        await (document as any).fonts.ready;
-      }
-    } catch {
-      // Best-effort — fallback icons still render.
-    }
-  })();
-  return fontReady;
-}
 
 function renderIcon(iconName: string, color: string, hasMapBadge: boolean = false, style: PinStyle = 'icon'): string {
   const size = 40;

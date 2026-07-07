@@ -28,6 +28,7 @@ import { saveRegistry } from '../../registry/registry';
 import { getTierForNarrative } from '../../middle/writing-helpers';
 import { mountContextGraph, type GraphHandle, type HopDepth } from './context-pane-graph';
 import { mountContextLists, type ContextListsHandle } from './context-pane-lists';
+import { getKnowledgeRoomTab } from '../../middle/knowledge-room';
 import { mountContextPreview, type ContextPreviewHandle } from './context-pane-preview';
 import { mountContextToolbar, type ContextToolbarHandle } from './context-pane-toolbar';
 import { extractTemporalNodes } from '../../visualization/timeline/data-normalizer';
@@ -497,7 +498,9 @@ function emptyCopyForRoute(route: Route): string {
     case 'search':
       return 'Pick a search result to see its context.';
     case 'knowledge':
-      return 'Open a knowledge entry to see its holders and subjects.';
+      return getKnowledgeRoomTab() === 'knowers'
+        ? 'Open a knower to see their world.'
+        : 'Open a knowledge entry to see its holders and subjects.';
     case 'map':
       return 'Open an element or narrative to focus the graph.';
     default:

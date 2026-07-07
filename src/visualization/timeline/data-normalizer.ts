@@ -75,6 +75,9 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
     let endDate: number | null = null;
     if (fields.end) {
       endDate = parseTemporalValue((el as Record<string, unknown>)[fields.end]);
+      // Drop an inverted range (end before start) — it would draw the range-line
+      // backwards and can blow out the axis. Treat as no end date.
+      if (endDate !== null && endDate < startDate) endDate = null;
     }
 
     nodes.push({

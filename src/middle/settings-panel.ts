@@ -27,6 +27,7 @@ import { renderEditingTab, wireEditingTab } from './settings-editing';
 import { renderWorldTab, wireWorldTab } from './settings-world';
 import { renderWritingTab, wireWritingTab } from './settings-writing';
 import { renderContextTab, wireContextTab } from './settings-context';
+import pkg from '../../package.json';
 
 export interface SettingsMount {
   target: HTMLElement;
@@ -107,7 +108,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
                 <span>${groupLabel}</span>
               </div>${buttons}`;
           }).join('')}
-          <div class="atlas-settings-version">Atlas v0.0.1 · <a href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a></div>
+          <div class="atlas-settings-version">Atlas v${pkg.version} · <a href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a></div>
         </nav>
         <section class="atlas-settings-body" role="tabpanel" data-active-tab="${tab}">
           ${renderTab(tab, reg, activeWorld)}
