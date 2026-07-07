@@ -345,25 +345,40 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
  * writes world.json, registers, and activates. Shared by createWorldInRoot
  * (empty world) and createWorldFromImportedData (populated from an import).
  */
-async function scaffoldWorldInRoot(name: string): Promise<{
+async function scaffoldWorldInRoot(
+  name: string,
+  // Sample-world path (Bout DEMO): scaffold under an explicit parent handle
+  // (OPFS on first launch) instead of the atlas root — no folder pick, no
+  // permission prompt (OPFS needs none).
+  parentOverride?: { handle: FileSystemDirectoryHandle; label: string },
+): Promise<{
   store: FsFolderStore;
   worldUuid: string;
   subName: string;
   handleKey: string;
   rootFolderName: string;
 }> {
-  const reg = getState().registry;
-  if (!reg.atlas_root) {
-    throw new Error('Atlas root is not set up — pick a folder first');
-  }
-  const rootHandle = await loadHandle(reg.atlas_root.handle_key);
-  if (!rootHandle) {
-    throw new Error('Atlas root handle is missing from the vault — re-pick it from settings');
-  }
-  // Re-grant permission on the root (user gesture at click-time is acceptable here).
-  const granted = await ensureWritable(rootHandle);
-  if (!granted) {
-    throw new Error('Write permission for the atlas folder was denied');
+  let rootHandle: FileSystemDirectoryHandle;
+  let rootLabel: string;
+  if (parentOverride) {
+    rootHandle = parentOverride.handle;
+    rootLabel = parentOverride.label;
+  } else {
+    const reg = getState().registry;
+    if (!reg.atlas_root) {
+      throw new Error('Atlas root is not set up — pick a folder first');
+    }
+    const loaded = await loadHandle(reg.atlas_root.handle_key);
+    if (!loaded) {
+      throw new Error('Atlas root handle is missing from the vault — re-pick it from settings');
+    }
+    // Re-grant permission on the root (user gesture at click-time is acceptable here).
+    const granted = await ensureWritable(loaded);
+    if (!granted) {
+      throw new Error('Write permission for the atlas folder was denied');
+    }
+    rootHandle = loaded;
+    rootLabel = reg.atlas_root.folder_name;
   }
 
   // Close any prior active store before we open a new one.
@@ -385,7 +400,7 @@ async function scaffoldWorldInRoot(name: string): Promise<{
   const store = new FsFolderStore();
   await store.open(worldHandle);
 
-  return { store, worldUuid, subName, handleKey, rootFolderName: reg.atlas_root.folder_name };
+  return { store, worldUuid, subName, handleKey, rootFolderName: rootLabel };
 }
 
 export async function createWorldInRoot(name: string): Promise<{ entry: WorldRegistryEntry }> {
@@ -425,10 +440,15 @@ export async function createWorldInRoot(name: string): Promise<{ entry: WorldReg
  */
 export async function createWorldFromImportedData(
   plan: ImportPlan,
-  opts: { name?: string; onProgress?: (p: ApplyProgress) => void } = {},
+  opts: {
+    name?: string;
+    onProgress?: (p: ApplyProgress) => void;
+    /** Scaffold under this handle instead of the atlas root (sample world / OPFS). */
+    parentHandle?: { handle: FileSystemDirectoryHandle; label: string };
+  } = {},
 ): Promise<{ entry: WorldRegistryEntry; applied: ApplyResult }> {
   const name = (plan.worldMeta?.name ?? opts.name ?? '').trim() || 'Imported world';
-  const { store, worldUuid, subName, handleKey, rootFolderName } = await scaffoldWorldInRoot(name);
+  const { store, worldUuid, subName, handleKey, rootFolderName } = await scaffoldWorldInRoot(name, opts.parentHandle);
 
   // World metadata from the import; id/name forced (export carries no world id).
   await store.writeWorldMeta({ ...(plan.worldMeta ?? {}), id: worldUuid, name });

@@ -116,6 +116,15 @@ const PARAMS = {
 };
 
 const NODE_DIAMETER = 36;
+
+/**
+ * Max node labels rendered at once. Above this, the label pass keeps the
+ * highest-priority labels (center + selection + most-connected) and hides the
+ * rest to stop a dense scene from becoming a label-colliding hairball (T-CX2);
+ * hidden labels reveal on hover via CSS. Ported idea, not code, from the charts
+ * label-priority pass.
+ */
+const LABEL_BUDGET = 14;
 /**
  * The center node renders larger (CSS .is-center). The diameter used here
  * MUST match the CSS width/height or the node will sit off-center relative
@@ -546,6 +555,37 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     }
 
     lastNodeEls = nodeEls;
+    applyLabelBudget(nodeEls, nodes, neighborSets);
+  }
+
+  /**
+   * Label-priority pass (T-CX2). On dense graphs, keep only the highest-value
+   * labels visible: the anchor (center) and the currently-selected node always
+   * win; the remaining budget fills by degree (most-connected first). Everyone
+   * else hides their label (CSS reveals it on hover). No-op under the budget.
+   */
+  function applyLabelBudget(
+    nodeEls: Map<string, HTMLElement>,
+    nodes: SimNode[],
+    neighborSets: Map<string, Set<string>>,
+  ): void {
+    if (nodes.length <= LABEL_BUDGET) {
+      for (const el of nodeEls.values()) el.classList.remove('is-label-hidden');
+      return;
+    }
+    const alwaysShow = new Set<string>();
+    for (const n of nodes) if (n.isCenter) alwaysShow.add(n.id);
+    if (lastHighlightedId) alwaysShow.add(lastHighlightedId);
+    const slots = Math.max(0, LABEL_BUDGET - alwaysShow.size);
+    const ranked = nodes
+      .filter(n => !alwaysShow.has(n.id))
+      .map(n => ({ id: n.id, degree: (neighborSets.get(n.id)?.size ?? 1) - 1 }))
+      .sort((a, b) => b.degree - a.degree);
+    const show = new Set<string>(alwaysShow);
+    for (let i = 0; i < ranked.length && i < slots; i++) show.add(ranked[i].id);
+    for (const [id, el] of nodeEls) {
+      el.classList.toggle('is-label-hidden', !show.has(id));
+    }
   }
 
   /**

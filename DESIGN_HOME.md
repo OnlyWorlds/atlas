@@ -1,7 +1,7 @@
 # Atlas — World Home Design
 
 **Version**: 1.0 (2026-05-18)
-**Status**: Locked. Building this session.
+**Status**: ⚠️ **PARTIALLY SUPERSEDED (session 248, workplan D2)** — home is now the **cover-page × study-desk hybrid**: identity hero (+ cover image), quiet text-links, D2b cast slot (protagonist/home favorites), woven clickable stat line, Continue strip, tight room-routed Recent. The count-card grid, timeline-mini, and boxed quick actions below are GONE (timeline-mini may return post-charts-sitdown as a starred chart). Current truth: `src/middle/world-home.ts` header comment + PROGRESS.md session-248 entries. Sections below remain valid for identity click-edit + onboarding.
 **Related**: `DESIGN.md` (Rooms model), `DESIGN_WRITING.md`, `DESIGN_PUBLISHING.md`
 
 ---

@@ -1,8 +1,22 @@
 # Atlas — Build Brief (the polish-arc orchestrator handover)
 
-**Created**: 2026-07-07 18:07 (session 247 close) · **Author**: Temper, for build-seat Temper
+**Created**: 2026-07-07 18:07 (session 247 close) · **Author**: Temper, for build-seat Temper · **Updated**: 2026-07-07 late (session 248 settle)
 **This is the pickup for the UI/UX build sessions.** Load order: this file → `Forge/Notes/2026-07-05-atlas-ui-workplan.md` (THE spec source — every ID below resolves there) → `Forge/Notes/2026-07-05-atlas-copy-inventory.md` (exact strings for the copy work). Positioning/post material: `Forge/Notes/2026-07-05-atlas-positioning-research.md`.
-**State**: every design decision is CLOSED (Captain's pass + rounds 1-8, 2026-07-05→07). "Aim high, get this nice and complete." Nothing here is speculative — build what the workplan says, judge by screenshot, keep the tree green.
+**State**: every design decision is CLOSED (rounds 1-8). **Session 248 executed THIRTEEN bouts in one day — the ENTIRE workplan is shipped except Bout OW and Bout E.** Tree at close: typecheck + **977 vitest + 163 e2e**, EXIT=0. Nothing committed (Captain's git).
+
+## ⚑ SESSION 249 OPENER (the handover)
+
+1. **Bout OW is the session** — the last real bout. Read item 11 below + workplan D11/D11b/D11c IN FULL before any code. The bout lives or dies on the hook guardrails:
+   - Waypoint checks fire at **USER-GESTURE call sites only** — button clicks, field commits, explicit node clicks. If you find yourself hooking FolderStore or any data layer, STOP (workplan D11c, verbatim).
+   - **Origins that can NEVER complete a waypoint**: import, sync/pull, and the demo world. `src/demo/sample-world.ts` carries the contract note — thread an origin flag from creation paths into the hooks.
+   - Toast rules: once-ever per waypoint · one at a time (queued, list-order priority) · suppressed while any modal/text input has focus · the FIRST toast ever carries "optional — see all · turn off" · OW-styled glyph family.
+   - State = atlas-level localStorage (not per-world, not synced) + "mark all as familiar" on the OW page + quiet "N of 10" (page only).
+   - Suggested shape: `src/core/waypoints.ts` (defs + state + `completeWaypoint(id, origin)`) · hooks at the ~10 gesture sites · `settings-onlyworlds.ts` replacing the Account tab (rename per D11: intro identity sentence · account block · waypoint grid · links row · dev corner incl. magelet + LLM-context-pack) · footer OW icon → `settingsHash(w, 'onlyworlds')`.
+   - This is persisted state + app-wide hooks — consider a quick adversarial pass on the hook map (which gestures, which origins) BEFORE wiring; that table IS the contract.
+2. **Bout E rider** (30 min): T-E1 dim-empty-rows — one approach, screenshot, Captain judges.
+3. **Captain's open items**: G9 pick (`g9-sidebar-{grey,cyan}.png`) · smoke session 248's surface (home cover + favorites, knowledge zones, share meta row, import validation, sample world, `?` overlay) · **commit + push atlas AND show** (show carries three unpushed waves — gates pipeline smoke, S5, Skeld's copy pass).
+4. **Then in Captain's decided order**: charts sitdown (D7 agenda) → home pass 2 → pipeline smoke (needs show redeploy) → pre-flight (`Notes/2026-07-03-atlas-release-plan.md`).
+5. **Fresh-context tip**: session 248's full detail = `PROGRESS.md` CURRENT STATE + `Logs/Chatlogs/chat-2026-07-07-session248.md` (incl. the sample-world snapshot rebuild recipe).
 
 ---
 
@@ -33,11 +47,11 @@
 7. ✅ DONE (session 248 — S5 still rides the show wave) **Bout S — share simplification**: REMOVE intent picker (D5 — `atlas_page_intent` stays in model, hidden; default on create; keep wire compat) · empty-state use-case examples ("a character showcase · a player handout · a world landing page") · S3 full-page preview tab (payload-true renderer → blob/`?preview`) · T-S7 meta collapse (slim summary row: theme swatch · publish state) · embeddable-suggestions row in block picker ("from your world: N circles · N charts · N maps") · S5 rides the show wave (Captain's push).
 
 ### BUILD 3 — context & the OW layer
-8. **Bout W — writing setup** (WR1-4 + WR5): visual nest (indented Book › Chapter › Scene + floating Draft, inline-editable labels), norm-claim reworded, supertype-speak behind ⓘ, delta-only narratives table, skip-consequence line, tier-label affordance on the writing landing header.
-9. **Bout CX — context defaults** (D3): knowledge-list entries-graph (K7) · share-page carded-elements mini-graph (refs mirror) · writing-landing fill · T-CX2 hairball label rules (port charts' label-priority idea) · T-CX3 anchor caption · per-tab empty-state copy.
-10. **Bout HELP**: the `?` overlay component (one shape, every room; unify with hotkey reference) + per-room content map (what this room is for, 3-4 "you can…" lines, links; strings in one file). Content voice: Part 3 rules.
+8. ✅ DONE (session 248, opus agent) **Bout W — writing setup** (WR1-4 + WR5): visual nest (indented Book › Chapter › Scene + floating Draft, inline-editable labels), norm-claim reworded, supertype-speak behind ⓘ, delta-only narratives table, skip-consequence line, tier-label affordance on the writing landing header.
+9. ✅ DONE (session 248, opus agent) **Bout CX — context defaults** (D3): knowledge-list entries-graph (K7) · share-page carded-elements mini-graph (refs mirror) · writing-landing fill · T-CX2 hairball label rules (port charts' label-priority idea) · T-CX3 anchor caption · per-tab empty-state copy.
+10. ✅ DONE (session 248, keeper) **Bout HELP**: the `?` overlay component (one shape, every room; unify with hotkey reference) + per-room content map (what this room is for, 3-4 "you can…" lines, links; strings in one file). Content voice: Part 3 rules.
 11. **Bout OW**: Settings→Account becomes **"OnlyWorlds"** — intro (identity sentence + powered-by), account block (masked PIN), **waypoints v3** (workplan D11c: 10 waypoints, action-hooks at USER-GESTURE call sites only — never data layer; import/demo/sync origins blocked; once-ever OW-styled toast, queued, suppressed during input, first-ever toast carries "optional — see all · turn off"; "mark all as familiar"; quiet "N of 10"), links row (site · tools · AI toolkit · council · spec), **dev corner** (spec · SDK · schema · example world · magelet as reference integration), footer OW icon → routes to the tab.
-12. **Bout DEMO**: bundle a trimmed Moppetopia snapshot · "Explore the sample world" (welcome + home) → local-only world via `createWorldFromImportedData` · "make it yours" conversion path. Demo actions must NOT complete waypoints (origin flag).
+12. ✅ DONE (session 248, keeper — snapshot = FULL Moppetopia 254/254; found+fixed the unnamed-pin/marker import drop, a real round-trip bug; OPFS first-launch path live-verified; "make it yours" one-click move = fast-follow) **Bout DEMO**: bundle a trimmed Moppetopia snapshot · "Explore the sample world" (welcome + home) → local-only world via `createWorldFromImportedData` · "make it yours" conversion path. Demo actions must NOT complete waypoints (origin flag).
 13. **Bout E** (any session with 30 min headroom): T-E1 dim-empty-rows try → screenshot → judge.
 
 ### Then (in Captain's decided order)

@@ -62,7 +62,12 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
     records.forEach((rec, i) => {
       const path = `${cap(type)}[${i}]`;
 
-      if (typeof rec.name !== 'string' || !rec.name.trim()) {
+      // Pins and markers are UNNAMED BY DESIGN (atlas creates them with an
+      // empty name) — requiring a name here silently dropped every unnamed
+      // spatial artifact on re-import, breaking export→import round-trips
+      // (found via the bundled sample world, session 248).
+      const nameOptional = type === 'pin' || type === 'marker';
+      if (!nameOptional && (typeof rec.name !== 'string' || !rec.name.trim())) {
         issues.push({
           path: `${path}.name`,
           field: 'name',

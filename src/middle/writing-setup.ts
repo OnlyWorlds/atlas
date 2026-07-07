@@ -65,20 +65,23 @@ export function mountWritingSetup(
         <header class="atlas-writing-setup-header">
           <h1>Set up writing</h1>
           <p class="atlas-writing-setup-subtitle">
-            Atlas's writing room organises your narratives into a four-tier tree.
-            Most worldbuilders use Book / Chapter / Scene plus a flexible Draft tier
-            for scratch ideas, but you can rename any of them to fit your project.
-            Whatever you choose here becomes the <code>supertype</code> stored on
-            each narrative, so other OnlyWorlds tools see the same labels too.
+            A common shape: Book / Chapter / Scene, plus a flexible Draft tier.
+            Rename any of them to fit your project.
           </p>
+          <!-- div, not p: the HTML parser closes a <p> at a <details> (flow
+               content), which would eject the info toggle onto its own line. -->
+          <div class="atlas-writing-setup-lead">
+            These labels organise your narratives into a tree.<details class="atlas-writing-setup-tech"><summary title="How labels are stored"><span class="material-symbols-outlined atlas-writing-setup-tech-icon">info</span></summary><span class="atlas-writing-setup-tech-body">Each label is stored as the narrative's <code>supertype</code>, so other OnlyWorlds tools see the same labels too.</span></details>
+          </div>
         </header>
 
         <section class="atlas-writing-setup-labels">
-          <h2 class="atlas-writing-setup-section-title">Tier labels</h2>
-          ${labelInputHtml('l1', labels.l1, DEFAULT_WRITING_LABELS.l1, detected.l1)}
-          ${labelInputHtml('l2', labels.l2, DEFAULT_WRITING_LABELS.l2, detected.l2)}
-          ${labelInputHtml('l3', labels.l3, DEFAULT_WRITING_LABELS.l3, detected.l3)}
-          ${labelInputHtml('l4', labels.l4, DEFAULT_WRITING_LABELS.l4, detected.l4)}
+          <div class="atlas-writing-setup-nest">
+            ${nestRowHtml('l1', 0, labels.l1, DEFAULT_WRITING_LABELS.l1, detected.l1)}
+            ${nestRowHtml('l2', 1, labels.l2, DEFAULT_WRITING_LABELS.l2, detected.l2)}
+            ${nestRowHtml('l3', 2, labels.l3, DEFAULT_WRITING_LABELS.l3, detected.l3)}
+          </div>
+          ${draftRowHtml('l4', labels.l4, DEFAULT_WRITING_LABELS.l4, detected.l4)}
         </section>
 
         ${candidates.length > 0 ? promoteSectionHtml(candidates, labels) : ''}
@@ -89,43 +92,85 @@ export function mountWritingSetup(
             : ''}
           <button class="atlas-btn-primary" data-action="save">Save and start writing</button>
         </div>
+        ${candidates.length > 0
+          ? '<p class="atlas-writing-setup-skip-note">Skip leaves the room unconfigured, so setup reappears next visit. You can also set it up later in Settings → Writing.</p>'
+          : ''}
       </div>
     `;
     wireInputs();
   }
 
+  /** One editable label in the nested Book › Chapter › Scene spine. */
+  function nestRowHtml(
+    key: 'l1' | 'l2' | 'l3',
+    depth: 0 | 1 | 2,
+    value: string,
+    defaultValue: string,
+    detectedValue: string | null,
+  ): string {
+    const connector = depth > 0
+      ? `<span class="atlas-writing-setup-nest-connector material-symbols-outlined">subdirectory_arrow_right</span>`
+      : '';
+    return `
+      <div class="atlas-writing-setup-nest-row" data-depth="${depth}">
+        ${connector}
+        ${labelInputHtml(key, value, defaultValue)}
+        ${suggestionHtml(key, value, defaultValue, detectedValue)}
+      </div>
+    `;
+  }
+
+  /** The flexible Draft tier — floats beside the spine, not part of it. */
+  function draftRowHtml(
+    key: 'l4',
+    value: string,
+    defaultValue: string,
+    detectedValue: string | null,
+  ): string {
+    return `
+      <div class="atlas-writing-setup-nest-draft">
+        <div class="atlas-writing-setup-nest-draft-head">
+          <span class="atlas-writing-setup-nest-badge">flexible</span>
+          ${labelInputHtml(key, value, defaultValue)}
+          ${suggestionHtml(key, value, defaultValue, detectedValue)}
+        </div>
+        <span class="atlas-writing-setup-hint">Sits anywhere in the tree. Useful for half-formed ideas, alternate versions, or research notes.</span>
+      </div>
+    `;
+  }
+
+  /** Inline-editable label. Reads as text; click to place the cursor and edit. */
   function labelInputHtml(
+    key: 'l1' | 'l2' | 'l3' | 'l4',
+    value: string,
+    defaultValue: string,
+  ): string {
+    return `
+      <span class="atlas-writing-setup-label-wrap">
+        <input
+          type="text"
+          class="atlas-writing-setup-label"
+          data-label-key="${key}"
+          value="${escapeAttr(value)}"
+          placeholder="${escapeAttr(defaultValue)}"
+          aria-label="${escapeAttr(key === 'l4' ? 'Flexible tier label' : 'Tier label')}"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <span class="atlas-writing-setup-label-pencil material-symbols-outlined" aria-hidden="true">edit</span>
+      </span>
+    `;
+  }
+
+  function suggestionHtml(
     key: 'l1' | 'l2' | 'l3' | 'l4',
     value: string,
     defaultValue: string,
     detectedValue: string | null,
   ): string {
-    const tierName =
-      key === 'l1' ? 'Top tier (the largest container, e.g. a book)'
-      : key === 'l2' ? 'Second tier (sits inside the top tier, e.g. a chapter)'
-      : key === 'l3' ? 'Third tier (sits inside the second, e.g. a scene)'
-      : 'Flexible tier (a scratch tier that can sit anywhere)';
-    const hint = key === 'l4'
-      ? `<span class="atlas-writing-setup-hint">Useful for half-formed ideas, alternate versions, research notes — anything that does not fit the main spine.</span>`
+    return detectedValue && detectedValue !== value && detectedValue !== defaultValue
+      ? `<button type="button" class="atlas-writing-setup-suggestion" data-suggest="${escapeAttr(key)}" data-suggest-value="${escapeAttr(detectedValue)}">use detected: <strong>${escapeText(detectedValue)}</strong></button>`
       : '';
-    const suggestion = detectedValue && detectedValue !== value && detectedValue !== defaultValue
-      ? `<button type="button" class="atlas-writing-setup-suggestion" data-suggest="${escapeAttr(key)}" data-suggest-value="${escapeAttr(detectedValue)}">Adopt detected: <strong>${escapeText(detectedValue)}</strong></button>`
-      : '';
-    return `
-      <label class="atlas-writing-setup-field">
-        <span class="atlas-writing-setup-field-label">${tierName}</span>
-        <input
-          type="text"
-          class="atlas-input atlas-writing-setup-input"
-          data-label-key="${key}"
-          value="${escapeAttr(value)}"
-          placeholder="${escapeAttr(defaultValue)}"
-          autocomplete="off"
-        />
-        ${suggestion}
-        ${hint}
-      </label>
-    `;
   }
 
   function promoteSectionHtml(cands: PromoteCandidate[], current: WritingLabels): string {
@@ -135,18 +180,21 @@ export function mountWritingSetup(
       const list = groups[d];
       if (list.length === 0) return '';
       const tierLabel = d === 0 ? current.l1 : d === 1 ? current.l2 : d === 2 ? current.l3 : current.l4;
-      const sample = list.slice(0, 3).map(c => c.el.name).filter(Boolean).join(', ');
-      const more = list.length > 3 ? ` plus ${list.length - 3} more` : '';
-      const existingValues = new Set(list.map(c => c.currentSupertype).filter(Boolean));
-      const note = existingValues.size > 0
-        ? `Currently labelled: ${[...existingValues].map(v => `"${v ?? ''}"`).join(', ')}. Will become "${tierLabel}".`
-        : `Will be labelled "${tierLabel}".`;
+      // Delta-only: only speak when a label actually changes on this row.
+      const changed = list.filter(c => c.currentSupertype !== c.proposedSupertype);
+      const oldValues = [...new Set(changed.map(c => c.currentSupertype).filter(Boolean))];
+      let delta = '';
+      if (changed.length > 0) {
+        delta = oldValues.length > 0
+          ? `${oldValues.map(v => `"${v ?? ''}"`).join(', ')} → "${tierLabel}"`
+          : `→ "${tierLabel}"`;
+      }
       return `
-        <div class="atlas-writing-setup-promote-row">
-          <div class="atlas-writing-setup-promote-row-tier">${escapeText(tierLabel)} (${list.length})</div>
-          <div class="atlas-writing-setup-promote-row-sample">${escapeText(sample)}${escapeText(more)}</div>
-          <div class="atlas-writing-setup-promote-row-note">${escapeText(note)}</div>
-        </div>
+        <tr class="atlas-writing-setup-promote-trow">
+          <td class="atlas-writing-setup-promote-tier">${escapeText(tierLabel)}</td>
+          <td class="atlas-writing-setup-promote-count">${list.length}</td>
+          <td class="atlas-writing-setup-promote-delta">${escapeText(delta)}</td>
+        </tr>
       `;
     }
     return `
@@ -154,17 +202,19 @@ export function mountWritingSetup(
         <h2 class="atlas-writing-setup-section-title">Existing narratives</h2>
         <p class="atlas-writing-setup-section-subtitle">
           Atlas found ${cands.length} narrative${cands.length === 1 ? '' : 's'} already
-          arranged in parent/child chains. They look like a writing project. Tick the
-          box below to bring them into the writing tree using the labels above.
-          You can always change a single narrative later from its detail view.
+          arranged in parent/child chains. They look like a writing project.
         </p>
-        ${depthRow(0)}
-        ${depthRow(1)}
-        ${depthRow(2)}
-        ${depthRow(3)}
+        <table class="atlas-writing-setup-promote-table">
+          <tbody>
+            ${depthRow(0)}
+            ${depthRow(1)}
+            ${depthRow(2)}
+            ${depthRow(3)}
+          </tbody>
+        </table>
         <label class="atlas-writing-setup-promote-toggle">
           <input type="checkbox" data-role="promote-toggle" checked />
-          Bring these narratives into the writing tree on save
+          These keep their current labels and appear in the tree.
         </label>
       </section>
     `;

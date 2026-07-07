@@ -23,7 +23,7 @@ import {
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { getActiveStore } from '../core/active-store';
-import { ELEMENT_ICONS } from '../core/constants';
+import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import type { Element, ElementType } from '../core/types';
 import { narrativeKindOf } from '../core/narrative-kind';
 import { isWritingNarrative } from './writing-helpers';
@@ -161,7 +161,9 @@ function buildCover(
       seg.type = 'button';
       seg.className = 'atlas-home-statline-seg';
       seg.title = `Show ${type}s in the sidebar`;
-      seg.innerHTML = `<b>${count}</b> ${escapeText(count === 1 ? type : `${type}s`)}`;
+      seg.innerHTML = `<b>${count}</b> ${escapeText((count === 1
+        ? ELEMENT_LABELS[type]?.singular
+        : ELEMENT_LABELS[type]?.plural) ?? type)}`;
       seg.addEventListener('click', () => {
         const ui = getState().ui;
         if (ui.sidebarMode !== 'elements') {

@@ -201,7 +201,7 @@ export function defaultBindings(): HotkeyBinding[] {
   return [
     {
       id: 'open-reference',
-      description: 'Show keyboard shortcuts',
+      description: 'Help for this room + all shortcuts',
       scope: 'Global',
       key: '?',
       modifier: 'none',
@@ -395,9 +395,11 @@ export function openHotkeyReferenceModal(): void {
     openModalImpl();
     return;
   }
-  // Fallback: dynamic import keeps the modal out of the main chunk.
-  void import('../ui/hotkey-reference-modal').then(m => {
-    m.openHotkeyReferenceModal();
+  // Bout HELP: the `?` surface is the room-aware help overlay (purpose +
+  // "you can" lines + the full shortcut reference — one shape, every room).
+  // Dynamic import keeps it out of the main chunk.
+  void import('../ui/help-overlay').then(m => {
+    m.openHelpOverlay();
   });
 }
 

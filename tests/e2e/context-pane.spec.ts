@@ -487,6 +487,62 @@ test('settings: Context tab renders and persists hop depth', async ({ page }) =>
   expect(lockPersisted).toBe(true);
 });
 
+test('knowledge list: context pane anchors on the most-held entry with a caption (K7)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page);
+  await createWorld(page, 'ctx world');
+
+  const knowerId = await createElement(page, 'character', { name: 'Sage' });
+  await createElement(page, 'narrative', {
+    name: 'The Secret',
+    subtype: 'knowledge',
+    narrator: knowerId,
+  });
+
+  // Knowledge LIST route (no open entry/knower).
+  await page.evaluate(() => {
+    const m = window.location.hash.match(/#\/w\/([^/]+)/);
+    if (!m) throw new Error('no active world in URL');
+    window.location.hash = `#/w/${m[1]}/knowledge`;
+  });
+  await openContextTab(page);
+
+  const pane = page.locator('.atlas-context-pane');
+  // Anchored graph centers on the knowledge entry instead of showing empty text.
+  await expect(pane.locator('.atlas-context-graph-node.is-center')).toHaveText(/The Secret/);
+  // Caption explains WHY this entry is shown (T-CX3).
+  const caption = pane.locator('.atlas-context-pane-caption');
+  await expect(caption).toBeVisible();
+  await expect(caption).toContainText(/most widely held/i);
+});
+
+test('share page: context pane anchors on the first carded element', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page);
+  await createWorld(page, 'ctx world');
+
+  const heroId = await createElement(page, 'character', { name: 'Protagonist' });
+  const pageId = await createElement(page, 'narrative', {
+    name: 'My Page',
+    subtype: 'page',
+    atlas_page_blocks: [
+      { id: 'block-1', kind: 'element-card', elementId: heroId, variant: 'compact', fields: [] },
+    ],
+    atlas_page_refs: [heroId],
+  });
+
+  await page.evaluate((id) => {
+    const m = window.location.hash.match(/#\/w\/([^/]+)/);
+    if (!m) throw new Error('no active world in URL');
+    window.location.hash = `#/w/${m[1]}/share/${id}`;
+  }, pageId);
+  await openContextTab(page);
+
+  const pane = page.locator('.atlas-context-pane');
+  await expect(pane.locator('.atlas-context-graph-node.is-center')).toHaveText(/Protagonist/);
+  await expect(pane.locator('.atlas-context-pane-caption')).toContainText(/first featured element/i);
+});
+
 test('right-click "Add to story" appears in writing mode only', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);

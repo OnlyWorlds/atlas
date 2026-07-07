@@ -25,10 +25,12 @@ import type { Element, ElementType, WorldRegistryEntry } from '../../core/types'
 import { ToastManager } from '../../ui/toast-manager';
 import { onHashChange, parseHash, type Route } from '../../core/router';
 import { saveRegistry } from '../../registry/registry';
-import { getTierForNarrative } from '../../middle/writing-helpers';
+import { getTierForNarrative, isWritingNarrative } from '../../middle/writing-helpers';
 import { mountContextGraph, type GraphHandle, type HopDepth } from './context-pane-graph';
 import { mountContextLists, type ContextListsHandle } from './context-pane-lists';
 import { getKnowledgeRoomTab } from '../../middle/knowledge-room';
+import { listKnowledgeEntries, heldByCount } from '../../core/knowledge';
+import { blocksOf, pageRefsFor } from '../../core/sharing';
 import { mountContextPreview, type ContextPreviewHandle } from './context-pane-preview';
 import { mountContextToolbar, type ContextToolbarHandle } from './context-pane-toolbar';
 import { extractTemporalNodes } from '../../visualization/timeline/data-normalizer';
@@ -46,12 +48,41 @@ interface Subject {
   element: Element | null;
   /** Which details renderer to mount below the graph. */
   detailsMode: DetailsMode;
+  /**
+   * One-line muted explainer shown above the details when the pane ANCHORED a
+   * default (charts / knowledge list / share page / writing landing) instead of
+   * the user focusing something — so a surprising anchor doesn't read as random
+   * (T-CX3). Absent for direct focus.
+   */
+  caption?: string;
+}
+
+/** Most-recently-edited element in a set (by local/server update timestamp). */
+function mostRecentlyEdited(els: readonly Element[]): Element | null {
+  let best: Element | null = null;
+  let bestTs = '';
+  for (const e of els) {
+    const rec = e as Record<string, unknown>;
+    const ts = String(rec.local_updated_at ?? rec.server_updated_at ?? '');
+    if (!best || ts > bestTs) { best = e; bestTs = ts; }
+  }
+  return best;
 }
 
 function resolveSubject(route: Route, elements: readonly Element[]): Subject {
   if (route.mode === 'writing' && route.narrativeId) {
     const el = elements.find(e => e.id === route.narrativeId) ?? null;
     return { element: el, detailsMode: 'writing' };
+  }
+  // Writing landing (no open narrative): instead of a void, anchor the graph on
+  // the most recently edited writing-tree narrative so the pane teaches by
+  // example. World with no writing narratives falls through to the empty state.
+  if (route.mode === 'writing' && route.worldId) {
+    const writing = elements.filter(e => isWritingNarrative(e, route.worldId!));
+    const anchor = mostRecentlyEdited(writing);
+    return anchor
+      ? { element: anchor, detailsMode: 'element', caption: 'your most recently edited narrative' }
+      : { element: null, detailsMode: 'empty' };
   }
   if (route.mode === 'element' && route.elementId) {
     const el = elements.find(e => e.id === route.elementId) ?? null;
@@ -70,7 +101,9 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
     }
     const topId = [...rankAnchors(extractTemporalNodes([...elements]), 1)][0];
     const el = topId ? (elements.find(e => e.id === topId) ?? null) : null;
-    return el ? { element: el, detailsMode: 'element' } : { element: null, detailsMode: 'empty' };
+    return el
+      ? { element: el, detailsMode: 'element', caption: 'most connected in this period' }
+      : { element: null, detailsMode: 'empty' };
   }
   // Knowledge room: an open entry (or knower known-view) is the subject —
   // entry ↔ holders ↔ subjects in the graph via the existing element mode.
@@ -82,6 +115,33 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
   if (route.mode === 'knowledge' && route.knowerId) {
     const el = elements.find(e => e.id === route.knowerId) ?? null;
     return { element: el, detailsMode: 'element' };
+  }
+  // Knowledge list (no open entry/knower): anchor on the most widely held
+  // entry so the pane shows the world's knowledge web instead of empty text
+  // (K7). The graph's element mode draws entry ↔ holders ↔ subjects around it.
+  if (route.mode === 'knowledge') {
+    const entries = listKnowledgeEntries([...elements]);
+    if (entries.length === 0) return { element: null, detailsMode: 'empty' };
+    const anchor = entries.reduce(
+      (best, e) => (heldByCount(e) > heldByCount(best) ? e : best),
+      entries[0],
+    );
+    return { element: anchor, detailsMode: 'element', caption: 'the world’s most widely held entry' };
+  }
+  // Share page detail: anchor on the page's first carded element so the pane
+  // previews what the page features. Pages with no element cards fall through
+  // to the empty state (which names the next action). The list view (no
+  // pageId) also falls through — nothing is focused yet.
+  if (route.mode === 'share' && route.pageId) {
+    const page = elements.find(e => e.id === route.pageId) ?? null;
+    if (!page) return { element: null, detailsMode: 'empty' };
+    const refs = pageRefsFor(blocksOf(page));
+    const firstEl = refs
+      .map(id => elements.find(e => e.id === id))
+      .find((e): e is Element => Boolean(e)) ?? null;
+    return firstEl
+      ? { element: firstEl, detailsMode: 'element', caption: 'this page’s first featured element' }
+      : { element: null, detailsMode: 'empty' };
   }
   return { element: null, detailsMode: 'empty' };
 }
@@ -104,6 +164,13 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
   const graphSlot = document.createElement('div');
   graphSlot.className = 'atlas-context-pane-graph';
   root.appendChild(graphSlot);
+
+  // Anchor caption (T-CX3) — sits between the graph and the details slot;
+  // populated only when the subject was an anchored default (see setCaption).
+  const captionHost = document.createElement('div');
+  captionHost.className = 'atlas-context-pane-caption';
+  captionHost.dataset.state = 'hidden';
+  root.appendChild(captionHost);
 
   const belowGraph = document.createElement('div');
   belowGraph.className = 'atlas-context-pane-below';
@@ -140,7 +207,13 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
   let lastAppliedPrefs: ReturnType<typeof getWorldContextPrefs> | null = null;
 
   function routeKey(route: Route): string {
-    return `${route.mode}|${route.narrativeId ?? ''}|${route.elementId ?? ''}|${route.knowledgeId ?? ''}|${route.knowerId ?? ''}`;
+    return `${route.mode}|${route.narrativeId ?? ''}|${route.elementId ?? ''}|${route.knowledgeId ?? ''}|${route.knowerId ?? ''}|${route.pageId ?? ''}`;
+  }
+
+  /** Show or clear the anchor caption above the details slot. */
+  function setCaption(text: string | null): void {
+    captionHost.textContent = text ?? '';
+    captionHost.dataset.state = text ? 'visible' : 'hidden';
   }
 
   function hiddenEquals(a: Set<ElementType>, b: Set<ElementType>): boolean {
@@ -189,6 +262,7 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
   }
 
   function showEmpty(message: string): void {
+    setCaption(null);
     graphSlot.innerHTML = `<div class="atlas-context-pane-empty">${message}</div>`;
     listsHost.innerHTML = '';
     previewHost.innerHTML = '';
@@ -313,6 +387,8 @@ export function mountContextTab(opts: MountContextTabOpts): () => void {
     selectedId = null;
 
     currentRender = { mode: subject.detailsMode, subject: subject.element };
+    // Anchor caption rides with the subject (only anchored defaults set it).
+    setCaption(subject.caption ?? null);
 
     // No subject: show empty state and bail. Distinguish "no focus yet" from
     // "focus resolves to nothing in current data".
@@ -501,6 +577,12 @@ function emptyCopyForRoute(route: Route): string {
       return getKnowledgeRoomTab() === 'knowers'
         ? 'Open a knower to see their world.'
         : 'Open a knowledge entry to see its holders and subjects.';
+    case 'writing':
+      return 'Create a narrative to see its connections here.';
+    case 'share':
+      return route.pageId
+        ? 'Add an element card to see the elements this page features.'
+        : 'Open a page to see the elements it features.';
     case 'map':
       return 'Open an element or narrative to focus the graph.';
     default:

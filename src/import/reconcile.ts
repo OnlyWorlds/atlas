@@ -78,7 +78,12 @@ export function reconcile(
     const claimed = new Set<string>(); // existing ids claimed by a name match this type
     for (const raw of records) {
       const name = typeof raw.name === 'string' ? raw.name : '';
-      if (!name.trim()) {
+      // Pins and markers are unnamed by design (atlas creates them with an
+      // empty name) — dropping them here broke export→import round-trips
+      // for every unnamed spatial artifact (session 248, via the sample
+      // world). Everything else still requires a name.
+      const nameOptional = type === 'pin' || type === 'marker';
+      if (!name.trim() && !nameOptional) {
         report.invalidRecords++;
         continue;
       }
@@ -94,7 +99,8 @@ export function reconcile(
         const ex = existingById.get(rawId)!;
         if (!ex.name || normName(ex.name) === normName(name)) matched = ex;
       }
-      if (!matched && matchByName) {
+      if (!matched && matchByName && name.trim()) {
+        // Empty names never name-match (two unnamed pins are not "the same").
         const cand = existingByNameType.get(keyNT(type, name));
         if (cand && !claimed.has(cand.id)) matched = cand;
       }

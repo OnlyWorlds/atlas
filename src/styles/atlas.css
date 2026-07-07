@@ -6668,21 +6668,6 @@ a.atlas-writing-workspace-crumb-seg:hover {
   gap: 12px;
 }
 
-.atlas-writing-setup-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.atlas-writing-setup-field-label {
-  font-size: 12px;
-  color: var(--atlas-text-muted);
-}
-
-.atlas-writing-setup-input {
-  width: 100%;
-}
-
 .atlas-writing-setup-hint {
   font-size: 12px;
   color: var(--atlas-text-muted);
@@ -6714,44 +6699,6 @@ a.atlas-writing-workspace-crumb-seg:hover {
   background: var(--atlas-bg-panel);
 }
 
-.atlas-writing-setup-promote-row {
-  display: grid;
-  grid-template-columns: minmax(0, 140px) 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--atlas-divider);
-}
-
-.atlas-writing-setup-promote-row:last-of-type {
-  border-bottom: none;
-}
-
-.atlas-writing-setup-promote-row-tier {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--atlas-text);
-  grid-row: 1;
-}
-
-.atlas-writing-setup-promote-row-sample {
-  font-size: 12px;
-  color: var(--atlas-text-muted);
-  grid-row: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.atlas-writing-setup-promote-row-note {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  font-size: 11px;
-  color: var(--atlas-text-muted);
-  opacity: 0.75;
-  margin-top: 2px;
-}
-
 .atlas-writing-setup-promote-toggle {
   display: flex;
   align-items: center;
@@ -6767,6 +6714,201 @@ a.atlas-writing-workspace-crumb-seg:hover {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* WR1-WR4 setup redesign (session 247): visual nest, inline labels,
+   tech foldout, delta-only count table, skip consequence. */
+
+.atlas-writing-setup-lead {
+  font-size: 13px;
+  color: var(--atlas-text-muted);
+  margin: 8px 0 0 0;
+  line-height: 1.5;
+}
+.atlas-writing-setup-tech summary { margin-left: 4px; }
+
+.atlas-writing-setup-tech {
+  display: inline;
+}
+
+.atlas-writing-setup-tech summary {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  cursor: pointer;
+  list-style: none;
+  color: var(--atlas-text-muted);
+}
+
+.atlas-writing-setup-tech summary::-webkit-details-marker {
+  display: none;
+}
+
+.atlas-writing-setup-tech .atlas-writing-setup-tech-icon {
+  font-size: 15px;
+  opacity: 0.7;
+}
+
+.atlas-writing-setup-tech summary:hover .atlas-writing-setup-tech-icon {
+  opacity: 1;
+  color: var(--atlas-cyan);
+}
+
+.atlas-writing-setup-tech .atlas-writing-setup-tech-body {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+/* --- The tier nest (Book > Chapter > Scene) + floating Draft --- */
+
+.atlas-writing-setup-nest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atlas-writing-setup-nest-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+
+.atlas-writing-setup-nest-row[data-depth="1"] {
+  padding-left: 22px;
+}
+
+.atlas-writing-setup-nest-row[data-depth="2"] {
+  padding-left: 44px;
+}
+
+.atlas-writing-setup-nest-connector {
+  font-size: 18px;
+  color: var(--atlas-text-muted);
+  opacity: 0.55;
+}
+
+.atlas-writing-setup-nest-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px dashed var(--atlas-divider);
+  border-radius: 6px;
+  background: var(--atlas-bg-panel);
+}
+
+.atlas-writing-setup-nest-draft-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-writing-setup-nest-badge {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--atlas-text-muted);
+  border: 1px solid var(--atlas-divider);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+/* --- Inline-editable label: reads as text, click to edit --- */
+
+.atlas-writing-setup-label-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.atlas-writing-setup-label {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--atlas-text);
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  padding: 2px 2px;
+  /* Inputs don't shrink-to-content: a fixed short width keeps the detected-
+     value suggestion sitting right beside the label instead of mid-air. */
+  width: 110px;
+  border-radius: 0;
+}
+
+.atlas-writing-setup-label:hover {
+  border-bottom-color: var(--atlas-divider);
+}
+
+.atlas-writing-setup-label:focus {
+  outline: none;
+  border-bottom-color: var(--atlas-cyan);
+}
+
+.atlas-writing-setup-label-wrap .atlas-writing-setup-label-pencil {
+  font-size: 14px;
+  color: var(--atlas-text-muted);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.atlas-writing-setup-label-wrap:hover .atlas-writing-setup-label-pencil,
+.atlas-writing-setup-label:focus + .atlas-writing-setup-label-pencil {
+  opacity: 0.5;
+}
+
+/* --- Existing-narratives count table (delta-only) --- */
+
+.atlas-writing-setup-promote-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.atlas-writing-setup-promote-trow td {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--atlas-divider);
+}
+
+.atlas-writing-setup-promote-trow:last-child td {
+  border-bottom: none;
+}
+
+.atlas-writing-setup-promote-tier {
+  color: var(--atlas-text);
+  font-weight: 500;
+}
+
+/* td.-prefixed: the .atlas-writing-setup-promote-trow td shorthand (0,1,1)
+   would out-specify a bare class and zero the right padding. */
+td.atlas-writing-setup-promote-count {
+  color: var(--atlas-text-muted);
+  text-align: right;
+  width: 3em;
+  padding-right: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-writing-setup-promote-delta {
+  color: var(--atlas-text-muted);
+  opacity: 0.75;
+  font-size: 12px;
+  width: 60%;
+}
+
+/* --- Skip consequence line (Part 3 copy rule #5) --- */
+
+.atlas-writing-setup-skip-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  opacity: 0.75;
+  line-height: 1.5;
 }
 
 /* ---- Search room (src/middle/search.ts) ---- */
@@ -6881,6 +7023,23 @@ a.atlas-writing-workspace-crumb-seg:hover {
   color: var(--atlas-text-muted);
   max-width: 680px;
   line-height: 1.5;
+}
+
+/* WR5: tier-label affordance on the writing landing header. */
+.atlas-writing-landing-labels {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  opacity: 0.8;
+}
+
+.atlas-writing-landing-labels-edit {
+  color: var(--atlas-cyan);
+  text-decoration: none;
+}
+
+.atlas-writing-landing-labels-edit:hover {
+  text-decoration: underline;
 }
 
 .atlas-room-hint {
@@ -9605,6 +9764,29 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-cyan);
   opacity: 1;
 }
+/* Label-budget pass (T-CX2): on dense graphs, lower-priority labels hide to
+   avoid a colliding hairball; hover brings the label back. */
+.atlas-context-graph-node.is-label-hidden .atlas-context-graph-node-label {
+  opacity: 0;
+}
+.atlas-context-graph-node.is-label-hidden:hover .atlas-context-graph-node-label {
+  opacity: 1;
+}
+
+/* Anchor caption (T-CX3): a muted one-liner explaining WHY this element is
+   shown when the pane anchored a default (charts / knowledge list / share page /
+   writing landing) rather than the user focusing it. Hidden for direct focus. */
+.atlas-context-pane-caption {
+  flex: 0 0 auto;
+  padding: 4px 12px 0;
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--atlas-text-muted);
+  text-align: center;
+}
+.atlas-context-pane-caption[data-state='hidden'] {
+  display: none;
+}
 
 .atlas-context-pane-below {
   flex: 1 1 auto;
@@ -10543,4 +10725,30 @@ body.atlas-share-fullpreview > * {
   max-width: 880px;
   margin: 0 auto;
   padding: 40px 28px;
+}
+
+/* ==== Bout HELP — the ? overlay (D8, session 248) ==== */
+.atlas-help-purpose {
+  margin: 0 0 14px 0;
+  font-size: 13px;
+  color: var(--atlas-text);
+  line-height: 1.5;
+}
+.atlas-help-can-head {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--atlas-text-muted);
+}
+.atlas-help-can {
+  margin: 0 0 4px 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--atlas-text-muted);
+  line-height: 1.7;
+}
+.atlas-help-can li::marker { color: var(--atlas-cyan); }
+.atlas-help-divider {
+  border-top: 1px solid var(--atlas-divider);
+  margin: 14px 0;
 }

@@ -395,3 +395,33 @@ describe('reconcile — adversarial review regressions (session 241)', () => {
     expect(plan.creates[0].data.birthplace).toBe(U.loc);
   });
 });
+
+// ---- Unnamed spatial artifacts survive import (session 248 round-trip fix) --
+
+describe('unnamed pins/markers round-trip (session 248)', () => {
+  it('keeps unnamed pins and markers as creates; empty names never name-match', () => {
+    const parsed = parsePayload({
+      Location: [{ id: '068e5012-d77c-799d-8000-0000000000e1', name: 'Keep' }],
+      Map: [{ id: '068e5012-d77c-799d-8000-0000000000e2', name: 'M', width: 100, height: 100 }],
+      Pin: [
+        { id: '068e5012-d77c-799d-8000-0000000000e3', name: '', map: '068e5012-d77c-799d-8000-0000000000e2', element: '068e5012-d77c-799d-8000-0000000000e1', x: 1, y: 2 },
+        { id: '068e5012-d77c-799d-8000-0000000000e4', name: '', map: '068e5012-d77c-799d-8000-0000000000e2', element: '068e5012-d77c-799d-8000-0000000000e1', x: 3, y: 4 },
+      ],
+      Marker: [
+        { id: '068e5012-d77c-799d-8000-0000000000e5', name: '', map: '068e5012-d77c-799d-8000-0000000000e2', zone: '068e5012-d77c-799d-8000-0000000000e6', x: 5, y: 6 },
+      ],
+    });
+    const plan = reconcile(parsed, [], { genId: genIdFactory() });
+    expect(plan.report.invalidRecords).toBe(0);
+    const types = plan.creates.map(c => c.type);
+    expect(types.filter(t => t === 'pin')).toHaveLength(2); // both unnamed pins kept, NOT merged
+    expect(types.filter(t => t === 'marker')).toHaveLength(1);
+  });
+
+  it('still rejects unnamed CONTENT elements', () => {
+    const parsed = parsePayload({ Character: [{ name: '' }, { name: 'Ok' }] });
+    const plan = reconcile(parsed, [], { genId: genIdFactory() });
+    expect(plan.report.invalidRecords).toBe(1);
+    expect(plan.creates).toHaveLength(1);
+  });
+});

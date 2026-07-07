@@ -15,7 +15,7 @@
  */
 
 import { getState, patchSlice, subscribe } from '../core/state';
-import { onHashChange, parseHash, navigate, writingHash } from '../core/router';
+import { onHashChange, parseHash, navigate, writingHash, settingsHash } from '../core/router';
 import { ToastManager } from '../ui/toast-manager';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import { getActiveStore } from '../core/active-store';
@@ -183,6 +183,7 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
       roomHeader.innerHTML = `
         <h1>Writing</h1>
         <p class="atlas-room-subtitle">Your world's long-form writing.</p>
+        <p class="atlas-writing-landing-labels">labels: ${escapeText(labels.l1)} › ${escapeText(labels.l2)} › ${escapeText(labels.l3)} · <a class="atlas-writing-landing-labels-edit" href="${escapeText(settingsHash(active.worldId, 'writing'))}">edit</a></p>
       `;
       detailSlot.appendChild(roomHeader);
 
