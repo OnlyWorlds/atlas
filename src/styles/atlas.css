@@ -5272,7 +5272,8 @@ svg .atlas-zone-selected {
 
 .atlas-home-recent-row {
   display: grid;
-  grid-template-columns: 24px 1fr auto auto;
+  /* 5 tracks: icon | name | room-of-edit (may be absent; track collapses) | type | time */
+  grid-template-columns: 24px 1fr auto auto auto;
   align-items: center;
   gap: 10px;
   padding: 6px 10px;
@@ -7026,29 +7027,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
   margin: 0 0 10px 0;
 }
 
-.atlas-knowledge-holder-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 0;
-  border-top: 1px solid var(--atlas-divider);
-}
-
-.atlas-knowledge-holder-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.atlas-knowledge-holder-label {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.atlas-knowledge-holder-hint {
-  font-size: 11px;
-  color: var(--atlas-text-muted);
-}
+/* Holder sub-rows superseded by the single WHO-zone band (D4, session 248). */
 
 .atlas-knowledge-chips {
   display: flex;
@@ -7583,6 +7562,118 @@ a.atlas-writing-workspace-crumb-seg:hover {
   justify-content: center;
   font-size: 11px;
   color: var(--atlas-text-soft);
+}
+
+/* ---- Bout IE polish (IE3/IE5/IE6/IE7 + D8) ---- */
+
+/* IE6: one-line framing for the bring-in tab. */
+.atlas-import-lead {
+  margin: 2px 0 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--atlas-text-muted);
+  max-width: 560px;
+}
+
+/* IE5: a larger drop target and a paste box that grows with content. These
+   override the base rules above (same specificity, later wins). */
+.atlas-import-drop {
+  padding: 40px 24px;
+  gap: 7px;
+}
+.atlas-import-drop .material-symbols-outlined { font-size: 38px; }
+
+.atlas-import-paste {
+  min-height: 132px;
+  resize: none; /* height is managed by autoGrow */
+}
+
+/* IE6: live validity border + inline read-out. */
+.atlas-import-paste.is-valid { border-color: var(--atlas-success); }
+.atlas-import-paste.is-invalid { border-color: var(--atlas-danger); }
+.atlas-import-paste.is-valid:focus { border-color: var(--atlas-success); }
+.atlas-import-paste.is-invalid:focus { border-color: var(--atlas-danger); }
+
+.atlas-import-live {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.atlas-import-live.is-valid { color: var(--atlas-success); }
+.atlas-import-live.is-invalid { color: var(--atlas-danger); }
+
+/* IE7: example JSON links sit at the right of the paste actions row. */
+.atlas-import-paste-actions .atlas-import-example {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.atlas-import-example-sep { color: var(--atlas-text-dim); font-size: 11px; }
+
+/* D8: quiet "bring notes from anywhere" section below the main flow. */
+.atlas-import-ai {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--atlas-divider);
+  background: var(--atlas-bg-panel);
+}
+.atlas-import-ai > .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--atlas-text-muted);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.atlas-import-ai-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.atlas-import-ai-lead { margin: 0; font-size: 12px; line-height: 1.5; color: var(--atlas-text-muted); }
+.atlas-import-ai-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+/* IE3: grouped two-column take-out type list (content | spatial). */
+.atlas-import-typelist { margin: 10px 0; }
+.atlas-import-type-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--atlas-divider);
+  cursor: pointer;
+}
+.atlas-import-type-all input { accent-color: var(--atlas-cyan); margin: 0; }
+.atlas-import-type-all-label { font-size: 12px; font-weight: 600; color: var(--atlas-text); }
+.atlas-import-type-all-count { margin-left: auto; font-size: 11px; color: var(--atlas-text-muted); }
+
+.atlas-import-type-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 20px;
+}
+.atlas-import-type-col { display: flex; flex-direction: column; }
+.atlas-import-type-col-empty { margin: 6px 2px; font-size: 11px; color: var(--atlas-text-dim); }
+
+.atlas-import-type-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--atlas-text-soft);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.atlas-import-type-row:hover { background: var(--atlas-bg-hover); }
+.atlas-import-type-icon { font-size: 17px; color: var(--atlas-text-muted); flex-shrink: 0; }
+.atlas-import-type-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atlas-import-type-row .atlas-import-type-count { font-size: 11px; color: var(--atlas-text-muted); }
+.atlas-import-type-row input { accent-color: var(--atlas-cyan); margin: 0; flex-shrink: 0; }
+
+@media (max-width: 560px) {
+  .atlas-import-type-cols { grid-template-columns: 1fr; }
+  .atlas-import-type-col-empty { display: none; }
 }
 
 /* ---- Share room (DESIGN_SHARING.md — Track B) ---- */
@@ -10193,6 +10284,16 @@ a.atlas-share-map-pin { cursor: pointer; }
   vertical-align: middle;
 }
 
+/* Reserved-taxonomy row mark (D9b) — grey sparkle left of the sidebar type
+   label; grey (not cyan) so it reads as metadata at list density. */
+.atlas-row-reserved {
+  font-size: 11px !important;
+  color: var(--atlas-text-muted);
+  opacity: 0.6;
+  cursor: help;
+  flex: 0 0 auto;
+}
+
 /* Sidebar sub-filter chips (D9b lever 3) — second small chip row when the
    filter strip narrows to exactly one type. */
 .atlas-subfilter-row {
@@ -10215,3 +10316,231 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-subfilter-chip:hover { color: var(--atlas-text); }
 .atlas-subfilter-chip.active { color: var(--atlas-cyan); border-color: var(--atlas-cyan); }
 .atlas-subfilter-chip.sub { font-size: 9px; opacity: 0.85; }
+
+/* ==== Bout H — home cover-page × study-desk (workplan D2, session 248) ==== */
+
+.atlas-home-cover {
+  height: 160px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 18px;
+  border: 1px solid var(--atlas-divider);
+}
+
+.atlas-home-links {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+}
+.atlas-home-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.atlas-home-link:hover { color: var(--atlas-cyan); }
+
+/* Cast slot (D2b): protagonist + home cards. */
+.atlas-home-cast {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+.atlas-home-cast-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--atlas-divider);
+  border-radius: 6px;
+  padding: 8px 14px 8px 10px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.atlas-home-cast-card:hover {
+  border-color: var(--atlas-cyan-soft, rgba(34, 211, 238, 0.4));
+  background: rgba(255, 255, 255, 0.04);
+}
+.atlas-home-cast-face {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  flex: 0 0 auto;
+}
+.atlas-home-cast-icon {
+  font-size: 26px !important;
+  color: var(--atlas-text-muted);
+}
+.atlas-home-cast-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.atlas-home-cast-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--atlas-text);
+}
+.atlas-home-cast-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--atlas-text-muted);
+}
+.atlas-home-cast-role .material-symbols-outlined { font-size: 12px; }
+
+/* The woven stat line — replaces the count-card grid. */
+.atlas-home-statline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--atlas-text-muted);
+}
+.atlas-home-statline-seg {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.atlas-home-statline-seg b {
+  color: var(--atlas-text);
+  font-weight: 500;
+}
+.atlas-home-statline-seg:hover { color: var(--atlas-cyan); }
+.atlas-home-statline-seg:hover b { color: var(--atlas-cyan); }
+.atlas-home-statline-sep { opacity: 0.45; }
+
+/* The desk: continue strip + recent. */
+.atlas-home-desk { margin-top: 26px; }
+.atlas-home-continue { margin-bottom: 20px; }
+.atlas-home-continue-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 560px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--atlas-text);
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+}
+.atlas-home-continue-row:hover { background: rgba(255, 255, 255, 0.04); }
+.atlas-home-continue-row .material-symbols-outlined {
+  font-size: 17px;
+  color: var(--atlas-cyan);
+  flex: 0 0 auto;
+}
+.atlas-home-continue-verb {
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+.atlas-home-continue-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atlas-home-continue-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  flex: 0 0 auto;
+}
+
+/* Recent rows gained a room-of-edit label (H5). */
+.atlas-home-recent-room {
+  font-size: 10px;
+  color: var(--atlas-cyan);
+  opacity: 0.75;
+  flex: 0 0 auto;
+}
+
+/* Element-detail header: cast-favorite toggle (D2b). */
+.atlas-header-favorite.active .material-symbols-outlined {
+  color: var(--atlas-cyan);
+}
+
+/* ==== Bout S — share simplification (D5/T-S7/S3, session 248) ==== */
+
+/* T-S7: the slim meta summary row (theme swatch + words + publish state). */
+.atlas-share-meta-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--atlas-divider);
+  border-radius: 5px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease;
+}
+.atlas-share-meta-summary:hover { border-color: var(--atlas-cyan-soft, rgba(34, 211, 238, 0.4)); }
+.atlas-share-meta-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.atlas-share-meta-pub[data-state="live"] { color: var(--atlas-cyan); }
+.atlas-share-meta-pub[data-state="revoked"] { color: var(--atlas-warn); }
+.atlas-share-meta-chevron {
+  margin-left: auto;
+  font-size: 16px !important;
+}
+
+/* D5b: embeddable-suggestions line under the add-block menu. */
+.atlas-share-embeddable-hint {
+  margin: 6px 0 0 2px;
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  opacity: 0.8;
+}
+
+/* Share list empty-state use-case examples (D5). */
+.atlas-share-empty-examples {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--atlas-cyan);
+  opacity: 0.8;
+}
+
+/* S3: the standalone full-page preview document body. */
+body.atlas-share-fullpreview {
+  margin: 0;
+  min-height: 100vh;
+  background: #000;
+}
+body.atlas-share-fullpreview > * {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 40px 28px;
+}

@@ -60,7 +60,7 @@ async function setPageTitle(page: Page, name: string) {
   await expect(title).toHaveText(name);
 }
 
-test('create page → detail; rename + revert both persist; intent change sticks', async ({ page }) => {
+test('create page → detail; rename + revert both persist; intent stays hidden but defaulted', async ({ page }) => {
   await setupWorld(page);
   await openShare(page);
 
@@ -69,6 +69,8 @@ test('create page → detail; rename + revert both persist; intent change sticks
   await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
   await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
   await expect(page.locator('[data-action="copy-payload"]')).toBeVisible();
+  // T-S7: Theme + Publish sit behind the meta summary row — expand first.
+  await page.click('.atlas-share-meta-summary');
   // S4 gating: a local-only world can't publish — the section says why and
   // offers no controls.
   await expect(page.locator('.atlas-share-publish-hint')).toContainText('online world');
@@ -83,21 +85,21 @@ test('create page → detail; rename + revert both persist; intent change sticks
   await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
   await setPageTitle(page, 'barovia primer');
 
-  // Intent: defaults to show; change to reference persists to the element.
-  await expect(page.locator('select.atlas-share-intent')).toHaveValue('show');
-  await page.selectOption('select.atlas-share-intent', 'reference');
+  // D5 (v1): the intent PICKER is gone from the UI — but the FIELD must
+  // stay defaulted on the element (hidden ≠ deleted; the wire expects it).
+  await expect(page.locator('select.atlas-share-intent')).toHaveCount(0);
   await page.waitForFunction(() => {
     const s = (window as any).__atlasTestApi.getState();
     return s.data.elements.some((e: any) =>
-      e.type === 'narrative' && e.subtype === 'page' && e.atlas_page_intent === 'reference');
+      e.type === 'narrative' && e.subtype === 'page' && e.atlas_page_intent === 'show');
   });
 
-  // Back to the list — the page row shows name + intent chip + empty summary.
+  // Back to the list — the page row shows name + empty summary (no intent chip).
   await page.click('.atlas-drillin-prefix');
   await expect(page).toHaveURL(/\/share$/);
   const row = page.locator('.atlas-share-row', { hasText: 'barovia primer' });
   await expect(row).toBeVisible();
-  await expect(row.locator('.atlas-share-intent-chip')).toHaveText('reference');
+  await expect(row.locator('.atlas-share-intent-chip')).toHaveCount(0);
   await expect(row.locator('.atlas-share-row-meta')).toHaveText('empty');
 
   // A second create gets a unique default name.
@@ -408,11 +410,13 @@ test('circle block: the Knowledge bridge mints a page; compiled entries render; 
   await expect(circleBlock.locator('.atlas-share-circle-name')).toHaveText('the party');
   await expect(circleBlock.locator('.atlas-share-circle-entry-title')).toHaveText('the mists');
   await expect(circleBlock).toContainText('The mists never lift.');
-  await expect(page.locator('select.atlas-share-intent')).toHaveValue('reference');
+  // D5: no picker — the bridge-minted page still carries intent 'reference'
+  // in the model (hidden field, wire compat).
   await page.waitForFunction(() => {
     const s = (window as any).__atlasTestApi.getState();
     const p = s.data.elements.find((e: any) => e.type === 'narrative' && e.subtype === 'page');
-    return p && typeof p.story === 'string' && p.story.includes('[ the party — circle knowledge ]');
+    return p && p.atlas_page_intent === 'reference'
+      && typeof p.story === 'string' && p.story.includes('[ the party — circle knowledge ]');
   });
 
   // Visitor preview (payload-true): the FROZEN entry renders; the prose

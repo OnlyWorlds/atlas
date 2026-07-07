@@ -14,6 +14,7 @@ import { onHashChange, navigate, elementHash } from '../core/router';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { lensKnownSet } from '../core/knowledge';
+import { reservedRowHint } from '../core/taxonomy';
 import { ToastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { getCurrentSyncEngine, pullNowAndRefresh } from '../sync/sync-attach';
@@ -131,8 +132,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
     }
     return [...counts.keys()]
-      .sort((a, b) => (counts.get(b)! - counts.get(a)!) || a.localeCompare(b))
-      .slice(0, 12);
+      .sort((a, b) => (counts.get(b)! - counts.get(a)!) || a.localeCompare(b));
   }
 
   function renderSubFilters(): void {
@@ -148,13 +148,24 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       subFilterType = single; superFilter = null; subtypeFilter = null;
     }
     const supers = taxonomyValues(state.data.elements, single, 'supertype', null);
-    if (supers.length === 0 && !superFilter) {
+    // A selected value that no longer exists in the world (last holder edited
+    // away) would leave a filter active with no chip to click off — auto-clear
+    // instead of stranding the user on an empty list.
+    if (superFilter && !supers.includes(superFilter)) {
+      superFilter = null;
+      subtypeFilter = null;
+    }
+    if (superFilter && subtypeFilter
+      && !taxonomyValues(state.data.elements, single, 'subtype', superFilter).includes(subtypeFilter)) {
+      subtypeFilter = null;
+    }
+    if (supers.length === 0) {
       subFilterRow.hidden = true;
       return;
     }
     subFilterRow.hidden = false;
     subFilterRow.innerHTML = '';
-    for (const v of supers) {
+    for (const v of supers.slice(0, 12)) {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'atlas-subfilter-chip' + (superFilter === v ? ' active' : '');
@@ -169,7 +180,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     }
     // Second tier: subtypes within the chosen supertype.
     if (superFilter) {
-      for (const v of taxonomyValues(state.data.elements, single, 'subtype', superFilter)) {
+      for (const v of taxonomyValues(state.data.elements, single, 'subtype', superFilter).slice(0, 12)) {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'atlas-subfilter-chip sub' + (subtypeFilter === v ? ' active' : '');
@@ -510,12 +521,20 @@ function renderElementRow(
   // be pin targets either (constructed via markers, never pinned). Setting
   // the attribute selectively avoids even the start gesture.
   const draggable = (el.type !== 'map' && el.type !== 'zone') ? 'draggable="true"' : '';
+  // Reserved-taxonomy mark (D9b): quiet grey sparkle left of the type label
+  // when the element's supertype/subtype carries atlas semantics (writing
+  // tier / knowledge / page / circle). Same mark family as element detail.
+  const reserved = reservedRowHint(el);
+  const reservedBadge = reserved
+    ? `<span class="material-symbols-outlined atlas-row-reserved" title="${escapeAttr(reserved)}">auto_awesome</span>`
+    : '';
   return `
     <div class="${cls}" ${draggable} data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}"${flashAttr} role="button" tabindex="0">
       <span class="material-symbols-outlined">${icon}</span>
       <span class="atlas-row-main">${escapeText(el.name || '(unnamed)')}</span>
       ${mapBadge}
       ${onMapBadge}
+      ${reservedBadge}
       <span class="atlas-row-meta">${escapeText(el.type)}</span>
     </div>
   `;

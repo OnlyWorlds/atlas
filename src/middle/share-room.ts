@@ -30,7 +30,7 @@ import { getEditorSettings } from '../registry/registry';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { escapeText } from '../core/dom-utils';
 import {
-  PAGE_SUBTYPE, PAGE_INTENTS, PAGE_INTENT_HINTS, type PageIntent,
+  PAGE_SUBTYPE,
   isPageNarrative, listPages, pageIntentOf, blocksOf, blockSummary,
   findUniquePageName, newBlockId, pageBlocksPatch, pagePubOf, pageContentSig,
   pageThemeOf, PAGE_THEME_ACCENTS, PAGE_THEME_FONTS, type PageTheme,
@@ -64,6 +64,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   let mountedResolved = true;
   // Visitor preview toggle (detail view) — ephemeral, resets on view switch.
   let previewMode = false;
+  // T-S7 meta row (Theme + Publish) expanded state — ephemeral, collapsed by
+  // default so Blocks lead; resets on view switch.
+  let metaExpanded = false;
   // Elements ref at last build — same-view ticks skip work when the data
   // didn't change (hash-echo renders, ui-slice patches).
   let lastBuiltElementsRef: readonly Element[] | null = null;
@@ -1205,6 +1208,53 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     addRow.appendChild(addBtn('show_chart', '+ chart', () => { void addChartBlock(pageId); }, 'A saved chart from the Charts room'));
     addRow.appendChild(addBtn('groups', '+ circle', () => { void addCircleBlock(pageId); }, 'A frozen snapshot of what a circle knows'));
     blocksHost.appendChild(addRow);
+
+    // Embeddable-suggestions (D5b): a quiet discoverability line — what the
+    // world already offers as blocks. Only non-zero kinds; hidden when none.
+    const els = getState().data.elements;
+    const circleCount = els.filter(e => e.type === 'collective'
+      && String((e as Record<string, unknown>).subtype ?? '').toLowerCase() === 'circle').length;
+    const mapCount = els.filter(e => e.type === 'map'
+      && typeof (e as Record<string, unknown>).image_url === 'string'
+      && ((e as Record<string, unknown>).image_url as string).trim()).length;
+    const chartCount = pageCharts.length;
+    const parts: string[] = [];
+    if (circleCount) parts.push(`${circleCount} circle${circleCount === 1 ? '' : 's'}`);
+    if (chartCount) parts.push(`${chartCount} saved chart${chartCount === 1 ? '' : 's'}`);
+    if (mapCount) parts.push(`${mapCount} map${mapCount === 1 ? '' : 's'}`);
+    if (parts.length > 0) {
+      const hint = document.createElement('p');
+      hint.className = 'atlas-share-embeddable-hint';
+      hint.textContent = `from your world: ${parts.join(' · ')}`;
+      blocksHost.appendChild(hint);
+    }
+  }
+
+  /**
+   * S3 — open a payload-true full-page preview in a NEW TAB as a standalone
+   * document. Styles are serialized from the live document (vite injects
+   * <style> tags in dev; the built CSS <link> is same-origin in prod — both
+   * are readable via cssRules), so the blob page renders exactly like the
+   * in-app preview with zero routing or shell changes. Cross-origin sheets
+   * (Google Fonts) can't be read — their <link> tags are copied instead.
+   */
+  function openFullPagePreview(page: Element): void {
+    const payload = buildPagePayload(page, getState().data.elements, pageCharts);
+    const pageEl = renderPayloadPage(payload);
+    let css = '';
+    for (const sheet of Array.from(document.styleSheets)) {
+      try {
+        for (const rule of Array.from(sheet.cssRules)) css += rule.cssText + '\n';
+      } catch { /* cross-origin — covered by the copied <link>s below */ }
+    }
+    const fontLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"], link[rel="preconnect"]'))
+      .filter(l => l.href.includes('fonts.googleapis') || l.href.includes('fonts.gstatic'))
+      .map(l => l.outerHTML).join('');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeText(page.name || 'page preview')}</title>${fontLinks}<style>${css}</style></head><body class="atlas-share-fullpreview">${pageEl.outerHTML}</body></html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000); // tab has loaded by then
   }
 
   /** Inline link to a Settings tab — used by the Publish prerequisite hints (A6). */
@@ -1765,6 +1815,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           A page is a stack of blocks — headings, prose, element cards — built
           from your world's elements. Create one to start composing.
         </p>
+        <p class="atlas-share-empty-examples">a character showcase · a player handout · a world landing page</p>
       `;
       root.appendChild(empty);
       return;
@@ -1773,7 +1824,6 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const list = document.createElement('div');
     list.className = 'atlas-share-list';
     for (const page of pages) {
-      const intent = pageIntentOf(page);
       const blocks = blocksOf(page);
       const pub = pagePubOf(page);
       const pubBadge = pub && !pub.revoked
@@ -1791,7 +1841,6 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           <span class="atlas-share-row-meta">${escapeText(blockSummary(blocks))}</span>
         </span>
         ${pubBadge}
-        <span class="atlas-share-intent-chip" data-intent="${intent}">${intent}</span>
       `;
       row.addEventListener('click', () => navigate(shareHash(worldId, page.id)));
       list.appendChild(row);
@@ -1858,6 +1907,22 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       })();
     });
     header.appendChild(previewBtn);
+    // S3: full-page preview in its OWN tab — payload-true, standalone document.
+    const fullPreview = document.createElement('button');
+    fullPreview.type = 'button';
+    fullPreview.className = 'atlas-share-preview-toggle';
+    fullPreview.dataset.action = 'full-preview';
+    fullPreview.title = 'Open a full-page preview in a new tab';
+    fullPreview.innerHTML = `<span class="material-symbols-outlined">open_in_new</span> full page`;
+    fullPreview.addEventListener('click', () => {
+      void (async () => {
+        await commitOpenEdit(pageId);
+        await writeChain; // pending edits land before the snapshot
+        const current = elOf(pageId);
+        if (current) openFullPagePreview(current);
+      })();
+    });
+    header.appendChild(fullPreview);
     // Copy the §5 publish payload — inspection/debugging affordance (and the
     // concrete artifact for backend contract review).
     const copyPayload = document.createElement('button');
@@ -1907,31 +1972,22 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
 
     // (Name lives in the header as the editable title — no separate field.)
 
-    // Intent
-    const intentField = document.createElement('div');
-    intentField.className = 'atlas-share-field';
-    intentField.innerHTML = `<label class="atlas-share-field-label">Intent</label>`;
-    const intentSelect = document.createElement('select');
-    intentSelect.className = 'atlas-select atlas-share-intent';
-    for (const i of PAGE_INTENTS) {
-      const opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = `${i}: ${PAGE_INTENT_HINTS[i]}`;
-      intentSelect.appendChild(opt);
+    // D5 (v1): the intent PICKER is removed — the three intents were
+    // behaviorally identical and confused their own designer. The FIELD
+    // stays: `atlas_page_intent` is still defaulted on create and still
+    // ships on the wire (publish/republish send pageIntentOf — the fakes
+    // and the server expect it). Hidden ≠ deleted; it returns WITH real
+    // behavior post-launch.
+
+    // T-S7: Theme + Publish collapse behind a slim summary row so Blocks —
+    // the actual content — start on the first screenful.
+    body.appendChild(buildMetaSummary(page, pageId));
+    if (metaExpanded) {
+      // Theme — S3 (curated tokens; applies to preview + published page).
+      body.appendChild(buildThemeSection(page));
+      // Publish — S4 (api-linked worlds; frozen-only per contract v0.3).
+      body.appendChild(buildPublishSection(page));
     }
-    intentSelect.value = pageIntentOf(page);
-    intentSelect.addEventListener('change', () => {
-      const v = intentSelect.value as PageIntent;
-      if ((PAGE_INTENTS as string[]).includes(v)) void patchPage(pageId, { atlas_page_intent: v });
-    });
-    intentField.appendChild(intentSelect);
-    body.appendChild(intentField);
-
-    // Theme — S3 (curated tokens; applies to preview + published page).
-    body.appendChild(buildThemeSection(page));
-
-    // Publish — S4 (api-linked worlds; frozen-only per contract v0.3).
-    body.appendChild(buildPublishSection(page));
 
     // Blocks — the builder.
     const blocksSection = document.createElement('section');
@@ -1942,6 +1998,56 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     blocksSection.appendChild(blocksHost);
     body.appendChild(blocksSection);
     renderBlocks(pageId);
+  }
+
+  /**
+   * T-S7 — the slim meta row: accent swatch + theme words + publish state,
+   * click to expand/collapse the full Theme + Publish sections. Collapsed by
+   * default so the page opens on its content.
+   */
+  function buildMetaSummary(page: Element, pageId: string): HTMLElement {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'atlas-share-meta-summary' + (metaExpanded ? ' is-open' : '');
+    row.title = metaExpanded ? 'Collapse theme and publish settings' : 'Theme and publish settings';
+
+    const theme = pageThemeOf(page);
+    const accent = theme.accent ?? PAGE_THEME_ACCENTS[0].hex;
+    const swatch = document.createElement('span');
+    swatch.className = 'atlas-share-meta-swatch';
+    swatch.style.background = accent;
+    row.appendChild(swatch);
+
+    const themeWords = document.createElement('span');
+    themeWords.className = 'atlas-share-meta-words';
+    themeWords.textContent = `${theme.font ?? 'clean'} · ${theme.mode ?? 'dark'}`;
+    row.appendChild(themeWords);
+
+    const pub = pagePubOf(page);
+    const pubState = document.createElement('span');
+    pubState.className = 'atlas-share-meta-pub';
+    if (pub && !pub.revoked) {
+      pubState.textContent = `live · /${pub.slug}`;
+      pubState.dataset.state = 'live';
+    } else if (pub?.revoked) {
+      pubState.textContent = 'revoked';
+      pubState.dataset.state = 'revoked';
+    } else {
+      pubState.textContent = 'not published';
+      pubState.dataset.state = 'none';
+    }
+    row.appendChild(pubState);
+
+    const chev = document.createElement('span');
+    chev.className = 'material-symbols-outlined atlas-share-meta-chevron';
+    chev.textContent = metaExpanded ? 'expand_less' : 'expand_more';
+    row.appendChild(chev);
+
+    row.addEventListener('click', () => {
+      metaExpanded = !metaExpanded;
+      rebuildPreservingScroll(() => buildDetail(pageId));
+    });
+    return row;
   }
 
   /**
@@ -2001,6 +2107,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // commits explicitly; this is the defensive path for direct URL changes).
     flushAndTeardown(mountedView);
     previewMode = false;
+    metaExpanded = false;
     mountedView = tgt;
     if (tgt === 'list') buildList();
     else buildDetail(tgt);

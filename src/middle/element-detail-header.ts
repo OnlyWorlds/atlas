@@ -19,7 +19,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
-import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/registry';
+import { getEditorSettings, setEditorSettings, saveRegistry, setWorldFavoriteElement } from '../registry/registry';
 import {
   parseHash, navigate, homeHash, elementHash, writingHash, mapHash,
 } from '../core/router';
@@ -131,6 +131,11 @@ export function renderHeader(el: Element): HTMLElement {
   // get [+map] so the affordance to start is always visible.
   renderMapPinClusters(el, header);
 
+  // Cast-favorite assignment (D2b): characters can be the world's
+  // protagonist, locations its home. Renders on the home cover's cast slot.
+  const favBtn = buildFavoriteAction(el);
+  if (favBtn) header.appendChild(favBtn);
+
   // Per-element save/sync indicator. Local-only world = always "saved"
   // (synchronous disk write). Api-linked + local stamp > server stamp =
   // pending push (autosave debounce will fire soon).
@@ -232,6 +237,43 @@ function startInlineNameEdit(host: HTMLElement, el: Element): void {
     }
     void commit();
   });
+}
+
+// ====== Cast favorite (D2b) ======
+
+/**
+ * The protagonist / home assignment toggle. Characters → 'protagonist',
+ * locations → 'nexus' (shown to users as "home"). Stored on the registry
+ * entry (atlas-local); the home cover renders whoever holds the slot.
+ */
+function buildFavoriteAction(el: Element): HTMLElement | null {
+  if (el.type !== 'character' && el.type !== 'location') return null;
+  const worldId = getState().active?.worldId;
+  if (!worldId) return null;
+  const kind = el.type === 'character' ? 'protagonist' : 'nexus';
+  const label = kind === 'protagonist' ? 'protagonist' : 'home';
+  const icon = kind === 'protagonist' ? 'person_pin' : 'home_pin';
+  const favorites = getState().registry.worlds.find(w => w.id === worldId)?.favorites;
+  const currentId = kind === 'protagonist' ? favorites?.protagonist_id : favorites?.nexus_id;
+  const isSet = currentId === el.id;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'atlas-icon-btn-sm atlas-header-favorite' + (isSet ? ' active' : '');
+  btn.setAttribute('data-action', 'set-cast-favorite');
+  btn.title = isSet
+    ? `This is the world's ${label} — click to unset`
+    : `Set as the world's ${label} (shows on the home page)`;
+  btn.innerHTML = `<span class="material-symbols-outlined">${icon}</span>`;
+  btn.addEventListener('click', () => {
+    const next = setWorldFavoriteElement(getState().registry, worldId, kind, isSet ? null : el.id);
+    saveRegistry(next);
+    patchSlice('registry', next);
+    toastManager.info(isSet
+      ? `No longer the world's ${label}`
+      : `${el.name || 'This element'} is now the world's ${label}`);
+  });
+  return btn;
 }
 
 // ====== Sync dot ======

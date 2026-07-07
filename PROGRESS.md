@@ -4,7 +4,33 @@ Operational state. Architecture in **DESIGN.md** (+ `DESIGN_MAPS.md`, `DESIGN_ZO
 
 ---
 
-## CURRENT STATE (2026-07-07 evening — BUILD 1 COMPLETE: S9 + Bout Q + Bout U shipped)
+## CURRENT STATE (2026-07-07 — SESSION 248 CLOSED: BUILD 1 + BUILD 2 COMPLETE)
+
+**2026-07-07 (session 248 final — Bouts S + IE in parallel; close gate: typecheck + 975 vitest + 160 e2e, EXIT=0)**:
+- **Bout S (keeper hands, share-room)**: **D5 intent picker REMOVED** — `atlas_page_intent` stays in the model (defaulted on create, ships on the wire; hidden ≠ deleted — the removal is comment-documented at the site; list intent-chip also dropped; e2e rewritten to assert the hidden-but-defaulted contract) · **T-S7 meta collapse** — Theme + Publish behind a slim summary row (accent swatch · font/mode words · publish state · chevron; collapsed by default, Blocks lead; the S9 mount harness was updated to expand-first — it CAUGHT the change, working as designed) · **S3 full-page preview** — "full page" header button opens a payload-true STANDALONE document in a new tab (stylesheets serialized from the live document, dev+prod both; verified live) · empty-state use-case examples · **D5b embeddable-suggestions** line under the add-block menu ("from your world: N circles · N saved charts · N maps").
+- **Bout IE (opus agent, keeper-verified + inspected)**: IE3 grouped two-column take-out list (content | spatial, all-types row, counts) · IE5 auto-growing paste box · IE6 debounced live validation (green/red border + granular inline error; new e2e spec) · IE7 example-JSON copy/download (minimal full-world doubling as format docs, name-based relation shown) · D8 AI section ("Bring notes from anywhere": copyable convert-my-notes prompt derived from ALL_ELEMENT_TYPES + toolkit link) · bring-in lead line.
+- Screenshots: `bS-detail-{collapsed,expanded}.png` · `bS-fullpage-tab.png` · `bIE-{bringin,invalid,valid,takeout-grouped}.png`.
+- **Session 248 grand total: S9 · Bout Q · Bout U · smoke fixes · Bout H · Bout K · Bout S · Bout IE — BUILD 1 + BUILD 2 both complete.** Next: **BUILD 3** (W → CX → HELP → OW → DEMO), then charts sitdown → home pass 2 → pipeline smoke (gated on Captain's show push) → pre-flight. Pending Captain: G9 pick · commit.
+
+## PRIOR STATE (2026-07-07 late — BUILD 1 + BOUT H + BOUT K COMPLETE)
+
+**2026-07-07 (session 248 final arc — BOUT K, knowledge clarity; close gate: typecheck + 975 vitest + 159 e2e + 1 documented flaky, EXIT=0)**:
+- **D4 WHO/WHAT/ABOUT zones SHIPPED**: the entry page's four explainer paragraphs + three label layers are GONE. Reading order: **"Who knows this"** (ONE chips band — character + circles, icons carry the distinction; inline `+ character` / `+ add circle` / **`+ new circle` (K9)** — the fresh circle joins the holders via `openNewCircle(onCircle)`, live-verified) → **"What they know"** (prose dominant, one hint line "Type @ to mention an element.") → **"About"** (quiet chips). `holderRow` deleted (+ its CSS); every "Held by" copy reference renamed to "Who knows this" (both toast twins, empty states).
+- **K8 naming unification**: knowers-tab button now reads **"open known world →"**; knower rows' hover verb matches ("Open the known world of X").
+- Screenshots: `bK-entry-zones.png` (the zone page) · `bK-k9-newcircle.png` (K9 flow) · `bK-knowers-k8.png`.
+- **Session 248 total: S9 + Bout Q (fleet) + Bout U + post-commit fixes + Bout H + Bout K.** Remaining BUILD 2: **Bout IE → Bout S**; then BUILD 3 (W/CX/HELP/OW/DEMO); G9 pick pending Captain.
+
+## PRIOR STATE (2026-07-07 night — BUILD 1 + BOUT H COMPLETE; Captain committed BUILD 1 mid-session)
+
+**2026-07-07 (session 248 continued — post-commit fixes + BOUT H, the home rebuild; close gate: typecheck + 975 vitest + 160 e2e, 0 flaky, EXIT=0)**:
+- **Captain-feedback fixes (post-BUILD-1 smoke)**: sub-filter chips **auto-clear** when their value vanishes from the world (was: stranded filter on an empty list); taxonomy helpers moved to **`src/core/taxonomy.ts`** (re-exported from element-detail-fields so tests/callers stand); **grey reserved-sparkle in sidebar rows** (left of the type label, `reservedRowHint` — verified 5 marks on the narrative set).
+- **BOUT H — home = cover page × study desk (my hands, workplan D2)**: `world-home.ts` REWRITTEN. Cover: image banner when `meta.image_url` set (T-H7, mechanism verified) · identity (click-to-edit name/description kept) · **quiet text-links** (new element · open writing · import — boxed buttons dead, H6) · **cast slot** (D2b favorites!) · **woven stat line** ("9 characters · 4 locations · …", clickable → sidebar filter; count-card grid + meta chips dead, H2/H3). Desk: **Continue strip** (last writing → writing room · last map → map tab · last edited → its room) + **tight Recent** whose rows route to the room the element LIVES in (knowledge→knowledge, page→share, tier→writing) with a small room label (H5). Timeline-mini REMOVED (H4; `timeline-bar.ts` dormant; revisit at the charts sitdown as "starred chart"). Empty-world onboarding preserved.
+- **D2b favorites SHIPPED (the stretch landed)**: `WorldRegistryEntry.favorites {protagonist_id, nexus_id}` + `setWorldFavoriteElement` (registry.ts) · element-detail header toggle (char=person_pin "protagonist", loc=home_pin "home"; cyan when set) · home cast cards (image face or type icon, role label, click→element). Assignment flow verified via real UI clicks.
+- **G9 comparison pair banked**: `Notes/ui-snapshots/2026-07-07/g9-sidebar-{grey,cyan}.png` — Captain picks.
+- **Screenshots**: `bH-home-cover2.png` (the money shot) + `bH-home-cover-image.png` (banner mechanism) + `b1fix-*.png` (chips auto-clear, row sparkles).
+- Next: **Bout K (knowledge WHO/WHAT/ABOUT) → IE → S** per BUILD_BRIEF; home pass 2 (starred chart? protagonist refinement) stays post-charts-sitdown.
+
+## PRIOR STATE (2026-07-07 evening — BUILD 1 COMPLETE: S9 + Bout Q + Bout U shipped)
 
 **2026-07-07 (session 248, BUILD 1 — orchestrator session: 6 agents + keeper hands; full suite green at close: typecheck + 975 vitest + 159 e2e, PLAYWRIGHT_EXIT=0, 1 documented TipTap flaky)**:
 - **S9 (trust-critical, keeper)**: `republishPage` now honors `patchPage`'s boolean (parity with publishPage's failure toast). NEW regression harness `tests/integration/share-room.republishMirror.test.ts` — the FIRST test that MOUNTS the share room in jsdom (MockFolderStore + stateful sharing fakes + forced mirror-write failure); reuse its bootstrap for future room-level tests (Bout S).

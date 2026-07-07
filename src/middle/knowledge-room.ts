@@ -190,7 +190,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   function maybeToastDroppedCollective(): void {
     if (collectiveToastShown) return;
     collectiveToastShown = true;
-    toasts.info('Mentioning a circle in the text doesn\'t add it as a holder. To share with the circle, use the "Held by" section below.');
+    toasts.info('Mentioning a circle in the text doesn\'t add it as a holder. To share with the circle, add it under "Who knows this".');
   }
 
   // ---- writes ---------------------------------------------------------------
@@ -394,51 +394,43 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     return chip;
   }
 
-  function holderRow(
-    label: string, hint: string, ids: string[], single: boolean, term: string,
-    onAdd: () => void, onRemove?: (id: string) => void,
-  ): HTMLElement {
-    const row = document.createElement('div');
-    row.className = 'atlas-knowledge-holder-row';
-    const head = document.createElement('div');
-    head.className = 'atlas-knowledge-holder-head';
-    head.innerHTML = `<span class="atlas-knowledge-holder-label">${escapeText(label)}</span>
-      <span class="atlas-knowledge-holder-hint">${escapeText(hint)}</span>`;
-    row.appendChild(head);
-    const chips = document.createElement('div');
-    chips.className = 'atlas-knowledge-chips';
-    for (const id of ids) chips.appendChild(elementChip(id, onRemove ? () => onRemove(id) : undefined));
-    if (!(single && ids.length > 0)) {
-      const add = document.createElement('button');
-      add.type = 'button';
-      add.className = 'atlas-knowledge-add';
-      add.textContent = single ? `+ set ${term}` : `+ add ${term}`;
-      add.addEventListener('click', onAdd);
-      chips.appendChild(add);
-    }
-    row.appendChild(chips);
-    return row;
+  function addAffordance(label: string, title: string, onClick: () => void): HTMLButtonElement {
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'atlas-knowledge-add';
+    add.textContent = label;
+    add.title = title;
+    add.addEventListener('click', onClick);
+    return add;
   }
 
+  /**
+   * The WHO zone band (D4): character + circle chips in ONE row — the chip
+   * icons (person vs groups) carry the distinction, no sub-labels. Inline
+   * affordances: + character (when unset), + add circle, + new circle (K9).
+   */
   function renderHeldBy(container: HTMLElement, ctx: EditorCtx): void {
     container.innerHTML = '';
     const held = ctx.heldBy();
-    container.appendChild(holderRow(
-      'Character', 'one character who holds it', held.narrator ? [held.narrator] : [], true, 'character',
-      async () => {
+    const chips = document.createElement('div');
+    chips.className = 'atlas-knowledge-chips';
+    if (held.narrator) chips.appendChild(elementChip(held.narrator, () => ctx.setNarrator(null)));
+    for (const id of held.collectives) chips.appendChild(elementChip(id, () => ctx.removeCircle(id)));
+    if (!held.narrator) {
+      chips.appendChild(addAffordance('+ character', 'One character who holds this knowledge', async () => {
         const p = await pickElement({ restrictToType: 'character', title: 'Who knows this?' });
         if (p) ctx.setNarrator(p.id);
-      },
-      () => ctx.setNarrator(null),
-    ));
-    container.appendChild(holderRow(
-      'Circles', 'groups whose members inherit it', held.collectives, false, 'circle',
-      async () => {
-        const p = await pickElement({ restrictToType: 'collective', excludeIds: held.collectives, title: 'Add a circle' });
-        if (p) ctx.addCircle(p.id);
-      },
-      (id) => ctx.removeCircle(id),
-    ));
+      }));
+    }
+    chips.appendChild(addAffordance('+ add circle', 'A group whose members inherit this knowledge', async () => {
+      const p = await pickElement({ restrictToType: 'collective', excludeIds: ctx.heldBy().collectives, title: 'Add a circle' });
+      if (p) ctx.addCircle(p.id);
+    }));
+    // K9: mint a circle without leaving the entry — it joins the holders.
+    chips.appendChild(addAffordance('+ new circle', 'Create a circle and add it as a holder', () => {
+      openNewCircle((id) => ctx.addCircle(id));
+    }));
+    container.appendChild(chips);
   }
 
   /**
@@ -467,7 +459,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     add.addEventListener('click', async () => {
       const p = await pickElement({ title: 'What is this knowledge about?', excludeIds: ctx.aboutIds() });
       if (!p) return;
-      if (p.type === 'collective') { toasts.info('Circles are holders — add them under "Circles".'); return; }
+      if (p.type === 'collective') { toasts.info('Circles are holders — add them under "Who knows this".'); return; }
       if (!aboutFieldFor(p.type)) { toasts.info('That element type can\'t be a subject.'); return; }
       ctx.addAbout(p.id);
     });
@@ -505,8 +497,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   }
 
   /** Open the "new circle" create modal (collective + circle tag). Shared by
-   *  the knowers-tab action and the empty-state CTA. */
-  function openNewCircle(): void {
+   *  the knowers-tab action, the empty-state CTA, and the entry WHO zone
+   *  (K9 — pass onCircle to adopt the fresh circle as a holder). */
+  function openNewCircle(onCircle?: (id: string) => void): void {
     new ElementCreateModal(toasts, {
       initialType: 'collective',
       suppressNavigate: true,
@@ -518,6 +511,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       extraData: { subtype: CIRCLE_SUBTYPE },
       onCreated: (id, type) => {
         if (type !== 'collective') void patchEntry(id, { subtype: '' });
+        else onCircle?.(id);
       },
     }).open();
   }
@@ -580,7 +574,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         viewAs.type = 'button';
         viewAs.className = 'atlas-btn-ghost atlas-knowledge-viewas';
         viewAs.title = 'See the world as any character knows it';
-        viewAs.textContent = 'view as…';
+        viewAs.textContent = 'open known world →';
         viewAs.addEventListener('click', async () => {
           const p = await pickElement({ restrictToType: 'character', title: 'View the world as…' });
           if (p) navigate(knowledgeKnowerHash(worldId, p.id));
@@ -590,7 +584,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         newCircle.className = 'atlas-btn-ghost atlas-knowledge-newcircle';
         newCircle.title = 'Create a circle (a collective acting as a knower-group)';
         newCircle.textContent = '+ new circle';
-        newCircle.addEventListener('click', openNewCircle);
+        newCircle.addEventListener('click', () => openNewCircle());
         actionSlot.append(viewAs, newCircle);
         buildKnowersList(worldId, listContainer);
       }
@@ -663,7 +657,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       empty.innerHTML = `
         <p class="atlas-knowledge-empty-title">No knowers yet.</p>
         <p class="atlas-knowledge-hint">
-          Assign a character or circle in an entry's "Held by" — or create a
+          Assign a character or circle in an entry's "Who knows this" — or create a
           circle here to set one up before it holds anything.
         </p>
       `;
@@ -671,7 +665,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       cta.type = 'button';
       cta.className = 'atlas-btn-ghost atlas-knowledge-empty-cta';
       cta.textContent = '+ new circle';
-      cta.addEventListener('click', openNewCircle);
+      cta.addEventListener('click', () => openNewCircle());
       empty.appendChild(cta);
       container.appendChild(empty);
       return;
@@ -690,7 +684,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'atlas-knowledge-row';
-      row.title = `View what ${k.name || 'this knower'} knows`;
+      row.title = `Open the known world of ${k.name || 'this knower'}`;
       row.innerHTML = `
         <span class="material-symbols-outlined atlas-knowledge-row-icon">${isCircle ? 'groups' : (ELEMENT_ICONS[k.type] ?? 'person')}</span>
         <span class="atlas-knowledge-row-main">
@@ -845,7 +839,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     if (held.length === 0) {
       const none = document.createElement('p');
       none.className = 'atlas-knowledge-none';
-      none.textContent = 'Holds no knowledge yet — assign it in an entry\'s "Held by".';
+      none.textContent = 'Holds no knowledge yet — assign it in an entry\'s "Who knows this".';
       heldSection.appendChild(none);
     } else {
       const list = document.createElement('div');
@@ -1065,32 +1059,24 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
 
     const ctx = makeCtx(entryId);
 
-    // Held by
-    const heldSection = document.createElement('section');
-    heldSection.className = 'atlas-knowledge-section';
-    heldSection.innerHTML = `<h2 class="atlas-knowledge-section-title">Held by</h2>
-      <p class="atlas-knowledge-section-hint">Who knows this. Members of a circle inherit it.</p>`;
+    // D4: three zones in reading order — WHO holds it, WHAT they know,
+    // ABOUT whom. Short labels, no explainer paragraphs: the room subtitle
+    // carries the model, the zones' shape tells the story.
+
+    // WHO — one chips band (character + circles + inline add/create).
+    const whoSection = document.createElement('section');
+    whoSection.className = 'atlas-knowledge-section atlas-knowledge-zone-who';
+    whoSection.innerHTML = `<h2 class="atlas-knowledge-section-title">Who knows this</h2>`;
     heldByMount = document.createElement('div');
-    heldSection.appendChild(heldByMount);
-    body.appendChild(heldSection);
+    whoSection.appendChild(heldByMount);
+    body.appendChild(whoSection);
     renderHeldBy(heldByMount, ctx);
 
-    // About
-    const aboutSection = document.createElement('section');
-    aboutSection.className = 'atlas-knowledge-section';
-    aboutSection.innerHTML = `<h2 class="atlas-knowledge-section-title">About</h2>
-      <p class="atlas-knowledge-section-hint">The elements this knowledge concerns. @-mentions in the text link up automatically.</p>`;
-    aboutMount = document.createElement('div');
-    aboutSection.appendChild(aboutMount);
-    body.appendChild(aboutSection);
-    if (isDraft) refreshDraftAbout(ctx);
-    else renderAbout(aboutMount, ctx);
-
-    // Knowledge (prose) — the embedded writing editor (K3), lazy-loaded.
+    // WHAT — the text, dominant. The embedded writing editor (K3), lazy-loaded.
     const proseSection = document.createElement('section');
-    proseSection.className = 'atlas-knowledge-section';
-    proseSection.innerHTML = `<h2 class="atlas-knowledge-section-title">Knowledge</h2>
-      <p class="atlas-knowledge-section-hint">The text is the knowledge — what's known. Type @ to mention an element.</p>`;
+    proseSection.className = 'atlas-knowledge-section atlas-knowledge-zone-what';
+    proseSection.innerHTML = `<h2 class="atlas-knowledge-section-title">What they know</h2>
+      <p class="atlas-knowledge-section-hint">Type @ to mention an element.</p>`;
     const proseHost = document.createElement('div');
     // Reuses the writing prose CSS (typography, chips, autolink hints) — the
     // writing-room :has() chrome rules key off .atlas-writing-workspace, which
@@ -1099,6 +1085,16 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     proseHost.innerHTML = '<div class="atlas-knowledge-prose-loading">loading editor…</div>';
     proseSection.appendChild(proseHost);
     body.appendChild(proseSection);
+
+    // ABOUT — quiet derived/manual subject chips.
+    const aboutSection = document.createElement('section');
+    aboutSection.className = 'atlas-knowledge-section atlas-knowledge-zone-about';
+    aboutSection.innerHTML = `<h2 class="atlas-knowledge-section-title">About</h2>`;
+    aboutMount = document.createElement('div');
+    aboutSection.appendChild(aboutMount);
+    body.appendChild(aboutSection);
+    if (isDraft) refreshDraftAbout(ctx);
+    else renderAbout(aboutMount, ctx);
 
     void mountProseEditor(proseHost, isDraft ? NEW : entryId!, ctx);
 

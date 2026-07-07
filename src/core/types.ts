@@ -336,6 +336,16 @@ export interface WorldRegistryEntry {
   parent_id?: string;
   order?: number;
   favorite?: boolean;
+  /**
+   * Home-cover favorites (D2b): the world's named cast — a protagonist
+   * (character) and a home/nexus (location). Assignment via the element-detail
+   * header icon (char + loc only); rendered as the cast slot on the home
+   * cover page. Atlas-local (registry-side, never synced).
+   */
+  favorites?: {
+    protagonist_id?: string | null;
+    nexus_id?: string | null;
+  };
   created_at: string;
   last_opened_at?: string;
   /**

@@ -17,7 +17,7 @@ import { getState, subscribe } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { escapeText } from '../core/dom-utils';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
-import { ELEMENT_LABELS } from '../core/constants';
+import { ELEMENT_LABELS, ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
 import { parsePayload } from '../import/parse';
 import { validatePayload, generateFixPrompt } from '../import/validate';
 import { reconcile } from '../import/reconcile';
@@ -30,6 +30,57 @@ import type { ParseResult, ImportPlan, ValidationIssue } from '../import/types';
 import { ToastManager } from '../ui/toast-manager';
 
 type Mode = 'new' | 'merge';
+
+/** The OnlyWorlds AI toolkit — teaches an assistant the schema + naming rules. */
+const OW_TOOLKIT_URL = 'https://onlyworlds.github.io';
+
+/**
+ * IE7: a minimal valid full-world export. Doubles as format documentation —
+ * a World block plus a few element arrays, with a name-based relation
+ * (`birthplace` → the Location by name) to show how links resolve on import.
+ */
+const EXAMPLE_JSON = `{
+  "World": {
+    "name": "Example World",
+    "description": "A tiny world showing the OnlyWorlds import format."
+  },
+  "Character": [
+    { "name": "Ada the Cartographer", "birthplace": "Old Harbor" },
+    { "name": "Bram Quill" }
+  ],
+  "Location": [
+    { "name": "Old Harbor", "description": "A fog-wrapped port town." }
+  ],
+  "Object": [
+    { "name": "The Brass Astrolabe" }
+  ]
+}
+`;
+
+/**
+ * D8: a copyable prompt that teaches any AI assistant to convert freeform notes
+ * into OnlyWorlds import JSON. Sibling to validate.ts's fix-prompt — same idea,
+ * pointed at creation rather than repair. The type list stays in sync with the
+ * schema by deriving from ALL_ELEMENT_TYPES.
+ */
+function buildConvertNotesPrompt(): string {
+  const types = ALL_ELEMENT_TYPES.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ');
+  return [
+    'I have freeform worldbuilding notes I want to import into OnlyWorlds. Convert them into a single JSON object in this shape:',
+    '',
+    '- Top-level keys are element types in PascalCase, each holding an array of elements.',
+    `- Element types you can use: ${types}.`,
+    '- Every element needs a "name" (a non-empty string). Everything else is optional.',
+    '- To link elements, use the target\'s name as the value: a single link like "location": "Old Harbor", or a list like "objects": ["Sword", "Shield"]. Only reference elements you also include.',
+    '- Optionally add a "World" block with "name" and "description" to make it a full world.',
+    '- Do not invent field names — when unsure, put the detail in "description".',
+    '',
+    'Return only the JSON, nothing else.',
+    '',
+    'My notes:',
+    '<paste your notes here>',
+  ].join('\n');
+}
 
 export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -52,20 +103,37 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     </div>
     <div class="atlas-import-body">
       <div class="atlas-import-panel" data-panel="in" role="tabpanel">
+        <p class="atlas-import-lead">Bring in a world exported from onlyworlds.com, or loose elements from an AI assistant. Drop a file or paste the JSON, then review before it lands.</p>
         <div class="atlas-import-drop" data-role="drop" tabindex="0" title="drop or click to choose a .json file">
           <span class="material-symbols-outlined">place_item</span>
           <p>drop a world or elements <b>.json</b> here</p>
           <span class="atlas-import-drop-sub">or click to choose a file</span>
           <input type="file" accept="application/json,.json" data-role="file" hidden />
         </div>
-        <textarea class="atlas-import-paste" data-role="paste" rows="4"
+        <textarea class="atlas-import-paste" data-role="paste" rows="6"
           placeholder="…or paste OnlyWorlds JSON — a full world export, or loose element lists"></textarea>
+        <p class="atlas-import-live" data-role="live" hidden></p>
         <div class="atlas-import-paste-actions">
           <button type="button" class="atlas-btn-ghost" data-action="load">load pasted JSON</button>
           <button type="button" class="atlas-btn-ghost" data-action="clear" hidden>clear</button>
+          <span class="atlas-import-example">
+            <button type="button" class="atlas-btn-link" data-action="example-copy">copy example JSON</button>
+            <span class="atlas-import-example-sep">·</span>
+            <button type="button" class="atlas-btn-link" data-action="example-download">download example.json</button>
+          </span>
         </div>
         <p class="atlas-import-error" data-role="error" hidden></p>
         <div data-role="review"></div>
+        <div class="atlas-import-ai">
+          <span class="material-symbols-outlined">auto_awesome</span>
+          <div class="atlas-import-ai-body">
+            <p class="atlas-import-ai-lead">Bring notes from anywhere — turn freeform notes into importable JSON with any AI assistant.</p>
+            <div class="atlas-import-ai-actions">
+              <button type="button" class="atlas-btn-ghost" data-action="convert-prompt">copy the convert-my-notes prompt</button>
+              <a class="atlas-btn-link" href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">open the OnlyWorlds AI toolkit</a>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="atlas-import-panel" data-panel="out" role="tabpanel" hidden>
         <div data-role="export"></div>
@@ -76,6 +144,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   const dropEl = root.querySelector<HTMLElement>('[data-role="drop"]')!;
   const fileInput = root.querySelector<HTMLInputElement>('[data-role="file"]')!;
   const pasteEl = root.querySelector<HTMLTextAreaElement>('[data-role="paste"]')!;
+  const liveEl = root.querySelector<HTMLElement>('[data-role="live"]')!;
   const errorEl = root.querySelector<HTMLElement>('[data-role="error"]')!;
   const reviewMount = root.querySelector<HTMLElement>('[data-role="review"]')!;
   const exportMount = root.querySelector<HTMLElement>('[data-role="export"]')!;
@@ -130,6 +199,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     }
     parsed = result;
     clearBtn.hidden = false;
+    liveEl.hidden = true; // the review summary now carries the format read-out
     // Default mode: full-world → new world; loose → merge into current.
     mode = result.format === 'full-world' ? 'new' : 'merge';
     conflict = 'skip';
@@ -145,6 +215,61 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     errorEl.hidden = true;
     reviewMount.innerHTML = '';
     clearBtn.hidden = true;
+    autoGrow();
+    liveValidate();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Paste box: auto-grow (IE5) + debounced live validation (IE6)
+  // ---------------------------------------------------------------------------
+
+  /** Grow the textarea with its content up to a max, then scroll (IE5). */
+  function autoGrow(): void {
+    pasteEl.style.height = 'auto';
+    const max = 340;
+    const next = Math.min(pasteEl.scrollHeight, max);
+    pasteEl.style.height = `${next}px`;
+    pasteEl.style.overflowY = pasteEl.scrollHeight > max ? 'auto' : 'hidden';
+  }
+
+  /**
+   * IE6: surface parse/shape validity on the box itself. Neutral when empty,
+   * green when the text is JSON with a recognizable OW shape, red otherwise with
+   * the most granular error inline. Reuses parsePayload — no new logic, and it
+   * never auto-loads (the load button stays the explicit step).
+   */
+  function liveValidate(): void {
+    const text = pasteEl.value.trim();
+    pasteEl.classList.remove('is-valid', 'is-invalid');
+    if (!text) { liveEl.hidden = true; liveEl.textContent = ''; return; }
+
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text);
+    } catch (err) {
+      pasteEl.classList.add('is-invalid');
+      const detail = err instanceof Error ? err.message : 'invalid JSON';
+      setLive('invalid', `Not valid JSON — ${detail}.`);
+      return;
+    }
+    const result = parsePayload(raw);
+    if (!result.ok) {
+      pasteEl.classList.add('is-invalid');
+      setLive('invalid', result.error ?? 'No recognizable OnlyWorlds elements.');
+      return;
+    }
+    pasteEl.classList.add('is-valid');
+    const name = result.format === 'full-world' && typeof result.world?.name === 'string' && result.world.name.trim()
+      ? ` "${result.world.name.trim()}"`
+      : '';
+    const kind = result.format === 'full-world' ? `Full world${name}` : 'Loose elements';
+    setLive('valid', `${kind} · ${result.totalElements} element${result.totalElements === 1 ? '' : 's'}. Load to review.`);
+  }
+
+  function setLive(state: 'valid' | 'invalid', msg: string): void {
+    liveEl.hidden = false;
+    liveEl.className = `atlas-import-live is-${state}`;
+    liveEl.textContent = msg;
   }
 
   // ---------------------------------------------------------------------------
@@ -341,16 +466,33 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       return;
     }
 
+    const contentTypes = populated.filter(t => !SPATIAL_TYPES.has(t));
+    const spatialTypes = populated.filter(t => SPATIAL_TYPES.has(t));
+    const totalEls = populated.reduce((sum, t) => sum + (counts.get(t) ?? 0), 0);
+    const typeRow = (t: ElementType) => `
+      <label class="atlas-import-type-row">
+        <span class="material-symbols-outlined atlas-import-type-icon">${escapeText(ELEMENT_ICONS[t] ?? 'category')}</span>
+        <span class="atlas-import-type-name">${escapeText(ELEMENT_LABELS[t]?.plural ?? t)}</span>
+        <span class="atlas-import-type-count">${counts.get(t)}</span>
+        <input type="checkbox" value="${t}" checked />
+      </label>`;
+
     exportMount.innerHTML = `
       <p class="atlas-share-section-hint">Download <b>${escapeText(aw.meta?.name ?? 'this world')}</b> as an ow.com-compatible JSON. Untick types to export a subset.</p>
-      <div class="atlas-import-types">
-        ${populated.map(t => `
-          <label class="atlas-import-type">
-            <input type="checkbox" value="${t}" checked />
-            <span>${escapeText(ELEMENT_LABELS[t]?.plural ?? t)}</span>
-            <span class="atlas-import-type-count">${counts.get(t)}</span>
-          </label>
-        `).join('')}
+      <div class="atlas-import-typelist">
+        <label class="atlas-import-type-all">
+          <input type="checkbox" data-role="all" checked />
+          <span class="atlas-import-type-all-label">all types</span>
+          <span class="atlas-import-type-all-count">${totalEls} element${totalEls === 1 ? '' : 's'}</span>
+        </label>
+        <div class="atlas-import-type-cols">
+          <div class="atlas-import-type-col">
+            ${contentTypes.map(typeRow).join('')}
+          </div>
+          <div class="atlas-import-type-col">
+            ${spatialTypes.length ? spatialTypes.map(typeRow).join('') : '<p class="atlas-import-type-col-empty">no maps, pins, or zones yet</p>'}
+          </div>
+        </div>
       </div>
       ${isApiLinked ? `
         <label class="atlas-import-check">
@@ -366,19 +508,28 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
     const credsBox = exportMount.querySelector<HTMLInputElement>('[data-role="creds"]');
     credsBox?.addEventListener('change', () => { includeCreds = credsBox.checked; });
+    const allBox = exportMount.querySelector<HTMLInputElement>('[data-role="all"]')!;
     const exportBtn = exportMount.querySelector<HTMLButtonElement>('[data-action="export"]')!;
     const copyJsonBtn = exportMount.querySelector<HTMLButtonElement>('[data-action="copy-json"]')!;
     const updateBtnLabel = () => {
-      const all = exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type input');
+      const all = exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type-row input');
       const checked = Array.from(all).filter(c => c.checked).length;
+      // Reflect the type-checkbox state on the all/none toggle.
+      allBox.checked = checked === all.length;
+      allBox.indeterminate = checked > 0 && checked < all.length;
       const suffix = checked === all.length ? '' : ` ${checked} type${checked === 1 ? '' : 's'}`;
       exportBtn.textContent = checked === all.length ? 'Save to file' : `Save${suffix} to file`;
       copyJsonBtn.textContent = checked === all.length ? 'Copy JSON' : `Copy${suffix} as JSON`;
       exportBtn.disabled = checked === 0;
       copyJsonBtn.disabled = checked === 0;
     };
-    exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type input').forEach(c =>
+    exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type-row input').forEach(c =>
       c.addEventListener('change', updateBtnLabel));
+    allBox.addEventListener('change', () => {
+      exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type-row input')
+        .forEach(c => { c.checked = allBox.checked; });
+      updateBtnLabel();
+    });
     exportBtn.addEventListener('click', () => void runExport());
     copyJsonBtn.addEventListener('click', () => void runCopyJson());
   }
@@ -387,9 +538,9 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const store = getActiveStore();
     const aw = activeWorld();
     if (!store || !aw) return;
-    const checked = Array.from(exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type input'))
+    const checked = Array.from(exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type-row input'))
       .filter(c => c.checked).map(c => c.value as ElementType);
-    const all = exportMount.querySelectorAll('.atlas-import-type input').length;
+    const all = exportMount.querySelectorAll('.atlas-import-type-row input').length;
     try {
       const data = await buildWorldExport(store, {
         includeCredentials: includeCreds,
@@ -411,9 +562,9 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const store = getActiveStore();
     const aw = activeWorld();
     if (!store || !aw) return;
-    const checked = Array.from(exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type input'))
+    const checked = Array.from(exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type-row input'))
       .filter(c => c.checked).map(c => c.value as ElementType);
-    const all = exportMount.querySelectorAll('.atlas-import-type input').length;
+    const all = exportMount.querySelectorAll('.atlas-import-type-row input').length;
     try {
       const data = await buildWorldExport(store, {
         includeCredentials: includeCreds,
@@ -452,6 +603,31 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   });
   clearBtn.addEventListener('click', clearLoaded);
 
+  // Paste box grows with content; live validation runs on a 400ms debounce.
+  let liveTimer: number | undefined;
+  pasteEl.addEventListener('input', () => {
+    autoGrow();
+    window.clearTimeout(liveTimer);
+    liveTimer = window.setTimeout(liveValidate, 400);
+  });
+
+  // IE7: example JSON as copy or download — doubles as format documentation.
+  root.querySelector<HTMLButtonElement>('[data-action="example-copy"]')!.addEventListener('click', () => {
+    void navigator.clipboard.writeText(EXAMPLE_JSON)
+      .then(() => toasts.success('Example JSON copied'))
+      .catch(() => toasts.error('Could not copy to clipboard'));
+  });
+  root.querySelector<HTMLButtonElement>('[data-action="example-download"]')!.addEventListener('click', () => {
+    downloadText(EXAMPLE_JSON, 'onlyworlds_example.json');
+  });
+
+  // D8: the convert-my-notes prompt for an AI assistant.
+  root.querySelector<HTMLButtonElement>('[data-action="convert-prompt"]')!.addEventListener('click', () => {
+    void navigator.clipboard.writeText(buildConvertNotesPrompt())
+      .then(() => toasts.success('Convert-notes prompt copied'))
+      .catch(() => toasts.error('Could not copy to clipboard'));
+  });
+
   // ---- react to world switches (room persists across them) -------------------
   let lastWorldId = activeWorld()?.worldId ?? null;
   let lastElementsRef: readonly Element[] | null = activeElements();
@@ -474,7 +650,11 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 }
 
 function downloadJson(data: unknown, filename: string): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  downloadText(JSON.stringify(data, null, 2), filename);
+}
+
+function downloadText(text: string, filename: string): void {
+  const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

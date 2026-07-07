@@ -295,6 +295,29 @@ export function setFavorite(
  * per-world settings that don't warrant their own named setter (e.g. the
  * writing-font and context-pane prefs in the settings panel).
  */
+/**
+ * Set (or clear, with null) a world's cast favorite (D2b): 'protagonist'
+ * (character) or 'nexus' (the home location). Returns a NEW registry —
+ * caller saves + patches state like every other setter here.
+ */
+export function setWorldFavoriteElement(
+  reg: WorldsRegistry,
+  worldId: string,
+  kind: 'protagonist' | 'nexus',
+  elementId: string | null,
+): WorldsRegistry {
+  return {
+    ...reg,
+    worlds: reg.worlds.map(w => {
+      if (w.id !== worldId) return w;
+      const favorites = { ...(w.favorites ?? {}) };
+      if (kind === 'protagonist') favorites.protagonist_id = elementId;
+      else favorites.nexus_id = elementId;
+      return { ...w, favorites };
+    }),
+  };
+}
+
 export function updateWorldEntry(
   reg: WorldsRegistry,
   worldId: string,

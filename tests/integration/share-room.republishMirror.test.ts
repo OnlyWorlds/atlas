@@ -102,6 +102,13 @@ describe('share room — republish honors the mirror write result (S9)', () => {
   });
 
   function republishButton(): HTMLButtonElement {
+    // T-S7 (session 248): Theme + Publish collapse behind the meta summary
+    // row by default — expand it first, like a user would.
+    if (!host.querySelector('[data-action="republish"]')) {
+      const summary = host.querySelector<HTMLButtonElement>('.atlas-share-meta-summary');
+      expect(summary, 'meta summary row should render on the detail view').toBeTruthy();
+      summary!.click();
+    }
     const btn = host.querySelector<HTMLButtonElement>('[data-action="republish"]');
     expect(btn, 'republish button should render for a published page').toBeTruthy();
     return btn!;

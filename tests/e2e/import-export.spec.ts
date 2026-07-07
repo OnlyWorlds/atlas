@@ -104,6 +104,37 @@ test('tabs switch between bring in and take out', async ({ page }) => {
   await expect(page.locator('[data-panel="out"]')).toBeHidden();
 });
 
+test('IE6: paste box shows live validity (green valid / red invalid)', async ({ page }) => {
+  await setupWorld(page);
+  await openImport(page);
+  // Not JSON → red border + inline error (debounced ~400ms; assertions auto-retry).
+  await page.fill('[data-role="paste"]', 'not json at all');
+  await expect(page.locator('[data-role="paste"]')).toHaveClass(/is-invalid/);
+  await expect(page.locator('.atlas-import-live.is-invalid')).toBeVisible();
+  // Recognizable OW shape → green border + inline read-out.
+  await page.fill('[data-role="paste"]', JSON.stringify(FULL_WORLD));
+  await expect(page.locator('[data-role="paste"]')).toHaveClass(/is-valid/);
+  await expect(page.locator('.atlas-import-live.is-valid')).toContainText('Full world');
+});
+
+test('IE3: take-out shows grouped type rows with an all/none toggle', async ({ page }) => {
+  await setupWorld(page);
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    await store.createElement('character', { name: 'Strahd' });
+    api.patchData(await store.listElements());
+  });
+  await openImport(page);
+  await page.click('.atlas-room-tab[data-tab="out"]');
+  await expect(page.locator('.atlas-import-type-all')).toBeVisible();
+  await expect(page.locator('.atlas-import-type-row')).toHaveCount(1);
+  // Unticking "all types" clears the per-type checkboxes and disables export.
+  await page.uncheck('[data-role="all"]');
+  await expect(page.locator('.atlas-import-type-row input')).not.toBeChecked();
+  await expect(page.locator('[data-action="export"]')).toBeDisabled();
+});
+
 test('export downloads an ow.com-compatible JSON', async ({ page }) => {
   await setupWorld(page);
   await page.evaluate(async () => {

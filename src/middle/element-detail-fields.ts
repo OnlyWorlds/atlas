@@ -32,8 +32,7 @@ import { pickElement } from '../ui/element-picker-modal';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { readImageDimsFromUrl } from '../ui/image-dims';
 import { getEditorSettings } from '../registry/registry';
-import { KNOWLEDGE_SUBTYPE, CIRCLE_SUBTYPE } from '../core/knowledge';
-import { PAGE_SUBTYPE } from '../core/sharing';
+import { suggestionsForField, reservedValueHint } from '../core/taxonomy';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */
 const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
@@ -515,71 +514,6 @@ function pickIconFor(target: ElementType | undefined): string {
   return 'add_link';
 }
 
-/**
- * Suggestion strings to surface in the field-edit popover for the given
- * element + field. Returns null if no suggestions apply.
- *
- * `supertype` / `subtype` on EVERY type: the world's own distinct values for
- * this (type, field) pair, most-used first — derived live from the loaded
- * elements, never tracked (server-pulled values appear automatically; D9b).
- * Narrative `supertype` pins the four writing-tier labels first, in tier
- * order (they place the narrative in the writing tree).
- */
-const TAXONOMY_SUGGESTION_CAP = 8;
-
-export function suggestionsForField(el: Element, fieldName: string): string[] | null {
-  if (fieldName !== 'supertype' && fieldName !== 'subtype') return null;
-  const pinned: string[] = [];
-  if (el.type === 'narrative' && fieldName === 'supertype') {
-    const active = getState().active;
-    if (active) {
-      const labels = getWritingLabels(active.worldId);
-      pinned.push(labels.l1, labels.l2, labels.l3, labels.l4);
-    }
-  }
-  const counts = new Map<string, number>();
-  for (const other of getState().data.elements) {
-    if (other.type !== el.type) continue;
-    const v = (other as Record<string, unknown>)[fieldName];
-    if (typeof v !== 'string') continue;
-    const trimmed = v.trim();
-    if (!trimmed) continue;
-    counts.set(trimmed, (counts.get(trimmed) ?? 0) + 1);
-  }
-  const derived = [...counts.keys()]
-    .filter(v => !pinned.includes(v))
-    .sort((a, b) => (counts.get(b)! - counts.get(a)!) || a.localeCompare(b));
-  const merged = [...pinned, ...derived].slice(0, Math.max(TAXONOMY_SUGGESTION_CAP, pinned.length));
-  return merged.length > 0 ? merged : null;
-}
-
-/**
- * Atlas semantics attached to a supertype/subtype VALUE — surfaced as a quiet
- * tooltipped icon on the field row so users don't trip reserved values by
- * accident, and discover what a value unlocks (D9b lever 2). Matching mirrors
- * the semantic sites EXACTLY: writing tiers compare case-sensitively
- * (writing-helpers.tierFor), knowledge/page/circle subtypes case-insensitively
- * (core/knowledge + core/sharing predicates).
- */
-export function reservedValueHint(el: Element, fieldName: string): string | null {
-  const raw = (el as Record<string, unknown>)[fieldName];
-  if (typeof raw !== 'string' || !raw.trim()) return null;
-  const v = raw.trim();
-  if (el.type === 'narrative' && fieldName === 'supertype') {
-    const active = getState().active;
-    if (active) {
-      const labels = getWritingLabels(active.worldId);
-      if (v === labels.l1 || v === labels.l2 || v === labels.l3 || v === labels.l4) {
-        return `"${v}" places this narrative in the writing tree`;
-      }
-    }
-  }
-  if (el.type === 'narrative' && fieldName === 'subtype') {
-    if (v.toLowerCase() === KNOWLEDGE_SUBTYPE) return `"${v}" makes this a knowledge entry — it lives in the knowledge room`;
-    if (v.toLowerCase() === PAGE_SUBTYPE) return `"${v}" makes this a share page — it lives in the share room`;
-  }
-  if (el.type === 'collective' && fieldName === 'subtype') {
-    if (v.toLowerCase() === CIRCLE_SUBTYPE) return `"${v}" marks this collective as a knowledge circle`;
-  }
-  return null;
-}
+// D9b taxonomy helpers moved to core/taxonomy.ts (the sidebar consumes them
+// too — a UI-domain-neutral home). Re-exported so tests + callers keep working.
+export { suggestionsForField, reservedValueHint } from '../core/taxonomy';
