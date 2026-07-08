@@ -142,7 +142,7 @@ function renderSection(
   } else if (section.children.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'atlas-writing-compiled-empty';
-    empty.textContent = '(empty — click the section heading to edit)';
+    empty.textContent = '(empty · click the section heading to edit)';
     body.appendChild(empty);
   }
 

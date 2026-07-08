@@ -27,7 +27,7 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
   if (!reason) return null;
   switch (reason.kind) {
     case 'no-active-world':
-      toasts.info('No active world — pick one from the sidebar');
+      toasts.info('No active world. Pick one from the sidebar');
       return reason;
     case 'local-only':
       toasts.info('Sync is only available on API-linked worlds');
@@ -37,11 +37,11 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
       navigate(settingsHash(reason.worldId, 'onlyworlds'));
       return reason;
     case 'attached-but-paused':
-      toasts.info('Sync is paused — resume from settings');
+      toasts.info('Sync is paused. Resume from settings');
       return reason;
     case 'engine-not-ready':
     default:
-      toasts.info('Sync engine not ready — try again in a moment');
+      toasts.info('Sync engine not ready. Try again in a moment');
       return reason;
   }
 }

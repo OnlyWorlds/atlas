@@ -175,7 +175,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     const sourceParentId = sourceRow?.getAttribute('data-parent-id') ?? '';
     const targetParentId = row.getAttribute('data-parent-id') ?? '';
     if (sourceParentId !== targetParentId) {
-      toasts.info('Drag-to-reorder works within the same sibling group — use the create modal\'s parent map override to reparent');
+      toasts.info('Drag-to-reorder works within the same sibling group. Use the create modal\'s parent map override to reparent');
       return;
     }
 
@@ -501,7 +501,7 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   if (node.brokenParent) {
     const chip = document.createElement('span');
     chip.className = 'atlas-row-chip atlas-row-chip-warn';
-    chip.title = 'parent_map references a missing map (or would create a cycle) — surfaced at root';
+    chip.title = 'parent_map references a missing map (or would create a cycle); surfaced at root';
     chip.textContent = 'Broken parent';
     row.appendChild(chip);
   }

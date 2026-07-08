@@ -74,7 +74,7 @@ function renderStorageDeviceSection(): string {
   return `
     <section class="atlas-settings-section">
       <h3>On this device</h3>
-      <p class="atlas-settings-hint">Where atlas keeps your worlds. New local worlds default here. Changing this folder doesn't move existing worlds — they stay where they were created.</p>
+      <p class="atlas-settings-hint">Where atlas keeps your worlds. New local worlds default here; existing worlds stay where they were created.</p>
       ${ar
         ? `<dl class="atlas-settings-meta">
             <dt>Folder</dt><dd><code>${escapeText(ar.pathHint ?? ar.folderName)}</code></dd>
@@ -105,7 +105,7 @@ function wireStorageDeviceActions(toasts: ToastManager): void {
       if (result) {
         toasts.success(
           result.imported > 0
-            ? `Atlas folder updated — found ${result.imported} world${result.imported === 1 ? '' : 's'} there`
+            ? `Atlas folder updated: found ${result.imported} world${result.imported === 1 ? '' : 's'} there`
             : 'Atlas folder updated'
         );
       }
@@ -125,7 +125,7 @@ function wireStorageDeviceActions(toasts: ToastManager): void {
       if (result) {
         toasts.success(
           result.imported > 0
-            ? `Re-linked atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
+            ? `Re-linked atlas folder: restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
             : 'Re-linked atlas folder (no worlds found inside)'
         );
       }
@@ -152,7 +152,7 @@ function renderSyncTab(reg: WorldsRegistry): string {
   const debounceSec = Math.round(debounceMs / 1000);
   return `
     <section class="atlas-settings-section">
-      <h3>Sync — global</h3>
+      <h3>Global sync</h3>
       <p class="atlas-settings-hint">Applies to every API-linked world. Atlas is local-first: pulls are opt-in.</p>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="pause-all" ${pauseAll ? 'checked' : ''} />
@@ -176,7 +176,7 @@ function renderSyncTab(reg: WorldsRegistry): string {
           <input class="atlas-input atlas-settings-debounce-input" type="number" name="debounce-sec" min="1" max="3600" step="1" value="${debounceSec}" ${pauseAll ? 'disabled' : ''} />
           <span class="atlas-settings-debounce-unit">seconds</span>
         </span>
-        <span class="atlas-settings-hint-sub">After a local edit, atlas waits this long before pushing to the API. The sync pill shows a decay ring during the wait — click it to push now.</span>
+        <span class="atlas-settings-hint-sub">After a local edit, atlas waits this long before pushing to the API. The sync pill shows a decay ring during the wait; click it to push now.</span>
       </label>
       <fieldset class="atlas-settings-fieldset" ${pauseAll ? 'disabled' : ''}>
         <legend>Default conflict policy</legend>

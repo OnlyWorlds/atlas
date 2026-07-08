@@ -38,9 +38,9 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
       <h3>OnlyWorlds</h3>
       <p class="atlas-settings-hint">
         Atlas is a free, local worldbuilding studio, powered by
-        <a href="${OW_SITE_URL}" target="_blank" rel="noopener">OnlyWorlds</a> —
+        <a href="${OW_SITE_URL}" target="_blank" rel="noopener">OnlyWorlds</a>,
         an open format for whole worlds. Your world lives as plain files in a
-        folder you own; the format is why any OnlyWorlds tool can read it.
+        folder you own, and the format is why any OnlyWorlds tool can read it.
       </p>
     </section>
     ${renderAccountTab(reg)}
@@ -74,21 +74,22 @@ function renderWaypointsSection(activeWorld: WorldRegistryEntry | undefined): st
   const rows = WAYPOINTS.map((w) => {
     const met = !!state.completed[w.id];
     const link = w.id === 'council' ? OW_COUNCIL_URL : w.link(activeWorld?.id ?? null);
-    const go = met
+    // Unmet cards carry a quiet arrow in the bottom-right corner that opens
+    // the feature (Captain's call: an arrow reads more elegant than a text link).
+    const arrow = met || !link
       ? ''
       : w.id === 'council'
-        ? `<a class="atlas-ow-waypoint-go" href="${OW_COUNCIL_URL}" target="_blank" rel="noopener" data-ow-council>go there →</a>`
-        : link
-          ? `<a class="atlas-ow-waypoint-go" href="${link}" data-ow-nav="${link}">go there →</a>`
-          : '';
+        ? `<a class="atlas-ow-waypoint-arrow" href="${OW_COUNCIL_URL}" target="_blank" rel="noopener" data-ow-council aria-label="${escapeText(w.action)}" title="${escapeText(w.action)}"><span class="material-symbols-outlined">arrow_forward</span></a>`
+        : `<a class="atlas-ow-waypoint-arrow" href="${link}" data-ow-nav="${link}" aria-label="${escapeText(w.action)}" title="${escapeText(w.action)}"><span class="material-symbols-outlined">arrow_forward</span></a>`;
     return `
       <div class="atlas-ow-waypoint ${met ? 'is-met' : ''}" data-waypoint="${w.id}">
         <span class="material-symbols-outlined atlas-ow-waypoint-glyph">${met ? 'check_circle' : w.glyph}</span>
         <div class="atlas-ow-waypoint-text">
           <span class="atlas-ow-waypoint-name">${escapeText(w.name)}</span>
           <span class="atlas-ow-waypoint-concept">${escapeText(w.concept)}</span>
-          ${met ? '' : `<span class="atlas-ow-waypoint-action">${escapeText(w.action)} ${go}</span>`}
+          ${met ? '' : `<span class="atlas-ow-waypoint-action">${escapeText(w.action)}</span>`}
         </div>
+        ${arrow}
       </div>
     `;
   }).join('');
@@ -99,7 +100,7 @@ function renderWaypointsSection(activeWorld: WorldRegistryEntry | undefined): st
         <span class="atlas-ow-waypoints-count">${count} of ${WAYPOINTS.length}</span>
       </div>
       <p class="atlas-settings-hint">Ten small ways atlas and OnlyWorlds fit together. Each one opens the feature it describes.</p>
-      ${demoActive ? '<p class="atlas-settings-hint atlas-ow-demo-hint">You are exploring the sample world — these light up in a world of your own.</p>' : ''}
+      ${demoActive ? '<p class="atlas-settings-hint atlas-ow-demo-hint">You are exploring the sample world; these light up in a world of your own.</p>' : ''}
       <div class="atlas-ow-waypoint-grid">${rows}</div>
       <div class="atlas-ow-waypoints-foot">
         <button type="button" class="atlas-btn-ghost" data-action="waypoints-mark-all">mark all as familiar</button>

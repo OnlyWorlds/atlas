@@ -117,7 +117,7 @@ describe('share room — republish honors the mirror write result (S9)', () => {
   it('toasts success when the mirror write lands', async () => {
     republishButton().click();
     await vi.waitFor(() =>
-      expect(toasts.success).toHaveBeenCalledWith('Republished — the public page is up to date'));
+      expect(toasts.success).toHaveBeenCalledWith('Republished; the public page is up to date'));
     expect(toasts.error).not.toHaveBeenCalled();
   });
 

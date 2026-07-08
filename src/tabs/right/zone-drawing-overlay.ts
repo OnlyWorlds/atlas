@@ -24,7 +24,7 @@ export function buildDrawingOverlay(
   root.innerHTML = `
     <span class="atlas-zone-draft-mode">${mode.charAt(0).toUpperCase()}${mode.slice(1)}</span>
     <span class="atlas-zone-draft-count"><span class="atlas-zone-draft-count-num">0</span> markers</span>
-    <span class="atlas-zone-draft-hint" title="Hold shift while clicking to snap the new marker to a 45° axis from the previous marker — chain four shift-clicks for a perfect rectangle">Hold <kbd>Shift</kbd> to snap to 45° axis</span>
+    <span class="atlas-zone-draft-hint" title="Hold shift while clicking to snap the new marker to a 45° axis from the previous marker; chain four shift-clicks for a perfect rectangle">Hold <kbd>Shift</kbd> to snap to 45° axis</span>
     <span class="atlas-zone-draft-spacer"></span>
     <span class="atlas-zone-draft-keys">
       <kbd>Enter</kbd> finish · <kbd>Esc</kbd> cancel

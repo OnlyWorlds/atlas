@@ -162,7 +162,7 @@ function renderMapsSection(reg: WorldsRegistry): string {
   return `
     <section class="atlas-settings-section">
       <h3>Maps</h3>
-      <p class="atlas-settings-hint">How atlas renders maps and map affordances across the UI. Label toggles default off — tighter icon-only layout. Flip on for explicit names.</p>
+      <p class="atlas-settings-hint">How atlas renders maps and map affordances across the UI. Label toggles default off for a tighter icon-only layout; flip on for explicit names.</p>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="show-map-names-in-header" ${showMaps ? 'checked' : ''} />
         <span>Show map names alongside map icons in element header</span>

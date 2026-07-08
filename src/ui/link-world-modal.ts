@@ -109,7 +109,7 @@ export class LinkWorldModal extends BaseModal {
           progressBox.textContent = `Discovering ${p.currentType ?? ''}…`;
         } else {
           progressBox.textContent = p.total === 0
-            ? 'World is empty — finishing up'
+            ? 'World is empty; finishing up'
             : `Downloading ${p.done} of ${p.total} elements…`;
         }
         progressBox.hidden = false;
@@ -124,9 +124,9 @@ export class LinkWorldModal extends BaseModal {
         });
         const failures = result.failures.length;
         if (failures > 0) {
-          this.toasts.error(`Linked ${result.entry.name} — ${failures} element${failures === 1 ? '' : 's'} failed (will retry on next sync)`);
+          this.toasts.error(`Linked ${result.entry.name}, but ${failures} element${failures === 1 ? '' : 's'} failed (will retry on next sync)`);
         } else {
-          this.toasts.success(`Linked ${result.entry.name} — ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
+          this.toasts.success(`Linked ${result.entry.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
         }
         // Waypoint (hookmap wp8): linking counts UNGATED — spec-decided
         // ("linking the readonly demo world counts; never require an account

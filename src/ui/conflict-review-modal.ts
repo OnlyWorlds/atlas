@@ -93,7 +93,7 @@ export class ConflictReviewModal extends BaseModal {
         // guard, a mid-modal world switch would apply the user's choice to
         // the wrong world's local files.
         if (getState().active?.worldId !== this.capturedWorldId) {
-          this.toasts.info('World changed — close and reopen to review conflicts');
+          this.toasts.info('World changed. Close and reopen to review conflicts');
           this.hide();
           return;
         }

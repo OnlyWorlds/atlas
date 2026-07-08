@@ -140,8 +140,8 @@ export function mountContextToolbar(opts: ContextToolbarOpts): ContextToolbarHan
     if (current.lockLayout) btn.classList.add('is-on');
     btn.dataset.locked = current.lockLayout ? 'true' : 'false';
     btn.title = current.lockLayout
-      ? 'Layout locked — filter toggles hide nodes without re-arranging. Click to unlock.'
-      : 'Layout free — filter toggles re-run the sim so surviving nodes redistribute. Click to lock.';
+      ? 'Layout locked: filter toggles hide nodes without re-arranging. Click to unlock.'
+      : 'Layout free: filter toggles re-run the sim so surviving nodes redistribute. Click to lock.';
     btn.innerHTML =
       `<span class="material-symbols-outlined">${current.lockLayout ? 'lock' : 'lock_open'}</span>`;
     btn.addEventListener('click', () => onToggleLockLayout());

@@ -191,7 +191,7 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       if (tab.kind === 'context') {
         btn.setAttribute('data-tab-kind', 'context');
         btn.innerHTML = `<span class="material-symbols-outlined">hub</span><span>Context</span>`;
-        btn.title = 'Context — graph + details for the active element or narrative';
+        btn.title = 'Context · graph + details for the active element or narrative';
         btn.addEventListener('click', () => {
           patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
         });
@@ -210,7 +210,7 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       const label = m?.name || tab.label || '(missing map)';
       btn.innerHTML = `<span class="material-symbols-outlined">${isStale ? 'cloud_off' : 'map'}</span><span>${escapeText(label)}</span><span class="atlas-tab-close" data-role="close" aria-label="Close tab">×</span>`;
       if (isStale) {
-        btn.title = 'This map is no longer in the current world — click anywhere on the tab to close it';
+        btn.title = 'This map is no longer in the current world. Click anywhere on the tab to close it';
       }
       const closeEl = btn.querySelector<HTMLElement>('[data-role="close"]');
       closeEl?.addEventListener('click', (e) => {
@@ -329,7 +329,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   const linked = entry?.state === 'api-linked';
   if (!linked) {
     pill.dataset.state = 'local';
-    pill.title = 'Local-only world — folder is the source of truth';
+    pill.title = 'Local-only world: folder is the source of truth';
     pill.innerHTML = `
       <span class="atlas-sync-pill-dot"></span>
       <span>Local</span>
@@ -349,7 +349,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     ? {
         dataState: 'pending',
         label: `Review ${conflictCount}`,
-        title: `${conflictCount} unresolved conflict${conflictCount === 1 ? '' : 's'} — click ⚠ to resolve`,
+        title: `${conflictCount} unresolved conflict${conflictCount === 1 ? '' : 's'} · click ⚠ to resolve`,
       }
     : base;
   pill.dataset.state = dataState;
@@ -411,7 +411,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       return;
     }
     if (cur?.kind === 'paused') {
-      toasts.info(cur.reason === 'network' ? 'Offline — pull skipped' : 'Sync paused — flip stay-offline off to pull');
+      toasts.info(cur.reason === 'network' ? 'Offline; pull skipped' : 'Sync paused. Flip stay-offline off to pull');
       return;
     }
     try {
@@ -448,7 +448,7 @@ function mapEngineStateToPill(
     return {
       dataState: 'api',
       label: 'Linked',
-      title: 'API-linked world — engine starting up',
+      title: 'API-linked world · engine starting up',
     };
   }
   switch (engine.kind) {
@@ -461,7 +461,7 @@ function mapEngineStateToPill(
       return {
         dataState: 'synced',
         label: rel ? `Synced ${rel}` : 'Synced',
-        title: engine.last_sync_at ? `Last synced ${formatTime(engine.last_sync_at)}` : 'Idle — no sync yet',
+        title: engine.last_sync_at ? `Last synced ${formatTime(engine.last_sync_at)}` : 'Idle · no sync yet',
       };
     }
     case 'syncing':
@@ -475,10 +475,10 @@ function mapEngineStateToPill(
         dataState: 'pending',
         label: engine.reason === 'network' ? 'Offline' : 'Paused',
         title: engine.pending_changes
-          ? `${engine.reason === 'network' ? 'Offline' : 'Paused'} — ${engine.pending_changes} pending`
+          ? `${engine.reason === 'network' ? 'Offline' : 'Paused'} · ${engine.pending_changes} pending`
           : engine.reason === 'network'
             ? 'Offline'
-            : 'Paused — local edits queued',
+            : 'Paused · local edits queued',
       };
     case 'error':
       return {

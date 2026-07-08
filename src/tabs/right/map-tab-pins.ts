@@ -174,8 +174,8 @@ function refreshChipStrip(entry: MapTabCacheEntry, allMinePins: Pin[]): void {
     chip.setAttribute('data-hidden', String(hidden));
     const label = ELEMENT_LABELS[type as keyof typeof ELEMENT_LABELS]?.singular ?? type;
     chip.title = hidden
-      ? `${count} ${label}${count === 1 ? '' : 's'} hidden — click to show`
-      : `${count} ${label}${count === 1 ? '' : 's'} shown — click to hide`;
+      ? `${count} ${label}${count === 1 ? '' : 's'} hidden · click to show`
+      : `${count} ${label}${count === 1 ? '' : 's'} shown · click to hide`;
     const iconName = ELEMENT_ICONS[type as keyof typeof ELEMENT_ICONS] ?? 'category';
     chip.innerHTML = `<span class="material-symbols-outlined">${iconName}</span><span class="atlas-pin-filter-chip-count">${count}</span>`;
     chip.addEventListener('click', (e) => {

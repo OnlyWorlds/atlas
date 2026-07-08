@@ -328,7 +328,7 @@ test('element card: pick → compact card; full variant reveals chosen fields; p
   await page.waitForFunction(() => {
     const s = (window as any).__atlasTestApi.getState();
     const p = s.data.elements.find((e: any) => e.type === 'narrative' && e.subtype === 'page');
-    return p && typeof p.story === 'string' && p.story.includes('[ Ireena — element card ]');
+    return p && typeof p.story === 'string' && p.story.includes('[ Ireena · element card ]');
   });
 
   // Refs mirror carries the binding (the id-swap safety net).
@@ -416,7 +416,7 @@ test('circle block: the Knowledge bridge mints a page; compiled entries render; 
     const s = (window as any).__atlasTestApi.getState();
     const p = s.data.elements.find((e: any) => e.type === 'narrative' && e.subtype === 'page');
     return p && p.atlas_page_intent === 'reference'
-      && typeof p.story === 'string' && p.story.includes('[ the party — circle knowledge ]');
+      && typeof p.story === 'string' && p.story.includes('[ the party · circle knowledge ]');
   });
 
   // Visitor preview (payload-true): the FROZEN entry renders; the prose

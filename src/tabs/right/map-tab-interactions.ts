@@ -78,7 +78,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       (e): e is WorldMap => e.type === 'map' && e.id === entry.mapId,
     );
     if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
-      toasts.info('Set a map image first — pins anchor to the image');
+      toasts.info('Set a map image first; pins anchor to the image');
       return;
     }
     try {
@@ -91,7 +91,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       const cached = getState().data.elements.find(e => e.id === placement.elementId);
       const pinned = cached ?? await store.getElement(placement.elementId);
       if (!pinned) {
-        toasts.error('Cannot place pin — element not found');
+        toasts.error('Cannot place pin: element not found');
         return;
       }
       await store.createPin({
@@ -181,7 +181,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       (em): em is WorldMap => em.type === 'map' && em.id === entry.mapId,
     );
     if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
-      toasts.info('Set a map image first — pins anchor to the image');
+      toasts.info('Set a map image first; pins anchor to the image');
       return;
     }
     const point = leafletToStorage(latlng, height);
@@ -310,7 +310,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       (em): em is WorldMap => em.type === 'map' && em.id === entry.mapId,
     );
     if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
-      toasts.info('Set a map image first — pins anchor to the image');
+      toasts.info('Set a map image first; pins anchor to the image');
       return;
     }
     const lMap = manager.getMap();

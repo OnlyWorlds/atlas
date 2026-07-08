@@ -23,14 +23,14 @@ function wireSampleButton(root: HTMLElement): void {
   btn.addEventListener('click', async () => {
     const existing = existingSampleWorld();
     if (existing) {
-      toastManager.info('The sample world already exists — open it from the Worlds list.');
+      toastManager.info('The sample world already exists. Open it from the Worlds list.');
       return;
     }
     btn.disabled = true;
     btn.textContent = 'Opening Moppetopia…';
     try {
       const entry = await createSampleWorld();
-      toastManager.success('Welcome to Moppetopia — poke anything, it\'s your copy.');
+      toastManager.success('Welcome to Moppetopia. Poke anything, it\'s your copy.');
       navigate(homeHash(entry.id));
     } catch (err) {
       toastManager.error(err instanceof Error ? err.message : String(err));
@@ -58,7 +58,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         <header class="atlas-room-header"><h1>Welcome back</h1></header>
         <div class="atlas-welcome-empty">
           <p>Atlas detected a previously-set-up folder on this device: <code>${escapeText(atlasRootRecoverable.folderName)}</code>.</p>
-          <p class="atlas-welcome-hint">Your worlds are still on disk — click below to re-grant folder access and restore the world list.</p>
+          <p class="atlas-welcome-hint">Your worlds are still on disk. Click below to re-grant folder access and restore the world list.</p>
           <div class="atlas-welcome-actions">
             <button class="atlas-btn-primary" data-action="recover-atlas">Re-link atlas folder</button>
           </div>
@@ -73,7 +73,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           if (result) {
             toastManager.success(
               result.imported > 0
-                ? `Re-linked atlas folder — restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
+                ? `Re-linked atlas folder: restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
                 : 'Re-linked atlas folder (no worlds found inside)'
             );
           }
@@ -93,12 +93,12 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         <header class="atlas-room-header"><h1>Welcome to Atlas</h1></header>
         <div class="atlas-welcome-empty">
           <p>Atlas keeps your worlds as folders on disk. One chosen folder holds all your worlds.</p>
-          <p class="atlas-welcome-hint">Pick any folder — atlas will create an <code>onlyworlds-atlas/</code> subfolder inside it for your worlds. (If you pick a folder that's already an atlas root, atlas just re-uses it.)</p>
+          <p class="atlas-welcome-hint">Pick any folder; atlas creates an <code>onlyworlds-atlas/</code> subfolder inside it for your worlds. (If you pick a folder that's already an atlas root, atlas just re-uses it.)</p>
           <div class="atlas-welcome-actions">
             <button class="atlas-btn-primary" data-action="setup-atlas">Set up atlas folder</button>
             <button class="atlas-btn-ghost" data-action="explore-sample">Explore the sample world</button>
           </div>
-          <p class="atlas-welcome-hint atlas-welcome-sample-hint">The sample opens instantly in browser storage — no folder needed.</p>
+          <p class="atlas-welcome-hint atlas-welcome-sample-hint">The sample opens instantly in browser storage, no folder needed.</p>
         </div>
       `;
       wireSampleButton(root);
@@ -111,7 +111,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           if (result) {
             toastManager.success(
               result.imported > 0
-                ? `Atlas folder set up — found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
+                ? `Atlas folder set up: found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
                 : 'Atlas folder is set up'
             );
           }

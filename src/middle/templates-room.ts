@@ -21,7 +21,7 @@ export function mountTemplatesRoom(target: HTMLElement): () => void {
   const body = document.createElement('div');
   body.className = 'atlas-pane-empty';
   body.innerHTML = `
-    <p>Templates are atlas-local — they never sync to the OW API.</p>
+    <p>Templates are atlas-local; they never sync to the OW API.</p>
     <p class="atlas-room-hint">
       Coming soon: create a template by selecting an element and saving its
       field pattern. Apply with one click to scaffold new elements that follow

@@ -52,9 +52,9 @@ export const PAGE_INTENTS: readonly PageIntent[] = ['show', 'reference', 'publis
 
 /** Human hint per intent (list chips + the intent picker). */
 export const PAGE_INTENT_HINTS: Record<PageIntent, string> = {
-  show: 'social — look at this!',
-  reference: 'selective — for a specific audience',
-  publish: 'permanent — a curated destination',
+  show: 'social: look at this',
+  reference: 'selective: for a specific audience',
+  publish: 'permanent: a curated destination',
 };
 
 /** A page's intent; defaults to 'show' when missing/unknown. */
@@ -427,16 +427,16 @@ export function compilePageStory(
         if (b.markdown.trim()) parts.push(b.markdown.trim());
         break;
       case 'element-card':
-        parts.push(`[ ${resolveName(b.elementId) ?? b.elementId} — element card ]`);
+        parts.push(`[ ${resolveName(b.elementId) ?? b.elementId} · element card ]`);
         break;
       case 'circle':
-        parts.push(`[ ${resolveName(b.knowerId) ?? b.knowerId} — circle knowledge ]`);
+        parts.push(`[ ${resolveName(b.knowerId) ?? b.knowerId} · circle knowledge ]`);
         break;
       case 'collection':
-        parts.push(`[ ${b.elementIds.map(id => resolveName(id) ?? id).join(', ')} — collection ]`);
+        parts.push(`[ ${b.elementIds.map(id => resolveName(id) ?? id).join(', ')} · collection ]`);
         break;
       case 'map':
-        parts.push(`[ ${resolveName(b.mapId) ?? b.mapId} — map ]`);
+        parts.push(`[ ${resolveName(b.mapId) ?? b.mapId} · map ]`);
         break;
       case 'chart':
         parts.push('[ chart ]');

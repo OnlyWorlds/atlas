@@ -129,7 +129,7 @@ export function startDrawing(entry: MapTabCacheEntry, mode: DrawMode, toasts: To
   const state = getState();
   const map = state.data.elements.find(e => e.type === 'map' && e.id === entry.mapId);
   if (!map || (!(map as { image_url?: string }).image_url && !(map as { image_media_id?: string }).image_media_id)) {
-    toasts.info('Set a map image first — zones anchor to the image');
+    toasts.info('Set a map image first; zones anchor to the image');
     return;
   }
 
@@ -260,7 +260,7 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
 
   const store = getActiveStore();
   if (!store) {
-    draft.toasts.error('No active world store — cannot save zone');
+    draft.toasts.error('No active world store; cannot save zone');
     return;
   }
 

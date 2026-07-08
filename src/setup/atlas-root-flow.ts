@@ -63,7 +63,7 @@ export async function setupAtlasRoot(): Promise<SetupAtlasRootResult | null> {
 
   const granted = await ensureWritable(picked);
   if (!granted) {
-    throw new Error('Folder is read-only — atlas needs write access');
+    throw new Error('Folder is read-only; atlas needs write access');
   }
 
   const rootHandle = await resolveOrCreateRoot(picked);
@@ -301,7 +301,7 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
   if (!hasMarker) {
     await deleteHandle(ATLAS_ROOT_HANDLE_KEY);
     patchSlice('atlasRootRecoverable', null);
-    throw new Error('Folder no longer looks like an atlas root — pick again');
+    throw new Error('Folder no longer looks like an atlas root. Pick again');
   }
   const pathHint = handle.name;
   const nextRegistry = setAtlasRoot(getState().registry, {
@@ -370,11 +370,11 @@ async function scaffoldWorldInRoot(
   } else {
     const reg = getState().registry;
     if (!reg.atlas_root) {
-      throw new Error('Atlas root is not set up — pick a folder first');
+      throw new Error('Atlas root is not set up. Pick a folder first');
     }
     const loaded = await loadHandle(reg.atlas_root.handle_key);
     if (!loaded) {
-      throw new Error('Atlas root handle is missing from the vault — re-pick it from settings');
+      throw new Error('Atlas root handle is missing from the vault. Re-pick it from settings');
     }
     // Re-grant permission on the root (user gesture at click-time is acceptable here).
     const granted = await ensureWritable(loaded);
@@ -541,7 +541,7 @@ export async function linkExistingApiWorldInRoot(
 ): Promise<LinkExistingApiWorldResult> {
   const reg = getState().registry;
   if (!reg.atlas_root) {
-    throw new Error('Atlas root is not set up — pick a folder first');
+    throw new Error('Atlas root is not set up. Pick a folder first');
   }
   const apiKey = opts.apiKey.trim();
   const apiPin = opts.apiPin.trim();
@@ -557,7 +557,7 @@ export async function linkExistingApiWorldInRoot(
     const msg = err instanceof Error ? err.message : String(err);
     if (/401|403/.test(msg)) throw new Error('API key or PIN invalid');
     if (/404/.test(msg)) throw new Error('No world found for that API key');
-    if (/network|fetch/i.test(msg)) throw new Error('Could not reach onlyworlds — check your connection');
+    if (/network|fetch/i.test(msg)) throw new Error('Could not reach onlyworlds. Check your connection');
     throw new Error(msg);
   }
   if (!world.id) throw new Error('Server returned no world ID (unexpected)');
@@ -579,7 +579,7 @@ export async function linkExistingApiWorldInRoot(
 
   const rootHandle = await loadHandle(reg.atlas_root.handle_key);
   if (!rootHandle) {
-    throw new Error('Atlas root handle is missing from the vault — re-pick it from settings');
+    throw new Error('Atlas root handle is missing from the vault. Re-pick it from settings');
   }
   const granted = await ensureWritable(rootHandle);
   if (!granted) {
@@ -676,11 +676,11 @@ export async function linkExistingApiWorldInRoot(
 export async function deleteWorldFolderUnderRoot(folderName: string): Promise<void> {
   const reg = getState().registry;
   if (!reg.atlas_root) {
-    throw new Error('Atlas root not configured — cannot delete');
+    throw new Error('Atlas root not configured; cannot delete');
   }
   const rootHandle = await loadHandle(reg.atlas_root.handle_key);
   if (!rootHandle) {
-    throw new Error('Atlas root handle missing — re-pick the root in settings');
+    throw new Error('Atlas root handle missing. Re-pick the root in settings');
   }
   const granted = await ensureWritable(rootHandle);
   if (!granted) {

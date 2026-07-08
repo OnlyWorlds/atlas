@@ -64,11 +64,11 @@ export function openSplitDialog(opts: SplitOptions): void {
   // We treat "at start" / "at end" as "nothing to split" — split with nothing
   // moving wouldn't be useful (and would create an empty sibling or empty self).
   if (cursorPos <= 0) {
-    toastManager.info('Cursor is at the start — move it where you want to split.');
+    toastManager.info('Cursor is at the start. Move it where you want to split.');
     return;
   }
   if (cursorPos >= docSize) {
-    toastManager.info('Cursor is at the end — nothing after the cursor to split into a new sibling.');
+    toastManager.info('Cursor is at the end; nothing after it to split into a new sibling.');
     return;
   }
 

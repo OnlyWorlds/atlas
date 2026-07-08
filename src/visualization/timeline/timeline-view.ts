@@ -582,7 +582,7 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   const chip = document.createElement('button');
   chip.type = 'button';
   chip.className = 'atlas-timeline-chip';
-  chip.title = `${link.fieldLabel}: ${link.name} (${link.type}) — focus`;
+  chip.title = `${link.fieldLabel}: ${link.name} (${link.type}) · focus`;
   const icon = ELEMENT_ICONS[link.type as ElementType] ?? 'category';
   chip.innerHTML =
     `<span class="material-symbols-outlined">${escapeText(icon)}</span>` +

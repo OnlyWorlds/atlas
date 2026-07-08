@@ -246,7 +246,7 @@ export function toggleGhostsAtSourcePin(args: ToggleArgs): number {
     // Content-element source with no location link. Location-element sources
     // never trip this since their own id is the locId. Toast wording reflects
     // that nuance.
-    onToast("this pin's element has no location set — nothing to ghost", 'info');
+    onToast("this pin's element has no location set; nothing to ghost", 'info');
     return 0;
   }
   const candidates = computeGhostCandidates(sourcePinElementId, mapId, elements);
@@ -281,7 +281,7 @@ export function toggleGhostsAtSourcePin(args: ToggleArgs): number {
       // what's around). Default Leaflet zIndexOffset is 0; +500 keeps us
       // above standard markers without clobbering popovers.
       zIndexOffset: 500,
-      title: `${el.name || '(unnamed)'} — left click to select, right click to remove`,
+      title: `${el.name || '(unnamed)'} · left click to select, right click to remove`,
     });
 
     // Optional name label rendered as a separate divIcon marker, anchored

@@ -30,14 +30,14 @@ export class AliasesEditModal extends BaseModal {
 
   open(): void {
     const { overlay, body } = this.buildModalShell({
-      title: `aliases — ${this.opts.elementName || '(unnamed)'}`,
+      title: `aliases · ${this.opts.elementName || '(unnamed)'}`,
       dataModal: 'aliases-edit',
       panelClass: 'atlas-aliases-modal',
     });
     body.innerHTML = `
       <p class="atlas-modal-hint">
         Alternate names that the writing room's <code>@</code> picker matches against
-        when looking for this element. One alias per row — handy for nicknames,
+        when looking for this element. One alias per row; handy for nicknames,
         titles, abbreviations.
       </p>
       <div class="atlas-aliases-rows" data-role="rows"></div>

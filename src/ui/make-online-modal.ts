@@ -135,14 +135,14 @@ export class MakeOnlineModal extends BaseModal {
               <input type="radio" name="link-policy" value="b" checked />
               <span>
                 <strong>Overwrite <span class="atlas-settings-default-tag">default</span></strong>
-                <em>Local copy wins — pushes your version, server's is replaced.</em>
+                <em>Local copy wins: pushes your version, server's is replaced.</em>
               </span>
             </label>
             <label class="atlas-policy-option">
               <input type="radio" name="link-policy" value="c" />
               <span>
                 <strong>Skip</strong>
-                <em>Keep server copy — local edits to matched elements are lost.</em>
+                <em>Keep server copy: local edits to matched elements are lost.</em>
               </span>
             </label>
           </fieldset>
@@ -328,10 +328,10 @@ export class MakeOnlineModal extends BaseModal {
       // 8. Toast + close.
       const failures = pushResult.failures.length;
       if (failures > 0) {
-        this.toasts.error(`${name} is online — ${failures} element${failures === 1 ? '' : 's'} failed (will retry on next sync)`);
+        this.toasts.error(`${name} is online, but ${failures} element${failures === 1 ? '' : 's'} failed (will retry on next sync)`);
       } else {
         const uploaded = pushResult.pushed.creates + pushResult.pushed.updates;
-        this.toasts.success(`${name} is online — ${uploaded} element${uploaded === 1 ? '' : 's'} uploaded`);
+        this.toasts.success(`${name} is online · ${uploaded} element${uploaded === 1 ? '' : 's'} uploaded`);
       }
       completeWaypoint('ecosystem');
       void pushDone; void pushTotal;
@@ -470,7 +470,7 @@ export class MakeOnlineModal extends BaseModal {
       if (failed) parts.push(`${failed} failed`);
       const summary = parts.length ? parts.join(', ') : 'Nothing to merge';
       const verb = failed > 0 ? this.toasts.error.bind(this.toasts) : this.toasts.success.bind(this.toasts);
-      verb(`Linked to ${world.name ?? 'world'} — ${summary}`);
+      verb(`Linked to ${world.name ?? 'world'} · ${summary}`);
       completeWaypoint('ecosystem');
 
       this.hide();

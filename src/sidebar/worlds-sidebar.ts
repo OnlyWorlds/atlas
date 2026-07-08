@@ -161,7 +161,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
 
     if (worlds.length === 0) {
       if (state.atlasRoot) {
-        listEl.innerHTML = `<div class="atlas-pane-empty">No worlds yet — create one to start.</div>`;
+        listEl.innerHTML = `<div class="atlas-pane-empty">No worlds yet. Create one to start.</div>`;
       } else if (state.atlasRootRecoverable) {
         listEl.innerHTML = `<div class="atlas-pane-empty">Use the welcome panel to re-link your atlas folder.</div>`;
       } else {
@@ -360,7 +360,7 @@ export async function activateWorld(
       const cleaned = deleteWorldEntry(getState().registry, worldId);
       saveRegistry(cleaned);
       patchSlice('registry', cleaned);
-      if (!silent) toasts.info(`"${entry.name}" folder is gone — removed from atlas`);
+      if (!silent) toasts.info(`"${entry.name}" folder is gone; removed from atlas`);
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }

@@ -298,8 +298,8 @@ function buildRow(el: Element, opts: RowOpts): HTMLElement {
     const dot = document.createElement('span');
     dot.className = `atlas-context-pane-row-status atlas-context-pane-row-status-${opts.status}`;
     dot.title = opts.status === 'featured'
-      ? 'Featured — appears in the prose'
-      : 'Planned — in the cast but not yet written into the prose';
+      ? 'Featured · appears in the prose'
+      : 'Planned · in the cast but not yet written into the prose';
     row.appendChild(dot);
   }
 

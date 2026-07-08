@@ -76,30 +76,30 @@ export class SharingApiError extends Error {
 /** Human-facing message per code (toast copy). */
 export function sharingErrorMessage(err: SharingApiError): string {
   switch (err.code) {
-    case 'slug_taken': return 'That URL is already taken — pick another slug.';
+    case 'slug_taken': return 'That URL is already taken. Pick another slug.';
     case 'slug_invalid': {
       // The server's detail beats the generic rule recital (e.g. a RESERVED
       // slug passes the format rules — "must be 4–40 chars" would gaslight).
       const detail = err.message && err.message !== 'slug_invalid' ? err.message : '';
       return detail
-        ? `Slug rejected — ${detail}`
+        ? `Slug rejected: ${detail}`
         : 'Slug must be 4–40 chars: a–z, 0–9, hyphens (not at the edges). Some words are reserved.';
     }
-    case 'quota_exceeded': return 'Page limit reached — revoke an old page to publish a new one.';
+    case 'quota_exceeded': return 'Page limit reached. Revoke an old page to publish a new one.';
     case 'payload_too_large': return 'This page is too large to publish (256KB limit).';
     case 'revoked': return 'This page has been revoked.';
     case 'not_found': return 'Page not found on the server.';
-    case 'rate_limited': return 'Too many publishes — wait a bit and try again.';
+    case 'rate_limited': return 'Too many publishes. Wait a bit and try again.';
     case 'admin_locked': return 'This slug has been locked by an administrator.';
     case 'title_too_long': return 'Page name is too long to publish (200 characters max).';
-    case 'intent_invalid': return 'Page intent isn\'t valid — pick show, reference, or publish.';
+    case 'intent_invalid': return 'Page intent isn\'t valid. Pick show, reference, or publish.';
     // As-built: 403 forbidden fires only for demo-world writes (cross-account
     // mutations are existence-hidden 404s).
     case 'forbidden': return 'This world doesn\'t allow publishing.';
     case 'unauthorized':
-    case 'auth_failed': return 'Authentication failed — check the world\'s API key and PIN in settings.';
+    case 'auth_failed': return 'Authentication failed. Check the world\'s API key and PIN in settings.';
     case 'network': return 'Could not reach the sharing server.';
-    default: return 'Publishing failed — try again.';
+    default: return 'Publishing failed. Try again.';
   }
 }
 

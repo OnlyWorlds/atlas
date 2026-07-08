@@ -309,7 +309,7 @@ function buildOnboarding(toasts: ToastManager): HTMLElement {
   onboarding.innerHTML = `
     <h2 class="atlas-home-section-title">Your world is empty</h2>
     <p class="atlas-home-onboarding-copy">
-      Start by adding a few elements. Characters, locations, events — anything that lives in your world.
+      Start with a few characters, locations, or events.
     </p>
     <div class="atlas-home-onboarding-grid">
       <button class="atlas-home-onboarding-tile" data-create-type="character">

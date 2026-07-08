@@ -333,7 +333,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
             // type, so we approximate via a re-list comparison.
             const totalPulled = result.pulled.creates + result.pulled.updates;
             if (totalPulled > 0) {
-              toasts.success(`Refreshed (${totalPulled} change${totalPulled === 1 ? '' : 's'} pulled — ${label} may be among them)`);
+              toasts.success(`Refreshed (${totalPulled} change${totalPulled === 1 ? '' : 's'} pulled; ${label} may be among them)`);
             } else {
               toasts.info(`${label} are up to date`);
             }
@@ -367,9 +367,9 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       } else if (!state.atlasRoot) {
         msg = 'Use the welcome panel to set up your atlas folder.';
       } else if (state.registry.worlds.length === 0) {
-        msg = 'No worlds yet — create one from the Worlds tab.';
+        msg = 'No worlds yet. Create one from the Worlds tab.';
       } else {
-        msg = 'No active world — pick one from the Worlds tab.';
+        msg = 'No active world. Pick one from the Worlds tab.';
       }
       listEl.innerHTML = `<div class="atlas-pane-empty">${msg}</div>`;
       return;
@@ -409,7 +409,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     if (filtered.length === 0) {
       const msg = elements.length === 0
-        ? 'No elements yet — click <b>+ new element</b> to start.'
+        ? 'No elements yet. Click <b>+ new element</b> to start.'
         : 'No elements match the current filter.';
       listEl.innerHTML = `<div class="atlas-pane-empty">${msg}</div>`;
       return;

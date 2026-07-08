@@ -100,7 +100,7 @@ export class ServerDeleteReviewModal extends BaseModal {
         // wrong world would surprise the user (and could lose data in the
         // "delete locally" case).
         if (getState().active?.worldId !== this.capturedWorldId) {
-          this.toasts.info('World changed — close and reopen to review');
+          this.toasts.info('World changed. Close and reopen to review');
           this.hide();
           return;
         }

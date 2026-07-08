@@ -22,7 +22,7 @@ export function renderWritingTab(entry: WorldRegistryEntry): string {
       <h3>Writing</h3>
       <p class="atlas-settings-hint">
         Four tier labels for the writing room. The label IS the
-        <code>supertype</code> stored on each Narrative — renaming a label
+        <code>supertype</code> stored on each Narrative; renaming a label
         rewrites existing narratives' supertype so display and storage stay
         consistent.
       </p>

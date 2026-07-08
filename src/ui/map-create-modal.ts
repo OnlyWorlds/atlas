@@ -302,7 +302,7 @@ class MapCreateModal extends BaseModal {
       const hasFile = !!fileField.files?.length;
       const hasUrl = !!urlField.value.trim();
       if (hasFile && hasUrl) {
-        hintEl.textContent = 'Image URL is set — your uploaded file will be stored as fallback but the URL will display.';
+        hintEl.textContent = 'Image URL is set; your uploaded file is stored as fallback but the URL displays.';
         hintEl.classList.add('atlas-modal-hint-warn');
       } else {
         hintEl.textContent = 'Used as fallback when image URL is empty. Stored locally, never uploaded.';

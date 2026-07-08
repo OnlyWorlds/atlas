@@ -193,7 +193,7 @@ export function renderCollectionView(
   if (members.length === 0) {
     const none = document.createElement('p');
     none.className = 'atlas-share-hint';
-    none.textContent = 'Empty collection — add elements in the editor.';
+    none.textContent = 'Empty collection. Add elements in the editor.';
     wrap.appendChild(none);
     return wrap;
   }
@@ -322,7 +322,7 @@ export function renderMapView(
   if (!frozen) {
     const hint = document.createElement('p');
     hint.className = 'atlas-share-hint atlas-share-map-unpublishable';
-    hint.textContent = 'This map can\'t publish yet — it needs a web image URL '
+    hint.textContent = 'This map can\'t publish yet: it needs a web image URL '
       + '(local files never leave your folder; host the image and set image_url '
       + 'on the map). Dimensions fill in automatically when the image loads in atlas.';
     return hint;
@@ -448,7 +448,7 @@ export function renderBlockView(block: PageBlock, elements: Map<string, Element>
       if (!frozen) {
         const miss = document.createElement('div');
         miss.className = 'atlas-share-hint';
-        miss.textContent = 'chart not found — it may have been deleted';
+        miss.textContent = 'chart not found; it may have been deleted';
         return miss;
       }
       return renderChartView(frozen);

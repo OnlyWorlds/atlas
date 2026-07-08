@@ -64,7 +64,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'first-world',
     name: 'Your world, your files',
-    concept: 'Your world is plain files on your disk — no account, no lock-in. The open format is why any tool can read them.',
+    concept: 'Your world is plain files on your disk: no account, no lock-in. The open format is why any tool can read them.',
     action: 'Create your first world. Peek in the folder afterwards.',
     toast: 'Your world lives in a folder you own.',
     glyph: 'folder',
@@ -73,7 +73,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'first-element',
     name: 'A place for everything',
-    concept: 'Every OnlyWorlds tool speaks the same 22 element types — a shared vocabulary for whole worlds.',
+    concept: 'Every OnlyWorlds tool speaks the same 22 element types, a shared vocabulary for whole worlds.',
     action: 'Create your first element and meet the type grid.',
     toast: 'Every piece of your world has a place.',
     glyph: 'category',
@@ -82,7 +82,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'taxonomy',
     name: 'Label it your way',
-    concept: 'Supertype and subtype are free labels on every element — no fixed categories.',
+    concept: 'Supertype and subtype are free labels on every element. No fixed categories.',
     action: 'Set a supertype and a subtype on any element.',
     toast: 'Labels are yours to invent.',
     glyph: 'sell',
@@ -92,7 +92,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
     id: 'links',
     name: 'Everything links',
     concept: 'Relation fields weave elements into a world graph; stable ids are why the links hold.',
-    action: 'Link one element to another — a field, or an @ mention.',
+    action: 'Link one element to another, with a field or an @ mention.',
     toast: 'Your world is starting to connect.',
     glyph: 'hub',
     link: (w) => (w ? `#/w/${w}/elements` : null),
@@ -100,7 +100,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'maps',
     name: 'Places on maps',
-    concept: 'Maps, pins and zones are world data too — spatial elements in the same schema.',
+    concept: 'Maps, pins and zones are world data too, spatial elements in the same schema.',
     action: 'Place a pin on a map.',
     toast: 'Your world has places now.',
     glyph: 'location_on',
@@ -109,7 +109,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'time',
     name: 'Your world through time',
-    concept: 'Events and dates are structured data — a chart is one view of it.',
+    concept: 'Events and dates are structured data; a chart is one view of it.',
     action: 'Open the charts room and click a node.',
     toast: 'Your world has a timeline of its own.',
     glyph: 'timeline',
@@ -127,7 +127,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'ecosystem',
     name: 'One world, many tools',
-    concept: 'Your world travels by API key and PIN — the same world in any OnlyWorlds tool.',
+    concept: 'Your world travels by API key and PIN: the same world in any OnlyWorlds tool.',
     action: 'Make a world online, or link an existing one.',
     toast: 'Your world can travel between tools.',
     glyph: 'cloud_sync',
@@ -136,7 +136,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'share',
     name: 'Share your world as a page',
-    concept: 'Publishing renders your existing elements at a public URL — no separate site needed.',
+    concept: 'Publishing renders your existing elements at a public URL. No separate site needed.',
     action: 'Preview or publish a page in the share room.',
     toast: 'Your world has a public face.',
     glyph: 'public',
@@ -145,7 +145,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'council',
     name: 'Help shape the format',
-    concept: 'The schema is governed in the open — anyone can propose changes at the council.',
+    concept: 'The schema is governed in the open: anyone can propose changes at the council.',
     action: 'Visit the council and see an open motion.',
     toast: 'You have seen where the format is shaped.',
     glyph: 'gavel',

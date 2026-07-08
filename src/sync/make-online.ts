@@ -85,13 +85,13 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
     } catch {
       // Non-JSON body — fall through to the generic message.
     }
-    throw new Error(serverMessage ?? 'Invalid email or PIN — verify your onlyworlds.com account');
+    throw new Error(serverMessage ?? 'Invalid email or PIN. Verify your onlyworlds.com account');
   }
   if (response.status === 429) {
-    throw new Error('Too many requests — please try again later');
+    throw new Error('Too many requests. Try again later');
   }
   if (!response.ok) {
-    throw new Error(`Server error ${response.status} — unable to create world`);
+    throw new Error(`Server error ${response.status}; unable to create world`);
   }
   const data = await response.json() as { success?: boolean; api_key?: string; message?: string };
   if (!data.success || !data.api_key) {

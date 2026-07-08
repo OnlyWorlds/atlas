@@ -129,7 +129,7 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
         chip.type = 'button';
         chip.className = 'atlas-room-nav-selected';
         if (route.mode === 'element') chip.classList.add('active');
-        chip.title = `${el.name || '(unnamed)'} — click to view`;
+        chip.title = `${el.name || '(unnamed)'} · click to view`;
         const truncatedName = truncateName(el.name || '(unnamed)', 22);
         chip.innerHTML = `
           <span class="material-symbols-outlined atlas-room-nav-selected-icon">${ELEMENT_ICONS[el.type] ?? 'category'}</span>

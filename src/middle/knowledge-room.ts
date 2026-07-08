@@ -380,7 +380,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     body.className = 'atlas-knowledge-chip-body';
     body.innerHTML = `<span class="material-symbols-outlined">${icon}</span><span>${escapeText(name)}</span>`;
     if (el && worldId) {
-      body.title = derived ? `${name} — mentioned in the text` : `Open ${name}`;
+      body.title = derived ? `${name} · mentioned in the text` : `Open ${name}`;
       body.addEventListener('click', () => navigate(elementHash(worldId, el.id)));
     } else {
       body.disabled = true;
@@ -463,7 +463,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     add.addEventListener('click', async () => {
       const p = await pickElement({ title: 'What is this knowledge about?', excludeIds: ctx.aboutIds() });
       if (!p) return;
-      if (p.type === 'collective') { toasts.info('Circles are holders — add them under "Who knows this".'); return; }
+      if (p.type === 'collective') { toasts.info('Circles are holders; add them under "Who knows this".'); return; }
       if (!aboutFieldFor(p.type)) { toasts.info('That element type can\'t be a subject.'); return; }
       ctx.addAbout(p.id);
     });
@@ -608,8 +608,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       empty.innerHTML = `
         <p class="atlas-knowledge-empty-title">No knowledge entries yet.</p>
         <p class="atlas-knowledge-hint">
-          Create one to record something known in your world — a secret, a rumor,
-          a fact — then assign who holds it (a character, or a circle).
+          Create one to record something known in your world: a secret, a rumor,
+          a fact. Then assign who holds it, a character or a circle.
         </p>
       `;
       const cta = document.createElement('button');
@@ -661,7 +661,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       empty.innerHTML = `
         <p class="atlas-knowledge-empty-title">No knowers yet.</p>
         <p class="atlas-knowledge-hint">
-          Assign a character or circle in an entry's "Who knows this" — or create a
+          Assign a character or circle in an entry's "Who knows this", or create a
           circle here to set one up before it holds anything.
         </p>
       `;
@@ -798,7 +798,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const existing = listPages(getState().data.elements).find(p =>
           blocksOf(p).some(b => b.kind === 'circle' && b.knowerId === knower.id));
         if (existing) {
-          toasts.info(`Opened the existing page for this circle — "${existing.name || '(untitled)'}"`);
+          toasts.info(`Opened the existing page for this circle: "${existing.name || '(untitled)'}"`);
           navigate(shareHash(worldId, existing.id));
           return;
         }
@@ -843,7 +843,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     if (held.length === 0) {
       const none = document.createElement('p');
       none.className = 'atlas-knowledge-none';
-      none.textContent = 'Holds no knowledge yet — assign it in an entry\'s "Who knows this".';
+      none.textContent = 'Holds no knowledge yet. Assign it in an entry\'s "Who knows this".';
       heldSection.appendChild(none);
     } else {
       const list = document.createElement('div');
@@ -871,13 +871,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const knownSection = document.createElement('section');
     knownSection.className = 'atlas-knowledge-section';
     knownSection.innerHTML = `<h2 class="atlas-knowledge-section-title">Known world</h2>
-      <p class="atlas-knowledge-section-hint">The world as ${escapeText(knower.name || 'they')} knows it — compiled from held entries, not the canonical records.</p>`;
+      <p class="atlas-knowledge-section-hint">The world as ${escapeText(knower.name || 'they')} knows it: compiled from held entries, not the canonical records.</p>`;
     if (knownIds.length === 0) {
       const none = document.createElement('p');
       none.className = 'atlas-knowledge-none';
       none.textContent = held.length === 0
         ? 'Nothing known yet.'
-        : 'Held entries have no subjects yet — mention elements in their text, or add subjects.';
+        : 'Held entries have no subjects yet. Mention elements in their text, or add subjects.';
       knownSection.appendChild(none);
     } else {
       const known = knownIds
@@ -913,13 +913,13 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           } else {
             const text = document.createElement('div');
             text.className = 'atlas-knowledge-known-text';
-            text.textContent = '(no text — the entry only references it)';
+            text.textContent = '(no text; the entry only references it)';
             quote.appendChild(text);
           }
           const src = document.createElement('button');
           src.type = 'button';
           src.className = 'atlas-knowledge-known-src';
-          src.textContent = `— ${entry.name || '(untitled)'}`;
+          src.textContent = `from ${entry.name || '(untitled)'}`;
           src.title = 'Open this entry';
           src.addEventListener('click', () => navigate(knowledgeHash(worldId, entry.id)));
           quote.appendChild(src);
@@ -1145,7 +1145,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       host.innerHTML = '';
       const fail = document.createElement('div');
       fail.className = 'atlas-knowledge-prose-loading';
-      fail.append('editor failed to load — ');
+      fail.append('editor failed to load. ');
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.className = 'atlas-knowledge-allfields';

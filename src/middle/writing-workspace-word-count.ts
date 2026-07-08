@@ -45,7 +45,7 @@ export function createWordCount(deps: {
     wcBtn.type = 'button';
     wcBtn.className = 'atlas-writing-workspace-wc-btn';
     wcBtn.title = goal != null
-      ? `${wordCount.toLocaleString()} / ${goal.toLocaleString()} words — click to change goal`
+      ? `${wordCount.toLocaleString()} / ${goal.toLocaleString()} words · click to change goal`
       : 'Click to set session word goal';
     if (goal != null) wcBtn.dataset.hasGoal = 'true';
     renderWordCountInto(wcBtn, wordCount, goal);

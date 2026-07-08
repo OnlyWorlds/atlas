@@ -175,7 +175,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const url = publicUrlFor(pub.slug);
       const msg = client
         ? `"${el?.name || 'This page'}" is published at ${url}. Deleting it also takes the public page down. Continue?`
-        : `"${el?.name || 'This page'}" is published at ${url}, but atlas can't reach the sharing server for this world — the public page would STAY up with no way to revoke it from here. Delete anyway?`;
+        : `"${el?.name || 'This page'}" is published at ${url}, but atlas can't reach the sharing server for this world. The public page would stay up with no way to revoke it from here. Delete anyway?`;
       if (!window.confirm(msg)) return;
       publishConfirmed = true;
       if (client) {
@@ -183,7 +183,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           await client.revoke(pub.slug);
         } catch (err) {
           if (!(err instanceof SharingApiError && err.code === 'not_found')) {
-            surfaceSharingError(err, 'Could not take the public page down — page not deleted');
+            surfaceSharingError(err, 'Could not take the public page down; page not deleted');
             return; // abort: retry the delete once the server is reachable
           }
           // not_found = already gone server-side; the delete may proceed.
@@ -486,7 +486,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       // Builder-only affordance: an empty prose block invites a click.
       const empty = document.createElement('p');
       empty.className = 'atlas-share-block-placeholder';
-      empty.textContent = 'empty text block — click to write';
+      empty.textContent = 'empty text block · click to write';
       content.appendChild(empty);
       return content;
     }
@@ -642,7 +642,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'atlas-btn-ghost';
-    changeBtn.textContent = el ? `element: ${el.name || '(unnamed)'} — change…` : 'pick element…';
+    changeBtn.textContent = el ? `element: ${el.name || '(unnamed)'} · change…` : 'pick element…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ title: 'Change card to…', excludeIds: [pageId] });
@@ -758,7 +758,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'atlas-btn-ghost';
-    changeBtn.textContent = knower ? `circle: ${knower.name || '(unnamed)'} — change…` : 'pick circle…';
+    changeBtn.textContent = knower ? `circle: ${knower.name || '(unnamed)'} · change…` : 'pick circle…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ restrictToType: 'collective', title: 'Whose knowledge? (a circle)' });
@@ -777,7 +777,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
 
     const hint = document.createElement('p');
     hint.className = 'atlas-share-section-hint';
-    hint.textContent = 'Publishes a frozen copy of everything this circle holds — later knowledge edits never leak until you republish.';
+    hint.textContent = 'Publishes a frozen copy of everything this circle holds; later knowledge edits never leak until you republish.';
     wrap.appendChild(hint);
 
     const doneRow = document.createElement('div');
@@ -827,7 +827,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'atlas-btn-ghost';
-    changeBtn.textContent = map ? `map: ${map.name || '(unnamed)'} — change…` : 'pick map…';
+    changeBtn.textContent = map ? `map: ${map.name || '(unnamed)'} · change…` : 'pick map…';
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ restrictToType: 'map', title: 'Which map?' });
@@ -927,8 +927,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           fullBtn.className = 'atlas-share-pin-full-toggle' + (isFull ? ' is-on' : '');
           fullBtn.textContent = 'full';
           fullBtn.title = isFull
-            ? 'Sharing every populated field of this element — click to share only name, type, description and image'
-            : 'Sharing name, type, description and image — click to share every populated field of this element';
+            ? 'Sharing every populated field of this element. Click to share only name, type, description and image'
+            : 'Sharing name, type, description and image. Click to share every populated field of this element';
           fullBtn.addEventListener('click', (e) => {
             e.preventDefault(); // inside a <label> — don't toggle the checkbox
             const curr = block.fullPinIds ?? [];
@@ -943,7 +943,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     } else {
       const none = document.createElement('p');
       none.className = 'atlas-share-section-hint';
-      none.textContent = 'This map has no pins — it publishes as the image alone.';
+      none.textContent = 'This map has no pins; it publishes as the image alone.';
       wrap.appendChild(none);
     }
 
@@ -1101,7 +1101,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (blocks.length === 0 && !editingBlockId) {
       const empty = document.createElement('p');
       empty.className = 'atlas-share-section-hint';
-      empty.textContent = 'No blocks yet — the page is an ordered stack. Add a heading, text, card, collection, map, or circle below.';
+      empty.textContent = 'No blocks yet. A page is an ordered stack: add a heading, text, card, collection, map, or circle below.';
       blocksHost.appendChild(empty);
     }
 
@@ -1205,7 +1205,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     addRow.className = 'atlas-share-block-add';
     addRow.appendChild(addBtn('title', '+ heading', () => { void addBlock(pageId, 'heading'); }, 'A section or subsection heading'));
     addRow.appendChild(addBtn('notes', '+ text', () => { void addBlock(pageId, 'prose'); }, 'A rich-text block with @-mentions'));
-    addRow.appendChild(addBtn('badge', '+ element card', () => { void addElementCard(pageId); }, 'A card for one element — identity plus the fields you choose'));
+    addRow.appendChild(addBtn('badge', '+ element card', () => { void addElementCard(pageId); }, 'A card for one element: identity plus the fields you choose'));
     addRow.appendChild(addBtn('grid_view', '+ collection', () => { void addCollectionBlock(pageId); }, 'A grid of several elements (identity only)'));
     addRow.appendChild(addBtn('map', '+ map', () => { void addMapBlock(pageId); }, 'A map image with the pins you include'));
     addRow.appendChild(addBtn('show_chart', '+ chart', () => { void addChartBlock(pageId); }, 'A saved chart from the Charts room'));
@@ -1333,11 +1333,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         },
       });
       if (mirrored) {
-        toasts.success(`Published — ${publicUrlFor(res.slug)}`);
+        toasts.success(`Published at ${publicUrlFor(res.slug)}`);
       } else {
         // The page IS live; only the local record failed. Don't claim success,
         // don't lose the URL.
-        toasts.error(`Published at ${publicUrlFor(res.slug)} — but atlas couldn't record it locally. Keep that URL.`);
+        toasts.error(`Published at ${publicUrlFor(res.slug)}, but atlas couldn't record it locally. Keep that URL.`);
       }
       completeWaypoint('share'); // hookmap wp9 — the publish gesture succeeded
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
@@ -1371,11 +1371,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         },
       });
       if (mirrored) {
-        toasts.success('Republished — the public page is up to date');
+        toasts.success('Republished; the public page is up to date');
       } else {
         // Same rule as publishPage: the public page IS updated; only the
         // local record failed. Don't claim the mirror is current.
-        toasts.error('Republished — the public page is up to date, but atlas couldn\'t record it locally.');
+        toasts.error('Republished; the public page is up to date, but atlas couldn\'t record it locally.');
       }
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
@@ -1384,7 +1384,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         // cleanup). Clear the mirror so the page returns to a publishable
         // state instead of a permanent dead-end.
         await patchPage(pageId, { atlas_page_pub: null });
-        toasts.info('The sharing server no longer has this page — publish it again.');
+        toasts.info('The sharing server no longer has this page. Publish it again.');
         if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
         return;
       }
@@ -1405,7 +1405,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       await patchPage(pageId, {
         atlas_page_pub: { ...pub, revoked: true, updated_at: new Date().toISOString() },
       });
-      toasts.success('Revoked — the link no longer serves this page');
+      toasts.success('Revoked; the link no longer serves this page');
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
       if (err instanceof SharingApiError && err.code === 'not_found') {
@@ -1413,7 +1413,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         await patchPage(pageId, {
           atlas_page_pub: { ...pub, revoked: true, updated_at: new Date().toISOString() },
         });
-        toasts.info('Already gone on the server — marked revoked here.');
+        toasts.info('Already gone on the server; marked revoked here.');
         if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
         return;
       }
@@ -1551,7 +1551,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (!entry?.api?.api_key) {
       const hint = document.createElement('p');
       hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
-      hint.append('Publishing to a public URL needs an online world — use ');
+      hint.append('Publishing to a public URL needs an online world. Use ');
       hint.appendChild(settingsLink(worldId, 'world', '"Make online" in Settings → World'));
       hint.append(' first.');
       section.appendChild(hint);
@@ -1595,7 +1595,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const meta = document.createElement('p');
       meta.className = 'atlas-share-section-hint';
       const fmt = (iso: string) => iso ? new Date(iso).toLocaleString() : '?';
-      meta.textContent = `Frozen snapshot — published ${fmt(pub.published_at)} · updated ${fmt(pub.updated_at)}. World edits don't leak until you republish.`;
+      meta.textContent = `Frozen snapshot, published ${fmt(pub.published_at)} · updated ${fmt(pub.updated_at)}. World edits don't leak until you republish.`;
       section.appendChild(meta);
 
       // B1 (2026-07-03): content-signature drift = the public copy is behind.
@@ -1608,7 +1608,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         dot.className = 'atlas-share-stale-dot';
         stale.appendChild(dot);
         stale.appendChild(document.createTextNode(
-          'edited since publish — republish to update the public copy'));
+          'edited since publish; republish to update the public copy'));
         section.appendChild(stale);
       }
 
@@ -1630,7 +1630,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       rev.className = 'atlas-btn-ghost';
       rev.dataset.action = 'revoke';
       rev.textContent = 'revoke';
-      rev.title = 'Take the page down — the link shows "no longer shared"; you keep the slug';
+      rev.title = 'Take the page down. The link shows "no longer shared"; you keep the slug';
       rev.addEventListener('click', () => {
         rev.disabled = true;
         void revokePage(page.id).finally(() => { rev.disabled = false; });
@@ -1644,7 +1644,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const hint = document.createElement('p');
     hint.className = 'atlas-share-section-hint';
     hint.textContent = pub?.revoked
-      ? 'Revoked — republishing restores this URL with the current composition.'
+      ? 'Revoked. Republishing restores this URL with the current composition.'
       : 'Publish a frozen snapshot to a public URL. Only what the blocks include is shared.';
     section.appendChild(hint);
 
@@ -1816,7 +1816,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       empty.innerHTML = `
         <p class="atlas-share-empty-title">No pages yet.</p>
         <p class="atlas-share-hint">
-          A page is a stack of blocks — headings, prose, element cards — built
+          A page is a stack of blocks: headings, prose, element cards, built
           from your world's elements. Create one to start composing.
         </p>
         <p class="atlas-share-empty-examples">a character showcase · a player handout · a world landing page</p>
@@ -1833,7 +1833,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const pubBadge = pub && !pub.revoked
         ? `<span class="atlas-share-row-pub" title="${escapeText(publicUrlFor(pub.slug))}"><span class="material-symbols-outlined">public</span>live</span>`
         : pub?.revoked
-          ? `<span class="atlas-share-row-pub is-revoked" title="Revoked — slug ${escapeText(pub.slug)} held">revoked</span>`
+          ? `<span class="atlas-share-row-pub is-revoked" title="Revoked; slug ${escapeText(pub.slug)} held">revoked</span>`
           : '';
       const row = document.createElement('button');
       row.type = 'button';
@@ -1953,7 +1953,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           toasts.success('Page JSON copied');
         } catch {
           console.info('[share-room] page JSON (clipboard unavailable):\n' + json);
-          toasts.info('Clipboard unavailable — page JSON logged to console');
+          toasts.info('Clipboard unavailable; page JSON logged to console');
         }
       })();
     });

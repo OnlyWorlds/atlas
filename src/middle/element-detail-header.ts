@@ -77,7 +77,7 @@ export function renderHeader(el: Element): HTMLElement {
     thumb.src = imageUrl;
     thumb.alt = '';
     thumb.loading = 'lazy';
-    thumb.title = `${ELEMENT_LABELS[el.type].singular} — click to show element images`;
+    thumb.title = `${ELEMENT_LABELS[el.type].singular} · click to show element images`;
     thumb.addEventListener('click', () => {
       const next = setEditorSettings(getState().registry, { show_element_images: true });
       saveRegistry(next);
@@ -198,7 +198,7 @@ function startInlineNameEdit(host: HTMLElement, el: Element): void {
     const store = getActiveStore();
     if (!store) {
       host.textContent = original || '(unnamed)';
-      toastManager.error('Cannot rename — no active world');
+      toastManager.error('Cannot rename: no active world');
       return;
     }
     try {
@@ -262,7 +262,7 @@ function buildFavoriteAction(el: Element): HTMLElement | null {
   btn.className = 'atlas-icon-btn-sm atlas-header-favorite' + (isSet ? ' active' : '');
   btn.setAttribute('data-action', 'set-cast-favorite');
   btn.title = isSet
-    ? `This is the world's ${label} — click to unset`
+    ? `This is the world's ${label} · click to unset`
     : `Set as the world's ${label} (shows on the home page)`;
   btn.innerHTML = `<span class="material-symbols-outlined">${icon}</span>`;
   btn.addEventListener('click', () => {
@@ -300,7 +300,7 @@ function buildSyncDot(el: Element): HTMLElement {
     const dirty = !serverStamp || localStamp > serverStamp;
     if (dirty) {
       icon = 'cloud_upload';
-      title = 'Pending sync — autosave will push within a few seconds';
+      title = 'Pending sync; autosave will push within a few seconds';
       state = 'dirty';
     } else {
       icon = 'cloud_done';
@@ -609,7 +609,7 @@ function renderMapPinnedElementStrip(
     moreBtn.type = 'button';
     moreBtn.className = 'atlas-icon-btn-sm atlas-header-pinned-more';
     moreBtn.setAttribute('data-action', 'pinned-more');
-    moreBtn.title = `${overflow.length} more pinned element${overflow.length === 1 ? '' : 's'} — click to search all`;
+    moreBtn.title = `${overflow.length} more pinned element${overflow.length === 1 ? '' : 's'} · click to search all`;
     moreBtn.textContent = `+${overflow.length}`;
     moreBtn.addEventListener('click', async () => {
       // Picker filtered to the remaining ids. User can search by name +
@@ -760,7 +760,7 @@ function buildPinAffordance(
   btn.setAttribute('data-pin-id', pin.id);
   // Surface the right-click affordance in the tooltip — symmetric with
   // the drag-to-trash on the map canvas and the right-click-ghost prune.
-  btn.title = `Pin on ${mapName} — click to open and center, right-click to delete pin`;
+  btn.title = `Pin on ${mapName} · click to open and center, right-click to delete pin`;
   const iconHtml = '<span class="material-symbols-outlined">push_pin</span>';
   if (showMapName) {
     btn.innerHTML = `${iconHtml}<span class="atlas-header-map-label">${escapeText(mapName)}</span>`;

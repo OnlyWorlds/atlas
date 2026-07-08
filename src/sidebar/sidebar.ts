@@ -226,7 +226,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
   owBtn.className = 'atlas-icon-btn atlas-footer-owmark';
   owBtn.setAttribute('data-action', 'open-onlyworlds');
   owBtn.setAttribute('aria-label', 'OnlyWorlds');
-  owBtn.title = 'OnlyWorlds — account, waypoints, links';
+  owBtn.title = 'OnlyWorlds · account, waypoints, links';
   owBtn.innerHTML = '<img class="atlas-footer-ow-icon" src="owlogo.png" alt="" />';
   footer.appendChild(owBtn);
   owBtn.addEventListener('click', () => {

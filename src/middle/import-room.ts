@@ -74,7 +74,7 @@ function buildConvertNotesPrompt(): string {
     '- Every element needs a "name" (a non-empty string). Everything else is optional.',
     '- To link elements, use the target\'s name as the value: a single link like "location": "Old Harbor", or a list like "objects": ["Sword", "Shield"]. Only reference elements you also include.',
     '- Optionally add a "World" block with "name" and "description" to make it a full world.',
-    '- Do not invent field names — when unsure, put the detail in "description".',
+    '- Do not invent field names; when unsure, put the detail in "description".',
     '',
     'Return only the JSON, nothing else.',
     '',
@@ -112,7 +112,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           <input type="file" accept="application/json,.json" data-role="file" hidden />
         </div>
         <textarea class="atlas-import-paste" data-role="paste" rows="6"
-          placeholder="…or paste OnlyWorlds JSON — a full world export, or loose element lists"></textarea>
+          placeholder="…or paste OnlyWorlds JSON: a full world export, or loose element lists"></textarea>
         <p class="atlas-import-live" data-role="live" hidden></p>
         <div class="atlas-import-paste-actions">
           <button type="button" class="atlas-btn-ghost" data-action="load">load pasted JSON</button>
@@ -128,7 +128,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         <div class="atlas-import-ai">
           <span class="material-symbols-outlined">auto_awesome</span>
           <div class="atlas-import-ai-body">
-            <p class="atlas-import-ai-lead">Bring notes from anywhere — turn freeform notes into importable JSON with any AI assistant.</p>
+            <p class="atlas-import-ai-lead">Bring notes from anywhere: any AI assistant can turn freeform notes into importable JSON.</p>
             <div class="atlas-import-ai-actions">
               <button type="button" class="atlas-btn-ghost" data-action="convert-prompt">copy the convert-my-notes prompt</button>
               <a class="atlas-btn-link" href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">open the OnlyWorlds AI toolkit</a>
@@ -190,7 +190,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     try {
       raw = JSON.parse(text);
     } catch {
-      showError(`${sourceLabel} isn't valid JSON — check for a missing comma, quote, or bracket.`);
+      showError(`${sourceLabel} isn't valid JSON. Check for a missing comma, quote, or bracket.`);
       return;
     }
     const result = parsePayload(raw);
@@ -250,7 +250,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     } catch (err) {
       pasteEl.classList.add('is-invalid');
       const detail = err instanceof Error ? err.message : 'invalid JSON';
-      setLive('invalid', `Not valid JSON — ${detail}.`);
+      setLive('invalid', `Not valid JSON: ${detail}.`);
       return;
     }
     const result = parsePayload(raw);
@@ -343,7 +343,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
             ${r.updated ? `<span class="atlas-import-stat"><b>${r.updated}</b> update</span>` : ''}
             ${r.skipped ? `<span class="atlas-import-stat is-dim"><b>${r.skipped}</b> skip</span>` : ''}
             ${r.invalidRecords ? `<span class="atlas-import-stat is-warn"><b>${r.invalidRecords}</b> invalid</span>` : ''}
-            ${r.droppedLinks.length ? `<span class="atlas-import-stat is-warn" title="Links to other elements not found in this import — the connection is dropped but each element is still created.">${r.droppedLinks.length} link${r.droppedLinks.length === 1 ? '' : 's'} dropped</span>` : ''}
+            ${r.droppedLinks.length ? `<span class="atlas-import-stat is-warn" title="Links to other elements not found in this import. The connection is dropped; each element is still created.">${r.droppedLinks.length} link${r.droppedLinks.length === 1 ? '' : 's'} dropped</span>` : ''}
           </div>
 
           <button type="button" class="atlas-btn-primary" data-action="import" ${importing ? 'disabled' : ''}>
@@ -369,10 +369,10 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           <button type="button" class="atlas-btn-ghost" data-action="copy-fix">copy fix prompt</button>
         </div>
         <ul class="atlas-import-issue-list">
-          ${shown.map(i => `<li><code>${escapeText(i.path)}</code> — ${escapeText(i.issue)}</li>`).join('')}
+          ${shown.map(i => `<li><code>${escapeText(i.path)}</code>: ${escapeText(i.issue)}</li>`).join('')}
           ${more > 0 ? `<li class="is-dim">+${more} more…</li>` : ''}
         </ul>
-        <p class="atlas-import-issues-note">Import still runs — invalid entries are skipped and broken links removed. Paste the fix prompt to your AI to repair the source.</p>
+        <p class="atlas-import-issues-note">Import still runs; invalid entries are skipped and broken links removed. Paste the fix prompt to your AI to repair the source.</p>
       </div>
     `;
   }
@@ -412,7 +412,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     try {
       if (mode === 'new') {
         const { applied } = await createWorldFromImportedData(plan, { name: worldName, onProgress });
-        toasts.success(`Created "${plan.worldMeta?.name ?? 'world'}" — ${applied.created} element${applied.created === 1 ? '' : 's'}`);
+        toasts.success(`Created "${plan.worldMeta?.name ?? 'world'}" · ${applied.created} element${applied.created === 1 ? '' : 's'}`);
         reportFailures(applied.failures.length, plan.report.droppedLinks.length);
         // The file carried API credentials — guide to the (separate, consent-gated) sync link.
         if (hadCreds) toasts.info('Imported as a local world. To sync it, use "make online" in settings.');
@@ -424,7 +424,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         const bits = [`${applied.created} created`];
         if (applied.updated) bits.push(`${applied.updated} updated`);
         if (plan.report.skipped) bits.push(`${plan.report.skipped} skipped`);
-        toasts.success(`Imported — ${bits.join(', ')}`);
+        toasts.success(`Imported · ${bits.join(', ')}`);
         reportFailures(applied.failures.length, plan.report.droppedLinks.length);
         clearLoaded();
         renderExport();
@@ -466,7 +466,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const isApiLinked = !!aw.meta?.id && getState().registry.worlds.find(w => w.id === aw.worldId)?.state === 'api-linked';
 
     if (populated.length === 0) {
-      exportMount.innerHTML = `<p class="atlas-room-hint">This world has no elements yet — nothing to export.</p>`;
+      exportMount.innerHTML = `<p class="atlas-room-hint">This world has no elements yet; nothing to export.</p>`;
       return;
     }
 

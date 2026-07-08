@@ -149,9 +149,9 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
             console.warn('[settings] persist api.world_name to world.json failed:', err);
           }
         }
-        toasts.success(`Connected — name on API is "${liveName}"${cachedName ? ` (was "${cachedName}")` : ''}`);
+        toasts.success(`Connected. Name on API is "${liveName}"${cachedName ? ` (was "${cachedName}")` : ''}`);
       } else {
-        toasts.success(`Connected — ${liveName ?? 'world'}`);
+        toasts.success(`Connected: ${liveName ?? 'world'}`);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -181,7 +181,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       '',
       `WHAT HAPPENS:`,
       `  • Local folder${elementCount > 0 ? ` (${elementCount} element${elementCount === 1 ? '' : 's'})` : ''} stays exactly where it is`,
-      `  • Sync stops immediately — no more push or pull`,
+      `  • Sync stops immediately: no more push or pull`,
       `  • Local sync history is cleared (server timestamps, pending tombstones)`,
       `  • The world on onlyworlds.com is NOT deleted`,
       '',
@@ -211,7 +211,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
         // still proceeds, but warn loudly so the next Make-Online doesn't
         // silently produce an empty world.
         console.warn('[unlink] resetSyncBaseline failed:', err);
-        toasts.error('Warning: could not fully clear sync history — re-linking may produce an empty world. Check console.');
+        toasts.error('Warning: could not fully clear sync history. Re-linking may produce an empty world; check console.');
       }
     }
     const next = detachApi(getState().registry, world.id);
@@ -227,7 +227,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
   deleteBtn?.addEventListener('click', async () => {
     const ok = window.confirm(
       `Remove "${world.name}" from atlas?\n\n` +
-      `The folder on disk is NOT deleted — atlas just forgets about it. You can re-open the folder anytime to recover.`
+      `The folder on disk is NOT deleted; atlas just forgets about it. You can re-open the folder anytime to recover.`
     );
     if (!ok) return;
     const store = getActiveStore();
@@ -249,7 +249,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     const ok = window.confirm(
       `PERMANENTLY DELETE "${world.name}"?\n\n` +
       `This removes atlas's record AND DELETES the world's folder on disk. ` +
-      `Everything in it — elements, maps, media — is gone forever.\n\n` +
+      `Everything in it (elements, maps, media) is gone forever.\n\n` +
       `${world.state === 'api-linked' ? '\n(The matching API world on onlyworlds.com is NOT deleted server-side.)\n' : ''}` +
       `There is no undo. Continue?`
     );

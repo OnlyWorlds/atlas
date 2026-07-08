@@ -16,7 +16,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
   return `
     <section class="atlas-settings-section">
       <h3>Account</h3>
-      <p class="atlas-settings-hint">Global, used when creating or linking online worlds. Changes to PIN take effect immediately — any active sync engine is re-attached.</p>
+      <p class="atlas-settings-hint">Global, used when creating or linking online worlds. PIN changes take effect immediately; any active sync engine is re-attached.</p>
       <label class="atlas-settings-field">
         <span>Email</span>
         <input class="atlas-input" type="email" name="email"

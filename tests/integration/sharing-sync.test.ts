@@ -114,7 +114,7 @@ describe('sharing page sync round-trip (full stack: adapter + SDK + MSW)', () =>
     const serverPage = serverNarratives[0] as Record<string, unknown>;
     expect(serverPage.subtype).toBe('page');
     expect(serverPage.story).toContain('# The Domain');
-    expect(serverPage.story).toContain('[ Strahd — element card ]');
+    expect(serverPage.story).toContain('[ Strahd · element card ]');
     expect('atlas_page_blocks' in serverPage).toBe(false);
     expect('atlas_page_refs' in serverPage).toBe(false);
     expect('atlas_page_intent' in serverPage).toBe(false);

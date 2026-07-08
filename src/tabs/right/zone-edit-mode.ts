@@ -280,7 +280,7 @@ export function enterEditMode(
 
   const entry = mapTabCache.get(mapId);
   if (!entry) {
-    toasts.error('Cannot edit — map tab not open');
+    toasts.error('Cannot edit: map tab not open');
     return;
   }
   const lMap = entry.manager.getMap();
@@ -855,7 +855,7 @@ async function optimisticInsertMarker(args: {
     rebuildHandles();
   } catch (err) {
     console.error('[zone-edit] optimistic insert background-write failed:', err);
-    active?.toasts.error('Failed to insert marker — reverting');
+    active?.toasts.error('Failed to insert marker; reverting');
     // Re-prime from disk (truth) and re-render handles.
     try {
       const fresh = await store.listElements();
@@ -1022,7 +1022,7 @@ async function restoreFromSnapshot(session: EditSession): Promise<void> {
     session.toasts.info('Edit cancelled');
   } catch (err) {
     console.error('[zone-edit] restore from snapshot failed:', err);
-    session.toasts.error('Failed to fully restore — manual cleanup may be needed');
+    session.toasts.error('Failed to fully restore; manual cleanup may be needed');
   }
 }
 

@@ -18,7 +18,7 @@ export function renderContextTab(entry: WorldRegistryEntry): string {
     <section class="atlas-settings-section">
       <h3>Context pane</h3>
       <p class="atlas-settings-hint">
-        Preferences for the right-pane Context tab — the graph + element preview
+        Preferences for the right-pane Context tab: the graph + element preview
         / cast lists. Per-world. The same toolbar controls live above the graph
         and write to the same settings.
       </p>
@@ -52,7 +52,7 @@ export function renderContextTab(entry: WorldRegistryEntry): string {
       </label>
       <p class="atlas-settings-hint">
         Off (default): all edges render in the neutral cyan accent. On:
-        radial edges take the colour of the connected element's type — quick
+        radial edges take the colour of the connected element's type, a quick
         visual grouping by type at the edge of the graph.
       </p>
     </section>

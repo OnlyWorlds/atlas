@@ -160,7 +160,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
       (e): e is Marker => e.type === 'marker' && (e as Marker).zone_id === zone.id,
     );
     if (markers.length === 0) {
-      toasts.info('Zone has no markers to edit — draw it on a map first');
+      toasts.info('Zone has no markers to edit. Draw it on a map first');
       return;
     }
     const mapId = markers[0].map_id;
@@ -188,7 +188,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
   if (markers.length === 0) {
     body.innerHTML = `
       <div class="atlas-zone-markers-empty">
-        No markers yet — draw this zone on a map (Polygon or Line tool in the canvas toolbar)
+        No markers yet. Draw this zone on a map (Polygon or Line tool in the canvas toolbar)
         to give it geometry.
       </div>
     `;

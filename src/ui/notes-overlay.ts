@@ -28,7 +28,7 @@ export class NotesOverlay extends BaseModal {
     if (!entry) return;
 
     const { overlay, body, panel } = this.buildModalShell({
-      title: `notes — ${entry.name}`,
+      title: `notes · ${entry.name}`,
       dataModal: 'notes-overlay',
       panelClass: 'atlas-notes-panel',
     });
@@ -37,7 +37,7 @@ export class NotesOverlay extends BaseModal {
     body.innerHTML = `
       <textarea
         class="atlas-textarea atlas-notes-textarea"
-        placeholder="random thoughts, plot beats, todos — anything. saves as you type."
+        placeholder="random thoughts, plot beats, todos. saves as you type."
         spellcheck="false"
       ></textarea>
       <div class="atlas-notes-status" data-role="status">saved</div>

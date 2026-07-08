@@ -19,7 +19,7 @@ class HelpOverlay extends BaseModal {
     const help = helpForRoom(mode);
 
     const { overlay, body } = this.buildModalShell({
-      title: help ? `${help.name} — help` : 'Help',
+      title: help ? `${help.name} · help` : 'Help',
       dataModal: 'help-overlay',
     });
 

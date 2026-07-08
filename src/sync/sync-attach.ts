@@ -179,7 +179,7 @@ async function flushPendingOnAttach(
       if (!result.auth_blocked) {
         const failed = result.failures.length;
         toastManager.error(
-          `Couldn't sync ${failed} pending change${failed === 1 ? '' : 's'} — check console or test connection in settings`
+          `Couldn't sync ${failed} pending change${failed === 1 ? '' : 's'}. Check console or test connection in settings`
         );
       }
     }
@@ -421,7 +421,7 @@ function emitConflictToasts(
   if (result.failures.length > 0 && synced === 0) {
     const n = result.failures.length;
     toastManager.error(
-      `Couldn't sync ${n} change${n === 1 ? '' : 's'} — check console or test connection in settings`
+      `Couldn't sync ${n} change${n === 1 ? '' : 's'}. Check console or test connection in settings`
     );
     // Fall through — there might be conflicts to surface too.
   }

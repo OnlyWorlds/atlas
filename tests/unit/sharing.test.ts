@@ -161,8 +161,8 @@ describe('blocksOf — refs-mirror heal (id-swap correctness)', () => {
     expect(patch.atlas_page_blocks).toBe(blocks);
     expect(patch.atlas_page_refs).toEqual(['old-a', 'old-b']);
     expect(patch.story).toContain('# Cast');
-    expect(patch.story).toContain('[ Aralia — element card ]');
-    expect(patch.story).toContain('[ old-b — element card ]'); // unresolvable → id fallback
+    expect(patch.story).toContain('[ Aralia · element card ]');
+    expect(patch.story).toContain('[ old-b · element card ]'); // unresolvable → id fallback
   });
 });
 
@@ -175,7 +175,7 @@ describe('compilePageStory — the derived mirror', () => {
       { id: '4', kind: 'element-card', elementId: 'e-strahd', variant: 'full', fields: [] },
     ];
     const story = compilePageStory(blocks, (id) => (id === 'e-strahd' ? 'Strahd' : null));
-    expect(story).toBe('# Barovia\n\nThe mists never lift.\n\n## The Count\n\n[ Strahd — element card ]');
+    expect(story).toBe('# Barovia\n\nThe mists never lift.\n\n## The Count\n\n[ Strahd · element card ]');
   });
 
   it('skips empty prose; empty stack compiles to empty string', () => {

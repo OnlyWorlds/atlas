@@ -230,7 +230,7 @@ export class SyncEngine {
     this.pauseReason = 'manual';
     this.setState({
       kind: 'error',
-      message: 'authentication failed — verify pin in settings, test connection, or unlink',
+      message: 'authentication failed. Verify pin in settings, test connection, or unlink',
       recoverable: true,
     });
   }
@@ -1016,7 +1016,7 @@ export class SyncEngine {
             type: elem.type,
             operation: 'create',
             message: routedPeer
-              ? `referenced ${parsed.refType} was deleted on the server — review in sync panel`
+              ? `referenced ${parsed.refType} was deleted on the server; review in sync panel`
               : `referenced ${parsed.refType} not found on the server`,
           });
         } else {

@@ -10835,12 +10835,18 @@ body.atlas-share-fullpreview > * {
   color: var(--atlas-text-dim);
   line-height: 1.5;
 }
-.atlas-ow-waypoint-go {
-  color: var(--atlas-cyan);
+.atlas-ow-waypoint { position: relative; }
+.atlas-ow-waypoint-arrow {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  color: var(--atlas-text-dim);
   text-decoration: none;
-  white-space: nowrap;
+  line-height: 1;
+  transition: color 120ms ease, transform 120ms ease;
 }
-.atlas-ow-waypoint-go:hover { text-decoration: underline; }
+.atlas-ow-waypoint-arrow .material-symbols-outlined { font-size: 16px; }
+.atlas-ow-waypoint-arrow:hover { color: var(--atlas-cyan); transform: translateX(2px); }
 .atlas-ow-waypoints-foot {
   display: flex;
   gap: 10px;
