@@ -18,6 +18,7 @@ import { nowIso } from '../store/folder-store';
 import { getState } from '../core/state';
 import { navigate, worldHash } from '../core/router';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
+import { completeWaypoint } from '../core/waypoints';
 import { escapeText } from '../core/dom-utils';
 import type { WorldRegistryEntry } from '../core/types';
 
@@ -92,6 +93,9 @@ export class CreateWorldModal extends BaseModal {
       cancelBtn.hidden = true;
       try {
         const { entry } = await createWorldInRoot(name);
+        // Waypoint: the created world is non-demo by construction — ungated
+        // even when the sample world is active at click time (hookmap wp1).
+        completeWaypoint('first-world');
         this.toasts.success(`Created ${entry.name}`);
         this.hide();
         this.onCreated?.({ entry });

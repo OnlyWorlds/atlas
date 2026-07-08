@@ -12,8 +12,10 @@
  *   session-248 build script against the source world.
  *
  * ⚠ Bout OW contract (workplan D11c): everything this module creates counts
- * as DEMO-origin — waypoint action-hooks must never fire from it. When
- * waypoints land, thread `origin: 'demo'` through any hook this path touches.
+ * as DEMO-origin — waypoint action-hooks never fire from it. Implemented via
+ * `demo: true` below (world.json + registry); `src/core/waypoints.ts` gates
+ * world-data waypoints on the active world's demo flag. Contract doc:
+ * Forge/Notes/2026-07-07-atlas-waypoint-hookmap.md.
  */
 
 import { parsePayload } from '../import/parse';
@@ -41,13 +43,14 @@ export async function createSampleWorld(): Promise<WorldRegistryEntry> {
   plan.worldMeta = { ...(plan.worldMeta ?? {}), name: SAMPLE_WORLD_NAME };
 
   if (getState().registry.atlas_root) {
-    const { entry } = await createWorldFromImportedData(plan);
+    const { entry } = await createWorldFromImportedData(plan, { demo: true });
     return entry;
   }
   // First launch — no atlas folder yet. OPFS keeps the demo zero-friction.
   const opfs = await navigator.storage.getDirectory();
   const { entry } = await createWorldFromImportedData(plan, {
     parentHandle: { handle: opfs, label: 'browser storage' },
+    demo: true,
   });
   return entry;
 }

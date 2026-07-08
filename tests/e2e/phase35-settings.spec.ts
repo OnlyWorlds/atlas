@@ -51,12 +51,12 @@ test.beforeEach(async ({ page }) => {
   await freshBoot(page);
 });
 
-test('settings opens to account tab; world tab disabled without active world', async ({ page }) => {
+test('settings opens to onlyworlds tab; world tab disabled without active world', async ({ page }) => {
   await page.click('[data-action="open-settings"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
-  await expect(page.locator('[data-settings-tab="account"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-settings-tab="onlyworlds"]')).toHaveClass(/active/);
   await expect(page.locator('[data-settings-tab="world"]')).toBeDisabled();
-  // Account tab fields are visible.
+  // Account block fields live on the OnlyWorlds page.
   await expect(page.locator('.atlas-settings input[name="email"]')).toBeVisible();
 });
 

@@ -28,6 +28,7 @@ import {
 } from '../setup/atlas-root-flow';
 import type { ParseResult, ImportPlan, ValidationIssue } from '../import/types';
 import { ToastManager } from '../ui/toast-manager';
+import { completeWaypoint } from '../core/waypoints';
 
 type Mode = 'new' | 'merge';
 
@@ -428,6 +429,9 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         clearLoaded();
         renderExport();
       }
+      // Waypoint (hookmap wp7): the import BUTTON gesture is the waypoint —
+      // ungated (portability class). The imported DATA completes nothing.
+      completeWaypoint('import');
     } catch (err) {
       console.error('[import] failed', err);
       toasts.error(err instanceof Error ? err.message : 'Import failed');
@@ -614,11 +618,12 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   // IE7: example JSON as copy or download — doubles as format documentation.
   root.querySelector<HTMLButtonElement>('[data-action="example-copy"]')!.addEventListener('click', () => {
     void navigator.clipboard.writeText(EXAMPLE_JSON)
-      .then(() => toasts.success('Example JSON copied'))
+      .then(() => { toasts.success('Example JSON copied'); completeWaypoint('import'); })
       .catch(() => toasts.error('Could not copy to clipboard'));
   });
   root.querySelector<HTMLButtonElement>('[data-action="example-download"]')!.addEventListener('click', () => {
     downloadText(EXAMPLE_JSON, 'onlyworlds_example.json');
+    completeWaypoint('import');
   });
 
   // D8: the convert-my-notes prompt for an AI assistant.

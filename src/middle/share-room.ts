@@ -28,6 +28,7 @@ import { navigate, shareHash, elementHash, settingsHash, parseHash, onHashChange
 import { getActiveStore } from '../core/active-store';
 import { getEditorSettings } from '../registry/registry';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
+import { completeWaypoint } from '../core/waypoints';
 import { escapeText } from '../core/dom-utils';
 import {
   PAGE_SUBTYPE,
@@ -140,6 +141,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         atlas_page_blocks: [],
         atlas_page_refs: [],
       } as Partial<Element>);
+      // Waypoint: page creation bypasses the element-create modal (hookmap wp2).
+      completeWaypoint('first-element');
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
       navigate(shareHash(worldId, created.id));
@@ -1258,7 +1261,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   }
 
   /** Inline link to a Settings tab — used by the Publish prerequisite hints (A6). */
-  function settingsLink(worldId: string | null, tab: 'world' | 'account', label: string): HTMLAnchorElement {
+  function settingsLink(worldId: string | null, tab: 'world' | 'onlyworlds', label: string): HTMLAnchorElement {
     const a = document.createElement('a');
     a.href = settingsHash(worldId, tab);
     a.className = 'atlas-share-settings-link';
@@ -1336,6 +1339,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         // don't lose the URL.
         toasts.error(`Published at ${publicUrlFor(res.slug)} — but atlas couldn't record it locally. Keep that URL.`);
       }
+      completeWaypoint('share'); // hookmap wp9 — the publish gesture succeeded
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
       surfaceSharingError(err, 'Could not publish page');
@@ -1557,7 +1561,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const hint = document.createElement('p');
       hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
       hint.append('Set your PIN in ');
-      hint.appendChild(settingsLink(worldId, 'account', 'Settings → Account'));
+      hint.appendChild(settingsLink(worldId, 'onlyworlds', 'Settings → OnlyWorlds'));
       hint.append(' to publish.');
       section.appendChild(hint);
       return section;
@@ -1903,6 +1907,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       void (async () => {
         await commitOpenEdit(pageId);
         previewMode = !previewMode;
+        // Waypoint (hookmap wp9): only the flip INTO preview counts —
+        // an explicit visitor-view gesture, not the auto-rendered pane.
+        if (previewMode) completeWaypoint('share');
         buildDetail(pageId);
       })();
     });
@@ -1919,7 +1926,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         await commitOpenEdit(pageId);
         await writeChain; // pending edits land before the snapshot
         const current = elOf(pageId);
-        if (current) openFullPagePreview(current);
+        if (current) {
+          openFullPagePreview(current);
+          completeWaypoint('share'); // hookmap wp9 — explicit preview gesture
+        }
       })();
     });
     header.appendChild(fullPreview);

@@ -22,6 +22,7 @@ import { escapeText } from '../../core/dom-utils';
 import { ELEMENT_ICONS } from '../../core/constants';
 import { rankAnchors, ANCHOR_CAP } from './degree';
 import { applyAlpha, ensureIconFont } from './canvas-utils';
+import { completeWaypoint } from '../../core/waypoints';
 
 const DOT_RADIUS = 4;             // placement radius for binning + hit-test base
 const DOT_RADIUS_HOVER = 6;       // hit-test tolerance (px)
@@ -678,6 +679,9 @@ function handleMouseUp(state: ViewState): void {
   state.canvas.style.cursor = state.hoveredDot ? 'pointer' : (state.zoom > 1 ? 'grab' : 'default');
   if (!state.dragMoved && state.hoveredDot) {
     state.onSelect(state.hoveredDot.node.id); // a click (not a drag) selects
+    // Waypoint (hookmap wp6): a true canvas click — the URL-derived anchor
+    // default and programmatic onSelect calls never pass through here.
+    completeWaypoint('time');
   }
 }
 

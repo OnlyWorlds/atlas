@@ -178,6 +178,15 @@ export interface WorldMeta {
   version?: string;
   /** World cover image URL. Preserved on import/export round-trip (DESIGN_IMPORT.md). */
   image_url?: string;
+  /**
+   * True only for the bundled sample world (Bout OW/DEMO). Gestures inside a
+   * demo world never complete waypoints. Lives in world.json so the flag
+   * survives localStorage wipes + rediscovery; make-online clears it (the
+   * world is genuinely yours then). Normal imports never set it — the import
+   * world-block mapper whitelists fields, and createWorldFromImportedData
+   * strips it defensively.
+   */
+  demo?: boolean;
   /** Present iff world is api-linked. */
   api?: {
     world_id: string;
@@ -346,6 +355,8 @@ export interface WorldRegistryEntry {
     protagonist_id?: string | null;
     nexus_id?: string | null;
   };
+  /** Mirror of `WorldMeta.demo` — the bundled sample world. Gestures in a demo world never complete waypoints. */
+  demo?: boolean;
   created_at: string;
   last_opened_at?: string;
   /**

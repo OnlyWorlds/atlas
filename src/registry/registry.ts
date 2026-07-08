@@ -57,6 +57,8 @@ export interface CreateLocalWorldOpts {
   handleKey: string;
   pathHint?: string;
   parentId?: string;
+  /** The bundled sample world (mirrors WorldMeta.demo — see waypoints). */
+  demo?: boolean;
 }
 
 export function createLocalWorld(
@@ -74,6 +76,7 @@ export function createLocalWorld(
       last_path_hint: opts.pathHint,
     },
     parent_id: opts.parentId,
+    ...(opts.demo ? { demo: true } : {}),
     created_at: now,
     last_opened_at: now,
   };
@@ -143,7 +146,10 @@ export function attachApi(
         api_key: api.apiKey,
       };
       if (api.worldName) apiBlock.world_name = api.worldName;
-      return { ...w, state: 'api-linked', api: apiBlock };
+      // Making a world online also un-demos it (Bout OW class rule): the
+      // world is genuinely the user's now, so gestures in it count.
+      const { demo: _clearDemo, ...rest } = w;
+      return { ...rest, state: 'api-linked', api: apiBlock };
     }),
   };
 }

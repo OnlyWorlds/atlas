@@ -25,6 +25,7 @@ import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { attachApi, saveRegistry, setPin, setEmail, findLinkedWorld } from '../registry/registry';
+import { completeWaypoint } from '../core/waypoints';
 import { getActiveStore } from '../core/active-store';
 import { attachSyncEngine, detachSyncEngine, applyIdSwapToUi } from '../sync/sync-attach';
 import { SyncEngine } from '../sync/sync-engine';
@@ -315,6 +316,9 @@ export class MakeOnlineModal extends BaseModal {
       //    world rescan already reads world.json on import.
       await folder.writeWorldMeta({
         api: { world_id: world.id, api_key: apiKey, ...(world.name ? { world_name: world.name } : {}) },
+        // Un-demo on make-online (attachApi drops the registry mirror; the
+        // merge + stringify drops an undefined key from world.json).
+        demo: undefined,
       });
 
       // 7. Attach the long-running SyncEngine for this world.
@@ -329,6 +333,7 @@ export class MakeOnlineModal extends BaseModal {
         const uploaded = pushResult.pushed.creates + pushResult.pushed.updates;
         this.toasts.success(`${name} is online — ${uploaded} element${uploaded === 1 ? '' : 's'} uploaded`);
       }
+      completeWaypoint('ecosystem');
       void pushDone; void pushTotal;
       this.hide();
     } catch (err) {
@@ -436,6 +441,8 @@ export class MakeOnlineModal extends BaseModal {
       // 4. Persist api credentials + cached server-side name to disk.
       await folder.writeWorldMeta({
         api: { world_id: world.id, api_key: apiKey, ...(world.name ? { world_name: world.name } : {}) },
+        // Un-demo on make-online (see Route 1 note).
+        demo: undefined,
       });
 
       // 5. Attach SyncEngine for ongoing sync.
@@ -464,6 +471,7 @@ export class MakeOnlineModal extends BaseModal {
       const summary = parts.length ? parts.join(', ') : 'Nothing to merge';
       const verb = failed > 0 ? this.toasts.error.bind(this.toasts) : this.toasts.success.bind(this.toasts);
       verb(`Linked to ${world.name ?? 'world'} — ${summary}`);
+      completeWaypoint('ecosystem');
 
       this.hide();
     } catch (err) {

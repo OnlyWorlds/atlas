@@ -200,7 +200,7 @@ test('settings shows atlas folder + identity fields', async ({ page }) => {
   await page.click('[data-action="open-settings"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
 
-  // Default tab is 'account' — email/pin inputs are visible.
+  // Default tab is 'onlyworlds' — email/pin inputs are visible there.
   await page.fill('input[name="email"]', 'titus@example.com');
   await page.locator('input[name="email"]').blur();
   await page.fill('input[name="pin"]', '4242');

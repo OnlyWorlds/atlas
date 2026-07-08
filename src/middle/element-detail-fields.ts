@@ -27,6 +27,8 @@ import { openFieldEditInline } from '../ui/field-edit-inline';
 import { AliasesEditModal } from '../ui/aliases-edit-modal';
 import { toastManager } from '../ui/toast-manager';
 import type { FieldMeta, SectionLayout } from '../editor/field-schema';
+import { relationFieldsFor } from '../editor/field-schema';
+import { completeWaypoint, completeTaxonomyHalf } from '../core/waypoints';
 import { getFieldDescription } from '../editor/field-descriptions';
 import { pickElement } from '../ui/element-picker-modal';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
@@ -87,6 +89,13 @@ export function renderSection(section: SectionLayout, el: Element, alwaysExpande
 function renderField(meta: FieldMeta, el: Element): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'atlas-field';
+
+  // T-E1 (Bout E): sparse elements read as a wall of placeholder rows — dim
+  // whole empty rows a step further. Hover restores full strength so the
+  // edit affordance survives (see atlas.css .atlas-field-empty-row).
+  const rowRaw = (el as Record<string, unknown>)[meta.name];
+  const rowEmpty = Array.isArray(rowRaw) ? rowRaw.length === 0 : !formatValue(rowRaw);
+  if (rowEmpty) wrap.classList.add('atlas-field-empty-row');
 
   const label = document.createElement('div');
   label.className = 'atlas-field-label';
@@ -447,6 +456,20 @@ async function persistFieldPatch(el: Element, fieldName: string, nextValue: unkn
     patchSlice('data', { elements });
     // Local write succeeded — schedule a debounced push. No-op for local-only.
     requestPushIfLinked();
+
+    // Waypoint hooks (Bout OW). This function is GESTURE-ONLY — every caller
+    // is a field-widget commit handler in this file; do not call it from
+    // sync/import/derive paths or these hooks would leak (hookmap wp3/wp4).
+    if ((fieldName === 'supertype' || fieldName === 'subtype')
+        && typeof valueToPersist === 'string' && valueToPersist.trim()) {
+      completeTaxonomyHalf(fieldName);
+    }
+    const nonEmpty = Array.isArray(valueToPersist) ? valueToPersist.length > 0
+      : typeof valueToPersist === 'string' ? valueToPersist.trim().length > 0
+      : false;
+    if (nonEmpty && relationFieldsFor(el.type).some(f => f.diskField === fieldName)) {
+      completeWaypoint('links');
+    }
 
     // Map.image_url auto-detect (DESIGN_MAPS.md §4 + session 211 bout ID):
     // when a Map element's image_url changes to a non-empty value, fetch

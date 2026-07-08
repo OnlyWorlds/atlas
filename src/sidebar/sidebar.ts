@@ -220,6 +220,19 @@ export function mountSidebar(mount: SidebarMount): () => void {
     notesBtn.title = active ? 'Notes for this world (N)' : 'Open a world to use notes';
   }
 
+  // ----- Footer OW icon — opens Settings → OnlyWorlds (Bout OW, D11) -----
+  // No new window concept: it's a route; browser Back returns for free.
+  const owBtn = document.createElement('button');
+  owBtn.className = 'atlas-icon-btn atlas-footer-owmark';
+  owBtn.setAttribute('data-action', 'open-onlyworlds');
+  owBtn.setAttribute('aria-label', 'OnlyWorlds');
+  owBtn.title = 'OnlyWorlds — account, waypoints, links';
+  owBtn.innerHTML = '<img class="atlas-footer-ow-icon" src="owlogo.png" alt="" />';
+  footer.appendChild(owBtn);
+  owBtn.addEventListener('click', () => {
+    navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
+  });
+
   // ----- Footer ? button — keyboard shortcut reference (session 219) -----
   // Tiny inline popover listing implemented gestures + a "more coming"
   // footer. Discoverability for the bindings that exist TODAY (Esc, F,

@@ -29,6 +29,7 @@ import { PAGE_SUBTYPE, blocksOf, listPages, newBlockId, pageBlocksPatch, type Pa
 import { getActiveStore } from '../core/active-store';
 import { getEditorSettings } from '../registry/registry';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
+import { completeWaypoint } from '../core/waypoints';
 import { escapeText } from '../core/dom-utils';
 import {
   KNOWLEDGE_SUBTYPE, CIRCLE_SUBTYPE, listKnowledgeEntries, heldByOf, aboutIdsOf,
@@ -351,6 +352,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     }
     try {
       const created = await folder.createElement('narrative', data as Partial<Element>);
+      // Waypoint: entry creation is a gesture path that bypasses the
+      // element-create modal (hookmap wp2).
+      completeWaypoint('first-element');
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
       draft = null;
@@ -943,10 +947,12 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       return ctx;
     }
     const cur = () => elOf(entryId) ?? ({ id: entryId } as Element);
+    // Waypoint (hookmap wp4): the held-by/about ADD handlers are link-creating
+    // gestures; removals and the shared patchEntry helper stay unhooked.
     return {
       heldBy: () => heldByOf(cur()),
-      setNarrator: (id) => { void patchEntry(entryId, { narrator: id }); },
-      addCircle: (id) => { void patchEntry(entryId, { collectives: [...heldByOf(cur()).collectives, id] }); },
+      setNarrator: (id) => { void patchEntry(entryId, { narrator: id }); if (id) completeWaypoint('links'); },
+      addCircle: (id) => { void patchEntry(entryId, { collectives: [...heldByOf(cur()).collectives, id] }); completeWaypoint('links'); },
       removeCircle: (id) => { void patchEntry(entryId, { collectives: heldByOf(cur()).collectives.filter(c => c !== id) }); },
       aboutIds: () => aboutIdsOf(cur()),
       addAbout: (id) => {
@@ -955,7 +961,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         if (!f) return;
         const arr = (cur() as Record<string, unknown>)[f];
         const list = Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : [];
-        if (!list.includes(id)) void patchEntry(entryId, { [f]: [...list, id] });
+        if (!list.includes(id)) { void patchEntry(entryId, { [f]: [...list, id] }); completeWaypoint('links'); }
       },
       removeAbout: (id) => {
         const e = cur() as Record<string, unknown>;

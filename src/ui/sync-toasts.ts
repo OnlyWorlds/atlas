@@ -34,7 +34,7 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
       return reason;
     case 'pin-missing':
       toasts.info('Enter your PIN in settings to enable sync');
-      navigate(settingsHash(reason.worldId, 'account'));
+      navigate(settingsHash(reason.worldId, 'onlyworlds'));
       return reason;
     case 'attached-but-paused':
       toasts.info('Sync is paused — resume from settings');

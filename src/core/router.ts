@@ -52,9 +52,9 @@ export type RouteMode =
   | 'import'
   | 'templates';
 
-export type SettingsTab = 'account' | 'storage' | 'editing' | 'world' | 'writing' | 'context';
+export type SettingsTab = 'onlyworlds' | 'storage' | 'editing' | 'world' | 'writing' | 'context';
 
-export const SETTINGS_TABS: SettingsTab[] = ['account', 'storage', 'editing', 'world', 'writing', 'context'];
+export const SETTINGS_TABS: SettingsTab[] = ['onlyworlds', 'storage', 'editing', 'world', 'writing', 'context'];
 
 /**
  * Settings tabs grouped by scope for the nav rail. 'atlas' scope applies to
@@ -62,17 +62,18 @@ export const SETTINGS_TABS: SettingsTab[] = ['account', 'storage', 'editing', 'w
  * tabs disable when no world is active).
  */
 export const SETTINGS_TAB_GROUPS: ReadonlyArray<{ scope: 'atlas' | 'world'; tabs: SettingsTab[] }> = [
-  { scope: 'atlas', tabs: ['account', 'storage', 'editing'] },
+  { scope: 'atlas', tabs: ['onlyworlds', 'storage', 'editing'] },
   { scope: 'world', tabs: ['world', 'writing', 'context'] },
 ];
 
-/** Legacy settings-tab keys → current keys (pre-session-232 deep links / stored last-tab). */
+/** Legacy settings-tab keys → current keys (pre-session-232 deep links / stored last-tab; 'account' renamed to 'onlyworlds' in Bout OW). */
 const LEGACY_SETTINGS_TABS: Record<string, SettingsTab> = {
-  identity: 'account',
+  identity: 'onlyworlds',
+  account: 'onlyworlds',
   atlas: 'storage',
   sync: 'storage',
   maps: 'editing',
-  about: 'account',
+  about: 'onlyworlds',
 };
 
 export interface Route {
@@ -102,7 +103,7 @@ export interface Route {
 function parseSettingsTab(s: string | undefined): SettingsTab {
   if (s && (SETTINGS_TABS as string[]).includes(s)) return s as SettingsTab;
   if (s && LEGACY_SETTINGS_TABS[s]) return LEGACY_SETTINGS_TABS[s];
-  return 'account';
+  return 'onlyworlds';
 }
 
 function splitHashAndQuery(input: string): { path: string; query: string } {

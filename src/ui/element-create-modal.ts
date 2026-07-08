@@ -17,6 +17,7 @@ import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { getActiveStore } from '../core/active-store';
+import { completeWaypoint } from '../core/waypoints';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { requestPushIfLinked } from '../sync/sync-attach';
@@ -309,6 +310,9 @@ export class ElementCreateModal extends BaseModal {
           this.hide();
           const result = await createMapDialog(this.toasts, { initialName: name });
           if (!result) return; // user cancelled — no element created
+          // Waypoint: this early-return path bypasses the hook below — a
+          // first element that's a Map still counts (hookmap wp2).
+          completeWaypoint('first-element');
           const worldId = getState().active?.worldId;
           patchSlice('ui', { ...getState().ui, selectedElementId: result.map.id });
           if (worldId) navigate(elementHash(worldId, result.map.id));
@@ -317,6 +321,7 @@ export class ElementCreateModal extends BaseModal {
 
         const store = getActiveStore()!;
         const el = await store.createElement(this.selected, { ...this.opts.extraData, name } as Partial<Element>);
+        completeWaypoint('first-element');
         const elements = await store.listElements();
         patchSlice('data', { elements });
         patchSlice('ui', { ...getState().ui, selectedElementId: el.id });

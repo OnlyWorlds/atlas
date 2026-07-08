@@ -140,7 +140,7 @@ export async function discoverWorldsInRoot(
     }
 
     // Is this an atlas world folder? Read world.json.
-    let meta: { id?: string; name?: string; api?: { world_id?: string; api_key?: string; world_name?: string } } | null = null;
+    let meta: { id?: string; name?: string; demo?: boolean; api?: { world_id?: string; api_key?: string; world_name?: string } } | null = null;
     try {
       meta = await readJson(folderHandle, 'world.json');
     } catch (err) {
@@ -182,6 +182,10 @@ export async function discoverWorldsInRoot(
         folderName: entry.name,
         handleKey,
         pathHint: `${rootPathHint}/${entry.name}`,
+        // Re-mirror the demo flag from world.json — without this, a
+        // localStorage wipe + rediscovery would silently un-demo the sample
+        // world and its gestures would start completing waypoints.
+        demo: meta.demo === true,
       }));
     }
     saveRegistry(next);
@@ -445,13 +449,19 @@ export async function createWorldFromImportedData(
     onProgress?: (p: ApplyProgress) => void;
     /** Scaffold under this handle instead of the atlas root (sample world / OPFS). */
     parentHandle?: { handle: FileSystemDirectoryHandle; label: string };
+    /** ONLY the bundled sample world sets this (Bout OW demo-origin contract). */
+    demo?: boolean;
   } = {},
 ): Promise<{ entry: WorldRegistryEntry; applied: ApplyResult }> {
   const name = (plan.worldMeta?.name ?? opts.name ?? '').trim() || 'Imported world';
   const { store, worldUuid, subName, handleKey, rootFolderName } = await scaffoldWorldInRoot(name, opts.parentHandle);
 
   // World metadata from the import; id/name forced (export carries no world id).
-  await store.writeWorldMeta({ ...(plan.worldMeta ?? {}), id: worldUuid, name });
+  // `demo` never rides an import plan — only the explicit sample-world opt sets
+  // it (an exported demo world must re-import as an ordinary world, or its
+  // gestures would silently stop completing waypoints).
+  const { demo: _dropDemo, ...importedMeta } = plan.worldMeta ?? {};
+  await store.writeWorldMeta({ ...importedMeta, id: worldUuid, name, ...(opts.demo ? { demo: true } : {}) });
 
   // Apply the elements BEFORE the world goes active.
   const applied = await applyImportPlan(store, plan, { onProgress: opts.onProgress });
@@ -461,6 +471,7 @@ export async function createWorldFromImportedData(
     folderName: subName,
     handleKey,
     pathHint: `${rootFolderName}/${subName}`,
+    demo: opts.demo === true,
   });
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);

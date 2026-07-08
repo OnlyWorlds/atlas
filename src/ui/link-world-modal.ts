@@ -21,6 +21,7 @@ import { ToastManager } from './toast-manager';
 import { getState } from '../core/state';
 import { navigate, homeHash } from '../core/router';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
+import { completeWaypoint } from '../core/waypoints';
 import type { InitialDownloadProgress } from '../sync/initial-download';
 import { escapeAttr } from '../core/dom-utils';
 
@@ -127,6 +128,10 @@ export class LinkWorldModal extends BaseModal {
         } else {
           this.toasts.success(`Linked ${result.entry.name} — ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
         }
+        // Waypoint (hookmap wp8): linking counts UNGATED — spec-decided
+        // ("linking the readonly demo world counts; never require an account
+        // action to light a learning waypoint").
+        completeWaypoint('ecosystem');
         this.hide();
         navigate(homeHash(result.entry.id));
       } catch (err) {

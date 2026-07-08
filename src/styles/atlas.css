@@ -10752,3 +10752,172 @@ body.atlas-share-fullpreview > * {
   border-top: 1px solid var(--atlas-divider);
   margin: 14px 0;
 }
+
+/* ==== Bout OW — OnlyWorlds page + waypoints (D11, session 249) ==== */
+.atlas-ow-intro .atlas-settings-hint { line-height: 1.6; }
+.atlas-ow-intro a { color: var(--atlas-cyan); text-decoration: none; }
+.atlas-ow-intro a:hover { text-decoration: underline; }
+
+.atlas-ow-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 12.5px;
+}
+.atlas-ow-links a {
+  color: var(--atlas-text-soft);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.atlas-ow-links a:hover {
+  color: var(--atlas-cyan);
+  border-bottom-color: var(--atlas-cyan);
+}
+
+.atlas-ow-waypoints-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.atlas-ow-waypoints-count {
+  font-size: 11.5px;
+  color: var(--atlas-text-dim);
+}
+.atlas-ow-demo-hint { color: var(--atlas-text-muted); font-style: italic; }
+
+.atlas-ow-waypoint-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.atlas-ow-waypoint {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 6px;
+  background: var(--atlas-bg-panel);
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.atlas-ow-waypoint-glyph {
+  font-size: 18px;
+  color: var(--atlas-text-dim);
+  margin-top: 1px;
+}
+.atlas-ow-waypoint.is-met { background: var(--atlas-bg-panel-elevated); }
+.atlas-ow-waypoint.is-met .atlas-ow-waypoint-glyph { color: var(--atlas-cyan); }
+.atlas-ow-waypoint.is-highlight {
+  border-color: var(--atlas-cyan);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.18);
+}
+.atlas-ow-waypoint-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.atlas-ow-waypoint-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--atlas-text-soft);
+}
+.atlas-ow-waypoint.is-met .atlas-ow-waypoint-name { color: var(--atlas-text); }
+.atlas-ow-waypoint-concept {
+  font-size: 11.5px;
+  color: var(--atlas-text-muted);
+  line-height: 1.5;
+}
+.atlas-ow-waypoint-action {
+  font-size: 11.5px;
+  color: var(--atlas-text-dim);
+  line-height: 1.5;
+}
+.atlas-ow-waypoint-go {
+  color: var(--atlas-cyan);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.atlas-ow-waypoint-go:hover { text-decoration: underline; }
+.atlas-ow-waypoints-foot {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* Footer OW icon (sidebar) */
+.atlas-footer-ow-icon {
+  width: 15px;
+  height: 15px;
+  opacity: 0.55;
+  transition: opacity 120ms ease;
+  display: block;
+}
+.atlas-footer-owmark:hover .atlas-footer-ow-icon { opacity: 1; }
+
+/* Waypoint toast — OW-styled, clickable, own renderer (core/waypoints.ts) */
+.atlas-waypoint-toast {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: rgba(8, 20, 24, 0.92);
+  cursor: default;
+}
+.atlas-waypoint-toast-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.atlas-waypoint-toast-glyph { width: 18px; height: 18px; flex: none; }
+.atlas-waypoint-toast-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.atlas-waypoint-toast-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--atlas-cyan);
+}
+.atlas-waypoint-toast-line {
+  font-size: 12px;
+  color: var(--atlas-text-soft);
+}
+.atlas-waypoint-toast-rider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 8px;
+  border-top: 1px solid var(--atlas-divider);
+  font-size: 11px;
+  color: var(--atlas-text-dim);
+}
+.atlas-waypoint-toast-rider-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+}
+.atlas-waypoint-toast-rider-btn:hover { color: var(--atlas-cyan); }
+
+/* ==== Bout E — T-E1: dim empty field rows (hover restores) ==== */
+.atlas-field-empty-row .atlas-field-label { opacity: 0.45; transition: opacity 120ms ease; }
+.atlas-field-empty-row:hover .atlas-field-label { opacity: 1; }
+.atlas-field-empty-row .atlas-field-value.empty { opacity: 0.55; transition: opacity 120ms ease; }
+.atlas-field-empty-row:hover .atlas-field-value.empty { opacity: 1; }
+.atlas-field-empty-row .atlas-link-pick-empty { opacity: 0.55; transition: opacity 120ms ease; }
+.atlas-field-empty-row:hover .atlas-link-pick-empty { opacity: 1; }

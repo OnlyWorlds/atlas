@@ -21,7 +21,7 @@ import { getState, subscribe } from '../core/state';
 import { ToastManager } from '../ui/toast-manager';
 import { navigate, parseHash, settingsHash, SETTINGS_TABS, SETTINGS_TAB_GROUPS, onHashChange, type SettingsTab } from '../core/router';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
-import { renderAccountTab, wireAccountTab } from './settings-account';
+import { renderOnlyWorldsTab, wireOnlyWorldsTab } from './settings-onlyworlds';
 import { renderStorageTab, wireStorageTab } from './settings-storage';
 import { renderEditingTab, wireEditingTab } from './settings-editing';
 import { renderWorldTab, wireWorldTab } from './settings-world';
@@ -49,7 +49,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
   (function maybeRestoreTab(): void {
     const route = parseHash(window.location.hash);
     if (route.mode !== 'settings') return;
-    // parseSettingsTab() defaults to 'account' when the URL has no tab
+    // parseSettingsTab() defaults to 'onlyworlds' when the URL has no tab
     // segment, so route.settingsTab is always truthy — we can't use it to
     // detect "no tab in URL". Compare against the bare settings hash
     // instead: matches → URL has no tab → restore from storage.
@@ -58,14 +58,14 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
     if (window.location.hash !== bareSettings) return;
     let stored: string | null = null;
     try { stored = localStorage.getItem(SETTINGS_LAST_TAB_KEY); } catch { /* private mode */ }
-    if (!stored || stored === 'account' || !(SETTINGS_TABS as string[]).includes(stored)) return;
+    if (!stored || stored === 'onlyworlds' || !(SETTINGS_TABS as string[]).includes(stored)) return;
     // Replace history entry so back-button doesn't bounce through the
     // intermediate /settings URL.
     window.location.replace(settingsHash(wid, stored as SettingsTab));
   })();
 
   function activeTab(): SettingsTab {
-    return parseHash(window.location.hash).settingsTab ?? 'account';
+    return parseHash(window.location.hash).settingsTab ?? 'onlyworlds';
   }
 
   function rememberActiveTab(t: SettingsTab): void {
@@ -101,7 +101,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
                 role="tab"
                 data-settings-tab="${t}"
                 ${enabled ? '' : 'disabled aria-disabled="true"'}
-                aria-selected="${active}">${t.charAt(0).toUpperCase() + t.slice(1)}</button>`;
+                aria-selected="${active}">${tabLabel(t)}</button>`;
             }).join('');
             return `<div class="atlas-settings-tab-group-label">
                 <span class="material-symbols-outlined">${groupIcon}</span>
@@ -138,6 +138,12 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
   return () => { unsubState(); unsubHash(); };
 }
 
+/** Tab display label — 'onlyworlds' is the brand name, the rest sentence-case. */
+function tabLabel(t: SettingsTab): string {
+  if (t === 'onlyworlds') return 'OnlyWorlds';
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 function renderTab(
   tab: SettingsTab,
   reg: WorldsRegistry,
@@ -145,8 +151,8 @@ function renderTab(
 ): string {
   const noWorld = '<p class="atlas-settings-hint">No world is active.</p>';
   switch (tab) {
-    case 'account':
-      return renderAccountTab(reg);
+    case 'onlyworlds':
+      return renderOnlyWorldsTab(reg, activeWorld);
     case 'storage':
       return renderStorageTab(reg);
     case 'editing':
@@ -166,8 +172,8 @@ function wireTabHandlers(
   activeWorld: WorldRegistryEntry | undefined
 ): void {
   switch (tab) {
-    case 'account':
-      wireAccountTab(toasts);
+    case 'onlyworlds':
+      wireOnlyWorldsTab(toasts, activeWorld);
       break;
     case 'storage':
       wireStorageTab(toasts);
