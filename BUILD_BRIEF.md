@@ -1,4 +1,13 @@
-# Atlas — Build Brief (the polish-arc orchestrator handover)
+# Atlas — Build Brief (the polish-arc orchestrator handover) — ⚑ SUPERSEDED
+
+**⚑ SUPERSEDED 2026-07-09: the entire UI/UX workplan is SHIPPED** (16 bouts across sessions 248-250, incl. the voice sweep). This file is the arc's record; nothing here is pending. Current pickups, in Captain's decided order:
+1. **Charts sitdown** → `Forge/Notes/2026-07-09-charts-sitdown-brief.md` (agenda + fresh evidence)
+2. Home pass 2 (post-sitdown; starred-chart candidate)
+3. Pipeline smoke (gated on Captain's show push + Boss redeploy)
+4. Pre-flight + release → `Forge/Notes/2026-07-03-atlas-release-plan.md`
+Captain's open: commit S249+250 work · push show · G9 pick · Bout E keep/tune/drop · smoke.
+
+---
 
 **Created**: 2026-07-07 18:07 (session 247 close) · **Author**: Temper, for build-seat Temper · **Updated**: 2026-07-07 late (session 248 settle)
 **This is the pickup for the UI/UX build sessions.** Load order: this file → `Forge/Notes/2026-07-05-atlas-ui-workplan.md` (THE spec source — every ID below resolves there) → `Forge/Notes/2026-07-05-atlas-copy-inventory.md` (exact strings for the copy work). Positioning/post material: `Forge/Notes/2026-07-05-atlas-positioning-research.md`.
