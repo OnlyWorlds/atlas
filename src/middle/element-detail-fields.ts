@@ -89,6 +89,7 @@ export function renderSection(section: SectionLayout, el: Element, alwaysExpande
 function renderField(meta: FieldMeta, el: Element): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'atlas-field';
+  wrap.dataset.field = meta.name;
 
   // T-E1 (Bout E): sparse elements read as a wall of placeholder rows — dim
   // whole empty rows a step further. Hover restores full strength so the

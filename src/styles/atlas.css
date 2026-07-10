@@ -11081,3 +11081,43 @@ body.atlas-share-fullpreview > * {
 .atlas-field-empty-row:hover .atlas-field-value.empty { opacity: 1; }
 .atlas-field-empty-row .atlas-link-pick-empty { opacity: 0.55; transition: opacity 120ms ease; }
 .atlas-field-empty-row:hover .atlas-link-pick-empty { opacity: 1; }
+
+/* ====== Map "Local image" row (element editor, maps only — session 253) ======
+   Sits under the image_url field. Own class family (e2e locator contract —
+   never reuse another surface's classes). */
+.atlas-map-localimage-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.atlas-map-localimage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--atlas-text);
+  font-size: 12px;
+}
+.atlas-map-localimage-chip .material-symbols-outlined {
+  font-size: 15px;
+  color: var(--atlas-text-soft);
+}
+.atlas-map-localimage-empty {
+  color: var(--atlas-text-soft);
+  font-size: 12px;
+  font-style: italic;
+}
+.atlas-map-localimage-btn {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+  color: var(--atlas-text-soft);
+  font-size: 11.5px;
+  border-radius: 4px;
+  transition: color 120ms, background 120ms;
+}
+.atlas-map-localimage-btn:hover {
+  color: var(--atlas-cyan);
+  background: rgba(255, 255, 255, 0.04);
+}

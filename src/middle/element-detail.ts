@@ -23,6 +23,7 @@ import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/
 import { toastManager } from '../ui/toast-manager';
 import { sectionsFor } from '../editor/field-schema';
 import { buildZoneSections } from './element-detail-zone-sections';
+import { buildMapLocalImageRow } from './element-detail-map-image';
 import { renderReferencedBy } from './element-detail-refs';
 import { renderSection } from './element-detail-fields';
 import { renderHeader } from './element-detail-header';
@@ -159,6 +160,15 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const sectionEl = renderSection(section, el, idx === 0);
       if (sectionEl) detail.appendChild(sectionEl);
     });
+
+    // Map-specific: the "Local image" row, directly under the image_url row
+    // (folder-stored file as map background; session 253).
+    if (el.type === 'map') {
+      const row = buildMapLocalImageRow(el as import('../core/types').WorldMap, toastManager);
+      const urlRow = detail.querySelector('[data-field="image_url"]');
+      if (urlRow) urlRow.insertAdjacentElement('afterend', row);
+      else detail.querySelector('.atlas-detail-section-body')?.appendChild(row);
+    }
 
     // Zone-specific sections (visuals + markers) — DESIGN_ZONES.md §4.4.
     if (el.type === 'zone') {

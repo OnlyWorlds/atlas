@@ -4,7 +4,15 @@ Operational state. Architecture in **DESIGN.md**; per-room design in `DESIGN_{MA
 
 ---
 
-## CURRENT STATE (2026-07-10 — SESSION 252: DOCS SYSTEM + BOUT 2 + BOUT 3; close gate: typecheck + 1015 vitest + 167 e2e, 1 documented flaky, EXIT=0)
+## CURRENT STATE (2026-07-10 — SESSION 253: map Local-image field + Sikelia live import smoke; gates: typecheck + vitest full + phase2-ui 15/15, all green)
+
+**2026-07-10 (session 253 — the Sikelia arc, evening):**
+- **MAP "LOCAL IMAGE" FIELD (Captain's ask)**: maps-only row in the element editor directly under Image URL — choose/replace/clear a folder-stored image (`src/middle/element-detail-map-image.ts`; addMedia 'base-image' → image_media_id → refreshElementsAfterWrite, the map-create flow's proven primitives). New `atlas-map-localimage-*` class family (locator-contract law). Every editor field row now carries `data-field` (locator hook). NOTE: map-create-modal's configure mode has ZERO callers (dead abstraction — flagged, not used).
+- **SIKELIA LIVE IMPORT SMOKE (my eyes, 3046)**: 588-element generated world (196 pinned locations) through the import room → "Looks well-formed", created + activated clean · Local-image field fed the 19MB Color.png (OPFS media write fine) · 196 pins render tracing the island, hover tooltips + click-through to element detail work · element detail shows the full contract surface (Registers block, decoded political_climate, Populations chip) · sidebar smooth at 588. **Finding (S14 family, logged not fixed)**: a fully DATELESS world lands charts on "Nothing dated in this view" — honest but bare; imported worlds often start dateless; empty state could point at + Event / date fields. Post-v1 UX consideration.
+- Sikelia context: `Forge/Notes/2026-07-10-sikelia-world-plan.md` (contract §6a GATED, 17 findings folded) + `Forge/Notes/sikelia/` (payload, ledger, generator, calibration). Captain imported on his side same evening: "pins SLIGHTLY off but only slightly — really awesome."
+- Cross-bay: Skeld ported `create-world-external` to keel same evening (my blocker flag → D30/P14); staging ready for the Sikelia reference run; staging key pinged. Boss redeploy still pending (bundle checked: old).
+
+## PRIOR STATE (2026-07-10 — SESSION 252: DOCS SYSTEM + BOUT 2 + BOUT 3; close gate: typecheck + 1015 vitest + 167 e2e, 1 documented flaky, EXIT=0)
 
 **2026-07-10 (session 252 — docs consolidation + trust-set Bouts 2 + 3; orchestrated: 3 agents + keeper hands)**:
 - **DOCS SYSTEM straightened (Captain's ask)**: the rule is now stated in README ("Notes decide, DESIGN docs hold" + the five-layer doc map). Six superseded files archived to `docs-archive/` (BUILD_BRIEF, PHASE_SHARING_BRIEF, SHARING_HANDOVER, DESIGN_PUBLISHING + DESIGN_TIMELINE stubs, SWEEP-2026-05-20). **DESIGN_CHARTS.md REBUILT** (opus agent + keeper fixes): S1-S15 folded in as the authoritative design table with status tags, stale `zoomFactor`+`panCenter` text replaced by the window-is-the-camera model, roadmap = v1 trust set + Acts 1-3; Simmer's section verbatim. **CHARTS_HANDOVER.md rebuilt** (sonnet agent): deduped, stale state corrected. **timeline-bar.ts DELETED** (S15; sonnet agent: module + 58 CSS lines + comment refs; zero importers). Stray `Knowledge/User/` note from S251 moved out of the repo to Forge/Knowledge/.

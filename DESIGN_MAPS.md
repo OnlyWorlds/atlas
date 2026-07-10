@@ -427,6 +427,8 @@ Current behavior: right-click → opens element-create modal → new element + d
 - Map create modal — see §3.2 hint dynamics.
 - Map detail — when both are set, show a small indicator near the image_url field: *"local image stored as fallback (not shown while URL is set)."*
 
+**Local image on EXISTING maps (S253)**: the element editor shows a maps-only "Local image" row directly under Image URL (`src/middle/element-detail-map-image.ts`): choose/replace/clear a folder-stored file (addMedia 'base-image' → `image_media_id`). Same primitives as the create flow. Note: the create modal's configure-existing mode has zero callers (dead path — do not wire without exercising it first).
+
 **Push behavior on api-linked worlds** (already correct in atlas-extension layer): `image_url` syncs. `image_media_id` and the actual media blob stay local. Other machines accessing the same api-linked world only see whatever `image_url` provides.
 
 **Implication**: a user with only `image_media_id` (no URL) on an api-linked world has a map that displays locally but shows as image-less on other machines. We surface this in the maps tab row as a soft hint: *"local-only image — set a URL to share."* Same hint used for orphan loc-bound surfaces — non-blocking, just informational.
