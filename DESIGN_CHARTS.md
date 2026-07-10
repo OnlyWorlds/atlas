@@ -1,6 +1,6 @@
 # Atlas — Charts Design
 
-**Status**: Chart #1 + Chart #2 "The Landing" SHIPPED (2026-06-19) — identity, significance/anchors, LOD, unified select=focus nav, density-fan layout, labels-by-default. Supersedes `DESIGN_TIMELINE.md` (the "timeline" was one chart type; this is the general frame). Resume the arc from `CHARTS_HANDOVER.md`. Market evidence: `Forge/Notes/2026-06-18-timeline-market-analysis.md`.
+**Status**: Chart #1 + Chart #2 "The Landing" SHIPPED (2026-06-19) — identity, significance/anchors, LOD, unified select=focus nav, density-fan layout. **SITDOWN LAYER (2026-07-10, session 251): every open call closed in `Forge/Notes/2026-07-10-charts-sitdown-decisions.md` (S1-S15)** — window-is-the-camera + the overview strip SHIPPED same session (`zoom`/`panCenter` replaced by one `{start,end}` window; strip = full-universe reference frame with draggable band + ghost; labels clickable; focus jumps animate). Labels-by-default is superseded by S4's weight-ranked budget (Bout 2, next). Resume from `CHARTS_HANDOVER.md` ⚑ SESSION 252 OPENER. Market evidence: `Forge/Notes/2026-06-18-timeline-market-analysis.md`. Scroll-view technique dig: `Forge/Notes/2026-07-10-owcom-scroll-technique.md`.
 **Scope** (Captain's call): **maximum ambition, built outward from a small clear core.** A creative box for views of the world; ship one chart at a time so we never drown.
 
 ---

@@ -1,6 +1,18 @@
-# Charts — Handover (Chart #1 + #2 "The Landing" ✅ DONE)
+# Charts — Handover (Chart #1 + #2 ✅ · SITDOWN HELD 2026-07-10 · trust-set Bout 1 ✅)
 
-*Running-start pickup for the Charts arc. Load this FIRST when resuming charts work, then `DESIGN_CHARTS.md` for the full design. Updated end of the chart-#2 + layout-polish session (2026-06-19). **The Chart #2 plan is fully shipped — this section is now history; the live work is "Queued chart bouts" below.***
+*Running-start pickup for the Charts arc. Load order: **`Forge/Notes/2026-07-10-charts-sitdown-decisions.md` FIRST** (S1-S15: the frame, the roadmap, every open call closed), then this file, then `DESIGN_CHARTS.md`.*
+
+## ⚑ SESSION 252 OPENER (the live work)
+
+**Bout 2 — smart default + label budget (S4/S5)**: Captain's protagonist flags first (header icon reportedly lights for non-protagonists — NOT reproduced, suspect stale header render on registry patch; add × unset on the home cast card) → `TimelineNode.contentMass` in the normalizer (description/prose length) → weight = degree + content mass + favorites (favorites ids passed via setNodes extras) → per-column label budget replacing the fill-all pri-3 tier in `drawLabels` (+N affordance, click = zoom to cluster) → protagonist-first default (explicit `favorites.protagonist_id` or inferred highest-degree character; implement as default WINDOW centered on their neighbourhood + label boost, NOT auto-focus URL — flag the deviation from S5's letter for Captain).
+**Bout 3 — dock the card (S7)**: right-edge-in-room vs bottom strip, screenshot both, Captain picks. Content budget: chips capped per role group + "+N", description snippet, Open/Edit actions.
+**Then**: home pass 2 → pipeline smoke (Captain's show push gates) → pre-flight.
+**Banked forensics**: the OPFS rapid-reload activation hang (PROGRESS 2026-07-10 entry — first `listElements` after open never resolves when reloaded within seconds; bfcache write-lock hypothesis; 15s watchdog toast shipped).
+**Captain's open**: icon pick (`Notes/ui-snapshots/2026-07-10/icons-{current,variant-a,variant-b}.png`) · poke the strip · show push.
+
+## SHIPPED 2026-07-10 (session 251 — Bout 1 of the trust set)
+
+**The window refactor + overview strip (S2/S3/S6)**: `zoom`+`panCenter` are GONE — the one viewport state is `window: {start,end}` in world-date units (`clampWindow`/`zoomWindow` pure + unit-locked; LOD derives from fitSpan/viewSpan). The **overview strip** (bottom 26px of the canvas) renders the FULL dated universe as density marks — the room passes `setNodes(scoped, allNodes)` — with a bright viewport band (drag = travel, edge-drag = resize, track-click = jump) and ONE fading ghost of the previous window. Focus jumps ANIMATE (280ms ease-out; single rAF driver). Axis dates brightened; **labels are click targets** (`state.labelBoxes`). Evidence: `Notes/ui-snapshots/2026-07-10/b1-*.png`.
 
 ## Where it stands — DONE
 

@@ -277,9 +277,20 @@ export async function activateWorld(
   const gen = ++activationSeq;
   const run = activationChain.then(async () => {
     if (gen !== activationSeq) return false; // superseded while queued
+    // Watchdog: an activation that WEDGES (observed 2026-07-10 on OPFS after
+    // rapid reloads — a first listElements that never resolves, suspected
+    // stale OPFS write-lock held by the bfcached previous document) would
+    // otherwise show "Opening world…" forever with no explanation. Honest
+    // guidance beats silence; the hang itself is banked for forensics.
+    const watchdog = setTimeout(() => {
+      if (getState().data.loading) {
+        toasts.info('This world is taking unusually long to open. A reload usually clears it.');
+      }
+    }, 15_000);
     try {
       return await doActivateWorld(worldId, toasts, opts);
     } finally {
+      clearTimeout(watchdog);
       // Whatever path activation took (success primes, failures return
       // early), the loading flag must not outlive the attempt — a stuck
       // flag would show "Opening world…" forever.
