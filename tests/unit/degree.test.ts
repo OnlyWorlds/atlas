@@ -22,6 +22,7 @@ function node(id: string, opts: { links?: LinkedRef[]; startDate?: number; degre
     color: '#fff',
     links: opts.links ?? [],
     degree: opts.degree ?? 0,
+    contentMass: 0,
   };
 }
 

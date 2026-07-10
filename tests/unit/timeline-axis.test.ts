@@ -22,8 +22,8 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange pads min/max by 2%', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'event', name: 'A', startDate: 0, endDate: null, dateSpec: { kind: 'exact', value: 0 }, color: '#fff', links: [], degree: 0 },
-      { id: 'b', elementType: 'event', name: 'B', startDate: 100, endDate: null, dateSpec: { kind: 'exact', value: 100 }, color: '#fff', links: [], degree: 0 },
+      { id: 'a', elementType: 'event', name: 'A', startDate: 0, endDate: null, dateSpec: { kind: 'exact', value: 0 }, color: '#fff', links: [], degree: 0, contentMass: 0 },
+      { id: 'b', elementType: 'event', name: 'B', startDate: 100, endDate: null, dateSpec: { kind: 'exact', value: 100 }, color: '#fff', links: [], degree: 0, contentMass: 0 },
     ]);
     // span 100, padding 2 → [-2, 102]
     expect(r.min).toBeCloseTo(-2, 5);
@@ -32,7 +32,7 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange handles endDate', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'narrative', name: 'A', startDate: 10, endDate: 200, dateSpec: { kind: 'exact', value: 10 }, color: '#fff', links: [], degree: 0 },
+      { id: 'a', elementType: 'narrative', name: 'A', startDate: 10, endDate: 200, dateSpec: { kind: 'exact', value: 10 }, color: '#fff', links: [], degree: 0, contentMass: 0 },
     ]);
     // min 10, max 200, span 190, padding 3.8
     expect(r.min).toBeCloseTo(10 - 3.8, 4);
@@ -41,7 +41,7 @@ describe('timeline axis-calculator', () => {
 
   it('calculateTimeRange expands single-point range', () => {
     const r = calculateTimeRange([
-      { id: 'a', elementType: 'event', name: 'A', startDate: 42, endDate: null, dateSpec: { kind: 'exact', value: 42 }, color: '#fff', links: [], degree: 0 },
+      { id: 'a', elementType: 'event', name: 'A', startDate: 42, endDate: null, dateSpec: { kind: 'exact', value: 42 }, color: '#fff', links: [], degree: 0, contentMass: 0 },
     ]);
     // After max <= min fallback (max = min + 100) → padding kicks in too
     expect(r.max).toBeGreaterThan(r.min);
@@ -177,6 +177,32 @@ describe('timeline data-normalizer', () => {
     expect(make('that winter')).toHaveLength(0);
     expect(make(120)).toHaveLength(1);
     expect(make('120')).toHaveLength(1);
+  });
+});
+
+describe('timeline node contentMass (S4 label weight input)', () => {
+  it('counts description + story chars; absent fields count zero', () => {
+    const nodes = extractTemporalNodes([
+      {
+        id: 'n1', type: 'narrative', name: 'Chronicle', local_updated_at: 'x',
+        start_date: 10, description: 'ab', story: 'cdef',
+      } as Element & Record<string, unknown>,
+      {
+        id: 'e1', type: 'event', name: 'Bare', local_updated_at: 'x', start_date: 20,
+      } as Element & Record<string, unknown>,
+    ]);
+    expect(nodes.find(n => n.id === 'n1')!.contentMass).toBe(6);
+    expect(nodes.find(n => n.id === 'e1')!.contentMass).toBe(0);
+  });
+
+  it('ignores non-string description values (never NaN)', () => {
+    const nodes = extractTemporalNodes([
+      {
+        id: 'e2', type: 'event', name: 'Odd', local_updated_at: 'x',
+        start_date: 30, description: null,
+      } as unknown as Element,
+    ]);
+    expect(nodes[0].contentMass).toBe(0);
   });
 });
 

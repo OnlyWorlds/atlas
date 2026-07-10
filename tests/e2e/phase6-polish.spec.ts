@@ -48,8 +48,8 @@ test('timeline route renders the interactive timeline-view', async ({ page }) =>
     if (m) window.location.hash = `#/w/${m[1]}/timeline`;
   });
   await expect(page.locator('.atlas-timeline-room')).toBeVisible();
-  // Session 242: the room mounts the interactive canvas+DOM timeline-view
-  // (the compact timeline-bar stays on Home). See DESIGN_TIMELINE.md.
+  // Session 242: the room mounts the interactive canvas+DOM timeline-view.
+  // See DESIGN_TIMELINE.md.
   await expect(page.locator('.atlas-timeline-view')).toBeVisible();
   await expect(page.locator('.atlas-timeline-view-canvas')).toBeVisible();
 });

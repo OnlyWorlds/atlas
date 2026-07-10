@@ -56,6 +56,23 @@ function resolveLinks(el: Element, byId: Map<string, Element>): LinkedRef[] {
 }
 
 /**
+ * Content mass (S4): how much the author has actually WRITTEN about an element.
+ * `description` is universal; `story` is the narrative prose markdown (the
+ * writing room's canonical text — `atlas_richtext_json` is its TipTap mirror,
+ * deliberately not counted twice). Raw char count; the label-weight function
+ * applies log scaling, so no normalization here.
+ */
+function computeContentMass(el: Element): number {
+  const rec = el as Record<string, unknown>;
+  let mass = 0;
+  for (const field of ['description', 'story']) {
+    const v = rec[field];
+    if (typeof v === 'string') mass += v.length;
+  }
+  return mass;
+}
+
+/**
  * Convert atlas elements into timeline nodes. Only elements with a valid start
  * date become nodes. Optional end date is parsed when the type supports it.
  * Each node carries its resolved `links` (the elements it touches) — a pure
@@ -80,6 +97,7 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
       if (endDate !== null && endDate < startDate) endDate = null;
     }
 
+    const desc = (el as Record<string, unknown>).description;
     nodes.push({
       id: el.id,
       elementType: el.type,
@@ -90,6 +108,10 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
       color: ELEMENT_TYPE_COLORS[el.type as ElementType] ?? FALLBACK_COLOR,
       links: resolveLinks(el, byId),
       degree: 0, // filled below once every node exists (bidirectional read)
+      contentMass: computeContentMass(el),
+      snippet: typeof desc === 'string' && desc.trim()
+        ? desc.trim().slice(0, 220) + (desc.trim().length > 220 ? '…' : '')
+        : undefined,
     });
   }
 

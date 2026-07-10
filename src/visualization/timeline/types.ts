@@ -64,6 +64,21 @@ export interface TimelineNode {
    * stable. A pure render cache, never serialized.
    */
   degree: number;
+  /**
+   * Content mass — raw character count of the element's long-form text
+   * (description + narrative story prose). Second input to the S4 label
+   * weight (degree + content mass + favorites): an element someone wrote
+   * three paragraphs about matters more than a bare-named stub at equal
+   * degree. A pure render cache like `degree`, never serialized; the weight
+   * function applies its own scaling (log), so this stays a raw count.
+   */
+  contentMass: number;
+  /**
+   * Short description excerpt for the docked card (S7 content budget). The
+   * view is store-free, so the text travels with the node. Absent when the
+   * element has no description.
+   */
+  snippet?: string;
   /** Grouping key for swimlanes (narrative id etc.) — used by the lanes bout. */
   laneKey?: string;
 }

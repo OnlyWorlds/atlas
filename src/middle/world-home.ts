@@ -28,6 +28,8 @@ import type { Element, ElementType } from '../core/types';
 import { narrativeKindOf } from '../core/narrative-kind';
 import { isWritingNarrative } from './writing-helpers';
 import { escapeText, relativeTime } from '../core/dom-utils';
+import { setWorldFavoriteElement, saveRegistry } from '../registry/registry';
+import { toastManager } from '../ui/toast-manager';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -228,16 +230,16 @@ function buildCastSlot(worldId: string): HTMLElement | null {
   const favorites = reg.worlds.find(w => w.id === worldId)?.favorites;
   if (!favorites) return buildCastHint(worldId);
   const elements = getState().data.elements;
-  const entries: { el: Element; role: string; icon: string }[] = [];
+  const entries: { el: Element; role: string; icon: string; kind: 'protagonist' | 'nexus' }[] = [];
   const protagonist = favorites.protagonist_id ? elements.find(e => e.id === favorites.protagonist_id) : undefined;
   const nexus = favorites.nexus_id ? elements.find(e => e.id === favorites.nexus_id) : undefined;
-  if (protagonist) entries.push({ el: protagonist, role: 'protagonist', icon: 'person_pin' });
-  if (nexus) entries.push({ el: nexus, role: 'home', icon: 'home_pin' });
+  if (protagonist) entries.push({ el: protagonist, role: 'protagonist', icon: 'person_pin', kind: 'protagonist' });
+  if (nexus) entries.push({ el: nexus, role: 'home', icon: 'home_pin', kind: 'nexus' });
   if (entries.length === 0) return buildCastHint(worldId);
 
   const slot = document.createElement('div');
   slot.className = 'atlas-home-cast';
-  for (const { el, role, icon } of entries) {
+  for (const { el, role, icon, kind } of entries) {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'atlas-home-cast-card';
@@ -261,6 +263,23 @@ function buildCastSlot(worldId: string): HTMLElement | null {
     `;
     card.appendChild(text);
     card.addEventListener('click', () => navigate(elementHash(worldId, el.id)));
+    // Unset affordance (sitdown pile, S5 discoverability): the setter lives on
+    // the element header, but the UNSET must be reachable from where the
+    // assignment is visible. A span, not a button — buttons don't nest.
+    const unset = document.createElement('span');
+    unset.className = 'atlas-home-cast-unset material-symbols-outlined';
+    unset.setAttribute('role', 'button');
+    unset.setAttribute('aria-label', `Unset ${role}`);
+    unset.title = `Unset ${role}`;
+    unset.textContent = 'close';
+    unset.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const next = setWorldFavoriteElement(getState().registry, worldId, kind, null);
+      saveRegistry(next);
+      patchSlice('registry', next);
+      toastManager.info(`No longer the world's ${role}`);
+    });
+    card.appendChild(unset);
     slot.appendChild(card);
   }
   return slot;

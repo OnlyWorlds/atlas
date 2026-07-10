@@ -118,6 +118,95 @@ export function pickDefaultChart(elements: Element[]): ChartConfig {
 }
 
 /**
+ * S5 protagonist-first — step 0 of the default view. Returns the OPENING
+ * WINDOW (world-date units) centered on the protagonist's dated neighbourhood,
+ * or null when there's nothing to center on (caller falls through to the
+ * plain recipe fit). Deliberately a WINDOW, not an auto-focus URL: the landing
+ * keeps its broad orient job, it just lands you AT the protagonist's era.
+ *
+ * Protagonist = the explicit favorite when set; else the dated character with
+ * the largest dated neighbourhood (same inference the character-life recipe
+ * uses). An undated explicit protagonist still works via its dated
+ * neighbourhood (reverse links). Skips (null) when the neighbourhood span is
+ * most of the universe anyway — a window that shows everything orients nothing.
+ */
+export function protagonistWindow(
+  nodes: TimelineNode[],
+  explicitProtagonistId: string | null,
+): { start: number; end: number } | null {
+  if (nodes.length === 0) return null;
+  let pid = explicitProtagonistId;
+  if (!pid) {
+    // Infer: the character with the largest DATED neighbourhood. Characters
+    // are usually UNDATED (no birth_date → no node), so counting only dated
+    // character nodes misses the actual protagonist — tally every character
+    // the dated set touches via its resolved links instead, plus the dated
+    // character nodes' own degrees. Ties keep the first-seen (deterministic).
+    const tally = new Map<string, number>();
+    for (const n of nodes) {
+      if (n.elementType === 'character') tally.set(n.id, (tally.get(n.id) ?? 0) + n.degree);
+      for (const l of n.links) {
+        if (l.type === 'character') tally.set(l.id, (tally.get(l.id) ?? 0) + 1);
+      }
+    }
+    let bestId: string | null = null;
+    let bestN = 0;
+    for (const [id, count] of tally) {
+      if (count > bestN) { bestId = id; bestN = count; }
+    }
+    // A one-event neighbourhood orients nothing — fall through to the plain fit.
+    if (!bestId || bestN < 2) return null;
+    pid = bestId;
+  }
+
+  // The neighbourhood's dates: the protagonist's own span + every dated node
+  // it links to or that links to it (both directions, resolved node links).
+  const self = nodes.find(n => n.id === pid);
+  const dates: number[] = [];
+  if (self) {
+    dates.push(self.startDate);
+    if (self.endDate != null) dates.push(self.endDate);
+    for (const l of self.links) {
+      const t = nodes.find(n => n.id === l.id);
+      if (t) { dates.push(t.startDate); if (t.endDate != null) dates.push(t.endDate); }
+    }
+  }
+  for (const n of nodes) {
+    if (n.id === pid) continue;
+    if (n.links.some(l => l.id === pid)) {
+      dates.push(n.startDate);
+      if (n.endDate != null) dates.push(n.endDate);
+    }
+  }
+  if (dates.length === 0) return null;
+
+  const uniMin = Math.min(...nodes.map(n => n.startDate));
+  const uniMax = Math.max(...nodes.map(n => Math.max(n.startDate, n.endDate ?? n.startDate)));
+  const uniSpan = Math.max(1e-9, uniMax - uniMin);
+  // The protagonist's ERA is the DENSEST cluster of their neighbourhood, not
+  // its min-max envelope — a single early chronicle or a birth date far from
+  // the story's mass would otherwise stretch the window across most of history
+  // (live finding: The Crumbler's envelope was 50..458 because of one year-50
+  // reference; his story lives at 447..458). Smallest window covering ~75% of
+  // the neighbourhood's dates, by sliding over the sorted list.
+  dates.sort((a, b) => a - b);
+  const k = Math.max(1, Math.ceil(dates.length * 0.75));
+  let bestStart = 0;
+  let bestSpan = Infinity;
+  for (let i = 0; i + k - 1 < dates.length; i++) {
+    const s = dates[i + k - 1] - dates[i];
+    if (s < bestSpan) { bestSpan = s; bestStart = i; }
+  }
+  const min = dates[bestStart];
+  const max = dates[bestStart + k - 1];
+  const span = max - min;
+  // Even the dense window ≈ the whole universe → the window adds nothing.
+  if (span / uniSpan > 0.8) return null;
+  const pad = Math.max(span * 0.15, uniSpan * 0.02);
+  return { start: min - pad, end: max + pad };
+}
+
+/**
  * The effective chart scope from the URL focus + the broad-view type filter
  * (chart #2 nav model). FOCUS (a `/timeline/<id>` in the URL) wins — it's the
  * dominant lens; otherwise the broad-view type filter; otherwise all. Pure, so

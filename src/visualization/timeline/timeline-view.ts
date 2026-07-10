@@ -1,6 +1,6 @@
 /**
- * Timeline view — the interactive, room-grade chart renderer (vs the compact
- * home bar in `timeline-bar.ts`). Canvas + DOM hybrid, the context-graph pattern:
+ * Timeline view — the interactive, room-grade chart renderer. Canvas + DOM
+ * hybrid, the context-graph pattern:
  *
  *   - CANVAS layer: fill-space axis, ticks, grid, dots, range-lines, with
  *     wheel-zoom + drag-pan and cursor-proximity labels (so a dense world reads
@@ -40,6 +40,11 @@ const NODE_Y_GAP = 34;           // density-fan: vertical step between stacked n
 const LABEL_MAX_CHARS = 24;
 const LABEL_NEAR_RADIUS = 150;   // px — cursor neighbourhood that gets labels
 const LABEL_NEAR_MAX = 9;        // most labels to reveal around the cursor
+// S4 label budget: fan columns are NODE_X_GAP wide; each column may label at
+// most one node per this many px of band height (weight-ranked; favorites +
+// anchors are exempt). The remainder surfaces as a "+N" badge under the column.
+const LABEL_BUDGET_PX_PER_ROW = 56;
+const PLUS_BADGE_H = 14;         // badge hit-box height
 const ZOOM_MAX = 200;            // max magnification vs the fitted span
 const ZOOM_STEP = 1.2;
 // Overview strip (sitdown S2) — the always-visible full-world reference frame
@@ -58,12 +63,24 @@ export interface TimelineViewOptions {
   onOpenElement: (elementId: string) => void;
 }
 
+/** Render extras the room threads in alongside the node set (S4/S5). */
+export interface TimelineViewExtras {
+  /** Explicit cast favorites (protagonist/home) — their labels always win the
+   *  budget (S4) . Re-passed each render; last value sticks. */
+  favoriteIds?: string[];
+  /** One-shot opening window (S5 protagonist-first: a default WINDOW centered
+   *  on the protagonist's neighbourhood, deliberately NOT an auto-focus URL —
+   *  the landing keeps its broad orient job). Applied only while the view is
+   *  still on auto-fit; any user navigation wins. */
+  defaultWindow?: TimeWindow;
+}
+
 export interface TimelineViewHandle {
   /**
    * The room passes already-scoped nodes (it owns the ChartConfig/scope), plus
    * the FULL dated universe for the overview strip's constant reference frame.
    */
-  setNodes(nodes: TimelineNode[], universe?: TimelineNode[]): void;
+  setNodes(nodes: TimelineNode[], universe?: TimelineNode[], extras?: TimelineViewExtras): void;
   setSelection(elementId: string | null): void;
   redraw(): void;
   destroy(): void;
@@ -74,10 +91,18 @@ export interface TimeWindow { start: number; end: number }
 
 interface LabelBox { x0: number; x1: number; y0: number; y1: number; nodeId: string }
 
+/** A "+N" cluster badge — the label budget's honest remainder (S4). Click =
+ *  zoom the window to that fan column's dates. */
+interface PlusBadge { x0: number; x1: number; y0: number; y1: number; dateMin: number; dateMax: number; hidden: number }
+
 interface ViewState {
   container: HTMLElement;
+  canvasWrap: HTMLElement;      // the canvas's own flex cell — sizing reads THIS (the card dock is a sibling)
   canvas: HTMLCanvasElement;
   card: HTMLElement;
+  // Expanded chip groups on the docked card ("+N more" toggles); reset on
+  // selection change so every card opens in its budgeted state.
+  expandedGroups: Set<string>;
   nodes: TimelineNode[];
   universe: TimelineNode[];     // full dated world (strip reference frame)
   placedDots: PlacedDot[];
@@ -100,6 +125,10 @@ interface ViewState {
   layoutNodes: TimelineNode[] | null;
   // Placed label boxes from the last draw — labels are click targets too (S6).
   labelBoxes: LabelBox[];
+  // "+N" cluster badges from the last draw — click targets (zoom to cluster).
+  plusBadges: PlusBadge[];
+  // Cast favorites (S4): their labels always win the budget.
+  favoriteIds: Set<string>;
   // cursor (canvas coords; null when outside) — drives proximity labels
   mouseX: number | null;
   mouseY: number | null;
@@ -119,11 +148,20 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
 
   const container = document.createElement('div');
   container.className = 'atlas-timeline-view';
+  // S7: the card DOCKS — it reserves layout space beside/below the canvas and
+  // never floats over data. Two variants for Captain's pick; the flag is a
+  // localStorage dev switch until the pick lands ('right' default).
+  const dock = localStorage.getItem('atlas_chart_card_dock') === 'bottom' ? 'bottom' : 'right';
+  container.dataset.dock = dock;
   target.appendChild(container);
+
+  const canvasWrap = document.createElement('div');
+  canvasWrap.className = 'atlas-timeline-view-canvaswrap';
+  container.appendChild(canvasWrap);
 
   const canvas = document.createElement('canvas');
   canvas.className = 'atlas-timeline-view-canvas';
-  container.appendChild(canvas);
+  canvasWrap.appendChild(canvas);
 
   const card = document.createElement('div');
   card.className = 'atlas-timeline-card';
@@ -131,12 +169,15 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
   container.appendChild(card);
 
   const state: ViewState = {
-    container, canvas, card,
+    container, canvasWrap, canvas, card,
+    expandedGroups: new Set(),
     nodes: [], universe: [], placedDots: [], hoveredDot: null, selectedId: null,
     window: null, baseRange: null,
     anim: null, ghost: null, rafPending: false,
     layoutSig: null, layoutNodes: null,
     labelBoxes: [],
+    plusBadges: [],
+    favoriteIds: new Set(),
     mouseX: null, mouseY: null,
     dragging: false, dragStartX: 0, dragStartWindow: null, dragMoved: false,
     stripDrag: null,
@@ -156,8 +197,10 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
   window.addEventListener('mouseup', onUp);
   canvas.addEventListener('wheel', onWheel, { passive: false });
 
-  const ro = new ResizeObserver(() => { draw(state); positionCard(state); });
-  ro.observe(container);
+  // Observe the canvas CELL — when the docked card mounts/unmounts, the cell
+  // reflows and the chart redraws to its new width/height.
+  const ro = new ResizeObserver(() => draw(state));
+  ro.observe(canvasWrap);
 
   // Material Symbols may not be in the FontFaceSet at first paint (the DOM card
   // that also uses it starts hidden) — load it, then redraw so any first-frame
@@ -165,12 +208,19 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
   void ensureIconFont().then(() => draw(state));
 
   return {
-    setNodes(nodes: TimelineNode[], universe?: TimelineNode[]): void {
+    setNodes(nodes: TimelineNode[], universe?: TimelineNode[], extras?: TimelineViewExtras): void {
       const prevView = currentViewRange(state);
       const prevBase = state.baseRange;
       state.nodes = nodes;
       if (universe) state.universe = universe;
+      if (extras?.favoriteIds) state.favoriteIds = new Set(extras.favoriteIds);
       state.layoutSig = null; // new node set → re-pack
+      // S5 protagonist-first: a one-shot opening window, honored only while the
+      // view is still on auto-fit (no user window, no travel in flight).
+      if (extras?.defaultWindow && state.window === null && !state.anim && nodes.length > 0) {
+        const bounds = navBounds(state) ?? calculateTimeRange(nodes);
+        state.window = clampWindow(extras.defaultWindow, bounds);
+      }
       // Focus travel (S6): when the scope's fitted range changes while a
       // window (or prior fit) is on screen, animate to the new fit instead of
       // teleporting, and leave the old window as a fading ghost on the strip.
@@ -198,6 +248,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
       const next = elementId ? elementId : null;
       if (next === state.selectedId) return;
       state.selectedId = next;
+      state.expandedGroups.clear(); // every card opens budgeted (S7)
       draw(state);
       renderCard(state);
     },
@@ -371,8 +422,8 @@ export function computeBeeswarm(
 
 function draw(state: ViewState): void {
   if (state.destroyed) return; // a late font-load/ResizeObserver tick after destroy()
-  const { canvas, container } = state;
-  const rect = container.getBoundingClientRect();
+  const { canvas, canvasWrap } = state;
+  const rect = canvasWrap.getBoundingClientRect();
   const w = Math.max(0, rect.width);
   const h = Math.max(0, rect.height);
   const dpr = window.devicePixelRatio || 1;
@@ -477,10 +528,11 @@ function draw(state: ViewState): void {
     ctx.stroke();
   }
 
-  // Labels — PROXIMITY REVEAL: selected + hovered always; otherwise only the
-  // dots nearest the cursor. Dots-only at rest keeps a dense world legible
-  // (the overlapping-wall fix). Collision-avoided within the labelled set.
-  drawLabels(ctx, state, placed, w, anchorIds);
+  // Labels — priority tiers (selected/hover → favorites → anchors → proximity),
+  // then a WEIGHT-RANKED PER-COLUMN BUDGET for the rest (S4): each fan column
+  // labels its heaviest nodes up to a space-proportional budget; the remainder
+  // surfaces as a clickable "+N" badge (zoom to cluster) instead of a smear.
+  drawLabels(ctx, state, placed, w, axisY, anchorIds);
 
   // Nodes → type-tinted category glyphs (selected + hovered emphasised).
   // Identity over anonymity: a glance distinguishes event / character /
@@ -539,9 +591,10 @@ function draw(state: ViewState): void {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
 
-  drawStrip(ctx, state, w, h, view);
+  // Cluster badges LAST in the band — they must read over the glyphs they count.
+  drawClusterBadges(ctx, state, placed, w, axisY);
 
-  positionCard(state);
+  drawStrip(ctx, state, w, h, view);
 }
 
 // ====== The overview strip (S2) ======
@@ -625,7 +678,13 @@ function stripHit(state: ViewState, mx: number, my: number, w: number, h: number
   return { kind: 'track' };
 }
 
-function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: PlacedDot[], w: number, anchorIds: Set<string>): void {
+/** S4 label weight: connectivity + how much is actually written about it.
+ *  Favorites don't need a boost here — they're pushed as their own tier. */
+function labelWeight(n: TimelineNode): number {
+  return n.degree + Math.log10(1 + n.contentMass);
+}
+
+function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: PlacedDot[], w: number, axisY: number, anchorIds: Set<string>): void {
   // Build label candidates in PRIORITY order, then place greedily: a higher-
   // priority label claims its row-space first and any lower-priority label that
   // would collide simply drops. This keeps anchors legible even when several
@@ -641,6 +700,8 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
   };
   push(state.selectedId ? byId.get(state.selectedId) : undefined, 0);
   push(state.hoveredDot ?? undefined, 0);
+  // favorites always win (S4) — ahead of anchors, exempt from the budget
+  for (const d of placed.filter(d => state.favoriteIds.has(d.node.id))) push(d, 1);
   // anchors by degree desc (highest significance wins a contested row slot)
   for (const d of placed.filter(d => anchorIds.has(d.node.id)).sort((a, b) => b.node.degree - a.node.degree)) push(d, 1);
   // proximity reveal — the "explore the rest" layer, nearest first
@@ -652,11 +713,23 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
       .slice(0, LABEL_NEAR_MAX);
     for (const x of near) push(x.d, 2);
   }
-  // Labels by default: offer EVERY on-screen node as a low-priority candidate;
-  // the collision-avoider below fills in as many names as actually fit. More
-  // become legible as you zoom because the density-fan spreads rows apart.
-  // (Captain: "labels in the default view too.")
-  for (const d of placed) push(d, 3);
+  // S4: the rest go through a WEIGHT-RANKED PER-COLUMN BUDGET (this replaced
+  // the offer-everything tier, which at broad spans degraded into a first-come
+  // smear — the label wall was a scale problem, but the budget is what makes
+  // the default window honest about what it drops).
+  const colOf = (d: PlacedDot): number => Math.floor(d.x / NODE_X_GAP);
+  const byCol = new Map<number, PlacedDot[]>();
+  for (const d of placed) {
+    if (seen.has(d.node.id)) continue;
+    const c = colOf(d);
+    const arr = byCol.get(c);
+    if (arr) arr.push(d); else byCol.set(c, [d]);
+  }
+  const budget = Math.max(1, Math.floor((axisY - TOP_PAD) / LABEL_BUDGET_PX_PER_ROW));
+  for (const dots of byCol.values()) {
+    dots.sort((a, b) => labelWeight(b.node) - labelWeight(a.node));
+    for (const d of dots.slice(0, budget)) push(d, 3);
+  }
   cands.sort((a, b) => a.pri - b.pri);
 
   // TRUE 2D placement: a label's bounding box must clear every already-placed
@@ -677,22 +750,126 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
     ctx.font = isAnchor ? '600 12px system-ui, sans-serif' : '11px system-ui, sans-serif';
     const text = truncate(dot.node.name, LABEL_MAX_CHARS);
     const tw = ctx.measureText(text).width;
-    // Flip the label to the LEFT of the dot in the right third so it never clips
-    // the panel edge (self-inspection finding).
-    const flip = dot.x > w * 0.66;
     const off = isAnchor ? 12 : 9;
-    const x0 = flip ? dot.x - off - tw : dot.x + off;
-    const box: Box = { x0, x1: x0 + tw, y0: dot.y - 7, y1: dot.y + 7 };
-    if (placedBoxes.some(b => overlaps(box, b))) continue;
-    if (glyphBoxes.some(g => g.id !== dot.node.id && overlaps(box, g.box))) continue;
-    placedBoxes.push(box);
-    state.labelBoxes.push({ ...box, nodeId: dot.node.id });
+    const gh = glyphHalf(dot);
+    // Candidate positions in preference order: beside the glyph first (panel-
+    // edge flip preserved), then ABOVE/BELOW it. In multi-column eras a side
+    // label always crosses the next column, so without the vertical fallbacks
+    // whole columns starve while half the band sits empty (live finding).
+    const sideFirst: Array<'right' | 'left'> = dot.x > w * 0.66 ? ['left', 'right'] : ['right', 'left'];
+    const attempts: Array<{ box: Box; align: CanvasTextAlign; tx: number; ty: number }> = [];
+    for (const side of sideFirst) {
+      const x0 = side === 'left' ? dot.x - off - tw : dot.x + off;
+      attempts.push({
+        box: { x0, x1: x0 + tw, y0: dot.y - 7, y1: dot.y + 7 },
+        align: side === 'left' ? 'right' : 'left',
+        tx: dot.x + (side === 'left' ? -off : off), ty: dot.y,
+      });
+    }
+    for (const dir of [-1, 1]) {
+      const cy = dot.y + dir * (gh + 9);
+      attempts.push({
+        box: { x0: dot.x - tw / 2, x1: dot.x + tw / 2, y0: cy - 7, y1: cy + 7 },
+        align: 'center', tx: dot.x, ty: cy,
+      });
+    }
+    const fit = attempts.find(a =>
+      a.box.x0 >= 2 && a.box.x1 <= w - 2
+      && !placedBoxes.some(b => overlaps(a.box, b))
+      && !glyphBoxes.some(g => g.id !== dot.node.id && overlaps(a.box, g.box)));
+    if (!fit) continue;
+    placedBoxes.push(fit.box);
+    state.labelBoxes.push({ ...fit.box, nodeId: dot.node.id });
     ctx.fillStyle = isSel ? 'rgba(255,255,255,0.95)' : isAnchor ? 'rgba(255,255,255,0.86)' : 'rgba(255,255,255,0.6)';
-    ctx.textAlign = flip ? 'right' : 'left';
-    ctx.fillText(text, dot.x + (flip ? -off : off), dot.y);
+    ctx.textAlign = fit.align;
+    ctx.fillText(text, fit.tx, fit.ty);
   }
+
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
+}
+
+/**
+ * "+N" cluster badges — the budget's honest remainder (S4). Adjacent starved
+ * columns merge into one badge (a dense era reads as one cluster, and the
+ * zoom-to-cluster target is that era's whole span, not one 42px sliver).
+ * Drawn AFTER the glyph pass — a badge buried under glyphs is a silent drop,
+ * which is exactly what the badge exists to prevent (live-inspection finding).
+ */
+function drawClusterBadges(ctx: CanvasRenderingContext2D, state: ViewState, placed: PlacedDot[], w: number, axisY: number): void {
+  state.plusBadges = [];
+  const labelled = new Set(state.labelBoxes.map(b => b.nodeId));
+  const colOf2 = (d: PlacedDot): number => Math.floor(d.x / NODE_X_GAP);
+  const colDots = new Map<number, PlacedDot[]>();
+  for (const d of placed) {
+    const c = colOf2(d);
+    const arr = colDots.get(c);
+    if (arr) arr.push(d); else colDots.set(c, [d]);
+  }
+  const starved = [...colDots.entries()]
+    .map(([c, dots]) => ({ c, dots, hidden: dots.filter(d => !labelled.has(d.node.id)).length }))
+    .filter(e => e.hidden > 0)
+    .sort((a, b) => a.c - b.c);
+  type Run = { dots: PlacedDot[]; hidden: number; lastCol: number };
+  const runs: Run[] = [];
+  for (const e of starved) {
+    const prev = runs[runs.length - 1];
+    if (prev && e.c - prev.lastCol <= 1) {
+      prev.dots.push(...e.dots);
+      prev.hidden += e.hidden;
+      prev.lastCol = e.c;
+    } else {
+      runs.push({ dots: [...e.dots], hidden: e.hidden, lastCol: e.c });
+    }
+  }
+  ctx.font = '600 10px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  for (const run of runs) {
+    const xs = run.dots.map(d => d.x);
+    const dates = run.dots.map(d => d.node.startDate);
+    const text = `+${run.hidden}`;
+    const tw = ctx.measureText(text).width;
+    // Clamp inside the canvas — edge clusters otherwise clip their badge
+    // (live-inspection finding: the right-edge "+29" was half off-screen).
+    const cx = Math.min(w - tw / 2 - 6, Math.max(tw / 2 + 6, (Math.min(...xs) + Math.max(...xs)) / 2));
+    const y = axisY - 6;
+    const box: PlusBadge = {
+      x0: cx - tw / 2 - 5, x1: cx + tw / 2 + 5,
+      y0: y - PLUS_BADGE_H / 2, y1: y + PLUS_BADGE_H / 2,
+      dateMin: Math.min(...dates), dateMax: Math.max(...dates),
+      hidden: run.hidden,
+    };
+    // Dark pill backing keeps the badge legible over bottom-row glyphs.
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.roundRect(box.x0, box.y0, box.x1 - box.x0, PLUS_BADGE_H, 7);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(34,211,238,0.75)';
+    ctx.fillText(text, cx, y + 0.5);
+    state.plusBadges.push(box);
+  }
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+}
+
+/** The "+N" badge under (mx,my), if any — badges are zoom-to-cluster targets. */
+function badgeAt(state: ViewState, mx: number, my: number): PlusBadge | null {
+  return state.plusBadges.find(b => mx >= b.x0 && mx <= b.x1 && my >= b.y0 && my <= b.y1) ?? null;
+}
+
+/** Animate the window to a cluster's span (the "+N" click, S4). */
+function zoomToCluster(state: ViewState, badge: PlusBadge): void {
+  const view = currentViewRange(state);
+  const bounds = navBounds(state) ?? state.baseRange;
+  if (!view || !bounds) return;
+  const boundsSpan = Math.max(1e-9, bounds.max - bounds.min);
+  const pad = Math.max((badge.dateMax - badge.dateMin) * 0.2, boundsSpan / 200);
+  const target = clampWindow({ start: badge.dateMin - pad, end: badge.dateMax + pad }, bounds);
+  state.ghost = { win: view, bornAt: performance.now() };
+  state.anim = { from: view, to: target, t0: performance.now() };
+  state.window = target;
+  scheduleMotion(state);
 }
 
 // ====== The DOM card (the wedge) ======
@@ -720,6 +897,15 @@ function renderCard(state: ViewState): void {
   meta.className = 'atlas-timeline-card-meta';
   meta.textContent = `${node.elementType} · ${dateStr}`;
   card.appendChild(meta);
+
+  // Description snippet (S7 content budget) — the one-breath answer to
+  // "what is this?" before the chips answer "what does it touch?".
+  if (node.snippet) {
+    const snip = document.createElement('div');
+    snip.className = 'atlas-timeline-card-snippet';
+    snip.textContent = node.snippet;
+    card.appendChild(snip);
+  }
 
   // Reverse links — elements that point AT this node (within the visible set; in
   // focus mode that's the full neighbourhood). `node.links` is the wedge FROM the
@@ -771,11 +957,14 @@ function renderCard(state: ViewState): void {
   actions.appendChild(open);
   card.appendChild(actions);
 
-  card.style.display = 'block';
-  positionCard(state);
+  card.style.display = 'flex';
 }
 
-/** A labelled chip cluster (one role group) inside the card. */
+// S7 content budget: chips shown per role group before the "+N more" toggle.
+const CARD_GROUP_CHIP_CAP = 5;
+
+/** A labelled chip cluster (one role group) inside the card — capped at
+ *  CARD_GROUP_CHIP_CAP with a "+N more" expander (S7 content budget). */
 function buildChipGroup(state: ViewState, label: string, refs: LinkedRef[]): HTMLElement {
   const group = document.createElement('div');
   group.className = 'atlas-timeline-card-group';
@@ -785,7 +974,22 @@ function buildChipGroup(state: ViewState, label: string, refs: LinkedRef[]): HTM
   group.appendChild(gl);
   const row = document.createElement('div');
   row.className = 'atlas-timeline-card-chiprow';
-  for (const link of refs) row.appendChild(buildChip(state, link));
+  const key = `${state.selectedId}·${label}`;
+  const expanded = state.expandedGroups.has(key);
+  const shown = expanded ? refs : refs.slice(0, CARD_GROUP_CHIP_CAP);
+  for (const link of shown) row.appendChild(buildChip(state, link));
+  if (!expanded && refs.length > CARD_GROUP_CHIP_CAP) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'atlas-timeline-chip atlas-timeline-chip-more';
+    more.textContent = `+${refs.length - CARD_GROUP_CHIP_CAP} more`;
+    more.title = `Show all ${refs.length}`;
+    more.addEventListener('click', () => {
+      state.expandedGroups.add(key);
+      renderCard(state);
+    });
+    row.appendChild(more);
+  }
   group.appendChild(row);
   return group;
 }
@@ -803,29 +1007,8 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   return chip;
 }
 
-/** Anchor the card near the selected dot, kept inside the container bounds. */
-function positionCard(state: ViewState): void {
-  if (state.card.style.display === 'none') return;
-  const dot = state.placedDots.find(d => d.node.id === state.selectedId);
-  const rect = state.container.getBoundingClientRect();
-  const cw = state.card.offsetWidth || 240;
-  const ch = state.card.offsetHeight || 120;
-  let left: number;
-  let top: number;
-  if (dot) {
-    left = dot.x + 14;
-    top = dot.y - 8;
-    if (left + cw > rect.width - 8) left = dot.x - cw - 14; // flip left
-    if (left < 8) left = 8;
-    if (top + ch > rect.height - 8) top = rect.height - ch - 8;
-    if (top < 8) top = 8;
-  } else {
-    left = rect.width - cw - 12;
-    top = 12;
-  }
-  state.card.style.left = `${Math.round(left)}px`;
-  state.card.style.top = `${Math.round(top)}px`;
-}
+// (The old float-near-the-dot positioning is gone — S7: the card is a docked
+// flex sibling of the canvas cell; CSS owns its geometry entirely.)
 
 // ====== Mouse / zoom / pan ======
 
@@ -924,6 +1107,13 @@ function handleMouseMove(state: ViewState, e: MouseEvent): void {
     }
   }
 
+  if (badgeAt(state, mx, my)) {
+    state.hoveredDot = null;
+    state.canvas.style.cursor = 'pointer';
+    draw(state);
+    return;
+  }
+
   const found = hitTest(state, mx, my);
   state.hoveredDot = found;
   state.canvas.style.cursor = found ? 'pointer' : 'grab';
@@ -982,6 +1172,12 @@ function handleMouseUp(state: ViewState): void {
   if (!state.dragging) return;
   state.dragging = false;
   state.canvas.style.cursor = state.hoveredDot ? 'pointer' : 'grab';
+  // "+N" badge click → zoom to that cluster (S4); checked before dot selection
+  // (badges sit in the axis gutter where no dot hit-test fires anyway).
+  if (!state.dragMoved && state.mouseX != null && state.mouseY != null) {
+    const badge = badgeAt(state, state.mouseX, state.mouseY);
+    if (badge) { zoomToCluster(state, badge); return; }
+  }
   if (!state.dragMoved && state.hoveredDot) {
     state.onSelect(state.hoveredDot.node.id); // a click (not a drag) selects
     // Waypoint (hookmap wp6): a true canvas click — the URL-derived anchor

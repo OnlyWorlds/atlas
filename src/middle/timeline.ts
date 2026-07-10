@@ -14,9 +14,9 @@ import { getState, subscribe } from '../core/state';
 import { navigate, elementHash, timelineHash, parseHash, onHashChange, type Route } from '../core/router';
 import { ToastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
-import { mountTimelineView, type TimelineViewHandle } from '../visualization/timeline/timeline-view';
+import { mountTimelineView, type TimelineViewHandle, type TimelineViewExtras } from '../visualization/timeline/timeline-view';
 import { extractTemporalNodes } from '../visualization/timeline/data-normalizer';
-import { pickDefaultChart, filterNodesByScope, scopeFromFocus } from '../visualization/timeline/chart-recipe';
+import { pickDefaultChart, filterNodesByScope, scopeFromFocus, protagonistWindow } from '../visualization/timeline/chart-recipe';
 import type { ChartConfig, ChartScope, TimelineNode } from '../visualization/timeline/types';
 import { defaultChartName, upsertChart, removeChart, renameChart, sameScope } from '../visualization/timeline/charts-store';
 import { getActiveStore } from '../core/active-store';
@@ -284,8 +284,10 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // Seed the broad-view type filter from the recipe ONCE, so the opening view
     // is the focused recipe (Story / Events / Foundings), not the full wall. A
     // 'focus' recipe leaves the broad view = all (the user clicks to focus).
+    let justSeeded = false;
     if (!seeded && allNodes.length > 0) {
       seeded = true;
+      justSeeded = true;
       if (!config) config = pickDefaultChart(all);
       if (config.scope.kind === 'types') typeFilter = new Set(config.scope.types);
     }
@@ -303,9 +305,24 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     }
 
     const scoped = filterNodesByScope(allNodes, scopeFromFocus(route.elementId ?? null, typeFilter));
+    // Cast favorites (S4): their labels always win the budget. Re-read each
+    // render so a toggle on the element header reflects immediately.
+    const favorites = getState().registry.worlds.find(w => w.id === wid)?.favorites;
+    const extras: TimelineViewExtras = {
+      favoriteIds: [favorites?.protagonist_id, favorites?.nexus_id]
+        .filter((x): x is string => typeof x === 'string' && x.length > 0),
+    };
+    // S5 protagonist-first: on the seed render (broad landing only — a focus
+    // URL owns its own fit), open the window on the protagonist's era. One-shot
+    // by construction: only the seed render passes it, and the view ignores it
+    // once the user has a window of their own.
+    if (justSeeded && !route.elementId) {
+      const win = protagonistWindow(allNodes, favorites?.protagonist_id ?? null);
+      if (win) extras.defaultWindow = win;
+    }
     // allNodes rides along as the overview strip's constant reference frame
     // (the full world's history stays visible however narrow the scope, S2).
-    handle.setNodes(scoped, allNodes);
+    handle.setNodes(scoped, allNodes, extras);
     handle.setSelection(route.mode === 'timeline' ? (route.elementId ?? null) : null);
 
     if (!suppressGallery) renderGallery(); // keep the active-chart highlight in sync

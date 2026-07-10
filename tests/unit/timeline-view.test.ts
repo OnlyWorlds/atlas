@@ -22,6 +22,7 @@ function node(id: string, startDate: number): TimelineNode {
     color: '#fff',
     links: [],
     degree: 0,
+    contentMass: 0,
   };
 }
 
