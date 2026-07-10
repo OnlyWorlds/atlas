@@ -451,7 +451,7 @@ Pins anchor to the map's image coordinate system. To prevent the "pins-placed-on
 - `right-pane.ts` checks each tab's mapId against `data.elements` on every render. Missing → `atlas-tab-stale` class + click handler that closes (vs activates).
 - Stale tab body pane (`map-tab.ts`) shows a friendly "this map isn't in the current world" state with an explicit Close button.
 - `activateWorld` does NOT touch `ui.rightTabs` on world switch. Tabs persist.
-- Per-world snapshot helpers (`setWorldRightTabs` / `getWorldRightTabs` in registry) are retained as dormant code, in case future UX work wants to revive per-world persistence as an alternate mode.
+- Per-world snapshot helpers (`setWorldRightTabs` / `getWorldRightTabs`) were removed in the 2026-07-10 dead-export cleanup (dead-by-design since tabs went global in session 209); `right_tabs` stays on `WorldRegistryEntry` as a documented-but-unused field if per-world persistence is ever revived.
 
 ---
 

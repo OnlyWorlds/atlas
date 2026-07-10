@@ -30,6 +30,12 @@ import { isWritingNarrative } from './writing-helpers';
 import { escapeText, relativeTime } from '../core/dom-utils';
 import { setWorldFavoriteElement, saveRegistry } from '../registry/registry';
 import { toastManager } from '../ui/toast-manager';
+import { timelineHash } from '../core/router';
+import { tableauScope } from '../visualization/timeline/chart-recipe';
+import { extractTemporalNodes } from '../visualization/timeline/data-normalizer';
+import { freezeChartBlock } from '../visualization/timeline/chart-freeze';
+import { renderChartView } from '../visualization/timeline/chart-static';
+import type { ChartConfig } from '../visualization/timeline/types';
 
 const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'character', 'location', 'institution', 'object', 'event', 'narrative',
@@ -54,6 +60,23 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
   const root = document.createElement('div');
   root.className = 'atlas-world-home';
   target.appendChild(root);
+
+  // Saved charts for the home chart strip (S15) — fetched once per mount,
+  // refreshed on out-of-band changes (save/rename/delete in the Charts room,
+  // id-swap migration). null = not loaded yet (strip falls back to the recipe
+  // default meanwhile, which is also the no-saved-charts behavior).
+  let savedCharts: ChartConfig[] | null = null;
+  let chartFetchGen = 0;
+  function refreshSavedCharts(): void {
+    const gen = ++chartFetchGen;
+    const store = getActiveStore();
+    if (!store) { savedCharts = []; return; }
+    void store.readCharts().then(charts => {
+      if (gen !== chartFetchGen) return; // superseded fetch
+      savedCharts = charts;
+      render();
+    }).catch(() => { savedCharts = []; });
+  }
 
   function render(): void {
     const active = getState().active;
@@ -88,13 +111,71 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       root.appendChild(buildOnboarding(toasts));
       return;
     }
+    // The chart strip (S15: the "starred chart") — the shape of the world's
+    // history between the cover and the desk (timeline-mini's old slot, now
+    // the real chart pipeline: first saved chart, else the recipe default).
+    const chartStrip = buildChartStrip(elements, worldId, savedCharts ?? []);
+    if (chartStrip) root.appendChild(chartStrip);
     const desk = buildDesk(elements, worldId);
     if (desk) root.appendChild(desk);
   }
 
+  const onChartsChanged = (): void => refreshSavedCharts();
+  window.addEventListener('atlas:charts-changed', onChartsChanged);
+  refreshSavedCharts();
   const unsub = subscribe(render);
   render();
-  return () => { unsub(); };
+  return () => {
+    window.removeEventListener('atlas:charts-changed', onChartsChanged);
+    unsub();
+  };
+}
+
+// ---- The chart strip (S15) --------------------------------------------------
+
+/**
+ * A static render of the world's chart on the cover: the FIRST saved chart
+ * when one exists (saving a chart is the "starring" act for v1), else the
+ * TABLEAU — the same default the Charts room lands on (Captain set a home
+ * location and couldn't find it here: the old Story-recipe default could
+ * never include a location). Cast rides into the freeze so protagonist/home
+ * read cyan. Every node carries a ref, so a click lands in the Charts room
+ * FOCUSED on that element. Hidden below 3 dated nodes.
+ */
+function buildChartStrip(elements: readonly Element[], worldId: string, savedCharts: ChartConfig[]): HTMLElement | null {
+  const favorites = getState().registry.worlds.find(w => w.id === worldId)?.favorites;
+  const cast = { protagonistId: favorites?.protagonist_id ?? null, nexusId: favorites?.nexus_id ?? null };
+  const chart: ChartConfig = savedCharts[0] ?? {
+    schema_version: 1,
+    id: 'home-tableau',
+    name: 'Tableau',
+    axis: { kind: 'time', direction: 'both' },
+    scope: tableauScope(
+      extractTemporalNodes([...elements]),
+      [cast.protagonistId, cast.nexusId].filter((x): x is string => !!x),
+    ),
+    render: '2d',
+  };
+  const charts = savedCharts.length > 0 ? savedCharts : [chart];
+  const frozen = freezeChartBlock(chart.id, 'home-chart-strip', charts, [...elements], new Set(elements.map(e => e.id)), { cast });
+  if (!frozen || frozen.nodes.length < 3) return null;
+
+  const section = document.createElement('section');
+  section.className = 'atlas-home-charts';
+  const title = document.createElement('button');
+  title.type = 'button';
+  title.className = 'atlas-home-section-title atlas-home-charts-title';
+  title.title = 'Open the Charts room';
+  title.innerHTML = `Charts · ${escapeText(chart.name)} <span class="material-symbols-outlined">arrow_forward</span>`;
+  title.addEventListener('click', () => navigate(timelineHash(worldId)));
+  section.appendChild(title);
+
+  const view = renderChartView(frozen, {
+    height: 170,
+    onRef: (ref) => navigate(timelineHash(worldId, ref)),
+  });
+  section.appendChild(view);
+  return section;
 }
 
 // ---- The cover -------------------------------------------------------------
@@ -193,56 +274,84 @@ function buildCover(
   return cover;
 }
 
+/** The per-kind cast configuration — card + ghost share it. */
+const CAST_KINDS = [
+  {
+    kind: 'protagonist' as const, role: 'protagonist', icon: 'person_pin',
+    elementType: 'character' as const, ghostName: 'choose a protagonist',
+    ghostTitle: 'Open a character and click the person pin in its header to set your protagonist',
+  },
+  {
+    kind: 'nexus' as const, role: 'home', icon: 'home_pin',
+    elementType: 'location' as const, ghostName: 'choose a home',
+    ghostTitle: 'Open a location and click the home pin in its header to set your home place',
+  },
+];
+
 /**
- * Ghost cast card shown while no favorite is set — the setter lives on the
- * element-detail header, which Captain couldn't find from home (2026-07-10).
- * Clicking filters the sidebar to characters so the path is one hop.
+ * Ghost cast card for an unset slot — the setter lives on the element-detail
+ * header, which Captain couldn't find from home (2026-07-10). Clicking filters
+ * the sidebar to the right type so the path is one hop. Both kinds get a
+ * ghost side by side (nexus beside protagonist, Captain 2026-07-10).
  */
-function buildCastHint(_worldId: string): HTMLElement | null {
-  const elements = getState().data.elements;
-  if (getState().data.loading) return null;
-  if (!elements.some(e => e.type === 'character')) return null;
-  const slot = document.createElement('div');
-  slot.className = 'atlas-home-cast';
+function buildCastGhost(spec: typeof CAST_KINDS[number]): HTMLElement {
   const ghost = document.createElement('button');
   ghost.type = 'button';
   ghost.className = 'atlas-home-cast-card atlas-home-cast-ghost';
-  ghost.title = 'Open a character and click the person pin in its header to set your protagonist';
+  ghost.title = spec.ghostTitle;
   ghost.innerHTML = `
-    <span class="material-symbols-outlined atlas-home-cast-icon">person_pin</span>
+    <span class="material-symbols-outlined atlas-home-cast-icon">${spec.icon}</span>
     <span class="atlas-home-cast-text">
-      <span class="atlas-home-cast-name">choose a protagonist</span>
+      <span class="atlas-home-cast-name">${spec.ghostName}</span>
       <span class="atlas-home-cast-role">shows here on the cover</span>
     </span>
   `;
   ghost.addEventListener('click', () => {
     const ui = getState().ui;
-    patchSlice('ui', { ...ui, sidebarMode: 'elements', elementFilters: new Set(['character' as const]) });
+    // Assignment MODE (Captain, 2026-07-10): the ghost doesn't just filter —
+    // the next click on a matching sidebar row assigns directly. One hop.
+    patchSlice('ui', {
+      ...ui,
+      sidebarMode: 'elements',
+      elementFilters: new Set([spec.elementType]),
+      castAssign: { kind: spec.kind },
+    });
     setSidebarModePref('elements');
   });
-  slot.appendChild(ghost);
-  return slot;
+  return ghost;
 }
 
-/** The cast slot: protagonist + home cards, only those that are set. */
+/** The cast slot: a card per set favorite, a ghost per unset one. */
 function buildCastSlot(worldId: string): HTMLElement | null {
+  if (getState().data.loading) return null;
   const reg = getState().registry;
   const favorites = reg.worlds.find(w => w.id === worldId)?.favorites;
-  if (!favorites) return buildCastHint(worldId);
   const elements = getState().data.elements;
-  const entries: { el: Element; role: string; icon: string; kind: 'protagonist' | 'nexus' }[] = [];
-  const protagonist = favorites.protagonist_id ? elements.find(e => e.id === favorites.protagonist_id) : undefined;
-  const nexus = favorites.nexus_id ? elements.find(e => e.id === favorites.nexus_id) : undefined;
-  if (protagonist) entries.push({ el: protagonist, role: 'protagonist', icon: 'person_pin', kind: 'protagonist' });
-  if (nexus) entries.push({ el: nexus, role: 'home', icon: 'home_pin', kind: 'nexus' });
-  if (entries.length === 0) return buildCastHint(worldId);
 
   const slot = document.createElement('div');
   slot.className = 'atlas-home-cast';
-  for (const { el, role, icon, kind } of entries) {
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'atlas-home-cast-card';
+  let rendered = 0;
+  for (const spec of CAST_KINDS) {
+    const favId = spec.kind === 'protagonist' ? favorites?.protagonist_id : favorites?.nexus_id;
+    const el = favId ? elements.find(e => e.id === favId) : undefined;
+    if (el) {
+      slot.appendChild(buildCastCard(el, spec, worldId));
+      rendered++;
+    } else if (elements.some(e => e.type === spec.elementType)) {
+      // Ghost only when the world HAS candidates of that type.
+      slot.appendChild(buildCastGhost(spec));
+      rendered++;
+    }
+  }
+  return rendered > 0 ? slot : null;
+}
+
+/** One set cast card: face, name, role, click-through, hover × unset. */
+function buildCastCard(el: Element, spec: typeof CAST_KINDS[number], worldId: string): HTMLElement {
+  const { role, icon, kind } = spec;
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'atlas-home-cast-card';
     const image = (el as { image_url?: string }).image_url;
     if (image) {
       const face = document.createElement('span');
@@ -280,9 +389,7 @@ function buildCastSlot(worldId: string): HTMLElement | null {
       toastManager.info(`No longer the world's ${role}`);
     });
     card.appendChild(unset);
-    slot.appendChild(card);
-  }
-  return slot;
+    return card;
 }
 
 // ---- The desk (continue + recent) ------------------------------------------

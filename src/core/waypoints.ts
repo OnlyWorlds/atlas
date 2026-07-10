@@ -206,10 +206,6 @@ export function completedCount(): number {
   return WAYPOINTS.filter((w) => !!s.completed[w.id]).length;
 }
 
-export function isCompleted(id: WaypointId): boolean {
-  return !!loadWaypointsState().completed[id];
-}
-
 export function isMuted(): boolean {
   return loadWaypointsState().muted;
 }

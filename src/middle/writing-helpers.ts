@@ -136,25 +136,6 @@ export function tierIndex(tier: WritingTier): number {
   }
 }
 
-/**
- * Whether a tier has structural constraints atlas enforces at create time.
- *   l1 (Book): no parent required
- *   l2 (Chapter): requires parent_narrative
- *   l3 (Scene): requires parent_narrative
- *   l4 (Draft): no constraints — flexible parent
- */
-export function tierConstraints(tier: 'l1' | 'l2' | 'l3' | 'l4'): {
-  requiresParent: boolean;
-  allowsChildren: boolean;
-} {
-  switch (tier) {
-    case 'l1': return { requiresParent: false, allowsChildren: true };
-    case 'l2': return { requiresParent: true, allowsChildren: true };
-    case 'l3': return { requiresParent: true, allowsChildren: false };
-    case 'l4': return { requiresParent: false, allowsChildren: true };
-  }
-}
-
 // ====== Tree building (consolidated from writing-sidebar / writing) ======
 
 export interface NarrativeNode {

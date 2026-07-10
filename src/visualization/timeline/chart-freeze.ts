@@ -51,6 +51,9 @@ export interface PayloadChartNode {
   endDate?: number;
   /** Top-N by significance — rendered larger + always-labelled. */
   anchor?: boolean;
+  /** The world's cast (protagonist/home) — always-labelled in cyan. ADDITIVE
+   *  field: the show viewer's copy ignores it until re-lifted. */
+  cast?: 'protagonist' | 'home';
   /** Present ONLY when the element is also carded on the page (click-through). */
   ref?: string;
 }
@@ -81,6 +84,7 @@ export function freezeChartBlock(
   charts: ChartConfig[],
   elements: Element[],
   includedIds: ReadonlySet<string>,
+  opts?: { cast?: { protagonistId?: string | null; nexusId?: string | null } },
 ): PayloadChartBlock | null {
   const chart = charts.find(c => c.id === chartId);
   if (!chart) return null;
@@ -95,6 +99,8 @@ export function freezeChartBlock(
       const node: PayloadChartNode = { type: n.elementType, name: n.name || '(unnamed)', date: n.startDate };
       if (n.endDate != null && n.endDate > n.startDate) node.endDate = n.endDate;
       if (anchors.has(n.id)) node.anchor = true;
+      if (n.id === opts?.cast?.protagonistId) node.cast = 'protagonist';
+      else if (n.id === opts?.cast?.nexusId) node.cast = 'home';
       if (includedIds.has(n.id)) node.ref = n.id;
       return node;
     });

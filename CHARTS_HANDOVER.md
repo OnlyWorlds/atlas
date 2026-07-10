@@ -1,18 +1,17 @@
-# Charts — Handover (Chart #1 + #2 ✅ · SITDOWN 2026-07-10 ✅ · trust-set Bouts 1 + 2 + 3 ✅)
+# Charts — Handover (the v1 CHARTS ARC IS CLOSED · 2026-07-10, sessions 251-252)
 
-*Running-start pickup for the Charts arc. Load order: **`DESIGN_CHARTS.md` FIRST** (holds the integrated S1-S15 layer + roadmap), then this file. The sitdown note (`Forge/Notes/2026-07-10-charts-sitdown-decisions.md`) is the dated decision record.*
+*Load order: **`DESIGN_CHARTS.md` FIRST** (holds the integrated S1-S15 layer, every revision, and the Acts roadmap), then this file. The sitdown note (`Forge/Notes/2026-07-10-charts-sitdown-decisions.md`) is the dated decision record. Full build history: PROGRESS.md session-251/252 entries.*
 
-## ⚑ OPENER (the live work)
+## ⚑ OPENER — what remains before v1 (charts itself is DONE)
 
-**THE v1 TRUST SET IS SHIPPED (Bouts 1-3, sessions 251-252).** What remains before v1:
-- **Captain's picks**: card dock variant (`b3-card-dock-right-final.png` vs `b3-card-dock-bottom.png`, switch = `localStorage.atlas_chart_card_dock`; loser code gets removed after the pick) · room icons (`icons-{current,variant-a,variant-b}.png`) · Bout E dim-rows keep/tune/drop · S7 "Edit" action call (shipped Open only — see PROGRESS flags).
-- **Home pass 2** (S15: starred chart vs "coming up" strip) → **pipeline smoke** (GATED on Captain's show push + Boss redeploy) → **pre-flight** (`Forge/Notes/2026-07-03-atlas-release-plan.md`).
-**Banked forensics**: the OPFS rapid-reload activation hang (PROGRESS 2026-07-10/S251 entry — first `listElements` after open never resolves when reloaded within seconds; bfcache write-lock hypothesis; 15s watchdog toast shipped). Post-v1 unless Captain hits it live.
+- **Pipeline smoke** (GATED on Captain's show push + Boss redeploy) → **pre-flight** (`Forge/Notes/2026-07-03-atlas-release-plan.md`) → **v1**.
+- Captain's side: show push · S14 recipe-fit poke on his real worlds · commit the session-252 tail.
+- Ungated bout candidates: **Cmd+K palette** (the one open feature-level item across atlas) · OPFS rapid-reload forensics (watchdog shipped; PROGRESS S251 entry has the trail — post-v1 lean) · og:image (blocked on Captain's card asset).
+- **Banked test item**: an e2e locking the cast ASSIGNMENT MODE (ghost card → `ui.castAssign` → sidebar banner → matching row-click assigns + returns home; both kinds live-verified twice, not yet test-locked; the flow spans world-home.ts ghost click + elements-sidebar.ts banner/interception).
 
-## SHIPPED 2026-07-10 (session 252 — Bouts 2 + 3)
+## What the closed arc contains (all in DESIGN_CHARTS.md; one-line map)
 
-**Bout 2 (S4/S5)**: weight-ranked per-column label budget (`labelWeight` = degree + log-scaled `contentMass`; favorites always win) · "+N" cluster badges (merged runs, drawn over glyphs, click = animated zoom-to-cluster) · label position fallbacks (side/above/below) · **protagonist-first default window** (`protagonistWindow`: explicit favorite else link-tally inference; era = densest ~75% date cluster, outlier-robust; one-shot window, never auto-focus). Captain's flag bug was a CSS leak (`.atlas-middle-header` icon rule painted the favorite toggle cyan) — fixed with a direct-child scope; × unset added to the home cast card.
-**Bout 3 (S7)**: the card DOCKS as a flex sibling of the canvas cell (canvas reflows; float positioning deleted) — description snippet + role groups capped at 5 + "+N more" + pinned Open; chips scroll.
+Window-is-the-camera + overview strip (S251) · weight-ranked label budget + "+N" zoom-to-cluster badges · docked-right card (snippet, capped chip groups, pinned actions) · **PEEK/FOCUS split** (peek reads free; Focus/Edit are the card's verbs; Back walks the focus chain) · **always-reserved rail** (ambient legend + cast rows; no reflow) · **THE TABLEAU as the landing** (no chips lit; `tableauScope` = cast + weighted essentials; all-chips-off returns to it; the home strip defaults to it too) · quiet cast signal (size boost + bright cyan label; `PayloadChartNode.cast` additive through freeze/static) · **cast assignment mode** (`ui.castAssign`) · +Event stays in the room · adaptive beeswarm gaps · ring-aware/y-bounded/below-first label placement.
 
 ## Shipped
 

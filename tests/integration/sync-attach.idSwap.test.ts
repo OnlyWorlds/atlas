@@ -41,6 +41,7 @@ beforeEach(() => {
     zoneEditing: null,
     sidebarWritingOverride: false,
     knowledgeLens: null,
+    castAssign: null,
   });
   window.location.hash = '#/';
 });

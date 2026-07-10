@@ -360,14 +360,12 @@ async function doActivateWorld(
   // Tabs are GLOBAL across world switches by design (DESIGN_MAPS.md §5 revised
   // session 209). Tabs whose mapId isn't in the active world's elements get
   // the stale visual treatment (darkened, click-to-close) in right-pane.ts.
-  // The per-world persistence layer (setWorldRightTabs / hydrateRightTabsFromRegistry)
-  // is left in the registry helpers but not invoked here.
   if (!preserveSelection) {
     // loading:true — the cache is about to be primed async; empty ≠ loading
     // (the misleading empty-home flash, 2026-07-10).
     patchSlice('data', { elements: [], loading: true });
-    // knowledgeLens cleared too — it references a knower of the OLD world.
-    patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null });
+    // knowledgeLens + castAssign cleared too — both reference the OLD world.
+    patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, castAssign: null });
     const currentRoute = parseHash(window.location.hash);
     if (currentRoute.worldId !== worldId) {
       if (currentRoute.mode === 'settings') {

@@ -32,6 +32,7 @@ interface Placed {
   color: string;
   name: string;
   anchor: boolean;
+  cast?: 'protagonist' | 'home';
   ref?: string;
   endX?: number;
 }
@@ -55,10 +56,14 @@ function levelFor(x: number, lastXAtLevel: Map<number, number>, maxLevel: number
 export interface ChartViewOptions {
   /** Called when a node with a `ref` (a carded element) is clicked. */
   onRef?: (ref: string) => void;
+  /** Canvas height in px (default 240). ADDITIVE option — the show viewer's
+   *  copy of this module can lag without behavior change (re-lift discipline). */
+  height?: number;
 }
 
 /** Render a frozen chart block to a self-contained element. */
 export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions = {}): HTMLElement {
+  const height = opts.height ?? HEIGHT;
   const wrap = document.createElement('div');
   wrap.className = 'atlas-chart-static';
 
@@ -69,7 +74,7 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
 
   const canvasWrap = document.createElement('div');
   canvasWrap.className = 'atlas-chart-static-canvas-wrap';
-  canvasWrap.style.height = `${HEIGHT}px`;
+  canvasWrap.style.height = `${height}px`;
   wrap.appendChild(canvasWrap);
 
   if (block.nodes.length === 0) {
@@ -88,35 +93,35 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
     const cssW = canvasWrap.clientWidth || 600;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(cssW * dpr);
-    canvas.height = Math.round(HEIGHT * dpr);
+    canvas.height = Math.round(height * dpr);
     canvas.style.width = `${cssW}px`;
-    canvas.style.height = `${HEIGHT}px`;
+    canvas.style.height = `${height}px`;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cssW, HEIGHT);
+    ctx.clearRect(0, 0, cssW, height);
 
     const span = Math.max(1, block.axisMax - block.axisMin);
     const plotW = cssW - 2 * PAD_X;
-    const midY = PAD_TOP + (HEIGHT - PAD_TOP - PAD_BOTTOM) / 2;
-    const maxLevel = Math.max(1, Math.floor((HEIGHT - PAD_TOP - PAD_BOTTOM) / 2 / Y_STEP));
+    const midY = PAD_TOP + (height - PAD_TOP - PAD_BOTTOM) / 2;
+    const maxLevel = Math.max(1, Math.floor((height - PAD_TOP - PAD_BOTTOM) / 2 / Y_STEP));
     const dateToX = (d: number): number => PAD_X + ((d - block.axisMin) / span) * plotW;
 
     // Axis baseline.
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(PAD_X, HEIGHT - PAD_BOTTOM + 8);
-    ctx.lineTo(cssW - PAD_X, HEIGHT - PAD_BOTTOM + 8);
+    ctx.moveTo(PAD_X, height - PAD_BOTTOM + 8);
+    ctx.lineTo(cssW - PAD_X, height - PAD_BOTTOM + 8);
     ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillStyle = 'rgba(255,255,255,0.68)';
     ctx.font = "11px system-ui, sans-serif";
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
-    ctx.fillText(String(block.axisMin), PAD_X, HEIGHT - 8);
+    ctx.fillText(String(block.axisMin), PAD_X, height - 8);
     if (block.axisMax !== block.axisMin) {
       ctx.textAlign = 'right';
-      ctx.fillText(String(block.axisMax), cssW - PAD_X, HEIGHT - 8);
+      ctx.fillText(String(block.axisMax), cssW - PAD_X, height - 8);
     }
 
     // Layout: anchors first (they hold the centre), then by date.
@@ -135,7 +140,7 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       return {
         x, y: midY + level * Y_STEP,
         icon: ELEMENT_ICONS[n.type as ElementType] ?? 'category',
-        color, name: n.name, anchor: !!n.anchor, ref: n.ref,
+        color, name: n.name, anchor: !!n.anchor, cast: n.cast, ref: n.ref,
         endX: n.endDate != null ? dateToX(n.endDate) : undefined,
       };
     });
@@ -151,11 +156,12 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       ctx.stroke();
     }
 
-    // Glyphs + anchor labels.
+    // Glyphs + anchor/cast labels (cast = the world's protagonist/home —
+    // always labelled, in cyan, matching the interactive room's signal).
     ctx.textBaseline = 'middle';
     for (const p of placed) {
-      const size = p.anchor ? ICON_ANCHOR : ICON;
-      if (p.anchor) {
+      const size = p.cast ? ICON_ANCHOR + 3 : p.anchor ? ICON_ANCHOR : ICON;
+      if (p.anchor && !p.cast) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, size * 0.85, 0, Math.PI * 2);
         ctx.fillStyle = applyAlpha(p.color, 0.12);
@@ -166,9 +172,9 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       ctx.textAlign = 'center';
       ctx.fillText(p.icon, p.x, p.y);
 
-      if (p.anchor) {
+      if (p.anchor || p.cast) {
         ctx.font = "12px system-ui, sans-serif";
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillStyle = p.cast ? 'rgba(34,211,238,0.95)' : 'rgba(255,255,255,0.85)';
         const lw = ctx.measureText(p.name).width;
         const rightX = p.x + size * 0.7;
         if (rightX + lw > cssW - PAD_X) {

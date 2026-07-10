@@ -75,7 +75,7 @@ When a chart embeds a map (a later act), it embeds a **real OW Map** (image + it
 | S2 | Overview strip | IN — the room's anchor mechanism. Thin full-span density strip; bright band = current viewport; band draggable/resizable (a control, not a display). ONE fading ghost of the previous window. Era bands + now-line markers live here later. Signature element: gets real design care. | ✅ SHIPPED (Bout 1) |
 | S3 | Zoom model | There is no camera: the viewport IS the band. One state `{start,end}` in world-time replaces `zoom`+`panCenter`. Wheel resizes the band around the cursor date; drag slides it. Vertical never zooms (fan = layout). | ✅ SHIPPED (Bout 1) |
 | S4 | Label budget | Weight = graph degree + content mass (description/prose length) + favorites (always win). Budget per fan column proportional to space; "+N" affordance where dropped (click = zoom to cluster). | ✅ SHIPPED (Bout 2, S252) — plus label position fallbacks (side/above/below) |
-| S5 | Default recipe | NEW step 0: protagonist-first. `favorites.protagonist_id` set → default centers on their neighbourhood; else INFER; else existing recipe order. Cast-slot discoverability hint on home. | ✅ SHIPPED (Bout 2, S252) — *as a default WINDOW on the densest ~75% cluster of the neighbourhood's dates (outlier-robust), NOT an auto-focus URL; inference tallies characters via the dated set's links (undated characters win)* |
+| S5 | Default recipe | NEW step 0: protagonist-first. Cast-slot discoverability hint on home. | ✅ SUPERSEDED BY THE TABLEAU (S252, Captain's call): the LANDING is the tableau — no chips lit, cast + weighted essentials across categories, cast marks make the protagonist central. The interim protagonist-WINDOW implementation was deleted same-session. |
 | S6 | Focus jumps | Main axis re-fits per focus (not locked), ANIMATED as camera travel; the strip provides constancy. Clickable labels (not just glyphs). Axis date text brighter. | ✅ SHIPPED (Bout 1) |
 | S7 | The card | Docked (right-edge-in-room vs bottom strip: prototype both, Captain picks from screenshots), content-budgeted (chips capped per role group + "+N", description snippet), clear Open/Edit actions. Never floats over data. | ✅ SHIPPED (Bout 3, S252) — flex-sibling dock (canvas reflows), both variants live behind `localStorage.atlas_chart_card_dock`; PICK PENDING. Shipped Open only (element room IS the edit surface) |
 | S8 | Per-type element charts | The grammar: **beats** (Event), **arcs** (Narrative), **lifespans/tenures** (Character/Creature/Title/Institution/Family/Location), **presence** (rest). `/timeline/<id>` already IS the element's chart; the work is per-type curation. Order: narrative+event → character → location → **Title early (tenure bars, cheap, nobody has it)**. One at a time, map the other 18 to archetypes as we go. | POST-LAUNCH (Act 2) |
@@ -154,14 +154,15 @@ ChartScope =
 
 ---
 
-## The default — auto best-guess, instantly switchable (no wizard)
+## The default — the TABLEAU (revised S252, Captain's call)
 
-The default *is* the welcome; the controls *are* the customization. A `pickDefaultChart(elements)` runs an **ordered recipe list** — first that fits wins:
-0. **Protagonist-first (S5, Bout 2)** — `favorites.protagonist_id` set → default chart centers on their neighbourhood; else INFER the highest-degree character. *Implemented as a default WINDOW centered on that neighbourhood + a label boost, NOT an auto-focus URL — a deliberate deviation from S5's letter, flagged for Captain.*
-1. **Writing spine** — has book/chapter/scene narratives (or a `parent_narrative` tree)? → scope = narratives + events.
-2. **Story events** — has dated events? → scope = events.
-3. **Character life** — most-linked character with a `birth_date`? → focus on that character. (recipe-3 ranks by **dated-neighbourhood size** — a character with only undated referrers falls through, no lone-dot collapse.)
-4. **Deep time** — locations/institutions with `founding_date`? → scope = those.
+**The Charts room LANDS on the tableau**: no type chips lit (neutral state), `tableauScope` composing the world at a glance — protagonist + nexus always in (lead character + location stand in when unset), then the top-weighted essentials across categories (per-type cap 4, total 22, weight = degree + log content-mass, deterministic). Cast marks + the sparse-set spacing make the protagonist central and the view breathable. Ticking chips narrows to those types; all-off returns to the tableau (the old empty-filter → "everything" inversion is closed).
+
+`pickDefaultChart(elements)` (the ordered recipe list: Story → Events → Character life → Foundings → all) still names/scopes the **home chart strip** default and remains available for future recipes:
+1. **Writing spine** — a `parent_narrative` tree + dated content → narratives + events.
+2. **Story events** — dated events → events.
+3. **Character life** — most-linked character by **dated-neighbourhood size** (no lone-dot collapse).
+4. **Deep time** — dated locations/institutions.
 5. **Fallback** — everything temporal, or an honest empty-with-CTA.
 
 Unknown `scope.kind` **fails safe to empty**, never the whole-world wall. S14: real-world recipe fit is pending Captain's pass.
@@ -184,7 +185,12 @@ X is the only meaningful axis (date); Y is anti-overlap. The rule: **a node sits
 
 ⚠ **Superseded:** the original Landing shipped **labels-by-default** (every on-screen node a low-priority candidate, a collision-avoider filling as many as fit). S1 reframed the wall as a SCALE problem and S4 replaces fill-all with a **weight-ranked per-column budget** (degree + content mass + favorites; "+N" where dropped) — landing in Bout 2. Labels-by-default was overriding chart #2's own LOD intent.
 
-**Navigation (unified select = focus, shipped):** focus lives in the URL — `/timeline` = recipe default (broad); `/timeline/<id>` = focused on `<id>` (its temporal neighbourhood + card). Clicking a glyph, a label, OR a card chip → `/timeline/<id>`. **Browser Back walks the focus chain** (focus derived each render from the URL, not room-local state). "Open →" escapes to the full element inspect room; the focus pill clears to broad. The right-pane context graph anchor-defaults to the highest-degree in-scope node (never empty).
+**Navigation — PEEK/FOCUS split (2026-07-10; REVISES the original "unified select=focus", which Captain reopened after real use — every click narrowing made reading expensive):**
+- **PEEK** — clicking a glyph, label, or card chip shows that element's card in the reserved right rail. No routing, no scope change; re-click, ×, or another click moves it. Reading is free.
+- **FOCUS** — the card's Focus action (and the room's fallback for out-of-scope chip targets) routes to `/timeline/<id>`: scope narrows to the temporal neighbourhood, the pill shows, **browser Back walks the focus chain**. A focus navigation auto-peeks its element. **Edit** on the card opens the element inspect room.
+- **The rail is ALWAYS reserved** (no canvas reflow on peek — the "jump" complaint): nothing peeked → ambient content (cast rows, type legend with counts, interaction hint).
+- **The TABLEAU**: all type chips off = the world's default view, NOT everything — `tableauScope` picks the cast (protagonist/nexus; lead character + location stand in) plus weighted essentials across categories (per-type cap 4, total 22). The old empty-filter → 'all' inversion is closed. Cast glyphs carry a persistent cyan ring + pin badge at every scope/zoom.
+- The right-pane context graph anchor-defaults to the highest-degree in-scope node (never empty).
 
 ---
 
@@ -218,7 +224,7 @@ X is the only meaningful axis (date); Y is anti-overlap. The rule: **a node sits
 | D9 | Causality / consistency | Reserve the link-model shape; the moat (Act 3). |
 | **D10** | **Forward half** | **Adopted as the chart's identity** (Simmer): render owed/coming/due; now-line as the seam. S11 stages it fieldless-first; status vocab when lapse-tracking lands. |
 
-**Locked earlier, still true (don't re-litigate):** chart = saveable view + share block, never an OW element · `.atlas/charts.json` + versioned `ChartConfig` · unified select=focus, Back walks the chain · events inherit their location's pin (events are not pins) · auto recipe default · anchor cap 7 · `DateSpec` tagged union (fuzzy/relative additive).
+**Locked earlier, still true (don't re-litigate):** chart = saveable view + share block, never an OW element · `.atlas/charts.json` + versioned `ChartConfig` · events inherit their location's pin (events are not pins) · auto recipe default · anchor cap 7 · `DateSpec` tagged union (fuzzy/relative additive). **Revised 2026-07-10**: "unified select=focus" → the PEEK/FOCUS split (see Navigation above); Back still walks the focus chain.
 
 ---
 

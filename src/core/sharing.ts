@@ -50,13 +50,6 @@ export type PageIntent = 'show' | 'reference' | 'publish';
 
 export const PAGE_INTENTS: readonly PageIntent[] = ['show', 'reference', 'publish'];
 
-/** Human hint per intent (list chips + the intent picker). */
-export const PAGE_INTENT_HINTS: Record<PageIntent, string> = {
-  show: 'social: look at this',
-  reference: 'selective: for a specific audience',
-  publish: 'permanent: a curated destination',
-};
-
 /** A page's intent; defaults to 'show' when missing/unknown. */
 export function pageIntentOf(el: Element): PageIntent {
   const raw = (el as Record<string, unknown>).atlas_page_intent;

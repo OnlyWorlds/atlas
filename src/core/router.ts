@@ -294,10 +294,6 @@ export function importHash(worldId: string): string {
   return `#/w/${worldId}/import`;
 }
 
-export function templatesHash(worldId: string): string {
-  return `#/w/${worldId}/templates`;
-}
-
 export function onHashChange(fn: (route: Route) => void): () => void {
   const handler = () => fn(parseHash(window.location.hash));
   window.addEventListener('hashchange', handler);

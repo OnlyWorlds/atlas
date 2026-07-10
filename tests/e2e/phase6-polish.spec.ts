@@ -161,6 +161,9 @@ test('timeline + event create from timeline header', async ({ page }) => {
   await page.click('[data-modal="create-element"] [data-action="create"]');
   await expect(page.locator('[data-modal="create-element"]')).toHaveCount(0);
 
-  // After create, the URL navigates to the element detail (default behavior).
-  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/element\/[0-9a-f-]+$/);
+  // Creating from the charts room STAYS in the room (Captain, 2026-07-10) —
+  // the chart is the workspace; a toast explains the undated event isn't
+  // placeable yet.
+  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/timeline$/);
+  await expect(page.locator('.ow-toast', { hasText: 'give it a date' })).toBeVisible();
 });

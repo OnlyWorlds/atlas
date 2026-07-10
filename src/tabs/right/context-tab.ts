@@ -590,7 +590,3 @@ function emptyCopyForRoute(route: Route): string {
   }
 }
 
-/** Type-narrow helper for the right-pane dispatch. */
-export function isContextTab(t: RightTabRef): t is { kind: 'context' } {
-  return t.kind === 'context';
-}

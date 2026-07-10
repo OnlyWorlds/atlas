@@ -68,18 +68,6 @@ export function createMapDialog(
   });
 }
 
-/**
- * Open the map modal in configure-existing mode against `mapId`. Used after
- * element-create produces a map element with only a name set — the modal
- * gives the user a single-pass surface to fill location + image fields.
- */
-export function configureMapDialog(toasts: ToastManager, mapId: string): Promise<MapCreateResult | null> {
-  return new Promise((resolve) => {
-    const modal = new MapCreateModal(toasts, (result) => resolve(result), { existingMapId: mapId });
-    modal.open();
-  });
-}
-
 class MapCreateModal extends BaseModal {
   private onDone: (result: MapCreateResult | null) => void;
   private toasts: ToastManager;

@@ -143,6 +143,14 @@ export interface UiState {
    * persisted — purely in-session.
    */
   knowledgeLens: { knowerId: string } | null;
+  /**
+   * Cast-assignment mode (home ghost cards, 2026-07-10): when set, the next
+   * click on a matching sidebar element row ASSIGNS it as the world's
+   * protagonist/home instead of opening it — the ghost card's one-hop path.
+   * Cleared by the assignment itself, the sidebar banner ×, or world switch.
+   * Never persisted — purely in-session.
+   */
+  castAssign: { kind: 'protagonist' | 'nexus' } | null;
 }
 
 export interface AppState {
@@ -177,6 +185,7 @@ let state: AppState = {
     zoneEditing: null,
     sidebarWritingOverride: false,
     knowledgeLens: null,
+    castAssign: null,
   },
   sync: {
     byWorld: {},

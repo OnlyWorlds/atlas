@@ -16,7 +16,7 @@ import { ToastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { mountTimelineView, type TimelineViewHandle, type TimelineViewExtras } from '../visualization/timeline/timeline-view';
 import { extractTemporalNodes } from '../visualization/timeline/data-normalizer';
-import { pickDefaultChart, filterNodesByScope, scopeFromFocus, protagonistWindow } from '../visualization/timeline/chart-recipe';
+import { filterNodesByScope, scopeFromFocus, tableauScope } from '../visualization/timeline/chart-recipe';
 import type { ChartConfig, ChartScope, TimelineNode } from '../visualization/timeline/types';
 import { defaultChartName, upsertChart, removeChart, renameChart, sameScope } from '../visualization/timeline/charts-store';
 import { getActiveStore } from '../core/active-store';
@@ -46,7 +46,15 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   newEventBtn.dataset.action = 'new-event';
   newEventBtn.title = 'Create a new event';
   newEventBtn.textContent = '+ Event';
-  newEventBtn.addEventListener('click', () => new ElementCreateModal(toasts, { initialType: 'event' }).open());
+  newEventBtn.addEventListener('click', () => new ElementCreateModal(toasts, {
+    initialType: 'event',
+    // Stay in the room (Captain, 2026-07-10): the chart is the workspace here.
+    // A fresh event is undated, so it can't appear on the axis yet — say so
+    // instead of letting it silently not-show. (Act 1's undated rail is the
+    // real home for this.)
+    suppressNavigate: true,
+    onCreated: () => toasts.info('Event created · give it a date to place it on the chart'),
+  }).open());
   actions.appendChild(newEventBtn);
 
   const saveBtn = document.createElement('button');
@@ -73,9 +81,16 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   wrap.appendChild(viewMount);
 
   let handle: TimelineViewHandle | null = null;
-  let config: ChartConfig | null = null;        // seeded once; the save/share contract
-  let typeFilter: Set<ElementType> | null = null; // broad-view filter (null = all); focus is URL-driven
-  let seeded = false;
+  let config: ChartConfig | null = null;        // set when a saved chart loads; the save/share contract
+  // The LANDING is the TABLEAU (Captain, 2026-07-10: "no highlights, neutral
+  // state") — an EMPTY type filter, no chips lit. Ticking a chip narrows to
+  // that type; null = every type (all chips on).
+  let typeFilter: Set<ElementType> | null = new Set();
+  // PEEK state (the 2026-07-10 split): reading an element's card is room-local
+  // and free; FOCUS is the URL. A focus navigation auto-peeks its element.
+  let peekId: string | null = null;
+  let lastFocusId: string | null | undefined = undefined; // undefined = never seen
+  let lastScoped: TimelineNode[] = [];
   let savedCharts: ChartConfig[] = [];          // from .atlas/charts.json
   let suppressGallery = false;                  // true while an inline rename input is open
 
@@ -114,6 +129,17 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       controlBar.appendChild(pill);
     }
 
+    // Tableau state (all chips off): say what's showing instead of leaving an
+    // unlabeled curated view (it isn't "nothing selected", it's the default
+    // world view — cast + essentials).
+    if (!focused && typeFilter && typeFilter.size === 0) {
+      const hint = document.createElement('span');
+      hint.className = 'atlas-chart-tableau-hint';
+      hint.textContent = 'Tableau: the cast and essentials';
+      hint.title = 'With no types picked, the chart shows the world at a glance. Pick types above for the full sets.';
+      controlBar.appendChild(hint);
+    }
+
     // Type toggle chips — the broad-view filter (null = all). While focused they
     // read inactive (focus is the lens); clicking one drops focus and applies it.
     for (const t of present) {
@@ -137,10 +163,31 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     }
   }
 
-  /** The scope the live view is currently showing (focus URL + type filter). */
+  /** The world's cast favorites (protagonist/nexus ids) from the registry. */
+  function castIds(): string[] {
+    const wid = worldId();
+    const favorites = wid ? getState().registry.worlds.find(w => w.id === wid)?.favorites : undefined;
+    return [favorites?.protagonist_id, favorites?.nexus_id]
+      .filter((x): x is string => typeof x === 'string' && x.length > 0);
+  }
+
+  /**
+   * The scope the live view is currently showing. Focus (URL) wins; an EMPTY
+   * type filter means the TABLEAU (the world's cast + weighted essentials),
+   * not "everything" — unticking every chip used to invert into the full soup.
+   */
+  function effectiveScope(allNodes: TimelineNode[], route: Route): ChartScope {
+    if (!route.elementId && typeFilter && typeFilter.size === 0) {
+      return tableauScope(allNodes, castIds());
+    }
+    return scopeFromFocus(route.elementId ?? null, typeFilter);
+  }
+
+  /** Same, for save-chart (reads the route itself). */
   function currentScope(): ChartScope {
     const route = parseHash(window.location.hash);
-    return scopeFromFocus(route.elementId ?? null, typeFilter);
+    const allNodes = extractTemporalNodes(getState().data.elements);
+    return effectiveScope(allNodes, route);
   }
 
   /** Save the current view as a named chart in `.atlas/charts.json`. */
@@ -281,49 +328,53 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     if (!wid) return;
     const all = getState().data.elements;
     const allNodes = extractTemporalNodes(all);
-    // Seed the broad-view type filter from the recipe ONCE, so the opening view
-    // is the focused recipe (Story / Events / Foundings), not the full wall. A
-    // 'focus' recipe leaves the broad view = all (the user clicks to focus).
-    let justSeeded = false;
-    if (!seeded && allNodes.length > 0) {
-      seeded = true;
-      justSeeded = true;
-      if (!config) config = pickDefaultChart(all);
-      if (config.scope.kind === 'types') typeFilter = new Set(config.scope.types);
-    }
 
     const route = parseHash(window.location.hash);
     renderControlBar(allNodes, route);
 
     if (!handle) {
       handle = mountTimelineView(viewMount, {
-        // Unified select=focus: a dot OR a card chip focuses that element via the
-        // URL (Back walks the chain). Empty id clears focus.
-        onSelect: (id) => { const w = worldId(); if (w) navigate(id ? timelineHash(w, id) : timelineHash(w)); },
+        // PEEK: clicking reads; it never routes... unless the clicked id (a
+        // card chip can point outside the scope) has no node here — then the
+        // honest move is a focus jump so the user still lands somewhere real.
+        onSelect: (id) => {
+          if (!id) { peekId = null; handle?.setSelection(null); return; }
+          if (lastScoped.some(n => n.id === id)) {
+            peekId = id;
+            handle?.setSelection(id);
+          } else {
+            const w = worldId();
+            if (w) navigate(timelineHash(w, id));
+          }
+        },
+        // FOCUS: the explicit narrowing verb — URL-backed, Back walks out.
+        onFocus: (id) => { const w = worldId(); if (w) navigate(timelineHash(w, id)); },
         onOpenElement: (id) => { const w = worldId(); if (w) navigate(elementHash(w, id)); },
       });
     }
 
-    const scoped = filterNodesByScope(allNodes, scopeFromFocus(route.elementId ?? null, typeFilter));
-    // Cast favorites (S4): their labels always win the budget. Re-read each
-    // render so a toggle on the element header reflects immediately.
+    const scoped = filterNodesByScope(allNodes, effectiveScope(allNodes, route));
+    lastScoped = scoped;
+    // Cast favorites (S4 + the cast marks): re-read each render so a toggle on
+    // the element header reflects immediately.
     const favorites = getState().registry.worlds.find(w => w.id === wid)?.favorites;
     const extras: TimelineViewExtras = {
-      favoriteIds: [favorites?.protagonist_id, favorites?.nexus_id]
-        .filter((x): x is string => typeof x === 'string' && x.length > 0),
+      cast: {
+        protagonistId: favorites?.protagonist_id ?? null,
+        nexusId: favorites?.nexus_id ?? null,
+      },
     };
-    // S5 protagonist-first: on the seed render (broad landing only — a focus
-    // URL owns its own fit), open the window on the protagonist's era. One-shot
-    // by construction: only the seed render passes it, and the view ignores it
-    // once the user has a window of their own.
-    if (justSeeded && !route.elementId) {
-      const win = protagonistWindow(allNodes, favorites?.protagonist_id ?? null);
-      if (win) extras.defaultWindow = win;
-    }
     // allNodes rides along as the overview strip's constant reference frame
     // (the full world's history stays visible however narrow the scope, S2).
     handle.setNodes(scoped, allNodes, extras);
-    handle.setSelection(route.mode === 'timeline' ? (route.elementId ?? null) : null);
+    // A focus CHANGE auto-peeks its element (the card answers "what am I
+    // looking at"); otherwise the peek is sticky across re-renders.
+    const focusNow = route.mode === 'timeline' ? (route.elementId ?? null) : null;
+    if (focusNow !== lastFocusId) {
+      lastFocusId = focusNow;
+      peekId = focusNow;
+    }
+    handle.setSelection(peekId);
 
     if (!suppressGallery) renderGallery(); // keep the active-chart highlight in sync
   }

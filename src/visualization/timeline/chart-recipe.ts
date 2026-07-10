@@ -117,93 +117,51 @@ export function pickDefaultChart(elements: Element[]): ChartConfig {
   return { ...base, name: 'Everything', scope: { kind: 'all' } };
 }
 
+/** Same weight the label budget uses: connectivity + how much is written. */
+function nodeWeight(n: TimelineNode): number {
+  return n.degree + Math.log10(1 + n.contentMass);
+}
+
 /**
- * S5 protagonist-first — step 0 of the default view. Returns the OPENING
- * WINDOW (world-date units) centered on the protagonist's dated neighbourhood,
- * or null when there's nothing to center on (caller falls through to the
- * plain recipe fit). Deliberately a WINDOW, not an auto-focus URL: the landing
- * keeps its broad orient job, it just lands you AT the protagonist's era.
- *
- * Protagonist = the explicit favorite when set; else the dated character with
- * the largest dated neighbourhood (same inference the character-life recipe
- * uses). An undated explicit protagonist still works via its dated
- * neighbourhood (reverse links). Skips (null) when the neighbourhood span is
- * most of the universe anyway — a window that shows everything orients nothing.
+ * The TABLEAU (Captain, 2026-07-10) — the world's default view when no type
+ * filter is active: cast-centered essentials across categories, deliberately
+ * not-crowded. Protagonist + nexus when set (and dated); otherwise the most
+ * weighted character and location stand in; then the top-weighted nodes fill
+ * across types (per-type cap so no single category floods it). Replaces the
+ * old all-chips-off → whole-world-soup inversion. Deterministic.
  */
-export function protagonistWindow(
-  nodes: TimelineNode[],
-  explicitProtagonistId: string | null,
-): { start: number; end: number } | null {
-  if (nodes.length === 0) return null;
-  let pid = explicitProtagonistId;
-  if (!pid) {
-    // Infer: the character with the largest DATED neighbourhood. Characters
-    // are usually UNDATED (no birth_date → no node), so counting only dated
-    // character nodes misses the actual protagonist — tally every character
-    // the dated set touches via its resolved links instead, plus the dated
-    // character nodes' own degrees. Ties keep the first-seen (deterministic).
-    const tally = new Map<string, number>();
-    for (const n of nodes) {
-      if (n.elementType === 'character') tally.set(n.id, (tally.get(n.id) ?? 0) + n.degree);
-      for (const l of n.links) {
-        if (l.type === 'character') tally.set(l.id, (tally.get(l.id) ?? 0) + 1);
-      }
-    }
-    let bestId: string | null = null;
-    let bestN = 0;
-    for (const [id, count] of tally) {
-      if (count > bestN) { bestId = id; bestN = count; }
-    }
-    // A one-event neighbourhood orients nothing — fall through to the plain fit.
-    if (!bestId || bestN < 2) return null;
-    pid = bestId;
-  }
+export function tableauScope(nodes: TimelineNode[], favoriteIds: string[]): ChartScope {
+  const TOTAL_CAP = 22;
+  const PER_TYPE_CAP = 4;
+  const picked = new Set<string>();
+  const typeCounts = new Map<string, number>();
+  const take = (n: TimelineNode): void => {
+    picked.add(n.id);
+    typeCounts.set(n.elementType, (typeCounts.get(n.elementType) ?? 0) + 1);
+  };
 
-  // The neighbourhood's dates: the protagonist's own span + every dated node
-  // it links to or that links to it (both directions, resolved node links).
-  const self = nodes.find(n => n.id === pid);
-  const dates: number[] = [];
-  if (self) {
-    dates.push(self.startDate);
-    if (self.endDate != null) dates.push(self.endDate);
-    for (const l of self.links) {
-      const t = nodes.find(n => n.id === l.id);
-      if (t) { dates.push(t.startDate); if (t.endDate != null) dates.push(t.endDate); }
-    }
+  // 1. The cast — always in, never counted against the caps.
+  for (const id of favoriteIds) {
+    const n = nodes.find(x => x.id === id);
+    if (n && !picked.has(n.id)) take(n);
   }
-  for (const n of nodes) {
-    if (n.id === pid) continue;
-    if (n.links.some(l => l.id === pid)) {
-      dates.push(n.startDate);
-      if (n.endDate != null) dates.push(n.endDate);
-    }
+  // 2. A lead character + a lead location, when the cast doesn't cover them.
+  for (const t of ['character', 'location'] as const) {
+    if ([...picked].some(id => nodes.find(n => n.id === id)?.elementType === t)) continue;
+    const best = nodes
+      .filter(n => n.elementType === t)
+      .sort((a, b) => nodeWeight(b) - nodeWeight(a) || (a.id < b.id ? -1 : 1))[0];
+    if (best) take(best);
   }
-  if (dates.length === 0) return null;
-
-  const uniMin = Math.min(...nodes.map(n => n.startDate));
-  const uniMax = Math.max(...nodes.map(n => Math.max(n.startDate, n.endDate ?? n.startDate)));
-  const uniSpan = Math.max(1e-9, uniMax - uniMin);
-  // The protagonist's ERA is the DENSEST cluster of their neighbourhood, not
-  // its min-max envelope — a single early chronicle or a birth date far from
-  // the story's mass would otherwise stretch the window across most of history
-  // (live finding: The Crumbler's envelope was 50..458 because of one year-50
-  // reference; his story lives at 447..458). Smallest window covering ~75% of
-  // the neighbourhood's dates, by sliding over the sorted list.
-  dates.sort((a, b) => a - b);
-  const k = Math.max(1, Math.ceil(dates.length * 0.75));
-  let bestStart = 0;
-  let bestSpan = Infinity;
-  for (let i = 0; i + k - 1 < dates.length; i++) {
-    const s = dates[i + k - 1] - dates[i];
-    if (s < bestSpan) { bestSpan = s; bestStart = i; }
+  // 3. Essentials across categories: global weight order, per-type capped.
+  const global = [...nodes].sort((a, b) => nodeWeight(b) - nodeWeight(a) || (a.id < b.id ? -1 : 1));
+  for (const n of global) {
+    if (picked.size >= TOTAL_CAP) break;
+    if (picked.has(n.id)) continue;
+    if ((typeCounts.get(n.elementType) ?? 0) >= PER_TYPE_CAP) continue;
+    take(n);
   }
-  const min = dates[bestStart];
-  const max = dates[bestStart + k - 1];
-  const span = max - min;
-  // Even the dense window ≈ the whole universe → the window adds nothing.
-  if (span / uniSpan > 0.8) return null;
-  const pad = Math.max(span * 0.15, uniSpan * 0.02);
-  return { start: min - pad, end: max + pad };
+  return { kind: 'selection', elementIds: [...picked] };
 }
 
 /**

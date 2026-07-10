@@ -10,7 +10,8 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
-import { onHashChange, navigate, elementHash } from '../core/router';
+import { onHashChange, navigate, elementHash, homeHash } from '../core/router';
+import { setWorldFavoriteElement, saveRegistry } from '../registry/registry';
 import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { lensKnownSet } from '../core/knowledge';
@@ -217,6 +218,31 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   lensBanner.appendChild(lensOff);
   content.appendChild(lensBanner);
 
+  // ----- Cast-assign banner (hidden unless ui.castAssign is set) -----
+  // The home ghost card put the sidebar in assignment mode: the next click
+  // on a matching row assigns the world's protagonist/home (one hop, no
+  // hunting for the header pin — Captain, 2026-07-10).
+  // Own class FAMILY, none shared with .atlas-lens-banner-* — the lens e2e
+  // uses strict locators on those classes and a second match breaks them
+  // (live finding, twice: parent AND child classes). CSS mirrors the look.
+  const assignBanner = document.createElement('div');
+  assignBanner.className = 'atlas-cast-assign-banner';
+  assignBanner.setAttribute('data-active', 'false');
+  const assignLabel = document.createElement('span');
+  assignLabel.className = 'atlas-cast-assign-label';
+  const assignOff = document.createElement('button');
+  assignOff.type = 'button';
+  assignOff.className = 'atlas-cast-assign-off';
+  assignOff.title = 'Cancel assigning';
+  assignOff.innerHTML = '<span class="material-symbols-outlined">close</span>';
+  assignOff.addEventListener('click', () => {
+    patchSlice('ui', { ...getState().ui, castAssign: null });
+  });
+  assignBanner.innerHTML = '<span class="material-symbols-outlined atlas-cast-assign-icon">person_pin</span>';
+  assignBanner.appendChild(assignLabel);
+  assignBanner.appendChild(assignOff);
+  content.appendChild(assignBanner);
+
   // ----- List body -----
   const listEl = document.createElement('div');
   listEl.className = 'atlas-list';
@@ -228,6 +254,23 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const id = row.getAttribute('data-element-id')!;
     const worldId = getState().active?.worldId;
     if (!worldId) return;
+    // Assignment mode: a click on a MATCHING row assigns the cast slot and
+    // returns home to show the result (the loop the ghost card opened).
+    const assign = getState().ui.castAssign;
+    if (assign) {
+      const el = getState().data.elements.find(x => x.id === id);
+      const wantType = assign.kind === 'protagonist' ? 'character' : 'location';
+      if (el?.type === wantType) {
+        const next = setWorldFavoriteElement(getState().registry, worldId, assign.kind, id);
+        saveRegistry(next);
+        patchSlice('registry', next);
+        patchSlice('ui', { ...getState().ui, castAssign: null });
+        toasts.success(`${el.name || 'This element'} is now the world's ${assign.kind === 'protagonist' ? 'protagonist' : 'home'}`);
+        navigate(homeHash(worldId));
+        return;
+      }
+      // Mismatched type (user cleared the filter): fall through to normal open.
+    }
     patchSlice('ui', { ...getState().ui, selectedElementId: id });
     navigate(elementHash(worldId, id));
     // Sidebar-click no longer auto-opens an associated map (DESIGN_MAPS.md
@@ -358,6 +401,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       subFilterRow.hidden = true;
       subFilterType = null; superFilter = null; subtypeFilter = null;
       lensBanner.setAttribute('data-active', 'false');
+      assignBanner.setAttribute('data-active', 'false');
       // Empty-state copy depends on what action the user can actually take.
       // (Session 221 W2 follow-up: the sidebar's old "pick one from Worlds tab"
       // message lied when there were no worlds because no atlas root existed.)
@@ -392,6 +436,18 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const knownSet = lens && knower ? lensKnownSet(lens.knowerId, elements) : null;
     lensBanner.setAttribute('data-active', knownSet ? 'true' : 'false');
     if (knownSet) lensLabel.textContent = `world as ${knower!.name || '(unnamed)'} knows it`;
+
+    // Cast-assign banner: says what the next click does + offers the exit ×.
+    const assign = state.ui.castAssign;
+    assignBanner.setAttribute('data-active', assign ? 'true' : 'false');
+    if (assign) {
+      const isProt = assign.kind === 'protagonist';
+      assignLabel.textContent = isProt
+        ? 'Click a character to set your protagonist'
+        : 'Click a location to set your home';
+      const icon = assignBanner.querySelector('.atlas-cast-assign-icon');
+      if (icon) icon.textContent = isProt ? 'person_pin' : 'home_pin';
+    }
 
     // Pins + markers are truly map artifacts — created from map interactions,
     // accessible via their owning map's element. Zones, despite being spatial,

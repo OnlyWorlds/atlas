@@ -7501,7 +7501,11 @@ td.atlas-writing-setup-promote-count {
 }
 
 /* Sidebar banner — visible while the lens is on; carries the exit ×. */
-.atlas-lens-banner {
+/* .atlas-cast-assign-banner mirrors the lens banner look but keeps its OWN
+   class — e2e locators on .atlas-lens-banner must match exactly one element.
+   The -icon/-label/-off child classes are shared (style-only, never located). */
+.atlas-lens-banner,
+.atlas-cast-assign-banner {
   display: none;
   align-items: center;
   gap: 6px;
@@ -7514,11 +7518,14 @@ td.atlas-writing-setup-promote-count {
   line-height: 1.3;
 }
 
-.atlas-lens-banner[data-active="true"] { display: flex; }
+.atlas-lens-banner[data-active="true"],
+.atlas-cast-assign-banner[data-active="true"] { display: flex; }
 
-.atlas-lens-banner-icon { font-size: 14px; flex: 0 0 auto; }
+.atlas-lens-banner-icon,
+.atlas-cast-assign-icon { font-size: 14px; flex: 0 0 auto; }
 
-.atlas-lens-banner-label {
+.atlas-lens-banner-label,
+.atlas-cast-assign-label {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -7526,7 +7533,8 @@ td.atlas-writing-setup-promote-count {
   white-space: nowrap;
 }
 
-.atlas-lens-banner-off {
+.atlas-lens-banner-off,
+.atlas-cast-assign-off {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -7538,9 +7546,11 @@ td.atlas-writing-setup-promote-count {
   border-radius: 4px;
 }
 
-.atlas-lens-banner-off:hover { color: var(--atlas-cyan); }
+.atlas-lens-banner-off:hover,
+.atlas-cast-assign-off:hover { color: var(--atlas-cyan); }
 
-.atlas-lens-banner-off .material-symbols-outlined { font-size: 13px; }
+.atlas-lens-banner-off .material-symbols-outlined,
+.atlas-cast-assign-off .material-symbols-outlined { font-size: 13px; }
 
 /* The dimming itself — the world going dark outside the knower's knowledge.
    Transition scoped to the lens class (NOT bare .atlas-row) so drag-dim
@@ -8927,7 +8937,6 @@ a.atlas-share-map-pin { cursor: pointer; }
   display: flex;
 }
 .atlas-timeline-view[data-dock="right"] { flex-direction: row; }
-.atlas-timeline-view[data-dock="bottom"] { flex-direction: column; }
 
 .atlas-timeline-view-canvaswrap {
   position: relative;
@@ -8967,16 +8976,6 @@ a.atlas-share-map-pin { cursor: pointer; }
   width: 264px;
   border-left: 1px solid var(--atlas-divider);
 }
-.atlas-timeline-view[data-dock="bottom"] .atlas-timeline-card {
-  max-height: 168px;
-  border-top: 1px solid var(--atlas-divider);
-}
-/* Bottom dock reads horizontally: snippet + groups flow as columns. */
-.atlas-timeline-view[data-dock="bottom"] .atlas-timeline-card .atlas-timeline-card-chips {
-  flex-direction: row;
-  flex-wrap: wrap;
-  column-gap: 22px;
-}
 
 .atlas-timeline-card-snippet {
   margin: 0 0 8px;
@@ -8990,6 +8989,76 @@ a.atlas-share-map-pin { cursor: pointer; }
   font-style: normal;
 }
 .atlas-timeline-chip-more:hover { color: var(--atlas-cyan); }
+
+/* The rail's ambient (nothing-peeked) state: legend + cast + hint. */
+.atlas-timeline-rail-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 8px;
+}
+.atlas-timeline-rail-cast {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 4px 0;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--atlas-text);
+  cursor: pointer;
+  text-align: left;
+}
+.atlas-timeline-rail-cast .material-symbols-outlined {
+  font-size: 15px;
+  color: var(--atlas-cyan);
+}
+.atlas-timeline-rail-cast:hover .atlas-timeline-rail-cast-name { color: var(--atlas-cyan); }
+.atlas-timeline-rail-cast-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atlas-timeline-rail-cast-role {
+  font-size: 10px;
+  color: var(--atlas-text-muted);
+}
+.atlas-timeline-rail-legend {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.atlas-timeline-rail-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.atlas-timeline-rail-legend-row .material-symbols-outlined { font-size: 14px; }
+.atlas-timeline-rail-legend-count {
+  margin-left: auto;
+  color: var(--atlas-text-muted);
+}
+.atlas-timeline-rail-hint {
+  margin-top: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+/* Tableau state label in the control bar (all type chips off). */
+.atlas-chart-tableau-hint {
+  align-self: center;
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+  margin-right: 4px;
+}
 
 .atlas-timeline-card-head {
   display: flex;
@@ -10665,6 +10734,34 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-home-statline-seg:hover { color: var(--atlas-cyan); }
 .atlas-home-statline-seg:hover b { color: var(--atlas-cyan); }
 .atlas-home-statline-sep { opacity: 0.45; }
+
+/* The chart strip (S15) — the world's history shape on the cover. */
+.atlas-home-charts { margin-top: 24px; }
+.atlas-home-charts-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.atlas-home-charts-title .material-symbols-outlined {
+  font-size: 13px;
+  opacity: 0;
+  transform: translateX(-2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.atlas-home-charts-title:hover { color: var(--atlas-cyan); }
+.atlas-home-charts-title:hover .material-symbols-outlined {
+  opacity: 1;
+  transform: translateX(0);
+}
+/* The section header IS the title here — hide the static renderer's own. */
+.atlas-home-charts .atlas-chart-static-title { display: none; }
+.atlas-home-charts .atlas-chart-static canvas { cursor: pointer; }
 
 /* The desk: continue strip + recent. */
 .atlas-home-desk { margin-top: 26px; }

@@ -19,7 +19,7 @@ import type { ElementType } from '../../core/types';
 import type { LinkedRef, PlacedDot, TimelineNode } from './types';
 import { calculateTicks, calculateTimeRange, createDateToX } from './axis-calculator';
 import { escapeText } from '../../core/dom-utils';
-import { ELEMENT_ICONS } from '../../core/constants';
+import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { rankAnchors, ANCHOR_CAP } from './degree';
 import { applyAlpha, ensureIconFont } from './canvas-utils';
 import { completeWaypoint } from '../../core/waypoints';
@@ -56,23 +56,25 @@ const GHOST_MS = 2500;           // previous-window ghost fade duration
 const TRAVEL_MS = 280;           // focus-jump window animation
 
 export interface TimelineViewOptions {
-  /** A dot or card chip was clicked → focus that element (unified select=focus;
-   *  the room turns this into a `/timeline/<id>` route change). Empty id clears. */
+  /**
+   * PEEK (the 2026-07-10 split): a dot, label, or card chip was clicked →
+   * show that element's card. NO routing — reading is free. Empty id clears.
+   * The room may still route when the id isn't in the current scope.
+   */
   onSelect: (elementId: string) => void;
-  /** The card's "Open" action → jump to that element's full room. */
+  /** FOCUS — the explicit narrowing verb (the card's Focus action). The room
+   *  turns this into a `/timeline/<id>` route change (Back walks the chain). */
+  onFocus: (elementId: string) => void;
+  /** The card's "Edit" action → the element's full inspect room. */
   onOpenElement: (elementId: string) => void;
 }
 
 /** Render extras the room threads in alongside the node set (S4/S5). */
 export interface TimelineViewExtras {
-  /** Explicit cast favorites (protagonist/home) — their labels always win the
-   *  budget (S4) . Re-passed each render; last value sticks. */
-  favoriteIds?: string[];
-  /** One-shot opening window (S5 protagonist-first: a default WINDOW centered
-   *  on the protagonist's neighbourhood, deliberately NOT an auto-focus URL —
-   *  the landing keeps its broad orient job). Applied only while the view is
-   *  still on auto-fit; any user navigation wins. */
-  defaultWindow?: TimeWindow;
+  /** The cast (protagonist/home nexus). Their labels always win the budget
+   *  (S4) and their glyphs carry a persistent cyan mark + pin badge at every
+   *  scope and zoom. Re-passed each render; last value sticks. */
+  cast?: { protagonistId?: string | null; nexusId?: string | null };
 }
 
 export interface TimelineViewHandle {
@@ -127,8 +129,11 @@ interface ViewState {
   labelBoxes: LabelBox[];
   // "+N" cluster badges from the last draw — click targets (zoom to cluster).
   plusBadges: PlusBadge[];
-  // Cast favorites (S4): their labels always win the budget.
+  // Cast favorites (S4): labels always win the budget; glyphs get the mark.
   favoriteIds: Set<string>;
+  protagonistId: string | null;
+  nexusId: string | null;
+  onFocus: (id: string) => void;
   // cursor (canvas coords; null when outside) — drives proximity labels
   mouseX: number | null;
   mouseY: number | null;
@@ -148,11 +153,10 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
 
   const container = document.createElement('div');
   container.className = 'atlas-timeline-view';
-  // S7: the card DOCKS — it reserves layout space beside/below the canvas and
-  // never floats over data. Two variants for Captain's pick; the flag is a
-  // localStorage dev switch until the pick lands ('right' default).
-  const dock = localStorage.getItem('atlas_chart_card_dock') === 'bottom' ? 'bottom' : 'right';
-  container.dataset.dock = dock;
+  // S7: the card DOCKS on the right — it reserves layout space beside the
+  // canvas and never floats over data. (Right-vs-bottom was prototyped
+  // 2026-07-10; right won: full group visibility, vertical scan.)
+  container.dataset.dock = 'right';
   target.appendChild(container);
 
   const canvasWrap = document.createElement('div');
@@ -178,6 +182,9 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
     labelBoxes: [],
     plusBadges: [],
     favoriteIds: new Set(),
+    protagonistId: null,
+    nexusId: null,
+    onFocus: opts.onFocus,
     mouseX: null, mouseY: null,
     dragging: false, dragStartX: 0, dragStartWindow: null, dragMoved: false,
     stripDrag: null,
@@ -213,14 +220,13 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
       const prevBase = state.baseRange;
       state.nodes = nodes;
       if (universe) state.universe = universe;
-      if (extras?.favoriteIds) state.favoriteIds = new Set(extras.favoriteIds);
-      state.layoutSig = null; // new node set → re-pack
-      // S5 protagonist-first: a one-shot opening window, honored only while the
-      // view is still on auto-fit (no user window, no travel in flight).
-      if (extras?.defaultWindow && state.window === null && !state.anim && nodes.length > 0) {
-        const bounds = navBounds(state) ?? calculateTimeRange(nodes);
-        state.window = clampWindow(extras.defaultWindow, bounds);
+      if (extras?.cast) {
+        state.protagonistId = extras.cast.protagonistId ?? null;
+        state.nexusId = extras.cast.nexusId ?? null;
+        state.favoriteIds = new Set([state.protagonistId, state.nexusId]
+          .filter((x): x is string => !!x));
       }
+      state.layoutSig = null; // new node set → re-pack
       // Focus travel (S6): when the scope's fitted range changes while a
       // window (or prior fit) is on screen, animate to the new fit instead of
       // teleporting, and leave the old window as a fading ghost on the strip.
@@ -372,7 +378,10 @@ export function computeBeeswarm(
   dateToX: (d: number) => number,
   w: number,
   axisY: number,
+  gaps?: { x: number; y: number },
 ): PlacedDot[] {
+  const gapX = gaps?.x ?? NODE_X_GAP;
+  const gapY = gaps?.y ?? NODE_Y_GAP;
   const top = TOP_PAD;
   const bottom = axisY - 8;
   // Degenerate band (container shorter than the top padding + axis strip) — no
@@ -392,14 +401,14 @@ export function computeBeeswarm(
     if (x < -40 || x > w + 40) continue;
     const free = (cy: number): boolean =>
       cy >= top && cy <= bottom
-      && !placed.some(p => Math.abs(p.x - x) < NODE_X_GAP && Math.abs(p.y - cy) < NODE_Y_GAP);
+      && !placed.some(p => Math.abs(p.x - x) < gapX && Math.abs(p.y - cy) < gapY);
     let y = centerY;
     if (!free(y)) {
       let found = false;
-      const maxK = Math.ceil(span / NODE_Y_GAP) + 1;
+      const maxK = Math.ceil(span / gapY) + 1;
       for (let k = 1; k <= maxK && !found; k++) {
-        const up = centerY - k * NODE_Y_GAP;
-        const down = centerY + k * NODE_Y_GAP;
+        const up = centerY - k * gapY;
+        const down = centerY + k * gapY;
         if (free(up)) { y = up; found = true; }
         else if (free(down)) { y = down; found = true; }
       }
@@ -410,7 +419,7 @@ export function computeBeeswarm(
         // could fling a node into otherwise-empty canvas).
         const k = (placed.length % maxK) + 1;
         const dir = placed.length % 2 === 0 ? -1 : 1;
-        y = Math.min(bottom, Math.max(top, centerY + dir * k * NODE_Y_GAP));
+        y = Math.min(bottom, Math.max(top, centerY + dir * k * gapY));
       }
     }
     placed.push({ node, x, y, radius: DOT_RADIUS });
@@ -510,7 +519,12 @@ function draw(state: ViewState): void {
   for (const n of state.nodes) degreeHash = (degreeHash * 31 + n.degree) | 0;
   const layoutSig = `${w.toFixed(1)}|${axisY.toFixed(1)}|${range.min.toFixed(2)}|${range.max.toFixed(2)}|${state.nodes.length}|${degreeHash}`;
   if (state.layoutSig !== layoutSig || state.layoutNodes !== state.nodes) {
-    state.placedDots = computeBeeswarm(state.nodes, anchorIds, dateToX, w, axisY);
+    // Sparse sets (the tableau, small worlds) spread out — the default gaps
+    // are tuned for dense sets, and at ~22 nodes they cram the middle while
+    // the band sits empty (Captain: "space it all out better"). Node count is
+    // part of layoutSig, so the gap choice re-derives with the set.
+    const gaps = state.nodes.length <= 30 ? { x: 84, y: 60 } : undefined;
+    state.placedDots = computeBeeswarm(state.nodes, anchorIds, dateToX, w, axisY, gaps);
     state.layoutSig = layoutSig;
     state.layoutNodes = state.nodes;
   }
@@ -548,7 +562,11 @@ function draw(state: ViewState): void {
     const isSel = dot.node.id === state.selectedId;
     const isHover = dot === state.hoveredDot;
     const isAnchor = anchorIds.has(dot.node.id);
+    const isCast = dot.node.id === state.protagonistId || dot.node.id === state.nexusId;
+    // The cast outranks anchors visually — a protagonist that's hard to find
+    // defeats the whole cast system (Captain, 2026-07-10).
     const size = isSel ? ICON_SELECTED
+      : isCast ? ICON_ANCHOR + detail + 5
       : isAnchor ? ICON_ANCHOR + detail
       : isHover ? ICON_HOVER
       : ICON_BASE - 1 + detail * 2;   // 13 (overview) → 15 → 17 (close)
@@ -587,6 +605,10 @@ function draw(state: ViewState): void {
     ctx.strokeText(icon, dot.x, dot.y);
     ctx.fillStyle = dot.node.color;
     ctx.fillText(icon, dot.x, dot.y);
+
+    // The cast signal (revised 2026-07-10, Captain: ring + corner badge were
+    // "a bit much"): a modest size boost (above) + the BRIGHT CYAN LABEL do
+    // the signifying — quiet, fitting the style, still unmistakable.
   }
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
@@ -738,7 +760,13 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
   // and labels one fan-level up/down — the dense-band smear. Greedy in priority
   // order: anchors + selection claim their space first, the rest fill the gaps.
   const overlaps = (a: Box, b: Box): boolean => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
-  const glyphHalf = (d: PlacedDot): number => (anchorIds.has(d.node.id) ? ICON_ANCHOR : ICON_BASE) * 0.5 + 2;
+  const isCastId = (id: string): boolean => id === state.protagonistId || id === state.nexusId;
+  // Collision extent must include the RINGS, not just the glyph — labels were
+  // overprinting anchor halos and the cast rings (Captain's "labels are weird").
+  const glyphHalf = (d: PlacedDot): number =>
+    isCastId(d.node.id) ? 16
+    : anchorIds.has(d.node.id) ? 21
+    : ICON_BASE * 0.5 + 2;
   const glyphBoxes = placed.map(d => ({ id: d.node.id, box: boxAround(d.x, d.y, glyphHalf(d)) }));
   const placedBoxes: Box[] = [];
   state.labelBoxes = []; // rebuilt each draw — labels are click targets (S6)
@@ -747,40 +775,61 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
   for (const { dot } of cands) {
     const isSel = dot.node.id === state.selectedId;
     const isAnchor = anchorIds.has(dot.node.id);
-    ctx.font = isAnchor ? '600 12px system-ui, sans-serif' : '11px system-ui, sans-serif';
+    const isCast = isCastId(dot.node.id);
+    ctx.font = isCast ? '600 12.5px system-ui, sans-serif'
+      : isAnchor ? '600 12px system-ui, sans-serif'
+      : '11px system-ui, sans-serif';
     const text = truncate(dot.node.name, LABEL_MAX_CHARS);
     const tw = ctx.measureText(text).width;
-    const off = isAnchor ? 12 : 9;
+    // Offsets clear the visual extent (anchor halos reach ~ringR+8).
+    const off = isCast ? 18 : isAnchor ? 16 : 10;
     const gh = glyphHalf(dot);
     // Candidate positions in preference order: beside the glyph first (panel-
     // edge flip preserved), then ABOVE/BELOW it. In multi-column eras a side
     // label always crosses the next column, so without the vertical fallbacks
     // whole columns starve while half the band sits empty (live finding).
+    // RANGE nodes flip the preference: a side label sits ON the range line
+    // and reads struck-through, so they try above/below first.
     const sideFirst: Array<'right' | 'left'> = dot.x > w * 0.66 ? ['left', 'right'] : ['right', 'left'];
-    const attempts: Array<{ box: Box; align: CanvasTextAlign; tx: number; ty: number }> = [];
+    const sideAttempts: Array<{ box: Box; align: CanvasTextAlign; tx: number; ty: number }> = [];
     for (const side of sideFirst) {
       const x0 = side === 'left' ? dot.x - off - tw : dot.x + off;
-      attempts.push({
+      sideAttempts.push({
         box: { x0, x1: x0 + tw, y0: dot.y - 7, y1: dot.y + 7 },
         align: side === 'left' ? 'right' : 'left',
         tx: dot.x + (side === 'left' ? -off : off), ty: dot.y,
       });
     }
-    for (const dir of [-1, 1]) {
-      const cy = dot.y + dir * (gh + 9);
-      attempts.push({
+    // BELOW before above — one consistent direction reads as a system where a
+    // mix reads as scatter (Captain: "labels are still random").
+    const vertAttempts: Array<{ box: Box; align: CanvasTextAlign; tx: number; ty: number }> = [];
+    for (const dir of [1, -1]) {
+      const cy = dot.y + dir * (gh + 8);
+      vertAttempts.push({
         box: { x0: dot.x - tw / 2, x1: dot.x + tw / 2, y0: cy - 7, y1: cy + 7 },
         align: 'center', tx: dot.x, ty: cy,
       });
     }
+    const attempts = dot.node.endDate != null
+      ? [...vertAttempts, ...sideAttempts]
+      : [...sideAttempts, ...vertAttempts];
+    // Collision test with a 5px horizontal breathing pad — a label ENDING
+    // flush at the next glyph reads as one word ("Captain SnootPip", live).
+    const padded = (b: Box): Box => ({ x0: b.x0 - 5, x1: b.x1 + 5, y0: b.y0, y1: b.y1 });
+    // Vertical bounds keep labels INSIDE the band — an above-label near the
+    // top edge was getting clipped mid-glyph (Captain's sshot).
     const fit = attempts.find(a =>
       a.box.x0 >= 2 && a.box.x1 <= w - 2
-      && !placedBoxes.some(b => overlaps(a.box, b))
-      && !glyphBoxes.some(g => g.id !== dot.node.id && overlaps(a.box, g.box)));
+      && a.box.y0 >= 2 && a.box.y1 <= axisY - 2
+      && !placedBoxes.some(b => overlaps(padded(a.box), b))
+      && !glyphBoxes.some(g => g.id !== dot.node.id && overlaps(padded(a.box), g.box)));
     if (!fit) continue;
     placedBoxes.push(fit.box);
     state.labelBoxes.push({ ...fit.box, nodeId: dot.node.id });
-    ctx.fillStyle = isSel ? 'rgba(255,255,255,0.95)' : isAnchor ? 'rgba(255,255,255,0.86)' : 'rgba(255,255,255,0.6)';
+    ctx.fillStyle = isSel ? 'rgba(255,255,255,0.95)'
+      : isCast ? 'rgba(34,211,238,0.95)'   // bright cyan = the cast signal
+      : isAnchor ? 'rgba(255,255,255,0.86)'
+      : 'rgba(255,255,255,0.6)';
     ctx.textAlign = fit.align;
     ctx.fillText(text, fit.tx, fit.ty);
   }
@@ -877,7 +926,9 @@ function zoomToCluster(state: ViewState, badge: PlusBadge): void {
 function renderCard(state: ViewState): void {
   const { card } = state;
   const node = state.selectedId ? state.nodes.find(n => n.id === state.selectedId) ?? null : null;
-  if (!node) { card.style.display = 'none'; card.innerHTML = ''; return; }
+  // The rail is ALWAYS reserved (no canvas reflow when a peek opens — the
+  // "jump" complaint, 2026-07-10). Nothing peeked → ambient content.
+  if (!node) { renderAmbientRail(state); return; }
 
   const dateStr = node.endDate != null ? `${node.startDate} – ${node.endDate}` : String(node.startDate);
   const icon = ELEMENT_ICONS[node.elementType as ElementType] ?? 'category';
@@ -946,16 +997,83 @@ function renderCard(state: ViewState): void {
   }
   card.appendChild(chipsWrap);
 
+  // Focus = the routing verb (narrows the chart to this element's
+  // neighbourhood, URL-backed so browser Back walks out). Edit = the full
+  // inspect room. Peek (just clicking) stays free of both.
   const actions = document.createElement('div');
   actions.className = 'atlas-timeline-card-actions';
-  const open = document.createElement('button');
-  open.type = 'button';
-  open.className = 'atlas-timeline-card-action';
-  open.innerHTML = '<span>Open</span><span class="material-symbols-outlined">arrow_forward</span>';
-  open.title = 'Open this element';
-  open.addEventListener('click', () => state.onOpenElement(node.id));
-  actions.appendChild(open);
+  const focus = document.createElement('button');
+  focus.type = 'button';
+  focus.className = 'atlas-timeline-card-action';
+  focus.innerHTML = '<span class="material-symbols-outlined">filter_center_focus</span><span>Focus</span>';
+  focus.title = 'Narrow the chart to this element and its connections';
+  focus.addEventListener('click', () => state.onFocus(node.id));
+  actions.appendChild(focus);
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.className = 'atlas-timeline-card-action';
+  edit.innerHTML = '<span class="material-symbols-outlined">edit</span><span>Edit</span>';
+  edit.title = 'Open this element for editing';
+  edit.addEventListener('click', () => state.onOpenElement(node.id));
+  actions.appendChild(edit);
   card.appendChild(actions);
+
+  card.style.display = 'flex';
+}
+
+/**
+ * The rail's resting state: a quiet legend of what's on the chart, the cast,
+ * and the interaction hint. Ambient orientation, not chrome — the rail exists
+ * so peeks never reflow the canvas.
+ */
+function renderAmbientRail(state: ViewState): void {
+  const { card } = state;
+  card.innerHTML = '';
+
+  const head = document.createElement('div');
+  head.className = 'atlas-timeline-rail-head';
+  head.textContent = 'This chart';
+  card.appendChild(head);
+
+  // Cast lines — only when the cast is actually on the chart.
+  const castRows: Array<{ icon: string; label: string; node: TimelineNode }> = [];
+  const prot = state.protagonistId ? state.nodes.find(n => n.id === state.protagonistId) : undefined;
+  const nex = state.nexusId ? state.nodes.find(n => n.id === state.nexusId) : undefined;
+  if (prot) castRows.push({ icon: 'person_pin', label: 'protagonist', node: prot });
+  if (nex) castRows.push({ icon: 'home_pin', label: 'home', node: nex });
+  for (const row of castRows) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'atlas-timeline-rail-cast';
+    el.innerHTML =
+      `<span class="material-symbols-outlined">${row.icon}</span>` +
+      `<span class="atlas-timeline-rail-cast-name">${escapeText(row.node.name)}</span>` +
+      `<span class="atlas-timeline-rail-cast-role">${row.label}</span>`;
+    el.title = `Read ${row.node.name}`;
+    el.addEventListener('click', () => state.onSelect(row.node.id));
+    card.appendChild(el);
+  }
+
+  // Type legend — what the marks mean, with in-view counts.
+  const counts = new Map<string, number>();
+  for (const n of state.nodes) counts.set(n.elementType, (counts.get(n.elementType) ?? 0) + 1);
+  const legend = document.createElement('div');
+  legend.className = 'atlas-timeline-rail-legend';
+  for (const [type, count] of [...counts.entries()].sort((a, b) => b[1] - a[1])) {
+    const row = document.createElement('div');
+    row.className = 'atlas-timeline-rail-legend-row';
+    const color = ELEMENT_TYPE_COLORS[type as ElementType] ?? '#94a3b8';
+    row.innerHTML =
+      `<span class="material-symbols-outlined" style="color:${color}">${ELEMENT_ICONS[type as ElementType] ?? 'category'}</span>` +
+      `<span>${escapeText(type)}</span><span class="atlas-timeline-rail-legend-count">${count}</span>`;
+    legend.appendChild(row);
+  }
+  card.appendChild(legend);
+
+  const hint = document.createElement('div');
+  hint.className = 'atlas-timeline-rail-hint';
+  hint.textContent = 'Click any element to read it here. Focus narrows the chart; re-click or × dismisses.';
+  card.appendChild(hint);
 
   card.style.display = 'flex';
 }
@@ -1179,6 +1297,12 @@ function handleMouseUp(state: ViewState): void {
     if (badge) { zoomToCluster(state, badge); return; }
   }
   if (!state.dragMoved && state.hoveredDot) {
+    // Click the already-selected node again → deselect (Captain, 2026-07-10:
+    // a re-click is the natural inverse; the × stays as the explicit path).
+    if (state.hoveredDot.node.id === state.selectedId) {
+      state.onSelect('');
+      return;
+    }
     state.onSelect(state.hoveredDot.node.id); // a click (not a drag) selects
     // Waypoint (hookmap wp6): a true canvas click — the URL-derived anchor
     // default and programmatic onSelect calls never pass through here.
