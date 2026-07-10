@@ -104,6 +104,16 @@ describe('writing-compiled / renderProseFragment', () => {
     expect(html).toContain('<code>git log</code>');
   });
 
+  it('escapes HTML-special chars in inline code exactly once (preview ≡ served)', () => {
+    // Regression (2026-07-10 sweep): the code-span replacer re-escaped
+    // content captured from the ALREADY-escaped string, so `<div>` rendered
+    // as the literal text "&lt;div&gt;" in atlas previews while show's
+    // renderer showed "<div>" — a preview-vs-served divergence.
+    const html = renderProseFragment('wrap it in `<div>` first', elementsMap).outerHTML;
+    expect(html).toContain('<code>&lt;div&gt;</code>');
+    expect(html).not.toContain('&amp;lt;');
+  });
+
   it('renders unordered lists', () => {
     const html = renderProseFragment('- one\n- two\n- three', elementsMap).outerHTML;
     expect(html).toContain('<ul>');

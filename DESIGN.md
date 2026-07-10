@@ -1,7 +1,7 @@
 # Atlas — Design Document
 
-**Version**: 1.5 (2026-07-07, session 248) — folder-first rebuild
-**Status**: **Feature-complete, in v1 RELEASE PREP — the UI/UX workplan is SHIPPED except Bout OW (waypoints + OnlyWorlds page) and Bout E.** Phases 0–6 + 3.5 shipped · Knowledge phase 1 (234-236) · **Sharing LIVE end-to-end** (237-239, contract v0.3; viewer at show.onlyworlds.com) · Import & export (241) · Charts (242-245) · filename contract + sync-state serialization gated (246) · **session 248 (13 bouts)**: D1 unification (`src/ui/room-tabs.ts` room-section tabs + `src/ui/drill-in.ts` prefix bands = the entity-view back affordance) · D9b taxonomy (`src/core/taxonomy.ts`) · home = cover×desk with D2b favorites (`WorldRegistryEntry.favorites` + cast slot) · knowledge WHO/WHAT/ABOUT · share intent picker REMOVED (field hidden + defaulted, wire-compatible) + meta collapse + blob full-page preview · import IE3-IE7 + AI section · writing-setup visual nest · context anchored-defaults + label budget · `?` = room-aware help overlay (`src/ui/help-{overlay,content}.ts`) · bundled sample world (`src/demo/`, OPFS first-launch path) · **round-trip fix: unnamed pins/markers are no longer dropped by import validate/reconcile** · v1.0.0 + CHANGELOG. **Current arc pickup: `BUILD_BRIEF.md` ⚑ SESSION 249 OPENER**; decision base: `Forge/Notes/2026-07-05-atlas-ui-workplan.md`; release record: `Forge/Notes/2026-07-03-atlas-release-plan.md`. Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
+**Version**: 1.6 (2026-07-10, session 251) — folder-first rebuild
+**Status**: **Feature-complete, in v1 RELEASE PREP — the ENTIRE UI/UX workplan is SHIPPED (16 bouts, sessions 248-250, incl. Bout OW waypoints v3 + the OnlyWorlds page, Bout E, and the app-wide voice sweep). Next: charts sitdown → home pass 2 → pipeline smoke → pre-flight.** Phases 0–6 + 3.5 shipped · Knowledge phase 1 (234-236) · **Sharing LIVE end-to-end** (237-239, contract v0.3; viewer at show.onlyworlds.com) · Import & export (241) · Charts (242-245) · filename contract + sync-state serialization gated (246) · **session 248 (13 bouts)**: D1 unification (`src/ui/room-tabs.ts` room-section tabs + `src/ui/drill-in.ts` prefix bands = the entity-view back affordance) · D9b taxonomy (`src/core/taxonomy.ts`) · home = cover×desk with D2b favorites (`WorldRegistryEntry.favorites` + cast slot) · knowledge WHO/WHAT/ABOUT · share intent picker REMOVED (field hidden + defaulted, wire-compatible) + meta collapse + blob full-page preview · import IE3-IE7 + AI section · writing-setup visual nest · context anchored-defaults + label budget · `?` = room-aware help overlay (`src/ui/help-{overlay,content}.ts`) · bundled sample world (`src/demo/`, OPFS first-launch path) · **round-trip fix: unnamed pins/markers are no longer dropped by import validate/reconcile** · v1.0.0 + CHANGELOG. **Current arc pickup: `Forge/Notes/2026-07-09-charts-sitdown-brief.md`** (BUILD_BRIEF.md is superseded, kept as the shipped arc's record); decision base: `Forge/Notes/2026-07-05-atlas-ui-workplan.md`; release record: `Forge/Notes/2026-07-03-atlas-release-plan.md`. Operational state in `PROGRESS.md`; this doc is the stable architectural reference.
 **Predecessor**: `tools/atlas-deprecated/` (IDB-cached architecture, retained as UI/UX reference)
 
 ---
@@ -220,6 +220,8 @@ The atlas root also supports **external worlds** (advanced path, no UI in v1): a
 
 Single source of truth. Implements every read/write Atlas needs.
 
+**Illustrative, not exhaustive** — the authoritative interface is `src/store/folder-store.ts` (which has since grown `findDependents`, `readCharts`/`writeCharts`, `updateSyncState`, `applyServerRecord`, `stampServerUpdatedAt`, `clearServerBaseline`, `clearTombstone`, `resetSyncBaseline`, and more).
+
 ```ts
 interface FolderStore {
   // Lifecycle
@@ -231,13 +233,14 @@ interface FolderStore {
   getElement(id: string): Promise<Element | null>;
   createElement(type: ElementType, data: Partial<Element>): Promise<Element>;
   updateElement(id: string, patch: Partial<Element>): Promise<Element>;
-  deleteElement(id: string): Promise<void>;       // also writes a tombstone
+  // deletes cascade by default (W9) and report what they tombstoned
+  deleteElement(id: string, opts?: { cascade?: boolean }): Promise<{ tombstones: Tombstone[] }>;
 
   // Spatial (maps, pins, zones, markers — same shape, specialized types)
   listMaps(): Promise<WorldMap[]>;
   createMap(data: Partial<WorldMap>): Promise<WorldMap>;
   updateMap(id: string, patch: Partial<WorldMap>): Promise<WorldMap>;
-  deleteMap(id: string): Promise<void>;
+  deleteMap(id: string, opts?: { cascade?: boolean }): Promise<{ tombstones: Tombstone[] }>;
   listPins(mapId?: string): Promise<Pin[]>;
   // ... pins, zones, markers identical shape
 

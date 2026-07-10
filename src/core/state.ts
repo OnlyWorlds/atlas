@@ -86,6 +86,12 @@ export interface AtlasRootRecoverableRef {
  */
 export interface DataState {
   elements: Element[];
+  /**
+   * True while a world activation is priming the cache from disk. Views with
+   * an empty state MUST branch on this: "empty" and "still loading" are
+   * different truths (the misleading empty-home flash, 2026-07-10).
+   */
+  loading?: boolean;
 }
 
 /**

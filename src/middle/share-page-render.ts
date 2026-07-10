@@ -184,6 +184,7 @@ export function renderElementCard(block: ElementCardBlock, elements: Map<string,
 export function renderCollectionView(
   block: CollectionBlock,
   resolve: (id: string) => { name: string; type: string; image_url?: string } | null,
+  opts: { editorHint?: boolean } = {},
 ): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'atlas-share-collection';
@@ -191,10 +192,16 @@ export function renderCollectionView(
     .map(id => ({ id, entry: resolve(id) }))
     .filter((m): m is { id: string; entry: NonNullable<ReturnType<typeof resolve>> } => m.entry !== null);
   if (members.length === 0) {
-    const none = document.createElement('p');
-    none.className = 'atlas-share-hint';
-    none.textContent = 'Empty collection. Add elements in the editor.';
-    wrap.appendChild(none);
+    // Editor guidance only in the builder. The payload path (preview +
+    // viewer) renders blank, matching show's renderCollection — an
+    // all-dangling published collection must not show editor copy to a
+    // public visitor (preview ≡ served).
+    if (opts.editorHint) {
+      const none = document.createElement('p');
+      none.className = 'atlas-share-hint';
+      none.textContent = 'Empty collection. Add elements in the editor.';
+      wrap.appendChild(none);
+    }
     return wrap;
   }
   for (const { entry } of members) {
@@ -402,7 +409,7 @@ export function renderBlockView(block: PageBlock, elements: Map<string, Element>
     case 'element-card':
       return renderElementCard(block, elements);
     case 'collection':
-      return renderCollectionView(block, worldResolver(elements));
+      return renderCollectionView(block, worldResolver(elements), { editorHint: true });
     case 'map': {
       // Builder context: freeze live (every world element counts as
       // "included" so pins open in the builder; the PAYLOAD freeze applies

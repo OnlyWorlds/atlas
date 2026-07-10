@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { computeBeeswarm, effectiveRange } from '../../src/visualization/timeline/timeline-view';
+import { computeBeeswarm, clampWindow, zoomWindow } from '../../src/visualization/timeline/timeline-view';
 import type { TimelineNode } from '../../src/visualization/timeline/types';
 
 function node(id: string, startDate: number): TimelineNode {
@@ -63,33 +63,62 @@ describe('computeBeeswarm — density-fan layout', () => {
   });
 });
 
-describe('effectiveRange — zoom/pan clamp', () => {
-  const base = { min: 0, max: 100 };
+describe('clampWindow — the band clamp (S3)', () => {
+  const bounds = { min: 0, max: 100 };
 
-  it('returns the base range unchanged at zoom <= 1', () => {
-    expect(effectiveRange(base, 1, null)).toEqual(base);
-    expect(effectiveRange(base, 0.5, 50)).toEqual(base);
+  it('keeps an in-bounds window unchanged', () => {
+    expect(clampWindow({ start: 20, end: 60 }, bounds)).toEqual({ start: 20, end: 60 });
   });
 
-  it('returns the base range for a zero/negative span', () => {
-    expect(effectiveRange({ min: 5, max: 5 }, 4, null)).toEqual({ min: 5, max: 5 });
+  it('clamps a slide past the high edge to bounds.max + 5% pad, keeping the span', () => {
+    const r = clampWindow({ start: 90, end: 140 }, bounds);
+    expect(r.end).toBeCloseTo(105, 6);
+    expect(r.start).toBeCloseTo(55, 6);
   });
 
-  it('centres a zoomed window on the base midpoint when unpanned', () => {
-    // span 100 / zoom 2 = 50, centred on 50 → [25, 75].
-    expect(effectiveRange(base, 2, null)).toEqual({ min: 25, max: 75 });
+  it('clamps a slide past the low edge to bounds.min - 5% pad, keeping the span', () => {
+    const r = clampWindow({ start: -60, end: -10 }, bounds);
+    expect(r.start).toBeCloseTo(-5, 6);
+    expect(r.end).toBeCloseTo(45, 6);
   });
 
-  it('clamps a pan past the high edge to base.max + 5% pad', () => {
-    // pad = 5. Panning far right pins max at 105 and keeps the effSpan (50).
-    const r = effectiveRange(base, 2, 1000);
-    expect(r.max).toBeCloseTo(105, 6);
-    expect(r.min).toBeCloseTo(55, 6);
+  it('a window wider than the padded bounds collapses to them', () => {
+    const r = clampWindow({ start: -500, end: 500 }, bounds);
+    expect(r.start).toBeCloseTo(-5, 6);
+    expect(r.end).toBeCloseTo(105, 6);
   });
 
-  it('clamps a pan past the low edge to base.min - 5% pad', () => {
-    const r = effectiveRange(base, 2, -1000);
-    expect(r.min).toBeCloseTo(-5, 6);
-    expect(r.max).toBeCloseTo(45, 6);
+  it('degenerate bounds return the bounds themselves', () => {
+    expect(clampWindow({ start: 0, end: 10 }, { min: 5, max: 5 })).toEqual({ start: 5, end: 5 });
+  });
+});
+
+describe('zoomWindow — resize around the cursor date (S3)', () => {
+  const bounds = { min: 0, max: 100 };
+
+  it('halving the span keeps the anchor date at the same fraction', () => {
+    // Window [0,100], anchor 25 (25% across). Zoom in ×0.5 → span 50; the
+    // anchor stays 25% across the new window → [12.5, 62.5].
+    const r = zoomWindow({ start: 0, end: 100 }, 0.5, 25, bounds);
+    expect(r.start).toBeCloseTo(12.5, 6);
+    expect(r.end).toBeCloseTo(62.5, 6);
+  });
+
+  it('zooming out clamps the span to bounds·1.1', () => {
+    const r = zoomWindow({ start: 0, end: 100 }, 10, 50, bounds);
+    expect(r.end - r.start).toBeCloseTo(110, 6);
+  });
+
+  it('zooming in clamps the span to bounds/ZOOM_MAX (never inverts)', () => {
+    let win = { start: 40, end: 60 };
+    for (let i = 0; i < 60; i++) win = zoomWindow(win, 0.5, 50, bounds);
+    expect(win.end - win.start).toBeGreaterThan(0);
+    expect(win.end - win.start).toBeCloseTo(100 / 200, 4);
+  });
+
+  it('a zoomed window stays inside the padded bounds', () => {
+    const r = zoomWindow({ start: 60, end: 100 }, 2, 100, bounds);
+    expect(r.end).toBeLessThanOrEqual(105 + 1e-9);
+    expect(r.start).toBeGreaterThanOrEqual(-5 - 1e-9);
   });
 });

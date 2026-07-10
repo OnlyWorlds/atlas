@@ -24,9 +24,16 @@ import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, shareHash, p
 import type { FolderStore } from '../store/folder-store';
 import { rewriteChartScopeIds } from '../visualization/timeline/charts-store';
 import type { Element, WorldRegistryEntry, SyncEngineState, ElementType } from '../core/types';
+import { setWorldFavoriteElement, saveRegistry } from '../registry/registry';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
+
+// Chart-scope migrations are read-modify-writes on .atlas/charts.json with no
+// store-level serialization (unlike sync-state.json / tombstones.json). Two
+// swaps landing during one make-online could interleave reads and clobber each
+// other's rewrite — serialize them through a module-level chain.
+let chartsMigrationChain: Promise<void> = Promise.resolve();
 
 /**
  * Attach a fresh SyncEngine to the given (api-linked) world's folder. Returns
@@ -557,7 +564,7 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
   {
     const folder = currentFolder;
     if (folder) {
-      void (async () => {
+      chartsMigrationChain = chartsMigrationChain.then(async () => {
         try {
           const charts = await folder.readCharts();
           const { charts: nextCharts, changed } = rewriteChartScopeIds(charts, swap.old_id, swap.new_id);
@@ -568,7 +575,30 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
         } catch (err) {
           console.warn('[sync-attach] chart-scope id migration failed:', err);
         }
-      })();
+      });
+    }
+  }
+
+  // Cast favorites (D2b) live in the REGISTRY keyed by element id — outside
+  // the element-file ref rewrite. A protagonist/home favorited while the
+  // world was local-only would silently vanish from the home cover after
+  // make-online without this remap (same class as the camera-state and
+  // chart-scope migrations above).
+  let nextRegistry = current.registry;
+  if (swap.type === 'character' || swap.type === 'location') {
+    const activeWorldId = current.active?.worldId;
+    const entry = activeWorldId
+      ? current.registry.worlds.find((w) => w.id === activeWorldId)
+      : undefined;
+    const fav = entry?.favorites;
+    if (activeWorldId && fav) {
+      if (fav.protagonist_id === swap.old_id) {
+        nextRegistry = setWorldFavoriteElement(nextRegistry, activeWorldId, 'protagonist', swap.new_id);
+      }
+      if (fav.nexus_id === swap.old_id) {
+        nextRegistry = setWorldFavoriteElement(nextRegistry, activeWorldId, 'nexus', swap.new_id);
+      }
+      if (nextRegistry !== current.registry) saveRegistry(nextRegistry);
     }
   }
 
@@ -602,11 +632,16 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
 
   // Only setState if at least one slice actually changed — avoids a spurious
   // render when the swap doesn't intersect anything the UI is showing.
-  if (nextElements !== current.data.elements || nextUi !== current.ui) {
+  if (
+    nextElements !== current.data.elements ||
+    nextUi !== current.ui ||
+    nextRegistry !== current.registry
+  ) {
     setState({
       ...current,
       data: { ...current.data, elements: nextElements },
       ui: nextUi,
+      registry: nextRegistry,
     });
   }
 

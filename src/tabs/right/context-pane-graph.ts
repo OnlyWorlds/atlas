@@ -33,6 +33,7 @@ import type { Element, ElementType } from '../../core/types';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { navigate, elementHash } from '../../core/router';
 import { getTierForNarrative } from '../../middle/writing-helpers';
+import { escapeText } from '../../core/dom-utils';
 
 export interface GraphHandle {
   /** Visually emphasize a node (or clear highlight when id is null). */
@@ -505,7 +506,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
         || (n.isCenter && n.id === homeId ? subject.name || '(home)' : '(unknown)');
       nodeEl.innerHTML =
         `<span class="material-symbols-outlined">${iconName}</span>` +
-        `<span class="atlas-context-graph-node-label">${escapeHtml(rawName)}</span>`;
+        `<span class="atlas-context-graph-node-label">${escapeText(rawName)}</span>`;
       // Native browser tooltip — name + first ~200 chars of description so
       // the writer can peek at "what is this" without clicking.
       const desc = typeof n.el?.description === 'string' ? n.el.description.trim() : '';
@@ -958,7 +959,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     item.className = 'atlas-context-graph-node-menu-item';
     item.innerHTML =
       `<span class="material-symbols-outlined">${icon}</span>` +
-      `<span>${escapeHtml(label)}</span>`;
+      `<span>${escapeText(label)}</span>`;
     item.addEventListener('click', () => {
       onClick();
       closeNodeMenu();
@@ -1010,7 +1011,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     homeChip.dataset.trailIndex = '-1';
     homeChip.innerHTML =
       `<span class="material-symbols-outlined">home</span>` +
-      `<span>${escapeHtml(subject.name || '(home)')}</span>`;
+      `<span>${escapeText(subject.name || '(home)')}</span>`;
     homeChip.addEventListener('click', (e) => {
       e.stopPropagation();
       jumpToBreadcrumbIndex(-1);
@@ -1192,12 +1193,4 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = (n >> 8) & 0xff;
   const b = n & 0xff;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }

@@ -1760,7 +1760,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     blocksHost = null;
     mountedResolved = false;
     const header = document.createElement('header');
-    header.className = 'atlas-room-header atlas-share-detail-header';
+    // Compact entity band, matching the resolved detail view (conv #80: a
+    // single named entity gets .atlas-middle-header, not the room landing h1).
+    header.className = 'atlas-middle-header atlas-share-detail-header';
     // D1 drill-in prefix — same affordance as the entity headers.
     header.appendChild(makeDrillInPrefix('Share', () => navigate(shareHash(worldId))));
     root.appendChild(header);

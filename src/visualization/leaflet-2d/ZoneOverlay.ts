@@ -19,6 +19,7 @@
 import L from 'leaflet';
 import { storageToLeaflet } from './CoordinateUtils';
 import type { Point } from './ZoneGeometry';
+import { escapeText } from '../../core/dom-utils';
 
 const DEFAULT_COLOR = '#22d3ee';
 const DEFAULT_OPACITY = 0.4;
@@ -548,7 +549,7 @@ export class ZoneOverlay {
   }
 
   private buildLabelIcon(text: string): L.DivIcon {
-    const safe = escapeHtml(text);
+    const safe = escapeText(text);
     return L.divIcon({
       className: 'atlas-zone-label',
       html: `<span>${safe}</span>`,
@@ -596,12 +597,3 @@ function lineMidAnchor(points: Point[]): Point {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, c => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[c] as string);
-}

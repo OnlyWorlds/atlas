@@ -42,14 +42,16 @@ const ROOMS: RoomDef[] = [
   // Home matches 'home', 'elements' (legacy sidebar-mode URL, now middle=home),
   // and 'welcome' (no-world case never reaches room nav, but defensive).
   { id: 'home',      label: 'Home',      icon: 'home',           hashFor: homeHash,      matches: ['home', 'elements'] },
-  { id: 'writing',   label: 'Writing',   icon: 'edit_note',      hashFor: writingHash,   matches: ['writing'] },
-  { id: 'knowledge', label: 'Knowledge', icon: 'menu_book',      hashFor: knowledgeHash, matches: ['knowledge'] },
-  { id: 'timeline',  label: 'Charts',    icon: 'timeline',       hashFor: timelineHash,  matches: ['timeline'] },
+  // Icon pass 2026-07-10 (Captain): writing takes the book; knowledge/charts/
+  // share candidates screenshotted for his pick (icons-variant-{a,b}.png).
+  { id: 'writing',   label: 'Writing',   icon: 'menu_book',      hashFor: writingHash,   matches: ['writing'] },
+  { id: 'knowledge', label: 'Knowledge', icon: 'psychology',     hashFor: knowledgeHash, matches: ['knowledge'] },
+  { id: 'timeline',  label: 'Charts',    icon: 'insights',       hashFor: timelineHash,  matches: ['timeline'] },
   // Search room removed pre-release (session 240) — the dedicated room was the
   // weakest search surface; the planned replacement is a Cmd+K command palette
   // (see DESIGN.md "Search"). The elements-sidebar name filter remains interim.
   // Route + search.ts stay dormant; re-add this entry to restore the room.
-  { id: 'share',     label: 'Share',          icon: 'public',         hashFor: (w) => shareHash(w), matches: ['share'] },
+  { id: 'share',     label: 'Share',          icon: 'ios_share',      hashFor: (w) => shareHash(w), matches: ['share'] },
   { id: 'import',    label: 'Import & export', icon: 'import_export',  hashFor: importHash,    matches: ['import'] },
   // Templates hidden pre-release (not building it before launch). Route +
   // templates-room.ts stay dormant; re-add this entry to restore it to the nav.

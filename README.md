@@ -2,7 +2,7 @@
 
 Folder-first OnlyWorlds world browser and editor with optional API sync.
 
-**Status**: Rebuild in progress (started 2026-05-12). See `DESIGN.md` for architecture.
+**Status**: Feature-complete, v1.0.0, in release prep (rebuild ran 2026-05-12 to 2026-07). See `DESIGN.md` for architecture, `PROGRESS.md` for operational state, `CHANGELOG.md` for releases.
 **Legacy**: Previous IDB-cached design lives at `tools/atlas-deprecated/` — UI/UX reference only. See its `DEPRECATED.md` for what to port vs drop.
 
 ## Run

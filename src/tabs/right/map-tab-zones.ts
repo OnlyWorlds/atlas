@@ -13,6 +13,7 @@ import { getState, patchSlice } from '../../core/state';
 import { navigate, elementHash } from '../../core/router';
 import { ELEMENT_LABELS } from '../../core/constants';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
+import { escapeText } from '../../core/dom-utils';
 import {
   listZonesOnMap,
   markersForZoneOnMap,
@@ -148,7 +149,7 @@ function renderChipStrip(entry: MapTabCacheEntry, zones: Zone[], selectedId?: st
     chip.innerHTML = `
       <span class="material-symbols-outlined atlas-zone-chip-shape">${shapeIcon}</span>
       <span class="atlas-zone-chip-dot" style="background:${color}"></span>
-      <span class="atlas-zone-chip-name">${escapeHtml(z.name)}</span>
+      <span class="atlas-zone-chip-name">${escapeText(z.name)}</span>
       <button type="button" class="atlas-zone-chip-x" data-action="delete" title="Delete zone">
         <span class="material-symbols-outlined">delete</span>
       </button>
@@ -305,12 +306,3 @@ function activeCache(mapId: string): MapTabCacheEntry | null {
   return mapTabCache.get(mapId) ?? null;
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, c => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[c] as string);
-}

@@ -8,7 +8,7 @@
  */
 
 import { getState, patchSlice } from '../../core/state';
-import { escapeHtml } from './map-tab-tooltip';
+import { escapeText } from '../../core/dom-utils';
 
 export function renderStaleMapPane(pane: HTMLElement, mapId: string): void {
   const state = getState();
@@ -18,7 +18,7 @@ export function renderStaleMapPane(pane: HTMLElement, mapId: string): void {
   const ownerLabel = ownerWorld?.name ?? null;
   const tabLabel = tab && tab.kind === 'map' ? tab.label : '';
   const subMsg = ownerLabel
-    ? `This map belongs to <b>${escapeHtml(ownerLabel)}</b>${tabLabel ? ` ("${escapeHtml(tabLabel)}")` : ''}. Switch to that world to view it.`
+    ? `This map belongs to <b>${escapeText(ownerLabel)}</b>${tabLabel ? ` ("${escapeText(tabLabel)}")` : ''}. Switch to that world to view it.`
     : `It may have been deleted, or you switched worlds while it was open.`;
   pane.innerHTML = `
     <div class="atlas-empty-state atlas-map-stale-pane" data-role="map-stale-pane">

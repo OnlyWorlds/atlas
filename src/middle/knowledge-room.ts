@@ -484,7 +484,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     heldByMount = aboutMount = null;
     mountedResolved = false;
     const header = document.createElement('header');
-    header.className = 'atlas-room-header atlas-knowledge-detail-header';
+    // Compact entity band, matching the resolved detail views (conv #80: a
+    // single named entity gets .atlas-middle-header, not the room landing h1).
+    header.className = 'atlas-middle-header atlas-knowledge-detail-header';
     // D1 drill-in prefix — same affordance as the entity headers.
     header.appendChild(makeDrillInPrefix('Knowledge', () => {
       if (kind === 'knower') roomTab = 'knowers';

@@ -41,16 +41,22 @@ export interface AppShell {
 }
 
 interface Ratios { sidebar: number; middle: number; }
-// Sidebar default at 19% — a touch wider than the original 18% so the footer
-// fits gear + reset + sync pill without crowding, but tighter than 20% which
-// took a noticeable bite out of the middle pane.
-const DEFAULT_RATIOS: Ratios = { sidebar: 0.19, middle: 0.51 };
+// Sidebar default at 20% — wide enough that the 22 type-filter chips sit in
+// two rows of 11 on common window widths (Captain, 2026-07-10; was 19%,
+// which wrapped them to a ragged third row).
+const DEFAULT_RATIOS: Ratios = { sidebar: 0.20, middle: 0.51 };
+// Prior default — a stored ratio equal to it means "never customized";
+// upgrade those to the new default so the change actually reaches users.
+const LEGACY_SIDEBAR_DEFAULT = 0.19;
 
 function loadRatios(): Ratios {
   try {
     const raw = localStorage.getItem(SHELL_RATIOS_STORAGE_KEY);
     if (!raw) return { ...DEFAULT_RATIOS };
     const parsed = JSON.parse(raw) as Partial<Ratios>;
+    if (parsed.sidebar != null && Math.abs(parsed.sidebar - LEGACY_SIDEBAR_DEFAULT) < 0.001) {
+      parsed.sidebar = DEFAULT_RATIOS.sidebar;
+    }
     const sidebar = clamp(parsed.sidebar ?? DEFAULT_RATIOS.sidebar, 0.12, 0.40);
     const middle = clamp(parsed.middle ?? DEFAULT_RATIOS.middle, 0.20, 0.70);
     if (sidebar + middle > 0.85) return { ...DEFAULT_RATIOS };

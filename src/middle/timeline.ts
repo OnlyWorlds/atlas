@@ -303,7 +303,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     }
 
     const scoped = filterNodesByScope(allNodes, scopeFromFocus(route.elementId ?? null, typeFilter));
-    handle.setNodes(scoped);
+    // allNodes rides along as the overview strip's constant reference frame
+    // (the full world's history stays visible however narrow the scope, S2).
+    handle.setNodes(scoped, allNodes);
     handle.setSelection(route.mode === 'timeline' ? (route.elementId ?? null) : null);
 
     if (!suppressGallery) renderGallery(); // keep the active-chart highlight in sync

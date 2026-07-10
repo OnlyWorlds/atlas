@@ -223,3 +223,25 @@ describe('populatedCardFields — the card field checklist source', () => {
     expect(populatedCardFields(char)).toEqual(['description', 'birthplace', 'species', 'age']);
   });
 });
+
+describe('renderCollectionView — empty-state hint stays in the builder', () => {
+  // Regression (2026-07-10 sweep): the payload path (preview + viewer)
+  // appended "Empty collection. Add elements in the editor." for an
+  // all-dangling collection — editor copy shown to public visitors, and a
+  // divergence from show's renderCollection (renders blank). preview ≡ served.
+  const emptyBlock = { kind: 'collection', id: 'b1', elementIds: ['gone-1', 'gone-2'] } as any;
+  const resolveNone = () => null;
+
+  it('payload path (default) renders blank for an all-dangling collection', async () => {
+    const { renderCollectionView } = await import('../../src/middle/share-page-render');
+    const el = renderCollectionView(emptyBlock, resolveNone);
+    expect(el.textContent).toBe('');
+    expect(el.querySelector('.atlas-share-hint')).toBeNull();
+  });
+
+  it('builder path (editorHint) keeps the guidance copy', async () => {
+    const { renderCollectionView } = await import('../../src/middle/share-page-render');
+    const el = renderCollectionView(emptyBlock, resolveNone, { editorHint: true });
+    expect(el.textContent).toContain('Empty collection');
+  });
+});

@@ -408,9 +408,12 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       .sort((a, b) => a.name.localeCompare(b.name));
 
     if (filtered.length === 0) {
-      const msg = elements.length === 0
-        ? 'No elements yet. Click <b>+ new element</b> to start.'
-        : 'No elements match the current filter.';
+      // Empty ≠ loading: during activation the cache is priming from disk.
+      const msg = state.data.loading
+        ? 'Opening world…'
+        : elements.length === 0
+          ? 'No elements yet. Click <b>+ new element</b> to start.'
+          : 'No elements match the current filter.';
       listEl.innerHTML = `<div class="atlas-pane-empty">${msg}</div>`;
       return;
     }

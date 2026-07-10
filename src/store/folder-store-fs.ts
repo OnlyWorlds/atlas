@@ -99,6 +99,12 @@ export interface FsFolderStoreOptions {
    * Default true (matches the "one writer per folder, with stale recovery" rule).
    */
   takeStaleLock?: boolean;
+  /**
+   * Take the lock even if another tab holds a LIVE one. Only set after
+   * explicit user consent (the "take over" prompt in world activation) —
+   * two live writers on one folder can produce conflicting writes.
+   */
+  forceTakeLock?: boolean;
   /** Disable heartbeat timer (tests that don't want the interval). */
   disableHeartbeat?: boolean;
 }
@@ -209,12 +215,13 @@ export class FsFolderStore implements FolderStore {
     if (existing) {
       const heartbeat = Date.parse(existing.last_heartbeat);
       const age = Date.now() - heartbeat;
-      if (Number.isFinite(heartbeat) && age < LOCK_STALE_MS) {
+      if (Number.isFinite(heartbeat) && age < LOCK_STALE_MS && !this.opts.forceTakeLock) {
         if (this.opts.takeStaleLock === false) {
           throw new ELockHeld(existing);
         }
         // takeStaleLock: stale-only enforcement happens in the else branch.
-        // Live lock + takeStaleLock !== false → still throw (we don't steal live).
+        // Live lock + takeStaleLock !== false → still throw (we don't steal
+        // live; forceTakeLock above is the consent-gated exception).
         if (existing.tab_id !== this.tabId) {
           throw new ELockHeld(existing);
         }

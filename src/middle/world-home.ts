@@ -73,6 +73,16 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     root.innerHTML = '';
     root.appendChild(buildCover(meta, worldId, totalElements, counts, toasts));
     if (totalElements === 0) {
+      // Empty and still-loading are different truths: during activation the
+      // cache is primed async from disk, and showing onboarding meanwhile
+      // reads as "your world is empty" (misleading-empty, 2026-07-10).
+      if (getState().data.loading) {
+        const loadingEl = document.createElement('section');
+        loadingEl.className = 'atlas-home-loading';
+        loadingEl.innerHTML = `<p class="atlas-home-loading-copy">Opening world…</p>`;
+        root.appendChild(loadingEl);
+        return;
+      }
       root.appendChild(buildOnboarding(toasts));
       return;
     }
@@ -181,18 +191,49 @@ function buildCover(
   return cover;
 }
 
+/**
+ * Ghost cast card shown while no favorite is set — the setter lives on the
+ * element-detail header, which Captain couldn't find from home (2026-07-10).
+ * Clicking filters the sidebar to characters so the path is one hop.
+ */
+function buildCastHint(_worldId: string): HTMLElement | null {
+  const elements = getState().data.elements;
+  if (getState().data.loading) return null;
+  if (!elements.some(e => e.type === 'character')) return null;
+  const slot = document.createElement('div');
+  slot.className = 'atlas-home-cast';
+  const ghost = document.createElement('button');
+  ghost.type = 'button';
+  ghost.className = 'atlas-home-cast-card atlas-home-cast-ghost';
+  ghost.title = 'Open a character and click the person pin in its header to set your protagonist';
+  ghost.innerHTML = `
+    <span class="material-symbols-outlined atlas-home-cast-icon">person_pin</span>
+    <span class="atlas-home-cast-text">
+      <span class="atlas-home-cast-name">choose a protagonist</span>
+      <span class="atlas-home-cast-role">shows here on the cover</span>
+    </span>
+  `;
+  ghost.addEventListener('click', () => {
+    const ui = getState().ui;
+    patchSlice('ui', { ...ui, sidebarMode: 'elements', elementFilters: new Set(['character' as const]) });
+    setSidebarModePref('elements');
+  });
+  slot.appendChild(ghost);
+  return slot;
+}
+
 /** The cast slot: protagonist + home cards, only those that are set. */
 function buildCastSlot(worldId: string): HTMLElement | null {
   const reg = getState().registry;
   const favorites = reg.worlds.find(w => w.id === worldId)?.favorites;
-  if (!favorites) return null;
+  if (!favorites) return buildCastHint(worldId);
   const elements = getState().data.elements;
   const entries: { el: Element; role: string; icon: string }[] = [];
   const protagonist = favorites.protagonist_id ? elements.find(e => e.id === favorites.protagonist_id) : undefined;
   const nexus = favorites.nexus_id ? elements.find(e => e.id === favorites.nexus_id) : undefined;
   if (protagonist) entries.push({ el: protagonist, role: 'protagonist', icon: 'person_pin' });
   if (nexus) entries.push({ el: nexus, role: 'home', icon: 'home_pin' });
-  if (entries.length === 0) return null;
+  if (entries.length === 0) return buildCastHint(worldId);
 
   const slot = document.createElement('div');
   slot.className = 'atlas-home-cast';
@@ -241,8 +282,8 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   const lastEdited = byRecency.find(el => el !== lastWriting && el !== lastMap);
   const continueRows: { icon: string; verb: string; el: Element; hash: string }[] = [];
   if (lastWriting) continueRows.push({ icon: 'edit_note', verb: 'Continue writing', el: lastWriting, hash: writingHash(worldId, lastWriting.id) });
-  if (lastMap) continueRows.push({ icon: 'map', verb: 'Open map', el: lastMap, hash: mapHash(worldId, lastMap.id) });
-  if (lastEdited) continueRows.push({ icon: ELEMENT_ICONS[lastEdited.type] ?? 'category', verb: 'Last edited', el: lastEdited, hash: roomOf(lastEdited, worldId).hash });
+  if (lastMap) continueRows.push({ icon: 'map', verb: 'Continue mapping', el: lastMap, hash: mapHash(worldId, lastMap.id) });
+  if (lastEdited) continueRows.push({ icon: ELEMENT_ICONS[lastEdited.type] ?? 'category', verb: 'Continue editing', el: lastEdited, hash: roomOf(lastEdited, worldId).hash });
 
   if (continueRows.length > 0) {
     const section = document.createElement('section');
@@ -275,7 +316,9 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
     section.className = 'atlas-home-recent';
     const title = document.createElement('h2');
     title.className = 'atlas-home-section-title';
-    title.textContent = 'Recent';
+    // Truthful label: rows sort on local_updated_at, so this is edit recency,
+    // not view recency.
+    title.textContent = 'Recently edited';
     section.appendChild(title);
     const list = document.createElement('div');
     list.className = 'atlas-home-recent-list';

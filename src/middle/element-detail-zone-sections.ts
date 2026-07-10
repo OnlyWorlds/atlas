@@ -21,6 +21,7 @@ import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
 import { enterEditMode, isEditing, getEditingZoneId, doneEdit, cancelEdit } from '../tabs/right/zone-edit-mode';
 import type { ToastManager } from '../ui/toast-manager';
+import { escapeText } from '../core/dom-utils';
 
 export function buildZoneSections(zone: Zone, toasts: ToastManager): HTMLElement[] {
   return [
@@ -212,7 +213,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
     groupHeader.className = 'atlas-zone-markers-group-header';
     groupHeader.innerHTML = `
       <span class="material-symbols-outlined">map</span>
-      <span>${escapeHtml(mapName)}</span>
+      <span>${escapeText(mapName)}</span>
       <span class="atlas-zone-markers-group-count">${list.length}</span>
     `;
     body.appendChild(groupHeader);
@@ -280,12 +281,3 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
   return section;
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, c => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  })[c] as string);
-}

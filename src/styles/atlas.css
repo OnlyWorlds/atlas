@@ -845,14 +845,17 @@
 .atlas-filter-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: 2px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--atlas-divider);
+  /* Break the 20 type chips into two even rows of 10 (Captain, 2026-07-10):
+     10 × 25px + 9 × 2px gap + 16px padding. Narrow sidebars wrap naturally. */
+  max-width: 284px;
 }
 
 .atlas-filter-btn {
-  width: 26px;
-  height: 26px;
+  width: 25px;
+  height: 25px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1828,6 +1831,33 @@
 .atlas-world-state-chip.api-linked {
   background: var(--atlas-cyan-tint);
   color: var(--atlas-cyan);
+}
+
+/* The cloud state icon doubles as the refresh action (the dedicated refresh
+   button is gone). Bare-button reset so it sits exactly like the old span. */
+.atlas-world-cloud-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.atlas-world-cloud-btn .material-symbols-outlined {
+  transition: color 120ms ease;
+}
+.atlas-world-cloud-btn:hover .material-symbols-outlined {
+  color: var(--atlas-cyan);
+}
+
+/* Home: world is activating, cache still priming (empty ≠ loading). */
+.atlas-home-loading-copy {
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--atlas-text-muted);
 }
 
 /* ============================================================
@@ -5273,10 +5303,10 @@ svg .atlas-zone-selected {
 .atlas-home-recent-row {
   display: grid;
   /* 5 tracks: icon | name | room-of-edit (may be absent; track collapses) | type | time */
-  grid-template-columns: 24px 1fr auto auto auto;
+  grid-template-columns: 20px 1fr auto auto auto;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
+  padding: 6px 8px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -5291,7 +5321,9 @@ svg .atlas-zone-selected {
 }
 
 .atlas-home-recent-icon {
-  font-size: 18px;
+  /* Matches the Continue rows (17px) — the two lists sit adjacent and read
+     as one density (Captain: recent rows looked bigger, jarring). */
+  font-size: 17px;
   color: var(--atlas-cyan);
 }
 
@@ -9986,8 +10018,8 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 .atlas-context-pane-row-dismiss:hover {
   opacity: 1;
-  color: #ff8a80;
-  background: rgba(255, 138, 128, 0.1);
+  color: var(--atlas-danger-hover);
+  background: var(--atlas-danger-hover-tint);
 }
 
 /* Element preview — fills the post-graph slot when active.
@@ -10548,6 +10580,19 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-home-cast-card:hover {
   border-color: var(--atlas-cyan-soft, rgba(34, 211, 238, 0.4));
   background: rgba(255, 255, 255, 0.04);
+}
+/* Ghost card: no favorite set yet — quiet invitation, not a demand. */
+.atlas-home-cast-ghost {
+  background: transparent;
+  border-style: dashed;
+}
+.atlas-home-cast-ghost .atlas-home-cast-icon,
+.atlas-home-cast-ghost .atlas-home-cast-name {
+  color: var(--atlas-text-muted);
+}
+.atlas-home-cast-ghost:hover .atlas-home-cast-icon,
+.atlas-home-cast-ghost:hover .atlas-home-cast-name {
+  color: var(--atlas-text);
 }
 .atlas-home-cast-face {
   width: 36px;

@@ -362,8 +362,10 @@ function renderInline(
   });
 
   // Inline code (backticks) — done before bold/italic so backticks don't
-  // collide with surrounding emphasis.
-  s = s.replace(/`([^`\n]+?)`/g, (_, code) => `<code>${escapeText(code)}</code>`);
+  // collide with surrounding emphasis. `code` was captured from the
+  // already-escaped string — re-escaping would double-escape (`<` would
+  // render as the literal text "&lt;"; show's renderer does not).
+  s = s.replace(/`([^`\n]+?)`/g, (_, code) => `<code>${code}</code>`);
 
   // Bold: **text**
   s = s.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');

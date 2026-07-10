@@ -9,10 +9,10 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
-import { onHashChange, parseHash, navigate, worldHash } from '../core/router';
+import { onHashChange, parseHash, navigate, worldHash, settingsHash } from '../core/router';
 import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused, deleteWorldEntry } from '../registry/registry';
 import { loadHandle, ensureWritable, queryWritable, deleteHandle } from '../store/handle-vault';
-import { FsFolderStore } from '../store/folder-store-fs';
+import { FsFolderStore, ELockHeld } from '../store/folder-store-fs';
 import { CreateWorldModal } from '../ui/create-world-modal';
 import { setActiveStore, getActiveStore } from '../core/active-store';
 import { LinkWorldModal } from '../ui/link-world-modal';
@@ -203,19 +203,24 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   const favIcon = world.favorite ? 'star' : 'star_border';
   const favCls = world.favorite ? 'is-fav' : '';
   const cls = ['atlas-row', active ? 'selected' : ''].filter(Boolean).join(' ');
-  // Hover-reveal sync controls only for api-linked worlds.
+  // Hover-reveal sync controls only for api-linked worlds. The dedicated
+  // refresh button is gone: the CLOUD state icon is the refresh action now
+  // (Captain, 2026-07-10) — one icon fewer, same reach.
   const syncActions = world.state === 'api-linked'
     ? `
         <button type="button" class="atlas-icon-btn-sm sync-action-btn ${world.sync_paused ? 'is-paused' : ''}" data-role="toggle-paused" data-world-id="${escapeAttr(world.id)}" title="${world.sync_paused ? 'Resume sync' : 'Stay offline'}">
           <span class="material-symbols-outlined">${world.sync_paused ? 'play_arrow' : 'pause'}</span>
-        </button>
-        <button type="button" class="atlas-icon-btn-sm sync-action-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="Refresh from API">
-          <span class="material-symbols-outlined">refresh</span>
         </button>`
     : '';
+  const pathHint = world.folder?.last_path_hint ?? '';
+  const stateIconHtml = world.state === 'api-linked'
+    ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="Refresh from API">
+        <span class="material-symbols-outlined">${stateIcon}</span>
+      </button>`
+    : `<span class="material-symbols-outlined"${pathHint ? ` title="${escapeAttr(pathHint)}"` : ''}>${stateIcon}</span>`;
   return `
-    <div class="${cls}" data-world-id="${escapeAttr(world.id)}" role="button" tabindex="0">
-      <span class="material-symbols-outlined">${stateIcon}</span>
+    <div class="${cls}" data-world-id="${escapeAttr(world.id)}" role="button" tabindex="0"${pathHint ? ` title="${escapeAttr(pathHint)}"` : ''}>
+      ${stateIconHtml}
       <span class="atlas-row-main">${escapeText(world.name)}</span>
       ${stateChip}
       <span class="atlas-inline-actions">${syncActions}
@@ -254,7 +259,40 @@ export interface ActivateWorldOpts {
  * - Otherwise, navigates to `elementsHash(worldId)` for legacy parity (clicking
  *   a world drops the user into elements mode, not the welcome panel).
  */
+// Concurrent activations interleave on the SHARED active store: the second
+// call's `prior.close()` closes the first call's just-opened store mid-flight,
+// its `listElements` throws "FsFolderStore not open", and the catch primes
+// `elements: []` — the "world opens empty sometimes" race (boot-path
+// activation overlapping an early sidebar click, or a double-click). All
+// activations serialize through this chain; a queued request that has been
+// superseded by a newer click is skipped instead of run.
+let activationSeq = 0;
+let activationChain: Promise<unknown> = Promise.resolve();
+
 export async function activateWorld(
+  worldId: string,
+  toasts: ToastManager,
+  opts: ActivateWorldOpts = {}
+): Promise<boolean> {
+  const gen = ++activationSeq;
+  const run = activationChain.then(async () => {
+    if (gen !== activationSeq) return false; // superseded while queued
+    try {
+      return await doActivateWorld(worldId, toasts, opts);
+    } finally {
+      // Whatever path activation took (success primes, failures return
+      // early), the loading flag must not outlive the attempt — a stuck
+      // flag would show "Opening world…" forever.
+      const d = getState().data;
+      if (d.loading) patchSlice('data', { ...d, loading: false });
+    }
+  });
+  // The chain must survive a failed activation (never reject downstream).
+  activationChain = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+async function doActivateWorld(
   worldId: string,
   toasts: ToastManager,
   opts: ActivateWorldOpts = {}
@@ -314,15 +352,26 @@ export async function activateWorld(
   // The per-world persistence layer (setWorldRightTabs / hydrateRightTabsFromRegistry)
   // is left in the registry helpers but not invoked here.
   if (!preserveSelection) {
-    patchSlice('data', { elements: [] });
+    // loading:true — the cache is about to be primed async; empty ≠ loading
+    // (the misleading empty-home flash, 2026-07-10).
+    patchSlice('data', { elements: [], loading: true });
     // knowledgeLens cleared too — it references a knower of the OLD world.
     patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null });
     const currentRoute = parseHash(window.location.hash);
     if (currentRoute.worldId !== worldId) {
-      // Session 223: activate → home, not /elements. Sidebar mode is
-      // independent UI state now; activation doesn't force a sidebar flip.
-      navigate(worldHash(worldId));
+      if (currentRoute.mode === 'settings') {
+        // Settings stays settings across a world switch: follow to the SAME
+        // tab of the new world instead of bouncing to home (Captain,
+        // 2026-07-10).
+        navigate(settingsHash(worldId, currentRoute.settingsTab));
+      } else {
+        // Session 223: activate → home, not /elements. Sidebar mode is
+        // independent UI state now; activation doesn't force a sidebar flip.
+        navigate(worldHash(worldId));
+      }
     }
+  } else {
+    patchSlice('data', { ...getState().data, loading: true });
   }
 
   const handle = await loadHandle(entry.folder.handle_key);
@@ -347,7 +396,7 @@ export async function activateWorld(
   // world don't survive into this one.
   resetElementDetailScrollMemory();
 
-  const store = new FsFolderStore();
+  let store = new FsFolderStore();
   try {
     await store.open(handle);
   } catch (err) {
@@ -364,9 +413,34 @@ export async function activateWorld(
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }
-    if (!silent) toasts.error(`Failed to open ${entry.name}: ${err instanceof Error ? err.message : String(err)}`);
-    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
-    return false;
+    // Another tab holds a live folder lock. Dead-ending here left the user
+    // stranded (Captain, 2026-07-10) — offer an explicit, consented takeover.
+    // Never prompt on the silent boot path.
+    if (err instanceof ELockHeld && !silent) {
+      const hb = Date.parse(err.lock.last_heartbeat);
+      const ageS = Number.isFinite(hb) ? Math.max(0, Math.round((Date.now() - hb) / 1000)) : null;
+      const take = window.confirm(
+        `"${entry.name}" appears to be open in another atlas tab` +
+        (ageS != null ? ` (last active ${ageS}s ago)` : '') +
+        `.\n\nClose the other tab, or take over here. Taking over while the other tab is still live can cause conflicting writes.\n\nTake over?`
+      );
+      if (!take) {
+        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        return false;
+      }
+      store = new FsFolderStore({ forceTakeLock: true });
+      try {
+        await store.open(handle);
+      } catch (err2) {
+        toasts.error(`Failed to open ${entry.name}: ${err2 instanceof Error ? err2.message : String(err2)}`);
+        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        return false;
+      }
+    } else {
+      if (!silent) toasts.error(`Failed to open ${entry.name}: ${err instanceof Error ? err.message : String(err)}`);
+      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      return false;
+    }
   }
   const meta = await store.readWorldMeta();
   setActiveStore(store);
@@ -379,10 +453,10 @@ export async function activateWorld(
   // Prime the elements cache for this world.
   try {
     const elements = await store.listElements();
-    patchSlice('data', { elements });
+    patchSlice('data', { elements, loading: false });
   } catch (err) {
     console.warn('[worlds-sidebar] failed to prime elements:', err);
-    patchSlice('data', { elements: [] });
+    patchSlice('data', { elements: [], loading: false });
   }
   // Orphan-snapshot recovery (Captain smoke session 219): if the user
   // refreshed the page mid-zone-edit, the in-flight snapshot persisted to

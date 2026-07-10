@@ -353,4 +353,67 @@ describe('sync-attach: id-swap migrates UI state', () => {
     expect(getState().ui.rightTabs).toEqual([{ kind: 'map-index' }]);
     expect(getState().data.elements[0].id).toBe('m-new');
   });
+
+  // ---- Cast favorites (D2b) — registry ids must follow the swap ----
+  //
+  // Favorites live in the REGISTRY keyed by element id, outside the
+  // element-file ref rewrite. Without the remap, a protagonist/home
+  // favorited while local-only silently vanishes from the home cover
+  // after make-online (2026-07-10 sweep, convergent finding).
+
+  const worldEntry = (favorites: any) =>
+    ({ id: 'w1', name: 'TestWorld', state: 'local-only', favorites } as any);
+
+  it('remaps favorites.protagonist_id when the favorited character id-swaps', () => {
+    patchSlice('registry', {
+      ...getState().registry,
+      worlds: [worldEntry({ protagonist_id: 'old-id', nexus_id: null })],
+    });
+
+    __test_handleIdSwap({ old_id: 'old-id', new_id: 'new-id', type: 'character' });
+
+    const fav = getState().registry.worlds.find((w) => w.id === 'w1')?.favorites;
+    expect(fav?.protagonist_id).toBe('new-id');
+    expect(fav?.nexus_id).toBeNull();
+  });
+
+  it('remaps favorites.nexus_id when the favorited location id-swaps', () => {
+    patchSlice('registry', {
+      ...getState().registry,
+      worlds: [worldEntry({ protagonist_id: 'someone-else', nexus_id: 'old-id' })],
+    });
+
+    __test_handleIdSwap({ old_id: 'old-id', new_id: 'new-id', type: 'location' });
+
+    const fav = getState().registry.worlds.find((w) => w.id === 'w1')?.favorites;
+    expect(fav?.nexus_id).toBe('new-id');
+    expect(fav?.protagonist_id).toBe('someone-else');
+  });
+
+  it('leaves the registry identity untouched when no favorite matches the swap', () => {
+    patchSlice('registry', {
+      ...getState().registry,
+      worlds: [worldEntry({ protagonist_id: 'other', nexus_id: null })],
+    });
+    const before = getState().registry;
+
+    __test_handleIdSwap({ old_id: 'old-id', new_id: 'new-id', type: 'character' });
+
+    expect(getState().registry).toBe(before);
+  });
+
+  it('does not touch favorites of a non-active world', () => {
+    patchSlice('registry', {
+      ...getState().registry,
+      worlds: [
+        worldEntry({ protagonist_id: 'other', nexus_id: null }),
+        { id: 'w2', name: 'Elsewhere', state: 'local-only', favorites: { protagonist_id: 'old-id' } } as any,
+      ],
+    });
+
+    __test_handleIdSwap({ old_id: 'old-id', new_id: 'new-id', type: 'character' });
+
+    const w2fav = getState().registry.worlds.find((w) => w.id === 'w2')?.favorites;
+    expect(w2fav?.protagonist_id).toBe('old-id');
+  });
 });

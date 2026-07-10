@@ -40,8 +40,15 @@ const NODE_Y_GAP = 34;           // density-fan: vertical step between stacked n
 const LABEL_MAX_CHARS = 24;
 const LABEL_NEAR_RADIUS = 150;   // px — cursor neighbourhood that gets labels
 const LABEL_NEAR_MAX = 9;        // most labels to reveal around the cursor
-const ZOOM_MAX = 200;
+const ZOOM_MAX = 200;            // max magnification vs the fitted span
 const ZOOM_STEP = 1.2;
+// Overview strip (sitdown S2) — the always-visible full-world reference frame
+// under the main axis. The bright band is the viewport; drag/resize it there.
+const STRIP_H = 26;
+const STRIP_GAP = 8;
+const STRIP_EDGE_GRAB = 5;       // px — band-edge resize hit tolerance
+const GHOST_MS = 2500;           // previous-window ghost fade duration
+const TRAVEL_MS = 280;           // focus-jump window animation
 
 export interface TimelineViewOptions {
   /** A dot or card chip was clicked → focus that element (unified select=focus;
@@ -52,37 +59,56 @@ export interface TimelineViewOptions {
 }
 
 export interface TimelineViewHandle {
-  /** The room passes already-scoped nodes (it owns the ChartConfig/scope). */
-  setNodes(nodes: TimelineNode[]): void;
+  /**
+   * The room passes already-scoped nodes (it owns the ChartConfig/scope), plus
+   * the FULL dated universe for the overview strip's constant reference frame.
+   */
+  setNodes(nodes: TimelineNode[], universe?: TimelineNode[]): void;
   setSelection(elementId: string | null): void;
   redraw(): void;
   destroy(): void;
 }
+
+/** The one viewport state: a visible time window in world-date units (S3). */
+export interface TimeWindow { start: number; end: number }
+
+interface LabelBox { x0: number; x1: number; y0: number; y1: number; nodeId: string }
 
 interface ViewState {
   container: HTMLElement;
   canvas: HTMLCanvasElement;
   card: HTMLElement;
   nodes: TimelineNode[];
+  universe: TimelineNode[];     // full dated world (strip reference frame)
   placedDots: PlacedDot[];
   hoveredDot: PlacedDot | null;
   selectedId: string | null;
-  // zoom/pan
-  zoom: number;
-  panCenter: number | null;   // date the view is centred on (null = base centre)
+  // THE viewport: null = auto-fit the scoped node set. There is no separate
+  // camera — wheel resizes this window around the cursor date, drag slides it
+  // (sitdown S3; replaced zoom+panCenter).
+  window: TimeWindow | null;
   baseRange: { min: number; max: number } | null;
+  // Focus-jump travel: animate the window between fits so a jump reads as
+  // camera travel, not a teleport (S6).
+  anim: { from: TimeWindow; to: TimeWindow; t0: number } | null;
+  // Previous window's ghost on the strip, fading over GHOST_MS (S2).
+  ghost: { win: TimeWindow; bornAt: number } | null;
+  rafPending: boolean;
   // layout cache — the density-fan is deterministic per geometry; recompute only
   // when size / range / node set changes, NOT on every mousemove redraw.
   layoutSig: string | null;
   layoutNodes: TimelineNode[] | null;
+  // Placed label boxes from the last draw — labels are click targets too (S6).
+  labelBoxes: LabelBox[];
   // cursor (canvas coords; null when outside) — drives proximity labels
   mouseX: number | null;
   mouseY: number | null;
-  // drag-pan
+  // drag-pan (main canvas) + strip drags
   dragging: boolean;
   dragStartX: number;
-  dragStartCenter: number;
+  dragStartWindow: TimeWindow | null;
   dragMoved: boolean;
+  stripDrag: { mode: 'move' | 'left' | 'right'; startX: number; startWin: TimeWindow } | null;
   destroyed: boolean;           // set on destroy(); guards late async redraws
   onSelect: (id: string) => void;
   onOpenElement: (id: string) => void;
@@ -106,11 +132,14 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
 
   const state: ViewState = {
     container, canvas, card,
-    nodes: [], placedDots: [], hoveredDot: null, selectedId: null,
-    zoom: 1, panCenter: null, baseRange: null,
+    nodes: [], universe: [], placedDots: [], hoveredDot: null, selectedId: null,
+    window: null, baseRange: null,
+    anim: null, ghost: null, rafPending: false,
     layoutSig: null, layoutNodes: null,
+    labelBoxes: [],
     mouseX: null, mouseY: null,
-    dragging: false, dragStartX: 0, dragStartCenter: 0, dragMoved: false,
+    dragging: false, dragStartX: 0, dragStartWindow: null, dragMoved: false,
+    stripDrag: null,
     destroyed: false,
     onSelect: opts.onSelect,
     onOpenElement: opts.onOpenElement,
@@ -136,9 +165,29 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
   void ensureIconFont().then(() => draw(state));
 
   return {
-    setNodes(nodes: TimelineNode[]): void {
+    setNodes(nodes: TimelineNode[], universe?: TimelineNode[]): void {
+      const prevView = currentViewRange(state);
+      const prevBase = state.baseRange;
       state.nodes = nodes;
+      if (universe) state.universe = universe;
       state.layoutSig = null; // new node set → re-pack
+      // Focus travel (S6): when the scope's fitted range changes while a
+      // window (or prior fit) is on screen, animate to the new fit instead of
+      // teleporting, and leave the old window as a fading ghost on the strip.
+      const nextBase = nodes.length > 0 ? calculateTimeRange(nodes) : null;
+      if (
+        prevView && prevBase && nextBase &&
+        (Math.abs(nextBase.min - prevBase.min) > 1e-9 || Math.abs(nextBase.max - prevBase.max) > 1e-9)
+      ) {
+        state.ghost = { win: prevView, bornAt: performance.now() };
+        state.anim = {
+          from: prevView,
+          to: { start: nextBase.min, end: nextBase.max },
+          t0: performance.now(),
+        };
+        state.window = null; // settle on auto-fit when travel completes
+        scheduleMotion(state);
+      }
       draw(state);
       renderCard(state);
     },
@@ -166,23 +215,96 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
   };
 }
 
-// ====== Zoom helpers ======
+// ====== Window helpers (S3 — the band IS the camera) ======
 
-export function effectiveRange(
-  base: { min: number; max: number },
-  zoom: number,
-  panCenter: number | null,
-): { min: number; max: number } {
-  const span = base.max - base.min;
-  if (span <= 0 || zoom <= 1) return base;
-  const effSpan = span / zoom;
-  const center = panCenter ?? (base.min + span / 2);
-  const pad = span * 0.05;
-  let min = center - effSpan / 2;
-  let max = center + effSpan / 2;
-  if (min < base.min - pad) { min = base.min - pad; max = min + effSpan; }
-  if (max > base.max + pad) { max = base.max + pad; min = max - effSpan; }
-  return { min, max };
+/**
+ * Clamp a window inside padded bounds, preserving its span where possible.
+ * `bounds` is the full navigable range (the universe when present, else the
+ * scoped fit); a 5% pad lets the edges breathe like the old zoom clamp did.
+ */
+export function clampWindow(
+  win: TimeWindow,
+  bounds: { min: number; max: number },
+): TimeWindow {
+  const boundSpan = bounds.max - bounds.min;
+  if (boundSpan <= 0) return { start: bounds.min, end: bounds.max };
+  const pad = boundSpan * 0.05;
+  const lo = bounds.min - pad;
+  const hi = bounds.max + pad;
+  let span = Math.min(win.end - win.start, hi - lo);
+  if (span <= 0) span = hi - lo;
+  let start = win.start;
+  if (start < lo) start = lo;
+  if (start + span > hi) start = hi - span;
+  return { start, end: start + span };
+}
+
+/**
+ * Resize a window by `factor` (>1 zooms out, <1 zooms in) around `anchorDate`
+ * so the date under the cursor stays put. Span is clamped to
+ * [boundsSpan/ZOOM_MAX, boundsSpan·1.1].
+ */
+export function zoomWindow(
+  win: TimeWindow,
+  factor: number,
+  anchorDate: number,
+  bounds: { min: number; max: number },
+): TimeWindow {
+  const boundSpan = Math.max(1e-9, bounds.max - bounds.min);
+  const span = win.end - win.start;
+  const nextSpan = Math.min(boundSpan * 1.1, Math.max(boundSpan / ZOOM_MAX, span * factor));
+  const frac = span > 0 ? (anchorDate - win.start) / span : 0.5;
+  const start = anchorDate - frac * nextSpan;
+  return clampWindow({ start, end: start + nextSpan }, bounds);
+}
+
+/** Fit range for the scoped nodes as a window. */
+function fitWindow(state: ViewState): TimeWindow | null {
+  if (!state.baseRange) return null;
+  return { start: state.baseRange.min, end: state.baseRange.max };
+}
+
+/** The navigable bounds: the universe when present (pan across the whole
+ *  world's history, not just the scope), else the scoped fit. */
+function navBounds(state: ViewState): { min: number; max: number } | null {
+  if (state.universe.length > 0) return calculateTimeRange(state.universe);
+  return state.baseRange;
+}
+
+/** The window currently ON SCREEN: animation frame > explicit window > fit. */
+function currentViewRange(state: ViewState): TimeWindow | null {
+  if (state.anim) {
+    const t = Math.min(1, (performance.now() - state.anim.t0) / TRAVEL_MS);
+    const e = 1 - Math.pow(1 - t, 3); // ease-out cubic
+    const { from, to } = state.anim;
+    return {
+      start: from.start + (to.start - from.start) * e,
+      end: from.end + (to.end - from.end) * e,
+    };
+  }
+  return state.window ?? fitWindow(state);
+}
+
+/** Zoom magnification vs the fitted span — drives the LOD rungs. */
+function zoomFactorOf(state: ViewState, view: TimeWindow): number {
+  if (!state.baseRange) return 1;
+  const baseSpan = state.baseRange.max - state.baseRange.min;
+  const span = view.end - view.start;
+  return span > 0 && baseSpan > 0 ? Math.max(1, baseSpan / span) : 1;
+}
+
+/** One rAF driver for travel + ghost fade; stops itself when both are done. */
+function scheduleMotion(state: ViewState): void {
+  if (state.rafPending || state.destroyed) return;
+  state.rafPending = true;
+  requestAnimationFrame(() => {
+    state.rafPending = false;
+    if (state.destroyed) return;
+    if (state.anim && performance.now() - state.anim.t0 >= TRAVEL_MS) state.anim = null;
+    if (state.ghost && performance.now() - state.ghost.bornAt >= GHOST_MS) state.ghost = null;
+    draw(state);
+    if (state.anim || state.ghost) scheduleMotion(state);
+  });
 }
 
 /**
@@ -271,6 +393,7 @@ function draw(state: ViewState): void {
   if (state.nodes.length === 0) {
     state.placedDots = [];
     state.baseRange = null;
+    state.labelBoxes = [];
     ctx.fillStyle = 'rgba(255,255,255,0.30)';
     ctx.font = '13px system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -280,10 +403,12 @@ function draw(state: ViewState): void {
 
   const base = calculateTimeRange(state.nodes);
   state.baseRange = base;
-  const range = effectiveRange(base, state.zoom, state.panCenter);
+  const view = currentViewRange(state) ?? { start: base.min, end: base.max };
+  const range = { min: view.start, max: view.end };
   const dateToX = createDateToX(range, w);
   const ticks = calculateTicks(range, w);
-  const axisY = h - AXIS_LABEL_HEIGHT;
+  // The overview strip reserves the bottom band (S2).
+  const axisY = h - AXIS_LABEL_HEIGHT - STRIP_H - STRIP_GAP;
 
   // Grid
   ctx.strokeStyle = 'rgba(255,255,255,0.03)';
@@ -303,17 +428,18 @@ function draw(state: ViewState): void {
   ctx.strokeStyle = 'rgba(255,255,255,0.10)';
   ctx.stroke();
 
-  // Tick labels
-  ctx.font = '10px system-ui, sans-serif';
+  // Tick labels — brighter than the old 0.30 wash (S6: "the time below is
+  // barely readable"); dates are navigation, not decoration.
+  ctx.font = '11px system-ui, sans-serif';
   ctx.textAlign = 'center';
   for (const tick of ticks) {
     const x = dateToX(tick);
     ctx.beginPath();
     ctx.moveTo(x, axisY - 3);
     ctx.lineTo(x, axisY + 3);
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.20)';
     ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.30)';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.fillText(String(Math.round(tick)), x, axisY + 15);
   }
 
@@ -364,7 +490,8 @@ function draw(state: ViewState): void {
   ctx.textBaseline = 'middle';
   // LOD: glyphs grow a little as you zoom in (overview stays light, detail on
   // demand). Anchors stay prominent at every rung.
-  const detail = state.zoom > RUNG_CLOSE ? 2 : state.zoom > RUNG_MID ? 1 : 0;
+  const zf = zoomFactorOf(state, view);
+  const detail = zf > RUNG_CLOSE ? 2 : zf > RUNG_MID ? 1 : 0;
   for (const dot of placed) {
     const isSel = dot.node.id === state.selectedId;
     const isHover = dot === state.hoveredDot;
@@ -412,7 +539,90 @@ function draw(state: ViewState): void {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
 
+  drawStrip(ctx, state, w, h, view);
+
   positionCard(state);
+}
+
+// ====== The overview strip (S2) ======
+
+/** Strip x-mapping over the FULL universe range (constant reference frame). */
+function stripScale(state: ViewState, w: number): { toX: (d: number) => number; toDate: (x: number) => number; bounds: { min: number; max: number } } | null {
+  const bounds = navBounds(state);
+  if (!bounds) return null;
+  const span = Math.max(1e-9, bounds.max - bounds.min);
+  const pad = 10;
+  const usable = Math.max(1, w - pad * 2);
+  return {
+    toX: (d) => pad + ((d - bounds.min) / span) * usable,
+    toDate: (x) => bounds.min + ((x - pad) / usable) * span,
+    bounds,
+  };
+}
+
+function stripTop(h: number): number { return h - STRIP_H; }
+
+function drawStrip(ctx: CanvasRenderingContext2D, state: ViewState, w: number, h: number, view: TimeWindow): void {
+  const scale = stripScale(state, w);
+  if (!scale) return;
+  const top = stripTop(h);
+  const midY = top + STRIP_H / 2;
+
+  // Track
+  ctx.fillStyle = 'rgba(255,255,255,0.025)';
+  ctx.fillRect(0, top, w, STRIP_H);
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.strokeRect(0.5, top + 0.5, w - 1, STRIP_H - 1);
+
+  // Density marks — every dated element in the world, faint; overlap builds
+  // visible mass so the strip reads as the shape of the world's history.
+  const marks = state.universe.length > 0 ? state.universe : state.nodes;
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  for (const n of marks) {
+    const x = scale.toX(n.startDate);
+    ctx.fillRect(x - 0.75, midY - 4, 1.5, 8);
+  }
+
+  // Ghost of the previous window, fading (S2).
+  if (state.ghost) {
+    const age = performance.now() - state.ghost.bornAt;
+    const alpha = Math.max(0, 0.22 * (1 - age / GHOST_MS));
+    if (alpha > 0.005) {
+      const g0 = scale.toX(state.ghost.win.start);
+      const g1 = scale.toX(state.ghost.win.end);
+      ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+      ctx.fillRect(g0, top + 2, Math.max(2, g1 - g0), STRIP_H - 4);
+    }
+  }
+
+  // The viewport band — bright, draggable, edge-resizable.
+  const b0 = scale.toX(view.start);
+  const b1 = scale.toX(view.end);
+  const bw = Math.max(4, b1 - b0);
+  ctx.fillStyle = 'rgba(34,211,238,0.14)';
+  ctx.fillRect(b0, top + 1, bw, STRIP_H - 2);
+  ctx.strokeStyle = 'rgba(34,211,238,0.65)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(b0 + 0.5, top + 1.5, bw - 1, STRIP_H - 3);
+  // Edge grips
+  ctx.fillStyle = 'rgba(34,211,238,0.85)';
+  ctx.fillRect(b0 - 1, midY - 5, 2, 10);
+  ctx.fillRect(b0 + bw - 1, midY - 5, 2, 10);
+}
+
+/** Which strip control is under (mx,my), if any. */
+function stripHit(state: ViewState, mx: number, my: number, w: number, h: number, view: TimeWindow):
+  | { kind: 'left' | 'right' | 'band' | 'track' }
+  | null {
+  if (my < stripTop(h)) return null;
+  const scale = stripScale(state, w);
+  if (!scale) return null;
+  const b0 = scale.toX(view.start);
+  const b1 = scale.toX(view.end);
+  if (Math.abs(mx - b0) <= STRIP_EDGE_GRAB) return { kind: 'left' };
+  if (Math.abs(mx - b1) <= STRIP_EDGE_GRAB) return { kind: 'right' };
+  if (mx > b0 && mx < b1) return { kind: 'band' };
+  return { kind: 'track' };
 }
 
 function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: PlacedDot[], w: number, anchorIds: Set<string>): void {
@@ -458,6 +668,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
   const glyphHalf = (d: PlacedDot): number => (anchorIds.has(d.node.id) ? ICON_ANCHOR : ICON_BASE) * 0.5 + 2;
   const glyphBoxes = placed.map(d => ({ id: d.node.id, box: boxAround(d.x, d.y, glyphHalf(d)) }));
   const placedBoxes: Box[] = [];
+  state.labelBoxes = []; // rebuilt each draw — labels are click targets (S6)
 
   ctx.textBaseline = 'middle';
   for (const { dot } of cands) {
@@ -475,6 +686,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
     if (placedBoxes.some(b => overlaps(box, b))) continue;
     if (glyphBoxes.some(g => g.id !== dot.node.id && overlaps(box, g.box))) continue;
     placedBoxes.push(box);
+    state.labelBoxes.push({ ...box, nodeId: dot.node.id });
     ctx.fillStyle = isSel ? 'rgba(255,255,255,0.95)' : isAnchor ? 'rgba(255,255,255,0.86)' : 'rgba(255,255,255,0.6)';
     ctx.textAlign = flip ? 'right' : 'left';
     ctx.fillText(text, dot.x + (flip ? -off : off), dot.y);
@@ -624,34 +836,97 @@ function hitTest(state: ViewState, mx: number, my: number): PlacedDot | null {
     const dist = Math.hypot(dot.x - mx, dot.y - my);
     if (dist < DOT_RADIUS_HOVER + 5 && dist < bestDist) { bestDist = dist; found = dot; }
   }
-  return found;
+  if (found) return found;
+  // Labels are click targets too (S6) — a name is a bigger, friendlier hit
+  // area than a 14px glyph.
+  for (const lb of state.labelBoxes) {
+    if (mx >= lb.x0 && mx <= lb.x1 && my >= lb.y0 && my <= lb.y1) {
+      return state.placedDots.find(d => d.node.id === lb.nodeId) ?? null;
+    }
+  }
+  return null;
+}
+
+/** The date under a main-canvas x (uses the current on-screen window). */
+function dateAtX(state: ViewState, x: number, w: number): number | null {
+  const view = currentViewRange(state);
+  if (!view) return null;
+  const span = view.end - view.start;
+  return span > 0 && w > 0 ? view.start + (x / w) * span : view.start;
 }
 
 function handleMouseMove(state: ViewState, e: MouseEvent): void {
   const rect = state.canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
+  const w = rect.width;
+  const h = rect.height;
   state.mouseX = mx;
   state.mouseY = my;
 
+  // Strip drags own the mouse while active (S2: the band is a control).
+  if (state.stripDrag) {
+    const scale = stripScale(state, w);
+    if (scale) {
+      const { mode, startX, startWin } = state.stripDrag;
+      const dDate = scale.toDate(mx) - scale.toDate(startX);
+      const bounds = scale.bounds;
+      const minSpan = (bounds.max - bounds.min) / ZOOM_MAX;
+      if (mode === 'move') {
+        state.window = clampWindow({ start: startWin.start + dDate, end: startWin.end + dDate }, bounds);
+      } else if (mode === 'left') {
+        const start = Math.min(startWin.start + dDate, startWin.end - minSpan);
+        state.window = clampWindow({ start, end: startWin.end }, bounds);
+      } else {
+        const end = Math.max(startWin.end + dDate, startWin.start + minSpan);
+        state.window = clampWindow({ start: startWin.start, end }, bounds);
+      }
+      state.anim = null;
+      draw(state);
+    }
+    return;
+  }
+
   if (state.dragging && state.baseRange) {
-    const w = rect.width;
-    const range = effectiveRange(state.baseRange, state.zoom, state.panCenter);
-    const dateToX = createDateToX(range, w);
-    const pxPerUnit = dateToX(range.min + 1) - dateToX(range.min);
-    if (pxPerUnit !== 0) {
-      const dx = mx - state.dragStartX;
-      if (Math.abs(dx) > 3) state.dragMoved = true;
-      state.panCenter = state.dragStartCenter - dx / pxPerUnit;
+    const view = currentViewRange(state);
+    if (view) {
+      const span = view.end - view.start;
+      const pxPerUnit = span > 0 ? w / span : 0;
+      if (pxPerUnit !== 0) {
+        const dx = mx - state.dragStartX;
+        if (Math.abs(dx) > 3) state.dragMoved = true;
+        const startWin = state.dragStartWindow ?? view;
+        const bounds = navBounds(state) ?? state.baseRange;
+        state.window = clampWindow(
+          { start: startWin.start - dx / pxPerUnit, end: startWin.end - dx / pxPerUnit },
+          bounds,
+        );
+        state.anim = null;
+      }
     }
     state.canvas.style.cursor = 'grabbing';
     draw(state);
     return;
   }
 
+  // Hover cursor: strip controls get resize/grab affordances.
+  const view = currentViewRange(state);
+  if (view) {
+    const sh = stripHit(state, mx, my, w, h, view);
+    if (sh) {
+      state.hoveredDot = null;
+      state.canvas.style.cursor =
+        sh.kind === 'left' || sh.kind === 'right' ? 'ew-resize'
+        : sh.kind === 'band' ? 'grab'
+        : 'pointer';
+      draw(state);
+      return;
+    }
+  }
+
   const found = hitTest(state, mx, my);
   state.hoveredDot = found;
-  state.canvas.style.cursor = found ? 'pointer' : (state.zoom > 1 ? 'grab' : 'default');
+  state.canvas.style.cursor = found ? 'pointer' : 'grab';
   draw(state); // redraw for hover + proximity labels following the cursor
 }
 
@@ -666,17 +941,47 @@ function handleMouseLeave(state: ViewState): void {
 function handleMouseDown(state: ViewState, e: MouseEvent): void {
   if (e.button !== 0) return;
   const rect = state.canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const view = currentViewRange(state);
+
+  // Strip interactions first (the strip owns its vertical band).
+  if (view) {
+    const sh = stripHit(state, mx, my, rect.width, rect.height, view);
+    if (sh) {
+      if (sh.kind === 'track') {
+        // Jump: center the band on the clicked date, then drag continues as a move.
+        const scale = stripScale(state, rect.width);
+        if (scale) {
+          const span = view.end - view.start;
+          const c = scale.toDate(mx);
+          state.window = clampWindow({ start: c - span / 2, end: c + span / 2 }, scale.bounds);
+          state.anim = null;
+          draw(state);
+        }
+        state.stripDrag = { mode: 'move', startX: mx, startWin: currentViewRange(state) ?? view };
+      } else {
+        state.stripDrag = { mode: sh.kind === 'band' ? 'move' : sh.kind, startX: mx, startWin: view };
+      }
+      return;
+    }
+  }
+
   state.dragging = true;
   state.dragMoved = false;
-  state.dragStartX = e.clientX - rect.left;
-  const base = state.baseRange;
-  state.dragStartCenter = state.panCenter ?? (base ? (base.min + base.max) / 2 : 0);
+  state.dragStartX = mx;
+  state.dragStartWindow = view;
 }
 
 function handleMouseUp(state: ViewState): void {
+  if (state.stripDrag) {
+    state.stripDrag = null;
+    state.canvas.style.cursor = 'default';
+    return;
+  }
   if (!state.dragging) return;
   state.dragging = false;
-  state.canvas.style.cursor = state.hoveredDot ? 'pointer' : (state.zoom > 1 ? 'grab' : 'default');
+  state.canvas.style.cursor = state.hoveredDot ? 'pointer' : 'grab';
   if (!state.dragMoved && state.hoveredDot) {
     state.onSelect(state.hoveredDot.node.id); // a click (not a drag) selects
     // Waypoint (hookmap wp6): a true canvas click — the URL-derived anchor
@@ -691,26 +996,14 @@ function handleWheel(state: ViewState, e: WheelEvent): void {
   const rect = state.canvas.getBoundingClientRect();
   const w = rect.width;
   const mx = e.clientX - rect.left;
-  const base = state.baseRange;
-  const span = base.max - base.min;
-  if (span <= 0) return;
-
-  const range = effectiveRange(base, state.zoom, state.panCenter);
-  const dateToX = createDateToX(range, w);
-  const pxPerUnit = dateToX(range.min + 1) - dateToX(range.min);
-  if (pxPerUnit === 0) return;
-  const dateAtCursor = range.min + (mx - dateToX(range.min)) / pxPerUnit;
-  const frac = (dateAtCursor - range.min) / (range.max - range.min);
-
-  const newZoom = Math.min(ZOOM_MAX, Math.max(1, state.zoom * (e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP)));
-  state.zoom = newZoom;
-  if (newZoom <= 1) {
-    state.panCenter = null; // back to full fit
-  } else {
-    const newEffSpan = span / newZoom;
-    const newMin = dateAtCursor - frac * newEffSpan;
-    state.panCenter = newMin + newEffSpan / 2; // effectiveRange will clamp
-  }
+  const view = currentViewRange(state);
+  const bounds = navBounds(state) ?? state.baseRange;
+  if (!view) return;
+  const anchor = dateAtX(state, mx, w);
+  if (anchor == null) return;
+  const factor = e.deltaY < 0 ? 1 / ZOOM_STEP : ZOOM_STEP;
+  state.window = zoomWindow(view, factor, anchor, bounds);
+  state.anim = null;
   draw(state);
 }
 
