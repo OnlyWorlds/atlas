@@ -297,6 +297,12 @@ function ensureMapTabOpen(mapId: string): void {
   if (exists) return;
   const m = getState().data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId);
   if (!m) return;
+  // Imageless maps: openMapTab refuses and DIVERTS (ui patch + navigate).
+  // This runs inside the render pass, and the ui patch re-enters renderMiddle
+  // on the still-current /map/ hash — infinite recursion (found via a
+  // /map/<id> deep link, session 254). The divert is a click-path affordance;
+  // on route restoration we just leave the tab closed.
+  if (!(m.image_url || m.image_media_id)) return;
   openMapTab(m);
 }
 

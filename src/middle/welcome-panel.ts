@@ -27,10 +27,10 @@ function wireSampleButton(root: HTMLElement): void {
       return;
     }
     btn.disabled = true;
-    btn.textContent = 'Opening Moppetopia…';
+    btn.textContent = 'Opening Sikelia…';
     try {
       const entry = await createSampleWorld();
-      toastManager.success('Welcome to Moppetopia. Poke anything, it\'s your copy.');
+      toastManager.success('Welcome to Sikelia. Poke anything, it\'s your copy.');
       navigate(homeHash(entry.id));
     } catch (err) {
       toastManager.error(err instanceof Error ? err.message : String(err));

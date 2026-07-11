@@ -454,10 +454,21 @@ function draw(state: ViewState): void {
     state.placedDots = [];
     state.baseRange = null;
     state.labelBoxes = [];
-    ctx.fillStyle = 'rgba(255,255,255,0.30)';
-    ctx.font = '13px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Nothing dated in this view.', w / 2, h / 2);
+    ctx.font = '13px system-ui, sans-serif';
+    // Two different truths: the current scope filtered everything out, vs the
+    // whole world carries no dates at all (fresh imports usually start there —
+    // the Sikelia demo made this the first impression, session 254).
+    const worldIsDateless = (state.universe?.length ?? 0) === 0;
+    if (worldIsDateless) {
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillText('Nothing in this world has a date yet.', w / 2, h / 2 - 12);
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      ctx.fillText('Charts draw from date fields. The quickest start: + Event above.', w / 2, h / 2 + 12);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.30)';
+      ctx.fillText('Nothing dated in this view.', w / 2, h / 2);
+    }
     return;
   }
 
