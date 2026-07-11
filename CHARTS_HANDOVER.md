@@ -2,12 +2,12 @@
 
 *Load order: **`DESIGN_CHARTS.md` FIRST** (holds the integrated S1-S15 layer, every revision, and the Acts roadmap), then this file. The sitdown note (`Forge/Notes/2026-07-10-charts-sitdown-decisions.md`) is the dated decision record. Full build history: PROGRESS.md session-251/252 entries.*
 
-## ⚑ OPENER — what remains before v1 (charts itself is DONE)
+## ⚑ OPENER — status 2026-07-11 (charts DONE; pipeline smoke PASSED live)
 
-- **Pipeline smoke** (GATED on Captain's show push + Boss redeploy) → **pre-flight** (`Forge/Notes/2026-07-03-atlas-release-plan.md`) → **v1**.
-- Captain's side: show push · S14 recipe-fit poke on his real worlds · commit the session-252 tail.
-- Ungated bout candidates: **Cmd+K palette** (the one open feature-level item across atlas) · OPFS rapid-reload forensics (watchdog shipped; PROGRESS S251 entry has the trail — post-v1 lean) · og:image (blocked on Captain's card asset).
-- **Banked test item**: an e2e locking the cast ASSIGNMENT MODE (ghost card → `ui.castAssign` → sidebar banner → matching row-click assigns + returns home; both kinds live-verified twice, not yet test-locked; the flow spans world-home.ts ghost click + elements-sidebar.ts banner/interception).
+- **Pipeline smoke PASSED end to end (2026-07-11, S254)** — import, publish, pins, chart block, republish/revoke all verified on production. PROGRESS CURRENT STATE is the live status; this file is now the charts-arc record + bootstrap reference.
+- Remaining before v1: Captain's S14 recipe-fit poke on his real worlds · og:image (Captain's card asset) · fresh-eyes runthrough of setup → demo → first-world (next-session opener).
+- Ungated post-v1 candidates: **Cmd+K palette** · OPFS rapid-reload forensics (watchdog shipped) · **two-phase Make-Online push** (`Forge/Notes/2026-07-11-two-phase-push-spec.md` — lean EARLY) · v2 API port.
+- Cast-assignment e2e: DONE (S254, `tests/e2e/cast-assign.spec.ts`, 3 tests).
 
 ## What the closed arc contains (all in DESIGN_CHARTS.md; one-line map)
 

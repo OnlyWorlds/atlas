@@ -1041,6 +1041,14 @@ function renderAmbientRail(state: ViewState): void {
   const { card } = state;
   card.innerHTML = '';
 
+  // Nothing charted (dateless or empty world): the canvas empty state already
+  // teaches the next step. A rail inviting clicks on elements that don't
+  // exist would narrate a void (S255 fresh-eyes pass) — stay silent.
+  if (state.nodes.length === 0) {
+    card.style.display = 'flex';
+    return;
+  }
+
   const head = document.createElement('div');
   head.className = 'atlas-timeline-rail-head';
   head.textContent = 'This chart';

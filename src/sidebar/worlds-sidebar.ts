@@ -25,6 +25,9 @@ import { rightTabHashFor } from './sidebar';
 import { ToastManager } from '../ui/toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
 
+/** One-time "start here" tour tag on +folder — dismissed forever on first hover. */
+const TOUR_CREATE_SEEN_KEY = 'atlas_tour_create_seen';
+
 export interface WorldsBodyMount {
   content: HTMLElement;
   toasts: ToastManager;
@@ -82,6 +85,36 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     });
     const linkBtn = header.querySelector<HTMLButtonElement>('[data-action="link-api"]');
     linkBtn?.addEventListener('click', () => new LinkWorldModal(toasts).open());
+
+    // Hover trail (S255v2): hovering a create button paints its explanation
+    // into the grounded welcome's detail zone. The welcome panel listens for
+    // this event; when it isn't mounted the dispatch is a no-op.
+    const dispatchHover = (path: string | null): void => {
+      window.dispatchEvent(new CustomEvent('atlas:worlds-path-hover', { detail: { path } }));
+    };
+    for (const btn of [createBtn, newApiBtn, linkBtn]) {
+      if (!btn) continue;
+      const path = btn.getAttribute('data-action');
+      btn.addEventListener('mouseenter', () => dispatchHover(path));
+      btn.addEventListener('mouseleave', () => dispatchHover(null));
+    }
+
+    // One-time tour tag: with a fresh root and zero worlds, a small floating
+    // label points at +folder — the always-start-here action. First hover
+    // dismisses it for good (the detail zone takes over the teaching).
+    if (root && getState().registry.worlds.length === 0
+        && !localStorage.getItem(TOUR_CREATE_SEEN_KEY) && createBtn) {
+      createBtn.classList.add('atlas-tour-target');
+      const tag = document.createElement('span');
+      tag.className = 'atlas-tour-tag';
+      tag.textContent = 'start here';
+      header.appendChild(tag);
+      createBtn.addEventListener('mouseenter', () => {
+        localStorage.setItem(TOUR_CREATE_SEEN_KEY, '1');
+        createBtn.classList.remove('atlas-tour-target');
+        tag.remove();
+      }, { once: true });
+    }
     // Setup/recover-atlas buttons moved exclusively to the welcome panel
     // (session 221 W2). The sidebar no longer renders them; their handlers
     // were dropped along with the markup.
@@ -163,10 +196,10 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     if (worlds.length === 0) {
       if (state.atlasRoot) {
         listEl.innerHTML = `<div class="atlas-pane-empty">No worlds yet. Create one to start.</div>`;
-      } else if (state.atlasRootRecoverable) {
-        listEl.innerHTML = `<div class="atlas-pane-empty">Use the welcome panel to re-link your atlas folder.</div>`;
       } else {
-        listEl.innerHTML = `<div class="atlas-pane-empty">Use the welcome panel to set up your atlas folder.</div>`;
+        // Pre-setup, the middle pane is the only voice on screen — the
+        // sidebar narrating the same instruction competed with it (S255).
+        listEl.innerHTML = '';
       }
       return;
     }

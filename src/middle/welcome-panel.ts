@@ -21,7 +21,13 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
   root.className = 'atlas-middle-body atlas-welcome';
   target.appendChild(root);
 
+  // Active listener for the grounded state's sidebar-hover detail zone;
+  // re-renders replace it, unmount clears it.
+  let hoverCleanup: (() => void) | null = null;
+
   async function render(): Promise<void> {
+    hoverCleanup?.();
+    hoverCleanup = null;
     const state = getState();
     const { active, atlasRoot, atlasRootRecoverable } = state;
 
@@ -62,24 +68,28 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       return;
     }
 
-    // First-launch: no atlas folder yet. This page is the product's first
-    // impression: the story first, one primary action, the demo as a quiet
-    // side door (session 254 — the old version read as a storage dialog).
+    // First-launch: no atlas folder yet. The landing (session 255 rebuild):
+    // wordmark + tagline carry identity, three beat columns carry the taste,
+    // ONE filled CTA carries the action. Center-aligned prose is banned here;
+    // beats are narrow left-aligned columns so nothing ever rags.
     if (!atlasRoot) {
       root.innerHTML = `
-        <header class="atlas-room-header"><h1>Welcome to Atlas</h1></header>
-        <div class="atlas-welcome-empty">
-          <p class="atlas-welcome-lead">Atlas is a free, local worldbuilding studio.</p>
-          <ul class="atlas-welcome-beats">
-            <li>Build your world as linked elements: characters, places, events, and 19 more types you can browse, filter, and edit.</li>
-            <li>Work it from every angle: maps with pins and zones, long-form writing, timelines, who-knows-what tracking.</li>
-            <li>Everything lives as plain files in a folder you own. Online sync and publishing are there when you want them; never required.</li>
-          </ul>
-          <div class="atlas-welcome-actions">
-            <button class="atlas-btn-primary" data-action="setup-atlas">Set up your atlas folder</button>
+        <div class="atlas-landing">
+          <div class="atlas-landing-hero">
+            <div class="atlas-landing-mark">Atlas</div>
+            <p class="atlas-landing-tag">A free, local-first worldbuilding studio.</p>
           </div>
-          <p class="atlas-welcome-hint">Setup is one folder pick. Atlas creates an <code>onlyworlds-atlas/</code> subfolder inside it and keeps every world there; picking an existing atlas folder re-links it.</p>
-          <p class="atlas-welcome-hint atlas-welcome-sample-hint">Want to see a finished world first? <a href="#/demo" class="atlas-welcome-demo-link">Look around the sample world</a> · view only, nothing is stored.</p>
+          <div class="atlas-landing-rooms" aria-hidden="true">
+            <span><span class="material-symbols-outlined">home</span>home</span>
+            <span><span class="material-symbols-outlined">menu_book</span>writing</span>
+            <span><span class="material-symbols-outlined">psychology</span>knowledge</span>
+            <span><span class="material-symbols-outlined">insights</span>charts</span>
+            <span><span class="material-symbols-outlined">public</span>share</span>
+            <span><span class="material-symbols-outlined">import_export</span>import</span>
+          </div>
+          <div class="atlas-landing-cta">
+            <button class="atlas-btn-primary atlas-landing-btn" data-action="setup-atlas">Set up a local folder</button>
+          </div>
         </div>
       `;
       const btn = root.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]')!;
@@ -111,33 +121,60 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     if (!active) {
       const hasWorlds = state.registry.worlds.length > 0;
       if (!hasWorlds) {
+        // Zero worlds = the grounding beat, minimal (S255v2, Captain's call):
+        // just the confirmation + path. The three sidebar + buttons are the
+        // actions; HOVERING one paints its explanation into the detail zone
+        // below (worlds-sidebar dispatches `atlas:worlds-path-hover`), and a
+        // one-time tour tag on +folder starts the trail.
         root.innerHTML = `
-          <header class="atlas-room-header"><h1>Create your first world</h1></header>
-          <div class="atlas-welcome-empty">
-            <p>Your atlas folder is ready. A world is one subfolder inside it; every element you make becomes a file there.</p>
-            <div class="atlas-welcome-actions">
-              <button class="atlas-btn-primary" data-action="welcome-create-world">New world</button>
+          <div class="atlas-landing atlas-grounded">
+            <div class="atlas-landing-hero">
+              <p class="atlas-grounded-check"><span class="material-symbols-outlined">check_circle</span>Your atlas folder is ready</p>
+              <p class="atlas-grounded-path"><code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
             </div>
-            <p class="atlas-welcome-hint">Already have a world on onlyworlds.com? The sidebar's link button downloads it into atlas. Bringing notes or an export instead? Create a world, then use Import.</p>
-            <p class="atlas-welcome-hint">Atlas folder: <code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
-            <p class="atlas-welcome-hint atlas-welcome-sample-hint"><a href="#/demo" class="atlas-welcome-demo-link">Look around the sample world</a> · view only</p>
+            <div class="atlas-grounded-detail" data-role="path-detail"></div>
           </div>
         `;
-        root.querySelector<HTMLButtonElement>('[data-action="welcome-create-world"]')!
-          .addEventListener('click', () => {
-            void import('../ui/create-world-modal').then(({ CreateWorldModal }) => {
-              new CreateWorldModal(toastManager).open();
-            });
-          });
+        const detail = root.querySelector<HTMLElement>('[data-role="path-detail"]')!;
+        const owLine =
+          `<p class="atlas-grounded-detail-ow"><img src="${import.meta.env.BASE_URL}owlogo.png" alt="" />` +
+          `<a href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a></p>`;
+        const DETAILS: Record<string, string> = {
+          'create-local': `
+            <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>
+            <h3>create a world</h3>
+            <p>A new subfolder in your atlas folder. Elements become files as you build, and everything works offline. You can take it online later.</p>
+            <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
+          'new-api': `
+            <span class="material-symbols-outlined atlas-grounded-detail-icon">cloud_upload</span>
+            <h3>new OnlyWorlds world</h3>
+            <p>Creates the world locally and on onlyworlds.com in one step, synced from the start. Needs a free account.</p>
+            ${owLine}
+            <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
+          'link-api': `
+            <span class="material-symbols-outlined atlas-grounded-detail-icon">link</span>
+            <h3>link an OnlyWorlds world</h3>
+            <p>Already have a world online? Paste its key: atlas downloads a full local copy and keeps the two in sync.</p>
+            ${owLine}
+            <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
+        };
+        const onPathHover = (e: Event): void => {
+          const path = (e as CustomEvent<{ path: string | null }>).detail?.path;
+          const html = path ? DETAILS[path] : undefined;
+          detail.innerHTML = html ?? '';
+          detail.setAttribute('data-active', html ? 'true' : 'false');
+        };
+        window.addEventListener('atlas:worlds-path-hover', onPathHover);
+        hoverCleanup = () => window.removeEventListener('atlas:worlds-path-hover', onPathHover);
         return;
       }
       root.innerHTML = `
-        <header class="atlas-room-header"><h1>Atlas</h1></header>
-        <div class="atlas-welcome-empty">
-          <p>No world open.</p>
-          <p class="atlas-welcome-hint">Pick a world from the sidebar, or create a new one with its folder button.</p>
-          <p class="atlas-welcome-hint">Atlas folder: <code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
-          <p class="atlas-welcome-hint atlas-welcome-sample-hint"><a href="#/demo" class="atlas-welcome-demo-link">Look around the sample world</a> · view only</p>
+        <div class="atlas-landing atlas-grounded">
+          <div class="atlas-landing-hero">
+            <div class="atlas-landing-mark atlas-landing-mark-sm">Atlas</div>
+            <p class="atlas-landing-tag">No world open. Pick one from the sidebar.</p>
+            <p class="atlas-grounded-path"><code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
+          </div>
         </div>
       `;
       return;
@@ -175,7 +212,11 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
 
   const unsub = subscribe(() => { render().catch(console.error); });
   render().catch(console.error);
-  return unsub;
+  return () => {
+    hoverCleanup?.();
+    hoverCleanup = null;
+    unsub();
+  };
 }
 
 

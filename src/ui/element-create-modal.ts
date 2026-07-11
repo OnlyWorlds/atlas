@@ -172,7 +172,7 @@ export class ElementCreateModal extends BaseModal {
       <form data-form="create-element">
         ${nameFieldHtml}
         <div class="atlas-modal-field">
-          <span>Category</span>
+          <span>Type</span>
           <div class="atlas-input-ghost-wrap">
             <span class="atlas-input-ghost"><span class="ghost-typed"></span><span class="ghost-suffix"></span></span>
             <input class="atlas-input" type="text" name="element-type" placeholder="Type to filter (e.g. 'char')" autocomplete="off" />

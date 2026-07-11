@@ -112,6 +112,10 @@ export function mountSidebar(mount: SidebarMount): () => void {
     const reg = getState().registry;
     const worldId = route.worldId;
     const entry = worldId ? reg.worlds.find(w => w.id === worldId) : undefined;
+    // Pre-setup (no atlas root) the whole sidebar is silent — a lit "Worlds"
+    // tab over an empty rail competed with the landing, the screen's one
+    // voice (S255). The header appears once a root exists.
+    if (!getState().atlasRoot) return;
     // When the writing-room takeover is active, neither toggle button is lit —
     // the body is the writing tree, the toggle is an escape hatch.
     const effective = resolveEffectiveBody();

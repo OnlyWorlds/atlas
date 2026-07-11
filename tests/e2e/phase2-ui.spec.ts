@@ -45,8 +45,9 @@ test('first launch shows the setup-atlas CTA, not create-local', async ({ page }
   await expect(page.locator('.atlas-shell')).toBeVisible();
   await expect(page.locator('[data-action="setup-atlas"]').first()).toBeVisible();
   await expect(page.locator('[data-action="create-local"]')).toHaveCount(0);
-  await expect(page.locator('.atlas-middle')).toContainText('Welcome to Atlas');
-  await expect(page.locator('.atlas-middle')).toContainText('Set up your atlas folder');
+  await expect(page.locator('.atlas-landing-mark')).toHaveText('Atlas');
+  await expect(page.locator('.atlas-middle')).toContainText('A free, local-first worldbuilding studio.');
+  await expect(page.locator('.atlas-middle')).toContainText('Set up a local folder');
 });
 
 test('set up atlas folder flips the UI into create-local mode', async ({ page }) => {
@@ -391,9 +392,10 @@ test('rescan: re-picking an existing root after a localStorage wipe imports worl
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
 
-  // First-launch CTA returns; sidebar is empty.
+  // First-launch CTA returns; sidebar renders nothing pre-root (S255: the
+  // middle pane is the only voice on screen before a root is set).
   await expect(page.locator('[data-action="setup-atlas"]').first()).toBeVisible();
-  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toBeVisible();
+  await expect(page.locator('.atlas-sidebar .atlas-row')).toHaveCount(0);
 
   // 3. Re-pick the SAME parent folder. Discovery should find both worlds.
   await page.evaluate(async () => {

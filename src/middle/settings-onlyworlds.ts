@@ -52,7 +52,7 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
         <a href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">AI toolkit</a>
         <a href="${OW_COUNCIL_URL}" target="_blank" rel="noopener" data-ow-council>council</a>
         <a href="${OW_GITHUB_URL}" target="_blank" rel="noopener">GitHub</a>
-        <a href="#/demo" data-ow-nav="#/demo">sample world</a>
+        <a href="#/demo" data-ow-nav="#/demo">example page</a>
       </div>
     </section>
     <section class="atlas-settings-section">

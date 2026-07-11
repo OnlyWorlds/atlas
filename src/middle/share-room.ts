@@ -1832,6 +1832,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           from your world's elements. Create one to start composing.
         </p>
         <p class="atlas-share-empty-examples">a character showcase · a player handout · a world landing page</p>
+        <p class="atlas-share-hint atlas-share-example-line"><a href="#/demo" class="atlas-welcome-demo-link">See an example page</a> · built from a real world, view only</p>
       `;
       root.appendChild(empty);
       return;

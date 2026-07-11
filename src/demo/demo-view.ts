@@ -15,6 +15,7 @@
  */
 
 import { navigate } from '../core/router';
+import { getState } from '../core/state';
 import type { PagePayload, PayloadElementEntry } from '../core/share-payload';
 
 interface DemoData {
@@ -47,7 +48,7 @@ export function mountDemo(): void {
   overlay.className = 'atlas-demo-overlay';
   overlay.innerHTML = `
     <div class="atlas-demo-band">
-      <span class="atlas-demo-band-title">Sikelia · sample world · view only</span>
+      <span class="atlas-demo-band-title">Sikelia · example page · view only</span>
       <button type="button" class="atlas-demo-exit" data-action="demo-exit">
         <span class="material-symbols-outlined">close</span> exit
       </button>
@@ -56,14 +57,15 @@ export function mountDemo(): void {
       <div class="atlas-demo-intro">
         <h1>Sikelia</h1>
         <p>Ancient Sicily around 505 BC: 196 settlements on hand-made map art, with the political web between poleis, native peoples, and Phoenician ports recorded as linked elements.</p>
-        <p class="atlas-demo-intro-sub">This is a real world built in atlas. Zoom the map, click any pin. Below the map: a dozen highlights from its 586 elements.</p>
+        <p class="atlas-demo-intro-sub">A page like this is what atlas publishes: blocks built from a real world. Zoom the map, click any pin. Below it: a dozen highlights from 586 elements.</p>
       </div>
       <div class="atlas-demo-map" data-role="demo-map"></div>
       <p class="atlas-demo-map-hint">Drag to pan · scroll to zoom · click a pin to read about the place</p>
       <div class="atlas-demo-cards" data-role="demo-cards"></div>
       <div class="atlas-demo-footer">
-        <p>Pages like this are what atlas publishes when you share part of a world.</p>
-        <button type="button" class="atlas-btn-primary" data-action="demo-exit-setup">Set up your atlas folder</button>
+        <p>Compose your own in the share room: pick blocks, preview, publish.</p>
+        <button type="button" class="atlas-btn-primary" data-action="demo-exit-setup">Set up a local folder</button>
+        <button type="button" class="atlas-btn-primary" data-action="demo-exit-back">Back to atlas</button>
       </div>
     </div>
   `;
@@ -75,6 +77,13 @@ export function mountDemo(): void {
   // required for showDirectoryPicker, so this handler IS the picker moment),
   // then leaves the demo — straight from "I've seen it" to "it's mine."
   const setupBtn = overlay.querySelector<HTMLButtonElement>('[data-action="demo-exit-setup"]')!;
+  const backBtn = overlay.querySelector<HTMLButtonElement>('[data-action="demo-exit-back"]')!;
+  // Entry is the share room's example link now (S255): visitors with an
+  // atlas root get "back to atlas"; rootless visitors (old links, curious
+  // strangers) still get the setup CTA. Show exactly one.
+  if (getState().atlasRoot) setupBtn.remove();
+  else backBtn.remove();
+  backBtn.addEventListener('click', exit);
   setupBtn.addEventListener('click', async () => {
     setupBtn.disabled = true;
     try {
@@ -140,7 +149,9 @@ async function mountDemoMap(
   const assetUrl = new URL('./sikelia-map.webp', import.meta.url).href;
   const bounds: L.LatLngBoundsExpression = [[0, 0], [H, W]];
   L.imageOverlay(assetUrl, bounds).addTo(map);
-  map.fitBounds(bounds);
+  // Padding so the initial fit shows the WHOLE island — the bare fit clipped
+  // the northeast tip at the container edge (S255 fresh-eyes pass).
+  map.fitBounds(bounds, { padding: [16, 16] });
   map.setMaxBounds([[-H * 0.15, -W * 0.15], [H * 1.15, W * 1.15]]);
 
   for (const pin of data.map.pins) {
@@ -154,7 +165,9 @@ async function mountDemoMap(
       fillOpacity: 0.75,
     }).addTo(map);
     marker.bindTooltip(pin.name, { direction: 'top', offset: [0, -6] });
-    if (entry) marker.on('click', () => openEntry(entry));
+    // Close the hover tooltip before the modal opens — it otherwise lingers
+    // under the dimmed backdrop like debris (S255 fresh-eyes pass).
+    if (entry) marker.on('click', () => { marker.closeTooltip(); openEntry(entry); });
   }
 
   return () => map.remove();

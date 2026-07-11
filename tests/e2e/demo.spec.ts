@@ -3,8 +3,8 @@
  *
  * The demo is NOT a world: no registry entry, no OPFS write, no folder.
  * It's an overlay built from the share renderer's payload path plus a
- * Leaflet hero. These tests lock the entry paths (welcome link), the
- * view-only surface (map + pins + modal + cards), and the exits.
+ * Leaflet hero. These tests lock the entry paths (share room's example
+ * link), the view-only surface (map + pins + modal + cards), and the exits.
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -18,13 +18,27 @@ async function freshBoot(page: Page) {
   await page.waitForSelector('.atlas-shell');
 }
 
-test('welcome links into the demo; the demo renders map, pins, and cards', async ({ page }) => {
+test('the share room links into the demo; the demo renders map, pins, and cards', async ({ page }) => {
   await freshBoot(page);
-  await expect(page.locator('.atlas-middle')).toContainText('Atlas is a free, local worldbuilding studio.');
-  await page.locator('.atlas-welcome-demo-link').first().click();
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const root = await navigator.storage.getDirectory();
+    const sub = await root.getDirectoryHandle('demo-entry-root', { create: true });
+    api.setNextDirectory(sub);
+  });
+  await page.click('[data-action="setup-atlas"]');
+  await page.waitForSelector('[data-action="create-local"]');
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'Demo Entry World');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Demo Entry World' })).toBeVisible();
+
+  await page.click('.atlas-room-nav-btn[data-room="share"]');
+  await expect(page.locator('.atlas-share-example-line a')).toHaveText('See an example page');
+  await page.locator('.atlas-share-example-line a').click();
 
   await expect(page).toHaveURL(/#\/demo/);
-  await expect(page.locator('.atlas-demo-band-title')).toHaveText('Sikelia · sample world · view only');
+  await expect(page.locator('.atlas-demo-band-title')).toHaveText('Sikelia · example page · view only');
   // The Leaflet hero with all 196 pins (lazy chunks: generous timeout).
   await expect(page.locator('.atlas-demo-map path.leaflet-interactive')).toHaveCount(196, { timeout: 20000 });
   // The curated cards render through the payload renderer.

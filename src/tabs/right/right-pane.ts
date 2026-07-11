@@ -90,7 +90,9 @@ export function mountRightPane(mount: RightPaneMount): () => void {
         unmountActive?.();
         unmountActive = null;
         closeVisualSettingsPopover();
-        pane.innerHTML = '<div class="atlas-pane-empty">Open a world to see its context here.</div>';
+        // Silent when no world is open — narration here competed with the
+        // welcome/landing panel, the screen's one voice (S255).
+        pane.innerHTML = '';
         lastTabKey = 'no-world';
       }
       renderSyncIndicator(state, toasts);

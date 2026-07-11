@@ -405,17 +405,17 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       // Empty-state copy depends on what action the user can actually take.
       // (Session 221 W2 follow-up: the sidebar's old "pick one from Worlds tab"
       // message lied when there were no worlds because no atlas root existed.)
+      // Pre-setup the panes stay silent — the middle pane is the only voice
+      // on first launch (S255). With a root, the copy names the real action.
       let msg: string;
-      if (!state.atlasRoot && state.atlasRootRecoverable) {
-        msg = 'Use the welcome panel to re-link your atlas folder.';
-      } else if (!state.atlasRoot) {
-        msg = 'Use the welcome panel to set up your atlas folder.';
+      if (!state.atlasRoot) {
+        msg = '';
       } else if (state.registry.worlds.length === 0) {
         msg = 'No worlds yet. Create one from the Worlds tab.';
       } else {
         msg = 'No active world. Pick one from the Worlds tab.';
       }
-      listEl.innerHTML = `<div class="atlas-pane-empty">${msg}</div>`;
+      listEl.innerHTML = msg ? `<div class="atlas-pane-empty">${msg}</div>` : '';
       return;
     }
 
