@@ -39,6 +39,7 @@
 
 export type RouteMode =
   | 'welcome'
+  | 'demo'
   | 'home'
   | 'settings'
   | 'elements'
@@ -135,6 +136,11 @@ export function parseHash(hash: string): Route {
   // /settings[/:tab] (no world)
   if (parts[0] === 'settings') {
     return { worldId: null, mode: 'settings', settingsTab: parseSettingsTab(parts[1]) };
+  }
+
+  // /demo — the view-only sample-world presentation (no world, no registry).
+  if (parts[0] === 'demo') {
+    return { worldId: null, mode: 'demo' };
   }
 
   // /w/<id>...

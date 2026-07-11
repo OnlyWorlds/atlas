@@ -2743,6 +2743,137 @@
   gap: 8px;
 }
 
+/* First-launch welcome: the story layer (session 254). */
+.atlas-welcome-lead {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.atlas-welcome-beats {
+  margin: 12px auto 0;
+  padding-left: 18px;
+  max-width: 460px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.atlas-welcome-beats li { margin-top: 6px; }
+
+.atlas-welcome-demo-link {
+  color: var(--atlas-cyan);
+  text-decoration: none;
+}
+
+.atlas-welcome-demo-link:hover { text-decoration: underline; }
+
+/* ============================================================
+   The sample-world demo overlay (#/demo) — view-only presentation
+   ============================================================ */
+.atlas-demo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  background: #0a0a0a;
+}
+
+.atlas-demo-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  border-bottom: 1px solid rgba(34, 211, 238, 0.25);
+  background: rgba(34, 211, 238, 0.05);
+  flex: 0 0 auto;
+}
+
+.atlas-demo-band-title {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: rgba(34, 211, 238, 0.85);
+}
+
+.atlas-demo-exit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.atlas-demo-exit:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+.atlas-demo-exit .material-symbols-outlined { font-size: 16px; }
+
+.atlas-demo-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.atlas-demo-intro {
+  max-width: 760px;
+  margin: 28px auto 0;
+  padding: 0 24px;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.55;
+}
+
+.atlas-demo-intro h1 {
+  font-size: 26px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 10px;
+}
+
+.atlas-demo-intro-sub {
+  color: rgba(255, 255, 255, 0.50);
+  font-size: 13.5px;
+}
+
+.atlas-demo-map {
+  height: min(62vh, 640px);
+  max-width: 1100px;
+  margin: 18px auto 0;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 6px;
+  background: #0a0a0a;
+}
+
+/* Leaflet mounts INTO the div (the container class lands on .atlas-demo-map
+   itself), and leaflet.css loads after atlas.css — win the tie with two
+   classes (conv #52: specificity ties are load-order roulette). */
+.atlas-demo-map.leaflet-container { background: #0a0a0a; }
+
+.atlas-demo-map-hint {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 12.5px;
+  margin: 8px 0 0;
+}
+
+.atlas-demo-cards {
+  max-width: 760px;
+  margin: 26px auto 0;
+  padding: 0 24px;
+}
+
+.atlas-demo-footer {
+  max-width: 760px;
+  margin: 30px auto 48px;
+  padding: 18px 24px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13.5px;
+}
+
+.atlas-demo-footer .atlas-btn-primary { margin-top: 10px; }
+
 /* ============================================================
    Phase 2 — Settings panel
    ============================================================ */

@@ -1,0 +1,161 @@
+/**
+ * The sample-world demo — a VIEW-ONLY PRESENTATION at `#/demo`, not a world
+ * in the registry (session 254 decision: the old in-app sample world stranded
+ * users in a half-configured app and read as "what is this world doing here").
+ *
+ * Built from the share renderer's payload path (born read-only: cards, pin
+ * modal, zero edit affordances) plus a Leaflet hero for the map (zoom/pan is
+ * the prize piece). Nothing is written anywhere: no registry entry, no OPFS,
+ * no folder. Close it and it's gone.
+ *
+ * Data: `demo-page.json` (curated from Captain's Sikelia world — prose-only
+ * descriptions, 12 carded highlights, every pin click-openable) + the bundled
+ * map art webp. Both lazy-load; neither rides the main chunk. Regenerate the
+ * JSON via the session-254 script in PROGRESS (source: Forge/Notes/sikelia/).
+ */
+
+import { navigate } from '../core/router';
+import type { PagePayload, PayloadElementEntry } from '../core/share-payload';
+
+interface DemoData {
+  payload: PagePayload;
+  map: {
+    width: number;
+    height: number;
+    pins: Array<{ x: number; y: number; name: string; ref: string }>;
+  };
+}
+
+let overlay: HTMLElement | null = null;
+let cleanup: (() => void) | null = null;
+
+export function isDemoMounted(): boolean {
+  return overlay !== null;
+}
+
+export function unmountDemo(): void {
+  cleanup?.();
+  cleanup = null;
+  overlay?.remove();
+  overlay = null;
+}
+
+/** Mount the demo as a full-viewport overlay. Idempotent. */
+export function mountDemo(): void {
+  if (overlay) return;
+  overlay = document.createElement('div');
+  overlay.className = 'atlas-demo-overlay';
+  overlay.innerHTML = `
+    <div class="atlas-demo-band">
+      <span class="atlas-demo-band-title">Sikelia · sample world · view only</span>
+      <button type="button" class="atlas-demo-exit" data-action="demo-exit">
+        <span class="material-symbols-outlined">close</span> exit
+      </button>
+    </div>
+    <div class="atlas-demo-scroll">
+      <div class="atlas-demo-intro">
+        <h1>Sikelia</h1>
+        <p>Ancient Sicily around 505 BC: 196 settlements on hand-made map art, with the political web between poleis, native peoples, and Phoenician ports recorded as linked elements.</p>
+        <p class="atlas-demo-intro-sub">This is a real world built in atlas. Zoom the map, click any pin. Below the map: a dozen highlights from its 586 elements.</p>
+      </div>
+      <div class="atlas-demo-map" data-role="demo-map"></div>
+      <p class="atlas-demo-map-hint">Drag to pan · scroll to zoom · click a pin to read about the place</p>
+      <div class="atlas-demo-cards" data-role="demo-cards"></div>
+      <div class="atlas-demo-footer">
+        <p>Pages like this are what atlas publishes when you share part of a world.</p>
+        <button type="button" class="atlas-btn-primary" data-action="demo-exit-setup">Set up your atlas folder</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const exit = (): void => { navigate('#/'); };
+  overlay.querySelector('[data-action="demo-exit"]')!.addEventListener('click', exit);
+  // The footer CTA runs the real folder setup from here (user gesture is
+  // required for showDirectoryPicker, so this handler IS the picker moment),
+  // then leaves the demo — straight from "I've seen it" to "it's mine."
+  const setupBtn = overlay.querySelector<HTMLButtonElement>('[data-action="demo-exit-setup"]')!;
+  setupBtn.addEventListener('click', async () => {
+    setupBtn.disabled = true;
+    try {
+      const { setupAtlasRoot } = await import('../setup/atlas-root-flow');
+      const result = await setupAtlasRoot();
+      if (result) exit();
+    } catch {
+      // Cancelled or failed — stay in the demo; the welcome page offers it again.
+    } finally {
+      setupBtn.disabled = false;
+    }
+  });
+  const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') exit(); };
+  window.addEventListener('keydown', onKey);
+
+  let disposed = false;
+  let mapDispose: (() => void) | null = null;
+  cleanup = () => {
+    disposed = true;
+    window.removeEventListener('keydown', onKey);
+    mapDispose?.();
+  };
+
+  // Everything heavy loads lazily after the shell paints.
+  void (async () => {
+    const [{ default: data }, render] = await Promise.all([
+      import('./demo-page.json') as Promise<{ default: DemoData }>,
+      import('../middle/share-page-render'),
+    ]);
+    if (disposed || !overlay) return;
+
+    // Cards through the real payload renderer (view-only by construction).
+    const cardsMount = overlay.querySelector<HTMLElement>('[data-role="demo-cards"]')!;
+    cardsMount.appendChild(render.renderPayloadPage(data.payload));
+
+    // The map hero: Leaflet on the bundled art, every pin openable.
+    mapDispose = await mountDemoMap(
+      overlay.querySelector<HTMLElement>('[data-role="demo-map"]')!,
+      data,
+      (entry) => render.openPinModal(entry, data.payload.elements),
+    );
+    if (disposed) mapDispose?.();
+  })();
+}
+
+async function mountDemoMap(
+  mount: HTMLElement,
+  data: DemoData,
+  openEntry: (entry: PayloadElementEntry) => void,
+): Promise<() => void> {
+  const { default: L } = await import('leaflet');
+  await import('leaflet/dist/leaflet.css');
+  const { width: W, height: H } = data.map;
+
+  const map = L.map(mount, {
+    crs: L.CRS.Simple,
+    attributionControl: false,
+    zoomControl: true,
+    minZoom: -4,
+    maxZoom: 1,
+    zoomSnap: 0.25,
+  });
+  const assetUrl = new URL('./sikelia-map.webp', import.meta.url).href;
+  const bounds: L.LatLngBoundsExpression = [[0, 0], [H, W]];
+  L.imageOverlay(assetUrl, bounds).addTo(map);
+  map.fitBounds(bounds);
+  map.setMaxBounds([[-H * 0.15, -W * 0.15], [H * 1.15, W * 1.15]]);
+
+  for (const pin of data.map.pins) {
+    const entry = data.payload.elements[pin.ref];
+    // Storage is top-left origin; Leaflet CRS.Simple is bottom-left.
+    const marker = L.circleMarker([H - pin.y, pin.x], {
+      radius: 5,
+      color: '#22d3ee',
+      weight: 1.5,
+      fillColor: '#0e7490',
+      fillOpacity: 0.75,
+    }).addTo(map);
+    marker.bindTooltip(pin.name, { direction: 'top', offset: [0, -6] });
+    if (entry) marker.on('click', () => openEntry(entry));
+  }
+
+  return () => map.remove();
+}

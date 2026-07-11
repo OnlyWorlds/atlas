@@ -11,34 +11,9 @@
 import { getState, subscribe } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
-import { createSampleWorld, existingSampleWorld } from '../demo/sample-world';
 import { toastManager } from '../ui/toast-manager';
-import { navigate, timelineHash, homeHash } from '../core/router';
+import { navigate, timelineHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
-
-/** "Explore the sample world" (D10) — shared by both no-world welcome states. */
-function wireSampleButton(root: HTMLElement): void {
-  const btn = root.querySelector<HTMLButtonElement>('[data-action="explore-sample"]');
-  if (!btn) return;
-  btn.addEventListener('click', async () => {
-    const existing = existingSampleWorld();
-    if (existing) {
-      toastManager.info('The sample world already exists. Open it from the Worlds list.');
-      return;
-    }
-    btn.disabled = true;
-    btn.textContent = 'Opening Sikelia…';
-    try {
-      const entry = await createSampleWorld();
-      toastManager.success('Welcome to Sikelia. Poke anything, it\'s your copy.');
-      navigate(homeHash(entry.id));
-    } catch (err) {
-      toastManager.error(err instanceof Error ? err.message : String(err));
-      btn.disabled = false;
-      btn.textContent = 'Explore the sample world';
-    }
-  });
-}
 
 export function mountWelcomePanel(target: HTMLElement): () => void {
   target.innerHTML = '';
@@ -87,21 +62,26 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       return;
     }
 
-    // First-launch: no atlas folder yet.
+    // First-launch: no atlas folder yet. This page is the product's first
+    // impression: the story first, one primary action, the demo as a quiet
+    // side door (session 254 — the old version read as a storage dialog).
     if (!atlasRoot) {
       root.innerHTML = `
         <header class="atlas-room-header"><h1>Welcome to Atlas</h1></header>
         <div class="atlas-welcome-empty">
-          <p>Atlas keeps your worlds as folders on disk. One chosen folder holds all your worlds.</p>
-          <p class="atlas-welcome-hint">Pick any folder; atlas creates an <code>onlyworlds-atlas/</code> subfolder inside it for your worlds. (If you pick a folder that's already an atlas root, atlas just re-uses it.)</p>
+          <p class="atlas-welcome-lead">Atlas is a free, local worldbuilding studio.</p>
+          <ul class="atlas-welcome-beats">
+            <li>Build your world as linked elements: characters, places, events, and 19 more types you can browse, filter, and edit.</li>
+            <li>Work it from every angle: maps with pins and zones, long-form writing, timelines, who-knows-what tracking.</li>
+            <li>Everything lives as plain files in a folder you own. Online sync and publishing are there when you want them; never required.</li>
+          </ul>
           <div class="atlas-welcome-actions">
-            <button class="atlas-btn-primary" data-action="setup-atlas">Set up atlas folder</button>
-            <button class="atlas-btn-ghost" data-action="explore-sample">Explore the sample world</button>
+            <button class="atlas-btn-primary" data-action="setup-atlas">Set up your atlas folder</button>
           </div>
-          <p class="atlas-welcome-hint atlas-welcome-sample-hint">The sample opens instantly in browser storage, no folder needed.</p>
+          <p class="atlas-welcome-hint">Setup is one folder pick. Atlas creates an <code>onlyworlds-atlas/</code> subfolder inside it and keeps every world there; picking an existing atlas folder re-links it.</p>
+          <p class="atlas-welcome-hint atlas-welcome-sample-hint">Want to see a finished world first? <a href="#/demo" class="atlas-welcome-demo-link">Look around the sample world</a> · view only, nothing is stored.</p>
         </div>
       `;
-      wireSampleButton(root);
       const btn = root.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]')!;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
@@ -133,12 +113,9 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           <p>No world open.</p>
           <p class="atlas-welcome-hint">Use the sidebar to <strong>Create local</strong>, or pick an existing world from the list.</p>
           <p class="atlas-welcome-hint">Atlas folder: <code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
-          <div class="atlas-welcome-actions">
-            <button class="atlas-btn-ghost" data-action="explore-sample">Explore the sample world</button>
-          </div>
+          <p class="atlas-welcome-hint atlas-welcome-sample-hint"><a href="#/demo" class="atlas-welcome-demo-link">Look around the sample world</a> · view only</p>
         </div>
       `;
-      wireSampleButton(root);
       return;
     }
     // Stats from the active store, if open.

@@ -112,10 +112,22 @@ export function startApp(container: HTMLElement): AppHandle {
   // Middle pane — routed by hash mode + active world.
   let unmountMiddle: (() => void) | null = null;
   let currentMode: MiddleMode | null = null;
+  let demoWasMounted = false;
 
   function renderMiddle(): void {
     const route = parseHash(window.location.hash);
     const active = getState().active;
+
+    // The demo is a full-viewport overlay above the shell — the middle pane
+    // behind it stays on whatever the no-demo route resolves to. The chunk
+    // only ever loads once the user visits #/demo (demoWasMounted guard).
+    if (route.mode === 'demo') {
+      demoWasMounted = true;
+      void import('./demo/demo-view').then(m => m.mountDemo());
+    } else if (demoWasMounted) {
+      demoWasMounted = false;
+      void import('./demo/demo-view').then(m => m.unmountDemo());
+    }
 
     // Resolve the room (middleMode) from the route + active state.
     let nextMode: MiddleMode;

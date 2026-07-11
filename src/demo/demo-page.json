@@ -1,0 +1,3090 @@
+{
+ "payload": {
+  "schema_version": 1,
+  "title": "Highlights",
+  "intent": "show",
+  "theme": {},
+  "blocks": [
+   {
+    "id": "3b6d44c7-6759-5beb-a6fc-7cadf9664f77",
+    "kind": "element-card",
+    "elementId": "29c92b41-6372-56ca-a6e7-311a740a9ea7",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "23728131-609a-5a1f-ac2f-9fff92831b80",
+    "kind": "element-card",
+    "elementId": "889abf46-9695-55c1-8f98-dad82f9858db",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "d59ee8cd-0041-56b1-a513-9f0b84b53b53",
+    "kind": "element-card",
+    "elementId": "1d4707d1-5620-57cf-b49f-4c40a45fda0d",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "ea7e594f-e133-54c7-bac2-c60304b12f69",
+    "kind": "element-card",
+    "elementId": "082602ab-3c02-5f21-aead-0b3991874900",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "57b49cb2-64c9-531f-8ff9-d64c3e27cd6a",
+    "kind": "element-card",
+    "elementId": "b3426a87-93af-5403-a400-ae7461907aef",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "4389a526-4066-5372-91bb-a9fcffaf2277",
+    "kind": "element-card",
+    "elementId": "72055884-9a16-55c4-9a65-87b91f06c4e3",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "58f8cf62-8935-5442-8a09-8c359b0f9cb6",
+    "kind": "element-card",
+    "elementId": "131df24c-6877-5578-8387-13d88d0aea8b",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "bde89dd9-195e-512d-b2e7-0bd47ece5a0e",
+    "kind": "element-card",
+    "elementId": "555acba6-31ff-58bd-a7b2-5b011cbe0794",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "69f8d716-60bc-5235-9f4b-ca9fc58d51e5",
+    "kind": "element-card",
+    "elementId": "569933a5-488b-56ab-8adf-85f8cd8d4de4",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "5449caba-9fcb-5cd9-85da-55d784c7e3fc",
+    "kind": "element-card",
+    "elementId": "beeef3a8-ba28-5ab5-9c91-fe4d7b5ac11d",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "32dfc5a2-8cbe-5f2b-9a83-e8f58a1b2013",
+    "kind": "element-card",
+    "elementId": "8eb41efc-3ae6-5ec4-9b4f-ba9defac1f22",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   },
+   {
+    "id": "97980eec-b1ed-59d0-8cca-58f4ec15a857",
+    "kind": "element-card",
+    "elementId": "d9cb7ceb-b402-5c2c-81ea-404e275739d6",
+    "variant": "full",
+    "fields": [
+     "description",
+     "supertype",
+     "subtype"
+    ]
+   }
+  ],
+  "elements": {
+   "12b1fd1c-d64b-5575-b5b3-fb249a42740e": {
+    "name": "Abakainon",
+    "type": "location",
+    "fields": {
+     "description": "Exploitation of their rich wooded valley is hampered by Longane unfriendliness.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "8ad23f98-f465-5c3e-94a1-d0a8e8e53b85": {
+    "name": "Abolla",
+    "type": "location",
+    "fields": {
+     "description": "On a sunny platform, a small thriving community was quickly hellenized and conquered.\nHellenized at an early stage, and quickly conquered during initial Syrakusan expansion.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "853c0284-4cba-5d85-9a83-a0d347cf040d": {
+    "name": "Adrane",
+    "type": "location",
+    "fields": {
+     "description": "Prosperous fusion of cultures that is inaccessible and well-defended - but Greek presence is inching towards a garrison.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "a3abb5c6-0651-5867-a4fe-a601712962b4": {
+    "name": "Adranos",
+    "type": "location",
+    "fields": {
+     "description": "Friendly with neighbors while banking on its volcano cult dedications.\nMyth: The temple of Adranus has a cult probably linked to the activity of Etna. According to Aelian, about a thousand sacred dogs were kept near it.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "f0a83770-24cd-51da-a698-90e05261bb06": {
+    "name": "Adryx",
+    "type": "location",
+    "fields": {
+     "description": "Among the first conquered Sitel sites, much of its original culture is dimished.\nWas quickly hellenized and so spared the most violent dominion.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "6d6a6143-ca35-5c5d-a940-63aadf006c99": {
+    "name": "Aegesta",
+    "type": "location",
+    "fields": {
+     "description": "Primacy among Elymians for its central, fertile, strategic location.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "6c25757f-b18b-55ca-80e6-4c995319e885": {
+    "name": "Aegeston Emporion",
+    "type": "location",
+    "fields": {
+     "description": "Serves local and global customers to a rich selection.\nSuperior in its rich selection of West-Sicily foods.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "98bac999-2c3b-52d1-9a73-d5ac0a68aa89": {
+    "name": "Aereo",
+    "type": "location",
+    "fields": {
+     "description": "Rich in animal industry - and fossils.\nMyth: Fossils of dwarf elephants, big tortoises, red deer and wild boar spark legends.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "a55e7d55-e138-541b-9d36-c36e7b60596c": {
+    "name": "Agathyrnon",
+    "type": "location",
+    "fields": {
+     "description": "Isolated, scarcely known settlement. Occasional shelter for Liparan pirates that know how to locate it.\nMyth: Diodoros attributes its foundation to Agathyrnos, son of Aiolos.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "d24e03c1-0396-58c6-82b3-4e563224b4ac": {
+    "name": "Agera",
+    "type": "location",
+    "fields": {
+     "description": "Strong and combative sikel settlement with commanding views.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "201379b2-9745-5159-94e4-3039a5dcb42b": {
+    "name": "Agrilla",
+    "type": "location",
+    "fields": {
+     "description": "Holds out against Greek influence, but with a taste for their wares.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "06601828-44ed-5a6d-97ef-ee3187226fa3": {
+    "name": "Agyrion",
+    "type": "location",
+    "fields": {
+     "description": "Local dominance in its stone quarry, command of valleys, and abdundant festivals.\nMyth: Honored Herakles as an immortal when he passed through the city during his tenth labor.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "d9cb7ceb-b402-5c2c-81ea-404e275739d6": {
+    "name": "Akragas",
+    "type": "location",
+    "fields": {
+     "description": "Commercial, aggressive, powerful.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "291493ed-801f-5b43-b3da-6bfd80128aff": {
+    "name": "Akrai",
+    "type": "location",
+    "fields": {
+     "description": "Prosperous fortress-town in a very defensible and commanding position.\nProsperous dependent fortress in a very defensible and commanding position.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "3d6b9e7e-3615-5703-8370-f916a5e66886": {
+    "name": "Akrillai",
+    "type": "location",
+    "fields": {
+     "description": "Syrakusan fortress in a favorable trading position.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "970395a4-8f6a-5d4c-a47a-8fc162101297": {
+    "name": "Alagene",
+    "type": "location",
+    "fields": {
+     "description": "Small Sikanian settlement has seen Myttistratos encroach on their autonomy, for their strategic lookout and trade position.\nSmall Sikanian settlement requested assistance and has been taken over by Myttistratos for strategic lookout and Henna trade facilitation.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "1508279f-cbe1-564e-a090-a6b2aac1b99d": {
+    "name": "Allisse",
+    "type": "location",
+    "fields": {
+     "description": "Deep in the mountains with a love for Greek products - even Engyon's inferior crafts.\nStrongly hellenized settlement is an offload for inferior Engyon productions.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "0f7cabf5-c733-52c9-ac12-13c9d5b05b56": {
+    "name": "Amaselos",
+    "type": "location",
+    "fields": {
+     "description": "Causing tension by raiding along the route that his fortress commands.\nLocal king is causing tension by raiding along the route that his fortress commands.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "5a6981c0-82d4-5386-9f92-4f2a32addfee": {
+    "name": "Ambikos",
+    "type": "location",
+    "fields": {
+     "description": "Overlooks, if not in full control of, the road from Himera to Enna.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "fb0e2f86-532e-5e65-a46a-769851af757c": {
+    "name": "Ancyrai",
+    "type": "location",
+    "fields": {
+     "description": "Claim of a legendary treasure to lay beyond their pass.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "4c84774b-4659-5b36-96fb-d482390c3662": {
+    "name": "Apollonia",
+    "type": "location",
+    "fields": {
+     "description": "Prosperous and protected through its natural position and nearby Skurke.\nRich small settlement protected by its natural position and nearby Skurke.\nMyth: Dedicated a temple to a divinity likened by the Greeks to Apollo.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "eb8ec8c8-e7ed-5d6f-8866-b6a1079f7eb7": {
+    "name": "Ariaiton",
+    "type": "location",
+    "fields": {
+     "description": "Formerly flourishing community is slowly recovering from early and hard Geloan aggression.\nFormerly flourishing Sikan hilltop is slowly recovering from early Geloan aggression.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "9c81cac4-babb-5259-91e0-8fa5244e6c9e": {
+    "name": "Artemision",
+    "type": "location",
+    "fields": {
+     "description": "Small population with a smaller minority that is heavy handed with the regional sanctuary's wealth.\nSmall population with a smaller minority heavy handed in the regional sanctuary's wealth.\nMyth: Home to a famous sanctuary of Artemis Phakelitis.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "8b081a90-003c-51cf-954b-eea178b3c470": {
+    "name": "Artesine",
+    "type": "location",
+    "fields": {
+     "description": "Supplements a meager farming economy with an inventive figurine industry.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "89ab0a3c-d4e0-522f-bf0d-c17b1fc8fed4": {
+    "name": "Assoros",
+    "type": "location",
+    "fields": {
+     "description": "Here is little taste for Greek products and ideas.\nMyth: Temple to river-god Chrysas on the way to Henna.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "95af74f5-2e83-5866-b52f-99899b2e6c87": {
+    "name": "Babalon",
+    "type": "location",
+    "fields": {
+     "description": "Strong and fortified, actively favorable to Greek influence.\nStrong and fortified with an actively favorable disposition to Greek influence.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "44a21f06-f022-5bae-b1e7-88182e7bbc90": {
+    "name": "Bakra",
+    "type": "location",
+    "fields": {
+     "description": "Local craftsmen make a brave attempt at quality pottery.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "ee7bad1c-7d30-54d7-9fb6-520069217750": {
+    "name": "Balekena",
+    "type": "location",
+    "fields": {
+     "description": "Ancient Sikan dwelling with small but settled populations of both Greek and Carthaginian artisans.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "710d0293-e05b-5834-81d6-bedb0c92f367": {
+    "name": "Balkonon",
+    "type": "location",
+    "fields": {
+     "description": "Chalkidian-Greek phrourion with its native population and traditions still largely in place.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "2e7a6cbc-7c3f-53a7-a01f-818e89d60f80": {
+    "name": "Bidis",
+    "type": "location",
+    "fields": {
+     "description": "Small Greek farming outlier with loyalties divided between Syrakusai and Kamarina.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "851dc09c-3ad4-5b1a-a76c-66bb352d0288": {
+    "name": "Boukara",
+    "type": "location",
+    "fields": {
+     "description": "Ancient and elaborate, especially in construction - but fearing loss of independence where influence is already waning.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "50d38e4e-3c17-510a-a3b9-7cd5c923adfe": {
+    "name": "Brikinniai",
+    "type": "location",
+    "fields": {
+     "description": "Water-supplied and strengthened, overseeing splendid farmland valley.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "23b9d57e-2b03-5091-88bc-44bb29b44a51": {
+    "name": "Chersonos",
+    "type": "location",
+    "fields": {
+     "description": "Small port settlement with no strong allegiance except to opportunistic coastal trade.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "08b48545-b347-52db-8994-6d7dc8bfe229": {
+    "name": "Demena",
+    "type": "location",
+    "fields": {
+     "description": "In the dominion of Tissa, and reliant on them for their favorite Greek wares.\nIn the dominion of Tissa, and reliant on them for Greek wares,  but with some independent nature.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "8371806a-da6c-51b0-a568-b09659e86df4": {
+    "name": "Digenos",
+    "type": "location",
+    "fields": {
+     "description": "Makes the best of otherwise average farmlands.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "58ad9af3-d32c-56bb-8431-e9074a2d2ccc": {
+    "name": "Drepanon",
+    "type": "location",
+    "fields": {
+     "description": "Designated port for Eryx sees a strong Phoenician influence taking advantage of its harbor.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "0a99546b-26df-5a2b-a686-7d91b654b0f1": {
+    "name": "Echetla",
+    "type": "location",
+    "fields": {
+     "description": "Native and Greek populations live in balanced power, working stronger elements of both cultures.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "db24c523-b253-5084-8ec1-57fa56d44b4b": {
+    "name": "Edissa",
+    "type": "location",
+    "fields": {
+     "description": "Exploits a safe anchorage harbor - one where Odysseus is said to have landed.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "72bd18ba-2916-520d-a953-a79cc0c1f093": {
+    "name": "Egenimos",
+    "type": "location",
+    "fields": {
+     "description": "Controls traffic on land and river, as its position dictates - sometimes aggressively.\nControls the land- and river traffic its position dictates - sometimes aggressively.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "5e3bc616-30a8-53f2-a80a-60411098d1c6": {
+    "name": "Eknomos",
+    "type": "location",
+    "fields": {
+     "description": "Akragan hilltop fortress that dominates the surrounding farmlands and coastal route.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "0ff0990f-a3aa-51b0-b285-8197404c6c2c": {
+    "name": "Elima",
+    "type": "location",
+    "fields": {
+     "description": "Ancient heritage kept some people here, while most lower settlements of the West saw a population shift to urban centers.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "f8ec22dc-b040-569a-a5d0-5420e19101e7": {
+    "name": "Engyon",
+    "type": "location",
+    "fields": {
+     "description": "Colonized by Cretans long ago. Expansive and agrressive but limited by inland connections.\nMyth: Took its name from a spring that arose in the land chosen by the colonists. Has an  ancient temple of Rhea that was imported from Crete.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "555acba6-31ff-58bd-a7b2-5b011cbe0794": {
+    "name": "Enna",
+    "type": "location",
+    "fields": {
+     "description": "Ancient native capital of cultural and strategic dominance.\nMyth: Temple of Demeter was a famous site of worship.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "451df48d-aa85-52f5-8a3a-57c39effa5e9": {
+    "name": "Entella",
+    "type": "location",
+    "fields": {
+     "description": "Riverbank settlement draws crowds on festivals and legends.\nMyth: Thesmophoria location. Cave with legends.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "2d51716e-c48c-5acc-b089-944e85453b73": {
+    "name": "Ergetion",
+    "type": "location",
+    "fields": {
+     "description": "Strong fighting traditions and willingness to employ it for pay.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "f62b609f-833c-508b-8998-2ac75e1c22a1": {
+    "name": "Erkenia",
+    "type": "location",
+    "fields": {
+     "description": "Rich farmlands but weak in manpower and under threat of Murene power.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "9feaffd8-91c2-53ac-b8a3-9c83fb7ae657": {
+    "name": "Eryke",
+    "type": "location",
+    "fields": {
+     "description": "Great views of the valleys and their traffic.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "8eb41efc-3ae6-5ec4-9b4f-ba9defac1f22": {
+    "name": "Eryx",
+    "type": "location",
+    "fields": {
+     "description": "Founded in legend on a commanding mountaintop. Agreeable towards Segesta and the Phoenicians.\nMyth: Has a celebrated temple of Tanit (/Aphrodite), supposedly founded by Aeneas.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "a3ddaeb5-b767-5db8-8c8c-348a42c08d45": {
+    "name": "Euboia",
+    "type": "location",
+    "fields": {
+     "description": "Prosperous settlement, aided in part by local Greeks that are well settled.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "b442ca4e-78bf-5646-8763-9081cc06c48c": {
+    "name": "Fiinoka",
+    "type": "location",
+    "fields": {
+     "description": "Former dependency of Noto has seen most of its population exploited as farm laborers.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "b07f8d44-52e8-5128-9f66-75f9c0ba3947": {
+    "name": "Gela",
+    "type": "location",
+    "fields": {
+     "description": "Militaristic.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "88d4351c-8c73-5774-a863-21a43c91aa93": {
+    "name": "Gibol Gabol",
+    "type": "location",
+    "fields": {
+     "description": "Sikan outpost that dominates the river valley below.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "8dfed504-64e5-5e4c-b806-82909464266a": {
+    "name": "Gidinon",
+    "type": "location",
+    "fields": {
+     "description": "River dwellers.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "5c4279ff-3fd9-5c6f-87c7-5171a976e38b": {
+    "name": "Goraion",
+    "type": "location",
+    "fields": {
+     "description": "Grand views allow for a beacon to warn for - or assist - pirates.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "a56075ed-a10c-5d31-bb13-c467cd641495": {
+    "name": "Grannai",
+    "type": "location",
+    "fields": {
+     "description": "Exports quality timber at both sides of the mountain.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "ed92b347-dad9-569e-abbe-168ebdba59f5": {
+    "name": "Halfason",
+    "type": "location",
+    "fields": {
+     "description": "Isolated if not for outside interest in its timber exports.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "27024eab-ad87-5a99-8e44-1ad8ee1da5d4": {
+    "name": "Halikyai",
+    "type": "location",
+    "fields": {
+     "description": "Strong and rich but in the political shadow of Aegesta.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "e07aef25-6009-5862-991b-566177140d17": {
+    "name": "Halontion",
+    "type": "location",
+    "fields": {
+     "description": "Independent tradition. Produces beautiful oils and jars.\nMyth: Its foundation ascribed to Acarnanians led by Patron, some of whom settled here after guiding Aeneas from Greece.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "ac69b364-f0f7-53eb-a9f3-16c9798a52e5": {
+    "name": "Hamiit",
+    "type": "location",
+    "fields": {
+     "description": "Phoenician trading outpost providing this and thats in an otherwise scarce location.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "27220b1d-35cd-5fa3-a73a-b789245f5616": {
+    "name": "Helketion",
+    "type": "location",
+    "fields": {
+     "description": "Aggressively protects extensive farmlands from Greek curiosity and, so far, incursions.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "3df3b211-feb4-567e-ba88-076534697ea8": {
+    "name": "Heloros",
+    "type": "location",
+    "fields": {
+     "description": "Forward Syrakusan phrourion developed into a prosperous settlement in its own right, due to its rich farmlands and supply of serf-labor.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "07a4a069-b0af-527a-9013-ef37e2b79860": {
+    "name": "Herbessos",
+    "type": "location",
+    "fields": {
+     "description": "Claims ties to Herakles who supposedly visited here on his labors.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "01b6a9cb-64a3-5a28-a13d-87cfcc9b7746": {
+    "name": "Herbita",
+    "type": "location",
+    "fields": {
+     "description": "Secluded and home to a mysterious, possibly gruesome cult.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "70ec1dc1-39e7-56d8-adb5-bdfef2ccc5b1": {
+    "name": "Hesas",
+    "type": "location",
+    "fields": {
+     "description": "Small in everything but their dedication to olives.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "77e56abb-b608-5b61-aee7-84a14237b91e": {
+    "name": "Himera",
+    "type": "location",
+    "fields": {
+     "description": "Dominates important sea and land routes.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "d9e4620e-93d8-5f93-a082-b57029f6dc89": {
+    "name": "Hippana",
+    "type": "location",
+    "fields": {
+     "description": "Its position along the Akragas-Panormos road drives a commercial, pro-Phoenician demeanor.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "0b6343d8-10b1-5d25-bd08-9b5a3adfcf4a": {
+    "name": "Hybla Geleatis",
+    "type": "location",
+    "fields": {
+     "description": "Traditionally independent and strong, with a king that is happy to cash in on Greek products for profit.\nMyth: Its sanctuary attracted not Sikel but also Greek attention; the 'Galeotai' priests are interpreters of visions.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "cfbc2bab-7e13-59eb-89e4-4371499b5727": {
+    "name": "Hybla Heraia",
+    "type": "location",
+    "fields": {
+     "description": "Traditionally dominating, now bracing for Syrakousan aggression.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "2d5f57cb-9e77-5a86-87fb-30bc32c6c9d7": {
+    "name": "Hykarra",
+    "type": "location",
+    "fields": {
+     "description": "Fishing village that increasingly capitalizes on Phoenician trade opportunities.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "ec0ce03c-ecc9-525e-95fa-a767e290c686": {
+    "name": "Iaitas",
+    "type": "location",
+    "fields": {
+     "description": "Strong and commanding while rapidly hellenizing.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "5ae841f1-633c-5ae8-af03-2a901f701fff": {
+    "name": "Ichana",
+    "type": "location",
+    "fields": {
+     "description": "Greatly held out against Syrakusan domination of the territory - at the cost of most of their population.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "b143a80c-1735-5fcf-90bd-09ec860954ee": {
+    "name": "Imachara",
+    "type": "location",
+    "fields": {
+     "description": "Rich lands, hardworking people and strong communal institutions.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "cf5aef73-2420-59d2-aaac-8a18776e96b0": {
+    "name": "Inessa",
+    "type": "location",
+    "fields": {
+     "description": "Waystation to top of Etna that is rich in strength and farmlands.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "0cd5532b-c1bf-5649-9556-52d930686736": {
+    "name": "Inikon",
+    "type": "location",
+    "fields": {
+     "description": "Sells its specialty wines along the Egesta trade system.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "c9c0c53f-291e-54c6-ac2d-c420ca97e74c": {
+    "name": "Ispika",
+    "type": "location",
+    "fields": {
+     "description": "Use of extensive nearby cave systems make this previously thriving settlement hard to conquer.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "c285fc27-ea1b-51d6-b3e0-b9ac1f5c4445": {
+    "name": "Kakyron",
+    "type": "location",
+    "fields": {
+     "description": "Flourishing Greek subcolony that was won by Akragas with Geloan help. Dominates surrounding farmland economies.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "2a76ac6c-ada1-5a4d-be36-b882b74b78b0": {
+    "name": "Kalakte",
+    "type": "location",
+    "fields": {
+     "description": "Occasional trade with passing Greek and Etruscan merchant ships on an otherwise secluded stretch of coast.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "864d05fa-d50c-579f-bbaa-ae457db14110": {
+    "name": "Kaligenos",
+    "type": "location",
+    "fields": {
+     "description": "In an advantageous position, but dominated by its Northern Sikel neighbors. Maintains a small sanctuary with meagre offerings.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "2d6593c4-09d2-5428-b546-52eddaf9e0bb": {
+    "name": "Kalkarak",
+    "type": "location",
+    "fields": {
+     "description": "Its strategic and defensible position has seen its ancient inhabitants entirely dominated by a strong Akragantine Garrison.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "bff4d1fb-1495-5112-9361-73ab0ddf2b0d": {
+    "name": "Kallipolis",
+    "type": "location",
+    "fields": {
+     "description": "Stronghold and food source to Naxos.\nMyth: Some marshy Myth.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "11dc78a6-f975-5182-884c-819bc85f880c": {
+    "name": "Kaloba",
+    "type": "location",
+    "fields": {
+     "description": "Few remain from emigration, but they remain on the rock.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "374bd071-5711-5d21-b9e2-39cb969f8b1e": {
+    "name": "Kaltigene",
+    "type": "location",
+    "fields": {
+     "description": "Ancient and conservative Sikan valley-controller.\nMyth: Important sanctuary of the 'Castelluccio' culture.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "72055884-9a16-55c4-9a65-87b91f06c4e3": {
+    "name": "Kamarina",
+    "type": "location",
+    "fields": {
+     "description": "Original Syrakusan foundation has already revolted, lost, and been repopulated by Gelans.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "e6ae7292-1db0-5a70-a624-38d50b3f792d": {
+    "name": "Kamerai",
+    "type": "location",
+    "fields": {
+     "description": "Nucleus of settlements around a fertile riverdelta.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "131df24c-6877-5578-8387-13d88d0aea8b": {
+    "name": "Kamikos",
+    "type": "location",
+    "fields": {
+     "description": "Powerful, defensible Sikanian site that dominates the lower river and prime farmlands.\nMyth: According to legend: Constructed by Daedalus for Cocalus, the king of the Sicanians, who made it his royal residence, and deposited his treasures here.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "022994e5-6abc-5770-bfae-0f2d50bf8599": {
+    "name": "Kamporale",
+    "type": "location",
+    "fields": {
+     "description": "Minor settlement suspected of playing a major role in mysterious local hazards to road traffic.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "989f1fdc-1dcb-55a0-b05b-69ef8aa8e6ec": {
+    "name": "Kapod",
+    "type": "location",
+    "fields": {
+     "description": "Sikel settlement has been fortified and serves as outpost now.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "ecc7015b-09d9-5c48-87bc-d5210e6c9c99": {
+    "name": "Kaprianon",
+    "type": "location",
+    "fields": {
+     "description": "Its defensive qualities and border-position have so far seen it spared from overwhelming force.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "588be673-8383-56fc-845d-9241f8694434": {
+    "name": "Kapution",
+    "type": "location",
+    "fields": {
+     "description": "Currently ruled by a cruel puppet-king installed by Engyon to ensure resource extraction.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "14bf6fbf-3038-5e03-adf2-73047e1ea74a": {
+    "name": "Karastele",
+    "type": "location",
+    "fields": {
+     "description": "Stays out of sight and spheres of influence.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "876b5683-d07f-5d6d-8edb-a82e70ce2c50": {
+    "name": "Karole",
+    "type": "location",
+    "fields": {
+     "description": "Sits pretty amid riches of land and traffic.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "d25f80fb-1cc7-59d0-91d4-2083236f45a6": {
+    "name": "Kasasi",
+    "type": "location",
+    "fields": {
+     "description": "Strong fighters with clear preference for a regional Sikel dominion where they feel Greeks are enchroaching.\nThough with considerable fighting population, preference to be part of a Sikel domain where Greeks are enchroaching.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "61025336-04df-540f-bc46-023028e9b1eb": {
+    "name": "Kasgeraton",
+    "type": "location",
+    "fields": {
+     "description": "Small colony of Geloan traders and farmers, in close cooperation with Maroi.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "9f27db68-7293-590c-bd3b-71ee24ee6bba": {
+    "name": "Kasibe",
+    "type": "location",
+    "fields": {
+     "description": "Population center in a defensible position is now exploited for Syrakusan labor demands.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "290f68ae-1056-5afc-818c-3625fb4e0f74": {
+    "name": "Kasmenai",
+    "type": "location",
+    "fields": {
+     "description": "Poorly habitable but well-planned and well-populated military town.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "c96c07c4-efb7-5cfc-8450-44d253631779": {
+    "name": "Katane",
+    "type": "location",
+    "fields": {
+     "description": "Tradition of lawgiving: public order, family, justice, morality.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "03df1f5d-19cd-52c9-aa51-86f74acb0fc6": {
+    "name": "Kataria",
+    "type": "location",
+    "fields": {
+     "description": "Controls rivers in several directions.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "2c120891-080c-58d9-906e-999792f06a3e": {
+    "name": "Katulle",
+    "type": "location",
+    "fields": {
+     "description": "Former native trading station is now mostly a small food provider.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "110c4738-2718-5640-9758-03e84f9b0bc2": {
+    "name": "Kaukanai",
+    "type": "location",
+    "fields": {
+     "description": "Nucleus of a productive farmlands cluster.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "df80d87c-617f-5e16-95db-30d0fe7ed40f": {
+    "name": "Kausos",
+    "type": "location",
+    "fields": {
+     "description": "Overlooks a verdant river valley.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "034fc1ae-c4a7-50e2-903c-2063eda157cf": {
+    "name": "Kentoripa",
+    "type": "location",
+    "fields": {
+     "description": "Strategic hub that re-exports and imitates Greek pottery and jewelry.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "f1f4f07a-6703-5171-953d-76a6908387a0": {
+    "name": "Kephaloidion",
+    "type": "location",
+    "fields": {
+     "description": "Emulates Greek (building) traditions, significantly funded by passing sea trade .",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "54572d71-dd43-5e31-b056-b627c938d389": {
+    "name": "Kibone",
+    "type": "location",
+    "fields": {
+     "description": "Fortified ancient Sikanian town has fallen to Murene's assault troops recently.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "f2803095-c6b6-502e-a584-134c3c7a2093": {
+    "name": "Kilon",
+    "type": "location",
+    "fields": {
+     "description": "Small, strong and fortified, placated by Phoenician imports, it protects them and their Konika founders.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "ccc8f93c-32d3-52fc-ba83-cb87f30ec400": {
+    "name": "Kimena",
+    "type": "location",
+    "fields": {
+     "description": "Productive and commercial settlement sees a confluence of Greek and Phoenician cultures.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "53eed2c2-9f79-57e8-b6d5-8febacee6db1": {
+    "name": "Kolibra",
+    "type": "location",
+    "fields": {
+     "description": "Out of sight and not easily accessible.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "e71ec4ae-04ca-5f13-bae7-3f75f1cd5cd8": {
+    "name": "Kolle Kalos",
+    "type": "location",
+    "fields": {
+     "description": "Dominated by Himeran Greek as a food source at an early stage.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "24401ad7-3c22-5a0b-9166-38f36d3f9cd1": {
+    "name": "Koor",
+    "type": "location",
+    "fields": {
+     "description": "Local traditions are greatly impacted by outside religious influence.\nMyth: Unknown sanctuary location; Naxos fusion and possibly related to South Italy / Lokri.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "b825453e-78b9-5c24-b5b5-9a02e4aa4e97": {
+    "name": "Koskon",
+    "type": "location",
+    "fields": {
+     "description": "Akragantine outpost that secures a major inland road, and an area rich in water and fertility.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "b18c1983-9170-54eb-a71c-5059cbfa0e89": {
+    "name": "Krastos",
+    "type": "location",
+    "fields": {
+     "description": "Most Northern outpost under direct Akragantine control. Fortifications are still under construction.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "a37c2bae-7026-50a5-8bc1-f1c86def9ca7": {
+    "name": "Kronia",
+    "type": "location",
+    "fields": {
+     "description": "Though overlooking the Panormos coast and fortress, its people are drawn to Greek traditions.\nMyth: Animal fossils found in nearby cave, including an elephant skull (Cyclops..).",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "5e757a76-1ec0-5e61-b9e0-0298454cf363": {
+    "name": "Lavenka",
+    "type": "location",
+    "fields": {
+     "description": "Small but productive hilltop settlement that would be a first step in Geloan expansion.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "02663282-1884-5b80-ae28-8b08a0123226": {
+    "name": "Leona",
+    "type": "location",
+    "fields": {
+     "description": "Original native people displaced by a small productive Greek outpost in an excellent strategic location.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "9c7dfa1a-c650-5a02-966c-d4606e9251e3": {
+    "name": "Leontinoi",
+    "type": "location",
+    "fields": {
+     "description": "Powerful agricultural economy and institutions.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "059fa351-4b49-558c-b9ec-38c97795d32a": {
+    "name": "Lipara",
+    "type": "location",
+    "fields": {
+     "description": "Largest city of the largest Aiolian island. Successfully supports a proto-socialist farming community.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "d1f75c66-bdf3-562e-b451-4a10d52c318c": {
+    "name": "Longane",
+    "type": "location",
+    "fields": {
+     "description": "Competes for local dominance with Abakainon.\nMyth: Worshipping the river god Longanus.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "0a46fb8d-b9e9-53bd-ab5b-f50f4de376ba": {
+    "name": "Madara",
+    "type": "location",
+    "fields": {
+     "description": "Commercial and Agricultaral center with strong Greek influence on its cults and industries.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "42a4b6f7-baa1-5140-9b69-fe293410e2d1": {
+    "name": "Makella",
+    "type": "location",
+    "fields": {
+     "description": "Controls an important intersection of Phoenician - Greek trade from a rich and defensible position.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "cbf810f9-e665-5770-8ecb-a223c4e58464": {
+    "name": "Maktorion",
+    "type": "location",
+    "fields": {
+     "description": "A hybrid settlement where the Greek garrison protects the access to the plains of Gela, but has little say about the local economy.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "91985329-61b3-52e4-82ba-9f75733f7033": {
+    "name": "Manikos",
+    "type": "location",
+    "fields": {
+     "description": "Sikan outlier in a dominant hilltop position.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "eb309690-a130-50b6-ada9-2dc368a93eb8": {
+    "name": "Markesa",
+    "type": "location",
+    "fields": {
+     "description": "Wedged between greater powers.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "371c4cd7-bdd0-537e-b491-3ad7d224971e": {
+    "name": "Maroi",
+    "type": "location",
+    "fields": {
+     "description": "Several summit plateaus host workshops, sanctuaries, and both Ionian and Dorian Greek subgroups.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "46487d2c-9602-5293-8c9a-1d73d5b269a6": {
+    "name": "Mastrome",
+    "type": "location",
+    "fields": {
+     "description": "Small trading base where the most crafty Sikel from surrounding settlements peddle wares to road travelers.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "9e5178d2-dd87-5724-92e8-f3e2750594d0": {
+    "name": "Mazara",
+    "type": "location",
+    "fields": {
+     "description": "Initial Phoenician settlement has been long vacated and established as fortified emporion by Selinous.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "aac6fcd7-9a36-5f3d-825a-75c897b3ce46": {
+    "name": "Megara",
+    "type": "location",
+    "fields": {
+     "description": "Never quite found its footing. Progressive but hemmed in.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "02bb324f-5b2d-5e09-9d37-a2e8217c65ec": {
+    "name": "Menai",
+    "type": "location",
+    "fields": {
+     "description": "Small but prosperous Sikel settlement, with strong adherence to their old traditions.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "439df1e4-30b6-57ed-bafa-c7aac588e6bc": {
+    "name": "Mentuse",
+    "type": "location",
+    "fields": {
+     "description": "Nucleus of farmlands on the Eastern Gela plain.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "364ff1a9-c111-582e-a47f-c74b9d2836bf": {
+    "name": "Merkane",
+    "type": "location",
+    "fields": {
+     "description": "Minorly concerned with Greek domination when they can keep access to their beautiful coast and river trade.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "2a023e7c-c8ef-5a7a-8462-015f62d563fd": {
+    "name": "Minoa",
+    "type": "location",
+    "fields": {
+     "description": "Previously-contested Selinous border outpost has seen its distant support weaken recently.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "8c725ead-4497-53d7-8dd0-4c71f7719ab1": {
+    "name": "Montope",
+    "type": "location",
+    "fields": {
+     "description": "Particularly wealthy settlement is rumored to control a rare source of metal.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "5319303d-29ef-5ef9-8758-135b26fb3ce9": {
+    "name": "Morankusa",
+    "type": "location",
+    "fields": {
+     "description": "A taste for quality wares leads it to occasional direct contact with Selinous.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "b3426a87-93af-5403-a400-ae7461907aef": {
+    "name": "Morgantina",
+    "type": "location",
+    "fields": {
+     "description": "Legends of an Italian foundation, now an entrepreneurial community.\nMyth: Its terracotta heads, female faces, gorgons and felines, are uncommon. These  are found at only two other sites in Sicily, Maroi and Adranos.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "569933a5-488b-56ab-8adf-85f8cd8d4de4": {
+    "name": "Motya",
+    "type": "location",
+    "fields": {
+     "description": "Important commercial waystation, set on an island in a shallow lagoon.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "054aa593-a47b-5878-a2f8-daf291eb1abe": {
+    "name": "Motyka",
+    "type": "location",
+    "fields": {
+     "description": "Prosperous Sikel settlement that is at the border of (and has experienced) Syrakusan aggression.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "bbe49809-2f4e-5a17-9110-4b41ee8b0d96": {
+    "name": "Motyon",
+    "type": "location",
+    "fields": {
+     "description": "Small settlement that was made into a fortress after previous incursions by Phalaris.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "cc9887cf-3172-58fa-a06c-9a313892ae8e": {
+    "name": "Murene",
+    "type": "location",
+    "fields": {
+     "description": "Less concerned with bordering Sikel / Sikanian culture than with its own warrior and festival traditions.\nMyth: Attracts outside visitors to its lavish Thesmophoria celebrations.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "2dac277e-c396-5636-80cb-fb44073e2f71": {
+    "name": "Mylai",
+    "type": "location",
+    "fields": {
+     "description": "Has some drive to controls its own constitution independently of Zankle, but has not got very far.\nMyth: Sits on an ancient, significant necropolis.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "d255ea79-51ab-5ee4-a166-a51ff6eb468e": {
+    "name": "Myttistratos",
+    "type": "location",
+    "fields": {
+     "description": "Founded as a forward post of Akragas, now self-serving in the distance.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "c5b1898e-da9b-5771-a2f8-c84d6e97cdcd": {
+    "name": "Nakone",
+    "type": "location",
+    "fields": {
+     "description": "Rich farmlands, strong allies, and political strife over how to deal with looming Selinous power.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "8d55a681-c5e2-54bd-bda0-e875073d9068": {
+    "name": "Naone",
+    "type": "location",
+    "fields": {
+     "description": "Small Sikan farming settlement that is feeling the heat from potential Greek aggression.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "df685ad0-bd1a-5772-bb8e-c0805fa0000f": {
+    "name": "Naulochos",
+    "type": "location",
+    "fields": {
+     "description": "A tiny but dedicated warship building industry - perhaps related to pirate activity.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "1d4707d1-5620-57cf-b49f-4c40a45fda0d": {
+    "name": "Naxos",
+    "type": "location",
+    "fields": {
+     "description": "Foundational legend makes for stronger diplomatic than territorial power.\nMyth: Home to a famous sanctuary of Apollo Archegetes. Travellers offer sacrifice in the sanctuary before setting sail from Sicily.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "63f8b7f2-7a09-5ffd-aa5d-cd84902358d1": {
+    "name": "Neaition",
+    "type": "location",
+    "fields": {
+     "description": "Strong and central settlement that has maintained a small degree of autonomy - so long as food is shipped out regularly.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "c8e6dee9-d623-5d01-b302-ed29015d003c": {
+    "name": "Nikos",
+    "type": "location",
+    "fields": {
+     "description": "Base for Greek raiders that settled away out of Engyon for some reason.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "7a01e6ee-c7df-52a0-93d7-b3967edba172": {
+    "name": "Nilaios",
+    "type": "location",
+    "fields": {
+     "description": "At the springs of rivers that are teeming with life.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "6637a305-cd55-563b-bfdc-9334f0092968": {
+    "name": "Noai",
+    "type": "location",
+    "fields": {
+     "description": "Central valley position where local industries draw heavily on Greek island-bound trade.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "5253b60c-c201-5810-8241-8d23ed8b7210": {
+    "name": "Omphake",
+    "type": "location",
+    "fields": {
+     "description": "Critical hilltop settlement for defense of the Geloan plain. Recovering its grip on native traditions.\nMyth: Here existed a source whose drinking water, to barren women, made them proliferate.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "d57056da-88b5-5e0e-96dd-73ff73eb80c6": {
+    "name": "Pachynos",
+    "type": "location",
+    "fields": {
+     "description": "Draws on a a busy sea route and well-cultivated farmlands.\nMyth: Has a locally-famous temple of Apollo.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "545ff929-c851-5816-a758-65ca122873a2": {
+    "name": "Palike",
+    "type": "location",
+    "fields": {
+     "description": "A sizable population draws on the prestige of its nearby Palikoi sanctuary.\nMyth: Near the pan-Sikelian sanctuary of the Palikoi are hosted a pair of divinities related to the boiling lakes / volcano activity.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "beeef3a8-ba28-5ab5-9c91-fe4d7b5ac11d": {
+    "name": "Panormos",
+    "type": "location",
+    "fields": {
+     "description": "Principal Phoenician trading port that is surrounded by fruit trees.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "889abf46-9695-55c1-8f98-dad82f9858db": {
+    "name": "Pantalika",
+    "type": "location",
+    "fields": {
+     "description": "Magnificent buildings of its primacy days remain. Syrakousai pressure has left it unable to support its former, even larger population.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "3d78511e-ecea-591c-b52e-0ecdd4282a60": {
+    "name": "Parkenon",
+    "type": "location",
+    "fields": {
+     "description": "Its extensive olive yields and trade are under threat of Murene raiders.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "789f3f5d-9c2a-5e5d-a7bf-c8c472942e2c": {
+    "name": "Paropos",
+    "type": "location",
+    "fields": {
+     "description": "Joint control of river and roads, with a rich hunting tradition.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "7a9c9895-b794-58ea-8152-b56332ebcf0a": {
+    "name": "Pergane",
+    "type": "location",
+    "fields": {
+     "description": "Great view of valleys where from people flock to their sanctuary.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "56aefe6b-b0b5-5fc8-b01c-3ca622c59fee": {
+    "name": "Pergusa",
+    "type": "location",
+    "fields": {
+     "description": "Exerts clear control of its own slice of valley towards the East.\nExerts clear control of its own slice of valleys, mostly towards the West.\nMyth: The ancient legend of the Rape of Persephone/Kore is set on the shores of lake Pergusa.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "a80a7a9e-3dbc-5686-a23f-6c3e970b8030": {
+    "name": "Petrosa",
+    "type": "location",
+    "fields": {
+     "description": "Its tower on a rock and command of the Hypsas river give it some stature, but the settlement was quickly dominated by Selinous.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "5f96f796-b36f-5a52-8faa-8633be4fcd5d": {
+    "name": "Phalarion",
+    "type": "location",
+    "fields": {
+     "description": "Well fortified and loyal. Gela's primary phrourion that dominates and protects its Western entrance.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "dd2307f6-4bc8-5915-af14-b7bc1ee6f541": {
+    "name": "Phoinix",
+    "type": "location",
+    "fields": {
+     "description": "Originally a native port of Agrilla. Now it is under strong influence by Naxos Greek.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "ccef4fde-54d4-557c-9bc5-8ad543c827e7": {
+    "name": "Piakos",
+    "type": "location",
+    "fields": {
+     "description": "Active export of skilled bronzework products. Friendly with Adranon.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "daf33a69-4c64-5637-b5cb-a0ff2699ed61": {
+    "name": "Pikone",
+    "type": "location",
+    "fields": {
+     "description": "Protects the Northern routes to Madora.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "7e2582ce-77dd-5997-a2eb-45d0863c2c1d": {
+    "name": "Pipana",
+    "type": "location",
+    "fields": {
+     "description": "Effectively under Akragan control, but its domination of several surrounding villages has provided it enough power to yet avoid a garrison.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "a5815ce8-85d6-5751-9b37-6e424c7cd864": {
+    "name": "Pirama",
+    "type": "location",
+    "fields": {
+     "description": "Small but in firm control of a higher, alternate route to Makella's river connection.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "9395c6fe-a889-5a8a-98cd-a75dad635f9c": {
+    "name": "Plemmyrion",
+    "type": "location",
+    "fields": {
+     "description": "Sikel coastal settlement was already in decline when Syrakousai was founded, and then quickly dominated for strategic purposes.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "db81f308-bccd-5053-a1ae-69e86bb9dc90": {
+    "name": "Pollike",
+    "type": "location",
+    "fields": {
+     "description": "Punches above its weight from its high mountain ridge.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "f711bec8-bac9-5b14-9894-c5dcb589eb10": {
+    "name": "Rakine",
+    "type": "location",
+    "fields": {
+     "description": "Tradition of fine native arts, with very little Greek influence.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "27c2f185-2854-52b3-98c7-c523646467bc": {
+    "name": "Ravanusa",
+    "type": "location",
+    "fields": {
+     "description": "Tiny but greatly defensible stronghold commanding a major river.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "0a77d35e-85f7-59e9-a451-56be33bf4005": {
+    "name": "Rhegion",
+    "type": "location",
+    "fields": {
+     "description": "Rich and progressive but struggling with mainland alliances.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "f8719e58-0fc4-50bc-bbc9-c09036d78b62": {
+    "name": "Rokka",
+    "type": "location",
+    "fields": {
+     "description": "Minor settlement with strong strategic potential with its command of the lower road and valley.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "17aa284c-1ea8-5f77-bbef-36cd844c0249": {
+    "name": "Romnos",
+    "type": "location",
+    "fields": {
+     "description": "Independent foresters and timber suppliers.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "4c20deb5-3ca4-58f0-9947-f40a93ed2d55": {
+    "name": "Rotonde",
+    "type": "location",
+    "fields": {
+     "description": "Nucleus of several productive farmland settlements, on the edge of competing teritories.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "36688718-0e26-5605-a340-3293e79ce59a": {
+    "name": "Sabukina",
+    "type": "location",
+    "fields": {
+     "description": "Eastern-edge of Sikan territory. Thriving and overlooking an important river valley, wary of Greek approaches.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "0efc48b7-6bc8-50ba-ba9c-de35b266a943": {
+    "name": "Saneka",
+    "type": "location",
+    "fields": {
+     "description": "Tucked in at a lakeside, away from Phoenician and Greek influence.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "a7f055c1-8fe9-51e4-8f6f-e43b726c289c": {
+    "name": "Schera",
+    "type": "location",
+    "fields": {
+     "description": "With a beautiful, expansive view of their valley and whatever traverses it.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "331aec1f-adb7-576e-b727-fac09b2a7cbe": {
+    "name": "Selefe",
+    "type": "location",
+    "fields": {
+     "description": "Remains of its larger population in previous centuries is still evident in its extensive cemeteries.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "041e281d-e7cf-5eb0-8fa6-3861f453c50f": {
+    "name": "Selinous",
+    "type": "location",
+    "fields": {
+     "description": "Diplomatic outlier in a strong trading position.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "837960f1-afec-5698-b104-9cb2943dd533": {
+    "name": "Skiara",
+    "type": "location",
+    "fields": {
+     "description": "Valley fortress recently set up by Himera.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "24f0f56b-56c2-544c-b7f5-f2cb48d4aad1": {
+    "name": "Skikli",
+    "type": "location",
+    "fields": {
+     "description": "Simple farming community with some interest in Greek wares and traditions.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "6f59d7e5-8ba8-5e85-89fb-d9f4fef1ca8f": {
+    "name": "Skornake",
+    "type": "location",
+    "fields": {
+     "description": "Small farming community secures the road for Syrakusan interests.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "c1e2980f-f67d-52e5-8ad6-3b04a9062db1": {
+    "name": "Skurke",
+    "type": "location",
+    "fields": {
+     "description": "Dominates proto-Greek settlements to the West.",
+     "supertype": "Settled",
+     "subtype": "UrbanCenter"
+    }
+   },
+   "a1d0e381-4efc-5e19-8be7-4aaa492a9fe0": {
+    "name": "Solous",
+    "type": "location",
+    "fields": {
+     "description": "On a strong rock that directly protects the coastal road to Panormos.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "5915a1ec-6a23-59a5-8bf0-6b92019a8a18": {
+    "name": "Spolion",
+    "type": "location",
+    "fields": {
+     "description": "In total command of the road that runs right below its steep hillsides.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "9586cb05-b199-52cb-9e98-f72a8ff5d9c2": {
+    "name": "Styella",
+    "type": "location",
+    "fields": {
+     "description": "Rich  hunting traditions turned heavily fortified outpost.\nMyth: Close to a particularly rich spring.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "a5589d2a-eb82-53ae-8594-12c50f372ea3": {
+    "name": "Symaithos",
+    "type": "location",
+    "fields": {
+     "description": "Tiny settlement around a small sanctuary to the river god Symaethus.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "29c92b41-6372-56ca-a6e7-311a740a9ea7": {
+    "name": "Syrakousai",
+    "type": "location",
+    "fields": {
+     "description": "Key city for its prime harbor, defensibility, and shipping location.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   },
+   "b82d5ec4-9763-585e-96cb-2006c88d897d": {
+    "name": "Tavake",
+    "type": "location",
+    "fields": {
+     "description": "Provides dominating Agyrion with its plenitful harvests.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "cb35c8f7-07d4-5335-84ad-7ee40e991760": {
+    "name": "Thapsos",
+    "type": "location",
+    "fields": {
+     "description": "Bulk of previous settlers moved on to Megara. Small community of Greek remains to build on previous trade networks and industries.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "60dcaff0-debe-5d9a-b14a-3a1053cd2357": {
+    "name": "Tigra",
+    "type": "location",
+    "fields": {
+     "description": "Dominates surrounding Sikan farming settlements, if only economically.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "e571806b-9bd5-5aa5-b519-b8c52e11db06": {
+    "name": "Tirakii",
+    "type": "location",
+    "fields": {
+     "description": "Dependent on Tissa for Greek products. Supplies them with raw goods.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "66eff82c-7e93-510d-8565-d2eae7f4b696": {
+    "name": "Tirnon",
+    "type": "location",
+    "fields": {
+     "description": "A small farming community supports this road-controlling Akragan outpost.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "d8da4cbe-a3e9-59ce-88e9-326791f841f1": {
+    "name": "Tissa",
+    "type": "location",
+    "fields": {
+     "description": "Local dominion with a favorable trade position.",
+     "supertype": "Settled",
+     "subtype": "Stronghold"
+    }
+   },
+   "729308f6-6dc7-5a8f-a294-2af2e3075e53": {
+    "name": "Triokala",
+    "type": "location",
+    "fields": {
+     "description": "Near-impregnable mountaintop fortress.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "f383f1f7-10d4-5e5e-b502-a34cb0d94642": {
+    "name": "Trotilon",
+    "type": "location",
+    "fields": {
+     "description": "Small community stayed behind from earlier Megaran settlement. Hidden caves and creek allow for preying on passing ships.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "0ef38751-c009-58a2-ba29-a412c52d2d95": {
+    "name": "Tyrrhene",
+    "type": "location",
+    "fields": {
+     "description": "Small, fortified Greeks of unclear origin. Connected to Herbita's cult practices.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "ae6083a2-d312-55fd-b1c0-5e927cbf95b4": {
+    "name": "Xiphonia",
+    "type": "location",
+    "fields": {
+     "description": "Refugees from Sybaris have set up a small community and trading station.\nMyth: Rumored to be near the home of cyclope Polyphemus.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "585ac9c4-38a4-5103-a843-95eaac4010fe": {
+    "name": "Xuthia",
+    "type": "location",
+    "fields": {
+     "description": "Hellenized but never conquered by Greeks, due to its wooded and high position.",
+     "supertype": "Settled",
+     "subtype": "Village"
+    }
+   },
+   "082602ab-3c02-5f21-aead-0b3991874900": {
+    "name": "Zankle",
+    "type": "location",
+    "fields": {
+     "description": "Founded and sometimes plagued by pirates. Prime harbor for maintaining a fleet.",
+     "supertype": "Settled",
+     "subtype": "Polis"
+    }
+   }
+  }
+ },
+ "map": {
+  "width": 8000,
+  "height": 5200,
+  "pins": [
+   {
+    "x": 6530,
+    "y": 976,
+    "name": "Abakainon",
+    "ref": "12b1fd1c-d64b-5575-b5b3-fb249a42740e"
+   },
+   {
+    "x": 6865,
+    "y": 4417,
+    "name": "Abolla",
+    "ref": "8ad23f98-f465-5c3e-94a1-d0a8e8e53b85"
+   },
+   {
+    "x": 1978,
+    "y": 2517,
+    "name": "Adrane",
+    "ref": "853c0284-4cba-5d85-9a83-a0d347cf040d"
+   },
+   {
+    "x": 6136,
+    "y": 2222,
+    "name": "Adranos",
+    "ref": "a3abb5c6-0651-5867-a4fe-a601712962b4"
+   },
+   {
+    "x": 6750,
+    "y": 4121,
+    "name": "Adryx",
+    "ref": "f0a83770-24cd-51da-a698-90e05261bb06"
+   },
+   {
+    "x": 1214,
+    "y": 1788,
+    "name": "Aegesta",
+    "ref": "6d6a6143-ca35-5c5d-a940-63aadf006c99"
+   },
+   {
+    "x": 1406,
+    "y": 1381,
+    "name": "Aegeston Emporion",
+    "ref": "6c25757f-b18b-55ca-80e6-4c995319e885"
+   },
+   {
+    "x": 1548,
+    "y": 1651,
+    "name": "Aereo",
+    "ref": "98bac999-2c3b-52d1-9a73-d5ac0a68aa89"
+   },
+   {
+    "x": 5656,
+    "y": 641,
+    "name": "Agathyrnon",
+    "ref": "a55e7d55-e138-541b-9d36-c36e7b60596c"
+   },
+   {
+    "x": 5735,
+    "y": 4493,
+    "name": "Agera",
+    "ref": "d24e03c1-0396-58c6-82b3-4e563224b4ac"
+   },
+   {
+    "x": 7015,
+    "y": 1115,
+    "name": "Agrilla",
+    "ref": "201379b2-9745-5159-94e4-3039a5dcb42b"
+   },
+   {
+    "x": 5243,
+    "y": 2236,
+    "name": "Agyrion",
+    "ref": "06601828-44ed-5a6d-97ef-ee3187226fa3"
+   },
+   {
+    "x": 2993,
+    "y": 3588,
+    "name": "Akragas",
+    "ref": "d9cb7ceb-b402-5c2c-81ea-404e275739d6"
+   },
+   {
+    "x": 6336,
+    "y": 4145,
+    "name": "Akrai",
+    "ref": "291493ed-801f-5b43-b3da-6bfd80128aff"
+   },
+   {
+    "x": 5843,
+    "y": 4200,
+    "name": "Akrillai",
+    "ref": "3d6b9e7e-3615-5703-8370-f916a5e66886"
+   },
+   {
+    "x": 4346,
+    "y": 2625,
+    "name": "Alagene",
+    "ref": "970395a4-8f6a-5d4c-a47a-8fc162101297"
+   },
+   {
+    "x": 5868,
+    "y": 1560,
+    "name": "Allisse",
+    "ref": "1508279f-cbe1-564e-a090-a6b2aac1b99d"
+   },
+   {
+    "x": 5571,
+    "y": 2292,
+    "name": "Amaselos",
+    "ref": "0f7cabf5-c733-52c9-ac12-13c9d5b05b56"
+   },
+   {
+    "x": 3741,
+    "y": 1818,
+    "name": "Ambikos",
+    "ref": "5a6981c0-82d4-5386-9f92-4f2a32addfee"
+   },
+   {
+    "x": 1042,
+    "y": 1290,
+    "name": "Ancyrai",
+    "ref": "fb0e2f86-532e-5e65-a46a-769851af757c"
+   },
+   {
+    "x": 5304,
+    "y": 1229,
+    "name": "Apollonia",
+    "ref": "4c84774b-4659-5b36-96fb-d482390c3662"
+   },
+   {
+    "x": 4738,
+    "y": 3764,
+    "name": "Ariaiton",
+    "ref": "eb8ec8c8-e7ed-5d6f-8866-b6a1079f7eb7"
+   },
+   {
+    "x": 7103,
+    "y": 887,
+    "name": "Artemision",
+    "ref": "9c81cac4-babb-5259-91e0-8fa5244e6c9e"
+   },
+   {
+    "x": 4791,
+    "y": 2134,
+    "name": "Artesine",
+    "ref": "8b081a90-003c-51cf-954b-eea178b3c470"
+   },
+   {
+    "x": 5121,
+    "y": 2315,
+    "name": "Assoros",
+    "ref": "89ab0a3c-d4e0-522f-bf0d-c17b1fc8fed4"
+   },
+   {
+    "x": 3855,
+    "y": 2665,
+    "name": "Babalon",
+    "ref": "95af74f5-2e83-5866-b52f-99899b2e6c87"
+   },
+   {
+    "x": 4604,
+    "y": 3300,
+    "name": "Bakra",
+    "ref": "44a21f06-f022-5bae-b1e7-88182e7bbc90"
+   },
+   {
+    "x": 2937,
+    "y": 1615,
+    "name": "Balekena",
+    "ref": "ee7bad1c-7d30-54d7-9fb6-520069217750"
+   },
+   {
+    "x": 5467,
+    "y": 3531,
+    "name": "Balkonon",
+    "ref": "710d0293-e05b-5834-81d6-bedb0c92f367"
+   },
+   {
+    "x": 5445,
+    "y": 4143,
+    "name": "Bidis",
+    "ref": "2e7a6cbc-7c3f-53a7-a01f-818e89d60f80"
+   },
+   {
+    "x": 3420,
+    "y": 1514,
+    "name": "Boukara",
+    "ref": "851dc09c-3ad4-5b1a-a76c-66bb352d0288"
+   },
+   {
+    "x": 6233,
+    "y": 3137,
+    "name": "Brikinniai",
+    "ref": "50d38e4e-3c17-510a-a3b9-7cd5c923adfe"
+   },
+   {
+    "x": 6171,
+    "y": 5068,
+    "name": "Chersonos",
+    "ref": "23b9d57e-2b03-5091-88bc-44bb29b44a51"
+   },
+   {
+    "x": 6179,
+    "y": 1429,
+    "name": "Demena",
+    "ref": "08b48545-b347-52db-8994-6d7dc8bfe229"
+   },
+   {
+    "x": 4520,
+    "y": 3222,
+    "name": "Digenos",
+    "ref": "8371806a-da6c-51b0-a568-b09659e86df4"
+   },
+   {
+    "x": 592,
+    "y": 1427,
+    "name": "Drepanon",
+    "ref": "58ad9af3-d32c-56bb-8431-e9074a2d2ccc"
+   },
+   {
+    "x": 5631,
+    "y": 3656,
+    "name": "Echetla",
+    "ref": "0a99546b-26df-5a2b-a686-7d91b654b0f1"
+   },
+   {
+    "x": 6660,
+    "y": 5042,
+    "name": "Edissa",
+    "ref": "db24c523-b253-5084-8ec1-57fa56d44b4b"
+   },
+   {
+    "x": 3246,
+    "y": 2633,
+    "name": "Egenimos",
+    "ref": "72bd18ba-2916-520d-a953-a79cc0c1f093"
+   },
+   {
+    "x": 3870,
+    "y": 3986,
+    "name": "Eknomos",
+    "ref": "5e3bc616-30a8-53f2-a80a-60411098d1c6"
+   },
+   {
+    "x": 927,
+    "y": 1563,
+    "name": "Elima",
+    "ref": "0ff0990f-a3aa-51b0-b285-8197404c6c2c"
+   },
+   {
+    "x": 5515,
+    "y": 1728,
+    "name": "Engyon",
+    "ref": "f8ec22dc-b040-569a-a5d0-5420e19101e7"
+   },
+   {
+    "x": 4715,
+    "y": 2591,
+    "name": "Enna",
+    "ref": "555acba6-31ff-58bd-a7b2-5b011cbe0794"
+   },
+   {
+    "x": 1907,
+    "y": 2263,
+    "name": "Entella",
+    "ref": "451df48d-aa85-52f5-8a3a-57c39effa5e9"
+   },
+   {
+    "x": 6587,
+    "y": 2440,
+    "name": "Ergetion",
+    "ref": "2d51716e-c48c-5acc-b089-944e85453b73"
+   },
+   {
+    "x": 4182,
+    "y": 2665,
+    "name": "Erkenia",
+    "ref": "f62b609f-833c-508b-8998-2ac75e1c22a1"
+   },
+   {
+    "x": 5747,
+    "y": 3197,
+    "name": "Eryke",
+    "ref": "9feaffd8-91c2-53ac-b8a3-9c83fb7ae657"
+   },
+   {
+    "x": 629,
+    "y": 1472,
+    "name": "Eryx",
+    "ref": "8eb41efc-3ae6-5ec4-9b4f-ba9defac1f22"
+   },
+   {
+    "x": 5872,
+    "y": 3823,
+    "name": "Euboia",
+    "ref": "a3ddaeb5-b767-5db8-8c8c-348a42c08d45"
+   },
+   {
+    "x": 6568,
+    "y": 4553,
+    "name": "Fiinoka",
+    "ref": "b442ca4e-78bf-5646-8763-9081cc06c48c"
+   },
+   {
+    "x": 4580,
+    "y": 4026,
+    "name": "Gela",
+    "ref": "b07f8d44-52e8-5128-9f66-75f9c0ba3947"
+   },
+   {
+    "x": 4310,
+    "y": 3064,
+    "name": "Gibol Gabol",
+    "ref": "88d4351c-8c73-5774-a863-21a43c91aa93"
+   },
+   {
+    "x": 2715,
+    "y": 3169,
+    "name": "Gidinon",
+    "ref": "8dfed504-64e5-5e4c-b806-82909464266a"
+   },
+   {
+    "x": 6133,
+    "y": 696,
+    "name": "Goraion",
+    "ref": "5c4279ff-3fd9-5c6f-87c7-5171a976e38b"
+   },
+   {
+    "x": 2453,
+    "y": 2325,
+    "name": "Grannai",
+    "ref": "a56075ed-a10c-5d31-bb13-c467cd641495"
+   },
+   {
+    "x": 5007,
+    "y": 2883,
+    "name": "Halfason",
+    "ref": "ed92b347-dad9-569e-abbe-168ebdba59f5"
+   },
+   {
+    "x": 1162,
+    "y": 2144,
+    "name": "Halikyai",
+    "ref": "27024eab-ad87-5a99-8e44-1ad8ee1da5d4"
+   },
+   {
+    "x": 5620,
+    "y": 1056,
+    "name": "Halontion",
+    "ref": "e07aef25-6009-5862-991b-566177140d17"
+   },
+   {
+    "x": 4744,
+    "y": 1433,
+    "name": "Hamiit",
+    "ref": "ac69b364-f0f7-53eb-a9f3-16c9798a52e5"
+   },
+   {
+    "x": 3457,
+    "y": 2124,
+    "name": "Helketion",
+    "ref": "27220b1d-35cd-5fa3-a73a-b789245f5616"
+   },
+   {
+    "x": 6873,
+    "y": 4701,
+    "name": "Heloros",
+    "ref": "3df3b211-feb4-567e-ba88-076534697ea8"
+   },
+   {
+    "x": 4803,
+    "y": 2954,
+    "name": "Herbessos",
+    "ref": "07a4a069-b0af-527a-9013-ef37e2b79860"
+   },
+   {
+    "x": 4384,
+    "y": 1909,
+    "name": "Herbita",
+    "ref": "01b6a9cb-64a3-5a28-a13d-87cfcc9b7746"
+   },
+   {
+    "x": 4542,
+    "y": 1293,
+    "name": "Hesas",
+    "ref": "70ec1dc1-39e7-56d8-adb5-bdfef2ccc5b1"
+   },
+   {
+    "x": 3541,
+    "y": 1423,
+    "name": "Himera",
+    "ref": "77e56abb-b608-5b61-aee7-84a14237b91e"
+   },
+   {
+    "x": 2690,
+    "y": 2400,
+    "name": "Hippana",
+    "ref": "d9e4620e-93d8-5f93-a082-b57029f6dc89"
+   },
+   {
+    "x": 6311,
+    "y": 2564,
+    "name": "Hybla Geleatis",
+    "ref": "0b6343d8-10b1-5d25-bd08-9b5a3adfcf4a"
+   },
+   {
+    "x": 5970,
+    "y": 4572,
+    "name": "Hybla Heraia",
+    "ref": "cfbc2bab-7e13-59eb-89e4-4371499b5727"
+   },
+   {
+    "x": 1995,
+    "y": 961,
+    "name": "Hykarra",
+    "ref": "2d5f57cb-9e77-5a86-87fb-30bc32c6c9d7"
+   },
+   {
+    "x": 1995,
+    "y": 1553,
+    "name": "Iaitas",
+    "ref": "ec0ce03c-ecc9-525e-95fa-a767e290c686"
+   },
+   {
+    "x": 6881,
+    "y": 4909,
+    "name": "Ichana",
+    "ref": "5ae841f1-633c-5ae8-af03-2a901f701fff"
+   },
+   {
+    "x": 4989,
+    "y": 1663,
+    "name": "Imachara",
+    "ref": "b143a80c-1735-5fcf-90bd-09ec860954ee"
+   },
+   {
+    "x": 6070,
+    "y": 2643,
+    "name": "Inessa",
+    "ref": "cf5aef73-2420-59d2-aaac-8a18776e96b0"
+   },
+   {
+    "x": 1331,
+    "y": 1517,
+    "name": "Inikon",
+    "ref": "0cd5532b-c1bf-5649-9556-52d930686736"
+   },
+   {
+    "x": 6352,
+    "y": 4760,
+    "name": "Ispika",
+    "ref": "c9c0c53f-291e-54c6-ac2d-c420ca97e74c"
+   },
+   {
+    "x": 3987,
+    "y": 3607,
+    "name": "Kakyron",
+    "ref": "c285fc27-ea1b-51d6-b3e0-b9ac1f5c4445"
+   },
+   {
+    "x": 4983,
+    "y": 1171,
+    "name": "Kalakte",
+    "ref": "2a76ac6c-ada1-5a4d-be36-b882b74b78b0"
+   },
+   {
+    "x": 4182,
+    "y": 2500,
+    "name": "Kaligenos",
+    "ref": "864d05fa-d50c-579f-bbaa-ae457db14110"
+   },
+   {
+    "x": 3195,
+    "y": 3507,
+    "name": "Kalkarak",
+    "ref": "2d6593c4-09d2-5428-b546-52eddaf9e0bb"
+   },
+   {
+    "x": 6915,
+    "y": 2008,
+    "name": "Kallipolis",
+    "ref": "bff4d1fb-1495-5112-9361-73ab0ddf2b0d"
+   },
+   {
+    "x": 1587,
+    "y": 1470,
+    "name": "Kaloba",
+    "ref": "11dc78a6-f975-5182-884c-819bc85f880c"
+   },
+   {
+    "x": 4267,
+    "y": 2906,
+    "name": "Kaltigene",
+    "ref": "374bd071-5711-5d21-b9e2-39cb969f8b1e"
+   },
+   {
+    "x": 5341,
+    "y": 4699,
+    "name": "Kamarina",
+    "ref": "72055884-9a16-55c4-9a65-87b91f06c4e3"
+   },
+   {
+    "x": 5028,
+    "y": 3853,
+    "name": "Kamerai",
+    "ref": "e6ae7292-1db0-5a70-a624-38d50b3f792d"
+   },
+   {
+    "x": 2956,
+    "y": 3083,
+    "name": "Kamikos",
+    "ref": "131df24c-6877-5578-8387-13d88d0aea8b"
+   },
+   {
+    "x": 1766,
+    "y": 1827,
+    "name": "Kamporale",
+    "ref": "022994e5-6abc-5770-bfae-0f2d50bf8599"
+   },
+   {
+    "x": 4555,
+    "y": 2869,
+    "name": "Kapod",
+    "ref": "989f1fdc-1dcb-55a0-b05b-69ef8aa8e6ec"
+   },
+   {
+    "x": 2478,
+    "y": 3140,
+    "name": "Kaprianon",
+    "ref": "ecc7015b-09d9-5c48-87bc-d5210e6c9c99"
+   },
+   {
+    "x": 5189,
+    "y": 1538,
+    "name": "Kapution",
+    "ref": "588be673-8383-56fc-845d-9241f8694434"
+   },
+   {
+    "x": 2697,
+    "y": 1666,
+    "name": "Karastele",
+    "ref": "14bf6fbf-3038-5e03-adf2-73047e1ea74a"
+   },
+   {
+    "x": 6107,
+    "y": 2519,
+    "name": "Karole",
+    "ref": "876b5683-d07f-5d6d-8edb-a82e70ce2c50"
+   },
+   {
+    "x": 5586,
+    "y": 3384,
+    "name": "Kasasi",
+    "ref": "d25f80fb-1cc7-59d0-91d4-2083236f45a6"
+   },
+   {
+    "x": 5271,
+    "y": 3789,
+    "name": "Kasgeraton",
+    "ref": "61025336-04df-540f-bc46-023028e9b1eb"
+   },
+   {
+    "x": 6941,
+    "y": 4309,
+    "name": "Kasibe",
+    "ref": "9f27db68-7293-590c-bd3b-71ee24ee6bba"
+   },
+   {
+    "x": 6184,
+    "y": 4064,
+    "name": "Kasmenai",
+    "ref": "290f68ae-1056-5afc-818c-3625fb4e0f74"
+   },
+   {
+    "x": 6716,
+    "y": 2735,
+    "name": "Katane",
+    "ref": "c96c07c4-efb7-5cfc-8450-44d253631779"
+   },
+   {
+    "x": 2340,
+    "y": 1275,
+    "name": "Kataria",
+    "ref": "03df1f5d-19cd-52c9-aa51-86f74acb0fc6"
+   },
+   {
+    "x": 6821,
+    "y": 3348,
+    "name": "Katulle",
+    "ref": "2c120891-080c-58d9-906e-999792f06a3e"
+   },
+   {
+    "x": 5465,
+    "y": 4882,
+    "name": "Kaukanai",
+    "ref": "110c4738-2718-5640-9758-03e84f9b0bc2"
+   },
+   {
+    "x": 2496,
+    "y": 2066,
+    "name": "Kausos",
+    "ref": "df80d87c-617f-5e16-95db-30d0fe7ed40f"
+   },
+   {
+    "x": 5819,
+    "y": 2385,
+    "name": "Kentoripa",
+    "ref": "034fc1ae-c4a7-50e2-903c-2063eda157cf"
+   },
+   {
+    "x": 4142,
+    "y": 1242,
+    "name": "Kephaloidion",
+    "ref": "f1f4f07a-6703-5171-953d-76a6908387a0"
+   },
+   {
+    "x": 4019,
+    "y": 2583,
+    "name": "Kibone",
+    "ref": "54572d71-dd43-5e31-b056-b627c938d389"
+   },
+   {
+    "x": 4743,
+    "y": 1299,
+    "name": "Kilon",
+    "ref": "f2803095-c6b6-502e-a584-134c3c7a2093"
+   },
+   {
+    "x": 2977,
+    "y": 1789,
+    "name": "Kimena",
+    "ref": "ccc8f93c-32d3-52fc-ba83-cb87f30ec400"
+   },
+   {
+    "x": 2812,
+    "y": 2311,
+    "name": "Kolibra",
+    "ref": "53eed2c2-9f79-57e8-b6d5-8febacee6db1"
+   },
+   {
+    "x": 3782,
+    "y": 1465,
+    "name": "Kolle Kalos",
+    "ref": "e71ec4ae-04ca-5f13-bae7-3f75f1cd5cd8"
+   },
+   {
+    "x": 6692,
+    "y": 1431,
+    "name": "Koor",
+    "ref": "24401ad7-3c22-5a0b-9166-38f36d3f9cd1"
+   },
+   {
+    "x": 3648,
+    "y": 3383,
+    "name": "Koskon",
+    "ref": "b825453e-78b9-5c24-b5b5-9a02e4aa4e97"
+   },
+   {
+    "x": 3010,
+    "y": 2431,
+    "name": "Krastos",
+    "ref": "b18c1983-9170-54eb-a71c-5059cbfa0e89"
+   },
+   {
+    "x": 2615,
+    "y": 1178,
+    "name": "Kronia",
+    "ref": "a37c2bae-7026-50a5-8bc1-f1c86def9ca7"
+   },
+   {
+    "x": 4941,
+    "y": 3657,
+    "name": "Lavenka",
+    "ref": "5e757a76-1ec0-5e61-b9e0-0298454cf363"
+   },
+   {
+    "x": 5869,
+    "y": 2924,
+    "name": "Leona",
+    "ref": "02663282-1884-5b80-ae28-8b08a0123226"
+   },
+   {
+    "x": 6543,
+    "y": 3423,
+    "name": "Leontinoi",
+    "ref": "9c7dfa1a-c650-5a02-966c-d4606e9251e3"
+   },
+   {
+    "x": 6224,
+    "y": -259,
+    "name": "Lipara",
+    "ref": "059fa351-4b49-558c-b9ec-38c97795d32a"
+   },
+   {
+    "x": 6694,
+    "y": 839,
+    "name": "Longane",
+    "ref": "d1f75c66-bdf3-562e-b451-4a10d52c318c"
+   },
+   {
+    "x": 3094,
+    "y": 2175,
+    "name": "Madara",
+    "ref": "0a46fb8d-b9e9-53bd-ab5b-f50f4de376ba"
+   },
+   {
+    "x": 2537,
+    "y": 1538,
+    "name": "Makella",
+    "ref": "42a4b6f7-baa1-5140-9b69-fe293410e2d1"
+   },
+   {
+    "x": 4979,
+    "y": 3543,
+    "name": "Maktorion",
+    "ref": "cbf810f9-e665-5770-8ecb-a223c4e58464"
+   },
+   {
+    "x": 4062,
+    "y": 1465,
+    "name": "Manikos",
+    "ref": "91985329-61b3-52e4-82ba-9f75733f7033"
+   },
+   {
+    "x": 4116,
+    "y": 3757,
+    "name": "Markesa",
+    "ref": "eb309690-a130-50b6-ada9-2dc368a93eb8"
+   },
+   {
+    "x": 5350,
+    "y": 3717,
+    "name": "Maroi",
+    "ref": "371c4cd7-bdd0-537e-b491-3ad7d224971e"
+   },
+   {
+    "x": 5744,
+    "y": 4924,
+    "name": "Mastrome",
+    "ref": "46487d2c-9602-5293-8c9a-1d73d5b269a6"
+   },
+   {
+    "x": 658,
+    "y": 2660,
+    "name": "Mazara",
+    "ref": "9e5178d2-dd87-5724-92e8-f3e2750594d0"
+   },
+   {
+    "x": 6997,
+    "y": 3667,
+    "name": "Megara",
+    "ref": "aac6fcd7-9a36-5f3d-825a-75c897b3ce46"
+   },
+   {
+    "x": 5829,
+    "y": 3552,
+    "name": "Menai",
+    "ref": "02bb324f-5b2d-5e09-9d37-a2e8217c65ec"
+   },
+   {
+    "x": 4873,
+    "y": 4151,
+    "name": "Mentuse",
+    "ref": "439df1e4-30b6-57ed-bafa-c7aac588e6bc"
+   },
+   {
+    "x": 2123,
+    "y": 3161,
+    "name": "Merkane",
+    "ref": "364ff1a9-c111-582e-a47f-c74b9d2836bf"
+   },
+   {
+    "x": 2358,
+    "y": 3341,
+    "name": "Minoa",
+    "ref": "2a023e7c-c8ef-5a7a-8462-015f62d563fd"
+   },
+   {
+    "x": 2033,
+    "y": 1144,
+    "name": "Montope",
+    "ref": "8c725ead-4497-53d7-8dd0-4c71f7719ab1"
+   },
+   {
+    "x": 1952,
+    "y": 1999,
+    "name": "Morankusa",
+    "ref": "5319303d-29ef-5ef9-8758-135b26fb3ce9"
+   },
+   {
+    "x": 5257,
+    "y": 3131,
+    "name": "Morgantina",
+    "ref": "b3426a87-93af-5403-a400-ae7461907aef"
+   },
+   {
+    "x": 427,
+    "y": 2010,
+    "name": "Motya",
+    "ref": "569933a5-488b-56ab-8adf-85f8cd8d4de4"
+   },
+   {
+    "x": 6089,
+    "y": 4718,
+    "name": "Motyka",
+    "ref": "054aa593-a47b-5878-a2f8-daf291eb1abe"
+   },
+   {
+    "x": 3895,
+    "y": 2987,
+    "name": "Motyon",
+    "ref": "bbe49809-2f4e-5a17-9110-4b41ee8b0d96"
+   },
+   {
+    "x": 4141,
+    "y": 2375,
+    "name": "Murene",
+    "ref": "cc9887cf-3172-58fa-a06c-9a313892ae8e"
+   },
+   {
+    "x": 6912,
+    "y": 373,
+    "name": "Mylai",
+    "ref": "2dac277e-c396-5636-80cb-fb44073e2f71"
+   },
+   {
+    "x": 4142,
+    "y": 2786,
+    "name": "Myttistratos",
+    "ref": "d255ea79-51ab-5ee4-a166-a51ff6eb468e"
+   },
+   {
+    "x": 1595,
+    "y": 2445,
+    "name": "Nakone",
+    "ref": "c5b1898e-da9b-5771-a2f8-c84d6e97cdcd"
+   },
+   {
+    "x": 4770,
+    "y": 3343,
+    "name": "Naone",
+    "ref": "8d55a681-c5e2-54bd-bda0-e875073d9068"
+   },
+   {
+    "x": 7288,
+    "y": 327,
+    "name": "Naulochos",
+    "ref": "df685ad0-bd1a-5772-bb8e-c0805fa0000f"
+   },
+   {
+    "x": 7135,
+    "y": 1521,
+    "name": "Naxos",
+    "ref": "1d4707d1-5620-57cf-b49f-4c40a45fda0d"
+   },
+   {
+    "x": 6602,
+    "y": 4446,
+    "name": "Neaition",
+    "ref": "63f8b7f2-7a09-5ffd-aa5d-cd84902358d1"
+   },
+   {
+    "x": 5114,
+    "y": 1887,
+    "name": "Nikos",
+    "ref": "c8e6dee9-d623-5d01-b302-ed29015d003c"
+   },
+   {
+    "x": 2419,
+    "y": 1895,
+    "name": "Nilaios",
+    "ref": "7a01e6ee-c7df-52a0-93d7-b3967edba172"
+   },
+   {
+    "x": 5662,
+    "y": 2753,
+    "name": "Noai",
+    "ref": "6637a305-cd55-563b-bfdc-9334f0092968"
+   },
+   {
+    "x": 4492,
+    "y": 3796,
+    "name": "Omphake",
+    "ref": "5253b60c-c201-5810-8241-8d23ed8b7210"
+   },
+   {
+    "x": 6964,
+    "y": 5081,
+    "name": "Pachynos",
+    "ref": "d57056da-88b5-5e0e-96dd-73ff73eb80c6"
+   },
+   {
+    "x": 5989,
+    "y": 3366,
+    "name": "Palike",
+    "ref": "545ff929-c851-5816-a758-65ca122873a2"
+   },
+   {
+    "x": 2457,
+    "y": 999,
+    "name": "Panormos",
+    "ref": "beeef3a8-ba28-5ab5-9c91-fe4d7b5ac11d"
+   },
+   {
+    "x": 6641,
+    "y": 3853,
+    "name": "Pantalika",
+    "ref": "889abf46-9695-55c1-8f98-dad82f9858db"
+   },
+   {
+    "x": 3612,
+    "y": 2544,
+    "name": "Parkenon",
+    "ref": "3d78511e-ecea-591c-b52e-0ecdd4282a60"
+   },
+   {
+    "x": 2735,
+    "y": 1265,
+    "name": "Paropos",
+    "ref": "789f3f5d-9c2a-5e5d-a7bf-c8c472942e2c"
+   },
+   {
+    "x": 1681,
+    "y": 2183,
+    "name": "Pergane",
+    "ref": "7a9c9895-b794-58ea-8152-b56332ebcf0a"
+   },
+   {
+    "x": 4799,
+    "y": 2715,
+    "name": "Pergusa",
+    "ref": "56aefe6b-b0b5-5fc8-b01c-3ca622c59fee"
+   },
+   {
+    "x": 1400,
+    "y": 2577,
+    "name": "Petrosa",
+    "ref": "a80a7a9e-3dbc-5686-a23f-6c3e970b8030"
+   },
+   {
+    "x": 4246,
+    "y": 3945,
+    "name": "Phalarion",
+    "ref": "5f96f796-b36f-5a52-8faa-8633be4fcd5d"
+   },
+   {
+    "x": 7259,
+    "y": 1252,
+    "name": "Phoinix",
+    "ref": "dd2307f6-4bc8-5915-af14-b7bc1ee6f541"
+   },
+   {
+    "x": 6048,
+    "y": 2047,
+    "name": "Piakos",
+    "ref": "ccef4fde-54d4-557c-9bc5-8ad543c827e7"
+   },
+   {
+    "x": 3097,
+    "y": 1873,
+    "name": "Pikone",
+    "ref": "daf33a69-4c64-5637-b5cb-a0ff2699ed61"
+   },
+   {
+    "x": 3487,
+    "y": 3806,
+    "name": "Pipana",
+    "ref": "7e2582ce-77dd-5997-a2eb-45d0863c2c1d"
+   },
+   {
+    "x": 2380,
+    "y": 1543,
+    "name": "Pirama",
+    "ref": "a5815ce8-85d6-5751-9b37-6e424c7cd864"
+   },
+   {
+    "x": 7335,
+    "y": 4166,
+    "name": "Plemmyrion",
+    "ref": "9395c6fe-a889-5a8a-98cd-a75dad635f9c"
+   },
+   {
+    "x": 1132,
+    "y": 2012,
+    "name": "Pollike",
+    "ref": "db81f308-bccd-5053-a1ae-69e86bb9dc90"
+   },
+   {
+    "x": 3567,
+    "y": 2831,
+    "name": "Rakine",
+    "ref": "f711bec8-bac9-5b14-9894-c5dcb589eb10"
+   },
+   {
+    "x": 3905,
+    "y": 3722,
+    "name": "Ravanusa",
+    "ref": "27c2f185-2854-52b3-98c7-c523646467bc"
+   },
+   {
+    "x": 7907,
+    "y": 612,
+    "name": "Rhegion",
+    "ref": "0a77d35e-85f7-59e9-a451-56be33bf4005"
+   },
+   {
+    "x": 1930,
+    "y": 2892,
+    "name": "Rokka",
+    "ref": "f8719e58-0fc4-50bc-bbc9-c09036d78b62"
+   },
+   {
+    "x": 7281,
+    "y": 563,
+    "name": "Romnos",
+    "ref": "17aa284c-1ea8-5f77-bbef-36cd844c0249"
+   },
+   {
+    "x": 2516,
+    "y": 3294,
+    "name": "Rotonde",
+    "ref": "4c20deb5-3ca4-58f0-9947-f40a93ed2d55"
+   },
+   {
+    "x": 4432,
+    "y": 2947,
+    "name": "Sabukina",
+    "ref": "36688718-0e26-5605-a340-3293e79ce59a"
+   },
+   {
+    "x": 3178,
+    "y": 1431,
+    "name": "Saneka",
+    "ref": "0efc48b7-6bc8-50ba-ba9c-de35b266a943"
+   },
+   {
+    "x": 2337,
+    "y": 2202,
+    "name": "Schera",
+    "ref": "a7f055c1-8fe9-51e4-8f6f-e43b726c289c"
+   },
+   {
+    "x": 6773,
+    "y": 3506,
+    "name": "Selefe",
+    "ref": "331aec1f-adb7-576e-b727-fac09b2a7cbe"
+   },
+   {
+    "x": 1236,
+    "y": 2914,
+    "name": "Selinous",
+    "ref": "041e281d-e7cf-5eb0-8fa6-3861f453c50f"
+   },
+   {
+    "x": 3660,
+    "y": 1906,
+    "name": "Skiara",
+    "ref": "837960f1-afec-5698-b104-9cb2943dd533"
+   },
+   {
+    "x": 5977,
+    "y": 4858,
+    "name": "Skikli",
+    "ref": "24f0f56b-56c2-544c-b7f5-f2cb48d4aad1"
+   },
+   {
+    "x": 5528,
+    "y": 4223,
+    "name": "Skornake",
+    "ref": "6f59d7e5-8ba8-5e85-89fb-d9f4fef1ca8f"
+   },
+   {
+    "x": 5461,
+    "y": 1098,
+    "name": "Skurke",
+    "ref": "c1e2980f-f67d-52e5-8ad6-3b04a9062db1"
+   },
+   {
+    "x": 2773,
+    "y": 992,
+    "name": "Solous",
+    "ref": "a1d0e381-4efc-5e19-8be7-4aaa492a9fe0"
+   },
+   {
+    "x": 2456,
+    "y": 2111,
+    "name": "Spolion",
+    "ref": "5915a1ec-6a23-59a5-8bf0-6b92019a8a18"
+   },
+   {
+    "x": 6378,
+    "y": 3653,
+    "name": "Styella",
+    "ref": "9586cb05-b199-52cb-9e98-f72a8ff5d9c2"
+   },
+   {
+    "x": 6594,
+    "y": 3104,
+    "name": "Symaithos",
+    "ref": "a5589d2a-eb82-53ae-8594-12c50f372ea3"
+   },
+   {
+    "x": 7298,
+    "y": 4016,
+    "name": "Syrakousai",
+    "ref": "29c92b41-6372-56ca-a6e7-311a740a9ea7"
+   },
+   {
+    "x": 4998,
+    "y": 2268,
+    "name": "Tavake",
+    "ref": "b82d5ec4-9763-585e-96cb-2006c88d897d"
+   },
+   {
+    "x": 7108,
+    "y": 3785,
+    "name": "Thapsos",
+    "ref": "cb35c8f7-07d4-5335-84ad-7ee40e991760"
+   },
+   {
+    "x": 4807,
+    "y": 3189,
+    "name": "Tigra",
+    "ref": "60dcaff0-debe-5d9a-b14a-3a1053cd2357"
+   },
+   {
+    "x": 6374,
+    "y": 1340,
+    "name": "Tirakii",
+    "ref": "e571806b-9bd5-5aa5-b519-b8c52e11db06"
+   },
+   {
+    "x": 3074,
+    "y": 3277,
+    "name": "Tirnon",
+    "ref": "66eff82c-7e93-510d-8565-d2eae7f4b696"
+   },
+   {
+    "x": 6577,
+    "y": 1566,
+    "name": "Tissa",
+    "ref": "d8da4cbe-a3e9-59ce-88e9-326791f841f1"
+   },
+   {
+    "x": 2128,
+    "y": 2841,
+    "name": "Triokala",
+    "ref": "729308f6-6dc7-5a8f-a294-2af2e3075e53"
+   },
+   {
+    "x": 6972,
+    "y": 3430,
+    "name": "Trotilon",
+    "ref": "f383f1f7-10d4-5e5e-b502-a34cb0d94642"
+   },
+   {
+    "x": 4223,
+    "y": 2079,
+    "name": "Tyrrhene",
+    "ref": "0ef38751-c009-58a2-ba29-a412c52d2d95"
+   },
+   {
+    "x": 6907,
+    "y": 2526,
+    "name": "Xiphonia",
+    "ref": "ae6083a2-d312-55fd-b1c0-5e927cbf95b4"
+   },
+   {
+    "x": 5914,
+    "y": 3977,
+    "name": "Xuthia",
+    "ref": "585ac9c4-38a4-5103-a843-95eaac4010fe"
+   },
+   {
+    "x": 7704,
+    "y": 424,
+    "name": "Zankle",
+    "ref": "082602ab-3c02-5f21-aead-0b3991874900"
+   }
+  ]
+ }
+}
