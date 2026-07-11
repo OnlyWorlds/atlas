@@ -371,8 +371,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (!picked) return;
     const page = elOf(pageId);
     if (!page) return;
+    // Default = full + description: a bare identity row surprised the first
+    // real publisher ("only shows pic and name?", Captain's smoke S254).
+    // The editor's field picker narrows from here; compact stays available.
     const block: PageBlock = {
-      id: newBlockId(), kind: 'element-card', elementId: picked.id, variant: 'compact', fields: [],
+      id: newBlockId(), kind: 'element-card', elementId: picked.id, variant: 'full', fields: ['description'],
     };
     await saveBlocks(pageId, [...blocksOf(page), block]);
     editingBlockId = block.id;
@@ -646,9 +649,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     changeBtn.addEventListener('click', () => {
       void (async () => {
         const picked = await pickElement({ title: 'Change card to…', excludeIds: [pageId] });
-        // Re-picking resets the field choice — the old element's fields
-        // don't apply to the new one.
-        if (picked) await patchCardBlock(pageId, block.id, { elementId: picked.id, fields: [] });
+        // Re-picking resets the field choice to the same default a new card
+        // gets — the old element's fields don't apply to the new one.
+        if (picked) await patchCardBlock(pageId, block.id, { elementId: picked.id, fields: ['description'] });
       })();
     });
     bindRow.appendChild(changeBtn);
@@ -884,6 +887,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       labelRow.className = 'atlas-share-field-label';
       labelRow.textContent = 'Visible pins';
       labelRow.title = 'Included pins share their element\'s name, type, description and image on the published page. Toggle "full" on a pin to share every populated field of that element.';
+      // Visible, not tooltip-only: the full toggle went unfound in the
+      // release smoke (Captain, S254). One line states the disclosure rule.
+      const disclosureHint = document.createElement('p');
+      disclosureHint.className = 'atlas-share-hint atlas-share-map-disclosure-hint';
+      disclosureHint.textContent = 'Checked pins share name, type, description and image. Click full on a pin to share its whole profile.';
       const allBtn = document.createElement('button');
       allBtn.type = 'button';
       allBtn.className = 'atlas-share-map-pins-toggle';
@@ -897,6 +905,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       });
       labelRow.appendChild(allBtn);
       fieldsWrap.appendChild(labelRow);
+      fieldsWrap.appendChild(disclosureHint);
       for (const pin of mapPins) {
         const target = elOf((pin as Record<string, unknown>).element_id as string);
         const row = document.createElement('label');
@@ -1541,6 +1550,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   function buildPublishSection(page: Element): HTMLElement {
     const section = document.createElement('section');
     section.className = 'atlas-share-section atlas-share-publish';
+    section.dataset.role = 'publish-section';
     section.innerHTML = `<h2 class="atlas-share-section-title">Publish</h2>`;
 
     const worldId = wid();
@@ -1960,6 +1970,28 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       })();
     });
     header.appendChild(copyPayload);
+    // The publish action, headlined. The T-S7 collapse buried publishing so
+    // well its own designer hunted for it (Captain's smoke, S254) — the verb
+    // belongs in the header; the button expands the meta and lands you there.
+    const publishBtn = document.createElement('button');
+    publishBtn.type = 'button';
+    publishBtn.className = 'atlas-share-preview-toggle atlas-share-publish-cta';
+    publishBtn.dataset.action = 'open-publish';
+    const pubNow = pagePubOf(page);
+    publishBtn.title = pubNow && !pubNow.revoked
+      ? 'Publish settings: republish or take the live page down'
+      : 'Publish this page to a public link';
+    publishBtn.innerHTML = `<span class="material-symbols-outlined">public</span> ${pubNow && !pubNow.revoked ? 'published' : 'publish'}`;
+    publishBtn.addEventListener('click', () => {
+      void (async () => {
+        await commitOpenEdit(pageId);
+        if (previewMode) previewMode = false;
+        metaExpanded = true;
+        buildDetail(pageId);
+        root.querySelector('[data-role="publish-section"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      })();
+    });
+    header.appendChild(publishBtn);
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'atlas-share-delete';

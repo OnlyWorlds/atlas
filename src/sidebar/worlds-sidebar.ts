@@ -57,7 +57,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">cloud_upload</span>
         </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="link-api" title="Link existing API world (downloads into atlas)">
+        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="link-api" title="Add existing API world (downloads into atlas)">
+          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">link</span>
         </button>
       `;

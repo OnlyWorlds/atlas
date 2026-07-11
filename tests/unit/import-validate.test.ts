@@ -27,6 +27,13 @@ describe('validatePayload', () => {
     expect(issues.some(i => i.field === 'vibe' && /unknown field/i.test(i.issue))).toBe(true);
   });
 
+  it('accepts server stamps (created_at/updated_at) — atlas exports carry them', () => {
+    const issues = validatePayload(parsePayload({
+      Character: [{ name: 'A', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-02T00:00:00Z' }],
+    }));
+    expect(issues).toEqual([]);
+  });
+
   it('flags an unknown element-type bucket', () => {
     const issues = validatePayload(parsePayload({ Character: [{ name: 'A' }], Widgets: [{ name: 'W' }] }));
     expect(issues.some(i => i.field === 'Widgets' && /unknown element type/i.test(i.issue))).toBe(true);

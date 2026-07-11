@@ -105,13 +105,37 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       return;
     }
 
-    // Atlas root set but no world active.
+    // Atlas root set but no world active. Zero worlds = the moment after
+    // first setup — headline the ONE next step (Captain's smoke, S254: "not
+    // super clear what the intent is here"); with worlds, it's just a picker.
     if (!active) {
+      const hasWorlds = state.registry.worlds.length > 0;
+      if (!hasWorlds) {
+        root.innerHTML = `
+          <header class="atlas-room-header"><h1>Create your first world</h1></header>
+          <div class="atlas-welcome-empty">
+            <p>Your atlas folder is ready. A world is one subfolder inside it; every element you make becomes a file there.</p>
+            <div class="atlas-welcome-actions">
+              <button class="atlas-btn-primary" data-action="welcome-create-world">New world</button>
+            </div>
+            <p class="atlas-welcome-hint">Already have a world on onlyworlds.com? The sidebar's link button downloads it into atlas. Bringing notes or an export instead? Create a world, then use Import.</p>
+            <p class="atlas-welcome-hint">Atlas folder: <code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
+            <p class="atlas-welcome-hint atlas-welcome-sample-hint"><a href="#/demo" class="atlas-welcome-demo-link">Look around the sample world</a> · view only</p>
+          </div>
+        `;
+        root.querySelector<HTMLButtonElement>('[data-action="welcome-create-world"]')!
+          .addEventListener('click', () => {
+            void import('../ui/create-world-modal').then(({ CreateWorldModal }) => {
+              new CreateWorldModal(toastManager).open();
+            });
+          });
+        return;
+      }
       root.innerHTML = `
         <header class="atlas-room-header"><h1>Atlas</h1></header>
         <div class="atlas-welcome-empty">
           <p>No world open.</p>
-          <p class="atlas-welcome-hint">Use the sidebar to <strong>Create local</strong>, or pick an existing world from the list.</p>
+          <p class="atlas-welcome-hint">Pick a world from the sidebar, or create a new one with its folder button.</p>
           <p class="atlas-welcome-hint">Atlas folder: <code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
           <p class="atlas-welcome-hint atlas-welcome-sample-hint"><a href="#/demo" class="atlas-welcome-demo-link">Look around the sample world</a> · view only</p>
         </div>

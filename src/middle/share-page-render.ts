@@ -184,7 +184,7 @@ export function renderElementCard(block: ElementCardBlock, elements: Map<string,
 export function renderCollectionView(
   block: CollectionBlock,
   resolve: (id: string) => { name: string; type: string; image_url?: string } | null,
-  opts: { editorHint?: boolean } = {},
+  opts: { editorHint?: boolean; onOpen?: (id: string) => void } = {},
 ): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'atlas-share-collection';
@@ -204,9 +204,22 @@ export function renderCollectionView(
     }
     return wrap;
   }
-  for (const { entry } of members) {
+  for (const { id, entry } of members) {
     const cell = document.createElement('div');
     cell.className = 'atlas-share-collection-cell';
+    // A cell click opens the identity modal (same surface as pins) — the old
+    // show-side anchor jump did nothing unless the member was ALSO carded,
+    // which read as broken (Captain's smoke, S254).
+    if (opts.onOpen) {
+      cell.classList.add('is-openable');
+      cell.setAttribute('role', 'button');
+      cell.tabIndex = 0;
+      const open = (): void => opts.onOpen!(id);
+      cell.addEventListener('click', open);
+      cell.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+    }
     if (entry.image_url && /^https?:\/\//i.test(entry.image_url)) {
       const img = document.createElement('img');
       img.className = 'atlas-share-collection-avatar';
@@ -723,7 +736,12 @@ export function renderPayloadPage(payload: PagePayload): HTMLElement {
         node = renderPayloadCard(block, payload.elements);
         break;
       case 'collection':
-        node = renderCollectionView(block, (id) => payload.elements[id] ?? null);
+        node = renderCollectionView(block, (id) => payload.elements[id] ?? null, {
+          onOpen: (id) => {
+            const entry = payload.elements[id];
+            if (entry) openPinModal(entry, payload.elements);
+          },
+        });
         break;
       case 'map':
         node = renderMapView(block, (id) => payload.elements[id] ?? null, payload.elements);

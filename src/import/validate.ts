@@ -19,6 +19,11 @@ import type { ParseResult, RawRecord, ValidationIssue } from './types';
 
 const ATLAS_EXT = new Set<string>(ATLAS_LOCAL_EXTENSION_FIELDS);
 const SPATIAL_SAFE = new Set(['x', 'y', 'z', 'order', 'element_type']);
+// Server bookkeeping stamps. Files in an api-linked world carry these, so
+// atlas's OWN export round-trips through here — flagging them produced 45
+// bogus "unknown field" warnings on a clean export (Captain's smoke, S254).
+// Reconcile strips them; the validator's job is only to not cry wolf.
+const SERVER_STAMPS = new Set(['created_at', 'updated_at']);
 const VALID_TYPE_LIST = ALL_ELEMENT_TYPES.map(t => cap(t)).join(', ');
 
 function cap(s: string): string {
@@ -104,7 +109,7 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
           continue;
         }
 
-        if (!known.has(k) && !ATLAS_EXT.has(k) && !(isSpatial && SPATIAL_SAFE.has(k))) {
+        if (!known.has(k) && !ATLAS_EXT.has(k) && !SERVER_STAMPS.has(k) && !(isSpatial && SPATIAL_SAFE.has(k))) {
           issues.push({
             path: `${path}.${k}`,
             field: k,
