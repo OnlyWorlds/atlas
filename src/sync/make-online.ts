@@ -17,6 +17,7 @@
 
 import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { OwClientAdapter } from './ow-client-adapter';
+import { devApiBase } from './dev-api-base';
 import type { FolderStore } from '../store/folder-store';
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import type { Element, ElementType, PerElementFailure } from '../core/types';
@@ -33,7 +34,7 @@ export function setMakeOnlineBaseUrl(url: string): void {
 let overriddenBase: string | null = null;
 
 function getWorldsyncUrl(): string {
-  const base = overriddenBase ?? DEFAULT_OW_BASE;
+  const base = overriddenBase ?? devApiBase() ?? DEFAULT_OW_BASE;
   const worldsyncBase = base.endsWith('/worldapi') ? base.replace(/\/worldapi$/, '/worldsync') : base;
   return `${worldsyncBase}/create-world-external/`;
 }
@@ -557,6 +558,6 @@ export function buildOwClient(apiKey: string, apiPin: string, baseUrl?: string):
   return new OnlyWorldsClient({
     apiKey: apiKey.trim(),
     apiPin: apiPin.trim(),
-    baseUrl: baseUrl ?? (overriddenBase ?? undefined),
+    baseUrl: baseUrl ?? overriddenBase ?? devApiBase() ?? undefined,
   });
 }

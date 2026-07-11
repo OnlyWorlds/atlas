@@ -3,7 +3,19 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: './',
-  server: { port: 3045 },
+  server: {
+    port: 3045,
+    // Dev-only proxy for pointing the sync surface at non-production APIs
+    // (keel-staging has no CORS yet — flagged to Skeld 2026-07-11). Used with
+    // localStorage 'atlas_dev_api_base' = 'http://localhost:3045/keel/api/worldapi'.
+    proxy: {
+      '/keel': {
+        target: 'https://keel-staging.onrender.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/keel/, ''),
+      },
+    },
+  },
   build: {
     target: 'es2020',
     outDir: 'dist'

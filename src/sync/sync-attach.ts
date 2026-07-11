@@ -17,6 +17,7 @@
 
 import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { OwClientAdapter } from './ow-client-adapter';
+import { devApiBase } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
 import { patchSlice, getState, setState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
@@ -69,6 +70,7 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
   const client = new OnlyWorldsClient({
     apiKey: entry.api.api_key,
     apiPin: pin,
+    baseUrl: devApiBase() ?? undefined,
   });
   const adapter = new OwClientAdapter(client);
   const engine = new SyncEngine({
