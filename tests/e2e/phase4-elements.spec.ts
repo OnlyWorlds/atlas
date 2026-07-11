@@ -33,7 +33,9 @@ async function createWorld(page: Page, name: string) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
+  // Creating a world now flips the sidebar into elements mode (S255v3), so
+  // world rows are no longer visible here — wait for the elements body instead.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
 async function setupWorldA(page: Page) {
@@ -44,8 +46,10 @@ async function setupWorldA(page: Page) {
 
 test('right tab is hidden without an active world; worlds tab remains', async ({ page }) => {
   await freshBoot(page);
-  // Right tab (per-world label) is rendered only when a world is active. With
-  // no active world there's nothing meaningful to switch to.
+  // Pre-root the whole sidebar header is silent (S255v3); set up a root (no
+  // world) so the toggle exists. Right tab (per-world label) is rendered only
+  // when a world is active — with none there's nothing meaningful to switch to.
+  await setupAtlasRoot(page, 'elements-noworld-root');
   await expect(page.locator('.atlas-mode-btn[data-action="mode-elements"]')).toHaveCount(0);
   await expect(page.locator('.atlas-mode-btn[data-action="mode-worlds"]')).toBeEnabled();
 });
@@ -53,7 +57,11 @@ test('right tab is hidden without an active world; worlds tab remains', async ({
 test('elements mode becomes enabled and toggles when a world is active', async ({ page }) => {
   await setupWorldA(page);
 
-  // Worlds mode is active by default.
+  // Creating a world lands directly in elements mode (S255v3).
+  await expect(page.locator('.atlas-mode-btn[data-action="mode-elements"]')).toHaveClass(/active/);
+
+  // Toggle back to worlds mode, then forward again, to confirm the switch works.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await expect(page.locator('.atlas-mode-btn[data-action="mode-worlds"]')).toHaveClass(/active/);
 
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
@@ -62,7 +70,9 @@ test('elements mode becomes enabled and toggles when a world is active', async (
   // the URL. URL stays on the active world. Elements body renders.
   await expect(page.locator('.atlas-mode-btn[data-action="mode-elements"]')).toHaveClass(/active/);
   await expect(page.locator('.atlas-sidebar .atlas-list')).toBeVisible();
-  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toContainText('No elements yet');
+  // Empty world: no narration line; the + button pulses and the search field
+  // invites creating instead (S255v3).
+  await expect(page.locator('[data-role="elements-search"]')).toHaveAttribute('placeholder', 'Create an element...');
 });
 
 test('create element from elements sidebar → row + detail view', async ({ page }) => {
@@ -262,7 +272,7 @@ test('switching worlds resets the elements view to the new world', async ({ page
   // Now active world is beta — switch to elements mode, alpha hero must NOT appear.
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
   await expect(page.locator('.atlas-row[data-element-id]', { hasText: 'alpha hero' })).toHaveCount(0);
-  // Scope to the elements sidebar — the map index also renders an
-  // atlas-pane-empty when no maps exist.
-  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toBeVisible();
+  // Empty world: no narration line; the search field placeholder invites
+  // creating instead (S255v3).
+  await expect(page.locator('[data-role="elements-search"]')).toHaveAttribute('placeholder', 'Create an element...');
 });

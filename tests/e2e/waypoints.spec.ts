@@ -37,7 +37,7 @@ async function createWorld(page: Page, name: string) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {

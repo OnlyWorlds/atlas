@@ -341,10 +341,10 @@ function renderWritingTierActions(el: Element, header: HTMLElement): void {
   const cluster = document.createElement('div');
   cluster.className = 'atlas-header-cluster atlas-header-writing';
 
-  const badge = document.createElement('span');
-  badge.className = 'atlas-header-writing-tier';
-  badge.textContent = tierLabel;
-  cluster.appendChild(badge);
+  // The tier badge ("Book"/"Chapter" pill) was dropped S255v3 (Captain): the
+  // sidebar tree already names the tier, and the label diluted the create
+  // buttons it sat beside. tierLabel still drives the button tooltips below.
+  void tierLabel;
 
   const childTiers: Array<'l1' | 'l2' | 'l3' | 'l4'> = [];
   if (tier === 'l1') childTiers.push('l2', 'l4');

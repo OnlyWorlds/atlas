@@ -31,7 +31,9 @@ test('the share room links into the demo; the demo renders map, pins, and cards'
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Demo Entry World');
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Demo Entry World' })).toBeVisible();
+  // Creating a world flips the sidebar into elements mode (S255v3) — sync on
+  // the elements body, not a worlds-list row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 
   await page.click('.atlas-room-nav-btn[data-room="share"]');
   await expect(page.locator('.atlas-share-example-line a')).toHaveText('See an example page');

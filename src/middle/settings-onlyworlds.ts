@@ -37,10 +37,11 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
     <section class="atlas-settings-section atlas-ow-intro">
       <h3>OnlyWorlds</h3>
       <p class="atlas-settings-hint">
-        Atlas is a free, local worldbuilding studio, powered by
-        <a href="${OW_SITE_URL}" target="_blank" rel="noopener">OnlyWorlds</a>,
-        an open format for whole worlds. Your world lives as plain files in a
-        folder you own, and the format is why any OnlyWorlds tool can read it.
+        <a href="${OW_SITE_URL}" target="_blank" rel="noopener">OnlyWorlds</a>
+        is an open format for whole worlds: 22 element types, one schema, and
+        a free account that stores your worlds online. Atlas writes that
+        format to your folder, so other OnlyWorlds tools can read your worlds,
+        and syncs with your account when you link one.
       </p>
     </section>
     ${renderAccountTab(reg)}

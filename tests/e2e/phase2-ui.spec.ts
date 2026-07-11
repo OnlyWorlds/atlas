@@ -95,7 +95,9 @@ test('re-use: picking a folder that is already an atlas root does NOT double-wra
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'In Existing Root');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'In Existing Root' })).toBeVisible();
+  // Creating a world flips the sidebar into elements mode (S255v3) — use the
+  // mode-independent completion signal instead of a worlds-list row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
   await page.click('[data-action="open-settings"]');
   await page.click('[data-settings-tab="storage"]');
   await expect(page.locator('.atlas-settings')).toContainText('existing-root');
@@ -126,6 +128,10 @@ test('create local world inside atlas root → sidebar + welcome + URL', async (
   await page.click('[data-action="pick"]');
 
   await expect(page.locator('[data-modal="create-world"]')).toHaveCount(0);
+  // Creating a world flips the sidebar into elements mode (S255v3); switch
+  // back to worlds mode to assert on the row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   const row = page.locator('.atlas-row[data-world-id]', { hasText: 'My First World' });
   await expect(row).toBeVisible();
   await expect(row).toHaveClass(/selected/);
@@ -155,12 +161,17 @@ test('two worlds created in root share parent folder', async ({ page }) => {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Alpha');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Alpha' })).toBeVisible();
+  // Creating a world flips the sidebar into elements mode (S255v3) — wait for
+  // the mode-independent signal, then switch back to worlds mode so the
+  // create-local button (worlds-mode-only) is available for the next create.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
 
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Beta');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Beta' })).toBeVisible();
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
 
   // Beta is the most-recently-created so it's active.
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Beta' })).toHaveClass(/selected/);
@@ -196,7 +207,9 @@ test('settings shows atlas folder + identity fields', async ({ page }) => {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'For Settings');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'For Settings' })).toBeVisible();
+  // Creating a world flips the sidebar into elements mode (S255v3) — use the
+  // mode-independent completion signal instead of a worlds-list row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 
   await page.click('[data-action="open-settings"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
@@ -261,7 +274,9 @@ test('reload → atlas root + world both persist, click re-activates', async ({ 
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Persistent');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Persistent' })).toBeVisible();
+  // Creating a world flips the sidebar into elements mode (S255v3) — use the
+  // mode-independent completion signal instead of a worlds-list row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 
   // Reload via `/` — this drops the URL hash, so auto-activate-from-url has no
   // worldId to act on. The world should remain listed but not active.
@@ -290,11 +305,15 @@ test('reload with world in URL hash → silent auto-activate preserves state', a
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'AutoOpen');
   await page.click('[data-action="pick"]');
-  const row = page.locator('.atlas-row[data-world-id]', { hasText: 'AutoOpen' });
-  await expect(row).toBeVisible();
+  // Creating a world flips the sidebar into elements mode (S255v3) — the
+  // world row isn't visible there, so capture the world id from the URL hash
+  // instead of the row's data-world-id attribute.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await page.waitForURL(/#\/w\//);
 
-  // Capture the world's id from its row and build a deep URL into elements mode.
-  const worldId = await row.getAttribute('data-world-id');
+  // Capture the world's id from the URL hash and build a deep URL into elements mode.
+  const hash = await page.evaluate(() => window.location.hash);
+  const worldId = hash.match(/#\/w\/([0-9a-f-]+)/)?.[1];
   expect(worldId).toBeTruthy();
 
   // Reload preserving the worlds-mode URL for this world.
@@ -303,6 +322,10 @@ test('reload with world in URL hash → silent auto-activate preserves state', a
 
   // OPFS handles auto-grant permission, so silent auto-activate succeeds.
   // The world should show as active in the sidebar without any click.
+  // The sidebar mode pref persisted as "elements" from the create flow above,
+  // and the reloaded URL carries an active world id, so switch back to
+  // worlds mode to assert on the row.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'AutoOpen' })).toHaveClass(/selected/);
   // Sidebar mode toggle reflects the active world via its right-tab label.
   await expect(page.locator('[data-action="mode-elements"] .atlas-mode-btn-label')).toContainText('AutoOpen');
@@ -313,7 +336,9 @@ test('forget world removes it from sidebar + nav to root, atlas root preserved',
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Doomed');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Doomed' })).toBeVisible();
+  // Creating a world flips the sidebar into elements mode (S255v3) — use the
+  // mode-independent completion signal instead of a worlds-list row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 
   page.on('dialog', d => d.accept());
   await page.click('[data-action="open-settings"]');
@@ -321,8 +346,12 @@ test('forget world removes it from sidebar + nav to root, atlas root preserved',
   await page.click('[data-settings-tab="world"]');
   await page.click('[data-action="delete-world"]');
 
-  // World list empty but atlas root still present (we forgot the world, not the folder root).
-  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toBeVisible();
+  // World list empty but atlas root still present (we forgot the world, not
+  // the folder root). No narration line in the empty list (S255v2). The
+  // deleted world no longer has an entry, so the sidebar falls back to
+  // worlds mode on its own — switch explicitly for a deterministic assert.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
+  await expect(page.locator('.atlas-row[data-world-id]')).toHaveCount(0);
   await expect(page.locator('[data-action="create-local"]')).toBeVisible();
   await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
 });
@@ -332,7 +361,9 @@ test('change atlas folder swaps the root without losing existing worlds', async 
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Pre-Swap');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Pre-Swap' })).toBeVisible();
+  // Creating a world flips the sidebar into elements mode (S255v3) — use the
+  // mode-independent completion signal instead of a worlds-list row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 
   // Go to settings, switch to storage tab, queue a different folder, click change.
   await page.click('[data-action="open-settings"]');
@@ -348,7 +379,10 @@ test('change atlas folder swaps the root without losing existing worlds', async 
 
   // Settings now shows the new folder.
   await expect(page.locator('.atlas-settings')).toContainText('atlas-root-g2');
-  // Pre-Swap world is still in the sidebar (its own handle is independent of root).
+  // Pre-Swap world is still in the sidebar (its own handle is independent of
+  // root). The sidebar mode pref persisted as "elements" from the create
+  // flow above, so switch back to worlds mode to assert on the row.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Pre-Swap' })).toBeVisible();
 });
 
@@ -373,11 +407,16 @@ test('rescan: re-picking an existing root after a localStorage wipe imports worl
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'kept world');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'kept world' })).toBeVisible();
+  // Creating a world flips the sidebar into elements mode (S255v3) — wait for
+  // the mode-independent signal, then switch back to worlds mode so the
+  // create-local button (worlds-mode-only) is available for the next create.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
+
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'second world');
   await page.click('[data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'second world' })).toBeVisible();
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 
   // 2. Wipe localStorage + IDB ONLY (keep OPFS — that's the disk).
   await page.evaluate(async () => {
@@ -417,5 +456,7 @@ test('create modal cancel button closes without creating a world', async ({ page
   await expect(page.locator('[data-modal="create-world"]')).toBeVisible();
   await page.click('[data-action="cancel"]');
   await expect(page.locator('[data-modal="create-world"]')).toHaveCount(0);
-  await expect(page.locator('.atlas-sidebar .atlas-pane-empty')).toBeVisible();
+  // Zero-worlds sidebar renders no rows and no narration line (S255v2 —
+  // the tour tag + hover details replaced the "No worlds yet" copy).
+  await expect(page.locator('.atlas-sidebar .atlas-row')).toHaveCount(0);
 });

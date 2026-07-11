@@ -36,7 +36,7 @@ async function createWorld(page: Page, name: string) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
 test.describe('Bout CC — sidebar toggle + gear + selection UX', () => {
@@ -55,6 +55,10 @@ test.describe('Bout CC — sidebar toggle + gear + selection UX', () => {
 
   test('right tab is hidden when no world is active', async ({ page }) => {
     await freshBoot(page);
+    // Pre-root the whole sidebar header is silent (S255v3) — the toggle only
+    // exists once an atlas root is set. Set one up (no world) so the test's
+    // real subject — no right tab without an active world — is observable.
+    await setupAtlasRoot(page);
     await expect(page.locator('[data-action="mode-elements"]')).toHaveCount(0);
     await expect(page.locator('[data-action="mode-worlds"]')).toBeVisible();
   });

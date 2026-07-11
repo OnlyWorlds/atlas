@@ -15,7 +15,8 @@
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { nowIso } from '../store/folder-store';
-import { getState } from '../core/state';
+import { getState, patchSlice } from '../core/state';
+import { setSidebarModePref } from '../core/ui-prefs';
 import { navigate, worldHash } from '../core/router';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
 import { completeWaypoint } from '../core/waypoints';
@@ -99,6 +100,10 @@ export class CreateWorldModal extends BaseModal {
         this.toasts.success(`Created ${entry.name}`);
         this.hide();
         this.onCreated?.({ entry });
+        // Land in world view: sidebar flips to the elements list so the new
+        // world's (empty) contents are the visible surface (S255v3).
+        patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
+        setSidebarModePref('elements');
         navigate(worldHash(entry.id));
       } catch (err) {
         this.showError(errorBox, err instanceof Error ? err.message : String(err));

@@ -33,7 +33,9 @@ async function setupWorld(page: Page, name = 'Barovia') {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
+  // Creating a local world flips the sidebar to elements mode (S255v3); use
+  // that as the mode-independent completion signal instead of a worlds-list row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
 async function openImport(page: Page) {
@@ -60,6 +62,11 @@ test('import full-world JSON creates a new world (Mode A)', async ({ page }) => 
   await expect(page.locator('.atlas-import-name')).toHaveValue('Blood Meridian');
 
   await page.click('[data-action="import"]');
+  // Import (Mode A) creates and activates the new world; sidebar mode is
+  // untouched by the import flow itself, but stays wherever setupWorld left
+  // it (elements). Switch back to worlds mode to assert on the row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Blood Meridian' })).toBeVisible();
   // The new world is active and carries its elements + preserved relation.
   await expect.poll(async () => page.evaluate(() => {

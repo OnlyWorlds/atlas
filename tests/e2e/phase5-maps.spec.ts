@@ -35,7 +35,9 @@ async function createWorld(page: Page, name: string) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
+  // Creating a local world flips the sidebar to elements mode (S255v3); use
+  // that as the mode-independent completion signal instead of a worlds-list row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {

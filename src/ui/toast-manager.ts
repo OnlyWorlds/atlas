@@ -86,10 +86,14 @@ export class ToastManager {
 
     this.container.appendChild(toastEl);
 
-    // Auto-dismiss after duration
-    setTimeout(() => {
-      this.removeToast(toast.id);
-    }, toast.duration);
+    // Auto-dismiss after duration; hovering holds the toast open (reading
+    // shouldn't race a timer — S255v2), with a short grace after leave.
+    let timer = setTimeout(() => this.removeToast(toast.id), toast.duration);
+    toastEl.addEventListener('mouseenter', () => clearTimeout(timer));
+    toastEl.addEventListener('mouseleave', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => this.removeToast(toast.id), 2000);
+    });
   }
 
   /**

@@ -32,7 +32,10 @@ async function setupWorld(page: Page) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'sworld');
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'sworld' })).toBeVisible();
+  // Creating a world flips the sidebar into elements mode (S255v3) — the
+  // elements-search input is the mode-independent signal that creation
+  // finished, since world rows are no longer visible in that mode.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
 async function openShare(page: Page) {

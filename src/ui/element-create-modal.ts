@@ -55,6 +55,12 @@ export interface ElementCreateOptions {
    */
   onCreated?: (id: string, type: ElementType) => void;
   /**
+   * Also called after a successful create, but — unlike `onCreated` — has NO
+   * effect on the map inline-create delegation check. For side effects like
+   * the elements-sidebar clearing its search after a prefilled create (S255v4).
+   */
+  afterCreate?: (id: string, type: ElementType) => void;
+  /**
    * NPM mode (DESIGN_MAPS.md §3.7). When set, the name field gets ghost-line
    * autocomplete against existing elements of the currently-selected category;
    * TAB at end of input accepts the suggestion and flips the submit button
@@ -328,6 +334,7 @@ export class ElementCreateModal extends BaseModal {
         this.toasts.success(`Created ${this.selected}: ${el.name}`);
         this.hide();
         this.opts.onCreated?.(el.id, this.selected);
+        this.opts.afterCreate?.(el.id, this.selected);
         requestPushIfLinked();
 
         if (!this.opts.suppressNavigate) {

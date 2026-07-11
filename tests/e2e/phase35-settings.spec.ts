@@ -40,7 +40,7 @@ async function createWorld(page: Page, name: string) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
 async function loadRegistry(page: Page): Promise<Record<string, unknown>> {
@@ -115,6 +115,10 @@ test('world tab — rename + stay-offline toggle persist', async ({ page }) => {
   // Rename
   await page.fill('input[name="world-name"]', 'Renamed');
   await page.locator('input[name="world-name"]').blur();
+
+  // Creating the world flipped the sidebar to elements mode; switch back to
+  // worlds mode to see the renamed row.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'Renamed' })).toBeVisible();
 
   // Stay-offline toggle is only present for api-linked worlds; verify it's absent here.
@@ -136,6 +140,9 @@ test('world tab — api-linked worlds get stay-offline + refresh + unlink + test
   });
   await page.reload();
   await page.waitForSelector('.atlas-shell');
+  // Sidebar mode (elements, from world creation) persists across reload via
+  // localStorage; switch back to worlds mode to click the row.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await page.click('.atlas-row[data-world-id]:has-text("Fake API World")');
   await page.click('[data-action="open-settings"]');
   await page.click('[data-settings-tab="world"]');
@@ -165,6 +172,9 @@ test('unlink-from-api flips state back to local-only', async ({ page }) => {
   });
   await page.reload();
   await page.waitForSelector('.atlas-shell');
+  // Sidebar mode (elements, from world creation) persists across reload via
+  // localStorage; switch back to worlds mode to click the row.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await page.click('.atlas-row[data-world-id]:has-text("Linked World")');
   await page.click('[data-action="open-settings"]');
   await page.click('[data-settings-tab="world"]');

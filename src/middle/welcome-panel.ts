@@ -79,14 +79,6 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             <div class="atlas-landing-mark">Atlas</div>
             <p class="atlas-landing-tag">A free, local-first worldbuilding studio.</p>
           </div>
-          <div class="atlas-landing-rooms" aria-hidden="true">
-            <span><span class="material-symbols-outlined">home</span>home</span>
-            <span><span class="material-symbols-outlined">menu_book</span>writing</span>
-            <span><span class="material-symbols-outlined">psychology</span>knowledge</span>
-            <span><span class="material-symbols-outlined">insights</span>charts</span>
-            <span><span class="material-symbols-outlined">public</span>share</span>
-            <span><span class="material-symbols-outlined">import_export</span>import</span>
-          </div>
           <div class="atlas-landing-cta">
             <button class="atlas-btn-primary atlas-landing-btn" data-action="setup-atlas">Set up a local folder</button>
           </div>
@@ -136,9 +128,11 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           </div>
         `;
         const detail = root.querySelector<HTMLElement>('[data-role="path-detail"]')!;
+        // No links in hover details — the panel only exists while the cursor
+        // sits on the sidebar button, so nothing in it is clickable (S255v2).
         const owLine =
           `<p class="atlas-grounded-detail-ow"><img src="${import.meta.env.BASE_URL}owlogo.png" alt="" />` +
-          `<a href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a></p>`;
+          `the OnlyWorlds icon in the footer has more info</p>`;
         const DETAILS: Record<string, string> = {
           'create-local': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>

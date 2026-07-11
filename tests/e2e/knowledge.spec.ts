@@ -32,7 +32,9 @@ async function setupWorld(page: Page) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'kworld');
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: 'kworld' })).toBeVisible();
+  // Creating a world now flips the sidebar into elements mode (S255v3), so
+  // world rows are no longer visible here — wait for the elements body instead.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
 /** Create an element directly via the active FolderStore (setup shortcut). */

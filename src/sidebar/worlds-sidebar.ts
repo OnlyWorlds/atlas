@@ -194,13 +194,10 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const worlds = state.registry.worlds;
 
     if (worlds.length === 0) {
-      if (state.atlasRoot) {
-        listEl.innerHTML = `<div class="atlas-pane-empty">No worlds yet. Create one to start.</div>`;
-      } else {
-        // Pre-setup, the middle pane is the only voice on screen — the
-        // sidebar narrating the same instruction competed with it (S255).
-        listEl.innerHTML = '';
-      }
+      // Silent in both pre-root and zero-worlds states (S255v2): pre-root the
+      // landing is the one voice; with a root, the tour tag + hover details
+      // teach — a narration line under them was redundant.
+      listEl.innerHTML = '';
       return;
     }
 

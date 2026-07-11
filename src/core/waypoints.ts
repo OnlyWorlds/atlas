@@ -406,7 +406,15 @@ function renderWaypointToast(id: WaypointId): void {
   container.appendChild(el);
 
   let dismissed = false;
-  const timer = setTimeout(() => dismiss(), TOAST_MS);
+  let timer = setTimeout(() => dismiss(), TOAST_MS);
+  // Hover holds the toast open (S255v2, Captain): reading shouldn't race a
+  // timer. The countdown restarts with a short grace when the cursor leaves.
+  el.addEventListener('mouseenter', () => clearTimeout(timer));
+  el.addEventListener('mouseleave', () => {
+    if (dismissed) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => dismiss(), 2500);
+  });
   function dismiss(): void {
     if (dismissed) return;
     dismissed = true;

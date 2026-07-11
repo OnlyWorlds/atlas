@@ -180,9 +180,12 @@ export function startApp(container: HTMLElement): AppHandle {
       }
     }
 
-    // Toggle the room nav strip's visibility — active when world is active and
-    // we're NOT on welcome. Welcome owns the full middle pane during onboarding.
-    const navActive = active != null && nextMode !== 'welcome';
+    // Room nav strip visibility: shown when a world is active (the real nav),
+    // AND during onboarding when no world exists (labeled PREVIEW mode —
+    // S255v2: the future nav doubles as the landing's "what's inside" line;
+    // labels collapse away when the first world activates). Hidden only for
+    // the legacy active-world welcome branch.
+    const navActive = active == null || nextMode !== 'welcome';
     shell.middleRoomNav.setAttribute('data-active', navActive ? 'true' : 'false');
 
     if (nextMode !== currentMode) {

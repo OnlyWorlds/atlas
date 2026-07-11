@@ -99,7 +99,19 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   createBtn.setAttribute('data-action', 'create-element');
   createBtn.title = 'New element';
   createBtn.innerHTML = '<span class="material-symbols-outlined">add</span>';
-  createBtn.addEventListener('click', () => new ElementCreateModal(toasts).open());
+  // Whatever's typed in the search field rides into the create modal as the
+  // name (S255v3): searched-for-it-and-it's-missing flows straight into
+  // making it, and the empty-world "Create an element…" placeholder keeps
+  // its promise.
+  createBtn.addEventListener('click', () => new ElementCreateModal(toasts, {
+    initialName: searchInput.value.trim() || undefined,
+    // The search text became the element's name — clear the filter so the
+    // new element isn't the only visible row (S255v4, Captain).
+    afterCreate: () => {
+      searchInput.value = '';
+      patchSlice('ui', { ...getState().ui, search: '' });
+    },
+  }).open());
   searchRow.appendChild(createBtn);
 
   content.appendChild(searchRow);
@@ -429,6 +441,13 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const query = state.ui.search.trim().toLowerCase();
     const selectedId = state.ui.selectedElementId;
 
+    // Empty world: the search field invites creating instead (typed text
+    // rides into the modal as the name), and the + button pulses a few beats
+    // to spotlight where creation lives (S255v3).
+    const worldEmpty = elements.length === 0 && !state.data.loading;
+    searchInput.placeholder = worldEmpty ? 'Create an element...' : 'Search elements...';
+    createBtn.classList.toggle('atlas-create-pulse', worldEmpty);
+
     // Knowledge lens: rows OUTSIDE the knower's known set dim. The banner
     // names the knower + offers the exit ×.
     const lens = state.ui.knowledgeLens;
@@ -465,12 +484,14 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
     if (filtered.length === 0) {
       // Empty ≠ loading: during activation the cache is priming from disk.
+      // Empty world says nothing here — the pulsing + button and the home
+      // onboarding tiles carry it (S255v3).
       const msg = state.data.loading
         ? 'Opening world…'
         : elements.length === 0
-          ? 'No elements yet. Click <b>+ new element</b> to start.'
+          ? ''
           : 'No elements match the current filter.';
-      listEl.innerHTML = `<div class="atlas-pane-empty">${msg}</div>`;
+      listEl.innerHTML = msg ? `<div class="atlas-pane-empty">${msg}</div>` : '';
       return;
     }
 

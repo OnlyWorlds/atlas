@@ -30,10 +30,17 @@ async function setupAtlasRoot(page: Page, dirName: string = 'polish-test-root') 
 }
 
 async function createWorld(page: Page, name: string) {
+  // Creating a world flips the sidebar to elements mode (S255v3). If a prior
+  // world was already created in this test, switch back to worlds mode first
+  // so the create-local button (worlds-mode only) is reachable again.
+  const worldsModeBtn = page.locator('.atlas-mode-btn[data-action="mode-worlds"]');
+  if (await worldsModeBtn.isVisible().catch(() => false)) {
+    await worldsModeBtn.click();
+  }
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
 test('timeline route renders the interactive timeline-view', async ({ page }) => {
@@ -108,6 +115,11 @@ test('favorite star toggles and sorts favorites to the top', async ({ page }) =>
   await createWorld(page, 'alpha');
   await createWorld(page, 'bravo');
   // (after creating bravo, bravo becomes active. Now we have two worlds in sidebar.)
+
+  // Creating bravo flipped the sidebar to elements mode; switch back to
+  // worlds mode to see the world rows.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
 
   // Both rows visible. Order: alpha, bravo.
   const rows = page.locator('.atlas-row[data-world-id]');

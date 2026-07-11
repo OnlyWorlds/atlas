@@ -214,21 +214,8 @@ function buildCover(
   nameEl.addEventListener('click', () => openIdentityEdit('name', meta.name, nameEl, toasts));
   descEl.addEventListener('click', () => openIdentityEdit('description', meta.description ?? '', descEl, toasts));
 
-  // Quiet text-links (H6) — the old boxed quick actions, folded into the cover.
-  const links = document.createElement('div');
-  links.className = 'atlas-home-links';
-  const link = (label: string, onClick: () => void): HTMLButtonElement => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'atlas-home-link';
-    b.textContent = label;
-    b.addEventListener('click', onClick);
-    return b;
-  };
-  links.appendChild(link('new element', () => new ElementCreateModal(toasts).open()));
-  links.appendChild(link('open writing', () => navigate(writingHash(worldId))));
-  links.appendChild(link('import', () => navigate(importHash(worldId))));
-  cover.appendChild(links);
+  // (The old quick text-links — new element / open writing / import — were
+  // removed S255v3: the room nav + onboarding tiles cover every one of them.)
 
   // Cast slot (D2b) — renders only when a favorite is set; assignment lives
   // on the element-detail header (char + loc).
@@ -478,7 +465,7 @@ function buildOnboarding(toasts: ToastManager): HTMLElement {
   onboarding.innerHTML = `
     <h2 class="atlas-home-section-title">Your world is empty</h2>
     <p class="atlas-home-onboarding-copy">
-      Start with a few characters, locations, or events.
+      Create something new.
     </p>
     <div class="atlas-home-onboarding-grid">
       <button class="atlas-home-onboarding-tile" data-create-type="character">
@@ -493,14 +480,11 @@ function buildOnboarding(toasts: ToastManager): HTMLElement {
         <span class="material-symbols-outlined">${ELEMENT_ICONS['event'] ?? 'event'}</span>
         <span>event</span>
       </button>
-      <button class="atlas-home-onboarding-tile" data-create-type="narrative">
-        <span class="material-symbols-outlined">${ELEMENT_ICONS['narrative'] ?? 'menu_book'}</span>
-        <span>narrative</span>
+      <button class="atlas-home-onboarding-tile" data-create-any>
+        <span class="material-symbols-outlined">add</span>
+        <span>everything else</span>
       </button>
     </div>
-    <p class="atlas-home-onboarding-hint">
-      Or pick any of the 22 element types via the + button in the elements sidebar.
-    </p>
   `;
   onboarding.querySelectorAll<HTMLButtonElement>('[data-create-type]').forEach((btn) => {
     const initialType = btn.dataset.createType as ElementType;
@@ -508,6 +492,13 @@ function buildOnboarding(toasts: ToastManager): HTMLElement {
       new ElementCreateModal(toasts, { initialType }).open();
     });
   });
+  // "everything else": opens the full type grid; hovering it spotlights the
+  // sidebar's + button — teaching where creation lives permanently (S255v3).
+  const anyTile = onboarding.querySelector<HTMLButtonElement>('[data-create-any]')!;
+  anyTile.addEventListener('click', () => new ElementCreateModal(toasts).open());
+  const sidebarCreate = (): HTMLElement | null => document.querySelector('[data-action="create-element"]');
+  anyTile.addEventListener('mouseenter', () => sidebarCreate()?.classList.add('atlas-create-pulse'));
+  anyTile.addEventListener('mouseleave', () => sidebarCreate()?.classList.remove('atlas-create-pulse'));
   return onboarding;
 }
 

@@ -10,7 +10,27 @@
  * Layered on top of onlyworlds-base.css.
  */
 
+/* Open Sans — the OnlyWorlds ecosystem standard (--ow-font-sans in
+   onlyworlds-base.css; council/workshop run it). Self-hosted variable woff2
+   (latin subset), bundled by vite so URLs survive base:'./' deploys. */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('../assets/fonts/open-sans-latin-variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: italic;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('../assets/fonts/open-sans-latin-italic-variable.woff2') format('woff2');
+}
+
 :root {
+  --atlas-font-sans: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --atlas-bg: #0a0a0a;
   --atlas-bg-panel: rgba(255, 255, 255, 0.015);
   --atlas-bg-panel-elevated: rgba(255, 255, 255, 0.035);
@@ -2783,7 +2803,8 @@
   justify-content: flex-start;
   padding: clamp(56px, 16vh, 150px) 48px 64px;
   text-align: center;
-  background: radial-gradient(ellipse 680px 440px at 50% 30%, rgba(34, 211, 238, 0.045), transparent 70%);
+  /* No atmosphere gradient — its edge read as a boxy seam on the pure-black
+     shell (S255v2, Captain). Flat black is the calmer statement. */
 }
 
 .atlas-landing-hero { display: flex; flex-direction: column; align-items: center; }
@@ -2811,27 +2832,8 @@
   gap: 10px;
 }
 
-/* The rooms whisper: the app's real nav glyphs + lowercase names, one dim
-   line. A preview of the actual interface, not a feature pitch (S255 —
-   replaced the marketing-shaped three-beat triptych). */
-.atlas-landing-rooms {
-  display: flex;
-  gap: 26px;
-  margin-top: 52px;
-  font-size: 12px;
-  color: var(--atlas-text-muted);
-}
-
-.atlas-landing-rooms > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.atlas-landing-rooms .material-symbols-outlined {
-  font-size: 16px;
-  color: var(--atlas-text-dim);
-}
+/* (The in-body rooms row moved into the room-nav strip's preview mode —
+   see .atlas-room-nav-preview-btn.) */
 
 .atlas-landing-btn {
   padding: 12px 32px;
@@ -2867,17 +2869,19 @@
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  line-height: 1;
+  /* Icon and text share a 22px line box so flex centering actually centers
+     them — mismatched line boxes had the label ~7px low (S255v4, measured). */
+  line-height: 22px;
   color: var(--atlas-text);
 }
 
 .atlas-grounded-check .material-symbols-outlined {
   font-size: 22px;
-  line-height: 1;
-  /* Optical: the glyph's ink sits high in its em box against a text
-     baseline; nudge down so icon and label read centered (S255v2 sshot). */
+  line-height: 22px;
+  /* Empirical (S255v4, measured live): Open Sans drops its ink low in the
+     line box; the glyph needs +7px to sit centered on the label's ink. */
   position: relative;
-  top: 1px;
+  top: 7px;
   color: var(--atlas-cyan);
 }
 
@@ -5382,6 +5386,74 @@ svg .atlas-zone-selected {
   font-size: 18px;
 }
 
+/* Onboarding preview mode (S255v2): the same strip, pre-world, with lowercase
+   labels after each icon. Buttons are inert; the strip is a truthful preview
+   of the nav the user is about to get. */
+.atlas-room-nav-btn .atlas-room-nav-label {
+  max-width: 90px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--atlas-text-muted);
+  transition: max-width 300ms ease, opacity 240ms ease, margin-left 300ms ease;
+  margin-left: 6px;
+}
+
+.atlas-room-nav-preview-btn {
+  width: auto;
+  padding: 0 8px;
+  cursor: default;
+}
+
+.atlas-room-nav-preview-btn:hover {
+  color: var(--atlas-text-muted);
+  background: transparent;
+}
+
+.atlas-room-nav-strip.is-preview { gap: 10px; }
+
+/* World just activated: labels collapse, icons slide into their real
+   positions. One-shot; the next render is the clean icon-only strip. */
+.atlas-room-nav-strip.is-settling .atlas-room-nav-label {
+  max-width: 0;
+  opacity: 0;
+  margin-left: 0;
+}
+
+.atlas-room-nav-strip:not(.is-preview) .atlas-room-nav-btn:has(.atlas-room-nav-label) {
+  width: auto;
+  padding: 0 5px;
+}
+
+/* Ghost expander — toggles the room labels on the real strip. Dim until
+   hovered; reads as chrome, not as a room. */
+.atlas-room-nav-expand {
+  height: 28px;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--atlas-text-dim);
+  cursor: pointer;
+  transition: color 80ms ease;
+}
+
+.atlas-room-nav-expand:hover { color: var(--atlas-text-soft); }
+
+.atlas-room-nav-expand .material-symbols-outlined { font-size: 16px; }
+
+/* Spotlight on the elements-sidebar + button: pulses a few beats when the
+   world is empty (and while hovering home's "everything else" tile), then
+   rests at a soft cyan border (S255v3). */
+.atlas-create-pulse {
+  border-color: var(--atlas-cyan-soft) !important;
+  animation: atlas-tour-pulse 2.2s ease-in-out 3;
+}
+
 /* Flex spacer pushes the selected-element chip to the far right of the strip. */
 .atlas-room-nav-spacer {
   flex: 1 1 auto;
@@ -5773,6 +5845,19 @@ svg .atlas-zone-selected {
 
 .atlas-header-writing-create {
   flex-shrink: 0;
+  /* Weightier than sibling icon buttons (S255v3, Captain): the child-create
+     verbs are the writing header's main actions now the tier pill is gone. */
+  color: var(--atlas-text);
+}
+
+.atlas-header-writing-create .material-symbols-outlined {
+  font-size: 18px;
+  font-variation-settings: 'wght' 500;
+}
+
+.atlas-header-writing-create:hover {
+  color: var(--atlas-cyan);
+  border-color: var(--atlas-cyan-soft);
 }
 
 .atlas-writing-editor-detail-slot {

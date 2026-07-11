@@ -35,7 +35,9 @@ async function createLocalWorld(page: Page, name: string) {
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');
-  await expect(page.locator('.atlas-row[data-world-id]', { hasText: name })).toBeVisible();
+  // Creating a local world flips the sidebar to elements mode automatically
+  // (S255v3) — wait for the elements body rather than a worlds-list row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -128,7 +130,11 @@ test('Make Online button is hidden for an already-api-linked world', async ({ pa
   });
   await page.reload();
   await page.waitForSelector('.atlas-shell');
-  // Re-open the world (silent auto-activate from URL hash isn't set; click it).
+  // The world was left active (in elements mode) before reload, and that
+  // state persists across reload (S255v3) — swap back to worlds mode first,
+  // then re-open the world via its row.
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await page.click('.atlas-row[data-world-id]:has-text("Already Online")');
   // Now go to settings → World tab. Make-online is hidden for api-linked worlds.
   await page.click('[data-action="open-settings"]');

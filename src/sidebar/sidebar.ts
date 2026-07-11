@@ -21,7 +21,6 @@ import { mountWorldsBody } from './worlds-sidebar';
 import { mountElementsBody } from './elements-sidebar';
 import { mountWritingBody } from './writing-sidebar';
 import { ToastManager } from '../ui/toast-manager';
-import { buildShortcutsContent } from '../ui/shortcuts-content';
 import { escapeText } from '../core/dom-utils';
 
 /**
@@ -232,7 +231,6 @@ export function mountSidebar(mount: SidebarMount): () => void {
   owBtn.setAttribute('aria-label', 'OnlyWorlds');
   owBtn.title = 'OnlyWorlds · account, waypoints, links';
   owBtn.innerHTML = '<img class="atlas-footer-ow-icon" src="owlogo.png" alt="" />';
-  footer.appendChild(owBtn);
   owBtn.addEventListener('click', () => {
     navigate(settingsHash(getState().active?.worldId ?? null, 'onlyworlds'));
   });
@@ -244,11 +242,23 @@ export function mountSidebar(mount: SidebarMount): () => void {
   const helpBtn = document.createElement('button');
   helpBtn.className = 'atlas-icon-btn';
   helpBtn.setAttribute('data-action', 'help-shortcuts');
-  helpBtn.setAttribute('aria-label', 'Keyboard shortcuts');
-  helpBtn.title = 'Keyboard shortcuts';
+  helpBtn.setAttribute('aria-label', 'Help');
+  helpBtn.title = 'Help · this room + shortcuts (?)';
   helpBtn.innerHTML = '<span class="material-symbols-outlined">help</span>';
+  // S255v4 (Captain): the ? glyph read as general help but opened only the
+  // shortcuts popover. It now opens the room-aware help overlay (same surface
+  // as the ? hotkey — room purpose, "you can", full shortcut reference). The
+  // old shortcuts popover retires with its content module.
+  helpBtn.addEventListener('click', () => {
+    void import('../ui/help-overlay').then(({ openHelpOverlay }) => {
+      openHelpOverlay(parseHash(window.location.hash).mode);
+    });
+  });
+
+  // Order (S255v3, Captain): shortcuts before the OW mark — the brand glyph
+  // anchors the row's right end.
   footer.appendChild(helpBtn);
-  helpBtn.addEventListener('click', () => openShortcutsPopover(helpBtn));
+  footer.appendChild(owBtn);
 
   // ----- Body mount/unmount as effective body changes -----
   let unmountBody: (() => void) | null = null;
@@ -315,62 +325,5 @@ export function mountSidebar(mount: SidebarMount): () => void {
   };
 }
 
-// ============================================================================
-// Keyboard-shortcut reference popover (session 219).
-// ============================================================================
-
-let activeShortcutsPopover: HTMLElement | null = null;
-
-function openShortcutsPopover(anchor: HTMLElement): void {
-  if (activeShortcutsPopover) {
-    closeShortcutsPopover();
-    return;
-  }
-  const panel = document.createElement('div');
-  panel.className = 'atlas-shortcuts-popover';
-  panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', 'Keyboard shortcuts');
-  const title = document.createElement('div');
-  title.className = 'atlas-shortcuts-title';
-  title.textContent = 'Keyboard shortcuts';
-  panel.appendChild(title);
-  panel.appendChild(buildShortcutsContent());
-  document.body.appendChild(panel);
-
-  // Anchor near the help button — pop UP-RIGHT since the button is in the
-  // sidebar footer (bottom-left area).
-  const r = anchor.getBoundingClientRect();
-  panel.style.position = 'fixed';
-  panel.style.left = `${Math.round(r.right + 6)}px`;
-  panel.style.bottom = `${Math.round(window.innerHeight - r.bottom)}px`;
-  panel.style.zIndex = '200';
-
-  activeShortcutsPopover = panel;
-
-  const outsideHandler = (e: MouseEvent) => {
-    if (!activeShortcutsPopover) return;
-    const t = e.target as Node;
-    if (panel.contains(t) || anchor.contains(t)) return;
-    closeShortcutsPopover();
-  };
-  const escHandler = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') closeShortcutsPopover();
-  };
-  // Defer so the originating click doesn't immediately close us.
-  setTimeout(() => {
-    document.addEventListener('mousedown', outsideHandler);
-    document.addEventListener('keydown', escHandler);
-  }, 0);
-  (panel as HTMLElement & { __atlasCleanup?: () => void }).__atlasCleanup = () => {
-    document.removeEventListener('mousedown', outsideHandler);
-    document.removeEventListener('keydown', escHandler);
-  };
-}
-
-function closeShortcutsPopover(): void {
-  if (!activeShortcutsPopover) return;
-  const p = activeShortcutsPopover as HTMLElement & { __atlasCleanup?: () => void };
-  p.__atlasCleanup?.();
-  if (p.parentElement) p.parentElement.removeChild(p);
-  activeShortcutsPopover = null;
-}
+// (Shortcuts popover retired S255v4 — the footer ? opens the room-aware
+// help overlay, which includes the full shortcut reference.)

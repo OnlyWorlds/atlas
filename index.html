@@ -21,10 +21,11 @@
       height: 100%;
       overflow: hidden;
       background: #0a0a0a;
-      /* System font stack — same as legacy onlyworlds-base.css. Without an
-         explicit body font-family, h1/h2/etc default to browser serif (Times
-         New Roman on Windows) which makes titles look noticeably less crisp. */
-      font-family: system-ui, -apple-system, BlinkMacSystemFont,
+      /* Open Sans is the OW ecosystem standard (self-hosted @font-face in
+         atlas.css, S255v2); the system stack is the pre-load fallback.
+         Without an explicit body font-family, h1/h2/etc default to browser
+         serif (Times New Roman on Windows). */
+      font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont,
                    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif,
                    'Apple Color Emoji', 'Segoe UI Emoji';
       -webkit-font-smoothing: antialiased;

@@ -51,19 +51,26 @@ const ROOMS: RoomDef[] = [
   // weakest search surface; the planned replacement is a Cmd+K command palette
   // (see DESIGN.md "Search"). The elements-sidebar name filter remains interim.
   // Route + search.ts stay dormant; re-add this entry to restore the room.
-  // Icon: `public` (S255, Captain's ask) — the room's distinguishing act is
-  // making something public; the old ios_share box-and-arrow read as an OS
-  // share sheet.
-  { id: 'share',     label: 'Share',          icon: 'public',         hashFor: (w) => shareHash(w), matches: ['share'] },
+  // Icon: `wall_art` (S255v3, Captain's ask: not a globe, not a share-sheet —
+  // the room is about showing off, publishing, displaying; a framed piece on
+  // a wall is the exhibit).
+  { id: 'share',     label: 'Share',          icon: 'wall_art',       hashFor: (w) => shareHash(w), matches: ['share'] },
   { id: 'import',    label: 'Import & export', icon: 'import_export',  hashFor: importHash,    matches: ['import'] },
   // Templates hidden pre-release (not building it before launch). Route +
   // templates-room.ts stay dormant; re-add this entry to restore it to the nav.
-  { id: 'settings',  label: 'Settings',  icon: 'settings',       hashFor: (w) => settingsHash(w), matches: ['settings'] },
+  // Settings dropped from the strip S255v4 (Captain): the sidebar footer gear
+  // is the one settings entrance. Route + gear-as-toggle unaffected.
 ];
 
 export interface RoomNavMount {
   target: HTMLElement;
 }
+
+/** Rooms shown in the labeled onboarding preview (settings joins later). */
+const PREVIEW_ROOM_IDS = new Set(['home', 'writing', 'knowledge', 'timeline', 'share', 'import']);
+
+/** Persistent labels-on preference — the ghost expander toggles it (S255v3). */
+const NAV_LABELS_KEY = 'atlas_nav_labels';
 
 export function mountRoomNav(mount: RoomNavMount): () => void {
   const { target } = mount;
@@ -73,11 +80,54 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
   strip.className = 'atlas-room-nav-strip';
   target.appendChild(strip);
 
-  function render(): void {
+  // Tracks the preview→real transition: when the first world activates, one
+  // render keeps the labels in the DOM and collapses them (max-width → 0),
+  // so the icons visibly slide into their real nav positions (S255v2).
+  let wasPreview = false;
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function renderPreview(): void {
     strip.innerHTML = '';
+    strip.classList.add('is-preview');
+    for (const room of ROOMS) {
+      if (!PREVIEW_ROOM_IDS.has(room.id)) continue;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'atlas-room-nav-btn atlas-room-nav-preview-btn';
+      btn.disabled = true;
+      btn.innerHTML =
+        `<span class="material-symbols-outlined">${room.icon}</span>` +
+        `<span class="atlas-room-nav-label">${room.id === 'import' ? 'import' : room.label.toLowerCase()}</span>`;
+      strip.appendChild(btn);
+    }
+    wasPreview = true;
+  }
+
+  function render(): void {
+    // Settle choreography in flight: world activation floods state updates,
+    // and a mid-animation re-render would strip the labels instantly. Skip;
+    // the timer's final pass repaints fresh (380ms, nothing user-critical
+    // changes in the strip within that window).
+    if (settleTimer) return;
     const route = parseHash(window.location.hash);
     const worldId = route.worldId ?? getState().active?.worldId ?? null;
-    if (!worldId) return; // No world → strip stays empty; container is hidden anyway.
+    // A worldId the registry doesn't know (stale URL hash surviving a
+    // clear-site-data, dead deep link) must not paint the real nav — it was
+    // rendering a stuck icon-only strip full of dead routes (S255v4).
+    const known = worldId != null && (
+      getState().active?.worldId === worldId ||
+      getState().registry.worlds.some(w => w.id === worldId)
+    );
+    if (!worldId || !known) {
+      renderPreview();
+      return;
+    }
+
+    const labelsOn = localStorage.getItem(NAV_LABELS_KEY) === '1';
+    const settling = wasPreview && !labelsOn;
+    wasPreview = false;
+    strip.innerHTML = '';
+    strip.classList.remove('is-preview');
 
     for (const room of ROOMS) {
       const btn = document.createElement('button');
@@ -89,7 +139,12 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       if (room.matches.includes(route.mode)) {
         btn.classList.add('active');
       }
-      btn.innerHTML = `<span class="material-symbols-outlined">${room.icon}</span>`;
+      // Labels ride along while settling (then collapse) or permanently when
+      // the ghost expander has them toggled on.
+      const labelHtml = (settling || labelsOn) && PREVIEW_ROOM_IDS.has(room.id)
+        ? `<span class="atlas-room-nav-label">${room.id === 'import' ? 'import' : room.label.toLowerCase()}</span>`
+        : '';
+      btn.innerHTML = `<span class="material-symbols-outlined">${room.icon}</span>${labelHtml}`;
       btn.addEventListener('click', () => {
         // Special case for writing: clicking the writing icon clears the
         // sidebar writing-takeover override so the tree comes back even if
@@ -117,6 +172,35 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       });
       strip.appendChild(btn);
     }
+
+    // Ghost expander: re-shows / hides the room labels at will (S255v3 —
+    // Captain wanted the settle-in re-showable; a persistent labels mode
+    // beats a one-shot replay). Dim chevron at the end of the icon run.
+    const expander = document.createElement('button');
+    expander.type = 'button';
+    expander.className = 'atlas-room-nav-expand';
+    expander.title = labelsOn ? 'Hide room names' : 'Show room names';
+    expander.innerHTML = `<span class="material-symbols-outlined">${labelsOn ? 'keyboard_double_arrow_left' : 'keyboard_double_arrow_right'}</span>`;
+    expander.addEventListener('click', () => {
+      if (settleTimer) return;
+      if (labelsOn) {
+        // Collapse with the settle animation, then drop the labels.
+        strip.classList.add('is-settling');
+        settleTimer = setTimeout(() => {
+          strip.classList.remove('is-settling');
+          settleTimer = null;
+          localStorage.setItem(NAV_LABELS_KEY, '0');
+          render();
+        }, 420);
+      } else {
+        // Mount labels pre-collapsed, then release for the expand transition.
+        localStorage.setItem(NAV_LABELS_KEY, '1');
+        strip.classList.add('is-settling');
+        render();
+        requestAnimationFrame(() => requestAnimationFrame(() => strip.classList.remove('is-settling')));
+      }
+    });
+    strip.appendChild(expander);
 
     // Selected-element chip (far right). Visible whenever a selection exists;
     // gives a persistent "you have X selected, click to return" affordance
@@ -152,6 +236,17 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
         });
         strip.appendChild(chip);
       }
+    }
+
+    if (settling) {
+      // Lock re-renders out for the animation's lifetime FIRST, then collapse
+      // the labels two frames later (they need one paint at full width).
+      settleTimer = setTimeout(() => {
+        strip.classList.remove('is-settling');
+        settleTimer = null;
+        render(); // clean pass without labels
+      }, 420);
+      requestAnimationFrame(() => requestAnimationFrame(() => strip.classList.add('is-settling')));
     }
   }
 
