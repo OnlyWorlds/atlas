@@ -137,7 +137,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
     id: 'share',
     name: 'Share your world as a page',
     concept: 'Publishing renders your existing elements at a public URL. No separate site needed.',
-    action: 'Preview or publish a page in the share room.',
+    action: 'Preview or publish a page in the pages room.',
     toast: 'Your world has a public face.',
     glyph: 'public',
     link: (w) => (w ? `#/w/${w}/share` : null),

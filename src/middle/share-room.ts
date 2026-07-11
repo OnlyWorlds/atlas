@@ -1774,7 +1774,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // single named entity gets .atlas-middle-header, not the room landing h1).
     header.className = 'atlas-middle-header atlas-share-detail-header';
     // D1 drill-in prefix — same affordance as the entity headers.
-    header.appendChild(makeDrillInPrefix('Share', () => navigate(shareHash(worldId))));
+    header.appendChild(makeDrillInPrefix('Pages', () => navigate(shareHash(worldId))));
     root.appendChild(header);
     const empty = document.createElement('div');
     empty.className = 'atlas-share-empty';
@@ -1803,7 +1803,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const header = document.createElement('header');
     header.className = 'atlas-room-header';
     header.innerHTML = `
-      <h1>Share</h1>
+      <h1>Pages</h1>
       <p class="atlas-room-subtitle">Build pages from your world to share with a group or publish for anyone to see.</p>
     `;
     root.appendChild(header);
@@ -1882,7 +1882,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const header = document.createElement('div');
     header.className = 'atlas-middle-header atlas-share-detail-header';
     // D1 drill-in: the clickable room-name prefix IS the back affordance.
-    header.appendChild(makeDrillInPrefix('Share', () => {
+    header.appendChild(makeDrillInPrefix('Pages', () => {
       void commitOpenEdit(pageId).then(() => navigate(shareHash(worldId)));
     }));
 

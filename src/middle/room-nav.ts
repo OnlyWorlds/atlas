@@ -54,7 +54,7 @@ const ROOMS: RoomDef[] = [
   // Icon: `wall_art` (S255v3, Captain's ask: not a globe, not a share-sheet —
   // the room is about showing off, publishing, displaying; a framed piece on
   // a wall is the exhibit).
-  { id: 'share',     label: 'Share',          icon: 'wall_art',       hashFor: (w) => shareHash(w), matches: ['share'] },
+  { id: 'share',     label: 'Pages',          icon: 'wall_art',       hashFor: (w) => shareHash(w), matches: ['share'] },
   { id: 'import',    label: 'Import & export', icon: 'import_export',  hashFor: importHash,    matches: ['import'] },
   // Templates hidden pre-release (not building it before launch). Route +
   // templates-room.ts stay dormant; re-add this entry to restore it to the nav.

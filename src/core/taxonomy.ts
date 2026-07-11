@@ -62,7 +62,7 @@ export function reservedValueHint(el: Element, fieldName: string): string | null
   }
   if (el.type === 'narrative' && fieldName === 'subtype') {
     if (v.toLowerCase() === KNOWLEDGE_SUBTYPE) return `"${v}" makes this a knowledge entry; it lives in the knowledge room`;
-    if (v.toLowerCase() === PAGE_SUBTYPE) return `"${v}" makes this a share page; it lives in the share room`;
+    if (v.toLowerCase() === PAGE_SUBTYPE) return `"${v}" makes this a share page; it lives in the pages room`;
   }
   if (el.type === 'collective' && fieldName === 'subtype') {
     if (v.toLowerCase() === CIRCLE_SUBTYPE) return `"${v}" marks this collective as a knowledge circle`;

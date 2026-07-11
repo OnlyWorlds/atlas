@@ -68,7 +68,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     ],
   },
   share: {
-    name: 'Share',
+    name: 'Pages',
     purpose: 'Build pages from your world to share with a group or publish for anyone.',
     can: [
       'stack blocks: headings, text, cards, collections, maps, charts, circles',

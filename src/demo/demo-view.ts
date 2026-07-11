@@ -63,7 +63,7 @@ export function mountDemo(): void {
       <p class="atlas-demo-map-hint">Drag to pan · scroll to zoom · click a pin to read about the place</p>
       <div class="atlas-demo-cards" data-role="demo-cards"></div>
       <div class="atlas-demo-footer">
-        <p>Compose your own in the share room: pick blocks, preview, publish.</p>
+        <p>Compose your own in the pages room: pick blocks, preview, publish.</p>
         <button type="button" class="atlas-btn-primary" data-action="demo-exit-setup">Set up a local folder</button>
         <button type="button" class="atlas-btn-primary" data-action="demo-exit-back">Back to atlas</button>
       </div>

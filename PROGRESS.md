@@ -4,7 +4,13 @@ Operational state. Architecture in **DESIGN.md**; per-room design in `DESIGN_{MA
 
 ---
 
-## CURRENT STATE (2026-07-11 — SESSION 255: FIRST-ENTRY REBUILD; final gates: typecheck + 1003 vitest + full e2e 174/175 with the KNOWN knowledge.spec:94 load flake (passes serially with 1 retry-heal, exit 0 isolated — watch item, not a regression))
+## CURRENT STATE (2026-07-11 NIGHT — SESSION 255 CLOSE: FIRST-ENTRY REBUILD **DEPLOYED + LIVE-SMOKED on the KEEL-FLIPPED production backend**; gates: typecheck + 1003 vitest + full e2e 174/175 (knowledge.spec:94 = documented load flake, passes isolated) + prod build green)
+
+**THE KEEL FLIP IS LIVE ON PRODUCTION** (Captain+Skeld deployed it 2026-07-11 evening; my probes from atlas's seat): worldapi = keel on Render (CORS grants atlas.onlyworlds.com incl. `idempotency-key` — the D40 signature; 401 without creds) · **Anchor's sharing API intact** (JSON error enum on the contract paths — first probe missed the trailing slash, don't repeat that). Atlas needed ZERO config changes: the cutover is transparent, which the S254 reference run was for. **Captain's post-deploy live smoke PASSED: pokearound + publish/revoke on deployed atlas against the flipped backend.**
+
+⚑ **TWO-PHASE PUSH = NEXT BOUT, NOW URGENT**: keel fails cyclic Make-Online pushes LOUDLY (honest-400, per-element retries can never converge) where v1 silently dropped links. A Sikelia-class world cannot Make-Online until this ships. Spec banked: `Notes/2026-07-11-two-phase-push-spec.md`. Acyclic worlds unaffected.
+
+**PAGES RENAME SHIPPED (Captain's call, S255 close)**: room name Share → **Pages** across all user-visible surfaces (room-nav label, room h1, drill-in prefixes, help entry, demo footer, waypoint action line, taxonomy hint, 2 e2e assertions). Untouched by design: route `/share` + `/publish` alias, all code identifiers/CSS families (`.atlas-share-*`, `data-room="share"`), share/publish as VERBS, and "share page" as the narrative-subtype concept name. Fits the `wall_art` exhibit icon + "a page is a stack of blocks." **COMMIT GATE (S255 true close): typecheck + 1003 vitest + full e2e 175 passed / 0 flaky / direct exit 0 on a clean machine** — knowledge.spec:94's earlier "flake" was pure CPU contention from a concurrently-running dev server; with no competing server the suite is spotless. Law: full-suite verdicts want a quiet machine, and a recurring flake's first suspect is the environment sharing its CPU.
 
 **2026-07-11 (session 255 cont. — v4 final tweaks):**
 - **Grounded check-row alignment MEASURED + fixed**: label ink sat 7px below the icon center (Open Sans's tall hhea metrics drop ink low in the line box); glyph gets an empirical +7px. Law reinforcement: measure the boxes, don't nudge blind.

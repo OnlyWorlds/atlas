@@ -40,7 +40,7 @@ async function setupWorld(page: Page) {
 
 async function openShare(page: Page) {
   await page.click('.atlas-room-nav-btn[data-room="share"]');
-  await expect(page.locator('.atlas-share-room h1').first()).toHaveText('Share');
+  await expect(page.locator('.atlas-share-room h1').first()).toHaveText('Pages');
 }
 
 test('share room: nav button opens the room with an empty state', async ({ page }) => {
@@ -451,6 +451,6 @@ test('legacy /publish URL aliases into the share room', async ({ page }) => {
   });
 
   // The share room mounts (URL itself is left as-is — parse-level alias).
-  await expect(page.locator('.atlas-share-room h1').first()).toHaveText('Share');
+  await expect(page.locator('.atlas-share-room h1').first()).toHaveText('Pages');
   await expect(page.locator('.atlas-room-nav-btn[data-room="share"]')).toHaveClass(/active/);
 });
