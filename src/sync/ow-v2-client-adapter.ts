@@ -361,13 +361,17 @@ export class OwV2ClientAdapter implements OwApiClient {
       items: wireItems,
     }, headers) as {
       errors?: boolean;
-      items?: Array<{ status: number; id: string; error?: { code?: string; message?: string; param?: string | null } }>;
+      items?: Array<{ status: number; id: string; updated_at?: string; created_at?: string; error?: { code?: string; message?: string; param?: string | null } }>;
     };
     return {
       errors: !!response?.errors,
       items: (response?.items ?? []).map(it => ({
         status: it.status,
         id: it.id,
+        // keel D46 (2026-07-12): success slots echo server-authoritative
+        // timestamps — the engine stamps baselines directly from these and
+        // only read-back-backfills items lacking them.
+        updatedAt: typeof it.updated_at === 'string' ? it.updated_at : undefined,
         error: it.error
           ? { code: it.error.code ?? 'unknown', message: it.error.message ?? '', param: it.error.param ?? null }
           : undefined,

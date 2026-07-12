@@ -21,6 +21,7 @@ import { ElementCreateModal } from '../ui/element-create-modal';
 import { getCurrentSyncEngine, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
 import { escapeText, escapeAttr } from '../core/dom-utils';
+import { elementMatchesQuery } from '../core/element-search';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
 const FILTER_TYPES_WITH_MAP: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
@@ -479,7 +480,10 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       .filter(el => filters.size === 0 || filters.has(el.type))
       .filter(el => !superFilter || String((el as Record<string, unknown>).supertype ?? '').trim() === superFilter)
       .filter(el => !subtypeFilter || String((el as Record<string, unknown>).subtype ?? '').trim() === subtypeFilter)
-      .filter(el => !query || el.name.toLowerCase().includes(query))
+      // Same match language as the command palette (name/alias/taxonomy/
+      // description) — its "see all →" hands queries here and must never
+      // under-deliver (core/element-search.ts).
+      .filter(el => !query || elementMatchesQuery(el, query))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     if (filtered.length === 0) {

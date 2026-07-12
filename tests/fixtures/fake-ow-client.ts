@@ -287,7 +287,10 @@ export class FakeOwApiClient implements OwApiClient {
     // Persist the successes (all of them under atomic-success; the good ones
     // under non-atomic). Records land exactly like createElement so a
     // subsequent getElement / listElements returns them with a server
-    // `updated_at` from the clock (the response items deliberately omit it).
+    // `updated_at` from the clock. Success slots ECHO that timestamp
+    // (keel D46, deployed 2026-07-12) unless the pre-D46 seam is on — the
+    // engine stamps baselines from the echo and only read-back-backfills
+    // items lacking it.
     for (let i = 0; i < items.length; i++) {
       const wireBody = wireBodies[i];
       if (!wireBody) continue;
@@ -296,8 +299,18 @@ export class FakeOwApiClient implements OwApiClient {
       const record: ServerRecord = { ...wireBody, id, type, updated_at: this.clock() };
       this.bucket(type).set(id, record);
       this.appendUpsert(record);
+      if (!this.omitBulkTimestamps) results[i].updatedAt = record.updated_at;
     }
     return { errors: anyError, items: results };
+  }
+
+  /**
+   * Test seam: simulate a pre-D46 server whose /bulk items carry no
+   * timestamp echo — keeps the engine's read-back backfill fallback covered.
+   */
+  private omitBulkTimestamps = false;
+  __omit_bulk_timestamps(enabled = true): void {
+    this.omitBulkTimestamps = enabled;
   }
 
   /**

@@ -339,6 +339,11 @@ export interface StatefulV2ServerOptions {
    * must join getIncompleteListTypes()).
    */
   brokenCursor?: boolean;
+  /**
+   * Simulate a pre-D46 server: /bulk success slots omit the created_at +
+   * updated_at echo, forcing the engine's read-back backfill fallback.
+   */
+  omitBulkTimestamps?: boolean;
 }
 
 /**
@@ -534,6 +539,7 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
 
       // atomic + any failure → persist NOTHING (rollback). Otherwise persist the
       // good items. Per-item statuses are reported either way.
+      const stampById = new Map<string, { created_at: string; updated_at: string }>();
       if (!(atomic && anyError)) {
         for (const r of evaluated) {
           if (r.ok) {
@@ -542,14 +548,24 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
             const record: ServerRecord = { ...r.item.element, id: r.id, created_at: existing?.created_at ?? ts, updated_at: ts };
             bucket(r.item.type).set(r.id, record);
             logUpsert(r.item.type, record);
+            stampById.set(r.id, { created_at: record.created_at as string, updated_at: ts });
           }
         }
       }
 
-      // Items carry NO updated_at (backfill lives client-side until keel ships the echo).
+      // keel D46 (deployed 2026-07-12): success slots echo created_at +
+      // updated_at (read-serialization format). Error slots carry none.
+      // `options.omitBulkTimestamps` simulates a pre-D46 server so the
+      // engine's read-back backfill fallback stays covered.
       const response = {
         errors: anyError,
-        items: evaluated.map(r => (r.ok ? { status: r.status, id: r.id } : { status: r.status, id: r.id, error: r.error })),
+        items: evaluated.map(r => {
+          if (!r.ok) return { status: r.status, id: r.id, error: r.error };
+          const stamp = options.omitBulkTimestamps ? undefined : stampById.get(r.id);
+          return stamp
+            ? { status: r.status, id: r.id, created_at: stamp.created_at, updated_at: stamp.updated_at }
+            : { status: r.status, id: r.id };
+        }),
       };
       if (idemKey) idempotency.set(idemKey, { payload: payloadStr, response });
       return HttpResponse.json(response);

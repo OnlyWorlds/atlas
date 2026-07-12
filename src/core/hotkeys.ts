@@ -221,14 +221,25 @@ export function defaultBindings(): HotkeyBinding[] {
       action: () => { getCallbacks().openCreateElement?.(); },
     },
     {
-      id: 'focus-search',
-      description: 'Focus elements search',
-      scope: 'Sidebar',
+      id: 'command-palette',
+      description: 'Search everywhere (palette)',
+      scope: 'Global',
       key: 'k',
       modifier: 'mod',
       disabledInModal: true,
-      when: () => Boolean(getCallbacks().focusSearch),
-      action: () => { getCallbacks().focusSearch?.(); },
+      when: () => Boolean(getCallbacks().getActiveWorldId?.()),
+      action: () => { getCallbacks().openCommandPalette?.(); },
+    },
+    {
+      id: 'command-palette-slash',
+      description: 'Search everywhere (palette)',
+      scope: 'Global',
+      key: '/',
+      modifier: 'none',
+      disabledInModal: true,
+      disabledInTextInput: true,
+      when: () => Boolean(getCallbacks().getActiveWorldId?.()),
+      action: () => { getCallbacks().openCommandPalette?.(); },
     },
     {
       id: 'save-active-editor',
@@ -357,8 +368,8 @@ export interface HotkeyCallbacks {
   getActiveWorldId?: () => string | null | undefined;
   /** Open the ElementCreateModal. */
   openCreateElement?: () => void;
-  /** Focus the sidebar search input; flip sidebar mode to 'elements' if needed. */
-  focusSearch?: () => void;
+  /** Open the command palette (Ctrl/Cmd+K, `/`) — lazy-loaded in app.ts. */
+  openCommandPalette?: () => void;
   /** True when state.ui.selectedElementId is set — gates the deselect hotkey. */
   hasSelectedElement?: () => boolean;
   /** Clear selection + navigate to home (DESIGN convention #32). */

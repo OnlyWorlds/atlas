@@ -1423,6 +1423,76 @@
   letter-spacing: -0.2em;
 }
 
+/* ====== Custom fields section (D9) ====== */
+
+/* Removable rows grow a third column for the ×. */
+.atlas-field.atlas-field-removable {
+  grid-template-columns: 150px 1fr auto;
+}
+
+.atlas-field-remove {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--atlas-text-dim);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease;
+  align-self: center;
+}
+
+.atlas-field:hover .atlas-field-remove {
+  opacity: 0.55;
+}
+
+.atlas-field-remove:hover {
+  opacity: 1;
+  color: var(--atlas-danger, #f87171);
+}
+
+.atlas-custom-add-row {
+  padding: 4px 0 2px;
+}
+
+.atlas-custom-add-btn {
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font-size: 12px;
+  color: var(--atlas-text-dim);
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.atlas-custom-add-btn:hover {
+  color: var(--atlas-cyan);
+}
+
+.atlas-custom-add-input {
+  width: 180px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--atlas-text);
+  background: rgba(34, 211, 238, 0.04);
+  border: 1px solid var(--atlas-cyan-soft);
+  border-radius: 3px;
+  padding: 3px 7px;
+  outline: none;
+}
+
+.atlas-custom-add-input:focus {
+  border-color: var(--atlas-cyan);
+}
+
+.atlas-custom-add-hint {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--atlas-text-dim);
+}
+
 /* Inline edit mode — the value cell becomes an input container. Strip the
    hover background + cursor:text from the wrapper so it doesn't compete
    with the input. The input itself owns interaction. */
@@ -2290,6 +2360,120 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ====== Command palette (Ctrl/Cmd+K, `/`) ====== */
+
+.atlas-cmdk-panel {
+  align-self: flex-start;
+  margin-top: 12vh;
+  width: 560px;
+  max-width: 92vw;
+  padding: 10px;
+}
+
+.atlas-cmdk-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--atlas-text);
+  background: rgba(34, 211, 238, 0.04);
+  border: 1px solid var(--atlas-cyan-soft);
+  border-radius: 4px;
+  padding: 8px 11px;
+  outline: none;
+}
+
+.atlas-cmdk-input:focus {
+  border-color: var(--atlas-cyan);
+}
+
+.atlas-cmdk-list {
+  margin-top: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.atlas-cmdk-hint {
+  padding: 10px 8px 6px;
+  font-size: 12px;
+  color: var(--atlas-text-dim);
+}
+
+.atlas-cmdk-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 8px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--atlas-text);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.atlas-cmdk-row.is-active {
+  background: rgba(34, 211, 238, 0.09);
+}
+
+.atlas-cmdk-icon {
+  font-size: 16px;
+  color: var(--atlas-text-dim);
+  flex: 0 0 auto;
+}
+
+.atlas-cmdk-row.is-active .atlas-cmdk-icon {
+  color: var(--atlas-cyan);
+}
+
+.atlas-cmdk-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.atlas-cmdk-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atlas-cmdk-snippet {
+  font-size: 11px;
+  color: var(--atlas-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atlas-cmdk-rowhint {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--atlas-text-dim);
+  white-space: nowrap;
+}
+
+.atlas-cmdk-seeall {
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0 0 4px 4px;
+  color: var(--atlas-text-dim);
+  font-size: 12px;
+}
+
+.atlas-cmdk-seeall.is-active {
+  color: var(--atlas-cyan);
 }
 
 /* Mode chip shown beside modal title when NPM accepts an existing element

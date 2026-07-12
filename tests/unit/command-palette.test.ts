@@ -1,0 +1,83 @@
+/**
+ * Command palette search ranking (pure half of src/ui/command-palette.ts).
+ *
+ * Tiers: name-prefix (100) > name-substring (80) > alias (70) >
+ * supertype/subtype (60) > description (40, with context snippet).
+ * Rooms match by name (prefix 90 / substring 55). Caps: 12 elements, 3 rooms.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { searchPalette } from '../../src/ui/command-palette';
+import type { Element } from '../../src/core/types';
+
+let n = 0;
+function el(data: Record<string, unknown>): Element {
+  n += 1;
+  return {
+    id: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+    type: 'character',
+    name: '',
+    local_updated_at: '2026-07-12T10:00:00.000Z',
+    ...data,
+  } as Element;
+}
+
+describe('searchPalette ranking', () => {
+  it('empty query returns nothing', () => {
+    expect(searchPalette('', [el({ name: 'Aldric' })])).toEqual([]);
+    expect(searchPalette('   ', [el({ name: 'Aldric' })])).toEqual([]);
+  });
+
+  it('name prefix beats substring beats alias beats taxonomy beats description', () => {
+    const elements = [
+      el({ name: 'The Aldwood', description: '' }),           // substring (80)
+      el({ name: 'Aldric', description: '' }),                // prefix (100)
+      el({ name: 'Marta', atlas_aliases: ['Alda'] }),         // alias (70)
+      el({ name: 'Keep', supertype: 'Aldstone fort' }),       // taxonomy (60)
+      el({ name: 'Brenn', description: 'Guards the ald road east of town.' }), // description (40)
+    ];
+    const results = searchPalette('ald', elements).filter(r => r.kind === 'element');
+    expect(results.map(r => r.name)).toEqual(['Aldric', 'The Aldwood', 'Marta', 'Keep', 'Brenn']);
+  });
+
+  it('description matches carry a context snippet; others do not', () => {
+    const results = searchPalette('dragon', [
+      el({ name: 'Dragon' }),
+      el({ name: 'Brenn', description: 'x'.repeat(100) + ' slew the dragon of the vale ' + 'y'.repeat(100) }),
+    ]);
+    const byName = new Map(results.map(r => [r.name, r]));
+    expect(byName.get('Dragon')?.snippet).toBeUndefined();
+    expect(byName.get('Brenn')?.snippet).toContain('dragon of the vale');
+    expect(byName.get('Brenn')?.snippet).toMatch(/^…/);
+  });
+
+  it('matching is case-insensitive; unnamed elements surface via description as (unnamed)', () => {
+    const results = searchPalette('HARBOR', [
+      el({ name: 'old harbor' }),
+      el({ name: '', description: 'A quiet harbor town.' }),
+    ]);
+    expect(results.map(r => r.name)).toEqual(['old harbor', '(unnamed)']);
+  });
+
+  it('rooms match by name; an element name-prefix outranks them, but rooms beat weaker tiers', () => {
+    const results = searchPalette('wri', [el({ name: 'Wright the Smith' })]);
+    // Element prefix (100) > room prefix (90) — the palette's long tail is
+    // elements; rooms are always one nav click away.
+    expect(results[0]).toMatchObject({ kind: 'element', name: 'Wright the Smith' });
+    expect(results[1]).toMatchObject({ kind: 'room', name: 'writing' });
+
+    const weaker = searchPalette('wri', [el({ name: 'Marta', description: 'A skilled wright of barrels.' })]);
+    expect(weaker[0]).toMatchObject({ kind: 'room', name: 'writing' });
+  });
+
+  it('caps element results at 12', () => {
+    const many = Array.from({ length: 30 }, (_, i) => el({ name: `Torch ${i}` }));
+    const results = searchPalette('torch', many);
+    expect(results.filter(r => r.kind === 'element')).toHaveLength(12);
+  });
+
+  it('element hint carries type and taxonomy', () => {
+    const [r] = searchPalette('vael', [el({ name: 'Vaelin', supertype: 'Noble', subtype: 'Exile' })]);
+    expect(r.hint).toBe('character · Noble · Exile');
+  });
+});

@@ -20,7 +20,7 @@ import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { getWritingLabels } from './writing-helpers';
 import type { Element, ElementType } from '../core/types';
-import { ELEMENT_ICONS } from '../core/constants';
+import { ELEMENT_ICONS, EXTENSION_FIELD_NAMESPACES, isExtensionField, isCustomEditableField } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { openFieldEditInline } from '../ui/field-edit-inline';
@@ -44,8 +44,15 @@ const collapsedSections = new Set<string>();
 
 // ====== Public API ======
 
-export function renderSection(section: SectionLayout, el: Element, alwaysExpanded: boolean): HTMLElement | null {
-  if (section.fields.length === 0) return null;
+export interface RenderSectionOpts {
+  /** Render a × on each row that calls back with the field name (custom-fields section). */
+  onRemoveField?: (fieldName: string) => void;
+  /** Render the section shell even with zero fields (the custom section keeps its add-row visible). */
+  allowEmpty?: boolean;
+}
+
+export function renderSection(section: SectionLayout, el: Element, alwaysExpanded: boolean, opts?: RenderSectionOpts): HTMLElement | null {
+  if (section.fields.length === 0 && !opts?.allowEmpty) return null;
 
   const wrap = document.createElement('div');
   wrap.className = 'atlas-detail-section';
@@ -78,7 +85,23 @@ export function renderSection(section: SectionLayout, el: Element, alwaysExpande
   if (!isCollapsed) {
     const body = document.createElement('div');
     body.className = 'atlas-detail-section-body';
-    section.fields.forEach(meta => body.appendChild(renderField(meta, el)));
+    section.fields.forEach(meta => {
+      const row = renderField(meta, el);
+      if (opts?.onRemoveField) {
+        row.classList.add('atlas-field-removable');
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'atlas-field-remove';
+        rm.title = `Remove ${humanizeFieldName(meta.name)}`;
+        rm.textContent = '×';
+        rm.addEventListener('click', (e) => {
+          e.stopPropagation();
+          opts.onRemoveField!(meta.name);
+        });
+        row.appendChild(rm);
+      }
+      body.appendChild(row);
+    });
     wrap.appendChild(body);
   }
   return wrap;
@@ -104,6 +127,9 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   // back silently when no description exists for this (type, field) pair.
   const description = getFieldDescription(el.type, meta.name);
   if (description) label.title = description;
+  // Custom fields have no SDK description; the tooltip discloses the real
+  // stored key (labels hide the x_ prefix — D9).
+  else if (isExtensionField(meta.name)) label.title = `Custom field · stored as ${meta.name}`;
   const labelText = document.createElement('span');
   labelText.textContent = humanizeFieldName(meta.name);
   label.appendChild(labelText);
@@ -450,6 +476,22 @@ async function persistFieldPatch(el: Element, fieldName: string, nextValue: unkn
     } else {
       valueToPersist = null;
     }
+  } else if (isCustomEditableField(fieldName)) {
+    // Custom fields (D9): the editor hands back strings; preserve the value's
+    // existing on-disk type so a synced/imported number stays a number, a
+    // boolean stays a boolean, an array round-trips through the CSV display.
+    // `null` passes through untouched — it's the field's delete tombstone
+    // (keel keeps null-valued extension keys; probed 2026-07-12).
+    const prev = (el as Record<string, unknown>)[fieldName];
+    if (nextValue !== null && typeof nextValue === 'string') {
+      if (Array.isArray(prev)) {
+        valueToPersist = nextValue.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      } else if (typeof prev === 'boolean' && (nextValue === 'true' || nextValue === 'false')) {
+        valueToPersist = nextValue === 'true';
+      } else if (typeof prev === 'number' && nextValue.trim() !== '' && !Number.isNaN(Number(nextValue))) {
+        valueToPersist = Number(nextValue);
+      }
+    }
   }
   try {
     await store.updateElement(el.id, { [fieldName]: valueToPersist } as Partial<Element>);
@@ -512,10 +554,11 @@ async function autoUpdateMapDims(mapId: string, url: string): Promise<void> {
 
 /** "image_url" → "Image URL" via the ACRONYMS set. */
 export function humanizeFieldName(name: string): string {
-  // Drop the `atlas_` prefix on atlas-local extension fields when surfacing
-  // them in the UI — keeps labels clean. The on-disk field name still uses
-  // the prefix (DESIGN.md atlas-specific tracking section).
-  const cleaned = name.startsWith('atlas_') ? name.slice('atlas_'.length) : name;
+  // Drop extension-namespace prefixes (atlas_/x_/shadow_) when surfacing
+  // fields in the UI — keeps labels clean ("x_mood" → "Mood"). The on-disk
+  // field name still uses the prefix; the row tooltip discloses it (D9).
+  const ns = EXTENSION_FIELD_NAMESPACES.find(p => name.startsWith(p));
+  const cleaned = ns ? name.slice(ns.length) : name;
   return cleaned
     .split('_')
     .map(word => {

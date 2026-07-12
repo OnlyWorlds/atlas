@@ -28,7 +28,7 @@ import { loadPersistedRightTabs } from './tabs/right/right-tabs-persistence';
 import { toastManager, ToastManager } from './ui/toast-manager';
 import { loadRegistry } from './registry/registry';
 import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
-import { loadUiPrefs, setSidebarModePref } from './core/ui-prefs';
+import { loadUiPrefs } from './core/ui-prefs';
 import { onHashChange, parseHash, navigate, homeHash } from './core/router';
 import { hydrateAtlasRoot } from './setup/atlas-root-flow';
 import { activateWorld } from './sidebar/worlds-sidebar';
@@ -207,7 +207,7 @@ export function startApp(container: HTMLElement): AppHandle {
   renderMiddle();
 
   // Global hotkeys. Callbacks bind the dispatcher to app behavior (creating
-  // an element, focusing search) without coupling hotkeys.ts to UI modules.
+  // an element, opening the palette) without coupling hotkeys.ts to UI modules.
   setHotkeyCallbacks({
     getActiveWorldId: () => getState().active?.worldId ?? null,
     openCreateElement: () => {
@@ -215,25 +215,11 @@ export function startApp(container: HTMLElement): AppHandle {
       if (!active) return;
       new ElementCreateModal(toasts).open();
     },
-    focusSearch: () => {
+    openCommandPalette: () => {
       const active = getState().active;
       if (!active) return;
-      // Flip to elements mode if needed (search lives in the elements body).
-      // Session 223 decoupling: sidebar mode is pure state, set directly +
-      // persist as a user preference. No URL navigation here.
-      if (getState().ui.sidebarMode !== 'elements') {
-        patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
-        // Persist the preference so the user's choice survives reload.
-        setSidebarModePref('elements');
-      }
-      // Defer focus to after the elements body mounts.
-      queueMicrotask(() => {
-        const input = document.querySelector<HTMLInputElement>('input[data-role="elements-search"]');
-        if (input) {
-          input.focus();
-          input.select();
-        }
-      });
+      // Lazy chunk — same pattern as the notes/help overlays.
+      void import('./ui/command-palette').then(m => m.openCommandPalette());
     },
     hasSelectedElement: () => Boolean(getState().ui.selectedElementId),
     deselectToHome: () => {

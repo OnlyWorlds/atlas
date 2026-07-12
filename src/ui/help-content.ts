@@ -34,6 +34,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'edit any field by clicking its value',
       'link elements through the link fields',
       'label it your way with supertype and subtype',
+      'add your own fields in the Custom fields section',
       'place it on a map from the header pin button',
     ],
   },

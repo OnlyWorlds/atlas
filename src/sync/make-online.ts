@@ -494,11 +494,25 @@ export async function mergeLocalIntoApi(
     }
 
     if (!result.errors) {
-      // Everything landed atomically. Backfill authoritative timestamps
-      // (bulk items carry no updated_at yet): small batch → per-element GET,
-      // large → one list walk per pushed type. Never stamp client now().
-      if (batch.length <= 20) {
-        for (const b of batch) {
+      // Everything landed atomically. Stamp from the per-item timestamp echo
+      // (keel D46) where present; only items lacking it fall to the read-back
+      // backfill (small batch → per-element GET, large → one list walk per
+      // pushed type). Never stamp client now().
+      const needBackfill: typeof batch = [];
+      for (let i = 0; i < batch.length; i++) {
+        const echo = result.items[i]?.updatedAt;
+        if (typeof echo === 'string' && echo) {
+          await folder.stampServerUpdatedAt(batch[i].item.element.id as string, batch[i].dec.type, echo);
+          creates++;
+          done++;
+          onProgress?.({ done, total, phase: 'apply' });
+        } else {
+          needBackfill.push(batch[i]);
+        }
+      }
+      if (needBackfill.length === 0) return;
+      if (needBackfill.length <= 20) {
+        for (const b of needBackfill) {
           const id = b.item.element.id as string;
           try {
             const remote = await adapter.getElement(b.dec.type, id);
@@ -516,7 +530,7 @@ export async function mergeLocalIntoApi(
         }
       } else {
         const byType = new Map<ElementType, Array<{ dec: LocalDecision; item: BulkItem }>>();
-        for (const b of batch) {
+        for (const b of needBackfill) {
           if (!byType.has(b.dec.type)) byType.set(b.dec.type, []);
           byType.get(b.dec.type)!.push(b);
         }

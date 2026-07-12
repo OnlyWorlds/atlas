@@ -23,6 +23,7 @@ import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/
 import { toastManager } from '../ui/toast-manager';
 import { sectionsFor } from '../editor/field-schema';
 import { buildZoneSections } from './element-detail-zone-sections';
+import { buildCustomFieldsSection } from './element-detail-custom-fields';
 import { buildMapLocalImageRow } from './element-detail-map-image';
 import { renderReferencedBy } from './element-detail-refs';
 import { renderSection } from './element-detail-fields';
@@ -176,6 +177,11 @@ export function mountElementDetail(target: HTMLElement): () => void {
         detail.appendChild(node);
       }
     }
+
+    // Custom fields (D9): user-defined x_/shadow_ extension fields — render
+    // what's there, let the user add more. Always present (the add row is
+    // the feature's discoverability).
+    detail.appendChild(buildCustomFieldsSection(el));
 
     const refs = renderReferencedBy(el);
     if (refs) detail.appendChild(refs);

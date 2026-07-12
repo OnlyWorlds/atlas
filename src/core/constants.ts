@@ -222,6 +222,31 @@ export function isExtensionField(name: string): boolean {
   return EXTENSION_FIELD_NAMESPACES.some(ns => name.startsWith(ns));
 }
 
+/**
+ * A user-editable custom field: extension-namespaced but NOT atlas machinery
+ * (page blocks, richtext, aliases, zone visuals, ...). The D9 custom-fields
+ * section in element detail renders exactly these; a `null` value is the
+ * field's delete tombstone (keel keeps null-valued extension keys — probed
+ * 2026-07-12) and hides the row.
+ */
+export function isCustomEditableField(name: string): boolean {
+  return isExtensionField(name)
+    && !(ATLAS_LOCAL_EXTENSION_FIELDS as readonly string[]).includes(name);
+}
+
+/**
+ * Does a custom-field value carry real content? `''` is a live-but-empty
+ * field (created, not yet filled — still renders a row); `null` is deleted.
+ * Used by suggestion derivation and delete-confirm gating, where only
+ * content matters.
+ */
+export function isPopulatedCustomValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return typeof value === 'number' || typeof value === 'boolean';
+}
+
 // Map visual prefs storage keys (DESIGN_MAPS.md §11).
 export const MAP_VIEW_PREFS_DEFAULTS_KEY = 'atlas_map_view_defaults';
 export const MAP_VIEW_PREFS_BY_MAP_KEY = 'atlas_map_view_prefs';

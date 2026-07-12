@@ -74,7 +74,7 @@ function buildConvertNotesPrompt(): string {
     '- Every element needs a "name" (a non-empty string). Everything else is optional.',
     '- To link elements, use the target\'s name as the value: a single link like "location": "Old Harbor", or a list like "objects": ["Sword", "Shield"]. Only reference elements you also include.',
     '- Optionally add a "World" block with "name" and "description" to make it a full world.',
-    '- Do not invent field names; when unsure, put the detail in "description".',
+    '- Do not invent field names. A detail that deserves its own field can be a custom field prefixed x_ (like "x_mood": "grim"); when unsure, put it in "description".',
     '',
     'Return only the JSON, nothing else.',
     '',

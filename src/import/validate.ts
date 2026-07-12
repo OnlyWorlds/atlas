@@ -116,7 +116,7 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
             value: v,
             issue: `Unknown field "${k}" for ${label}`,
             expected: 'A valid OnlyWorlds field name',
-            suggestion: `Remove "${k}" or check the spelling.`,
+            suggestion: `Remove "${k}", check the spelling, or rename it to "x_${k}" to keep it as a custom field.`,
           });
         }
       }

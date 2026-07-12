@@ -17,9 +17,36 @@ import { getState } from './state';
 import { getWritingLabels } from '../middle/writing-helpers';
 import { KNOWLEDGE_SUBTYPE, CIRCLE_SUBTYPE } from './knowledge';
 import { PAGE_SUBTYPE } from './sharing';
+import { isCustomEditableField, isPopulatedCustomValue } from './constants';
 import type { Element } from './types';
 
 const TAXONOMY_SUGGESTION_CAP = 8;
+const CUSTOM_FIELD_SUGGESTION_CAP = 12;
+
+/**
+ * Distinct custom-field NAMES already in use across the world (D9) — the
+ * add-field datalist, so "population" stays one field instead of five
+ * spellings. Derived live from loaded elements, never tracked (D9b law).
+ *
+ * Only `x_`-namespaced fields feed the list (the add flow mints x_ keys;
+ * suggesting a shadow_/atlas_ name would create a DIFFERENT key). Names are
+ * returned bare (prefix stripped — what the user types). Null-valued keys
+ * (deleted fields) don't suggest.
+ */
+export function customFieldNameSuggestions(): string[] {
+  const counts = new Map<string, number>();
+  for (const el of getState().data.elements) {
+    for (const [k, v] of Object.entries(el)) {
+      if (!k.startsWith('x_') || !isCustomEditableField(k)) continue;
+      if (!isPopulatedCustomValue(v)) continue;
+      const bare = k.slice(2);
+      counts.set(bare, (counts.get(bare) ?? 0) + 1);
+    }
+  }
+  return [...counts.keys()]
+    .sort((a, b) => (counts.get(b)! - counts.get(a)!) || a.localeCompare(b))
+    .slice(0, CUSTOM_FIELD_SUGGESTION_CAP);
+}
 
 export function suggestionsForField(el: Element, fieldName: string): string[] | null {
   if (fieldName !== 'supertype' && fieldName !== 'subtype') return null;

@@ -57,7 +57,21 @@ describe('mergeLocalIntoApi /bulk create phase', () => {
     expect(await folder.getElement('00000000-0000-4000-8000-00000000cafe')).toBeTruthy();
   });
 
-  it('backfills >20 creates via a per-type list walk', async () => {
+  it('stamps >20 creates straight from the D46 echo (no post-bulk read-back)', async () => {
+    for (let i = 0; i < 25; i++) {
+      await folder.createElement('object', { name: `bulk-obj-${i}` });
+    }
+    const result = await mergeLocalIntoApi(folder, client, 'b');
+    expect(result.creates).toBe(25);
+    expect(result.failures).toHaveLength(0);
+    const bulkIdx = client.calls.findIndex(c => c.method === 'bulk');
+    expect(client.calls.slice(bulkIdx + 1).filter(c => c.method === 'get')).toHaveLength(0);
+    const all = await folder.listElements();
+    expect(all.filter(e => !e.server_updated_at)).toHaveLength(0);
+  });
+
+  it('pre-D46 fallback: >20 creates without the echo backfill via a per-type list walk', async () => {
+    client.__omit_bulk_timestamps();
     for (let i = 0; i < 25; i++) {
       await folder.createElement('object', { name: `bulk-obj-${i}` });
     }

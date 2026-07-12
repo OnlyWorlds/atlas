@@ -215,11 +215,12 @@ describe('dispatchSaveRequest', () => {
 });
 
 describe('defaultBindings', () => {
-  it('declares the MVP set: open-reference, new-element, focus-search, save-active-editor', () => {
+  it('declares the MVP set: open-reference, new-element, command-palette (both triggers), save-active-editor', () => {
     const ids = defaultBindings().map(b => b.id);
     expect(ids).toContain('open-reference');
     expect(ids).toContain('new-element');
-    expect(ids).toContain('focus-search');
+    expect(ids).toContain('command-palette');
+    expect(ids).toContain('command-palette-slash');
     expect(ids).toContain('save-active-editor');
   });
 

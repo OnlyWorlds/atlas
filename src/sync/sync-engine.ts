@@ -35,6 +35,14 @@ export interface BulkResult {
   items: Array<{
     status: number;
     id: string;
+    /**
+     * Server-authoritative timestamp echo (keel D46, deployed 2026-07-12) —
+     * byte-stable with subsequent GET/list serialization. Present on success
+     * slots; absent on error slots and on pre-D46 servers (the engine falls
+     * back to the read-back backfill for any item lacking it). NEVER trust
+     * these on an `errors: true` atomic response (counterfactual echoes).
+     */
+    updatedAt?: string;
     error?: { code: string; message: string; param: string | null };
   }>;
 }
@@ -966,8 +974,24 @@ export class SyncEngine {
     }
 
     if (!result.errors) {
-      // Everything landed. Backfill authoritative server timestamps.
-      const stamped = await this.backfillBulkTimestamps(items, failures);
+      // Everything landed. Stamp baselines from the per-item timestamp echo
+      // (keel D46) where present; anything lacking it (pre-D46 server, fake
+      // without the seam) falls back to the read-back backfill.
+      let stamped = 0;
+      const needBackfill: BulkItem[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (this.stopped) break;
+        const echo = result.items[i]?.updatedAt;
+        if (typeof echo === 'string' && echo) {
+          await this.folder.stampServerUpdatedAt(items[i].element.id as string, items[i].type, echo);
+          stamped++;
+        } else {
+          needBackfill.push(items[i]);
+        }
+      }
+      if (needBackfill.length > 0 && !this.stopped) {
+        stamped += await this.backfillBulkTimestamps(needBackfill, failures);
+      }
       for (const _ of items) onItemDone();
       return { created: stamped, authBlocked: false };
     }

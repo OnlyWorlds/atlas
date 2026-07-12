@@ -70,7 +70,32 @@ describe('SyncEngine /bulk push path', () => {
     expect(localB?.server_updated_at).toBe(serverB?.updated_at);
   });
 
-  it('backfills via listElements for >20 creates and stamps every element', async () => {
+  it('stamps >20 creates straight from the D46 timestamp echo — no read-back at all', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 25; i++) {
+      const o = await folder.createElement('object', { name: `obj ${i}` });
+      ids.push(o.id);
+    }
+
+    const result = await engine.pushOnce();
+    expect(result.pushed.creates).toBe(25);
+    expect(result.failures).toHaveLength(0);
+
+    // One bulk call and NOTHING after it: no per-element GETs, no list walk —
+    // the echo made the whole backfill class unnecessary (keel D46).
+    const bulkIdx = client.calls.findIndex(c => c.method === 'bulk');
+    expect(bulkIdx).toBeGreaterThanOrEqual(0);
+    expect(client.calls.slice(bulkIdx + 1).filter(c => c.method === 'list' || c.method === 'get')).toHaveLength(0);
+
+    // Every element stamped from its server timestamp.
+    for (const id of ids) {
+      const local = await folder.getElement(id);
+      expect(local?.server_updated_at).toBe(client.__server_get('object', id)?.updated_at);
+    }
+  });
+
+  it('pre-D46 fallback: items without the echo backfill via listElements for >20 creates', async () => {
+    client.__omit_bulk_timestamps();
     const ids: string[] = [];
     for (let i = 0; i < 25; i++) {
       const o = await folder.createElement('object', { name: `obj ${i}` });
