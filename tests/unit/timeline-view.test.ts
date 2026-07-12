@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { computeBeeswarm, clampWindow, zoomWindow } from '../../src/visualization/timeline/timeline-view';
+import { computeBeeswarm, clampWindow, zoomWindow, rangeVsNow } from '../../src/visualization/timeline/timeline-view';
 import type { TimelineNode } from '../../src/visualization/timeline/types';
 
 function node(id: string, startDate: number): TimelineNode {
@@ -27,6 +27,34 @@ function node(id: string, startDate: number): TimelineNode {
 }
 
 const identityX = (d: number): number => d;
+
+describe('rangeVsNow — the forward-half classifier (Act 1)', () => {
+  it('treats everything as past when there is no now', () => {
+    expect(rangeVsNow(10, null, null)).toBe('past');
+    expect(rangeVsNow(10, 50, null)).toBe('past');
+  });
+
+  it('classifies a point node against the seam (AT now = past, inclusive)', () => {
+    expect(rangeVsNow(30, null, 40)).toBe('past');
+    expect(rangeVsNow(40, null, 40)).toBe('past');   // exactly at now → past side
+    expect(rangeVsNow(50, null, 40)).toBe('future');
+  });
+
+  it('classifies a range: wholly past, wholly future, or straddling', () => {
+    expect(rangeVsNow(10, 30, 40)).toBe('past');      // ends before now
+    expect(rangeVsNow(50, 70, 40)).toBe('future');    // starts after now
+    expect(rangeVsNow(30, 45, 40)).toBe('straddle');  // now falls inside
+  });
+
+  it('a range ending exactly at now is past, not straddling', () => {
+    expect(rangeVsNow(30, 40, 40)).toBe('past');
+  });
+
+  it('a zero/negative-length range falls back to point semantics', () => {
+    expect(rangeVsNow(50, 50, 40)).toBe('future');    // end !> start → point at 50
+    expect(rangeVsNow(30, 30, 40)).toBe('past');
+  });
+});
 
 describe('computeBeeswarm — density-fan layout', () => {
   it('returns [] for a degenerate band (bottom <= top)', () => {

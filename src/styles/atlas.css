@@ -9684,12 +9684,120 @@ a.atlas-share-map-pin { cursor: pointer; }
   margin-left: auto;
   color: var(--atlas-text-muted);
 }
-.atlas-timeline-rail-hint {
-  margin-top: 12px;
-  font-size: 11px;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.38);
+/* The undated backlog (Bout 1.1) — the work queue in the ambient rail. */
+.atlas-timeline-rail-undated {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--atlas-divider);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 300px;    /* the backlog "fills fast" (Simmer) — scroll it, don't clip the card */
+  overflow-y: auto;
 }
+.atlas-timeline-rail-undated-head {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+.atlas-timeline-rail-undated-count {
+  margin-left: auto;
+  color: rgba(245, 180, 90, 0.9); /* warm — same family as the now controls: these want a time */
+  font-weight: 600;
+}
+.atlas-timeline-rail-undated-sub {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 2px;
+}
+.atlas-timeline-rail-undated-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 8px;
+}
+.atlas-timeline-rail-undated-grouphead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.5);
+}
+.atlas-timeline-rail-undated-grouphead .material-symbols-outlined { font-size: 13px; }
+.atlas-timeline-rail-undated-groupcount {
+  margin-left: auto;
+  color: var(--atlas-text-muted);
+}
+.atlas-timeline-rail-undated-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 11px;
+  padding: 2px 6px 2px 14px;
+  border-radius: 5px;
+  cursor: grab;               /* the whole row is draggable onto the axis */
+  transition: background 100ms ease, color 100ms ease;
+  width: 100%;
+}
+.atlas-timeline-rail-undated-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+.atlas-timeline-rail-undated-item:active { cursor: grabbing; }
+.atlas-timeline-rail-undated-grip {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.28);
+  flex: 0 0 auto;
+  transition: color 100ms ease;
+}
+.atlas-timeline-rail-undated-item:hover .atlas-timeline-rail-undated-grip {
+  color: rgba(34, 211, 238, 0.75); /* cyan hint on hover: this drags onto the (cyan-guide) axis */
+}
+.atlas-timeline-rail-undated-name {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The floating drag chip (Bout 1.2) — follows the cursor while dragging a rail
+   element onto the axis. */
+.atlas-timeline-drag-ghost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 240px;
+  padding: 4px 9px;
+  border-radius: 7px;
+  background: rgba(12, 16, 22, 0.96);
+  border: 1px solid rgba(34, 211, 238, 0.5);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.atlas-timeline-drag-ghost .material-symbols-outlined { font-size: 15px; }
+.atlas-timeline-rail-undated-more {
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--atlas-text-muted);
+  font-size: 10.5px;
+  padding: 1px 6px 1px 20px;
+  cursor: pointer;
+}
+.atlas-timeline-rail-undated-more:hover { color: rgba(255, 255, 255, 0.7); }
 
 /* Tableau state label in the control bar (all type chips off). */
 .atlas-chart-tableau-hint {
@@ -10089,6 +10197,76 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 
 .atlas-chart-focus-clear:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* The now control (Act 1): establish / show the world's now (time_current).
+   Warm gold matches the now-line seam on the canvas. Pushed to the bar's right
+   end so it reads as a distinct control from the type chips. */
+.atlas-chart-now {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.atlas-chart-now-set {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px 3px 7px;
+  border: 1px solid rgba(245, 180, 90, 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(245, 180, 90, 0.85);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.atlas-chart-now-set:hover {
+  background: rgba(245, 180, 90, 0.12);
+  border-color: rgba(245, 180, 90, 0.6);
+  color: rgba(245, 180, 90, 1);
+}
+
+.atlas-chart-now-set .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.atlas-chart-now-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 4px 3px 8px;
+  border: 1px solid rgba(245, 180, 90, 0.45);
+  border-radius: 999px;
+  background: rgba(245, 180, 90, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+}
+
+.atlas-chart-now-chip .material-symbols-outlined {
+  font-size: 14px;
+  color: rgba(245, 180, 90, 0.9);
+}
+
+.atlas-chart-now-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.atlas-chart-now-clear:hover {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
 }

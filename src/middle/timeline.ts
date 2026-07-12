@@ -10,16 +10,18 @@
  * (unified select=focus, Captain-confirmed). See DESIGN_CHARTS.md.
  */
 
-import { getState, subscribe } from '../core/state';
+import { getState, subscribe, patchSlice } from '../core/state';
 import { navigate, elementHash, timelineHash, parseHash, onHashChange, type Route } from '../core/router';
 import { ToastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { mountTimelineView, type TimelineViewHandle, type TimelineViewExtras } from '../visualization/timeline/timeline-view';
 import { extractTemporalNodes } from '../visualization/timeline/data-normalizer';
+import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from '../visualization/timeline/temporal-fields';
 import { filterNodesByScope, scopeFromFocus, tableauScope } from '../visualization/timeline/chart-recipe';
 import type { ChartConfig, ChartScope, TimelineNode } from '../visualization/timeline/types';
 import { defaultChartName, upsertChart, removeChart, renameChart, sameScope } from '../visualization/timeline/charts-store';
 import { getActiveStore } from '../core/active-store';
+import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
@@ -98,6 +100,33 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   const elementById = (id: string): Element | undefined =>
     getState().data.elements.find(e => e.id === id);
 
+  // The world's "now" (Act 1) — `World.time_current`, drawn as the now-line and
+  // the forward-half seam. Local-only (World-meta doesn't sync today).
+  const nowValue = (): number | null => getState().active?.meta?.time_current ?? null;
+
+  /** Persist the now to world.json + mirror into state so the room re-renders. */
+  async function setNow(value: number | null): Promise<void> {
+    const store = getActiveStore();
+    const active = getState().active;
+    if (!store || !active) return;
+    await store.writeWorldMeta({ time_current: value ?? undefined });
+    patchSlice('active', {
+      ...active,
+      meta: { ...active.meta, time_current: value ?? undefined },
+    });
+  }
+
+  /** A sensible first "now": the MEDIAN dated point, so roughly half the world
+   *  sits on each side (a mid-range average gets skewed early by one ancient
+   *  outlier). The user drags it from there. */
+  function suggestNow(nodes: TimelineNode[]): number {
+    const dates = nodes.map(n => n.startDate).sort((a, b) => a - b);
+    if (dates.length === 0) return 0;
+    const mid = Math.floor(dates.length / 2);
+    const median = dates.length % 2 === 0 ? (dates[mid - 1] + dates[mid]) / 2 : dates[mid];
+    return Math.round(median);
+  }
+
   /** Temporal types actually present, first-seen order (stable enough). */
   function presentTypes(nodes: TimelineNode[]): ElementType[] {
     const seen = new Set<string>();
@@ -160,6 +189,89 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
         else render();
       });
       controlBar.appendChild(chip);
+    }
+
+    // The now control (Act 1): establish the world's now, or show + clear it.
+    // Once set, the now-line is draggable directly on the canvas.
+    const now = nowValue();
+    const nowWrap = document.createElement('div');
+    nowWrap.className = 'atlas-chart-now';
+    if (now == null) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'atlas-chart-now-set';
+      btn.title = "Set the world's current point in time. Everything after it becomes the forward half (drag the line to move it).";
+      btn.innerHTML = `<span class="material-symbols-outlined">flag</span><span>Set current</span>`;
+      btn.addEventListener('click', () => void setNow(suggestNow(allNodes)));
+      nowWrap.appendChild(btn);
+    } else {
+      const chip = document.createElement('span');
+      chip.className = 'atlas-chart-now-chip';
+      chip.title = 'Drag the now-line on the chart to move it';
+      chip.innerHTML =
+        `<span class="material-symbols-outlined">schedule</span>` +
+        `<span>now · ${escapeText(String(now))}</span>` +
+        `<button type="button" class="atlas-chart-now-clear" title="Clear now (remove the seam)">×</button>`;
+      chip.querySelector('.atlas-chart-now-clear')!
+        .addEventListener('click', () => void setNow(null));
+      nowWrap.appendChild(chip);
+    }
+    controlBar.appendChild(nowWrap);
+  }
+
+  /**
+   * The work queue (Act 1, Bout 1.1): elements of dateable types that carry no
+   * date yet — the backlog that could go on the axis. Global (the whole world's
+   * undated backlog, not the current scope), grouped for the rail by the caller.
+   */
+  function undatedElements(): Array<{ id: string; type: ElementType; name: string }> {
+    const out: Array<{ id: string; type: ElementType; name: string }> = [];
+    for (const el of getState().data.elements) {
+      const map = TEMPORAL_TYPE_FIELDS[el.type];
+      if (!map) continue; // not a dateable type — never counts as "undated"
+      if (parseTemporalValue((el as Record<string, unknown>)[map.start]) != null) continue;
+      out.push({ id: el.id, type: el.type as ElementType, name: el.name || '(unnamed)' });
+    }
+    return out;
+  }
+
+  /**
+   * Drag-to-date commit (Bout 1.2): write the type's start-date field, then
+   * GUARANTEE the element is visible. A bare write can silently vanish it — the
+   * default tableau caps at 22 by weight and a type filter excludes off-type
+   * elements, so a freshly-dated low-weight element may enter neither the rail
+   * (now dated) nor the scoped chart (gate: convergent HIGH finding).
+   */
+  async function dateElement(id: string, date: number): Promise<void> {
+    const store = getActiveStore();
+    const el = getState().data.elements.find(e => e.id === id);
+    if (!store || !el) { toasts.error('element not found'); return; } // deleted mid-drag (gate)
+    const field = TEMPORAL_TYPE_FIELDS[el.type]?.start;
+    if (!field) { toasts.error('this type has no date field'); return; }
+    try {
+      await store.updateElement(id, { [field]: date });
+      await refreshElementsAfterWrite(store);
+      // Deferred so the re-render's lastScoped is fresh.
+      queueMicrotask(() => showDatedElement(id, el.name, date));
+    } catch (err) {
+      console.error('[charts] drag-to-date write failed:', err);
+      toasts.error('could not save the date');
+    }
+  }
+
+  /**
+   * Confirm a just-dated element. PEEK it if it's on the chart — a gentle
+   * highlight + card, never a FOCUS (focus narrows the scope and loses the
+   * user's view, Captain). If it fell outside the current tableau/filter, an
+   * honest toast confirms the write instead of it silently vanishing (gate).
+   */
+  function showDatedElement(id: string, name: string, date: number): void {
+    if (lastScoped.some(n => n.id === id)) {
+      peekId = id;
+      handle?.setSelection(id);
+      toasts.success(`Dated ${name} to ${date}`);
+    } else {
+      toasts.success(`Dated ${name} to ${date} · not in this view`);
     }
   }
 
@@ -350,6 +462,10 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
         // FOCUS: the explicit narrowing verb — URL-backed, Back walks out.
         onFocus: (id) => { const w = worldId(); if (w) navigate(timelineHash(w, id)); },
         onOpenElement: (id) => { const w = worldId(); if (w) navigate(elementHash(w, id)); },
+        // The now-line was dragged/established → persist to World.time_current.
+        onSetNow: (value) => void setNow(value),
+        // A rail element was dragged onto the axis and dropped at `date`.
+        onDateElement: (id, date) => void dateElement(id, date),
       });
     }
 
@@ -363,6 +479,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
         protagonistId: favorites?.protagonist_id ?? null,
         nexusId: favorites?.nexus_id ?? null,
       },
+      now: nowValue(),
+      undated: undatedElements(),
     };
     // allNodes rides along as the overview strip's constant reference frame
     // (the full world's history stays visible however narrow the scope, S2).
