@@ -15,7 +15,7 @@ import { getState, patchSlice } from '../core/state';
 import { saveRegistry, attachApi, setPin, setEmail } from '../registry/registry';
 import { completeWaypoint } from '../core/waypoints';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
-import { createApiWorld, buildOwClient } from '../sync/make-online';
+import { createApiWorld, buildV2Adapter } from '../sync/make-online';
 import { attachSyncEngine } from '../sync/sync-attach';
 import { getActiveStore } from '../core/active-store';
 import { escapeAttr } from '../core/dom-utils';
@@ -109,11 +109,11 @@ export class NewApiWorldModal extends BaseModal {
         const apiKey = created.apiKey;
 
         // World id + name come straight from the create response (keel
-        // includes them); worlds.get is the fallback for older servers.
+        // includes them); v2 GET /world is the fallback for older servers.
         let world: { id?: string; name?: string } = { id: created.worldId, name: created.worldName };
         if (!world.id) {
           progressEl.textContent = `Fetching new world ID...`;
-          world = await buildOwClient(apiKey, pin).worlds.get();
+          world = await buildV2Adapter(apiKey, pin).getWorld();
         }
         if (!world?.id) throw new Error('Server returned no world ID');
 

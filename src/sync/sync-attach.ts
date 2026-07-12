@@ -80,7 +80,9 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
     policy: reg.sync_default_policy ?? 'local-wins',
     onStateChange: (s) => publishSyncState(entry.id, s),
     onSyncResult: (phase, result) => emitConflictToasts(phase, result),
-    onIdSwap: (swap) => handleIdSwap(swap),
+    // NOTE: the engine no longer has an onIdSwap hook — keel preserves client
+    // ids on CREATE (id-swap create-path excised 2026-07-12). handleIdSwap
+    // below survives for the Route 2 MATCH-phase swaps via applyIdSwapToUi.
   });
   // Apply persisted debounce preference if the user configured one. Engine
   // default (5000ms) stands when registry has no value.

@@ -12,19 +12,23 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { mswServer } from '../setup';
-import { statefulOwHandlers } from '../msw-handlers';
+import { statefulOwHandlers, statefulV2Handlers } from '../msw-handlers';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
-import { OwClientAdapter } from '../../src/sync/ow-client-adapter';
+import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
 import {
   createApiWorld,
   mergeLocalIntoApi,
   setMakeOnlineBaseUrl,
 } from '../../src/sync/make-online';
 
+// Route 1 (create-world-external) is a v1 /worldsync route that STAYS on v1 in
+// production, so its handler (from statefulOwHandlers) is still registered.
+// Route 2 element CRUD + /bulk goes through the v2 adapter against the keel v2
+// MSW at the /api/v2 sibling base.
 const TEST_BASE = 'https://test-ow.local/api/worldapi';
+const V2_BASE = 'https://test-ow.local/api/v2';
 
 let serverState: ReturnType<typeof statefulOwHandlers>;
 let clock: MonotonicClock;
@@ -32,8 +36,11 @@ let folder: MockFolderStore;
 
 beforeEach(async () => {
   clock = new MonotonicClock('2026-01-01T00:00:00.000Z');
+  // v1 handlers: only the /worldsync create-world-external route is consumed
+  // (Route 1). v2 handlers serve all element CRUD + /bulk (Route 2).
   serverState = statefulOwHandlers({ baseUrl: TEST_BASE, clock: clock.next });
-  mswServer.use(...serverState.handlers);
+  const v2 = statefulV2Handlers({ baseUrl: V2_BASE, clock: clock.next });
+  mswServer.use(...serverState.handlers, ...v2.handlers);
   folder = new MockFolderStore();
   folder.setClock(clock.next);
   await folder.open(null);
@@ -45,14 +52,8 @@ afterEach(() => {
   setMakeOnlineBaseUrl(TEST_BASE); // reset for next test; helper is module-level
 });
 
-function makeAdapter(): OwClientAdapter {
-  return new OwClientAdapter(
-    new OnlyWorldsClient({
-      apiKey: 'test-key',
-      apiPin: '1234',
-      baseUrl: TEST_BASE,
-    })
-  );
+function makeAdapter(): OwV2ClientAdapter {
+  return new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '1234', baseUrl: V2_BASE });
 }
 
 // ---------------------------------------------------------------------------
@@ -173,34 +174,23 @@ describe('mergeLocalIntoApi (Route 2)', () => {
 
   it('per-element resilience: one failure does not abort others', async () => {
     const adapter = makeAdapter();
-    // Make folder.stampServerUpdatedAt throw for one specific element.
+    // Three local-only creates → one atomic /bulk. Bob carries an unknown
+    // non-namespaced field the v2 server rejects (422). Under atomic /bulk the
+    // whole batch rolls back, but the merge retries the survivors once — so
+    // Alice + Carol still land while Bob is surfaced as the lone failure.
     await folder.createElement('character', { name: 'Alice' });
-    const bad = await folder.createElement('character', { name: 'Bob' });
+    await folder.createElement('character', { name: 'Bob', mood: 'unknowable' });
     await folder.createElement('character', { name: 'Carol' });
-
-    // We don't have a clean inject for stamp failures — pass a server list with
-    // a deliberately-broken match. Inject via name-collision shenanigans:
-    // pre-create on server a duplicate with the same name that throws on PATCH.
-    // Simpler: cause `adapter.createElement` to fail for one id.
-    // We don't have a fake adapter — use a small MSW override that 500s the second character.
-    let charPostCount = 0;
-    const { http, HttpResponse } = await import('msw');
-    mswServer.use(
-      http.post(`${TEST_BASE}/character/`, async ({ request }) => {
-        charPostCount++;
-        if (charPostCount === 2) return HttpResponse.json({ error: 'boom' }, { status: 500 });
-        const body = await request.json() as Record<string, unknown>;
-        const id = (body.id as string) ?? crypto.randomUUID();
-        return HttpResponse.json({ ...body, id, updated_at: clock.next() }, { status: 201 });
-      })
-    );
 
     const result = await mergeLocalIntoApi(folder, adapter, 'b');
 
     expect(result.creates).toBe(2);
     expect(result.failures).toHaveLength(1);
     expect(result.failures[0].type).toBe('character');
-    void bad;
+
+    // End state: Alice + Carol on the server, Bob absent.
+    const list = await adapter.listElements('character');
+    expect(list.map(r => r.name).sort()).toEqual(['Alice', 'Carol']);
   });
 
   it('progress callback fires for each local element', async () => {
@@ -349,75 +339,48 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     void bob; void carol;
   });
 
-  it('handles server-assigned ids on local-only CREATE (id-swap during merge)', async () => {
-    // Simulates real OW: server assigns its own v7 id, ignoring client uuid.
-    // Regression for the "vanished from server" false-positive Captain caught
-    // immediately after a Route 2 merge with newly-created locals.
+  it('lands local-only CREATEs at their client ids under v2 (no id reassignment)', async () => {
+    // v2 preserves client ids (no server-side v7 reassignment), so a Route 2
+    // merge of never-synced locals lands each at its own id with a stamped
+    // baseline — no id-swap, no silent-removal, no tombstones. This is the v2
+    // shape of the "vanished from server" regression guard: with ids stable
+    // there is no vector for the false positive at all.
     const adapter = makeAdapter();
-    // Server starts empty (no matches).
-    // Local has 2 unique characters.
+    // Server starts empty (no matches). Local has 2 unique characters → /bulk.
     const a = await folder.createElement('character', { name: 'NewA' });
     const b = await folder.createElement('character', { name: 'NewB' });
-
-    // Override MSW to ignore client-sent ids on POST and assign fresh ones.
-    const { http, HttpResponse } = await import('msw');
-    mswServer.use(
-      http.post(`${TEST_BASE}/character/`, async ({ request }) => {
-        const body = (await request.json()) as Record<string, unknown>;
-        // Strip client id; force server-side fresh uuid.
-        const { id: _drop, ...rest } = body;
-        void _drop;
-        const id = crypto.randomUUID();
-        return HttpResponse.json({ ...rest, id, updated_at: clock.next() }, { status: 201 });
-      })
-    );
 
     const result = await mergeLocalIntoApi(folder, adapter, 'b');
 
     expect(result.creates).toBe(2);
     expect(result.failures).toEqual([]);
 
-    // Local files should now be at the SERVER's ids, not the client uuids.
-    expect(await folder.getElement(a.id)).toBeNull();
-    expect(await folder.getElement(b.id)).toBeNull();
+    // Files stay at their client ids, both baselined.
+    expect(await folder.getElement(a.id)).not.toBeNull();
+    expect(await folder.getElement(b.id)).not.toBeNull();
     const allLocal = await folder.listElements();
     expect(allLocal).toHaveLength(2);
     expect(allLocal.find(e => e.name === 'NewA')!.server_updated_at).toBeTruthy();
     expect(allLocal.find(e => e.name === 'NewB')!.server_updated_at).toBeTruthy();
 
-    // Tombstones: should be EMPTY (silent removal) — otherwise a subsequent
-    // sync would push DELETE for the old client uuid.
+    // Both present on the server at their client ids.
+    expect(await adapter.getElement('character', a.id)).not.toBeNull();
+    expect(await adapter.getElement('character', b.id)).not.toBeNull();
+
+    // No tombstones — nothing was silently removed.
     const tombs = await folder.listTombstonesSince(null);
-    expect(tombs.find(t => t.id === a.id)).toBeUndefined();
-    expect(tombs.find(t => t.id === b.id)).toBeUndefined();
+    expect(tombs).toHaveLength(0);
   });
 
   it('matched element references new local elements via FK — both directions push correctly', async () => {
-    // Captain's bug: Splashworth (matched by name) has friends/rivals
-    // pointing at locally-created Bob and Carol. After merge, server should
-    // have Splashworth WITH those friends pointing at Bob's and Carol's
-    // SERVER ids — not the stale local ids.
-    //
-    // Use assignsServerIds so server diverges from client ids — makes the
-    // assertion meaningful (otherwise serverBob.id === bob.id and "no leak"
-    // is trivially true).
-    const altState = statefulOwHandlers({
-      baseUrl: TEST_BASE,
-      clock: clock.next,
-      assignsServerIds: true,
-    });
-    mswServer.resetHandlers();
-    mswServer.use(...altState.handlers);
-    // Seed srv-alice DIRECTLY into the stateful state — bypassing the handler
-    // (which would assign a fresh id and we'd lose srv-alice).
-    if (!altState.state.get('character')) altState.state.set('character', new Map());
-    altState.state.get('character')!.set('srv-alice', {
-      id: 'srv-alice',
-      name: 'Alice',
-      updated_at: clock.next(),
-    });
-
+    // Captain's bug: Alice (matched by name) has friends pointing at
+    // locally-created Bob and Carol. The merge must CREATE Bob + Carol before
+    // UPDATEing Alice, so Alice's friends reference ids the server already has
+    // (else the v2 FK validator 400s the dangling link). v2 preserves client
+    // ids, so those ids ARE Bob's and Carol's local ids.
     const adapter = makeAdapter();
+    // srv-alice on the server (v2 preserves the client-supplied id).
+    await adapter.createElement('character', { id: 'srv-alice', name: 'Alice' });
 
     const bob = await folder.createElement('character', { name: 'Bob' });
     const carol = await folder.createElement('character', { name: 'Carol' });
@@ -432,42 +395,24 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     const serverAlice = charsOnServer.find(c => c.id === 'srv-alice')!;
     const serverBob = charsOnServer.find(c => c.name === 'Bob')!;
     const serverCarol = charsOnServer.find(c => c.name === 'Carol')!;
-    // Server assigned its own ids — diverge from local.
-    expect(serverBob.id).not.toBe(bob.id);
-    expect(serverCarol.id).not.toBe(carol.id);
-    // Alice's friends point at the SERVER ids of Bob/Carol.
+    // Ids preserved under v2.
+    expect(serverBob.id).toBe(bob.id);
+    expect(serverCarol.id).toBe(carol.id);
+    // Alice's friends resolve to Bob/Carol on the server (created first, so the
+    // FK validator accepted the matched UPDATE).
     const aliceFriends = (serverAlice.friends as string[] | undefined) ?? (serverAlice.friends_ids as string[] | undefined) ?? [];
-    expect(aliceFriends).toContain(serverBob.id);
-    expect(aliceFriends).toContain(serverCarol.id);
-    // NOT the stale local ids.
-    expect(aliceFriends).not.toContain(bob.id);
-    expect(aliceFriends).not.toContain(carol.id);
+    expect(aliceFriends).toContain(bob.id);
+    expect(aliceFriends).toContain(carol.id);
   });
 
-  it('chain-CREATE: new element references another new element — server receives the swapped FK', async () => {
-    // Bout V (session 202) regression — the gap was: within phase 4b-2's
-    // CREATE loop, no file-level rewrite runs between iterations. Carol
-    // (iteration 2) whose `friends` references Bob (iteration 1) would send
-    // Bob's stale local id to the server even though Bob's CREATE produced an
-    // idSwap. Server ended up with `Carol.friends = [bob.localId]` (a dangling
-    // reference). Phase 4b-3 would rewrite Carol's LOCAL file correctly, but
-    // the server stayed stale until something else triggered a push for Carol.
-    //
-    // Fix: applyIdSwapsToBody runs on the body in-memory before each send.
-    //
-    // Use assignsServerIds so server diverges from client ids, making the
-    // assertion meaningful (server.bob.id !== local.bob.id).
-    const altState = statefulOwHandlers({
-      baseUrl: TEST_BASE,
-      clock: clock.next,
-      assignsServerIds: true,
-    });
-    mswServer.resetHandlers();
-    mswServer.use(...altState.handlers);
-
+  it('chain-CREATE: new element references another new element — server receives the resolved FK', async () => {
+    // A new Carol references a new Bob. Both land in one atomic /bulk whose
+    // server-side fixpoint resolves the in-batch reference (Bob's id is present
+    // in the same batch), so Carol.friends points at Bob on the server. v2
+    // preserves client ids, so that id IS Bob's local id.
     const adapter = makeAdapter();
 
-    // Local Bob (no FK) + local Carol (friends -> Bob's local id).
+    // Local Bob (no FK) + local Carol (friends -> Bob's id).
     const bob = await folder.createElement('character', { name: 'Bob' });
     await folder.createElement('character', { name: 'Carol', friends: [bob.id] });
 
@@ -476,28 +421,19 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     const charsOnServer = await adapter.listElements('character');
     const serverBob = charsOnServer.find(c => c.name === 'Bob')!;
     const serverCarol = charsOnServer.find(c => c.name === 'Carol')!;
-    // Server assigned its own ids.
-    expect(serverBob.id).not.toBe(bob.id);
-    // CRITICAL: Carol's friends on the SERVER point at server-Bob, not local-Bob.
+    expect(serverBob.id).toBe(bob.id);
+    // Carol's friends on the SERVER resolve to Bob.
     const serverCarolFriends =
       (serverCarol.friends as string[] | undefined) ??
       (serverCarol.friends_ids as string[] | undefined) ??
       [];
-    expect(serverCarolFriends).toContain(serverBob.id);
-    expect(serverCarolFriends).not.toContain(bob.id);
+    expect(serverCarolFriends).toContain(bob.id);
   });
 
-  it('chain-CREATE three deep: A → B → C with all server-assigned ids', async () => {
-    // Extended scenario: three new locals in a forward chain. Each iteration
-    // depends on the prior iteration's idSwap to land correctly on the wire.
-    const altState = statefulOwHandlers({
-      baseUrl: TEST_BASE,
-      clock: clock.next,
-      assignsServerIds: true,
-    });
-    mswServer.resetHandlers();
-    mswServer.use(...altState.handlers);
-
+  it('chain-CREATE three deep: A → B → C resolved by one atomic /bulk', async () => {
+    // Three new locals in a forward chain. One atomic /bulk resolves the whole
+    // chain server-side (fixpoint FK resolution over the in-batch id set), so
+    // B.friends → A and C.friends → B on the server. v2 preserves client ids.
     const adapter = makeAdapter();
 
     const a = await folder.createElement('character', { name: 'A' });
@@ -510,6 +446,9 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     const sA = charsOnServer.find(x => x.name === 'A')!;
     const sB = charsOnServer.find(x => x.name === 'B')!;
     const sC = charsOnServer.find(x => x.name === 'C')!;
+    expect(sA.id).toBe(a.id);
+    expect(sB.id).toBe(b.id);
+    expect(sC.id).toBe(c.id);
 
     const bFriends =
       (sB.friends as string[] | undefined) ??
@@ -519,11 +458,8 @@ describe('mergeLocalIntoApi (Route 2)', () => {
       (sC.friends as string[] | undefined) ??
       (sC.friends_ids as string[] | undefined) ??
       [];
-    expect(bFriends).toContain(sA.id);
-    expect(bFriends).not.toContain(a.id);
-    expect(cFriends).toContain(sB.id);
-    expect(cFriends).not.toContain(b.id);
-    void c;
+    expect(bFriends).toContain(a.id);
+    expect(cFriends).toContain(b.id);
   });
 
   it('matchByName=false: same-name elements are treated as separate items', async () => {
@@ -599,17 +535,13 @@ describe('mergeLocalIntoApi onIdSwap callback', () => {
     });
   });
 
-  it('fires for a CREATE-time server-assigned id (local-only Bob, server assigns v7)', async () => {
-    // The MSW handler preserves client-provided ids by default. Real OW
-    // enforces UUID v7, replacing the client v4. Switch to that mode for this
-    // test so the swap actually happens.
-    mswServer.resetHandlers();
-    mswServer.use(
-      ...statefulOwHandlers({ baseUrl: TEST_BASE, clock: clock.next, assignsServerIds: true }).handlers
-    );
-
+  it('does NOT fire for a local-only CREATE under v2 (client ids preserved)', async () => {
+    // v2 preserves the client id on CREATE (no v7 reassignment), so a
+    // local-only create produces no id-swap and onIdSwap must stay silent —
+    // the inverse guard: if id reassignment were reintroduced, a spurious swap
+    // would fire here.
     const adapter = makeAdapter();
-    const localBob = await folder.createElement('character', { name: 'Bob' });
+    await folder.createElement('character', { name: 'Bob' });
 
     const swaps: Array<{ old_id: string; new_id: string; type: string }> = [];
     const result = await mergeLocalIntoApi(folder, adapter, 'b', {
@@ -617,35 +549,27 @@ describe('mergeLocalIntoApi onIdSwap callback', () => {
     });
 
     expect(result.creates).toBe(1);
-    expect(swaps).toHaveLength(1);
-    expect(swaps[0].old_id).toBe(localBob.id);
-    expect(swaps[0].new_id).not.toBe(localBob.id);
-    expect(swaps[0].type).toBe('character');
+    expect(swaps).toHaveLength(0);
   });
 
-  it('fires for both a match-swap AND a CREATE-swap in the same merge', async () => {
-    // Enable server-assigned ids so the local-only Dave triggers a CREATE-swap
-    // alongside the match-phase swap for Alice. (assignsServerIds only affects
-    // CREATEs the merge issues — seed POSTs against the same handler also get
-    // re-keyed, so we capture their post-write ids for the name match.)
-    mswServer.resetHandlers();
-    const fresh = statefulOwHandlers({ baseUrl: TEST_BASE, clock: clock.next, assignsServerIds: true });
-    mswServer.use(...fresh.handlers);
+  it('fires only for the match-swap when a merge mixes a match-swap and a local-only CREATE', async () => {
+    // Alice matches an existing server element by name (different id) → one
+    // match-phase swap. Dave is a local-only create → no swap under v2. Exactly
+    // one swap fires, for Alice.
     const adapter = makeAdapter();
     await adapter.createElement('character', { name: 'Alice' });
 
-    // Local: Alice (name match → swap) + Dave (new → CREATE swap).
     const localAlice = await folder.createElement('character', { name: 'Alice' });
-    const localDave = await folder.createElement('character', { name: 'Dave' });
+    await folder.createElement('character', { name: 'Dave' });
 
     const swaps: Array<{ old_id: string; new_id: string; type: string }> = [];
     await mergeLocalIntoApi(folder, adapter, 'b', {
       onIdSwap: (s) => swaps.push(s),
     });
 
-    expect(swaps).toHaveLength(2);
-    const oldIds = swaps.map((s) => s.old_id).sort();
-    expect(oldIds).toEqual([localAlice.id, localDave.id].sort());
+    expect(swaps).toHaveLength(1);
+    expect(swaps[0].old_id).toBe(localAlice.id);
+    expect(swaps[0].type).toBe('character');
   });
 
   it('no-op when the merge has no swaps at all (same-id + downloads only)', async () => {

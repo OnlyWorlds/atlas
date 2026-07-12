@@ -319,6 +319,9 @@ const V2_LOCAL_REJECT = new Set<string>([
 export interface StatefulV2ServerOptions {
   /** Override the base URL. Default: production v2. Routes have NO trailing slash. */
   baseUrl?: string;
+  /** GET /world identity (v2 tail). Defaults keep older suites indifferent. */
+  worldId?: string;
+  worldName?: string;
   /** Deterministic clock for created_at/updated_at + change deleted_at. */
   clock?: () => string;
   /** LIST page size for the cursor walk. Default 100. */
@@ -485,10 +488,16 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       const blocked = authBlocked();
       if (blocked) return blocked;
       const url = new URL(request.url);
+      // v2 tail (2026-07-12): /changes REJECTS unknown query params with a
+      // loud 422 naming the param (was: silently ignored — the
+      // cursor=-replays-page-1-forever trap, now dead at the root). Encode
+      // the real server's rule (convention #20).
+      for (const key of url.searchParams.keys()) {
+        if (key !== 'limit' && key !== 'since') {
+          return envelope({ status: 422, code: 'invalid_request', message: `Unknown query parameter: ${key}`, param: key });
+        }
+      }
       const limit = Math.max(1, parseInt(url.searchParams.get('limit') ?? '500', 10) || 500);
-      // Continuation is `since` ONLY. A `cursor=` param is SILENTLY IGNORED —
-      // this locks the real-server trap (a cursor=-walker replays the epoch
-      // forever with has_more:true). We never read `cursor` here.
       const since = url.searchParams.get('since');
       const sinceSeq = since ? (parseInt(since.split(':')[0], 10) || 0) : 0;
       const pending = opLog.filter(op => op.change_seq > sinceSeq);
@@ -496,7 +505,24 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       const hasMore = pending.length > changes.length;
       const last = changes[changes.length - 1];
       const cursor = last ? `${last.change_seq}:${last.id}` : (since ?? null);
-      return HttpResponse.json({ cursor, has_more: hasMore, changes });
+      // `head` = the world's current change_seq (v2 tail) — the engine's
+      // rewind detector reads it.
+      const head = opLog.reduce((m, op) => Math.max(m, op.change_seq), 0);
+      return HttpResponse.json({ cursor, has_more: hasMore, head, changes });
+    }),
+
+    // GET /world — credential validation + world identity (v2 tail,
+    // 2026-07-12; replaced the v1 SDK worlds.get validation lane).
+    // MUST precede GET /:type (a bare /world would match type="world").
+    http.get(`${base}/world`, () => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      return HttpResponse.json({
+        id: options.worldId ?? '00000000-0000-4000-8000-000000w0r1d0',
+        name: options.worldName ?? 'fake v2 world',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      });
     }),
 
     // POST /bulk — atomic/non-atomic multi-create with fixpoint FK resolution.

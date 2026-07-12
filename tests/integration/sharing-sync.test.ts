@@ -4,34 +4,33 @@
  * A page is a plain Narrative (subtype 'page') whose composition lives in
  * atlas-local fields (`atlas_page_blocks` / `atlas_page_refs` /
  * `atlas_page_intent`) — so sync needs NO sharing-specific code. This suite
- * locks that in against the FULL production stack (engine → OwClientAdapter
- * → real SDK → MSW with strict unknown-field validation + server-assigned
- * ids):
+ * locks that in against the FULL production stack (engine → OwV2ClientAdapter
+ * → keel v2 MSW with strict unknown-field validation + /bulk fixpoint FK
+ * resolution):
  *
- *   - First push id-swaps the page AND its referenced elements; the flat
- *     `atlas_page_refs` mirror is rewritten by `rewriteIdReferences`, and
- *     `blocksOf()` heals each element-card's nested id from the mirror —
- *     the make-online journey (compose locally → go online) keeps every
- *     card binding intact.
+ *   - First push lands the page AND its referenced elements in one atomic
+ *     /bulk (v2 preserves client ids, so no id-swap); the flat
+ *     `atlas_page_refs` mirror stays consistent and `blocksOf()` heals each
+ *     element-card's nested id from the mirror — the make-online journey
+ *     (compose locally → go online) keeps every card binding intact.
  *   - The composition fields never reach the wire (strict validator would
- *     400) but SURVIVE locally through the id-swap and a pull-overlay.
+ *     422) but SURVIVE locally through the push and a pull-overlay.
  *   - The derived `story` mirror is what other devices/tools see.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { mswServer } from '../setup';
-import { statefulOwHandlers } from '../msw-handlers';
+import { statefulV2Handlers } from '../msw-handlers';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
 import { SyncEngine } from '../../src/sync/sync-engine';
-import { OwClientAdapter } from '../../src/sync/ow-client-adapter';
+import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
 import { blocksOf, pageBlocksPatch, type PageBlock } from '../../src/core/sharing';
 
-const TEST_BASE = 'https://test-ow.local/api/worldapi';
+const TEST_BASE = 'https://test-ow.local/api/v2';
 
 let folder: MockFolderStore;
-let adapter: OwClientAdapter;
+let adapter: OwV2ClientAdapter;
 let engine: SyncEngine;
 let clock: MonotonicClock;
 
@@ -40,14 +39,9 @@ beforeEach(async () => {
   folder = new MockFolderStore();
   folder.setClock(clock.next);
   await folder.open(null);
-  const { handlers } = statefulOwHandlers({
-    baseUrl: TEST_BASE,
-    clock: clock.next,
-    assignsServerIds: true, // real OW enforces UUID v7 → id-swap path
-  });
+  const { handlers } = statefulV2Handlers({ baseUrl: TEST_BASE, clock: clock.next });
   mswServer.use(...handlers);
-  const sdkClient = new OnlyWorldsClient({ apiKey: 'test-key', apiPin: '1234', baseUrl: TEST_BASE });
-  adapter = new OwClientAdapter(sdkClient);
+  adapter = new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '1234', baseUrl: TEST_BASE });
   engine = new SyncEngine({ folder, client: adapter });
 });
 
@@ -88,12 +82,13 @@ describe('sharing page sync round-trip (full stack: adapter + SDK + MSW)', () =>
     const newStrahd = await byName('Strahd');
     const newCastle = await byName('Ravenloft');
     const newPage = await byName('barovia primer');
-    expect(newStrahd.id).not.toBe(strahd.id);
-    expect(newPage.id).not.toBe(page.id);
+    // v2 /bulk preserves client ids — no id-swap. Bindings hold because the
+    // ids never move.
+    expect(newStrahd.id).toBe(strahd.id);
+    expect(newPage.id).toBe(page.id);
 
-    // The flat refs mirror followed the swaps (rewriteIdReferences handles
-    // flat string arrays), and the composition fields survived the id-swap's
-    // applyServerRecord at a fresh id.
+    // The flat refs mirror is intact and the composition fields survived the
+    // push (stripped from the wire, preserved on the local file).
     expect((newPage as any).atlas_page_refs).toEqual([newStrahd.id, newCastle.id]);
     expect((newPage as any).atlas_page_intent).toBe('reference');
     expect((newPage as any).subtype).toBe('page');
@@ -108,7 +103,7 @@ describe('sharing page sync round-trip (full stack: adapter + SDK + MSW)', () =>
 
     // Server side: the page exists as a plain narrative with the derived
     // story mirror, but NONE of the composition fields landed there (strict
-    // validator would have 400'd the push; absence proves the strip).
+    // validator would have 422'd the push; absence proves the strip).
     const serverNarratives = await adapter.listElements('narrative');
     expect(serverNarratives).toHaveLength(1);
     const serverPage = serverNarratives[0] as Record<string, unknown>;

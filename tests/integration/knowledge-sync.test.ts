@@ -4,32 +4,32 @@
  * A knowledge entry is a plain Narrative (subtype 'knowledge') whose holder
  * channels are canon OW fields (narrator single-link, collectives multi-link)
  * — so sync needs NO knowledge-specific code. This suite locks that in
- * against the FULL production stack (engine → OwClientAdapter → real SDK →
- * MSW with strict unknown-field validation + server-assigned ids):
+ * against the FULL production stack (engine → OwV2ClientAdapter → keel v2 MSW
+ * with strict unknown-field validation + /bulk fixpoint FK resolution):
  *
- *   - First push id-swaps the entry AND its holders/subjects; every FK
- *     (narrator, collectives, locations, circle membership) is rewritten so
- *     the computed-knowing scans still resolve on the post-swap local set.
+ *   - First push lands the entry AND its holders/subjects in one atomic /bulk
+ *     (v2 preserves client ids, so no id-swap); every FK (narrator,
+ *     collectives, locations, circle membership) resolves and the
+ *     computed-knowing scans still work on the pushed local set.
  *   - `atlas_richtext_json` never reaches the wire (strict validator would
- *     400) but SURVIVES locally through the id-swap's applyServerRecord at a
- *     fresh id, and through a pull-overlay of a server-side edit.
+ *     422) but SURVIVES locally through the push, and through a pull-overlay
+ *     of a server-side edit.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { mswServer } from '../setup';
-import { statefulOwHandlers } from '../msw-handlers';
+import { statefulV2Handlers } from '../msw-handlers';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
 import { SyncEngine } from '../../src/sync/sync-engine';
-import { OwClientAdapter } from '../../src/sync/ow-client-adapter';
+import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
 import { knowledgeHeldBy, elementsKnownAboutBy, heldByOf } from '../../src/core/knowledge';
 
-const TEST_BASE = 'https://test-ow.local/api/worldapi';
+const TEST_BASE = 'https://test-ow.local/api/v2';
 const RICHTEXT = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Barovia is cursed.' }] }] };
 
 let folder: MockFolderStore;
-let adapter: OwClientAdapter;
+let adapter: OwV2ClientAdapter;
 let engine: SyncEngine;
 let clock: MonotonicClock;
 
@@ -38,14 +38,9 @@ beforeEach(async () => {
   folder = new MockFolderStore();
   folder.setClock(clock.next);
   await folder.open(null);
-  const { handlers } = statefulOwHandlers({
-    baseUrl: TEST_BASE,
-    clock: clock.next,
-    assignsServerIds: true, // real OW enforces UUID v7 → id-swap path
-  });
+  const { handlers } = statefulV2Handlers({ baseUrl: TEST_BASE, clock: clock.next });
   mswServer.use(...handlers);
-  const sdkClient = new OnlyWorldsClient({ apiKey: 'test-key', apiPin: '1234', baseUrl: TEST_BASE });
-  adapter = new OwClientAdapter(sdkClient);
+  adapter = new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '1234', baseUrl: TEST_BASE });
   engine = new SyncEngine({ folder, client: adapter });
 });
 
@@ -82,30 +77,31 @@ describe('knowledge entry sync round-trip (full stack: adapter + SDK + MSW)', ()
     expect(result.failures, JSON.stringify(result.failures, null, 2)).toEqual([]);
     expect(result.pushed.creates).toBe(4);
 
-    // Every element id-swapped to a server-assigned id.
+    // v2 /bulk preserves client ids (no server-side v7 reassignment), so no
+    // id-swap happens — FK integrity holds because the ids never move.
     const newIreena = await byName('Ireena');
     const newParty = await byName('the party');
     const newBarovia = await byName('Barovia');
     const newEntry = await byName('the curse');
-    expect(newIreena.id).not.toBe(ireena.id);
-    expect(newEntry.id).not.toBe(entry.id);
+    expect(newIreena.id).toBe(ireena.id);
+    expect(newEntry.id).toBe(entry.id);
 
-    // Holder + subject FKs rewritten to the post-swap ids.
+    // Holder + subject FKs still resolve to the same ids.
     expect(heldByOf(newEntry)).toEqual({ narrator: newIreena.id, collectives: [newParty.id] });
     expect((newEntry as any).locations).toEqual([newBarovia.id]);
     // Circle membership rewritten too (Collective.characters drives inheritance).
     expect((newParty as any).characters).toEqual([newIreena.id]);
     expect(newEntry.server_updated_at).toBeTruthy();
 
-    // Knowledge identity intact + richtext SURVIVED the id-swap (the swap
-    // writes at a fresh id, where no existing file can donate the field —
-    // the engine's swapped record must carry it itself).
+    // Knowledge identity intact + richtext SURVIVED the push (stripped from
+    // the wire body, preserved on the local file — the bulk baseline stamp
+    // never touches other fields).
     expect((newEntry as any).subtype).toBe('knowledge');
     expect((newEntry as any).story).toBe('Barovia is cursed.');
     expect((newEntry as any).atlas_richtext_json).toEqual(RICHTEXT);
 
     // Server side: entry exists with knowledge identity, but the atlas-local
-    // richtext never landed there (strict validator would have 400'd the
+    // richtext never landed there (strict validator would have 422'd the
     // push; absence here proves the adapter stripped it).
     const serverNarratives = await adapter.listElements('narrative');
     expect(serverNarratives).toHaveLength(1);

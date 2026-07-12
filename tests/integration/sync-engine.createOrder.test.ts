@@ -99,36 +99,25 @@ describe('SyncEngine CREATE ordering (topo-sort by FK)', () => {
     void pin;
   });
 
-  it('handles assignServerIds: Location swaps, Character body carries the swapped id', async () => {
-    // Real-OW behavior: server assigns its own UUID v7 on CREATE, overriding
-    // the client's v4. The id-swap path must work in combination with the
-    // dependency ordering: Location pushes first, gets new id, the rewrite
-    // propagates to Character's body before Character pushes.
-    client.assignServerIds = true;
-    // Reverse insertion order to make the topo-sort the load-bearing thing.
+  it('id reassignment on CREATE = loud per-element failure, nothing swapped (v2 contract)', async () => {
+    // keel PRESERVES client ids (probed 2026-07-12); the create-path id-swap
+    // machinery was excised with the v1 adapter. If a server ever reassigns
+    // again, the engine must fail that element loudly instead of silently
+    // re-keying the world: no baseline stamped, local file untouched at its
+    // original id, element retried next round.
+    client.assignServerIds = true; // simulate a contract-violating server
     const character = await folder.createElement('character', { name: 'Carol' });
-    const location = await folder.createElement('location', { name: 'Cliffside' });
-    await folder.updateElement(character.id, { birthplace: location.id });
 
     const result = await engine.pushOnce();
 
-    expect(result.pushed.creates).toBe(2);
-    expect(result.failures).toHaveLength(0);
-
-    // Find the character's CREATE call body.
-    const createCalls = client.calls.filter((c) => c.method === 'create');
-    const charCreate = createCalls.find((c) => c.method === 'create' && c.type === 'character');
-    if (!charCreate || charCreate.method !== 'create') throw new Error('expected character create');
-    // The id-swap path: after Location's CREATE swapped its id, rewriteIdReferences
-    // updated the Character's local file. Then the engine re-fetched the Character
-    // and sent the swapped id in the body. So character body's birthplace should
-    // NOT be the original local-id; it should match the server's location id.
-    const serverLocations = Array.from((client as unknown as { byType: Map<string, Map<string, unknown>> }).byType.get('location')?.values() ?? []);
-    expect(serverLocations).toHaveLength(1);
-    const serverLocationId = (serverLocations[0] as { id: string }).id;
-    expect(charCreate.body.birthplace).toBe(serverLocationId);
-    expect(charCreate.body.birthplace).not.toBe(location.id); // not the original local v4
-    void character;
+    expect(result.pushed.creates).toBe(0);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0].element_id).toBe(character.id);
+    expect(result.failures[0].message).toMatch(/contract violation/i);
+    // Local file untouched: same id, no server baseline.
+    const local = await folder.getElement(character.id);
+    expect(local).not.toBeNull();
+    expect(local!.server_updated_at).toBeUndefined();
   });
 
   it('falls back to input order on cycles (no infinite loop / crash)', async () => {

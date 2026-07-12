@@ -148,8 +148,7 @@ describe('engine.pushOnce — pin push', () => {
     expect(result.failures[0].message).toMatch(/element_type/i);
   });
 
-  it('pushes new pin when its referenced map gets a server-assigned id', async () => {
-    client.assignServerIds = true;
+  it('pushes new pin alongside its map in one batch (ids preserved, FK intact)', async () => {
     await client.createElement('character', { id: 'char1', name: 'Alice', type: 'character' });
     await folder.applyServerRecord('character', { id: 'char1', name: 'Alice', type: 'character' }, '2026-01-01T00:00:00.001Z');
 
@@ -168,12 +167,12 @@ describe('engine.pushOnce — pin push', () => {
     expect(result.failures).toEqual([]);
 
     const newMapEntry = (await folder.listElements()).find(e => e.name === 'AssignedIdMap')!;
-    expect(newMapEntry.id).not.toBe(localMapId);
+    expect(newMapEntry.id).toBe(localMapId); // ids preserved under v2
 
     const newPinEntry = (await folder.listElements()).find(e => e.type === 'pin')!;
-    expect(newPinEntry.map_id).toBe(newMapEntry.id);
+    expect(newPinEntry.map_id).toBe(localMapId);
 
     const serverPin = client.__server_get('pin', newPinEntry.id);
-    expect(serverPin!.map_id).toBe(newMapEntry.id);
+    expect(serverPin!.map_id).toBe(localMapId);
   });
 });

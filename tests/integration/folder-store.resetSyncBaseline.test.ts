@@ -153,14 +153,13 @@ describe('FolderStore.resetSyncBaseline — re-link Route 1 after unlink (the ca
     const bob = await folder.createElement('character', { name: 'Bob' });
 
     // First "Make-Online Route 1": transient engine pushes to an api world.
-    // Use assignServerIds=true so the simulation matches real OW (UUID v7).
+    // (keel preserves client ids — v2 contract, probed 2026-07-12.)
     const client1 = new FakeOwApiClient();
     client1.setClock(clock.next);
-    client1.assignServerIds = true;
     const engine1 = new SyncEngine({ folder, client: client1 });
     const firstPush = await engine1.pushOnce();
     expect(firstPush.pushed.creates).toBe(2);
-    // After: both elements have new server-assigned ids + server_updated_at.
+    // After: both elements keep their client ids + gain server_updated_at.
     const afterFirst = await folder.listElements();
     expect(afterFirst).toHaveLength(2);
     expect(afterFirst.every((e) => !!e.server_updated_at)).toBe(true);
@@ -180,7 +179,6 @@ describe('FolderStore.resetSyncBaseline — re-link Route 1 after unlink (the ca
     // and no 404 → server_delete routing.
     const client2 = new FakeOwApiClient();
     client2.setClock(clock.next);
-    client2.assignServerIds = true;
     const engine2 = new SyncEngine({ folder, client: client2 });
     const secondPush = await engine2.pushOnce();
 

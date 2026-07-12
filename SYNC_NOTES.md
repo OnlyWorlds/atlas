@@ -24,7 +24,7 @@ If you ever touch the adapter, run `ow-v2-client-adapter.test.ts`.
 
 ## Server-assigned ids — DORMANT under keel (id-swap machinery kept dead-but-safe)
 
-**Keel preserves client ids** (v1 AND v2, probed live 2026-07-12): `crypto.randomUUID()` v4 ids land verbatim; a duplicate POST returns 409 `id_conflict`; v2 PUT is create-or-replace upsert. The id-swap path below **never fires against keel** — `response.id !== current.id` is structurally false. The machinery stays in-tree dead-but-safe (gate decision §9.4) until v2 id-preservation has production mileage; excision is a named cleanup bout.
+**Keel preserves client ids** (v1 AND v2, probed live 2026-07-12): `crypto.randomUUID()` v4 ids land verbatim; a duplicate POST returns 409 `id_conflict`; v2 PUT is create-or-replace upsert. **EXCISED (cleanup bout, 2026-07-12 evening)**: the engine's create-path swap branch, `rewriteIdReferences`, and the engine `onIdSwap` hook are gone — a server that reassigns an id on CREATE now produces a loud per-element failure (contract violation; nothing stamped, retried next round). Route 2's MATCH-phase swaps (same name+type, different ids across machines) remain real and keep `applyIdSwapToUi`/`handleIdSwap` (UI + URL + favorites migration). The legacy v1 `OwClientAdapter` and its dedicated suites were retired in the same bout (its 5 flow suites migrated to `statefulV2Handlers`/the v2 adapter); the v1 `worldsync` create-world route stays (still v1 in production).
 
 HISTORY (pre-keel): the old Django server assigned its OWN UUID v7 on CREATE, overriding client v4 ids — everything below was load-bearing then.
 
@@ -595,7 +595,15 @@ Protocol (gate 10.6, rollback verified live):
 
 `pullPhase` dispatches to `pullPhaseChanges` whenever the client has `pullChanges`: a cursor walk of the per-world change feed (`{cursor, changes, has_more}`, continuation via `since=`). Deletions arrive as EXPLICIT ops — the absence-inference server-delete detection (and its incomplete-list false-positive class) doesn't exist on this path. Full design + the 3-lens gate resolutions (delete-then-recreate revival, cursor/side-effect atomicity, the stop() abort latch, single-sourced timestamps, the non-advancing-cursor trap): `Forge/Notes/2026-07-12-v2-changes-pull-design.md`. The legacy full-list pull remains as the fallback and keeps the `getIncompleteListTypes` suppression guard.
 
-⚠ The /changes continuation param is **`since=`**, not `cursor=` — keel silently ignores unknown query params, so a wrong param name replays page 1 forever with has_more:true. The adapter aborts any walk whose cursor stops advancing.
+⚠ The /changes continuation param is **`since=`**, not `cursor=`. HISTORY: keel originally ignored unknown query params silently (a wrong param name replayed page 1 forever with has_more:true); since Skeld's v2 tail (2026-07-12 evening) unknown params get a loud 422 naming the param, killing the trap at the root. The adapter's advance-verification stays as belt-and-suspenders. Both fakes encode the 422.
+
+## Rewind guard + the v1 validation-lane retirement (v2 tail, 2026-07-12)
+
+Skeld's v2 tail (all five S257 asks, live on production same day) closed the remaining v1 remnants and the last /changes soft-edge:
+
+- **`GET /api/v2/world`** replaced the v1 SDK `worlds.get()` validation lane: all five validation sites (link modal, make-online both routes' fallbacks, new-api-world fallback, settings Test Connection, atlas-root link flow) now call `OwV2ClientAdapter.getWorld()` via `buildV2Adapter`. `buildOwClient` is deleted; the SDK survives ONLY for FIELD_SCHEMA statics. `OwV2Error` keeps the `API Error NNN:` message prefix, so the sites' status-regex error mapping was untouched.
+- **Rewind guard**: every /changes response now carries `head` (the world's current change_seq). Normal operation never rewinds (§8 law); the one legal rewind is disaster restore-from-backup. The engine persists `changes_last_seq` (highest APPLIED seq, advanced in the same lockstep as the cursor) and, when a page's `head` is strictly below it, drops cursor + seq memory and cold-walks from the epoch (retention law makes the cold walk complete-state; upserts idempotent, deletes explicit). Single-reset-per-round latch prevents a pathological head from looping. Regression: `sync-engine.changesPull.test.ts` rewind describe-block; fake seam `__rewind_op_log(maxSeq)`.
+- **Retention** is now written law (no compaction horizon) — the /changes cold-walk bootstrap for INITIAL DOWNLOAD is unblocked if we ever want it (currently initial download stays on the list walk; revisit only if it earns its keep).
 
 ---
 

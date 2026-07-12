@@ -15,7 +15,6 @@
  * element has a `server_updated_at` baseline set on success).
  */
 
-import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { OwV2ClientAdapter } from './ow-v2-client-adapter';
 import { devWorldapiBase, devV2Base } from './dev-api-base';
 import type { FolderStore } from '../store/folder-store';
@@ -715,21 +714,11 @@ async function rewriteIdReferences(folder: FolderStore, idMap: Map<string, strin
 }
 
 // ---------------------------------------------------------------------------
-// Client builders (gate 10.7 split).
-//
-//   buildOwClient   — v1 SDK client, VALIDATION ONLY (`client.worlds.get()`
-//                     has no v2 equivalent yet). Never used for element CRUD.
-//   buildV2Adapter  — the thin v2 fetch adapter carrying all element CRUD,
-//                     /bulk, and /changes.
+// Client builder. buildV2Adapter — the thin v2 fetch adapter carrying all
+// element CRUD, /bulk, /changes, AND credential validation via GET /world
+// (the v1 SDK buildOwClient lane retired 2026-07-12 when Skeld shipped the
+// /world endpoint; the SDK survives only for FIELD_SCHEMA statics).
 // ---------------------------------------------------------------------------
-
-export function buildOwClient(apiKey: string, apiPin: string, baseUrl?: string): OnlyWorldsClient {
-  return new OnlyWorldsClient({
-    apiKey: apiKey.trim(),
-    apiPin: apiPin.trim(),
-    baseUrl: baseUrl ?? overriddenBase ?? devWorldapiBase() ?? undefined,
-  });
-}
 
 export function buildV2Adapter(apiKey: string, apiPin: string, baseUrl?: string): OwV2ClientAdapter {
   // Test seam compat: `setMakeOnlineBaseUrl` stores a v1-worldapi-shaped base;

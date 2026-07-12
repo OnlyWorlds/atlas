@@ -32,7 +32,6 @@ import { SyncEngine } from '../sync/sync-engine';
 import {
   createApiWorld,
   mergeLocalIntoApi,
-  buildOwClient,
   buildV2Adapter,
   type MergePolicy,
   type MergeProgress,
@@ -263,11 +262,11 @@ export class MakeOnlineModal extends BaseModal {
       const adapter = buildV2Adapter(apiKey, pin);
 
       // 3. World id + name come straight from the create response (keel
-      //    includes them); fall back to the v1 worlds.get only when absent.
+      //    includes them); fall back to v2 GET /world only when absent.
       let world: { id?: string; name?: string } = { id: created.worldId, name: created.worldName };
       if (!world.id) {
         progressBox.textContent = 'Reading new world ID…';
-        world = await buildOwClient(apiKey, pin).worlds.get() as { id?: string; name?: string };
+        world = await adapter.getWorld();
       }
       if (!world.id) throw new Error('Server did not return a world ID');
 
@@ -289,13 +288,9 @@ export class MakeOnlineModal extends BaseModal {
       const engine = new SyncEngine({
         folder,
         client: adapter,
-        // Wire UI propagation on every server-assigned id. Real OW enforces
-        // UUID v7, so every CREATE here can swap. Without this, the user's
-        // selectedElementId / URL keeps pointing at the pre-swap local id,
-        // and after the modal closes the middle pane renders
-        // "element <old-id> not found in this world." (Same machinery the
-        // attached engine uses — convention #15 + #124.)
-        onIdSwap: applyIdSwapToUi,
+        // No onIdSwap: keel preserves client ids on CREATE (create-path
+        // id-swap excised 2026-07-12). Route 2's MATCH-phase swaps still
+        // propagate via MergeOpts.onIdSwap → applyIdSwapToUi below.
         onPushProgress: (done, total) => {
           pushDone = done;
           pushTotal = total;
@@ -393,13 +388,13 @@ export class MakeOnlineModal extends BaseModal {
       .forEach((b) => (b.hidden = true));
 
     try {
-      // 1. Validate via client.worlds.get().
+      // 1. Validate via v2 GET /world.
       progressBox.textContent = 'Validating credentials…';
       progressBox.hidden = false;
-      const client = buildOwClient(apiKey, pin);
+      const client = buildV2Adapter(apiKey, pin);
       let world: { id?: string; name?: string };
       try {
-        world = await client.worlds.get();
+        world = await client.getWorld();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (/401|403/.test(msg)) throw new Error('API key or PIN invalid');

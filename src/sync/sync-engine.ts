@@ -51,6 +51,8 @@ export interface BulkResult {
 export interface ChangesPage {
   cursor: string | null;
   hasMore: boolean;
+  /** World's current change_seq (v2 tail, 2026-07-12). null/absent when the server predates it. */
+  head?: number | null;
   changes: Array<
     | { op: 'upsert'; type: ElementType; id: string; changeSeq: number; updatedAt: string; element: { id: string; updated_at: string } & Record<string, unknown> }
     | { op: 'delete'; type: ElementType; id: string; changeSeq: number; deletedAt: string }
@@ -163,14 +165,6 @@ export interface SyncEngineOptions {
     phase: 'push' | 'pull' | 'sync',
     result: SyncResult
   ) => void;
-  /**
-   * Fires when push CREATE produces a server-assigned id different from the
-   * local one (id-swap). UI uses this to migrate `state.ui.selectedElementId`
-   * and the URL hash when the swap affects the currently-viewed element —
-   * without it, the user sees a confusing "element <old-id> not found in this
-   * world" empty state because the URL still references the pre-swap id.
-   */
-  onIdSwap?: (swap: { old_id: string; new_id: string; type: ElementType }) => void;
 }
 
 // ---- The engine ----
@@ -183,7 +177,6 @@ export class SyncEngine {
   private onStateChange: (state: SyncEngineState) => void;
   private onPushProgress: (done: number, total: number) => void;
   private onSyncResult: (phase: 'push' | 'pull' | 'sync', result: SyncResult) => void;
-  private onIdSwap: (swap: { old_id: string; new_id: string; type: ElementType }) => void;
   private state: SyncEngineState = { kind: 'idle', last_sync_at: null };
   private paused = false;
   private pauseReason: 'manual' | 'network' | null = null;
@@ -235,7 +228,6 @@ export class SyncEngine {
     this.onStateChange = opts.onStateChange ?? (() => {});
     this.onPushProgress = opts.onPushProgress ?? (() => {});
     this.onSyncResult = opts.onSyncResult ?? (() => {});
-    this.onIdSwap = opts.onIdSwap ?? (() => {});
   }
 
   getState(): SyncEngineState {
@@ -741,8 +733,7 @@ export class SyncEngine {
    *
    * Builds the graph by scanning every string + string-array field on each
    * candidate; any value matching another candidate's id becomes a dep edge.
-   * Schema-agnostic — doesn't need FIELD_SCHEMA — matches the same approach
-   * `rewriteIdReferences` uses.
+   * Schema-agnostic — doesn't need FIELD_SCHEMA.
    *
    * Cycles fall back to input order (rare in OW data; the user can clean up
    * by removing one side of the cycle). The first push round in a cycle
@@ -810,45 +801,6 @@ export class SyncEngine {
       });
     }
     return sorted;
-  }
-
-  /**
-   * Rewrite a single id reference across every local element. Used when the
-   * server assigns its own id on CREATE — any local element that referenced
-   * the old client-side id must be updated to point at the server's id.
-   *
-   * Walks every string + string-array field (skipping schema-irrelevant fields
-   * like name/timestamps). Updates elements via folder.updateElement so the
-   * change is durable and they'll be picked up on the next push pass.
-   */
-  private async rewriteIdReferences(oldId: string, newId: string): Promise<void> {
-    const SKIP = new Set(['id', 'type', 'name', 'local_updated_at', 'server_updated_at']);
-    const all = await this.folder.listElements();
-    for (const el of all) {
-      let modified = false;
-      const patch: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(el)) {
-        if (SKIP.has(key)) continue;
-        if (typeof value === 'string' && value === oldId) {
-          patch[key] = newId;
-          modified = true;
-        } else if (Array.isArray(value)) {
-          let changed = false;
-          const newArr = value.map(v => {
-            if (typeof v === 'string' && v === oldId) {
-              changed = true;
-              return newId;
-            }
-            return v;
-          });
-          if (changed) { patch[key] = newArr; modified = true; }
-        }
-      }
-      if (modified) {
-        await this.folder.updateElement(el.id, patch);
-        console.info(`[atlas:sync] rewrote id reference ${oldId} → ${newId} in ${el.type}/${el.id}`);
-      }
-    }
   }
 
   /** Append new conflicts to sync-state.json (dedupe by element_id). */
@@ -1230,29 +1182,23 @@ export class SyncEngine {
           const body = stripSyncFields(current);
           const response = await this.client.createElement(current.type, body);
           if (response.id !== current.id) {
-            console.info(`[atlas:sync] server assigned new id on create`, {
+            // Contract-impossible under keel (client ids PRESERVED — probed
+            // 2026-07-12; the pre-keel Django server's v7 reassignment was the
+            // reason the excised id-swap machinery existed). If a server ever
+            // reassigns again, fail LOUDLY per-element rather than silently
+            // re-keying the user's world; the element retries next round.
+            console.error('[atlas:sync] server returned a DIFFERENT id on create — contract violation, element not stamped', {
               type: current.type, localId: current.id, serverId: response.id,
             });
-            // Write local file at the server's id (current content + stamped).
-            const swapped = {
-              ...stripSyncFields(current),
-              id: response.id,
-            };
-            await this.folder.applyServerRecord(current.type, swapped, response.updated_at);
-            // Remove old local file silently — there's no server counterpart
-            // at the old id, so no DELETE should propagate.
-            await this.folder.deleteElement(current.id, { silent: true });
-            // Rewrite refs to old id across all local elements.
-            await this.rewriteIdReferences(current.id, response.id);
-            // Notify the UI so it can migrate selectedElementId / URL hash if
-            // the swap affects the currently-viewed element. Without this,
-            // the user sees a confusing "element <old-id> not found in this
-            // world" empty state because the URL still references the pre-
-            // swap id.
-            this.onIdSwap({ old_id: current.id, new_id: response.id, type: current.type });
-          } else {
-            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at);
+            failures.push({
+              element_id: current.id,
+              type: current.type,
+              operation: 'create',
+              message: `server reassigned id on create (${current.id} → ${response.id}) — v2 contract violation`,
+            });
+            continue;
           }
+          await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at);
           creates++;
         } else {
           // UPDATE path: re-fetch element from folder in case an in-loop
@@ -1540,6 +1486,12 @@ export class SyncEngine {
     let cursor: string | null = syncState.changes_cursor ?? null;
     /** Cursor of the last FULLY-APPLIED page — the only value ever persisted. */
     let lastAppliedCursor: string | null = cursor;
+    /**
+     * Rewind memory (v2 tail): highest change_seq ever applied. Advanced in
+     * the same lockstep as the cursor; compared against each page's `head`.
+     */
+    let lastAppliedSeq: number | null = syncState.changes_last_seq ?? null;
+    let rewindDetected = false;
     let walkComplete = false;
 
     const tombstones = await this.folder.listTombstonesSince(null);
@@ -1565,6 +1517,7 @@ export class SyncEngine {
         return {
           ...(walkComplete ? { last_pull_at: nowIso() } : {}),
           changes_cursor: lastAppliedCursor,
+          changes_last_seq: lastAppliedSeq,
           conflicts: persistedConflicts,
           server_deletes: [...existing, ...fresh],
         };
@@ -1590,6 +1543,27 @@ export class SyncEngine {
             break;
           }
           throw err;
+        }
+
+        // Rewind guard (v2 tail): normal operation never rewinds; `head`
+        // below our last-applied seq means the server was restored from
+        // backup. Re-baseline: drop the cursor + seq memory and cold-walk
+        // from the epoch (retention law makes the cold walk complete-state;
+        // upserts are idempotent, deletes explicit). One reset per round —
+        // a head that's STILL behind after reset would mean a server bug,
+        // not a rewind, and must not loop.
+        if (!rewindDetected
+            && typeof pageResult.head === 'number'
+            && lastAppliedSeq !== null
+            && pageResult.head < lastAppliedSeq) {
+          console.warn('[atlas:sync] /changes head below last-applied seq — server rewind detected; re-baselining with a cold walk', {
+            head: pageResult.head, lastAppliedSeq,
+          });
+          rewindDetected = true;
+          cursor = null;
+          lastAppliedCursor = null;
+          lastAppliedSeq = null;
+          continue; // refetch from the epoch; this page's ops are discarded
         }
 
         for (const op of pageResult.changes) {
@@ -1687,6 +1661,9 @@ export class SyncEngine {
           break;
         }
         if (nextCursor) lastAppliedCursor = nextCursor;
+        // Advance the rewind memory in the same lockstep as the cursor.
+        const pageMaxSeq = pageResult.changes.reduce((m, op) => Math.max(m, op.changeSeq), 0);
+        if (pageMaxSeq > 0 && pageMaxSeq > (lastAppliedSeq ?? 0)) lastAppliedSeq = pageMaxSeq;
         cursor = nextCursor ?? cursor;
         if (!pageResult.hasMore) {
           walkComplete = true;

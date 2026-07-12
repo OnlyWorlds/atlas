@@ -234,6 +234,26 @@ export class OwV2ClientAdapter implements OwApiClient {
     }
   }
 
+  /**
+   * GET /world — credential validation + world identity in one read call
+   * (Skeld's v2 tail, live 2026-07-12; replaced the v1 SDK worlds.get lane).
+   * Reads work key-only; a walled world wants the PIN this client carries.
+   */
+  async getWorld(): Promise<{ id: string; name: string; created_at?: string; updated_at?: string }> {
+    const response = await this.request('GET', '/world') as {
+      id?: string; name?: string; created_at?: string; updated_at?: string;
+    };
+    if (!response || typeof response.id !== 'string') {
+      throw new Error('v2 /world response missing id');
+    }
+    return {
+      id: response.id,
+      name: typeof response.name === 'string' ? response.name : '',
+      created_at: response.created_at,
+      updated_at: response.updated_at,
+    };
+  }
+
   async createElement(type: ElementType, body: Record<string, unknown>): Promise<ServerRecord> {
     const wireBody = toV2WireShape(body, type, 'create');
     try {
@@ -394,6 +414,7 @@ export class OwV2ClientAdapter implements OwApiClient {
     const response = await this.request('GET', `/changes?${params.toString()}`) as {
       cursor?: string;
       has_more?: boolean;
+      head?: number;
       changes?: Array<{
         op: string;
         type: string;
@@ -434,6 +455,10 @@ export class OwV2ClientAdapter implements OwApiClient {
     return {
       cursor: response?.cursor ?? null,
       hasMore: !!response?.has_more,
+      // World's current change_seq (Skeld's v2 tail) — the engine's rewind
+      // detector: persisted last-applied seq > head means the server was
+      // restored from backup; re-baseline with a cold walk.
+      head: typeof response?.head === 'number' ? response.head : null,
       changes: ops,
     };
   }

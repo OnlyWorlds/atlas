@@ -364,7 +364,35 @@ export class FakeOwApiClient implements OwApiClient {
             deletedAt: o.deleted_at ?? '',
           },
     );
-    return { cursor, hasMore, changes };
+    // `head` = the world's current change_seq (v2 tail) — the engine's rewind
+    // detector compares it against its persisted last-applied seq.
+    const head = this.opLog.reduce((m, o) => Math.max(m, o.seq), 0);
+    return { cursor, hasMore, head, changes };
+  }
+
+  /**
+   * Test seam: simulate a server restore-from-backup (the one legal rewind
+   * path). Drops every op with `seq > maxSeq` AND removes the corresponding
+   * records from element state — the world literally IS its earlier self.
+   * After this, /changes serves `head = maxSeq` and the engine's rewind
+   * detector should fire on any client holding a later cursor.
+   */
+  __rewind_op_log(maxSeq: number): void {
+    const dropped = this.opLog.filter(o => o.seq > maxSeq);
+    this.opLog = this.opLog.filter(o => o.seq <= maxSeq);
+    this.opSeq = maxSeq; // the restored server continues from here
+    for (const op of dropped) {
+      if (op.op === 'upsert') {
+        // A post-rewind world has no memory of the upsert; drop the record
+        // unless a SURVIVING op re-establishes it (then restore that snapshot).
+        const surviving = [...this.opLog].reverse().find(o => o.id === op.id && o.op === 'upsert');
+        if (surviving && surviving.op === 'upsert') {
+          this.bucket(op.type).set(op.id, { ...(surviving.element as ServerRecord) });
+        } else {
+          this.bucket(op.type).delete(op.id);
+        }
+      }
+    }
   }
 
   /** Engine reads this to learn which types are paginated. */

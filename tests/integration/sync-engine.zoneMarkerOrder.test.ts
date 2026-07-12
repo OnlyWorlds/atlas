@@ -13,14 +13,13 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { mswServer } from '../setup';
-import { statefulOwHandlers } from '../msw-handlers';
+import { statefulV2Handlers } from '../msw-handlers';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { FakeOwApiClient } from '../fixtures/fake-ow-client';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
 import { SyncEngine } from '../../src/sync/sync-engine';
-import { OwClientAdapter } from '../../src/sync/ow-client-adapter';
+import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
 
 let folder: MockFolderStore;
 let client: FakeOwApiClient;
@@ -34,15 +33,13 @@ beforeEach(async () => {
   await folder.open(null);
   client = new FakeOwApiClient();
   client.setClock(clock.next);
-  // Real OW enforces UUID v7 by overriding client-sent ids on CREATE. This
-  // is what makes the bug exposable — without id-swap, local ids match
-  // server ids and no rewrite is needed.
-  client.assignServerIds = true;
+  // keel preserves client ids (v2 contract, probed 2026-07-12) — the
+  // ordering + FK-resolution intent stands; ids simply never move.
   engine = new SyncEngine({ folder, client });
 });
 
-describe('SyncEngine pushPhase: zone+marker CREATE ordering with id-swap', () => {
-  it('marker push succeeds when zone is in the same CREATE batch and gets server-assigned id', async () => {
+describe('SyncEngine pushPhase: zone+marker CREATE ordering', () => {
+  it('marker push succeeds when zone is in the same CREATE batch (ids preserved)', async () => {
     // 1. Build the scenario: fresh local world with one map, one zone,
     //    multiple markers pointing at the zone+map. All never-synced.
     const map = await folder.createElement('map', { name: 'Test map' });
@@ -94,8 +91,8 @@ describe('SyncEngine pushPhase: zone+marker CREATE ordering with id-swap', () =>
       if (call.method !== 'create') continue; // narrow the union
       // After id-swap + rewrite, the body should NOT contain the original
       // v4 zone.id — it should contain the server-assigned v7 id.
-      expect(call.body.zone_id).not.toBe(zone.id);
-      expect(call.body.map_id).not.toBe(map.id);
+      expect(call.body.zone_id).toBe(zone.id); // ids preserved under v2
+      expect(call.body.map_id).toBe(map.id);
       // And the ids in the body should be ones the server actually accepted
       // (i.e. exist in the server bucket).
       const zoneRefAlive = client.__server_get('zone', call.body.zone_id as string);
@@ -108,8 +105,8 @@ describe('SyncEngine pushPhase: zone+marker CREATE ordering with id-swap', () =>
     //    push round, or a UI re-render, sees the new ids).
     const localMarkers = await folder.listElements('marker');
     for (const lm of localMarkers) {
-      expect((lm as any).zone_id).not.toBe(zone.id); // rewritten to server's
-      expect((lm as any).map_id).not.toBe(map.id);
+      expect((lm as any).zone_id).toBe(zone.id); // ids never move under v2
+      expect((lm as any).map_id).toBe(map.id);
     }
     // Original marker ids may have been id-swapped too — find them by name/coords.
     const lm1 = localMarkers.find(m => (m as any).x === 100);
@@ -126,20 +123,14 @@ describe('SyncEngine pushPhase: zone+marker CREATE ordering with id-swap', () =>
     // The previous tests used FakeOwApiClient directly, bypassing the adapter.
     // If a bug lives in the adapter (e.g. prepareRelations mangling marker
     // FK fields the engine just rewrote), only this test surfaces it.
-    const TEST_BASE = 'https://test-ow.local/api/worldapi';
-    const { handlers } = statefulOwHandlers({
+    const TEST_BASE = 'https://test-ow.local/api/v2';
+    const { handlers } = statefulV2Handlers({
       baseUrl: TEST_BASE,
       clock: clock.next,
-      assignsServerIds: true,
     });
     mswServer.use(...handlers);
 
-    const sdkClient = new OnlyWorldsClient({
-      apiKey: 'test-key',
-      apiPin: '1234',
-      baseUrl: TEST_BASE,
-    });
-    const adapter = new OwClientAdapter(sdkClient);
+    const adapter = new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '1234', baseUrl: TEST_BASE });
     const engineE2E = new SyncEngine({ folder, client: adapter });
 
     // Captain's smoke world shape: a map, a couple of zones, several markers

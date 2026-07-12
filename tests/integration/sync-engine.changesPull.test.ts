@@ -236,3 +236,55 @@ describe('changes pull: walk mechanics (scripted pages)', () => {
     expect(state.changes_cursor ?? null).toBeNull();
   });
 });
+
+describe('changes pull: rewind guard (v2 tail — head below last-applied seq)', () => {
+  it('normal operation never triggers the guard (head >= last-applied seq)', async () => {
+    await client.createElement('character', { id: '00000000-0000-4000-8000-00000000r001', name: 'A' });
+    await engine.pullNow();
+    await client.createElement('character', { id: '00000000-0000-4000-8000-00000000r002', name: 'B' });
+    const r = await engine.pullNow();
+    expect(r.pulled.creates).toBe(1);
+    const state = await folder.readSyncState();
+    expect(state.changes_last_seq).toBeGreaterThan(0);
+  });
+
+  it('server restore-from-backup: head < persisted seq → cursor dropped, cold walk re-baselines', async () => {
+    // Reach seq 2 and persist it.
+    await client.createElement('character', { id: '00000000-0000-4000-8000-00000000r011', name: 'Keep' });
+    await client.createElement('character', { id: '00000000-0000-4000-8000-00000000r012', name: 'Lost in restore' });
+    await engine.pullNow();
+    const before = await folder.readSyncState();
+    expect(before.changes_last_seq).toBe(2);
+
+    // Disaster: server restored from a backup taken at seq 1.
+    client.__rewind_op_log(1);
+    // The restored server then takes ONE new edit (seq 2 again, different content).
+    await client.createElement('location', { id: '00000000-0000-4000-8000-00000000r013', name: 'Post-restore town' });
+
+    // Our persisted seq (2) equals the new head (2) — no rewind signal yet;
+    // rewind detection needs head strictly BELOW our memory. Rewind further:
+    client.__rewind_op_log(1);
+
+    const r = await engine.pullNow();
+    // Guard fired: cursor dropped, cold walk replayed the world from the epoch.
+    expect(r.pulled.creates + r.pulled.updates).toBeGreaterThanOrEqual(0); // walk completed, no throw
+    const after = await folder.readSyncState();
+    expect(after.changes_last_seq).toBe(1); // re-baselined to the restored head
+    expect(after.changes_cursor).toBe('1:00000000-0000-4000-8000-00000000r011');
+  });
+
+  it('a head that stays behind after one reset does not loop (single reset per round)', async () => {
+    await client.createElement('character', { id: '00000000-0000-4000-8000-00000000r021', name: 'A' });
+    await engine.pullNow();
+    // Pathological server: claims head 0 forever but still serves ops.
+    const real = client.pullChanges!.bind(client);
+    client.pullChanges = async (since, limit) => {
+      const page = await real(since, limit);
+      return { ...page, head: 0 };
+    };
+    // Must complete (SAFETY_CAP protects regardless; the single-reset latch
+    // means we don't even spin to the cap).
+    const r = await engine.pullNow();
+    expect(r).toBeDefined();
+  });
+});

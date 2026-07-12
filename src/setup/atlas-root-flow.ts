@@ -34,7 +34,7 @@ import { newId } from '../store/folder-store';
 import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-utils';
 import { getActiveStore, setActiveStore } from '../core/active-store';
 import { attachSyncEngine, refreshElementsAfterWrite } from '../sync/sync-attach';
-import { buildOwClient, buildV2Adapter } from '../sync/make-online';
+import { buildV2Adapter } from '../sync/make-online';
 import { initialDownloadAll, type InitialDownloadProgress } from '../sync/initial-download';
 import { applyImportPlan, type ApplyProgress, type ApplyResult } from '../import/apply-import-plan';
 import type { ImportPlan } from '../import/types';
@@ -547,12 +547,12 @@ export async function linkExistingApiWorldInRoot(
   if (!apiKey) throw new Error('API key is required');
   if (!apiPin) throw new Error('PIN is required');
 
-  // Validate creds via the v1 worlds.get (gate 10.7: validation-only lane;
-  // no v2 equivalent yet). The SDK throws "API Error NNN: ..." on failure.
-  const client = buildOwClient(apiKey, apiPin);
+  // Validate creds via v2 GET /world (live 2026-07-12; replaced the v1 SDK
+  // lane). OwV2Error keeps the "API Error NNN: ..." prefix these regexes read.
+  const client = buildV2Adapter(apiKey, apiPin);
   let world: { id?: string; name?: string };
   try {
-    world = await client.worlds.get();
+    world = await client.getWorld();
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/401|403/.test(msg)) throw new Error('API key or PIN invalid');

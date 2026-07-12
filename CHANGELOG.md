@@ -9,6 +9,8 @@
 - Pulling changes uses the server's change feed: faster, and deletions arrive as explicit events instead of being inferred, which removes a whole class of false "deleted on the server" prompts.
 - Elements deleted and later restored on the server no longer risk a stale deletion prompt.
 - Sync errors are more precise: a dangling reference names the missing element, an expired key reads differently from a wrong PIN, and rate limiting no longer pauses sync as if your credentials failed.
+- Credential checks (linking, Test connection, make online) use the v2 world endpoint: one call validates the key and reads the world's identity.
+- If the OnlyWorlds server is ever restored from a backup, atlas now detects it and rebuilds its sync position from scratch instead of trusting a position that points past the server's history.
 - Charts open richer by default: every element type present keeps a seat, and worlds dominated by one type now fill the whole view instead of a handful of dots.
 - Chart interactions: click previews an element, clicking it again focuses the chart on it, clicking empty space dismisses. Larger click targets and a clearer selection ring.
 - Events no longer sit directly on top of narrative or era lines in charts.

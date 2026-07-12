@@ -226,6 +226,15 @@ export interface SyncState {
    * resetSyncBaseline: a re-link must never inherit another world's cursor.
    */
   changes_cursor?: string | null;
+  /**
+   * Highest change_seq ever APPLIED from the /changes feed. The rewind
+   * detector's memory: a /changes response whose `head` is BELOW this means
+   * the server was restored from backup (the one legal rewind path, Skeld
+   * §8) — the engine re-baselines with a cold walk instead of trusting a
+   * cursor pointing past the world's history. Cleared with the cursor by
+   * resetSyncBaseline.
+   */
+  changes_last_seq?: number | null;
   conflicts: Conflict[];
   /**
    * Server-deleted elements detected during pull (Phase 3.5+).

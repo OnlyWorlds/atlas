@@ -195,55 +195,6 @@ describe('sync-attach: id-swap migrates UI state', () => {
     expect(window.location.hash).toBe('#/w/w1/element/pub-new');
   });
 
-  // End-to-end wiring test: prove a transient SyncEngine constructed exactly
-  // like Make-Online Route 1 builds it (`onIdSwap: applyIdSwapToUi`) actually
-  // propagates id-swaps to the UI when a CREATE produces a server-assigned id.
-  //
-  // Without this test, regressing the Route 1 wiring (e.g. dropping the
-  // onIdSwap option from make-online-modal.ts:249) wouldn't surface until
-  // someone ran T1.6 smoke and noticed the "element not found" flash. With it,
-  // the wiring is locked in mechanically.
-  it('transient engine + applyIdSwapToUi migrates UI on server-assigned id', async () => {
-    const folder = new MockFolderStore();
-    const clock = new MonotonicClock('2026-01-01T00:00:00.000Z');
-    folder.setClock(clock.next);
-    await folder.open(null);
-    const client = new FakeOwApiClient();
-    client.setClock(clock.next);
-    client.assignServerIds = true; // Real OW UUID v7 behavior.
-
-    const local = await folder.createElement('character', { name: 'TransientCarl' });
-
-    // Mirror UI state for the smoke-realistic scenario: user has the local
-    // element selected and the URL points at its id.
-    patchSlice('ui', { ...getState().ui, selectedElementId: local.id });
-    window.location.hash = `#/w/w1/element/${local.id}`;
-    patchSlice('data', {
-      elements: [
-        { id: local.id, type: 'character', name: 'TransientCarl', local_updated_at: 't' } as any,
-      ],
-    });
-
-    // Build the transient engine EXACTLY like make-online-modal.handleCreate does.
-    const transient = new SyncEngine({
-      folder,
-      client,
-      onIdSwap: applyIdSwapToUi,
-    });
-    await transient.pushOnce();
-
-    // UI state must have followed the swap. If wiring breaks, selectedElementId
-    // and URL would still be local.id and the middle pane would render
-    // "element <local.id> not found in this world."
-    expect(getState().ui.selectedElementId).not.toBe(local.id);
-    expect(window.location.hash).not.toBe(`#/w/w1/element/${local.id}`);
-    expect(window.location.hash).toMatch(/^#\/w\/w1\/element\//);
-    // And data.elements has been updated to the new id atomically.
-    const newId = getState().ui.selectedElementId!;
-    expect(getState().data.elements.find((e) => e.id === newId)).toBeDefined();
-    expect(getState().data.elements.find((e) => e.id === local.id)).toBeUndefined();
-  });
-
   it('atomically migrates data + ui in a single state transition', () => {
     // If the handler did two separate patchSlice calls, subscribers would
     // observe an intermediate state where ui.selectedElementId = new-id but

@@ -10,36 +10,29 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { OnlyWorldsClient } from '@onlyworlds/sdk';
 import { mswServer } from '../setup';
-import { statefulOwHandlers } from '../msw-handlers';
+import { statefulV2Handlers } from '../msw-handlers';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
-import { OwClientAdapter } from '../../src/sync/ow-client-adapter';
+import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
 import { initialDownloadAll, type InitialDownloadProgress } from '../../src/sync/initial-download';
 
-const TEST_BASE = 'https://test-ow.local/api/worldapi';
+const TEST_BASE = 'https://test-ow.local/api/v2';
 
-function makeAdapter(): OwClientAdapter {
-  return new OwClientAdapter(
-    new OnlyWorldsClient({
-      apiKey: 'test-key',
-      apiPin: '1234',
-      baseUrl: TEST_BASE,
-    })
-  );
+function makeAdapter(): OwV2ClientAdapter {
+  return new OwV2ClientAdapter({ apiKey: 'test-key', apiPin: '1234', baseUrl: TEST_BASE });
 }
 
 let folder: MockFolderStore;
 let clock: MonotonicClock;
-let serverState: ReturnType<typeof statefulOwHandlers>;
+let serverState: ReturnType<typeof statefulV2Handlers>;
 
 beforeEach(async () => {
   clock = new MonotonicClock('2026-01-01T00:00:00.000Z');
   folder = new MockFolderStore();
   folder.setClock(clock.next);
   await folder.open(null);
-  serverState = statefulOwHandlers({ baseUrl: TEST_BASE, clock: clock.next });
+  serverState = statefulV2Handlers({ baseUrl: TEST_BASE, clock: clock.next });
   mswServer.use(...serverState.handlers);
 });
 

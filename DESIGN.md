@@ -381,7 +381,7 @@ Push triggers are unchanged — autosave debounce is the only push trigger; user
 **Local creates use `crypto.randomUUID()` (v4), and keel PRESERVES client ids** (v1 and v2, probed live 2026-07-12): the id atlas mints locally is the id server-side, forever. Duplicate POST → 409 `id_conflict`; v2 `PUT /{type}/{id}` is create-or-replace upsert; any RFC-4122 UUID is first-class.
 
 Consequences:
-- The **id-swap machinery is DORMANT** (`response.id !== current.id` never fires against keel). It stays in-tree dead-but-safe — `rewriteIdReferences`, `onIdSwap` → `handleIdSwap` UI propagation, the merge-phase bookkeeping — until v2 id-preservation has production mileage; excision is a named cleanup bout. Match-phase swaps in Route 2 (name+type match with DIFFERENT ids) are still real and still use this machinery.
+- The **create-path id-swap machinery is EXCISED** (cleanup bout, 2026-07-12): the engine no longer swaps on `response.id !== current.id` — a reassigning server is a v2 contract violation and produces a LOUD per-element failure (nothing stamped, element retried; regression in `sync-engine.createOrder.test.ts`). `rewriteIdReferences` + the engine's `onIdSwap` hook are deleted. **Match-phase swaps in Route 2 (name+type match with DIFFERENT ids) remain real**: the merge machinery + `applyIdSwapToUi` → `handleIdSwap` (UI/URL/favorites migration) survive for exactly that path.
 - Locally (offline / local-only), client v4 ids work indefinitely and survive Make-Online unchanged.
 
 HISTORY: the pre-keel Django server assigned its own UUID v7 on CREATE, which is why the swap machinery exists (SYNC_NOTES "Server-assigned ids").

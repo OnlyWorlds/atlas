@@ -38,8 +38,3 @@ export function devWorldapiBase(): string | null {
   const origin = devApiOrigin();
   return origin ? `${origin}/api/worldapi` : null;
 }
-
-/** @deprecated legacy alias — returns the v1 worldapi base. */
-export function devApiBase(): string | null {
-  return devWorldapiBase();
-}
