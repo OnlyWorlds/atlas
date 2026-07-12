@@ -140,4 +140,95 @@ describe('applyServerRecord — atlas-local field preservation', () => {
   // works because the preservation loop walks the list dynamically. No
   // explicit per-field test needed — the contract is "every field in the
   // ATLAS_LOCAL_EXTENSION_FIELDS list is preserved if present locally."
+
+  it('preserves atlas_page_blocks (a different LOCAL_ONLY field) across a server update that lacks it', async () => {
+    const page = await folder.createElement('narrative', { name: 'Chapter One', subtype: 'page' });
+    await folder.updateElement(page.id, { atlas_page_blocks: [{ kind: 'text', value: 'intro' }] });
+    await folder.stampServerUpdatedAt(page.id, 'narrative', '2026-01-01T01:00:00.000Z');
+
+    // Server pull carries the synced `story` field but never atlas_page_blocks
+    // — the API doesn't know about it.
+    await folder.applyServerRecord(
+      'narrative',
+      { id: page.id, name: 'Chapter One', story: 'intro' },
+      '2026-01-01T02:00:00.000Z'
+    );
+
+    const after = await folder.getElement(page.id);
+    expect(after!.atlas_page_blocks).toEqual([{ kind: 'text', value: 'intro' }]);
+  });
+});
+
+describe('applyServerRecord — WIRE extension field split (gate 10.3)', () => {
+  it('server value wins when the server record carries atlas_shape', async () => {
+    const zone = await folder.createZone({ name: 'Border Forest', atlas_shape: 'polygon' });
+    await folder.stampServerUpdatedAt(zone.id, 'zone', '2026-01-01T01:00:00.000Z');
+
+    await folder.applyServerRecord(
+      'zone',
+      { id: zone.id, name: 'Border Forest', atlas_shape: 'line' },
+      '2026-01-01T02:00:00.000Z'
+    );
+
+    const after = await folder.getZone(zone.id);
+    expect(after!.atlas_shape).toBe('line');
+  });
+
+  it('preserves local atlas_shape when the server record omits the field entirely', async () => {
+    const zone = await folder.createZone({ name: 'Border Forest', atlas_shape: 'polygon' });
+    await folder.stampServerUpdatedAt(zone.id, 'zone', '2026-01-01T01:00:00.000Z');
+
+    // No atlas_shape at all — e.g. a v1-era or non-atlas client wrote this record.
+    await folder.applyServerRecord(
+      'zone',
+      { id: zone.id, name: 'Border Forest' },
+      '2026-01-01T02:00:00.000Z'
+    );
+
+    const after = await folder.getZone(zone.id);
+    expect(after!.atlas_shape).toBe('polygon');
+  });
+
+  it('lands an explicit server null for atlas_color instead of resurrecting the local value', async () => {
+    const zone = await folder.createZone({ name: 'Village Square', atlas_color: '#ff0000' });
+    await folder.stampServerUpdatedAt(zone.id, 'zone', '2026-01-01T01:00:00.000Z');
+
+    await folder.applyServerRecord(
+      'zone',
+      { id: zone.id, name: 'Village Square', atlas_color: null },
+      '2026-01-01T02:00:00.000Z'
+    );
+
+    const after = await folder.getZone(zone.id);
+    // `field in record` is true for an explicit null, so the WIRE branch
+    // treats the field as present and does NOT fall back to local — the
+    // server's clear lands as-is rather than being resurrected.
+    expect(after!.atlas_color).toBeNull();
+  });
+
+  it('LOCAL_ONLY field still wins even if a misbehaving server record carries it (edge case, gate 10.3)', async () => {
+    // This is the SAME contract as "does not let server response override
+    // image_media_id if both present" above, re-verified here for a second
+    // LOCAL_ONLY field so the new ATLAS_LOCAL_ONLY_FIELDS constant is locked
+    // on more than one member.
+    //
+    // Implementation verdict (read from folder-store-fs.ts / mock-folder-store.ts
+    // applyServerRecord): the LOCAL_ONLY preserve loop has no `field in record`
+    // guard — it unconditionally copies the existing local value into
+    // `preserved` whenever it's defined, and `preserved` is spread AFTER
+    // `...record` in the final object. So local wins even when the server
+    // carries a value for a field it isn't supposed to know about.
+    const page = await folder.createElement('narrative', { name: 'Chapter Two', subtype: 'page' });
+    await folder.updateElement(page.id, { atlas_page_blocks: ['local-block'] });
+    await folder.stampServerUpdatedAt(page.id, 'narrative', '2026-01-01T01:00:00.000Z');
+
+    await folder.applyServerRecord(
+      'narrative',
+      { id: page.id, name: 'Chapter Two', atlas_page_blocks: ['server-ghost-block'] },
+      '2026-01-01T02:00:00.000Z'
+    );
+
+    const after = await folder.getElement(page.id);
+    expect(after!.atlas_page_blocks).toEqual(['local-block']);
+  });
 });

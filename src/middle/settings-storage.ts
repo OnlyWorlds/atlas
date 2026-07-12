@@ -269,11 +269,27 @@ function wireSyncTab(toasts: ToastManager): void {
       // on the next sync round (local pushes anyway, server overwritten), so
       // a stale conflict badge from the prior policy would lie. (SYNC_NOTES
       // M4.) Only fire when the flip direction actually changes the semantic.
+      //
+      // Then ACTIVELY converge: fire a push so the cleared elements' pending
+      // local edits overwrite the server NOW. Under the v2 cursor pull, the
+      // conflicting ops are already behind the watermark — nothing re-detects
+      // them (event-once detection), so without this push the divergence
+      // would sit invisible until the next edit on either side (gate finding,
+      // 2026-07-12). The conflicted elements all have local_updated_at ahead
+      // of baseline, so pushOnce covers exactly the cleared set.
       if (prior === 'pause-and-review' && v === 'local-wins') {
         const folder = getCurrentSyncFolder();
         if (folder) {
           void folder.writeSyncState({ conflicts: [] })
             .then(() => refreshConflictsCount())
+            .then(() => {
+              const eng = getCurrentSyncEngine();
+              if (eng) {
+                return eng.pushOnce().then(() => undefined).catch((err) => {
+                  console.warn('[settings] post-policy-flip convergence push failed:', err);
+                });
+              }
+            })
             .catch((err) => console.warn('[settings] clear conflicts failed:', err));
         }
       }

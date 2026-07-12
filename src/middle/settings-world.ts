@@ -26,7 +26,7 @@ import {
   getCurrentSyncEngine,
   pullNowAndRefresh,
 } from '../sync/sync-attach';
-import { OnlyWorldsClient } from '@onlyworlds/sdk';
+import { buildOwClient } from '../sync/make-online';
 import type { WorldRegistryEntry } from '../core/types';
 import { escapeText, escapeAttr } from '../core/dom-utils';
 
@@ -127,7 +127,9 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     if (!pin) { toasts.error('Set your PIN first'); return; }
     testBtn.disabled = true;
     try {
-      const client = new OnlyWorldsClient({ apiKey: world.api.api_key, apiPin: pin });
+      // Test Connection stays on the v1 worlds.get (validation lane, gate
+      // 10.7); buildOwClient applies any dev/staging origin override.
+      const client = buildOwClient(world.api.api_key, pin);
       const fetched = await client.worlds.get();
       const liveName: string | undefined = fetched?.name;
       // If the server name differs from what we cached at link time, refresh

@@ -10,7 +10,7 @@
  */
 
 import { http, HttpResponse, type HttpHandler } from 'msw';
-import { ATLAS_LOCAL_EXTENSION_FIELDS } from '../src/core/constants';
+import { ATLAS_LOCAL_EXTENSION_FIELDS, ATLAS_LOCAL_ONLY_FIELDS } from '../src/core/constants';
 
 const DEFAULT_BASE = 'https://www.onlyworlds.com/api/worldapi';
 /** Single source of truth list — keep in lockstep with constants.ts. */
@@ -118,7 +118,10 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
     // CREATE WORLD (external, no auth) — used by Make-Online Route 1.
     // POST /worldsync/create-world-external/
     // body: { name, email, pin }
-    // 200: { success: true, api_key: string }
+    // 200 (probed keel shape, 2026-07-12): { success, world_id, name, version, api_key }
+    //     — Route 1's PRIMARY branch consumes world_id/name directly and
+    //     skips the worlds.get fallback; the fake serves the real shape so
+    //     that branch is what tests exercise (close-gate finding).
     // 400: { success: false, message: string }
     http.post(`${worldsyncBase}/create-world-external/`, async ({ request }) => {
       const body = (await request.json()) as { name?: string; email?: string; pin?: string };
@@ -130,7 +133,13 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
       }
       const api_key = `mock-api-key-${crypto.randomUUID().slice(0, 8)}`;
       worldCreations.push({ name: body.name, email: body.email, api_key });
-      return HttpResponse.json({ success: true, api_key });
+      return HttpResponse.json({
+        success: true,
+        world_id: crypto.randomUUID(),
+        name: body.name,
+        version: '0.30.00',
+        api_key,
+      });
     }),
 
     // LIST
@@ -275,6 +284,387 @@ export function statefulOwHandlers(options: StatefulServerOptions = {}): {
       const existing = bucket(type).get(id);
       if (!existing) throw new Error(`__mutate: ${type}/${id} not found`);
       bucket(type).set(id, { ...existing, ...patch, id, updated_at: clock() });
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// keel v2 dialect
+// ---------------------------------------------------------------------------
+
+/** A single op in the /changes feed (wire shape — bare relation names). */
+export type V2ChangeOp =
+  | { op: 'upsert'; type: string; id: string; change_seq: number; updated_at: string; element: ServerRecord }
+  | { op: 'delete'; type: string; id: string; change_seq: number; deleted_at: string };
+
+const V2_DEFAULT_BASE = 'https://www.onlyworlds.com/api/v2';
+
+/** UUID-shape test (v4 and friends) — the FK heuristic keys on this. */
+const V2_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Server-managed fields the wire rejects with 422 "<field> is read-only." */
+const V2_READONLY_FIELDS = new Set(['updated_at', 'created_at', 'world', 'type']);
+
+/**
+ * Fields that must NEVER reach the wire — the local-only extension bucket plus
+ * sync metadata. Rejected with the 422 unknown-field envelope (they are stripped
+ * client-side by toV2WireShape, so a real appearance means the strip pass broke).
+ */
+const V2_LOCAL_REJECT = new Set<string>([
+  ...ATLAS_LOCAL_ONLY_FIELDS,
+  'local_updated_at',
+  'server_updated_at',
+]);
+
+export interface StatefulV2ServerOptions {
+  /** Override the base URL. Default: production v2. Routes have NO trailing slash. */
+  baseUrl?: string;
+  /** Deterministic clock for created_at/updated_at + change deleted_at. */
+  clock?: () => string;
+  /** LIST page size for the cursor walk. Default 100. */
+  pageSize?: number;
+  /** Dead-creds simulation — every endpoint 401s when `.blocked`. Object indirection lets tests flip mid-run. */
+  authState?: { blocked: boolean };
+  /**
+   * Non-namespaced field names the server treats as unknown → 422. Default
+   * `['mood']`. This is the MSW SEAM: the fake can't know the full OW schema,
+   * so a field is rejected iff it is in the local-only/sync-metadata reject set
+   * OR in this list; everything else (bare schema names, `atlas_*`/`x_*`/
+   * `shadow_*` extensions) is accepted and round-tripped verbatim.
+   */
+  unknownFields?: string[];
+  /**
+   * Pathological LIST: always serve page 1 and claim `has_more:true` with a
+   * NON-ADVANCING cursor. Exercises the adapter's stuck-walk guard (the type
+   * must join getIncompleteListTypes()).
+   */
+  brokenCursor?: boolean;
+}
+
+/**
+ * Stateful MSW server speaking the FROZEN keel v2 dialect (see
+ * Notes/2026-07-12-v2-probed-facts.md — the single source of truth for every
+ * shape and status code below). Independent from statefulOwHandlers (which
+ * stays for the v1 SDK adapter): different envelopes, error shape, pagination,
+ * and the /bulk + /changes endpoints v1 never had.
+ *
+ * Returns `{handlers, state, opLog, __mutate}`. `opLog` is the ordered change
+ * feed (dense, gap-free per-instance change_seq); `__mutate` patches a record
+ * out-of-band AND logs an upsert op, mirroring a server-side edit.
+ */
+export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
+  handlers: HttpHandler[];
+  state: Map<string, Map<string, ServerRecord>>;
+  opLog: V2ChangeOp[];
+  __mutate: (type: string, id: string, patch: Record<string, unknown>) => void;
+} {
+  const base = (options.baseUrl ?? V2_DEFAULT_BASE).replace(/\/$/, '');
+  const clock = options.clock ?? (() => new Date().toISOString());
+  const pageSize = options.pageSize ?? 100;
+  const unknownFields = options.unknownFields ?? ['mood'];
+  const state = new Map<string, Map<string, ServerRecord>>();
+  const opLog: V2ChangeOp[] = [];
+  const idempotency = new Map<string, { payload: string; response: unknown }>();
+  const cursorOffsets = new Map<string, number>();
+  let seq = 0;
+
+  function bucket(type: string): Map<string, ServerRecord> {
+    let m = state.get(type);
+    if (!m) {
+      m = new Map();
+      state.set(type, m);
+    }
+    return m;
+  }
+
+  /** Does `id` exist under ANY type? (FK links are cross-type in v2.) */
+  function existsAnywhere(id: string): boolean {
+    for (const m of state.values()) if (m.has(id)) return true;
+    return false;
+  }
+
+  function logUpsert(type: string, record: ServerRecord): void {
+    seq += 1;
+    opLog.push({ op: 'upsert', type, id: record.id, change_seq: seq, updated_at: record.updated_at, element: { ...record } });
+  }
+  function logDelete(type: string, id: string, deletedAt: string): void {
+    seq += 1;
+    opLog.push({ op: 'delete', type, id, change_seq: seq, deleted_at: deletedAt });
+  }
+
+  function mintCursor(offset: number): string {
+    const token = `cur_${crypto.randomUUID().slice(0, 8)}`;
+    cursorOffsets.set(token, offset);
+    return token;
+  }
+
+  const errTypeFor = (code: string): string => {
+    if (code === 'invalid_credentials') return 'authentication_error';
+    if (code === 'idempotency_error') return 'idempotency_error';
+    return 'invalid_request_error';
+  };
+
+  interface ErrDesc { status: number; code: string; message: string; param: string | null }
+
+  function envelope(desc: ErrDesc): Response {
+    return HttpResponse.json(
+      {
+        error: {
+          type: errTypeFor(desc.code),
+          code: desc.code,
+          message: desc.message,
+          param: desc.param,
+          doc_url: `https://www.onlyworlds.com/docs/errors#${desc.code}`,
+        },
+      },
+      { status: desc.status },
+    );
+  }
+
+  function authBlocked(): Response | null {
+    if (options.authState?.blocked) {
+      return envelope({ status: 401, code: 'invalid_credentials', message: 'Incorrect PIN.', param: null });
+    }
+    return null;
+  }
+
+  /**
+   * Validate a write body against the v2 dialect. Returns an ErrDesc for the
+   * FIRST problem (read-only field, then unknown field, then dangling FK), or
+   * null when clean. `hasId` decides FK resolution — for /bulk it also consults
+   * the in-batch id set so reference cycles resolve.
+   */
+  function validateBody(
+    body: Record<string, unknown>,
+    opts: { requireName: boolean; hasId: (id: string) => boolean; linkSuffix?: string },
+  ): ErrDesc | null {
+    if (opts.requireName && !('name' in body)) {
+      return { status: 422, code: 'invalid_request', message: 'name is required.', param: 'name' };
+    }
+    for (const [k] of Object.entries(body)) {
+      if (k === 'id') continue;
+      if (V2_READONLY_FIELDS.has(k)) {
+        return { status: 422, code: 'invalid_request', message: `${k} is read-only.`, param: k };
+      }
+      if (V2_LOCAL_REJECT.has(k) || unknownFields.includes(k)) {
+        return { status: 422, code: 'invalid_request', message: `Unknown field: ${k}`, param: k };
+      }
+    }
+    // FK pass: bare single-link string fields + multi-link string arrays whose
+    // values look like uuids must resolve. Multi-link reports the FIRST dangling.
+    for (const [k, v] of Object.entries(body)) {
+      if (k === 'id') continue;
+      const refs = typeof v === 'string' && V2_UUID_RE.test(v)
+        ? [v]
+        : Array.isArray(v)
+          ? (v as unknown[]).filter((x): x is string => typeof x === 'string' && V2_UUID_RE.test(x))
+          : [];
+      for (const ref of refs) {
+        if (!opts.hasId(ref)) {
+          return {
+            status: 400,
+            code: 'invalid_link',
+            message: `${k} references Element '${ref}' which does not exist.${opts.linkSuffix ?? ''}`,
+            param: k,
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  const handlers: HttpHandler[] = [
+    // GET /changes — the per-world change feed. MUST precede GET /:type (a bare
+    // /changes would otherwise be captured as type="changes").
+    http.get(`${base}/changes`, ({ request }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      const url = new URL(request.url);
+      const limit = Math.max(1, parseInt(url.searchParams.get('limit') ?? '500', 10) || 500);
+      // Continuation is `since` ONLY. A `cursor=` param is SILENTLY IGNORED —
+      // this locks the real-server trap (a cursor=-walker replays the epoch
+      // forever with has_more:true). We never read `cursor` here.
+      const since = url.searchParams.get('since');
+      const sinceSeq = since ? (parseInt(since.split(':')[0], 10) || 0) : 0;
+      const pending = opLog.filter(op => op.change_seq > sinceSeq);
+      const changes = pending.slice(0, limit);
+      const hasMore = pending.length > changes.length;
+      const last = changes[changes.length - 1];
+      const cursor = last ? `${last.change_seq}:${last.id}` : (since ?? null);
+      return HttpResponse.json({ cursor, has_more: hasMore, changes });
+    }),
+
+    // POST /bulk — atomic/non-atomic multi-create with fixpoint FK resolution.
+    // MUST precede POST /:type (a bare /bulk would match type="bulk").
+    http.post(`${base}/bulk`, async ({ request }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      const idemKey = request.headers.get('Idempotency-Key');
+      const body = (await request.json()) as { atomic?: boolean; items?: Array<{ type: string; element: Record<string, unknown> }> };
+      const payloadStr = JSON.stringify(body);
+      if (idemKey) {
+        const seen = idempotency.get(idemKey);
+        if (seen) {
+          if (seen.payload !== payloadStr) {
+            return envelope({ status: 409, code: 'idempotency_error', message: 'Idempotency-Key reused with a different payload.', param: null });
+          }
+          return HttpResponse.json(seen.response as Record<string, unknown>); // exact replay
+        }
+      }
+      const atomic = body.atomic ?? true;
+      const items = Array.isArray(body.items) ? body.items : [];
+      // Fixpoint seam: a link resolves if the id is already stored OR appears
+      // anywhere in this batch (so reference cycles land together).
+      const batchIds = new Set(items.map(it => it?.element?.id).filter(Boolean) as string[]);
+      const hasId = (id: string): boolean => existsAnywhere(id) || batchIds.has(id);
+
+      const evaluated = items.map(it => {
+        // Probed fact (2026-07-12 note §/bulk): ONLY the non-atomic variant
+        // appends " in this world." to the invalid_link message; atomic /bulk
+        // (and single POST) use the bare form. The engine parser is
+        // suffix-tolerant either way, but the fake reproduces the distinction.
+        const err = validateBody(it.element, { requireName: true, hasId, linkSuffix: atomic ? '' : ' in this world.' });
+        const id = (it.element?.id as string | undefined) ?? '';
+        if (err) {
+          return { ok: false as const, status: err.status, id, error: { code: err.code, message: err.message, param: err.param } };
+        }
+        return { ok: true as const, status: 201, id, item: it };
+      });
+      const anyError = evaluated.some(r => !r.ok);
+
+      // atomic + any failure → persist NOTHING (rollback). Otherwise persist the
+      // good items. Per-item statuses are reported either way.
+      if (!(atomic && anyError)) {
+        for (const r of evaluated) {
+          if (r.ok) {
+            const ts = clock();
+            const existing = bucket(r.item.type).get(r.id);
+            const record: ServerRecord = { ...r.item.element, id: r.id, created_at: existing?.created_at ?? ts, updated_at: ts };
+            bucket(r.item.type).set(r.id, record);
+            logUpsert(r.item.type, record);
+          }
+        }
+      }
+
+      // Items carry NO updated_at (backfill lives client-side until keel ships the echo).
+      const response = {
+        errors: anyError,
+        items: evaluated.map(r => (r.ok ? { status: r.status, id: r.id } : { status: r.status, id: r.id, error: r.error })),
+      };
+      if (idemKey) idempotency.set(idemKey, { payload: payloadStr, response });
+      return HttpResponse.json(response);
+    }),
+
+    // GET single
+    http.get(`${base}/:type/:id`, ({ params }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      const type = String(params.type);
+      const id = String(params.id);
+      const r = bucket(type).get(id);
+      if (!r) return envelope({ status: 404, code: 'not_found', message: `${type} '${id}' not found.`, param: null });
+      return HttpResponse.json({ ...r });
+    }),
+
+    // LIST — cursor-paginated `{data, has_more, next_cursor}` envelope.
+    http.get(`${base}/:type`, ({ params, request }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      const type = String(params.type);
+      const all = Array.from(bucket(type).values());
+      if (options.brokenCursor) {
+        // Always page 1, always "more", never a new cursor → the adapter's
+        // non-advancing-cursor guard must abort the walk as incomplete.
+        return HttpResponse.json({ data: all.slice(0, pageSize), has_more: true, next_cursor: 'STUCK' });
+      }
+      const cursorParam = new URL(request.url).searchParams.get('cursor');
+      const offset = cursorParam ? (cursorOffsets.get(cursorParam) ?? 0) : 0;
+      const slice = all.slice(offset, offset + pageSize);
+      const nextOffset = offset + slice.length;
+      const hasMore = nextOffset < all.length;
+      return HttpResponse.json({ data: slice, has_more: hasMore, next_cursor: hasMore ? mintCursor(nextOffset) : null });
+    }),
+
+    // CREATE — 201, preserves client id, echoes full element + timestamps.
+    http.post(`${base}/:type`, async ({ params, request }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      const type = String(params.type);
+      const body = (await request.json()) as Record<string, unknown>;
+      const err = validateBody(body, { requireName: true, hasId: existsAnywhere });
+      if (err) return envelope(err);
+      const id = (body.id as string | undefined) ?? crypto.randomUUID();
+      if (bucket(type).has(id)) {
+        return envelope({ status: 409, code: 'id_conflict', message: `${type} '${id}' already exists.`, param: null });
+      }
+      const ts = clock();
+      const record: ServerRecord = { ...body, id, created_at: ts, updated_at: ts };
+      bucket(type).set(id, record);
+      logUpsert(type, record);
+      return HttpResponse.json({ ...record }, { status: 201 });
+    }),
+
+    // UPDATE — 200 full-element echo (partial merge; name not required).
+    http.patch(`${base}/:type/:id`, async ({ params, request }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      const type = String(params.type);
+      const id = String(params.id);
+      const existing = bucket(type).get(id);
+      if (!existing) return envelope({ status: 404, code: 'not_found', message: `${type} '${id}' not found.`, param: null });
+      const body = (await request.json()) as Record<string, unknown>;
+      const err = validateBody(body, { requireName: false, hasId: existsAnywhere });
+      if (err) return envelope(err);
+      const ts = clock();
+      const record: ServerRecord = { ...existing, ...body, id, created_at: existing.created_at, updated_at: ts };
+      bucket(type).set(id, record);
+      logUpsert(type, record);
+      return HttpResponse.json({ ...record });
+    }),
+
+    // PUT — upsert: 201 when fresh, 200 replace when existing.
+    http.put(`${base}/:type/:id`, async ({ params, request }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      const type = String(params.type);
+      const id = String(params.id);
+      const body = (await request.json()) as Record<string, unknown>;
+      const err = validateBody(body, { requireName: true, hasId: existsAnywhere });
+      if (err) return envelope(err);
+      const existing = bucket(type).get(id);
+      const ts = clock();
+      const record: ServerRecord = { ...body, id, created_at: existing?.created_at ?? ts, updated_at: ts };
+      bucket(type).set(id, record);
+      logUpsert(type, record);
+      return HttpResponse.json({ ...record }, { status: existing ? 200 : 201 });
+    }),
+
+    // DELETE — idempotent: 204 whether or not the id existed. Only a real
+    // removal logs a delete op.
+    http.delete(`${base}/:type/:id`, ({ params }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      const type = String(params.type);
+      const id = String(params.id);
+      const m = bucket(type);
+      if (m.has(id)) {
+        m.delete(id);
+        logDelete(type, id, clock());
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+  ];
+
+  return {
+    handlers,
+    state,
+    opLog,
+    __mutate: (type, id, patch) => {
+      const existing = bucket(type).get(id);
+      if (!existing) throw new Error(`__mutate: ${type}/${id} not found`);
+      const record: ServerRecord = { ...existing, ...patch, id, updated_at: clock() };
+      bucket(type).set(id, record);
+      logUpsert(type, record);
     },
   };
 }

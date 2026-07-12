@@ -2,38 +2,31 @@
 
 Companion to `DESIGN.md`. This file captures **lessons + patterns** from building the sync layer — the WHY behind decisions, the bug categories we've hit, and what to watch for. Read this before touching sync code.
 
+**⚑ DIALECT NOTE (v2 port, 2026-07-12)**: atlas element CRUD now speaks the keel **v2** dialect through `OwV2ClientAdapter` (thin fetch, no SDK). The frozen wire contract lives in `Forge/Notes/2026-07-12-v2-probed-facts.md`; the /changes pull design + its adversarial-gate resolutions in `Forge/Notes/2026-07-12-v2-changes-pull-design.md`. Sections below marked HISTORY (v1) describe the retired v1 dialect — kept because the failure PATTERNS they teach still apply.
+
 ---
 
 ## The wire format vs disk format mismatch (most-bitten gotcha)
 
-OnlyWorlds API wire format uses `_id` / `_ids` suffix on relation fields:
-- `birthplace_id` (single_link, string)
-- `species_ids` (multi_link, array of strings)
-- Some fields are LITERALLY named with `_id` in `FIELD_SCHEMA` (e.g. pin's `element_id`).
+**v2 (current)**: the wire uses BARE schema names both directions — `{location: "<id>"}`, `{friends: ["<id>"]}` — which is exactly atlas's disk shape for content types. The only conversion left is the SPATIAL rename: atlas stores pin/marker with `map_id`/`zone_id` on disk while the schema (and wire) use bare `map`/`zone` (pin's `element_id`/`element_type` ARE the schema names, unchanged). The rename table is derived from `FIELD_SCHEMA` via `relationFieldsFor` (diskField vs schemaField) in `ow-v2-client-adapter.ts` — never hardcoded.
 
-Atlas disk format uses **bare names** matching `FIELD_SCHEMA`:
-- `birthplace: 'id'`
-- `species: ['a', 'b']`
-- Pin is the exception: stored with `_id` suffix locally (matches wire).
+- **Read**: `adaptV2Record` stamps `type`, renames bare `map`→`map_id` / `zone`→`zone_id` for pin/marker, passes everything else through verbatim (including extension fields).
+- **Write**: `toV2WireShape` strips server-managed fields + `ATLAS_LOCAL_ONLY_FIELDS` + sync stamps, renames the spatial fields the other way, and lets wire extensions + custom namespace fields ride.
+- Old shapes are HARD errors now: `map_id` in a v2 write body → 422 "Unknown field: map_id". No silent ignoring.
 
-### How the conversion lives
+**Extension fields ride the wire on v2**: `atlas_*` / `x_*` / `shadow_*` round-trip verbatim (keel extension passthrough). The strip discipline SPLIT accordingly — `ATLAS_LOCAL_ONLY_FIELDS` (page blocks, richtext, media bindings: stripped on write, preserved on pull) vs `ATLAS_WIRE_EXTENSION_FIELDS` (zone visual prefs: sent on write, server-value-lands on pull, preserved only when the server record lacks the field). Both stores' `applyServerRecord` implement the split; getting it wrong makes multi-device zone styling a silent one-way no-op.
 
-- **Read**: `OwClientAdapter.adaptRecord` collapses nested relation objects (`{birthplace: {id, name}}`) AND wire-shape (`{birthplace_id: 'id'}`) to bare names. Pin keeps suffix.
-- **Write**: `OwClientAdapter.toWireShape` runs SDK's `OnlyWorldsClient.prepareRelations(body, type)` to add suffix. Pin SKIPS prepareRelations (would double-suffix `element_id` → `element_id_id`).
+HISTORY (v1): the old wire wanted `_id`/`_ids` suffixes via the SDK's `prepareRelations`, served nested `{id,name}` stubs on read, and 400'd on ALL extension fields. The v1 `OwClientAdapter` encoding those rules is retired.
 
-### Symptoms when this goes wrong
-
-- "Link import doesn't work" — adapter wrote `_id` suffix on disk, UI reads bare names, finds nothing
-- "Link write-back doesn't work" — body sent without prepareRelations, server doesn't recognize bare field names, silently ignores
-- "Pin `element_id_id` double suffix" — running prepareRelations on pin
-
-If you ever touch the adapter, run the entire `ow-client-adapter.test.ts` suite.
+If you ever touch the adapter, run `ow-v2-client-adapter.test.ts`.
 
 ---
 
-## Server-assigned ids (UUID v7 enforcement)
+## Server-assigned ids — DORMANT under keel (id-swap machinery kept dead-but-safe)
 
-The OW server now assigns its OWN id on `POST /element/`, overriding the client-provided UUID. Probably enforcing UUID v7 format (newer than `crypto.randomUUID()` v4).
+**Keel preserves client ids** (v1 AND v2, probed live 2026-07-12): `crypto.randomUUID()` v4 ids land verbatim; a duplicate POST returns 409 `id_conflict`; v2 PUT is create-or-replace upsert. The id-swap path below **never fires against keel** — `response.id !== current.id` is structurally false. The machinery stays in-tree dead-but-safe (gate decision §9.4) until v2 id-preservation has production mileage; excision is a named cleanup bout.
+
+HISTORY (pre-keel): the old Django server assigned its OWN UUID v7 on CREATE, overriding client v4 ids — everything below was load-bearing then.
 
 ### Symptoms when not handled
 
@@ -171,19 +164,19 @@ Used in `emitConflictToasts` for the auto-push-after-pull-conflict-under-local-w
 
 ## Server-managed fields in write bodies (server 422)
 
-The OW server rejects PATCH/POST bodies that include any of these server-managed fields:
+The server rejects PATCH/POST bodies that include any of these server-managed fields (v2: 422 `invalid_request`, "X is read-only."):
 - `type` (immutable; server infers from URL path)
 - `world` (server-side relation, can't be set by client)
 - `created_at` (server stamps once)
 - `updated_at` (server stamps every write)
 
-Plus atlas-local fields the server doesn't know about:
+Plus the sync metadata + LOCAL_ONLY extension fields:
 - `local_updated_at`, `server_updated_at` (sync metadata)
-- `image_media_id` (atlas extension)
+- everything in `ATLAS_LOCAL_ONLY_FIELDS` (image_media_id, page blocks, richtext, …)
 
-All stripped in `toWireShape`. `id` is the only nuanced one: KEPT on CREATE (client UUID either preserved or overridden by server with swap), STRIPPED on UPDATE (path parameter).
+All stripped in `toV2WireShape`. WIRE extension fields (`ATLAS_WIRE_EXTENSION_FIELDS`) + custom namespace fields are NOT stripped — v2 round-trips them. `id` is the only nuanced one: KEPT on CREATE/PUT (client id preserved), STRIPPED on PATCH (path parameter).
 
-If you see a 422, check the wire body (now logged via `logWireError` on failure).
+If you see a 422, check the wire body (logged via `logWireError` on failure) and the error's `param` field — it names the offender.
 
 ---
 
@@ -489,7 +482,12 @@ Fix: capture `currentWorldId` at schedule time, compare to current at fire time.
 
 ## Known soft-edges to revisit (3.6+)
 
-Updated through session 221. Listed by surface — none are cutover blockers.
+Updated through session 257. Listed by surface — none are cutover blockers.
+
+### v2 close-gate deferrals (2026-07-12, documented not fixed)
+- **skipIds on the /changes path is event-once**: an op for a push-conflicted id is skipped for the whole round and the cursor passes it; a genuinely newer third-party op for that id in the SAME round is never re-seen (the full-list pull re-derived it next round; the cursor path doesn't). Requires a 3-device same-round race; self-heals on any later edit to the element. Fix shape when it matters: scope the skip to ops at-or-below the conflict's seq, or drop skipIds on the changes path and rely on !serverChanged idempotence + conflict dedup.
+- **~7 flow suites still drive the v1 OwClientAdapter** (initial-download, knowledge-sync, zoneMarkerOrder, sharing-sync, make-online legacy, ow-client-adapter*): their integration confidence for the v2 production dialect is partial (the v2 adapter has its own direct suite + the bulkMerge/bulkPush/changesPull suites). Migrate them to statefulV2Handlers / the v2 fake in the SAME named cleanup bout that deletes the v1 adapter + excises id-swap.
+- **list items missing `updated_at`** are skipped-and-marked-incomplete (defensive, mirrors the /changes hardening); whether keel's list serializer can ever omit it is an open Skeld question.
 
 ### Sync engine internals
 - **Concurrent-edit race on autosave**: applying server response post-push would catch normalization but risks overwriting user's mid-push edit. Today we stamp-only (eventually consistent via next pull).
@@ -565,20 +563,39 @@ When adding a new atlas-only field: append it to `ATLAS_LOCAL_EXTENSION_FIELDS`.
 
 Verified by `tests/integration/ow-client-adapter.atlasLocal.test.ts` (4 tests).
 
-### FK constraint on CREATE → server-delete routing (session 221)
+### Dangling-link routing (invalid_link → server-delete review) — v2 rewrite of the old FK routing
 
-⚠ **KEEL GAP (2026-07-12 sweep)**: the matcher below is keyed to the OLD Django/MySQL server's error text. Keel (production since 2026-07-11) returns an honest 400 with a different body on dangling-FK CREATEs, so `parseFkConstraintError` never matches and this routing is currently DEAD against production — the child lands in generic `failures` and retries without converging. Fix pending: probe keel's actual FK error shape, then add a keel matcher alongside the legacy one and update `sync-engine.fkConstraint.test.ts` with the keel case.
+Keel rejects any write referencing a nonexistent element with a STRUCTURED error: HTTP 400, `{error: {code: "invalid_link", param: "<field>", message: "<field> references <Type> '<id>' which does not exist."}}` (the /bulk non-atomic variant appends " in this world."). `parseInvalidLinkError` keys on the code and extracts the Type AND the exact dangling id **from the message itself** (gate 10.4 — never a body lookup: multi-link fields would need array disambiguation and wire/disk names differ on spatial types).
 
-HISTORY (pre-keel): the old server returned `500 (1452, 'Cannot add or update a child row: a foreign key constraint fails ... FOREIGN KEY (\`zone_id\`)...')` on a marker/pin CREATE whose FK targets an element the server doesn't have anymore. Atlas's topo-sort can't help — the peer has `server_updated_at` locally (was synced previously) and is therefore NOT in the CREATE batch.
-
-`parseFkConstraintError(err)` extracts the FK field name and the referenced element type. On match:
-1. Look up the orphan peer in the local folder by the FK value.
-2. If the peer has `server_updated_at` set, route to `server_deletes` (same UX as Bout 8 UPDATE-404 routing).
+Atlas hits this when an element references a peer (zone, map, friend) that existed server-side at some prior point (locally baselined) but was deleted out-of-band. On match:
+1. Look up the orphan peer by the message's id (`routeDanglingPeer`).
+2. If the peer has `server_updated_at` set, route to `server_deletes` review (same UX as UPDATE-404 routing).
 3. Record the child element as a `failure` with a clearer message so the user knows why it didn't land.
 
-User picks `keep + re-push` → peer re-CREATEs next round → child element succeeds. Or picks `delete locally` → orphan cleaned up. Symmetric with UPDATE-404 detection.
+**Applies to CREATE, UPDATE, and /bulk item errors alike** — keel enforces links honestly on EVERY write. (The v1-era routing was CREATE-only because v1 silently dropped dangling multi-links on update; that silent-loss class is gone.)
 
-Verified by `tests/integration/sync-engine.fkConstraint.test.ts` (3 tests).
+User picks `keep + re-push` → peer re-CREATEs next round → child element succeeds. Or picks `delete locally` → orphan cleaned up.
+
+HISTORY (pre-keel): the old server surfaced this as `500 (1452, 'foreign key constraint fails ...')` MySQL text; the old `parseFkConstraintError` matched that shape and went structurally dead at the keel cutover — the S256 sweep's one CONFIRMED break, fixed by this rewrite.
+
+Verified by `tests/integration/sync-engine.fkConstraint.test.ts` (4 tests, incl. the new UPDATE case).
+
+---
+
+## /bulk CREATE path (v2) — atomic batches close the cyclic-push class
+
+`pushPhase` routes CREATE batches of ≥2 through `POST /bulk` when the client supports it (`bulkCreate` on the OwApiClient seam): ONE atomic request, server-side fixpoint FK resolution INCLUDING CYCLES. The Sikelia class (152/196 locations in one cyclic reference web — per-element retries can never converge) lands in a single round-trip; 700 items probed fine. Route 2 merge's create phase does the same (`processBulkCreates` in make-online.ts).
+
+Protocol (gate 10.6, rollback verified live):
+- `errors: true` under atomic → NOTHING persisted server-side, even for items reporting 201. Stamp NOTHING; fail the bad items (invalid_link items get dangling-peer routing; id_conflict items self-heal by adopting the server baseline); retry the survivors ONCE atomically; then surface.
+- Timestamp backfill (gate 10.1): /bulk items return `{status, id}` with no `updated_at` — NEVER stamp client now() (clock skew = mass spurious pulls or never-pulled elements). ≤20 creates → per-element GET; larger → one cursor list-walk per pushed type. Skeld ships a per-item `updated_at` echo next keel session; delete the backfill then.
+- The Kahn topo-sort (`sortCreatesByDependencies`) survives ONLY as the fallback path's orderer (single creates + clients without bulkCreate).
+
+## /changes cursor pull (v2) — explicit delete ops replace absence inference
+
+`pullPhase` dispatches to `pullPhaseChanges` whenever the client has `pullChanges`: a cursor walk of the per-world change feed (`{cursor, changes, has_more}`, continuation via `since=`). Deletions arrive as EXPLICIT ops — the absence-inference server-delete detection (and its incomplete-list false-positive class) doesn't exist on this path. Full design + the 3-lens gate resolutions (delete-then-recreate revival, cursor/side-effect atomicity, the stop() abort latch, single-sourced timestamps, the non-advancing-cursor trap): `Forge/Notes/2026-07-12-v2-changes-pull-design.md`. The legacy full-list pull remains as the fallback and keeps the `getIncompleteListTypes` suppression guard.
+
+⚠ The /changes continuation param is **`since=`**, not `cursor=` — keel silently ignores unknown query params, so a wrong param name replays page 1 forever with has_more:true. The adapter aborts any walk whose cursor stops advancing.
 
 ---
 

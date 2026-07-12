@@ -9,7 +9,7 @@
 import type { FolderStore } from '../../src/store/folder-store';
 import { newId, nowIso } from '../../src/store/folder-store';
 import { PerIdWriteChain } from '../../src/store/write-chain';
-import { ATLAS_LOCAL_EXTENSION_FIELDS } from '../../src/core/constants';
+import { ATLAS_LOCAL_ONLY_FIELDS, ATLAS_WIRE_EXTENSION_FIELDS } from '../../src/core/constants';
 import type {
   Element,
   ElementType,
@@ -347,13 +347,19 @@ export class MockFolderStore implements FolderStore {
       this.applyFailures.delete(id); // one-shot
       throw new Error(failure);
     }
-    // Mirror FsFolderStore: preserve atlas-extension fields from existing
-    // before overlaying the server record. See FsFolderStore.applyServerRecord
-    // for the rationale (image_media_id and friends never live on server).
+    // Mirror FsFolderStore: split preserve policy (gate 10.3). LOCAL_ONLY
+    // fields always preserved (server never knows them); WIRE extension
+    // fields preserved only when the server record lacks the field (server
+    // value wins when present — v2 round-trips them).
     const existing = this.elements.get(id);
     const preserved: Record<string, unknown> = {};
     if (existing) {
-      for (const field of ATLAS_LOCAL_EXTENSION_FIELDS) {
+      for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
+        const value = (existing as Record<string, unknown>)[field];
+        if (value !== undefined) preserved[field] = value;
+      }
+      for (const field of ATLAS_WIRE_EXTENSION_FIELDS) {
+        if (field in record) continue;
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;
       }

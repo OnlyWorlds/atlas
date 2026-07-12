@@ -16,11 +16,12 @@
  */
 
 import { OnlyWorldsClient } from '@onlyworlds/sdk';
-import { OwClientAdapter } from './ow-client-adapter';
-import { devApiBase } from './dev-api-base';
+import { OwV2ClientAdapter } from './ow-v2-client-adapter';
+import { devWorldapiBase, devV2Base } from './dev-api-base';
 import type { FolderStore } from '../store/folder-store';
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import type { Element, ElementType, PerElementFailure } from '../core/types';
+import type { OwApiClient, BulkItem } from './sync-engine';
 
 const DEFAULT_OW_BASE = 'https://www.onlyworlds.com/api/worldapi';
 
@@ -34,7 +35,7 @@ export function setMakeOnlineBaseUrl(url: string): void {
 let overriddenBase: string | null = null;
 
 function getWorldsyncUrl(): string {
-  const base = overriddenBase ?? devApiBase() ?? DEFAULT_OW_BASE;
+  const base = overriddenBase ?? devWorldapiBase() ?? DEFAULT_OW_BASE;
   const worldsyncBase = base.endsWith('/worldapi') ? base.replace(/\/worldapi$/, '/worldsync') : base;
   return `${worldsyncBase}/create-world-external/`;
 }
@@ -51,6 +52,14 @@ export interface CreateApiWorldOpts {
 
 export interface CreateApiWorldResult {
   apiKey: string;
+  /**
+   * Present when the server includes them in the create response (keel does:
+   * `{success, world_id, name, version, api_key}` — probed 2026-07-12).
+   * Callers use these directly and fall back to `client.worlds.get()` only
+   * when absent.
+   */
+  worldId?: string;
+  worldName?: string;
 }
 
 /**
@@ -94,11 +103,21 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
   if (!response.ok) {
     throw new Error(`Server error ${response.status}; unable to create world`);
   }
-  const data = await response.json() as { success?: boolean; api_key?: string; message?: string };
+  const data = await response.json() as {
+    success?: boolean;
+    api_key?: string;
+    message?: string;
+    world_id?: string;
+    name?: string;
+  };
   if (!data.success || !data.api_key) {
     throw new Error(data.message ?? 'Server reported failure creating world');
   }
-  return { apiKey: data.api_key };
+  return {
+    apiKey: data.api_key,
+    ...(typeof data.world_id === 'string' && data.world_id ? { worldId: data.world_id } : {}),
+    ...(typeof data.name === 'string' && data.name ? { worldName: data.name } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +193,7 @@ export interface MergeOpts {
 
 export async function mergeLocalIntoApi(
   folder: FolderStore,
-  adapter: OwClientAdapter,
+  adapter: OwApiClient,
   policy: MergePolicy,
   optsOrProgress?: MergeOpts | ((p: MergeProgress) => void)
 ): Promise<MergeResult> {
@@ -435,8 +454,139 @@ export async function mergeLocalIntoApi(
   }
 
   // 4b-2: Process CREATEs. Re-fetched local already has the post-rewrite FKs.
-  for (const dec of createDecisions) {
-    await processDecision(dec);
+  //
+  // v2 port: batches of ≥2 go through /bulk — one atomic request with
+  // server-side fixpoint FK resolution INCLUDING CYCLES. This is the merge
+  // counterpart of the engine's bulkCreatePhase: without it, a cyclic web of
+  // local-only elements (the Sikelia class) can never fully land through
+  // Route 2 either. Client ids are preserved under v2, so no CREATE-time
+  // id-swaps occur on this path (match-phase swaps were already applied to
+  // files in 4b-1 and to bodies via applyIdSwapsToBody).
+  async function processBulkCreates(decisions: LocalDecision[], isRetry = false): Promise<void> {
+    const batch: Array<{ dec: LocalDecision; item: BulkItem }> = [];
+    for (const dec of decisions) {
+      const current = await folder.getElement(dec.local.id);
+      if (!current) {
+        done++;
+        onProgress?.({ done, total, phase: 'apply' });
+        continue;
+      }
+      const { local_updated_at: _l, server_updated_at: _s, ...rawBody } = current;
+      const body = applyIdSwapsToBody(rawBody, idSwaps);
+      batch.push({ dec, item: { type: dec.type, element: body } });
+    }
+    if (batch.length === 0) return;
+
+    let result: Awaited<ReturnType<NonNullable<OwApiClient['bulkCreate']>>>;
+    try {
+      result = await adapter.bulkCreate!(batch.map(b => b.item), {
+        atomic: true,
+        idempotencyKey: crypto.randomUUID(),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      for (const b of batch) {
+        failures.push({ element_id: b.dec.local.id, type: b.dec.type, operation: 'create', message });
+        done++;
+        onProgress?.({ done, total, phase: 'apply' });
+      }
+      return;
+    }
+
+    if (!result.errors) {
+      // Everything landed atomically. Backfill authoritative timestamps
+      // (bulk items carry no updated_at yet): small batch → per-element GET,
+      // large → one list walk per pushed type. Never stamp client now().
+      if (batch.length <= 20) {
+        for (const b of batch) {
+          const id = b.item.element.id as string;
+          try {
+            const remote = await adapter.getElement(b.dec.type, id);
+            if (!remote) throw new Error('created element missing on read-back');
+            await folder.stampServerUpdatedAt(id, b.dec.type, remote.updated_at);
+            creates++;
+          } catch (err) {
+            failures.push({
+              element_id: id, type: b.dec.type, operation: 'create',
+              message: `created but baseline backfill failed: ${err instanceof Error ? err.message : String(err)}`,
+            });
+          }
+          done++;
+          onProgress?.({ done, total, phase: 'apply' });
+        }
+      } else {
+        const byType = new Map<ElementType, Array<{ dec: LocalDecision; item: BulkItem }>>();
+        for (const b of batch) {
+          if (!byType.has(b.dec.type)) byType.set(b.dec.type, []);
+          byType.get(b.dec.type)!.push(b);
+        }
+        for (const [type, group] of byType) {
+          let remoteById = new Map<string, string>();
+          try {
+            const listed = await adapter.listElements(type);
+            remoteById = new Map(listed.map(r => [r.id, r.updated_at]));
+          } catch (err) {
+            console.warn(`[atlas:sync] merge bulk backfill list walk failed for ${type}:`, err);
+          }
+          for (const b of group) {
+            const id = b.item.element.id as string;
+            const ts = remoteById.get(id);
+            if (ts) {
+              await folder.stampServerUpdatedAt(id, type, ts);
+              creates++;
+            } else {
+              failures.push({
+                element_id: id, type, operation: 'create',
+                message: 'created but baseline backfill failed: not present in post-bulk list walk',
+              });
+            }
+            done++;
+            onProgress?.({ done, total, phase: 'apply' });
+          }
+        }
+      }
+      return;
+    }
+
+    // errors: true under atomic → server rolled EVERYTHING back. Fail the bad
+    // items, retry the survivors once.
+    const survivors: LocalDecision[] = [];
+    result.items.forEach((it, i) => {
+      const b = batch[i];
+      if (!b) return;
+      if (it.status < 400) {
+        survivors.push(b.dec);
+        return;
+      }
+      failures.push({
+        element_id: b.dec.local.id,
+        type: b.dec.type,
+        operation: 'create',
+        message: it.error?.message || 'bulk item failed',
+      });
+      done++;
+      onProgress?.({ done, total, phase: 'apply' });
+    });
+    if (isRetry || survivors.length === 0) {
+      for (const s of survivors) {
+        failures.push({
+          element_id: s.local.id, type: s.type, operation: 'create',
+          message: 'rolled back by failing peers in the atomic batch; retry exhausted',
+        });
+        done++;
+        onProgress?.({ done, total, phase: 'apply' });
+      }
+      return;
+    }
+    await processBulkCreates(survivors, /* isRetry */ true);
+  }
+
+  if (typeof adapter.bulkCreate === 'function' && createDecisions.length >= 2) {
+    await processBulkCreates(createDecisions);
+  } else {
+    for (const dec of createDecisions) {
+      await processDecision(dec);
+    }
   }
 
   // 4b-3: Rewrite again — picks up any CREATE-time server-assigned ids so the
@@ -551,13 +701,32 @@ async function rewriteIdReferences(folder: FolderStore, idMap: Map<string, strin
 }
 
 // ---------------------------------------------------------------------------
-// Helper to construct a client for a given (apiKey, pin) pair.
+// Client builders (gate 10.7 split).
+//
+//   buildOwClient   — v1 SDK client, VALIDATION ONLY (`client.worlds.get()`
+//                     has no v2 equivalent yet). Never used for element CRUD.
+//   buildV2Adapter  — the thin v2 fetch adapter carrying all element CRUD,
+//                     /bulk, and /changes.
 // ---------------------------------------------------------------------------
 
 export function buildOwClient(apiKey: string, apiPin: string, baseUrl?: string): OnlyWorldsClient {
   return new OnlyWorldsClient({
     apiKey: apiKey.trim(),
     apiPin: apiPin.trim(),
-    baseUrl: baseUrl ?? overriddenBase ?? devApiBase() ?? undefined,
+    baseUrl: baseUrl ?? overriddenBase ?? devWorldapiBase() ?? undefined,
+  });
+}
+
+export function buildV2Adapter(apiKey: string, apiPin: string, baseUrl?: string): OwV2ClientAdapter {
+  // Test seam compat: `setMakeOnlineBaseUrl` stores a v1-worldapi-shaped base;
+  // derive the /api/v2 sibling from its origin so MSW/staging overrides steer
+  // both dialects together.
+  const overriddenV2 = overriddenBase
+    ? overriddenBase.replace(/\/api\/(worldapi|worldsync|v2)$/, '') + '/api/v2'
+    : null;
+  return new OwV2ClientAdapter({
+    apiKey,
+    apiPin,
+    baseUrl: baseUrl ?? overriddenV2 ?? devV2Base() ?? undefined,
   });
 }

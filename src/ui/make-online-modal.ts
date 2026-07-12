@@ -29,11 +29,11 @@ import { completeWaypoint } from '../core/waypoints';
 import { getActiveStore } from '../core/active-store';
 import { attachSyncEngine, detachSyncEngine, applyIdSwapToUi } from '../sync/sync-attach';
 import { SyncEngine } from '../sync/sync-engine';
-import { OwClientAdapter } from '../sync/ow-client-adapter';
 import {
   createApiWorld,
   mergeLocalIntoApi,
   buildOwClient,
+  buildV2Adapter,
   type MergePolicy,
   type MergeProgress,
 } from '../sync/make-online';
@@ -255,15 +255,20 @@ export class MakeOnlineModal extends BaseModal {
       // 1. Create new api world (server-side).
       progressBox.textContent = 'Creating world on onlyworlds.com…';
       progressBox.hidden = false;
-      const { apiKey } = await createApiWorld({ name, email, pin });
+      const created = await createApiWorld({ name, email, pin });
+      const apiKey = created.apiKey;
 
-      // 2. Build a client + adapter for the new api world.
-      const client = buildOwClient(apiKey, pin);
-      const adapter = new OwClientAdapter(client);
+      // 2. Build the v2 adapter for element CRUD (gate 10.7: the SDK client
+      //    exists only for the worlds.get fallback below).
+      const adapter = buildV2Adapter(apiKey, pin);
 
-      // 3. Find the new world's server-side id via client.worlds.get().
-      progressBox.textContent = 'Reading new world ID…';
-      const world = await client.worlds.get() as { id?: string; name?: string };
+      // 3. World id + name come straight from the create response (keel
+      //    includes them); fall back to the v1 worlds.get only when absent.
+      let world: { id?: string; name?: string } = { id: created.worldId, name: created.worldName };
+      if (!world.id) {
+        progressBox.textContent = 'Reading new world ID…';
+        world = await buildOwClient(apiKey, pin).worlds.get() as { id?: string; name?: string };
+      }
       if (!world.id) throw new Error('Server did not return a world ID');
 
       // 3b. Block double-link: refuse to link if another local world in this
@@ -411,8 +416,9 @@ export class MakeOnlineModal extends BaseModal {
         throw new Error(`This API world is already linked to "${dupe0.name}" locally. Unlink it first or open it from the sidebar.`);
       }
 
-      // 2. Run the merge.
-      const adapter = new OwClientAdapter(client);
+      // 2. Run the merge through the v2 adapter (worlds.get above stays the
+      //    v1 validation call — gate 10.7 split).
+      const adapter = buildV2Adapter(apiKey, pin);
       detachSyncEngine();
       const folder = getActiveStore()!;
       const renderProgress = (p: MergeProgress) => {

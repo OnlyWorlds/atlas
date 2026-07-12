@@ -15,9 +15,8 @@
  * we log + skip engine creation; the UI surfaces this via the pill state.
  */
 
-import { OnlyWorldsClient } from '@onlyworlds/sdk';
-import { OwClientAdapter } from './ow-client-adapter';
-import { devApiBase } from './dev-api-base';
+import { OwV2ClientAdapter } from './ow-v2-client-adapter';
+import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
 import { patchSlice, getState, setState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
@@ -67,12 +66,14 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
     return null;
   }
 
-  const client = new OnlyWorldsClient({
+  // v2 port: the engine talks the keel v2 dialect through the thin fetch
+  // adapter — no SDK client in the sync path (the SDK survives only for
+  // worlds.get validation at the link/settings surfaces, gate 10.7).
+  const adapter = new OwV2ClientAdapter({
     apiKey: entry.api.api_key,
     apiPin: pin,
-    baseUrl: devApiBase() ?? undefined,
+    baseUrl: devV2Base() ?? undefined,
   });
-  const adapter = new OwClientAdapter(client);
   const engine = new SyncEngine({
     folder,
     client: adapter,

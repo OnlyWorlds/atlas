@@ -34,8 +34,7 @@ import { newId } from '../store/folder-store';
 import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-utils';
 import { getActiveStore, setActiveStore } from '../core/active-store';
 import { attachSyncEngine, refreshElementsAfterWrite } from '../sync/sync-attach';
-import { OnlyWorldsClient } from '@onlyworlds/sdk';
-import { OwClientAdapter } from '../sync/ow-client-adapter';
+import { buildOwClient, buildV2Adapter } from '../sync/make-online';
 import { initialDownloadAll, type InitialDownloadProgress } from '../sync/initial-download';
 import { applyImportPlan, type ApplyProgress, type ApplyResult } from '../import/apply-import-plan';
 import type { ImportPlan } from '../import/types';
@@ -548,8 +547,9 @@ export async function linkExistingApiWorldInRoot(
   if (!apiKey) throw new Error('API key is required');
   if (!apiPin) throw new Error('PIN is required');
 
-  // Validate creds. The SDK throws "API Error NNN: ..." on auth/network failure.
-  const client = new OnlyWorldsClient({ apiKey, apiPin });
+  // Validate creds via the v1 worlds.get (gate 10.7: validation-only lane;
+  // no v2 equivalent yet). The SDK throws "API Error NNN: ..." on failure.
+  const client = buildOwClient(apiKey, apiPin);
   let world: { id?: string; name?: string };
   try {
     world = await client.worlds.get();
@@ -618,8 +618,9 @@ export async function linkExistingApiWorldInRoot(
     },
   });
 
-  // Initial download — all elements of all types stamped with `server_updated_at`.
-  const adapter = new OwClientAdapter(client);
+  // Initial download — all elements of all types stamped with
+  // `server_updated_at`, fetched over the v2 dialect.
+  const adapter = buildV2Adapter(apiKey, apiPin);
   const downloadResult = await initialDownloadAll(store, adapter, opts.onProgress);
 
   // Register the world in registry. Persist PIN globally if not set yet.

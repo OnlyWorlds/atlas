@@ -378,11 +378,13 @@ Push triggers are unchanged — autosave debounce is the only push trigger; user
 
 ## UUIDs
 
-**Local creates use `crypto.randomUUID()` (v4). The OW server assigns its OWN UUID v7 on CREATE, overriding the client id** — this superseded the original "server accepts client ids" assumption (verified live; see SYNC_NOTES "Server-assigned ids").
+**Local creates use `crypto.randomUUID()` (v4), and keel PRESERVES client ids** (v1 and v2, probed live 2026-07-12): the id atlas mints locally is the id server-side, forever. Duplicate POST → 409 `id_conflict`; v2 `PUT /{type}/{id}` is create-or-replace upsert; any RFC-4122 UUID is first-class.
 
 Consequences:
-- Every CREATE-push path runs the **id-swap**: re-key the local file to the server's id, rewrite FK references across all other local elements (`rewriteIdReferences`), silently delete the old file (no tombstone — the server never had the old id), and propagate to UI state + URL via `onIdSwap` → `handleIdSwap` (selection, `/element`, `/map`, `/knowledge`, `/knowledge/knower` routes).
-- Locally (offline / local-only), client v4 ids work indefinitely — the swap only happens at first push.
+- The **id-swap machinery is DORMANT** (`response.id !== current.id` never fires against keel). It stays in-tree dead-but-safe — `rewriteIdReferences`, `onIdSwap` → `handleIdSwap` UI propagation, the merge-phase bookkeeping — until v2 id-preservation has production mileage; excision is a named cleanup bout. Match-phase swaps in Route 2 (name+type match with DIFFERENT ids) are still real and still use this machinery.
+- Locally (offline / local-only), client v4 ids work indefinitely and survive Make-Online unchanged.
+
+HISTORY: the pre-keel Django server assigned its own UUID v7 on CREATE, which is why the swap machinery exists (SYNC_NOTES "Server-assigned ids").
 
 **Implications for Make-Online Route 2** (link to existing api world): name+type matching is the primary match key (elements created independently on different machines have different UUIDs); ID matching catches re-uploads from the same machine cleanly.
 
@@ -661,7 +663,7 @@ interface SyncSummaryState {
 The `state.sync` slice is populated by `attachSyncEngine(entry, folder)` (singleton in `src/sync/sync-attach.ts`). The helper:
 
 1. No-ops for `local-only` worlds (and detaches any prior engine).
-2. For `api-linked` worlds: constructs `OnlyWorldsClient` from `entry.api.api_key` + `registry.pin`, wraps in `OwClientAdapter`, instantiates `SyncEngine`, wires `onStateChange → patchSlice('sync', ...)`.
+2. For `api-linked` worlds: constructs `OwV2ClientAdapter` from `entry.api.api_key` + `registry.pin` (thin fetch, keel v2 dialect — no SDK in the sync path), instantiates `SyncEngine`, wires `onStateChange → patchSlice('sync', ...)`.
 3. Detaches the previous world's engine on switch — at most one active at a time.
 4. Exposed: `getCurrentSyncEngine()` for autosave callers, `requestPushIfLinked()` as a fire-and-forget convenience.
 
@@ -744,7 +746,7 @@ Inherited from legacy (hard-won; preserve in new code):
 5. **SDK-shape-agnostic relationships** — scan all array fields whose items have `id`; don't hardcode `_ids` suffix detection (SDK may rewrite field names).
 6. **Acronym-aware field labels** — `humanizeFieldName('image_url')` → `Image URL` via ACRONYMS set (URL, ID, API, UI, IP, HTML, HTTP, DNS, UUID, SDK, PIN, GPS).
 7. **ui-prefs vs URL state** — UX preferences in localStorage; navigation state in URL hash. Don't conflate.
-8. **Pin write SDK bypass** — `prepareRelations` mis-handles `element_id` (would convert to `element_id_id`). Use `client.request('POST'|'PATCH', '/pin/...')` directly with the wire-shape body.
+8. **Spatial disk↔wire rename lives in the adapter, schema-derived** — atlas stores pin/marker with `map_id`/`zone_id` on disk; the v2 wire uses bare `map`/`zone` (pin's `element_id`/`element_type` ARE the schema names). `OwV2ClientAdapter` derives the rename table from `FIELD_SCHEMA` via `relationFieldsFor` — never hardcode it. (HISTORY: this convention was born as the v1 "pin write SDK bypass" — `prepareRelations` would double-suffix `element_id` to `element_id_id`. The SDK no longer touches element CRUD.)
 9. **CSS class + data-active for visibility** — never inline `display: none` toggled by JS. Use opacity transition on a class. Debug-hostile otherwise.
 10. **Pane scroll preservation** — module-level `Map<contentId, scrollTop>`; capture before re-render via data attribute; restore via queueMicrotask.
 
@@ -767,7 +769,7 @@ Inherited from legacy (hard-won; preserve in new code):
 
 22. **Auth failure bails the round + transitions to `error` state.** When push or pull encounters 401/403 (PIN changed, api_key revoked, world deleted server-side — all surface the same way), the engine MUST: (a) stop iterating immediately, since every subsequent op would fail the same way against the dead key; (b) set `paused = true` so the autosave debounce no longer fires against the dead endpoint; (c) transition state to `{kind: 'error', message: 'authentication failed...', recoverable: true}` so the pill goes red. The `SyncResult.auth_blocked` flag tells `sync-attach` to emit a dedicated toast instead of the generic "couldn't sync N change(s)" message. Recovery is a fresh engine — changing PIN in settings calls `attachSyncEngine` which constructs a new `SyncEngine` instance (the error state doesn't bleed across instances). Without this convention, an auth-failed push round still set state to `idle`, the pill went "saving → synced," and the user thought everything was fine while changes silently failed (the "lying pill" class). Verified by `tests/integration/sync-engine.authBlocked.test.ts`.
 
-23. **CREATEs push in FK dependency order.** `pushPhase` topologically sorts the never-synced batch before iterating: an element whose FK fields reference another element in the same batch goes AFTER its dependencies. Without this, Make-Online-Route-1 (or any first push of a chained local world) produces real-OW `400 Invalid FK: <field> — referenced X with id 'Y' does not exist` when the dependent fires first. The chain self-heals via the next round's `rewriteIdReferences`, but the console noise is alarming and convergence takes the autosave window (~5s) to settle. Topo-sort (Kahn's algorithm, scanning every string + string-array field for matches against other batch members — schema-agnostic) eliminates the class. Genuine cycles (A references B AND B references A) fall back to input order and self-heal as before; that's a rare data shape and the safety remains intact. Verified by `tests/integration/sync-engine.createOrder.test.ts`.
+23. **CREATE batches go through `/bulk` — one atomic request, server-resolved order, cycles included.** `pushPhase` (and Route 2 merge) routes never-synced batches of ≥2 through `POST /bulk`: keel resolves in-batch FK order as a fixpoint, so cyclic reference webs (the Sikelia class — impossible for any per-element loop to converge) land in a single round-trip. Protocol: atomic + one retry of the survivors on partial failure + timestamp backfill (never client now()); see SYNC_NOTES "/bulk CREATE path". The Kahn topo-sort (`sortCreatesByDependencies`, schema-agnostic field scanning) survives ONLY as the fallback orderer for clients without `bulkCreate`. Verified by `tests/integration/sync-engine.bulkPush.test.ts` + `sync-engine.createOrder.test.ts` (fallback).
 
 24. **Unlink severs the sync history — `FolderStore.resetSyncBaseline()` is non-optional.** When the user unlinks from an api world, the folder is conceptually no longer associated with that api world. Every shred of sync metadata must be invalidated: every element's `server_updated_at`, every pending tombstone, the `sync-state.json` last_*_at + conflicts + server_deletes, and `world.json.api`. Without this, lingering baselines from the deleted api world make a subsequent Make-Online Route 1 treat every element as an UPDATE against the new world — pre-update GETs 404 → all routed to server_deletes → the new world appears online but empty. The settings unlink handler calls `resetSyncBaseline()` AFTER `detachSyncEngine()` (so no in-flight round mutates files mid-reset) and BEFORE the registry write (so the world flips to local-only with a clean folder). Verified by `tests/integration/folder-store.resetSyncBaseline.test.ts`. Note: `Forget World` is DIFFERENT — it removes the registry entry but doesn't touch the folder; reopening that folder later re-imports with its existing sync history intact.
 

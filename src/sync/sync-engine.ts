@@ -20,14 +20,41 @@ import type {
   SyncResult,
 } from '../core/types';
 
-// ---- Adapter shape: the minimum we need from the OW SDK ----
+// ---- Adapter shape: the minimum the engine needs from the API client ----
+
+/** One /bulk item: an element in DISK shape; the adapter wire-converts. */
+export interface BulkItem {
+  type: ElementType;
+  element: Record<string, unknown>;
+}
+
+/** /bulk response, positional with the input items. */
+export interface BulkResult {
+  /** True when ANY item failed. Under atomic mode: NOTHING was persisted. */
+  errors: boolean;
+  items: Array<{
+    status: number;
+    id: string;
+    error?: { code: string; message: string; param: string | null };
+  }>;
+}
+
+/** One page of the /changes feed (ops in commit order, adapted to disk shape). */
+export interface ChangesPage {
+  cursor: string | null;
+  hasMore: boolean;
+  changes: Array<
+    | { op: 'upsert'; type: ElementType; id: string; changeSeq: number; updatedAt: string; element: { id: string; updated_at: string } & Record<string, unknown> }
+    | { op: 'delete'; type: ElementType; id: string; changeSeq: number; deletedAt: string }
+  >;
+}
 
 /**
- * Subset of the OW SDK / client surface the engine needs.
+ * Subset of the API client surface the engine needs.
  *
- * We don't import the SDK directly so tests can inject a thin client that
- * mirrors only the methods exercised. In production this is satisfied by a
- * thin adapter wrapping `OnlyWorldsClient`.
+ * We don't import the adapter directly so tests can inject a thin client that
+ * mirrors only the methods exercised. In production this is satisfied by
+ * `OwV2ClientAdapter` (thin fetch, keel v2 dialect).
  */
 export interface OwApiClient {
   createElement(type: ElementType, body: Record<string, unknown>): Promise<{ id: string; updated_at: string } & Record<string, unknown>>;
@@ -37,14 +64,34 @@ export interface OwApiClient {
   /** Fetch single element. Used by SyncEngine pre-update conflict check. */
   getElement(type: ElementType, id: string): Promise<({ id: string; updated_at: string } & Record<string, unknown>) | null>;
   /**
-   * Optional: report which element types were paginated on their most recent
-   * listElements() call (i.e., the server reported more records than this page
-   * returned). The engine uses this to suppress server-delete detection for
-   * those types — without the guard, page-2 elements would be falsely flagged
-   * as "vanished from server" and the user would be prompted to delete them.
+   * Optional: atomic multi-element create with server-side FK-order resolution
+   * (cycles included) — keel v2 `/bulk`. When present, pushPhase routes CREATE
+   * batches of ≥2 through it (the cyclic-Make-Online fix); when absent, the
+   * engine falls back to the per-element topo-sorted loop.
+   */
+  bulkCreate?(items: BulkItem[], opts?: { atomic?: boolean; idempotencyKey?: string }): Promise<BulkResult>;
+  /**
+   * Optional: one page of the per-world change feed — keel v2 `/changes`.
+   * When present, pullPhase uses cursor-delta pull with EXPLICIT delete ops
+   * instead of full-list absence inference. `since` is the opaque cursor from
+   * the previous page (null = from the world's epoch).
+   */
+  pullChanges?(since: string | null, limit?: number): Promise<ChangesPage>;
+  /**
+   * Optional: report which element types' most recent listElements() walk may
+   * be INCOMPLETE (cursor walk aborted / capped / not advancing). The engine
+   * suppresses server-delete detection for those types — an incomplete
+   * seenLocalIds would falsely flag unfetched elements as "vanished from
+   * server" and prompt a destructive local delete (gate 10.5: this backstop
+   * survives the v2 port; only its trigger changed from offset pagination to
+   * cursor-walk incompleteness).
    *
    * Implementations that always return the full set (test fakes) can omit this.
+   * `getPaginatedTypes` is the legacy name for the same contract; the engine
+   * consults both.
    */
+  getIncompleteListTypes?(): ReadonlySet<ElementType>;
+  /** @deprecated legacy name for getIncompleteListTypes — still consulted. */
   getPaginatedTypes?(): ReadonlySet<ElementType>;
 }
 
@@ -134,6 +181,25 @@ export class SyncEngine {
   private pauseReason: 'manual' | 'network' | null = null;
   /** In-flight syncNow promise. Concurrent calls await the same result. */
   private inFlight: Promise<SyncResult> | null = null;
+  /**
+   * What the in-flight promise IS (push/pull/sync). Lets `requestPush`'s
+   * debounce re-arm behind an unrelated in-flight PULL instead of silently
+   * losing the trigger — the shared inFlight lock returns the pull's promise
+   * to pushOnce, and long v2 /changes walks widened that lost-trigger window
+   * from milliseconds to whole seconds (gate finding, 2026-07-12).
+   */
+  private inFlightKind: 'push' | 'pull' | 'sync' | null = null;
+  /**
+   * Set by stop() (detach/unlink). An in-flight pull round checks this before
+   * every local write AND before its terminal sync-state persist — without
+   * the check, a walk that outlives detachSyncEngine re-stamps baselines that
+   * resetSyncBaseline just cleared and resurrects the cleared changes_cursor,
+   * which a later re-link to a DIFFERENT world would inherit (silently
+   * skipping that world's history below the stale watermark). Gate finding,
+   * 2026-07-12. Engines are never restarted after stop() — a fresh engine is
+   * built per attach — so this latch never needs resetting.
+   */
+  private stopped = false;
   /** Debounce timer for `requestPush()` autosave. Reset on each write. */
   private debouncePushTimer: ReturnType<typeof setTimeout> | null = null;
   /** Debounce window for autosave pushes. ms. Configurable via setDebounceMs. */
@@ -253,6 +319,17 @@ export class SyncEngine {
     this.debouncePushTimer = setTimeout(() => {
       this.debouncePushTimer = null;
       this.setPendingPush(null);
+      // If a PULL is in flight, calling pushOnce now would return the pull's
+      // promise via the shared inFlight lock and the push would silently
+      // never run (the debounce timer is already consumed). Re-arm behind
+      // the in-flight round instead of dropping the user's edit trigger.
+      if (this.inFlight && this.inFlightKind === 'pull') {
+        console.info('[atlas:sync] debounce fired during in-flight pull — re-arming push behind it');
+        void this.inFlight.finally(() => {
+          if (!this.paused) this.requestPush();
+        });
+        return;
+      }
       console.info('[atlas:sync] debounce fired → pushOnce');
       void this.pushOnce().then(r => {
         console.info('[atlas:sync] push complete', {
@@ -302,6 +379,11 @@ export class SyncEngine {
    * Cancel the pending debounce timer and fire `pushOnce()` immediately.
    * The sync pill calls this when the user clicks during a pending window
    * ("push now, don't wait"). No-op if no debounce is armed or while paused.
+   *
+   * Same lost-trigger guard as `requestPush` (close-gate finding): when a
+   * PULL is in flight, a bare pushOnce() would return the pull's promise via
+   * the shared inFlight lock and the user's explicit "push now" would
+   * silently do nothing — chain the push behind the pull instead.
    */
   flushPendingPush(): Promise<SyncResult> | null {
     if (this.paused) return null;
@@ -309,6 +391,14 @@ export class SyncEngine {
     clearTimeout(this.debouncePushTimer);
     this.debouncePushTimer = null;
     this.setPendingPush(null);
+    if (this.inFlight && this.inFlightKind === 'pull') {
+      console.info('[atlas:sync] flush-pending-push during in-flight pull — chaining push behind it');
+      const chained = this.inFlight.then(() => {
+        if (this.paused) return emptyResult();
+        return this.pushOnce();
+      });
+      return chained;
+    }
     return this.pushOnce();
   }
 
@@ -330,7 +420,8 @@ export class SyncEngine {
     } catch { /* document not available in some test environments */ }
   }
 
-  /** Stop the engine: cancel pending debounced push, pause. Used on detach. */
+  /** Stop the engine: cancel pending debounced push, pause, and flag any
+   *  in-flight round to abort its writes + terminal persist. Used on detach. */
   stop(): void {
     if (this.debouncePushTimer) {
       clearTimeout(this.debouncePushTimer);
@@ -339,6 +430,7 @@ export class SyncEngine {
     this.setPendingPush(null);
     this.paused = true;
     this.pauseReason = 'manual';
+    this.stopped = true;
   }
 
   /**
@@ -476,8 +568,10 @@ export class SyncEngine {
    */
   syncNow(): Promise<SyncResult> {
     if (this.inFlight) return this.inFlight;
+    this.inFlightKind = 'sync';
     this.inFlight = this.runSync().finally(() => {
       this.inFlight = null;
+      this.inFlightKind = null;
     });
     return this.inFlight;
   }
@@ -490,8 +584,10 @@ export class SyncEngine {
    */
   pushOnce(): Promise<SyncResult> {
     if (this.inFlight) return this.inFlight;
+    this.inFlightKind = 'push';
     this.inFlight = this.runPushOnly().finally(() => {
       this.inFlight = null;
+      this.inFlightKind = null;
     });
     return this.inFlight;
   }
@@ -507,8 +603,10 @@ export class SyncEngine {
    */
   pullNow(): Promise<SyncResult> {
     if (this.inFlight) return this.inFlight;
+    this.inFlightKind = 'pull';
     this.inFlight = this.runPullOnly().finally(() => {
       this.inFlight = null;
+      this.inFlightKind = null;
     });
     return this.inFlight;
   }
@@ -622,13 +720,16 @@ export class SyncEngine {
   }
 
   /**
+   * FALLBACK-PATH ONLY since the v2 port: CREATE batches of ≥2 go through
+   * `/bulk` (server-side fixpoint ordering, cycles included) when the client
+   * supports it. This topo-sort orders the per-element loop used when
+   * bulkCreate is unavailable (legacy fakes, degraded clients).
+   *
    * Order CREATE candidates so each element's FK dependencies are pushed
-   * BEFORE the element itself. Without this ordering, real OW returns
-   * `400 Invalid FK: <field> — referenced X with id 'Y' does not exist` for
-   * elements pushed before their references — which then get retried on the
-   * next round after `rewriteIdReferences` propagates id-swaps. Topo-sort
-   * eliminates that ping-pong: dependencies go first, references resolve
-   * within the same round.
+   * BEFORE the element itself. Without this ordering, the server returns a
+   * dangling-link 400 for elements pushed before their references — which
+   * then get retried on the next round. Topo-sort eliminates that ping-pong:
+   * dependencies go first, references resolve within the same round.
    *
    * Builds the graph by scanning every string + string-array field on each
    * candidate; any value matching another candidate's id becomes a dep edge.
@@ -755,28 +856,277 @@ export class SyncEngine {
 
   // ---- Phases ----
 
+  /**
+   * Route a dangling-link error's missing PEER to the server-delete review
+   * modal — but only when the peer exists locally with a server baseline
+   * (it was synced once; the server lost it out-of-band). Returns true when
+   * routed. Shared by the per-element catch and the /bulk item-error path.
+   */
+  private async routeDanglingPeer(
+    parsed: { field: string; refType: string; refId: string },
+    child: { id: string; type: ElementType },
+    serverDeletesDetected: import('../core/types').ServerDeleteRecord[]
+  ): Promise<boolean> {
+    const peer = await this.folder.getElement(parsed.refId);
+    if (peer && peer.server_updated_at) {
+      if (!serverDeletesDetected.some(d => d.id === peer.id)) {
+        serverDeletesDetected.push({
+          id: peer.id,
+          type: peer.type,
+          detected_at: nowIso(),
+          name: peer.name,
+        });
+      }
+      console.warn('[atlas:sync] dangling link — peer was deleted server-side; routing peer to server-delete review', {
+        child_id: child.id, child_type: child.type,
+        peer_id: peer.id, peer_type: peer.type,
+        fk_field: parsed.field,
+      });
+      return true;
+    }
+    console.warn('[atlas:sync] dangling link but could not resolve missing peer locally', {
+      id: child.id, type: child.type, fk_field: parsed.field, ref_id: parsed.refId,
+    });
+    return false;
+  }
+
+  /**
+   * Push all never-synced elements through `/bulk` in ONE atomic request.
+   * The server resolves in-batch FK order — cycles included — so no client
+   * ordering is needed and the cyclic-Make-Online class is closed for good.
+   *
+   * Failure protocol (gate 10.6, verified live: atomic rollback is real):
+   *   - `errors: true` under atomic → NOTHING persisted server-side, even for
+   *     items reporting 201 ("would have succeeded"). Stamp NOTHING.
+   *   - Failed items → per-element failures (+ dangling-peer routing for
+   *     invalid_link items); surviving items retried ONCE atomically.
+   *   - A thrown auth error bails the round like everywhere else.
+   *
+   * Timestamp backfill (gate 10.1): /bulk items return `{status, id}` with no
+   * `updated_at` (Skeld ships the echo next keel session — delete this then).
+   * NEVER stamp client now(): clock skew yields mass spurious pulls or
+   * silently-never-pulled elements. Small batches → per-element GET; large
+   * batches (Make-Online scale) → one cursor list-walk per pushed type.
+   */
+  private async bulkCreatePhase(
+    candidates: Element[],
+    failures: PerElementFailure[],
+    serverDeletesDetected: import('../core/types').ServerDeleteRecord[],
+    onItemDone: () => void,
+    isRetry = false
+  ): Promise<{ created: number; authBlocked: boolean }> {
+    // Re-fetch each candidate from disk (freshness) + pin element_type
+    // self-heal, mirroring the per-element loop's pre-send discipline.
+    const items: BulkItem[] = [];
+    for (const elem of candidates) {
+      let current = await this.folder.getElement(elem.id);
+      if (!current) { onItemDone(); continue; }
+      if (
+        current.type === 'pin' &&
+        typeof current.element_id === 'string' &&
+        !current.element_type
+      ) {
+        const pinned = await this.folder.getElement(current.element_id);
+        if (pinned) {
+          current = await this.folder.updateElement(current.id, { element_type: pinned.type });
+          console.info('[atlas:sync] self-healed pin missing element_type', {
+            pinId: current.id, elementType: pinned.type,
+          });
+        }
+      }
+      items.push({ type: current.type, element: stripSyncFields(current) });
+    }
+    if (items.length === 0 || this.stopped) return { created: 0, authBlocked: false };
+
+    console.info(`[atlas:sync] bulk CREATE ${items.length} element(s)${isRetry ? ' (retry)' : ''}`);
+    let result: BulkResult;
+    try {
+      result = await this.client.bulkCreate!(items, {
+        atomic: true,
+        idempotencyKey: crypto.randomUUID(),
+      });
+    } catch (err) {
+      const auth = isAuthError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      for (const it of items) {
+        failures.push({
+          element_id: it.element.id as string,
+          type: it.type,
+          operation: 'create',
+          message,
+        });
+        onItemDone();
+      }
+      if (auth) {
+        console.warn('[atlas:sync] bulk CREATE hit auth error — bailing round', { message });
+      } else {
+        console.warn('[atlas:sync] bulk CREATE request failed', { message });
+      }
+      return { created: 0, authBlocked: auth };
+    }
+
+    if (!result.errors) {
+      // Everything landed. Backfill authoritative server timestamps.
+      const stamped = await this.backfillBulkTimestamps(items, failures);
+      for (const _ of items) onItemDone();
+      return { created: stamped, authBlocked: false };
+    }
+
+    // errors: true under atomic → server rolled EVERYTHING back. Split by
+    // per-item status (positional with input), fail the bad ones, retry the
+    // survivors once.
+    const failedIdx = new Set<number>();
+    result.items.forEach((it, i) => { if (it.status >= 400) failedIdx.add(i); });
+    const survivors: Element[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const res = result.items[i];
+      if (!failedIdx.has(i)) {
+        const local = candidates.find(c => c.id === item.element.id);
+        if (local) survivors.push(local);
+        continue;
+      }
+      const errObj = res?.error ?? { code: 'unknown', message: 'bulk item failed', param: null };
+      // id_conflict item: already on the server (prior backfill miss). Adopt
+      // the baseline instead of failing — same self-heal as the POST path;
+      // without it the bulk batch re-fails this item every round forever.
+      if (errObj.code === 'id_conflict') {
+        const id = item.element.id as string;
+        const remote = await this.client.getElement(item.type, id).catch(() => null);
+        if (remote) {
+          await this.folder.stampServerUpdatedAt(id, item.type, remote.updated_at);
+          console.info('[atlas:sync] bulk item id_conflict — element already on server; baseline adopted', {
+            id, type: item.type,
+          });
+          onItemDone();
+          continue;
+        }
+      }
+      const parsed = parseInvalidLinkItem(errObj);
+      let routed = false;
+      if (parsed) {
+        routed = await this.routeDanglingPeer(
+          parsed,
+          { id: item.element.id as string, type: item.type },
+          serverDeletesDetected
+        );
+      }
+      failures.push({
+        element_id: item.element.id as string,
+        type: item.type,
+        operation: 'create',
+        message: parsed
+          ? (routed
+              ? `referenced ${parsed.refType} was deleted on the server; review in sync panel`
+              : `referenced ${parsed.refType} not found on the server`)
+          : errObj.message || 'bulk item failed',
+      });
+      onItemDone();
+    }
+
+    if (isRetry || survivors.length === 0) {
+      // Retry exhausted (or nothing survived): the survivors of THIS attempt
+      // were rolled back and get surfaced as failures rather than retried
+      // again — one retry is the protocol, not a loop.
+      for (const s of survivors) {
+        failures.push({
+          element_id: s.id,
+          type: s.type,
+          operation: 'create',
+          message: 'rolled back by failing peers in the atomic batch; retry exhausted',
+        });
+        onItemDone();
+      }
+      return { created: 0, authBlocked: false };
+    }
+
+    console.info(`[atlas:sync] bulk CREATE retrying ${survivors.length} survivor(s) after atomic rollback`);
+    return this.bulkCreatePhase(survivors, failures, serverDeletesDetected, onItemDone, /* isRetry */ true);
+  }
+
+  /**
+   * Post-bulk timestamp backfill: fetch the server's authoritative
+   * `updated_at` for every created element and stamp the local baseline.
+   * ≤20 elements → per-element GET; larger → one list walk per pushed type.
+   * Returns the count successfully stamped; misses become failures (they'll
+   * re-push next round — CREATE turns into 409/id_conflict territory, which
+   * surfaces loudly rather than silently corrupting baselines).
+   */
+  private async backfillBulkTimestamps(
+    items: BulkItem[],
+    failures: PerElementFailure[]
+  ): Promise<number> {
+    let stamped = 0;
+    if (items.length <= 20) {
+      for (const it of items) {
+        if (this.stopped) break; // detach/unlink — never stamp past a reset
+        const id = it.element.id as string;
+        try {
+          const remote = await this.client.getElement(it.type, id);
+          if (!remote) throw new Error('created element missing on read-back');
+          await this.folder.stampServerUpdatedAt(id, it.type, remote.updated_at);
+          stamped++;
+        } catch (err) {
+          failures.push({
+            element_id: id, type: it.type, operation: 'create',
+            message: `created but baseline backfill failed: ${err instanceof Error ? err.message : String(err)}`,
+          });
+        }
+      }
+      return stamped;
+    }
+    const byType = new Map<ElementType, BulkItem[]>();
+    for (const it of items) {
+      if (!byType.has(it.type)) byType.set(it.type, []);
+      byType.get(it.type)!.push(it);
+    }
+    for (const [type, group] of byType) {
+      let remoteById = new Map<string, string>();
+      try {
+        const listed = await this.client.listElements(type);
+        remoteById = new Map(listed.map(r => [r.id, r.updated_at]));
+      } catch (err) {
+        console.warn(`[atlas:sync] bulk backfill list walk failed for ${type}:`, err);
+      }
+      for (const it of group) {
+        if (this.stopped) break; // detach/unlink — never stamp past a reset
+        const id = it.element.id as string;
+        const ts = remoteById.get(id);
+        if (ts) {
+          await this.folder.stampServerUpdatedAt(id, type, ts);
+          stamped++;
+        } else {
+          failures.push({
+            element_id: id, type, operation: 'create',
+            message: 'created but baseline backfill failed: not present in post-bulk list walk',
+          });
+        }
+      }
+    }
+    return stamped;
+  }
+
   private async pushPhase(): Promise<SyncResult> {
     const allChanged = await this.folder.listLocallyChangedSince(null);
     const tombstones = await this.folder.listTombstonesSince(null);
-    // Partition: CREATEs (never-synced) before UPDATEs. New elements MUST land
-    // server-side before any UPDATE references them as a foreign key — otherwise
-    // server 400s with "Invalid FK: referenced X with id ... does not exist".
-    // This handles the common chain: create Location locally → set character's
-    // birthplace = newLoc → push: Location lands, then Character update succeeds.
-    // Sort the CREATEs by FK dependency: if Character.birthplace references
-    // Location, push Location first. Without this, the wrong order produces
-    // a 400 "Invalid FK" from the server (the referenced element doesn't
-    // exist yet server-side). The chain self-heals via the next round's
-    // re-fetch + rewriteIdReferences, but the console noise is alarming and
-    // takes 5s+ to settle. Topo-sort eliminates the class.
-    const createsSorted = this.sortCreatesByDependencies(
-      allChanged.filter(e => !e.server_updated_at)
-    );
-    const changed = [
-      ...createsSorted,
-      ...allChanged.filter(e => !!e.server_updated_at),
-    ];
-    const total = changed.length + tombstones.length;
+    // Partition: CREATEs (never-synced) vs UPDATEs. New elements MUST land
+    // server-side before any UPDATE references them as a foreign key.
+    //
+    // CREATE batches of ≥2 route through `/bulk` when the client supports it:
+    // one atomic request, server-side fixpoint FK resolution INCLUDING cycles
+    // (the class the per-element loop can never converge on — 152/196 Sikelia
+    // locations form a cyclic web). Retires the topo-sort on this path.
+    //
+    // Fallback (no bulkCreate, or a single create): the per-element loop with
+    // Kahn topo-sort ordering, exactly the pre-v2 behavior. Cycles there fall
+    // back to input order and self-heal across rounds for the acyclic part.
+    const allCreates = allChanged.filter(e => !e.server_updated_at);
+    const updatesOnly = allChanged.filter(e => !!e.server_updated_at);
+    const useBulk = typeof this.client.bulkCreate === 'function' && allCreates.length >= 2;
+    const changed = useBulk
+      ? updatesOnly
+      : [...this.sortCreatesByDependencies(allCreates), ...updatesOnly];
+    const total = allChanged.length + tombstones.length;
     let done = 0;
 
     let creates = 0;
@@ -801,8 +1151,21 @@ export class SyncEngine {
      */
     let authBlocked = false;
 
+    if (useBulk) {
+      const bulk = await this.bulkCreatePhase(allCreates, failures, serverDeletesDetected, () => {
+        done++;
+        this.onPushProgress(done, total);
+      });
+      creates += bulk.created;
+      if (bulk.authBlocked) authBlocked = true;
+    }
+
     for (const elem of changed) {
-      if (authBlocked) break;
+      // `stopped` (detach/unlink) aborts the push loop like the pull walk —
+      // a stampServerUpdatedAt landing after resetSyncBaseline would
+      // resurrect a baseline the unlink just cleared (close-gate finding:
+      // the G-C latch was pull-only).
+      if (authBlocked || this.stopped) break;
       const isCreate = !elem.server_updated_at;
       try {
         if (isCreate) {
@@ -966,59 +1329,47 @@ export class SyncEngine {
             id: elem.id, type: elem.type,
           });
         }
-        // FK constraint failure on CREATE means a peer this element references
-        // (zone, map, parent, etc.) was deleted server-side while atlas still
-        // has it as "synced" locally. The topo-sort can't help — the peer
-        // isn't in this CREATE batch. Surface the orphan peer for review:
-        // user picks keep + re-push (peer re-CREATEs next round, this element
-        // succeeds), or delete-locally (this element will keep failing until
-        // it's also cleaned up, but that's the user's explicit choice).
+        // Dangling-link failure (keel "invalid_link") means a peer this
+        // element references (zone, map, friend, etc.) was deleted server-side
+        // while atlas still has it as "synced" locally. Applies to CREATE and
+        // UPDATE alike — keel enforces links honestly on every write (v1 only
+        // hard-failed single links; the CREATE-only routing was a v1 artifact).
+        // Surface the orphan peer for review: user picks keep + re-push (peer
+        // re-CREATEs next round, this element succeeds) or delete-locally.
         //
         // Record the CURRENT element as a failure with a clearer message so
         // the user knows why it didn't land, AND queue the missing peer for
-        // the server-delete review modal.
-        else if (isCreate && parseFkConstraintError(err)) {
-          const parsed = parseFkConstraintError(err)!;
-          // The body we just sent has the FK value — look it up by the parsed
-          // field name. (We re-fetched `current` from disk before sending, so
-          // its fields are the truth.)
-          const fkValue = (elem as Record<string, unknown>)[parsed.field];
-          const refId = typeof fkValue === 'string' ? fkValue : null;
-          let routedPeer = false;
-          if (refId) {
-            const peer = await this.folder.getElement(refId);
-            if (peer && peer.server_updated_at) {
-              // Peer existed server-side at some past point; was deleted out-
-              // of-band. Route to the same modal the UPDATE-404 path uses.
-              serverDeletesDetected.push({
-                id: peer.id,
-                type: peer.type,
-                detected_at: nowIso(),
-                name: peer.name,
-              });
-              console.warn('[atlas:sync] push CREATE hit FK constraint — peer was deleted server-side; routing peer to server-delete review', {
-                child_id: elem.id, child_type: elem.type,
-                peer_id: peer.id, peer_type: peer.type,
-                fk_field: parsed.field,
-              });
-              routedPeer = true;
-            }
-          }
-          if (!routedPeer) {
-            console.warn('[atlas:sync] push CREATE hit FK constraint but could not resolve missing peer locally', {
-              id: elem.id, type: elem.type, fk_field: parsed.field, ref_id: refId,
-            });
-          }
-          // Record the child failure regardless so the user sees one
-          // explanatory message per FK error rather than a silent skip.
+        // the server-delete review modal. The dangling id comes from the
+        // error message itself (gate 10.4) — no body lookup.
+        else if (parseInvalidLinkError(err)) {
+          const parsed = parseInvalidLinkError(err)!;
+          const routedPeer = await this.routeDanglingPeer(parsed, elem, serverDeletesDetected);
           failures.push({
             element_id: elem.id,
             type: elem.type,
-            operation: 'create',
+            operation: isCreate ? 'create' : 'update',
             message: routedPeer
               ? `referenced ${parsed.refType} was deleted on the server; review in sync panel`
               : `referenced ${parsed.refType} not found on the server`,
           });
+        }
+        // 409 id_conflict on CREATE: the server already has this id (backfill
+        // miss on a prior /bulk, or a re-push after an interrupted round).
+        // Adopt the server's timestamp as baseline instead of failing forever;
+        // any pending local divergence flows as UPDATE next round.
+        else if (isCreate && isIdConflictError(err)) {
+          const remote = await this.client.getElement(elem.type, elem.id);
+          if (remote) {
+            await this.folder.stampServerUpdatedAt(elem.id, elem.type, remote.updated_at);
+            console.info('[atlas:sync] CREATE 409 id_conflict — element already on server; baseline adopted', {
+              id: elem.id, type: elem.type,
+            });
+          } else {
+            failures.push({
+              element_id: elem.id, type: elem.type, operation: 'create',
+              message: 'server reported id_conflict but the element could not be read back',
+            });
+          }
         } else {
           // Per-element failure (4xx, validation, transient network) is non-fatal:
           // record and continue. Caller inspects result.failures to decide what
@@ -1038,7 +1389,7 @@ export class SyncEngine {
     }
 
     for (const tomb of tombstones) {
-      if (authBlocked) break;
+      if (authBlocked || this.stopped) break;
       try {
         await this.client.deleteElement(tomb.type, tomb.id);
         await this.folder.clearTombstone(tomb.id);
@@ -1092,8 +1443,9 @@ export class SyncEngine {
     //
     // SKIP if the round was auth-blocked — we can't trust any state derived
     // from a half-aborted round. The fresh engine post-recovery will detect
-    // any real server-deletes via its first pull.
-    if (!authBlocked) {
+    // any real server-deletes via its first pull. SKIP likewise when stopped
+    // (detach/unlink) — a post-reset write would resurrect cleared state.
+    if (!authBlocked && !this.stopped) {
       await this.folder.updateSyncState(curr => {
         if (serverDeletesDetected.length === 0) return { last_push_at: nowIso() };
         const existing = curr.server_deletes ?? [];
@@ -1111,7 +1463,238 @@ export class SyncEngine {
     };
   }
 
+  /**
+   * Pull dispatch: cursor-delta /changes walk when the client supports it
+   * (v2), else the legacy full-list pull (fakes mid-migration, degraded
+   * clients). Same SyncResult contract either way.
+   */
   private async pullPhase(skipIds: Set<string> = new Set()): Promise<SyncResult> {
+    if (typeof this.client.pullChanges === 'function') {
+      return this.pullPhaseChanges(skipIds);
+    }
+    return this.pullPhaseFullList(skipIds);
+  }
+
+  /**
+   * The v2 delta pull — walks the per-world /changes feed from the persisted
+   * cursor (cold start = the world's epoch, a complete-state replay).
+   *
+   * Structural win over the full-list pull: deletions arrive as EXPLICIT ops,
+   * so the absence-inference server-delete detection (and its incomplete-list
+   * false-positive class — a destructive prompt) doesn't exist on this path.
+   *
+   * Gate-hardened (3-lens pass, 2026-07-12 — design + resolutions in
+   * Notes/2026-07-12-v2-changes-pull-design.md):
+   *   - An upsert REVIVES its id: it cancels any pending server-delete review
+   *     entry for that id, in-round and persisted (delete-then-recreate must
+   *     never leave a destructive prompt on a live element).
+   *   - Delete ops carry a staleness guard (deleted_at <= local baseline →
+   *     superseded, skip).
+   *   - The cursor and the round's derived side-effects (server_deletes,
+   *     conflicts) persist ATOMICALLY — including on a non-auth mid-walk
+   *     throw. The cursor never advances past ops whose side-effects were
+   *     dropped.
+   *   - `this.stopped` (detach/unlink) aborts applies and the terminal
+   *     persist, so resetSyncBaseline's cleared cursor stays cleared.
+   *   - A non-advancing cursor with hasMore aborts the walk (the silent
+   *     replay trap — unknown query params are ignored server-side).
+   *   - Timestamps: the op's embedded element.updated_at is used for BOTH the
+   *     serverChanged comparison and the stamped baseline (probed byte-equal
+   *     across every endpoint; single-sourcing makes skew impossible).
+   */
+  private async pullPhaseChanges(skipIds: Set<string> = new Set()): Promise<SyncResult> {
+    let creates = 0;
+    let updates = 0;
+    const conflicts: Conflict[] = [];
+    const newServerDeletes: import('../core/types').ServerDeleteRecord[] = [];
+    /** Ids proven ALIVE by an upsert — cancel any delete-review entry. */
+    const revivedIds = new Set<string>();
+    const pulledIds: string[] = [];
+    let authBlocked = false;
+
+    const syncState = await this.folder.readSyncState();
+    let cursor: string | null = syncState.changes_cursor ?? null;
+    /** Cursor of the last FULLY-APPLIED page — the only value ever persisted. */
+    let lastAppliedCursor: string | null = cursor;
+    let walkComplete = false;
+
+    const tombstones = await this.folder.listTombstonesSince(null);
+    const tombstoneIds = new Set(tombstones.map(t => t.id));
+    const knownTypes = new Set<string>(ALL_ELEMENT_TYPES);
+
+    /**
+     * One atomic persist for cursor + side-effects, shared by every exit path
+     * (complete, aborted-incomplete, non-auth throw). Skipped when stopped
+     * (detached mid-walk) or auth-blocked (half-round state untrustworthy).
+     */
+    const persistRound = async (): Promise<void> => {
+      if (this.stopped || authBlocked) return;
+      await this.folder.updateSyncState(curr => {
+        const existing = (curr.server_deletes ?? []).filter(d => !revivedIds.has(d.id));
+        const existingIds = new Set(existing.map(d => d.id));
+        const fresh = newServerDeletes.filter(d => !existingIds.has(d.id));
+        let persistedConflicts = curr.conflicts;
+        if (this.policy === 'pause-and-review') {
+          const ids = new Set(curr.conflicts.map(c => c.element_id));
+          persistedConflicts = [...curr.conflicts, ...conflicts.filter(c => !ids.has(c.element_id))];
+        }
+        return {
+          ...(walkComplete ? { last_pull_at: nowIso() } : {}),
+          changes_cursor: lastAppliedCursor,
+          conflicts: persistedConflicts,
+          server_deletes: [...existing, ...fresh],
+        };
+      });
+    };
+
+    const SAFETY_CAP_PAGES = 500;
+    try {
+      for (let page = 0; page < SAFETY_CAP_PAGES; page++) {
+        if (this.stopped) {
+          console.info('[atlas:sync] changes walk aborted — engine stopped');
+          break;
+        }
+        let pageResult;
+        try {
+          pageResult = await this.client.pullChanges!(cursor, 500);
+        } catch (err) {
+          if (isAuthError(err)) {
+            authBlocked = true;
+            console.warn('[atlas:sync] changes walk hit auth error — bailing round', {
+              message: err instanceof Error ? err.message : String(err),
+            });
+            break;
+          }
+          throw err;
+        }
+
+        for (const op of pageResult.changes) {
+          if (this.stopped) break;
+          if (!knownTypes.has(op.type)) {
+            console.info(`[atlas:sync] changes: skipping op for unknown type "${op.type}"`);
+            continue;
+          }
+          if (tombstoneIds.has(op.id)) continue; // pending local delete owns this id
+          if (skipIds.has(op.id)) continue;      // push already conflicted on it
+
+          if (op.op === 'upsert') {
+            // The element demonstrably exists server-side — cancel any pending
+            // delete-review entry (in-round now; persisted list at round end).
+            revivedIds.add(op.id);
+            const idx = newServerDeletes.findIndex(d => d.id === op.id);
+            if (idx >= 0) newServerDeletes.splice(idx, 1);
+
+            const remoteBody = stripServerOnlyFields(op.element);
+            const serverStamp = op.element.updated_at;
+            const local = await this.folder.getElement(op.id);
+            if (!local) {
+              await this.folder.applyServerRecord(op.type, remoteBody, serverStamp);
+              creates++;
+              pulledIds.push(op.id);
+              console.info(`[atlas:sync] changes create ${op.type}/${op.id} (server: ${serverStamp})`);
+              continue;
+            }
+            const baseline = local.server_updated_at ?? '';
+            const serverChanged = serverStamp > baseline;
+            const localChanged = local.local_updated_at > baseline;
+            if (!serverChanged) continue; // own echo or stale replay — idempotent skip
+            if (localChanged) {
+              conflicts.push({
+                element_id: op.id,
+                type: op.type,
+                detected_at: nowIso(),
+                local_updated_at: local.local_updated_at,
+                server_updated_at: serverStamp,
+                fields: diffFieldNames(local, remoteBody),
+              });
+              console.warn(`[atlas:sync] changes conflict ${op.type}/${op.id}`, {
+                local_updated_at: local.local_updated_at,
+                server_updated_at: serverStamp,
+                baseline,
+              });
+              continue; // preserve the user's local change
+            }
+            // M3 race guard: bail if the user edited during this round.
+            const fresh = await this.folder.getElement(op.id);
+            if (fresh && fresh.local_updated_at !== local.local_updated_at) {
+              console.info(`[atlas:sync] changes skip ${op.type}/${op.id} — local edited during round`);
+              continue;
+            }
+            if (this.stopped) break;
+            await this.folder.applyServerRecord(op.type, remoteBody, serverStamp);
+            updates++;
+            pulledIds.push(op.id);
+          } else {
+            // delete op — explicit server-side deletion.
+            const local = await this.folder.getElement(op.id);
+            if (!local) continue; // already gone locally
+            if (!local.server_updated_at) {
+              // Never-synced local sharing the id (uuid collision territory).
+              // Never destroy a never-synced local from a feed op.
+              console.warn(`[atlas:sync] changes: delete op for never-synced local ${op.type}/${op.id} — skipping`);
+              continue;
+            }
+            // Staleness guard: a delete that predates our baseline was
+            // superseded by a newer server state we already hold.
+            if (op.deletedAt && op.deletedAt <= local.server_updated_at) {
+              console.info(`[atlas:sync] changes: stale delete op for ${op.type}/${op.id} — skipping`);
+              continue;
+            }
+            revivedIds.delete(op.id);
+            if (!newServerDeletes.some(d => d.id === op.id)) {
+              newServerDeletes.push({
+                id: op.id,
+                type: op.type,
+                detected_at: nowIso(),
+                name: local.name,
+              });
+              console.info('[atlas:sync] changes: server-side delete queued for review', {
+                id: op.id, type: op.type,
+              });
+            }
+          }
+        }
+        if (this.stopped) break;
+
+        // Page fully applied — its cursor is now a safe resume point.
+        const nextCursor = pageResult.cursor ?? null;
+        if (pageResult.hasMore && (!nextCursor || nextCursor === cursor)) {
+          console.warn('[atlas:sync] changes walk: hasMore with a non-advancing cursor — aborting as incomplete');
+          break;
+        }
+        if (nextCursor) lastAppliedCursor = nextCursor;
+        cursor = nextCursor ?? cursor;
+        if (!pageResult.hasMore) {
+          walkComplete = true;
+          break;
+        }
+      }
+    } catch (err) {
+      // Non-auth mid-walk failure: cursor + already-derived side-effects
+      // persist AS A UNIT (never a cursor-only write — that would advance the
+      // watermark past delete/conflict events and lose them forever), then
+      // rethrow for the caller's toast + idle-state restore.
+      await persistRound().catch(persistErr => {
+        console.warn('[atlas:sync] changes walk: persist-on-error failed:', persistErr);
+      });
+      throw err;
+    }
+
+    if (authBlocked) {
+      return {
+        pushed: zero(),
+        pulled: zero(),
+        conflicts: [],
+        failures: [],
+        auth_blocked: true,
+      };
+    }
+
+    await persistRound();
+    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures: [], pulled_ids: pulledIds };
+  }
+
+  private async pullPhaseFullList(skipIds: Set<string> = new Set()): Promise<SyncResult> {
     let creates = 0;
     let updates = 0;
     const conflicts: Conflict[] = [];
@@ -1256,7 +1839,9 @@ export class SyncEngine {
     // prompt the user to delete them locally → silent data loss for elements
     // alive on the server. The pagination flag is per-type, so types we DID
     // see fully still get server-delete detection.
-    const paginatedTypes = this.client.getPaginatedTypes?.() ?? new Set<ElementType>();
+    const paginatedTypes = this.client.getIncompleteListTypes?.()
+      ?? this.client.getPaginatedTypes?.()
+      ?? new Set<ElementType>();
     const allLocal = await this.folder.listElements();
     for (const elem of allLocal) {
       if (!elem.server_updated_at) continue; // never synced
@@ -1279,6 +1864,12 @@ export class SyncEngine {
     // same conflict over and over (Captain caught this growing 1 → 2 → 3).
     // Computed inside the store's sync-state chain so a concurrent round's
     // entries survive this round's write.
+    //
+    // Skipped when the engine was stopped mid-round (detach/unlink): a
+    // post-reset write would resurrect state resetSyncBaseline just cleared.
+    if (this.stopped) {
+      return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures: [], pulled_ids: pulledIds };
+    }
     await this.folder.updateSyncState(currentState => {
       const existingServerDeletes = currentState.server_deletes ?? [];
       const existingDeleteIds = new Set(existingServerDeletes.map(d => d.id));
@@ -1397,30 +1988,54 @@ function emptyResult(): SyncResult {
 }
 
 /**
+ * Duck-typed view of the v2 adapter's typed error (OwV2Error). Checked
+ * structurally so the engine stays decoupled from the adapter module and
+ * so errors that crossed a module boundary still qualify.
+ */
+function typedError(err: unknown): { status: number; code: string; param: string | null; message: string } | null {
+  if (!(err instanceof Error)) return null;
+  const e = err as Error & { status?: unknown; code?: unknown; param?: unknown };
+  if (typeof e.status !== 'number' || typeof e.code !== 'string') return null;
+  return { status: e.status, code: e.code, param: typeof e.param === 'string' ? e.param : null, message: e.message };
+}
+
+/**
  * Detect a 404 / "not found" server response from an arbitrary thrown error.
- * The SDK wraps server errors as `API Error <status>: <body>`; some adapters
- * also surface plain `404` strings. Defensive against both shapes so the
- * tombstone-recovery contract holds regardless of which adapter is in use.
+ * Typed check first (v2 envelope: status 404 / code "not_found"), then the
+ * legacy substring fallback so string-throwing fakes keep working during the
+ * dialect transition.
  */
 function isNotFoundError(err: unknown): boolean {
+  const t = typedError(err);
+  if (t) return t.status === 404 || t.code === 'not_found';
   if (!(err instanceof Error)) return false;
   return /api error 404/i.test(err.message) || /\b404\b/.test(err.message) || /not found/i.test(err.message);
 }
 
 /**
- * Detect an authentication failure (HTTP 401/403). Three vectors produce this
- * in practice:
- *   1. PIN changed on the server but atlas still has the old PIN in registry.
- *   2. api_key was revoked (e.g., admin action on onlyworlds.com).
- *   3. The world was deleted server-side — its api_key becomes a dead key,
- *      so all CRUD ops 401. (Atlas can't distinguish "deleted" from "bad
- *      creds" without a server-side signal — recovery path is identical.)
+ * Detect an authentication failure. Vectors:
+ *   1. PIN changed on the server but atlas still has the old PIN in registry
+ *      (v2: 401 code "invalid_credentials").
+ *   2. api_key was revoked (v2: distinct code "key_revoked" — keel T6).
+ *   3. The world was deleted server-side — its api_key goes dead; all CRUD 401.
+ *
+ * Explicitly NOT auth: "rate_limited" / HTTP 429 — that's transient back-off
+ * territory, and pausing the engine over it would strand pending writes
+ * behind a wall that clears by itself. Typed check first; legacy substring
+ * fallback second (with a rate-limit exclusion so a message mentioning 429
+ * never lands here).
  *
  * When this fires from inside a push or pull, the engine bails the round
  * early (no point retrying every element with the same dead key) and
  * transitions to `error` state. See `setAuthError`.
  */
 export function isAuthError(err: unknown): boolean {
+  const t = typedError(err);
+  if (t) {
+    if (t.code === 'rate_limited' || t.status === 429) return false;
+    return t.status === 401 || t.status === 403
+      || t.code === 'invalid_credentials' || t.code === 'key_revoked';
+  }
   if (!(err instanceof Error)) return false;
   return /api error 401/i.test(err.message)
     || /api error 403/i.test(err.message)
@@ -1431,33 +2046,64 @@ export function isAuthError(err: unknown): boolean {
 }
 
 /**
- * Detect a server-side FK constraint failure on CREATE. Real OW returns 500
- * with a MySQL 1452 error of the form:
+ * Parse a keel v2 dangling-reference failure (HTTP 400, code "invalid_link"):
  *
- *   API Error 500: Failed to create Marker: (1452, 'Cannot add or update a
- *   child row: a foreign key constraint fails (...FOREIGN KEY (`zone_id`)
- *   REFERENCES `elements_zone` (`id`))') refs={"map_id":"...","zone_id":"..."}
+ *   { error: { code: "invalid_link", param: "<field>",
+ *     message: "<field> references <Type> '<id>' which does not exist." } }
  *
- * Atlas hits this when an element references a peer (zone, map, etc.) that
- * existed server-side at some prior point (so locally has `server_updated_at`)
- * but was deleted out-of-band (zoner, web app, admin). The topo-sort doesn't
- * help — the peer isn't in the CREATE batch, atlas thinks it's already synced.
+ * The /bulk non-atomic variant appends " in this world." — the regex is
+ * suffix-tolerant. Gate 10.4: the DANGLING ID comes from the message itself,
+ * never from a body lookup (multi-link fields would need array disambiguation
+ * and the wire/disk field names can differ on spatial types).
  *
- * Returns `{ field, refType }` on match — caller looks up `body[field]` to
- * find the orphan id, then routes that element to server_deletes review so
- * the user can pick `keep + re-push` (which clears baseline, re-CREATEs the
- * peer next round) or `delete locally` (which removes the orphan).
+ * Atlas hits this when an element references a peer (zone, map, friend, etc.)
+ * that existed server-side at some prior point (so locally has
+ * `server_updated_at`) but was deleted out-of-band (web app, admin, another
+ * atlas). The caller routes that peer to server_deletes review so the user
+ * can pick `keep + re-push` (clears baseline, re-CREATEs the peer next round)
+ * or `delete locally` (removes the orphan).
+ *
+ * Applies to CREATE, UPDATE, and /bulk item errors alike — keel enforces
+ * links honestly on every write (v1 silently dropped dangling multi-links,
+ * which is why the old routing was CREATE-only).
  */
-function parseFkConstraintError(
+export function parseInvalidLinkError(
   err: unknown,
-): { field: string; refType: string } | null {
-  if (!(err instanceof Error)) return null;
-  if (!/foreign key constraint fails/i.test(err.message)) return null;
-  // Capture the FK field name and the referenced table (e.g., `zone_id` and
-  // `elements_zone`). Both shapes are matched independently because real OW
-  // sometimes returns either piece in a slightly different layout.
-  const fieldMatch = err.message.match(/FOREIGN KEY \(`([a-z_]+)`\)/i);
-  const refMatch = err.message.match(/REFERENCES `?elements_([a-z_]+)`?/i);
-  if (!fieldMatch || !refMatch) return null;
-  return { field: fieldMatch[1], refType: refMatch[1] };
+): { field: string; refType: string; refId: string } | null {
+  const t = typedError(err);
+  const code = t?.code;
+  const message = t?.message ?? (err instanceof Error ? err.message : null);
+  if (!message) return null;
+  // Typed path requires the code; legacy fallback requires the exact message
+  // shape (fakes throwing plain Errors during the transition).
+  if (t && code !== 'invalid_link') return null;
+  const m = message.match(/(\S+) references (\w+) '([0-9a-fA-F-]{36})' which does not exist/);
+  if (!m) return null;
+  return { field: t?.param ?? m[1], refType: m[2].toLowerCase(), refId: m[3] };
+}
+
+/**
+ * Detect a duplicate-id CREATE rejection (keel 409 `id_conflict`). The classic
+ * vector: a /bulk landed server-side but its timestamp backfill failed, so the
+ * local baseline stayed unstamped and the next round re-CREATEs an element the
+ * server already has. Without special handling this loops forever (gate
+ * finding, 2026-07-12); with it, the engine adopts the server's timestamp as
+ * baseline and the element self-heals (pending local edits flow as UPDATE on
+ * the following round).
+ */
+export function isIdConflictError(err: unknown): boolean {
+  const t = typedError(err);
+  if (t) return t.status === 409 || t.code === 'id_conflict';
+  if (!(err instanceof Error)) return false;
+  return /api error 409/i.test(err.message) || /id_conflict/i.test(err.message);
+}
+
+/** Same parse applied to a /bulk per-item error object (not a thrown Error). */
+export function parseInvalidLinkItem(
+  item: { code: string; message: string; param: string | null },
+): { field: string; refType: string; refId: string } | null {
+  if (item.code !== 'invalid_link') return null;
+  const m = item.message.match(/(\S+) references (\w+) '([0-9a-fA-F-]{36})' which does not exist/);
+  if (!m) return null;
+  return { field: item.param ?? m[1], refType: m[2].toLowerCase(), refId: m[3] };
 }

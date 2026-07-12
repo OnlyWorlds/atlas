@@ -121,32 +121,45 @@ export const LOCK_HEARTBEAT_MS = 30_000;
 export const LOCK_STALE_MS = 90_000;
 
 /**
- * Atlas-extension fields that live ONLY on local element files and are never
- * sent to/from the OW server. Two consequences:
+ * Atlas-extension field policy (split 2026-07-12, v2 port gate 10.3).
  *
- *   1. Adapter strips them from write bodies (server 422s on unknown fields).
- *   2. `applyServerRecord` MUST preserve them from the existing local file
- *      when overlaying a server response — otherwise pulling an update on
- *      e.g. a Map silently destroys its local `image_media_id` binding,
- *      orphaning the media file under `media/`.
+ * Two buckets with DIFFERENT wire + pull semantics:
  *
- * Add new atlas-only fields here; both ends pick them up automatically.
+ *   - `ATLAS_LOCAL_ONLY_FIELDS` — live only on local element files. Stripped
+ *     from every write body AND preserved from the existing local file when
+ *     `applyServerRecord` overlays a server response (otherwise pulling an
+ *     update on e.g. a Map silently destroys its local `image_media_id`
+ *     binding, orphaning the media file under `media/`).
+ *
+ *   - `ATLAS_WIRE_EXTENSION_FIELDS` — ride the v2 wire via keel's extension
+ *     passthrough (`atlas_*`/`x_*`/`shadow_*` round-trip verbatim). Sent on
+ *     write; on pull the SERVER value lands like any normal field — preserved
+ *     from local only when the server record doesn't carry the field at all
+ *     (element last written by a v1-era or non-atlas client). Without this
+ *     split, multi-device sync of zone visuals was a silent one-way no-op:
+ *     the preserve-loop would clobber every pulled change with the stale
+ *     local value.
+ *
+ * The v1 dialect rejects ALL extension fields (adapter mirrors v1's exact
+ * strictness — Skeld 2026-07-12), so wire extensions are v2-only; the legacy
+ * v1 adapter keeps stripping the combined list.
+ *
+ * Add new atlas-only fields to LOCAL_ONLY; new synced extensions to WIRE.
  */
-export const ATLAS_LOCAL_EXTENSION_FIELDS = [
-  'image_media_id',
-  // Zone visual extensions (DESIGN_ZONES.md §5) — stored on the Zone element
-  // file, never pushed to the OW API. atlas_color is a hex string; atlas_opacity
-  // is 0..1; atlas_label_visible is boolean.
+export const ATLAS_WIRE_EXTENSION_FIELDS = [
+  // Zone visual extensions (DESIGN_ZONES.md §5): atlas_color is a hex string;
+  // atlas_opacity is 0..1; atlas_label_visible is boolean; atlas_shape (ZD6)
+  // is 'polygon' | 'line'. Synced under v2 so multi-device zone styling
+  // converges. (Pre-v2 these were local-only — the old server 400'd on them,
+  // which session 221 learned the hard way.)
   'atlas_color',
   'atlas_opacity',
   'atlas_label_visible',
-  // Zone shape kind (ZD6) — 'polygon' | 'line'. Local-only; the OW server's
-  // Zone schema doesn't include it and rejects writes that carry it with a 400.
-  // Without this strip, every zone CREATE fails server-side, which cascades to
-  // FK failures on marker CREATEs that reference the (now-orphan) zone.
-  // (Bug surfaced session 221 against live OW; fakes silently accepted the
-  // unknown field so it slipped past the existing test coverage.)
   'atlas_shape',
+] as const;
+
+export const ATLAS_LOCAL_ONLY_FIELDS = [
+  'image_media_id',
   // Writing workspace richtext payload (DESIGN_WRITING.md §Storage model, convention #47).
   // TipTap JSON document for Narrative elements. The canonical `story` field
   // holds markdown serialization for OW-tool interop; this field holds the
@@ -181,7 +194,33 @@ export const ATLAS_LOCAL_EXTENSION_FIELDS = [
   // Never reaches the OW worldapi.
   'atlas_page_pub',
 ] as const;
+
+/**
+ * Combined list — the v1-dialect strip set (v1 rejects every extension field)
+ * and the historical name most call sites grew up with. Prefer the split
+ * constants above for new code; this stays the correct set for "fields the
+ * OLD server never accepts" (v1 adapter, import/export compatibility checks).
+ */
+export const ATLAS_LOCAL_EXTENSION_FIELDS = [
+  ...ATLAS_LOCAL_ONLY_FIELDS,
+  ...ATLAS_WIRE_EXTENSION_FIELDS,
+] as const;
 export type AtlasLocalExtensionField = typeof ATLAS_LOCAL_EXTENSION_FIELDS[number];
+
+/**
+ * The extension NAMESPACES keel v2 round-trips verbatim (Skeld T2, probed
+ * live 2026-07-12): any field whose name starts with one of these prefixes is
+ * legal wire data — including user-defined custom fields (D9's enablement
+ * layer). Import keeps them, the validator doesn't flag them, export carries
+ * them, and the v2 adapter sends them (minus ATLAS_LOCAL_ONLY_FIELDS, which
+ * stay atlas-internal machinery).
+ */
+export const EXTENSION_FIELD_NAMESPACES = ['atlas_', 'x_', 'shadow_'] as const;
+
+/** True when a field name lives in one of the extension namespaces. */
+export function isExtensionField(name: string): boolean {
+  return EXTENSION_FIELD_NAMESPACES.some(ns => name.startsWith(ns));
+}
 
 // Map visual prefs storage keys (DESIGN_MAPS.md §11).
 export const MAP_VIEW_PREFS_DEFAULTS_KEY = 'atlas_map_view_defaults';

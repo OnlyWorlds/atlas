@@ -12,12 +12,10 @@
  */
 
 import { knownFieldsFor, relationFieldsFor } from '../editor/field-schema';
-import { ATLAS_LOCAL_EXTENSION_FIELDS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
+import { isExtensionField, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { isUuid, normName } from './normalize';
 import type { ParseResult, RawRecord, ValidationIssue } from './types';
-
-const ATLAS_EXT = new Set<string>(ATLAS_LOCAL_EXTENSION_FIELDS);
 const SPATIAL_SAFE = new Set(['x', 'y', 'z', 'order', 'element_type']);
 // Server bookkeeping stamps. Files in an api-linked world carry these, so
 // atlas's OWN export round-trips through here — flagging them produced 45
@@ -109,7 +107,9 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
           continue;
         }
 
-        if (!known.has(k) && !ATLAS_EXT.has(k) && !SERVER_STAMPS.has(k) && !(isSpatial && SPATIAL_SAFE.has(k))) {
+        // Extension-namespace fields (atlas_/x_/shadow_) are legal custom
+        // data — keel v2 round-trips them; never cry wolf on them.
+        if (!known.has(k) && !isExtensionField(k) && !SERVER_STAMPS.has(k) && !(isSpatial && SPATIAL_SAFE.has(k))) {
           issues.push({
             path: `${path}.${k}`,
             field: k,

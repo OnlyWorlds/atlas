@@ -5,11 +5,21 @@
  * faithful but heavier).
  *
  * For Phase 0 / 1 unit tests, this is enough.
+ *
+ * v2 dialect (Bout 5, 2026-07-12): the fake now speaks keel v2 —
+ *   - wire-extension fields (`atlas_*` visual prefs) round-trip instead of
+ *     being rejected (see rejectAtlasLocalFields split below);
+ *   - `bulkCreate` implements `/bulk` (opt-in via `__enable_bulk()` so the
+ *     per-element createOrder tests still exercise the fallback path);
+ *   - `pullChanges` implements `/changes` over an internal commit-ordered op
+ *     log (every create/update/bulk/delete/__server_mutate appends an op);
+ *     opt-in via `__enable_changes()` for the same reason as bulkCreate — the
+ *     engine dispatches its pull phase on the method's mere presence.
  */
 
-import type { OwApiClient } from '../../src/sync/sync-engine';
+import type { OwApiClient, BulkItem, BulkResult, ChangesPage } from '../../src/sync/sync-engine';
 import type { ElementType } from '../../src/core/types';
-import { ATLAS_LOCAL_EXTENSION_FIELDS } from '../../src/core/constants';
+import { ATLAS_LOCAL_ONLY_FIELDS } from '../../src/core/constants';
 
 interface ServerRecord {
   id: string;
@@ -18,15 +28,48 @@ interface ServerRecord {
   [field: string]: unknown;
 }
 
+/** One entry of the internal `/changes` op log (commit-ordered by `seq`). */
+interface ChangeOp {
+  op: 'upsert' | 'delete';
+  type: ElementType;
+  id: string;
+  /** Dense, monotonic, gap-free per-world commit sequence (keel T1). */
+  seq: number;
+  updated_at?: string;
+  deleted_at?: string;
+  /** Full element snapshot AT COMMIT TIME (upsert ops only). */
+  element?: ServerRecord;
+}
+
+/** Standard keel v2 error envelope inner object. */
+interface V2ItemError {
+  code: string;
+  message: string;
+  param: string | null;
+}
+
 export class FakeOwApiClient implements OwApiClient {
   private clock = () => new Date().toISOString();
   private byType = new Map<ElementType, Map<string, ServerRecord>>();
   /** Test seam: per-id-and-operation error injection. */
   private injectedFailures = new Map<string, { msg: string }>();
+  /** Test seam: per-id forced /bulk item failure (one-shot). */
+  private injectedBulkFailures = new Map<string, V2ItemError>();
+  /**
+   * Commit-ordered change feed backing `pullChanges`. Every create, update,
+   * bulk-persisted item, delete, and __server_mutate appends one op. Cursor
+   * format mirrors keel: `"<seq>:<id>"`.
+   */
+  private opLog: ChangeOp[] = [];
+  private opSeq = 0;
   /**
    * Test seam: when true, CREATE ignores client-sent `id` and assigns a fresh
    * uuid (simulating real OW server behavior that enforces v7 format).
    * Tests covering the id-swap path on CREATE should enable this.
+   *
+   * NOTE: `/bulk` always preserves client ids regardless of this flag — the
+   * engine's bulk backfill re-reads each element by its client id, and the
+   * bulk path has no id-swap handling (probed contract: client ids preserved).
    */
   assignServerIds = false;
   /**
@@ -50,6 +93,7 @@ export class FakeOwApiClient implements OwApiClient {
     | { method: 'delete'; type: ElementType; id: string }
     | { method: 'list'; type: ElementType }
     | { method: 'get'; type: ElementType; id: string }
+    | { method: 'bulk'; items: number; atomic: boolean }
   > = [];
 
   setClock(fn: () => string): void { this.clock = fn; }
@@ -58,6 +102,31 @@ export class FakeOwApiClient implements OwApiClient {
     let m = this.byType.get(type);
     if (!m) { m = new Map(); this.byType.set(type, m); }
     return m;
+  }
+
+  /** Append an upsert op carrying the element snapshot at commit time. */
+  private appendUpsert(record: ServerRecord): void {
+    this.opSeq += 1;
+    this.opLog.push({
+      op: 'upsert',
+      type: record.type,
+      id: record.id,
+      seq: this.opSeq,
+      updated_at: record.updated_at,
+      element: { ...record },
+    });
+  }
+
+  /** Append a delete op (no element body — mirrors keel's delete op). */
+  private appendDelete(type: ElementType, id: string): void {
+    this.opSeq += 1;
+    this.opLog.push({
+      op: 'delete',
+      type,
+      id,
+      seq: this.opSeq,
+      deleted_at: this.clock(),
+    });
   }
 
   async createElement(type: ElementType, body: Record<string, unknown>): Promise<ServerRecord> {
@@ -94,6 +163,7 @@ export class FakeOwApiClient implements OwApiClient {
     this.throwIfInjected('create', id);
     const record: ServerRecord = { ...wireBody, id, type, updated_at: this.clock() };
     this.bucket(type).set(id, record);
+    this.appendUpsert(record);
     return { ...record };
   }
 
@@ -116,6 +186,7 @@ export class FakeOwApiClient implements OwApiClient {
     if (!existing) throw new Error(`API Error 404: ${id} not found in this world.`);
     const next: ServerRecord = { ...existing, ...wireBody, id, type, updated_at: this.clock() };
     m.set(id, next);
+    this.appendUpsert(next);
     return { ...next };
   }
 
@@ -123,15 +194,14 @@ export class FakeOwApiClient implements OwApiClient {
     this.throwIfAuthBlocked();
     this.calls.push({ method: 'delete', type, id });
     this.throwIfInjected('delete', id);
-    // Mirror real OW (DRF default): DELETE of an unknown id returns 404.
-    // The engine treats this as "already gone" and clears the tombstone, so
-    // unknown-id tombstones (never-synced local deletes) don't accumulate.
-    // Tests verifying that recovery path rely on this rule being enforced.
+    // v2 contract: DELETE is IDEMPOTENT — a missing id returns 204, same as
+    // success (probed 2026-07-12). The engine's 404 catch-arm survives as
+    // legacy tolerance; tests that want to exercise it inject a 404 via
+    // __inject_failure instead of relying on the fake's default behavior.
     const m = this.bucket(type);
-    if (!m.has(id)) {
-      throw new Error(`API Error 404: Not found.`);
-    }
+    if (!m.has(id)) return;
     m.delete(id);
+    this.appendDelete(type, id);
   }
 
   async listElements(type: ElementType): Promise<ServerRecord[]> {
@@ -147,6 +217,143 @@ export class FakeOwApiClient implements OwApiClient {
     return r ? { ...r } : null;
   }
 
+  /**
+   * POST /bulk — atomic multi-element create with server-side FK-order
+   * resolution (cycles included). Opt-in via `__enable_bulk()`: left
+   * undefined by default so the per-element createOrder tests still exercise
+   * the engine's topo-sort fallback (the engine routes ≥2 creates through
+   * /bulk only when `typeof client.bulkCreate === 'function'`).
+   *
+   * Faithful to the probed contract (Notes/2026-07-12-v2-probed-facts.md):
+   *   - HTTP 200 always; consult `errors` + per-item `status`.
+   *   - Success items → status 201, id preserved, NO `updated_at` (the engine
+   *     backfills authoritative timestamps via GET / list walk).
+   *   - `atomic:true` + any failure → `errors:true`, NOTHING persisted
+   *     (rollback verified live); per-item 201s still reported as
+   *     would-have-succeeded.
+   *   - `atomic:false` + failure → good items persist, bad items carry errors.
+   */
+  bulkCreate?: (items: BulkItem[], opts?: { atomic?: boolean; idempotencyKey?: string }) => Promise<BulkResult>;
+
+  private async runBulkCreate(
+    items: BulkItem[],
+    opts?: { atomic?: boolean; idempotencyKey?: string },
+  ): Promise<BulkResult> {
+    this.throwIfAuthBlocked();
+    const atomic = opts?.atomic ?? false;
+    this.calls.push({ method: 'bulk', items: items.length, atomic });
+
+    // Snapshot the resolvable id-space for the dangling-reference check:
+    // everything already stored PLUS every id in THIS batch (in-batch cycles
+    // resolve server-side, per the probed contract).
+    const existingIds = new Set<string>();
+    for (const bucket of this.byType.values()) {
+      for (const rid of bucket.keys()) existingIds.add(rid);
+    }
+    const batchIds = new Set<string>();
+    for (const it of items) {
+      const eid = it.element.id;
+      if (typeof eid === 'string') batchIds.add(eid);
+    }
+
+    // Validate each item positionally (never throw — produce a per-item
+    // result). Stash the wire body of the successes so we can persist them
+    // after the atomic decision.
+    const results: BulkResult['items'] = [];
+    const wireBodies: Array<Record<string, unknown> | null> = [];
+    let anyError = false;
+    for (const it of items) {
+      const wireBody = stripUndefined(it.element);
+      const id = (wireBody.id as string) ?? cryptoRandomId();
+      // Injection seam takes priority over intrinsic validation.
+      const err = this.takeInjectedBulkError(id)
+        ?? validateBulkItem(it.type, wireBody, id, existingIds, batchIds);
+      if (err) {
+        anyError = true;
+        results.push({ status: 400, id, error: err });
+        wireBodies.push(null);
+      } else {
+        results.push({ status: 201, id });
+        wireBodies.push(wireBody);
+      }
+    }
+
+    // atomic rollback: any failure → persist NOTHING (verified live). The
+    // per-item 201 statuses still report which items WOULD have succeeded.
+    if (atomic && anyError) {
+      return { errors: true, items: results };
+    }
+
+    // Persist the successes (all of them under atomic-success; the good ones
+    // under non-atomic). Records land exactly like createElement so a
+    // subsequent getElement / listElements returns them with a server
+    // `updated_at` from the clock (the response items deliberately omit it).
+    for (let i = 0; i < items.length; i++) {
+      const wireBody = wireBodies[i];
+      if (!wireBody) continue;
+      const type = items[i].type;
+      const id = results[i].id;
+      const record: ServerRecord = { ...wireBody, id, type, updated_at: this.clock() };
+      this.bucket(type).set(id, record);
+      this.appendUpsert(record);
+    }
+    return { errors: anyError, items: results };
+  }
+
+  /**
+   * GET /changes — one page of the internal commit-ordered op log. OPT-IN via
+   * `__enable_changes()`, mirroring `__enable_bulk`: the engine's pullPhase
+   * DISPATCHES on `typeof client.pullChanges === 'function'`, so an
+   * always-present method would reroute every legacy pull test (including the
+   * absence-inference pagination-guard trio in sync-engine.serverDelete)
+   * through the cursor path. Off by default keeps the full-list fallback
+   * exercised; changes-pull tests call `__enable_changes()`.
+   */
+  pullChanges?: (since: string | null, limit?: number) => Promise<ChangesPage>;
+
+  /** Test seam: attach (or detach) the optional `/changes` method. */
+  __enable_changes(enabled = true): void {
+    this.pullChanges = enabled
+      ? (since, limit) => this.runPullChanges(since, limit)
+      : undefined;
+  }
+
+  /**
+   * `since` is the opaque `"<seq>:<id>"` cursor from the previous page
+   * (null = from the world epoch). Returns ops with `seq > sinceSeq` up to
+   * `limit`, mapped to the engine's ChangesPage shape. The cursor is the last
+   * returned op's `"<seq>:<id>"`, or the `since` value verbatim when the page
+   * is empty.
+   */
+  private async runPullChanges(since: string | null, limit = 100): Promise<ChangesPage> {
+    this.throwIfAuthBlocked();
+    const sinceSeq = since ? parseInt(since.split(':')[0], 10) : 0;
+    const pending = this.opLog.filter(o => o.seq > sinceSeq);
+    const returned = pending.slice(0, limit);
+    const hasMore = pending.length > returned.length;
+    const last = returned[returned.length - 1];
+    const cursor = last ? `${last.seq}:${last.id}` : since;
+    const changes: ChangesPage['changes'] = returned.map(o =>
+      o.op === 'upsert'
+        ? {
+            op: 'upsert' as const,
+            type: o.type,
+            id: o.id,
+            changeSeq: o.seq,
+            updatedAt: o.updated_at ?? '',
+            element: { ...(o.element as ServerRecord) },
+          }
+        : {
+            op: 'delete' as const,
+            type: o.type,
+            id: o.id,
+            changeSeq: o.seq,
+            deletedAt: o.deleted_at ?? '',
+          },
+    );
+    return { cursor, hasMore, changes };
+  }
+
   /** Engine reads this to learn which types are paginated. */
   getPaginatedTypes(): ReadonlySet<ElementType> {
     return this.forcedPaginatedTypes;
@@ -156,6 +363,32 @@ export class FakeOwApiClient implements OwApiClient {
   __force_paginated(type: ElementType, enabled = true): void {
     if (enabled) this.forcedPaginatedTypes.add(type);
     else this.forcedPaginatedTypes.delete(type);
+  }
+
+  /**
+   * Test seam: attach (or detach) the optional `/bulk` method. Off by default
+   * so the engine's per-element topo-sort path stays exercised by the
+   * createOrder tests; bulk-path tests call this to opt in.
+   */
+  __enable_bulk(enabled = true): void {
+    this.bulkCreate = enabled
+      ? (items, opts) => this.runBulkCreate(items, opts)
+      : undefined;
+  }
+
+  /**
+   * Test seam: force a specific /bulk item to fail with the given error
+   * envelope (one-shot). Lets bulk tests drive a per-item failure without
+   * crafting a dangling reference.
+   */
+  __inject_bulk_item_failure(id: string, error: V2ItemError): void {
+    this.injectedBulkFailures.set(id, error);
+  }
+
+  private takeInjectedBulkError(id: string): V2ItemError | null {
+    const f = this.injectedBulkFailures.get(id);
+    if (f) { this.injectedBulkFailures.delete(id); return { ...f }; } // one-shot
+    return null;
   }
 
   /**
@@ -175,12 +408,15 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   /** Server-side mutation that doesn't show up in `calls` — for setting up
-   *  conflict scenarios in tests without polluting the call log. */
+   *  conflict scenarios in tests without polluting the call log. Still
+   *  appends a change-feed op (a real out-of-band edit would). */
   __server_mutate(type: ElementType, id: string, patch: Record<string, unknown>): void {
     const m = this.bucket(type);
     const existing = m.get(id);
     if (!existing) throw new Error(`__server_mutate: ${type}/${id} not found`);
-    m.set(id, { ...existing, ...patch, id, type, updated_at: this.clock() });
+    const next: ServerRecord = { ...existing, ...patch, id, type, updated_at: this.clock() };
+    m.set(id, next);
+    this.appendUpsert(next);
   }
 
   /**
@@ -204,11 +440,87 @@ export class FakeOwApiClient implements OwApiClient {
   // Test introspection
   __server_count(type: ElementType): number { return this.bucket(type).size; }
   __server_get(type: ElementType, id: string): ServerRecord | undefined { return this.bucket(type).get(id); }
+  /** Directly drop a record from the store WITHOUT a call/op — simulates an
+   *  out-of-band server delete for dangling-link routing tests. */
+  __server_evict(type: ElementType, id: string): void { this.bucket(type).delete(id); }
 }
 
 function cryptoRandomId(): string {
   // Mirror the engine's behavior. In tests we expect callers to provide ids.
   return crypto.randomUUID();
+}
+
+/** Matches a canonical 36-char UUID (any version). Used to decide whether a
+ *  string field VALUE looks like a relation reference — never applied to
+ *  names/descriptions (they don't match this shape). */
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/**
+ * Validate a single /bulk item the way createElement validates a write, but
+ * return a keel error envelope object instead of throwing. `null` = the item
+ * is accepted. Checks, in order: pin element_type rule, atlas-local rejection,
+ * double-suffix rule, then the dangling-reference check.
+ */
+function validateBulkItem(
+  type: ElementType,
+  wireBody: Record<string, unknown>,
+  id: string,
+  existingIds: Set<string>,
+  batchIds: Set<string>,
+): V2ItemError | null {
+  // pin requires element_type whenever element_id is set.
+  if (type === 'pin' && wireBody.element_id && !wireBody.element_type) {
+    return {
+      code: 'invalid_request',
+      message: 'element_type must be provided when element_id is specified',
+      param: 'element_type',
+    };
+  }
+  // atlas-local (never-synced) fields the server rejects. Wire-extension
+  // fields are NOT in this set — v2 round-trips them.
+  for (const k of Object.keys(wireBody)) {
+    if (ATLAS_LOCAL_REJECT.includes(k as (typeof ATLAS_LOCAL_REJECT)[number])) {
+      return { code: 'invalid_request', message: `Unknown field: ${k}`, param: k };
+    }
+  }
+  // Double-suffixed relation fields on spatial types (prepareRelations leak).
+  if (type === 'pin' || type === 'marker') {
+    for (const k of Object.keys(wireBody)) {
+      if (k.endsWith('_id_id') || k.endsWith('_ids_ids')) {
+        return {
+          code: 'invalid_request',
+          message: `body contains double-suffixed relation field "${k}"`,
+          param: k,
+        };
+      }
+    }
+  }
+  // Dangling-reference check: a uuid-shaped VALUE that resolves to no stored
+  // record and no in-batch id. Only uuid-shaped strings qualify (never
+  // names/descriptions). Multi-link fields report the FIRST dangling id.
+  const isDangling = (v: unknown): v is string =>
+    typeof v === 'string' && UUID_RE.test(v) && v !== id
+    && !existingIds.has(v) && !batchIds.has(v);
+  for (const [key, value] of Object.entries(wireBody)) {
+    if (key === 'id' || key === 'type') continue;
+    if (isDangling(value)) return danglingErr(key, value);
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        if (isDangling(v)) return danglingErr(key, v);
+      }
+    }
+  }
+  return null;
+}
+
+/** Keel v2 dangling-reference envelope. refType is a capitalized placeholder
+ *  ('Element') since the dangling id resolves to nothing to look up. */
+function danglingErr(field: string, refId: string): V2ItemError {
+  return {
+    code: 'invalid_link',
+    message: `${field} references Element '${refId}' which does not exist.`,
+    param: field,
+  };
 }
 
 /**
@@ -259,26 +571,40 @@ function rejectDoubleSuffix(
 }
 
 /**
- * Reject atlas-local fields appearing in write bodies — these are stored
- * locally only; the OW server doesn't know them and rejects the request 400.
+ * The set of extension fields the v2 server still rejects on a write: the
+ * atlas LOCAL-ONLY fields (never synced) plus the sync-internal timestamps.
+ *
+ * v2 split (2026-07-12, gate 10.3): ATLAS_WIRE_EXTENSION_FIELDS (`atlas_*`
+ * zone visual prefs) now ride the wire via keel's extension passthrough and
+ * round-trip verbatim, so they are NO LONGER rejected — the fake accepts and
+ * stores them like any normal field. Only ATLAS_LOCAL_ONLY_FIELDS
+ * (image_media_id, atlas_richtext_json, sharing composition, …) stay local
+ * and 400 if they reach the wire.
+ */
+const ATLAS_LOCAL_REJECT = [...ATLAS_LOCAL_ONLY_FIELDS, 'local_updated_at', 'server_updated_at'] as const;
+
+/**
+ * Reject atlas LOCAL-ONLY fields appearing in write bodies — these are stored
+ * on local disk only; the OW server doesn't know them and rejects the request
+ * 400. Wire-extension fields are intentionally NOT rejected (see the comment
+ * on ATLAS_LOCAL_REJECT: v2 round-trips them).
  *
  * Captain session 221: zone CREATE was carrying `atlas_shape: 'polygon'` to
- * live OW, which 400'd; markers then FK-failed against the absent zone. The
- * existing fake silently spread unknown fields so the bug only surfaced in
- * production. This guard catches the regression in tests.
+ * the v1 server, which 400'd; markers then FK-failed against the absent zone.
+ * Under v2 `atlas_shape` is a wire-extension and rides through fine; this
+ * guard now catches only genuinely local fields (image_media_id, richtext,
+ * sharing composition) that must never reach the wire.
  */
 function rejectAtlasLocalFields(
   type: ElementType,
   body: Record<string, unknown>,
   op: 'create' | 'update',
 ): void {
-  // Single source of truth — keep in lockstep with constants.ts via spread.
-  const ATLAS_LOCAL = [...ATLAS_LOCAL_EXTENSION_FIELDS, 'local_updated_at', 'server_updated_at'];
   for (const k of Object.keys(body)) {
-    if (ATLAS_LOCAL.includes(k as any)) {
+    if (ATLAS_LOCAL_REJECT.includes(k as (typeof ATLAS_LOCAL_REJECT)[number])) {
       throw new Error(
         `API Error 400: ${op} ${type} body contains atlas-local field "${k}" which the server rejects. ` +
-          `Add to ATLAS_LOCAL_EXTENSION_FIELDS in core/constants.ts so toWireShape strips it.`,
+          `Add to ATLAS_LOCAL_ONLY_FIELDS in core/constants.ts so toWireShape strips it.`,
       );
     }
   }

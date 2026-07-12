@@ -105,11 +105,16 @@ export class NewApiWorldModal extends BaseModal {
         completeWaypoint('first-world');
 
         progressEl.textContent = `Creating API world on onlyworlds.com...`;
-        const { apiKey } = await createApiWorld({ name, email, pin });
+        const created = await createApiWorld({ name, email, pin });
+        const apiKey = created.apiKey;
 
-        progressEl.textContent = `Fetching new world ID...`;
-        const client = buildOwClient(apiKey, pin);
-        const world = await client.worlds.get();
+        // World id + name come straight from the create response (keel
+        // includes them); worlds.get is the fallback for older servers.
+        let world: { id?: string; name?: string } = { id: created.worldId, name: created.worldName };
+        if (!world.id) {
+          progressEl.textContent = `Fetching new world ID...`;
+          world = await buildOwClient(apiKey, pin).worlds.get();
+        }
         if (!world?.id) throw new Error('Server returned no world ID');
 
         // Flip registry to api-linked + persist credentials to disk.

@@ -217,6 +217,15 @@ export interface SyncState {
   last_push_at: string | null;
   paused: boolean;
   pause_reason?: 'manual' | 'network';
+  /**
+   * Opaque /changes watermark for the v2 delta pull (format "<seq>:<id>",
+   * treated as opaque). Null/absent = never walked; the next pull cold-starts
+   * from the world's epoch. Advanced only in lockstep with the round's
+   * derived side-effects (server_deletes + conflicts) — never past ops whose
+   * side-effects weren't persisted (gate finding, 2026-07-12). Cleared by
+   * resetSyncBaseline: a re-link must never inherit another world's cursor.
+   */
+  changes_cursor?: string | null;
   conflicts: Conflict[];
   /**
    * Server-deleted elements detected during pull (Phase 3.5+).

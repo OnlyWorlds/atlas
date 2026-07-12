@@ -3,14 +3,18 @@
  * of Mode A import. Produces the ow.com-compatible shape: a `World` block + one
  * PascalCase array per element type (DESIGN_IMPORT.md "Export design").
  *
- * - Strips atlas-local + sync fields (never valid OW data).
+ * - Strips atlas-internal machinery + sync fields (LOCAL_ONLY list: page
+ *   blocks, richtext, media bindings — meaningless outside this atlas).
+ *   WIRE extension fields (zone visuals) and custom namespace fields
+ *   (atlas_/x_/shadow_) are KEPT: keel v2 round-trips them, so dropping them
+ *   here would lose user data on every export→import cycle (D9 enablement).
  * - Converts spatial disk shape back to bare names (map_id → map, zone_id → zone)
  *   so pin/marker round-trip through ow.com's `/store/` and atlas's own import.
  * - Drops the world id (ow.com keeps none); includes api_key only on request.
  */
 
 import { ALL_ELEMENT_TYPES, type ElementType } from '../core/types';
-import { ATLAS_LOCAL_EXTENSION_FIELDS } from '../core/constants';
+import { ATLAS_LOCAL_ONLY_FIELDS } from '../core/constants';
 import { relationFieldsFor } from '../editor/field-schema';
 import type { FolderStore } from '../store/folder-store';
 import type { RawRecord } from './types';
@@ -19,7 +23,7 @@ const STRIP_EXPORT = new Set<string>([
   'type',
   'local_updated_at',
   'server_updated_at',
-  ...ATLAS_LOCAL_EXTENSION_FIELDS,
+  ...ATLAS_LOCAL_ONLY_FIELDS,
 ]);
 
 export interface ExportOptions {

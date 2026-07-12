@@ -28,7 +28,8 @@
 
 import {
   ATLAS_INTERNAL_DIR,
-  ATLAS_LOCAL_EXTENSION_FIELDS,
+  ATLAS_LOCAL_ONLY_FIELDS,
+  ATLAS_WIRE_EXTENSION_FIELDS,
   CHARTS_FILE,
   ELEMENTS_DIR,
   LOCK_FILE,
@@ -873,16 +874,27 @@ export class FsFolderStore implements FolderStore {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');
 
-    // Preserve atlas-extension fields (image_media_id, ...) from the existing
-    // local file if present. The server doesn't know about these fields, so
-    // its response carries none — overlaying the response directly would
-    // silently destroy the local binding (e.g. a Map's locally-uploaded image
-    // pointer). Sync metadata (local_updated_at, server_updated_at) is set
+    // Preserve atlas-extension fields from the existing local file per the
+    // split policy (gate 10.3, v2 port):
+    //   - LOCAL_ONLY fields (image_media_id, page blocks, richtext, ...):
+    //     ALWAYS preserved — the server never knows them, so its response
+    //     carries none; overlaying directly would silently destroy the local
+    //     binding (e.g. a Map's locally-uploaded image pointer).
+    //   - WIRE extension fields (zone visual prefs): the server round-trips
+    //     them under v2, so a server value LANDS like any normal field.
+    //     Preserved from local only when the server record lacks the field
+    //     entirely (last written by a v1-era or non-atlas client).
+    // Sync metadata (local_updated_at, server_updated_at) is set
     // authoritatively below, so we don't carry it over from existing.
     const existing = await this.getElement(id);
     const preserved: Record<string, unknown> = {};
     if (existing) {
-      for (const field of ATLAS_LOCAL_EXTENSION_FIELDS) {
+      for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
+        const value = (existing as Record<string, unknown>)[field];
+        if (value !== undefined) preserved[field] = value;
+      }
+      for (const field of ATLAS_WIRE_EXTENSION_FIELDS) {
+        if (field in record) continue; // server value wins when present
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;
       }
