@@ -446,6 +446,13 @@ function xAtDate(state: ViewState, date: number, w: number): number | null {
   return span > 0 ? ((date - view.start) / span) * w : 0;
 }
 
+/** A default axis range for an EMPTY chart (no dated nodes) so the first
+ *  element can still be dragged onto it. Centers on the now if set, else neutral. */
+function emptyChartRange(state: ViewState): { min: number; max: number } {
+  if (state.now != null) return { min: state.now - 50, max: state.now + 50 };
+  return { min: 0, max: 100 };
+}
+
 /** The now-line's canvas x, or null when there's no now or it's off-screen. */
 function nowLineX(state: ViewState, w: number): number | null {
   if (state.now == null) return null;
@@ -565,30 +572,16 @@ function draw(state: ViewState): void {
   ctx.fillStyle = 'rgba(255,255,255,0.012)';
   ctx.fillRect(0, 0, w, h);
 
-  if (state.nodes.length === 0) {
-    state.placedDots = [];
-    state.baseRange = null;
-    state.labelBoxes = [];
-    ctx.textAlign = 'center';
-    ctx.font = '13px system-ui, sans-serif';
-    // Two different truths: the current scope filtered everything out, vs the
-    // whole world carries no dates at all (fresh imports usually start there —
-    // the Sikelia demo made this the first impression, session 254).
-    const worldIsDateless = (state.universe?.length ?? 0) === 0;
-    if (worldIsDateless) {
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fillText('Nothing in this world has a date yet.', w / 2, h / 2 - 12);
-      ctx.fillStyle = 'rgba(255,255,255,0.22)';
-      ctx.fillText('Charts draw from date fields. The quickest start: + Event above.', w / 2, h / 2 + 12);
-    } else {
-      ctx.fillStyle = 'rgba(255,255,255,0.30)';
-      ctx.fillText('Nothing dated in this view.', w / 2, h / 2);
-    }
-    return;
-  }
-
-  const base = calculateTimeRange(state.nodes);
+  // An EMPTY chart still draws a droppable axis (Bout 1.2): you can drag the
+  // FIRST element onto it, even with nothing dated yet. The range comes from the
+  // universe (dated elsewhere but filtered out here), else a sensible default
+  // around the now / a neutral span. The node rendering is skipped below.
+  const emptyChart = state.nodes.length === 0;
+  const base = emptyChart
+    ? (state.universe.length > 0 ? calculateTimeRange(state.universe) : emptyChartRange(state))
+    : calculateTimeRange(state.nodes);
   state.baseRange = base;
+  if (emptyChart) { state.placedDots = []; state.labelBoxes = []; }
   const view = currentViewRange(state) ?? { start: base.min, end: base.max };
   const range = { min: view.start, max: view.end };
   const dateToX = createDateToX(range, w);
@@ -637,6 +630,31 @@ function draw(state: ViewState): void {
     ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.fillText(String(Math.round(tick)), x, axisY + 15);
+  }
+
+  // Empty chart: a hint over the droppable axis (no nodes to render). The
+  // now-line, drop-guide, and strip still draw so a first drag reads + lands.
+  if (emptyChart) {
+    ctx.textAlign = 'center';
+    ctx.font = '13px system-ui, sans-serif';
+    const midY = (TOP_PAD + axisY) / 2;
+    if (state.undated.length > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.42)';
+      ctx.fillText('Drag an element from the list onto the line to give it a date.', w / 2, midY);
+    } else if (state.universe.length === 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillText('Nothing in this world has a date yet.', w / 2, midY - 10);
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      ctx.fillText('Add an event above, then drag it onto the line.', w / 2, midY + 10);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.30)';
+      ctx.fillText('Nothing dated in this view.', w / 2, midY);
+    }
+    ctx.textAlign = 'left';
+    drawNowLine(ctx, state, w, axisY);
+    drawDropGuide(ctx, state, w, axisY);
+    drawStrip(ctx, state, w, h, view);
+    return;
   }
 
   // Significance first — the most-connected nodes ("anchor beats") get a bigger

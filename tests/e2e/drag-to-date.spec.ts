@@ -90,3 +90,33 @@ test('dragging an undated item onto the axis writes its date and moves it out of
   }, prophecyId)).toBe(Number(snapped));
   await expect(page.locator('.atlas-timeline-rail-undated-item', { hasText: 'The Prophecy' })).toHaveCount(0);
 });
+
+test('a dateless chart still offers a droppable axis for the FIRST date', async ({ page }) => {
+  await setupWorld(page);
+  // NOTHING dated — the empty-chart case. Only an undated event to drag.
+  const eventId = await createElement(page, 'event', { name: 'The Prophecy' });
+  await openCharts(page);
+
+  // The empty chart draws a droppable axis + the drag hint (not a dead end).
+  const item = page.locator('.atlas-timeline-rail-undated-item', { hasText: 'The Prophecy' });
+  await expect(item).toBeVisible();
+
+  const ib = (await item.boundingBox())!;
+  const cb = (await page.locator('.atlas-timeline-view-canvas').boundingBox())!;
+  await page.mouse.move(ib.x + 20, ib.y + ib.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(ib.x + 32, ib.y + ib.height / 2);
+  await page.mouse.move(cb.x + cb.width * 0.5, cb.y + cb.height * 0.4, { steps: 6 });
+  await page.mouse.up();
+
+  const input = page.locator('.atlas-edit-popover input');
+  await expect(input).toBeVisible();
+  const snapped = await input.inputValue();
+  expect(Number.isFinite(Number(snapped))).toBe(true);
+  await input.press('Enter');
+
+  // The first date was placed on a previously-empty chart.
+  await expect.poll(async () => page.evaluate((id) => {
+    return (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.start_date ?? null;
+  }, eventId)).toBe(Number(snapped));
+});
