@@ -43,10 +43,8 @@ export type MiddleMode =
   | 'timeline'
   | 'writing'
   | 'knowledge'
-  | 'search'
   | 'share'
-  | 'import'
-  | 'templates';
+  | 'import';
 export type SidebarMode = 'worlds' | 'elements';
 
 export interface ActiveWorldRef {

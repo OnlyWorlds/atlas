@@ -5,8 +5,8 @@
  * Room model (DESIGN.md "Rooms"): the middle pane is a flex column with a
  * persistent room nav strip on top (when a world is active) and the active
  * room's content below. Rooms: welcome, home (default for active worlds),
- * element, writing, knowledge, timeline, search, share, import, templates,
- * settings.
+ * element, writing, knowledge, timeline, share, import, settings.
+ * (search + templates rooms removed session 256; legacy URLs land on home.)
  */
 
 import { mountAppShell, AppShell } from './layout/app-shell';
@@ -17,11 +17,9 @@ import { mountElementDetail } from './middle/element-detail';
 import { mountTimeline } from './middle/timeline';
 import { mountWorldHome } from './middle/world-home';
 import { mountWriting } from './middle/writing';
-import { mountSearch } from './middle/search';
 import { mountKnowledgeRoom } from './middle/knowledge-room';
 import { mountShareRoom } from './middle/share-room';
 import { mountImportRoom } from './middle/import-room';
-import { mountTemplatesRoom } from './middle/templates-room';
 import { mountRoomNav } from './middle/room-nav';
 import { mountRightPane } from './tabs/right/right-pane';
 import { installContextTabLifecycle } from './tabs/right/context-tab-lifecycle';
@@ -151,17 +149,11 @@ export function startApp(container: HTMLElement): AppHandle {
         case 'knowledge':
           nextMode = 'knowledge';
           break;
-        case 'search':
-          nextMode = 'search';
-          break;
         case 'share':
           nextMode = 'share';
           break;
         case 'import':
           nextMode = 'import';
-          break;
-        case 'templates':
-          nextMode = 'templates';
           break;
         case 'map':
           if (route.mapId) ensureMapTabOpen(route.mapId);
@@ -291,16 +283,12 @@ function mountRoom(mode: MiddleMode, target: HTMLElement, toasts: ToastManager):
       return mountWriting(target, toasts);
     case 'timeline':
       return mountTimeline(target, toasts);
-    case 'search':
-      return mountSearch(target);
     case 'knowledge':
       return mountKnowledgeRoom(target, toasts);
     case 'share':
       return mountShareRoom(target, toasts);
     case 'import':
       return mountImportRoom(target, toasts);
-    case 'templates':
-      return mountTemplatesRoom(target);
     case 'settings':
       return mountSettingsPanel({ target, toasts });
   }

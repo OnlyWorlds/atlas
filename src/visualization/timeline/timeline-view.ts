@@ -25,7 +25,9 @@ import { applyAlpha, ensureIconFont } from './canvas-utils';
 import { completeWaypoint } from '../../core/waypoints';
 
 const DOT_RADIUS = 4;             // placement radius for binning + hit-test base
-const DOT_RADIUS_HOVER = 6;       // hit-test tolerance (px)
+const DOT_RADIUS_HOVER = 14;      // hit-test tolerance (px) — covers the WHOLE
+                                  // drawn circle incl. ring, not just the icon
+                                  // (S256, Captain: "icons a bit hard to click")
 // Node glyphs — type-tinted Material Symbols, sizes in px (Identity, chart #2).
 const ICON_BASE = 14;
 const ICON_HOVER = 18;
@@ -396,12 +398,19 @@ export function computeBeeswarm(
     || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
   const placed: PlacedDot[] = [];
+  // Range-bearing nodes (narrative/construct/title spans) OCCUPY their whole
+  // x-span as a lane (S256, Captain on fx-2: point-events sitting exactly ON a
+  // range line read as membership, which is a coincidence of the midline rule,
+  // not a fact). Later nodes whose date falls inside a placed span step off
+  // that lane — near-the-line stays (related in time); on-the-line stops lying.
+  const lanes: { x0: number; x1: number; y: number }[] = [];
   for (const node of order) {
     const x = dateToX(node.startDate);
     if (x < -40 || x > w + 40) continue;
     const free = (cy: number): boolean =>
       cy >= top && cy <= bottom
-      && !placed.some(p => Math.abs(p.x - x) < gapX && Math.abs(p.y - cy) < gapY);
+      && !placed.some(p => Math.abs(p.x - x) < gapX && Math.abs(p.y - cy) < gapY)
+      && !lanes.some(r => x >= r.x0 - gapX && x <= r.x1 + gapX && r.y !== undefined && Math.abs(r.y - cy) < gapY);
     let y = centerY;
     if (!free(y)) {
       let found = false;
@@ -423,6 +432,10 @@ export function computeBeeswarm(
       }
     }
     placed.push({ node, x, y, radius: DOT_RADIUS });
+    if (node.endDate != null && node.endDate > node.startDate) {
+      const x1 = Math.min(w + 40, dateToX(node.endDate));
+      if (x1 > x) lanes.push({ x0: x, x1, y });
+    }
   }
   return placed;
 }
@@ -596,9 +609,18 @@ function draw(state: ViewState): void {
       ctx.stroke();
     }
     if (isSel) {
+      // Two-ring selection mark (S256, Captain: the old single 0.55-alpha ring
+      // "only has a slightly different border" — hard to find): a soft outer
+      // halo in the type color + a crisp near-white inner ring. Still quiet at
+      // canvas scale, but unmistakable when you look for it.
       ctx.beginPath();
-      ctx.arc(dot.x, dot.y, ringR + 4, 0, Math.PI * 2);
-      ctx.strokeStyle = applyAlpha(dot.node.color, 0.55);
+      ctx.arc(dot.x, dot.y, ringR + 8, 0, Math.PI * 2);
+      ctx.strokeStyle = applyAlpha(dot.node.color, 0.3);
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.y, ringR + 3.5, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
       ctx.lineWidth = 2;
       ctx.stroke();
     } else if (isHover) {
@@ -1316,16 +1338,22 @@ function handleMouseUp(state: ViewState): void {
     if (badge) { zoomToCluster(state, badge); return; }
   }
   if (!state.dragMoved && state.hoveredDot) {
-    // Click the already-selected node again → deselect (Captain, 2026-07-10:
-    // a re-click is the natural inverse; the × stays as the explicit path).
+    // Click progression (S256, revising the 2026-07-10 re-click-deselects
+    // lock — reopened by Captain's own live use, which is the lock working):
+    // click = peek · click the peeked node AGAIN = FOCUS · click empty canvas
+    // (below), Esc, or the card × = dismiss.
     if (state.hoveredDot.node.id === state.selectedId) {
-      state.onSelect('');
+      state.onFocus(state.hoveredDot.node.id);
       return;
     }
     state.onSelect(state.hoveredDot.node.id); // a click (not a drag) selects
     // Waypoint (hookmap wp6): a true canvas click — the URL-derived anchor
     // default and programmatic onSelect calls never pass through here.
     completeWaypoint('time');
+  } else if (!state.dragMoved && !state.hoveredDot && state.selectedId) {
+    // Click on empty canvas → dismiss the peek (S256 — dismissal moved here
+    // from the re-click, which now escalates to focus instead).
+    state.onSelect('');
   }
 }
 

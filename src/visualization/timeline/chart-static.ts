@@ -35,6 +35,8 @@ interface Placed {
   cast?: 'protagonist' | 'home';
   ref?: string;
   endX?: number;
+  /** Strip layout only: this node won a label slot (default layout labels anchors/cast). */
+  labelled?: boolean;
 }
 
 /** Centered greedy beeswarm: level order 0, +1, -1, +2, -2 … nearest free wins. */
@@ -59,6 +61,12 @@ export interface ChartViewOptions {
   /** Canvas height in px (default 240). ADDITIVE option — the show viewer's
    *  copy of this module can lag without behavior change (re-lift discipline). */
   height?: number;
+  /** 'strip' = the home chart strip's compact layout (S256): LABEL-AWARE row
+   *  occupancy (a labelled node claims its text width, a bare dot ~20px) in
+   *  pure date order, so short bands fan instead of collapsing to one midline
+   *  row with label pile-ups. ADDITIVE — omitted = the classic fan, so the
+   *  show viewer's copy is unaffected (re-lift discipline). */
+  layout?: 'default' | 'strip';
 }
 
 /** Render a frozen chart block to a self-contained element. */
@@ -124,26 +132,87 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       ctx.fillText(String(block.axisMax), cssW - PAD_X, height - 8);
     }
 
-    // Layout: anchors first (they hold the centre), then by date.
-    const ordered = block.nodes
-      .map((n, i) => ({ n, i }))
-      .sort((a, b) =>
-        (a.n.anchor === b.n.anchor ? 0 : a.n.anchor ? -1 : 1) ||
-        a.n.date - b.n.date ||
-        a.i - b.i,
-      );
-    const lastXAtLevel = new Map<number, number>();
-    placed = ordered.map(({ n }) => {
-      const x = dateToX(n.date);
-      const level = levelFor(x, lastXAtLevel, maxLevel);
-      const color = ELEMENT_TYPE_COLORS[n.type as ElementType] ?? '#94a3b8';
-      return {
-        x, y: midY + level * Y_STEP,
-        icon: ELEMENT_ICONS[n.type as ElementType] ?? 'category',
-        color, name: n.name, anchor: !!n.anchor, cast: n.cast, ref: n.ref,
-        endX: n.endDate != null ? dateToX(n.endDate) : undefined,
+    if (opts.layout === 'strip') {
+      // Strip layout (S256): pure date order + label-aware row occupancy.
+      // A labelled node (anchor/cast) reserves its glyph + text width on its
+      // row; a bare dot reserves ~20px. Rows fill greedily centre-out, so a
+      // short band spreads into a fan instead of one flat line whose labels
+      // overlap (Captain's home-strip shots, 2026-07-12).
+      const ordered = block.nodes
+        .map((n, i) => ({ n, i }))
+        .sort((a, b) => a.n.date - b.n.date || a.i - b.i);
+      const rightEdgeAtLevel = new Map<number, number>();
+      // Try to fit a node on a row, centre-out. A label that would clip at the
+      // right edge FLIPS left at draw time, so its reservation flips too: it
+      // needs clearance BEHIND the dot instead of ahead of it. Returns the
+      // row, or null when every row is taken — the caller then retries with
+      // bare-dot occupancy (label dropped, node never dropped).
+      const tryPlace = (x: number, occupied: number, flip: boolean): number | null => {
+        for (let step = 0; step <= maxLevel; step++) {
+          for (const level of step === 0 ? [0] : [step, -step]) {
+            const edge = rightEdgeAtLevel.get(level);
+            const fits = flip ? (edge === undefined || x - occupied >= edge) : (edge === undefined || x >= edge);
+            if (fits) {
+              rightEdgeAtLevel.set(level, flip ? x + 12 : x + occupied);
+              return level;
+            }
+          }
+        }
+        return null;
       };
-    });
+      placed = ordered.map(({ n }) => {
+        const x = dateToX(n.date);
+        const size = n.cast ? ICON_ANCHOR + 3 : n.anchor ? ICON_ANCHOR : ICON;
+        // EVERY node tries for a label in the strip (the room's label-budget
+        // spirit): labels are the content that keeps a preview from reading
+        // as a monotone dot-run. Cast/anchors measure at 12px, the rest 11px.
+        ctx.font = n.anchor || n.cast ? "12px system-ui, sans-serif" : "11px system-ui, sans-serif";
+        const labelOccupied = size * 0.7 + ctx.measureText(n.name).width + 14;
+        const flip = x + labelOccupied > cssW - PAD_X;
+        let labelled = true;
+        let level = tryPlace(x, labelOccupied, flip);
+        if (level == null) { labelled = false; level = tryPlace(x - 10, 20, false); }
+        if (level == null) {
+          // Every row full even for a bare dot — overflow onto the
+          // least-crowded row (never drop the node itself).
+          let best = 0; let bestEdge = Infinity;
+          for (const [lv, edge] of rightEdgeAtLevel) {
+            if (edge < bestEdge) { bestEdge = edge; best = lv; }
+          }
+          rightEdgeAtLevel.set(best, x + 20);
+          level = best;
+        }
+        const color = ELEMENT_TYPE_COLORS[n.type as ElementType] ?? '#94a3b8';
+        return {
+          x, y: midY + level * Y_STEP,
+          icon: ELEMENT_ICONS[n.type as ElementType] ?? 'category',
+          color, name: n.name, anchor: !!n.anchor, cast: n.cast, ref: n.ref,
+          endX: n.endDate != null ? dateToX(n.endDate) : undefined,
+          labelled,
+        };
+      });
+    } else {
+      // Layout: anchors first (they hold the centre), then by date.
+      const ordered = block.nodes
+        .map((n, i) => ({ n, i }))
+        .sort((a, b) =>
+          (a.n.anchor === b.n.anchor ? 0 : a.n.anchor ? -1 : 1) ||
+          a.n.date - b.n.date ||
+          a.i - b.i,
+        );
+      const lastXAtLevel = new Map<number, number>();
+      placed = ordered.map(({ n }) => {
+        const x = dateToX(n.date);
+        const level = levelFor(x, lastXAtLevel, maxLevel);
+        const color = ELEMENT_TYPE_COLORS[n.type as ElementType] ?? '#94a3b8';
+        return {
+          x, y: midY + level * Y_STEP,
+          icon: ELEMENT_ICONS[n.type as ElementType] ?? 'category',
+          color, name: n.name, anchor: !!n.anchor, cast: n.cast, ref: n.ref,
+          endX: n.endDate != null ? dateToX(n.endDate) : undefined,
+        };
+      });
+    }
 
     // Range lines first (under glyphs).
     for (const p of placed) {
@@ -172,9 +241,13 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       ctx.textAlign = 'center';
       ctx.fillText(p.icon, p.x, p.y);
 
-      if (p.anchor || p.cast) {
-        ctx.font = "12px system-ui, sans-serif";
-        ctx.fillStyle = p.cast ? 'rgba(34,211,238,0.95)' : 'rgba(255,255,255,0.85)';
+      const drawLabel = opts.layout === 'strip' ? p.labelled : (p.anchor || p.cast);
+      if (drawLabel) {
+        const plain = !p.anchor && !p.cast;
+        ctx.font = plain ? "11px system-ui, sans-serif" : "12px system-ui, sans-serif";
+        ctx.fillStyle = p.cast ? 'rgba(34,211,238,0.95)'
+          : plain ? 'rgba(255,255,255,0.62)'
+          : 'rgba(255,255,255,0.85)';
         const lw = ctx.measureText(p.name).width;
         const rightX = p.x + size * 0.7;
         if (rightX + lw > cssW - PAD_X) {

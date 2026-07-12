@@ -1,9 +1,10 @@
 /**
  * Shared "keyboard shortcuts + gestures" content.
  *
- * Two surfaces show this list: the sidebar footer `?` icon popover and the
- * `?` keyboard reference modal. Both call `buildShortcutsContent()` so a
- * single source of truth feeds them.
+ * Consumers: the room-aware help overlay (`help-overlay.ts`, the live `?`
+ * surface) and the dormant hotkey-reference-modal. Both call
+ * `buildShortcutsContent()` so a single source of truth feeds them. (The
+ * old sidebar-footer `?` popover was retired in S255v4.)
  *
  * Content has two kinds of rows:
  *   1. **Hotkey-table bindings** (auto) — pulled from `getInstalledBindings()`

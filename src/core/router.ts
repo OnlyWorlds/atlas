@@ -48,10 +48,8 @@ export type RouteMode =
   | 'timeline'
   | 'writing'
   | 'knowledge'
-  | 'search'
   | 'share'
-  | 'import'
-  | 'templates';
+  | 'import';
 
 export type SettingsTab = 'onlyworlds' | 'storage' | 'editing' | 'world' | 'writing' | 'context';
 
@@ -97,8 +95,6 @@ export interface Route {
   knowerId?: string;
   /** Share room selected page id (page-subtype narrative). */
   pageId?: string;
-  /** Search room query string. */
-  searchQuery?: string;
 }
 
 function parseSettingsTab(s: string | undefined): SettingsTab {
@@ -168,9 +164,11 @@ export function parseHash(hash: string): Route {
       const knowledgeId = parts[3];
       return knowledgeId ? { worldId, mode: 'knowledge', knowledgeId } : { worldId, mode: 'knowledge' };
     }
-    if (sub === 'search') return { worldId, mode: 'search', searchQuery: params.q ?? '' };
+    // 'search' + 'templates' rooms REMOVED (session 256; dormant since 240).
+    // Legacy URLs land on home — a dead link should reach somewhere alive.
+    // Search returns as the Cmd+K palette (post-v1).
+    if (sub === 'search' || sub === 'templates') return { worldId, mode: 'home' };
     if (sub === 'import') return { worldId, mode: 'import' };
-    if (sub === 'templates') return { worldId, mode: 'templates' };
 
     if (sub === 'share' || sub === 'publish') {
       // 'publish' is the legacy route name (pre-Sharing-arc stub) — parsed
@@ -283,12 +281,6 @@ export function knowledgeHash(worldId: string, knowledgeId?: string): string {
 /** Knowledge known-view: `#/w/<worldId>/knowledge/knower/<knowerId>`. */
 export function knowledgeKnowerHash(worldId: string, knowerId: string): string {
   return `#/w/${worldId}/knowledge/knower/${knowerId}`;
-}
-
-export function searchHash(worldId: string, query?: string): string {
-  const base = `#/w/${worldId}/search`;
-  if (!query) return base;
-  return `${base}?q=${encodeURIComponent(query)}`;
 }
 
 /** Share room: `#/w/<worldId>/share[/<pageId>]`. */

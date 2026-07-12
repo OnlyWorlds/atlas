@@ -588,13 +588,16 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 | `writing` | `#/w/<id>/writing[/<narrativeId>]` | Book/chapter/scene/draft authorship (any tier; ancestry derived from `parent_narrative`). See `DESIGN_WRITING.md`. Legacy long-form URL still parsed. | shipped |
 | `knowledge` | `#/w/<id>/knowledge[/<entryId>\|/new\|/knower/<id>]` | Knowledge entries — who knows what. [Entries \| Knowers] tabs, draft editor (persists nothing until create), embedded TipTap prose w/ mentions, known-view per knower. See `DESIGN_KNOWLEDGE.md` | shipped (phase 1) |
 | `timeline` (the **Charts** room) | `#/w/<id>/timeline[/<id>]` | **Charts** — chart views of the world along chosen axes (time first): type-icon identity, degree-ranked anchor beats, density-fan layout, LOD, unified select=focus (focus in the URL, Back walks the chain). Route key stays `timeline`; room title + nav read "Charts". See `DESIGN_CHARTS.md`. | shipped |
-| `search` | `#/w/<id>/search?q=<query>` | Global search across name + description + supertype + subtype | **removed from nav pre-release (240)** — route/file dormant; replacement = Cmd+K palette (see "Search" above) |
+| `search` | ~~`#/w/<id>/search`~~ | **DELETED (256; nav-hidden since 240)** — legacy URLs land on home; interim search = elements-sidebar filter; replacement = Cmd+K palette (see "Search" above) |
 | `share` | `#/w/<id>/share[/<pageId>]` | **The Pages room** (renamed from "Share" S255 — label only; route key + code identifiers keep `share`) — list + block builder (heading/prose/element-card/circle/collection/map/chart) + themes + payload-true visitor preview + LIVE publish/republish/revoke (contract v0.3). Legacy `/publish` URLs alias here. Icon `wall_art`. See `DESIGN_SHARING.md` | shipped + live |
 | `import` | `#/w/<id>/import` | **Import & export room** — bring in (full-world/loose JSON → new world or merge, validation + fix-prompt) / take out (ow.com-shape export, by-type subset). See `DESIGN_IMPORT.md` | shipped (241) |
-| `templates` | `#/w/<id>/templates` | Element creation templates (atlas-local) | **removed from nav pre-release (240)** — route/file dormant |
+| `templates` | ~~`#/w/<id>/templates`~~ | **DELETED (256; was a never-built stub)** — legacy URLs land on home |
 | `settings` | `#/w/<id>/settings[/<tab>]` | Account / storage / editing (atlas-wide) · world / writing / context (per-world) | shipped |
+| `demo` | `#/demo` | View-only example-page presentation (Sikelia; no world, no registry — entry: the Pages room's empty state) | shipped (254-255) |
 
 **Default route**: bare `#/w/<id>` resolves to `home` (was `timeline` pre-session-223). Welcome stays at root `#/` with no active world.
+
+**Room-stable world switch** (S256, generalizing the S253 settings-keeps-its-tab precedent): activating a different world keeps the current room KIND at its landing level — writing/knowledge/timeline/share/import follow to the new world; settings keeps its tab; element and map routes fall to home (their ids are world-bound). Implemented in `worlds-sidebar.activateWorld`.
 
 **Room nav strip** (`src/middle/room-nav.ts`) reads `state.active` + parsed route, highlights the active room icon. Hover → tooltip with sentence-case room name.
 
@@ -608,7 +611,7 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 
 Rule of thumb: **big title = you're in a room; compact band = you're looking at one thing.** Titles are white; cyan is for accents/links, not headings.
 
-**Search** (session 240): the dedicated search ROOM was removed pre-release — it was the weakest search surface. Interim search is the elements-sidebar name filter. The planned replacement is a **Cmd+K / "/" command palette**: an overlay summonable from any room that searches name + description + supertype + subtype and jumps to a result (with a "see all →" path). `search.ts` + the `/search` route stay dormant until the palette ships (re-add the `room-nav.ts` entry to restore the old room). **Templates** room likewise removed pre-release (not built before launch; route + `templates-room.ts` dormant).
+**Search** (240 → 256): the dedicated search ROOM was nav-hidden pre-release (240, weakest surface) and DELETED in 256 (`search.ts` + `templates-room.ts` removed; `/search` + `/templates` URLs parse to home). Interim search is the elements-sidebar name filter (the writing sidebar's "search everywhere" button hands its query to that filter). The planned replacement is a **Cmd+K / "/" command palette**: an overlay summonable from any room that searches name + description + supertype + subtype and jumps to a result (with a "see all →" path).
 
 Per-room design docs:
 - World Home: `DESIGN_HOME.md`
@@ -704,6 +707,7 @@ Hash-based, no server rewrites needed (Cloudflare Pages friendly).
 #/w/<worldId>/templates                     → templates room
 #/w/<worldId>/settings                      → settings (default tab)
 #/w/<worldId>/settings/<tab>                → settings deep-link (account/storage/editing/world/writing/context; legacy keys alias)
+#/demo                                      → view-only example-page presentation (no world, no registry)
 ```
 
 **Right-pane map composition** (orthogonal to room — maps live in the right pane, room lives in middle):
@@ -837,7 +841,7 @@ Related: convention #32 (Esc clears selection + nav home) is **gated to NOT fire
 
 *(#80 = the two-tier room-header model, documented in the Rooms section. #81-85 = import conventions, in `DESIGN_IMPORT.md`.)*
 
-86. **Sync-state mutations go through `updateSyncState(mutate)`** (2026-07-03). Every patch COMPUTED FROM the current sync-state (conflict/server-delete list edits, dedupe-appends) uses `FolderStore.updateSyncState(mutate)` — the mutator receives the CURRENT state inside a store-global chain and returns a partial patch. Never split into `readSyncState()` + `writeSyncState()`: the audit found resolveConflict/pushPhase/pullPhase computing whole-array patches from snapshots taken BEFORE network I/O, so a concurrent round's entries got silently clobbered. `writeSyncState(patch)` remains for whole-field replacement and rides the same chain. All five engine read-modify-write sites migrated; regression suite `tests/integration/folder-store.syncStateChain.test.ts`.
+86. **Sync-state mutations go through `updateSyncState(mutate)`** (2026-07-03). Every patch COMPUTED FROM the current sync-state (conflict/server-delete list edits, dedupe-appends) uses `FolderStore.updateSyncState(mutate)` — the mutator receives the CURRENT state inside a store-global chain and returns a partial patch. Never split into `readSyncState()` + `writeSyncState()`: the audit found resolveConflict/pushPhase/pullPhase computing whole-array patches from snapshots taken BEFORE network I/O, so a concurrent round's entries got silently clobbered. `writeSyncState(patch)` remains for whole-field replacement and rides the same chain. Every engine read-modify-write site goes through the mutator (grep `updateSyncState(` in sync-engine.ts for the current set); regression suite `tests/integration/folder-store.syncStateChain.test.ts`.
 
 87. **Filenames: sticky runtime writes, converging open-time tidy, lowercase equivalence** (2026-07-03, gate-hardened). The full contract is the "File naming" table in On-Disk Layout (the Folder Format spec source). The load-bearing halves: (a) a RUNTIME write keeps the file's current name whenever it's any valid form for the element's name, compared via `sameFsName` (lowercase) — case-folding filesystems (NTFS/APFS) make a case-variant pair the SAME physical entry, so write-new + delete-old self-destructs; OPFS-based tests cannot see this. (b) The open-time tidy is the ONLY converger: id-sorted (deterministic layouts), FULL occupancy view computed before any write (an incremental view lets an early id overwrite a later sibling's live file — 3-lens-convergent gate finding), never touches unreadable files. Index is built from file BODIES; `parseIdFromFilename` is diagnostics, never identity.
 
@@ -969,6 +973,9 @@ src/
 ├── tabs/right/    # map-index, map-tab(+concern modules), context-tab(+graph/toolbar/lists/preview), zone-drawing/edit, ghost-pins
 ├── visualization/ # leaflet-2d (Leaflet2DManager, ZoneOverlay, ZoneGeometry) + timeline-bar
 ├── editor/        # field-schema (SDK adapter) + field-descriptions
+├── import/        # import & export room engine (parse, validate, reconcile, export shapes)
+├── demo/          # bundled sample world + the #/demo view-only presentation
+├── assets/        # self-hosted fonts (Open Sans variable woff2)
 ├── ui/            # modals (create/picker/map-create/make-online/link/conflict/server-delete/zone-create), popovers, toast-manager, modal-base
 ├── setup/         # atlas-root-flow
 ├── styles/        # atlas.css (conventions #1-30 codified)
@@ -1021,6 +1028,7 @@ Atlas extends OnlyWorlds with capabilities that don't (yet) live in the OW schem
 | `atlas_shape` | Zone | `'polygon' \| 'line'` shape kind | **Yes** — fundamental zone geometry data |
 | `atlas_richtext_json` | Narrative | TipTap JSON for the richtext story body | Maybe — if OW adds richtext-on-story support |
 | `atlas_aliases` | Any element | `string[]` of name aliases for linking | **Yes** — broadly useful (writers want it; pickers want it; search wants it) |
+| `atlas_dismissed_suggestions` | Narrative | `string[]` of element ids dismissed from the context pane's Potentials list | Probably not — UI state |
 
 ### Semantic reinterpretations (candidates for first-class schema)
 

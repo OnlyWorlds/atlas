@@ -145,7 +145,13 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
 function buildChartStrip(elements: readonly Element[], worldId: string, savedCharts: ChartConfig[]): HTMLElement | null {
   const favorites = getState().registry.worlds.find(w => w.id === worldId)?.favorites;
   const cast = { protagonistId: favorites?.protagonist_id ?? null, nexusId: favorites?.nexus_id ?? null };
-  const chart: ChartConfig = savedCharts[0] ?? {
+  // ALWAYS the tableau (S256, Captain: "home charts feel a bit random") — the
+  // strip previews exactly what the Charts room opens to. One mental model:
+  // home is the zoomed-out truth, the room is the same picture with controls.
+  // Saved charts no longer hijack the strip (savedCharts[0] used to replace it
+  // wholesale, so an old experiment silently owned the home); they ride below
+  // as chips into the room's gallery.
+  const chart: ChartConfig = {
     schema_version: 1,
     id: 'home-tableau',
     name: 'Tableau',
@@ -156,8 +162,7 @@ function buildChartStrip(elements: readonly Element[], worldId: string, savedCha
     ),
     render: '2d',
   };
-  const charts = savedCharts.length > 0 ? savedCharts : [chart];
-  const frozen = freezeChartBlock(chart.id, 'home-chart-strip', charts, [...elements], new Set(elements.map(e => e.id)), { cast });
+  const frozen = freezeChartBlock(chart.id, 'home-chart-strip', [chart], [...elements], new Set(elements.map(e => e.id)), { cast });
   if (!frozen || frozen.nodes.length < 3) return null;
 
   const section = document.createElement('section');
@@ -166,15 +171,35 @@ function buildChartStrip(elements: readonly Element[], worldId: string, savedCha
   title.type = 'button';
   title.className = 'atlas-home-section-title atlas-home-charts-title';
   title.title = 'Open the Charts room';
-  title.innerHTML = `Charts · ${escapeText(chart.name)} <span class="material-symbols-outlined">arrow_forward</span>`;
+  title.innerHTML = `Charts <span class="material-symbols-outlined">arrow_forward</span>`;
   title.addEventListener('click', () => navigate(timelineHash(worldId)));
   section.appendChild(title);
 
   const view = renderChartView(frozen, {
     height: 170,
+    layout: 'strip',
     onRef: (ref) => navigate(timelineHash(worldId, ref)),
   });
   section.appendChild(view);
+
+  if (savedCharts.length > 0) {
+    const row = document.createElement('div');
+    row.className = 'atlas-home-saved-charts';
+    const label = document.createElement('span');
+    label.className = 'atlas-home-saved-charts-label';
+    label.textContent = 'Saved';
+    row.appendChild(label);
+    for (const saved of savedCharts) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'atlas-home-saved-chart-chip';
+      chip.textContent = saved.name;
+      chip.title = 'Open in the Charts room';
+      chip.addEventListener('click', () => navigate(timelineHash(worldId)));
+      row.appendChild(chip);
+    }
+    section.appendChild(row);
+  }
   return section;
 }
 

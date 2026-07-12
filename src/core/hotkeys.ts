@@ -331,14 +331,13 @@ export function defaultBindings(): HotkeyBinding[] {
  * via `isModalOpen()`. The classes below cover the non-modal overlays.
  */
 function isAnyOverlayActive(): boolean {
-  // Field-edit popover, visual settings popover, shortcuts popover, zone
-  // edit/drawing handles — all DOM-driven. Pin placement + zone editing also
-  // use Esc (within map-tab keydown). Both are tracked in state.ui.
+  // Field-edit popover, visual settings popover, zone edit/drawing handles —
+  // all DOM-driven. Pin placement + zone editing also use Esc (within
+  // map-tab keydown). Both are tracked in state.ui.
   const popoverSelectors = [
     '.atlas-edit-popover-backdrop',
     '.atlas-field-inline-edit',
     '.atlas-visual-settings-popover',
-    '.atlas-shortcuts-popover',
   ];
   for (const sel of popoverSelectors) {
     if (document.querySelector(sel)) return true;

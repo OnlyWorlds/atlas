@@ -571,8 +571,6 @@ function emptyCopyForRoute(route: Route): string {
       return 'Add dates to your elements to chart them here.';
     case 'settings':
       return 'Element-focused view returns when you leave settings.';
-    case 'search':
-      return 'Pick a search result to see its context.';
     case 'knowledge':
       return getKnowledgeRoomTab() === 'knowers'
         ? 'Open a knower to see their world.'

@@ -319,6 +319,10 @@ export class ElementCreateModal extends BaseModal {
           // Waypoint: this early-return path bypasses the hook below — a
           // first element that's a Map still counts (hookmap wp2).
           completeWaypoint('first-element');
+          // afterCreate must fire on this path too (it clears the sidebar
+          // search takeover) — only onCreated is deliberately skipped here,
+          // since its absence is what routed us to the inline map flow.
+          this.opts.afterCreate?.(result.map.id, 'map');
           const worldId = getState().active?.worldId;
           patchSlice('ui', { ...getState().ui, selectedElementId: result.map.id });
           if (worldId) navigate(elementHash(worldId, result.map.id));

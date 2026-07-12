@@ -9,7 +9,10 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
-import { onHashChange, parseHash, navigate, worldHash, settingsHash } from '../core/router';
+import {
+  onHashChange, parseHash, navigate, worldHash, settingsHash,
+  writingHash, knowledgeHash, timelineHash, shareHash, importHash,
+} from '../core/router';
 import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused, deleteWorldEntry } from '../registry/registry';
 import { loadHandle, ensureWritable, queryWritable, deleteHandle } from '../store/handle-vault';
 import { FsFolderStore, ELockHeld } from '../store/folder-store-fs';
@@ -399,15 +402,35 @@ async function doActivateWorld(
     patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, castAssign: null });
     const currentRoute = parseHash(window.location.hash);
     if (currentRoute.worldId !== worldId) {
-      if (currentRoute.mode === 'settings') {
-        // Settings stays settings across a world switch: follow to the SAME
-        // tab of the new world instead of bouncing to home (Captain,
-        // 2026-07-10).
-        navigate(settingsHash(worldId, currentRoute.settingsTab));
-      } else {
-        // Session 223: activate → home, not /elements. Sidebar mode is
-        // independent UI state now; activation doesn't force a sidebar flip.
-        navigate(worldHash(worldId));
+      // Room-stable world switch (S256, Captain: "less jumpy"): world-agnostic
+      // room KINDS follow to the new world at their landing level; specific
+      // entity ids (narrative/entry/page/focus) are world-bound and drop.
+      // Element + map routes fall to home. Settings keeps its tab — the
+      // original 2026-07-10 precedent this generalizes.
+      switch (currentRoute.mode) {
+        case 'settings':
+          navigate(settingsHash(worldId, currentRoute.settingsTab));
+          break;
+        case 'writing':
+          navigate(writingHash(worldId));
+          break;
+        case 'knowledge':
+          navigate(knowledgeHash(worldId));
+          break;
+        case 'timeline':
+          navigate(timelineHash(worldId));
+          break;
+        case 'share':
+          navigate(shareHash(worldId));
+          break;
+        case 'import':
+          navigate(importHash(worldId));
+          break;
+        default:
+          // element / map / home / anything world-bound → home. (Session 223:
+          // activate → home, not /elements; sidebar mode is independent UI
+          // state, activation doesn't force a flip.)
+          navigate(worldHash(worldId));
       }
     }
   } else {

@@ -30,7 +30,8 @@
 }
 
 :root {
-  --atlas-font-sans: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* The app font stack lives in index.html's body rule (it must apply before
+     this bundle loads); the @font-face blocks above supply Open Sans. */
   --atlas-bg: #0a0a0a;
   --atlas-bg-panel: rgba(255, 255, 255, 0.015);
   --atlas-bg-panel-elevated: rgba(255, 255, 255, 0.035);
@@ -2763,23 +2764,6 @@
   gap: 8px;
 }
 
-/* First-launch welcome: the story layer (session 254). */
-.atlas-welcome-lead {
-  font-size: 16px;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.atlas-welcome-beats {
-  margin: 12px auto 0;
-  padding-left: 18px;
-  max-width: 460px;
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 13.5px;
-  text-align: left;
-}
-
-.atlas-welcome-beats li { margin-top: 6px; }
-
 .atlas-welcome-demo-link {
   color: var(--atlas-cyan);
   text-decoration: none;
@@ -2847,18 +2831,6 @@
 .atlas-landing-btn:hover:not(:disabled) {
   background: rgba(34, 211, 238, 0.22);
   box-shadow: 0 0 32px rgba(34, 211, 238, 0.16);
-}
-
-.atlas-landing-mechanics {
-  margin: 0;
-  font-size: 12px;
-  color: var(--atlas-text-muted);
-}
-
-.atlas-landing-alt {
-  margin: 30px 0 0;
-  font-size: 12.5px;
-  color: var(--atlas-text-muted);
 }
 
 /* Grounded state (root set): confirmation + the three path cards. */
@@ -4281,31 +4253,8 @@
   vertical-align: middle;
 }
 
-/* Keyboard-shortcuts popover (session 219). Lives at document.body level
-   anchored against the sidebar footer's help button. Same dark-glass look
-   as the visual settings popover for visual coherence. */
-.atlas-shortcuts-popover {
-  width: 320px;
-  max-height: 70vh;
-  overflow-y: auto;
-  background: rgba(10, 10, 10, 0.94);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(34, 211, 238, 0.18);
-  border-radius: 6px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 12px;
-  padding: 10px 12px 8px;
-  user-select: none;
-}
-
-.atlas-shortcuts-title {
-  font-weight: 600;
-  color: var(--atlas-cyan);
-  margin: 0 0 6px;
-  letter-spacing: 0.02em;
-}
-
+/* Shortcuts content (built by shortcuts-content.ts, rendered inside the
+   room-aware help overlay; the old sidebar-footer popover retired S255v4). */
 .atlas-shortcuts-list {
   margin: 0;
   padding: 4px 0;
@@ -11214,8 +11163,35 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-home-statline-seg:hover b { color: var(--atlas-cyan); }
 .atlas-home-statline-sep { opacity: 0.45; }
 
-/* The chart strip (S15) — the world's history shape on the cover. */
+/* The chart strip (S15) — the world's history shape on the cover.
+   S256: always the tableau; saved charts ride below as chips. */
 .atlas-home-charts { margin-top: 24px; }
+.atlas-home-saved-charts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.atlas-home-saved-charts-label {
+  font-size: 11px;
+  color: var(--atlas-text-muted);
+}
+.atlas-home-saved-chart-chip {
+  font-family: inherit;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 2px 9px;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.atlas-home-saved-chart-chip:hover {
+  color: var(--atlas-cyan);
+  border-color: rgba(34, 211, 238, 0.45);
+}
 .atlas-home-charts-title {
   display: inline-flex;
   align-items: center;

@@ -68,10 +68,9 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       return;
     }
 
-    // First-launch: no atlas folder yet. The landing (session 255 rebuild):
-    // wordmark + tagline carry identity, three beat columns carry the taste,
-    // ONE filled CTA carries the action. Center-aligned prose is banned here;
-    // beats are narrow left-aligned columns so nothing ever rags.
+    // First-launch: no atlas folder yet. The landing (session 255, minimal
+    // final form): wordmark + tagline carry identity, ONE filled CTA carries
+    // the action. The rooms preview lives in the nav strip, not here.
     if (!atlasRoot) {
       root.innerHTML = `
         <div class="atlas-landing">
@@ -100,8 +99,10 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         } catch (err) {
           toastManager.error(err instanceof Error ? err.message : String(err));
         } finally {
+          // On success a state change re-renders this panel away; on cancel
+          // the button stays visible, so restore its original label.
           btn.disabled = false;
-          btn.textContent = 'Set up atlas folder';
+          btn.textContent = 'Set up a local folder';
         }
       });
       return;

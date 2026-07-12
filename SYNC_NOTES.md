@@ -310,9 +310,9 @@ Pull detects a per-element conflict when:
 - `remote.updated_at > local.server_updated_at` (server moved since our baseline)
 - AND `local.local_updated_at > local.server_updated_at` (local moved since baseline)
 
-The OW server has a known limitation: **`updated_at` doesn't bump on m2m_changed signals** by default (Django `auto_now` skips). Skeld shipped a server-side fix in May 2026 that explicitly bumps `updated_at` on m2m changes via a signal receiver. If you see "server-side change not propagating," verify the receiver is still wired server-side.
+HISTORY (pre-keel): the old Django server didn't bump `updated_at` on m2m_changed signals (`auto_now` skips them); Skeld shipped a signal-receiver fix in May 2026. That server was replaced by keel on 2026-07-11, so the receiver note no longer applies — whether keel bumps `updated_at` on m2m changes is UNVERIFIED (2026-07-12 sweep). If "server-side change not propagating" appears, probe keel's m2m semantics first.
 
-Atlas-side workaround if the receiver ever regresses: edit a non-m2m field on the same element on web to force a bump, then refresh.
+Atlas-side workaround if the server ever under-bumps: edit a non-m2m field on the same element on web to force a bump, then refresh.
 
 ---
 
@@ -567,7 +567,9 @@ Verified by `tests/integration/ow-client-adapter.atlasLocal.test.ts` (4 tests).
 
 ### FK constraint on CREATE → server-delete routing (session 221)
 
-Real OW returns `500 (1452, 'Cannot add or update a child row: a foreign key constraint fails ... FOREIGN KEY (\`zone_id\`)...')` on a marker/pin CREATE whose FK targets an element the server doesn't have anymore. Atlas's topo-sort can't help — the peer has `server_updated_at` locally (was synced previously) and is therefore NOT in the CREATE batch.
+⚠ **KEEL GAP (2026-07-12 sweep)**: the matcher below is keyed to the OLD Django/MySQL server's error text. Keel (production since 2026-07-11) returns an honest 400 with a different body on dangling-FK CREATEs, so `parseFkConstraintError` never matches and this routing is currently DEAD against production — the child lands in generic `failures` and retries without converging. Fix pending: probe keel's actual FK error shape, then add a keel matcher alongside the legacy one and update `sync-engine.fkConstraint.test.ts` with the keel case.
+
+HISTORY (pre-keel): the old server returned `500 (1452, 'Cannot add or update a child row: a foreign key constraint fails ... FOREIGN KEY (\`zone_id\`)...')` on a marker/pin CREATE whose FK targets an element the server doesn't have anymore. Atlas's topo-sort can't help — the peer has `server_updated_at` locally (was synced previously) and is therefore NOT in the CREATE batch.
 
 `parseFkConstraintError(err)` extracts the FK field name and the referenced element type. On match:
 1. Look up the orphan peer in the local folder by the FK value.

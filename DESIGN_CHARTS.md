@@ -256,3 +256,17 @@ Two things under "recurring": (1) true recurrence (rule generates instances — 
 ### If I had to pick ONE thing: **render the forward half.** The owed, the coming, the due — the thing no competitor has, and the thing that makes a *living* world legible. Mostly a render + status-vocab on data OW already holds. The wedge behind the wedge.
 
 *— Simmer, keeper of the Fold.*
+
+---
+
+## S256 charts-polish layer (2026-07-12 — decided live with Captain via the fixture-world lab, all shipped + e2e-gated)
+
+Lab: 6 fixture worlds (`Forge/Notes/2026-07-12-charts-lab-notes.md` has shapes + rebuild recipe). The durable rules:
+
+- **The tableau fill (tableauScope, chart-recipe.ts)**: cast (uncapped) → lead character+location → ONE SEAT PER PRESENT TYPE (fairness round-robin — no dateable type with members renders zero) → per-type-capped weight fill (diversity wins early slots) → OVERFLOW fill by weight regardless of type up to the 22 total. Rationale: in a world that is mostly events, events ARE the world; the total cap alone guards the wall. A 14-dated world shows all 14; a 63-dated world spends the whole budget.
+- **Range lines are occupied lanes** (computeBeeswarm): range-bearing nodes reserve their full x-span at their row, so point-events never sit exactly ON a range line — on-the-line used to fake membership by coincidence of the midline rule. (Room renderer only; chart-static's copy inherits at the next show re-lift.)
+- **Click progression**: click = peek · click the peeked node again = FOCUS · click empty canvas / Esc / card × = dismiss. Revises the 2026-07-10 re-click-deselects lock, reopened by its own locker in live use.
+- **Selection mark**: two rings (soft type-color halo + crisp near-white inner) — the old single 0.55-alpha ring was invisible. Hit radius 14px (the whole drawn circle, not the icon).
+- **Room-stable world switch**: switching worlds keeps the room KIND at landing level (charts→charts etc.); element/map fall to home. Generalizes the settings-keeps-its-tab precedent.
+- **The home chart strip = ALWAYS the tableau** (one mental model: home previews exactly what the room opens to). Saved charts are chips below, never the strip itself (savedCharts[0] used to hijack it — "home charts feel random"). `pickDefaultChart` (the pre-tableau ordered-recipe engine) is DELETED — it was consumer-less. The strip renders via `renderChartView(…, {layout:'strip'})`: label-aware row occupancy, every node tries for a label (bare-dot fallback when rows fill), edge-flipping labels reserve leftward. Additive option — the show viewer's chart-static copy is behaviorally untouched until the next deliberate re-lift.
+- **Banked**: deterministic label-side priority in the room renderer (right-of-dot → below → left).

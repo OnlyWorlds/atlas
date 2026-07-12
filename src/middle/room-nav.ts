@@ -47,17 +47,15 @@ const ROOMS: RoomDef[] = [
   { id: 'writing',   label: 'Writing',   icon: 'menu_book',      hashFor: writingHash,   matches: ['writing'] },
   { id: 'knowledge', label: 'Knowledge', icon: 'psychology',     hashFor: knowledgeHash, matches: ['knowledge'] },
   { id: 'timeline',  label: 'Charts',    icon: 'insights',       hashFor: timelineHash,  matches: ['timeline'] },
-  // Search room removed pre-release (session 240) — the dedicated room was the
-  // weakest search surface; the planned replacement is a Cmd+K command palette
-  // (see DESIGN.md "Search"). The elements-sidebar name filter remains interim.
-  // Route + search.ts stay dormant; re-add this entry to restore the room.
+  // Search room DELETED (session 256; nav-hidden since 240) — the elements-
+  // sidebar name filter is the interim search surface; the real replacement
+  // is the Cmd+K command palette (see DESIGN.md "Search").
   // Icon: `wall_art` (S255v3, Captain's ask: not a globe, not a share-sheet —
   // the room is about showing off, publishing, displaying; a framed piece on
   // a wall is the exhibit).
   { id: 'share',     label: 'Pages',          icon: 'wall_art',       hashFor: (w) => shareHash(w), matches: ['share'] },
   { id: 'import',    label: 'Import & export', icon: 'import_export',  hashFor: importHash,    matches: ['import'] },
-  // Templates hidden pre-release (not building it before launch). Route +
-  // templates-room.ts stay dormant; re-add this entry to restore it to the nav.
+  // Templates room DELETED (session 256; never built past a stub).
   // Settings dropped from the strip S255v4 (Captain): the sidebar footer gear
   // is the one settings entrance. Route + gear-as-toggle unaffected.
 ];

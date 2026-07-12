@@ -10,7 +10,7 @@
  */
 
 import { getState, patchSlice, subscribe } from '../core/state';
-import { onHashChange, parseHash, navigate, writingHash, searchHash } from '../core/router';
+import { onHashChange, parseHash, navigate, writingHash } from '../core/router';
 import { ToastManager } from '../ui/toast-manager';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import { getActiveStore } from '../core/active-store';
@@ -274,7 +274,17 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     globalSearchBtn.title = 'Search everywhere (all elements)';
     globalSearchBtn.innerHTML = '<span class="material-symbols-outlined">search</span>';
     globalSearchBtn.addEventListener('click', () => {
-      navigate(searchHash(active.worldId, searchQuery));
+      // Search room removed (session 256): "search everywhere" hands the query
+      // to the elements-sidebar filter — the interim search surface until the
+      // Cmd+K palette. Sidebar mode is pure state (session 223 decoupling).
+      patchSlice('ui', { ...getState().ui, sidebarMode: 'elements', search: searchQuery, sidebarWritingOverride: true });
+      queueMicrotask(() => {
+        const input = document.querySelector<HTMLInputElement>('input[data-role="elements-search"]');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      });
     });
     searchRow.appendChild(globalSearchBtn);
 
