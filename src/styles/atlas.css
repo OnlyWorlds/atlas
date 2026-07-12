@@ -3262,12 +3262,24 @@
 .atlas-demo-map .leaflet-tooltip-top::before { border-top-color: rgba(34, 211, 238, 0.25); }
 
 .atlas-demo-cards {
-  max-width: 760px;
+  max-width: 960px;
   margin: 26px auto 0;
   padding: 0 24px;
 }
 
-/* In the demo the cards fill the prose column — the share renderer's 505px
+/* Two-column gallery on wide screens (2026-07-12): 12 highlight cards in one
+   long column read as a scroll chore; two columns read as an exhibit. The
+   cards sit INSIDE renderPayloadPage's article, so the grid targets that.
+   Narrow screens collapse back to one column via auto-fit. */
+.atlas-demo-cards .atlas-share-page-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+  align-items: start;
+  max-width: 100%;
+}
+
+/* In the demo the cards fill their grid cell — the share renderer's 505px
    card cap left the page ragged against the intro edge (S255). */
 .atlas-demo-cards .atlas-share-card { max-width: 100%; }
 
@@ -9068,6 +9080,21 @@ a.atlas-share-map-pin { cursor: pointer; }
 
 .atlas-share-card-field-label {
   font-size: 10px;
+  color: var(--atlas-text-muted);
+}
+
+/* Inline meta line: short scalar fields as "Settled · Polis" (field name in
+   the tooltip). Presentation over database rows (2026-07-12). */
+.atlas-share-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--atlas-text);
+}
+
+.atlas-share-card-meta-sep {
   color: var(--atlas-text-muted);
 }
 

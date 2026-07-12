@@ -102,6 +102,10 @@ test('empty state: section still renders with just the add row', async ({ page }
 });
 
 test('add-field flow: name → x_ prefix → value editor auto-opens → save', async ({ page }) => {
+  // Short viewport = long scroll distance to the custom section. The popover
+  // mispositioning only reproduces when the pane's saved scrollTop is large
+  // (the bug measured the anchor against the unscrolled layout).
+  await page.setViewportSize({ width: 1280, height: 420 });
   await setupWorld(page);
   const id = await createElement(page, 'character', { name: 'Adder' });
   await openElement(page, id);
@@ -116,6 +120,16 @@ test('add-field flow: name → x_ prefix → value editor auto-opens → save', 
   await expect(row.locator('.atlas-field-label span').first()).toHaveText('Battle Cry');
   const popover = page.locator('.atlas-edit-popover');
   await expect(popover).toBeVisible();
+
+  // The popover must open AT the field, not at the bottom of the page — the
+  // anchor rect must be measured AFTER element-detail's scroll restore
+  // (Captain's live find: a microtask-timed click measured the unscrolled
+  // layout and the editor landed a page below the row).
+  const rowBox = await row.boundingBox();
+  const popBox = await popover.boundingBox();
+  expect(rowBox).toBeTruthy();
+  expect(popBox).toBeTruthy();
+  expect(Math.abs(popBox!.y - rowBox!.y)).toBeLessThan(250);
   await popover.locator('input.atlas-input').fill('For the Shire!');
   await popover.locator('input.atlas-input').press('Enter');
 

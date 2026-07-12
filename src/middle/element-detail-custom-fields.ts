@@ -107,16 +107,32 @@ export function buildCustomFieldsSection(el: Element): HTMLElement {
   })!;
   section.classList.add('atlas-custom-fields-section');
 
+  // Concise how-it-works on hover (Captain's ask, 2026-07-12). Voice: plain
+  // statements, no em-dashes.
+  const headerLabel = section.querySelector<HTMLElement>('.atlas-detail-section-header span');
+  if (headerLabel) {
+    headerLabel.title = 'Your own fields for this element. They sync, import, and export like any other data.';
+  }
+
   // The add row lives inside the section body (collapsed section hides it too).
   const body = section.querySelector<HTMLElement>('.atlas-detail-section-body');
   if (body) body.appendChild(buildAddRow(el));
 
   // Add-flow continuation: open the value editor on the just-created row.
+  // Timing matters: element-detail restores the pane's scrollTop in a
+  // queueMicrotask AFTER this section is built — a microtask click here
+  // would measure the anchor's rect against the UNSCROLLED layout and the
+  // popover would land at the bottom of the page (Captain's live find,
+  // 2026-07-12). rAF runs after all microtasks (scroll restored) and before
+  // paint; scrollIntoView pins the row on-screen so the anchor rect is real.
   if (pendingEdit && pendingEdit.elementId === el.id) {
     const field = pendingEdit.fieldName;
     pendingEdit = null;
-    queueMicrotask(() => {
-      section.querySelector<HTMLElement>(`[data-field="${CSS.escape(field)}"] .atlas-field-value`)?.click();
+    requestAnimationFrame(() => {
+      const value = section.querySelector<HTMLElement>(`[data-field="${CSS.escape(field)}"] .atlas-field-value`);
+      if (!value) return;
+      value.scrollIntoView({ block: 'nearest' });
+      value.click();
     });
   }
   return section;
@@ -163,6 +179,7 @@ function buildAddRow(el: Element): HTMLElement {
   btn.type = 'button';
   btn.className = 'atlas-custom-add-btn';
   btn.textContent = '+ add field';
+  btn.title = 'Name a field, then fill in its value. Names you have used elsewhere in this world are suggested. Stored with an x_ prefix so it never collides with OnlyWorlds fields.';
   row.appendChild(btn);
 
   btn.addEventListener('click', () => {

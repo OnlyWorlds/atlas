@@ -346,6 +346,19 @@ function buildCastSlot(worldId: string): HTMLElement | null {
   for (const spec of CAST_KINDS) {
     const favId = spec.kind === 'protagonist' ? favorites?.protagonist_id : favorites?.nexus_id;
     const el = favId ? elements.find(e => e.id === favId) : undefined;
+    if (favId && !el && elements.length > 0) {
+      // Stale favorite: the element was deleted (locally or via pull) and the
+      // registry id dangles. Self-heal lazily — every delete path lands on a
+      // home render eventually, and the loading guard above means an absent
+      // element is genuinely absent, not not-yet-loaded. Deferred: patching
+      // registry mid-render is the recursive-render class (conv #112).
+      const staleKind = spec.kind;
+      queueMicrotask(() => {
+        const next = setWorldFavoriteElement(getState().registry, worldId, staleKind, null);
+        saveRegistry(next);
+        patchSlice('registry', next);
+      });
+    }
     if (el) {
       slot.appendChild(buildCastCard(el, spec, worldId));
       rendered++;

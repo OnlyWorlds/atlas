@@ -843,9 +843,13 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
         align: 'center', tx: dot.x, ty: cy,
       });
     }
+    // Point nodes: right → below → left → above (the S256 lab sliver). A
+    // left-side label sits BETWEEN two dots and reads as ambiguous ownership;
+    // below is the clearer second choice. Range nodes keep vertical-first
+    // (a side label sits ON the range line and reads struck-through).
     const attempts = dot.node.endDate != null
       ? [...vertAttempts, ...sideAttempts]
-      : [...sideAttempts, ...vertAttempts];
+      : [sideAttempts[0], vertAttempts[0], sideAttempts[1], vertAttempts[1]];
     // Collision test with a 5px horizontal breathing pad — a label ENDING
     // flush at the next glyph reads as one word ("Captain SnootPip", live).
     const padded = (b: Box): Box => ({ x0: b.x0 - 5, x1: b.x1 + 5, y0: b.y0, y1: b.y1 });

@@ -21,6 +21,7 @@ import { completeWaypoint } from '../core/waypoints';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { requestPushIfLinked } from '../sync/sync-attach';
+import { setSidebarModePref } from '../core/ui-prefs';
 import { createMapDialog } from './map-create-modal';
 import { findExistingNameMatch } from './element-name-match';
 import { escapeAttr } from '../core/dom-utils';
@@ -334,7 +335,15 @@ export class ElementCreateModal extends BaseModal {
         completeWaypoint('first-element');
         const elements = await store.listElements();
         patchSlice('data', { elements });
-        patchSlice('ui', { ...getState().ui, selectedElementId: el.id });
+        // Creating an element flips the sidebar to elements mode so the new
+        // row is visible (mirrors the create-world flip, S255v3). Persisted
+        // as the user's preference, same as the world flow.
+        if (getState().ui.sidebarMode !== 'elements') {
+          patchSlice('ui', { ...getState().ui, sidebarMode: 'elements', selectedElementId: el.id });
+          setSidebarModePref('elements');
+        } else {
+          patchSlice('ui', { ...getState().ui, selectedElementId: el.id });
+        }
         this.toasts.success(`Created ${this.selected}: ${el.name}`);
         this.hide();
         this.opts.onCreated?.(el.id, this.selected);

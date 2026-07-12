@@ -4,7 +4,11 @@
 
 - Sync now speaks the OnlyWorlds v2 API. Making a world online uploads everything in one atomic request: worlds whose elements reference each other in loops (any real world, in practice) now come through complete on the first try.
 - Custom fields: fields named with an `atlas_`, `x_`, or `shadow_` prefix now sync, import, and export like any other data. Bring your own fields; atlas carries them.
-- Custom fields have a home in the editor: a Custom fields section at the bottom of every element shows them with clean labels, and an add field row creates new ones. Names autocomplete from fields already used in the world, values keep their type, and shared pages show the clean label too.
+- Custom fields have a home in the editor: a Custom fields section at the bottom of every element shows them with clean labels, and an add field row creates new ones. Names autocomplete from fields already used in the world, values keep their type, and shared pages show the clean label too. Hover the section header or the add row for a short explanation.
+- Published cards read as presentation: short values like supertype and subtype join one inline line under the name, the description flows as plain text, and only longer fields keep their labels. Applies in atlas previews and on published pages.
+- The example page shows its highlight cards in two columns on wide screens.
+- Creating an element switches the sidebar to the elements list so the new entry is visible, matching what creating a world already did.
+- Chart labels pick their spot more predictably: to the right of the dot first, then below, then left.
 - Zone colors, opacity, and shape now sync between devices instead of living on one machine.
 - Pulling changes uses the server's change feed: faster, and deletions arrive as explicit events instead of being inferred, which removes a whole class of false "deleted on the server" prompts.
 - Elements deleted and later restored on the server no longer risk a stale deletion prompt.

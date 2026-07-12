@@ -156,24 +156,95 @@ export function renderElementCard(block: ElementCardBlock, elements: Map<string,
   }
 
   if (block.variant === 'full' && block.fields.length > 0) {
-    const fieldsWrap = document.createElement('div');
-    fieldsWrap.className = 'atlas-share-card-fields';
-    for (const field of block.fields) {
-      const value = (el as Record<string, unknown>)[field];
-      if (isCardSkipField(field) || !isPopulated(value)) continue;
-      const row = document.createElement('div');
-      row.className = 'atlas-share-card-field';
-      const label = document.createElement('div');
-      label.className = 'atlas-share-card-field-label';
-      label.textContent = humanizeFieldName(field);
-      row.appendChild(label);
-      row.appendChild(renderFieldValue(value, elements));
-      fieldsWrap.appendChild(row);
-    }
-    card.appendChild(fieldsWrap);
+    const usable = block.fields.filter(f => !isCardSkipField(f) && isPopulated((el as Record<string, unknown>)[f]));
+    const fieldsWrap = buildCardFields(
+      usable,
+      f => (el as Record<string, unknown>)[f],
+      v => renderFieldValue(v, elements),
+      v => typeof v === 'string' && elements.has(v), // relation id → chip path
+    );
+    if (fieldsWrap) card.appendChild(fieldsWrap);
   }
 
   return card;
+}
+
+// ---------------------------------------------------------------------------
+// Card field presentation (2026-07-12, Captain's call): published cards read
+// as presentation, not database rows. Short scalar values collapse into ONE
+// inline meta line ("Settled · Polis"; the field name lives in the tooltip),
+// the description renders as unlabeled prose, and everything else (long text,
+// relation chips) keeps a quiet label row for ownership. Show carries a COPY
+// of this shape — re-lift on change.
+// ---------------------------------------------------------------------------
+
+const INLINE_SCALAR_MAX = 48;
+
+function isInlineScalarValue(v: unknown): boolean {
+  if (typeof v === 'number' || typeof v === 'boolean') return true;
+  return typeof v === 'string' && v.trim().length > 0
+    && v.trim().length <= INLINE_SCALAR_MAX && !v.includes('\n');
+}
+
+/**
+ * Shared card-fields builder for every card surface (world-backed card,
+ * payload card, pin/identity modal). `fields` must already be filtered to
+ * populated, non-skipped names. Returns null when nothing renders.
+ */
+function buildCardFields(
+  fields: string[],
+  get: (field: string) => unknown,
+  renderValue: (value: unknown) => HTMLElement,
+  /** True when a value must take the chip/labeled path even though it LOOKS
+   * like a short string — the world-backed card's relation ids (a bare uuid
+   * that resolves to an element renders as a chip, never inline text). */
+  excludeFromInline?: (value: unknown) => boolean,
+): HTMLElement | null {
+  if (fields.length === 0) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'atlas-share-card-fields';
+
+  const inlineable = (f: string): boolean =>
+    f !== 'description' && isInlineScalarValue(get(f)) && !(excludeFromInline?.(get(f)) ?? false);
+  const inline = fields.filter(inlineable);
+  const prose = fields.filter(f => f === 'description');
+  const labeled = fields.filter(f => f !== 'description' && !inlineable(f));
+
+  if (inline.length > 0) {
+    const meta = document.createElement('div');
+    meta.className = 'atlas-share-card-meta';
+    inline.forEach((f, i) => {
+      if (i > 0) {
+        const dot = document.createElement('span');
+        dot.className = 'atlas-share-card-meta-sep';
+        dot.textContent = '·';
+        meta.appendChild(dot);
+      }
+      const item = document.createElement('span');
+      item.className = 'atlas-share-card-meta-item';
+      item.textContent = String(get(f));
+      item.title = humanizeFieldName(f);
+      meta.appendChild(item);
+    });
+    wrap.appendChild(meta);
+  }
+  for (const f of prose) {
+    const row = document.createElement('div');
+    row.className = 'atlas-share-card-field atlas-share-card-field-plain';
+    row.appendChild(renderValue(get(f)));
+    wrap.appendChild(row);
+  }
+  for (const f of labeled) {
+    const row = document.createElement('div');
+    row.className = 'atlas-share-card-field';
+    const label = document.createElement('div');
+    label.className = 'atlas-share-card-field-label';
+    label.textContent = humanizeFieldName(f);
+    row.appendChild(label);
+    row.appendChild(renderValue(get(f)));
+    wrap.appendChild(row);
+  }
+  return wrap;
 }
 
 /**
@@ -306,21 +377,12 @@ export function openPinModal(
   }
 
   const rest = Object.keys(entry.fields).filter(f => f !== 'description');
-  if (rest.length > 0) {
-    const fieldsWrap = document.createElement('div');
-    fieldsWrap.className = 'atlas-share-card-fields';
-    for (const field of rest) {
-      const row = document.createElement('div');
-      row.className = 'atlas-share-card-field';
-      const label = document.createElement('div');
-      label.className = 'atlas-share-card-field-label';
-      label.textContent = humanizeFieldName(field);
-      row.appendChild(label);
-      row.appendChild(renderPayloadFieldValue(entry.fields[field], entries));
-      fieldsWrap.appendChild(row);
-    }
-    modal.appendChild(fieldsWrap);
-  }
+  const fieldsWrap = buildCardFields(
+    rest,
+    f => entry.fields[f],
+    v => renderPayloadFieldValue(v, entries),
+  );
+  if (fieldsWrap) modal.appendChild(fieldsWrap);
 
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -649,21 +711,12 @@ export function renderPayloadCard(
 
   if (block.variant === 'full') {
     const fieldNames = block.fields.filter(f => isPopulated(entry.fields[f]) || isTokenArray(entry.fields[f]));
-    if (fieldNames.length > 0) {
-      const fieldsWrap = document.createElement('div');
-      fieldsWrap.className = 'atlas-share-card-fields';
-      for (const field of fieldNames) {
-        const row = document.createElement('div');
-        row.className = 'atlas-share-card-field';
-        const label = document.createElement('div');
-        label.className = 'atlas-share-card-field-label';
-        label.textContent = humanizeFieldName(field);
-        row.appendChild(label);
-        row.appendChild(renderPayloadFieldValue(entry.fields[field], entries));
-        fieldsWrap.appendChild(row);
-      }
-      card.appendChild(fieldsWrap);
-    }
+    const fieldsWrap = buildCardFields(
+      fieldNames,
+      f => entry.fields[f],
+      v => renderPayloadFieldValue(v, entries),
+    );
+    if (fieldsWrap) card.appendChild(fieldsWrap);
   }
 
   return card;

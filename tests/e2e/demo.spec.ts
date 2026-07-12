@@ -46,6 +46,8 @@ test('the share room links into the demo; the demo renders map, pins, and cards'
   // The curated cards render through the payload renderer.
   await expect(page.locator('.atlas-demo-cards')).toContainText('Syrakousai');
   await expect(page.locator('.atlas-demo-cards')).toContainText('Pantalika');
+  await page.locator('.atlas-demo-cards').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'Notes/ui-snapshots/2026-07-12/demo-two-col-cards.png' });
 });
 
 test('pin click opens the read-only entry modal', async ({ page }) => {
