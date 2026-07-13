@@ -1804,7 +1804,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     header.className = 'atlas-room-header';
     header.innerHTML = `
       <h1>Pages</h1>
-      <p class="atlas-room-subtitle">Build pages from your world to share with a group or publish for anyone to see.</p>
+      <p class="atlas-room-subtitle">Build pages from your world to share with anyone.</p>
     `;
     root.appendChild(header);
 

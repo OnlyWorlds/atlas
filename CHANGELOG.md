@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Re-date by dragging: grab any dot on the chart and slide it to a new date; a guide line shows where it will land and a confirm keeps mis-drags harmless. Dragging a range moves its start; the end stays anchored, so the drag can never invert it.
+- Saved charts fixed: a chart saved from the default view can now be reopened (it silently refused before). The panel beside the chart names whichever saved chart is open, renames included, and the chips sit beside the buttons with a quieter look, so saving your first chart no longer shifts the page.
+- Previewing and focusing look different now: a click gives an element a soft ring; focusing it earns the bright one.
+- The charts room's create button is "+ Element" (it always could create more than events).
+- The home page now walks a new world in: character and location cards lead, and once both exist, quiet cards suggest what each next element type unlocks — create an event and the card becomes a door to Charts, a narrative opens Writing, a map, a collective for Knowledge, a construct for Pages, an object for Export. Each card can be dismissed for good.
+- Creating from a home card keeps you on the home page; your first element gets a highlighted row that takes you back into editing it.
+- Empty link fields are easier to read: fields brightened overall, fields whose target type exists in the world show a readier link icon, and a field with nothing to link opens element creation directly — the new element links itself in and you stay where you were.
+- The AI import prompt now carries the full OnlyWorlds field list for every type, generated from the schema itself — assistants no longer invent fields. The import room shows the prompt's approximate size.
+- The maps panel teaches by glow: with no maps yet, the new-map button lights up instead of a paragraph explaining it.
+- Category names appear instantly when hovering the sidebar's type icons.
+- Picking a category in the create dialog no longer steals focus from the name field.
+- Room descriptions tightened across writing, charts, knowledge, pages, and import.
+
 - Charts mark where recorded time ends, cleanly: the overview bar now ends exactly at the world's bounds (the viewport band pins inside it, never overhanging), and in the plot everything beyond the bounds dims back toward the page. The lit region is recorded history; its edge is the border.
 - Element chips on the chart card speak time: a border means the element is dated and lives on the chart; undated-but-dateable chips are borderless and can be dragged straight onto the axis to date them. A click still previews.
 - The date on the chart card is editable: click it, type, Enter. Same for elements with ranges (edits the start).

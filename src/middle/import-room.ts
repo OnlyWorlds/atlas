@@ -18,6 +18,7 @@ import { getActiveStore } from '../core/active-store';
 import { escapeText } from '../core/dom-utils';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { ELEMENT_LABELS, ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
+import { sectionsFor } from '../editor/field-schema';
 import { parsePayload } from '../import/parse';
 import { validatePayload, generateFixPrompt } from '../import/validate';
 import { reconcile } from '../import/reconcile';
@@ -59,28 +60,66 @@ const EXAMPLE_JSON = `{
 `;
 
 /**
+ * The full field whitelist, generated from the SDK FIELD_SCHEMA at runtime so
+ * the prompt is schema-true forever — no URL for the assistant to (fail to)
+ * fetch, no drift (S264; the schema-less prompt invited hallucinated fields
+ * like Character.age, the toolkit's top import-failure class).
+ * Grammar: bare = text · #field = number · field>Type = single link (value:
+ * the target's name) · field>>Type = list of links.
+ */
+export function buildSchemaDigest(): string {
+  const cap = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
+  const lines: string[] = [];
+  for (const type of ALL_ELEMENT_TYPES) {
+    const fields: string[] = [];
+    const seen = new Set<string>();
+    for (const section of sectionsFor(type)) {
+      for (const f of section.fields) {
+        if (f.name === 'name' || f.name.startsWith('atlas_') || seen.has(f.name)) continue;
+        seen.add(f.name);
+        if (f.widget === 'number') fields.push(`#${f.name}`);
+        else if (f.widget === 'single-link') fields.push(`${f.name}>${cap(f.target ?? 'element')}`);
+        else if (f.widget === 'multi-link') fields.push(`${f.name}>>${cap(f.target ?? 'element')}`);
+        else fields.push(f.name);
+      }
+    }
+    lines.push(`${cap(type)}: ${fields.join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * D8: a copyable prompt that teaches any AI assistant to convert freeform notes
  * into OnlyWorlds import JSON. Sibling to validate.ts's fix-prompt — same idea,
- * pointed at creation rather than repair. The type list stays in sync with the
- * schema by deriving from ALL_ELEMENT_TYPES.
+ * pointed at creation rather than repair. Carries the FULL generated field
+ * whitelist (S264) so the assistant never needs a schema lookup; key rules
+ * adapted from the OnlyWorlds toolkit's parsing skill.
  */
-function buildConvertNotesPrompt(): string {
-  const types = ALL_ELEMENT_TYPES.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ');
+export function buildConvertNotesPrompt(): string {
   return [
     'I have freeform worldbuilding notes I want to import into OnlyWorlds. Convert them into a single JSON object in this shape:',
     '',
     '- Top-level keys are element types in PascalCase, each holding an array of elements.',
-    `- Element types you can use: ${types}.`,
-    '- Every element needs a "name" (a non-empty string). Everything else is optional.',
-    '- To link elements, use the target\'s name as the value: a single link like "location": "Old Harbor", or a list like "objects": ["Sword", "Shield"]. Only reference elements you also include.',
+    '- Every element needs a "name" (a non-empty string). Everything else is optional — sparse is valid.',
+    '- Only the fields listed below exist. Do not invent field names (no Character.age, no Object.owner). A detail that deserves its own field can be a custom field prefixed x_ (like "x_mood": "grim"); when unsure, put it in "description".',
+    '- Field grammar in the list: a bare field is text · #field is a number (dates are plain numbers in the world\'s own timeline) · field>Type is a single link, its value the target element\'s name · field>>Type is a list of links.',
+    '- Only reference elements you also include. Prefer fields over tiny elements (physicality: "tall" beats a Trait named "Tall"). Only make elements for things specific to this world.',
     '- Optionally add a "World" block with "name" and "description" to make it a full world.',
-    '- Do not invent field names. A detail that deserves its own field can be a custom field prefixed x_ (like "x_mood": "grim"); when unsure, put it in "description".',
+    '',
+    'The field list per type:',
+    '',
+    buildSchemaDigest(),
     '',
     'Return only the JSON, nothing else.',
     '',
     'My notes:',
     '<paste your notes here>',
   ].join('\n');
+}
+
+/** Rough token estimate for the size hint (chars/4 is close enough for UI). */
+function estimateTokens(s: string): number {
+  return Math.round(s.length / 4);
 }
 
 export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () => void {
@@ -92,7 +131,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   root.innerHTML = `
     <header class="atlas-room-header">
       <h1>Import &amp; export</h1>
-      <p class="atlas-room-subtitle">Bring OnlyWorlds data into atlas, or take a world out as a portable JSON file.</p>
+      <p class="atlas-room-subtitle">Export your world as a complete file, or bring in OnlyWorlds-formatted data.</p>
     </header>
     <div class="atlas-room-tabs" role="tablist">
       <button type="button" class="atlas-room-tab is-active" data-tab="in" role="tab">
@@ -133,6 +172,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
               <button type="button" class="atlas-btn-ghost" data-action="convert-prompt">copy the convert-my-notes prompt</button>
               <a class="atlas-btn-link" href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">open the OnlyWorlds AI toolkit</a>
             </div>
+            <p class="atlas-import-ai-size">the prompt carries the full field list for every type · ~${estimateTokens(buildConvertNotesPrompt())} tokens</p>
           </div>
         </div>
       </div>

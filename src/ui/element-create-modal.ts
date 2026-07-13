@@ -551,6 +551,9 @@ export class ElementCreateModal extends BaseModal {
         this.setType(type);
         this.typeInput.value = ELEMENT_LABELS[type].singular;
         this.updateGhost();
+        // Hand focus straight back to the name input (S264, Captain: picking
+        // a category shouldn't cost a re-click before typing the name).
+        this.nameInput.focus();
       });
       this.typeButtons.set(type, btn);
       grid.appendChild(btn);

@@ -182,7 +182,7 @@ function mountEditor(container: HTMLElement, toasts: ToastManager): () => void {
       roomHeader.className = 'atlas-room-header';
       roomHeader.innerHTML = `
         <h1>Writing</h1>
-        <p class="atlas-room-subtitle">Your world's long-form writing.</p>
+        <p class="atlas-room-subtitle">Write your world's stories.</p>
         <p class="atlas-writing-landing-labels">labels: ${escapeText(labels.l1)} › ${escapeText(labels.l2)} › ${escapeText(labels.l3)} · <a class="atlas-writing-landing-labels-edit" href="${escapeText(settingsHash(active.worldId, 'writing'))}">edit</a></p>
       `;
       detailSlot.appendChild(roomHeader);

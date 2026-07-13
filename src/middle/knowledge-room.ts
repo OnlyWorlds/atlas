@@ -536,7 +536,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     header.innerHTML = `
       <h1>Knowledge</h1>
       <p class="atlas-room-subtitle">
-        What the characters and circles of your world know.
+        What your characters and collectives know about each other and the world.
       </p>
     `;
     root.appendChild(header);

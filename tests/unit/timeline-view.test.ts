@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { computeBeeswarm, clampWindow, zoomWindow, rangeVsNow, extendRangeForOpenEnds, temporalMetaLine, focusInferredEnd } from '../../src/visualization/timeline/timeline-view';
+import { computeBeeswarm, clampWindow, zoomWindow, rangeVsNow, extendRangeForOpenEnds, temporalMetaLine, focusInferredEnd, glyphDropDate } from '../../src/visualization/timeline/timeline-view';
 import { effectiveEndDate } from '../../src/visualization/timeline/temporal-fields';
 import type { TimelineNode } from '../../src/visualization/timeline/types';
 
@@ -268,5 +268,28 @@ describe('zoomWindow — resize around the cursor date (S3)', () => {
     const r = zoomWindow({ start: 60, end: 100 }, 2, 100, bounds);
     expect(r.end).toBeLessThanOrEqual(105 + 1e-9);
     expect(r.start).toBeGreaterThanOrEqual(-5 - 1e-9);
+  });
+});
+
+describe('glyphDropDate — re-dating snap + range clamp (S264)', () => {
+  it('rounds to whole dates', () => {
+    expect(glyphDropDate(12.4, null)).toBe(12);
+    expect(glyphDropDate(12.6, null)).toBe(13);
+    expect(glyphDropDate(-3.5, null)).toBe(-3);
+  });
+
+  it('clamps a range start at its recorded end (the end is anchored)', () => {
+    expect(glyphDropDate(99, 8)).toBe(8);
+    expect(glyphDropDate(8.4, 8)).toBe(8);
+  });
+
+  it('a fractional end clamps to its floor (start never passes the end)', () => {
+    expect(glyphDropDate(99, 8.7)).toBe(8);
+  });
+
+  it('dates at or before the end pass through untouched', () => {
+    expect(glyphDropDate(5, 8)).toBe(5);
+    expect(glyphDropDate(8, 8)).toBe(8);
+    expect(glyphDropDate(-40, 8)).toBe(-40);
   });
 });

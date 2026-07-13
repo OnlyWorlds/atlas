@@ -329,6 +329,24 @@ export function setFavorite(
  * (character) or 'nexus' (the home location). Returns a NEW registry —
  * caller saves + patches state like every other setter here.
  */
+/** Persist a home-tour card dismissal (S264). Idempotent; caller saves +
+ *  patches state like every other setter here. */
+export function dismissTourCard(
+  reg: WorldsRegistry,
+  worldId: string,
+  cardId: string,
+): WorldsRegistry {
+  return {
+    ...reg,
+    worlds: reg.worlds.map(w => {
+      if (w.id !== worldId) return w;
+      const dismissed = new Set(w.tour_dismissed ?? []);
+      dismissed.add(cardId);
+      return { ...w, tour_dismissed: [...dismissed] };
+    }),
+  };
+}
+
 export function setWorldFavoriteElement(
   reg: WorldsRegistry,
   worldId: string,

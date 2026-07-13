@@ -231,7 +231,11 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     header.appendChild(title);
 
     const newBtn = document.createElement('button');
-    newBtn.className = 'atlas-create-icon-btn atlas-header-add-glyph';
+    // Zero maps → the + glyph glows: the affordance IS the empty-state teaching
+    // (S264 — the explainer paragraph is gone; the glow points at the action).
+    const mapCount = state.data.elements.filter(e => e.type === 'map').length;
+    newBtn.className = 'atlas-create-icon-btn atlas-header-add-glyph'
+      + (mapCount === 0 ? ' atlas-create-glow' : '');
     newBtn.setAttribute('data-action', 'new-map');
     newBtn.innerHTML =
       '<span class="material-symbols-outlined atlas-add-glyph-plus">add</span>' +
@@ -319,10 +323,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       list.innerHTML = `
         <div class="atlas-pane-empty">
           <div style="max-width:340px">
-            <div style="margin-bottom:10px">No maps yet.</div>
-            <div style="color:var(--atlas-text-muted);font-size:11px;line-height:1.5">
-              Click <b>+ New map</b> to create one. Attach an image as the base canvas, or start blank.
-            </div>
+            <div>No maps yet.</div>
           </div>
         </div>
       `;

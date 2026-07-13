@@ -118,6 +118,12 @@ export interface TimelineViewExtras {
    * `null` means no focus (broad view).
    */
   focusId?: string | null;
+  /**
+   * The active saved chart's name (S264) — becomes the ambient rail's heading
+   * so the open chart is named where you read it. null = no saved chart active
+   * (the rail falls back to "This chart"). `undefined` leaves it untouched.
+   */
+  chartLabel?: string | null;
 }
 
 export interface TimelineViewHandle {
@@ -127,6 +133,10 @@ export interface TimelineViewHandle {
    */
   setNodes(nodes: TimelineNode[], universe?: TimelineNode[], extras?: TimelineViewExtras): void;
   setSelection(elementId: string | null): void;
+  /** Pan the window (span preserved, animated) so `date` is on screen. No-op
+   *  when it already is (S264 — a re-date must never leave its element
+   *  invisible off-window). */
+  revealDate(date: number): void;
   redraw(): void;
   destroy(): void;
 }
@@ -198,6 +208,14 @@ interface ViewState {
   // The URL-focused element (Act 2A) — the chart's subject; its span draws
   // emphasized. null = broad view.
   focusId: string | null;
+  // The active saved chart's name (S264) — the ambient rail's heading.
+  chartLabel: string | null;
+  // Glyph re-dating drag (S264): a PLACED dot is being dragged along the axis
+  // to a new start date. Threshold-armed on mousedown over a dot; a no-move
+  // mouseup falls through to the click progression (peek / re-click = focus).
+  // `maxDate` clamps a range's start at its recorded end (the end is anchored:
+  // the drag reduces/extends the range, never slides it — Captain's ruling).
+  glyphDrag: { dot: PlacedDot; startX: number; startY: number; active: boolean; maxDate: number | null } | null;
   // Drag-to-date (Bout 1.2): a rail item is being dragged onto the axis. Holds
   // the element DATA (not the DOM node — survives a mid-drag rail rebuild), the
   // start point + moved-past-threshold flag (click vs drag), and the floating
@@ -264,6 +282,8 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
     now: null, nowDrag: false, onSetNow: opts.onSetNow ?? null,
     undated: [], undatedExpanded: new Set(),
     focusId: null,
+    chartLabel: null,
+    glyphDrag: null,
     dateDrag: null, dropDate: null, onDateElement: opts.onDateElement ?? null,
     dateDragMove: null, dateDragUp: null,
     destroyed: false,
@@ -274,7 +294,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
   const onMove = (e: MouseEvent): void => handleMouseMove(state, e);
   const onLeave = (): void => handleMouseLeave(state);
   const onDown = (e: MouseEvent): void => handleMouseDown(state, e);
-  const onUp = (): void => handleMouseUp(state);
+  const onUp = (e: MouseEvent): void => handleMouseUp(state, e);
   const onWheel = (e: WheelEvent): void => handleWheel(state, e);
   canvas.addEventListener('mousemove', onMove);
   canvas.addEventListener('mouseleave', onLeave);
@@ -309,6 +329,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
       if (extras && 'now' in extras && !state.nowDrag) state.now = extras.now ?? null;
       if (extras && 'undated' in extras) state.undated = extras.undated ?? [];
       if (extras && 'focusId' in extras) state.focusId = extras.focusId ?? null;
+      if (extras && 'chartLabel' in extras) state.chartLabel = extras.chartLabel ?? null;
       state.layoutSig = null; // new node set → re-pack
       // Focus travel (S6): when the scope's fitted range changes while a
       // window (or prior fit) is on screen, animate to the new fit instead of
@@ -341,9 +362,25 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
       draw(state);
       renderCard(state);
     },
+    revealDate(date: number): void {
+      const view = currentViewRange(state);
+      if (!view) return;
+      if (date >= view.start && date <= view.end) return; // already on screen
+      const span = view.end - view.start;
+      // Shift (span preserved) so the date sits 15% in from the nearer edge.
+      const start = date < view.start ? date - span * 0.15 : date + span * 0.15 - span;
+      const bounds = navBounds(state) ?? state.baseRange;
+      if (!bounds) return;
+      const target = clampWindow({ start, end: start + span }, bounds);
+      state.ghost = { win: view, bornAt: performance.now() };
+      state.anim = { from: view, to: target, t0: performance.now() };
+      state.window = target;
+      scheduleMotion(state);
+    },
     redraw(): void { draw(state); },
     destroy(): void {
       state.destroyed = true;
+      state.glyphDrag = null;
       endDateDrag(state); // remove per-drag window listeners + the floating ghost (gate: no leak on mid-drag unmount)
       ro.disconnect();
       canvas.removeEventListener('mousemove', onMove);
@@ -889,19 +926,20 @@ function draw(state: ViewState): void {
       ctx.stroke();
     }
     if (isSel) {
-      // Two-ring selection mark (S256, Captain: the old single 0.55-alpha ring
-      // "only has a slightly different border" — hard to find): a soft outer
-      // halo in the type color + a crisp near-white inner ring. Still quiet at
-      // canvas scale, but unmistakable when you look for it.
+      // Peek vs focus split (S264, Captain: both states wore the same harsh
+      // white ring). PEEK = mellow — a soft type halo + a quiet white ring
+      // (reading is free, the mark should whisper). FOCUS = the subject — the
+      // full two-ring treatment, brighter and wider (the oomph lives here).
+      const isFocusGlyph = dot.node.id === state.focusId;
       ctx.beginPath();
-      ctx.arc(dot.x, dot.y, ringR + 8, 0, Math.PI * 2);
-      ctx.strokeStyle = applyAlpha(dot.node.color, 0.3);
-      ctx.lineWidth = 3.5;
+      ctx.arc(dot.x, dot.y, ringR + (isFocusGlyph ? 9 : 7), 0, Math.PI * 2);
+      ctx.strokeStyle = applyAlpha(dot.node.color, isFocusGlyph ? 0.42 : 0.22);
+      ctx.lineWidth = isFocusGlyph ? 4 : 2.5;
       ctx.stroke();
       ctx.beginPath();
       ctx.arc(dot.x, dot.y, ringR + 3.5, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = isFocusGlyph ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = isFocusGlyph ? 2.2 : 1.5;
       ctx.stroke();
     } else if (isHover) {
       ctx.beginPath();
@@ -1577,7 +1615,10 @@ function renderAmbientRail(state: ViewState): void {
 
   const head = document.createElement('div');
   head.className = 'atlas-timeline-rail-head';
-  head.textContent = 'This chart';
+  // An applied saved chart is named where you read it (S264); otherwise the
+  // generic heading. Renames flow through on the next room render.
+  head.textContent = state.chartLabel ?? 'This chart';
+  if (state.chartLabel) head.title = 'Saved chart';
   card.appendChild(head);
 
   // Cast lines — only when the cast is actually on the chart.
@@ -1781,6 +1822,16 @@ function endDateDrag(state: ViewState): void {
   if (had && !state.destroyed) draw(state);
 }
 
+/**
+ * Snap a glyph-drag date (S264): whole numbers, clamped at the range's
+ * recorded end when one exists (the end is anchored — a start past it would
+ * invert the range). Pure, exported for unit tests.
+ */
+export function glyphDropDate(raw: number, maxDate: number | null): number {
+  const d = Math.round(raw);
+  return maxDate != null && d > maxDate ? Math.floor(maxDate) : d;
+}
+
 /** The snapped drop date if (cx,cy) is over the main axis band, else null. */
 function dropDateAt(state: ViewState, cx: number, cy: number): number | null {
   const rect = state.canvas.getBoundingClientRect();
@@ -1944,6 +1995,26 @@ function handleMouseMove(state: ViewState, e: MouseEvent): void {
   state.mouseX = mx;
   state.mouseY = my;
 
+  // A glyph re-dating drag owns the mouse (S264): past the threshold, the
+  // cursor drives the drop-guide seam to the element's new start date. Ranges
+  // clamp at their recorded end (the end is anchored — the drag reduces or
+  // extends the range, never slides it).
+  if (state.glyphDrag) {
+    const g = state.glyphDrag;
+    if (!g.active) {
+      if (Math.hypot(mx - g.startX, my - g.startY) < DATE_DRAG_THRESHOLD) return;
+      g.active = true;
+      state.anim = null; // freeze camera travel — the guide date must be stable
+      state.canvas.style.cursor = 'grabbing';
+    }
+    const d = dateAtX(state, mx, w);
+    if (d != null) {
+      state.dropDate = glyphDropDate(d, g.maxDate);
+      draw(state);
+    }
+    return;
+  }
+
   // A now-line drag owns the mouse (Act 1): the line follows the cursor date;
   // committed to disk on mouseup.
   if (state.nowDrag) {
@@ -2067,9 +2138,23 @@ function handleMouseDown(state: ViewState, e: MouseEvent): void {
     }
   }
 
+  // A dot under the cursor arms a re-dating drag (S264, the S10 gesture
+  // grammar: "charts room edits time"). Threshold-gated — a no-move mouseup
+  // falls through to the click progression (peek / re-click = focus), so
+  // clicking is untouched. Pan from ON a dot is gone by design; the band's
+  // empty space (and the strip) still pans.
+  const hitDot = hitTest(state, mx, my);
+  if (hitDot && state.onDateElement && TEMPORAL_TYPE_FIELDS[hitDot.node.elementType]) {
+    state.glyphDrag = {
+      dot: hitDot, startX: mx, startY: my, active: false,
+      maxDate: hitDot.node.endDate ?? null,
+    };
+    return;
+  }
+
   // Now-line grab (Act 1) — after the strip, before pan. A dot under the cursor
   // wins (it's the more common intent, and a dot can sit right on the seam).
-  if (nearNowLine(state, mx, my, rect.width, rect.height) && !hitTest(state, mx, my)) {
+  if (nearNowLine(state, mx, my, rect.width, rect.height) && !hitDot) {
     state.nowDrag = true;
     return;
   }
@@ -2080,10 +2165,35 @@ function handleMouseDown(state: ViewState, e: MouseEvent): void {
   state.dragStartWindow = view;
 }
 
-function handleMouseUp(state: ViewState): void {
+function handleMouseUp(state: ViewState, e?: MouseEvent): void {
   // A date-drag's own window mouseup handler does the drop — this canvas-level
   // one (registered first) must bail so it can't also pan/select/dismiss.
   if (state.dateDrag) return;
+  // A glyph re-dating drag (S264): a real drag opens the confirm popover at
+  // the release point; a no-move mouseup replays the click progression the
+  // mousedown intercepted (peek / re-click = focus / badge zoom untouched —
+  // badges live in the axis gutter where no dot hit-test fires).
+  if (state.glyphDrag) {
+    const g = state.glyphDrag;
+    const wasActive = g.active;
+    const dropDate = state.dropDate;
+    state.glyphDrag = null;
+    state.dropDate = null;
+    state.canvas.style.cursor = 'pointer';
+    if (!wasActive) {
+      if (g.dot.node.id === state.selectedId) {
+        state.onFocus(g.dot.node.id);
+        return;
+      }
+      state.onSelect(g.dot.node.id);
+      completeWaypoint('time'); // a true canvas click, same as the old path
+      return;
+    }
+    draw(state); // clear the guide
+    if (dropDate == null || dropDate === Math.round(g.dot.node.startDate)) return;
+    openDropDatePopover(state, g.dot.node.id, dropDate, e?.clientX ?? 0, e?.clientY ?? 0);
+    return;
+  }
   // Commit a now-line drag (Act 1): persist the rounded value; the room writes
   // it to World.time_current and re-renders with the settled value.
   if (state.nowDrag) {

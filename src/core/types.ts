@@ -421,6 +421,12 @@ export interface WorldRegistryEntry {
     protagonist_id?: string | null;
     nexus_id?: string | null;
   };
+  /**
+   * Home-tour cards this world has dismissed (S264) — ids like `create-event`
+   * / `cta-object`. Absent = nothing dismissed. The tour itself is computed
+   * from element counts; only dismissals persist.
+   */
+  tour_dismissed?: string[];
   /** Mirror of `WorldMeta.demo` — the bundled sample world. Gestures in a demo world never complete waypoints. */
   demo?: boolean;
   created_at: string;

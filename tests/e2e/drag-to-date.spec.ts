@@ -120,3 +120,84 @@ test('a dateless chart still offers a droppable axis for the FIRST date', async 
     return (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.start_date ?? null;
   }, eventId)).toBe(Number(snapped));
 });
+
+// ====== Glyph re-dating (S264): drag a PLACED dot to a new start date ======
+
+/** Canvas position of a point node's dot: x from the fitted view (symmetric
+ *  2% pad → a node at the midpoint of the dated span sits at w/2); y = the
+ *  beeswarm midline ((TOP_PAD + axisY - 8) / 2, axisY = h - 56). */
+function bandMidY(cbHeight: number): number {
+  return (20 + (cbHeight - 56 - 8)) / 2;
+}
+
+test('dragging a placed dot re-dates it (glyph drag → popover → write)', async ({ page }) => {
+  await setupWorld(page);
+  // -20 and 30 frame the fit; 5 is the exact midpoint → its dot sits at w/2.
+  await createElement(page, 'event', { name: 'The Sundering', start_date: -20 });
+  await createElement(page, 'event', { name: 'The Long War', start_date: 30 });
+  const movableId = await createElement(page, 'event', { name: 'The Wandering', start_date: 5 });
+  await openCharts(page);
+
+  const cb = (await page.locator('.atlas-timeline-view-canvas').boundingBox())!;
+  const dotX = cb.x + cb.width * 0.5;
+  const dotY = cb.y + bandMidY(cb.height);
+  await page.mouse.move(dotX, dotY);
+  await page.mouse.down();
+  await page.mouse.move(dotX + 12, dotY); // past the 4px threshold
+  await page.mouse.move(dotX + 80, dotY, { steps: 5 });
+  await page.mouse.up();
+
+  // The confirm popover opens; type an explicit date and commit.
+  const input = page.locator('.atlas-edit-popover input');
+  await expect(input).toBeVisible();
+  await input.fill('12');
+  await input.press('Enter');
+
+  await expect.poll(async () => page.evaluate((id) => {
+    return (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.start_date ?? null;
+  }, movableId)).toBe(12);
+  await expect(page.locator('.ow-toast', { hasText: 'Dated The Wandering to 12' })).toBeVisible();
+});
+
+test('a range start cannot pass its recorded end (popover rejects, nothing written)', async ({ page }) => {
+  await setupWorld(page);
+  await createElement(page, 'event', { name: 'The Sundering', start_date: -20 });
+  await createElement(page, 'event', { name: 'The Long War', start_date: 30 });
+  const siegeId = await createElement(page, 'event', { name: 'The Siege', start_date: 5, end_date: 8 });
+  await openCharts(page);
+
+  const cb = (await page.locator('.atlas-timeline-view-canvas').boundingBox())!;
+  const dotX = cb.x + cb.width * 0.5; // start=5 is still the dated-span midpoint
+  const dotY = cb.y + bandMidY(cb.height);
+  await page.mouse.move(dotX, dotY);
+  await page.mouse.down();
+  await page.mouse.move(dotX + 12, dotY);
+  await page.mouse.move(dotX + 60, dotY, { steps: 5 });
+  await page.mouse.up();
+
+  const input = page.locator('.atlas-edit-popover input');
+  await expect(input).toBeVisible();
+  // The drag itself clamps live; the popover accepts free text — a start past
+  // the recorded end must be rejected by the room, not written inverted.
+  await input.fill('99');
+  await input.press('Enter');
+
+  await expect(page.locator('.ow-toast', { hasText: "the start can't pass the end (8)" })).toBeVisible();
+  expect(await page.evaluate((id) => {
+    return (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.start_date ?? null;
+  }, siegeId)).toBe(5);
+});
+
+test('a plain click on a dot still peeks (the drag threshold protects the click progression)', async ({ page }) => {
+  await setupWorld(page);
+  await createElement(page, 'event', { name: 'The Sundering', start_date: -20 });
+  await createElement(page, 'event', { name: 'The Long War', start_date: 30 });
+  await createElement(page, 'event', { name: 'The Wandering', start_date: 5 });
+  await openCharts(page);
+
+  const cb = (await page.locator('.atlas-timeline-view-canvas').boundingBox())!;
+  await page.mouse.click(cb.x + cb.width * 0.5, cb.y + bandMidY(cb.height));
+  await expect(page.locator('.atlas-timeline-card-title', { hasText: 'The Wandering' })).toBeVisible();
+  // No popover, no write — a click is a peek.
+  await expect(page.locator('.atlas-edit-popover')).toHaveCount(0);
+});

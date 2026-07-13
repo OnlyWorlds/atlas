@@ -29,7 +29,8 @@ import type { Element, ElementType } from '../core/types';
 import { narrativeKindOf } from '../core/narrative-kind';
 import { isWritingNarrative } from './writing-helpers';
 import { escapeText, relativeTime } from '../core/dom-utils';
-import { setWorldFavoriteElement, saveRegistry } from '../registry/registry';
+import { setWorldFavoriteElement, dismissTourCard, saveRegistry } from '../registry/registry';
+import { computeTourCards, type TourWaveEntry } from './home-tour';
 import { toastManager } from '../ui/toast-manager';
 import { timelineHash } from '../core/router';
 import { tableauScope } from '../visualization/timeline/chart-recipe';
@@ -98,20 +99,22 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
 
     root.innerHTML = '';
     root.appendChild(buildCover(meta, worldId, totalElements, counts, toasts));
-    if (totalElements === 0) {
+    if (totalElements === 0 && getState().data.loading) {
       // Empty and still-loading are different truths: during activation the
       // cache is primed async from disk, and showing onboarding meanwhile
       // reads as "your world is empty" (misleading-empty, 2026-07-10).
-      if (getState().data.loading) {
-        const loadingEl = document.createElement('section');
-        loadingEl.className = 'atlas-home-loading';
-        loadingEl.innerHTML = `<p class="atlas-home-loading-copy">Opening world…</p>`;
-        root.appendChild(loadingEl);
-        return;
-      }
-      root.appendChild(buildOnboarding(toasts));
+      const loadingEl = document.createElement('section');
+      loadingEl.className = 'atlas-home-loading';
+      loadingEl.innerHTML = `<p class="atlas-home-loading-copy">Opening world…</p>`;
+      root.appendChild(loadingEl);
       return;
     }
+    // The tour (S264): tutorial-state cards computed from world contents —
+    // the core create pair, then the next wave / room CTAs. Renders nothing
+    // for a built-out (or dismissed-out) world.
+    const tour = buildTour(counts, totalElements, worldId, toasts);
+    if (tour) root.appendChild(tour);
+    if (totalElements === 0) return;
     // The chart strip (S15: the "starred chart") — the shape of the world's
     // history between the cover and the desk (timeline-mini's old slot, now
     // the real chart pipeline: first saved chart, else the recipe default).
@@ -228,7 +231,7 @@ function buildCover(
   const identity = document.createElement('div');
   const descriptionMarkup = meta.description
     ? `<p class="atlas-home-world-description atlas-home-clickable" data-edit="description">${escapeText(meta.description)}</p>`
-    : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">add a description…</p>`;
+    : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">describe your world…</p>`;
   identity.innerHTML = `
     <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="click to rename (a local name — the OnlyWorlds world name lives in settings)">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
@@ -432,27 +435,34 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   const lastWriting = byRecency.find(el => el.type === 'narrative' && isWritingNarrative(el, worldId));
   const lastMap = byRecency.find(el => el.type === 'map');
   const lastEdited = byRecency.find(el => el !== lastWriting && el !== lastMap);
+  // Verbs are plain (S264, Captain: "Continue editing" implied a prior
+  // session that may not exist — "Edit X" is always true).
   const continueRows: { icon: string; verb: string; el: Element; hash: string }[] = [];
-  if (lastWriting) continueRows.push({ icon: 'edit_note', verb: 'Continue writing', el: lastWriting, hash: writingHash(worldId, lastWriting.id) });
-  if (lastMap) continueRows.push({ icon: 'map', verb: 'Continue mapping', el: lastMap, hash: mapHash(worldId, lastMap.id) });
-  if (lastEdited) continueRows.push({ icon: ELEMENT_ICONS[lastEdited.type] ?? 'category', verb: 'Continue editing', el: lastEdited, hash: roomOf(lastEdited, worldId).hash });
+  if (lastWriting) continueRows.push({ icon: 'edit_note', verb: 'Write', el: lastWriting, hash: writingHash(worldId, lastWriting.id) });
+  if (lastMap) continueRows.push({ icon: 'map', verb: 'Map', el: lastMap, hash: mapHash(worldId, lastMap.id) });
+  if (lastEdited) continueRows.push({ icon: ELEMENT_ICONS[lastEdited.type] ?? 'category', verb: 'Edit', el: lastEdited, hash: roomOf(lastEdited, worldId).hash });
+
+  // The first element gets a standing highlight (S264): with exactly one
+  // content element, its row IS the tour's next step — make it unmissable.
+  const firstElement = content.length === 1 ? content[0] : null;
 
   if (continueRows.length > 0) {
     const section = document.createElement('section');
     section.className = 'atlas-home-continue';
     const title = document.createElement('h2');
     title.className = 'atlas-home-section-title';
-    title.textContent = 'Continue';
+    title.textContent = 'Recent';
     section.appendChild(title);
     for (const row of continueRows) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'atlas-home-continue-row';
+      const isFirst = firstElement != null && row.el.id === firstElement.id;
+      btn.className = 'atlas-home-continue-row' + (isFirst ? ' atlas-home-first-element' : '');
       btn.innerHTML = `
         <span class="material-symbols-outlined">${row.icon}</span>
         <span class="atlas-home-continue-verb">${row.verb}</span>
         <span class="atlas-home-continue-name">${escapeText(row.el.name || '(unnamed)')}</span>
-        <span class="atlas-home-continue-time">${relativeTime(row.el.local_updated_at)}</span>
+        <span class="atlas-home-continue-time">${isFirst ? 'your first element · click to keep shaping it' : relativeTime(row.el.local_updated_at)}</span>
       `;
       btn.addEventListener('click', () => navigate(row.hash));
       section.appendChild(btn);
@@ -496,49 +506,147 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   return desk.childElementCount > 0 ? desk : null;
 }
 
-// ---- Empty-world onboarding (unchanged behavior) ----------------------------
+// ---- The home tour (S264 — tutorial-state cards) -----------------------------
 
-function buildOnboarding(toasts: ToastManager): HTMLElement {
-  const onboarding = document.createElement('section');
-  onboarding.className = 'atlas-home-onboarding';
-  onboarding.innerHTML = `
-    <h2 class="atlas-home-section-title">Your world is empty</h2>
-    <p class="atlas-home-onboarding-copy">
-      Create something new.
-    </p>
-    <div class="atlas-home-onboarding-grid">
-      <button class="atlas-home-onboarding-tile" data-create-type="character">
-        <span class="material-symbols-outlined">${ELEMENT_ICONS['character'] ?? 'person'}</span>
-        <span>character</span>
-      </button>
-      <button class="atlas-home-onboarding-tile" data-create-type="location">
-        <span class="material-symbols-outlined">${ELEMENT_ICONS['location'] ?? 'place'}</span>
-        <span>location</span>
-      </button>
-      <button class="atlas-home-onboarding-tile" data-create-type="event">
-        <span class="material-symbols-outlined">${ELEMENT_ICONS['event'] ?? 'event'}</span>
-        <span>event</span>
-      </button>
-      <button class="atlas-home-onboarding-tile" data-create-any>
-        <span class="material-symbols-outlined">add</span>
-        <span>everything else</span>
-      </button>
-    </div>
-  `;
-  onboarding.querySelectorAll<HTMLButtonElement>('[data-create-type]').forEach((btn) => {
-    const initialType = btn.dataset.createType as ElementType;
-    btn.addEventListener('click', () => {
-      new ElementCreateModal(toasts, { initialType }).open();
+/** The room CTA's click target. The map room is a map TAB — resolve the first
+ *  map element at click time. */
+function tourRoomHash(entry: TourWaveEntry, worldId: string): string | null {
+  switch (entry.room) {
+    case 'timeline': return timelineHash(worldId);
+    case 'writing': return writingHash(worldId);
+    case 'knowledge': return knowledgeHash(worldId);
+    case 'share': return shareHash(worldId);
+    case 'import': return importHash(worldId);
+    case 'map': {
+      const map = getState().data.elements.find(e => e.type === 'map');
+      return map ? mapHash(worldId, map.id) : null;
+    }
+  }
+}
+
+function persistDismiss(worldId: string, cardId: string): void {
+  const next = dismissTourCard(getState().registry, worldId, cardId);
+  saveRegistry(next);
+  patchSlice('registry', next);
+}
+
+function buildTour(
+  counts: Map<string, number>,
+  totalElements: number,
+  worldId: string,
+  toasts: ToastManager,
+): HTMLElement | null {
+  const reg = getState().registry.worlds.find(w => w.id === worldId);
+  const dismissed = new Set(reg?.tour_dismissed ?? []);
+  const cards = computeTourCards(counts, dismissed);
+  if (cards.length === 0) return null;
+
+  const corePhase = cards.some(c => c.kind === 'create' && c.highlighted);
+  const section = document.createElement('section');
+  section.className = 'atlas-home-onboarding';
+  if (totalElements === 0) {
+    section.innerHTML = `
+      <h2 class="atlas-home-section-title">Your world is empty</h2>
+      <p class="atlas-home-onboarding-copy">Create something new.</p>
+    `;
+  } else if (corePhase) {
+    section.innerHTML = `<p class="atlas-home-onboarding-copy">Every world starts with someone, somewhere.</p>`;
+  } else {
+    section.innerHTML = `<p class="atlas-home-onboarding-copy atlas-home-tour-label">build out your world</p>`;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'atlas-home-onboarding-grid';
+  section.appendChild(grid);
+
+  const attachDismiss = (tile: HTMLElement, cardId: string): void => {
+    const x = document.createElement('span');
+    x.className = 'material-symbols-outlined atlas-home-tile-dismiss';
+    x.setAttribute('role', 'button');
+    x.title = "Don't show this again";
+    x.textContent = 'close';
+    x.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      persistDismiss(worldId, cardId);
     });
-  });
-  // "everything else": opens the full type grid; hovering it spotlights the
-  // sidebar's + button — teaching where creation lives permanently (S255v3).
-  const anyTile = onboarding.querySelector<HTMLButtonElement>('[data-create-any]')!;
-  anyTile.addEventListener('click', () => new ElementCreateModal(toasts).open());
-  const sidebarCreate = (): HTMLElement | null => document.querySelector('[data-action="create-element"]');
-  anyTile.addEventListener('mouseenter', () => sidebarCreate()?.classList.add('atlas-create-pulse'));
-  anyTile.addEventListener('mouseleave', () => sidebarCreate()?.classList.remove('atlas-create-pulse'));
-  return onboarding;
+    tile.appendChild(x);
+  };
+
+  for (const card of cards) {
+    if (card.kind === 'create') {
+      const tile = document.createElement('button');
+      tile.className = 'atlas-home-onboarding-tile'
+        + (card.highlighted ? ' atlas-home-tile-core' : '');
+      tile.setAttribute('data-create-type', card.type);
+      tile.innerHTML = `
+        <span class="material-symbols-outlined">${ELEMENT_ICONS[card.type] ?? 'category'}</span>
+        <span>${escapeText(ELEMENT_LABELS[card.type]?.singular ?? card.type)}</span>
+      `;
+      // Stay on home (Captain, S264): the sidebar flip + the first-element
+      // Recent highlight carry "where did it go" — no jarring room jump.
+      tile.addEventListener('click', () =>
+        new ElementCreateModal(toasts, { initialType: card.type, suppressNavigate: true }).open());
+      if (card.dismissible) attachDismiss(tile, card.id);
+      grid.appendChild(tile);
+    } else {
+      const { entry } = card;
+      const tile = document.createElement('button');
+      tile.className = 'atlas-home-onboarding-tile atlas-home-tile-cta';
+      tile.setAttribute('data-tour-cta', entry.type);
+      tile.title = `Open ${entry.verb}`;
+      tile.innerHTML = `
+        <span class="material-symbols-outlined">${entry.icon}</span>
+        <span class="atlas-home-tile-cta-verb">${escapeText(entry.verb)}</span>
+        <span class="atlas-home-tile-cta-line">${escapeText(entry.line)}</span>
+      `;
+      tile.addEventListener('click', () => {
+        const hash = tourRoomHash(entry, worldId);
+        // Visiting the room completes the card's job — it doesn't come back.
+        persistDismiss(worldId, card.id);
+        if (hash) navigate(hash);
+      });
+      attachDismiss(tile, card.id);
+      grid.appendChild(tile);
+    }
+  }
+
+  // The "anything else" tile rides the core phase only — by the next wave the
+  // sidebar + is known (it spotlights it on hover, teaching the permanent home).
+  if (corePhase) {
+    const anyTile = document.createElement('button');
+    anyTile.className = 'atlas-home-onboarding-tile';
+    anyTile.setAttribute('data-create-any', '');
+    anyTile.innerHTML = `
+      <span class="material-symbols-outlined">add</span>
+      <span>anything else</span>
+    `;
+    anyTile.addEventListener('click', () => new ElementCreateModal(toasts, { suppressNavigate: true }).open());
+    const sidebarCreate = (): HTMLElement | null => document.querySelector('[data-action="create-element"]');
+    anyTile.addEventListener('mouseenter', () => sidebarCreate()?.classList.add('atlas-create-pulse'));
+    anyTile.addEventListener('mouseleave', () => sidebarCreate()?.classList.remove('atlas-create-pulse'));
+    grid.appendChild(anyTile);
+  }
+
+  // Empty world: the room links that work from element zero (Captain's ask —
+  // Write, Chart, Import are the actionables on an empty world).
+  if (totalElements === 0) {
+    const links = document.createElement('div');
+    links.className = 'atlas-home-tour-links';
+    const mk = (label: string, icon: string, hash: string): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'atlas-home-tour-link';
+      b.innerHTML = `<span class="material-symbols-outlined">${icon}</span><span>${label}</span>`;
+      b.addEventListener('click', () => navigate(hash));
+      return b;
+    };
+    links.appendChild(mk('Write', 'menu_book', writingHash(worldId)));
+    links.appendChild(mk('Chart', 'insights', timelineHash(worldId)));
+    links.appendChild(mk('Import', 'import_export', importHash(worldId)));
+    section.appendChild(links);
+  }
+
+  return section;
 }
 
 /**

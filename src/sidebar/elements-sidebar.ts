@@ -337,7 +337,10 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     FILTER_TYPES_WITH_MAP.forEach(type => {
       const btn = document.createElement('button');
       btn.className = 'atlas-filter-btn' + (filters.has(type) ? ' active' : '');
-      btn.title = ELEMENT_LABELS[type].plural;
+      // Instant CSS tooltip (S264, Captain: the category label should appear
+      // the moment you hover) — data-tip drives a ::after pseudo; no native
+      // title (its OS delay is the complaint, and doubling would ghost).
+      btn.dataset.tip = ELEMENT_LABELS[type].plural;
       btn.setAttribute('data-filter-type', type);
 
       const icon = document.createElement('span');

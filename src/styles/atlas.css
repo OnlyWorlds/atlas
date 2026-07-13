@@ -875,6 +875,7 @@
 }
 
 .atlas-filter-btn {
+  position: relative; /* anchors the instant data-tip tooltip (S264) */
   width: 25px;
   height: 25px;
   display: inline-flex;
@@ -5720,6 +5721,32 @@ svg .atlas-zone-selected {
   animation: atlas-tour-pulse 2.2s ease-in-out 3;
 }
 
+/* S264: a quiet standing glow on a create-affordance when its pane is empty —
+   the glow IS the empty-state teaching (maps pane +, first-run affordances). */
+.atlas-create-glow {
+  color: var(--atlas-cyan) !important;
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.55));
+}
+
+/* S264: instant tooltip on the sidebar type-filter icons — the OS-native title
+   delay hid the category names; a data-tip ::after appears on hover at once. */
+.atlas-filter-btn[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 4px);
+  left: -1px; /* left-anchored — a centered tip clips off-viewport on column 1 */
+  background: rgba(10, 14, 18, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 60;
+}
+
 /* Flex spacer pushes the selected-element chip to the far right of the strip. */
 .atlas-room-nav-spacer {
   flex: 1 1 auto;
@@ -5979,6 +6006,7 @@ svg .atlas-zone-selected {
 }
 
 .atlas-home-onboarding-tile {
+  position: relative; /* anchors the tour dismiss × (S264) */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5991,6 +6019,80 @@ svg .atlas-zone-selected {
   color: var(--atlas-text);
   cursor: pointer;
   transition: border-color 80ms ease, color 80ms ease, background 80ms ease;
+}
+
+/* ---- The home tour (S264) ---- */
+
+/* The core pair (character/location) — the tour's only highlighted cards. */
+.atlas-home-tile-core {
+  border-color: rgba(34, 211, 238, 0.35);
+  background: rgba(34, 211, 238, 0.07);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.10);
+}
+
+/* Room CTA cards — a verb + one quiet clause; the room glyph teaches the nav. */
+.atlas-home-tile-cta {
+  background: rgba(255, 255, 255, 0.02);
+  max-width: 150px;
+}
+.atlas-home-tile-cta .material-symbols-outlined { color: var(--atlas-cyan-soft); }
+.atlas-home-tile-cta-verb { font-weight: 600; }
+.atlas-home-tile-cta-line {
+  font-size: 10.5px;
+  color: var(--atlas-text-muted);
+  line-height: 1.3;
+  text-align: center;
+}
+
+/* Dismiss × — visible on hover only, top-right of a dismissible card. */
+.atlas-home-tile-dismiss {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 13px !important;
+  color: var(--atlas-text-dim);
+  opacity: 0;
+  padding: 2px;
+  border-radius: 50%;
+  transition: opacity 100ms ease, color 100ms ease;
+}
+.atlas-home-onboarding-tile:hover .atlas-home-tile-dismiss { opacity: 0.7; }
+.atlas-home-tile-dismiss:hover { opacity: 1 !important; color: #fff; background: rgba(255, 255, 255, 0.08); }
+
+/* The next-wave phase label — quieter than a section title. */
+.atlas-home-tour-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--atlas-text-muted);
+}
+
+/* Empty-world room links: Write · Chart · Import. */
+.atlas-home-tour-links {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.atlas-home-tour-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 5px;
+  transition: color 100ms ease, background 100ms ease;
+}
+.atlas-home-tour-link:hover { color: var(--atlas-cyan); background: rgba(34, 211, 238, 0.06); }
+.atlas-home-tour-link .material-symbols-outlined { font-size: 15px; }
+
+/* The first element's Recent row — the tour's next step, unmissable. */
+.atlas-home-first-element {
+  border: 1px solid rgba(34, 211, 238, 0.30);
+  background: rgba(34, 211, 238, 0.05);
+  border-radius: 6px;
 }
 
 .atlas-home-onboarding-tile:hover {
@@ -8567,6 +8669,7 @@ td.atlas-writing-setup-promote-count {
 }
 .atlas-import-ai-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .atlas-import-ai-lead { margin: 0; font-size: 12px; line-height: 1.5; color: var(--atlas-text-muted); }
+.atlas-import-ai-size { margin: 4px 0 0 0; font-size: 11px; color: var(--atlas-text-muted); opacity: 0.75; }
 .atlas-import-ai-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
 /* IE3: grouped two-column take-out type list (content | spatial). */
@@ -10128,12 +10231,17 @@ a.atlas-share-map-pin { cursor: pointer; }
   font-size: 15px;
 }
 
+/* S264: the gallery lives INSIDE the actions row (right of the buttons) so a
+   first save never reflows the layout below. Quieter chips: faint fill, no
+   standing border — the border arrives on hover/active. */
 .atlas-chart-gallery {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 0 24px 10px;
+  padding: 0;
+  margin-left: 14px;
+  min-width: 0;
 }
 .atlas-chart-gallery:empty {
   display: none;
@@ -10149,17 +10257,18 @@ a.atlas-share-map-pin { cursor: pointer; }
   align-items: center;
   gap: 1px;
   padding: 2px 4px;
-  border: 1px solid var(--atlas-divider);
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.04);
   transition: border-color 120ms ease, background 120ms ease;
 }
 .atlas-saved-chart:hover {
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
 }
 .atlas-saved-chart.active {
-  border-color: rgba(34, 211, 238, 0.5);
-  background: rgba(34, 211, 238, 0.12);
+  border-color: rgba(34, 211, 238, 0.35);
+  background: rgba(34, 211, 238, 0.08);
 }
 
 .atlas-saved-chart-name {
@@ -12107,12 +12216,31 @@ body.atlas-share-fullpreview > * {
 .atlas-waypoint-toast-rider-btn:hover { color: var(--atlas-cyan); }
 
 /* ==== Bout E — T-E1: dim empty field rows (hover restores) ==== */
-.atlas-field-empty-row .atlas-field-label { opacity: 0.45; transition: opacity 120ms ease; }
+/* S264 visibility pass: empty rows sit BRIGHTER than the old mute (0.45/0.55
+   read as disabled; Captain's call: a general visibility bump) — except
+   zero-candidate link fields (below), which stay deep-muted because there is
+   genuinely nothing to link yet. Hover still restores full strength. */
+.atlas-field-empty-row .atlas-field-label { opacity: 0.62; transition: opacity 120ms ease; }
 .atlas-field-empty-row:hover .atlas-field-label { opacity: 1; }
-.atlas-field-empty-row .atlas-field-value.empty { opacity: 0.55; transition: opacity 120ms ease; }
+.atlas-field-empty-row .atlas-field-value.empty { opacity: 0.72; transition: opacity 120ms ease; }
 .atlas-field-empty-row:hover .atlas-field-value.empty { opacity: 1; }
-.atlas-field-empty-row .atlas-link-pick-empty { opacity: 0.55; transition: opacity 120ms ease; }
+.atlas-field-empty-row .atlas-link-pick-empty { opacity: 0.72; transition: opacity 120ms ease; }
 .atlas-field-empty-row:hover .atlas-link-pick-empty { opacity: 1; }
+
+/* Zero-candidate link fields: the old deep mute. The click is still live —
+   it opens the create modal locked to the target type (create-from-link). */
+.atlas-field-link-none .atlas-field-label { opacity: 0.4; }
+.atlas-field-link-none .atlas-link-pick-empty { opacity: 0.45; }
+
+/* Candidate-bearing empty link fields: the pick icon lifts a notch — there is
+   something in the world to connect here. */
+.atlas-link-pick-ready {
+  color: var(--atlas-text-soft);
+  opacity: 0.9;
+}
+.atlas-link-pick-ready:hover {
+  color: var(--atlas-cyan);
+}
 
 /* ====== Map "Local image" row (element editor, maps only — session 253) ======
    Sits under the image_url field. Own class family (e2e locator contract —

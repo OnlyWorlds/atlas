@@ -36,7 +36,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   header.className = 'atlas-room-header';
   header.innerHTML = `
     <h1>Charts</h1>
-    <p class="atlas-room-subtitle">See your world arranged in time. Click any element to explore its connections.</p>
+    <p class="atlas-room-subtitle">See your world arranged in time.</p>
   `;
   wrap.appendChild(header);
 
@@ -46,8 +46,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   newEventBtn.type = 'button';
   newEventBtn.className = 'atlas-btn-ghost';
   newEventBtn.dataset.action = 'new-event';
-  newEventBtn.title = 'Create a new event';
-  newEventBtn.textContent = '+ Event';
+  newEventBtn.title = 'Create an element on this chart';
+  newEventBtn.textContent = '+ Element';
   newEventBtn.addEventListener('click', () => {
     // Charts-context create (S263): only dateable types are selectable and a
     // required Date field rides the modal, so the new element lands ON the
@@ -84,12 +84,14 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   saveBtn.innerHTML = `<span class="material-symbols-outlined">bookmark_add</span> Save chart`;
   saveBtn.addEventListener('click', () => void saveCurrentChart());
   actions.appendChild(saveBtn);
-  wrap.appendChild(actions);
 
-  // Saved-chart gallery — hidden until at least one chart is saved.
+  // Saved-chart gallery — rides the actions row (right of the buttons) so a
+  // first save never reflows the layout below (S264, Captain: the appearing
+  // row "moved the ui"). Hidden via :empty until a chart exists.
   const gallery = document.createElement('div');
   gallery.className = 'atlas-chart-gallery';
-  wrap.appendChild(gallery);
+  actions.appendChild(gallery);
+  wrap.appendChild(actions);
 
   const controlBar = document.createElement('div');
   controlBar.className = 'atlas-chart-controls';
@@ -101,6 +103,12 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
 
   let handle: TimelineViewHandle | null = null;
   let config: ChartConfig | null = null;        // set when a saved chart loads; the save/share contract
+  // An APPLIED selection-scope chart (S264). The default tableau saves as a
+  // `selection` scope, and applyChart used to REFUSE that kind with an info
+  // toast — the most common save produced a chart that could never reopen
+  // (Captain: "can not select them.. can not change to them"). The room now
+  // holds the applied scope here; a chip click (new lens) clears it.
+  let appliedSelection: ChartConfig | null = null;
   // The LANDING is the TABLEAU (Captain, 2026-07-10: "no highlights, neutral
   // state") — an EMPTY type filter, no chips lit. Ticking a chip narrows to
   // that type; null = every type (all chips on).
@@ -200,6 +208,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
         const base = new Set<ElementType>(typeFilter ?? present);
         if (base.has(t)) base.delete(t); else base.add(t);
         typeFilter = base.size >= present.length ? null : base;
+        appliedSelection = null; // the user picked a new lens — the chart releases
         const w = worldId();
         if (route.elementId && w) navigate(timelineHash(w)); // exit focus → hashchange re-renders
         else render();
@@ -262,8 +271,19 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const store = getActiveStore();
     const el = getState().data.elements.find(e => e.id === id);
     if (!store || !el) { toasts.error('element not found'); return; } // deleted mid-drag (gate)
-    const field = TEMPORAL_TYPE_FIELDS[el.type]?.start;
+    const mapping = TEMPORAL_TYPE_FIELDS[el.type];
+    const field = mapping?.start;
     if (!field) { toasts.error('this type has no date field'); return; }
+    // Re-dating a RANGE moves its start; the end stays anchored (S264,
+    // Captain's ruling: the drag reduces/extends the range, never slides it).
+    // The canvas drag clamps live, but the confirm popover accepts free text —
+    // reject a start past the recorded end instead of writing an inverted range.
+    const endRaw = mapping.end ? (el as Record<string, unknown>)[mapping.end] : undefined;
+    const endVal = parseTemporalValue(endRaw);
+    if (endVal != null && date > endVal) {
+      toasts.error(`the start can't pass the end (${endVal})`);
+      return;
+    }
     try {
       await store.updateElement(id, { [field]: date });
       await refreshElementsAfterWrite(store);
@@ -286,6 +306,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     if (lastScoped.some(n => n.id === id)) {
       peekId = id;
       handle?.setSelection(id);
+      // In scope but possibly OFF-SCREEN (S264): a popover-entered date can
+      // land outside the current window — pan it into view, never vanish it.
+      handle?.revealDate(date);
       toasts.success(phrase);
     } else {
       toasts.success(`${phrase} · not in this view`);
@@ -306,6 +329,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
    * not "everything" — unticking every chip used to invert into the full soup.
    */
   function effectiveScope(allNodes: TimelineNode[], route: Route): ChartScope {
+    // An applied saved chart holds its scope until a stronger lens arrives:
+    // focus (the URL) still wins; a type-chip click clears it (above).
+    if (!route.elementId && appliedSelection) return appliedSelection.scope;
     if (!route.elementId && typeFilter && typeFilter.size === 0) {
       return tableauScope(allNodes, castIds());
     }
@@ -336,7 +362,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     };
     savedCharts = upsertChart(savedCharts, chart);
     await store.writeCharts(savedCharts);
-    renderGallery();
+    render(); // full render — the rail heading names the (now-active) chart
     toasts.success(`saved "${chart.name}"`);
   }
 
@@ -347,6 +373,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     config = chart;
     const route = parseHash(window.location.hash);
     const scope = chart.scope;
+    appliedSelection = null;
     if (scope.kind === 'focus') {
       typeFilter = null;
       navigate(timelineHash(w, scope.elementId));
@@ -356,9 +383,15 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     } else if (scope.kind === 'all') {
       typeFilter = null;
       if (route.elementId) navigate(timelineHash(w)); else render();
+    } else if (scope.kind === 'selection') {
+      // The tableau-save case (S264 fix): hold the hand-picked scope in room
+      // state — the renderer has always supported it via filterNodesByScope.
+      appliedSelection = chart;
+      typeFilter = new Set(); // chips read unlit; the chart is the lens
+      if (route.elementId) navigate(timelineHash(w)); else render();
     } else {
-      // selection / unknown — not creatable in this editor yet; lands in share.
-      toasts.show('this chart opens in the share view', 'info');
+      // Unknown kind from a newer atlas / corrupt charts.json.
+      toasts.show('this chart type is not supported here', 'info');
     }
   }
 
@@ -396,7 +429,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
           if (store) await store.writeCharts(savedCharts);
         }
       }
-      renderGallery();
+      render(); // full render — the rail's chart-name label tracks renames too
     };
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); void commit(true); }
@@ -418,11 +451,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   function renderGallery(): void {
     gallery.innerHTML = '';
     if (savedCharts.length === 0) return;
-    const label = document.createElement('span');
-    label.className = 'atlas-chart-gallery-label';
-    label.textContent = 'Saved charts';
-    gallery.appendChild(label);
-
+    // (No "Saved charts" label since the S264 inline move — the chips sit
+    // beside Save chart, which names them; the rail names the active one.)
     const curScope = currentScope();
     for (const chart of savedCharts) {
       const card = document.createElement('div');
@@ -486,12 +516,17 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       });
     }
 
-    const scoped = filterNodesByScope(allNodes, effectiveScope(allNodes, route));
+    const scope = effectiveScope(allNodes, route);
+    const scoped = filterNodesByScope(allNodes, scope);
     lastScoped = scoped;
+    // The active saved chart, if the live scope matches one — its name becomes
+    // the rail's heading (S264: "This chart" should speak the chart's name).
+    const activeChart = savedCharts.find(c => sameScope(c.scope, scope)) ?? null;
     // Cast favorites (S4 + the cast marks): re-read each render so a toggle on
     // the element header reflects immediately.
     const favorites = getState().registry.worlds.find(w => w.id === wid)?.favorites;
     const extras: TimelineViewExtras = {
+      chartLabel: activeChart?.name ?? null,
       cast: {
         protagonistId: favorites?.protagonist_id ?? null,
         nexusId: favorites?.nexus_id ?? null,

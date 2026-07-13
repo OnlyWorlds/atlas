@@ -19,7 +19,9 @@
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { getWritingLabels } from './writing-helpers';
-import type { Element, ElementType } from '../core/types';
+import { CONTENT_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
+import { ElementCreateModal } from '../ui/element-create-modal';
+import { ELEMENT_LABELS } from '../core/constants';
 import { ELEMENT_ICONS, EXTENSION_FIELD_NAMESPACES, isExtensionField, isCustomEditableField } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
@@ -120,6 +122,15 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   const rowRaw = (el as Record<string, unknown>)[meta.name];
   const rowEmpty = Array.isArray(rowRaw) ? rowRaw.length === 0 : !formatValue(rowRaw);
   if (rowEmpty) wrap.classList.add('atlas-field-empty-row');
+  // Link-field candidate awareness (S264): an empty link field whose target
+  // type has ZERO elements in the world stays extra-muted (there is nothing to
+  // pick — clicking it offers creation instead); an empty link field WITH
+  // candidates keeps the brighter baseline so "there's something to connect
+  // here" is visible at a glance.
+  if (rowEmpty && (meta.widget === 'single-link' || meta.widget === 'multi-link')
+      && candidateCountFor(el, meta.target) === 0) {
+    wrap.classList.add('atlas-field-link-none');
+  }
 
   const label = document.createElement('div');
   label.className = 'atlas-field-label';
@@ -329,10 +340,48 @@ function renderAliasesRow(el: Element): HTMLElement {
   return row;
 }
 
+/** Elements of `target` type available to link (self excluded). null = the
+ *  field has no declared target (generic link) — candidate logic doesn't apply. */
+function candidateCountFor(el: Element, target: ElementType | undefined): number | null {
+  if (!target) return null;
+  let n = 0;
+  for (const e of getState().data.elements) {
+    if (e.type === target && e.id !== el.id) n++;
+  }
+  return n;
+}
+
+/** Types the create modal can actually offer (zones/pins/markers are
+ *  map-made) — gates the create-from-link-field flow. */
+const LINK_CREATABLE = new Set<ElementType>([...CONTENT_ELEMENT_TYPES, 'map']);
+
+/**
+ * Create-from-link-field (S264): a zero-candidate link field's click opens the
+ * create modal LOCKED to the target type; the new element auto-links into the
+ * field, and the user stays on this element (no navigation jump).
+ */
+function openCreateForLink(el: Element, meta: FieldMeta, existingIds: string[]): void {
+  const target = meta.target!;
+  const label = ELEMENT_LABELS[target]?.singular ?? target;
+  new ElementCreateModal(toastManager, {
+    initialType: target,
+    excludeTypes: [...LINK_CREATABLE].filter(t => t !== target),
+    suppressNavigate: true,
+    title: `New ${label} · ${humanizeFieldName(meta.name)}`,
+    afterCreate: (id, type) => {
+      if (type !== target) return; // grid is locked, but never link off-target
+      const value = meta.widget === 'multi-link' ? [...existingIds, id] : id;
+      void persistFieldPatch(el, meta.name, value).catch(() => { /* toasted in persist */ });
+    },
+  }).open();
+}
+
 function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
   const row = document.createElement('div');
   row.className = 'atlas-link-row';
   const raw = (el as Record<string, unknown>)[meta.name];
+  const candidates = candidateCountFor(el, meta.target);
+  const offerCreate = !raw && candidates === 0 && !!meta.target && LINK_CREATABLE.has(meta.target);
 
   if (raw) {
     row.appendChild(buildLinkChip(String(raw), meta, async () => {
@@ -350,13 +399,19 @@ function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
   pickBtn.type = 'button';
   pickBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
   if (!raw) pickBtn.classList.add('atlas-link-pick-empty');
-  pickBtn.title = raw ? 'Change link' : `Pick a ${meta.target ?? 'link'}`;
+  // Candidate-aware affordance (S264): candidates exist → the pick icon lifts
+  // a notch ("there's something to connect"); none exist → the click CREATES.
+  if (!raw && candidates != null && candidates > 0) pickBtn.classList.add('atlas-link-pick-ready');
+  pickBtn.title = raw ? 'Change link'
+    : offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? meta.target}s yet — create one`
+    : `Pick a ${meta.target ?? 'link'}`;
   // ALWAYS show the type-specific icon so users see at a glance what kind of
   // element this field links to — even before any link exists. Empty state
   // still uses the `atlas-link-pick-empty` class for muted styling (was a
   // generic `+` before, which hid which category the field targeted).
   pickBtn.innerHTML = `<span class="material-symbols-outlined">${pickIconFor(meta.target)}</span>`;
   pickBtn.addEventListener('click', async () => {
+    if (offerCreate) { openCreateForLink(el, meta, []); return; }
     // Exclude the current element itself and any value already linked here.
     // Self-linking is never meaningful — a Character pointing at itself via
     // `friends`, a Location pointing at itself via `parent_location_id`, etc.
@@ -381,6 +436,10 @@ function renderMultiLink(meta: FieldMeta, el: Element): HTMLElement {
 
   const raw = (el as Record<string, unknown>)[meta.name];
   const ids: string[] = Array.isArray(raw) ? raw.map(String) : [];
+  const candidates = candidateCountFor(el, meta.target);
+  // Every candidate already linked still means "nothing left to pick" — but
+  // only the fully-empty zero-candidate field reads as the create affordance.
+  const offerCreate = ids.length === 0 && candidates === 0 && !!meta.target && LINK_CREATABLE.has(meta.target);
 
   ids.forEach(id => {
     wrap.appendChild(buildLinkChip(id, meta, async () => {
@@ -394,12 +453,15 @@ function renderMultiLink(meta: FieldMeta, el: Element): HTMLElement {
   addBtn.type = 'button';
   addBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
   if (ids.length === 0) addBtn.classList.add('atlas-link-pick-empty');
-  addBtn.title = ids.length === 0 ? `Pick a ${meta.target ?? 'link'}` : `Add another ${meta.target ?? 'link'}`;
+  if (ids.length === 0 && candidates != null && candidates > 0) addBtn.classList.add('atlas-link-pick-ready');
+  addBtn.title = offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? meta.target}s yet — create one`
+    : ids.length === 0 ? `Pick a ${meta.target ?? 'link'}` : `Add another ${meta.target ?? 'link'}`;
   // Always show the type-specific icon so users see WHICH category this
   // multi-link field targets at a glance. `margin-left: auto` keeps the
   // button anchored right past any existing chips.
   addBtn.innerHTML = `<span class="material-symbols-outlined">${pickIconFor(meta.target)}</span>`;
   addBtn.addEventListener('click', async () => {
+    if (offerCreate) { openCreateForLink(el, meta, ids); return; }
     // Exclude the current element + everything already in the list. Same
     // self-link rule as renderSingleLink — A Character's `friends` shouldn't
     // include the character itself.
