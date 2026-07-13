@@ -36,7 +36,8 @@
 import { ATLAS_LOCAL_ONLY_FIELDS } from '../core/constants';
 import { relationFieldsFor } from '../editor/field-schema';
 import type { ElementType } from '../core/types';
-import type { OwApiClient, BulkItem, BulkResult, ChangesPage } from './sync-engine';
+import type { OwApiClient, BulkItem, BulkResult, ChangesPage, WorldMetaWire } from './sync-engine';
+import { META_SYNC_FIELDS, META_WIRE_RENAME, canonicalMetaValue } from './world-meta-sync';
 
 type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>;
 
@@ -254,6 +255,43 @@ export class OwV2ClientAdapter implements OwApiClient {
     };
   }
 
+  /**
+   * GET /world in DISK names — the world-meta sync read (S262). Same request
+   * as getWorld() but returns the full 13-field body with the one rename
+   * applied (wire `time_range_current` → disk `time_current`) and every
+   * synced field canonicalized ('' / [] / null) so the engine's diff never
+   * sees representational noise.
+   */
+  async getWorldMeta(): Promise<WorldMetaWire> {
+    const response = await this.request('GET', '/world') as Record<string, unknown>;
+    if (!response || typeof response.id !== 'string') {
+      throw new Error('v2 /world response missing id');
+    }
+    return adaptWorldMetaBody(response);
+  }
+
+  /**
+   * PATCH /world — partial world-meta write (S262). `fields` arrive in DISK
+   * names already canonicalized by the kernel; this renames to wire names
+   * (disk `time_current` → wire `time_range_current`) and WHITELISTS to the
+   * synced set — keel aborts the whole PATCH on one unknown field, so a
+   * stray key must never ride along. Cleared ints go as explicit null
+   * (omission means "no change"). Returns the full refreshed body.
+   */
+  async patchWorldMeta(fields: Record<string, unknown>): Promise<WorldMetaWire> {
+    const wireBody: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(fields)) {
+      const kind = META_SYNC_FIELDS[k];
+      if (!kind) continue; // whitelist
+      wireBody[META_WIRE_RENAME[k] ?? k] = canonicalMetaValue(kind, v);
+    }
+    const response = await this.request('PATCH', '/world', wireBody) as Record<string, unknown>;
+    if (!response || typeof response.id !== 'string') {
+      throw new Error('v2 PATCH /world response missing id');
+    }
+    return adaptWorldMetaBody(response);
+  }
+
   async createElement(type: ElementType, body: Record<string, unknown>): Promise<ServerRecord> {
     const wireBody = toV2WireShape(body, type, 'create');
     try {
@@ -462,6 +500,31 @@ export class OwV2ClientAdapter implements OwApiClient {
       changes: ops,
     };
   }
+}
+
+/**
+ * Wire /world body → WorldMetaWire in DISK names, canonicalized. Shared by
+ * getWorldMeta + patchWorldMeta (keel echoes the full GET body after a PATCH).
+ */
+function adaptWorldMetaBody(src: Record<string, unknown>): WorldMetaWire {
+  const text = (v: unknown): string => canonicalMetaValue('text', v) as string;
+  const list = (v: unknown): string[] => canonicalMetaValue('list', v) as string[];
+  const int = (v: unknown): number | null => canonicalMetaValue('int', v) as number | null;
+  return {
+    id: src.id as string,
+    name: text(src.name),
+    description: text(src.description),
+    image_url: text(src.image_url),
+    time_basic_unit: text(src.time_basic_unit),
+    time_format_names: list(src.time_format_names),
+    time_format_equivalents: list(src.time_format_equivalents),
+    time_range_min: int(src.time_range_min),
+    time_range_max: int(src.time_range_max),
+    time_current: int(src.time_range_current), // the one rename, wire → disk
+    public_read: typeof src.public_read === 'boolean' ? src.public_read : undefined,
+    created_at: typeof src.created_at === 'string' ? src.created_at : undefined,
+    updated_at: typeof src.updated_at === 'string' ? src.updated_at : '',
+  };
 }
 
 /**

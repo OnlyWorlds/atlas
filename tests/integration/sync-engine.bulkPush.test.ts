@@ -199,7 +199,7 @@ describe('SyncEngine /bulk push path', () => {
     expect(bulkCalls()).toHaveLength(0);
   });
 
-  it('bails the round and records auth_blocked when /bulk hits a 401', async () => {
+  it('bails the round and records auth_blocked on dead credentials', async () => {
     await folder.createElement('character', { name: 'A' });
     await folder.createElement('character', { name: 'B' });
     client.__inject_auth_failure();
@@ -208,8 +208,10 @@ describe('SyncEngine /bulk push path', () => {
 
     expect(result.auth_blocked).toBe(true);
     expect(engine.getState().kind).toBe('error');
-    // Both items recorded as failed (the round produced no progress).
-    expect(result.failures).toHaveLength(2);
+    // Since the world-meta step (S262), dead creds bail at the round-opening
+    // GET /world — /bulk is never attempted and no per-item failures accrue.
+    expect(result.failures).toHaveLength(0);
+    expect(bulkCalls()).toHaveLength(0);
     expect(result.pushed.creates).toBe(0);
     expect(client.__server_count('character')).toBe(0);
   });

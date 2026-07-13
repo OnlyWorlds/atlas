@@ -301,7 +301,7 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
   if (!hasMarker) {
     await deleteHandle(ATLAS_ROOT_HANDLE_KEY);
     patchSlice('atlasRootRecoverable', null);
-    throw new Error('Folder no longer looks like an atlas root. Pick again');
+    throw new Error('Folder no longer looks like an OnlyWorlds folder. Pick again');
   }
   const pathHint = handle.name;
   const nextRegistry = setAtlasRoot(getState().registry, {
@@ -370,16 +370,16 @@ async function scaffoldWorldInRoot(
   } else {
     const reg = getState().registry;
     if (!reg.atlas_root) {
-      throw new Error('Atlas root is not set up. Pick a folder first');
+      throw new Error('OnlyWorlds folder is not set up. Pick a folder first');
     }
     const loaded = await loadHandle(reg.atlas_root.handle_key);
     if (!loaded) {
-      throw new Error('Atlas root handle is missing from the vault. Re-pick it from settings');
+      throw new Error('OnlyWorlds folder link is missing. Re-pick it in settings');
     }
     // Re-grant permission on the root (user gesture at click-time is acceptable here).
     const granted = await ensureWritable(loaded);
     if (!granted) {
-      throw new Error('Write permission for the atlas folder was denied');
+      throw new Error('Write permission for the OnlyWorlds folder was denied');
     }
     rootHandle = loaded;
     rootLabel = reg.atlas_root.folder_name;
@@ -547,7 +547,7 @@ export async function linkExistingApiWorldInRoot(
 ): Promise<LinkExistingApiWorldResult> {
   const reg = getState().registry;
   if (!reg.atlas_root) {
-    throw new Error('Atlas root is not set up. Pick a folder first');
+    throw new Error('OnlyWorlds folder is not set up. Pick a folder first');
   }
   const apiKey = opts.apiKey.trim();
   const apiPin = opts.apiPin.trim();
@@ -601,11 +601,11 @@ export async function linkExistingApiWorldInRoot(
 
   const rootHandle = await loadHandle(reg.atlas_root.handle_key);
   if (!rootHandle) {
-    throw new Error('Atlas root handle is missing from the vault. Re-pick it from settings');
+    throw new Error('OnlyWorlds folder link is missing. Re-pick it in settings');
   }
   const granted = await ensureWritable(rootHandle);
   if (!granted) {
-    throw new Error('Write permission for the atlas folder was denied');
+    throw new Error('Write permission for the OnlyWorlds folder was denied');
   }
 
   // Close any prior active store before we open a new one.
@@ -712,15 +712,15 @@ export async function linkExistingApiWorldInRoot(
 export async function deleteWorldFolderUnderRoot(folderName: string): Promise<void> {
   const reg = getState().registry;
   if (!reg.atlas_root) {
-    throw new Error('Atlas root not configured; cannot delete');
+    throw new Error('OnlyWorlds folder not configured; cannot delete');
   }
   const rootHandle = await loadHandle(reg.atlas_root.handle_key);
   if (!rootHandle) {
-    throw new Error('Atlas root handle missing. Re-pick the root in settings');
+    throw new Error('OnlyWorlds folder link missing. Re-pick it in settings');
   }
   const granted = await ensureWritable(rootHandle);
   if (!granted) {
-    throw new Error('Write permission denied for atlas folder');
+    throw new Error('Write permission denied for the OnlyWorlds folder');
   }
   await rootHandle.removeEntry(folderName, { recursive: true });
 }

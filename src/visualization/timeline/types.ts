@@ -81,6 +81,13 @@ export interface TimelineNode {
   snippet?: string;
   /** Grouping key for swimlanes (narrative id etc.) — used by the lanes bout. */
   laneKey?: string;
+  /**
+   * Open-end semantics (Act 2A): the type records spans and this node has a
+   * start but NO recorded end — the span is still running (a held title). The
+   * renderer resolves the effective end against the live now at draw time
+   * (`effectiveEndDate`); this flag is type truth, not a resolved date.
+   */
+  openEnded?: boolean;
 }
 
 export interface PlacedDot {

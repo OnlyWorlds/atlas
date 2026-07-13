@@ -23,6 +23,7 @@ import {
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { getActiveStore } from '../core/active-store';
+import { requestPushIfLinked } from '../sync/sync-attach';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import type { Element, ElementType } from '../core/types';
 import { narrativeKindOf } from '../core/narrative-kind';
@@ -229,7 +230,7 @@ function buildCover(
     ? `<p class="atlas-home-world-description atlas-home-clickable" data-edit="description">${escapeText(meta.description)}</p>`
     : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">add a description…</p>`;
   identity.innerHTML = `
-    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="click to rename">${escapeText(meta.name)}</h1>
+    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="click to rename (a local name — the OnlyWorlds world name lives in settings)">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
   `;
   cover.appendChild(identity);
@@ -571,6 +572,10 @@ function openIdentityEdit(
         ...active,
         meta: { ...active.meta, [field]: value },
       });
+      // Description syncs via the world-meta step (S262); name is deliberately
+      // LOCAL-ONLY (D4 — the server world name is a separate identity, see
+      // settings → World), so only description triggers a push.
+      if (field === 'description') requestPushIfLinked();
       toasts.info(`World ${field} saved`);
     },
   });

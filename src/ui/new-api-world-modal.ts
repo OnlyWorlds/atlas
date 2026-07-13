@@ -27,7 +27,7 @@ export class NewApiWorldModal extends BaseModal {
 
   open(): void {
     if (!getState().registry.atlas_root) {
-      this.toasts.error('Set up atlas folder first');
+      this.toasts.error('Set up your OnlyWorlds folder first');
       return;
     }
     const reg = getState().registry;

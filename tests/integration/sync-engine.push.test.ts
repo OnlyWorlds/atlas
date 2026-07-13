@@ -30,9 +30,10 @@ beforeEach(async () => {
   engine = new SyncEngine({ folder, client });
 });
 
-/** Push tests focus on write methods. Pull phase issues list calls every sync;
- *  filter those out so push assertions stay focused on the push surface. */
-const writeCalls = () => client.calls.filter(c => c.method !== 'list');
+/** Push tests focus on write methods. Pull phase issues list calls every sync,
+ *  and the world-meta step (S262) issues a getWorldMeta read every round;
+ *  filter both out so push assertions stay focused on the push surface. */
+const writeCalls = () => client.calls.filter(c => c.method !== 'list' && c.method !== 'getWorldMeta');
 
 describe('SyncEngine push phase', () => {
   it('pushes a locally-created element as CREATE', async () => {

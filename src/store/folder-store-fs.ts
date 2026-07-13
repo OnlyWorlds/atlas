@@ -163,6 +163,20 @@ export class FsFolderStore implements FolderStore {
     this.syncStateChain = next.then(() => undefined, () => undefined);
     return next;
   }
+  /**
+   * Store-global serialization for `world.json` (world-meta sync gate R4,
+   * 2026-07-13). writeWorldMeta is a read-merge-write of one shared file with
+   * writers that can genuinely race: the user's setNow / home identity edit
+   * vs the sync engine's pull-apply. Without the chain, the pull's stale read
+   * silently erases the user's just-written now-line. resetSyncBaseline's
+   * api-strip rides the same chain — it rewrites the same file.
+   */
+  private worldMetaChain: Promise<unknown> = Promise.resolve();
+  private runWorldMetaOp<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.worldMetaChain.then(fn, fn);
+    this.worldMetaChain = next.then(() => undefined, () => undefined);
+    return next;
+  }
 
   constructor(opts: FsFolderStoreOptions = {}) {
     this.opts = opts;
@@ -399,10 +413,15 @@ export class FsFolderStore implements FolderStore {
   }
 
   async writeWorldMeta(patch: Partial<WorldMeta>): Promise<WorldMeta> {
-    const current = await this.readWorldMeta();
-    const next: WorldMeta = { ...current, ...patch };
-    await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, next);
-    return next;
+    // Serialized read-merge-write (world-meta gate R4): the read and the
+    // write happen atomically relative to every other meta writer, so a
+    // background pull-apply can never erase a concurrent user edit.
+    return this.runWorldMetaOp(async () => {
+      const current = await this.readWorldMeta();
+      const next: WorldMeta = { ...current, ...patch };
+      await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, next);
+      return next;
+    });
   }
 
   // ---- Elements (unified content + spatial) ----
@@ -860,13 +879,18 @@ export class FsFolderStore implements FolderStore {
     await writeJsonAtomic(atlasDir, SYNC_STATE_FILE, { ...DEFAULT_SYNC_STATE });
     // 4. Strip the api block from world.json so a future reload-and-rescan
     //    (e.g., handle re-permission, fresh atlas root setup) doesn't try to
-    //    auto-attach against dead credentials.
-    const meta = await this.readWorldMeta();
-    const { api: _dropApi, ...metaRest } = meta;
-    await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, metaRest as WorldMeta);
+    //    auto-attach against dead credentials. Rides the world-meta chain —
+    //    it rewrites the same file writeWorldMeta serializes (gate R4).
+    let hadApi = false;
+    await this.runWorldMetaOp(async () => {
+      const meta = await this.readWorldMeta();
+      hadApi = !!meta.api;
+      const { api: _dropApi, ...metaRest } = meta;
+      await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, metaRest as WorldMeta);
+    });
     console.info('[atlas:folder] resetSyncBaseline complete', {
       elementsCleared: cleared,
-      apiStripped: !!meta.api,
+      apiStripped: hadApi,
     });
   }
 

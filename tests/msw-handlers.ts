@@ -347,6 +347,55 @@ export interface StatefulV2ServerOptions {
    * updated_at echo, forcing the engine's read-back backfill fallback.
    */
   omitBulkTimestamps?: boolean;
+  /**
+   * Seed initial world-meta values (WIRE names, e.g. `time_range_current`).
+   * Overrides individual fields on top of the canonical-empty defaults; id/name
+   * still fall back to worldId/worldName when not given here.
+   */
+  worldMeta?: Record<string, unknown>;
+}
+
+/**
+ * PATCH /world writable fields (WIRE names) → kind. Anything not here is an
+ * unknown field: keel 422s and aborts the WHOLE PATCH (dig 2026-07-13). NOTE
+ * `time_range_current` is the wire name — atlas disk calls it `time_current`.
+ */
+const V2_WORLD_META_WRITABLE: Readonly<Record<string, 'text' | 'list' | 'int'>> = {
+  name: 'text',
+  description: 'text',
+  image_url: 'text',
+  time_basic_unit: 'text',
+  time_format_names: 'list',
+  time_format_equivalents: 'list',
+  time_range_min: 'int',
+  time_range_max: 'int',
+  time_range_current: 'int',
+};
+
+/**
+ * Per-field type validation for PATCH /world, WIRE names. Returns the keel
+ * message + param for the first problem, or null when the value is valid for
+ * its kind. Booleans are explicitly rejected on int fields (keel dig).
+ */
+function validateWorldMetaField(field: string, v: unknown): { message: string; param: string } | null {
+  const kind = V2_WORLD_META_WRITABLE[field];
+  if (kind === 'text') {
+    if (typeof v !== 'string') return { message: `'${field}' must be a string.`, param: field };
+    if (field === 'name' && v.trim() === '') return { message: 'name must be a non-empty string.', param: 'name' };
+    return null;
+  }
+  if (kind === 'list') {
+    if (!Array.isArray(v) || !v.every(x => typeof x === 'string')) {
+      return { message: `'${field}' must be a list of strings.`, param: field };
+    }
+    return null;
+  }
+  // int: integer or null; booleans (a number-ish JS value) explicitly rejected.
+  if (v === null) return null;
+  if (typeof v === 'boolean' || typeof v !== 'number' || !Number.isInteger(v)) {
+    return { message: `'${field}' must be an integer or null.`, param: field };
+  }
+  return null;
 }
 
 /**
@@ -365,6 +414,9 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
   state: Map<string, Map<string, ServerRecord>>;
   opLog: V2ChangeOp[];
   __mutate: (type: string, id: string, patch: Record<string, unknown>) => void;
+  /** Out-of-band server-side world-meta edit (WIRE names) — bumps updated_at,
+   *  mirrors __mutate for the /world resource. */
+  __mutate_world_meta: (patch: Record<string, unknown>) => void;
 } {
   const base = (options.baseUrl ?? V2_DEFAULT_BASE).replace(/\/$/, '');
   const clock = options.clock ?? (() => new Date().toISOString());
@@ -375,6 +427,45 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
   const idempotency = new Map<string, { payload: string; response: unknown }>();
   const cursorOffsets = new Map<string, number>();
   let seq = 0;
+
+  // World-meta state (v2 tail, S262). Seeded from worldId/worldName (defaults
+  // keep older suites indifferent) + canonical empties ('' text, [] list, null
+  // int); options.worldMeta overrides individual WIRE-named fields.
+  const worldMeta: Record<string, unknown> = {
+    id: options.worldId ?? '00000000-0000-4000-8000-000000w0r1d0',
+    name: options.worldName ?? 'fake v2 world',
+    description: '',
+    image_url: '',
+    time_basic_unit: '',
+    time_format_names: [] as string[],
+    time_format_equivalents: [] as string[],
+    time_range_min: null,
+    time_range_max: null,
+    time_range_current: null,
+    public_read: false,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...(options.worldMeta ?? {}),
+  };
+
+  /** The full 13-field GET /world body (WIRE names), lists copied out. */
+  function worldMetaBody(): Record<string, unknown> {
+    return {
+      id: worldMeta.id,
+      name: worldMeta.name,
+      description: worldMeta.description,
+      image_url: worldMeta.image_url,
+      time_format_names: [...(worldMeta.time_format_names as string[])],
+      time_format_equivalents: [...(worldMeta.time_format_equivalents as string[])],
+      time_basic_unit: worldMeta.time_basic_unit,
+      time_range_min: worldMeta.time_range_min,
+      time_range_max: worldMeta.time_range_max,
+      time_range_current: worldMeta.time_range_current,
+      public_read: worldMeta.public_read,
+      created_at: worldMeta.created_at,
+      updated_at: worldMeta.updated_at,
+    };
+  }
 
   function bucket(type: string): Map<string, ServerRecord> {
     let m = state.get(type);
@@ -517,12 +608,34 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
     http.get(`${base}/world`, () => {
       const blocked = authBlocked();
       if (blocked) return blocked;
-      return HttpResponse.json({
-        id: options.worldId ?? '00000000-0000-4000-8000-000000w0r1d0',
-        name: options.worldName ?? 'fake v2 world',
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
-      });
+      return HttpResponse.json(worldMetaBody());
+    }),
+
+    // PATCH /world — world-meta partial write (v2 tail, S262). MUST precede
+    // PATCH /:type (a bare /world would match type="world"). Contract (keel dig
+    // 2026-07-13): unknown-field check across ALL keys first — one stray field
+    // aborts the whole PATCH — then per-field type validation, then apply +
+    // bump. Only present fields change; keel does NOT diff, so a present field
+    // equal to its current value still bumps updated_at. Empty body {} → no
+    // save, no bump, returns the current body.
+    http.patch(`${base}/world`, async ({ request }) => {
+      const blocked = authBlocked();
+      if (blocked) return blocked;
+      const body = (await request.json()) as Record<string, unknown>;
+      const keys = Object.keys(body);
+      if (keys.length === 0) return HttpResponse.json(worldMetaBody());
+      for (const k of keys) {
+        if (!(k in V2_WORLD_META_WRITABLE)) {
+          return envelope({ status: 422, code: 'invalid_request', message: `Unknown field '${k}'.`, param: k });
+        }
+      }
+      for (const k of keys) {
+        const err = validateWorldMetaField(k, body[k]);
+        if (err) return envelope({ status: 422, code: 'invalid_request', message: err.message, param: err.param });
+      }
+      for (const k of keys) worldMeta[k] = body[k];
+      worldMeta.updated_at = clock();
+      return HttpResponse.json(worldMetaBody());
     }),
 
     // POST /bulk — atomic/non-atomic multi-create with fixpoint FK resolution.
@@ -707,6 +820,10 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       const record: ServerRecord = { ...existing, ...patch, id, updated_at: clock() };
       bucket(type).set(id, record);
       logUpsert(type, record);
+    },
+    __mutate_world_meta: (patch) => {
+      for (const [k, v] of Object.entries(patch)) worldMeta[k] = v;
+      worldMeta.updated_at = clock();
     },
   };
 }

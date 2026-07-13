@@ -65,7 +65,10 @@ describe('isAuthError detector', () => {
 
 describe('SyncEngine auth-blocked rounds', () => {
   describe('push', () => {
-    it('transitions to error state when all pushes 401', async () => {
+    it('transitions to error state on dead credentials (bails at the meta read, before any element attempt)', async () => {
+      // Since the world-meta step (S262) every round opens with GET /world;
+      // dead creds 401 THERE, so the round bails even earlier than the old
+      // element-loop bail — zero element attempts, zero failure entries.
       await folder.createElement('character', { name: 'Alice' });
       client.__inject_auth_failure(true);
 
@@ -73,7 +76,7 @@ describe('SyncEngine auth-blocked rounds', () => {
 
       expect(result.auth_blocked).toBe(true);
       expect(result.pushed.creates).toBe(0);
-      expect(result.failures.length).toBeGreaterThan(0);
+      expect(client.calls.filter(c => c.method === 'create')).toHaveLength(0);
 
       const state = engine.getState();
       expect(state.kind).toBe('error');
@@ -83,19 +86,17 @@ describe('SyncEngine auth-blocked rounds', () => {
       }
     });
 
-    it('bails the loop on first auth error (no retry storm)', async () => {
-      // Three pending CREATEs. With auth blocked, only ONE should be
-      // recorded in failures — the engine bails after the first 401 rather
-      // than collecting a failure per element.
-      await folder.createElement('character', { name: 'A' });
+    it('bails the element loop on first auth error (no retry storm)', async () => {
+      // Three pending CREATEs; the key dies MID-ROUND (after the meta read
+      // succeeded) — modeled by a per-element injected 401 on the first
+      // element attempted. Exactly ONE failure recorded; the rest untried.
+      const a = await folder.createElement('character', { name: 'A' });
       await folder.createElement('character', { name: 'B' });
       await folder.createElement('character', { name: 'C' });
-      client.__inject_auth_failure(true);
+      client.__inject_failure('create', a.id, 'API Error 401: Unauthorized');
 
       const result = await engine.pushOnce();
 
-      // Exactly one element marked failed — the one that tripped the auth
-      // check. The other two never got tried.
       expect(result.failures).toHaveLength(1);
       expect(result.auth_blocked).toBe(true);
     });

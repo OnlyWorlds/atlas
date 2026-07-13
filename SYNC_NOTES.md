@@ -605,6 +605,18 @@ Skeld's v2 tail (all five S257 asks, live on production same day) closed the rem
 - **Rewind guard**: every /changes response now carries `head` (the world's current change_seq). Normal operation never rewinds (§8 law); the one legal rewind is disaster restore-from-backup. The engine persists `changes_last_seq` (highest APPLIED seq, advanced in the same lockstep as the cursor) and, when a page's `head` is strictly below it, drops cursor + seq memory and cold-walks from the epoch (retention law makes the cold walk complete-state; upserts idempotent, deletes explicit). Single-reset-per-round latch prevents a pathological head from looping. Regression: `sync-engine.changesPull.test.ts` rewind describe-block; fake seam `__rewind_op_log(maxSeq)`.
 - **Retention** is now written law (no compaction horizon) — the /changes cold-walk bootstrap for INITIAL DOWNLOAD is unblocked if we ever want it (currently initial download stays on the list walk; revisit only if it earns its keep).
 
+## World-meta sync — the meta step (S262, gated)
+
+`world.json`'s eight OW wire fields sync via `GET|PATCH /world` (full design + all ten gate resolutions: `Forge/Notes/2026-07-13-worldmeta-sync-design.md`; the shipped shape is summarized in DESIGN.md "World-meta sync"). Engine-side facts a future session needs:
+
+- **`executeMetaStep()` opens every round** (all three run paths — a setNow debounce push must carry the now). Consequence for tests: every engine round now emits ONE `getWorldMeta` call; call-log assertions filter it (`sync-engine.push.test.ts` writeCalls) and dead-creds rounds bail AT THE META READ, before any element attempt (authBlocked/bulkPush suites re-locked to that truth; the element-loop first-bail is still covered via a per-element injected 401).
+- **Baseline lives in sync-state** (`meta_baseline`, canonical snapshot; `meta_server_updated_at` informational; `meta_conflicts` under pause-and-review). Seed rule: absent baseline → adopt server + fill local-empties, NEVER PATCH that round.
+- **Keel bump nuance** (source-dug): element writes NEVER bump world.updated_at (`update_fields=["change_seq"]`); v2 PATCH /world is the only runtime writer that names it — but a re-PATCH of IDENTICAL values still bumps (keel doesn't diff). Atlas's partial-diff means we never send identical values.
+- **Soft-edges (documented, not built)**:
+  - *Open-editor pull race*: a pull landing while the home description popover is open advances the baseline under the editor; the user's save then reads as a clean local change and overwrites the unseen server edit without a conflict flag (only matters under pause-and-review; window is seconds). Fix shape if it ever bites: capture baseline at popover-open, compare at save.
+  - *Import dirties meta with no push trigger*: import writes wire fields but doesn't requestPush — the NEXT round's diff catches it (meta step runs every round), so it's only stuck if the user imports and never edits/syncs again. Accepted.
+  - *MSW read-only-key modeling*: only FakeOwApiClient models the 403 write/read split (`__inject_write_permission_error`); MSW handlers model 401 blocking only.
+
 ---
 
 *Authored mid-session 201 (2026-05-13) after Phase 3.5 mega smoke. If you're reading this in a future chat, this is what the sync engine wanted you to know.*

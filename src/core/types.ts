@@ -241,6 +241,27 @@ export interface SyncState {
    * Local file still exists; awaiting user decision (delete locally vs re-push).
    */
   server_deletes?: ServerDeleteRecord[];
+  /**
+   * World-meta sync baseline (S262, gate R2): a CANONICAL snapshot of the 8
+   * synced world.json wire fields as last confirmed with the server
+   * (''/[]/null empties — see META_SYNC_FIELDS in sync/world-meta-sync.ts).
+   * Absent = meta never synced: the next meta step SEEDS it from GET /world
+   * and never PATCHes that round (the absent-baseline blind-push was the
+   * gate's 3-lens convergent finding). Refreshed PER-FIELD: only fields a
+   * PATCH sent or a pull applied — untouched fields keep their stale baseline
+   * so later server-only changes still surface. Cleared by resetSyncBaseline.
+   */
+  meta_baseline?: Record<string, unknown> | null;
+  /** Server updated_at from the last /world read or PATCH echo. Informational
+   *  skip-optimization only — never load-bearing (redundant same-value
+   *  PATCHes bump it server-side; the field diff is the truth). */
+  meta_server_updated_at?: string | null;
+  /**
+   * Contested world-meta fields under pause-and-review (both sides changed
+   * since baseline, values differ). Persisted so the badge survives reload;
+   * resolved via the conflict-review modal's world-settings rows (gate R9).
+   */
+  meta_conflicts?: string[];
 }
 
 export interface ServerDeleteRecord {
@@ -303,15 +324,28 @@ export interface SyncResult {
    * Refines auth_blocked when the server's typed error distinguished the
    * cause: a REVOKED key wants "mint a new key" guidance, not "check your
    * PIN" (gate R4, 2026-07-13 — minted account-mode keys are revocable from
-   * the portal independently of the PIN).
+   * the portal independently of the PIN). `read_only_key` is a 403
+   * permission_error — the key can never write, so the round bails like any
+   * auth failure but the copy must say "read-only key", never "check your
+   * PIN" (world-meta gate R1, 2026-07-13).
    */
-  auth_reason?: 'key_revoked';
+  auth_reason?: 'key_revoked' | 'read_only_key';
+  /**
+   * World-meta fields (disk names) the meta step PUSHED to / PULLED from
+   * `PATCH|GET /world` this round (world-meta sync, S262). Lets the UI
+   * surface meta-only rounds honestly — pushed/pulled above count elements
+   * only, so without these a meta-only round reads as "nothing synced"
+   * (gate R7, the lying-pill class).
+   */
+  meta_pushed?: string[];
+  meta_pulled?: string[];
 }
 
 export interface PerElementFailure {
   element_id: string;
-  type: ElementType;
-  operation: 'create' | 'update' | 'delete';
+  /** `'world'` = a world-meta step failure (element_id 'world', S262). */
+  type: ElementType | 'world';
+  operation: 'create' | 'update' | 'delete' | 'read';
   message: string;
 }
 

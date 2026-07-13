@@ -122,6 +122,21 @@ describe('timeline data-normalizer', () => {
     expect(nodes[0].endDate).toBeNull(); // inverted range discarded
   });
 
+  it('flags an unrevoked title open-ended; revoked, inverted-revoked, and end-less events stay closed (Act 2A)', () => {
+    const nodes = extractTemporalNodes([
+      { id: 't1', type: 'title', name: 'Held', local_updated_at: 'x', grant_date: 28 } as Element & Record<string, unknown>,
+      { id: 't2', type: 'title', name: 'Past', local_updated_at: 'x', grant_date: 12, revoke_date: 31 } as Element & Record<string, unknown>,
+      // Inverted revoke is RECORDED bad data — dropped as a range, but it must
+      // not be reinterpreted as an ongoing tenure.
+      { id: 't3', type: 'title', name: 'Bad', local_updated_at: 'x', grant_date: 30, revoke_date: 10 } as Element & Record<string, unknown>,
+      { id: 'e1', type: 'event', name: 'Moment', local_updated_at: 'x', start_date: 40 } as Element & Record<string, unknown>,
+    ]);
+    expect(nodes.find(n => n.id === 't1')!.openEnded).toBe(true);
+    expect(nodes.find(n => n.id === 't2')!.openEnded).toBeUndefined();
+    expect(nodes.find(n => n.id === 't3')!.openEnded).toBeUndefined();
+    expect(nodes.find(n => n.id === 'e1')!.openEnded).toBeUndefined(); // events are moments, not ongoing
+  });
+
   it('keeps an equal end_date (zero-length range is valid)', () => {
     const elements: Element[] = [
       {

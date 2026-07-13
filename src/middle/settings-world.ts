@@ -111,8 +111,12 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     try {
       const result = await pullNowAndRefresh();
       if (!result) { surfaceSyncUnavailable(toasts); return; }
-      const total = result.pulled.creates + result.pulled.updates;
-      toasts.success(total === 0 ? 'Already up to date' : `Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
+      const elementTotal = result.pulled.creates + result.pulled.updates;
+      const metaTotal = result.meta_pulled?.length ?? 0;
+      // Meta-only pulls already toast "Pulled world settings from API" in
+      // pullNowAndRefresh — stay quiet here rather than double-toasting.
+      if (elementTotal + metaTotal === 0) toasts.success('Already up to date');
+      else if (elementTotal > 0) toasts.success(`Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
     } catch (err) {
       toasts.error(err instanceof Error ? err.message : String(err));
     } finally {

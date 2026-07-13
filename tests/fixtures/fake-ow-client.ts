@@ -17,7 +17,7 @@
  *     engine dispatches its pull phase on the method's mere presence.
  */
 
-import type { OwApiClient, BulkItem, BulkResult, ChangesPage } from '../../src/sync/sync-engine';
+import type { OwApiClient, BulkItem, BulkResult, ChangesPage, WorldMetaWire } from '../../src/sync/sync-engine';
 import type { ElementType } from '../../src/core/types';
 import { ATLAS_LOCAL_ONLY_FIELDS } from '../../src/core/constants';
 
@@ -92,6 +92,36 @@ export class FakeOwApiClient implements OwApiClient {
    * Null = the historical plain-Error 401 (message-only), unchanged.
    */
   private authBlockedCode: 'invalid_credentials' | 'key_revoked' | null = null;
+  /**
+   * Test seam: when true, every WRITE (createElement, updateElement,
+   * deleteElement, bulkCreate, patchWorldMeta) throws a duck-typed 403
+   * permission_error, while every READ still succeeds. Models a read-only key
+   * (keel returns 403 "This key is read-only …" on any write). Toggle via
+   * __inject_write_permission_error.
+   */
+  private writePermissionBlocked = false;
+  /**
+   * World-meta store in DISK names (`time_current`, not the wire's
+   * `time_range_current`). getWorldMeta returns this; patchWorldMeta mutates it
+   * under the same validation rules as the server but on disk names. Defaults:
+   * canonical empties, a fixed epoch updated_at (deterministic; setClock drives
+   * bumps on write).
+   */
+  private worldMeta: WorldMetaWire = {
+    id: '00000000-0000-4000-8000-00000fake1d',
+    name: 'fake world',
+    description: '',
+    image_url: '',
+    time_basic_unit: '',
+    time_format_names: [],
+    time_format_equivalents: [],
+    time_range_min: null,
+    time_range_max: null,
+    time_current: null,
+    public_read: false,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+  };
 
   // Capture of every call for assertion.
   calls: Array<
@@ -101,6 +131,8 @@ export class FakeOwApiClient implements OwApiClient {
     | { method: 'list'; type: ElementType }
     | { method: 'get'; type: ElementType; id: string }
     | { method: 'bulk'; items: number; atomic: boolean }
+    | { method: 'getWorldMeta' }
+    | { method: 'patchWorldMeta'; body: Record<string, unknown> }
   > = [];
 
   setClock(fn: () => string): void { this.clock = fn; }
@@ -138,6 +170,7 @@ export class FakeOwApiClient implements OwApiClient {
 
   async createElement(type: ElementType, body: Record<string, unknown>): Promise<ServerRecord> {
     this.throwIfAuthBlocked();
+    this.throwIfWritePermission();
     // Mirror real-OW wire semantics: JSON.stringify drops undefined values,
     // so any field set to `undefined` in the body never reaches the server.
     // Without this, FakeOwApiClient would mask UI bugs that pass `undefined`
@@ -176,6 +209,7 @@ export class FakeOwApiClient implements OwApiClient {
 
   async updateElement(type: ElementType, id: string, body: Record<string, unknown>): Promise<ServerRecord> {
     this.throwIfAuthBlocked();
+    this.throwIfWritePermission();
     // Same wire-semantics rule as createElement: drop undefined before the
     // spread-merge. Real PATCH treats a missing key as "no change"; only an
     // explicit `null` (or a new value) overwrites the field.
@@ -199,6 +233,7 @@ export class FakeOwApiClient implements OwApiClient {
 
   async deleteElement(type: ElementType, id: string): Promise<void> {
     this.throwIfAuthBlocked();
+    this.throwIfWritePermission();
     this.calls.push({ method: 'delete', type, id });
     this.throwIfInjected('delete', id);
     // v2 contract: DELETE is IDEMPOTENT — a missing id returns 204, same as
@@ -225,6 +260,59 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   /**
+   * GET /world — the full 13-field body in DISK names (world-meta sync, S262).
+   * A READ: succeeds under a read-only key (only writes 403). Returns a clone
+   * so callers can't mutate internal state through the arrays.
+   */
+  async getWorldMeta(): Promise<WorldMetaWire> {
+    this.throwIfAuthBlocked();
+    this.calls.push({ method: 'getWorldMeta' });
+    return this.cloneWorldMeta();
+  }
+
+  /**
+   * PATCH /world — partial write in DISK names. Mirrors the keel contract but
+   * on disk names (so `time_current`, not the wire's `time_range_current`):
+   *   - stripUndefined first (a missing key = "no change"; a buggy caller that
+   *     passes `undefined` to "clear" gets the real resurrect behavior);
+   *   - unknown field → 422 param throw; wrong type → 422; name non-empty;
+   *     int-or-null with booleans rejected — validated across ALL keys before
+   *     any mutation (keel aborts the whole PATCH on one stray field);
+   *   - empty body after strip → return current body, NO updated_at bump;
+   *   - any applied field (even same value) bumps updated_at (keel doesn't diff).
+   * Returns the full refreshed body (keel echoes GET /world after the write).
+   */
+  async patchWorldMeta(fields: Record<string, unknown>): Promise<WorldMetaWire> {
+    this.throwIfAuthBlocked();
+    this.throwIfWritePermission();
+    const wireBody = stripUndefined(fields);
+    this.calls.push({ method: 'patchWorldMeta', body: { ...wireBody } });
+    const keys = Object.keys(wireBody);
+    // Unknown-field pass first (whole PATCH aborts), then per-field type.
+    for (const k of keys) {
+      if (!(k in DISK_WORLD_META_WRITABLE)) {
+        throw metaError(k, `Unknown field '${k}'.`);
+      }
+    }
+    for (const k of keys) {
+      const msg = validateDiskWorldMetaField(k, wireBody[k]);
+      if (msg) throw metaError(k, msg);
+    }
+    if (keys.length === 0) return this.cloneWorldMeta(); // no bump
+    for (const k of keys) (this.worldMeta as unknown as Record<string, unknown>)[k] = wireBody[k];
+    this.worldMeta.updated_at = this.clock();
+    return this.cloneWorldMeta();
+  }
+
+  private cloneWorldMeta(): WorldMetaWire {
+    return {
+      ...this.worldMeta,
+      time_format_names: [...this.worldMeta.time_format_names],
+      time_format_equivalents: [...this.worldMeta.time_format_equivalents],
+    };
+  }
+
+  /**
    * POST /bulk — atomic multi-element create with server-side FK-order
    * resolution (cycles included). Opt-in via `__enable_bulk()`: left
    * undefined by default so the per-element createOrder tests still exercise
@@ -247,6 +335,7 @@ export class FakeOwApiClient implements OwApiClient {
     opts?: { atomic?: boolean; idempotencyKey?: string },
   ): Promise<BulkResult> {
     this.throwIfAuthBlocked();
+    this.throwIfWritePermission();
     const atomic = opts?.atomic ?? false;
     this.calls.push({ method: 'bulk', items: items.length, atomic });
 
@@ -479,6 +568,46 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   /**
+   * Out-of-band server-side world-meta edit (DISK names). Bumps updated_at and,
+   * unlike patchWorldMeta, does NOT log a call — mirrors __server_mutate for
+   * elements. Used to set up meta pull/conflict scenarios. No validation (a
+   * real server edit is trusted).
+   */
+  __server_mutate_world_meta(patch: Record<string, unknown>): void {
+    for (const [k, v] of Object.entries(patch)) (this.worldMeta as unknown as Record<string, unknown>)[k] = v;
+    this.worldMeta.updated_at = this.clock();
+  }
+
+  /**
+   * Test seam: model a read-only key. When enabled, every WRITE throws a
+   * duck-typed 403 permission_error; every READ still succeeds. Needed for the
+   * engine's R1 (read-only-key auth-bail) tests.
+   */
+  __inject_write_permission_error(enabled = true): void {
+    this.writePermissionBlocked = enabled;
+  }
+
+  /**
+   * Test introspection: a copy of the internal DISK-named world-meta object, no
+   * call logged. Lets engine suites assert on server-side meta state directly
+   * (e.g. __get_world_meta_state().time_current after a push).
+   */
+  __get_world_meta_state(): Record<string, unknown> {
+    return this.cloneWorldMeta() as unknown as Record<string, unknown>;
+  }
+
+  private throwIfWritePermission(): void {
+    if (this.writePermissionBlocked) {
+      const err = new Error('API Error 403: This key is read-only and cannot write to this world.') as
+        Error & { status?: number; code?: string; param?: string | null };
+      err.status = 403;
+      err.code = 'permission_error';
+      err.param = null;
+      throw err;
+    }
+  }
+
+  /**
    * Inject a failure for a specific (operation, id). The next call to that
    * operation on that id will throw with the given message instead of
    * succeeding. Used to verify the engine tolerates per-element errors.
@@ -593,6 +722,58 @@ function danglingErr(field: string, refId: string): V2ItemError {
  * undefined when they mean "clear" (those bugs would surface only against
  * MSW or real OW).
  */
+/**
+ * PATCH /world writable fields in DISK names → kind. This fake implements
+ * OwApiClient (adapter-level), so it speaks disk names: `time_current`, NOT the
+ * wire's `time_range_current` (a caller passing the wire name gets an
+ * unknown-field 422, proving the disk boundary). Mirror of the server-side
+ * writable set in msw-handlers.ts, one rename apart.
+ */
+const DISK_WORLD_META_WRITABLE: Readonly<Record<string, 'text' | 'list' | 'int'>> = {
+  name: 'text',
+  description: 'text',
+  image_url: 'text',
+  time_basic_unit: 'text',
+  time_format_names: 'list',
+  time_format_equivalents: 'list',
+  time_range_min: 'int',
+  time_range_max: 'int',
+  time_current: 'int',
+};
+
+/** First type-validation problem for a DISK-named meta field, or null if ok. */
+function validateDiskWorldMetaField(field: string, v: unknown): string | null {
+  const kind = DISK_WORLD_META_WRITABLE[field];
+  if (kind === 'text') {
+    if (typeof v !== 'string') return `'${field}' must be a string.`;
+    if (field === 'name' && v.trim() === '') return 'name must be a non-empty string.';
+    return null;
+  }
+  if (kind === 'list') {
+    if (!Array.isArray(v) || !v.every(x => typeof x === 'string')) return `'${field}' must be a list of strings.`;
+    return null;
+  }
+  // int: integer or null; booleans explicitly rejected.
+  if (v === null) return null;
+  if (typeof v === 'boolean' || typeof v !== 'number' || !Number.isInteger(v)) {
+    return `'${field}' must be an integer or null.`;
+  }
+  return null;
+}
+
+/**
+ * Build a duck-typed OwV2Error for a 422 world-meta validation failure — same
+ * shape sync-engine's typedError() reads (.status/.code/.param, message
+ * prefixed "API Error 422: …"), mirroring the authBlockedCode pattern above.
+ */
+function metaError(param: string, detail: string): Error & { status: number; code: string; param: string | null } {
+  const err = new Error(`API Error 422: ${detail}`) as Error & { status: number; code: string; param: string | null };
+  err.status = 422;
+  err.code = 'invalid_request';
+  err.param = param;
+  return err;
+}
+
 function stripUndefined(body: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {

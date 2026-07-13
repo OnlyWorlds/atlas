@@ -18,8 +18,10 @@
  *        (422 param=pin either way — callers retry per the dance).
  *   POST /account/worlds/{id}/keys     → 201 {..., key} (full key once).
  *        Empty body = WRITE scope default. Owner-only; non-owner → 404.
- *        ⚠ No {name} field exists yet (asked of Skeld 2026-07-13) — do not
- *        send one, unknown body fields 422.
+ *        Optional {name} (≤255 chars, else 422 param=name) — echoed in the
+ *        mint response, GET .../keys rows, and the portal keys table. LIVE
+ *        on prod 2026-07-13 (Skeld OPS-3). Unknown body fields are silently
+ *        IGNORED (spec §2 — corrected: this route never 422'd unknowns).
  *
  * Errors ride the same §9 envelope as v2 element routes and surface as
  * OwV2Error (invalid token → 401 invalid_credentials; revoked token → 401
@@ -43,6 +45,8 @@ export interface MintedWorldKey {
   id: string;
   last4: string;
   scope: 'READ' | 'WRITE';
+  /** The key's display name ("atlas · windows") as echoed by the server; "" when unnamed. */
+  name?: string;
   /** The full ow_w_/ow_r_ key — shown exactly once, never retrievable again. */
   key: string;
 }
@@ -136,9 +140,13 @@ export class AccountClient {
   /**
    * Mint a WRITE key for an owned world. The response's `key` is shown once —
    * the caller must persist it (world.json api block) before dropping it.
+   * `name` labels the key in the portal ("atlas · windows") so the keys table
+   * reads honestly — Captain's named-keys condition, live 2026-07-13. Omitted
+   * name keeps the old bare mint (server stores "").
    */
-  async mintWorldKey(worldId: string): Promise<MintedWorldKey> {
-    const raw = await this.request('POST', `/account/worlds/${worldId}/keys`) as MintedWorldKey;
+  async mintWorldKey(worldId: string, name?: string): Promise<MintedWorldKey> {
+    const body = name ? { name } : undefined;
+    const raw = await this.request('POST', `/account/worlds/${worldId}/keys`, body) as MintedWorldKey;
     if (!raw || typeof raw.key !== 'string' || !raw.key) {
       throw new Error('key mint response missing the full key');
     }

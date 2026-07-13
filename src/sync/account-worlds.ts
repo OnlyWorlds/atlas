@@ -34,6 +34,19 @@ import type { AccountWorldRow } from '../core/types';
  */
 let inFlightToken: string | null = null;
 
+/**
+ * The name a minted key carries in the portal keys table: "atlas · windows".
+ * The device half is the coarsest honest label a browser can give (platform);
+ * it distinguishes tools and machine families, and the key's last4 covers the
+ * rest. Clipped to the server's 255-char limit (422 param=name past it).
+ */
+export function deviceKeyName(): string {
+  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+  const platform = (nav.userAgentData?.platform || nav.platform || 'device')
+    .toLowerCase().trim() || 'device';
+  return `atlas · ${platform}`.slice(0, 255);
+}
+
 export function refreshAccountWorlds(force = false): void {
   const { registry, accountWorlds } = getState();
   const token = registry.account_token;
@@ -104,7 +117,7 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
 
   // ---- Preconditions BEFORE the mint (gate R1: no orphaned keys) ----
   if (!state.atlasRoot) {
-    toasts.error('Set up your atlas folder first');
+    toasts.error('Set up your OnlyWorlds folder first');
     return false;
   }
   // The duplicate check re-runs inside the link flow (on the chain); this
@@ -133,7 +146,7 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
   try {
     // ---- Mint (the one server-side mutation before the download) ----
     overlay.update('Creating an access key…');
-    const minted = await new AccountClient(token).mintWorldKey(row.id);
+    const minted = await new AccountClient(token).mintWorldKey(row.id, deviceKeyName());
     toasts.info(`Created an access key for ${row.name}`);
 
     // ---- Download + register, serialized on the activation chain (R2) ----

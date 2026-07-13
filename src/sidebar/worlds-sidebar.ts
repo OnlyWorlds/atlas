@@ -57,7 +57,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // full action surfaced in the tooltip. Matches the [+map] / [+pin]
       // pattern in element-detail headers for visual coherence.
       header.innerHTML = `
-        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="create-local" title="New local world (in your atlas folder)">
+        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="create-local" title="New local world (in your OnlyWorlds folder)">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
         </button>
@@ -206,8 +206,12 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       try {
         const result = await pullNowAndRefresh();
         if (!result) { surfaceSyncUnavailable(toasts); return; }
-        const total = result.pulled.creates + result.pulled.updates;
-        toasts.success(total === 0 ? 'Already up to date' : `Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
+        const elementTotal = result.pulled.creates + result.pulled.updates;
+        const metaTotal = result.meta_pulled?.length ?? 0;
+        // Meta-only pulls already toast "Pulled world settings from API" in
+        // pullNowAndRefresh — stay quiet here rather than double-toasting.
+        if (elementTotal + metaTotal === 0) toasts.success('Already up to date');
+        else if (elementTotal > 0) toasts.success(`Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
       } catch (err) {
         toasts.error(err instanceof Error ? err.message : String(err));
       }
@@ -286,7 +290,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         : '';
       return `
         <div class="atlas-row atlas-remote-row ${opening ? 'is-opening' : ''}" data-remote-world-id="${escapeAttr(r.id)}" role="button" tabindex="0"
-             title="${r.role === 'collaborator' ? 'Shared with you — link with a key from its owner' : 'Open: download this world into your atlas folder'}">
+             title="${r.role === 'collaborator' ? 'Shared with you — link with a key from its owner' : 'Open: download this world into your OnlyWorlds folder'}">
           <span class="material-symbols-outlined">${opening ? 'downloading' : 'cloud'}</span>
           <span class="atlas-row-main">${escapeText(r.name)}</span>
           ${roleChip}

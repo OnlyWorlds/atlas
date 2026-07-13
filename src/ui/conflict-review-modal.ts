@@ -12,7 +12,7 @@
 
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
-import { getCurrentSyncEngine, getCurrentSyncFolder, refreshConflictsCount } from '../sync/sync-attach';
+import { getCurrentSyncEngine, getCurrentSyncFolder, refreshConflictsCount, refreshMetaCacheNow } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from './sync-toasts';
 import { patchSlice, getState } from '../core/state';
 import type { Conflict } from '../core/types';
@@ -20,6 +20,9 @@ import { escapeText } from '../core/dom-utils';
 
 export class ConflictReviewModal extends BaseModal {
   private conflicts: Conflict[] = [];
+  /** Contested world-meta fields (world-meta sync gate R9) — rendered as
+   *  compact "world setting" rows above the element rows. */
+  private metaConflicts: string[] = [];
   /**
    * worldId at modal open time. Validated before every resolve action so a
    * mid-modal world switch can't apply the user's choice to a different
@@ -40,17 +43,19 @@ export class ConflictReviewModal extends BaseModal {
     this.capturedWorldId = getState().active?.worldId ?? null;
     try {
       this.conflicts = await engine.listConflicts();
+      this.metaConflicts = await engine.listMetaConflicts();
     } catch (err) {
       this.toasts.error(err instanceof Error ? err.message : String(err));
       return;
     }
-    if (this.conflicts.length === 0) {
+    if (this.conflicts.length === 0 && this.metaConflicts.length === 0) {
       this.toasts.info('No conflicts to review');
       return;
     }
 
+    const total = this.conflicts.length + this.metaConflicts.length;
     const { overlay, body } = this.buildModalShell({
-      title: `${this.conflicts.length} conflict${this.conflicts.length === 1 ? '' : 's'} to review`,
+      title: `${total} conflict${total === 1 ? '' : 's'} to review`,
       panelClass: 'atlas-conflict-panel',
       dataModal: 'conflict-review',
     });
@@ -65,8 +70,57 @@ export class ConflictReviewModal extends BaseModal {
     const list = document.createElement('div');
     list.className = 'atlas-conflict-list';
     list.setAttribute('data-role', 'conflict-list');
+    this.metaConflicts.forEach((field) => list.appendChild(this.renderMetaRow(field)));
     this.conflicts.forEach((c) => list.appendChild(this.renderRow(c)));
     return list;
+  }
+
+  /** A contested world-meta field: same two verbs as element rows, resolved
+   *  via engine.resolveMetaConflict (gate R9). */
+  private renderMetaRow(field: string): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'atlas-conflict-row';
+    row.setAttribute('data-meta-conflict', field);
+    row.innerHTML = `
+      <div class="atlas-conflict-row-meta">
+        <span class="atlas-conflict-type">world setting</span>
+        <span class="atlas-conflict-name">${escapeText(field)}</span>
+        <span class="atlas-conflict-fields">changed here and on the server</span>
+      </div>
+      <div class="atlas-conflict-row-actions">
+        <button class="atlas-btn-ghost" data-action="overwrite-mine" title="Push local value to server">Overwrite (mine wins)</button>
+        <button class="atlas-btn-ghost" data-action="pull-theirs" title="Overwrite local with server">Pull (theirs wins)</button>
+      </div>
+    `;
+    row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const choice = btn.dataset.action === 'overwrite-mine' ? 'mine' as const : 'theirs' as const;
+        if (getState().active?.worldId !== this.capturedWorldId) {
+          this.toasts.info('World changed. Close and reopen to review conflicts');
+          this.hide();
+          return;
+        }
+        row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = true));
+        try {
+          const engine = getCurrentSyncEngine();
+          if (!engine) throw new Error('Engine not ready');
+          await engine.resolveMetaConflict(field, choice);
+          row.remove();
+          this.metaConflicts = this.metaConflicts.filter((f) => f !== field);
+          await refreshMetaCacheNow(); // 'theirs' rewrote world.json — reflect it
+          await refreshConflictsCount();
+          this.updateTitle();
+          if (this.conflicts.length === 0 && this.metaConflicts.length === 0) {
+            this.toasts.success('All conflicts resolved');
+            this.hide();
+          }
+        } catch (err) {
+          row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = false));
+          this.toasts.error(err instanceof Error ? err.message : String(err));
+        }
+      });
+    });
+    return row;
   }
 
   private renderRow(c: Conflict): HTMLElement {
@@ -149,7 +203,8 @@ export class ConflictReviewModal extends BaseModal {
   private updateTitle(): void {
     if (!this.modal) return;
     const title = this.modal.querySelector('.atlas-modal-title');
-    if (title) title.textContent = `${this.conflicts.length} conflict${this.conflicts.length === 1 ? '' : 's'} to review`;
+    const total = this.conflicts.length + this.metaConflicts.length;
+    if (title) title.textContent = `${total} conflict${total === 1 ? '' : 's'} to review`;
   }
 }
 

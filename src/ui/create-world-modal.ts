@@ -62,8 +62,8 @@ export class CreateWorldModal extends BaseModal {
         </label>
         <p class="atlas-modal-hint">
           ${rootDisplay
-            ? `Creates a new world folder inside your atlas folder (<code>${escapeText(rootDisplay)}</code>). You can move it online (sync with OnlyWorlds API) later.`
-            : 'Atlas needs an atlas folder before creating worlds. Set one up from the welcome panel.'}
+            ? `Creates a new world folder inside your OnlyWorlds folder (<code>${escapeText(rootDisplay)}</code>). You can move it online (sync with OnlyWorlds API) later.`
+            : 'Atlas needs an OnlyWorlds folder before creating worlds. Set one up from the welcome panel.'}
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">

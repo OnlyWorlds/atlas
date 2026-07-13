@@ -46,8 +46,8 @@ describe('SyncEngine.pullNow', () => {
     // Did NOT push the local element.
     expect(result.pushed.creates).toBe(0);
     const newCalls = client.calls.slice(callsBefore);
-    // Only list calls, no create/update.
-    expect(newCalls.every(c => c.method === 'list')).toBe(true);
+    // Only reads (list + the S262 world-meta GET), no create/update.
+    expect(newCalls.every(c => c.method === 'list' || c.method === 'getWorldMeta')).toBe(true);
   });
 
   it('no-op while paused', async () => {

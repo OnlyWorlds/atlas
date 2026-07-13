@@ -422,8 +422,10 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
         toasts.info('Engine not ready');
         return;
       }
-      const totalPulled = result.pulled.creates + result.pulled.updates + result.pulled.deletes;
-      const totalPushed = result.pushed.creates + result.pushed.updates + result.pushed.deletes;
+      const totalPulled = result.pulled.creates + result.pulled.updates + result.pulled.deletes
+        + (result.meta_pulled?.length ?? 0);
+      const totalPushed = result.pushed.creates + result.pushed.updates + result.pushed.deletes
+        + (result.meta_pushed?.length ?? 0);
       // pullNowAndRefresh fires the "pulled N" toast itself (so cadence /
       // pull-on-activate / catch-up pulls also surface). Pill-click adds ONLY
       // the "already up to date" affordance — it's a manual-only signal that

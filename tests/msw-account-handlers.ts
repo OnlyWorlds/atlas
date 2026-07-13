@@ -53,8 +53,9 @@ export interface StatefulAccountOptions {
 }
 
 export interface AccountHandlerState {
-  /** Every WRITE key minted via POST /account/worlds/{id}/keys, in order. */
-  minted: Array<{ worldId: string; key: string }>;
+  /** Every WRITE key minted via POST /account/worlds/{id}/keys, in order.
+   *  `name` mirrors the server: stored verbatim, "" when absent. */
+  minted: Array<{ worldId: string; key: string; name: string }>;
   /** Every world created via POST /account/worlds, in order. */
   created: Array<{ name: string; id: string; key: string }>;
   /** GET /account/worlds hit count — lets the caller assert fetch de-dup. */
@@ -155,8 +156,11 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
     }),
 
     // POST /account/worlds/{id}/keys — mint a WRITE key. Owner-only; a row that
-    // isn't owned (or doesn't exist) 404s per the contract.
-    http.post(`${base}/account/worlds/:id/keys`, ({ request, params }) => {
+    // isn't owned (or doesn't exist) 404s per the contract. Optional {name}
+    // (live 2026-07-13): stored verbatim + echoed, "" when absent, >255 chars
+    // → 422 param=name. Unknown body fields are silently IGNORED (spec §2 —
+    // the route never 422'd unknowns; Skeld's correction).
+    http.post(`${base}/account/worlds/:id/keys`, async ({ request, params }) => {
       const fail = authFail(request);
       if (fail) return fail;
       const worldId = String(params.id);
@@ -164,11 +168,16 @@ export function statefulAccountHandlers(options: StatefulAccountOptions): {
       if (!row || row.role !== 'owner') {
         return envelope(404, 'not_found', `World '${worldId}' not found.`);
       }
+      const body = (await request.json().catch(() => ({}))) as { name?: unknown } | null;
+      const name = typeof body?.name === 'string' ? body.name : '';
+      if (name.length > 255) {
+        return envelope(422, 'invalid_request', 'name must be at most 255 characters.', 'name');
+      }
       mintCounter += 1;
       const key = `ow_w_test${mintCounter}`;
-      state.minted.push({ worldId, key });
+      state.minted.push({ worldId, key, name });
       return HttpResponse.json(
-        { id: `key-${mintCounter}`, last4: key.slice(-4), scope: 'WRITE', last_used_at: null, revoked: false, key },
+        { id: `key-${mintCounter}`, last4: key.slice(-4), scope: 'WRITE', name, last_used_at: null, revoked: false, key },
         { status: 201 },
       );
     }),

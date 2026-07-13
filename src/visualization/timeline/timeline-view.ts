@@ -17,6 +17,7 @@
 
 import type { ElementType } from '../../core/types';
 import type { LinkedRef, PlacedDot, TimelineNode } from './types';
+import { effectiveEndDate } from './temporal-fields';
 import { calculateTicks, calculateTimeRange, createDateToX } from './axis-calculator';
 import { escapeText } from '../../core/dom-utils';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
@@ -78,8 +79,9 @@ export interface TimelineViewOptions {
   onOpenElement: (elementId: string) => void;
   /**
    * The now-line was established or dragged (Act 1). The room persists this to
-   * `World.time_current` (local — World-meta doesn't sync today) and re-renders.
-   * null clears the now (removes the seam).
+   * `World.time_current` (synced via the world-meta step since S262 — the now
+   * travels between devices) and re-renders. null clears the now (removes the
+   * seam; the clear syncs too, as an explicit wire null).
    */
   onSetNow?: (value: number | null) => void;
   /**
@@ -109,6 +111,13 @@ export interface TimelineViewExtras {
    * "in the world" and "on the axis" is legible. `undefined` leaves it untouched.
    */
   undated?: Array<{ id: string; type: string; name: string }>;
+  /**
+   * The URL-focused element (Act 2A): `/timeline/<id>` makes this the chart's
+   * SUBJECT — its span draws emphasized (thick bar; a focused character gets
+   * the dotted inferred life-line to the now). `undefined` leaves it untouched;
+   * `null` means no focus (broad view).
+   */
+  focusId?: string | null;
 }
 
 export interface TimelineViewHandle {
@@ -186,6 +195,9 @@ interface ViewState {
   // the ambient rail. Expanded type groups persist across re-renders.
   undated: Array<{ id: string; type: string; name: string }>;
   undatedExpanded: Set<string>;
+  // The URL-focused element (Act 2A) — the chart's subject; its span draws
+  // emphasized. null = broad view.
+  focusId: string | null;
   // Drag-to-date (Bout 1.2): a rail item is being dragged onto the axis. Holds
   // the element DATA (not the DOM node — survives a mid-drag rail rebuild), the
   // start point + moved-past-threshold flag (click vs drag), and the floating
@@ -247,6 +259,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
     stripDrag: null,
     now: null, nowDrag: false, onSetNow: opts.onSetNow ?? null,
     undated: [], undatedExpanded: new Set(),
+    focusId: null,
     dateDrag: null, dropDate: null, onDateElement: opts.onDateElement ?? null,
     dateDragMove: null, dateDragUp: null,
     destroyed: false,
@@ -291,6 +304,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
       // drag preview (a background re-render mid-drag would snap the line back).
       if (extras && 'now' in extras && !state.nowDrag) state.now = extras.now ?? null;
       if (extras && 'undated' in extras) state.undated = extras.undated ?? [];
+      if (extras && 'focusId' in extras) state.focusId = extras.focusId ?? null;
       state.layoutSig = null; // new node set → re-pack
       // Focus travel (S6): when the scope's fitted range changes while a
       // window (or prior fit) is on screen, animate to the new fit instead of
@@ -434,6 +448,72 @@ export function rangeVsNow(startDate: number, endDate: number | null, now: numbe
   return startDate > now ? 'future' : 'past';
 }
 
+/**
+ * Extend a fitted range so open-ended spans show their open end (Act 2A): a
+ * tenure held to the now must have the now ON SCREEN, or the bar runs off the
+ * fit's right edge and the openness is invisible (live baseline finding — the
+ * focused ongoing title fit stopped at its own grant date). Pure; keeps the
+ * 2% pad convention of calculateTimeRange.
+ */
+export function extendRangeForOpenEnds(
+  range: { min: number; max: number },
+  nodes: ReadonlyArray<Pick<TimelineNode, 'startDate' | 'endDate' | 'openEnded'>>,
+  now: number | null,
+): { min: number; max: number } {
+  if (now == null) return range;
+  let maxEff = range.max;
+  for (const n of nodes) {
+    const eff = effectiveEndDate(n.startDate, n.endDate, n.openEnded, now);
+    if (eff != null && eff > maxEff) maxEff = eff;
+  }
+  if (maxEff <= range.max) return range;
+  return { min: range.min, max: maxEff + (maxEff - range.min) * 0.02 };
+}
+
+/**
+ * The FOCUSED element's inferred span end (Act 2A): a character/creature born
+ * before the now is presumed alive to it. An INFERENCE, not recorded data —
+ * the schema has no death field — so it renders dotted, and ONLY for the
+ * focused element (the element's own chart emphasizes its temporal extent;
+ * in the broad view every living character's bar would converge on the
+ * now-line as a wall of parallel noise). Pure.
+ */
+export function focusInferredEnd(
+  node: Pick<TimelineNode, 'elementType' | 'startDate' | 'endDate' | 'openEnded'>,
+  now: number | null,
+): number | null {
+  if (node.endDate != null || node.openEnded) return null;
+  if (node.elementType !== 'character' && node.elementType !== 'creature') return null;
+  if (now == null || now <= node.startDate) return null;
+  return now;
+}
+
+/**
+ * The card's temporal meta line, in type vocabulary (Act 2A): a title reads as
+ * a tenure, a character as a life, a founded thing as founded — not a bare
+ * number. Durations stay unitless (calendar formatting is Act 2B). Pure.
+ */
+export function temporalMetaLine(
+  node: Pick<TimelineNode, 'elementType' | 'startDate' | 'endDate' | 'openEnded'>,
+  now: number | null,
+): string {
+  const f = (n: number): string => String(Math.round(n * 100) / 100);
+  const { elementType, startDate, endDate } = node;
+  if (elementType === 'title') {
+    if (endDate != null) return `granted ${f(startDate)} · revoked ${f(endDate)} · held ${f(endDate - startDate)}`;
+    const eff = effectiveEndDate(startDate, endDate, node.openEnded, now);
+    if (eff != null) return `granted ${f(startDate)} · held ${f(eff - startDate)} so far`;
+    return `granted ${f(startDate)}`;
+  }
+  if (elementType === 'character' || elementType === 'creature') {
+    if (now != null && now >= startDate) return `born ${f(startDate)} · age ${f(now - startDate)}`;
+    return `born ${f(startDate)}`;
+  }
+  if (elementType === 'institution' || elementType === 'location') return `founded ${f(startDate)}`;
+  if (elementType === 'collective') return `formed ${f(startDate)}`;
+  return endDate != null ? `${f(startDate)} – ${f(endDate)}` : f(startDate);
+}
+
 /** The y of the axis line = top of the reserved axis-labels + strip band. */
 function axisYOf(h: number): number { return h - AXIS_LABEL_HEIGHT - STRIP_H - STRIP_GAP; }
 
@@ -490,6 +570,8 @@ export function computeBeeswarm(
   w: number,
   axisY: number,
   gaps?: { x: number; y: number },
+  now?: number | null,
+  focusId?: string | null,
 ): PlacedDot[] {
   const gapX = gaps?.x ?? NODE_X_GAP;
   const gapY = gaps?.y ?? NODE_Y_GAP;
@@ -501,8 +583,13 @@ export function computeBeeswarm(
   if (bottom <= top) return [];
   const centerY = (top + bottom) / 2;
   const span = Math.max(1, bottom - top);
+  // The FOCUS node is the chart's subject (Act 2A): it places absolutely first
+  // (holds the centre spine) and its span — recorded, open, or inferred —
+  // claims the lane, so no other range runs collinearly with the subject line.
+  const rank = (n: TimelineNode): number =>
+    n.id === focusId ? 0 : anchorIds.has(n.id) ? 1 : 2;
   const order = [...nodes].sort((a, b) =>
-    (anchorIds.has(a.id) ? 0 : 1) - (anchorIds.has(b.id) ? 0 : 1)
+    rank(a) - rank(b)
     || a.startDate - b.startDate
     || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
@@ -541,8 +628,13 @@ export function computeBeeswarm(
       }
     }
     placed.push({ node, x, y, radius: DOT_RADIUS });
-    if (node.endDate != null && node.endDate > node.startDate) {
-      const x1 = Math.min(w + 40, dateToX(node.endDate));
+    // Lane claim runs to the EFFECTIVE end — an open tenure held to the now
+    // occupies its whole bar, so points can't sit ON a held span (Act 2A).
+    // The focus node's INFERRED life-line claims its lane too (subject spine).
+    const effEnd = effectiveEndDate(node.startDate, node.endDate, node.openEnded, now ?? null)
+      ?? (node.id === focusId ? focusInferredEnd(node, now ?? null) : null);
+    if (effEnd != null && effEnd > node.startDate) {
+      const x1 = Math.min(w + 40, dateToX(effEnd));
       if (x1 > x) lanes.push({ x0: x, x1, y });
     }
   }
@@ -577,9 +669,18 @@ function draw(state: ViewState): void {
   // universe (dated elsewhere but filtered out here), else a sensible default
   // around the now / a neutral span. The node rendering is skipped below.
   const emptyChart = state.nodes.length === 0;
-  const base = emptyChart
+  let base = emptyChart
     ? (state.universe.length > 0 ? calculateTimeRange(state.universe) : emptyChartRange(state))
-    : calculateTimeRange(state.nodes);
+    : extendRangeForOpenEnds(calculateTimeRange(state.nodes), state.nodes, state.now);
+  // The focused element's INFERRED life-line also wants its open end on screen
+  // (same rationale as extendRangeForOpenEnds; the inference is focus-only).
+  const focusNode = state.focusId ? state.nodes.find(n => n.id === state.focusId) : undefined;
+  if (focusNode) {
+    const inferred = focusInferredEnd(focusNode, state.now);
+    if (inferred != null && inferred > base.max) {
+      base = { min: base.min, max: inferred + (inferred - base.min) * 0.02 };
+    }
+  }
   state.baseRange = base;
   if (emptyChart) { state.placedDots = []; state.labelBoxes = []; }
   const view = currentViewRange(state) ?? { start: base.min, end: base.max };
@@ -678,7 +779,7 @@ function draw(state: ViewState): void {
     // the band sits empty (Captain: "space it all out better"). Node count is
     // part of layoutSig, so the gap choice re-derives with the set.
     const gaps = state.nodes.length <= 30 ? { x: 84, y: 60 } : undefined;
-    state.placedDots = computeBeeswarm(state.nodes, anchorIds, dateToX, w, axisY, gaps);
+    state.placedDots = computeBeeswarm(state.nodes, anchorIds, dateToX, w, axisY, gaps, state.now, state.focusId);
     state.layoutSig = layoutSig;
     state.layoutNodes = state.nodes;
   }
@@ -686,27 +787,48 @@ function draw(state: ViewState): void {
 
   // Range lines (endDate). A range that spans the now-line renders half-solid
   // (past) / half-dim (future) — the seam runs through the bar (Act 1).
+  // OPEN-ENDED spans (a title granted, never revoked — Act 2A) run to the now
+  // with a fade-out cap: no end is recorded, and the fade is that honesty.
+  // The FOCUSED node's span draws THICK (Act 2A) — it is the element's own
+  // chart, its span is the headline. A focused character/creature gets the
+  // DOTTED inferred life-line to the now (dotted = inference, not record);
+  // its dated neighbours deliberately ride the line — events of the life ON
+  // the life-bar (no lane claim, unlike recorded spans).
   for (const dot of placed) {
-    if (dot.node.endDate == null) continue;
+    const isFocus = dot.node.id === state.focusId;
+    const lw = isFocus ? 5 : 2;
+    const solidAlpha = isFocus ? 0.42 : 0.30;
+    if (dot.node.endDate == null) {
+      const eff = effectiveEndDate(dot.node.startDate, dot.node.endDate, dot.node.openEnded, state.now);
+      if (eff != null) {
+        strokeFadingSpan(ctx, dot.x, dateToX(eff), dot.y, dot.node.color, solidAlpha, lw, false);
+      } else if (isFocus) {
+        const inferred = focusInferredEnd(dot.node, state.now);
+        if (inferred != null) {
+          strokeFadingSpan(ctx, dot.x, dateToX(inferred), dot.y, dot.node.color, 0.35, 3, true);
+        }
+      }
+      continue;
+    }
     const x2 = dateToX(dot.node.endDate);
     const rel = rangeVsNow(dot.node.startDate, dot.node.endDate, state.now);
-    ctx.lineWidth = 2;
+    ctx.lineWidth = lw;
     if (rel === 'straddle' && nowX != null) {
       ctx.beginPath();
       ctx.moveTo(dot.x, dot.y);
       ctx.lineTo(nowX, dot.y);
-      ctx.strokeStyle = applyAlpha(dot.node.color, 0.30);
+      ctx.strokeStyle = applyAlpha(dot.node.color, solidAlpha);
       ctx.stroke();
       ctx.beginPath();
       ctx.moveTo(nowX, dot.y);
       ctx.lineTo(x2, dot.y);
-      ctx.strokeStyle = applyAlpha(dot.node.color, 0.12);
+      ctx.strokeStyle = applyAlpha(dot.node.color, isFocus ? 0.18 : 0.12);
       ctx.stroke();
     } else {
       ctx.beginPath();
       ctx.moveTo(dot.x, dot.y);
       ctx.lineTo(x2, dot.y);
-      ctx.strokeStyle = applyAlpha(dot.node.color, rel === 'future' ? 0.12 : 0.30);
+      ctx.strokeStyle = applyAlpha(dot.node.color, rel === 'future' ? (isFocus ? 0.18 : 0.12) : solidAlpha);
       ctx.stroke();
     }
   }
@@ -806,6 +928,46 @@ function draw(state: ViewState): void {
   drawClusterBadges(ctx, state, placed, w, axisY);
 
   drawStrip(ctx, state, w, h, view);
+}
+
+/**
+ * An open span line: solid from x0, fading to transparent at x1 (the open cap —
+ * no recorded end). `dashed` renders the INFERRED kind (a focused character's
+ * presumed-alive life-line) as dots: recorded spans are solid, inferences are
+ * not (Act 2A visual grammar).
+ */
+function strokeFadingSpan(
+  ctx: CanvasRenderingContext2D,
+  x0: number,
+  x1: number,
+  y: number,
+  color: string,
+  solidAlpha: number,
+  width: number,
+  dashed: boolean,
+): void {
+  if (x1 <= x0) return;
+  const FADE_PX = 26;
+  const fadeStart = Math.max(x0, x1 - FADE_PX);
+  ctx.save();
+  ctx.lineWidth = width;
+  if (dashed) ctx.setLineDash([2, 5]);
+  if (fadeStart > x0) {
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    ctx.lineTo(fadeStart, y);
+    ctx.strokeStyle = applyAlpha(color, solidAlpha);
+    ctx.stroke();
+  }
+  const grad = ctx.createLinearGradient(fadeStart, 0, x1, 0);
+  grad.addColorStop(0, applyAlpha(color, solidAlpha));
+  grad.addColorStop(1, applyAlpha(color, 0));
+  ctx.beginPath();
+  ctx.moveTo(fadeStart, y);
+  ctx.lineTo(x1, y);
+  ctx.strokeStyle = grad;
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** The drop guide (Bout 1.2) — a cyan dashed line + "= N" tag at the snapped
@@ -1083,8 +1245,13 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
     // Point nodes: right → below → left → above (the S256 lab sliver). A
     // left-side label sits BETWEEN two dots and reads as ambiguous ownership;
     // below is the clearer second choice. Range nodes keep vertical-first
-    // (a side label sits ON the range line and reads struck-through).
-    const attempts = dot.node.endDate != null
+    // (a side label sits ON the range line and reads struck-through) — judged
+    // by the EFFECTIVE span, so an open tenure running to the now counts too
+    // (Act 2A live finding: "High Chronicler" struck through by its own bar),
+    // and the focused subject's inferred life-line counts the same way.
+    const hasSpan = effectiveEndDate(dot.node.startDate, dot.node.endDate, dot.node.openEnded, state.now) != null
+      || (dot.node.id === state.focusId && focusInferredEnd(dot.node, state.now) != null);
+    const attempts = hasSpan
       ? [...vertAttempts, ...sideAttempts]
       : [sideAttempts[0], vertAttempts[0], sideAttempts[1], vertAttempts[1]];
     // Collision test with a 5px horizontal breathing pad — a label ENDING
@@ -1204,7 +1371,7 @@ function renderCard(state: ViewState): void {
   // "jump" complaint, 2026-07-10). Nothing peeked → ambient content.
   if (!node) { renderAmbientRail(state); return; }
 
-  const dateStr = node.endDate != null ? `${node.startDate} – ${node.endDate}` : String(node.startDate);
+  const dateStr = temporalMetaLine(node, state.now);
   const icon = ELEMENT_ICONS[node.elementType as ElementType] ?? 'category';
 
   card.innerHTML = '';

@@ -108,6 +108,25 @@ describe('AccountClient.mintWorldKey', () => {
     expect((caught as OwV2Error).code).toBe('not_found');
     expect(isAccountAuthError(caught)).toBe(false);
   });
+
+  it('sends the key name and gets it echoed; omitting it keeps the bare mint (live 2026-07-13)', async () => {
+    const state = mount();
+    const named = await new AccountClient(TOKEN).mintWorldKey('srv-owned', 'atlas · windows');
+    expect(named.name).toBe('atlas · windows');
+    expect(state.minted[0].name).toBe('atlas · windows');
+    const bare = await new AccountClient(TOKEN).mintWorldKey('srv-owned');
+    expect(bare.name).toBe('');
+    expect(state.minted[1].name).toBe('');
+  });
+
+  it('a name past 255 chars is a loud 422 param=name', async () => {
+    mount();
+    let caught: unknown;
+    await new AccountClient(TOKEN).mintWorldKey('srv-owned', 'x'.repeat(256)).catch(err => { caught = err; });
+    expect(caught).toBeInstanceOf(OwV2Error);
+    expect((caught as OwV2Error).status).toBe(422);
+    expect((caught as OwV2Error).param).toBe('name');
+  });
 });
 
 describe('AccountClient.createWorld', () => {

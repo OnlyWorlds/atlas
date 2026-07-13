@@ -30,6 +30,7 @@ import {
   refreshAccountWorlds,
   remoteAccountWorlds,
   openAccountWorld,
+  deviceKeyName,
 } from '../../src/sync/account-worlds';
 import type { AccountWorldRow } from '../../src/core/types';
 import type { ToastManager } from '../../src/ui/toast-manager';
@@ -215,6 +216,15 @@ describe('remoteAccountWorlds', () => {
   });
 });
 
+describe('deviceKeyName — the portal key label (live 2026-07-13)', () => {
+  it('reads "atlas · <platform>", lowercase, within the server 255 limit', () => {
+    const name = deviceKeyName();
+    expect(name).toMatch(/^atlas · \S/);
+    expect(name).toBe(name.toLowerCase());
+    expect(name.length).toBeLessThanOrEqual(255);
+  });
+});
+
 describe('openAccountWorld — synchronous short-circuits', () => {
   const row: AccountWorldRow = { id: 'srv-owned', name: 'Owned World', role: 'owner', public_read: false, keys: [] };
 
@@ -239,7 +249,7 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     const ok = await openAccountWorld(row, toasts);
     expect(ok).toBe(false);
     expect(state.minted).toHaveLength(0);
-    expect(toasts.calls.some(c => c.level === 'error' && /atlas folder/i.test(c.msg))).toBe(true);
+    expect(toasts.calls.some(c => c.level === 'error' && /OnlyWorlds folder/i.test(c.msg))).toBe(true);
   });
 
   it('returns false when the row is already represented in the registry', async () => {

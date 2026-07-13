@@ -83,14 +83,14 @@ function renderStorageDeviceSection(): string {
             <button class="atlas-btn-ghost" data-action="change-atlas-root">Change folder</button>
           </div>`
         : recoverable
-          ? `<p>A previous atlas folder can be re-linked: <code>${escapeText(recoverable.folderName)}</code>.</p>
+          ? `<p>A previous OnlyWorlds folder can be re-linked: <code>${escapeText(recoverable.folderName)}</code>.</p>
              <div class="atlas-settings-actions">
                <button class="atlas-btn-primary" data-action="recover-atlas-root">Re-link folder</button>
              </div>
              <p class="atlas-settings-hint-sub"><button class="atlas-btn-link" data-action="change-atlas-root">Or set up a different folder</button></p>`
           : `<p>Not set up yet.</p>
              <div class="atlas-settings-actions">
-               <button class="atlas-btn-primary" data-action="change-atlas-root">Set up atlas folder</button>
+               <button class="atlas-btn-primary" data-action="change-atlas-root">Set up OnlyWorlds folder</button>
              </div>`}
     </section>
   `;
@@ -105,8 +105,8 @@ function wireStorageDeviceActions(toasts: ToastManager): void {
       if (result) {
         toasts.success(
           result.imported > 0
-            ? `Atlas folder updated: found ${result.imported} world${result.imported === 1 ? '' : 's'} there`
-            : 'Atlas folder updated'
+            ? `OnlyWorlds folder updated: found ${result.imported} world${result.imported === 1 ? '' : 's'} there`
+            : 'OnlyWorlds folder updated'
         );
       }
     } catch (err) {
@@ -125,8 +125,8 @@ function wireStorageDeviceActions(toasts: ToastManager): void {
       if (result) {
         toasts.success(
           result.imported > 0
-            ? `Re-linked atlas folder: restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
-            : 'Re-linked atlas folder (no worlds found inside)'
+            ? `Re-linked OnlyWorlds folder: restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
+            : 'Re-linked OnlyWorlds folder (no worlds found inside)'
         );
       }
     } catch (err) {

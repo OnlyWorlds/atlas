@@ -21,7 +21,7 @@ import { filterNodesByScope, scopeFromFocus, tableauScope } from '../visualizati
 import type { ChartConfig, ChartScope, TimelineNode } from '../visualization/timeline/types';
 import { defaultChartName, upsertChart, removeChart, renameChart, sameScope } from '../visualization/timeline/charts-store';
 import { getActiveStore } from '../core/active-store';
-import { refreshElementsAfterWrite } from '../sync/sync-attach';
+import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
@@ -101,10 +101,13 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     getState().data.elements.find(e => e.id === id);
 
   // The world's "now" (Act 1) — `World.time_current`, drawn as the now-line and
-  // the forward-half seam. Local-only (World-meta doesn't sync today).
+  // the forward-half seam. Synced via the world-meta step (S262): the engine's
+  // pull-applies land back in this slice through refreshMetaCache.
   const nowValue = (): number | null => getState().active?.meta?.time_current ?? null;
 
-  /** Persist the now to world.json + mirror into state so the room re-renders. */
+  /** Persist the now to world.json + mirror into state so the room re-renders.
+   *  A cleared now writes undefined on disk; the meta step's canonicalization
+   *  turns that into an explicit wire null so the clear syncs (never resurrects). */
   async function setNow(value: number | null): Promise<void> {
     const store = getActiveStore();
     const active = getState().active;
@@ -114,6 +117,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       ...active,
       meta: { ...active.meta, time_current: value ?? undefined },
     });
+    requestPushIfLinked();
   }
 
   /** A sensible first "now": the MEDIAN dated point, so roughly half the world
@@ -481,6 +485,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       },
       now: nowValue(),
       undated: undatedElements(),
+      // The chart's subject (Act 2A): the URL focus draws emphasized.
+      focusId: route.mode === 'timeline' ? (route.elementId ?? null) : null,
     };
     // allNodes rides along as the overview strip's constant reference frame
     // (the full world's history stays visible however narrow the scope, S2).

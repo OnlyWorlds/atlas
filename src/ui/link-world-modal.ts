@@ -36,7 +36,7 @@ export class LinkWorldModal extends BaseModal {
 
   open(): void {
     if (!getState().atlasRoot) {
-      this.toasts.error('Set up your atlas folder first');
+      this.toasts.error('Set up your OnlyWorlds folder first');
       return;
     }
     this.modal = this.buildModal();
@@ -69,7 +69,7 @@ export class LinkWorldModal extends BaseModal {
           <input class="atlas-input" type="text" name="display-name" placeholder="Defaults to server world name" autocomplete="off" />
         </label>
         <p class="atlas-modal-hint">
-          Atlas will download every element of this world into a new folder inside your atlas folder. You can keep editing while offline; changes sync back next time you open it.
+          Atlas will download every element of this world into a new folder inside your OnlyWorlds folder. You can keep editing while offline; changes sync back next time you open it.
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-progress" data-role="progress" hidden></div>

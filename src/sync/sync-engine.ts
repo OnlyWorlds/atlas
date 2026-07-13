@@ -9,6 +9,16 @@
 import type { FolderStore } from '../store/folder-store';
 import { nowIso } from '../store/folder-store';
 import {
+  META_SYNC_FIELDS,
+  META_SYNC_FIELD_NAMES,
+  canonicalMetaValue,
+  encodeMetaFieldsForPush,
+  isMetaEmpty,
+  metaFieldLengthError,
+  pickSyncedMeta,
+  threeWayMetaDiff,
+} from './world-meta-sync';
+import {
   ALL_ELEMENT_TYPES,
 } from '../core/types';
 import type {
@@ -47,6 +57,28 @@ export interface BulkResult {
   }>;
 }
 
+/**
+ * World-meta body in DISK names (`time_current`, not the wire's
+ * `time_range_current` — the adapter owns the rename both directions).
+ * Returned by both getWorldMeta (GET /world) and patchWorldMeta (PATCH echo:
+ * keel returns the full refreshed body). Canonical empties: '' / [] / null.
+ */
+export interface WorldMetaWire {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string;
+  time_basic_unit: string;
+  time_format_names: string[];
+  time_format_equivalents: string[];
+  time_range_min: number | null;
+  time_range_max: number | null;
+  time_current: number | null;
+  public_read?: boolean;
+  created_at?: string;
+  updated_at: string;
+}
+
 /** One page of the /changes feed (ops in commit order, adapted to disk shape). */
 export interface ChangesPage {
   cursor: string | null;
@@ -73,6 +105,22 @@ export interface OwApiClient {
   listElements(type: ElementType): Promise<Array<{ id: string; updated_at: string } & Record<string, unknown>>>;
   /** Fetch single element. Used by SyncEngine pre-update conflict check. */
   getElement(type: ElementType, id: string): Promise<({ id: string; updated_at: string } & Record<string, unknown>) | null>;
+  /**
+   * World-meta read — GET /world's 13-field body in DISK names (world-meta
+   * sync, S262). REQUIRED, not optional: an optional method would silently
+   * reroute every legacy suite off the meta path (the S257
+   * coverage-migrates-onto-fallbacks law); there are exactly two implementers
+   * (OwV2ClientAdapter + FakeOwApiClient), so required is cheap.
+   */
+  getWorldMeta(): Promise<WorldMetaWire>;
+  /**
+   * World-meta partial write — PATCH /world with ONLY the given DISK-named
+   * fields (the adapter whitelists + renames time_current→time_range_current).
+   * Returns the full refreshed body (keel echoes GET /world after the write).
+   * Cleared ints must arrive as explicit null — keel treats a missing key as
+   * "no change".
+   */
+  patchWorldMeta(fields: Record<string, unknown>): Promise<WorldMetaWire>;
   /**
    * Optional: atomic multi-element create with server-side FK-order resolution
    * (cycles included) — keel v2 `/bulk`. When present, pushPhase routes CREATE
@@ -298,21 +346,29 @@ export class SyncEngine {
       kind: 'error',
       message: this.lastAuthReason === 'key_revoked'
         ? 'this world\'s access key was revoked. Reopen it from the sidebar, or unlink'
-        : 'authentication failed. Verify pin in settings, test connection, or unlink',
+        : this.lastAuthReason === 'read_only_key'
+          ? 'this world\'s access key is read-only — edits can\'t sync. Reopen it from the sidebar with a write key, or unlink'
+          : 'authentication failed. Verify pin in settings, test connection, or unlink',
       recoverable: true,
     });
   }
 
   /**
-   * Cause of the most recent auth bail, when the typed error distinguished it
-   * (key_revoked vs the invalid-credentials default). Read into SyncResult's
+   * Cause of the most recent auth bail, when the typed error distinguished it:
+   * key_revoked (mint a new key) or read_only_key (403 permission_error — the
+   * key can never write; "check your PIN" would be the wrong advice, world-meta
+   * gate R1) vs the invalid-credentials default. Read into SyncResult's
    * `auth_reason` and setAuthError's pill copy; reset at each bail site.
    */
-  private lastAuthReason: 'key_revoked' | null = null;
+  private lastAuthReason: 'key_revoked' | 'read_only_key' | null = null;
 
   private noteAuthBail(err: unknown): void {
     const t = typedError(err);
-    this.lastAuthReason = t?.code === 'key_revoked' ? 'key_revoked' : null;
+    this.lastAuthReason = t?.code === 'key_revoked'
+      ? 'key_revoked'
+      : t?.code === 'permission_error'
+        ? 'read_only_key'
+        : null;
   }
 
   /**
@@ -543,6 +599,188 @@ export class SyncEngine {
     return [...(s.server_deletes ?? [])];
   }
 
+  /** Contested world-meta fields under pause-and-review (world-meta gate R9). */
+  async listMetaConflicts(): Promise<string[]> {
+    const s = await this.folder.readSyncState();
+    return [...(s.meta_conflicts ?? [])];
+  }
+
+  /**
+   * Resolve one contested world-meta field (conflict-review modal, gate R9).
+   * 'mine' force-pushes the local value; 'theirs' applies the server value
+   * locally. Either way the field's baseline advances and it leaves
+   * meta_conflicts.
+   */
+  async resolveMetaConflict(field: string, choice: 'mine' | 'theirs'): Promise<void> {
+    const kind = META_SYNC_FIELDS[field];
+    if (!kind) throw new Error(`resolveMetaConflict: unknown meta field '${field}'`);
+    let baselineValue: unknown;
+    if (choice === 'mine') {
+      const local = await this.folder.readWorldMeta();
+      const resp = await this.client.patchWorldMeta(
+        encodeMetaFieldsForPush({ [field]: (local as unknown as Record<string, unknown>)[field] }),
+      );
+      baselineValue = canonicalMetaValue(kind, (resp as unknown as Record<string, unknown>)[field]);
+    } else {
+      const server = await this.client.getWorldMeta();
+      const value = canonicalMetaValue(kind, (server as unknown as Record<string, unknown>)[field]);
+      if (this.stopped) return;
+      await this.folder.writeWorldMeta({ [field]: value });
+      baselineValue = value;
+    }
+    if (this.stopped) return;
+    await this.folder.updateSyncState(current => ({
+      meta_baseline: { ...(current.meta_baseline ?? {}), [field]: baselineValue },
+      meta_conflicts: (current.meta_conflicts ?? []).filter(f => f !== field),
+    }));
+  }
+
+  /**
+   * THE META STEP (world-meta sync, S262 — gate R2). One per sync round, from
+   * all three run paths. GET-first three-way diff per field against the
+   * canonical baseline in sync-state:
+   *   server-only change → apply to disk (pull), local-only change → PATCH
+   *   (push, partial body), contested → policy (local-wins pushes; pause-and-
+   *   review skips + persists meta_conflicts).
+   * NEVER PATCHes on an absent baseline — that round SEEDS the baseline from
+   * the server and fills locally-empty fields (the 3-lens convergent
+   * blocker: push-before-pull would blank a link-existing world's real meta).
+   * Baseline advances PER-FIELD (sent + applied only), so server changes to
+   * fields we didn't touch still surface next round.
+   */
+  private async executeMetaStep(): Promise<{
+    meta_pushed: string[];
+    meta_pulled: string[];
+    failures: PerElementFailure[];
+    auth_blocked: boolean;
+  }> {
+    const empty = { meta_pushed: [], meta_pulled: [], failures: [], auth_blocked: false };
+    if (this.stopped || this.paused) return empty;
+
+    const metaFailure = (operation: 'read' | 'update', err: unknown): PerElementFailure => ({
+      element_id: 'world',
+      type: 'world',
+      operation,
+      message: err instanceof Error ? err.message : String(err),
+    });
+
+    let server: WorldMetaWire;
+    try {
+      server = await this.client.getWorldMeta();
+    } catch (err) {
+      if (isAuthError(err)) {
+        this.noteAuthBail(err);
+        return { ...empty, auth_blocked: true };
+      }
+      console.warn('[atlas:sync] meta step: GET /world failed — skipping meta this round', err);
+      return { ...empty, failures: [metaFailure('read', err)] };
+    }
+    if (this.stopped) return empty;
+
+    const serverRec = server as unknown as Record<string, unknown>;
+    const local = await this.folder.readWorldMeta() as unknown as Record<string, unknown>;
+    const syncState = await this.folder.readSyncState();
+    const baseline = syncState.meta_baseline ?? null;
+
+    // SEED round: adopt server as baseline, fill locally-empty fields from
+    // the server, PATCH nothing (gate R2 — the convergent blocker).
+    if (!baseline) {
+      const seeded = pickSyncedMeta(serverRec);
+      const pulls: Record<string, unknown> = {};
+      for (const field of META_SYNC_FIELD_NAMES) {
+        if (isMetaEmpty(field, local[field]) && !isMetaEmpty(field, seeded[field])) {
+          pulls[field] = seeded[field];
+        }
+      }
+      if (this.stopped) return empty;
+      if (Object.keys(pulls).length > 0) {
+        await this.folder.writeWorldMeta(pulls);
+      }
+      if (this.stopped) return empty;
+      await this.folder.updateSyncState(() => ({
+        meta_baseline: seeded,
+        meta_server_updated_at: server.updated_at || null,
+      }));
+      return { ...empty, meta_pulled: Object.keys(pulls) };
+    }
+
+    const diff = threeWayMetaDiff(local, serverRec, baseline);
+    const pushFields: Record<string, unknown> = { ...diff.pushFields };
+    let contested = diff.contested;
+    if (contested.length > 0 && this.policy === 'local-wins') {
+      // Local wins the contested fields: push them, nothing persists.
+      for (const f of contested) pushFields[f] = canonicalMetaValue(META_SYNC_FIELDS[f], local[f]);
+      contested = [];
+    }
+
+    const baselineNext = { ...baseline };
+    for (const f of diff.converged) {
+      baselineNext[f] = canonicalMetaValue(META_SYNC_FIELDS[f], serverRec[f]);
+    }
+
+    // Pull-apply server-only changes, then advance those baselines.
+    const pulled = Object.keys(diff.pullFields);
+    if (pulled.length > 0) {
+      if (this.stopped) return empty;
+      await this.folder.writeWorldMeta(diff.pullFields);
+      for (const f of pulled) baselineNext[f] = diff.pullFields[f];
+    }
+
+    // Length guard (dig Q9: keel never length-validates; overflow raw-500s).
+    // Overlong fields become honest per-field failures and stay dirty.
+    const failures: PerElementFailure[] = [];
+    for (const [f, v] of Object.entries(pushFields)) {
+      const lenErr = metaFieldLengthError(f, v);
+      if (lenErr) {
+        failures.push(metaFailure('update', new Error(lenErr)));
+        delete pushFields[f];
+      }
+    }
+
+    // Push local-only changes as ONE partial PATCH. Baseline advances only
+    // for the fields actually sent — from the response echo (gate finding:
+    // adopting the full body would swallow concurrent server-side changes).
+    const pushedNames = Object.keys(pushFields);
+    let serverUpdatedAt = server.updated_at || null;
+    if (pushedNames.length > 0) {
+      try {
+        const resp = await this.client.patchWorldMeta(encodeMetaFieldsForPush(pushFields));
+        const respRec = resp as unknown as Record<string, unknown>;
+        for (const f of pushedNames) {
+          baselineNext[f] = canonicalMetaValue(META_SYNC_FIELDS[f], respRec[f]);
+        }
+        serverUpdatedAt = resp.updated_at || serverUpdatedAt;
+      } catch (err) {
+        if (isAuthError(err)) {
+          this.noteAuthBail(err);
+          // Persist what the round already learned (pull-applies + converged)
+          // before bailing — the pushed fields stay dirty and retry.
+          if (!this.stopped) {
+            await this.folder.updateSyncState(current => ({
+              meta_baseline: baselineNext,
+              meta_server_updated_at: serverUpdatedAt,
+              meta_conflicts: this.policy === 'pause-and-review'
+                ? contested
+                : (current.meta_conflicts ?? []),
+            }));
+          }
+          return { meta_pushed: [], meta_pulled: pulled, failures, auth_blocked: true };
+        }
+        console.warn('[atlas:sync] meta step: PATCH /world failed — fields stay dirty', err);
+        failures.push(metaFailure('update', err));
+        pushedNames.length = 0; // nothing landed; baselines for them unchanged
+      }
+    }
+
+    if (this.stopped) return empty; // unlink raced us — never resurrect cleared state
+    await this.folder.updateSyncState(() => ({
+      meta_baseline: baselineNext,
+      meta_server_updated_at: serverUpdatedAt,
+      meta_conflicts: this.policy === 'pause-and-review' ? contested : [],
+    }));
+    return { meta_pushed: [...pushedNames], meta_pulled: pulled, failures, auth_blocked: false };
+  }
+
   /**
    * Resolve a server-deleted entry (3.5+). Two actions:
    *   - `delete-locally`: remove the local file silently (no tombstone — the
@@ -628,6 +866,18 @@ export class SyncEngine {
   private async runPushOnly(): Promise<SyncResult> {
     if (this.paused) return emptyResult();
     this.setState({ kind: 'syncing', phase: 'push' });
+    // The meta step rides EVERY round (world-meta sync R2) — a setNow-triggered
+    // debounce push is exactly the round that must carry the now to the server.
+    const meta = await this.executeMetaStep();
+    if (meta.auth_blocked) {
+      this.setAuthError();
+      const result: SyncResult = {
+        pushed: zero(), pulled: zero(), conflicts: [], failures: meta.failures,
+        auth_blocked: true, auth_reason: this.lastAuthReason ?? undefined,
+      };
+      this.onSyncResult('push', result);
+      return result;
+    }
     const pushResult = await this.pushPhase();
     // Only persist under pause-and-review. Under local-wins, conflicts are
     // informational (server already overwritten) — persisting would falsely
@@ -644,9 +894,11 @@ export class SyncEngine {
       pushed: pushResult.pushed,
       pulled: zero(),
       conflicts: pushResult.conflicts,
-      failures: pushResult.failures,
+      failures: [...meta.failures, ...pushResult.failures],
       auth_blocked: pushResult.auth_blocked,
       auth_reason: pushResult.auth_blocked ? this.lastAuthReason ?? undefined : undefined,
+      meta_pushed: meta.meta_pushed.length ? meta.meta_pushed : undefined,
+      meta_pulled: meta.meta_pulled.length ? meta.meta_pulled : undefined,
     };
     this.onSyncResult('push', result);
     return result;
@@ -655,6 +907,16 @@ export class SyncEngine {
   private async runPullOnly(): Promise<SyncResult> {
     if (this.paused) return emptyResult();
     this.setState({ kind: 'syncing', phase: 'pull' });
+    const meta = await this.executeMetaStep();
+    if (meta.auth_blocked) {
+      this.setAuthError();
+      const result: SyncResult = {
+        pushed: zero(), pulled: zero(), conflicts: [], failures: meta.failures,
+        auth_blocked: true, auth_reason: this.lastAuthReason ?? undefined,
+      };
+      this.onSyncResult('pull', result);
+      return result;
+    }
     let pullResult: SyncResult;
     try {
       pullResult = await this.pullPhase();
@@ -674,10 +936,12 @@ export class SyncEngine {
       pushed: zero(),
       pulled: pullResult.pulled,
       conflicts: pullResult.conflicts,
-      failures: pullResult.failures,
+      failures: [...meta.failures, ...pullResult.failures],
       pulled_ids: pullResult.pulled_ids,
       auth_blocked: pullResult.auth_blocked,
       auth_reason: pullResult.auth_blocked ? this.lastAuthReason ?? undefined : undefined,
+      meta_pushed: meta.meta_pushed.length ? meta.meta_pushed : undefined,
+      meta_pulled: meta.meta_pulled.length ? meta.meta_pulled : undefined,
     };
     this.onSyncResult('pull', result);
     return result;
@@ -688,6 +952,16 @@ export class SyncEngine {
       return emptyResult();
     }
     this.setState({ kind: 'syncing', phase: 'push' });
+    const meta = await this.executeMetaStep();
+    if (meta.auth_blocked) {
+      this.setAuthError();
+      const result: SyncResult = {
+        pushed: zero(), pulled: zero(), conflicts: [], failures: meta.failures,
+        auth_blocked: true, auth_reason: this.lastAuthReason ?? undefined,
+      };
+      this.onSyncResult('sync', result);
+      return result;
+    }
     const pushResult = await this.pushPhase();
     // Persist push conflicts BEFORE pull phase (so pull's currentState read
     // sees them when computing the union). Under local-wins, skip — server
@@ -723,10 +997,12 @@ export class SyncEngine {
       pushed: pushResult.pushed,
       pulled: pullResult.pulled,
       conflicts: [...pushResult.conflicts, ...pullResult.conflicts],
-      failures: [...pushResult.failures, ...pullResult.failures],
+      failures: [...meta.failures, ...pushResult.failures, ...pullResult.failures],
       pulled_ids: pullResult.pulled_ids,
       auth_blocked: pushResult.auth_blocked || pullResult.auth_blocked,
       auth_reason: (pushResult.auth_blocked || pullResult.auth_blocked) ? this.lastAuthReason ?? undefined : undefined,
+      meta_pushed: meta.meta_pushed.length ? meta.meta_pushed : undefined,
+      meta_pulled: meta.meta_pulled.length ? meta.meta_pulled : undefined,
     };
     if (pullResult.auth_blocked) {
       this.setAuthError();

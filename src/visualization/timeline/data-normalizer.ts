@@ -90,8 +90,10 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
     if (startDate === null) continue;
 
     let endDate: number | null = null;
+    let endRecorded = false;
     if (fields.end) {
       endDate = parseTemporalValue((el as Record<string, unknown>)[fields.end]);
+      endRecorded = endDate !== null;
       // Drop an inverted range (end before start) — it would draw the range-line
       // backwards and can blow out the axis. Treat as no end date.
       if (endDate !== null && endDate < startDate) endDate = null;
@@ -104,6 +106,10 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
       name: el.name || '(unnamed)',
       startDate,
       endDate,
+      // Open-end semantics (Act 2A): start recorded, end field EMPTY (an end
+      // dropped as inverted was still recorded — bad data must not become an
+      // invented ongoing tenure), and the type means "runs until ended".
+      openEnded: fields.openEnd === true && !endRecorded ? true : undefined,
       dateSpec: { kind: 'exact', value: startDate },
       color: ELEMENT_TYPE_COLORS[el.type as ElementType] ?? FALLBACK_COLOR,
       links: resolveLinks(el, byId),

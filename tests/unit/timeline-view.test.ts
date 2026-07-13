@@ -8,7 +8,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { computeBeeswarm, clampWindow, zoomWindow, rangeVsNow } from '../../src/visualization/timeline/timeline-view';
+import { computeBeeswarm, clampWindow, zoomWindow, rangeVsNow, extendRangeForOpenEnds, temporalMetaLine, focusInferredEnd } from '../../src/visualization/timeline/timeline-view';
+import { effectiveEndDate } from '../../src/visualization/timeline/temporal-fields';
 import type { TimelineNode } from '../../src/visualization/timeline/types';
 
 function node(id: string, startDate: number): TimelineNode {
@@ -56,6 +57,100 @@ describe('rangeVsNow — the forward-half classifier (Act 1)', () => {
   });
 });
 
+describe('effectiveEndDate — open-end resolution (Act 2A)', () => {
+  it('a recorded end always wins', () => {
+    expect(effectiveEndDate(10, 30, true, 50)).toBe(30);
+    expect(effectiveEndDate(10, 30, undefined, 50)).toBe(30);
+  });
+
+  it('an open-ended span runs to the now when the now is ahead of the start', () => {
+    expect(effectiveEndDate(28, null, true, 38)).toBe(38);
+  });
+
+  it('stays a point without a now, or when the now is at/behind the start', () => {
+    expect(effectiveEndDate(28, null, true, null)).toBeNull();
+    expect(effectiveEndDate(28, null, true, 28)).toBeNull();  // granted AT now — no span yet
+    expect(effectiveEndDate(28, null, true, 20)).toBeNull();  // granted in the future
+  });
+
+  it('a non-open-ended node never runs to the now', () => {
+    expect(effectiveEndDate(28, null, undefined, 38)).toBeNull();
+    expect(effectiveEndDate(28, null, false, 38)).toBeNull();
+  });
+});
+
+describe('extendRangeForOpenEnds — the fit shows the open end (Act 2A)', () => {
+  const openNode = { startDate: 28, endDate: null, openEnded: true };
+
+  it('extends the max to the now (plus pad) when an open span runs past it', () => {
+    const r = extendRangeForOpenEnds({ min: 8, max: 28 }, [openNode], 38);
+    expect(r.max).toBeGreaterThan(38);
+    expect(r.min).toBe(8);
+  });
+
+  it('no now / no open nodes / now inside the range → unchanged', () => {
+    expect(extendRangeForOpenEnds({ min: 8, max: 28 }, [openNode], null)).toEqual({ min: 8, max: 28 });
+    expect(extendRangeForOpenEnds({ min: 8, max: 28 }, [{ startDate: 12, endDate: 20 }], 38)).toEqual({ min: 8, max: 28 });
+    expect(extendRangeForOpenEnds({ min: 8, max: 50 }, [openNode], 38)).toEqual({ min: 8, max: 50 });
+  });
+});
+
+describe('focusInferredEnd — the presumed-alive life-line (Act 2A, focus-only)', () => {
+  it('a character born before the now is presumed alive to it', () => {
+    expect(focusInferredEnd({ elementType: 'character', startDate: 5, endDate: null }, 38)).toBe(38);
+    expect(focusInferredEnd({ elementType: 'creature', startDate: 5, endDate: null }, 38)).toBe(38);
+  });
+
+  it('no now, born at/after the now, or a recorded/open span → no inference', () => {
+    expect(focusInferredEnd({ elementType: 'character', startDate: 5, endDate: null }, null)).toBeNull();
+    expect(focusInferredEnd({ elementType: 'character', startDate: 38, endDate: null }, 38)).toBeNull();
+    expect(focusInferredEnd({ elementType: 'character', startDate: 45, endDate: null }, 38)).toBeNull();
+    expect(focusInferredEnd({ elementType: 'character', startDate: 5, endDate: 30 }, 38)).toBeNull();
+  });
+
+  it('only life types infer — a dateless-end event or a title stays out', () => {
+    expect(focusInferredEnd({ elementType: 'event', startDate: 5, endDate: null }, 38)).toBeNull();
+    expect(focusInferredEnd({ elementType: 'title', startDate: 5, endDate: null, openEnded: true }, 38)).toBeNull();
+  });
+});
+
+describe('temporalMetaLine — the card speaks type vocabulary (Act 2A)', () => {
+  it('a closed tenure reads granted/revoked/held', () => {
+    expect(temporalMetaLine({ elementType: 'title', startDate: 12, endDate: 31 }, 38))
+      .toBe('granted 12 · revoked 31 · held 19');
+  });
+
+  it('an ongoing tenure reads held-so-far against the now', () => {
+    expect(temporalMetaLine({ elementType: 'title', startDate: 28, endDate: null, openEnded: true }, 38))
+      .toBe('granted 28 · held 10 so far');
+  });
+
+  it('an ongoing tenure without a now reads granted only', () => {
+    expect(temporalMetaLine({ elementType: 'title', startDate: 28, endDate: null, openEnded: true }, null))
+      .toBe('granted 28');
+  });
+
+  it('a character reads born + age against the now', () => {
+    expect(temporalMetaLine({ elementType: 'character', startDate: 5, endDate: null }, 38))
+      .toBe('born 5 · age 33');
+    expect(temporalMetaLine({ elementType: 'character', startDate: 5, endDate: null }, null))
+      .toBe('born 5');
+    expect(temporalMetaLine({ elementType: 'character', startDate: 45, endDate: null }, 38))
+      .toBe('born 45'); // not yet born — no negative age
+  });
+
+  it('founded/formed vocabulary for institutions, locations, collectives', () => {
+    expect(temporalMetaLine({ elementType: 'institution', startDate: 8, endDate: null }, 38)).toBe('founded 8');
+    expect(temporalMetaLine({ elementType: 'location', startDate: 2, endDate: null }, null)).toBe('founded 2');
+    expect(temporalMetaLine({ elementType: 'collective', startDate: 3, endDate: null }, null)).toBe('formed 3');
+  });
+
+  it('other types keep the plain range / point forms', () => {
+    expect(temporalMetaLine({ elementType: 'event', startDate: 25, endDate: 27 }, 38)).toBe('25 – 27');
+    expect(temporalMetaLine({ elementType: 'event', startDate: 40, endDate: null }, 38)).toBe('40');
+  });
+});
+
 describe('computeBeeswarm — density-fan layout', () => {
   it('returns [] for a degenerate band (bottom <= top)', () => {
     // axisY - 8 <= TOP_PAD(20) → no vertical room. Must bail (else the whole
@@ -89,6 +184,30 @@ describe('computeBeeswarm — density-fan layout', () => {
     const placed = computeBeeswarm([node('a', 100), node('b', 100)], new Set(['b']), identityX, 400, 220);
     expect(placed.find(p => p.node.id === 'b')!.y).toBe(116);
     expect(placed.find(p => p.node.id === 'a')!.y).not.toBe(116);
+  });
+
+  it('the focus node places first and its inferred life-line claims the lane (Act 2A)', () => {
+    // Focused character born 100, now 300 → subject spine 100→300. A narrative
+    // range starting inside that span must step OFF the spine (no collinear
+    // ranges with the subject line — live finding), even though the character
+    // has no recorded span at all.
+    const chara: TimelineNode = { ...node('c', 100), elementType: 'character' };
+    const range: TimelineNode = { ...node('n', 180), endDate: 260 };
+    const placed = computeBeeswarm([range, chara], new Set(['n']), identityX, 400, 220, undefined, 300, 'c');
+    expect(placed.find(p => p.node.id === 'c')!.y).toBe(116); // subject holds the spine (beats the anchor)
+    expect(placed.find(p => p.node.id === 'n')!.y).not.toBe(116);
+  });
+
+  it('an open-ended span claims its lane to the now — later points step off it (Act 2A)', () => {
+    // Tenure a: 100 → now (300). Point b at 200 falls INSIDE the held span; it
+    // must not sit on the bar's lane. Without a now, the same b keeps the spine.
+    const tenure = { ...node('a', 100), openEnded: true };
+    const withNow = computeBeeswarm([tenure, node('b', 200)], new Set(), identityX, 400, 220, undefined, 300);
+    const aY = withNow.find(p => p.node.id === 'a')!.y;
+    const bY = withNow.find(p => p.node.id === 'b')!.y;
+    expect(bY).not.toBe(aY);
+    const noNow = computeBeeswarm([tenure, node('b', 200)], new Set(), identityX, 400, 220, undefined, null);
+    expect(noNow.find(p => p.node.id === 'b')!.y).toBe(116); // no span claimed → spine free
   });
 });
 

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- World settings travel between devices: the description, cover image URL, time setup, and the charts now-line sync for linked worlds. Move the now on one machine and it moves everywhere. Clearing the now syncs too.
+- Linking a world that already has a description or time setup on OnlyWorlds brings those in instead of blanking them.
+- A sync round that only moved world settings says "Pulled world settings" instead of pretending nothing happened, and "Already up to date" no longer fires when settings did change.
+- If both a device and the server changed the same world setting under review mode, the conflict list shows a world-settings row with the same keep-mine or take-theirs choice as elements.
+- The world name on the home page stays local by design (the OnlyWorlds name is a separate identity, shown in settings); its tooltip now says so.
+- A read-only access key now gets its own sync message instead of PIN advice.
+- Keys atlas creates for account worlds now carry a name ("atlas · windows"), so the portal keys table says which tool and machine each key belongs to.
+- Titles read as tenures in charts: a title granted and never revoked draws a bar from its grant to the world's now with a fading open end, instead of posing as a single instant. The bar claims its row, so other marks no longer sit on a held tenure.
+- Charts treat the focused element as the subject: its span draws thick and holds the center line. Focusing a character or creature born before the now shows a dotted life-line running to the now (dotted because atlas presumes alive; nothing records a death).
+- The chart card speaks in type language: "granted 12 · revoked 31 · held 19", "granted 28 · held 10 so far", "born 5 · age 33", "founded 8". Durations stay plain numbers until calendars land.
+- Focusing an element with an ongoing span keeps the world's now in view, so the openness is visible instead of running off the right edge.
 - Opening a world from the account list shows a progress overlay (creating the key, downloading N of M elements) instead of a silent freeze.
 - Account mode: paste one account token (minted at onlyworlds.com → Settings → Account tokens) into Settings → Account and atlas knows your account. Your OnlyWorlds worlds appear in the sidebar under "On OnlyWorlds"; opening one downloads it into your atlas folder, with atlas creating its own access key along the way. No more hunting API keys per world.
 - Creating a new API world while signed in goes through your account: no email needed, one request, and the world lands linked. Signed out, the classic email + PIN path still works.

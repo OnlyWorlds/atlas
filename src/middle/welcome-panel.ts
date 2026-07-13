@@ -41,7 +41,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           <p>Atlas detected a previously-set-up folder on this device: <code>${escapeText(atlasRootRecoverable.folderName)}</code>.</p>
           <p class="atlas-welcome-hint">Your worlds are still on disk. Click below to re-grant folder access and restore the world list.</p>
           <div class="atlas-welcome-actions">
-            <button class="atlas-btn-primary" data-action="recover-atlas">Re-link atlas folder</button>
+            <button class="atlas-btn-primary" data-action="recover-atlas">Re-link OnlyWorlds folder</button>
           </div>
         </div>
       `;
@@ -54,15 +54,15 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           if (result) {
             toastManager.success(
               result.imported > 0
-                ? `Re-linked atlas folder: restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
-                : 'Re-linked atlas folder (no worlds found inside)'
+                ? `Re-linked OnlyWorlds folder: restored ${result.imported} world${result.imported === 1 ? '' : 's'}`
+                : 'Re-linked OnlyWorlds folder (no worlds found inside)'
             );
           }
         } catch (err) {
           toastManager.error(err instanceof Error ? err.message : String(err));
         } finally {
           btn.disabled = false;
-          btn.textContent = 'Re-link atlas folder';
+          btn.textContent = 'Re-link OnlyWorlds folder';
         }
       });
       return;
@@ -92,8 +92,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           if (result) {
             toastManager.success(
               result.imported > 0
-                ? `Atlas folder set up: found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
-                : 'Atlas folder is set up'
+                ? `OnlyWorlds folder set up: found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
+                : 'OnlyWorlds folder is set up'
             );
           }
         } catch (err) {
@@ -122,7 +122,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         root.innerHTML = `
           <div class="atlas-landing atlas-grounded">
             <div class="atlas-landing-hero">
-              <p class="atlas-grounded-check"><span class="material-symbols-outlined">check_circle</span>Your atlas folder is ready</p>
+              <p class="atlas-grounded-check"><span class="material-symbols-outlined">check_circle</span>Your OnlyWorlds folder is ready</p>
               <p class="atlas-grounded-path"><code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
             </div>
             <div class="atlas-grounded-detail" data-role="path-detail"></div>
@@ -138,7 +138,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           'create-local': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>
             <h3>create a world</h3>
-            <p>A new subfolder in your atlas folder. Elements become files as you build, and everything works offline. You can take it online later.</p>
+            <p>A new subfolder in your OnlyWorlds folder. Elements become files as you build, and everything works offline. You can take it online later.</p>
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
           'new-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">cloud_upload</span>

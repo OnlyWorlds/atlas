@@ -339,7 +339,12 @@ export async function pullNowAndRefresh(): Promise<import('../core/types').SyncR
     const parts: string[] = [];
     if (result.pulled.creates > 0) parts.push(`${result.pulled.creates} new`);
     if (result.pulled.updates > 0) parts.push(`${result.pulled.updates} updated`);
+    if (result.meta_pulled?.length) parts.push('world settings');
     toastManager.info(`Pulled ${parts.join(' + ')} from API`);
+  } else if ((result.meta_pulled?.length ?? 0) > 0 && result.conflicts.length === 0) {
+    // Meta-only round (world-meta gate R7): the element counters are zero but
+    // something real changed — say so, or the pull reads as a silent no-op.
+    toastManager.info('Pulled world settings from API');
   }
   return result;
 }
@@ -383,10 +388,14 @@ function publishSyncState(worldId: string, engineState: SyncEngineState): void {
   });
   // Engine just transitioned to idle → push/pull just finished.
   // Refresh data.elements + conflicts so the UI catches id-swaps and pulled
-  // updates without a page reload.
+  // updates without a page reload. refreshMetaCache re-reads world.json into
+  // state.active.meta (world-meta sync R2/D7) — the charts room's nowValue()
+  // and the home identity strip read that slice live, so a pull-applied
+  // time_current moves the now-line without a reload.
   if (engineState.kind === 'idle') {
     void refreshConflictsCount();
     void refreshElementsCache();
+    void refreshMetaCache();
   }
 }
 
@@ -433,7 +442,8 @@ function emitConflictToasts(
   // pill go saving → idle and assumes everything synced.
   const synced =
     result.pushed.creates + result.pushed.updates + result.pushed.deletes +
-    result.pulled.creates + result.pulled.updates;
+    result.pulled.creates + result.pulled.updates +
+    (result.meta_pushed?.length ?? 0) + (result.meta_pulled?.length ?? 0);
   if (result.failures.length > 0 && synced === 0) {
     const n = result.failures.length;
     toastManager.error(
@@ -755,6 +765,31 @@ async function refreshElementsCache(): Promise<void> {
 }
 
 /**
+ * Re-read world.json into `state.active.meta` after a sync round (world-meta
+ * sync, S262). Without this, a pull-applied time_current/description changes
+ * the DISK but every consumer keeps rendering the stale slice until reload —
+ * the exact gap the S262 handover flagged. Guards: the active world must
+ * still be the world this engine belongs to (world switches race idle
+ * transitions), and a no-change read patches nothing (avoids spurious
+ * re-renders mid-interaction).
+ */
+async function refreshMetaCache(): Promise<void> {
+  if (!currentFolder) return;
+  try {
+    const active = getState().active;
+    if (!active || active.worldId !== currentWorldId) return;
+    const meta = await currentFolder.readWorldMeta();
+    const prev = JSON.stringify(active.meta);
+    if (JSON.stringify(meta) === prev) return;
+    const nowActive = getState().active;
+    if (!nowActive || nowActive.worldId !== currentWorldId) return;
+    patchSlice('active', { ...nowActive, meta });
+  } catch (err) {
+    console.warn('[sync-attach] refresh meta cache failed:', err);
+  }
+}
+
+/**
  * Refresh the conflict badge count from the folder's sync-state.json.
  * Fire-and-forget — called after any sync transition + after resolveConflict.
  */
@@ -768,11 +803,24 @@ export async function refreshConflictsCount(): Promise<void> {
   }
   try {
     const list = await currentEngine.listConflicts();
+    // World-meta contested fields count toward the badge too (gate R9) —
+    // they're the same "decide later" obligation, just world-shaped.
+    const metaList = await currentEngine.listMetaConflicts();
+    const total = list.length + metaList.length;
     const sync = getState().sync;
-    if (sync.activeConflictsCount !== list.length) {
-      patchSlice('sync', { ...sync, activeConflictsCount: list.length });
+    if (sync.activeConflictsCount !== total) {
+      patchSlice('sync', { ...sync, activeConflictsCount: total });
     }
   } catch (err) {
     console.warn('[sync-attach] refresh conflicts failed:', err);
   }
+}
+
+/**
+ * Public wrapper for the meta-slice refresh — the conflict modal calls it
+ * after resolving a world-settings row (the resolve may have rewritten
+ * world.json via 'theirs').
+ */
+export async function refreshMetaCacheNow(): Promise<void> {
+  return refreshMetaCache();
 }
