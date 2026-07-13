@@ -48,6 +48,14 @@ export class MockFolderStore implements FolderStore {
   private clock: () => string = nowIso;
   setClock(fn: () => string): void { this.clock = fn; }
 
+  // View-only guard (S264) — mirrors FsFolderStore: UI mutators throw; the
+  // engine's channels (applyServerRecord, silent deletes, fromSync meta) pass.
+  private viewOnly = false;
+  setViewOnly(viewOnly: boolean): void { this.viewOnly = viewOnly; }
+  private assertWritable(): void {
+    if (this.viewOnly) throw new Error('This world is view-only');
+  }
+
   async open(_handle: FileSystemDirectoryHandle | null): Promise<void> {
     this.opened = true;
   }
@@ -62,7 +70,8 @@ export class MockFolderStore implements FolderStore {
     return { ...this.meta };
   }
 
-  async writeWorldMeta(patch: Partial<WorldMeta>): Promise<WorldMeta> {
+  async writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta> {
+    if (!opts?.fromSync) this.assertWritable();
     this.meta = { ...this.meta, ...patch };
     return { ...this.meta };
   }
@@ -79,6 +88,7 @@ export class MockFolderStore implements FolderStore {
   }
 
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
+    this.assertWritable();
     const id = (data.id as string) ?? newId();
     const elem: Element = {
       ...data,
@@ -92,6 +102,7 @@ export class MockFolderStore implements FolderStore {
   }
 
   async updateElement(id: string, patch: Partial<Element>): Promise<Element> {
+    this.assertWritable();
     return this.writeChain.run(id, async () => {
       const existing = this.elements.get(id);
       if (!existing) throw new Error(`element ${id} not found`);
@@ -163,6 +174,7 @@ export class MockFolderStore implements FolderStore {
   }
 
   async deleteElement(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
+    if (!opts.silent) this.assertWritable();
     // Same chain as updateElement — an in-flight update lands before the
     // element disappears (mirrors FsFolderStore, convention #79).
     return this.writeChain.run(id, async () => {
@@ -232,6 +244,7 @@ export class MockFolderStore implements FolderStore {
   // ---- Media ----
 
   async addMedia(elementId: string, file: File, folder = 'default'): Promise<MediaItem> {
+    this.assertWritable();
     const id = newId();
     const item: MediaItem = {
       id,
@@ -256,6 +269,7 @@ export class MockFolderStore implements FolderStore {
   }
 
   async deleteMedia(mediaId: string): Promise<void> {
+    this.assertWritable();
     this.mediaItems.delete(mediaId);
     this.mediaBlobs.delete(mediaId);
   }
@@ -303,6 +317,7 @@ export class MockFolderStore implements FolderStore {
   }
 
   async writeCharts(charts: ChartConfig[]): Promise<void> {
+    this.assertWritable();
     this.charts = charts.map(c => ({ ...c }));
   }
 

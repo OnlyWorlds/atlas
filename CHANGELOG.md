@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- View a shared world: the worlds sidebar gained an eye button that accepts a read key — no PIN asked, anywhere. The world downloads into your OnlyWorlds folder, stays current with its owner's changes (refreshes on open and on demand), and is view-only by construction: atlas never writes to it, locally or on the server. The row wears an eye and a "view" chip; the corner pill says "View only".
+
 - Re-date by dragging: grab any dot on the chart and slide it to a new date; a guide line shows where it will land and a confirm keeps mis-drags harmless. Dragging a range moves its start; the end stays anchored, so the drag can never invert it.
 - Saved charts fixed: a chart saved from the default view can now be reopened (it silently refused before). The panel beside the chart names whichever saved chart is open, renames included, and the chips sit beside the buttons with a quieter look, so saving your first chart no longer shifts the page.
 - Previewing and focusing look different now: a click gives an element a soft ring; focusing it earns the bright one.

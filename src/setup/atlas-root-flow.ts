@@ -140,7 +140,7 @@ export async function discoverWorldsInRoot(
     }
 
     // Is this an atlas world folder? Read world.json.
-    let meta: { id?: string; name?: string; demo?: boolean; api?: { world_id?: string; api_key?: string; world_name?: string } } | null = null;
+    let meta: { id?: string; name?: string; demo?: boolean; api?: { world_id?: string; api_key?: string; world_name?: string; read_only?: boolean } } | null = null;
     try {
       meta = await readJson(folderHandle, 'world.json');
     } catch (err) {
@@ -175,6 +175,7 @@ export async function discoverWorldsInRoot(
         handleKey,
         pathHint: `${rootPathHint}/${entry.name}`,
         apiWorldName: meta.api!.world_name,
+        readOnly: !!meta.api!.read_only,
       }));
     } else {
       ({ next } = createLocalWorld(reg, {
@@ -534,6 +535,12 @@ export interface LinkExistingApiWorldOpts {
    * validation round-trip — one fewer post-mint failure window (gate R1b).
    */
   knownWorld?: { id: string; name: string };
+  /**
+   * View-only link (S264): the key is a READ key, no PIN required or stored.
+   * The world registers with `api.read_only`, the store blocks UI writes,
+   * and the engine attaches pull-only.
+   */
+  readOnly?: boolean;
 }
 
 export interface LinkExistingApiWorldResult {
@@ -552,7 +559,8 @@ export async function linkExistingApiWorldInRoot(
   const apiKey = opts.apiKey.trim();
   const apiPin = opts.apiPin.trim();
   if (!apiKey) throw new Error('API key is required');
-  if (!apiPin) throw new Error('PIN is required');
+  // View-only links run on a READ key — keel reads are keyless-PIN (S264).
+  if (!apiPin && !opts.readOnly) throw new Error('PIN is required');
 
   // Validate creds via v2 GET /world (live 2026-07-12; replaced the v1 SDK
   // lane). OwV2Error keeps the "API Error NNN: ..." prefix these regexes read.
@@ -650,6 +658,8 @@ export async function linkExistingApiWorldInRoot(
       world_id: serverWorldId,
       api_key: apiKey,
       ...(world.name ? { world_name: world.name } : {}),
+      // Mirrored so root discovery restores view-only status (S264).
+      ...(opts.readOnly ? { read_only: true } : {}),
     },
   });
 
@@ -658,9 +668,10 @@ export async function linkExistingApiWorldInRoot(
   const adapter = buildV2Adapter(apiKey, apiPin);
   const downloadResult = await initialDownloadAll(store, adapter, opts.onProgress);
 
-  // Register the world in registry. Persist PIN globally if not set yet.
+  // Register the world in registry. Persist PIN globally if not set yet
+  // (never from a view-only link — there is no PIN to persist).
   let regAfter = getState().registry;
-  if (!regAfter.pin) regAfter = setPin(regAfter, apiPin);
+  if (!regAfter.pin && apiPin) regAfter = setPin(regAfter, apiPin);
   const { next, entry } = createApiLinkedWorld(regAfter, {
     name: displayName,
     apiWorldId: serverWorldId,
@@ -669,11 +680,15 @@ export async function linkExistingApiWorldInRoot(
     handleKey,
     pathHint: `${reg.atlas_root.folder_name}/${subName}`,
     apiWorldName: world.name,
+    readOnly: !!opts.readOnly,
   });
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);
   patchSlice('registry', activated);
   patchSlice('active', { worldId: entry.id, meta: { id: localWorldUuid, name: displayName }, opened: true });
+  // Arm the view-only guard AFTER the setup writes above (they are this
+  // flow's own, legitimate writes) and BEFORE the store reaches the UI.
+  if (opts.readOnly) store.setViewOnly(true);
   setActiveStore(store);
 
   // Prime the elements cache from the newly-downloaded folder.

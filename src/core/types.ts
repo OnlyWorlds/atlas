@@ -200,6 +200,9 @@ export interface WorldMeta {
      * the server world to match local.
      */
     world_name?: string;
+    /** View-only world (S264) — mirror of the registry flag so root discovery
+     *  (registry wiped, folder survives) restores view-only status. */
+    read_only?: boolean;
   };
   /** Time format config — passes through to OW schema. */
   time_format_names?: string[];
@@ -394,6 +397,12 @@ export interface WorldRegistryEntry {
     api_key: string;
     /** See `WorldMeta.api.world_name` — display-only mirror of server-side name. */
     world_name?: string;
+    /**
+     * View-only world (S264): linked with a READ key, no PIN anywhere. The
+     * engine never pushes (pull-only), and UI writes are blocked at the store
+     * seam. Mirrored in `WorldMeta.api.read_only` so discovery restores it.
+     */
+    read_only?: boolean;
   };
   /**
    * Server world id this entry was PREVIOUSLY linked to (set by unlink /

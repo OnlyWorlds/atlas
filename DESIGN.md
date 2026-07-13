@@ -61,6 +61,8 @@ Two states. The difference is **whether sync is wired**, not where data lives.
 
 No `api-only` mode. Every world has a folder. The folder is the truth. If you want the world "online," you attach api credentials and the SyncEngine begins reconciling.
 
+**View-only worlds (S264)** are a FLAG on api-linked, not a third state: `api.read_only` (registry + world.json mirror, so root discovery restores it). Linked via the sidebar's `+eye` → ViewWorldModal with a READ key — no PIN anywhere (keel reads are keyless-PIN). The folder-first invariant holds (full local download, browsable offline); the difference is the double wall: the engine is pull-only (`readOnly` option — no push trigger survives, the meta step never PATCHes, pull-on-activate always runs) and the store blocks every UI mutation at the seam (`setViewOnly` → "This world is view-only"; the engine's own channels bypass). The sister-shares-with-her-DM flow. Details: SYNC_NOTES "Read-only engines".
+
 **Transitions**:
 - `local-only` → `api-linked`: **Make Online** flow (two routes, see Workflows).
 - `api-linked` → `local-only`: detach api credentials. Folder remains, sync stops. Reversible at any time without data loss. The server world id is remembered as `former_api_world_id` so the account-mode remote list knows the world is already here.

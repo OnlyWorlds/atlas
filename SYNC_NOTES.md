@@ -605,6 +605,29 @@ Skeld's v2 tail (all five S257 asks, live on production same day) closed the rem
 - **Rewind guard**: every /changes response now carries `head` (the world's current change_seq). Normal operation never rewinds (§8 law); the one legal rewind is disaster restore-from-backup. The engine persists `changes_last_seq` (highest APPLIED seq, advanced in the same lockstep as the cursor) and, when a page's `head` is strictly below it, drops cursor + seq memory and cold-walks from the epoch (retention law makes the cold walk complete-state; upserts idempotent, deletes explicit). Single-reset-per-round latch prevents a pathological head from looping. Regression: `sync-engine.changesPull.test.ts` rewind describe-block; fake seam `__rewind_op_log(maxSeq)`.
 - **Retention** is now written law (no compaction horizon) — the /changes cold-walk bootstrap for INITIAL DOWNLOAD is unblocked if we ever want it (currently initial download stays on the list walk; revisit only if it earns its keep).
 
+## Read-only engines — view-only worlds (S264)
+
+Worlds linked with a READ key (`api.read_only` in registry + world.json) run a
+pull-only engine: `readOnly` in SyncEngineOptions. The double wall:
+
+1. **Engine**: `pushOnce()` resolves empty immediately and `requestPush()` is a
+   no-op — every push trigger funnels through those two (debounce, flush,
+   resume, online-event, the local-wins convergence push), so ONE guard closes
+   them all. `syncNow()` degrades to `pullNow()`. The meta step pull-applies
+   but never PATCHes (`pushedNames` forced empty). Flush-on-attach is skipped;
+   pull-on-activate runs UNCONDITIONALLY for view worlds (sync-attach).
+2. **Store seam**: `setViewOnly(true)` on the store (armed at activation +
+   link) throws "This world is view-only" from every UI mutator. The engine's
+   channels bypass: `applyServerRecord`/stamps/sync-state (never guarded),
+   `deleteElement` with `silent` (the server-delete channel), and
+   `writeWorldMeta(patch, { fromSync: true })` (new opts param — all four
+   engine meta-write sites pass it; both stores implement the guard).
+
+The adapter omits the `API-Pin` header entirely when the pin is empty (keel
+reads are keyless-PIN; an empty header is a malformed credential). Regression:
+`sync-engine.readOnly.test.ts`. Live-verified against the fake keel: read-key
+download + edit-block + a wire log with zero writes.
+
 ## World-meta sync — the meta step (S262, gated)
 
 `world.json`'s eight OW wire fields sync via `GET|PATCH /world` (full design + all ten gate resolutions: `Forge/Notes/2026-07-13-worldmeta-sync-design.md`; the shipped shape is summarized in DESIGN.md "World-meta sync"). Engine-side facts a future session needs:

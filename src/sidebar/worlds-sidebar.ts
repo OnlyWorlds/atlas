@@ -69,6 +69,10 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">link</span>
         </button>
+        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="view-api" title="View a world with a read key (downloads it, view only)">
+          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
+          <span class="material-symbols-outlined atlas-add-glyph-main">visibility</span>
+        </button>
       `;
     } else {
       // No atlas root (recoverable or first-launch): the sidebar header has
@@ -90,6 +94,12 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     });
     const linkBtn = header.querySelector<HTMLButtonElement>('[data-action="link-api"]');
     linkBtn?.addEventListener('click', () => new LinkWorldModal(toasts).open());
+    const viewBtn = header.querySelector<HTMLButtonElement>('[data-action="view-api"]');
+    viewBtn?.addEventListener('click', () => {
+      void import('../ui/view-world-modal').then(({ ViewWorldModal }) => {
+        new ViewWorldModal(toasts).open();
+      });
+    });
 
     // Hover trail (S255v2): hovering a create button paints its explanation
     // into the grounded welcome's detail zone. The welcome panel listens for
@@ -97,7 +107,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const dispatchHover = (path: string | null): void => {
       window.dispatchEvent(new CustomEvent('atlas:worlds-path-hover', { detail: { path } }));
     };
-    for (const btn of [createBtn, newApiBtn, linkBtn]) {
+    for (const btn of [createBtn, newApiBtn, linkBtn, viewBtn]) {
       if (!btn) continue;
       const path = btn.getAttribute('data-action');
       btn.addEventListener('mouseenter', () => dispatchHover(path));
@@ -325,12 +335,18 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   // its own toggle or by the global "pause all sync" master switch. Local-only
   // worlds always render `folder` regardless of pause state (no sync to pause).
   const isPaused = world.state === 'api-linked' && (!!world.sync_paused || globalPaused);
-  const stateIcon = world.state === 'api-linked'
-    ? (isPaused ? 'cloud_off' : 'cloud')
-    : 'folder';
-  const stateChip = world.state === 'api-linked'
-    ? '<span class="atlas-world-state-chip api-linked">online</span>'
-    : '';
+  // View-only worlds (S264, read-key link): the EYE is the identity — the row
+  // says at a glance this world is someone else's, read-not-write.
+  const viewOnly = world.state === 'api-linked' && !!world.api?.read_only;
+  const stateIcon = viewOnly ? 'visibility'
+    : world.state === 'api-linked'
+      ? (isPaused ? 'cloud_off' : 'cloud')
+      : 'folder';
+  const stateChip = viewOnly
+    ? '<span class="atlas-world-state-chip view-only">view</span>'
+    : world.state === 'api-linked'
+      ? '<span class="atlas-world-state-chip api-linked">online</span>'
+      : '';
   const favIcon = world.favorite ? 'star' : 'star_border';
   const favCls = world.favorite ? 'is-fav' : '';
   const cls = ['atlas-row', active ? 'selected' : ''].filter(Boolean).join(' ');
@@ -600,6 +616,8 @@ async function doActivateWorld(
     }
   }
   const meta = await store.readWorldMeta();
+  // View-only worlds (S264): arm the store guard before the UI can reach it.
+  store.setViewOnly(!!entry.api?.read_only);
   setActiveStore(store);
 
   const nextRegistry = setActiveWorld(getState().registry, worldId);

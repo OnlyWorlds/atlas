@@ -60,8 +60,11 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
   }
 
   const reg = getState().registry;
+  const readOnly = !!entry.api.read_only;
   const pin = reg.pin;
-  if (!pin) {
+  // View-only worlds (S264) run on a READ key — no PIN exists or is needed
+  // (keel reads are keyless-PIN; the engine never writes).
+  if (!pin && !readOnly) {
     console.warn('[sync-attach] PIN missing — engine not attached for', entry.name);
     return null;
   }
@@ -71,12 +74,13 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
   // worlds.get validation at the link/settings surfaces, gate 10.7).
   const adapter = new OwV2ClientAdapter({
     apiKey: entry.api.api_key,
-    apiPin: pin,
+    apiPin: readOnly ? '' : (pin as string),
     baseUrl: devV2Base() ?? undefined,
   });
   const engine = new SyncEngine({
     folder,
     client: adapter,
+    readOnly,
     policy: reg.sync_default_policy ?? 'local-wins',
     onStateChange: (s) => publishSyncState(entry.id, s),
     onSyncResult: (phase, result) => emitConflictToasts(phase, result),
@@ -130,14 +134,20 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
   // is unconditional when pending exist; pull-on-activate is opt-in.
   if (!shouldPause) {
     void (async () => {
-      try {
-        await flushPendingOnAttach(engine, folder, entry.name);
-      } catch (err) {
-        // flushPendingOnAttach swallows its own errors; outer catch is defense-
-        // in-depth in case the helper is ever refactored to throw.
-        console.warn('[sync-attach] flush-on-attach failed:', err);
+      // View-only: nothing local can be pending (writes are blocked at the
+      // store seam), so the flush is skipped — and the pull-on-activate runs
+      // UNCONDITIONALLY: a viewer's whole intent is seeing the world's current
+      // state, and the local-first push asymmetry doesn't apply (no pushes).
+      if (!readOnly) {
+        try {
+          await flushPendingOnAttach(engine, folder, entry.name);
+        } catch (err) {
+          // flushPendingOnAttach swallows its own errors; outer catch is defense-
+          // in-depth in case the helper is ever refactored to throw.
+          console.warn('[sync-attach] flush-on-attach failed:', err);
+        }
       }
-      if (reg.sync_pull_on_activate) {
+      if (reg.sync_pull_on_activate || readOnly) {
         try {
           await pullNowAndRefresh();
         } catch (err) {

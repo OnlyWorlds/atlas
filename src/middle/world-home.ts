@@ -111,9 +111,13 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     }
     // The tour (S264): tutorial-state cards computed from world contents —
     // the core create pair, then the next wave / room CTAs. Renders nothing
-    // for a built-out (or dismissed-out) world.
-    const tour = buildTour(counts, totalElements, worldId, toasts);
-    if (tour) root.appendChild(tour);
+    // for a built-out (or dismissed-out) world — and never on a VIEW-ONLY
+    // world (inviting creates that can only toast is noise, not teaching).
+    const viewOnly = !!getState().registry.worlds.find(w => w.id === worldId)?.api?.read_only;
+    if (!viewOnly) {
+      const tour = buildTour(counts, totalElements, worldId, toasts);
+      if (tour) root.appendChild(tour);
+    }
     if (totalElements === 0) return;
     // The chart strip (S15: the "starred chart") — the shape of the world's
     // history between the cover and the desk (timeline-mini's old slot, now
@@ -229,9 +233,14 @@ function buildCover(
   }
 
   const identity = document.createElement('div');
+  // View-only worlds (S264): the empty-description INVITE is withheld (the
+  // write would only toast); an existing description still renders plainly.
+  const viewOnly = !!getState().registry.worlds.find(w => w.id === worldId)?.api?.read_only;
   const descriptionMarkup = meta.description
     ? `<p class="atlas-home-world-description atlas-home-clickable" data-edit="description">${escapeText(meta.description)}</p>`
-    : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">describe your world…</p>`;
+    : viewOnly
+      ? ''
+      : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">describe your world…</p>`;
   identity.innerHTML = `
     <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="click to rename (a local name — the OnlyWorlds world name lives in settings)">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
@@ -239,9 +248,9 @@ function buildCover(
   cover.appendChild(identity);
 
   const nameEl = identity.querySelector<HTMLElement>('[data-edit="name"]')!;
-  const descEl = identity.querySelector<HTMLElement>('[data-edit="description"]')!;
+  const descEl = identity.querySelector<HTMLElement>('[data-edit="description"]');
   nameEl.addEventListener('click', () => openIdentityEdit('name', meta.name, nameEl, toasts));
-  descEl.addEventListener('click', () => openIdentityEdit('description', meta.description ?? '', descEl, toasts));
+  descEl?.addEventListener('click', () => openIdentityEdit('description', meta.description ?? '', descEl, toasts));
 
   // (The old quick text-links — new element / open writing / import — were
   // removed S255v3: the room nav + onboarding tiles cover every one of them.)

@@ -93,6 +93,8 @@ export interface CreateApiLinkedWorldOpts {
   parentId?: string;
   /** Server-side world name from `client.worlds.get()`. Display-only. */
   apiWorldName?: string;
+  /** View-only world linked with a READ key (S264) — no PIN, engine pull-only. */
+  readOnly?: boolean;
 }
 
 /**
@@ -109,6 +111,7 @@ export function createApiLinkedWorld(
     api_key: opts.apiKey,
   };
   if (opts.apiWorldName) apiBlock.world_name = opts.apiWorldName;
+  if (opts.readOnly) apiBlock.read_only = true;
   const entry: WorldRegistryEntry = {
     id: crypto.randomUUID(),
     name: opts.name.trim() || 'untitled world',

@@ -123,6 +123,16 @@ export class FsFolderStore implements FolderStore {
   private tabId: string;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private opts: FsFolderStoreOptions;
+  /** View-only world (S264) — UI mutations throw; sync channels bypass. */
+  private viewOnly = false;
+
+  setViewOnly(viewOnly: boolean): void { this.viewOnly = viewOnly; }
+
+  /** The view-only guard. Sits on the UI-facing mutators; the engine's write
+   *  channels (applyServerRecord, silent deletes, fromSync meta) skip it. */
+  private assertWritable(): void {
+    if (this.viewOnly) throw new Error('This world is view-only');
+  }
 
   /**
    * Per-element filename index. Maps `id → { type, filename }` so reads and
@@ -412,7 +422,8 @@ export class FsFolderStore implements FolderStore {
     return meta ?? { ...DEFAULT_META };
   }
 
-  async writeWorldMeta(patch: Partial<WorldMeta>): Promise<WorldMeta> {
+  async writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta> {
+    if (!opts?.fromSync) this.assertWritable(); // engine pull-apply bypasses (S264)
     // Serialized read-merge-write (world-meta gate R4): the read and the
     // write happen atomically relative to every other meta writer, so a
     // background pull-apply can never erase a concurrent user edit.
@@ -468,6 +479,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
+    this.assertWritable();
     const id = (data.id as string) ?? newId();
     const elem: Element = {
       ...data,
@@ -485,6 +497,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   async updateElement(id: string, patch: Partial<Element>): Promise<Element> {
+    this.assertWritable();
     // Per-id serialization (convention #79): two concurrent updates to the
     // same element race the read-merge-write below — the second call's read
     // predates the first call's write, silently reverting its fields.
@@ -596,6 +609,9 @@ export class FsFolderStore implements FolderStore {
   }
 
   async deleteElement(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
+    // Silent deletes are the ENGINE's channel (server-side deletes applying
+    // locally) — they bypass the view-only guard; UI deletes never pass silent.
+    if (!opts.silent) this.assertWritable();
     // Same chain as updateElement: an in-flight update to this id lands (or
     // fails) before the file disappears — no "element not found" tail errors.
     return this.writeChain.run(id, () => this.deleteElementUnchained(id, opts));
@@ -676,6 +692,7 @@ export class FsFolderStore implements FolderStore {
   // ---- Media ----
 
   async addMedia(elementId: string, file: File, folder = 'default'): Promise<MediaItem> {
+    this.assertWritable();
     const mediaRoot = await getDir(this.requireRoot(), [MEDIA_DIR, elementId, folder]);
     const id = newId();
     // Use the original filename to keep the folder browsable; collisions get suffixed.
@@ -753,6 +770,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   async deleteMedia(mediaId: string): Promise<void> {
+    this.assertWritable();
     const mediaRoot = await tryGetDir(this.requireRoot(), [MEDIA_DIR]);
     if (!mediaRoot) return;
     // @ts-expect-error — values()
@@ -824,6 +842,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   async writeCharts(charts: ChartConfig[]): Promise<void> {
+    this.assertWritable();
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
     await writeJsonAtomic(atlasDir, CHARTS_FILE, { charts });
   }

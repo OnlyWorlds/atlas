@@ -208,7 +208,10 @@ export class OwV2ClientAdapter implements OwApiClient {
   ): Promise<unknown> {
     const headers: Record<string, string> = {
       'API-Key': this.apiKey,
-      'API-Pin': this.apiPin,
+      // Omit the PIN header entirely when there is no PIN (view-only worlds
+      // run on a READ key, S264) — reads are keyless-PIN on keel, and an
+      // empty-string header is a malformed credential, not an absent one.
+      ...(this.apiPin ? { 'API-Pin': this.apiPin } : {}),
       ...extraHeaders,
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';

@@ -152,6 +152,12 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             <p>Already have a world online? Paste its key: atlas downloads a full local copy and keeps the two in sync.</p>
             ${owLine}
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
+          'view-api': `
+            <span class="material-symbols-outlined atlas-grounded-detail-icon">visibility</span>
+            <h3>view a shared world</h3>
+            <p>Someone shared a read key with you? Paste it: atlas downloads their world to browse, view only. No PIN needed.</p>
+            ${owLine}
+            <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
         };
         const onPathHover = (e: Event): void => {
           const path = (e as CustomEvent<{ path: string | null }>).detail?.path;

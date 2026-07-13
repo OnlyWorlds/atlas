@@ -35,10 +35,21 @@ export interface FolderStore {
   /** Detach. Implementations may flush in-flight writes. */
   close(): Promise<void>;
 
+  /**
+   * View-only mode (S264 — worlds linked with a READ key). When set, every
+   * UI-originated mutation throws "This world is view-only"; the sync engine's
+   * legitimate write channels stay open (applyServerRecord + friends,
+   * `deleteElement` with `silent` — the server-delete channel — and
+   * `writeWorldMeta` with `fromSync`). One seam, both stores, so no UI call
+   * site needs to know.
+   */
+  setViewOnly(viewOnly: boolean): void;
+
   // ---- World metadata ----
 
   readWorldMeta(): Promise<WorldMeta>;
-  writeWorldMeta(patch: Partial<WorldMeta>): Promise<WorldMeta>;
+  /** `fromSync` bypasses the view-only guard — the engine's pull-apply channel. */
+  writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta>;
 
   // ---- Content elements ----
 

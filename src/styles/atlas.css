@@ -1931,6 +1931,13 @@
   color: var(--atlas-cyan);
 }
 
+/* View-only world chip (S264, read-key link) — neutral, not cyan: the world
+   is someone else's; the eye icon on the row carries the same message. */
+.atlas-world-state-chip.view-only {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--atlas-text-muted);
+}
+
 /* "On OnlyWorlds" — account worlds not yet on disk (account mode, S260).
    Dimmed rows below the local list; opening one downloads it and it moves up. */
 .atlas-remote-worlds {
@@ -2406,6 +2413,15 @@
 
 .atlas-sync-pill[data-state="error"] .atlas-sync-pill-dot {
   background: var(--atlas-danger);
+}
+
+/* View-only world (S264): a quiet neutral pill with the eye as the signal. */
+.atlas-sync-pill[data-state="view"] .atlas-sync-pill-dot {
+  background: rgba(255, 255, 255, 0.35);
+}
+.atlas-sync-pill-eye {
+  font-size: 13px;
+  opacity: 0.8;
 }
 
 @keyframes atlas-sync-pulse {

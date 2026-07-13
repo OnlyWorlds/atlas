@@ -195,6 +195,13 @@ export interface SyncEngineOptions {
   folder: FolderStore;
   client: OwApiClient;
   policy?: ConflictPolicy;
+  /**
+   * View-only world (S264 — linked with a READ key, no PIN). The engine never
+   * pushes: every push trigger (autosave debounce, flushPendingPush, syncNow's
+   * push half, the local-wins convergence push) dies at the `pushOnce` /
+   * `requestPush` boundary, and the meta step is pull-apply only (no PATCH).
+   */
+  readOnly?: boolean;
   /** Called when a conflict is detected. */
   onConflict?: (conflict: Conflict) => void;
   /** Called whenever engine state changes (for UI). */
@@ -221,6 +228,8 @@ export class SyncEngine {
   private folder: FolderStore;
   private client: OwApiClient;
   private policy: CanonicalPolicy;
+  /** View-only engine (S264): pull-only, no push of any kind. */
+  private readOnly = false;
   private onConflict: (conflict: Conflict) => void;
   private onStateChange: (state: SyncEngineState) => void;
   private onPushProgress: (done: number, total: number) => void;
@@ -271,6 +280,7 @@ export class SyncEngine {
   constructor(opts: SyncEngineOptions) {
     this.folder = opts.folder;
     this.client = opts.client;
+    this.readOnly = !!opts.readOnly;
     this.policy = normalizePolicy(opts.policy);
     this.onConflict = opts.onConflict ?? (() => {});
     this.onStateChange = opts.onStateChange ?? (() => {});
@@ -381,6 +391,7 @@ export class SyncEngine {
    * Override the debounce window for tests via `setDebounceMs`.
    */
   requestPush(): void {
+    if (this.readOnly) return; // view-only world — nothing ever pushes (S264)
     if (this.paused) {
       console.info('[atlas:sync] push requested but engine paused — skipping');
       return;
@@ -625,7 +636,7 @@ export class SyncEngine {
       const server = await this.client.getWorldMeta();
       const value = canonicalMetaValue(kind, (server as unknown as Record<string, unknown>)[field]);
       if (this.stopped) return;
-      await this.folder.writeWorldMeta({ [field]: value });
+      await this.folder.writeWorldMeta({ [field]: value }, { fromSync: true });
       baselineValue = value;
     }
     if (this.stopped) return;
@@ -694,7 +705,7 @@ export class SyncEngine {
       }
       if (this.stopped) return empty;
       if (Object.keys(pulls).length > 0) {
-        await this.folder.writeWorldMeta(pulls);
+        await this.folder.writeWorldMeta(pulls, { fromSync: true });
       }
       if (this.stopped) return empty;
       await this.folder.updateSyncState(() => ({
@@ -722,7 +733,7 @@ export class SyncEngine {
     const pulled = Object.keys(diff.pullFields);
     if (pulled.length > 0) {
       if (this.stopped) return empty;
-      await this.folder.writeWorldMeta(diff.pullFields);
+      await this.folder.writeWorldMeta(diff.pullFields, { fromSync: true });
       for (const f of pulled) baselineNext[f] = diff.pullFields[f];
     }
 
@@ -740,7 +751,9 @@ export class SyncEngine {
     // Push local-only changes as ONE partial PATCH. Baseline advances only
     // for the fields actually sent — from the response echo (gate finding:
     // adopting the full body would swallow concurrent server-side changes).
-    const pushedNames = Object.keys(pushFields);
+    // View-only (S264): never PATCH — local meta can't legitimately diverge
+    // (the store guard blocks UI writes), so anything here stays unpushed.
+    const pushedNames = this.readOnly ? [] : Object.keys(pushFields);
     let serverUpdatedAt = server.updated_at || null;
     if (pushedNames.length > 0) {
       try {
@@ -819,6 +832,7 @@ export class SyncEngine {
    * Concurrent calls share the in-flight promise rather than racing.
    */
   syncNow(): Promise<SyncResult> {
+    if (this.readOnly) return this.pullNow(); // view-only: sync means refresh
     if (this.inFlight) return this.inFlight;
     this.inFlightKind = 'sync';
     this.inFlight = this.runSync().finally(() => {
@@ -835,6 +849,10 @@ export class SyncEngine {
    * iteration. Caller decides what to surface (toast count, retry UX).
    */
   pushOnce(): Promise<SyncResult> {
+    // View-only (S264): the push boundary. Every trigger funnels here (the
+    // debounce, flushPendingPush, resume, the local-wins convergence push) —
+    // one guard closes them all.
+    if (this.readOnly) return Promise.resolve(emptyResult());
     if (this.inFlight) return this.inFlight;
     this.inFlightKind = 'push';
     this.inFlight = this.runPushOnly().finally(() => {

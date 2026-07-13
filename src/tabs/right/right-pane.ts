@@ -340,6 +340,33 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     return;
   }
 
+  // View-only world (S264): the pill says what this world IS — read-only —
+  // rather than mapping the engine's save states (nothing ever saves up).
+  // Click still refreshes (pull-only).
+  if (entry?.api?.read_only) {
+    pill.dataset.state = 'view';
+    pill.dataset.clickable = 'true';
+    pill.title = "View-only world: you can read everything, edit nothing · click to refresh";
+    pill.innerHTML = `
+      <span class="atlas-sync-pill-dot"></span>
+      <span class="material-symbols-outlined atlas-sync-pill-eye">visibility</span>
+      <span>View only</span>
+      <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from API">refresh</span>
+    `;
+    pill.onclick = async () => {
+      try {
+        const result = await pullNowAndRefresh();
+        if (!result) { toasts.info('Engine not ready'); return; }
+        const totalPulled = result.pulled.creates + result.pulled.updates + result.pulled.deletes
+          + (result.meta_pulled?.length ?? 0);
+        if (totalPulled === 0) toasts.info('Already up to date');
+      } catch (err) {
+        toasts.error(err instanceof Error ? err.message : String(err));
+      }
+    };
+    return;
+  }
+
   // api-linked: surface engine state if available.
   const engine = state.sync.activeSync;
   const conflictCount = state.sync.activeConflictsCount;
