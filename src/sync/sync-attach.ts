@@ -418,8 +418,12 @@ function emitConflictToasts(
   // notification. Skip if the round had successes (mixed-blocked is rare and
   // the engine still went to error — keep the surfacing single).
   if (result.auth_blocked) {
+    // Revoked minted key ≠ wrong PIN (gate R4): the PIN advice would send the
+    // user to the wrong fix. Re-opening from the sidebar mints a fresh key.
     toastManager.error(
-      'Sync paused: authentication failed. Verify your PIN in settings, or unlink this world if it was deleted on the server.'
+      result.auth_reason === 'key_revoked'
+        ? 'Sync paused: this world\'s access key was revoked. Unlink it, then reopen it from the sidebar to get a new key.'
+        : 'Sync paused: authentication failed. Verify your PIN in settings, or unlink this world if it was deleted on the server.'
     );
     return;
   }

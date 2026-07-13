@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Opening a world from the account list shows a progress overlay (creating the key, downloading N of M elements) instead of a silent freeze.
+- Account mode: paste one account token (minted at onlyworlds.com → Settings → Account tokens) into Settings → Account and atlas knows your account. Your OnlyWorlds worlds appear in the sidebar under "On OnlyWorlds"; opening one downloads it into your atlas folder, with atlas creating its own access key along the way. No more hunting API keys per world.
+- Creating a new API world while signed in goes through your account: no email needed, one request, and the world lands linked. Signed out, the classic email + PIN path still works.
+- Shared worlds (where you are a collaborator, not the owner) show in the account list with a hint to link them with a key from the owner.
+- If a world's access key is revoked, sync now says exactly that and points at the fix, instead of suggesting your PIN is wrong.
+- Unlinked worlds no longer reappear in the account list as if they weren't on disk; atlas remembers the folder is already yours.
+- Fixed a long-standing race where clicking a world during a link download could corrupt the download or land you in the wrong world; downloads and world switches now queue politely.
+
 - Sync now speaks the OnlyWorlds v2 API. Making a world online uploads everything in one atomic request: worlds whose elements reference each other in loops (any real world, in practice) now come through complete on the first try.
 - Custom fields: fields named with an `atlas_`, `x_`, or `shadow_` prefix now sync, import, and export like any other data. Bring your own fields; atlas carries them.
 - Custom fields have a home in the editor: a Custom fields section at the bottom of every element shows them with clean labels, and an add field row creates new ones. Names autocomplete from fields already used in the world, values keep their type, and shared pages show the clean label too. Hover the section header or the add row for a short explanation.

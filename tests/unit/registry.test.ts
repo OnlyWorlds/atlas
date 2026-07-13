@@ -16,7 +16,9 @@ import {
   detachApi,
   findLinkedWorld,
   findWorld,
+  findWorldByServerId,
   isDescendantOf,
+  setAccountToken,
   loadRegistry,
   renameWorld,
   saveRegistry,
@@ -519,5 +521,92 @@ describe('registry — maps settings (DESIGN_MAPS.md §3.5)', () => {
     expect(settings.show_map_names_in_header).toBe(true);
     expect(settings.show_pinned_element_names_in_header).toBe(true);
     expect(settings.show_pin_map_names_in_header).toBe(false);
+  });
+});
+
+// ---- Account mode (session 260): token + former-link identity ----
+
+describe('registry — setAccountToken', () => {
+  it('sets a trimmed token + username', () => {
+    const r1 = setAccountToken(defaultRegistry(), '  ow_a_abc  ', 'titus');
+    expect(r1.account_token).toBe('ow_a_abc');
+    expect(r1.account_username).toBe('titus');
+  });
+
+  it('keeps the prior username when a later set omits one', () => {
+    const r1 = setAccountToken(defaultRegistry(), 'ow_a_1', 'titus');
+    const r2 = setAccountToken(r1, 'ow_a_2');
+    expect(r2.account_token).toBe('ow_a_2');
+    expect(r2.account_username).toBe('titus');
+  });
+
+  it('clearing (undefined) drops both token AND username', () => {
+    const r1 = setAccountToken(defaultRegistry(), 'ow_a_1', 'titus');
+    const r2 = setAccountToken(r1, undefined);
+    expect(r2.account_token).toBeUndefined();
+    expect(r2.account_username).toBeUndefined();
+  });
+
+  it('an all-whitespace token clears like undefined', () => {
+    const r1 = setAccountToken(defaultRegistry(), 'ow_a_1', 'titus');
+    const r2 = setAccountToken(r1, '   ');
+    expect(r2.account_token).toBeUndefined();
+    expect(r2.account_username).toBeUndefined();
+  });
+
+  it('round-trips through save → load (spread-survival)', () => {
+    // Seed localStorage raw so the assertion pins loadRegistry's spread, not a
+    // hand-picked field list that would silently drop the new keys.
+    localStorage.setItem('atlas_worlds_registry', JSON.stringify({
+      version: 1,
+      worlds: [],
+      account_token: 'ow_a_persisted',
+      account_username: 'titus',
+    }));
+    const loaded = loadRegistry();
+    expect(loaded.account_token).toBe('ow_a_persisted');
+    expect(loaded.account_username).toBe('titus');
+  });
+});
+
+describe('registry — former-link tracking (detach/attach + findWorldByServerId)', () => {
+  it('detachApi stamps former_api_world_id from the live api.world_id', () => {
+    const { next: r1, entry } = createApiLinkedWorld(defaultRegistry(), {
+      name: 'W', apiWorldId: 'srv-1', apiKey: 'k', folderName: 'w', handleKey: 'h',
+    });
+    const r2 = detachApi(r1, entry.id);
+    expect(r2.worlds[0].state).toBe('local-only');
+    expect(r2.worlds[0].api).toBeUndefined();
+    expect(r2.worlds[0].former_api_world_id).toBe('srv-1');
+  });
+
+  it('attachApi clears a stale former_api_world_id when re-linking', () => {
+    const { next: r1, entry } = createApiLinkedWorld(defaultRegistry(), {
+      name: 'W', apiWorldId: 'srv-1', apiKey: 'k', folderName: 'w', handleKey: 'h',
+    });
+    const r2 = detachApi(r1, entry.id);
+    expect(r2.worlds[0].former_api_world_id).toBe('srv-1');
+    const r3 = attachApi(r2, entry.id, { worldId: 'srv-2', apiKey: 'k2' });
+    expect(r3.worlds[0].state).toBe('api-linked');
+    expect(r3.worlds[0].api?.world_id).toBe('srv-2');
+    expect(r3.worlds[0].former_api_world_id).toBeUndefined();
+  });
+
+  it('findWorldByServerId matches a LIVE api.world_id', () => {
+    const { next } = createApiLinkedWorld(defaultRegistry(), {
+      name: 'W', apiWorldId: 'srv-1', apiKey: 'k', folderName: 'w', handleKey: 'h',
+    });
+    expect(findWorldByServerId(next, 'srv-1')?.name).toBe('W');
+    expect(findWorldByServerId(next, 'srv-nope')).toBeUndefined();
+  });
+
+  it('findWorldByServerId still matches after unlink via former_api_world_id', () => {
+    const { next: r1, entry } = createApiLinkedWorld(defaultRegistry(), {
+      name: 'W', apiWorldId: 'srv-1', apiKey: 'k', folderName: 'w', handleKey: 'h',
+    });
+    const r2 = detachApi(r1, entry.id);
+    // No live api block anymore, but the former-link memory keeps it findable.
+    expect(findLinkedWorld(r2, 'srv-1')).toBeUndefined();
+    expect(findWorldByServerId(r2, 'srv-1')?.id).toBe(entry.id);
   });
 });

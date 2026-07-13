@@ -28,6 +28,7 @@ import {
   setPin,
   saveRegistry,
   findLinkedWorld,
+  findWorldByServerId,
 } from '../registry/registry';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { newId } from '../store/folder-store';
@@ -527,6 +528,12 @@ export interface LinkExistingApiWorldOpts {
   displayName?: string;
   /** Per-element progress during the initial download. */
   onProgress?: (p: InitialDownloadProgress) => void;
+  /**
+   * World identity already known to the caller (account-mode open flow: the
+   * account list returned `{id, name}` moments ago). Skips the GET /world
+   * validation round-trip — one fewer post-mint failure window (gate R1b).
+   */
+  knownWorld?: { id: string; name: string };
 }
 
 export interface LinkExistingApiWorldResult {
@@ -549,16 +556,22 @@ export async function linkExistingApiWorldInRoot(
 
   // Validate creds via v2 GET /world (live 2026-07-12; replaced the v1 SDK
   // lane). OwV2Error keeps the "API Error NNN: ..." prefix these regexes read.
-  const client = buildV2Adapter(apiKey, apiPin);
+  // Skipped when the caller already holds the world identity (account-mode
+  // list → open; gate R1b — the fresh minted key needs no re-validation).
   let world: { id?: string; name?: string };
-  try {
-    world = await client.getWorld();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (/401|403/.test(msg)) throw new Error('API key or PIN invalid');
-    if (/404/.test(msg)) throw new Error('No world found for that API key');
-    if (/network|fetch/i.test(msg)) throw new Error('Could not reach onlyworlds. Check your connection');
-    throw new Error(msg);
+  if (opts.knownWorld) {
+    world = opts.knownWorld;
+  } else {
+    const client = buildV2Adapter(apiKey, apiPin);
+    try {
+      world = await client.getWorld();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/401|403/.test(msg)) throw new Error('API key or PIN invalid');
+      if (/404/.test(msg)) throw new Error('No world found for that API key');
+      if (/network|fetch/i.test(msg)) throw new Error('Could not reach onlyworlds. Check your connection');
+      throw new Error(msg);
+    }
   }
   if (!world.id) throw new Error('Server returned no world ID (unexpected)');
 
@@ -569,11 +582,20 @@ export async function linkExistingApiWorldInRoot(
   // the same api world. Multi-device is handled by separate atlas instances
   // (each with its own folder); two locals in one atlas linked to the same
   // api would cause confusing sync amplification and has no valid use case.
-  const existingLink = findLinkedWorld(getState().registry, serverWorldId);
+  // Gate R3c: match ANY entry associated with this server world — a live link
+  // OR a former one (unlinked world whose folder is still here). Re-checked
+  // here (inside the activation-chained task) so two concurrent link attempts
+  // for the same world can't both pass a stale read.
+  const existingLink = findLinkedWorld(getState().registry, serverWorldId)
+    ?? findWorldByServerId(getState().registry, serverWorldId);
   if (existingLink) {
+    const live = existingLink.state === 'api-linked';
     throw new Error(
-      `This API world is already linked to a local world ("${existingLink.name}"). ` +
-      `Open it from the sidebar, or unlink it first if you want to start fresh.`
+      live
+        ? `This API world is already linked to a local world ("${existingLink.name}"). ` +
+          `Open it from the sidebar, or unlink it first if you want to start fresh.`
+        : `This world is already here as a local folder ("${existingLink.name}") from an earlier link. ` +
+          `Open it from the sidebar; use Make Online → link to reconnect it.`
     );
   }
 
@@ -592,7 +614,20 @@ export async function linkExistingApiWorldInRoot(
   setActiveStore(null);
 
   const slug = slugify(displayName);
-  const subName = `${slug}-${serverWorldId.slice(0, 8)}`;
+  let subName = `${slug}-${serverWorldId.slice(0, 8)}`;
+
+  // Folder-collision guard (gate R3b): the deterministic name can already be
+  // taken by a leftover folder (unlink/forget keeps folders on disk). Never
+  // download into existing data — fall to a numeric suffix instead.
+  for (let n = 2; ; n++) {
+    try {
+      await rootHandle.getDirectoryHandle(subName); // probe, no create
+      subName = `${slug}-${serverWorldId.slice(0, 8)}-${n}`;
+    } catch {
+      break; // name is free
+    }
+    if (n > 20) throw new Error('Could not find a free folder name for this world');
+  }
 
   // Create the subfolder under the root.
   const worldHandle = await rootHandle.getDirectoryHandle(subName, { create: true });

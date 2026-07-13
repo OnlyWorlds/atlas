@@ -13,7 +13,7 @@
  * `data.elements` with a new array reference after every mutation.
  */
 
-import type { WorldsRegistry, WorldMeta, Element, ElementType, SyncEngineState, RightTabRef } from './types';
+import type { WorldsRegistry, WorldMeta, Element, ElementType, SyncEngineState, RightTabRef, AccountWorldRow } from './types';
 import { defaultRegistry } from './types';
 
 // Re-export so existing imports (`import { RightTabRef } from '../core/state'`)
@@ -151,6 +151,25 @@ export interface UiState {
   castAssign: { kind: 'protagonist' | 'nexus' } | null;
 }
 
+/**
+ * Account-mode world list (GET /account/worlds). Offline-first law: this
+ * slice only ever ADDS a section to the worlds sidebar — local rendering
+ * never waits on it and an error here never blocks local work.
+ */
+export interface AccountWorldsState {
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  rows: AccountWorldRow[];
+  /**
+   * The token the current fetch/rows belong to (R6): render triggers a fetch
+   * when the registry token differs — covers both Worlds-mode mount AND
+   * signing in from Settings while the sidebar is already mounted.
+   */
+  fetchedWithToken?: string;
+  error?: string;
+  /** Server world id of an open-flow currently in flight (row spinner + guard). */
+  opening: string | null;
+}
+
 export interface AppState {
   registry: WorldsRegistry;
   atlasRoot: AtlasRootRef | null;
@@ -160,6 +179,7 @@ export interface AppState {
   data: DataState;
   ui: UiState;
   sync: SyncSummaryState;
+  accountWorlds: AccountWorldsState;
   /** Toast surface state — currently unused; reserved for next bouts. */
   busy: boolean;
 }
@@ -190,6 +210,7 @@ let state: AppState = {
     activeSync: null,
     activeConflictsCount: 0,
   },
+  accountWorlds: { status: 'idle', rows: [], opening: null },
   busy: false,
 };
 

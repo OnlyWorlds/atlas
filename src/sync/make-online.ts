@@ -15,7 +15,9 @@
  * element has a `server_updated_at` baseline set on success).
  */
 
-import { OwV2ClientAdapter } from './ow-v2-client-adapter';
+import { OwV2ClientAdapter, OwV2Error } from './ow-v2-client-adapter';
+import { AccountClient, accountErrorMessage } from './account-client';
+import { getState } from '../core/state';
 import { devWorldapiBase, devV2Base } from './dev-api-base';
 import type { FolderStore } from '../store/folder-store';
 import { ALL_ELEMENT_TYPES } from '../core/types';
@@ -62,9 +64,18 @@ export interface CreateApiWorldResult {
 }
 
 /**
- * Calls the create-world-external endpoint outside the worldapi prefix.
- * Returns the new world's api_key. The server-side world_id is fetched
- * separately by the caller via `client.worlds.get()` once the api_key is known.
+ * Create a new api world. Two lanes (session 260):
+ *
+ *   - SIGNED IN (registry has an account token): `POST /api/v2/account/worlds`
+ *     with the PIN dance — try WITHOUT `pin` first (an account that already
+ *     has a PIN rejects one, even the correct value); on 422 param=pin retry
+ *     WITH the caller's PIN (fresh accounts require it, and it becomes the
+ *     account PIN). The 201 carries the world row + full WRITE key in one
+ *     round-trip. This retires the v1 path for account users.
+ *
+ *   - SIGNED OUT: the legacy v1 `create-world-external` endpoint
+ *     (name + email + pin), unchanged — the no-account path until keel
+ *     sunsets it.
  *
  * Throws on validation failure, rate limit, network error — the caller
  * surfaces these as inline error messages.
@@ -74,6 +85,25 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
   const email = opts.email.trim();
   const pin = opts.pin.trim();
   if (!name) throw new Error('Name is required');
+
+  const token = getState().registry.account_token;
+  if (token) {
+    const client = new AccountClient(token);
+    let created;
+    try {
+      created = await client.createWorld(name);
+    } catch (err) {
+      if (err instanceof OwV2Error && err.status === 422 && err.param === 'pin') {
+        // Fresh account: the PIN is required and becomes the account PIN.
+        if (!pin) throw new Error('PIN is required');
+        created = await client.createWorld(name, pin);
+      } else {
+        throw new Error(accountErrorMessage(err));
+      }
+    }
+    return { apiKey: created.key, worldId: created.id, worldName: created.name };
+  }
+
   if (!email) throw new Error('Email is required');
   if (!pin) throw new Error('PIN is required');
 

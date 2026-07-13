@@ -9,6 +9,7 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
+import { enqueueActivation, currentActivationGen } from '../core/activation-chain';
 import {
   onHashChange, parseHash, navigate, worldHash, settingsHash,
   writingHash, knowledgeHash, timelineHash, shareHash, importHash,
@@ -24,6 +25,7 @@ import { escapeText, escapeAttr } from '../core/dom-utils';
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
+import { refreshAccountWorlds, remoteAccountWorlds, openAccountWorld } from '../sync/account-worlds';
 import { rightTabHashFor } from './sidebar';
 import { ToastManager } from '../ui/toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
@@ -128,6 +130,34 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   listEl.className = 'atlas-list';
   content.appendChild(listEl);
 
+  // "On OnlyWorlds" — account worlds not yet on disk (account mode, S260).
+  // Renders only when signed in; local rows above never wait on it.
+  const remoteEl = document.createElement('div');
+  remoteEl.className = 'atlas-remote-worlds';
+  content.appendChild(remoteEl);
+
+  remoteEl.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+    const refreshBtn = target.closest<HTMLElement>('[data-role="remote-refresh"]');
+    if (refreshBtn) {
+      refreshAccountWorlds(true);
+      return;
+    }
+    const row = target.closest<HTMLElement>('[data-remote-world-id]');
+    if (!row) return;
+    const worldId = row.getAttribute('data-remote-world-id')!;
+    const remote = remoteAccountWorlds().find(r => r.id === worldId);
+    if (!remote) return;
+    if (remote.role === 'collaborator') {
+      // Minting is owner-only (server 404s) — the honest path for a shared
+      // world is a key from its owner via the existing link flow.
+      toasts.info('Shared world: ask its owner for an API key, then link it');
+      new LinkWorldModal(toasts).open();
+      return;
+    }
+    await openAccountWorld(remote, toasts);
+  });
+
   // Click delegation — separate the favorite-toggle from the row click.
   listEl.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
@@ -217,9 +247,72 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       .join('');
   }
 
-  const unsubState = subscribe(render);
-  const unsubHash = onHashChange(render);
-  render();
+  function renderRemote(): void {
+    const state = getState();
+    const token = state.registry.account_token;
+    if (!token || !state.atlasRoot) {
+      remoteEl.innerHTML = '';
+      return;
+    }
+    // R6: render-path fetch trigger — token-identity-guarded no-op when the
+    // current token's list is already fetched or in flight. Covers mount AND
+    // the sign-in-from-Settings transition without a remount.
+    refreshAccountWorlds();
+    const aw = state.accountWorlds;
+    const rows = remoteAccountWorlds();
+    if (aw.status === 'error' && rows.length === 0) {
+      remoteEl.innerHTML = `
+        <div class="atlas-remote-head">
+          <span>On OnlyWorlds</span>
+          <button type="button" class="atlas-icon-btn-sm" data-role="remote-refresh" title="Retry">
+            <span class="material-symbols-outlined">refresh</span>
+          </button>
+        </div>
+        <div class="atlas-remote-error">${escapeText(aw.error ?? 'Could not reach onlyworlds')}</div>
+      `;
+      return;
+    }
+    if (rows.length === 0) {
+      // Nothing remote-only (or still loading a first fetch) — stay quiet.
+      remoteEl.innerHTML = aw.status === 'loading'
+        ? '<div class="atlas-remote-head"><span>On OnlyWorlds</span><span class="atlas-remote-loading">…</span></div>'
+        : '';
+      return;
+    }
+    const items = rows.map(r => {
+      const opening = aw.opening === r.id;
+      const roleChip = r.role === 'collaborator'
+        ? '<span class="atlas-world-state-chip">shared</span>'
+        : '';
+      return `
+        <div class="atlas-row atlas-remote-row ${opening ? 'is-opening' : ''}" data-remote-world-id="${escapeAttr(r.id)}" role="button" tabindex="0"
+             title="${r.role === 'collaborator' ? 'Shared with you — link with a key from its owner' : 'Open: download this world into your atlas folder'}">
+          <span class="material-symbols-outlined">${opening ? 'downloading' : 'cloud'}</span>
+          <span class="atlas-row-main">${escapeText(r.name)}</span>
+          ${roleChip}
+          ${opening ? '<span class="atlas-remote-loading">opening…</span>' : ''}
+        </div>
+      `;
+    }).join('');
+    remoteEl.innerHTML = `
+      <div class="atlas-remote-head">
+        <span>On OnlyWorlds</span>
+        <button type="button" class="atlas-icon-btn-sm" data-role="remote-refresh" title="Refresh list">
+          <span class="material-symbols-outlined">refresh</span>
+        </button>
+      </div>
+      ${items}
+    `;
+  }
+
+  function renderAll(): void {
+    render();
+    renderRemote();
+  }
+
+  const unsubState = subscribe(renderAll);
+  const unsubHash = onHashChange(renderAll);
+  renderAll();
   return () => { unsubState(); unsubHash(); };
 }
 
@@ -300,17 +393,17 @@ export interface ActivateWorldOpts {
 // activation overlapping an early sidebar click, or a double-click). All
 // activations serialize through this chain; a queued request that has been
 // superseded by a newer click is skipped instead of run.
-let activationSeq = 0;
-let activationChain: Promise<unknown> = Promise.resolve();
+// Serialization moved to core/activation-chain.ts (gate R2, 2026-07-13):
+// ONE chain now covers activations AND link/download flows, so a mid-flight
+// initial download can't be closed by a world click racing beside it.
 
 export async function activateWorld(
   worldId: string,
   toasts: ToastManager,
   opts: ActivateWorldOpts = {}
 ): Promise<boolean> {
-  const gen = ++activationSeq;
-  const run = activationChain.then(async () => {
-    if (gen !== activationSeq) return false; // superseded while queued
+  return enqueueActivation(async (gen) => {
+    if (gen !== currentActivationGen()) return false; // superseded while queued
     // Watchdog: an activation that WEDGES (observed 2026-07-10 on OPFS after
     // rapid reloads — a first listElements that never resolves, suspected
     // stale OPFS write-lock held by the bfcached previous document) would
@@ -332,9 +425,6 @@ export async function activateWorld(
       if (d.loading) patchSlice('data', { ...d, loading: false });
     }
   });
-  // The chain must survive a failed activation (never reject downstream).
-  activationChain = run.then(() => undefined, () => undefined);
-  return run;
 }
 
 async function doActivateWorld(

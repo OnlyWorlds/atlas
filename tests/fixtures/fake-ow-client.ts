@@ -85,6 +85,13 @@ export class FakeOwApiClient implements OwApiClient {
    * detect via isAuthError and transition to error state.
    */
   private authBlocked = false;
+  /**
+   * Optional typed code carried by the injected 401. When set, the thrown
+   * Error is duck-typed as an OwV2Error (status 401 + code) so sync-engine's
+   * `typedError` picks up `key_revoked` and threads it into SyncResult.auth_reason.
+   * Null = the historical plain-Error 401 (message-only), unchanged.
+   */
+  private authBlockedCode: 'invalid_credentials' | 'key_revoked' | null = null;
 
   // Capture of every call for assertion.
   calls: Array<
@@ -438,13 +445,24 @@ export class FakeOwApiClient implements OwApiClient {
    * production triggers attachSyncEngine to spin up a fresh engine with new
    * creds — engine error state clears on the new instance).
    */
-  __inject_auth_failure(enabled = true): void {
+  __inject_auth_failure(
+    enabled = true,
+    code?: 'invalid_credentials' | 'key_revoked',
+  ): void {
     this.authBlocked = enabled;
+    this.authBlockedCode = enabled ? (code ?? null) : null;
   }
 
   private throwIfAuthBlocked(): void {
     if (this.authBlocked) {
-      throw new Error('API Error 401: Unauthorized');
+      const err = new Error('API Error 401: Unauthorized');
+      // With a code, mimic a real OwV2Error so typedError() classifies the
+      // bail as key_revoked (vs the message-only default that stays untyped).
+      if (this.authBlockedCode) {
+        (err as Error & { status?: number; code?: string }).status = 401;
+        (err as Error & { status?: number; code?: string }).code = this.authBlockedCode;
+      }
+      throw err;
     }
   }
 

@@ -21,6 +21,7 @@ import { ToastManager } from './toast-manager';
 import { getState } from '../core/state';
 import { navigate, homeHash } from '../core/router';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
+import { enqueueActivationTask } from '../core/activation-chain';
 import { completeWaypoint } from '../core/waypoints';
 import type { InitialDownloadProgress } from '../sync/initial-download';
 import { escapeAttr } from '../core/dom-utils';
@@ -116,12 +117,18 @@ export class LinkWorldModal extends BaseModal {
       };
 
       try {
-        const result = await linkExistingApiWorldInRoot({
-          apiKey,
-          apiPin,
-          displayName,
-          onProgress: renderProgress,
-        });
+        // On the activation chain (gate R2, 2026-07-13): a world click during
+        // this multi-second download would otherwise close the download's
+        // store mid-write, or the download's setActiveStore would clobber the
+        // just-activated world.
+        const result = await enqueueActivationTask(() =>
+          linkExistingApiWorldInRoot({
+            apiKey,
+            apiPin,
+            displayName,
+            onProgress: renderProgress,
+          })
+        );
         const failures = result.failures.length;
         if (failures > 0) {
           this.toasts.error(`Linked ${result.entry.name}, but ${failures} element${failures === 1 ? '' : 's'} failed (will retry on next sync)`);

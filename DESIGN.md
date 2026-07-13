@@ -63,7 +63,19 @@ No `api-only` mode. Every world has a folder. The folder is the truth. If you wa
 
 **Transitions**:
 - `local-only` → `api-linked`: **Make Online** flow (two routes, see Workflows).
-- `api-linked` → `local-only`: detach api credentials. Folder remains, sync stops. Reversible at any time without data loss.
+- `api-linked` → `local-only`: detach api credentials. Folder remains, sync stops. Reversible at any time without data loss. The server world id is remembered as `former_api_world_id` so the account-mode remote list knows the world is already here.
+
+## Account mode (session 260 — design + gate record: `Forge/Notes/2026-07-13-account-mode-design.md`)
+
+Atlas can hold an OnlyWorlds **account token** (`ow_a_`, minted in the portal's Tokens UI, pasted in Settings → Account). The token is a key-minting authority, never a sync credential — sync always runs on per-world keys in `world.json`, exactly as above.
+
+- **Sign-in**: paste in Settings → Account → validated via `GET /api/v2/account` (profile; username cached for display). Registry stores `account_token` + `account_username` (same trust posture as the PIN). Forget drops both; opened worlds keep their own keys.
+- **"On OnlyWorlds" sidebar section** (`worlds-sidebar.renderRemote` + `src/sync/account-worlds.ts`): account worlds not represented locally (by live `api.world_id` OR remembered `former_api_world_id`) render as dimmed rows below the local list. Owned row click = the open flow: **preconditions first** (atlas root, PIN — prompted via `PinPromptModal` and saved if absent), THEN mint a WRITE key (`POST /account/worlds/{id}/keys`; no name field yet, asked of Skeld), then the existing link pipeline (`linkExistingApiWorldInRoot` with `knownWorld` skipping re-validation) **on the activation chain**, then `navigate(home)` + the ecosystem waypoint. Collaborator rows route to the link-by-key path (minting is owner-only; server 404s). Offline-first law: the account fetch can only ever ADD a section; local rendering never waits on it.
+- **The activation chain** (`src/core/activation-chain.ts`): ONE serializer for everything that touches the shared active store — activations (supersedable) and link/download flows (never superseded). LinkWorldModal and the account open flow both ride it (gate R2; the modal raced the chain before).
+- **Create world v2**: `createApiWorld` (make-online.ts) branches — signed in → `POST /api/v2/account/worlds` with the PIN dance (omit `pin` first; a fresh account 422s param=pin → retry with the PIN, which becomes the account PIN); signed out → the v1 `create-world-external` fallback. The new-api-world modal hides the email field when signed in.
+- **Auth split** (keel, pinned 2026-07-13): account routes = `Authorization: Bearer ow_a_...`; world routes = `API-Key` (+ `API-Pin` on writes). No shared headers. A revoked world key surfaces a distinct sync toast (`SyncResult.auth_reason === 'key_revoked'`: "reopen from the sidebar", not "check your PIN").
+- **Folder-collision guard**: the link flow probes the deterministic subfolder name and falls to `-2`/`-3` suffixes rather than ever writing into an existing folder.
+- **Deferred**: world-meta sync via `PATCH /api/v2/world` (own gated bout; keel's field name is `time_range_current`) · watched worlds (`ow_r_`) · device-code sign-in.
 
 ---
 

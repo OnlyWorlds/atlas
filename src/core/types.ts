@@ -299,6 +299,13 @@ export interface SyncResult {
    * recovery (PIN change in settings → engine re-attach with fresh creds).
    */
   auth_blocked?: boolean;
+  /**
+   * Refines auth_blocked when the server's typed error distinguished the
+   * cause: a REVOKED key wants "mint a new key" guidance, not "check your
+   * PIN" (gate R4, 2026-07-13 — minted account-mode keys are revocable from
+   * the portal independently of the PIN).
+   */
+  auth_reason?: 'key_revoked';
 }
 
 export interface PerElementFailure {
@@ -354,6 +361,13 @@ export interface WorldRegistryEntry {
     /** See `WorldMeta.api.world_name` — display-only mirror of server-side name. */
     world_name?: string;
   };
+  /**
+   * Server world id this entry was PREVIOUSLY linked to (set by unlink /
+   * detachApi). Lets the account-mode remote list suppress worlds that are
+   * already here as local-only folders — without it, an unlinked world
+   * reappears "On OnlyWorlds" and re-opening it would duplicate the folder.
+   */
+  former_api_world_id?: string;
   /** Present for every world — Atlas always has a folder. */
   folder: {
     handle_key: string;
@@ -525,6 +539,18 @@ export interface ShowcaseEntry {
   atlas_cover_image_url?: string;
 }
 
+/**
+ * One world row from GET /api/v2/account/worlds (account-mode). Wire shape
+ * pinned 2026-07-13 — see Notes/2026-07-13-account-mode-design.md.
+ */
+export interface AccountWorldRow {
+  id: string;
+  name: string;
+  role: 'owner' | 'collaborator';
+  public_read: boolean;
+  keys: Array<{ last4: string; scope: 'READ' | 'WRITE'; revoked: boolean }>;
+}
+
 export interface WorldsRegistry {
   version: number;
   worlds: WorldRegistryEntry[];
@@ -532,6 +558,15 @@ export interface WorldsRegistry {
   pin?: string;
   /** Global email for OW account (used by create-world-external). */
   email?: string;
+  /**
+   * OnlyWorlds account token (`ow_a_...`), pasted from the portal Tokens UI.
+   * Grants account-scoped reads (world list) and key minting — sync itself
+   * still runs on per-world keys in world.json. Same trust posture as `pin`:
+   * a bearer credential on the user's own machine.
+   */
+  account_token?: string;
+  /** Display cache from GET /account at sign-in ("Signed in as …"). */
+  account_username?: string;
   active_world_id?: string;
   /**
    * Default container folder for newly-created local worlds.

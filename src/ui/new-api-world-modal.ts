@@ -18,7 +18,7 @@ import { createWorldInRoot } from '../setup/atlas-root-flow';
 import { createApiWorld, buildV2Adapter } from '../sync/make-online';
 import { attachSyncEngine } from '../sync/sync-attach';
 import { getActiveStore } from '../core/active-store';
-import { escapeAttr } from '../core/dom-utils';
+import { escapeAttr, escapeText } from '../core/dom-utils';
 
 export class NewApiWorldModal extends BaseModal {
   constructor(private toasts: ToastManager) {
@@ -43,10 +43,14 @@ export class NewApiWorldModal extends BaseModal {
         <span>World name</span>
         <input class="atlas-input" type="text" name="api-name" placeholder="My new world" autocomplete="off" required />
       </label>
+      ${reg.account_token ? `
+      <p class="atlas-modal-hint atlas-account-create-as">Creating on your OnlyWorlds account${reg.account_username ? ` (${escapeText(reg.account_username)})` : ''}.</p>
+      ` : `
       <label class="atlas-modal-field">
         <span>Email</span>
         <input class="atlas-input" type="email" name="api-email" placeholder="you@example.com" value="${escapeAttr(reg.email ?? '')}" autocomplete="email" required />
       </label>
+      `}
       <label class="atlas-modal-field">
         <span>PIN</span>
         <input class="atlas-input" type="text" name="api-pin" placeholder="OnlyWorlds PIN (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
@@ -60,7 +64,8 @@ export class NewApiWorldModal extends BaseModal {
     `;
 
     const nameInput = body.querySelector<HTMLInputElement>('input[name="api-name"]')!;
-    const emailInput = body.querySelector<HTMLInputElement>('input[name="api-email"]')!;
+    // Absent when signed in (the account token replaces the email lane).
+    const emailInput = body.querySelector<HTMLInputElement>('input[name="api-email"]');
     const pinInput = body.querySelector<HTMLInputElement>('input[name="api-pin"]')!;
     const errorEl = body.querySelector<HTMLElement>('[data-role="error"]')!;
     const progressEl = body.querySelector<HTMLElement>('[data-role="progress"]')!;
@@ -71,11 +76,12 @@ export class NewApiWorldModal extends BaseModal {
 
     submitBtn.addEventListener('click', async () => {
       const name = nameInput.value.trim();
-      const email = emailInput.value.trim();
+      const email = emailInput?.value.trim() ?? '';
       const pin = pinInput.value.trim();
+      const signedIn = !!getState().registry.account_token;
       errorEl.hidden = true;
       if (!name) { errorEl.textContent = 'Name is required'; errorEl.hidden = false; return; }
-      if (!email) { errorEl.textContent = 'Email is required'; errorEl.hidden = false; return; }
+      if (!signedIn && !email) { errorEl.textContent = 'Email is required'; errorEl.hidden = false; return; }
       if (!pin) { errorEl.textContent = 'PIN is required'; errorEl.hidden = false; return; }
 
       submitBtn.disabled = true;
@@ -84,14 +90,14 @@ export class NewApiWorldModal extends BaseModal {
       // user shouldn't even see the affordance.
       cancelBtn.hidden = true;
       nameInput.disabled = true;
-      emailInput.disabled = true;
+      if (emailInput) emailInput.disabled = true;
       pinInput.disabled = true;
       progressEl.hidden = false;
 
       try {
         // 1. Persist global identity fields if not already set.
         let regAfter = getState().registry;
-        if (!regAfter.email) regAfter = setEmail(regAfter, email);
+        if (!regAfter.email && email) regAfter = setEmail(regAfter, email);
         if (!regAfter.pin) regAfter = setPin(regAfter, pin);
         if (regAfter !== getState().registry) {
           saveRegistry(regAfter);
@@ -151,7 +157,7 @@ export class NewApiWorldModal extends BaseModal {
         submitBtn.disabled = false;
         cancelBtn.hidden = false;
         nameInput.disabled = false;
-        emailInput.disabled = false;
+        if (emailInput) emailInput.disabled = false;
         pinInput.disabled = false;
       }
     });

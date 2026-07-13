@@ -148,7 +148,8 @@ export function attachApi(
       if (api.worldName) apiBlock.world_name = api.worldName;
       // Making a world online also un-demos it (Bout OW class rule): the
       // world is genuinely the user's now, so gestures in it count.
-      const { demo: _clearDemo, ...rest } = w;
+      // A former-link memory is stale the moment a live link exists.
+      const { demo: _clearDemo, former_api_world_id: _clearFormer, ...rest } = w;
       return { ...rest, state: 'api-linked', api: apiBlock };
     }),
   };
@@ -178,6 +179,8 @@ export function setApiWorldName(
 /**
  * Flip an api-linked world back to local-only. Folder remains; api credentials
  * stripped from the entry. The remote api world is NOT deleted server-side.
+ * The server world id is remembered as `former_api_world_id` so the account-
+ * mode remote list can suppress a world that's already here as a folder.
  */
 export function detachApi(reg: WorldsRegistry, worldId: string): WorldsRegistry {
   return {
@@ -185,9 +188,29 @@ export function detachApi(reg: WorldsRegistry, worldId: string): WorldsRegistry 
     worlds: reg.worlds.map(w => {
       if (w.id !== worldId) return w;
       const { api, ...rest } = w;
-      return { ...rest, state: 'local-only' };
+      return {
+        ...rest,
+        state: 'local-only',
+        ...(api?.world_id ? { former_api_world_id: api.world_id } : {}),
+      };
     }),
   };
+}
+
+/**
+ * Find any registry entry associated with the given server world id — a LIVE
+ * link (`api.world_id`) or a remembered former link (`former_api_world_id`,
+ * any state). Broader than `findLinkedWorld`: used by account-mode to decide
+ * whether a remote world is "already here" and by the open flow's just-
+ * before-commit duplicate check.
+ */
+export function findWorldByServerId(
+  reg: WorldsRegistry,
+  serverWorldId: string
+): WorldRegistryEntry | undefined {
+  return reg.worlds.find(w =>
+    w.api?.world_id === serverWorldId || w.former_api_world_id === serverWorldId
+  );
 }
 
 // ---- Lookups ----
@@ -382,6 +405,24 @@ export function setPin(reg: WorldsRegistry, pin: string | undefined): WorldsRegi
 
 export function setEmail(reg: WorldsRegistry, email: string | undefined): WorldsRegistry {
   return { ...reg, email: email?.trim() || undefined };
+}
+
+/**
+ * Set (or clear) the OnlyWorlds account token + its display-name cache.
+ * Clearing ("forget") drops both; worlds already opened via minted keys keep
+ * working — their keys live in world.json, independent of the token.
+ */
+export function setAccountToken(
+  reg: WorldsRegistry,
+  token: string | undefined,
+  username?: string
+): WorldsRegistry {
+  const trimmed = token?.trim() || undefined;
+  return {
+    ...reg,
+    account_token: trimmed,
+    account_username: trimmed ? (username?.trim() || reg.account_username) : undefined,
+  };
 }
 
 // ---- Sync settings (Phase 3.5+) ----

@@ -152,7 +152,7 @@ Two fields on every Narrative:
 3. Auto-derive relation fields (see below).
 4. Single `folder.updateElement` call. Sync push fires via existing `requestPushIfLinked()` pipeline.
 
-**Coherence**: the two representations are atomically updated in the same write. If another OW tool edits `story` while atlas isn't running, atlas detects `server_updated_at` newer than the recorded local timestamp on next pull, re-parses markdown, regenerates `atlas_richtext_json`. Atlas-only features (callouts, footnotes when added) would be lost in this edge case. Acceptable tradeoff for portability.
+**Coherence**: the two representations are atomically updated in the same write. ⚠ **OUT-OF-BAND `story` EDITS ARE NOT YET RECONCILED (verified 2026-07-13, S260)**: the editor prefers `atlas_richtext_json` unconditionally when non-empty (`writing-workspace-editor.ts` initial-content rule), so a `story` edited by another tool (API pull or folder handoff) is silently shadowed by the stale sidecar and would be OVERWRITTEN by atlas's next save. The earlier text here described the intended mechanism as if built; it is not. **The story-coherence bout (banked, gate-worthy — persisted shape)**: store a `story` fingerprint alongside the sidecar; on load, fingerprint mismatch → re-parse markdown, regenerate the sidecar (atlas-only styling lost = the documented tradeoff, then actually enforced). Prerequisite for blessing `story` as the cross-tool prose contract (Skeld's Track H ask, 2026-07-13).
 
 ### TipTap stack (the library decision)
 

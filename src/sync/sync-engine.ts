@@ -296,9 +296,23 @@ export class SyncEngine {
     this.pauseReason = 'manual';
     this.setState({
       kind: 'error',
-      message: 'authentication failed. Verify pin in settings, test connection, or unlink',
+      message: this.lastAuthReason === 'key_revoked'
+        ? 'this world\'s access key was revoked. Reopen it from the sidebar, or unlink'
+        : 'authentication failed. Verify pin in settings, test connection, or unlink',
       recoverable: true,
     });
+  }
+
+  /**
+   * Cause of the most recent auth bail, when the typed error distinguished it
+   * (key_revoked vs the invalid-credentials default). Read into SyncResult's
+   * `auth_reason` and setAuthError's pill copy; reset at each bail site.
+   */
+  private lastAuthReason: 'key_revoked' | null = null;
+
+  private noteAuthBail(err: unknown): void {
+    const t = typedError(err);
+    this.lastAuthReason = t?.code === 'key_revoked' ? 'key_revoked' : null;
   }
 
   /**
@@ -632,6 +646,7 @@ export class SyncEngine {
       conflicts: pushResult.conflicts,
       failures: pushResult.failures,
       auth_blocked: pushResult.auth_blocked,
+      auth_reason: pushResult.auth_blocked ? this.lastAuthReason ?? undefined : undefined,
     };
     this.onSyncResult('push', result);
     return result;
@@ -662,6 +677,7 @@ export class SyncEngine {
       failures: pullResult.failures,
       pulled_ids: pullResult.pulled_ids,
       auth_blocked: pullResult.auth_blocked,
+      auth_reason: pullResult.auth_blocked ? this.lastAuthReason ?? undefined : undefined,
     };
     this.onSyncResult('pull', result);
     return result;
@@ -689,6 +705,7 @@ export class SyncEngine {
         conflicts: pushResult.conflicts,
         failures: pushResult.failures,
         auth_blocked: true,
+        auth_reason: this.lastAuthReason ?? undefined,
       };
       this.onSyncResult('sync', result);
       return result;
@@ -709,6 +726,7 @@ export class SyncEngine {
       failures: [...pushResult.failures, ...pullResult.failures],
       pulled_ids: pullResult.pulled_ids,
       auth_blocked: pushResult.auth_blocked || pullResult.auth_blocked,
+      auth_reason: (pushResult.auth_blocked || pullResult.auth_blocked) ? this.lastAuthReason ?? undefined : undefined,
     };
     if (pullResult.auth_blocked) {
       this.setAuthError();
@@ -918,6 +936,7 @@ export class SyncEngine {
         onItemDone();
       }
       if (auth) {
+        this.noteAuthBail(err);
         console.warn('[atlas:sync] bulk CREATE hit auth error — bailing round', { message });
       } else {
         console.warn('[atlas:sync] bulk CREATE request failed', { message });
@@ -1274,6 +1293,7 @@ export class SyncEngine {
         // engine state to `error` based on the auth_blocked flag.
         if (isAuthError(err)) {
           authBlocked = true;
+          this.noteAuthBail(err);
           failures.push({
             element_id: elem.id,
             type: elem.type,
@@ -1368,6 +1388,7 @@ export class SyncEngine {
         // Auth failure here behaves identically to the elements loop: bail.
         if (isAuthError(err)) {
           authBlocked = true;
+          this.noteAuthBail(err);
           failures.push({
             element_id: tomb.id,
             type: tomb.type,
@@ -1537,6 +1558,7 @@ export class SyncEngine {
         } catch (err) {
           if (isAuthError(err)) {
             authBlocked = true;
+            this.noteAuthBail(err);
             console.warn('[atlas:sync] changes walk hit auth error — bailing round', {
               message: err instanceof Error ? err.message : String(err),
             });
@@ -1727,6 +1749,7 @@ export class SyncEngine {
       } catch (err) {
         if (isAuthError(err)) {
           authBlocked = true;
+          this.noteAuthBail(err);
           console.warn('[atlas:sync] pull hit auth error — bailing round', {
             type, message: err instanceof Error ? err.message : String(err),
           });
