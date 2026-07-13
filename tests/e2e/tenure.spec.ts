@@ -76,7 +76,7 @@ test('tenure and life vocabulary on the chart card, with and without a now', asy
 
   // Establish the now via the real control (median of [5,12,28,38,38,48] = 33).
   await page.locator('.atlas-chart-now-set').click();
-  await expect(page.locator('.atlas-chart-now-chip')).toContainText('now · 33');
+  await expect(page.locator('.atlas-chart-now-chip')).toContainText('33'); // bare date (S263)
 
   // Ongoing tenure: held to the now. Closed tenure: recorded ends win, the now
   // is irrelevant. Character: age against the now.

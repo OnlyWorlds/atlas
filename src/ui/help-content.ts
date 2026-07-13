@@ -65,7 +65,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'click any element to focus on what it touches',
       'set the world\'s current moment and drag undated elements onto the axis',
       'focus a title or character to see its tenure or life drawn to the now',
-      'filter by type and zoom into a period',
+      'filter by type and zoom into a period (no types picked = the cast and essentials, not everything)',
       'save a chart and reload it from the gallery',
       'drop a saved chart onto a share page',
     ],

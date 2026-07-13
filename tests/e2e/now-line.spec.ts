@@ -78,7 +78,7 @@ test('Set now establishes time_current and toggles to a now chip; clear resets',
   await setBtn.click();
   const chip = page.locator('.atlas-chart-now-chip');
   await expect(chip).toBeVisible();
-  await expect(chip).toContainText('now · 10');
+  await expect(chip).toContainText('10'); // bare date — the gold chip IS the "now" (S263)
   await expect(page.locator('.atlas-chart-now-set')).toHaveCount(0);
   expect(await timeCurrent(page)).toBe(10);
 

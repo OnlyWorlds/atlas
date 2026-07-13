@@ -26,6 +26,7 @@ import { createMapDialog } from './map-create-modal';
 import { findExistingNameMatch } from './element-name-match';
 import { escapeAttr } from '../core/dom-utils';
 import { loadUiPrefs } from '../core/ui-prefs';
+import { TEMPORAL_TYPE_FIELDS } from '../visualization/timeline/temporal-fields';
 
 /**
  * Types offered in the create modal.
@@ -90,6 +91,17 @@ export interface ElementCreateOptions {
    * an ow:// chip and shouldn't navigate the user out of the room.
    */
   suppressNavigate?: boolean;
+  /**
+   * Charts-context create (S263). The chart can only show DATED elements, so
+   * a bare create silently never appears — the vanish class the drag-to-date
+   * gate killed. With this set: (a) types without a start-date field render
+   * greyed-out in the grid (visible but disabled — teaches the difference)
+   * and are excluded from category matching; (b) a Date field appears under
+   * Name, prefilled with `defaultDate` and labeled with the selected type's
+   * real start field; (c) the date is REQUIRED and merged into the create
+   * body, so the new element lands on the chart immediately.
+   */
+  temporalContext?: { defaultDate: number };
 }
 
 export class ElementCreateModal extends BaseModal {
@@ -121,11 +133,25 @@ export class ElementCreateModal extends BaseModal {
     this.selected = opts.initialType ?? loadUiPrefs().defaultCreateType;
   }
 
-  /** Types this modal instance offers — CREATE_TYPES minus opts.excludeTypes. */
+  /** Types this modal instance offers — CREATE_TYPES minus opts.excludeTypes.
+   *  Under temporalContext, dateless types stay VISIBLE in the grid (greyed)
+   *  but are not selectable — so they're excluded here, and renderTypeGrid
+   *  draws them disabled separately. */
   private effectiveTypes(): ElementType[] {
-    if (!this.opts.excludeTypes?.length) return CREATE_TYPES;
-    const excluded = new Set(this.opts.excludeTypes);
-    return CREATE_TYPES.filter(t => !excluded.has(t));
+    let types = CREATE_TYPES;
+    if (this.opts.excludeTypes?.length) {
+      const excluded = new Set(this.opts.excludeTypes);
+      types = types.filter(t => !excluded.has(t));
+    }
+    if (this.opts.temporalContext) {
+      types = types.filter(t => !!TEMPORAL_TYPE_FIELDS[t]);
+    }
+    return types;
+  }
+
+  /** The selected type's start-date field name (temporalContext only). */
+  private startFieldOf(type: ElementType): string | null {
+    return TEMPORAL_TYPE_FIELDS[type]?.start ?? null;
   }
 
   open(): void {
@@ -175,9 +201,19 @@ export class ElementCreateModal extends BaseModal {
           <input class="atlas-input" type="text" name="element-name" placeholder="Element name" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
         </label>`;
 
+    // Charts-context (S263): the Date row, prefilled; its label names the
+    // selected type's REAL start field and re-labels on type change.
+    const dateFieldHtml = this.opts.temporalContext
+      ? `<label class="atlas-modal-field" data-role="date-field">
+          <span data-role="date-label">Date</span>
+          <input class="atlas-input" type="number" name="element-date" autocomplete="off" value="${escapeAttr(String(this.opts.temporalContext.defaultDate))}" />
+        </label>`
+      : '';
+
     body.innerHTML = `
       <form data-form="create-element">
         ${nameFieldHtml}
+        ${dateFieldHtml}
         <div class="atlas-modal-field">
           <span>Type</span>
           <div class="atlas-input-ghost-wrap">
@@ -213,6 +249,7 @@ export class ElementCreateModal extends BaseModal {
     this.renderTypeGrid(grid);
     this.typeInput.value = ELEMENT_LABELS[this.selected].singular;
     this.updateGhost();
+    this.updateDateLabel(body);
 
     // Type filtering: best-match category from the typed text → highlight + ghost.
     const effective = this.effectiveTypes();
@@ -270,6 +307,21 @@ export class ElementCreateModal extends BaseModal {
         errorBox.textContent = 'Pick a category';
         errorBox.hidden = false;
         return;
+      }
+
+      // Charts-context: the date is required — an undated create can't appear
+      // on the chart, and a write that succeeds invisibly is the vanish class.
+      let temporalDate: number | null = null;
+      if (this.opts.temporalContext) {
+        const dateInput = form.querySelector<HTMLInputElement>('input[name="element-date"]')!;
+        const parsed = dateInput.value.trim() === '' ? NaN : Number(dateInput.value);
+        if (!Number.isFinite(parsed)) {
+          errorBox.textContent = 'A date is required to place it on the chart';
+          errorBox.hidden = false;
+          dateInput.focus();
+          return;
+        }
+        temporalDate = parsed;
       }
 
       // NPM Place mode — short-circuit the create path. Drop a pin at the
@@ -331,7 +383,9 @@ export class ElementCreateModal extends BaseModal {
         }
 
         const store = getActiveStore()!;
-        const el = await store.createElement(this.selected, { ...this.opts.extraData, name } as Partial<Element>);
+        const startField = this.opts.temporalContext ? this.startFieldOf(this.selected) : null;
+        const temporalData = startField && temporalDate != null ? { [startField]: temporalDate } : {};
+        const el = await store.createElement(this.selected, { ...this.opts.extraData, ...temporalData, name } as Partial<Element>);
         completeWaypoint('first-element');
         const elements = await store.listElements();
         patchSlice('data', { elements });
@@ -344,7 +398,11 @@ export class ElementCreateModal extends BaseModal {
         } else {
           patchSlice('ui', { ...getState().ui, selectedElementId: el.id });
         }
-        this.toasts.success(`Created ${this.selected}: ${el.name}`);
+        // Charts-context callers toast their own, more specific confirmation
+        // ("Created X at 60" + peek) — a second generic toast here doubles it.
+        if (!this.opts.temporalContext) {
+          this.toasts.success(`Created ${this.selected}: ${el.name}`);
+        }
         this.hide();
         this.opts.onCreated?.(el.id, this.selected);
         this.opts.afterCreate?.(el.id, this.selected);
@@ -367,9 +425,20 @@ export class ElementCreateModal extends BaseModal {
     return overlay;
   }
 
+  /** Re-label the charts-context Date row with the selected type's real
+   *  start field ("Date · grant_date") so the user learns which field this is. */
+  private updateDateLabel(scope?: HTMLElement): void {
+    if (!this.opts.temporalContext) return;
+    const root = scope ?? this.modal;
+    const label = root?.querySelector<HTMLElement>('[data-role="date-label"]');
+    const field = this.startFieldOf(this.selected);
+    if (label && field) label.textContent = `Date · ${field}`;
+  }
+
   private setType(type: ElementType): void {
     this.selected = type;
     this.typeButtons.forEach((btn, t) => btn.classList.toggle('active', t === type));
+    this.updateDateLabel();
     // Category change invalidates any accepted place-existing selection — the
     // selected element belonged to the prior category. Drop back to Create.
     if (this.placingExistingId) this.clearPlaceExisting();
@@ -486,6 +555,27 @@ export class ElementCreateModal extends BaseModal {
       this.typeButtons.set(type, btn);
       grid.appendChild(btn);
     });
+
+    // Charts-context: the dateless types stay VISIBLE but disabled — showing
+    // the difference teaches it (Captain, S263). They're created from the
+    // elements sidebar, where undated is a normal state.
+    if (this.opts.temporalContext) {
+      const excluded = new Set(this.opts.excludeTypes ?? []);
+      const dateless = CREATE_TYPES.filter(t => !excluded.has(t) && !TEMPORAL_TYPE_FIELDS[t]);
+      for (const type of dateless) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.disabled = true;
+        btn.className = 'atlas-create-type-btn atlas-create-type-btn-dateless';
+        btn.setAttribute('data-type', type);
+        btn.title = `${ELEMENT_LABELS[type].singular} has no date fields — create it from the elements sidebar`;
+        btn.innerHTML = `
+          <span class="material-symbols-outlined">${ELEMENT_ICONS[type]}</span>
+          <span>${ELEMENT_LABELS[type].singular}</span>
+        `;
+        grid.appendChild(btn);
+      }
+    }
   }
 }
 

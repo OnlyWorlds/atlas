@@ -169,13 +169,20 @@ test('timeline + event create from timeline header', async ({ page }) => {
   // The type should be pre-selected to 'event'.
   await expect(page.locator('.atlas-create-type-btn[data-type="event"].active')).toBeVisible();
 
+  // Charts-context create (S263): a required Date field rides the modal
+  // (prefilled — 0 on this dateless world) and dateless types are visible
+  // but disabled, so everything created here lands ON the chart.
+  const dateInput = page.locator('input[name="element-date"]');
+  await expect(dateInput).toBeVisible();
+  await expect(page.locator('.atlas-create-type-btn-dateless[data-type="species"]')).toBeDisabled();
+
   await page.fill('input[name="element-name"]', 'battle of pelennor');
+  await dateInput.fill('3019');
   await page.click('[data-modal="create-element"] [data-action="create"]');
   await expect(page.locator('[data-modal="create-element"]')).toHaveCount(0);
 
   // Creating from the charts room STAYS in the room (Captain, 2026-07-10) —
-  // the chart is the workspace; a toast explains the undated event isn't
-  // placeable yet.
+  // the chart is the workspace; the element arrives dated and confirmed.
   expect(await page.evaluate(() => window.location.hash)).toMatch(/\/timeline$/);
-  await expect(page.locator('.ow-toast', { hasText: 'give it a date' })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: 'Created battle of pelennor at 3019' })).toBeVisible();
 });

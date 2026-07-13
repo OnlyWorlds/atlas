@@ -17,7 +17,7 @@
 
 import type { ElementType } from '../../core/types';
 import type { LinkedRef, PlacedDot, TimelineNode } from './types';
-import { effectiveEndDate } from './temporal-fields';
+import { effectiveEndDate, TEMPORAL_TYPE_FIELDS } from './temporal-fields';
 import { calculateTicks, calculateTimeRange, createDateToX } from './axis-calculator';
 import { escapeText } from '../../core/dom-utils';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
@@ -205,6 +205,10 @@ interface ViewState {
   dateDrag: {
     id: string; type: string; name: string;
     startX: number; startY: number; active: boolean; ghost: HTMLElement | null;
+    /** What a NO-MOVE mouseup does: rail items open the element room; card
+     *  chips peek in place (S263 — chips drag to date too, but a click on a
+     *  chip has always meant "peek it"). */
+    clickAction?: 'open' | 'select';
   } | null;
   dropDate: number | null;
   onDateElement: ((id: string, date: number) => void) | null;
@@ -700,6 +704,11 @@ function draw(state: ViewState): void {
     ctx.fillRect(fx, TOP_PAD, w - fx, axisY - TOP_PAD);
   }
 
+  // World-edge markers (S263): the bounds of recorded time, legible when in
+  // view. Beyond each bound the plot dims back toward the page and a bracket
+  // tick marks the terminal — at full zoom-out both edges read immediately.
+  drawWorldEdges(ctx, state, dateToX, w, axisY);
+
   // Grid
   ctx.strokeStyle = 'rgba(255,255,255,0.03)';
   ctx.lineWidth = 1;
@@ -746,7 +755,7 @@ function draw(state: ViewState): void {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.fillText('Nothing in this world has a date yet.', w / 2, midY - 10);
       ctx.fillStyle = 'rgba(255,255,255,0.22)';
-      ctx.fillText('Add an event above, then drag it onto the line.', w / 2, midY + 10);
+      ctx.fillText('Add an event above — it lands right here with its date.', w / 2, midY + 10);
     } else {
       ctx.fillStyle = 'rgba(255,255,255,0.30)';
       ctx.fillText('Nothing dated in this view.', w / 2, midY);
@@ -1005,6 +1014,36 @@ function drawDropGuide(ctx: CanvasRenderingContext2D, state: ViewState, w: numbe
   ctx.textBaseline = 'alphabetic';
 }
 
+/**
+ * World-edge treatment (S263, revised same day on Captain's read): beyond the
+ * bounds of recorded time the plot simply DIMS back toward the page — the lit
+ * region IS recorded history, its edge IS the border. The first cut also drew
+ * bracket lines, which read as unexplained marks when the current scope shows
+ * fewer elements than the universe the bounds describe; one signal beats
+ * three. Skipped on a dateless world (no bounds to mark).
+ */
+function drawWorldEdges(
+  ctx: CanvasRenderingContext2D,
+  state: ViewState,
+  dateToX: (d: number) => number,
+  w: number,
+  axisY: number,
+): void {
+  const nav = navBounds(state);
+  if (!nav || !(state.universe.length > 0 || state.nodes.length > 0)) return;
+  const top = TOP_PAD - 4;
+  for (const side of ['min', 'max'] as const) {
+    const x = dateToX(side === 'min' ? nav.min : nav.max);
+    if (x < -1 || x > w + 1) continue;
+    const voidX = side === 'min' ? 0 : x;
+    const voidW = side === 'min' ? Math.max(0, x) : Math.max(0, w - x);
+    if (voidW > 0.5) {
+      ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      ctx.fillRect(voidX, top, voidW, axisY - top);
+    }
+  }
+}
+
 /** The now-line + its live value tag (Act 1). A soft warm glow under a crisp
  *  line; the tag shows the raw value (calendar formatting arrives in Act 2). */
 function drawNowLine(ctx: CanvasRenderingContext2D, state: ViewState, w: number, axisY: number): void {
@@ -1018,9 +1057,11 @@ function drawNowLine(ctx: CanvasRenderingContext2D, state: ViewState, w: number,
   ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, axisY); ctx.stroke();
 
-  // "now" tag riding the top of the line (clamped inside the canvas).
+  // The value tag riding the top of the line (clamped inside the canvas).
+  // Just the date — the warm-gold treatment IS the "now" (Captain, S263:
+  // saying "now" here and in the control chip doubled the word on screen).
   ctx.font = '600 10px system-ui, sans-serif';
-  const label = `now · ${Math.round(state.now)}`;
+  const label = String(Math.round(state.now));
   const tw = ctx.measureText(label).width;
   const tagW = tw + 12;
   const tagH = 15;
@@ -1062,11 +1103,27 @@ function drawStrip(ctx: CanvasRenderingContext2D, state: ViewState, w: number, h
   const top = stripTop(h);
   const midY = top + STRIP_H / 2;
 
+  // The track ENDS where recorded time ends (S263, Captain's read: "the bar
+  // went beyond the borders" — it must not). With real data the track runs
+  // exactly capMin..capMax and everything on it clamps inside; on a dateless
+  // world (synthetic range, no real bounds) it runs full width, uncapped.
+  const hasData = state.universe.length > 0 || state.nodes.length > 0;
+  const capMin = hasData ? scale.toX(scale.bounds.min) : 0;
+  const capMax = hasData ? scale.toX(scale.bounds.max) : w;
+  const clampX = (x: number): number => Math.min(capMax, Math.max(capMin, x));
+
   // Track
   ctx.fillStyle = 'rgba(255,255,255,0.025)';
-  ctx.fillRect(0, top, w, STRIP_H);
+  ctx.fillRect(capMin, top, capMax - capMin, STRIP_H);
   ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.strokeRect(0.5, top + 0.5, w - 1, STRIP_H - 1);
+  ctx.strokeRect(capMin + 0.5, top + 0.5, capMax - capMin - 1, STRIP_H - 1);
+
+  // Terminal caps — the track's own ends, marked so the border reads.
+  if (hasData) {
+    ctx.fillStyle = 'rgba(255,255,255,0.32)';
+    ctx.fillRect(capMin - 1, top + 1, 2, STRIP_H - 2);
+    ctx.fillRect(capMax - 1, top + 1, 2, STRIP_H - 2);
+  }
 
   // Density marks — every dated element in the world, faint; overlap builds
   // visible mass so the strip reads as the shape of the world's history.
@@ -1077,21 +1134,23 @@ function drawStrip(ctx: CanvasRenderingContext2D, state: ViewState, w: number, h
     ctx.fillRect(x - 0.75, midY - 4, 1.5, 8);
   }
 
-  // Ghost of the previous window, fading (S2).
+  // Ghost of the previous window, fading (S2). Clamped inside the track.
   if (state.ghost) {
     const age = performance.now() - state.ghost.bornAt;
     const alpha = Math.max(0, 0.22 * (1 - age / GHOST_MS));
     if (alpha > 0.005) {
-      const g0 = scale.toX(state.ghost.win.start);
-      const g1 = scale.toX(state.ghost.win.end);
+      const g0 = clampX(scale.toX(state.ghost.win.start));
+      const g1 = clampX(scale.toX(state.ghost.win.end));
       ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
       ctx.fillRect(g0, top + 2, Math.max(2, g1 - g0), STRIP_H - 4);
     }
   }
 
-  // The viewport band — bright, draggable, edge-resizable.
-  const b0 = scale.toX(view.start);
-  const b1 = scale.toX(view.end);
+  // The viewport band — bright, draggable, edge-resizable. CLAMPED to the
+  // track: a view that extends past the world's bounds (the fit's breathing
+  // room) pins its band at the terminal instead of overhanging the border.
+  const b0 = clampX(scale.toX(view.start));
+  const b1 = clampX(scale.toX(view.end));
   const bw = Math.max(4, b1 - b0);
   ctx.fillStyle = 'rgba(34,211,238,0.14)';
   ctx.fillRect(b0, top + 1, bw, STRIP_H - 2);
@@ -1124,8 +1183,15 @@ function stripHit(state: ViewState, mx: number, my: number, w: number, h: number
   if (my < stripTop(h)) return null;
   const scale = stripScale(state, w);
   if (!scale) return null;
-  const b0 = scale.toX(view.start);
-  const b1 = scale.toX(view.end);
+  // Same clamp as drawStrip (S263): grips are HIT where they are DRAWN — a
+  // band pinned at the track terminal must grab at the terminal, not at the
+  // off-track position of the unclamped view edge.
+  const hasData = state.universe.length > 0 || state.nodes.length > 0;
+  const capMin = hasData ? scale.toX(scale.bounds.min) : 0;
+  const capMax = hasData ? scale.toX(scale.bounds.max) : w;
+  const clampX = (x: number): number => Math.min(capMax, Math.max(capMin, x));
+  const b0 = clampX(scale.toX(view.start));
+  const b1 = clampX(scale.toX(view.end));
   if (Math.abs(mx - b0) <= STRIP_EDGE_GRAB) return { kind: 'left' };
   if (Math.abs(mx - b1) <= STRIP_EDGE_GRAB) return { kind: 'right' };
   if (mx > b0 && mx < b1) return { kind: 'band' };
@@ -1375,6 +1441,7 @@ function renderCard(state: ViewState): void {
   const icon = ELEMENT_ICONS[node.elementType as ElementType] ?? 'category';
 
   card.innerHTML = '';
+  card.classList.remove('atlas-timeline-card-blank');
   const head = document.createElement('div');
   head.className = 'atlas-timeline-card-head';
   head.innerHTML =
@@ -1387,7 +1454,26 @@ function renderCard(state: ViewState): void {
 
   const meta = document.createElement('div');
   meta.className = 'atlas-timeline-card-meta';
-  meta.textContent = `${node.elementType} · ${dateStr}`;
+  // Dateable elements: the date part of the meta line is click-to-edit
+  // (S263) — same number popover + write path as drag-to-date, so the card
+  // is the second place a date can be changed without leaving the chart.
+  if (TEMPORAL_TYPE_FIELDS[node.elementType] && state.onDateElement) {
+    const typeSpan = document.createElement('span');
+    typeSpan.textContent = `${node.elementType} · `;
+    meta.appendChild(typeSpan);
+    const dateBtn = document.createElement('button');
+    dateBtn.type = 'button';
+    dateBtn.className = 'atlas-timeline-card-date';
+    dateBtn.textContent = dateStr;
+    dateBtn.title = 'Change the date';
+    dateBtn.addEventListener('click', () => {
+      const r = dateBtn.getBoundingClientRect();
+      openDropDatePopover(state, node.id, Math.round(node.startDate), r.left + r.width / 2, r.bottom + 4);
+    });
+    meta.appendChild(dateBtn);
+  } else {
+    meta.textContent = `${node.elementType} · ${dateStr}`;
+  }
   card.appendChild(meta);
 
   // Description snippet (S7 content budget) — the one-breath answer to
@@ -1443,13 +1529,16 @@ function renderCard(state: ViewState): void {
   // inspect room. Peek (just clicking) stays free of both.
   const actions = document.createElement('div');
   actions.className = 'atlas-timeline-card-actions';
-  const focus = document.createElement('button');
-  focus.type = 'button';
-  focus.className = 'atlas-timeline-card-action';
-  focus.innerHTML = '<span class="material-symbols-outlined">filter_center_focus</span><span>Focus</span>';
-  focus.title = 'Narrow the chart to this element and its connections';
-  focus.addEventListener('click', () => state.onFocus(node.id));
-  actions.appendChild(focus);
+  // Already the chart's focus? Offering Focus again is a dead verb (S263).
+  if (state.focusId !== node.id) {
+    const focus = document.createElement('button');
+    focus.type = 'button';
+    focus.className = 'atlas-timeline-card-action';
+    focus.innerHTML = '<span class="material-symbols-outlined">filter_center_focus</span><span>Focus</span>';
+    focus.title = 'Narrow the chart to this element and its connections';
+    focus.addEventListener('click', () => state.onFocus(node.id));
+    actions.appendChild(focus);
+  }
   const edit = document.createElement('button');
   edit.type = 'button';
   edit.className = 'atlas-timeline-card-action';
@@ -1477,9 +1566,14 @@ function renderAmbientRail(state: ViewState): void {
   if (state.nodes.length === 0) {
     const undated = buildUndatedSection(state);
     if (undated) card.appendChild(undated);
+    // No backlog either (a truly empty world): keep the SPACE (peeks must
+    // never reflow the canvas) but drop the panel chrome — an empty bordered
+    // box reads as a broken widget (S263 style-up made the chrome visible).
+    card.classList.toggle('atlas-timeline-card-blank', !undated);
     card.style.display = 'flex';
     return;
   }
+  card.classList.remove('atlas-timeline-card-blank');
 
   const head = document.createElement('div');
   head.className = 'atlas-timeline-rail-head';
@@ -1613,13 +1707,19 @@ const DATE_DRAG_THRESHOLD = 4; // px before a mousedown becomes a drag (vs a cli
 /** mousedown on a rail item: arm a PENDING drag. Captures element DATA (not the
  *  DOM node — survives a mid-drag rail rebuild). Becomes a drag past the
  *  threshold, else a click (open) on mouseup. */
-function startItemDrag(state: ViewState, item: { id: string; type: string; name: string }, e: MouseEvent): void {
+function startItemDrag(
+  state: ViewState,
+  item: { id: string; type: string; name: string },
+  e: MouseEvent,
+  clickAction: 'open' | 'select' = 'open',
+): void {
   if (e.button !== 0) return;
   e.preventDefault(); // no text-selection / focus flicker while dragging
   endDateDrag(state); // clear any stale drag defensively
   state.dateDrag = {
     id: item.id, type: item.type, name: item.name,
     startX: e.clientX, startY: e.clientY, active: false, ghost: null,
+    clickAction,
   };
   state.dateDragMove = (ev: MouseEvent) => handleDateDragMove(state, ev);
   state.dateDragUp = (ev: MouseEvent) => handleDateDragUp(state, ev);
@@ -1656,8 +1756,14 @@ function handleDateDragUp(state: ViewState, e: MouseEvent): void {
   const wasActive = d.active;
   const dropDate = state.dropDate;
   const id = d.id;
+  const clickAction = d.clickAction ?? 'open';
   endDateDrag(state);
-  if (!wasActive) { state.onOpenElement(id); return; } // a click → open the element
+  if (!wasActive) {
+    // A click, not a drag: rail items open the element room; card chips peek.
+    if (clickAction === 'select') state.onSelect(id);
+    else state.onOpenElement(id);
+    return;
+  }
   if (dropDate == null) return; // released off the axis → cancel, no write
   openDropDatePopover(state, id, dropDate, e.clientX, e.clientY);
 }
@@ -1754,16 +1860,35 @@ function buildChipGroup(state: ViewState, label: string, refs: LinkedRef[]): HTM
   return group;
 }
 
+/**
+ * Card chips speak time (S263): a BORDER means "this element is dated — it
+ * lives on this chart". Undated-but-dateable chips are borderless AND
+ * draggable onto the axis (the rail's drag machinery; a plain click still
+ * peeks). Non-dateable types are just quiet references.
+ */
 function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   const chip = document.createElement('button');
   chip.type = 'button';
-  chip.className = 'atlas-timeline-chip';
-  chip.title = `${link.fieldLabel}: ${link.name} (${link.type}) · focus`;
+  const dateable = !!TEMPORAL_TYPE_FIELDS[link.type];
+  const dated = dateable && state.universe.some(n => n.id === link.id);
+  chip.className = 'atlas-timeline-chip'
+    + (dated ? ' atlas-timeline-chip-dated' : '')
+    + (dateable && !dated ? ' atlas-timeline-chip-undated' : '');
+  chip.title = dated
+    ? `${link.fieldLabel}: ${link.name} (${link.type}) · on this chart`
+    : dateable
+      ? `${link.fieldLabel}: ${link.name} (${link.type}) · undated — drag onto the chart to date it`
+      : `${link.fieldLabel}: ${link.name} (${link.type})`;
   const icon = ELEMENT_ICONS[link.type as ElementType] ?? 'category';
   chip.innerHTML =
     `<span class="material-symbols-outlined">${escapeText(icon)}</span>` +
     `<span class="atlas-timeline-chip-name">${escapeText(link.name)}</span>`;
-  chip.addEventListener('click', () => state.onSelect(link.id));
+  if (dateable && !dated && state.onDateElement) {
+    // Drag-to-date from the card; the no-move click stays a peek.
+    chip.addEventListener('mousedown', (e) => startItemDrag(state, { id: link.id, type: link.type, name: link.name }, e, 'select'));
+  } else {
+    chip.addEventListener('click', () => state.onSelect(link.id));
+  }
   return chip;
 }
 

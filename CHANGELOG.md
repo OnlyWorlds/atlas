@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Charts mark where recorded time ends, cleanly: the overview bar now ends exactly at the world's bounds (the viewport band pins inside it, never overhanging), and in the plot everything beyond the bounds dims back toward the page. The lit region is recorded history; its edge is the border.
+- Element chips on the chart card speak time: a border means the element is dated and lives on the chart; undated-but-dateable chips are borderless and can be dragged straight onto the axis to date them. A click still previews.
+- The date on the chart card is editable: click it, type, Enter. Same for elements with ranges (edits the start).
+- When the chart is already focused on an element, its card no longer offers a redundant Focus button.
+- The "Tableau: the cast and essentials" label is gone; the help overlay explains the default view instead.
+- "Set current" is now "set now time". Once set, the chart tag and the control both show just the date (the gold treatment already says it's the now), and the control keeps its exact size when toggled, so the view no longer jumps.
+- A world with nothing dated still gets its full chart: the axis, the overview bar, and Set now time all work from element zero.
+- Creating from the charts room now asks for the date up front (prefilled with the now) and only offers types that can carry one; dateless types stay visible but disabled so the difference is learnable. The new element lands on the chart immediately, selected, or says so honestly if the current view excludes it.
+- The element card in charts is a compact raised panel: content-height with a visible edge, and Focus and Edit sit right under the content instead of the bottom of a tall empty column.
 - World settings travel between devices: the description, cover image URL, time setup, and the charts now-line sync for linked worlds. Move the now on one machine and it moves everywhere. Clearing the now syncs too.
 - Linking a world that already has a description or time setup on OnlyWorlds brings those in instead of blanking them.
 - A sync round that only moved world settings says "Pulled world settings" instead of pretending nothing happened, and "Already up to date" no longer fires when settings did change.

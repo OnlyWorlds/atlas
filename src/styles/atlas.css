@@ -9711,30 +9711,48 @@ a.atlas-share-map-pin { cursor: pointer; }
   height: 100%;
 }
 
-/* The docked selection card (S7). Hidden = display:none (JS); shown = a flex
-   column that scrolls its own overflow. */
+/* The docked selection card (S7; style-up S263). Hidden = display:none (JS);
+   shown = a CONTENT-HEIGHT elevated panel, not a full-height column — the
+   old floor-to-ceiling wedge left a void between the chips and the actions
+   and its dark-on-dark edge read as the strip running behind it. Depth =
+   lighter surface + real border + shadow (border/shadow/glow move together). */
 .atlas-timeline-card {
   flex: 0 0 auto;
   flex-direction: column;
-  background: rgba(10, 14, 20, 0.94);
+  background: rgba(18, 24, 33, 0.97);
   padding: 10px 12px 12px;
   overflow: hidden;
   min-height: 0;
 }
-/* The CHIPS are the scroller — head, snippet, and the Open action stay pinned
-   (a primary action below a scroll fold is a hidden action). */
+/* The CHIPS are the scroller — content-height until the panel hits its cap,
+   then they scroll; the actions always sit directly under the content
+   (a primary action below a void is a lost action, S263). */
 .atlas-timeline-card .atlas-timeline-card-chips {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
 }
 .atlas-timeline-card .atlas-timeline-card-actions {
   flex: 0 0 auto;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .atlas-timeline-view[data-dock="right"] .atlas-timeline-card {
-  width: 264px;
-  border-left: 1px solid var(--atlas-divider);
+  width: 272px;
+  align-self: flex-start;
+  max-height: calc(100% - 16px);
+  margin: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* Truly-empty rail (blank world): keep the reserved space, drop the chrome.
+   Selector mirrors the docked rule above — it must WIN that specificity. */
+.atlas-timeline-view[data-dock="right"] .atlas-timeline-card.atlas-timeline-card-blank,
+.atlas-timeline-card.atlas-timeline-card-blank {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .atlas-timeline-card-snippet {
@@ -10013,13 +10031,44 @@ a.atlas-share-map-pin { cursor: pointer; }
   gap: 4px;
   max-width: 100%;
   padding: 3px 8px 3px 6px;
-  border: 1px solid rgba(34, 211, 238, 0.28);
+  /* S263: the BORDER is the "dated — lives on this chart" affordance; the
+     base chip is borderless (transparent keeps the box size stable). */
+  border: 1px solid transparent;
   border-radius: 999px;
   background: rgba(34, 211, 238, 0.08);
   color: rgba(255, 255, 255, 0.85);
   font-size: 11px;
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease;
+}
+
+.atlas-timeline-chip-dated {
+  border-color: rgba(34, 211, 238, 0.28);
+}
+
+/* The card meta line's editable date (S263): reads as text, edits on click. */
+.atlas-timeline-card-date {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.25);
+}
+.atlas-timeline-card-date:hover {
+  color: rgba(255, 255, 255, 0.95);
+  border-bottom-color: rgba(34, 211, 238, 0.6);
+}
+
+/* Undated but dateable: draggable onto the axis. Grab cursor + a dashed warm
+   hint on hover (matches the drop-guide's language). */
+.atlas-timeline-chip-undated {
+  cursor: grab;
+}
+.atlas-timeline-chip-undated:hover {
+  border-color: rgba(245, 180, 90, 0.45);
+  border-style: dashed;
 }
 
 .atlas-timeline-chip:hover {
@@ -10322,6 +10371,16 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: #fff;
 }
 
+/* Charts-context create (S263): dateless types stay visible but disabled —
+   the difference teaches which types can live on a chart. */
+.atlas-create-type-btn-dateless,
+.atlas-create-type-btn-dateless:hover {
+  opacity: 0.32;
+  cursor: not-allowed;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
 /* The now control (Act 1): establish / show the world's now (time_current).
    Warm gold matches the now-line seam on the canvas. Pushed to the bar's right
    end so it reads as a distinct control from the type chips. */
@@ -10335,7 +10394,10 @@ a.atlas-share-map-pin { cursor: pointer; }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 10px 3px 7px;
+  box-sizing: border-box;
+  height: 24px; /* LOCKED equal to .atlas-chart-now-chip — toggling set/unset
+                   must never resize the bar and jump the UI below (S263) */
+  padding: 0 10px 0 7px;
   border: 1px solid rgba(245, 180, 90, 0.4);
   border-radius: 999px;
   background: transparent;
@@ -10359,7 +10421,9 @@ a.atlas-share-map-pin { cursor: pointer; }
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 4px 3px 8px;
+  box-sizing: border-box;
+  height: 24px; /* LOCKED equal to .atlas-chart-now-set (S263) */
+  padding: 0 4px 0 8px;
   border: 1px solid rgba(245, 180, 90, 0.45);
   border-radius: 999px;
   background: rgba(245, 180, 90, 0.1);

@@ -48,15 +48,32 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   newEventBtn.dataset.action = 'new-event';
   newEventBtn.title = 'Create a new event';
   newEventBtn.textContent = '+ Event';
-  newEventBtn.addEventListener('click', () => new ElementCreateModal(toasts, {
-    initialType: 'event',
-    // Stay in the room (Captain, 2026-07-10): the chart is the workspace here.
-    // A fresh event is undated, so it can't appear on the axis yet — say so
-    // instead of letting it silently not-show. (Act 1's undated rail is the
-    // real home for this.)
-    suppressNavigate: true,
-    onCreated: () => toasts.info('Event created · give it a date to place it on the chart'),
-  }).open());
+  newEventBtn.addEventListener('click', () => {
+    // Charts-context create (S263): only dateable types are selectable and a
+    // required Date field rides the modal, so the new element lands ON the
+    // chart instead of silently nowhere (the vanish class). Default date =
+    // the now when set, else the median of the dated world (same default the
+    // Set-now gesture uses), else 0 on a fresh world.
+    const allNodes = extractTemporalNodes(getState().data.elements);
+    const defaultDate = nowValue() ?? suggestNow(allNodes);
+    new ElementCreateModal(toasts, {
+      initialType: 'event',
+      // Stay in the room (Captain, 2026-07-10): the chart is the workspace here.
+      suppressNavigate: true,
+      temporalContext: { defaultDate },
+      onCreated: (id) => {
+        // Same visibility guarantee as drag-to-date: peek it if in scope,
+        // honest toast if the tableau/filter excludes it. Deferred so the
+        // re-render's lastScoped is fresh.
+        queueMicrotask(() => {
+          const el = getState().data.elements.find(e => e.id === id);
+          const field = el ? TEMPORAL_TYPE_FIELDS[el.type]?.start : undefined;
+          const date = el && field ? parseTemporalValue((el as Record<string, unknown>)[field]) : null;
+          if (el && date != null) showDatedElement(id, el.name || '(unnamed)', date, 'Created');
+        });
+      },
+    }).open();
+  });
   actions.appendChild(newEventBtn);
 
   const saveBtn = document.createElement('button');
@@ -143,7 +160,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
 
   function renderControlBar(allNodes: TimelineNode[], route: Route): void {
     controlBar.innerHTML = '';
-    if (allNodes.length === 0) return;
+    // The bar renders UNCONDITIONALLY (Captain, S263): a dateless world still
+    // gets its chart — axis, strip, rail, and above all "Set now time" — so
+    // the room works from element zero instead of gating on dated content.
     const present = presentTypes(allNodes);
     const focused = !!route.elementId;
 
@@ -162,16 +181,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       controlBar.appendChild(pill);
     }
 
-    // Tableau state (all chips off): say what's showing instead of leaving an
-    // unlabeled curated view (it isn't "nothing selected", it's the default
-    // world view — cast + essentials).
-    if (!focused && typeFilter && typeFilter.size === 0) {
-      const hint = document.createElement('span');
-      hint.className = 'atlas-chart-tableau-hint';
-      hint.textContent = 'Tableau: the cast and essentials';
-      hint.title = 'With no types picked, the chart shows the world at a glance. Pick types above for the full sets.';
-      controlBar.appendChild(hint);
-    }
+    // (The "Tableau: the cast and essentials" label was REMOVED S263 —
+    // mechanism-naming jargon; the type chips carry the state and the help
+    // overlay explains the default view's selectivity.)
 
     // Type toggle chips — the broad-view filter (null = all). While focused they
     // read inactive (focus is the lens); clicking one drops focus and applies it.
@@ -205,16 +217,16 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       btn.type = 'button';
       btn.className = 'atlas-chart-now-set';
       btn.title = "Set the world's current point in time. Everything after it becomes the forward half (drag the line to move it).";
-      btn.innerHTML = `<span class="material-symbols-outlined">flag</span><span>Set current</span>`;
+      btn.innerHTML = `<span class="material-symbols-outlined">flag</span><span>set now time</span>`;
       btn.addEventListener('click', () => void setNow(suggestNow(allNodes)));
       nowWrap.appendChild(btn);
     } else {
       const chip = document.createElement('span');
       chip.className = 'atlas-chart-now-chip';
-      chip.title = 'Drag the now-line on the chart to move it';
+      chip.title = "The world's now. Drag the line on the chart to move it";
       chip.innerHTML =
         `<span class="material-symbols-outlined">schedule</span>` +
-        `<span>now · ${escapeText(String(now))}</span>` +
+        `<span>${escapeText(String(now))}</span>` +
         `<button type="button" class="atlas-chart-now-clear" title="Clear now (remove the seam)">×</button>`;
       chip.querySelector('.atlas-chart-now-clear')!
         .addEventListener('click', () => void setNow(null));
@@ -269,13 +281,14 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
    * user's view, Captain). If it fell outside the current tableau/filter, an
    * honest toast confirms the write instead of it silently vanishing (gate).
    */
-  function showDatedElement(id: string, name: string, date: number): void {
+  function showDatedElement(id: string, name: string, date: number, verb: 'Dated' | 'Created' = 'Dated'): void {
+    const phrase = verb === 'Created' ? `Created ${name} at ${date}` : `Dated ${name} to ${date}`;
     if (lastScoped.some(n => n.id === id)) {
       peekId = id;
       handle?.setSelection(id);
-      toasts.success(`Dated ${name} to ${date}`);
+      toasts.success(phrase);
     } else {
-      toasts.success(`Dated ${name} to ${date} · not in this view`);
+      toasts.success(`${phrase} · not in this view`);
     }
   }
 
