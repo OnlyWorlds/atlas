@@ -359,7 +359,16 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       requestPushIfLinked();
       draft = null;
       clearDraftStash(worldId);
-      navigate(knowledgeHash(worldId, created.id));
+      // ONLY navigate if the user is still on the draft: this function is
+      // async, and its tail used to fire navigate(created) after a quick
+      // back-click had already returned to the list — a stale navigation
+      // yanking the user into the entry (S268: the knowledge:94 "flake" was
+      // this race, reproduced 3/3 with a hash logger). The refresh stays
+      // BEFORE the navigate so the entry route never renders not-found.
+      const route = parseHash(window.location.hash);
+      if (route.mode === 'knowledge' && route.knowledgeId === NEW) {
+        navigate(knowledgeHash(worldId, created.id));
+      }
     } catch (err) {
       console.error('[knowledge-room] create failed', err);
       toasts.error('Could not create knowledge entry');

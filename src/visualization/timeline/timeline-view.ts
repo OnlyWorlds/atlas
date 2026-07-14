@@ -1211,7 +1211,7 @@ function seasonFill(frac: number): string {
   const j = (i + 1) % SEASON_STOPS.length;
   const u = t - Math.floor(t);
   const c = SEASON_STOPS[i].map((v, k) => Math.round(v + (SEASON_STOPS[j][k] - v) * u));
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, 0.10)`;
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, 0.07)`;
 }
 
 /**
@@ -1236,7 +1236,7 @@ function drawCalendarTexture(
     const x0 = Math.max(0, dateToX(band.lo));
     const x1 = Math.min(w, dateToX(band.hi));
     if (x1 <= x0) continue;
-    ctx.fillStyle = band.intercalary ? 'rgba(235, 200, 120, 0.16)' : seasonFill(band.frac);
+    ctx.fillStyle = band.intercalary ? 'rgba(235, 200, 120, 0.12)' : seasonFill(band.frac);
     ctx.fillRect(x0, TOP_PAD, x1 - x0, axisY - TOP_PAD);
   }
 

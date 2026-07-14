@@ -15,6 +15,7 @@ import { navigate, elementHash, timelineHash, parseHash, onHashChange, type Rout
 import { ToastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { mountTimelineView, type TimelineViewHandle, type TimelineViewExtras } from '../visualization/timeline/timeline-view';
+import { mountScrollView } from '../visualization/timeline/scroll-view';
 import { extractTemporalNodes } from '../visualization/timeline/data-normalizer';
 import { TEMPORAL_TYPE_FIELDS, parseTemporalValue } from '../visualization/timeline/temporal-fields';
 import { filterNodesByScope, scopeFromFocus, tableauScope } from '../visualization/timeline/chart-recipe';
@@ -114,6 +115,11 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   wrap.appendChild(viewMount);
 
   let handle: TimelineViewHandle | null = null;
+  // The render mode (2C, S13): the pannable canvas or the scrolling document.
+  // A chart property (ChartConfig.render) surfaced as a view control; the
+  // mode swap is a mount swap — both views drive the same handle surface.
+  let renderMode: '2d' | 'scroll' = '2d';
+  let mountedMode: '2d' | 'scroll' | null = null;
   let config: ChartConfig | null = null;        // set when a saved chart loads; the save/share contract
   // An APPLIED selection-scope chart (S264). The default tableau saves as a
   // `selection` scope, and applyChart used to REFUSE that kind with an info
@@ -273,6 +279,28 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       `<span>${escapeText(lens ? lens.name : 'no calendar')}</span>`;
     calChip.addEventListener('click', () => openCalendarMenu(calChip));
     controlBar.appendChild(calChip);
+
+    // The render-mode toggle (2C): canvas ⇄ document. Same scope, same lens,
+    // same saved-chart machinery — only the render surface swaps.
+    const mode = document.createElement('div');
+    mode.className = 'atlas-chart-mode';
+    const modeBtn = (m: '2d' | 'scroll', icon: string, title: string): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = renderMode === m ? 'active' : '';
+      b.dataset.action = m === 'scroll' ? 'chart-mode-scroll' : 'chart-mode-canvas';
+      b.title = title;
+      b.innerHTML = `<span class="material-symbols-outlined">${icon}</span>`;
+      b.addEventListener('click', () => {
+        if (renderMode === m) return;
+        renderMode = m;
+        render();
+      });
+      return b;
+    };
+    mode.appendChild(modeBtn('2d', 'view_timeline', 'Canvas view: pan and zoom the chart'));
+    mode.appendChild(modeBtn('scroll', 'view_agenda', 'Document view: scroll through your history'));
+    controlBar.appendChild(mode);
 
     renderMintOffer();
   }
@@ -654,7 +682,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       name: defaultChartName(scope, all),
       axis,
       scope,
-      render: '2d',
+      render: renderMode,
       // The chart remembers its lens (2B §3): reopening restores the calendar
       // it was saved under. Absent = bare numbers.
       ...(lens ? { calendarId: lens.id } : {}),
@@ -670,6 +698,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const w = worldId();
     if (!w) return;
     config = chart;
+    // Restore the chart's render mode (2C). Unknown values from a newer
+    // atlas fall back to the canvas — never a refusal.
+    renderMode = chart.render === 'scroll' ? 'scroll' : '2d';
     // Restore the chart's saved lens (2B §3). A dangling calendarId resolves
     // to bare numbers downstream; an ABSENT one means the chart was saved
     // without a calendar — also bare numbers, deliberately.
@@ -804,7 +835,31 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const route = parseHash(window.location.hash);
     renderControlBar(allNodes, route);
 
+    // A mode change remounts the view — both renderers drive the same handle
+    // surface, so everything downstream (setNodes/setSelection/reveal) holds.
+    if (handle && mountedMode !== renderMode) {
+      handle.destroy();
+      handle = null;
+    }
+    if (!handle && renderMode === 'scroll') {
+      mountedMode = 'scroll';
+      handle = mountScrollView(viewMount, {
+        onSelect: (id) => {
+          if (!id) { peekId = null; handle?.setSelection(null); return; }
+          if (lastScoped.some(n => n.id === id)) {
+            peekId = id;
+            handle?.setSelection(id);
+          } else {
+            const w = worldId();
+            if (w) navigate(timelineHash(w, id));
+          }
+        },
+        onFocus: (id) => { const w = worldId(); if (w) navigate(timelineHash(w, id)); },
+        onOpenElement: (id) => { const w = worldId(); if (w) navigate(elementHash(w, id)); },
+      });
+    }
     if (!handle) {
+      mountedMode = '2d';
       handle = mountTimelineView(viewMount, {
         // PEEK: clicking reads; it never routes... unless the clicked id (a
         // card chip can point outside the scope) has no node here — then the

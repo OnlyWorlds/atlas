@@ -72,6 +72,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'drag things into time: an undated element onto the axis, a dot to re-date it, a range\'s end cap to stretch it, the now-line to move the now',
       'focus a title or character to see its tenure or life drawn to the now',
       'filter by type and zoom from eras down to days (no types picked = the cast and essentials, not everything)',
+      'switch to the document view and scroll through your history: eras section it, skipped time is named, the now is a seam you scroll across',
       'save a chart and reload it from the gallery, or drop it onto a share page',
     ],
   },

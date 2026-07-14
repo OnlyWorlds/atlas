@@ -145,7 +145,11 @@ export interface ChartConfig {
   name: string;
   axis: ChartAxis;
   scope: ChartScope;
-  render: '2d';
+  /** How the chart draws: the pannable canvas or the scrolling document
+   *  (2C, S13). Widened additively — older readers never inspect this field
+   *  (verified: charts-store + freeze don't read it), and an unknown value
+   *  falls back to '2d' at apply time. */
+  render: '2d' | 'scroll';
   style?: ChartStyle;
   /**
    * The calendar LENS this chart was saved under (2B): a calendar Construct's

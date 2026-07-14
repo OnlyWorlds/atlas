@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The charts room gained a document view: a toggle beside the calendar chip turns the chart into a scrolling page of your history. Down is later; era names section the document; long silences read as "132 years pass" instead of empty distance; the now is a gold seam you scroll across; a corner readout tracks the date under your eye. Click a card to expand it with its links and actions. A chart saved in document view reopens in document view, and shares as the same static chart block as before.
+- The season wash settled at half its prototype strength: the lowest level where the months still read.
+- The chart view toggle holds its place at the right end of the controls instead of drifting with the type chips.
+- Creating a knowledge entry no longer pulls you back into it when you navigate away in the moment after clicking create.
+
 - Calendars arrived in the charts room: name your world's time and every date surface speaks it. Set the world clock once (what one step of time means), then build a calendar: eras, months, weeks, festival days, and how a date reads, with a live preview formatting your own dates as you type. A date like "12 Frostwane, Year 454 FT" now works everywhere a number did: axis labels, the now, cards, drag guides, and typed date entry with a quiet "resolves to" hint before you commit. Bare numbers keep working forever.
 - A calendar is a real element of your world: a Construct with its own lore fields (founder, history), so it syncs, exports, and can sit on the charts it labels. Several calendars can name the same history; switch the lens and every label changes while nothing moves.
 - The chart grid follows your calendar: ticks land on real year and month boundaries with round years ("450 KR", never a raw step number), era bands shade the chart and the overview strip under their names, months wash the background in season colors, and festival days glint gold.
