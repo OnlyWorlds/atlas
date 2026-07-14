@@ -30,9 +30,12 @@ describe('atlas-extension field split (gate 10.3)', () => {
     expect(overlap).toEqual([]);
   });
 
-  it('the WIRE list is exactly the four zone visual extension fields', () => {
+  it('the WIRE list is exactly the four zone visual fields + the calendar config', () => {
+    // atlas_calendar joined 2026-07-14 (2B): calendars sync through the
+    // element pipeline, and WIRE membership hides the field from the
+    // custom-fields editor. It is the first NESTED-OBJECT wire extension.
     expect([...ATLAS_WIRE_EXTENSION_FIELDS].sort()).toEqual(
-      ['atlas_color', 'atlas_label_visible', 'atlas_opacity', 'atlas_shape'].sort()
+      ['atlas_calendar', 'atlas_color', 'atlas_label_visible', 'atlas_opacity', 'atlas_shape'].sort()
     );
   });
 });

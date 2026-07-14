@@ -156,6 +156,15 @@ export const ATLAS_WIRE_EXTENSION_FIELDS = [
   'atlas_opacity',
   'atlas_label_visible',
   'atlas_shape',
+  // Calendar config (2B, design 2026-07-14): the machine structure of a
+  // calendar Construct (supertype 'calendar' by convention; DETECTION keys on
+  // this field's presence, never the supertype). A nested JSON object — the
+  // first non-scalar wire extension; keel passthrough round-trips it (probe
+  // owed before the sync-touching bout). WIRE (not LOCAL_ONLY) is load-bearing:
+  // calendars must travel between devices through the element pipeline, and
+  // WIRE membership also hides it from the custom-fields editor
+  // (isCustomEditableField excludes the combined list) — builder-only editing.
+  'atlas_calendar',
 ] as const;
 
 export const ATLAS_LOCAL_ONLY_FIELDS = [

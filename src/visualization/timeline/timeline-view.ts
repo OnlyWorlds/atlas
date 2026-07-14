@@ -25,6 +25,10 @@ import { rankAnchors, ANCHOR_CAP } from './degree';
 import { applyAlpha, ensureIconFont } from './canvas-utils';
 import { completeWaypoint } from '../../core/waypoints';
 import { openFieldEditPopover } from '../../ui/field-edit-popover';
+import {
+  type CalendarConfig, formatStep, formatYearLabel, formatDuration,
+  approxYearLength, parseDate, isParseError,
+} from '../../core/calendar';
 
 const DOT_RADIUS = 4;             // placement radius for binning + hit-test base
 const DOT_RADIUS_HOVER = 14;      // hit-test tolerance (px) — covers the WHOLE
@@ -124,6 +128,12 @@ export interface TimelineViewExtras {
    * (the rail falls back to "This chart"). `undefined` leaves it untouched.
    */
   chartLabel?: string | null;
+  /**
+   * The active calendar LENS (2B): every date surface speaks it — ticks, the
+   * now tag, drag guides, popovers (incl. typed calendar-word entry), the
+   * card's temporal line. null = bare numbers; `undefined` leaves it untouched.
+   */
+  calendar?: CalendarConfig | null;
 }
 
 export interface TimelineViewHandle {
@@ -210,6 +220,9 @@ interface ViewState {
   focusId: string | null;
   // The active saved chart's name (S264) — the ambient rail's heading.
   chartLabel: string | null;
+  // The active calendar lens (2B) — null = bare numbers. Every date surface
+  // formats through fmtDate/fmtTick so lens switches are pure re-labels.
+  calendar: CalendarConfig | null;
   // Glyph re-dating drag (S264): a PLACED dot is being dragged along the axis
   // to a new start date. Threshold-armed on mousedown over a dot; a no-move
   // mouseup falls through to the click progression (peek / re-click = focus).
@@ -283,6 +296,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
     undated: [], undatedExpanded: new Set(),
     focusId: null,
     chartLabel: null,
+    calendar: null,
     glyphDrag: null,
     dateDrag: null, dropDate: null, onDateElement: opts.onDateElement ?? null,
     dateDragMove: null, dateDragUp: null,
@@ -330,6 +344,7 @@ export function mountTimelineView(target: HTMLElement, opts: TimelineViewOptions
       if (extras && 'undated' in extras) state.undated = extras.undated ?? [];
       if (extras && 'focusId' in extras) state.focusId = extras.focusId ?? null;
       if (extras && 'chartLabel' in extras) state.chartLabel = extras.chartLabel ?? null;
+      if (extras && 'calendar' in extras) state.calendar = extras.calendar ?? null;
       state.layoutSig = null; // new node set → re-pack
       // Focus travel (S6): when the scope's fitted range changes while a
       // window (or prior fit) is on screen, animate to the new fit instead of
@@ -532,27 +547,50 @@ export function focusInferredEnd(
 /**
  * The card's temporal meta line, in type vocabulary (Act 2A): a title reads as
  * a tenure, a character as a life, a founded thing as founded — not a bare
- * number. Durations stay unitless (calendar formatting is Act 2B). Pure.
+ * number. With a calendar lens (2B), dates speak the calendar and durations
+ * carry units ("held 19 years") — the Act 2A unitless debt, paid. Pure.
  */
 export function temporalMetaLine(
   node: Pick<TimelineNode, 'elementType' | 'startDate' | 'endDate' | 'openEnded'>,
   now: number | null,
+  calendar?: CalendarConfig | null,
 ): string {
-  const f = (n: number): string => String(Math.round(n * 100) / 100);
+  const f = (n: number): string =>
+    calendar ? formatStep(calendar, Math.round(n)) : String(Math.round(n * 100) / 100);
+  const dur = (n: number): string =>
+    calendar ? formatDuration(calendar, Math.round(n)) : String(Math.round(n * 100) / 100);
   const { elementType, startDate, endDate } = node;
   if (elementType === 'title') {
-    if (endDate != null) return `granted ${f(startDate)} · revoked ${f(endDate)} · held ${f(endDate - startDate)}`;
+    if (endDate != null) return `granted ${f(startDate)} · revoked ${f(endDate)} · held ${dur(endDate - startDate)}`;
     const eff = effectiveEndDate(startDate, endDate, node.openEnded, now);
-    if (eff != null) return `granted ${f(startDate)} · held ${f(eff - startDate)} so far`;
+    if (eff != null) return `granted ${f(startDate)} · held ${dur(eff - startDate)} so far`;
     return `granted ${f(startDate)}`;
   }
   if (elementType === 'character' || elementType === 'creature') {
-    if (now != null && now >= startDate) return `born ${f(startDate)} · age ${f(now - startDate)}`;
+    if (now != null && now >= startDate) return `born ${f(startDate)} · age ${dur(now - startDate)}`;
     return `born ${f(startDate)}`;
   }
   if (elementType === 'institution' || elementType === 'location') return `founded ${f(startDate)}`;
   if (elementType === 'collective') return `formed ${f(startDate)}`;
   return endDate != null ? `${f(startDate)} – ${f(endDate)}` : f(startDate);
+}
+
+/** A date spoken through the active lens: full format, else the bare number. */
+function fmtDate(state: Pick<ViewState, 'calendar'>, n: number): string {
+  return state.calendar ? formatStep(state.calendar, Math.round(n)) : String(Math.round(n));
+}
+
+/**
+ * Zoom-adaptive tick label (2B §Flow 3): ticks tighter than a year speak the
+ * full date; wider ticks speak "{year} {era}". Bare numbers with no lens.
+ */
+function fmtTick(state: Pick<ViewState, 'calendar'>, tick: number, tickInterval: number): string {
+  if (!state.calendar) return String(Math.round(tick));
+  const yearLen = approxYearLength(state.calendar);
+  if (yearLen != null && yearLen > 1 && tickInterval < yearLen) {
+    return formatStep(state.calendar, Math.round(tick));
+  }
+  return formatYearLabel(state.calendar, Math.round(tick));
 }
 
 /** The y of the axis line = top of the reserved axis-labels + strip band. */
@@ -768,6 +806,7 @@ function draw(state: ViewState): void {
   // barely readable"); dates are navigation, not decoration.
   ctx.font = '11px system-ui, sans-serif';
   ctx.textAlign = 'center';
+  const tickInterval = ticks.length > 1 ? ticks[1] - ticks[0] : Infinity;
   for (const tick of ticks) {
     const x = dateToX(tick);
     ctx.beginPath();
@@ -776,7 +815,9 @@ function draw(state: ViewState): void {
     ctx.strokeStyle = 'rgba(255,255,255,0.20)';
     ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillText(String(Math.round(tick)), x, axisY + 15);
+    // Ticks speak the lens (2B): year labels wide, full dates when the ticks
+    // are tighter than a year.
+    ctx.fillText(fmtTick(state, tick, tickInterval), x, axisY + 15);
   }
 
   // Empty chart: a hint over the droppable axis (no nodes to render). The
@@ -1033,7 +1074,7 @@ function drawDropGuide(ctx: CanvasRenderingContext2D, state: ViewState, w: numbe
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.font = '600 11px system-ui, sans-serif';
-  const label = `= ${state.dropDate}`;
+  const label = `= ${fmtDate(state, state.dropDate)}`;
   const tw = ctx.measureText(label).width;
   const tagW = tw + 12;
   const tagH = 16;
@@ -1083,7 +1124,7 @@ function drawWorldEdges(
 }
 
 /** The now-line + its live value tag (Act 1). A soft warm glow under a crisp
- *  line; the tag shows the raw value (calendar formatting arrives in Act 2). */
+ *  line; the tag speaks the active lens (2B). */
 function drawNowLine(ctx: CanvasRenderingContext2D, state: ViewState, w: number, axisY: number): void {
   const x = nowLineX(state, w);
   if (x == null || state.now == null) return;
@@ -1099,7 +1140,7 @@ function drawNowLine(ctx: CanvasRenderingContext2D, state: ViewState, w: number,
   // Just the date — the warm-gold treatment IS the "now" (Captain, S263:
   // saying "now" here and in the control chip doubled the word on screen).
   ctx.font = '600 10px system-ui, sans-serif';
-  const label = String(Math.round(state.now));
+  const label = fmtDate(state, state.now);
   const tw = ctx.measureText(label).width;
   const tagW = tw + 12;
   const tagH = 15;
@@ -1487,7 +1528,7 @@ function renderCard(state: ViewState): void {
   // "jump" complaint, 2026-07-10). Nothing peeked → ambient content.
   if (!node) { renderAmbientRail(state); return; }
 
-  const dateStr = temporalMetaLine(node, state.now);
+  const dateStr = temporalMetaLine(node, state.now, state.calendar);
   const icon = ELEMENT_ICONS[node.elementType as ElementType] ?? 'category';
 
   card.innerHTML = '';
@@ -1877,15 +1918,35 @@ function openDropDatePopover(state: ViewState, id: string, dropDate: number, cx:
   const anchor = document.createElement('div');
   anchor.style.cssText = `position:fixed;left:${cx}px;top:${cy}px;width:1px;height:1px;pointer-events:none;`;
   document.body.appendChild(anchor);
+  const cal = state.calendar;
+  // With a lens active the popover accepts calendar words ("Frostwane 12,
+  // 454") AND bare numbers (always the raw step, contract rule 9); the live
+  // hint shows what the text resolves to before Enter (2B Flow 4).
+  const resolve = (raw: string): number | null => {
+    if (!cal) {
+      const n = Number(raw);
+      return Number.isFinite(n) ? Math.round(n) : null;
+    }
+    const r = parseDate(cal, raw, { now: state.now });
+    return isParseError(r) ? null : r.step;
+  };
   openFieldEditPopover({
     anchor,
     label: edge === 'end' ? 'End date' : 'Date',
-    value: String(dropDate),
-    widget: 'number',
+    value: cal ? formatStep(cal, dropDate) : String(dropDate),
+    widget: cal ? 'text-short' : 'number',
+    liveHint: cal
+      ? (raw) => {
+          if (raw.trim() === '') return null;
+          const r = parseDate(cal, raw, { now: state.now });
+          if (isParseError(r)) return `· ${r.error}`;
+          return `= ${formatStep(cal, r.step)} (step ${r.step})`;
+        }
+      : undefined,
     onSave: (v: unknown) => {
       anchor.remove();
-      const n = typeof v === 'number' ? v : Number(v);
-      if (Number.isFinite(n)) state.onDateElement?.(id, Math.round(n), edge);
+      const step = resolve(String(v));
+      if (step != null) state.onDateElement?.(id, step, edge);
     },
     onCancel: () => { anchor.remove(); },
   });

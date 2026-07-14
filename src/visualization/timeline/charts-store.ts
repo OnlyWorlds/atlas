@@ -69,19 +69,26 @@ export function rewriteChartScopeIds(
 ): { charts: ChartConfig[]; changed: boolean } {
   let changed = false;
   const next = charts.map(c => {
-    const scope = c.scope;
+    let chart = c;
+    const scope = chart.scope;
     if (scope.kind === 'focus' && scope.elementId === oldId) {
       changed = true;
-      return { ...c, scope: { kind: 'focus' as const, elementId: newId } };
-    }
-    if (scope.kind === 'selection' && scope.elementIds.includes(oldId)) {
+      chart = { ...chart, scope: { kind: 'focus' as const, elementId: newId } };
+    } else if (scope.kind === 'selection' && scope.elementIds.includes(oldId)) {
       changed = true;
-      return {
-        ...c,
+      chart = {
+        ...chart,
         scope: { kind: 'selection' as const, elementIds: scope.elementIds.map(id => (id === oldId ? newId : id)) },
       };
     }
-    return c;
+    // The lens reference is an element id too (a calendar Construct) — a
+    // Route-2 match-swap would silently strand it, and the degrade-to-bare-
+    // numbers rule would HIDE the loss (gate 2026-07-14).
+    if (chart.calendarId === oldId) {
+      changed = true;
+      chart = { ...chart, calendarId: newId };
+    }
+    return chart;
   });
   return { charts: changed ? next : charts, changed };
 }

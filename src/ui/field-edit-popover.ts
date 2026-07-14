@@ -42,6 +42,12 @@ export interface FieldEditOptions {
    * supertype editing to surface the four tier labels.
    */
   suggestions?: string[];
+  /**
+   * Optional live hint under the input, recomputed per keystroke from the raw
+   * text (2B date entry: the quiet "resolves to" line — the user sees what
+   * will be saved before committing). null/'' hides the line.
+   */
+  liveHint?: (raw: string) => string | null;
 }
 
 export function openFieldEditPopover(opts: FieldEditOptions): void {
@@ -99,6 +105,21 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
         input.value = match;
       }
     }) as EventListener);
+  }
+
+  // Live hint (optional): a quiet resolves-to line under the input, updated
+  // per keystroke (2B date entry).
+  if (opts.liveHint) {
+    const live = document.createElement('div');
+    live.className = 'atlas-edit-popover-live';
+    const update = (): void => {
+      const text = opts.liveHint!(input.value);
+      live.textContent = text ?? '';
+      live.style.display = text ? '' : 'none';
+    };
+    input.addEventListener('input', update);
+    update();
+    panel.appendChild(live);
   }
 
   // Footer (hint + actions)

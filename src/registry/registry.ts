@@ -368,6 +368,23 @@ export function setWorldFavoriteElement(
   };
 }
 
+/**
+ * The charts room's active calendar lens for a world (2B). Device-local room
+ * state; null = bare numbers. Dangling ids are resolved (to bare numbers) at
+ * read time by calendar-lens.ts, so no cleanup pass is needed here.
+ */
+export function setWorldActiveCalendar(
+  reg: WorldsRegistry,
+  worldId: string,
+  calendarId: string | null,
+): WorldsRegistry {
+  return {
+    ...reg,
+    worlds: reg.worlds.map(w =>
+      w.id === worldId ? { ...w, active_calendar_id: calendarId } : w),
+  };
+}
+
 export function updateWorldEntry(
   reg: WorldsRegistry,
   worldId: string,

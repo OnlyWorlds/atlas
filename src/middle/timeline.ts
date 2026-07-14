@@ -25,6 +25,11 @@ import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-att
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
+import { worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
+import { formatStep } from '../core/calendar';
+import { setWorldActiveCalendar, saveRegistry } from '../registry/registry';
+import { WorldClockModal } from '../ui/world-clock-modal';
+import { CalendarBuilderModal } from '../ui/calendar-builder-modal';
 
 export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -233,15 +238,34 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       const chip = document.createElement('span');
       chip.className = 'atlas-chart-now-chip';
       chip.title = "The world's now. Drag the line on the chart to move it";
+      // The now speaks the active lens (2B): "454 AE" instead of "454".
+      const lensForNow = activeLens();
+      const nowLabel = lensForNow ? formatStep(lensForNow.config, Math.round(now)) : String(now);
       chip.innerHTML =
         `<span class="material-symbols-outlined">schedule</span>` +
-        `<span>${escapeText(String(now))}</span>` +
+        `<span>${escapeText(nowLabel)}</span>` +
         `<button type="button" class="atlas-chart-now-clear" title="Clear now (remove the seam)">×</button>`;
       chip.querySelector('.atlas-chart-now-clear')!
         .addEventListener('click', () => void setNow(null));
       nowWrap.appendChild(chip);
     }
     controlBar.appendChild(nowWrap);
+
+    // The calendar chip (2B): shows the active lens; the menu switches lenses,
+    // creates (through the world clock gate), edits, or revisits the clock.
+    const lens = activeLens();
+    const calChip = document.createElement('button');
+    calChip.type = 'button';
+    calChip.className = 'atlas-cal-chip' + (lens ? ' active' : '');
+    calChip.dataset.action = 'calendar-menu';
+    calChip.title = lens
+      ? `Dates read in ${lens.name}. Click to switch or edit`
+      : 'These numbers could have names — create a calendar';
+    calChip.innerHTML =
+      `<span class="material-symbols-outlined">calendar_month</span>` +
+      `<span>${escapeText(lens ? lens.name : 'no calendar')}</span>`;
+    calChip.addEventListener('click', () => openCalendarMenu(calChip));
+    controlBar.appendChild(calChip);
   }
 
   /**
@@ -323,6 +347,153 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     }
   }
 
+  // ---- The calendar LENS (2B) ----------------------------------------------
+  // At most one calendar speaks in the room at a time; none = bare numbers.
+  // The room remembers the last lens per world (registry, device-local);
+  // saved charts carry their own (ChartConfig.calendarId). Resolution always
+  // degrades to bare numbers on dangling/malformed refs — never an error.
+
+  function registryEntry() {
+    const wid = worldId();
+    return wid ? getState().registry.worlds.find(w => w.id === wid) : undefined;
+  }
+
+  function activeLens(): WorldCalendar | null {
+    return resolveCalendarLens(getState().data.elements, registryEntry()?.active_calendar_id);
+  }
+
+  function setLens(calendarId: string | null): void {
+    const wid = worldId();
+    if (!wid) return;
+    const next = setWorldActiveCalendar(getState().registry, wid, calendarId);
+    saveRegistry(next);
+    patchSlice('registry', next); // subscribers re-render the room
+  }
+
+  /** Dates a builder preview should demonstrate: span ends, the now, a mid. */
+  function previewSamples(): number[] {
+    const allNodes = extractTemporalNodes(getState().data.elements);
+    const dates = allNodes.map(n => n.startDate).sort((a, b) => a - b);
+    const now = nowValue();
+    const set = new Set<number>();
+    if (dates.length > 0) {
+      set.add(Math.round(dates[0]));
+      set.add(Math.round(dates[Math.floor(dates.length / 2)]));
+      set.add(Math.round(dates[dates.length - 1]));
+    }
+    if (now != null) set.add(Math.round(now));
+    if (set.size === 0) { set.add(0); set.add(454); }
+    return [...set].sort((a, b) => a - b).slice(0, 4);
+  }
+
+  function clockIsSet(): boolean {
+    const meta = getState().active?.meta;
+    return typeof meta?.time_basic_unit === 'string' && meta.time_basic_unit.trim() !== '';
+  }
+
+  /** Open the world clock modal — with the api-linked baseline wait when the
+   *  unit is still unset (the seed rule would otherwise let device B blindly
+   *  overwrite the physics device A already established, gate 2026-07-14). */
+  async function openWorldClock(onSaved?: () => void): Promise<void> {
+    const entry = registryEntry();
+    if (!clockIsSet() && entry?.api && !entry.api.read_only) {
+      const store = getActiveStore();
+      const syncState = store ? await store.readSyncState() : null;
+      if (!syncState?.meta_baseline) {
+        toasts.show('world settings are still syncing — try again in a moment', 'info');
+        return;
+      }
+    }
+    new WorldClockModal(toasts, { onSaved: onSaved ?? (() => render()) }).open();
+  }
+
+  /** Open the builder. The menu greys this out until the clock is set, so the
+   *  guard here is a backstop, not the flow. */
+  function openCalendarCreate(): void {
+    if (!clockIsSet()) {
+      toasts.show('set the world clock first — one step of time needs a meaning', 'info');
+      return;
+    }
+    new CalendarBuilderModal(toasts, {
+      sampleSteps: previewSamples(),
+      onSaved: (id) => setLens(id),
+    }).open();
+  }
+
+  /** The chip's dropdown: pick a lens, revisit the clock, create, edit. */
+  function openCalendarMenu(anchor: HTMLElement): void {
+    document.querySelector('.atlas-cal-menu')?.remove(); // one at a time
+    const lens = activeLens();
+    const calendars = worldCalendars(getState().data.elements);
+    const viewOnly = !!registryEntry()?.api?.read_only;
+
+    const menu = document.createElement('div');
+    menu.className = 'atlas-cal-menu';
+    const item = (label: string, opts: { icon?: string; active?: boolean; disabled?: boolean; title?: string; action: () => void }): void => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'atlas-cal-menu-item'
+        + (opts.active ? ' active' : '')
+        + (opts.disabled ? ' disabled' : '');
+      if (opts.title) b.title = opts.title;
+      b.innerHTML =
+        (opts.icon ? `<span class="material-symbols-outlined">${escapeText(opts.icon)}</span>` : '') +
+        `<span>${escapeText(label)}</span>`;
+      b.addEventListener('click', () => {
+        if (opts.disabled) return; // stays open; the title explains
+        close();
+        opts.action();
+      });
+      menu.appendChild(b);
+    };
+
+    for (const cal of calendars) {
+      item(cal.name, { icon: 'calendar_month', active: lens?.id === cal.id, action: () => setLens(cal.id) });
+    }
+    if (calendars.length > 0) {
+      item('none (bare numbers)', { icon: 'tag', active: !lens, action: () => setLens(null) });
+    }
+    if (!viewOnly) {
+      if (lens) {
+        item(`edit ${lens.name}`, {
+          icon: 'edit',
+          action: () => new CalendarBuilderModal(toasts, {
+            elementId: lens.id,
+            sampleSteps: previewSamples(),
+            onSaved: () => render(),
+          }).open(),
+        });
+      }
+      // The clock sits ABOVE create (Captain's ruling): it is the prerequisite,
+      // and the order teaches it. Create greys out until the clock exists.
+      const clockSet = clockIsSet();
+      item(clockSet ? 'world clock' : 'world clock — set it first', {
+        icon: 'schedule',
+        action: () => void openWorldClock(),
+      });
+      item('+ new calendar', {
+        icon: 'add',
+        disabled: !clockSet,
+        title: clockSet ? undefined : 'The world clock comes first: a calendar names steps of time, so one step needs a meaning',
+        action: () => openCalendarCreate(),
+      });
+    }
+
+    const rect = anchor.getBoundingClientRect();
+    menu.style.left = `${Math.round(rect.left)}px`;
+    menu.style.top = `${Math.round(rect.bottom + 4)}px`;
+    document.body.appendChild(menu);
+    const close = (): void => {
+      menu.remove();
+      document.removeEventListener('mousedown', onOutside, true);
+    };
+    const onOutside = (e: MouseEvent): void => {
+      if (!menu.contains(e.target as Node)) close();
+    };
+    // Deferred so the opening click doesn't immediately close it.
+    setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+  }
+
   /** The world's cast favorites (protagonist/nexus ids) from the registry. */
   function castIds(): string[] {
     const wid = worldId();
@@ -360,6 +531,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const all = getState().data.elements;
     const scope = currentScope();
     const axis = config?.axis ?? { kind: 'time' as const, direction: 'both' as const };
+    const lens = activeLens();
     const chart: ChartConfig = {
       schema_version: 1,
       id: crypto.randomUUID(),
@@ -367,6 +539,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       axis,
       scope,
       render: '2d',
+      // The chart remembers its lens (2B §3): reopening restores the calendar
+      // it was saved under. Absent = bare numbers.
+      ...(lens ? { calendarId: lens.id } : {}),
     };
     savedCharts = upsertChart(savedCharts, chart);
     await store.writeCharts(savedCharts);
@@ -379,6 +554,10 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const w = worldId();
     if (!w) return;
     config = chart;
+    // Restore the chart's saved lens (2B §3). A dangling calendarId resolves
+    // to bare numbers downstream; an ABSENT one means the chart was saved
+    // without a calendar — also bare numbers, deliberately.
+    setLens(chart.calendarId ?? null);
     const route = parseHash(window.location.hash);
     const scope = chart.scope;
     appliedSelection = null;
@@ -553,6 +732,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       undated: undatedElements(),
       // The chart's subject (Act 2A): the URL focus draws emphasized.
       focusId: route.mode === 'timeline' ? (route.elementId ?? null) : null,
+      // The active calendar lens (2B): the view formats every date through it.
+      calendar: activeLens()?.config ?? null,
     };
     // allNodes rides along as the overview strip's constant reference frame
     // (the full world's history stays visible however narrow the scope, S2).

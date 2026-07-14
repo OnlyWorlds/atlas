@@ -90,7 +90,9 @@ test('renaming a chart renames the rail heading with it', async ({ page }) => {
   await page.click('[data-action="save-chart"]');
   const chip = page.locator('.atlas-saved-chart');
   // Freshly saved from the live view → immediately active → the rail names it.
-  await expect(page.locator('.atlas-timeline-rail-head')).toHaveText('Alpha & Beta');
+  // Member ORDER varies on local_updated_at timestamp ties (the S265 lesson —
+  // this assertion missed that sweep and flaked under 4-worker load).
+  await expect(page.locator('.atlas-timeline-rail-head')).toHaveText(/^(Alpha & Beta|Beta & Alpha)$/);
 
   await chip.hover();
   await chip.locator('.atlas-saved-chart-action').first().click(); // rename

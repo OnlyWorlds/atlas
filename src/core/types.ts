@@ -431,6 +431,14 @@ export interface WorldRegistryEntry {
     nexus_id?: string | null;
   };
   /**
+   * The charts room's last active calendar LENS for this world (2B): the id of
+   * a calendar Construct, or null/absent = bare numbers. Device-local room
+   * state (like camera persist) — saved charts carry their own calendarId in
+   * ChartConfig; there is deliberately NO "world default calendar" concept.
+   * A dangling id degrades to bare numbers at resolution, never an error.
+   */
+  active_calendar_id?: string | null;
+  /**
    * Home-tour cards this world has dismissed (S264) — ids like `create-event`
    * / `cta-object`. Absent = nothing dismissed. The tour itself is computed
    * from element counts; only dismissals persist.

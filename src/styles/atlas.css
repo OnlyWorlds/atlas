@@ -12436,3 +12436,307 @@ body.atlas-share-fullpreview > * {
   color: var(--atlas-cyan);
   background: rgba(255, 255, 255, 0.04);
 }
+
+/* ============================================================
+   Calendars (2B) — the lens chip + menu, the world clock modal,
+   and the calendar builder. New class families (locator contract:
+   never reuse another component's classes on interactive surfaces).
+   ============================================================ */
+
+.atlas-cal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-sizing: border-box;
+  height: 24px; /* matches the now control row (S263 no-jump lock) */
+  padding: 0 10px 0 7px;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.atlas-cal-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.atlas-cal-chip.active {
+  border-color: rgba(34, 211, 238, 0.45);
+  color: rgba(34, 211, 238, 0.9);
+}
+
+.atlas-cal-chip .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.atlas-cal-menu {
+  position: fixed;
+  z-index: 1200;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 8px;
+  background: rgba(12, 14, 18, 0.97);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+}
+
+.atlas-cal-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.atlas-cal-menu-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.atlas-cal-menu-item.active {
+  color: rgba(34, 211, 238, 0.92);
+}
+
+.atlas-cal-menu-item .material-symbols-outlined {
+  font-size: 15px;
+  opacity: 0.7;
+}
+
+/* ---- World clock modal ---- */
+
+.atlas-worldclock-panel {
+  width: min(440px, 92vw);
+}
+
+.atlas-worldclock-hint {
+  margin: 6px 0 14px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.atlas-worldclock-opt {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: none;
+  margin-left: 6px;
+}
+
+.atlas-worldclock-row {
+  margin-top: 10px;
+}
+
+.atlas-worldclock-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-worldclock-range-inputs span {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* ---- Calendar builder ---- */
+
+.atlas-calbuilder-panel {
+  width: min(760px, 94vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.atlas-calbuilder-panel .atlas-modal-body {
+  overflow-y: auto;
+}
+
+.atlas-calbuilder-form .atlas-modal-input {
+  box-sizing: border-box; /* the content-box overflow class (S265) */
+}
+
+.atlas-calbuilder-opt {
+  font-weight: normal;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-left: 7px;
+}
+
+.atlas-calbuilder-section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--atlas-divider);
+}
+
+.atlas-calbuilder-section-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 8px;
+}
+
+.atlas-calbuilder-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.atlas-calbuilder-row .atlas-modal-input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.atlas-calbuilder-row .atlas-calbuilder-narrow {
+  flex: 0 0 76px;
+}
+
+.atlas-calbuilder-row .atlas-calbuilder-mid {
+  flex: 0 0 118px;
+}
+
+.atlas-calbuilder-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.atlas-calbuilder-remove {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.atlas-calbuilder-remove:hover {
+  color: rgba(255, 120, 120, 0.9);
+}
+
+.atlas-calbuilder-add {
+  font-size: 11.5px;
+  padding: 3px 10px;
+}
+
+.atlas-calbuilder-week {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.atlas-calbuilder-week .atlas-calbuilder-week-len {
+  flex: 0 0 76px;
+}
+
+.atlas-calbuilder-week .atlas-calbuilder-week-mode {
+  flex: 0 0 150px;
+}
+
+.atlas-calbuilder-hint {
+  margin: 5px 0 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.atlas-calbuilder-preview {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-radius: 8px;
+  background: rgba(34, 211, 238, 0.04);
+}
+
+.atlas-calbuilder-preview-head {
+  font-size: 11px;
+  color: rgba(34, 211, 238, 0.65);
+  margin-bottom: 7px;
+}
+
+.atlas-calbuilder-preview-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.atlas-calbuilder-preview-step {
+  flex: 0 0 64px;
+  text-align: right;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-calbuilder-preview-date {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.atlas-calbuilder-errors {
+  margin-top: 8px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: rgba(245, 180, 90, 0.85);
+}
+
+/* The popover's live resolves-to line (2B date entry). */
+.atlas-edit-popover-live {
+  margin-top: 5px;
+  font-size: 11px;
+  color: rgba(34, 211, 238, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+
+/* World clock modal layout fix (Captain's screenshot 2026-07-14: the question
+   and its input were crammed on one line, placeholder truncated). Labels are
+   block; inputs take the full row. */
+.atlas-worldclock-form .atlas-modal-label {
+  display: block;
+  margin: 0 0 6px;
+}
+
+.atlas-worldclock-form .atlas-modal-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.atlas-worldclock-row {
+  margin-top: 16px;
+}
+
+.atlas-worldclock-row .atlas-modal-input {
+  width: 220px;
+}
+
+.atlas-worldclock-range-inputs .atlas-modal-input {
+  width: 130px;
+}
+
+/* Disabled menu entry: visible, explained by its title, not clickable. */
+.atlas-cal-menu-item.disabled {
+  color: rgba(255, 255, 255, 0.28);
+  cursor: default;
+}
+
+.atlas-cal-menu-item.disabled:hover {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.28);
+}

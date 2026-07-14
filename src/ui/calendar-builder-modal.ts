@@ -1,0 +1,437 @@
+/**
+ * Calendar builder modal — create or edit a calendar (2B design §Flow 2 + §5).
+ *
+ * A calendar is a Construct (supertype 'calendar' by convention) whose machine
+ * structure lives in the `atlas_calendar` field. The builder is the ONLY edit
+ * surface for that field (it is machinery — hidden from the custom-fields
+ * editor); the construct's lore fields (description, founder, custodian…) are
+ * edited in the element room like any element.
+ *
+ * Every section below "name" is optional: a minimal calendar (step word +
+ * eras + format) must feel complete, not truncated. The live preview panel
+ * formats real sample steps through the draft on every input — the instant
+ * loop is the point. Validation errors render loudly in the same panel;
+ * saving is blocked while any exist.
+ *
+ * The world grain rule (contract rule 10): a year-grain world's builder never
+ * offers months/weeks/intercalary — a calendar cannot invent finer resolution
+ * than the dates carry.
+ */
+
+import { BaseModal } from './modal-base';
+import { ToastManager } from './toast-manager';
+import { getState } from '../core/state';
+import { getActiveStore } from '../core/active-store';
+import { refreshElementsAfterWrite } from '../sync/sync-attach';
+import { escapeText } from '../core/dom-utils';
+import {
+  type CalendarConfig, type CalendarEra, type CalendarIntercalary,
+  validateCalendarConfig, formatStep,
+} from '../core/calendar';
+import { CALENDAR_SUPERTYPE } from '../core/calendar-lens';
+
+export interface CalendarBuilderOpts {
+  /** Present = edit this calendar element; absent = create a new one. */
+  elementId?: string;
+  /** Sample steps for the live preview (the room passes min/mid/now/max). */
+  sampleSteps: number[];
+  /** Called with the element id after create/save (the room activates the lens). */
+  onSaved?: (elementId: string) => void;
+}
+
+interface EraDraft {
+  name: string; abbrev: string; start: string; end: string;
+  numbering: 'from-1' | 'from-0' | 'continuous';
+  direction: 'up' | 'down';
+  closed: boolean;
+}
+
+interface MonthDraft { name: string; length: string; }
+interface InterDraft { name: string; after: string; everyYears: string; inWeek: boolean; }
+
+interface Draft {
+  name: string;
+  stepName: string;
+  eras: EraDraft[];
+  months: MonthDraft[];
+  weekLength: string;
+  weekNames: string;
+  weekMode: 'free' | 'nested';
+  intercalary: InterDraft[];
+  format: string;
+  formatIntercalary: string;
+}
+
+export class CalendarBuilderModal extends BaseModal {
+  private draft: Draft;
+  private grain: string;
+
+  constructor(private toasts: ToastManager, private opts: CalendarBuilderOpts) {
+    super();
+    this.grain = String(getState().active?.meta?.time_basic_unit ?? 'step');
+    this.draft = this.loadDraft();
+  }
+
+  private loadDraft(): Draft {
+    const empty: Draft = {
+      name: '', stepName: this.grain,
+      eras: [], months: [],
+      weekLength: '', weekNames: '', weekMode: 'free',
+      intercalary: [],
+      format: '', formatIntercalary: '',
+    };
+    if (!this.opts.elementId) return empty;
+    const el = getState().data.elements.find(e => e.id === this.opts.elementId);
+    if (!el) return empty;
+    const raw = (el as Record<string, unknown>)['atlas_calendar'];
+    const cfg = (typeof raw === 'object' && raw !== null ? raw : null) as CalendarConfig | null;
+    if (!cfg) return { ...empty, name: el.name };
+    return {
+      name: el.name,
+      stepName: cfg.step_name ?? cfg.grain,
+      eras: (cfg.eras ?? []).map(e => ({
+        name: e.name, abbrev: e.abbrev ?? '',
+        start: String(e.start), end: e.end != null ? String(e.end) : '',
+        numbering: e.restart === false ? 'continuous' : (e.year_base === 0 ? 'from-0' : 'from-1'),
+        direction: e.direction ?? 'up',
+        closed: !!e.closed,
+      })),
+      months: (cfg.bundles?.months?.names ?? []).map((n, i) => ({
+        name: n, length: String(cfg.bundles!.months!.lengths[i] ?? ''),
+      })),
+      weekLength: cfg.bundles?.week ? String(cfg.bundles.week.length) : '',
+      weekNames: cfg.bundles?.week?.names.join(', ') ?? '',
+      weekMode: cfg.bundles?.week?.mode ?? 'free',
+      intercalary: (cfg.intercalary ?? []).map(ic => ({
+        name: ic.name, after: String(ic.after_month),
+        everyYears: ic.every_years != null ? String(ic.every_years) : '',
+        inWeek: ic.in_week !== false,
+      })),
+      format: cfg.format ?? '',
+      formatIntercalary: cfg.format_intercalary ?? '',
+    };
+  }
+
+  /** The draft as a CalendarConfig (or the reason it isn't one yet). */
+  private buildConfig(): { config: CalendarConfig; errors: string[] } {
+    const d = this.draft;
+    const num = (s: string): number => Number(s.trim());
+    const config: CalendarConfig = { version: 1, grain: this.grain };
+    if (d.stepName.trim() && d.stepName.trim() !== this.grain) config.step_name = d.stepName.trim();
+
+    const eras: CalendarEra[] = [];
+    for (const e of d.eras) {
+      if (!e.name.trim() && !e.start.trim()) continue; // blank row
+      const era: CalendarEra = { name: e.name.trim(), start: num(e.start) };
+      if (e.abbrev.trim()) era.abbrev = e.abbrev.trim();
+      if (e.end.trim()) era.end = num(e.end);
+      if (e.numbering === 'continuous') era.restart = false;
+      else if (e.numbering === 'from-0') era.year_base = 0;
+      if (e.direction === 'down') era.direction = 'down';
+      if (e.closed) era.closed = true;
+      eras.push(era);
+    }
+    if (eras.length > 0) config.eras = eras;
+
+    if (!this.yearGrain()) {
+      const months = d.months.filter(m => m.name.trim() || m.length.trim());
+      if (months.length > 0) {
+        config.bundles = {
+          months: {
+            names: months.map(m => m.name.trim()),
+            lengths: months.map(m => num(m.length)),
+          },
+        };
+      }
+      if (d.weekLength.trim()) {
+        const names = d.weekNames.split(',').map(s => s.trim()).filter(Boolean);
+        config.bundles = {
+          ...config.bundles,
+          week: { length: num(d.weekLength), names, mode: d.weekMode },
+        };
+      }
+      const inter = d.intercalary.filter(ic => ic.name.trim());
+      if (inter.length > 0) {
+        config.intercalary = inter.map(ic => {
+          const entry: CalendarIntercalary = { name: ic.name.trim(), after_month: num(ic.after || '0') };
+          if (ic.everyYears.trim()) entry.every_years = num(ic.everyYears);
+          if (!ic.inWeek) entry.in_week = false;
+          return entry;
+        });
+      }
+    }
+
+    if (d.format.trim()) config.format = d.format.trim();
+    if (d.formatIntercalary.trim()) config.format_intercalary = d.formatIntercalary.trim();
+
+    const errors = validateCalendarConfig(config);
+    if (!this.draft.name.trim()) errors.unshift('the calendar needs a name');
+    return { config, errors };
+  }
+
+  private yearGrain(): boolean {
+    return this.grain.trim().toLowerCase() === 'year';
+  }
+
+  open(): void {
+    const { overlay, body } = this.buildModalShell({
+      title: this.opts.elementId ? 'edit calendar' : 'create a calendar',
+      dataModal: 'calendar-builder',
+      panelClass: 'atlas-calbuilder-panel',
+    });
+
+    body.innerHTML = `
+      <div class="atlas-calbuilder">
+        <div class="atlas-calbuilder-form">
+          <label class="atlas-modal-label" for="cb-name">Name</label>
+          <input id="cb-name" data-field="name" type="text" class="atlas-modal-input"
+                 placeholder="The Imperial Reckoning" value="${escapeText(this.draft.name)}" />
+
+          <label class="atlas-modal-label" for="cb-step">What one ${escapeText(this.grain)} is called here <span class="atlas-calbuilder-opt">optional</span></label>
+          <input id="cb-step" data-field="stepName" type="text" class="atlas-modal-input"
+                 placeholder="${escapeText(this.grain)}" value="${escapeText(this.draft.stepName)}" />
+
+          <div class="atlas-calbuilder-section" data-section="eras">
+            <div class="atlas-calbuilder-section-head">Eras <span class="atlas-calbuilder-opt">named stretches with their own counting</span></div>
+            <div class="atlas-calbuilder-rows" data-rows="eras"></div>
+            <button type="button" class="atlas-btn-ghost atlas-calbuilder-add" data-add="era">+ era</button>
+          </div>
+
+          ${this.yearGrain() ? '' : `
+          <div class="atlas-calbuilder-section" data-section="months">
+            <div class="atlas-calbuilder-section-head">Months <span class="atlas-calbuilder-opt">group ${escapeText(this.grain)}s into a year</span></div>
+            <div class="atlas-calbuilder-rows" data-rows="months"></div>
+            <button type="button" class="atlas-btn-ghost atlas-calbuilder-add" data-add="month">+ month</button>
+          </div>
+
+          <div class="atlas-calbuilder-section" data-section="week">
+            <div class="atlas-calbuilder-section-head">Week <span class="atlas-calbuilder-opt">a repeating cycle of named days</span></div>
+            <div class="atlas-calbuilder-week">
+              <input data-field="weekLength" type="number" min="1" class="atlas-modal-input atlas-calbuilder-week-len"
+                     placeholder="length" value="${escapeText(this.draft.weekLength)}" />
+              <input data-field="weekNames" type="text" class="atlas-modal-input"
+                     placeholder="day names, comma-separated" value="${escapeText(this.draft.weekNames)}" />
+              <select data-field="weekMode" class="atlas-modal-input atlas-calbuilder-week-mode" title="free: the week runs across month boundaries. nested: it restarts with each month.">
+                <option value="free" ${this.draft.weekMode === 'free' ? 'selected' : ''}>runs freely</option>
+                <option value="nested" ${this.draft.weekMode === 'nested' ? 'selected' : ''}>restarts each month</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="atlas-calbuilder-section" data-section="intercalary">
+            <div class="atlas-calbuilder-section-head">Festival days <span class="atlas-calbuilder-opt">days between months, belonging to none</span></div>
+            <div class="atlas-calbuilder-rows" data-rows="intercalary"></div>
+            <button type="button" class="atlas-btn-ghost atlas-calbuilder-add" data-add="intercalary">+ festival day</button>
+          </div>
+          `}
+
+          <div class="atlas-calbuilder-section" data-section="format">
+            <div class="atlas-calbuilder-section-head">How a date reads</div>
+            <input data-field="format" type="text" class="atlas-modal-input"
+                   placeholder="${this.yearGrain() ? '{year} {era}' : '{day} {month}, {year} {era}'}"
+                   value="${escapeText(this.draft.format)}" />
+            <p class="atlas-calbuilder-hint">Pieces: {day} {month} {weekday} {year} {era} {step}. Empty pieces disappear.</p>
+            ${this.yearGrain() ? '' : `
+            <input data-field="formatIntercalary" type="text" class="atlas-modal-input"
+                   placeholder="{intercalary}, {year} {era}" value="${escapeText(this.draft.formatIntercalary)}"
+                   title="How a festival day reads (it has no month or day number)" />
+            `}
+          </div>
+        </div>
+
+        <div class="atlas-calbuilder-preview" data-role="preview"></div>
+
+        <div class="atlas-modal-actions">
+          <button type="button" class="atlas-btn-ghost" data-action="cancel">cancel</button>
+          <button type="button" class="atlas-btn-primary" data-action="save-calendar">${this.opts.elementId ? 'save calendar' : 'create calendar'}</button>
+        </div>
+      </div>
+    `;
+
+    this.renderRows(body);
+    this.renderPreview(body);
+
+    // One delegated input listener keeps the draft + preview live per keystroke.
+    body.addEventListener('input', (e) => {
+      const t = e.target as HTMLElement;
+      const field = t.getAttribute('data-field');
+      if (field) this.readScalar(field, t as HTMLInputElement);
+      this.readRows(body);
+      this.renderPreview(body);
+    });
+    body.addEventListener('change', () => { this.readRows(body); this.renderPreview(body); });
+
+    body.addEventListener('click', (e) => {
+      const t = (e.target as HTMLElement).closest('[data-add],[data-remove],[data-action]') as HTMLElement | null;
+      if (!t) return;
+      const add = t.getAttribute('data-add');
+      if (add === 'era') this.draft.eras.push({ name: '', abbrev: '', start: '0', end: '', numbering: 'from-1', direction: 'up', closed: false });
+      if (add === 'month') this.draft.months.push({ name: '', length: '30' });
+      if (add === 'intercalary') this.draft.intercalary.push({ name: '', after: '0', everyYears: '', inWeek: true });
+      if (add) { this.renderRows(body); this.renderPreview(body); return; }
+      const remove = t.getAttribute('data-remove');
+      if (remove) {
+        const [kind, idxStr] = remove.split(':');
+        const idx = Number(idxStr);
+        if (kind === 'era') this.draft.eras.splice(idx, 1);
+        if (kind === 'month') this.draft.months.splice(idx, 1);
+        if (kind === 'intercalary') this.draft.intercalary.splice(idx, 1);
+        this.renderRows(body);
+        this.renderPreview(body);
+        return;
+      }
+      const action = t.getAttribute('data-action');
+      if (action === 'cancel') this.hide();
+      if (action === 'save-calendar') void this.save();
+    });
+
+    this.modal = overlay;
+    this.show();
+    (body.querySelector('#cb-name') as HTMLInputElement).focus();
+  }
+
+  private readScalar(field: string, input: HTMLInputElement): void {
+    const d = this.draft as unknown as Record<string, unknown>;
+    if (field in d && typeof d[field] === 'string') d[field] = input.value;
+  }
+
+  /** Re-read every row input into the draft (rows carry data-row/data-col). */
+  private readRows(body: HTMLElement): void {
+    body.querySelectorAll<HTMLElement>('[data-row]').forEach(row => {
+      const [kind, idxStr] = row.getAttribute('data-row')!.split(':');
+      const idx = Number(idxStr);
+      const col = (name: string): string =>
+        (row.querySelector(`[data-col="${name}"]`) as HTMLInputElement | HTMLSelectElement | null)?.value ?? '';
+      const checked = (name: string): boolean =>
+        (row.querySelector(`[data-col="${name}"]`) as HTMLInputElement | null)?.checked ?? false;
+      if (kind === 'era' && this.draft.eras[idx]) {
+        this.draft.eras[idx] = {
+          name: col('name'), abbrev: col('abbrev'), start: col('start'), end: col('end'),
+          numbering: col('numbering') as EraDraft['numbering'],
+          direction: col('direction') as EraDraft['direction'],
+          closed: checked('closed'),
+        };
+      }
+      if (kind === 'month' && this.draft.months[idx]) {
+        this.draft.months[idx] = { name: col('name'), length: col('length') };
+      }
+      if (kind === 'intercalary' && this.draft.intercalary[idx]) {
+        this.draft.intercalary[idx] = {
+          name: col('name'), after: col('after'), everyYears: col('every'), inWeek: checked('inweek'),
+        };
+      }
+    });
+  }
+
+  private renderRows(body: HTMLElement): void {
+    const eraRows = body.querySelector('[data-rows="eras"]');
+    if (eraRows) {
+      eraRows.innerHTML = this.draft.eras.map((e, i) => `
+        <div class="atlas-calbuilder-row" data-row="era:${i}">
+          <input data-col="name" type="text" class="atlas-modal-input" placeholder="era name" value="${escapeText(e.name)}" />
+          <input data-col="abbrev" type="text" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="abbr" value="${escapeText(e.abbrev)}" />
+          <input data-col="start" type="number" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="starts" title="Where this era begins on the world's line (for a countdown era: its pivot)" value="${escapeText(e.start)}" />
+          <input data-col="end" type="number" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="ends" title="Optional. Ends before the next era begins = a real gap in between" value="${escapeText(e.end)}" />
+          <select data-col="numbering" class="atlas-modal-input atlas-calbuilder-mid" title="How years number inside this era">
+            <option value="from-1" ${e.numbering === 'from-1' ? 'selected' : ''}>years from 1</option>
+            <option value="from-0" ${e.numbering === 'from-0' ? 'selected' : ''}>years from 0</option>
+            <option value="continuous" ${e.numbering === 'continuous' ? 'selected' : ''}>label only</option>
+          </select>
+          <select data-col="direction" class="atlas-modal-input atlas-calbuilder-mid" title="down = counts toward its pivot, like BC">
+            <option value="up" ${e.direction === 'up' ? 'selected' : ''}>counts up</option>
+            <option value="down" ${e.direction === 'down' ? 'selected' : ''}>counts down</option>
+          </select>
+          <label class="atlas-calbuilder-check" title="A closed era still formats old dates but is never offered when entering new ones">
+            <input data-col="closed" type="checkbox" ${e.closed ? 'checked' : ''} /> closed
+          </label>
+          <button type="button" class="atlas-calbuilder-remove" data-remove="era:${i}" title="Remove era">×</button>
+        </div>
+      `).join('');
+    }
+    const monthRows = body.querySelector('[data-rows="months"]');
+    if (monthRows) {
+      monthRows.innerHTML = this.draft.months.map((m, i) => `
+        <div class="atlas-calbuilder-row" data-row="month:${i}">
+          <input data-col="name" type="text" class="atlas-modal-input" placeholder="month name" value="${escapeText(m.name)}" />
+          <input data-col="length" type="number" min="1" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="${escapeText(this.grain)}s" value="${escapeText(m.length)}" />
+          <button type="button" class="atlas-calbuilder-remove" data-remove="month:${i}" title="Remove month">×</button>
+        </div>
+      `).join('');
+    }
+    const interRows = body.querySelector('[data-rows="intercalary"]');
+    if (interRows) {
+      const monthOptions = (selected: string): string => {
+        const opts = [`<option value="0" ${selected === '0' ? 'selected' : ''}>before month 1</option>`];
+        this.draft.months.forEach((m, i) => {
+          const v = String(i + 1);
+          opts.push(`<option value="${v}" ${selected === v ? 'selected' : ''}>after ${escapeText(m.name.trim() || `month ${v}`)}</option>`);
+        });
+        return opts.join('');
+      };
+      interRows.innerHTML = this.draft.intercalary.map((ic, i) => `
+        <div class="atlas-calbuilder-row" data-row="intercalary:${i}">
+          <input data-col="name" type="text" class="atlas-modal-input" placeholder="festival name" value="${escapeText(ic.name)}" />
+          <select data-col="after" class="atlas-modal-input atlas-calbuilder-mid">${monthOptions(ic.after)}</select>
+          <input data-col="every" type="number" min="1" class="atlas-modal-input atlas-calbuilder-narrow" placeholder="every N yrs"
+                 title="Leave empty for every year; 4 = a leap day every 4th year" value="${escapeText(ic.everyYears)}" />
+          <label class="atlas-calbuilder-check" title="Counted in the week? Days outside the week keep every date on the same weekday forever">
+            <input data-col="inweek" type="checkbox" ${ic.inWeek ? 'checked' : ''} /> in week
+          </label>
+          <button type="button" class="atlas-calbuilder-remove" data-remove="intercalary:${i}" title="Remove day">×</button>
+        </div>
+      `).join('');
+    }
+  }
+
+  private renderPreview(body: HTMLElement): void {
+    const panel = body.querySelector('[data-role="preview"]');
+    if (!panel) return;
+    const { config, errors } = this.buildConfig();
+    const structural = errors.filter(e => e !== 'the calendar needs a name');
+    if (structural.length > 0) {
+      panel.innerHTML = `<div class="atlas-calbuilder-errors">${structural.map(e => `<div>⚠ ${escapeText(e)}</div>`).join('')}</div>`;
+      return;
+    }
+    const samples = this.opts.sampleSteps.length > 0 ? this.opts.sampleSteps : [0];
+    panel.innerHTML = `
+      <div class="atlas-calbuilder-preview-head">Your dates will read as</div>
+      ${samples.map(s => `
+        <div class="atlas-calbuilder-preview-row">
+          <span class="atlas-calbuilder-preview-step">${s}</span>
+          <span class="atlas-calbuilder-preview-date">${escapeText(formatStep(config, s))}</span>
+        </div>
+      `).join('')}
+      ${errors.length > 0 ? `<div class="atlas-calbuilder-errors">${errors.map(e => `<div>⚠ ${escapeText(e)}</div>`).join('')}</div>` : ''}
+    `;
+  }
+
+  private async save(): Promise<void> {
+    const { config, errors } = this.buildConfig();
+    if (errors.length > 0) {
+      this.toasts.error(errors[0]);
+      return;
+    }
+    const store = getActiveStore();
+    if (!store) { this.toasts.error('no active world'); return; }
+    try {
+      let id = this.opts.elementId;
+      if (id) {
+        await store.updateElement(id, { name: this.draft.name.trim(), atlas_calendar: config });
+      } else {
+        const el = await store.createElement('construct', {
+          name: this.draft.name.trim(),
+          supertype: CALENDAR_SUPERTYPE,
+          atlas_calendar: config,
+        });
+        id = el.id;
+      }
+      await refreshElementsAfterWrite(store);
+      this.hide();
+      this.toasts.success(this.opts.elementId ? 'calendar saved' : `“${this.draft.name.trim()}” is your calendar now`);
+      this.opts.onSaved?.(id);
+    } catch (err) {
+      console.error('[calendar] save failed:', err);
+      this.toasts.error(err instanceof Error ? err.message : 'could not save the calendar');
+    }
+  }
+}
