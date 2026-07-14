@@ -449,7 +449,10 @@ export class OwV2ClientAdapter implements OwApiClient {
    * upsert ops carry the full element (adapted to disk shape here); delete
    * ops carry `{type, id, deleted_at}` only.
    */
-  async pullChanges(since: string | null, limit = 500): Promise<ChangesPage> {
+  // Page size 250 (was 500, S265): Skeld's DB-side pagination sized the
+  // launch runbook around clients walking at ≤ a few hundred — same total
+  // wire cost for atlas, flatter server memory under concurrent pulls.
+  async pullChanges(since: string | null, limit = 250): Promise<ChangesPage> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (since) params.set('since', since);
     const response = await this.request('GET', `/changes?${params.toString()}`) as {

@@ -106,6 +106,10 @@ export function buildConvertNotesPrompt(): string {
     '- Only reference elements you also include. Prefer fields over tiny elements (physicality: "tall" beats a Trait named "Tall"). Only make elements for things specific to this world.',
     '- Optionally add a "World" block with "name" and "description" to make it a full world.',
     '',
+    'Example of the shape (two elements, sparse on purpose — note the JSON keys are the bare field names; the # and > marks below are list notation only):',
+    '',
+    '{"World": {"name": "Emberfall"}, "Character": [{"name": "Aralia", "birth_date": 312, "birthplace": "Vallaki", "friends": ["Bram"], "x_mood": "grim"}, {"name": "Bram"}], "Location": [{"name": "Vallaki", "description": "A walled river town."}]}',
+    '',
     'The field list per type:',
     '',
     buildSchemaDigest(),
@@ -130,7 +134,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
   root.innerHTML = `
     <header class="atlas-room-header">
-      <h1>Import &amp; export</h1>
+      <h1>Data</h1>
       <p class="atlas-room-subtitle">Export your world as a complete file, or bring in OnlyWorlds-formatted data.</p>
     </header>
     <div class="atlas-room-tabs" role="tablist">
@@ -172,7 +176,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
               <button type="button" class="atlas-btn-ghost" data-action="convert-prompt">copy the convert-my-notes prompt</button>
               <a class="atlas-btn-link" href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">open the OnlyWorlds AI toolkit</a>
             </div>
-            <p class="atlas-import-ai-size">the prompt carries the full field list for every type · ~${estimateTokens(buildConvertNotesPrompt())} tokens</p>
+            <p class="atlas-import-ai-size">the prompt carries the full field list for every type · ~${Math.max(1, Math.round(estimateTokens(buildConvertNotesPrompt()) / 1000))}k tokens</p>
           </div>
         </div>
       </div>

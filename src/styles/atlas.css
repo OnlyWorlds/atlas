@@ -4054,6 +4054,9 @@
 
 .atlas-picker-list {
   flex: 1;
+  /* Fixed height, not content-driven: switching from a full category to a
+     two-row one must not shrink the modal under the cursor (S265). */
+  height: 48vh;
   min-height: 200px;
   max-height: 48vh;
   overflow-y: auto;
@@ -6499,6 +6502,10 @@ a.atlas-writing-workspace-crumb-seg:hover {
      generous writing area regardless of disclosure state — opening Details
      extends the scrollable body instead of shrinking the prose. */
   flex: 0 0 auto;
+  /* border-box: width 100% PLUS the 32px side padding overflowed the body
+     by 32px on the right (content-box default) — the "prose flows onto the
+     right edge" Captain's eye caught (S265, measured: rightGap −32px). */
+  box-sizing: border-box;
   max-width: var(--atlas-writing-content-width, 760px);
   width: 100%;
   margin: 0 auto;
@@ -6648,6 +6655,47 @@ a.atlas-writing-workspace-crumb-seg:hover {
   right: 18px;
   z-index: 4;
   pointer-events: none;
+}
+
+/* Link-all corner (S265) — gentle icon inside the prose panel's top-right,
+   present only while unlinked mention candidates exist. Count badge names
+   the size of the batch; click links them all in one undoable transaction. */
+.atlas-writing-workspace-prose {
+  position: relative; /* anchors the link-all pill */
+}
+.atlas-writing-linkall-corner {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 4;
+  appearance: none;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 3px 9px;
+  color: var(--atlas-text-muted);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.atlas-writing-linkall-corner[data-active='true'] {
+  display: inline-flex;
+}
+.atlas-writing-linkall-corner:hover {
+  color: var(--atlas-cyan);
+  border-color: rgba(34, 211, 238, 0.4);
+}
+.atlas-writing-linkall-corner .material-symbols-outlined {
+  font-size: 14px;
+}
+.atlas-writing-workspace.is-focus-mode .atlas-writing-linkall-corner {
+  display: none;
 }
 .atlas-writing-workspace-wc-corner > * {
   pointer-events: auto;
@@ -7270,7 +7318,11 @@ a.atlas-writing-workspace-crumb-seg:hover {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  /* matches .atlas-filter-strip gap so total height aligns */
+  /* One button now (the draft button retired, S265) — min-height keeps this
+     band the exact height of the elements sidebar's two-row filter strip
+     (2 × 25px + 2px gap = 52px content) so the search rows stay aligned. */
+  min-height: 52px;
+  justify-content: center;
   padding: 6px 8px;
   /* matches .atlas-filter-strip padding */
   border-bottom: 1px solid var(--atlas-divider);
@@ -7305,8 +7357,34 @@ a.atlas-writing-workspace-crumb-seg:hover {
   color: var(--atlas-cyan);
 }
 
-.atlas-writing-sidebar-create-btn-draft {
-  opacity: 0.85;
+/* Hover "+" on tree rows (S265): create the child tier inside this row.
+   Invisible until the row is hovered — same rhythm as inline actions. */
+.atlas-writing-tree-row-add {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 10px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 100ms ease, color 100ms ease;
+}
+.atlas-writing-tree-row:hover .atlas-writing-tree-row-add {
+  opacity: 0.7;
+}
+.atlas-writing-tree-row-add:hover {
+  opacity: 1 !important;
+  color: var(--atlas-cyan);
+}
+.atlas-writing-tree-row-add .material-symbols-outlined {
+  font-size: 18px;
 }
 
 /* Tune glyph reads heavier than the elements sidebar's "+" — match the
@@ -7320,6 +7398,11 @@ a.atlas-writing-workspace-crumb-seg:hover {
 
 .atlas-writing-tree-row {
   width: 100%;
+  /* border-box: the depth indent rides inline paddingLeft — without this,
+     width:100% + padding overflows right by 14px PER NESTING LEVEL, so the
+     hover "+" of a chapter sat further right than a book's (S265; same
+     content-box class as the prose-panel overflow). */
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -11749,11 +11832,50 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 .atlas-home-link:hover { color: var(--atlas-cyan); }
 
+/* Section hint (S265): a quiet ?-glyph beside a section title whose instant
+   tooltip explains the section's model. The ::after resets font-family —
+   it lives inside a Material Symbols span and would render as tofu. */
+.atlas-section-hint {
+  font-size: 14px;
+  color: var(--atlas-text-muted);
+  opacity: 0.5;
+  vertical-align: middle;
+  margin-left: 6px;
+  cursor: help;
+  position: relative;
+}
+.atlas-section-hint:hover { opacity: 1; }
+.atlas-section-hint[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: max-content;
+  max-width: 300px;
+  white-space: normal;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: normal;
+  color: var(--atlas-text);
+  background: rgba(8, 8, 8, 0.96);
+  border: 1px solid var(--atlas-divider);
+  border-radius: 4px;
+  padding: 7px 10px;
+  z-index: 60;
+  pointer-events: none;
+}
+
 /* Cast slot (D2b): protagonist + home cards. */
 .atlas-home-cast {
   display: flex;
   gap: 10px;
   margin-top: 18px;
+  /* Reserved even when empty — the first ghost card must not shift the tour
+     below (S265). Matches the card's rendered height. */
+  min-height: 52px;
 }
 .atlas-home-cast-card {
   display: inline-flex;
@@ -11775,6 +11897,14 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-home-cast-ghost {
   background: transparent;
   border-style: dashed;
+}
+/* Assignment mode: the ghost was clicked, the next sidebar click assigns —
+   hold a cyan edge while the "click in the left sidebar" instruction shows. */
+.atlas-home-cast-ghost.atlas-home-cast-assigning {
+  border-color: var(--atlas-cyan-soft, rgba(34, 211, 238, 0.4));
+}
+.atlas-home-cast-ghost.atlas-home-cast-assigning .atlas-home-cast-role {
+  color: var(--atlas-cyan);
 }
 .atlas-home-cast-ghost .atlas-home-cast-icon,
 .atlas-home-cast-ghost .atlas-home-cast-name {
@@ -11841,6 +11971,9 @@ a.atlas-share-map-pin { cursor: pointer; }
   align-items: baseline;
   gap: 7px;
   margin-top: 18px;
+  /* Reserved even when empty — the first element's count must not shift the
+     tour cards below (S265). */
+  min-height: 17px;
   font-size: 13px;
   color: var(--atlas-text-muted);
 }
@@ -11952,6 +12085,12 @@ a.atlas-share-map-pin { cursor: pointer; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.atlas-home-continue-kind {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.32);
+  letter-spacing: 0.04em;
 }
 .atlas-home-continue-time {
   margin-left: auto;

@@ -35,6 +35,8 @@ import { buildMentionItems } from './writing-workspace-mention-items';
 import { createWordCount } from './writing-workspace-word-count';
 import { createStickyBar } from './writing-workspace-sticky-bar';
 import { createProseContextMenu } from './writing-workspace-context-menu';
+import { countAutolinkHints, convertAllAutolinks, unlinkAllChips } from './writing-workspace-autolink';
+import { setLiveEditorOps } from './writing-live-editor-ops';
 import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { JSONContent } from '@tiptap/core';
 
@@ -513,6 +515,29 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       editorHandle.syncChipLabels((id) => byId.get(id) ?? null);
       // Apply per-world spellcheck preference to the contenteditable.
       applySpellcheck();
+
+      // Link-all corner affordance (S265): a gentle icon at the prose
+      // surface's top-right, visible only while unlinked mention candidates
+      // exist. Click converts every hint in one transaction (one Ctrl+Z
+      // undoes the batch). Refreshed on every editor transaction — the
+      // autolink plugin's decorations are the candidate truth.
+      editorHandle.editor.on('transaction', refreshLinkAllWidget);
+      refreshLinkAllWidget();
+
+      // Register the live bulk ops so the tree-level "link mentions in all
+      // scenes" routes THIS narrative through the editor (a disk write here
+      // would be reverted by the next autosave).
+      setLiveEditorOps({
+        narrativeId: el.id,
+        linkAll: () => {
+          const v = editorHandle?.editor.view;
+          return v ? convertAllAutolinks(v) : 0;
+        },
+        unlinkAll: () => {
+          const v = editorHandle?.editor.view;
+          return v ? unlinkAllChips(v) : 0;
+        },
+      });
     }
 
     // 5/6 — disclosures removed (moved to context pane).
@@ -568,11 +593,53 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     else root.appendChild(newWc);
   }
 
+  /**
+   * The link-all corner button — created lazily on the workspace root,
+   * shown only while the live editor has ≥1 autolink hint. The count rides
+   * in a small badge; the title names the gesture.
+   */
+  function refreshLinkAllWidget(): void {
+    // Anchored INSIDE the prose panel's top-right (Captain, S265) — the panel
+    // is position:relative; the pill rides its background, not the workspace
+    // edge.
+    const host = root.querySelector<HTMLElement>('.atlas-writing-workspace-prose');
+    if (!host) return;
+    let btn = host.querySelector<HTMLButtonElement>(':scope > .atlas-writing-linkall-corner');
+    const view = editorHandle?.editor.view;
+    const count = view ? countAutolinkHints(view) : 0;
+    if (count === 0) {
+      btn?.setAttribute('data-active', 'false');
+      return;
+    }
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'atlas-writing-linkall-corner';
+      btn.innerHTML = `
+        <span class="material-symbols-outlined">link</span>
+        <span class="atlas-writing-linkall-count"></span>
+      `;
+      btn.addEventListener('click', () => {
+        const v = editorHandle?.editor.view;
+        if (!v) return;
+        const n = convertAllAutolinks(v);
+        if (n > 0) toastManager.info(`Linked ${n} element${n === 1 ? '' : 's'} · Ctrl+Z undoes`);
+      });
+      host.appendChild(btn);
+    }
+    btn.setAttribute('data-active', 'true');
+    btn.title = `Link ${count} mentioned element${count === 1 ? '' : 's'}`;
+    const badge = btn.querySelector<HTMLElement>('.atlas-writing-linkall-count');
+    if (badge) badge.textContent = String(count);
+  }
+
   function teardownEditor(): void {
     if (editorHandle) {
       editorHandle.destroy();
       editorHandle = null;
     }
+    setLiveEditorOps(null);
+    root.querySelector('.atlas-writing-linkall-corner')?.setAttribute('data-active', 'false');
     mountedForId = null;
     lastSavedMarkdown = null;
     lastRefreshEl = null;

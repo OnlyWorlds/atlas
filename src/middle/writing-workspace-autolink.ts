@@ -29,91 +29,14 @@ import type { EditorState, Transaction } from '@tiptap/pm/state';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
 import type { Element } from '../core/types';
+import { buildAutolinkIndex } from '../core/prose-autolink';
+import type { AutolinkCandidate, AutolinkIndex } from '../core/prose-autolink';
 
-const MIN_NAME_CHARS = 3;
-/** Tiptap reserves up to ~50 keys reasonable in alternations; we cap to keep regex compile fast. */
-const MAX_KEYS_IN_INDEX = 2000;
-
-export interface AutolinkCandidate {
-  id: string;
-  type: string;
-  displayName: string;
-}
-
-export interface AutolinkIndex {
-  /** Map from lowercase-or-case-sensitive name to its candidate(s). */
-  byName: Map<string, AutolinkCandidate[]>;
-  /** Pre-compiled combined regex (case-sensitive, word-bounded alternation). */
-  scanner: RegExp | null;
-}
-
-/**
- * Build the autolink index from a snapshot of the world's elements. Includes
- * both `name` and `atlas_aliases` as match keys. Multi-word names live in
- * the same map. Match keys are case-sensitive so "Drizzle" matches "Drizzle"
- * in prose but not "drizzling" (also blocked by word-boundary regex).
- */
-export function buildAutolinkIndex(elements: Element[]): AutolinkIndex {
-  const byName = new Map<string, AutolinkCandidate[]>();
-  for (const el of elements) {
-    // Skip narratives / spatial entities — they're not the targets of
-    // prose auto-link (writers aren't linking pins or maps in narrative
-    // body text; the @ picker already excludes them).
-    if (el.type === 'narrative' || el.type === 'pin' || el.type === 'marker' || el.type === 'map') {
-      continue;
-    }
-    addEntry(byName, el.name, el);
-    if (Array.isArray(el.atlas_aliases)) {
-      for (const alias of el.atlas_aliases) {
-        if (typeof alias === 'string') addEntry(byName, alias, el);
-      }
-    }
-  }
-
-  const keys = [...byName.keys()].slice(0, MAX_KEYS_IN_INDEX);
-  // Sort longest first so multi-word names win over their sub-words in the
-  // alternation regex (greedy left-to-right match).
-  keys.sort((a, b) => b.length - a.length);
-  const scanner = keys.length > 0 ? buildCombinedRegex(keys) : null;
-
-  return { byName, scanner };
-}
-
-function addEntry(map: Map<string, AutolinkCandidate[]>, key: string | undefined, el: Element): void {
-  if (!key) return;
-  const trimmed = key.trim();
-  if (trimmed.length < MIN_NAME_CHARS) return;
-  const candidate: AutolinkCandidate = {
-    id: el.id,
-    type: el.type,
-    displayName: el.name ?? trimmed,
-  };
-  const existing = map.get(trimmed);
-  if (existing) {
-    // De-duplicate per (id, key) — the same element registering multiple
-    // aliases that happen to equal each other shouldn't pile up.
-    if (!existing.some(c => c.id === candidate.id)) existing.push(candidate);
-  } else {
-    map.set(trimmed, [candidate]);
-  }
-}
-
-function escapeRegexLiteral(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function buildCombinedRegex(keys: string[]): RegExp | null {
-  if (keys.length === 0) return null;
-  // Word-boundary on both sides — keeps "Drizzle" out of "drizzling".
-  // Case-sensitive (no /i) — proper nouns vs common nouns separate naturally.
-  // The `g` flag is essential for iterating matches via exec().
-  const pattern = `\\b(?:${keys.map(escapeRegexLiteral).join('|')})\\b`;
-  try {
-    return new RegExp(pattern, 'g');
-  } catch {
-    return null;
-  }
-}
+// Index construction moved to core/prose-autolink (S265) so the bulk
+// link/unlink kernel shares one matching ruleset with this plugin.
+// Re-exported for the existing import sites.
+export { buildAutolinkIndex };
+export type { AutolinkCandidate, AutolinkIndex };
 
 /** Walk the doc once to collect ids that are ALREADY chipped. */
 function collectChippedIds(doc: PmNode): Set<string> {
@@ -364,4 +287,92 @@ export function convertAutolinkAt(view: EditorView, docPos: number): boolean {
   const tr = view.state.tr.replaceWith(hit.from, hit.to, chip);
   view.dispatch(tr);
   return true;
+}
+
+/** Count the current autolink hints, optionally only those fully inside a range. */
+export function countAutolinkHints(view: EditorView, range?: { from: number; to: number }): number {
+  return findHints(view, range).length;
+}
+
+function findHints(
+  view: EditorView,
+  range?: { from: number; to: number },
+): Array<{ from: number; to: number; candidate: AutolinkCandidate }> {
+  const decos = AUTOLINK_PLUGIN_KEY.getState(view.state)?.decorations;
+  if (!decos) return [];
+  const found = range ? decos.find(range.from, range.to) : decos.find();
+  const out: Array<{ from: number; to: number; candidate: AutolinkCandidate }> = [];
+  for (const d of found) {
+    if (range && (d.from < range.from || d.to > range.to)) continue; // partial overlap: out
+    const candidate = (d.spec as { candidate?: AutolinkCandidate }).candidate;
+    if (candidate) out.push({ from: d.from, to: d.to, candidate });
+  }
+  return out;
+}
+
+/**
+ * Convert EVERY current autolink hint (or every hint fully inside `range`)
+ * into a chip, in ONE transaction — a single Ctrl+Z undoes the whole batch
+ * (S265, the link-all affordance). Returns the number converted.
+ */
+export function convertAllAutolinks(view: EditorView, range?: { from: number; to: number }): number {
+  const hints = findHints(view, range).sort((a, b) => a.from - b.from);
+  if (hints.length === 0) return 0;
+  const chipType = view.state.schema.nodes.elementChip;
+  if (!chipType) return 0;
+  let tr = view.state.tr;
+  for (const h of hints) {
+    const from = tr.mapping.map(h.from);
+    const to = tr.mapping.map(h.to);
+    tr = tr.replaceWith(from, to, chipType.create({
+      id: h.candidate.id,
+      type: h.candidate.type,
+      label: h.candidate.displayName,
+    }));
+  }
+  view.dispatch(tr);
+  return hints.length;
+}
+
+/** Count element chips, optionally only those inside a range. */
+export function countChips(view: EditorView, range?: { from: number; to: number }): number {
+  return findChips(view, range).length;
+}
+
+function findChips(
+  view: EditorView,
+  range?: { from: number; to: number },
+): Array<{ from: number; to: number; label: string }> {
+  const doc = view.state.doc;
+  const from = range?.from ?? 0;
+  const to = range?.to ?? doc.content.size;
+  const chips: Array<{ from: number; to: number; label: string }> = [];
+  doc.nodesBetween(from, to, (node, pos) => {
+    if (node.type.name === 'elementChip') {
+      chips.push({ from: pos, to: pos + node.nodeSize, label: String(node.attrs?.label ?? '') });
+    }
+  });
+  return chips;
+}
+
+/**
+ * Replace every chip (or every chip inside `range`) with its plain label
+ * text, in ONE transaction — the mass-unlink mirror of convertAllAutolinks.
+ * Unlike the single right-click unlink, this deliberately does NOT touch the
+ * narrative's relation fields (the derive's union semantics never remove;
+ * field removal stays the single-unlink's stronger explicit gesture).
+ */
+export function unlinkAllChips(view: EditorView, range?: { from: number; to: number }): number {
+  const chips = findChips(view, range).sort((a, b) => a.from - b.from);
+  if (chips.length === 0) return 0;
+  let tr = view.state.tr;
+  for (const c of chips) {
+    const from = tr.mapping.map(c.from);
+    const to = tr.mapping.map(c.to);
+    tr = c.label
+      ? tr.replaceWith(from, to, view.state.schema.text(c.label))
+      : tr.delete(from, to);
+  }
+  view.dispatch(tr);
+  return chips.length;
 }

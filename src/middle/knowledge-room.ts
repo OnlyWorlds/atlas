@@ -425,8 +425,20 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         const p = await pickElement({ restrictToType: 'character', title: 'Who knows this?' });
         if (p) ctx.setNarrator(p.id);
       }));
+    } else {
+      // A second individual knower can't be stored (narrator is single-link,
+      // by design — two+ knowers ARE a circle). Offer the promotion instead
+      // of dead-ending (S265, Susie's find).
+      chips.appendChild(addAffordance('+ character', 'Add a second knower — two individuals become a circle', async () => {
+        const first = ctx.heldBy().narrator;
+        if (!first) return;
+        const p = await pickElement({
+          restrictToType: 'character', excludeIds: [first], title: 'Add a second knower',
+        });
+        if (p) openPromoteToCircle(first, p.id, ctx);
+      }));
     }
-    chips.appendChild(addAffordance('+ add circle', 'A group whose members inherit this knowledge', async () => {
+    chips.appendChild(addAffordance('+ existing circle', 'A group whose members inherit this knowledge', async () => {
       const p = await pickElement({ restrictToType: 'collective', excludeIds: ctx.heldBy().collectives, title: 'Add a circle' });
       if (p) ctx.addCircle(p.id);
     }));
@@ -500,6 +512,35 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       <p class="atlas-knowledge-hint">It may still be loading, or it no longer exists in this world.</p>
     `;
     root.appendChild(empty);
+  }
+
+  /**
+   * Promote two individual knowers to a circle (S265). The create modal IS
+   * the confirm: it opens titled with the question, name prefilled from both
+   * characters, members already wired via extraData. Cancel = nothing
+   * changes; Create = the circle becomes the holder and narrator clears.
+   */
+  function openPromoteToCircle(firstId: string, secondId: string, ctx: EditorCtx): void {
+    const nameOf = (id: string): string =>
+      getState().data.elements.find(e => e.id === id)?.name || '(unnamed)';
+    new ElementCreateModal(toasts, {
+      initialType: 'collective',
+      initialName: `${nameOf(firstId)} & ${nameOf(secondId)}`,
+      suppressNavigate: true,
+      title: 'Two knowers make a circle',
+      extraData: { subtype: CIRCLE_SUBTYPE, characters: [firstId, secondId] },
+      onCreated: (id, type) => {
+        if (type !== 'collective') {
+          // User flipped the category — the promote intent is void; strip the
+          // circle machinery the extraData planted (same guard as openNewCircle).
+          void patchEntry(id, { subtype: '', characters: [] });
+          return;
+        }
+        ctx.addCircle(id);
+        ctx.setNarrator(null);
+        toasts.info('Both knowers now hold this through the circle.');
+      },
+    }).open();
   }
 
   /** Open the "new circle" create modal (collective + circle tag). Shared by
@@ -1074,7 +1115,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     // WHO — one chips band (character + circles + inline add/create).
     const whoSection = document.createElement('section');
     whoSection.className = 'atlas-knowledge-section atlas-knowledge-zone-who';
-    whoSection.innerHTML = `<h2 class="atlas-knowledge-section-title">Who knows this</h2>`;
+    whoSection.innerHTML = `<h2 class="atlas-knowledge-section-title">Who knows this
+      <span class="material-symbols-outlined atlas-section-hint" data-tip="One character can hold knowledge directly. Two or more knowers become a circle: any collective can hold knowledge, and its members inherit it.">help</span></h2>`;
     heldByMount = document.createElement('div');
     whoSection.appendChild(heldByMount);
     body.appendChild(whoSection);

@@ -102,8 +102,16 @@ export function defaultChartName(scope: ChartScope, elements: Element[]): string
     }
     case 'types':
       return typesName(scope.types);
-    case 'selection':
-      return `Selection (${scope.elementIds.length})`;
+    case 'selection': {
+      // Name from the members, like focus does — "Selection (4)" read as
+      // clinical (S265, Captain). Falls back when names are missing.
+      const names = scope.elementIds
+        .map(id => elements.find(e => e.id === id)?.name?.trim())
+        .filter((n): n is string => Boolean(n));
+      if (names.length === 0) return `Selection (${scope.elementIds.length})`;
+      if (names.length <= 2) return names.join(' & ');
+      return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+    }
     default:
       return 'Chart';
   }

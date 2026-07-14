@@ -64,6 +64,19 @@ describe('isWritingInitialized', () => {
     expect(isWritingInitialized(entry, elements)).toBe(false);
   });
 
+  it('a loose supertype-less narrative beside a labeled chain does NOT trigger setup (S265)', () => {
+    const entry = {
+      id: 'w', name: 'w', state: 'local-only',
+      writing_labels: { l1: 'Book', l2: 'Chapter', l3: 'Scene', l4: 'Draft' },
+    } as unknown as WorldRegistryEntry;
+    const elements = [
+      n('a', 'Book A', { supertype: 'Book' }),
+      n('b', 'Chapter 1', { supertype: 'Chapter', parent_narrative: 'a' }),
+      n('loose', 'tour-made note'), // no supertype, no parent — not structure
+    ];
+    expect(isWritingInitialized(entry, elements)).toBe(true);
+  });
+
   it('returns true when every structured narrative already matches writing labels', () => {
     const entry = {
       id: 'w', name: 'w', state: 'local-only',

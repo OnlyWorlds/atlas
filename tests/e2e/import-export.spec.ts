@@ -40,7 +40,7 @@ async function setupWorld(page: Page, name = 'Barovia') {
 
 async function openImport(page: Page) {
   await page.click('.atlas-room-nav-btn[data-room="import"]');
-  await expect(page.locator('.atlas-import-room h1')).toHaveText('Import & export');
+  await expect(page.locator('.atlas-import-room h1')).toHaveText('Data');
 }
 
 const FULL_WORLD = {

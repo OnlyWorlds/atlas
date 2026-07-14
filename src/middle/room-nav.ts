@@ -54,7 +54,7 @@ const ROOMS: RoomDef[] = [
   // the room is about showing off, publishing, displaying; a framed piece on
   // a wall is the exhibit).
   { id: 'share',     label: 'Pages',          icon: 'wall_art',       hashFor: (w) => shareHash(w), matches: ['share'] },
-  { id: 'import',    label: 'Import & export', icon: 'import_export',  hashFor: importHash,    matches: ['import'] },
+  { id: 'import',    label: 'Data',            icon: 'import_export',  hashFor: importHash,    matches: ['import'] },
   // Templates room DELETED (session 256; never built past a stub).
   // Settings dropped from the strip S255v4 (Captain): the sidebar footer gear
   // is the one settings entrance. Route + gear-as-toggle unaffected.

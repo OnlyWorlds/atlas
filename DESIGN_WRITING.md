@@ -283,6 +283,7 @@ Big-picture context-pane work moved into `DESIGN.md` "Context Pane" — that's t
 - ✅ **Reading mode redesign** — hides right pane, disables link visuals, keeps writer's font (session 230).
 - ✅ **Spellcheck toggle per world** + autolink hints always-`spellcheck=false` (session 230).
 - ✅ **Backspace-on-chip unlinks**, **right-click chip → unlink**, **right-click autolink hint → Link to {name}** (session 230).
+- ✅ **Bulk link/unlink (S265)**: corner link-all icon (one transaction, Ctrl+Z undoes) + selection right-click link/unlink + writing-tree right-click over a subtree. Kernel `src/core/prose-autolink.ts` transforms BOTH `story` markdown and the `atlas_richtext_json` sidecar for closed narratives (story-only writes are shadowed by the sidecar); the open narrative routes through live-editor ops (`writing-live-editor-ops.ts`). Same matching rules as the autolink plugin — the index moved to core and is shared.
 - ✅ **Aliases editor modal, focus mode, hover preview, find/replace, word goal, inline element creation, split-into-sibling, character cast strip, per-world font family, first-mention autolink, TipTap code-split** — see session 228 batch in archive.
 
 ### Still on the roadmap

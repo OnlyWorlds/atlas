@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- Link every mention at once: while writing, a quiet link icon in the corner counts the element names in your prose that aren't linked yet - one click links them all, one Ctrl+Z takes it back. Selecting text and right-clicking offers the same for just that selection (unlinking too), and right-clicking a book or chapter in the writing tree links mentions across every scene inside it.
+- Two people can know a secret: adding a second knower to a knowledge entry now offers to make the pair a circle (named after both, editable) instead of stopping at one. The circle affordances read "existing circle" and "new circle".
+- Clicking a map on the home page works: an open map tab comes forward, a new one opens, and a map without an image says so and takes you to its fields instead of doing nothing. Same fix for the Map card in the world tour.
+- The tour cards found their taglines: Chart "elements in time", Map "ground your world", Share "a page of your world", Export "your entire world".
+- The protagonist and home cards on the home page dropped their filler line; clicking one now says exactly what to do next ("click in the left sidebar").
+- Saved charts name themselves after their members ("Gale, Alpha +1") instead of "Selection (4)".
+- The element picker keeps one size while you flip categories instead of shrinking under the cursor.
+- Ranges stretch from both ends: drag a range's end cap on the chart to move its end date (the start stays put), with the same guide line and confirm as start-drags. Neither edge can cross the other.
+- Chart labels respect their neighbors' rings: name labels no longer end inside the ring around a selected or zoomed glyph.
+- Deleting the chart you're looking at now truly releases it — the view no longer stays invisibly scoped to a dead chart.
+- Creating a map from the home tour card stays on the home page like every other card.
+- The writing page sits centered again (it overflowed its right edge), the breadcrumb reads book › chapter in the right order, and the link-all icon lives inside the page's top corner.
+- The writing sidebar creates where you point: hover a book or chapter row for a "+" that creates directly inside it. The header keeps one button (new book); the draft button is gone, though existing drafts keep working.
+- The knowledge page's "Who knows this" carries a small ? that explains circles on hover.
+- The AI import prompt now includes a small example of the expected JSON shape.
+- The writing room no longer ambushes you with its setup screen: a loose narrative beside your book/chapter tree doesn't count as a structure decision anymore. Setup still appears for imported worlds whose tiers use different names.
+- Creating your first element no longer shifts the home page — the count line and the protagonist/home row reserve their space from the start.
+- The home page's element list lives under one "Recent" heading (the "Recently edited" subtitle is gone).
+- With the sidebar filtered to one category, the + button opens element creation with that category preselected.
+- The import/export room is now called "Data".
+- The home page's Recent list speaks one language: every row is verb + name + type + time, whether it's your latest writing, map, or any other element.
+- The writing tree's hover "+" sits in one column at every nesting depth.
+
 - View a shared world: the worlds sidebar gained an eye button that accepts a read key — no PIN asked, anywhere. The world downloads into your OnlyWorlds folder, stays current with its owner's changes (refreshes on open and on demand), and is view-only by construction: atlas never writes to it, locally or on the server. The row wears an eye and a "view" chip; the corner pill says "View only".
 
 - Re-date by dragging: grab any dot on the chart and slide it to a new date; a guide line shows where it will land and a confirm keeps mis-drags harmless. Dragging a range moves its start; the end stays anchored, so the drag can never invert it.

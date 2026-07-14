@@ -53,6 +53,8 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     purpose: 'What the characters and circles of your world know.',
     can: [
       'give knowledge to a character or a circle',
+      'hold knowledge as one character directly; two or more knowers become a circle',
+      'use any collective as a circle: its members inherit what it holds',
       'open anyone\'s known world to see through their eyes',
       'create a circle without leaving an entry',
       'type @ to mention the elements the knowledge concerns',
@@ -81,7 +83,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     ],
   },
   import: {
-    name: 'Import & export',
+    name: 'Data',
     purpose: 'Bring OnlyWorlds data into atlas, or take your world out as a file.',
     can: [
       'drop or paste JSON and review before anything lands',

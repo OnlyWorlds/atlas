@@ -376,9 +376,13 @@ export class ElementCreateModal extends BaseModal {
           // search takeover) — only onCreated is deliberately skipped here,
           // since its absence is what routed us to the inline map flow.
           this.opts.afterCreate?.(result.map.id, 'map');
-          const worldId = getState().active?.worldId;
           patchSlice('ui', { ...getState().ui, selectedElementId: result.map.id });
-          if (worldId) navigate(elementHash(worldId, result.map.id));
+          // suppressNavigate must hold on this path too — the home tour's map
+          // tile stays on home like every other tile (S265, Captain's smoke).
+          if (!this.opts.suppressNavigate) {
+            const worldId = getState().active?.worldId;
+            if (worldId) navigate(elementHash(worldId, result.map.id));
+          }
           return;
         }
 

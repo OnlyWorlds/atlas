@@ -90,7 +90,7 @@ export interface TimelineViewOptions {
    * makes the element visible (peek-or-focus — it may fall outside the current
    * scope, so a bare write would silently vanish it, gate finding).
    */
-  onDateElement?: (id: string, date: number) => void;
+  onDateElement?: (id: string, date: number, edge?: 'start' | 'end') => void;
 }
 
 /** Render extras the room threads in alongside the node set (S4/S5). */
@@ -215,7 +215,7 @@ interface ViewState {
   // mouseup falls through to the click progression (peek / re-click = focus).
   // `maxDate` clamps a range's start at its recorded end (the end is anchored:
   // the drag reduces/extends the range, never slides it — Captain's ruling).
-  glyphDrag: { dot: PlacedDot; startX: number; startY: number; active: boolean; maxDate: number | null } | null;
+  glyphDrag: { dot: PlacedDot; startX: number; startY: number; active: boolean; edge: 'start' | 'end'; maxDate: number | null; minDate: number | null } | null;
   // Drag-to-date (Bout 1.2): a rail item is being dragged onto the axis. Holds
   // the element DATA (not the DOM node — survives a mid-drag rail rebuild), the
   // start point + moved-past-threshold flag (click vs drag), and the floating
@@ -229,7 +229,7 @@ interface ViewState {
     clickAction?: 'open' | 'select';
   } | null;
   dropDate: number | null;
-  onDateElement: ((id: string, date: number) => void) | null;
+  onDateElement: ((id: string, date: number, edge?: 'start' | 'end') => void) | null;
   // Bound window listeners for an in-flight date-drag — stored so both
   // endDateDrag() and destroy() can remove them (they're added per-drag).
   dateDragMove: ((e: MouseEvent) => void) | null;
@@ -883,7 +883,11 @@ function draw(state: ViewState): void {
   // then a WEIGHT-RANKED PER-COLUMN BUDGET for the rest (S4): each fan column
   // labels its heaviest nodes up to a space-proportional budget; the remainder
   // surfaces as a clickable "+N" badge (zoom to cluster) instead of a smear.
-  drawLabels(ctx, state, placed, w, axisY, anchorIds);
+  // LOD rung computed here because BOTH the glyph draw and the label
+  // collision boxes need it (S265: labels intruded into zoom-grown rings).
+  const zf = zoomFactorOf(state, view);
+  const detail = zf > RUNG_CLOSE ? 2 : zf > RUNG_MID ? 1 : 0;
+  drawLabels(ctx, state, placed, w, axisY, anchorIds, detail);
 
   // Nodes → type-tinted category glyphs (selected + hovered emphasised).
   // Identity over anonymity: a glance distinguishes event / character /
@@ -891,10 +895,6 @@ function draw(state: ViewState): void {
   // Material Symbols per craft #18 (see pin-visuals.ts); chart #2 "The Landing".
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  // LOD: glyphs grow a little as you zoom in (overview stays light, detail on
-  // demand). Anchors stay prominent at every rung.
-  const zf = zoomFactorOf(state, view);
-  const detail = zf > RUNG_CLOSE ? 2 : zf > RUNG_MID ? 1 : 0;
   for (const dot of placed) {
     const isSel = dot.node.id === state.selectedId;
     const isHover = dot === state.hoveredDot;
@@ -1242,7 +1242,7 @@ function labelWeight(n: TimelineNode): number {
   return n.degree + Math.log10(1 + n.contentMass);
 }
 
-function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: PlacedDot[], w: number, axisY: number, anchorIds: Set<string>): void {
+function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: PlacedDot[], w: number, axisY: number, anchorIds: Set<string>, detail: number): void {
   // Build label candidates in PRIORITY order, then place greedily: a higher-
   // priority label claims its row-space first and any lower-priority label that
   // would collide simply drops. This keeps anchors legible even when several
@@ -1297,12 +1297,23 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
   // order: anchors + selection claim their space first, the rest fill the gaps.
   const overlaps = (a: Box, b: Box): boolean => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
   const isCastId = (id: string): boolean => id === state.protagonistId || id === state.nexusId;
-  // Collision extent must include the RINGS, not just the glyph — labels were
-  // overprinting anchor halos and the cast rings (Captain's "labels are weird").
-  const glyphHalf = (d: PlacedDot): number =>
-    isCastId(d.node.id) ? 16
-    : anchorIds.has(d.node.id) ? 21
-    : ICON_BASE * 0.5 + 2;
+  // Collision extent MIRRORS the draw math (size formula + outermost ring +
+  // stroke) instead of fixed constants — the old 16/21/9 ignored selection
+  // rings and LOD growth, so labels ended inside zoom-grown ring visuals
+  // (S265, Captain's sshot: a label flush against the next node's ring).
+  const glyphHalf = (d: PlacedDot): number => {
+    const isSel = d.node.id === state.selectedId;
+    const isCast = isCastId(d.node.id);
+    const isAnchor = anchorIds.has(d.node.id);
+    const size = isSel ? ICON_SELECTED
+      : isCast ? ICON_ANCHOR + detail + 5
+      : isAnchor ? ICON_ANCHOR + detail
+      : ICON_BASE - 1 + detail * 2;
+    const ringR = size * 0.6;
+    if (isSel) return ringR + (d.node.id === state.focusId ? 9 + 2 : 7 + 1.5) + 2;
+    if (isAnchor || isCast) return ringR + 8 + 1 + 2;
+    return size * 0.5 + 2;
+  };
   const glyphBoxes = placed.map(d => ({ id: d.node.id, box: boxAround(d.x, d.y, glyphHalf(d)) }));
   const placedBoxes: Box[] = [];
   state.labelBoxes = []; // rebuilt each draw — labels are click targets (S6)
@@ -1317,9 +1328,10 @@ function drawLabels(ctx: CanvasRenderingContext2D, state: ViewState, placed: Pla
       : '11px system-ui, sans-serif';
     const text = truncate(dot.node.name, LABEL_MAX_CHARS);
     const tw = ctx.measureText(text).width;
-    // Offsets clear the visual extent (anchor halos reach ~ringR+8).
-    const off = isCast ? 18 : isAnchor ? 16 : 10;
+    // Offsets clear the node's OWN drawn extent too — glyphHalf is the truth
+    // (a selected node's side label must start past its rings).
     const gh = glyphHalf(dot);
+    const off = Math.max(isCast ? 18 : isAnchor ? 16 : 10, gh + 4);
     // Candidate positions in preference order: beside the glyph first (panel-
     // edge flip preserved), then ABOVE/BELOW it. In multi-column eras a side
     // label always crosses the next column, so without the vertical fallbacks
@@ -1827,9 +1839,11 @@ function endDateDrag(state: ViewState): void {
  * recorded end when one exists (the end is anchored — a start past it would
  * invert the range). Pure, exported for unit tests.
  */
-export function glyphDropDate(raw: number, maxDate: number | null): number {
+export function glyphDropDate(raw: number, maxDate: number | null, minDate: number | null = null): number {
   const d = Math.round(raw);
-  return maxDate != null && d > maxDate ? Math.floor(maxDate) : d;
+  if (maxDate != null && d > maxDate) return Math.floor(maxDate);
+  if (minDate != null && d < minDate) return Math.ceil(minDate);
+  return d;
 }
 
 /** The snapped drop date if (cx,cy) is over the main axis band, else null. */
@@ -1859,19 +1873,19 @@ function buildDragGhost(type: string, name: string): HTMLElement {
 /** Drop-confirm popover (reuses the field-edit popover — number input, Enter
  *  saves, Esc/backdrop cancels; the backdrop intercepts click-away so the
  *  canvas mouse handlers never fire, gate finding). */
-function openDropDatePopover(state: ViewState, id: string, dropDate: number, cx: number, cy: number): void {
+function openDropDatePopover(state: ViewState, id: string, dropDate: number, cx: number, cy: number, edge: 'start' | 'end' = 'start'): void {
   const anchor = document.createElement('div');
   anchor.style.cssText = `position:fixed;left:${cx}px;top:${cy}px;width:1px;height:1px;pointer-events:none;`;
   document.body.appendChild(anchor);
   openFieldEditPopover({
     anchor,
-    label: 'Date',
+    label: edge === 'end' ? 'End date' : 'Date',
     value: String(dropDate),
     widget: 'number',
     onSave: (v: unknown) => {
       anchor.remove();
       const n = typeof v === 'number' ? v : Number(v);
-      if (Number.isFinite(n)) state.onDateElement?.(id, Math.round(n));
+      if (Number.isFinite(n)) state.onDateElement?.(id, Math.round(n), edge);
     },
     onCancel: () => { anchor.remove(); },
   });
@@ -1949,19 +1963,43 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
 // ====== Mouse / zoom / pan ======
 
 function hitTest(state: ViewState, mx: number, my: number): PlacedDot | null {
-  let found: PlacedDot | null = null;
-  let bestDist = Infinity;
-  for (const dot of state.placedDots) {
-    const dist = Math.hypot(dot.x - mx, dot.y - my);
-    if (dist < DOT_RADIUS_HOVER + 5 && dist < bestDist) { bestDist = dist; found = dot; }
-  }
-  if (found) return found;
+  const dot = dotOnlyHit(state, mx, my);
+  if (dot) return dot;
   // Labels are click targets too (S6) — a name is a bigger, friendlier hit
   // area than a 14px glyph.
   for (const lb of state.labelBoxes) {
     if (mx >= lb.x0 && mx <= lb.x1 && my >= lb.y0 && my <= lb.y1) {
       return state.placedDots.find(d => d.node.id === lb.nodeId) ?? null;
     }
+  }
+  return null;
+}
+
+/** Glyph-proximity hit only (no label fallback) — the mousedown grip order
+ *  needs it: dot > end cap > label (a side label often COVERS a short
+ *  range's end cap, and the precise grip must beat the generous text box). */
+function dotOnlyHit(state: ViewState, mx: number, my: number): PlacedDot | null {
+  let found: PlacedDot | null = null;
+  let bestDist = Infinity;
+  for (const dot of state.placedDots) {
+    const dist = Math.hypot(dot.x - mx, dot.y - my);
+    if (dist < DOT_RADIUS_HOVER + 5 && dist < bestDist) { bestDist = dist; found = dot; }
+  }
+  return found;
+}
+
+/**
+ * A range node's recorded END cap under the cursor (S265 end-stretch).
+ * Recorded ends only — openEnded fades and focus-inferred spans have no
+ * value to move. The start glyph wins where the two grips overlap (the
+ * caller checks hitTest first).
+ */
+function endCapHit(state: ViewState, mx: number, my: number, w: number): PlacedDot | null {
+  for (const dot of state.placedDots) {
+    if (dot.node.endDate == null) continue;
+    const ex = xAtDate(state, dot.node.endDate, w);
+    if (ex == null) continue;
+    if (Math.abs(mx - ex) <= 12 && Math.abs(my - dot.y) <= 10) return dot;
   }
   return null;
 }
@@ -2009,7 +2047,7 @@ function handleMouseMove(state: ViewState, e: MouseEvent): void {
     }
     const d = dateAtX(state, mx, w);
     if (d != null) {
-      state.dropDate = glyphDropDate(d, g.maxDate);
+      state.dropDate = glyphDropDate(d, g.maxDate, g.minDate);
       draw(state);
     }
     return;
@@ -2143,11 +2181,27 @@ function handleMouseDown(state: ViewState, e: MouseEvent): void {
   // falls through to the click progression (peek / re-click = focus), so
   // clicking is untouched. Pan from ON a dot is gone by design; the band's
   // empty space (and the strip) still pans.
-  const hitDot = hitTest(state, mx, my);
+  // Grip order: the START glyph wins, then a range's END CAP, then the label
+  // text (a side label often covers a short range's end cap — the precise
+  // grip beats the generous text box; the label still selects via no-move).
+  const dotHit = dotOnlyHit(state, mx, my);
+  const capHit = dotHit ? null : endCapHit(state, mx, my, rect.width);
+  const hitDot = dotHit ?? (capHit ? null : hitTest(state, mx, my));
   if (hitDot && state.onDateElement && TEMPORAL_TYPE_FIELDS[hitDot.node.elementType]) {
     state.glyphDrag = {
       dot: hitDot, startX: mx, startY: my, active: false,
-      maxDate: hitDot.node.endDate ?? null,
+      edge: 'start', maxDate: hitDot.node.endDate ?? null, minDate: null,
+    };
+    return;
+  }
+
+  // A range's END CAP arms an end-stretch drag (S265, the banked v2 of the
+  // S264 ruling: the start-drag anchors the end; this is the other grip).
+  // Only RECORDED ends — an open tenure's fade-cap has no value to move.
+  if (capHit && state.onDateElement && TEMPORAL_TYPE_FIELDS[capHit.node.elementType]?.end) {
+    state.glyphDrag = {
+      dot: capHit, startX: mx, startY: my, active: false,
+      edge: 'end', maxDate: null, minDate: capHit.node.startDate,
     };
     return;
   }
@@ -2190,8 +2244,9 @@ function handleMouseUp(state: ViewState, e?: MouseEvent): void {
       return;
     }
     draw(state); // clear the guide
-    if (dropDate == null || dropDate === Math.round(g.dot.node.startDate)) return;
-    openDropDatePopover(state, g.dot.node.id, dropDate, e?.clientX ?? 0, e?.clientY ?? 0);
+    const anchorDate = g.edge === 'end' ? (g.dot.node.endDate ?? g.dot.node.startDate) : g.dot.node.startDate;
+    if (dropDate == null || dropDate === Math.round(anchorDate)) return;
+    openDropDatePopover(state, g.dot.node.id, dropDate, e?.clientX ?? 0, e?.clientY ?? 0, g.edge);
     return;
   }
   // Commit a now-line drag (Act 1): persist the rounded value; the room writes

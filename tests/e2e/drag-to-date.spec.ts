@@ -201,3 +201,64 @@ test('a plain click on a dot still peeks (the drag threshold protects the click 
   // No popover, no write — a click is a peek.
   await expect(page.locator('.atlas-edit-popover')).toHaveCount(0);
 });
+
+test('dragging a range END cap stretches the end (S265, the other grip)', async ({ page }) => {
+  await setupWorld(page);
+  // TWO nodes only, far apart — three would fan into lanes on the small e2e
+  // viewport and the range's y would leave the midline (failed-shot finding).
+  // The range's END (5) is the exact midpoint of the fit (-20..30): the one
+  // x every pad model agrees on (w/2, ±the pad skew the 12px grip covers).
+  await createElement(page, 'event', { name: 'The Long War', start_date: 30 });
+  const siegeId = await createElement(page, 'event', { name: 'The Siege', start_date: -20, end_date: 5 });
+  await openCharts(page);
+
+  const cb = (await page.locator('.atlas-timeline-view-canvas').boundingBox())!;
+  const endX = cb.x + cb.width * 0.5;
+  const dotY = cb.y + bandMidY(cb.height);
+  await page.mouse.move(endX, dotY);
+  await page.mouse.down();
+  await page.mouse.move(endX + 12, dotY);
+  await page.mouse.move(endX + 60, dotY, { steps: 5 });
+  await page.mouse.up();
+
+  // The confirm popover is edge-aware ("End date"); commit an explicit value.
+  const input = page.locator('.atlas-edit-popover input');
+  await expect(input).toBeVisible();
+  await expect(page.locator('.atlas-edit-popover')).toContainText(/end date/i);
+  await input.fill('20');
+  await input.press('Enter');
+
+  await expect.poll(async () => page.evaluate((id) => {
+    return (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.end_date ?? null;
+  }, siegeId)).toBe(20);
+  // The start is untouched — the grip moved only its own edge.
+  expect(await page.evaluate((id) => {
+    return (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.start_date ?? null;
+  }, siegeId)).toBe(-20);
+});
+
+test('an end-stretch cannot precede the start (popover rejects, nothing written)', async ({ page }) => {
+  await setupWorld(page);
+  await createElement(page, 'event', { name: 'The Long War', start_date: 30 });
+  const siegeId = await createElement(page, 'event', { name: 'The Siege', start_date: -20, end_date: 5 });
+  await openCharts(page);
+
+  const cb = (await page.locator('.atlas-timeline-view-canvas').boundingBox())!;
+  const endX = cb.x + cb.width * 0.5;
+  const dotY = cb.y + bandMidY(cb.height);
+  await page.mouse.move(endX, dotY);
+  await page.mouse.down();
+  await page.mouse.move(endX + 12, dotY);
+  await page.mouse.move(endX + 40, dotY, { steps: 4 });
+  await page.mouse.up();
+
+  const input = page.locator('.atlas-edit-popover input');
+  await expect(input).toBeVisible();
+  await input.fill('-25');
+  await input.press('Enter');
+
+  await expect(page.locator('.ow-toast', { hasText: "the end can't precede the start (-20)" })).toBeVisible();
+  expect(await page.evaluate((id) => {
+    return (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.end_date ?? null;
+  }, siegeId)).toBe(5);
+});

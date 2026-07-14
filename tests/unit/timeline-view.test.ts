@@ -292,4 +292,11 @@ describe('glyphDropDate — re-dating snap + range clamp (S264)', () => {
     expect(glyphDropDate(8, 8)).toBe(8);
     expect(glyphDropDate(-40, 8)).toBe(-40);
   });
+
+  it('an end-stretch clamps at the recorded start (S265, the other grip)', () => {
+    expect(glyphDropDate(-5, null, 5)).toBe(5);
+    expect(glyphDropDate(4.4, null, 5)).toBe(5);
+    expect(glyphDropDate(20, null, 5)).toBe(20);
+    expect(glyphDropDate(3, null, 4.3)).toBe(5); // fractional start ceils
+  });
 });

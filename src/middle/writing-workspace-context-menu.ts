@@ -22,7 +22,10 @@ import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-att
 import { toastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { openSplitDialog } from './writing-workspace-split';
-import { findAutolinkCandidateAt, convertAutolinkAt } from './writing-workspace-autolink';
+import {
+  findAutolinkCandidateAt, convertAutolinkAt,
+  countAutolinkHints, countChips, convertAllAutolinks, unlinkAllChips,
+} from './writing-workspace-autolink';
 import { NARRATIVE_RELATION_FIELDS } from './writing-workspace-derive';
 import { WRITING_INLINE_CREATE_EVENT, WRITING_SPLIT_EVENT } from '../core/hotkeys';
 import type { Element } from '../core/types';
@@ -198,7 +201,30 @@ export function createProseContextMenu(deps: {
         </button>
       `);
     }
+    // Selection-scoped bulk linking (S265, Susie's gesture: select text,
+    // right-click, link everything in it). Counts come from the live
+    // decoration set / chip nodes, so the labels are exact.
+    let selLinkable = 0;
+    let selChips = 0;
     if (hasSelection) {
+      selLinkable = countAutolinkHints(editor.view, { from, to });
+      selChips = countChips(editor.view, { from, to });
+      if (selLinkable > 0) {
+        items.push(`
+          <button type="button" class="atlas-prose-context-menu-item" data-role="link-selection">
+            <span class="material-symbols-outlined">link</span>
+            <span>Link ${selLinkable} mention${selLinkable === 1 ? '' : 's'} in selection</span>
+          </button>
+        `);
+      }
+      if (selChips > 0) {
+        items.push(`
+          <button type="button" class="atlas-prose-context-menu-item" data-role="unlink-selection">
+            <span class="material-symbols-outlined">link_off</span>
+            <span>Unlink ${selChips} mention${selChips === 1 ? '' : 's'} in selection</span>
+          </button>
+        `);
+      }
       items.push(`
         <button type="button" class="atlas-prose-context-menu-item" data-role="create">
           <span class="material-symbols-outlined">add</span>
@@ -229,6 +255,18 @@ export function createProseContextMenu(deps: {
     menu.querySelector<HTMLElement>('[data-role="create"]')?.addEventListener('click', () => {
       dismissContextMenu();
       openInlineCreate();
+    });
+    menu.querySelector<HTMLElement>('[data-role="link-selection"]')?.addEventListener('click', () => {
+      dismissContextMenu();
+      if (!editorHandle) return;
+      const n = convertAllAutolinks(editorHandle.editor.view, { from, to });
+      if (n > 0) toastManager.info(`Linked ${n} element${n === 1 ? '' : 's'} · Ctrl+Z undoes`);
+    });
+    menu.querySelector<HTMLElement>('[data-role="unlink-selection"]')?.addEventListener('click', () => {
+      dismissContextMenu();
+      if (!editorHandle) return;
+      const n = unlinkAllChips(editorHandle.editor.view, { from, to });
+      if (n > 0) toastManager.info(`Unlinked ${n} mention${n === 1 ? '' : 's'} · Ctrl+Z undoes`);
     });
     menu.querySelector<HTMLElement>('[data-role="split"]')?.addEventListener('click', () => {
       dismissContextMenu();

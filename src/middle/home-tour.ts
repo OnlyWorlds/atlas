@@ -35,12 +35,12 @@ export interface TourWaveEntry {
  * Collective→Knowledge is his settled call: circles ARE collectives.
  */
 export const TOUR_WAVE: TourWaveEntry[] = [
-  { type: 'event',      room: 'timeline',  verb: 'Chart',  icon: 'insights',      line: 'see your events in time' },
+  { type: 'event',      room: 'timeline',  verb: 'Chart',  icon: 'insights',      line: 'elements in time' },
   { type: 'narrative',  room: 'writing',   verb: 'Write',  icon: 'menu_book',     line: 'tell it as a story' },
-  { type: 'map',        room: 'map',       verb: 'Map',    icon: 'map',           line: 'give your world ground' },
+  { type: 'map',        room: 'map',       verb: 'Map',    icon: 'map',           line: 'ground your world' },
   { type: 'collective', room: 'knowledge', verb: 'Know',   icon: 'psychology',    line: 'who knows what' },
-  { type: 'construct',  room: 'share',     verb: 'Pages',  icon: 'wall_art',      line: 'build a page to share' },
-  { type: 'object',     room: 'import',    verb: 'Export', icon: 'import_export', line: 'now there is something to your world' },
+  { type: 'construct',  room: 'share',     verb: 'Share',  icon: 'wall_art',      line: 'a page of your world' },
+  { type: 'object',     room: 'import',    verb: 'Export', icon: 'import_export', line: 'your entire world' },
 ];
 
 export type TourCard =

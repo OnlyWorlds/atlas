@@ -44,7 +44,9 @@ export function createStickyBar(deps: {
     const state = getState();
     const worldId = state.active!.worldId;
     const idx = buildNarrativeIndex(state.data.elements, worldId);
-    const chain = ancestorIds(idx, el.id);
+    // ancestorIds walks child->root (nearest first); a breadcrumb reads
+    // root->current, so reverse (S265 -- the crumb showed "chapter > book").
+    const chain = [...ancestorIds(idx, el.id)].reverse();
 
     const left = document.createElement('div');
     left.className = 'atlas-writing-workspace-crumb-left';

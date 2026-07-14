@@ -114,3 +114,30 @@ test('both cores → the next wave; a created type flips to its room CTA; dismis
   await expect(page.locator('.atlas-world-home')).toBeVisible();
   await expect(page.locator('[data-tour-cta="event"]')).toHaveCount(0);
 });
+
+test('desk map rows: imageless map diverts with a toast, never a dead click (S265)', async ({ page }) => {
+  await setupWorld(page);
+  await createViaStore(page, 'map', { name: 'Blank Atlas' });
+  const mapRow = page.locator('.atlas-home-continue-row', { hasText: 'Blank Atlas' });
+  await expect(mapRow).toBeVisible();
+  await mapRow.click();
+  // openMapTab's imageless path: toast + divert to the map's element detail.
+  await expect(page.locator('.ow-toast', { hasText: 'set a map image' })).toBeVisible();
+  await expect(page).toHaveURL(/\/element\//);
+});
+
+test('desk map rows: an already-open background map tab re-activates on click (S265)', async ({ page }) => {
+  await setupWorld(page);
+  await createViaStore(page, 'map', { name: 'Alpha Map', image_url: 'https://example.invalid/a.png' });
+  const mapRow = page.locator('.atlas-home-continue-row', { hasText: 'Alpha Map' });
+  await expect(mapRow).toBeVisible();
+  await mapRow.click();
+  // First click: tab opens and is active.
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Alpha Map' })).toBeVisible();
+  // Background the tab (switch to the map index), then click the row again.
+  await page.click('.atlas-tab[data-tab-kind="map-index"]');
+  await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toHaveClass(/active/);
+  await mapRow.click();
+  // The fix: the existing tab ACTIVATES instead of nothing happening.
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Alpha Map' })).toBeVisible();
+});

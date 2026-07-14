@@ -282,8 +282,17 @@ function mountRoom(mode: MiddleMode, target: HTMLElement, toasts: ToastManager):
 
 function ensureMapTabOpen(mapId: string): void {
   const ui = getState().ui;
-  const exists = ui.rightTabs.find(t => t.kind === 'map' && t.mapId === mapId);
-  if (exists) return;
+  const existsIndex = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === mapId);
+  if (existsIndex >= 0) {
+    // Activate a background tab — a /map/<id> route that lands on an open but
+    // inactive tab should surface it (S265). Guarded: only patch when the
+    // index actually changes, since this runs inside the render pass and an
+    // unconditional patch would re-enter renderMiddle forever.
+    if (ui.rightActiveIndex !== existsIndex) {
+      patchSlice('ui', { ...ui, rightActiveIndex: existsIndex });
+    }
+    return;
+  }
   const m = getState().data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId);
   if (!m) return;
   // Imageless maps: openMapTab refuses and DIVERTS (ui patch + navigate).

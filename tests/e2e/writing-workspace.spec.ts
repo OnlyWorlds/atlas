@@ -817,3 +817,88 @@ test('empty narrative shows initial empty paragraph', async ({ page }) => {
   await expect(proseRoot.locator('.atlas-element-chip')).toHaveCount(0);
   await expect(page.locator('.atlas-writing-workspace-wc')).toContainText('0 words');
 });
+
+test('link-all corner icon: counts candidates, one click chips them all (S265)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'linkall-root');
+  await createWorld(page, 'linkall world');
+  await createElement(page, 'character', { name: 'Aralia' });
+  await createElement(page, 'character', { name: 'Bram' });
+  const nid = await createElement(page, 'narrative', {
+    name: 'the meeting', supertype: 'Book', story: 'Aralia met Bram at dawn.',
+  });
+
+  await gotoWriting(page, nid);
+  await waitForEditor(page);
+
+  const corner = page.locator('.atlas-writing-linkall-corner');
+  await expect(corner).toBeVisible();
+  await expect(corner.locator('.atlas-writing-linkall-count')).toHaveText('2');
+
+  await corner.click();
+  await expect(page.locator('.atlas-writing-workspace-prose .atlas-element-chip')).toHaveCount(2);
+  // All candidates linked → the affordance retires itself.
+  await expect(corner).toBeHidden();
+});
+
+test('tree bulk link: right-click a book links mentions in its closed scenes, story + sidecar + derive (S265)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'bulklink-root');
+  await createWorld(page, 'bulklink world');
+  const aralia = await createElement(page, 'character', { name: 'Aralia' });
+  const bookId = await createElement(page, 'narrative', { name: 'the tome', supertype: 'Book' });
+  const chapId = await createElement(page, 'narrative', {
+    name: 'first chapter', supertype: 'Chapter', parent_narrative: bookId,
+    story: 'Aralia rides north.',
+  });
+
+  // Writing room with NO narrative open — the chapter stays a closed doc,
+  // exercising the disk path (story + relation derive).
+  await gotoWriting(page);
+  const bookRow = page.locator('.atlas-writing-tree-row', { hasText: 'the tome' });
+  await expect(bookRow).toBeVisible();
+
+  page.once('dialog', d => void d.accept());
+  await bookRow.click({ button: 'right' });
+  await page.locator('.atlas-prose-context-menu [data-role="bulk-link"]').click();
+
+  await expect(page.locator('.ow-toast', { hasText: 'Linked 1 mention' })).toBeVisible();
+  await expect.poll(async () => await page.evaluate((id) => {
+    const s = (window as any).__atlasTestApi.getState();
+    return s.data.elements.find((e: any) => e.id === id)?.story ?? '';
+  }, chapId)).toBe(`[Aralia](ow://character/${aralia}) rides north.`);
+  // Convention #50 derive rode the bulk write.
+  const chap = await page.evaluate((id) => {
+    const s = (window as any).__atlasTestApi.getState();
+    return s.data.elements.find((e: any) => e.id === id) ?? null;
+  }, chapId);
+  expect(chap.characters).toContain(aralia);
+});
+
+test('tree row hover "+" creates the child tier inside that row (S265)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'rowadd-root');
+  await createWorld(page, 'rowadd world');
+  const bookId = await createElement(page, 'narrative', { name: 'the tome', supertype: 'Book' });
+
+  await gotoWriting(page);
+  const bookRow = page.locator('.atlas-writing-tree-row', { hasText: 'the tome' });
+  await expect(bookRow).toBeVisible();
+  // Only "+ new book" remains in the header — the draft button retired.
+  await expect(page.locator('.atlas-writing-sidebar-create-btn')).toHaveCount(1);
+
+  await bookRow.hover();
+  await bookRow.locator('.atlas-writing-tree-row-add').click();
+  await page.fill('input[name="narrative-name"]', 'first chapter');
+  await page.click('[data-action="create"]');
+
+  // The new chapter lands INSIDE the book and opens.
+  const chapRow = page.locator('.atlas-writing-tree-row', { hasText: 'first chapter' });
+  await expect(chapRow).toBeVisible();
+  const chap = await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    return s.data.elements.find((e: any) => e.name === 'first chapter') ?? null;
+  });
+  expect(chap.parent_narrative).toBe(bookId);
+  expect(chap.supertype).toBe('Chapter');
+});

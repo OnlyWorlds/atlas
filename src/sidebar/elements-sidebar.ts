@@ -106,6 +106,12 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   // its promise.
   createBtn.addEventListener('click', () => new ElementCreateModal(toasts, {
     initialName: searchInput.value.trim() || undefined,
+    // A single active type filter carries into the modal as the preselected
+    // category (S265, Captain) — filtering to characters then hitting + means
+    // "another character" far more often than not.
+    initialType: getState().ui.elementFilters?.size === 1
+      ? [...getState().ui.elementFilters][0]
+      : undefined,
     // The search text became the element's name — clear the filter so the
     // new element isn't the only visible row (S255v4, Captain).
     afterCreate: () => {

@@ -65,7 +65,9 @@ test('a chart saved from the default view can be reopened (the selection-scope f
   await page.click('[data-action="save-chart"]');
   const chip = page.locator('.atlas-saved-chart');
   await expect(chip).toHaveCount(1);
-  await expect(chip.locator('.atlas-saved-chart-name')).toHaveText('Selection (3)');
+  // Member-derived name; exact order varies with timestamp ties, so capture it.
+  const savedName = (await chip.locator('.atlas-saved-chart-name').textContent()) ?? '';
+  expect(savedName).toMatch(/\+1$/); // members + overflow, not "Selection (3)"
 
   // Change the lens (narrow to events), then reopen the saved chart.
   await page.locator('.atlas-chart-type-chip', { hasText: 'characters' }).click();
@@ -76,7 +78,7 @@ test('a chart saved from the default view can be reopened (the selection-scope f
   await expect(page.locator('.ow-toast', { hasText: 'not supported' })).toHaveCount(0);
   await expect(page.locator('.ow-toast', { hasText: 'share view' })).toHaveCount(0);
   await expect(chip).toHaveClass(/active/);
-  await expect(page.locator('.atlas-timeline-rail-head')).toHaveText('Selection (3)');
+  await expect(page.locator('.atlas-timeline-rail-head')).toHaveText(savedName);
 });
 
 test('renaming a chart renames the rail heading with it', async ({ page }) => {
@@ -88,7 +90,7 @@ test('renaming a chart renames the rail heading with it', async ({ page }) => {
   await page.click('[data-action="save-chart"]');
   const chip = page.locator('.atlas-saved-chart');
   // Freshly saved from the live view → immediately active → the rail names it.
-  await expect(page.locator('.atlas-timeline-rail-head')).toHaveText('Selection (2)');
+  await expect(page.locator('.atlas-timeline-rail-head')).toHaveText('Alpha & Beta');
 
   await chip.hover();
   await chip.locator('.atlas-saved-chart-action').first().click(); // rename
@@ -115,4 +117,24 @@ test('a type-chip click releases an applied chart (the chart is a lens, not a lo
   await page.locator('.atlas-chart-type-chip', { hasText: 'events' }).click();
   await expect(chip).not.toHaveClass(/active/);
   await expect(page.locator('.atlas-timeline-rail-head')).toHaveText('This chart');
+});
+
+test('deleting the applied chart releases its lens (S265, the ghost-scope bug)', async ({ page }) => {
+  await setupWorld(page);
+  await createElement(page, 'event', { name: 'Alpha', start_date: 10 });
+  await createElement(page, 'event', { name: 'Beta', start_date: 20 });
+  await openCharts(page);
+
+  await page.click('[data-action="save-chart"]');
+  const chip = page.locator('.atlas-saved-chart');
+  // Applied: the rail names it (capture — member order varies on timestamp ties).
+  const savedName = (await chip.locator('.atlas-saved-chart-name').textContent()) ?? '';
+  await expect(page.locator('.atlas-timeline-rail-head')).toHaveText(savedName);
+
+  await chip.hover();
+  await chip.locator('.atlas-saved-chart-action[title="Delete chart"]').click();
+  await expect(page.locator('.atlas-saved-chart')).toHaveCount(0);
+  // The lens released with it — the rail no longer carries the dead chart's
+  // name (a stale appliedSelection kept scoping the room invisibly).
+  await expect(page.locator('.atlas-timeline-rail-head')).not.toHaveText(savedName);
 });

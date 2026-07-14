@@ -270,18 +270,25 @@ export function isWritingInitialized(
   // otherwise make `allInTree` false forever).
   const narratives = elements.filter(e => isStoryNarrative(e));
   if (narratives.length === 0) return true; // nothing to decide
-  // If every narrative already has a writing-tree supertype, treat as inited.
-  // (Could be a world filled by another tool that happens to use Book/Chapter/Scene.)
+  // Only CHAIN MEMBERS (a narrative with a parent, or one that IS a parent)
+  // warrant a setup decision. A loose supertype-less narrative — e.g. the
+  // home tour's create card, or any plain element-create — is not structure,
+  // and judging it here hijacked the whole writing room with the setup
+  // screen the moment a book+chapter chain existed beside it (S265, Captain's
+  // repro). Setup still fires for genuinely foreign chained structures
+  // (imported worlds whose tiers use other labels).
+  const parentIds = new Set(
+    narratives
+      .map(n => (n as Element & { parent_narrative?: string }).parent_narrative)
+      .filter((v): v is string => Boolean(v)),
+  );
+  const chainMembers = narratives.filter(n =>
+    Boolean((n as Element & { parent_narrative?: string }).parent_narrative) || parentIds.has(n.id));
+  if (chainMembers.length === 0) return true; // narratives exist but no hierarchy
   const labels = mergeLabels(entry?.writing_labels);
   const writingValues = new Set([labels.l1, labels.l2, labels.l3, labels.l4]);
-  const anyStructured = narratives.some(n => {
-    const parent = (n as Element & { parent_narrative?: string }).parent_narrative;
-    return Boolean(parent);
-  });
-  if (!anyStructured) return true; // narratives exist but no hierarchy
-  const allInTree = narratives.every(n => {
+  return chainMembers.every(n => {
     const supertype = (n as Element & { supertype?: string | null }).supertype;
     return supertype != null && writingValues.has(supertype);
   });
-  return allInTree;
 }

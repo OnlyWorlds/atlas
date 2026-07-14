@@ -267,22 +267,30 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
    * elements, so a freshly-dated low-weight element may enter neither the rail
    * (now dated) nor the scoped chart (gate: convergent HIGH finding).
    */
-  async function dateElement(id: string, date: number): Promise<void> {
+  async function dateElement(id: string, date: number, edge: 'start' | 'end' = 'start'): Promise<void> {
     const store = getActiveStore();
     const el = getState().data.elements.find(e => e.id === id);
     if (!store || !el) { toasts.error('element not found'); return; } // deleted mid-drag (gate)
     const mapping = TEMPORAL_TYPE_FIELDS[el.type];
-    const field = mapping?.start;
+    const field = edge === 'end' ? mapping?.end : mapping?.start;
     if (!field) { toasts.error('this type has no date field'); return; }
-    // Re-dating a RANGE moves its start; the end stays anchored (S264,
-    // Captain's ruling: the drag reduces/extends the range, never slides it).
-    // The canvas drag clamps live, but the confirm popover accepts free text —
-    // reject a start past the recorded end instead of writing an inverted range.
-    const endRaw = mapping.end ? (el as Record<string, unknown>)[mapping.end] : undefined;
-    const endVal = parseTemporalValue(endRaw);
-    if (endVal != null && date > endVal) {
-      toasts.error(`the start can't pass the end (${endVal})`);
-      return;
+    // Either edge respects the other as its bound (S264 ruling + the S265
+    // end-stretch): the canvas drag clamps live, but the confirm popover
+    // accepts free text — reject an inversion instead of writing one.
+    if (edge === 'start') {
+      const endRaw = mapping.end ? (el as Record<string, unknown>)[mapping.end] : undefined;
+      const endVal = parseTemporalValue(endRaw);
+      if (endVal != null && date > endVal) {
+        toasts.error(`the start can't pass the end (${endVal})`);
+        return;
+      }
+    } else {
+      const startRaw = mapping.start ? (el as Record<string, unknown>)[mapping.start] : undefined;
+      const startVal = parseTemporalValue(startRaw);
+      if (startVal != null && date < startVal) {
+        toasts.error(`the end can't precede the start (${startVal})`);
+        return;
+      }
     }
     try {
       await store.updateElement(id, { [field]: date });
@@ -399,7 +407,17 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     savedCharts = removeChart(savedCharts, chart.id);
     const store = getActiveStore();
     if (store) await store.writeCharts(savedCharts);
-    renderGallery();
+    // Deleting the APPLIED chart must release its lens — a stale
+    // appliedSelection kept scoping the room invisibly (chips unlit), so
+    // e.g. drag-to-date toasted "not in this view" against a ghost member
+    // list (S265, Captain's find).
+    if (appliedSelection?.id === chart.id || config?.id === chart.id) {
+      appliedSelection = null;
+      config = null;
+    }
+    // Always a full render: a fresh save is "active" by scope-match alone
+    // (no appliedSelection), and only render() rebuilds the rail heading.
+    render();
     toasts.show(`removed "${chart.name}"`, 'info');
   }
 
@@ -512,7 +530,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
         // The now-line was dragged/established → persist to World.time_current.
         onSetNow: (value) => void setNow(value),
         // A rail element was dragged onto the axis and dropped at `date`.
-        onDateElement: (id, date) => void dateElement(id, date),
+        onDateElement: (id, date, edge) => void dateElement(id, date, edge),
       });
     }
 

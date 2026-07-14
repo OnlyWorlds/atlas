@@ -469,3 +469,39 @@ test('element detail surfaces Knowledge: known by + subject of (K6)', async ({ p
   await expect(page).toHaveURL(new RegExp(`/knowledge/knower/${partyId}$`));
   await expect(page.locator('.atlas-knowledge-knower-header h2')).toContainText('the party');
 });
+
+test('two individual knowers promote to a circle (S265, the narrator single-link dead end)', async ({ page }) => {
+  await setupWorld(page);
+  const ireenaId = await createElement(page, 'character', { name: 'Ireena' });
+  await createElement(page, 'character', { name: 'Bram' });
+  const entryId = await createElement(page, 'narrative', {
+    name: 'the secret', subtype: 'knowledge', story: 'A secret.', narrator: ireenaId,
+  });
+  await openKnowledge(page);
+  await page.locator('.atlas-knowledge-row', { hasText: 'the secret' }).click();
+
+  const who = page.locator('.atlas-knowledge-zone-who');
+  await expect(who.locator('.atlas-knowledge-chip', { hasText: 'Ireena' })).toBeVisible();
+  // With a narrator set, "+ character" offers the second knower instead of dead-ending.
+  await who.locator('.atlas-knowledge-add', { hasText: '+ character' }).click();
+  // The picker excludes the current narrator.
+  await expect(page.locator('.atlas-picker-row', { hasText: 'Ireena' })).toHaveCount(0);
+  await page.locator('.atlas-picker-row', { hasText: 'Bram' }).click();
+
+  // The create modal IS the confirm — name prefilled from both knowers.
+  await expect(page.locator('input[name="element-name"]')).toHaveValue('Ireena & Bram');
+  await page.click('[data-action="create"]');
+
+  // One holder chip remains: the circle. Narrator cleared, members wired.
+  await expect(who.locator('.atlas-knowledge-chip')).toHaveCount(1);
+  await expect(who.locator('.atlas-knowledge-chip', { hasText: 'Ireena & Bram' })).toBeVisible();
+  await expect.poll(async () => (await getElement(page, entryId))?.narrator ?? null).toBeNull();
+  const entry = await getElement(page, entryId);
+  expect(entry.collectives).toHaveLength(1);
+  const circle = await getElement(page, entry.collectives[0]);
+  expect(circle.subtype).toBe('circle');
+  expect([...circle.characters].sort()).toEqual([ireenaId, (await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    return s.data.elements.find((e: any) => e.name === 'Bram').id;
+  }))].sort());
+});

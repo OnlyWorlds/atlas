@@ -29,6 +29,7 @@ import {
 } from '../middle/writing-helpers';
 import type { Element } from '../core/types';
 import { escapeText } from '../core/dom-utils';
+import { bulkLinkNarratives } from '../middle/writing-bulk-link';
 
 async function createNarrativeAtTier(
   tier: 'l1' | 'l2' | 'l3' | 'l4',
@@ -219,24 +220,10 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     });
     createRow.appendChild(newBookBtn);
 
-    const newDraftBtn = document.createElement('button');
-    newDraftBtn.type = 'button';
-    newDraftBtn.className = 'atlas-writing-sidebar-create-btn atlas-writing-sidebar-create-btn-draft';
-    newDraftBtn.title = `New ${labels.l4.toLowerCase()}`;
-    newDraftBtn.innerHTML = `<span class="material-symbols-outlined">add</span><span>new ${escapeText(labels.l4.toLowerCase())}</span>`;
-    newDraftBtn.addEventListener('click', () => {
-      new WritingCreateModal({
-        label: labels.l4,
-        onCreate: async (name) => {
-          const created = await createNarrativeAtTier('l4', null, name, active.worldId, toasts);
-          if (created) {
-            navigate(writingHash(active.worldId, created.id));
-            toasts.info(`${labels.l4} created`);
-          }
-        },
-      }).open();
-    });
-    createRow.appendChild(newDraftBtn);
+    // The "new draft" button is gone (S265, Captain: two parentless create
+    // buttons read as two competing entry points). Drafts (l4) stay a working
+    // tier — existing ones render and behave — they're just no longer pushed.
+    // Chapters and scenes create from their PARENT row's hover "+" instead.
 
     root.appendChild(createRow);
 
@@ -466,6 +453,45 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     });
     row.appendChild(body);
 
+    // Hover "+" (S265): create the child tier INSIDE this row — a book row
+    // makes a chapter, a chapter row a scene. The container question answers
+    // itself: it's the row you clicked. Scenes and drafts get no button.
+    const childTier = node.tier === 'l1' ? 'l2' as const : node.tier === 'l2' ? 'l3' as const : null;
+    if (childTier) {
+      const childLabel = labels[childTier];
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'atlas-writing-tree-row-add';
+      addBtn.title = `New ${childLabel.toLowerCase()} in "${node.el.name || `(unnamed ${tierLabel.toLowerCase()})`}"`;
+      addBtn.innerHTML = `<span class="material-symbols-outlined">add</span>`;
+      addBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        new WritingCreateModal({
+          label: childLabel,
+          onCreate: async (name) => {
+            const created = await createNarrativeAtTier(childTier, node.el.id, name, worldId, toasts);
+            if (created) {
+              // Un-collapse the parent so the new row is visible immediately.
+              if (collapsed.has(node.el.id)) {
+                const next = toggleWritingTreeCollapsed(getState().registry, worldId, node.el.id);
+                saveRegistry(next);
+                patchSlice('registry', next);
+              }
+              navigate(writingHash(worldId, created.id));
+              toasts.info(`${childLabel} created`);
+            }
+          },
+        }).open();
+      });
+      row.appendChild(addBtn);
+    }
+
+    // Right-click → bulk link/unlink over this node + descendants (S265).
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openTreeContextMenu(e, node, tierLabel, toasts);
+    });
+
     parent.appendChild(row);
 
     if (hasChildren && !isCollapsed) {
@@ -489,4 +515,87 @@ function pluralize(word: string): string {
   if (word.endsWith('s')) return word;
   if (word.endsWith('y')) return word.slice(0, -1) + 'ies';
   return word + 's';
+}
+
+// ---------------------------------------------------------------------------
+// Tree context menu — bulk link/unlink over a node + its descendants (S265)
+// ---------------------------------------------------------------------------
+
+function collectSubtreeIds(node: NarrativeNode): string[] {
+  return [node.el.id, ...node.children.flatMap(collectSubtreeIds)];
+}
+
+let activeTreeMenu: HTMLElement | null = null;
+function dismissTreeMenu(): void {
+  if (!activeTreeMenu) return;
+  activeTreeMenu.remove();
+  activeTreeMenu = null;
+  document.removeEventListener('mousedown', onTreeMenuOutside, true);
+  document.removeEventListener('keydown', onTreeMenuKey, true);
+}
+const onTreeMenuOutside = (e: MouseEvent): void => {
+  if (activeTreeMenu && !activeTreeMenu.contains(e.target as Node)) dismissTreeMenu();
+};
+const onTreeMenuKey = (e: KeyboardEvent): void => {
+  if (e.key === 'Escape') dismissTreeMenu();
+};
+
+function openTreeContextMenu(
+  e: MouseEvent,
+  node: NarrativeNode,
+  tierLabel: string,
+  toasts: ToastManager,
+): void {
+  dismissTreeMenu();
+  const ids = collectSubtreeIds(node);
+  const scope = ids.length > 1
+    ? `this ${tierLabel.toLowerCase()} · ${ids.length} narratives`
+    : `this ${tierLabel.toLowerCase()}`;
+
+  const menu = document.createElement('div');
+  menu.className = 'atlas-prose-context-menu';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = `
+    <button type="button" class="atlas-prose-context-menu-item" data-role="bulk-link">
+      <span class="material-symbols-outlined">link</span>
+      <span>Link mentions in ${escapeText(scope)}</span>
+    </button>
+    <button type="button" class="atlas-prose-context-menu-item" data-role="bulk-unlink">
+      <span class="material-symbols-outlined">link_off</span>
+      <span>Unlink mentions in ${escapeText(scope)}</span>
+    </button>
+  `;
+  menu.style.position = 'fixed';
+  menu.style.left = `${e.clientX}px`;
+  menu.style.top = `${e.clientY}px`;
+  menu.style.zIndex = '1000';
+  document.body.appendChild(menu);
+  activeTreeMenu = menu;
+
+  menu.querySelector<HTMLElement>('[data-role="bulk-link"]')?.addEventListener('click', () => {
+    dismissTreeMenu();
+    // Multi-narrative writes touch closed docs — one confirm line (Captain's
+    // ruling); a single narrative applies immediately like the corner icon.
+    if (ids.length > 1 && !confirm(`Link element mentions across ${ids.length} narratives?`)) return;
+    void bulkLinkNarratives(ids, 'link').then(({ changed, count }) => {
+      toasts.info(count > 0
+        ? `Linked ${count} mention${count === 1 ? '' : 's'} across ${changed} narrative${changed === 1 ? '' : 's'}`
+        : 'Nothing new to link');
+    });
+  });
+  menu.querySelector<HTMLElement>('[data-role="bulk-unlink"]')?.addEventListener('click', () => {
+    dismissTreeMenu();
+    // Always confirm: disk unlinks in closed narratives have no Ctrl+Z.
+    if (!confirm(`Unlink every element mention in ${scope}? This can't be undone for closed narratives.`)) return;
+    void bulkLinkNarratives(ids, 'unlink').then(({ changed, count }) => {
+      toasts.info(count > 0
+        ? `Unlinked ${count} mention${count === 1 ? '' : 's'} across ${changed} narrative${changed === 1 ? '' : 's'}`
+        : 'No linked mentions found');
+    });
+  });
+
+  queueMicrotask(() => {
+    document.addEventListener('mousedown', onTreeMenuOutside, true);
+    document.addEventListener('keydown', onTreeMenuKey, true);
+  });
 }

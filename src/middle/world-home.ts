@@ -21,11 +21,12 @@ import {
   navigate, writingHash, elementHash, importHash, knowledgeHash, shareHash, mapHash,
 } from '../core/router';
 import { ElementCreateModal } from '../ui/element-create-modal';
+import { openMapTab } from '../tabs/right/map-index-tab';
 import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
-import type { Element, ElementType } from '../core/types';
+import type { Element, ElementType, WorldMap } from '../core/types';
 import { narrativeKindOf } from '../core/narrative-kind';
 import { isWritingNarrative } from './writing-helpers';
 import { escapeText, relativeTime } from '../core/dom-utils';
@@ -55,6 +56,18 @@ function roomOf(el: Element, worldId: string): { hash: string; label: string } {
   }
   if (el.type === 'map') return { hash: mapHash(worldId, el.id), label: 'map' };
   return { hash: elementHash(worldId, el.id), label: '' };
+}
+
+/**
+ * Desk/recent/CTA click-through. Maps go through openMapTab, not navigation —
+ * navigate(mapHash) alone can't activate an already-open background tab
+ * (ensureMapTabOpen early-returns on exists), and imageless maps need the
+ * toast + divert-to-element feedback instead of a silent dead click (S265,
+ * Captain's find: "recent map does nothing").
+ */
+function openDeskTarget(el: Element, hash: string): void {
+  if (el.type === 'map') { openMapTab(el as WorldMap); return; }
+  navigate(hash);
 }
 
 export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () => void {
@@ -261,7 +274,9 @@ function buildCover(
   if (cast) cover.appendChild(cast);
 
   // The woven stat line (replaces the count-card grid + the meta chips).
-  if (totalElements > 0) {
+  // ALWAYS rendered — empty at zero elements, with a reserved min-height, so
+  // the first element's "1 character" doesn't shift everything below (S265).
+  {
     const statline = document.createElement('div');
     statline.className = 'atlas-home-statline';
     let first = true;
@@ -322,13 +337,19 @@ const CAST_KINDS = [
 function buildCastGhost(spec: typeof CAST_KINDS[number]): HTMLElement {
   const ghost = document.createElement('button');
   ghost.type = 'button';
-  ghost.className = 'atlas-home-cast-card atlas-home-cast-ghost';
+  const assigning = getState().ui.castAssign?.kind === spec.kind;
+  ghost.className = 'atlas-home-cast-card atlas-home-cast-ghost'
+    + (assigning ? ' atlas-home-cast-assigning' : '');
   ghost.title = spec.ghostTitle;
+  // Quiet by default (S265: the "shows here on the cover" line was noise);
+  // in assignment mode the role line becomes the instruction. The line is
+  // ALWAYS rendered (nbsp when idle) so the card never changes height and
+  // the layout never shifts on click.
   ghost.innerHTML = `
     <span class="material-symbols-outlined atlas-home-cast-icon">${spec.icon}</span>
     <span class="atlas-home-cast-text">
       <span class="atlas-home-cast-name">${spec.ghostName}</span>
-      <span class="atlas-home-cast-role">shows here on the cover</span>
+      <span class="atlas-home-cast-role">${assigning ? 'in the left sidebar' : ' '}</span>
     </span>
   `;
   ghost.addEventListener('click', () => {
@@ -381,7 +402,11 @@ function buildCastSlot(worldId: string): HTMLElement | null {
       rendered++;
     }
   }
-  return rendered > 0 ? slot : null;
+  // Always return the slot — empty it reserves its row via CSS min-height, so
+  // the first character/location's ghost doesn't shift the page below (S265,
+  // Captain: "the cards jumped down").
+  void rendered;
+  return slot;
 }
 
 /** One set cast card: face, name, role, click-through, hover × unset. */
@@ -451,6 +476,18 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   if (lastMap) continueRows.push({ icon: 'map', verb: 'Map', el: lastMap, hash: mapHash(worldId, lastMap.id) });
   if (lastEdited) continueRows.push({ icon: ELEMENT_ICONS[lastEdited.type] ?? 'category', verb: 'Edit', el: lastEdited, hash: roomOf(lastEdited, worldId).hash });
 
+  // The remaining recent elements join the SAME list in the SAME row style
+  // (S265, Captain's sshot: the old element rows beside the verb rows read as
+  // two competing designs under one heading). The verb comes from the room
+  // the row opens — Write for tree narratives, Map for maps, Edit otherwise —
+  // so every row speaks the identical language.
+  const continueIds = new Set(continueRows.map(r => r.el.id));
+  for (const el of byRecency.filter(e => !continueIds.has(e.id)).slice(0, 5)) {
+    const room = roomOf(el, worldId);
+    const verb = room.label === 'writing' ? 'Write' : room.label === 'map' ? 'Map' : 'Edit';
+    continueRows.push({ icon: ELEMENT_ICONS[el.type] ?? 'category', verb, el, hash: room.hash });
+  }
+
   // The first element gets a standing highlight (S264): with exactly one
   // content element, its row IS the tour's next step — make it unmissable.
   const firstElement = content.length === 1 ? content[0] : null;
@@ -471,44 +508,12 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
         <span class="material-symbols-outlined">${row.icon}</span>
         <span class="atlas-home-continue-verb">${row.verb}</span>
         <span class="atlas-home-continue-name">${escapeText(row.el.name || '(unnamed)')}</span>
+        <span class="atlas-home-continue-kind">${escapeText(row.el.type)}</span>
         <span class="atlas-home-continue-time">${isFirst ? 'your first element · click to keep shaping it' : relativeTime(row.el.local_updated_at)}</span>
       `;
-      btn.addEventListener('click', () => navigate(row.hash));
+      btn.addEventListener('click', () => openDeskTarget(row.el, row.hash));
       section.appendChild(btn);
     }
-    desk.appendChild(section);
-  }
-
-  // Recent — tight rows; each routes to the room the element lives in (H5).
-  const continueIds = new Set(continueRows.map(r => r.el.id));
-  const recent = byRecency.filter(el => !continueIds.has(el.id)).slice(0, 5);
-  if (recent.length > 0) {
-    const section = document.createElement('section');
-    section.className = 'atlas-home-recent';
-    const title = document.createElement('h2');
-    title.className = 'atlas-home-section-title';
-    // Truthful label: rows sort on local_updated_at, so this is edit recency,
-    // not view recency.
-    title.textContent = 'Recently edited';
-    section.appendChild(title);
-    const list = document.createElement('div');
-    list.className = 'atlas-home-recent-list';
-    for (const el of recent) {
-      const room = roomOf(el, worldId);
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.className = 'atlas-home-recent-row';
-      row.innerHTML = `
-        <span class="material-symbols-outlined atlas-home-recent-icon">${ELEMENT_ICONS[el.type] ?? 'category'}</span>
-        <span class="atlas-home-recent-name">${escapeText(el.name || '(unnamed)')}</span>
-        ${room.label ? `<span class="atlas-home-recent-room">${room.label}</span>` : ''}
-        <span class="atlas-home-recent-type">${el.type}</span>
-        <span class="atlas-home-recent-time">${relativeTime(el.local_updated_at)}</span>
-      `;
-      row.addEventListener('click', () => navigate(room.hash));
-      list.appendChild(row);
-    }
-    section.appendChild(list);
     desk.appendChild(section);
   }
 
@@ -561,7 +566,7 @@ function buildTour(
   } else if (corePhase) {
     section.innerHTML = `<p class="atlas-home-onboarding-copy">Every world starts with someone, somewhere.</p>`;
   } else {
-    section.innerHTML = `<p class="atlas-home-onboarding-copy atlas-home-tour-label">build out your world</p>`;
+    section.innerHTML = `<p class="atlas-home-onboarding-copy atlas-home-tour-label">build your world and explore atlas rooms</p>`;
   }
 
   const grid = document.createElement('div');
@@ -609,9 +614,17 @@ function buildTour(
         <span class="atlas-home-tile-cta-line">${escapeText(entry.line)}</span>
       `;
       tile.addEventListener('click', () => {
-        const hash = tourRoomHash(entry, worldId);
         // Visiting the room completes the card's job — it doesn't come back.
         persistDismiss(worldId, card.id);
+        if (entry.room === 'map') {
+          // The map room is a right-pane tab — go through openMapTab so an
+          // already-open background tab activates and an imageless map gets
+          // the toast + divert instead of a dead click (S265).
+          const map = getState().data.elements.find((e): e is WorldMap => e.type === 'map');
+          if (map) openMapTab(map);
+          return;
+        }
+        const hash = tourRoomHash(entry, worldId);
         if (hash) navigate(hash);
       });
       attachDismiss(tile, card.id);
