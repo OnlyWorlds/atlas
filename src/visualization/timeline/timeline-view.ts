@@ -26,9 +26,11 @@ import { applyAlpha, ensureIconFont } from './canvas-utils';
 import { completeWaypoint } from '../../core/waypoints';
 import { openFieldEditPopover } from '../../ui/field-edit-popover';
 import {
-  type CalendarConfig, formatStep, formatYearLabel, formatDuration,
-  approxYearLength, parseDate, isParseError,
+  type CalendarConfig, formatStep, formatDuration, parseDate, isParseError,
 } from '../../core/calendar';
+import {
+  type CalendarTick, calendarTicks, eraBandsInRange, seasonBandsInRange,
+} from '../../core/calendar-axis';
 
 const DOT_RADIUS = 4;             // placement radius for binning + hit-test base
 const DOT_RADIUS_HOVER = 14;      // hit-test tolerance (px) — covers the WHOLE
@@ -54,7 +56,17 @@ const LABEL_NEAR_MAX = 9;        // most labels to reveal around the cursor
 const LABEL_BUDGET_PX_PER_ROW = 56;
 const PLUS_BADGE_H = 14;         // badge hit-box height
 const ZOOM_MAX = 200;            // max magnification vs the fitted span
+// The magnification cap alone starved day-grain worlds: 200× of a 50-year day
+// world still shows ~90 steps — the day rung (2B) could never engage. Zoom may
+// always continue down to a window of this many steps, whichever cap is looser.
+const MIN_WINDOW_STEPS = 24;
 const ZOOM_STEP = 1.2;
+
+/** The smallest window span allowed over these bounds (the looser of the two caps). */
+function minWindowSpan(bounds: { min: number; max: number }): number {
+  const boundSpan = Math.max(1e-9, bounds.max - bounds.min);
+  return Math.min(boundSpan / ZOOM_MAX, MIN_WINDOW_STEPS);
+}
 // Overview strip (sitdown S2) — the always-visible full-world reference frame
 // under the main axis. The bright band is the viewport; drag/resize it there.
 const STRIP_H = 26;
@@ -435,7 +447,7 @@ export function clampWindow(
 /**
  * Resize a window by `factor` (>1 zooms out, <1 zooms in) around `anchorDate`
  * so the date under the cursor stays put. Span is clamped to
- * [boundsSpan/ZOOM_MAX, boundsSpan·1.1].
+ * [minWindowSpan(bounds), boundsSpan·1.1].
  */
 export function zoomWindow(
   win: TimeWindow,
@@ -445,7 +457,7 @@ export function zoomWindow(
 ): TimeWindow {
   const boundSpan = Math.max(1e-9, bounds.max - bounds.min);
   const span = win.end - win.start;
-  const nextSpan = Math.min(boundSpan * 1.1, Math.max(boundSpan / ZOOM_MAX, span * factor));
+  const nextSpan = Math.min(boundSpan * 1.1, Math.max(minWindowSpan(bounds), span * factor));
   const frac = span > 0 ? (anchorDate - win.start) / span : 0.5;
   const start = anchorDate - frac * nextSpan;
   return clampWindow({ start, end: start + nextSpan }, bounds);
@@ -581,16 +593,19 @@ function fmtDate(state: Pick<ViewState, 'calendar'>, n: number): string {
 }
 
 /**
- * Zoom-adaptive tick label (2B §Flow 3): ticks tighter than a year speak the
- * full date; wider ticks speak "{year} {era}". Bare numbers with no lens.
+ * The axis tick set (2B "Grid and texture"): with a lens active, ticks land on
+ * REAL calendar boundaries with rung labels — era landmarks "1 FT", round
+ * era-local years "450 KR", month names, day strides "11 Greening 454",
+ * festival days. Bare numbers keep the power-of-ten ticks.
  */
-function fmtTick(state: Pick<ViewState, 'calendar'>, tick: number, tickInterval: number): string {
-  if (!state.calendar) return String(Math.round(tick));
-  const yearLen = approxYearLength(state.calendar);
-  if (yearLen != null && yearLen > 1 && tickInterval < yearLen) {
-    return formatStep(state.calendar, Math.round(tick));
-  }
-  return formatYearLabel(state.calendar, Math.round(tick));
+function axisTicksFor(
+  state: Pick<ViewState, 'calendar'>,
+  range: { min: number; max: number },
+  w: number,
+  dateToX: (date: number) => number,
+): CalendarTick[] {
+  if (state.calendar) return calendarTicks(state.calendar, range.min, range.max, w, dateToX);
+  return calculateTicks(range, w).map((t) => ({ step: t, label: String(Math.round(t)), rung: 'year' as const }));
 }
 
 /** The y of the axis line = top of the reserved axis-labels + strip band. */
@@ -765,7 +780,7 @@ function draw(state: ViewState): void {
   const view = currentViewRange(state) ?? { start: base.min, end: base.max };
   const range = { min: view.start, max: view.end };
   const dateToX = createDateToX(range, w);
-  const ticks = calculateTicks(range, w);
+  const ticks = axisTicksFor(state, range, w, dateToX);
   // The overview strip reserves the bottom band (S2).
   const axisY = axisYOf(h);
   // The now (Act 1): its canvas x, and the forward-half tint. null when unset.
@@ -784,11 +799,14 @@ function draw(state: ViewState): void {
   // tick marks the terminal — at full zoom-out both edges read immediately.
   drawWorldEdges(ctx, state, dateToX, w, axisY);
 
-  // Grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  // Season wash + era bands (2B "Grid and texture") — under the grid.
+  drawCalendarTexture(ctx, state, range, dateToX, w, axisY);
+
+  // Grid — era boundaries read a shade firmer than routine unit lines.
   ctx.lineWidth = 1;
   for (const tick of ticks) {
-    const x = dateToX(tick);
+    const x = dateToX(tick.step);
+    ctx.strokeStyle = tick.rung === 'era' ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)';
     ctx.beginPath();
     ctx.moveTo(x, TOP_PAD);
     ctx.lineTo(x, axisY);
@@ -806,18 +824,19 @@ function draw(state: ViewState): void {
   // barely readable"); dates are navigation, not decoration.
   ctx.font = '11px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  const tickInterval = ticks.length > 1 ? ticks[1] - ticks[0] : Infinity;
   for (const tick of ticks) {
-    const x = dateToX(tick);
+    const x = dateToX(tick.step);
     ctx.beginPath();
     ctx.moveTo(x, axisY - 3);
     ctx.lineTo(x, axisY + 3);
-    ctx.strokeStyle = 'rgba(255,255,255,0.20)';
+    ctx.strokeStyle = tick.rung === 'era' ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.20)';
     ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    // Ticks speak the lens (2B): year labels wide, full dates when the ticks
-    // are tighter than a year.
-    ctx.fillText(fmtTick(state, tick, tickInterval), x, axisY + 15);
+    // Rung voicing: era landmarks firm, festival days a warm glint, the rest
+    // the standard wash.
+    ctx.fillStyle = tick.rung === 'era' ? 'rgba(255,255,255,0.72)'
+      : tick.rung === 'festival' ? 'rgba(235,200,120,0.62)'
+        : 'rgba(255,255,255,0.55)';
+    ctx.fillText(tick.label, x, axisY + 15);
   }
 
   // Empty chart: a hint over the droppable axis (no nodes to render). The
@@ -833,7 +852,7 @@ function draw(state: ViewState): void {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.fillText('Nothing in this world has a date yet.', w / 2, midY - 10);
       ctx.fillStyle = 'rgba(255,255,255,0.22)';
-      ctx.fillText('Add an event above — it lands right here with its date.', w / 2, midY + 10);
+      ctx.fillText('Add an event above: it lands right here with its date.', w / 2, midY + 10);
     } else {
       ctx.fillStyle = 'rgba(255,255,255,0.30)';
       ctx.fillText('Nothing dated in this view.', w / 2, midY);
@@ -1176,6 +1195,124 @@ function stripScale(state: ViewState, w: number): { toX: (d: number) => number; 
 
 function stripTop(h: number): number { return h - STRIP_H; }
 
+// Season ramp for the month wash: spring → summer → autumn → winter, looped.
+// Month 1 is treated as the year's opening (spring-ish); a world whose year
+// opens midwinter reads shifted — prototype territory, judged by eye.
+const SEASON_STOPS: [number, number, number][] = [
+  [110, 200, 130],  // spring green
+  [235, 205, 95],   // summer gold
+  [225, 140, 85],   // autumn amber
+  [110, 165, 225],  // winter blue
+];
+
+function seasonFill(frac: number): string {
+  const t = (((frac % 1) + 1) % 1) * SEASON_STOPS.length;
+  const i = Math.floor(t) % SEASON_STOPS.length;
+  const j = (i + 1) % SEASON_STOPS.length;
+  const u = t - Math.floor(t);
+  const c = SEASON_STOPS[i].map((v, k) => Math.round(v + (SEASON_STOPS[j][k] - v) * u));
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, 0.10)`;
+}
+
+/**
+ * Season wash + era bands over the plot (2B "Grid and texture"). Deliberately
+ * on the loud side — the prototype Captain judges by eye; subtraction is the
+ * expected next move. Era gaps stay unshaded: absence IS the gap's rendering.
+ */
+function drawCalendarTexture(
+  ctx: CanvasRenderingContext2D,
+  state: ViewState,
+  range: { min: number; max: number },
+  dateToX: (date: number) => number,
+  w: number,
+  axisY: number,
+): void {
+  const cal = state.calendar;
+  if (!cal) return;
+
+  // The month wash — only at zooms where months read (the module returns
+  // nothing over wide windows). Intercalary days get a warm festival glint.
+  for (const band of seasonBandsInRange(cal, range.min, range.max)) {
+    const x0 = Math.max(0, dateToX(band.lo));
+    const x1 = Math.min(w, dateToX(band.hi));
+    if (x1 <= x0) continue;
+    ctx.fillStyle = band.intercalary ? 'rgba(235, 200, 120, 0.16)' : seasonFill(band.frac);
+    ctx.fillRect(x0, TOP_PAD, x1 - x0, axisY - TOP_PAD);
+  }
+
+  // Era bands: alternating quiet shading + a seam where an era begins in view
+  // + the era's name resting along the top of the plot.
+  ctx.font = '10px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const band of eraBandsInRange(cal, range.min, range.max)) {
+    const x0 = Math.max(0, dateToX(band.lo));
+    const x1 = Math.min(w, dateToX(band.hi));
+    if (x1 <= x0) continue;
+    if (band.index % 2 === 1) {
+      ctx.fillStyle = 'rgba(160, 190, 255, 0.045)';
+      ctx.fillRect(x0, TOP_PAD, x1 - x0, axisY - TOP_PAD);
+    }
+    if (band.lo > range.min) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x0, TOP_PAD);
+      ctx.lineTo(x0, axisY);
+      ctx.stroke();
+    }
+    const width = x1 - x0;
+    const name = band.era.name.toUpperCase();
+    const abbrev = (band.era.abbrev ?? band.era.name).toUpperCase();
+    const label = width >= name.length * 6.5 + 16 ? name
+      : width >= abbrev.length * 6.5 + 12 ? abbrev : null;
+    if (label) {
+      ctx.fillStyle = 'rgba(255,255,255,0.30)';
+      ctx.fillText(label, (x0 + x1) / 2, TOP_PAD + 9);
+    }
+  }
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+}
+
+/** Era bands on the overview strip — the whole recorded span shows its reckonings. */
+function drawStripEraBands(
+  ctx: CanvasRenderingContext2D,
+  cal: CalendarConfig,
+  scale: { toX: (date: number) => number; bounds: { min: number; max: number } },
+  capMin: number,
+  capMax: number,
+  top: number,
+): void {
+  ctx.font = '9px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const band of eraBandsInRange(cal, scale.bounds.min, scale.bounds.max)) {
+    const x0 = Math.max(capMin, scale.toX(band.lo));
+    const x1 = Math.min(capMax, scale.toX(band.hi));
+    if (x1 <= x0) continue;
+    if (band.index % 2 === 1) {
+      ctx.fillStyle = 'rgba(160, 190, 255, 0.07)';
+      ctx.fillRect(x0, top + 1, x1 - x0, STRIP_H - 2);
+    }
+    if (scale.toX(band.lo) > capMin) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x0, top + 1);
+      ctx.lineTo(x0, top + STRIP_H - 1);
+      ctx.stroke();
+    }
+    const abbrev = (band.era.abbrev ?? band.era.name).toUpperCase();
+    if (x1 - x0 >= abbrev.length * 5.5 + 10) {
+      ctx.fillStyle = 'rgba(255,255,255,0.32)';
+      ctx.fillText(abbrev, (x0 + x1) / 2, top + STRIP_H / 2);
+    }
+  }
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+}
+
 function drawStrip(ctx: CanvasRenderingContext2D, state: ViewState, w: number, h: number, view: TimeWindow): void {
   const scale = stripScale(state, w);
   if (!scale) return;
@@ -1203,6 +1340,9 @@ function drawStrip(ctx: CanvasRenderingContext2D, state: ViewState, w: number, h
     ctx.fillRect(capMin - 1, top + 1, 2, STRIP_H - 2);
     ctx.fillRect(capMax - 1, top + 1, 2, STRIP_H - 2);
   }
+
+  // Era bands under everything else on the track (2B) — S2 reserved them.
+  if (state.calendar) drawStripEraBands(ctx, state.calendar, scale, capMin, capMax, top);
 
   // Density marks — every dated element in the world, faint; overlap builds
   // visible mass so the strip reads as the shape of the world's history.
@@ -2003,7 +2143,7 @@ function buildChip(state: ViewState, link: LinkedRef): HTMLElement {
   chip.title = dated
     ? `${link.fieldLabel}: ${link.name} (${link.type}) · on this chart`
     : dateable
-      ? `${link.fieldLabel}: ${link.name} (${link.type}) · undated — drag onto the chart to date it`
+      ? `${link.fieldLabel}: ${link.name} (${link.type}) · undated: drag onto the chart to date it`
       : `${link.fieldLabel}: ${link.name} (${link.type})`;
   const icon = ELEMENT_ICONS[link.type as ElementType] ?? 'category';
   chip.innerHTML =
@@ -2129,7 +2269,7 @@ function handleMouseMove(state: ViewState, e: MouseEvent): void {
       const { mode, startX, startWin } = state.stripDrag;
       const dDate = scale.toDate(mx) - scale.toDate(startX);
       const bounds = scale.bounds;
-      const minSpan = (bounds.max - bounds.min) / ZOOM_MAX;
+      const minSpan = minWindowSpan(bounds);
       if (mode === 'move') {
         state.window = clampWindow({ start: startWin.start + dDate, end: startWin.end + dDate }, bounds);
       } else if (mode === 'left') {

@@ -25,21 +25,29 @@ export interface WorldCalendar {
 }
 
 /**
+ * The tolerant `atlas_calendar` read: object OR JSON string (foreign tools may
+ * serialize; we read both, write objects). Null for anything unusable. EVERY
+ * consumer of the field goes through this — a reader that only accepts objects
+ * would silently blank a string-config calendar (the paired-readers trap).
+ */
+export function readCalendarValue(raw: unknown): CalendarConfig | null {
+  if (raw == null) return null;
+  let value: unknown = raw;
+  if (typeof raw === 'string') {
+    try { value = JSON.parse(raw); } catch { return null; }
+  }
+  return readCalendarConfig(value);
+}
+
+/**
  * Every usable calendar in the world: elements carrying a structurally valid
- * `atlas_calendar`. Accepts the config as an object OR a JSON string (foreign
- * tools may serialize; we read both, write objects). Malformed configs are
- * skipped silently — a broken calendar is invisible, not a broken room.
+ * `atlas_calendar`. Malformed configs are skipped silently — a broken calendar
+ * is invisible, not a broken room.
  */
 export function worldCalendars(elements: Element[]): WorldCalendar[] {
   const out: WorldCalendar[] = [];
   for (const el of elements) {
-    const raw = (el as Record<string, unknown>)['atlas_calendar'];
-    if (raw == null) continue;
-    let value: unknown = raw;
-    if (typeof raw === 'string') {
-      try { value = JSON.parse(raw); } catch { continue; }
-    }
-    const config = readCalendarConfig(value);
+    const config = readCalendarValue((el as Record<string, unknown>)['atlas_calendar']);
     if (!config) continue;
     out.push({ id: el.id, name: el.name || '(unnamed calendar)', config });
   }

@@ -575,7 +575,7 @@ export class ElementCreateModal extends BaseModal {
         btn.disabled = true;
         btn.className = 'atlas-create-type-btn atlas-create-type-btn-dateless';
         btn.setAttribute('data-type', type);
-        btn.title = `${ELEMENT_LABELS[type].singular} has no date fields — create it from the elements sidebar`;
+        btn.title = `${ELEMENT_LABELS[type].singular} has no date fields: create it from the elements sidebar`;
         btn.innerHTML = `
           <span class="material-symbols-outlined">${ELEMENT_ICONS[type]}</span>
           <span>${ELEMENT_LABELS[type].singular}</span>

@@ -172,3 +172,53 @@ test('lens off restores bare numbers; a saved chart remembers its lens', async (
   await expect(page.locator('.atlas-cal-chip')).toContainText('The Almanac');
   await expect(page.locator('.atlas-chart-now-chip')).toContainText('Year 3 FT');
 });
+
+test('the legacy-field mint offer seeds the builder and clears the fields', async ({ page }) => {
+  await setupWorld(page);
+  await createElement(page, 'event', { name: 'Founding', start_date: 0 });
+  // A world carrying the old time fields (junk-shaped, plus a usable "= 1"
+  // pair) — written to disk AND mirrored into the slice the room reads.
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const fields = {
+      time_format_names: ['Day', 'Week', 'Year'],
+      time_format_equivalents: ['1', '7', '365'],
+    };
+    await api.getActiveStore().writeWorldMeta(fields);
+    const s = api.getState();
+    api.patchSlice('active', { ...s.active, meta: { ...s.active.meta, ...fields } });
+  });
+  await openCharts(page);
+
+  // Gates hold (fields present, no calendar, writable) → the offer shows,
+  // and it says out loud that the fields will be cleared.
+  const banner = page.locator('.atlas-cal-mint-offer');
+  await expect(banner).toContainText('old fields are cleared');
+  await banner.locator('[data-action="mint-calendar"]').click();
+
+  // Clock unset → the world clock gate comes first, as everywhere.
+  await expect(page.locator('[data-modal="world-clock"]')).toBeVisible();
+  await page.fill('#wc-unit', 'day');
+  await page.click('[data-action="save-clock"]');
+
+  // The builder opens SEEDED: the step word came from the "= 1" pair.
+  await expect(page.locator('[data-modal="calendar-builder"]')).toBeVisible();
+  await expect(page.locator('#cb-step')).toHaveValue('day');
+  await page.fill('#cb-name', 'The Inherited Count');
+  await page.click('[data-action="save-calendar"]');
+
+  // Lens active · offer retired · both fields CLEARED on the world · the
+  // vocabulary preserved as description prose on the construct.
+  await expect(page.locator('.atlas-cal-chip')).toContainText('The Inherited Count');
+  await expect(banner).toBeEmpty();
+  await expect.poll(() => page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const meta = await api.getActiveStore().readWorldMeta();
+    const cal = api.getState().data.elements.find((e: any) => e.atlas_calendar);
+    return {
+      names: meta.time_format_names ?? [],
+      equivalents: meta.time_format_equivalents ?? [],
+      descHasUnits: (cal?.description ?? '').includes('Day = 1'),
+    };
+  })).toEqual({ names: [], equivalents: [], descHasUnits: true });
+});

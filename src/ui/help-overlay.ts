@@ -21,6 +21,10 @@ class HelpOverlay extends BaseModal {
     const { overlay, body } = this.buildModalShell({
       title: help ? `${help.name} · help` : 'Help',
       dataModal: 'help-overlay',
+      // The content outgrew the viewport once the shortcut reference filled in
+      // (S267): the panel caps its height and the BODY scrolls, so the title
+      // stays put and neither end is ever clipped.
+      panelClass: 'atlas-help-panel',
     });
 
     if (help) {

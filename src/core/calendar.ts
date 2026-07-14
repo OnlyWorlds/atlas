@@ -266,13 +266,13 @@ export function absoluteYear(cfg: CalendarConfig, step: number): number {
 
 // ---- Era arithmetic ----
 
-interface EraDomain {
+export interface EraDomain {
   era: CalendarEra;
   lo: number; // inclusive
   hi: number; // exclusive
 }
 
-function resolveEraDomains(eras: CalendarEra[]): EraDomain[] {
+export function resolveEraDomains(eras: CalendarEra[]): EraDomain[] {
   const sorted = [...eras].sort((a, b) => a.start - b.start);
   const out: EraDomain[] = [];
   for (let i = 0; i < sorted.length; i++) {
@@ -502,6 +502,40 @@ export function formatDuration(cfg: CalendarConfig, steps: number): string {
   return `${shown} ${plural(unit, shown)}`;
 }
 
+/**
+ * The first step of each month in absolute year y, in order. O(config) — walks
+ * month lengths + intercalary placement, never the year's days. Empty when the
+ * calendar has no months.
+ */
+export function monthStartSteps(cfg: CalendarConfig, y: number): { month: number; name: string; step: number }[] {
+  const months = cfg.bundles?.months;
+  if (!months) return [];
+  const inter = cfg.intercalary ?? [];
+  const active = (ic: CalendarIntercalary): boolean =>
+    ic.every_years == null || isLeapYear(y, ic.every_years);
+  const out: { month: number; name: string; step: number }[] = [];
+  let offset = inter.filter((i) => i.after_month === 0 && active(i)).length;
+  const start = yearStartStep(cfg, y);
+  for (let m = 1; m <= months.names.length; m++) {
+    out.push({ month: m, name: months.names[m - 1], step: start + offset });
+    offset += months.lengths[m - 1] + inter.filter((i) => i.after_month === m && active(i)).length;
+  }
+  return out;
+}
+
+/**
+ * Mid-rung label for dense axis ticks: "11 Greening 454" — day, month, display
+ * year, NO era word (the era bands carry the era; a label wall repeating "FT"
+ * is noise). Intercalary steps read "Hearthmoot 454". Monthless calendars fall
+ * back to the year label.
+ */
+export function formatMidLabel(cfg: CalendarConfig, step: number): string {
+  const b = breakdownStep(cfg, step);
+  if (b.intercalary != null) return `${b.intercalary} ${b.year}`;
+  if (b.monthName != null && b.day != null) return `${b.day} ${b.monthName} ${b.year}`;
+  return formatYearLabel(cfg, step);
+}
+
 // ---- Parse ----
 
 export interface ParseOptions {
@@ -521,7 +555,7 @@ function findEra(cfg: CalendarConfig, word: string): EraMatch | null {
 }
 
 /** Absolute year for an era-local display year (inverse of displayYear). */
-function absYearForEraYear(cfg: CalendarConfig, era: CalendarEra, Y: number): number {
+export function absYearForEraYear(cfg: CalendarConfig, era: CalendarEra, Y: number): number {
   if (era.restart === false) return Y;
   const base = era.year_base ?? 1;
   if ((era.direction ?? 'up') === 'down') return absoluteYear(cfg, era.start) - (Y - base + 1);

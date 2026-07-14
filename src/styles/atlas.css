@@ -12178,6 +12178,22 @@ body.atlas-share-fullpreview > * {
 }
 
 /* ==== Bout HELP — the ? overlay (D8, session 248) ==== */
+/* The help panel caps at the viewport and scrolls its body — the shortcut
+   reference is tall by design, the chrome (title) stays pinned. */
+.atlas-help-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 86vh;
+  min-height: 0;
+}
+
+.atlas-help-panel .atlas-modal-body {
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 8px;
+  scrollbar-width: thin;
+}
+
 .atlas-help-purpose {
   margin: 0 0 14px 0;
   font-size: 13px;
@@ -12512,6 +12528,48 @@ body.atlas-share-fullpreview > * {
 .atlas-cal-menu-item .material-symbols-outlined {
   font-size: 15px;
   opacity: 0.7;
+}
+
+/* ---- Legacy-field mint offer (2B seed) ---- */
+
+.atlas-cal-mint-offer {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.atlas-cal-mint-offer:not(:empty) {
+  margin: 2px 0 8px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.atlas-cal-mint-offer .material-symbols-outlined {
+  font-size: 16px;
+  color: rgba(235, 200, 120, 0.7);
+}
+
+.atlas-cal-mint-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.atlas-cal-mint-dismiss {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.atlas-cal-mint-dismiss:hover {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* ---- World clock modal ---- */

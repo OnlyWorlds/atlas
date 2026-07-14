@@ -640,6 +640,29 @@ download + edit-block + a wire log with zero writes.
   - *Import dirties meta with no push trigger*: import writes wire fields but doesn't requestPush — the NEXT round's diff catches it (meta step runs every round), so it's only stuck if the user imports and never edits/syncs again. Accepted.
   - *MSW read-only-key modeling*: only FakeOwApiClient models the 403 write/read split (`__inject_write_permission_error`); MSW handlers model 401 blocking only.
 
+## Extension fields carry any JSON shape verbatim (S267, source-verified)
+
+The 2B contract's §5b flagged that every shipped wire-extension field was a
+scalar and keel's passthrough had never been probed with a nested OBJECT
+(`atlas_calendar` is one). Resolution, S267:
+
+- **Live probe blocked**: keel-staging's `create-world-external` now 400s every
+  unauthenticated payload variant (the endpoint moved under account auth
+  hardening) — no disposable-world lane without real account credentials.
+- **Answered from keel source instead** (keel@e64f270, the S262 precedent):
+  `elements/serialize.py` takes namespaced fields verbatim (`extensions[key] =
+  value`, zero shape validation), every element model stores them in
+  `extensions = models.JSONField(default=dict)`, and the read path renders
+  "extensions … as top-level fields, verbatim" (§4 one-shape). PATCH merges
+  extensions per-KEY (whole-value replacement — fine, atlas always sends the
+  full config).
+- **Consequence**: nested objects round-trip by construction; calendars sync
+  with zero new machinery. `readCalendarValue` still tolerates JSON-string
+  configs from foreign tools.
+- **Owed**: one live smoke (save a calendar on an api-linked world, pull on a
+  second device) whenever real credentials are at hand — source truth is
+  strong, wire truth is stronger.
+
 ---
 
 *Authored mid-session 201 (2026-05-13) after Phase 3.5 mega smoke. If you're reading this in a future chat, this is what the sync engine wanted you to know.*

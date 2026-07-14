@@ -125,11 +125,33 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
     ctx.fillStyle = 'rgba(255,255,255,0.68)';
     ctx.font = "11px system-ui, sans-serif";
     ctx.textBaseline = 'alphabetic';
-    ctx.textAlign = 'left';
-    ctx.fillText(String(block.axisMin), PAD_X, height - 8);
-    if (block.axisMax !== block.axisMin) {
-      ctx.textAlign = 'right';
-      ctx.fillText(String(block.axisMax), cssW - PAD_X, height - 8);
+    if (block.axisTicks && block.axisTicks.length > 0) {
+      // Baked calendar ticks (2B publish bake): the lens spoke at publish time;
+      // this renderer just places text. Greedy left-to-right collision drop —
+      // the bake pruned for a nominal width, the live width re-prunes.
+      ctx.textAlign = 'center';
+      const span = Math.max(1, block.axisMax - block.axisMin);
+      let lastRight = -Infinity;
+      for (const t of block.axisTicks) {
+        const x = PAD_X + ((t.position - block.axisMin) / span) * plotW;
+        const half = ctx.measureText(t.label).width / 2 + 6;
+        if (x - half < lastRight) continue;
+        ctx.beginPath();
+        ctx.moveTo(x, height - PAD_BOTTOM + 5);
+        ctx.lineTo(x, height - PAD_BOTTOM + 11);
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.stroke();
+        ctx.fillText(t.label, Math.min(cssW - half, Math.max(half, x)), height - 8);
+        lastRight = x + half;
+      }
+      ctx.textAlign = 'left';
+    } else {
+      ctx.textAlign = 'left';
+      ctx.fillText(String(block.axisMin), PAD_X, height - 8);
+      if (block.axisMax !== block.axisMin) {
+        ctx.textAlign = 'right';
+        ctx.fillText(String(block.axisMax), cssW - PAD_X, height - 8);
+      }
     }
 
     if (opts.layout === 'strip') {

@@ -35,6 +35,9 @@ import type { ChartConfig } from './types';
 import { extractTemporalNodes } from './data-normalizer';
 import { filterNodesByScope } from './chart-recipe';
 import { rankAnchors, ANCHOR_CAP } from './degree';
+import { resolveCalendarLens } from '../../core/calendar-lens';
+import { formatStep } from '../../core/calendar';
+import { calendarTicks } from '../../core/calendar-axis';
 
 /** One node in a frozen chart — identity + axis position only. */
 export interface PayloadChartNode {
@@ -56,6 +59,12 @@ export interface PayloadChartNode {
   cast?: 'protagonist' | 'home';
   /** Present ONLY when the element is also carded on the page (click-through). */
   ref?: string;
+  /** The date SPOKEN through the chart's calendar lens at publish time —
+   *  "12 Frostwane, 454 AE". ADDITIVE (2B publish bake): `date` stays numeric
+   *  forever; a viewer that knows nothing about calendars renders this text. */
+  label?: string;
+  /** Range end, spoken. Present only when `endDate` is. */
+  endLabel?: string;
 }
 
 /** The payload form of a chart block — frozen at build, self-contained. */
@@ -67,7 +76,15 @@ export interface PayloadChartBlock {
   axisMin: number;
   axisMax: number;
   nodes: PayloadChartNode[];
+  /** Baked calendar axis ticks (2B publish bake) — positions on the numeric
+   *  axis with their lens-formatted labels, frozen at publish. ADDITIVE: absent
+   *  on lensless charts and ignored by older viewers. */
+  axisTicks?: { position: number; label: string }[];
 }
+
+/** Nominal viewer width the baked ticks are pruned against — the show viewer's
+ *  typical chart column. A wider viewer just gets airier ticks. */
+const BAKE_TICK_WIDTH = 640;
 
 /**
  * Freeze a chart block: resolve `chartId` against the saved charts + the world
@@ -92,6 +109,11 @@ export function freezeChartBlock(
   const nodes = filterNodesByScope(extractTemporalNodes(elements), chart.scope);
   const anchors = rankAnchors(nodes, ANCHOR_CAP);
 
+  // The chart's calendar lens (2B publish bake): resolved against the live
+  // elements like everywhere else; a dangling id bakes nothing — the numeric
+  // fields carry the block alone, exactly as before the lens existed.
+  const lens = resolveCalendarLens(elements, chart.calendarId);
+
   const frozen: PayloadChartNode[] = nodes
     .slice()
     .sort((a, b) => a.startDate - b.startDate || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
@@ -102,6 +124,10 @@ export function freezeChartBlock(
       if (n.id === opts?.cast?.protagonistId) node.cast = 'protagonist';
       else if (n.id === opts?.cast?.nexusId) node.cast = 'home';
       if (includedIds.has(n.id)) node.ref = n.id;
+      if (lens) {
+        node.label = formatStep(lens.config, Math.round(n.startDate));
+        if (node.endDate != null) node.endLabel = formatStep(lens.config, Math.round(node.endDate));
+      }
       return node;
     });
 
@@ -114,5 +140,14 @@ export function freezeChartBlock(
   }
   if (!Number.isFinite(axisMin)) { axisMin = 0; axisMax = 0; }
 
-  return { id: blockId, kind: 'chart', title: chart.name || '(untitled chart)', axisMin, axisMax, nodes: frozen };
+  const block: PayloadChartBlock = {
+    id: blockId, kind: 'chart', title: chart.name || '(untitled chart)', axisMin, axisMax, nodes: frozen,
+  };
+  if (lens && axisMax > axisMin) {
+    const span = axisMax - axisMin;
+    const toX = (step: number): number => ((step - axisMin) / span) * BAKE_TICK_WIDTH;
+    block.axisTicks = calendarTicks(lens.config, axisMin, axisMax, BAKE_TICK_WIDTH, toX)
+      .map(t => ({ position: t.step, label: t.label }));
+  }
+  return block;
 }

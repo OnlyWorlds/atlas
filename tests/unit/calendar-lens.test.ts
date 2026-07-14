@@ -4,7 +4,7 @@
  * and the saved-chart lens id-swap rewrite.
  */
 import { describe, it, expect } from 'vitest';
-import { worldCalendars, resolveCalendarLens } from '../../src/core/calendar-lens';
+import { worldCalendars, resolveCalendarLens, readCalendarValue } from '../../src/core/calendar-lens';
 import { rewriteChartScopeIds } from '../../src/visualization/timeline/charts-store';
 import { setWorldActiveCalendar, loadRegistry } from '../../src/registry/registry';
 import type { Element } from '../../src/core/types';
@@ -42,6 +42,19 @@ describe('worldCalendars', () => {
     ];
     const found = worldCalendars(elements);
     expect(found.map(c => c.id)).toEqual(['s1']);
+  });
+});
+
+describe('readCalendarValue (the one shared tolerant read)', () => {
+  // The builder's edit path MUST use this: an object-only read loads an empty
+  // draft for a string-config calendar and saving would blank the real config.
+  it('reads objects and JSON strings identically, null for junk', () => {
+    expect(readCalendarValue(CONFIG)?.grain).toBe('year');
+    expect(readCalendarValue(JSON.stringify(CONFIG))?.grain).toBe('year');
+    expect(readCalendarValue(JSON.stringify(CONFIG))?.eras?.[0].name).toBe('Third Age');
+    expect(readCalendarValue('{not json')).toBe(null);
+    expect(readCalendarValue(null)).toBe(null);
+    expect(readCalendarValue(42)).toBe(null);
   });
 });
 

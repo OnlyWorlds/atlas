@@ -55,6 +55,16 @@ function gestureSections(): Section[] {
       ],
     },
     {
+      label: 'Charts',
+      rows: [
+        { combo: 'Scroll on chart', description: 'Zoom around the cursor · drag empty space to pan · the bottom strip drags the whole window', comboAsKbd: false },
+        { combo: 'Click a dot', description: 'Peek its card · click again to focus', comboAsKbd: false },
+        { combo: 'Drag a dot', description: 'Re-date it · drag a range\'s end cap to stretch the end', comboAsKbd: false },
+        { combo: 'Drag the gold line', description: "Move the world's now", comboAsKbd: false },
+        { combo: 'Drag from Undated', description: 'Give an element its date', comboAsKbd: false },
+      ],
+    },
+    {
       label: 'Mouse',
       rows: [
         { combo: 'Right-click pin', description: 'Toggle ghost pins around it', comboAsKbd: false },

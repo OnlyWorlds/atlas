@@ -24,7 +24,8 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'edit the world name and description by clicking them',
       'set a protagonist or home from any character or location header',
       'jump to any element type from the stat line',
-      'pick up where you left off from the Continue list',
+      'pick up where you left off from the Recent list',
+      'follow the create cards on a young world; each opens the room it belongs to',
     ],
   },
   element: {
@@ -33,6 +34,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     can: [
       'edit any field by clicking its value',
       'link elements through the link fields',
+      'create a missing element straight from an empty link field',
       'label it your way with supertype and subtype',
       'add your own fields in the Custom fields section',
       'place it on a map from the header pin button',
@@ -44,7 +46,8 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
     can: [
       'rename the tiers to fit your project',
       'type @ to mention an element and link it',
-      'keep loose drafts beside the tree',
+      'link every unlinked mention at once from the corner link icon; right-click a selection or a tree row for the same',
+      'create a chapter or scene inside a row with its hover +',
       'split a long piece into siblings at the cursor',
     ],
   },
@@ -62,14 +65,14 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
   },
   timeline: {
     name: 'Charts',
-    purpose: 'Your world along a time axis.',
+    purpose: 'Your world along a time axis, in your world\'s own words.',
     can: [
       'click any element to focus on what it touches',
-      'set the world\'s current moment and drag undated elements onto the axis',
+      'set the world clock, then create a calendar: dates read as "12 Frostwane, Year 454" and you can type calendar words into any date field',
+      'drag things into time: an undated element onto the axis, a dot to re-date it, a range\'s end cap to stretch it, the now-line to move the now',
       'focus a title or character to see its tenure or life drawn to the now',
-      'filter by type and zoom into a period (no types picked = the cast and essentials, not everything)',
-      'save a chart and reload it from the gallery',
-      'drop a saved chart onto a share page',
+      'filter by type and zoom from eras down to days (no types picked = the cast and essentials, not everything)',
+      'save a chart and reload it from the gallery, or drop it onto a share page',
     ],
   },
   share: {
@@ -89,7 +92,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'drop or paste JSON and review before anything lands',
       'merge into the current world or create a new one',
       'export the whole world or a subset by type',
-      'turn freeform notes into importable JSON with any AI assistant',
+      'copy the AI prompt (it carries your world\'s exact fields) to turn freeform notes into importable JSON',
     ],
   },
   settings: {

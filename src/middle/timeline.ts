@@ -26,6 +26,7 @@ import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { worldCalendars, resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
+import { parseLegacySeed } from '../core/calendar-seed';
 import { formatStep } from '../core/calendar';
 import { setWorldActiveCalendar, saveRegistry } from '../registry/registry';
 import { WorldClockModal } from '../ui/world-clock-modal';
@@ -101,6 +102,12 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   const controlBar = document.createElement('div');
   controlBar.className = 'atlas-chart-controls';
   wrap.appendChild(controlBar);
+
+  // The legacy-field mint offer (2B §1/§5b) — a quiet banner between the
+  // controls and the chart, present only while its four gates hold.
+  const mintBanner = document.createElement('div');
+  mintBanner.className = 'atlas-cal-mint-offer';
+  wrap.appendChild(mintBanner);
 
   const viewMount = document.createElement('div');
   viewMount.className = 'atlas-timeline-view-mount';
@@ -266,6 +273,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       `<span>${escapeText(lens ? lens.name : 'no calendar')}</span>`;
     calChip.addEventListener('click', () => openCalendarMenu(calChip));
     controlBar.appendChild(calChip);
+
+    renderMintOffer();
   }
 
   /**
@@ -279,6 +288,10 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       const map = TEMPORAL_TYPE_FIELDS[el.type];
       if (!map) continue; // not a dateable type — never counts as "undated"
       if (parseTemporalValue((el as Record<string, unknown>)[map.start]) != null) continue;
+      // Calendars are complete without an adoption date — a lens construct
+      // sitting in the work queue forever reads as nagging, not backlog
+      // (S266 look item; datable any time via the element room's Date field).
+      if ((el as Record<string, unknown>)['atlas_calendar'] != null) continue;
       out.push({ id: el.id, type: el.type as ElementType, name: el.name || '(unnamed)' });
     }
     return out;
@@ -492,6 +505,109 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     };
     // Deferred so the opening click doesn't immediately close it.
     setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+  }
+
+  // ---- The legacy-field mint offer (2B §1/§5b) ------------------------------
+  // `time_format_names`/`time_format_equivalents` seed a world's FIRST calendar
+  // once, then get CLEARED on the world (Captain-blessed; "seed once" must live
+  // in the data or every fresh device re-offers the mint forever). Four gates:
+  // fields present ∧ no calendar exists ∧ writable ∧ (api-linked → meta
+  // baseline established — pre-baseline the S262 seed rule would PULL the
+  // cleared fields back and invite a duplicate calendar).
+
+  let mintDismissed = false;      // session-local "not now"
+  let clearRetryInFlight = false; // one quiet self-heal attempt at a time
+
+  function legacySeed() {
+    return parseLegacySeed(getState().active?.meta as Record<string, unknown> | undefined);
+  }
+
+  function writableWorld(): boolean {
+    return !registryEntry()?.api?.read_only;
+  }
+
+  /** Gate 4 for api-linked worlds: the first meta round must have run. */
+  async function metaBaselineReady(): Promise<boolean> {
+    const entry = registryEntry();
+    if (!entry?.api) return true; // local-only: no seed rule to race
+    const store = getActiveStore();
+    const syncState = store ? await store.readSyncState() : null;
+    return !!syncState?.meta_baseline;
+  }
+
+  /** Clear the legacy fields on the world (post-mint, or the self-heal retry).
+   *  Explicit [] — the list-kind canonical empty — so the meta step pushes the
+   *  clear instead of treating the fields as untouched. */
+  async function clearLegacyFields(): Promise<void> {
+    const store = getActiveStore();
+    const active = getState().active;
+    if (!store || !active) return;
+    try {
+      await store.writeWorldMeta({ time_format_names: [], time_format_equivalents: [] });
+      patchSlice('active', {
+        ...active,
+        meta: { ...active.meta, time_format_names: [], time_format_equivalents: [] },
+      });
+      requestPushIfLinked();
+    } catch (err) {
+      console.error('[calendar] legacy time-field clear failed:', err);
+    }
+  }
+
+  /** The mint flow: (baseline gate) → world clock if unset → builder prefilled
+   *  from the seed → save mints the construct → the fields clear. */
+  async function startMint(): Promise<void> {
+    if (!(await metaBaselineReady())) {
+      toasts.show('world settings are still syncing — try again in a moment', 'info');
+      return;
+    }
+    const seed = legacySeed();
+    const proceed = (): void => {
+      new CalendarBuilderModal(toasts, {
+        sampleSteps: previewSamples(),
+        seed: { stepName: seed.stepName, description: seed.description },
+        onSaved: (id) => {
+          setLens(id);
+          void clearLegacyFields();
+        },
+      }).open();
+    };
+    if (!clockIsSet()) void openWorldClock(proceed);
+    else proceed();
+  }
+
+  /** §5b self-heal: a crash between element-create and field-clear leaves a
+   *  calendar + surviving legacy fields; the room retries the clear quietly. */
+  function retryClearIfInterrupted(): void {
+    if (clearRetryInFlight) return;
+    if (!legacySeed().present) return;
+    if (worldCalendars(getState().data.elements).length === 0) return;
+    if (!writableWorld()) return;
+    clearRetryInFlight = true;
+    void (async () => {
+      try {
+        if (await metaBaselineReady()) await clearLegacyFields();
+      } finally {
+        clearRetryInFlight = false;
+      }
+    })();
+  }
+
+  function renderMintOffer(): void {
+    const seed = legacySeed();
+    const calendars = worldCalendars(getState().data.elements);
+    if (seed.present && calendars.length > 0) retryClearIfInterrupted();
+    const offer = seed.present && calendars.length === 0 && writableWorld() && !mintDismissed;
+    if (!offer) { mintBanner.innerHTML = ''; return; }
+    mintBanner.innerHTML =
+      `<span class="material-symbols-outlined">history_edu</span>` +
+      `<span class="atlas-cal-mint-text">This world carries old time fields. Mint your first calendar from them: the names move into the calendar and the old fields are cleared.</span>` +
+      `<button type="button" class="atlas-btn-ghost" data-action="mint-calendar">mint calendar</button>` +
+      `<button type="button" class="atlas-cal-mint-dismiss" data-action="mint-dismiss" title="Hide for this session">×</button>`;
+    mintBanner.querySelector('[data-action="mint-calendar"]')!
+      .addEventListener('click', () => void startMint());
+    mintBanner.querySelector('[data-action="mint-dismiss"]')!
+      .addEventListener('click', () => { mintDismissed = true; renderMintOffer(); });
   }
 
   /** The world's cast favorites (protagonist/nexus ids) from the registry. */

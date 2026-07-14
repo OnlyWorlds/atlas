@@ -1110,7 +1110,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     if (blocks.length === 0 && !editingBlockId) {
       const empty = document.createElement('p');
       empty.className = 'atlas-share-section-hint';
-      empty.textContent = 'No blocks yet. A page is an ordered stack: add a heading, text, card, collection, map, or circle below.';
+      empty.textContent = 'No blocks yet. A page is an ordered stack: add a heading, text, card, collection, map, chart, or circle below.';
       blocksHost.appendChild(empty);
     }
 

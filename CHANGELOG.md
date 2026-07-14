@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Calendars arrived in the charts room: name your world's time and every date surface speaks it. Set the world clock once (what one step of time means), then build a calendar: eras, months, weeks, festival days, and how a date reads, with a live preview formatting your own dates as you type. A date like "12 Frostwane, Year 454 FT" now works everywhere a number did: axis labels, the now, cards, drag guides, and typed date entry with a quiet "resolves to" hint before you commit. Bare numbers keep working forever.
+- A calendar is a real element of your world: a Construct with its own lore fields (founder, history), so it syncs, exports, and can sit on the charts it labels. Several calendars can name the same history; switch the lens and every label changes while nothing moves.
+- The chart grid follows your calendar: ticks land on real year and month boundaries with round years ("450 KR", never a raw step number), era bands shade the chart and the overview strip under their names, months wash the background in season colors, and festival days glint gold.
+- Zoom reaches the days now: a fifty-year world used to stop zooming around a three-month window; it now goes down to single days ("11 Greening 454").
+- Worlds carrying the old time format fields get a one-time offer to mint their first calendar from them: the step word carries over, the word lists move into the calendar's description, and the old fields clear so no other device re-offers forever.
+- Published charts speak their calendar: chart blocks bake the formatted dates and axis labels in at publish time, so a viewer reads "454 FT" with no calendar machinery. The numbers underneath stay untouched.
+- Calendar constructs no longer sit in the undated work list: a calendar is complete without an adoption date (you can still date one from its element page).
 - Link every mention at once: while writing, a quiet link icon in the corner counts the element names in your prose that aren't linked yet - one click links them all, one Ctrl+Z takes it back. Selecting text and right-clicking offers the same for just that selection (unlinking too), and right-clicking a book or chapter in the writing tree links mentions across every scene inside it.
 - Two people can know a secret: adding a second knower to a knowledge entry now offers to make the pair a circle (named after both, editable) instead of stopping at one. The circle affordances read "existing circle" and "new circle".
 - Clicking a map on the home page works: an open map tab comes forward, a new one opens, and a map without an image says so and takes you to its fields instead of doing nothing. Same fix for the Map card in the world tour.

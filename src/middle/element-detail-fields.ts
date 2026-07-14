@@ -403,7 +403,7 @@ function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
   // a notch ("there's something to connect"); none exist → the click CREATES.
   if (!raw && candidates != null && candidates > 0) pickBtn.classList.add('atlas-link-pick-ready');
   pickBtn.title = raw ? 'Change link'
-    : offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? meta.target}s yet — create one`
+    : offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? meta.target}s yet: create one`
     : `Pick a ${meta.target ?? 'link'}`;
   // ALWAYS show the type-specific icon so users see at a glance what kind of
   // element this field links to — even before any link exists. Empty state
@@ -454,7 +454,7 @@ function renderMultiLink(meta: FieldMeta, el: Element): HTMLElement {
   addBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
   if (ids.length === 0) addBtn.classList.add('atlas-link-pick-empty');
   if (ids.length === 0 && candidates != null && candidates > 0) addBtn.classList.add('atlas-link-pick-ready');
-  addBtn.title = offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? meta.target}s yet — create one`
+  addBtn.title = offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? meta.target}s yet: create one`
     : ids.length === 0 ? `Pick a ${meta.target ?? 'link'}` : `Add another ${meta.target ?? 'link'}`;
   // Always show the type-specific icon so users see WHICH category this
   // multi-link field targets at a glance. `margin-left: auto` keeps the

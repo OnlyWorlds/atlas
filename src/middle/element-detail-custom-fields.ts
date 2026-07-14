@@ -80,7 +80,7 @@ export function customFieldNameProblem(el: Element, key: string): string | null 
   if (input_is_atlas_namespace(key)) return 'The atlas_ namespace is reserved';
   const bare = key.startsWith('x_') ? key.slice(2) : key.startsWith('shadow_') ? key.slice(7) : key;
   if (knownFieldsFor(el.type).has(bare)) {
-    return `"${humanizeFieldName(bare)}" is a built-in field for this type — use that field instead`;
+    return `"${humanizeFieldName(bare)}" is a built-in field for this type: use that field instead`;
   }
   if (!isCustomEditableField(key)) return 'That name is reserved for atlas machinery';
   const current = (el as Record<string, unknown>)[key];

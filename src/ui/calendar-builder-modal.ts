@@ -28,7 +28,7 @@ import {
   type CalendarConfig, type CalendarEra, type CalendarIntercalary,
   validateCalendarConfig, formatStep,
 } from '../core/calendar';
-import { CALENDAR_SUPERTYPE } from '../core/calendar-lens';
+import { CALENDAR_SUPERTYPE, readCalendarValue } from '../core/calendar-lens';
 
 export interface CalendarBuilderOpts {
   /** Present = edit this calendar element; absent = create a new one. */
@@ -37,6 +37,11 @@ export interface CalendarBuilderOpts {
   sampleSteps: number[];
   /** Called with the element id after create/save (the room activates the lens). */
   onSaved?: (elementId: string) => void;
+  /**
+   * Legacy-field mint seed (2B §1): prefills the step word and lands the
+   * inherited vocabulary in the construct's description. Create-only.
+   */
+  seed?: { stepName?: string | null; description?: string };
 }
 
 interface EraDraft {
@@ -74,7 +79,7 @@ export class CalendarBuilderModal extends BaseModal {
 
   private loadDraft(): Draft {
     const empty: Draft = {
-      name: '', stepName: this.grain,
+      name: '', stepName: this.opts.seed?.stepName || this.grain,
       eras: [], months: [],
       weekLength: '', weekNames: '', weekMode: 'free',
       intercalary: [],
@@ -83,8 +88,9 @@ export class CalendarBuilderModal extends BaseModal {
     if (!this.opts.elementId) return empty;
     const el = getState().data.elements.find(e => e.id === this.opts.elementId);
     if (!el) return empty;
-    const raw = (el as Record<string, unknown>)['atlas_calendar'];
-    const cfg = (typeof raw === 'object' && raw !== null ? raw : null) as CalendarConfig | null;
+    // Tolerant read (object OR JSON string) — an object-only read here would
+    // load an EMPTY draft for a string-config calendar and save would blank it.
+    const cfg = readCalendarValue((el as Record<string, unknown>)['atlas_calendar']);
     if (!cfg) return { ...empty, name: el.name };
     return {
       name: el.name,
@@ -422,6 +428,8 @@ export class CalendarBuilderModal extends BaseModal {
           name: this.draft.name.trim(),
           supertype: CALENDAR_SUPERTYPE,
           atlas_calendar: config,
+          // The mint seed's inherited vocabulary becomes lore, not dead config.
+          ...(this.opts.seed?.description ? { description: this.opts.seed.description } : {}),
         });
         id = el.id;
       }

@@ -230,7 +230,7 @@ class CommandPalette extends BaseModal {
     seeAll.setAttribute('data-action', 'cmdk-see-all');
     seeAll.textContent = this.results.length > 0
       ? 'see all in the sidebar →'
-      : 'no quick matches — filter the sidebar →';
+      : 'no quick matches: filter the sidebar →';
     seeAll.addEventListener('mouseenter', () => {
       if (this.activeIndex !== this.results.length) {
         this.activeIndex = this.results.length;

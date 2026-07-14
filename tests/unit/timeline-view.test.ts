@@ -269,6 +269,16 @@ describe('zoomWindow — resize around the cursor date (S3)', () => {
     expect(r.end).toBeLessThanOrEqual(105 + 1e-9);
     expect(r.start).toBeGreaterThanOrEqual(-5 - 1e-9);
   });
+
+  it('day-grain worlds zoom past the ratio cap down to a fixed step window (2B)', () => {
+    // A 20000-step (≈55-year day-grain) world: the 200× ratio cap alone would
+    // stop at a 100-step window — the day rung could never engage. The floor
+    // is now the looser of ratio cap and MIN_WINDOW_STEPS.
+    const bigBounds = { min: 0, max: 20000 };
+    let win = { start: 0, end: 20000 };
+    for (let i = 0; i < 80; i++) win = zoomWindow(win, 0.5, 7600, bigBounds);
+    expect(win.end - win.start).toBeCloseTo(24, 4);
+  });
 });
 
 describe('glyphDropDate — re-dating snap + range clamp (S264)', () => {

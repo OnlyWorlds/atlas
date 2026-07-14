@@ -429,7 +429,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       // A second individual knower can't be stored (narrator is single-link,
       // by design — two+ knowers ARE a circle). Offer the promotion instead
       // of dead-ending (S265, Susie's find).
-      chips.appendChild(addAffordance('+ character', 'Add a second knower — two individuals become a circle', async () => {
+      chips.appendChild(addAffordance('+ character', 'Add a second knower: two individuals become a circle', async () => {
         const first = ctx.heldBy().narrator;
         if (!first) return;
         const p = await pickElement({

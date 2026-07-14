@@ -92,6 +92,19 @@ The eight OW world fields in `world.json` (`description`, `image_url`, `time_bas
 
 ---
 
+## Calendars (2B arc, sessions 266-267 — binding contract: `Forge/Notes/2026-07-14-calendar-design-final.md`)
+
+The world owns the clock, calendars own the language. Every dated element stores a plain integer forever; a calendar is a LENS that names those integers ("12 Frostwane, Year 454 FT"). Full arithmetic contract (eras/leap/intercalary/weekday/format/parse rules) lives in the design note — 3-lens gated, Skeld-passed; this section holds the architecture.
+
+- **The world clock**: `time_basic_unit` (the step meaning — required, the GATE for calendar creation), `time_current` (the now), `time_range_min/max` (extent). All ride the meta sync above. The clock modal is the one required first step; the chip menu keeps it ABOVE "+ new calendar", which stays greyed until the clock is set (the order teaches the model — Captain's ruling).
+- **A calendar = a Construct** with supertype `calendar` (display convention only) carrying its machine config in the **`atlas_calendar`** wire-extension field. **Detection keys on FIELD PRESENCE, never the supertype** (users hand-mint arbitrary supertypes; a lore-only "Calendar" must never surface as a broken lens). The field is in `ATLAS_WIRE_EXTENSION_FIELDS`: rides the v2 wire, hidden from the generic custom-fields editor, edited only via the builder modal. Keel stores extension fields VERBATIM in a per-element `JSONField` (source-verified at keel@e64f270, S267) — nested objects round-trip; calendars sync/export/import with zero new machinery. `readCalendarValue` (calendar-lens.ts) is the ONE tolerant read (object or JSON string) every consumer shares.
+- **Kernels, all pure**: `core/calendar.ts` (config types, validation, format/parse, era/leap/intercalary/weekday arithmetic — O(config), Euclidean floor, total under malformed input) · `core/calendar-axis.ts` (boundary ticks with rung labels: era landmarks / round era-local years / month names / day mid-labels / festival glints, plus era bands + season segmentation) · `core/calendar-seed.ts` (the legacy-field mint parse).
+- **Lens model**: at most one active per room (registry `active_calendar_id`, device-local); saved charts carry `ChartConfig.calendarId` (rewritten by `rewriteChartScopeIds` on Route-2 id-swaps); every dangling/malformed ref degrades to bare numbers, never an error.
+- **The legacy-field seed**: `time_format_names`/`time_format_equivalents` are read ONCE to offer minting the first calendar, then CLEARED on the world (both `[]`; rides the meta sync). Offer gates: fields present ∧ no calendar exists ∧ writable ∧ (api-linked → `meta_baseline` established, else the S262 seed round would pull the clear back). A crash between mint and clear self-heals: the calendar's presence suppresses re-offering and the room retries the clear quietly.
+- **Publish bake**: chart blocks freeze `PayloadChartNode.label`/`endLabel` (lens-formatted text) + `PayloadChartBlock.axisTicks` at publish; `date` stays numeric forever. Additive — old payloads valid, the show viewer ignores unknown fields until its deliberate re-lift (owed with the next show push).
+
+---
+
 ## On-Disk Layout
 
 User picks a root folder once per world (persisted via `FileSystemDirectoryHandle` in IndexedDB; the only IDB use case in atlas). Atlas writes (wrapper folder is `onlyworlds-atlas/` — `atlas-worlds/` is the recognized legacy name):

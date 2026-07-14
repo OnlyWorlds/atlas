@@ -133,5 +133,8 @@ if (import.meta.env.DEV) {
     getState: () => _getState(),
     getActiveStore: () => _getActiveStore(),
     patchData: (elements: unknown[]) => _patchSlice('data', { elements: elements as never }),
+    /** Generic slice patch — tests that write world meta directly to the store
+     *  mirror it here (the room reads the slice, not the disk). */
+    patchSlice: (slice: string, value: unknown) => _patchSlice(slice as never, value as never),
   };
 }

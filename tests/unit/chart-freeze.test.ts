@@ -56,4 +56,46 @@ describe('freezeChartBlock', () => {
     expect(frozen.axisMin).toBe(0);
     expect(frozen.axisMax).toBe(0);
   });
+
+  describe('the calendar publish bake (2B — additive, date stays numeric)', () => {
+    const CAL = {
+      version: 1, grain: 'year',
+      eras: [{ name: 'After Empire', abbrev: 'AE', start: 1000, restart: true }],
+      format: '{year} {era}',
+    };
+    const withCal = [
+      ...elements,
+      { id: 'cal1', type: 'construct', name: 'Imperial', atlas_calendar: CAL } as never as Element,
+    ];
+    const lensedChart: ChartConfig = { ...chart('ch1', { kind: 'all' }), calendarId: 'cal1' };
+
+    it('bakes node labels + axis ticks through the chart lens; numbers untouched', () => {
+      const frozen = freezeChartBlock('ch1', 'b1', [lensedChart], withCal, new Set())!;
+      const founding = frozen.nodes.find(n => n.name === 'Founding')!;
+      expect(founding.date).toBe(1000);            // numeric forever
+      expect(founding.label).toBe('1 AE');
+      const war = frozen.nodes.find(n => n.name === 'War')!;
+      expect(war.endLabel).toBe('19 AE');
+      expect(frozen.axisTicks!.length).toBeGreaterThan(0);
+      for (const t of frozen.axisTicks!) {
+        expect(typeof t.position).toBe('number');
+        expect(t.label).toMatch(/AE|\d/);
+      }
+    });
+
+    it('a dangling calendarId bakes nothing — the block stays purely numeric', () => {
+      const dangling: ChartConfig = { ...chart('ch1', { kind: 'all' }), calendarId: 'gone' };
+      const frozen = freezeChartBlock('ch1', 'b1', [dangling], withCal, new Set())!;
+      expect(frozen.axisTicks).toBeUndefined();
+      expect(frozen.nodes.every(n => n.label === undefined)).toBe(true);
+    });
+
+    it('a lensless chart is byte-identical to the pre-bake shape', () => {
+      const frozen = freezeChartBlock('ch1', 'b1', charts, withCal, new Set())!;
+      expect(frozen.axisTicks).toBeUndefined();
+      for (const n of frozen.nodes) {
+        for (const k of Object.keys(n)) expect(NODE_ALLOWED.has(k)).toBe(true);
+      }
+    });
+  });
 });
