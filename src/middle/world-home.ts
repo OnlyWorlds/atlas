@@ -493,6 +493,22 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
     continueRows.push({ icon: ELEMENT_ICONS[el.type] ?? 'category', verb, el, hash: room.hash });
   }
 
+  // A row whose element was never touched since birth says Created, not Edit
+  // ("it says edit when I only created" — Captain, 2026-07-19). Local creates
+  // stamp created_at === local_updated_at from one instant; any edit breaks
+  // the equality. Server-born elements carry the server's created_at, which
+  // never equals a local stamp — they correctly stay on their room verb.
+  for (const row of continueRows) {
+    const rec = row.el as Record<string, unknown>;
+    if (row.verb === 'Edit' && rec.created_at && rec.created_at === row.el.local_updated_at) {
+      row.verb = 'Created';
+    }
+  }
+  // Newest first, ALWAYS — the pinned Write/Map/Edit picks used to outrank a
+  // brand-new element, which read as stale ordering on fresh worlds.
+  continueRows.sort((a, b) =>
+    (b.el.local_updated_at ?? '').localeCompare(a.el.local_updated_at ?? ''));
+
   // The first element gets a standing highlight (S264): with exactly one
   // content element, its row IS the tour's next step — make it unmissable.
   const firstElement = content.length === 1 ? content[0] : null;

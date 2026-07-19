@@ -1666,6 +1666,12 @@ body.atlas-touring .atlas-shell {
   font-size: 14.5px;
   max-width: 75ch;
 }
+/* The first two steps: the sentence jumps out bright (Freek's round) —
+   the material leads before the parsing dims it into a progress surface. */
+.atlas-tour-bar.is-fresh .atlas-tour-sentence {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 15.5px;
+}
 .atlas-tour-word.parsed {
   color: rgba(255, 255, 255, 0.92);
   border-bottom: 2px solid var(--tour-word-color, var(--atlas-cyan));
@@ -13692,9 +13698,8 @@ body.atlas-share-fullpreview > * {
 .atlas-chart-rightstack {
   margin-left: auto;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
+  align-items: center;
+  gap: 10px;
 }
 
 .atlas-chart-mode {

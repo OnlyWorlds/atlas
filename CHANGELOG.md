@@ -8,6 +8,10 @@
 - A sync error class fixed: elements pulled from onlyworlds.com could carry a server bookkeeping field that the server then rejected back, leaving the element stuck at "couldn't sync pending change" forever. Those stuck elements clear on their next sync round.
 - The first screen carries the animated OnlyWorlds mark at full size, with more air between everything.
 - The tour's narrator starts docked at the bottom of the bare page and stays there: the workspace builds up above it from the first Next. No more large centered opener.
+- The tour opens straight on its first real act: create the world. The separate intro step is gone (17 steps now), the sentence glows bright on the opening beats, and the step counter label is gone: the sentence itself is the progress.
+- Tour touches from a live walkthrough: highlights narrowed to the exact words that become elements, "deeper" reads "more information", the pin step explains why the pin holds the Consul and how a council motion could give characters a vehicle field, and the Consul's possessions now list his spaceship.
+- The charts room's now field and view toggle share one line instead of stacking.
+- A just-created element's home row says "Created", not "Edit", until you actually change something, and the newest thing always sits on top of Recent.
 - The tour's two create steps have one route now: the create dialog itself. The quiet Next beside them read as a fork; every other step keeps watch-mode Next.
 - The tour's narrator panel holds one exact shape through all 18 steps: no more small resizes between steps with and without the deeper widget or longer copy.
 - A hands-on tour step's sentence icon now lights when you create the element, not when the step opens.

@@ -1,7 +1,7 @@
 # Atlas — Guided Tour Design
 
-**Version**: 2.2 (2026-07-19, S297 — consolidated after Captain's four design
-rounds; supersedes v1/v2 delta layers)
+**Version**: 2.3 (2026-07-19, S298 — the Freek round: 17 steps, docked-only
+narrator, single-route creates; supersedes v2.2)
 **Concept**: Freek + Captain, 2026-07-19. The opening sentence of *Hyperion*
 by Dan Simmons becomes a small linked world, step by railroaded step,
 teaching OnlyWorlds AND atlas at once — while the workspace BUILDS ITSELF
@@ -34,19 +34,23 @@ at the 'online' step as the deeper schema story).
   create-world live and the other four greyed (`.atlas-tour-locked`).
 - **Panel rows**: the annotated sentence · hairline · body copy (+ the meta
   subtext channel, always rendered — nbsp when a step has none — so the shape
-  holds; ✦ deeper; inline links) · act label "Elements · Step N of 18" +
-  controls. Steps carry NO titles: the act label orients, the hairline
-  divides material from narration.
+  holds; ✦ deeper; inline links) · controls (the visible act/step label was CUT in S298 — the sentence IS
+  the progress; `data-tour-step` on the panel is the test contract). The
+  hairline divides material from narration; the sentence renders BRIGHT on
+  the first two steps (`.is-fresh`).
 - **The annotated sentence** (the progress bar, ow.com vignette grammar):
   serif italic (Crimson Text stack, Georgia fallback — bundling owed if the
   look is blessed); parsed words take their element-type color and click-jump
   to their step; every span's END word carries an inline element-type glyph,
   PRE-SPACED from step 1 as a dim ghost and LIT (pop-in) when its step
-  arrives — zero reflow. The finale sweep paints remaining connectives a
-  quiet neutral (`fillRest`).
-- **✦ deeper**: real multi-paragraph content (`\n\n` renders as paragraphs)
-  in a scrollable FLYOUT above the panel — the dock's height never changes.
-  The explorer link shares the deeper toggle's exact metrics on the same row.
+  arrives — zero reflow. (The finale's neutral fill of connective words was
+  CUT in S298 — only element words ever color.)
+- **"more information"** (the ✦ bulb, relabeled S298): real multi-paragraph
+  content (`\n\n` renders as paragraphs) in a scrollable FLYOUT above the
+  panel — the dock's height never changes. The extras row always renders
+  (ghost placeholder when a step has neither bulb nor link); Captain's
+  Hyperion share-page link joins it on the 'online' step when it exists.
+  (The ecosystem-explorer link was cut in S298.)
 
 ## Hands-on beats (the watch/do rule)
 
@@ -56,7 +60,7 @@ dialog and stays on the step — never "back" (the panic-key rule). Names are
 LOCKED — every user's tour is identical, and no user-typed data rides into a
 throwaway world:
 
-1. **Create the world** (step 2): the REAL create-world modal, name
+1. **Create the world** (step 1 — the tour OPENS here): the REAL create-world modal, name
    "Hyperion" readonly, the folder hint replaced by the teaching line
    ("normally this becomes a folder; the tour world stays in your browser").
    Create → the shell materializes on the world's home. The sidebar's own
@@ -65,26 +69,26 @@ throwaway world:
    way; the consul step shows plain Next only after he exists. The stage-1
    sidebar toggle also keeps its final geometry: a locked ghost segment
    holds the place the world name will take.
-2. **Create the Consul** (step 3): the REAL element modal, type grid locked
+2. **Create the Consul** (step 2): the REAL element modal, type grid locked
    to character, name "The Consul" readonly. During this beat EVERY create
    door is scripted — the elements-sidebar + opens the same locked modal
    until the Consul exists; after that the sandbox is free.
-3. **Set up your folder** (step 18, finale): the real `setupAtlasRoot`
+3. **Set up your folder** (step 17, finale): the real `setupAtlasRoot`
    picker; success ends the tour. On OPFS-only browsers Finish is primary
    and no folder button renders.
 
 ## The residue contract
 
-The tour leaves NOTHING behind. The world is created at step 2 (not boot)
+The tour leaves NOTHING behind. The world is created at step 1 (not boot)
 and exit or Finish — anywhere, anytime — tears it down completely: registry
 entry, handle, OPFS folder. Exit returns to the launch location
 (`returnHash`: the landing for fresh users, the exact prior route for a
 settings replay). `atlas_tour_done_v1` survives as the only trace, driving
 the landing's emphasis swap.
 
-## Acts (18 steps)
+## Acts (17 steps — the intro was cut in S298; the tour opens on create-world)
 
-1. **Elements** (7): opener · create the world · create the Consul ·
+1. **Elements** (6): create the world (carries the framing; opens the tour) · create the Consul ·
    Hegemony institution · title · objects (balcony parent_object spaceship) ·
    linking payoff (objects BEFORE linking so the Consul's page carries real
    chips when the copy says "everything connects"; deeper: two-way links,
@@ -96,10 +100,10 @@ the landing's emphasis swap.
    the Prelude — chip targets must exist by chapter time).
 4. **Time** (1): the chart; events at years 7/12, zoom-out finds the gold
    now at 15 (deeper: drag-to-date, saved charts, calendars).
-5. **Your world** (4): the sweep (+ `fillRest`) · where-it-lives (files
+5. **Your world** (4): the sweep · where-it-lives (files
    story; Web-tab cameo via `webTab`; deeper: folder-is-the-world, offline) ·
-   online (demo key 0000000000; deeper: sync, read keys, ecosystem; explorer
-   link; Captain's Hyperion share-page link joins when it exists) · finale.
+   online (demo key 0000000000; deeper: sync, read keys, ecosystem;
+   Captain's Hyperion share-page link joins when it exists) · finale.
 
 **Cut from the tour** (stay as waypoints): knowledge room visit, import.
 
@@ -108,7 +112,7 @@ the landing's emphasis swap.
 - **`tour-data.ts`** — sentence + step script + `tourStageFor`. Steps
   reference bundle elements as `"type:Name"`; spans are word-index ranges +
   element type. Route kinds: home · elements · element · map · writing ·
-  chart; flags `webTab`, `fillRest`, `meta`, `deeper`,
+  chart; flags `webTab`, `meta`, `deeper`,
   `handsOn: 'create-world' | 'create-consul' | 'setup-folder'`.
 - **`tour-engine.ts`** — state (localStorage `atlas_tour_v1`:
   active/step/worldId/returnHash), boot/resume/exit, the reveal system,

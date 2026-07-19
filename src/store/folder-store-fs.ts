@@ -724,12 +724,19 @@ export class FsFolderStore implements FolderStore {
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
     this.assertWritable();
     const id = (data.id as string) ?? newId();
+    // created_at is stamped locally at birth from the SAME instant as
+    // local_updated_at, so "never edited since creation" is a plain equality
+    // check (home's Created/Edit verb). It never reaches the wire (the
+    // adapter strips server-managed fields) and a pull's server value
+    // overwrites it — locally true until the server has a truer one.
+    const now = this.clock();
     const elem: Element = {
+      created_at: now,
       ...data,
       id,
       type,
       name: (data.name as string) ?? '',
-      local_updated_at: this.clock(),
+      local_updated_at: now,
     };
     await this.ensureIndexFor(type);
     const dir = await getDir(this.requireRoot(), elementDirSegments(type));

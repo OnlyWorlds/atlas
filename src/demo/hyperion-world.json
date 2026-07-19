@@ -1,407 +1,409 @@
 {
-  "_source": "OnlyWorlds demo world 0000000000 (world 068e012b-52a9-79bf-8000-26bb67891425), fetched 2026-07-19",
-  "_bake_notes": [
-    "legacy marker-based zone twin merged into the creature-referenced zone (markers retargeted, order from names)",
-    "events dated (7, 12) for the chart act -- upstream has no dates; ask Skeld to date them server-side",
-    "imgur image_urls replaced by bundled webp via x_tour_media (offline tour); boot writes them as local media",
-    "pin renamed from 'Pin @ (237,305)'",
-    "link weave added (title issuer/holders, consul abilities/objects/institutions, creature species, collective members/zones, event participants) -- upstream demo carries no links; suggest Skeld adopt server-side",
-    "book 'Hyperion' + 'Chapter 1' narratives minted for the writing act (not upstream) -- chapter story is the sentence verbatim with ow:// chips; chip labels are deliberate display overrides so the sentence stays word-exact",
-    "atlas_aliases baked for the sentence surface forms -- keeps the chapter chips word-exact under label sync and feeds the @ picker",
-    "Rachmaninov birth_date (1873, Earth chronology) removed -- it stretched the chart axis to 0..1873 and crushed the dated events; the world clock runs 0..100"
-  ],
-  "world": {
-    "name": "Hyperion",
-    "description": "One sentence of a world: the opening line of Hyperion by Dan Simmons, held as OnlyWorlds elements.",
-    "time_basic_unit": "Year",
-    "time_range_min": 0,
-    "time_range_max": 100,
-    "time_current": 15
+ "_source": "OnlyWorlds demo world 0000000000 (world 068e012b-52a9-79bf-8000-26bb67891425), fetched 2026-07-19",
+ "_bake_notes": [
+  "legacy marker-based zone twin merged into the creature-referenced zone (markers retargeted, order from names)",
+  "events dated (7, 12) for the chart act -- upstream has no dates; ask Skeld to date them server-side",
+  "imgur image_urls replaced by bundled webp via x_tour_media (offline tour); boot writes them as local media",
+  "pin renamed from 'Pin @ (237,305)'",
+  "link weave added (title issuer/holders, consul abilities/objects/institutions, creature species, collective members/zones, event participants) -- upstream demo carries no links; suggest Skeld adopt server-side",
+  "book 'Hyperion' + 'Chapter 1' narratives minted for the writing act (not upstream) -- chapter story is the sentence verbatim with ow:// chips; chip labels are deliberate display overrides so the sentence stays word-exact",
+  "atlas_aliases baked for the sentence surface forms -- keeps the chapter chips word-exact under label sync and feeds the @ picker",
+  "Rachmaninov birth_date (1873, Earth chronology) removed -- it stretched the chart axis to 0..1873 and crushed the dated events; the world clock runs 0..100",
+  "S298 (Freek round): consul.objects gains Ebony Spaceship (balcony implied via parent_object, deliberately not listed); collective renamed Pack of Bellowing Saurians -> Saurian Pack (the word \"bellowed\" reveals after the collective does)."
+ ],
+ "world": {
+  "name": "Hyperion",
+  "description": "One sentence of a world: the opening line of Hyperion by Dan Simmons, held as OnlyWorlds elements.",
+  "time_basic_unit": "Year",
+  "time_range_min": 0,
+  "time_range_max": 100,
+  "time_current": 15
+ },
+ "elements": [
+  {
+   "type": "character",
+   "id": "068e2ddb-83c6-71a7-8000-a45b8b711e25",
+   "name": "The Consul",
+   "description": "Last seen on the balcony of a spaceship, over Hyperion.",
+   "supertype": "Human",
+   "mentality": "Unflappable",
+   "reputation": "Diplomatic standing",
+   "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
+   "abilities": [
+    "068e2e60-fc37-789e-8000-a64560195ff8"
+   ],
+   "objects": [
+    "068e2e8c-e2f4-7e4c-8000-8abcf4e8e286",
+    "068e2e56-d4b9-7c40-8000-173975bfd994"
+   ],
+   "institutions": [
+    "068e2f37-840a-7b3b-8000-41b6b6872c95"
+   ],
+   "atlas_aliases": [
+    "Consul",
+    "the Consul"
+   ]
   },
-  "elements": [
-    {
-      "type": "character",
-      "id": "068e2ddb-83c6-71a7-8000-a45b8b711e25",
-      "name": "The Consul",
-      "description": "Last seen on the balcony of a spaceship, over Hyperion.",
-      "supertype": "Human",
-      "mentality": "Unflappable",
-      "reputation": "Diplomatic standing",
-      "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
-      "abilities": [
-        "068e2e60-fc37-789e-8000-a64560195ff8"
-      ],
-      "objects": [
-        "068e2e56-d4b9-7c40-8000-173975bfd994"
-      ],
-      "institutions": [
-        "068e2f37-840a-7b3b-8000-41b6b6872c95"
-      ],
-      "atlas_aliases": [
-        "Consul",
-        "the Consul"
-      ]
-    },
-    {
-      "type": "character",
-      "id": "068e92db-4c40-79eb-8000-8ef44c0d52b4",
-      "name": "Rachmaninov",
-      "atlas_aliases": [
-        "Rachmaninov's"
-      ]
-    },
-    {
-      "type": "character",
-      "id": "068e92dc-10ec-7225-8000-7efd678bd862",
-      "name": "Steinway",
-      "description": "Some old piano maker"
-    },
-    {
-      "type": "creature",
-      "id": "068e2e71-8f4d-7de0-8000-dfbd8406227d",
-      "name": "Great Green Saurian",
-      "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
-      "zone": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "species": [
-        "068e2e72-3d17-7a23-8000-b8f0d24e2d1e"
-      ],
-      "traits": [
-        "068e6db2-91a2-783e-8000-ec27dff0708a"
-      ]
-    },
-    {
-      "type": "creature",
-      "id": "068e92e3-cf64-7fd4-8000-2b8be79a4c7c",
-      "name": "Greater Green Saurian",
-      "description": "Friendly with GGS, usually",
-      "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
-      "zone": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "species": [
-        "068e2e72-3d17-7a23-8000-b8f0d24e2d1e"
-      ],
-      "traits": [
-        "068e6db2-91a2-783e-8000-ec27dff0708a"
-      ]
-    },
-    {
-      "type": "species",
-      "id": "068e2e72-3d17-7a23-8000-b8f0d24e2d1e",
-      "name": "Saurians",
-      "atlas_aliases": [
-        "saurian"
-      ]
-    },
-    {
-      "type": "collective",
-      "id": "068e92dd-ce97-79b4-8000-90a11218fc88",
-      "name": "Pack of Bellowing Saurians",
-      "description": "Raging around the swamps of Hyperion",
-      "species": [
-        "068e2e72-3d17-7a23-8000-b8f0d24e2d1e"
-      ],
-      "creatures": [
-        "068e2e71-8f4d-7de0-8000-dfbd8406227d",
-        "068e92e3-cf64-7fd4-8000-2b8be79a4c7c"
-      ]
-    },
-    {
-      "type": "institution",
-      "id": "068e2f37-840a-7b3b-8000-41b6b6872c95",
-      "name": "The Hegemony",
-      "description": "Kind of a big deal",
-      "atlas_aliases": [
-        "Hegemony"
-      ]
-    },
-    {
-      "type": "location",
-      "id": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
-      "name": "Planet Hyperion",
-      "supertype": "Celestial",
-      "subtype": "Planet",
-      "x_tour_media": "hyperion-location.webp"
-    },
-    {
-      "type": "object",
-      "id": "068e2e56-d4b9-7c40-8000-173975bfd994",
-      "name": "The Consul's Steinway",
-      "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
-      "atlas_aliases": [
-        "Steinway"
-      ]
-    },
-    {
-      "type": "object",
-      "id": "068e2e8c-e2f4-7e4c-8000-8abcf4e8e286",
-      "name": "Ebony Spaceship",
-      "atlas_aliases": [
-        "spaceship"
-      ]
-    },
-    {
-      "type": "object",
-      "id": "068e2e8d-a92f-720d-8000-6df2dd75923a",
-      "name": "Spaceship Balcony",
-      "parent_object": "068e2e8c-e2f4-7e4c-8000-8abcf4e8e286",
-      "atlas_aliases": [
-        "balcony"
-      ]
-    },
-    {
-      "type": "construct",
-      "id": "068e2e55-18da-7cb9-8000-8ccd6ebf1c1e",
-      "name": "Rachmaninov's Prelude",
-      "characters": [
-        "068e92db-4c40-79eb-8000-8ef44c0d52b4"
-      ],
-      "species": [
-        "068e2e72-3d17-7a23-8000-b8f0d24e2d1e"
-      ],
-      "abilities": [
-        "068e2e60-fc37-789e-8000-a64560195ff8"
-      ],
-      "phenomena": [
-        "068e92f8-11fd-7052-8000-b9355be90c7d"
-      ],
-      "events": [
-        "068e8bcf-9136-7d63-8000-a61f8b461fb6"
-      ],
-      "atlas_aliases": [
-        "Prelude in C-sharp Minor",
-        "the Prelude"
-      ]
-    },
-    {
-      "type": "construct",
-      "id": "068e92e1-63df-7d1f-8000-33f2d0a334b1",
-      "name": "Steinway Piano",
-      "description": "Any piano that Steinway designed - or built? Played on?"
-    },
-    {
-      "type": "ability",
-      "id": "068e2e60-fc37-789e-8000-a64560195ff8",
-      "name": "Piano Playing",
-      "tradition": "068e2e55-18da-7cb9-8000-8ccd6ebf1c1e",
-      "effects": [
-        "068e92f8-11fd-7052-8000-b9355be90c7d"
-      ],
-      "instruments": [
-        "068e2e56-d4b9-7c40-8000-173975bfd994"
-      ]
-    },
-    {
-      "type": "trait",
-      "id": "068e6db2-91a2-783e-8000-ec27dff0708a",
-      "name": "Swamp Rage"
-    },
-    {
-      "type": "title",
-      "id": "068e2dde-8d1f-7dd2-8000-6178241a68ab",
-      "name": "Consul of the Hegemony",
-      "supertype": "Diplomatic",
-      "issuer": "068e2f37-840a-7b3b-8000-41b6b6872c95",
-      "holders": [
-        "068e2ddb-83c6-71a7-8000-a45b8b711e25"
-      ]
-    },
-    {
-      "type": "language",
-      "id": "068e92ee-d9d0-7612-8000-3d87f856e44c",
-      "name": "Western Musical Notation",
-      "description": "For c sharp minor and all that"
-    },
-    {
-      "type": "event",
-      "id": "068e8bcf-9136-7d63-8000-a61f8b461fb6",
-      "name": "The Primal Performance",
-      "description": "The Consul performs for bellowing saurians",
-      "characters": [
-        "068e2ddb-83c6-71a7-8000-a45b8b711e25"
-      ],
-      "objects": [
-        "068e2e56-d4b9-7c40-8000-173975bfd994"
-      ],
-      "locations": [
-        "068e2e4b-a594-71b2-8000-cd7b6283dd71"
-      ],
-      "abilities": [
-        "068e2e60-fc37-789e-8000-a64560195ff8"
-      ],
-      "phenomena": [
-        "068e92f8-11fd-7052-8000-b9355be90c7d"
-      ],
-      "start_date": 7
-    },
-    {
-      "type": "event",
-      "id": "068e92ec-4e66-75b7-8000-a8ae95bb5602",
-      "name": "The Raging of the Beasts",
-      "description": "A particular notable outburst of Swamp Rage",
-      "start_date": 12,
-      "collectives": [
-        "068e92dd-ce97-79b4-8000-90a11218fc88"
-      ],
-      "locations": [
-        "068e2e4b-a594-71b2-8000-cd7b6283dd71"
-      ],
-      "zones": [
-        "068e92f5-24b4-7462-8000-0c567b9104fb"
-      ]
-    },
-    {
-      "type": "narrative",
-      "id": "068e6f37-772b-708f-8000-d30d2a6553ca",
-      "name": "Story of the old piano",
-      "description": "This piano has seen some things",
-      "story": "It all started with a mr. called Steinway..",
-      "events": [
-        "068e8bcf-9136-7d63-8000-a61f8b461fb6"
-      ],
-      "characters": [
-        "068e2ddb-83c6-71a7-8000-a45b8b711e25"
-      ]
-    },
-    {
-      "type": "phenomenon",
-      "id": "068e92f8-11fd-7052-8000-b9355be90c7d",
-      "name": "Piano Music"
-    },
-    {
-      "type": "map",
-      "id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
-      "name": "Hyperion",
-      "width": 425,
-      "height": 624,
-      "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
-      "x_tour_media": "hyperion-map.webp"
-    },
-    {
-      "type": "pin",
-      "id": "069458de-0293-7765-8000-e3cf3687dd5c",
-      "name": "The Consul's balcony seat",
-      "x": 221,
-      "y": 295,
-      "element_type": "character",
-      "element_id": "068e2ddb-83c6-71a7-8000-a45b8b711e25",
-      "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b"
-    },
-    {
-      "type": "marker",
-      "id": "06947bdc-eff3-71b7-8000-ebe695f7837a",
-      "name": "The Swamps - Point 0",
-      "x": 234,
-      "y": 304,
-      "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
-      "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "order": 0
-    },
-    {
-      "type": "marker",
-      "id": "06947bdc-f366-7927-8000-62aaaf300609",
-      "name": "The Swamps - Point 1",
-      "x": 193,
-      "y": 328,
-      "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
-      "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "order": 1
-    },
-    {
-      "type": "marker",
-      "id": "06947bdc-f689-73bd-8000-611dc652729f",
-      "name": "The Swamps - Point 2",
-      "x": 183,
-      "y": 311,
-      "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
-      "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "order": 2
-    },
-    {
-      "type": "marker",
-      "id": "06947bdc-f99a-7453-8000-e8f00b5c825f",
-      "name": "The Swamps - Point 3",
-      "x": 163,
-      "y": 300,
-      "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
-      "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "order": 3
-    },
-    {
-      "type": "marker",
-      "id": "06947bdc-fcbf-78bc-8000-37fc3dc23cc2",
-      "name": "The Swamps - Point 4",
-      "x": 172,
-      "y": 284,
-      "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
-      "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "order": 4
-    },
-    {
-      "type": "marker",
-      "id": "06947bdd-0045-7fb7-8000-e8a344176d75",
-      "name": "The Swamps - Point 5",
-      "x": 178,
-      "y": 277,
-      "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
-      "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "order": 5
-    },
-    {
-      "type": "marker",
-      "id": "06947bdd-03b9-7e43-8000-6ce418b707a7",
-      "name": "The Swamps - Point 6",
-      "x": 188,
-      "y": 275,
-      "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
-      "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "order": 6
-    },
-    {
-      "type": "marker",
-      "id": "06947bdd-070b-71e0-8000-770bdc4acda3",
-      "name": "The Swamps - Point 7",
-      "x": 193,
-      "y": 283,
-      "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
-      "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "order": 7
-    },
-    {
-      "type": "marker",
-      "id": "06947bdd-0aee-736c-8000-d5241d0b80e9",
-      "name": "The Swamps - Point 8",
-      "x": 216,
-      "y": 290,
-      "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
-      "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "order": 8
-    },
-    {
-      "type": "zone",
-      "id": "068e92f5-24b4-7462-8000-0c567b9104fb",
-      "name": "The Swamps",
-      "description": "WARNING: home to bellowing beasts",
-      "atlas_shape": "polygon",
-      "atlas_aliases": [
-        "the swamps",
-        "swamps"
-      ]
-    },
-    {
-      "id": "2d16c352-6c2d-4d1f-9bab-8345bb17eaba",
-      "type": "narrative",
-      "name": "Hyperion",
-      "supertype": "Book",
-      "description": "The novel this world opens from.",
-      "order": 0
-    },
-    {
-      "id": "4ec4c158-e8fa-42de-aac0-18d739fd9536",
-      "type": "narrative",
-      "name": "Chapter 1",
-      "supertype": "Chapter",
-      "parent_narrative": "2d16c352-6c2d-4d1f-9bab-8345bb17eaba",
-      "order": 0,
-      "story": "The [Hegemony](ow://institution/068e2f37-840a-7b3b-8000-41b6b6872c95) [Consul](ow://character/068e2ddb-83c6-71a7-8000-a45b8b711e25) sat on the [balcony](ow://object/068e2e8d-a92f-720d-8000-6df2dd75923a) of his ebony [spaceship](ow://object/068e2e8c-e2f4-7e4c-8000-8abcf4e8e286) and played [Rachmaninov's](ow://character/068e92db-4c40-79eb-8000-8ef44c0d52b4) [Prelude in C-sharp Minor](ow://construct/068e2e55-18da-7cb9-8000-8ccd6ebf1c1e) on an ancient but well-maintained [Steinway](ow://object/068e2e56-d4b9-7c40-8000-173975bfd994) while great, green, [saurian](ow://species/068e2e72-3d17-7a23-8000-b8f0d24e2d1e) things surged and bellowed in [the swamps](ow://zone/068e92f5-24b4-7462-8000-0c567b9104fb) below."
-    }
-  ]
+  {
+   "type": "character",
+   "id": "068e92db-4c40-79eb-8000-8ef44c0d52b4",
+   "name": "Rachmaninov",
+   "atlas_aliases": [
+    "Rachmaninov's"
+   ]
+  },
+  {
+   "type": "character",
+   "id": "068e92dc-10ec-7225-8000-7efd678bd862",
+   "name": "Steinway",
+   "description": "Some old piano maker"
+  },
+  {
+   "type": "creature",
+   "id": "068e2e71-8f4d-7de0-8000-dfbd8406227d",
+   "name": "Great Green Saurian",
+   "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
+   "zone": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "species": [
+    "068e2e72-3d17-7a23-8000-b8f0d24e2d1e"
+   ],
+   "traits": [
+    "068e6db2-91a2-783e-8000-ec27dff0708a"
+   ]
+  },
+  {
+   "type": "creature",
+   "id": "068e92e3-cf64-7fd4-8000-2b8be79a4c7c",
+   "name": "Greater Green Saurian",
+   "description": "Friendly with GGS, usually",
+   "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
+   "zone": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "species": [
+    "068e2e72-3d17-7a23-8000-b8f0d24e2d1e"
+   ],
+   "traits": [
+    "068e6db2-91a2-783e-8000-ec27dff0708a"
+   ]
+  },
+  {
+   "type": "species",
+   "id": "068e2e72-3d17-7a23-8000-b8f0d24e2d1e",
+   "name": "Saurians",
+   "atlas_aliases": [
+    "saurian"
+   ]
+  },
+  {
+   "type": "collective",
+   "id": "068e92dd-ce97-79b4-8000-90a11218fc88",
+   "name": "Saurian Pack",
+   "description": "Raging around the swamps of Hyperion",
+   "species": [
+    "068e2e72-3d17-7a23-8000-b8f0d24e2d1e"
+   ],
+   "creatures": [
+    "068e2e71-8f4d-7de0-8000-dfbd8406227d",
+    "068e92e3-cf64-7fd4-8000-2b8be79a4c7c"
+   ]
+  },
+  {
+   "type": "institution",
+   "id": "068e2f37-840a-7b3b-8000-41b6b6872c95",
+   "name": "The Hegemony",
+   "description": "Kind of a big deal",
+   "atlas_aliases": [
+    "Hegemony"
+   ]
+  },
+  {
+   "type": "location",
+   "id": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
+   "name": "Planet Hyperion",
+   "supertype": "Celestial",
+   "subtype": "Planet",
+   "x_tour_media": "hyperion-location.webp"
+  },
+  {
+   "type": "object",
+   "id": "068e2e56-d4b9-7c40-8000-173975bfd994",
+   "name": "The Consul's Steinway",
+   "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
+   "atlas_aliases": [
+    "Steinway"
+   ]
+  },
+  {
+   "type": "object",
+   "id": "068e2e8c-e2f4-7e4c-8000-8abcf4e8e286",
+   "name": "Ebony Spaceship",
+   "atlas_aliases": [
+    "spaceship"
+   ]
+  },
+  {
+   "type": "object",
+   "id": "068e2e8d-a92f-720d-8000-6df2dd75923a",
+   "name": "Spaceship Balcony",
+   "parent_object": "068e2e8c-e2f4-7e4c-8000-8abcf4e8e286",
+   "atlas_aliases": [
+    "balcony"
+   ]
+  },
+  {
+   "type": "construct",
+   "id": "068e2e55-18da-7cb9-8000-8ccd6ebf1c1e",
+   "name": "Rachmaninov's Prelude",
+   "characters": [
+    "068e92db-4c40-79eb-8000-8ef44c0d52b4"
+   ],
+   "species": [
+    "068e2e72-3d17-7a23-8000-b8f0d24e2d1e"
+   ],
+   "abilities": [
+    "068e2e60-fc37-789e-8000-a64560195ff8"
+   ],
+   "phenomena": [
+    "068e92f8-11fd-7052-8000-b9355be90c7d"
+   ],
+   "events": [
+    "068e8bcf-9136-7d63-8000-a61f8b461fb6"
+   ],
+   "atlas_aliases": [
+    "Prelude in C-sharp Minor",
+    "the Prelude"
+   ]
+  },
+  {
+   "type": "construct",
+   "id": "068e92e1-63df-7d1f-8000-33f2d0a334b1",
+   "name": "Steinway Piano",
+   "description": "Any piano that Steinway designed - or built? Played on?"
+  },
+  {
+   "type": "ability",
+   "id": "068e2e60-fc37-789e-8000-a64560195ff8",
+   "name": "Piano Playing",
+   "tradition": "068e2e55-18da-7cb9-8000-8ccd6ebf1c1e",
+   "effects": [
+    "068e92f8-11fd-7052-8000-b9355be90c7d"
+   ],
+   "instruments": [
+    "068e2e56-d4b9-7c40-8000-173975bfd994"
+   ]
+  },
+  {
+   "type": "trait",
+   "id": "068e6db2-91a2-783e-8000-ec27dff0708a",
+   "name": "Swamp Rage"
+  },
+  {
+   "type": "title",
+   "id": "068e2dde-8d1f-7dd2-8000-6178241a68ab",
+   "name": "Consul of the Hegemony",
+   "supertype": "Diplomatic",
+   "issuer": "068e2f37-840a-7b3b-8000-41b6b6872c95",
+   "holders": [
+    "068e2ddb-83c6-71a7-8000-a45b8b711e25"
+   ]
+  },
+  {
+   "type": "language",
+   "id": "068e92ee-d9d0-7612-8000-3d87f856e44c",
+   "name": "Western Musical Notation",
+   "description": "For c sharp minor and all that"
+  },
+  {
+   "type": "event",
+   "id": "068e8bcf-9136-7d63-8000-a61f8b461fb6",
+   "name": "The Primal Performance",
+   "description": "The Consul performs for bellowing saurians",
+   "characters": [
+    "068e2ddb-83c6-71a7-8000-a45b8b711e25"
+   ],
+   "objects": [
+    "068e2e56-d4b9-7c40-8000-173975bfd994"
+   ],
+   "locations": [
+    "068e2e4b-a594-71b2-8000-cd7b6283dd71"
+   ],
+   "abilities": [
+    "068e2e60-fc37-789e-8000-a64560195ff8"
+   ],
+   "phenomena": [
+    "068e92f8-11fd-7052-8000-b9355be90c7d"
+   ],
+   "start_date": 7
+  },
+  {
+   "type": "event",
+   "id": "068e92ec-4e66-75b7-8000-a8ae95bb5602",
+   "name": "The Raging of the Beasts",
+   "description": "A particular notable outburst of Swamp Rage",
+   "start_date": 12,
+   "collectives": [
+    "068e92dd-ce97-79b4-8000-90a11218fc88"
+   ],
+   "locations": [
+    "068e2e4b-a594-71b2-8000-cd7b6283dd71"
+   ],
+   "zones": [
+    "068e92f5-24b4-7462-8000-0c567b9104fb"
+   ]
+  },
+  {
+   "type": "narrative",
+   "id": "068e6f37-772b-708f-8000-d30d2a6553ca",
+   "name": "Story of the old piano",
+   "description": "This piano has seen some things",
+   "story": "It all started with a mr. called Steinway..",
+   "events": [
+    "068e8bcf-9136-7d63-8000-a61f8b461fb6"
+   ],
+   "characters": [
+    "068e2ddb-83c6-71a7-8000-a45b8b711e25"
+   ]
+  },
+  {
+   "type": "phenomenon",
+   "id": "068e92f8-11fd-7052-8000-b9355be90c7d",
+   "name": "Piano Music"
+  },
+  {
+   "type": "map",
+   "id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
+   "name": "Hyperion",
+   "width": 425,
+   "height": 624,
+   "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
+   "x_tour_media": "hyperion-map.webp"
+  },
+  {
+   "type": "pin",
+   "id": "069458de-0293-7765-8000-e3cf3687dd5c",
+   "name": "The Consul's balcony seat",
+   "x": 221,
+   "y": 295,
+   "element_type": "character",
+   "element_id": "068e2ddb-83c6-71a7-8000-a45b8b711e25",
+   "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b"
+  },
+  {
+   "type": "marker",
+   "id": "06947bdc-eff3-71b7-8000-ebe695f7837a",
+   "name": "The Swamps - Point 0",
+   "x": 234,
+   "y": 304,
+   "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
+   "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "order": 0
+  },
+  {
+   "type": "marker",
+   "id": "06947bdc-f366-7927-8000-62aaaf300609",
+   "name": "The Swamps - Point 1",
+   "x": 193,
+   "y": 328,
+   "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
+   "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "order": 1
+  },
+  {
+   "type": "marker",
+   "id": "06947bdc-f689-73bd-8000-611dc652729f",
+   "name": "The Swamps - Point 2",
+   "x": 183,
+   "y": 311,
+   "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
+   "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "order": 2
+  },
+  {
+   "type": "marker",
+   "id": "06947bdc-f99a-7453-8000-e8f00b5c825f",
+   "name": "The Swamps - Point 3",
+   "x": 163,
+   "y": 300,
+   "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
+   "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "order": 3
+  },
+  {
+   "type": "marker",
+   "id": "06947bdc-fcbf-78bc-8000-37fc3dc23cc2",
+   "name": "The Swamps - Point 4",
+   "x": 172,
+   "y": 284,
+   "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
+   "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "order": 4
+  },
+  {
+   "type": "marker",
+   "id": "06947bdd-0045-7fb7-8000-e8a344176d75",
+   "name": "The Swamps - Point 5",
+   "x": 178,
+   "y": 277,
+   "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
+   "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "order": 5
+  },
+  {
+   "type": "marker",
+   "id": "06947bdd-03b9-7e43-8000-6ce418b707a7",
+   "name": "The Swamps - Point 6",
+   "x": 188,
+   "y": 275,
+   "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
+   "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "order": 6
+  },
+  {
+   "type": "marker",
+   "id": "06947bdd-070b-71e0-8000-770bdc4acda3",
+   "name": "The Swamps - Point 7",
+   "x": 193,
+   "y": 283,
+   "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
+   "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "order": 7
+  },
+  {
+   "type": "marker",
+   "id": "06947bdd-0aee-736c-8000-d5241d0b80e9",
+   "name": "The Swamps - Point 8",
+   "x": 216,
+   "y": 290,
+   "map_id": "068e2ead-acf3-758b-8000-78de9fa83a3b",
+   "zone_id": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "order": 8
+  },
+  {
+   "type": "zone",
+   "id": "068e92f5-24b4-7462-8000-0c567b9104fb",
+   "name": "The Swamps",
+   "description": "WARNING: home to bellowing beasts",
+   "atlas_shape": "polygon",
+   "atlas_aliases": [
+    "the swamps",
+    "swamps"
+   ]
+  },
+  {
+   "id": "2d16c352-6c2d-4d1f-9bab-8345bb17eaba",
+   "type": "narrative",
+   "name": "Hyperion",
+   "supertype": "Book",
+   "description": "The novel this world opens from.",
+   "order": 0
+  },
+  {
+   "id": "4ec4c158-e8fa-42de-aac0-18d739fd9536",
+   "type": "narrative",
+   "name": "Chapter 1",
+   "supertype": "Chapter",
+   "parent_narrative": "2d16c352-6c2d-4d1f-9bab-8345bb17eaba",
+   "order": 0,
+   "story": "The [Hegemony](ow://institution/068e2f37-840a-7b3b-8000-41b6b6872c95) [Consul](ow://character/068e2ddb-83c6-71a7-8000-a45b8b711e25) sat on the [balcony](ow://object/068e2e8d-a92f-720d-8000-6df2dd75923a) of his ebony [spaceship](ow://object/068e2e8c-e2f4-7e4c-8000-8abcf4e8e286) and played [Rachmaninov's](ow://character/068e92db-4c40-79eb-8000-8ef44c0d52b4) [Prelude in C-sharp Minor](ow://construct/068e2e55-18da-7cb9-8000-8ccd6ebf1c1e) on an ancient but well-maintained [Steinway](ow://object/068e2e56-d4b9-7c40-8000-173975bfd994) while great, green, [saurian](ow://species/068e2e72-3d17-7a23-8000-b8f0d24e2d1e) things surged and bellowed in [the swamps](ow://zone/068e92f5-24b4-7462-8000-0c567b9104fb) below."
+  }
+ ]
 }

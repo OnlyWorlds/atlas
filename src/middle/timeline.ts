@@ -302,11 +302,12 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     mode.appendChild(modeBtn('2d', 'view_timeline', 'Canvas view: pan and zoom the chart'));
     mode.appendChild(modeBtn('scroll', 'view_agenda', 'Document view: scroll through your history'));
 
-    // Right stack: view toggle on top, the now control under it.
+    // Right group, ONE line: the now control first, the view toggle to its
+    // right (the stacked layout wasted a row — Captain's round, 2026-07-19).
     const rightStack = document.createElement('div');
     rightStack.className = 'atlas-chart-rightstack';
-    rightStack.appendChild(mode);
     rightStack.appendChild(nowWrap);
+    rightStack.appendChild(mode);
     controlBar.appendChild(rightStack);
 
     renderMintOffer();

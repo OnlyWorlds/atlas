@@ -38,9 +38,6 @@ export const TOUR_OPENER_EYEBROW = 'One sentence, one world';
 export const TOUR_ATTRIBUTION = 'Hyperion, Dan Simmons (1989)';
 export const TOUR_ATTRIBUTION_URL = 'https://en.wikipedia.org/wiki/Hyperion_(Simmons_novel)';
 
-/** The legacy sentence tutorial, linked at the 'online' step as the deeper schema story. */
-export const TOUR_EXPLORER_URL = 'https://explorer.onlyworlds.com';
-
 /** Inclusive word-index range painted with an element type's color. */
 export interface TourSpan {
   from: number;
@@ -71,28 +68,20 @@ export interface TourStep {
     | { kind: 'chart' };
   /** Switch the right pane to the Web (context) tab on step enter. */
   webTab?: boolean;
-  /** Paint every still-unparsed word with a quiet neutral fill (the finale sweep). */
-  fillRest?: boolean;
   /** Hands-on steps: the real gesture OR Next does it for you (watch-mode). */
   handsOn?: 'create-world' | 'create-consul' | 'setup-folder';
 }
 
 export const TOUR_STEPS: readonly TourStep[] = [
   // ---------------------------------------------------------------- Act 1
-  {
-    id: 'intro',
-    act: 1,
-    body:
-      'A whole small world hides in this sentence. In a few minutes you will ' +
-      'turn it into linked elements and meet the rooms of atlas along the way, ' +
-      'building the workspace up from nothing as you go.',
-  },
+  // (The standalone intro step was CUT in S298 — Freek's round: the tour
+  // opens on the create-world beat directly; its body carries the framing.)
   {
     id: 'the-world',
     act: 1,
     body:
-      'Everything in atlas lives inside a world. Create this one: it is named ' +
-      'for the sentence that fills it.',
+      'A whole small world hides in this sentence. Everything in atlas lives ' +
+      'inside a world: create this one, named for the sentence that fills it.',
     meta: 'This is the real create dialog. Normally you would name the world and it would become a folder; the tour world stays in your browser.',
     handsOn: 'create-world',
   },
@@ -136,7 +125,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     spans: [
       { from: 6, to: 6, type: 'object' },
       { from: 9, to: 10, type: 'object' },
-      { from: 19, to: 23, type: 'object' },
+      { from: 23, to: 23, type: 'object' },
     ],
     reveal: ['object:Ebony Spaceship', 'object:Spaceship Balcony', "object:The Consul's Steinway"],
     route: { kind: 'element', ref: 'object:Spaceship Balcony' },
@@ -145,7 +134,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: 'linking',
     act: 1,
     body:
-      'Back on the Consul’s page: his Possessions now hold the three objects, his ' +
+      'Back on the Consul’s page: his Possessions now hold the spaceship and the ' +
+      'Steinway (the balcony rides along inside the ship), his ' +
       'Affiliations hold the Hegemony, and Referenced-by at the bottom shows his title pointing back at him. ' +
       'Click any chip to travel. This web of links is the heart of OnlyWorlds.',
     deeper:
@@ -189,6 +179,16 @@ export const TOUR_STEPS: readonly TourStep[] = [
     body:
       'Pins place elements on maps. This one marks where the Consul sat: ' +
       'hover it to see what it holds, click it to travel there.',
+    deeper:
+      'A sharp eye notices the pin holds the Consul, not his spaceship: a pin ' +
+      'records where an ELEMENT is, and the schema has no field yet that says a ' +
+      'character is aboard a vehicle. So we know where the Consul sat, and the ' +
+      'ship is wherever he is.' +
+      '\n\n' +
+      'That kind of gap is not fixed by one tool inventing a field: the ' +
+      'OnlyWorlds schema grows through council motions, public proposals anyone ' +
+      'can raise and argue. A motion to give characters a vehicle or equipment ' +
+      'field would close exactly this gap, for every tool at once.',
     spans: [{ from: 3, to: 3, type: 'pin' }],
     reveal: ["pin:The Consul's balcony seat"],
     route: { kind: 'map', ref: 'map:Hyperion' },
@@ -200,7 +200,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       'Zones are drawn regions: The Swamps are traced right onto the map. ' +
       'The saurian things live there: two creatures, their species, and one bellowing pack, all linked to the zone.',
     spans: [
-      { from: 25, to: 28, type: 'creature' },
+      { from: 27, to: 27, type: 'creature' },
       { from: 32, to: 34, type: 'zone' },
     ],
     reveal: [
@@ -209,7 +209,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       'marker:The Swamps - Point 3', 'marker:The Swamps - Point 4', 'marker:The Swamps - Point 5',
       'marker:The Swamps - Point 6', 'marker:The Swamps - Point 7', 'marker:The Swamps - Point 8',
       'creature:Great Green Saurian', 'creature:Greater Green Saurian',
-      'species:Saurians', 'collective:Pack of Bellowing Saurians',
+      'species:Saurians', 'collective:Saurian Pack',
     ],
     route: { kind: 'map', ref: 'map:Hyperion' },
   },
@@ -272,7 +272,6 @@ export const TOUR_STEPS: readonly TourStep[] = [
       { from: 13, to: 13, type: 'character' },
       { from: 14, to: 17, type: 'construct' },
     ],
-    fillRest: true,
     reveal: [
       'character:Steinway', 'construct:Steinway Piano', 'ability:Piano Playing',
       'trait:Swamp Rage', 'language:Western Musical Notation', 'phenomenon:Piano Music',
@@ -309,14 +308,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
     deeper:
       'OnlyWorlds is an open format: 22 element types, one schema, free accounts that ' +
       'store worlds online. Link an account and atlas syncs your folder with the API ' +
-      'both ways — edit on this machine, pull on another, share a read key so a friend ' +
+      'both ways: edit on this machine, pull on another, share a read key so a friend ' +
       'can browse without touching anything.' +
       '\n\n' +
       'The same world can then open in other tools: a mobile editor, an Obsidian ' +
-      'vault, games and viewers people build on the schema.' +
-      '\n\n' +
-      'The ecosystem explorer (linked below) walks this exact sentence through the ' +
-      'schema element by element: the deeper story of the format atlas builds on.',
+      'vault, games and viewers people build on the schema.',
   },
   {
     id: 'finale',
@@ -347,7 +343,6 @@ export const TOUR_ACT_NAMES: Record<number, string> = {
  */
 export function tourStageFor(stepIndex: number): number {
   const step = TOUR_STEPS[Math.min(Math.max(stepIndex, 0), TOUR_STEPS.length - 1)];
-  if (step.id === 'intro') return 0;
   if (step.id === 'the-world') return 1;
   if (step.act === 1) return 2;
   if (step.act === 2) return 3;

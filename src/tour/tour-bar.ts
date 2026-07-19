@@ -26,12 +26,12 @@ import { ELEMENT_TYPE_COLORS, ELEMENT_ICONS } from '../core/constants';
 import { hasFolderMode } from '../core/capabilities';
 import type { ElementType } from '../core/types';
 import {
-  TOUR_SENTENCE, TOUR_STEPS, TOUR_ACT_NAMES, tourStageFor,
-  TOUR_OPENER_EYEBROW, TOUR_ATTRIBUTION, TOUR_ATTRIBUTION_URL, TOUR_EXPLORER_URL,
+  TOUR_SENTENCE, TOUR_STEPS, tourStageFor,
+  TOUR_OPENER_EYEBROW, TOUR_ATTRIBUTION, TOUR_ATTRIBUTION_URL,
   type TourStep,
 } from './tour-data';
 import {
-  onTourChange, isTourActive, currentStepIndex, consulCreated,
+  onTourChange, isTourActive, currentStepIndex, consulCreated, tourWorldExists,
   nextStep, backStep, enterStep, exitTour, setupFolderFromTour,
 } from './tour-engine';
 
@@ -97,8 +97,6 @@ function glyphMap(): Map<number, Array<{ type: ElementType; step: number }>> {
 function buildSentence(idx: number, step: TourStep): HTMLElement {
   const fills = fillMap(idx);
   const glyphs = glyphMap();
-  const fillRestActive = TOUR_STEPS.slice(0, Math.min(idx, TOUR_STEPS.length - 1) + 1)
-    .some(s => s.fillRest);
   const activeWords = new Set<number>();
   for (const span of step.spans ?? []) {
     for (let w = span.from; w <= span.to; w++) activeWords.add(w);
@@ -116,9 +114,6 @@ function buildSentence(idx: number, step: TourStep): HTMLElement {
       span.style.setProperty('--tour-word-color', ELEMENT_TYPE_COLORS[fill.type] ?? '#22d3ee');
       span.title = `${fill.type} · jump to that step`;
       span.addEventListener('click', () => { void enterStep(fill.step); });
-    } else if (fillRestActive) {
-      span.classList.add('parsed', 'rest');
-      span.style.setProperty('--tour-word-color', 'rgba(255, 255, 255, 0.45)');
     }
     if (activeWords.has(w)) span.classList.add('active');
     sentence.appendChild(span);
@@ -148,7 +143,7 @@ function render(): void {
   const step = TOUR_STEPS[Math.min(idx, TOUR_STEPS.length - 1)];
   const stage = tourStageFor(idx);
   document.body.dataset.tourStage = String(stage);
-  const opener = stage === 0;
+  const opener = idx === 0;
 
   root.innerHTML = '';
   const panel = document.createElement('div');
@@ -156,7 +151,10 @@ function render(): void {
   // 2026-07-19: the centered vignette opener read as a different component;
   // now the dock IS the narrator from the first second, and the app builds
   // above it on Next).
-  panel.className = 'atlas-tour-bar';
+  panel.className = 'atlas-tour-bar' + (idx <= 1 ? ' is-fresh' : '');
+  // e2e locator contract: the visible act label is gone (Freek's round), the
+  // step number rides a data attribute instead.
+  panel.dataset.tourStep = String(idx + 1);
 
   panel.appendChild(buildSentence(idx, step));
 
@@ -178,7 +176,7 @@ function render(): void {
     const bulb = document.createElement('button');
     bulb.type = 'button';
     bulb.className = 'atlas-tour-deeper-toggle';
-    bulb.innerHTML = '<span class="material-symbols-outlined">emoji_objects</span> deeper';
+    bulb.innerHTML = '<span class="material-symbols-outlined">emoji_objects</span> more information';
     const deeper = document.createElement('div');
     deeper.className = 'atlas-tour-deeper';
     // Paragraph breaks (\n\n in the step data) render as real paragraphs —
@@ -193,22 +191,12 @@ function render(): void {
     extras.appendChild(bulb);
     panel.appendChild(deeper); // flyout anchors to the PANEL, above it
   }
-  if (step.id === 'online') {
-    // The legacy sentence tutorial, as the deeper schema story — same row
-    // and metrics as the deeper toggle so it never changes the dock's shape.
-    // A link to Captain's Hyperion share page joins here when it exists.
-    const explorer = document.createElement('a');
-    explorer.className = 'atlas-tour-inline-link';
-    explorer.href = TOUR_EXPLORER_URL;
-    explorer.target = '_blank';
-    explorer.rel = 'noopener';
-    explorer.innerHTML = '<span class="material-symbols-outlined">travel_explore</span> ecosystem explorer';
-    extras.appendChild(explorer);
-  }
+  // (The ecosystem-explorer link was CUT in S298, Freek's round. Captain's
+  // Hyperion share-page link can join this extras row when it exists.)
   if (extras.childElementCount === 0) {
     const ghost = document.createElement('span');
     ghost.className = 'atlas-tour-extras-ghost';
-    ghost.innerHTML = '<span class="material-symbols-outlined">emoji_objects</span> deeper';
+    ghost.innerHTML = '<span class="material-symbols-outlined">emoji_objects</span> more information';
     extras.appendChild(ghost);
   }
   copy.appendChild(extras);
@@ -241,11 +229,8 @@ function render(): void {
   const controls = document.createElement('div');
   controls.className = 'atlas-tour-controls';
 
-  const act = document.createElement('span');
-  act.className = 'atlas-tour-act';
-  act.textContent = `${TOUR_ACT_NAMES[step.act] ?? ''} · Step ${idx + 1} of ${TOUR_STEPS.length}`;
-  controls.appendChild(act);
-
+  // (The act/step label was CUT in S298, Freek's round — the sentence IS the
+  // progress; the step number survives as data-tour-step for tests.)
   const spacer = document.createElement('span');
   spacer.className = 'atlas-tour-spacer';
   controls.appendChild(spacer);
@@ -261,7 +246,7 @@ function render(): void {
 
   // Hands-on steps: the real gesture (primary) OR Next (watch-mode — the
   // engine performs the gesture and advances).
-  if (step.handsOn === 'create-world') {
+  if (step.handsOn === 'create-world' && !tourWorldExists()) {
     const doBtn = document.createElement('button');
     doBtn.type = 'button';
     doBtn.className = 'atlas-btn-primary';
