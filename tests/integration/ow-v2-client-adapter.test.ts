@@ -153,6 +153,56 @@ describe('OwV2ClientAdapter — extension field policy', () => {
   });
 });
 
+describe('OwV2ClientAdapter — change_seq is server bookkeeping (2026-07-19 regression)', () => {
+  // Captain's live 422: a pin pulled from keel carried `change_seq` in its
+  // disk file; the next local edit PATCHed the full body and keel rejected
+  // "change_seq is read-only" — forever, sticking the element in pending.
+  // The MSW server now mirrors keel's rejection, so these tests fail with a
+  // 422 if either strip regresses.
+
+  it('a legacy disk body carrying change_seq PATCHes clean', async () => {
+    const { handlers, state } = statefulV2Handlers({ baseUrl: TEST_BASE, clock: clock.next });
+    mswServer.use(...handlers);
+    const adapter = makeAdapter();
+
+    const pinId = uuid();
+    const charId = uuid();
+    const mapId = uuid();
+    await adapter.createElement('map', { id: mapId, name: 'Overworld' });
+    await adapter.createElement('character', { id: charId, name: 'Frodo' });
+    await adapter.createElement('pin', { id: pinId, name: '', map_id: mapId, element_id: charId, element_type: 'character', x: 5, y: 6 });
+
+    // Disk file written before the read-side drop existed: carries the counter.
+    const updated = await adapter.updateElement('pin', pinId, {
+      x: 42, y: 7, change_seq: 63, element_type: 'character',
+    });
+    expect(updated.id).toBe(pinId);
+    const stored = state.get('pin')!.get(pinId)!;
+    expect(stored.x).toBe(42);
+    expect(stored.change_seq).toBeUndefined();
+  });
+
+  it('CREATE bodies shed change_seq the same way', async () => {
+    const { handlers, state } = statefulV2Handlers({ baseUrl: TEST_BASE, clock: clock.next });
+    mswServer.use(...handlers);
+    const adapter = makeAdapter();
+
+    const id = uuid();
+    await adapter.createElement('event', { id, name: 'Battle', change_seq: 9 });
+    expect(state.get('event')!.get(id)!.change_seq).toBeUndefined();
+  });
+
+  it('adaptV2Record drops a server-sent change_seq so it never reaches disk', async () => {
+    const { adaptV2Record } = await import('../../src/sync/ow-v2-client-adapter');
+    const rec = adaptV2Record(
+      { id: uuid(), name: 'Frodo', updated_at: clock.next(), change_seq: 17 },
+      'character',
+    );
+    expect(rec.change_seq).toBeUndefined();
+    expect(rec.name).toBe('Frodo');
+  });
+});
+
 describe('OwV2ClientAdapter — LIST cursor walk', () => {
   it('walks >2 pages to completion; incomplete set stays empty', async () => {
     const { handlers } = statefulV2Handlers({ baseUrl: TEST_BASE, clock: clock.next, pageSize: 3 });

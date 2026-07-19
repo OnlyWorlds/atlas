@@ -778,6 +778,12 @@ function stripUndefined(body: Record<string, unknown>): Record<string, unknown> 
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {
     if (v === undefined) continue;
+    // Mirror OwV2ClientAdapter's SERVER_MANAGED_FIELDS strip for change_seq:
+    // legacy disk files written before the adaptV2Record drop can still carry
+    // keel's per-element commit counter, and the real adapter silently strips
+    // it before the wire. Without this mirror the fake would store + echo it,
+    // moving tests off the production path.
+    if (k === 'change_seq') continue;
     out[k] = v;
   }
   return out;

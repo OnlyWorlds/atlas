@@ -24,6 +24,8 @@ import { mountWorkspaceEditor, type WorkspaceEditorHandle } from './writing-work
 import { buildMentionItems } from './writing-workspace-mention-items';
 import { createChipPreview, type ChipPreviewController } from './writing-workspace-chip-preview';
 import { pushRecent } from './writing-workspace-recents';
+import { linkSelectionToExisting } from './prose-link-existing';
+import { mountSelectionBubble, type SelectionBubbleController } from './prose-selection-bubble';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import type { ToastManager } from '../ui/toast-manager';
 import type { Element } from '../core/types';
@@ -118,6 +120,15 @@ export function mountShareEditor(opts: ShareEditorOptions): ShareEditorHandle {
     }).open();
   }
 
+  function openLinkExisting(): void {
+    void linkSelectionToExisting(() => editorHandle, {
+      onLinked: (id) => {
+        const worldId = getState().active?.worldId;
+        if (worldId) pushRecent(worldId, id);
+      },
+    });
+  }
+
   const onContextMenu = (e: MouseEvent): void => {
     const target = e.target as HTMLElement | null;
     if (!target?.closest('.atlas-share-prose-rich .ProseMirror')) return;
@@ -170,6 +181,12 @@ export function mountShareEditor(opts: ShareEditorOptions): ShareEditorHandle {
     }
     if (hasSelection) {
       items.push(`
+        <button type="button" class="atlas-prose-context-menu-item" data-role="link-existing">
+          <span class="material-symbols-outlined">add_link</span>
+          <span>Link to existing element…</span>
+        </button>
+      `);
+      items.push(`
         <button type="button" class="atlas-prose-context-menu-item" data-role="create">
           <span class="material-symbols-outlined">add</span>
           <span>Create element from selection</span>
@@ -192,6 +209,10 @@ export function mountShareEditor(opts: ShareEditorOptions): ShareEditorHandle {
       dismissMenu();
       openInlineCreate();
     });
+    menu.querySelector<HTMLElement>('[data-role="link-existing"]')?.addEventListener('click', () => {
+      dismissMenu();
+      openLinkExisting();
+    });
     menu.querySelector<HTMLElement>('[data-role="unlink-chip"]')?.addEventListener('click', () => {
       dismissMenu();
       if (chipHit) {
@@ -208,6 +229,14 @@ export function mountShareEditor(opts: ShareEditorOptions): ShareEditorHandle {
     });
   };
   roomRoot.addEventListener('contextmenu', onContextMenu);
+
+  // ---- selection bubble (B / I / link — the marks worked via Ctrl+B/I all
+  // along; this makes them visible. Captain's ask, 2026-07-19) ----------------
+
+  const bubble: SelectionBubbleController = mountSelectionBubble({
+    getHandle: () => editorHandle,
+    onLinkExisting: openLinkExisting,
+  });
 
   // ---- handle -----------------------------------------------------------------
 
@@ -227,6 +256,7 @@ export function mountShareEditor(opts: ShareEditorOptions): ShareEditorHandle {
     destroy: () => {
       roomRoot.removeEventListener('contextmenu', onContextMenu);
       dismissMenu();
+      bubble.destroy();
       chipPreview.destroy();
       editorHandle.destroy();
     },

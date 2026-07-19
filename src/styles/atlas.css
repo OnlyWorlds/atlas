@@ -1611,21 +1611,18 @@ html {
 .atlas-tour-eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.22em;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--atlas-cyan);
 }
-.atlas-tour-bar.centered {
-  top: 50%;
-  bottom: auto;
-  transform: translate(-50%, -50%);
-  min-height: 0;
-  padding: 34px 38px 26px;
-  gap: 18px;
+/* Step 1's meta channel: eyebrow left · book cite right, one line. */
+.atlas-tour-meta-opener {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
 }
-.atlas-tour-bar.centered .atlas-tour-sentence {
-  font-size: 20px;
-  line-height: 1.8;
-}
+/* (The centered stage-0 variant was retired 2026-07-19, Captain's round:
+   the panel docks bottom from step 1 — one component, one position.) */
 /* The opener has no app behind it — hide the whole shell at stage 0. */
 body.atlas-touring[data-tour-stage="0"] .atlas-shell {
   visibility: hidden;
@@ -1640,7 +1637,10 @@ body.atlas-touring[data-tour-stage="0"] .atlas-shell {
   /* Below modals (z 1000): a dialog always outranks the narrator. */
   z-index: 900;
   width: min(960px, calc(100vw - 48px));
-  min-height: 148px;
+  /* Covers the tallest step's content (measured 269px, S298) so the dock is
+     ONE shape across all 17 docked steps — 2-line metas and 3-line bodies
+     included, not just the deeper/meta rows the reserves already hold. */
+  min-height: 272px;
   box-sizing: border-box;
   background: rgba(8, 13, 18, 0.92);
   backdrop-filter: blur(12px);
@@ -1731,6 +1731,23 @@ body.atlas-touring .atlas-shell {
 }
 .atlas-tour-deeper-toggle .material-symbols-outlined { font-size: 13px; }
 .atlas-tour-deeper-toggle:hover { color: var(--atlas-cyan); }
+/* The extras row (deeper bulb · inline links) renders on EVERY step — an
+   invisible placeholder holds the line when a step has neither, so the
+   panel never reshapes between deeper and non-deeper steps. */
+.atlas-tour-extras {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.atlas-tour-extras-ghost {
+  visibility: hidden;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.atlas-tour-extras-ghost .material-symbols-outlined { font-size: 13px; }
 /* Inline links in the copy row (the explorer) share the deeper toggle's
    metrics exactly — same line, same height, no dock reshape. */
 .atlas-tour-inline-link {
@@ -1765,16 +1782,19 @@ body.atlas-touring .atlas-shell {
 .atlas-tour-deeper p { margin: 0 0 9px; }
 .atlas-tour-deeper p:last-child { margin-bottom: 0; }
 .atlas-tour-attribution {
-  flex-basis: 100%;
   color: rgba(255, 255, 255, 0.3);
   font-size: 10.5px;
   text-decoration: none;
+  white-space: nowrap;
 }
 .atlas-tour-attribution:hover { color: rgba(255, 255, 255, 0.55); }
 .atlas-tour-controls {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Pin to the dock's bottom edge — shorter steps leave their slack between
+     copy and controls, so the buttons never travel between steps. */
+  margin-top: auto;
 }
 .atlas-tour-act {
   color: rgba(255, 255, 255, 0.35);
@@ -1854,11 +1874,12 @@ body.atlas-preroot .atlas-middle {
 /* Landing doors — tour + folder side by side (2026-07-19 v2). */
 .atlas-landing-doors {
   display: flex;
-  gap: 18px;
+  gap: 24px;
   justify-content: center;
   align-items: stretch;
   flex-wrap: wrap;
-  margin-top: 8px;
+  /* Breathing room between the hero stack and the doors (Captain's round). */
+  margin-top: 44px;
 }
 .atlas-landing-door {
   flex: 0 1 300px;
@@ -1895,7 +1916,7 @@ body.atlas-preroot .atlas-middle {
 .atlas-landing-context {
   color: rgba(255, 255, 255, 0.4);
   font-size: 11.5px;
-  margin-top: 8px;
+  margin-top: 32px;
   max-width: 420px;
 }
 .atlas-landing-context a { color: rgba(34, 211, 238, 0.7); }
@@ -3620,7 +3641,8 @@ body.atlas-preroot .atlas-middle {
   /* Anchored at the upper third rather than free-floating center — on tall
      windows pure centering left a dead lower half (S255 critique). */
   justify-content: flex-start;
-  padding: clamp(56px, 16vh, 150px) 48px 64px;
+  /* Top pad eased since the 240px sigil carries real height of its own. */
+  padding: clamp(32px, 8vh, 80px) 48px 64px;
   text-align: center;
   /* No atmosphere gradient — its edge read as a boxy seam on the pure-black
      shell (S255v2, Captain). Flat black is the calmer statement. */
@@ -3628,6 +3650,23 @@ body.atlas-preroot .atlas-middle {
 
 .atlas-landing-hero { display: flex; flex-direction: column; align-items: center; }
 
+/* The OnlyWorlds sigil + eyebrow above the Atlas mark — routed users see the
+   OW mark and the stated relationship before anything else (same-universe
+   continuity with onlyworlds.com; Skeld's opener note, 2026-07-19). */
+.atlas-landing-sigil {
+  /* ow.com landing scale (240px) — the small render also read pixelated. */
+  width: 240px;
+  height: 240px;
+  object-fit: contain;
+  margin-bottom: 20px;
+  /* screen-blend melts the video's near-black frame into the page black —
+     without it the mp4 reads as a hard square box around the round mark.
+     No drop-shadow: a filter shadow follows the opaque video RECT and paints
+     a square halo; the animation carries its own glow. The circle crop kills
+     the last corner sheen on bright animation frames — the mark is round. */
+  mix-blend-mode: screen;
+  border-radius: 50%;
+}
 .atlas-landing-mark {
   font-size: 40px;
   font-weight: 600;
@@ -3638,7 +3677,7 @@ body.atlas-preroot .atlas-middle {
 .atlas-landing-mark-sm { font-size: 26px; }
 
 .atlas-landing-tag {
-  margin: 12px 0 0;
+  margin: 16px 0 0;
   font-size: 15px;
   color: var(--atlas-text-soft);
 }
@@ -7398,6 +7437,54 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 .atlas-prose-context-menu-item .material-symbols-outlined {
   font-size: 16px;
+}
+
+/* Prose selection bubble — B / I / link-to-existing over a text selection
+   (share prose blocks; component in prose-selection-bubble.ts). Own class
+   family: locator contract, never reuse the context-menu classes. */
+.atlas-prose-bubble {
+  position: fixed;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+}
+.atlas-prose-bubble.is-visible {
+  display: flex;
+}
+.atlas-prose-bubble-btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--atlas-text);
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+.atlas-prose-bubble-btn:hover {
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--atlas-cyan);
+}
+.atlas-prose-bubble-btn.is-active {
+  color: var(--atlas-cyan);
+  background: rgba(34, 211, 238, 0.16);
+}
+.atlas-prose-bubble-btn .material-symbols-outlined {
+  font-size: 17px;
+}
+.atlas-prose-bubble-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 3px 2px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* Split confirm modal — single-line preview of what'll move. */

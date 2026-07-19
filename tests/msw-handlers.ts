@@ -303,7 +303,7 @@ const V2_DEFAULT_BASE = 'https://www.onlyworlds.com/api/v2';
 const V2_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Server-managed fields the wire rejects with 422 "<field> is read-only." */
-const V2_READONLY_FIELDS = new Set(['updated_at', 'created_at', 'world', 'type']);
+const V2_READONLY_FIELDS = new Set(['updated_at', 'created_at', 'world', 'type', 'change_seq']);
 
 /**
  * Fields that must NEVER reach the wire — the local-only extension bucket plus

@@ -23,17 +23,25 @@ async function nextStep(page: Page, expectLabel: string | RegExp) {
   await expect(page.locator('.atlas-tour-act')).toContainText(expectLabel);
 }
 
-/** Landing → stage 0 (the centered narrator with the vignette sentence). */
+/** Landing → stage 0 (the DOCKED narrator on the bare stage — one position since 2026-07-19). */
 async function openStage0(page: Page) {
   await page.click('[data-action="start-tour"]');
-  await expect(page.locator('.atlas-tour-bar.centered')).toBeVisible();
+  await expect(page.locator('.atlas-tour-bar')).toBeVisible();
+  await expect(page.locator('.atlas-tour-bar.centered')).toHaveCount(0);
   await expect(page.locator('.atlas-tour-attribution')).toContainText('Dan Simmons (1989)');
   expect(await page.evaluate(() => document.body.dataset.tourStage)).toBe('0');
 }
 
+/** The consul beat's single route: the locked element modal (no Next until he exists). */
+async function createConsulViaModal(page: Page) {
+  await page.locator('[data-tour-action="create-consul"]').click();
+  await page.locator('.atlas-modal-overlay button', { hasText: /^Create$/ }).click();
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+}
+
 /** Stage 0 → step 2 via the REAL create-world modal (locked to Hyperion). */
 async function createWorldViaModal(page: Page) {
-  await page.locator('.atlas-tour-bar button', { hasText: /^Begin$/ }).click();
+  await page.locator('.atlas-tour-controls button', { hasText: /^Next$/ }).click();
   await expect(page.locator('.atlas-tour-act')).toContainText('Step 2 of 18');
   // The sidebar materialized in its full final structure: create live, the
   // four siblings greyed.
@@ -134,21 +142,29 @@ test('full walk: bare stage → real-modal beats → acts → finish tears down'
   await expect(page.locator('.atlas-landing-doors h3').first()).toContainText('Replay the tour');
 });
 
-test('watch-mode: Next performs the hands-on beats', async ({ page }) => {
+test('the create beats are single-route: no watch-mode Next, the gesture is the way', async ({ page }) => {
+  // Captain's call (2026-07-19): two forward buttons at the first hands-on
+  // beats read as a fork. The locked modals are one-click, so the gesture is
+  // the only route; the consul step gains plain Next only AFTER he exists.
   await freshBoot(page);
   await openStage0(page);
-  await page.locator('.atlas-tour-bar button', { hasText: /^Begin$/ }).click();
+  await page.locator('.atlas-tour-controls button', { hasText: /^Next$/ }).click();
   await expect(page.locator('.atlas-tour-act')).toContainText('Step 2 of 18');
-  // Next on the world beat creates the world silently and advances.
-  await nextStep(page, 'Step 3 of 18');
-  const world = await page.evaluate(() => {
-    const s = (window as any).__atlasTestApi.getState();
-    return { worlds: s.registry.worlds.length, name: s.registry.worlds[0]?.name };
-  });
-  expect(world).toEqual({ worlds: 1, name: 'Hyperion' });
-  // Next on the consul beat backfills him (the label advances before the
-  // reveal lands — poll the store, don't snapshot it).
-  await nextStep(page, 'Step 4 of 18');
+  await expect(page.locator('[data-tour-action="create-world"]')).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+
+  // Through the locked modal → auto-advance to the consul beat: same rule.
+  await page.locator('[data-tour-action="create-world"]').click();
+  await page.locator('[data-modal="create-world"] [data-action="pick"]').click();
+  await expect(page.locator('.atlas-tour-act')).toContainText('Step 3 of 18');
+  await expect(page.locator('[data-tour-action="create-consul"]')).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+
+  // Create him → the step STAYS (the payoff is his page) and Next appears.
+  await page.locator('[data-tour-action="create-consul"]').click();
+  await page.locator('.atlas-modal-overlay button', { hasText: /^Create$/ }).click();
+  await expect(page.locator('.atlas-tour-act')).toContainText('Step 3 of 18');
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
   await expect.poll(async () => page.evaluate(async () => {
     const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
     return els.some((e: any) => e.name === 'The Consul');
@@ -159,6 +175,7 @@ test('resume after reload lands on the same step with the world active', async (
   await freshBoot(page);
   await openStage0(page);
   await createWorldViaModal(page);
+  await createConsulViaModal(page);
   await nextStep(page, 'Step 4 of 18');
 
   await page.reload();
@@ -200,6 +217,7 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   await openStage0(page);
   await createWorldViaModal(page);
   // Finale: no folder button on an OPFS-only browser; Finish is primary.
+  await createConsulViaModal(page);
   for (let step = 4; step <= 18; step++) {
     await nextStep(page, `Step ${step} of 18`);
   }

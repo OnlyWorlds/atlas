@@ -1,13 +1,10 @@
 /**
- * Tour bar — the guided tour's ONE narrator component, two positions:
- *
- *   STEP 1 (stage 0, the bare stage): the same panel, screen-CENTERED, the
- *   sentence at vignette scale, eyebrow + attribution + Begin. No app chrome
- *   exists yet.
- *
- *   STEPS 2+ : the panel DOCKS bottom-center (fixed min-height so the dock
- *   never jumps between steps). Same rows throughout — the user learns "that
- *   panel is my guide" in the first second, and the descend is structural.
+ * Tour bar — the guided tour's ONE narrator component, ONE position:
+ * docked bottom-center from step 1 (the centered vignette opener was retired
+ * 2026-07-19, Captain's round — the dock IS the narrator from the first
+ * second; the bare stage above it fills in on Next). min-height 272px keeps
+ * the dock a single exact shape across all 18 steps; step 1 carries its
+ * eyebrow + book cite in the always-rendered meta channel at zero extra rows.
  *
  * Rows: the annotated sentence · hairline · body copy (+ meta subtext,
  * ✦ deeper flyout) · controls. Steps carry no titles (v2.1): the act label
@@ -127,7 +124,11 @@ function buildSentence(idx: number, step: TourStep): HTMLElement {
     sentence.appendChild(span);
     for (const g of glyphs.get(w) ?? []) {
       const glyph = document.createElement('span');
-      const lit = g.step <= idx;
+      // A hands-on step's own glyph waits for the CREATE, not the step-enter
+      // — the light is the payoff of the user's gesture (banked S297 nuance).
+      const handsOnPending = g.step === idx
+        && step.handsOn === 'create-consul' && !consulCreated();
+      const lit = g.step <= idx && !handsOnPending;
       glyph.className = 'material-symbols-outlined atlas-tour-glyph' + (lit ? ' lit' : '');
       if (lit && g.step === idx) glyph.classList.add('pop');
       glyph.textContent = ELEMENT_ICONS[g.type] ?? 'circle';
@@ -151,26 +152,13 @@ function render(): void {
 
   root.innerHTML = '';
   const panel = document.createElement('div');
-  panel.className = 'atlas-tour-bar' + (opener ? ' centered' : '');
-
-  if (opener) {
-    const eyebrow = document.createElement('div');
-    eyebrow.className = 'atlas-tour-eyebrow';
-    eyebrow.textContent = TOUR_OPENER_EYEBROW;
-    panel.appendChild(eyebrow);
-  }
+  // ONE position for the panel — docked bottom from step 1 (Captain's round,
+  // 2026-07-19: the centered vignette opener read as a different component;
+  // now the dock IS the narrator from the first second, and the app builds
+  // above it on Next).
+  panel.className = 'atlas-tour-bar';
 
   panel.appendChild(buildSentence(idx, step));
-
-  if (opener) {
-    const attr = document.createElement('a');
-    attr.className = 'atlas-tour-attribution';
-    attr.href = TOUR_ATTRIBUTION_URL;
-    attr.target = '_blank';
-    attr.rel = 'noopener';
-    attr.textContent = TOUR_ATTRIBUTION;
-    panel.appendChild(attr);
-  }
 
   // Row 2 — step copy, under a hairline (the material/narration divider).
   const copy = document.createElement('div');
@@ -179,6 +167,13 @@ function render(): void {
   body.className = 'atlas-tour-body';
   body.textContent = step.body;
   copy.appendChild(body);
+  // The extras row (✦ deeper · inline links) ALWAYS renders — a step without
+  // them shows an invisible placeholder at the same metrics, so the panel
+  // keeps one shape whether or not a deeper widget exists (the constant-dock
+  // law, extended to this row 2026-07-19: baseline-floating the bulb beside
+  // the body let long bodies wrap it onto its own line on SOME steps only).
+  const extras = document.createElement('div');
+  extras.className = 'atlas-tour-extras';
   if (step.deeper) {
     const bulb = document.createElement('button');
     bulb.type = 'button';
@@ -195,7 +190,7 @@ function render(): void {
     }
     deeper.hidden = true;
     bulb.addEventListener('click', () => { deeper.hidden = !deeper.hidden; });
-    copy.appendChild(bulb);
+    extras.appendChild(bulb);
     panel.appendChild(deeper); // flyout anchors to the PANEL, above it
   }
   if (step.id === 'online') {
@@ -208,13 +203,37 @@ function render(): void {
     explorer.target = '_blank';
     explorer.rel = 'noopener';
     explorer.innerHTML = '<span class="material-symbols-outlined">travel_explore</span> ecosystem explorer';
-    copy.appendChild(explorer);
+    extras.appendChild(explorer);
   }
+  if (extras.childElementCount === 0) {
+    const ghost = document.createElement('span');
+    ghost.className = 'atlas-tour-extras-ghost';
+    ghost.innerHTML = '<span class="material-symbols-outlined">emoji_objects</span> deeper';
+    extras.appendChild(ghost);
+  }
+  copy.appendChild(extras);
   // The meta row ALWAYS renders (nbsp when the step has none) — steps with
-  // and without subtext keep the exact same panel shape.
+  // and without subtext keep the exact same panel shape. Step 1 uses the
+  // channel for its framing: eyebrow left, the book cite right — the opener
+  // carries them at ZERO extra rows, so the panel never reshapes on the
+  // first Next (Captain's docked-from-start round, 2026-07-19).
   const meta = document.createElement('p');
   meta.className = 'atlas-tour-meta';
-  meta.textContent = step.meta ?? ' ';
+  if (opener) {
+    meta.classList.add('atlas-tour-meta-opener');
+    const eyebrow = document.createElement('span');
+    eyebrow.className = 'atlas-tour-eyebrow';
+    eyebrow.textContent = TOUR_OPENER_EYEBROW;
+    const attr = document.createElement('a');
+    attr.className = 'atlas-tour-attribution';
+    attr.href = TOUR_ATTRIBUTION_URL;
+    attr.target = '_blank';
+    attr.rel = 'noopener';
+    attr.textContent = TOUR_ATTRIBUTION;
+    meta.append(eyebrow, attr);
+  } else {
+    meta.textContent = step.meta ?? ' ';
+  }
   copy.appendChild(meta);
   panel.appendChild(copy);
 
@@ -230,19 +249,6 @@ function render(): void {
   const spacer = document.createElement('span');
   spacer.className = 'atlas-tour-spacer';
   controls.appendChild(spacer);
-
-  if (opener) {
-    const begin = document.createElement('button');
-    begin.type = 'button';
-    begin.className = 'atlas-btn-primary atlas-tour-begin';
-    begin.textContent = 'Begin';
-    begin.addEventListener('click', () => { void nextStep(); });
-    controls.appendChild(begin);
-    appendExit(controls);
-    panel.appendChild(controls);
-    root!.appendChild(panel);
-    return;
-  }
 
   if (idx > 0) {
     const back = document.createElement('button');
@@ -276,7 +282,6 @@ function render(): void {
       })();
     });
     controls.appendChild(doBtn);
-    appendWatchNext(controls);
   } else if (step.handsOn === 'create-consul' && !consulCreated()) {
     const doBtn = document.createElement('button');
     doBtn.type = 'button';
@@ -300,7 +305,6 @@ function render(): void {
       })();
     });
     controls.appendChild(doBtn);
-    appendWatchNext(controls);
   } else if (step.handsOn === 'setup-folder') {
     // The finale: Finish (ghost) ends the tour — the world folds away
     // (residue contract); the primary hands over to the real folder setup.
@@ -353,13 +357,8 @@ function appendExit(controls: HTMLElement): void {
   controls.appendChild(exit);
 }
 
-/** The watch-mode Next beside a hands-on primary — quieter, still forward. */
-function appendWatchNext(controls: HTMLElement): void {
-  const next = document.createElement('button');
-  next.type = 'button';
-  next.className = 'atlas-btn-ghost';
-  next.title = 'Skip the gesture — the tour does it for you';
-  next.textContent = 'Next';
-  next.addEventListener('click', () => { void nextStep(); });
-  controls.appendChild(next);
-}
+// (The watch-mode Next beside a hands-on primary was REMOVED 2026-07-19,
+// Captain's call: two forward buttons at the first hands-on beats read as a
+// fork. The create dialogs are locked one-click affairs — the gesture IS the
+// route. Watch-mode Next survives everywhere else via the plain else-branch;
+// after the Consul exists the consul step shows plain Next to move on.)

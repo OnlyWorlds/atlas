@@ -144,6 +144,18 @@ export function mountSidebar(mount: SidebarMount): () => void {
       rightBtn.innerHTML = `<span class="atlas-mode-btn-label">${escapeText(entry.name)}</span>`;
       rightBtn.addEventListener('click', () => switchMode('elements'));
       toggle.appendChild(rightBtn);
+    } else if (isTourFlagActive()) {
+      // Tour stages before the world exists: the toggle keeps its TRUE final
+      // geometry (same principle as the greyed worlds-header icons) — a
+      // locked ghost segment holds the place the world name will take, so
+      // "Worlds" renders at its real compact size from the first frame
+      // instead of a full-width centered label (Captain's round, 2026-07-19).
+      const ghost = document.createElement('button');
+      ghost.type = 'button';
+      ghost.className = 'atlas-mode-btn atlas-tour-locked';
+      ghost.disabled = true;
+      ghost.innerHTML = '<span class="atlas-mode-btn-label">&nbsp;</span>';
+      toggle.appendChild(ghost);
     }
   }
 

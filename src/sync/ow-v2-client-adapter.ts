@@ -75,8 +75,12 @@ export function isOwV2Error(err: unknown): err is OwV2Error {
 /**
  * Fields the server manages; rejected in write bodies (422 "read-only").
  * `id` is nuanced: kept on CREATE/PUT (client id preserved), stripped on PATCH.
+ * `change_seq` is keel's per-element commit counter (v2 tail) — it rides read
+ * responses, so any disk file written from a server record before the
+ * adaptV2Record drop below may still carry it; stripping here keeps those
+ * legacy files pushable.
  */
-const SERVER_MANAGED_FIELDS = new Set(['type', 'world', 'created_at', 'updated_at']);
+const SERVER_MANAGED_FIELDS = new Set(['type', 'world', 'created_at', 'updated_at', 'change_seq']);
 
 /** Sync metadata + local-only extensions — never on the wire. */
 const STRIP_FIELDS = new Set<string>([
@@ -159,6 +163,10 @@ export function adaptV2Record(raw: unknown, type: ElementType): ServerRecord {
   const out: Record<string, unknown> = { type };
   for (const [k, v] of Object.entries(src)) {
     if (k === 'type') continue; // we stamp our own
+    // Server bookkeeping counter — never lands on disk (a stale copy in an
+    // element file would ride the next PATCH and 422 "change_seq is read-only";
+    // the /changes cursor machinery reads the op envelope, never the element).
+    if (k === 'change_seq') continue;
     out[rename.get(k) ?? k] = v;
   }
   if (typeof out.id !== 'string') throw new Error('adaptV2Record: response missing string id');

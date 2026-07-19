@@ -104,9 +104,15 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             <h3>Set up your folder</h3>
             <p>Folder mode (your worlds as real files) needs a Chromium browser: Chrome or Brave. This browser can take the tour.</p>
           </div>`;
+      // The OnlyWorlds sigil + eyebrow (Skeld's opener note, Captain's nod,
+      // 2026-07-19): users routed here from onlyworlds.com need the mark and
+      // the stated relationship to read "same universe". Bundled local copy
+      // of the animated logo — local-first app, local asset.
       root.innerHTML = `
         <div class="atlas-landing">
           <div class="atlas-landing-hero">
+            <video class="atlas-landing-sigil" autoplay loop muted playsinline
+              src="${import.meta.env.BASE_URL}ow-logo.mp4" aria-hidden="true"></video>
             <div class="atlas-landing-mark">Atlas</div>
             <p class="atlas-landing-tag">A free, local-first worldbuilding studio.</p>
           </div>

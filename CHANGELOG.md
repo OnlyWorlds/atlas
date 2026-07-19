@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Selecting text in a page's text block now raises a small toolbar: bold, italic, and a link button that connects the selection to any existing element. Bold and italic always worked from the keyboard (Ctrl+B, Ctrl+I); now they are visible, and they render on the published page too.
+- Link any words to any element: right-click a selection (in page text blocks AND the writing room) and choose "Link to existing element". The words you selected stay exactly as written; they become a chip pointing where you chose, and atlas remembers them as an alias of that element so future mentions auto-link too.
+- A map block on a page follows the world live now: move a pin on the map and the block shows the new position immediately, no re-adding the block needed. (Published pages update on republish, as before.)
+- A sync error class fixed: elements pulled from onlyworlds.com could carry a server bookkeeping field that the server then rejected back, leaving the element stuck at "couldn't sync pending change" forever. Those stuck elements clear on their next sync round.
+- The first screen carries the animated OnlyWorlds mark at full size, with more air between everything.
+- The tour's narrator starts docked at the bottom of the bare page and stays there: the workspace builds up above it from the first Next. No more large centered opener.
+- The tour's two create steps have one route now: the create dialog itself. The quiet Next beside them read as a fork; every other step keeps watch-mode Next.
+- The tour's narrator panel holds one exact shape through all 18 steps: no more small resizes between steps with and without the deeper widget or longer copy.
+- A hands-on tour step's sentence icon now lights when you create the element, not when the step opens.
+
 - The guided tour: one famous sentence becomes a small linked world, and atlas builds itself around it. From a bare page you create the world, then its first character through the real dialogs, and the workspace appears piece by piece as each room earns its place: elements and links, a map with a pin and a zone, the sentence itself as a chapter full of live chips, two dated events on a chart, and finally the whole thing at once. The sentence rides along the bottom the entire time, coloring in as you go: each parsed word takes its element type's color and a small icon lights up in place.
 - The tour needs nothing from you: no folder, no account, nothing touches your files. It runs in browser storage and folds away completely when it ends, and every hands-on step also works as watch mode: press Next and the tour performs the step for you. Replay it anytime from settings.
 - The first screen slimmed down to match: two doors on a bare page, take the tour or set up a folder. After a finished tour the folder door takes the lead.

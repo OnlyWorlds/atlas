@@ -224,7 +224,6 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
 
   let editingBlockId: string | null = null;
   let blocksHost: HTMLElement | null = null;
-  let lastRenderedBlocksJson: string | null = null;
 
   // Prose editor session (one live editor at a time; lazy TipTap chunk).
   let proseMount: ShareEditorHandle | null = null;
@@ -1104,7 +1103,6 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const page = elOf(pageId);
     if (!page) return;
     const blocks = blocksOf(page);
-    lastRenderedBlocksJson = JSON.stringify((page as Record<string, unknown>).atlas_page_blocks ?? []);
     blocksHost.innerHTML = '';
 
     if (blocks.length === 0 && !editingBlockId) {
@@ -2116,8 +2114,14 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       proseMount?.refresh(getState().data.elements);
       return;
     }
-    const blocksJson = JSON.stringify((page as Record<string, unknown>).atlas_page_blocks ?? []);
-    if (blocksJson !== lastRenderedBlocksJson) renderBlocks(pageId);
+    // Blocks render FROM world elements (map pins, card fields, circle
+    // members, collection names), not only from the page's own block stack —
+    // so every element-data tick re-renders them. Before 2026-07-19 this
+    // gated on the block-stack JSON alone, and a pin dragged on the map tab
+    // never moved on an open page's map block (Captain's live find). This
+    // branch only runs when data.elements got a new reference, so the
+    // rebuild cost rides real writes, never idle ticks.
+    renderBlocks(pageId);
   }
 
   // ---- render dispatch ------------------------------------------------------

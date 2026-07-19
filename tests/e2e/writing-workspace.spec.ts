@@ -902,3 +902,50 @@ test('tree row hover "+" creates the child tier inside that row (S265)', async (
   expect(chap.parent_narrative).toBe(bookId);
   expect(chap.supertype).toBe('Chapter');
 });
+
+test('right-click "Link to existing element" chips the selection and records an alias', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'writing-linkexisting-root');
+  await createWorld(page, 'lworld');
+  const heroId = await createElement(page, 'character', { name: 'Frodo' });
+  const narrativeId = await createElement(page, 'narrative', {
+    name: 'Scene 1', supertype: 'Book', story: 'A weary halfling rested here.',
+  });
+  await gotoWriting(page, narrativeId);
+  await waitForEditor(page);
+
+  // Select "weary halfling" inside the prose.
+  await page.evaluate(() => {
+    const pm = document.querySelector('.atlas-writing-workspace-prose .ProseMirror')!;
+    const walker = document.createTreeWalker(pm, NodeFilter.SHOW_TEXT);
+    const tn = walker.nextNode()!;
+    const t = tn.textContent!;
+    const range = document.createRange();
+    range.setStart(tn, t.indexOf('weary'));
+    range.setEnd(tn, t.indexOf('halfling') + 'halfling'.length);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.dispatchEvent(new Event('selectionchange'));
+  });
+
+  // Right-click the selection → the new menu item → picker → Frodo.
+  await page.locator('.atlas-writing-workspace-prose .ProseMirror').click({
+    button: 'right',
+    position: { x: 60, y: 10 },
+  });
+  await page.locator('.atlas-prose-context-menu-item', { hasText: 'Link to existing element' }).click();
+  await page.locator('.atlas-picker-row', { hasText: 'Frodo' }).click();
+
+  // Chip carries the SELECTED text as label (not the element name)…
+  const chip = page.locator('.atlas-writing-workspace-prose .atlas-element-chip');
+  await expect(chip).toHaveText('weary halfling');
+  await expect(chip).toHaveAttribute('data-id', heroId);
+
+  // …and the label survives sync because it was recorded as an alias.
+  await expect.poll(async () => await page.evaluate((id) => {
+    const el = (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id);
+    return el?.atlas_aliases ?? null;
+  }, heroId)).toEqual(['weary halfling']);
+  await expect(chip).toHaveText('weary halfling');
+});

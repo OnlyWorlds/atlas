@@ -254,7 +254,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       'chart and it remembers its window, its cast, and its lens.' +
       '\n\n' +
       'Worlds can also carry their own CALENDARS: name your months, eras, festival ' +
-      'days and week, and every date in atlas speaks that language — "11 Greening, ' +
+      'days and week, and every date in atlas speaks that language: "11 Greening, ' +
       'Year 454" instead of a bare number.' +
       '\n\n' +
       'A world with no dates at all still charts: time begins whenever you give ' +
@@ -288,7 +288,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       'real atlas world is a folder of plain files on your computer: yours to keep, back up, or open in any tool.',
     deeper:
       'The folder IS the world: one JSON file per element, sorted into type folders, ' +
-      'readable by any program — no export step, no lock-in, and it all works offline. ' +
+      'readable by any program. No export step, no lock-in, and it all works offline. ' +
       'Rename the folder, put it in a git repo, sync it with Dropbox: atlas does not ' +
       'mind, because the files are the truth and atlas is just a good pair of hands on them.' +
       '\n\n' +

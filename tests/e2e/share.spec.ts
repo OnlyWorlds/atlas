@@ -454,3 +454,117 @@ test('legacy /publish URL aliases into the share room', async ({ page }) => {
   await expect(page.locator('.atlas-share-room h1').first()).toHaveText('Pages');
   await expect(page.locator('.atlas-room-nav-btn[data-room="share"]')).toHaveClass(/active/);
 });
+
+test('map block: a pin moved elsewhere re-renders on the open page (no re-add needed)', async ({ page }) => {
+  await setupWorld(page);
+
+  // Seed: character + web-imaged map + one pin at 25%/25%.
+  const ids = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const char = await store.createElement('character', { name: 'Frodo' });
+    const map = await store.createElement('map', {
+      name: 'Overworld', image_url: 'https://example.com/map.png', width: 1000, height: 800,
+    });
+    const pin = await store.createPin({
+      name: 'camp', map_id: map.id, element_id: char.id, element_type: 'character', x: 250, y: 200,
+    });
+    api.patchData(await store.listElements());
+    return { pinId: pin.id };
+  });
+
+  await openShare(page);
+  await page.click('button.atlas-share-new');
+  await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
+
+  await page.click('.atlas-share-block-add-btn:has-text("map")');
+  await page.locator('.atlas-picker-row', { hasText: 'Overworld' }).click();
+  await page.click('.atlas-share-block-done');
+  const dot = page.locator('.atlas-share-map-pin');
+  await expect(dot).toHaveAttribute('style', /left: 25%/);
+
+  // Move the pin the way the map tab's drag handler does (store write +
+  // data patch) — the OPEN page's map block must follow without any block
+  // re-add or room re-mount (2026-07-19 regression: the tick gated on the
+  // block-stack JSON and never saw element changes).
+  await page.evaluate(async ({ pinId }) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    await store.updatePin(pinId, { x: 750, y: 600 });
+    api.patchData(await store.listElements());
+  }, ids);
+
+  await expect(page.locator('.atlas-share-map-pin')).toHaveAttribute('style', /left: 75%/);
+  await expect(page.locator('.atlas-share-map-pin')).toHaveAttribute('style', /top: 75%/);
+});
+
+test('prose selection bubble: bold + link-to-existing with preserved label (alias recorded)', async ({ page }) => {
+  await setupWorld(page);
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    await store.createElement('character', { name: 'Frodo' });
+    api.patchData(await store.listElements());
+  });
+
+  await openShare(page);
+  await page.click('button.atlas-share-new');
+  await page.click('.atlas-share-block-add-btn:has-text("text")');
+  const pm = page.locator('.atlas-share-prose-rich .ProseMirror');
+  await pm.click();
+  await page.keyboard.type('A weary halfling rested here.');
+
+  // Select "weary halfling" — the bubble appears above the selection.
+  await page.evaluate(() => {
+    const host = document.querySelector('.atlas-share-prose-rich .ProseMirror')!;
+    const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+    const tn = walker.nextNode()!;
+    const t = tn.textContent!;
+    const range = document.createRange();
+    range.setStart(tn, t.indexOf('weary'));
+    range.setEnd(tn, t.indexOf('halfling') + 'halfling'.length);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.dispatchEvent(new Event('selectionchange'));
+  });
+  const bubble = page.locator('.atlas-prose-bubble');
+  await expect(bubble).toHaveClass(/is-visible/);
+
+  // Bold via the bubble — StarterKit mark, now visible in the UI.
+  await bubble.locator('[data-role="bold"]').click();
+  await expect(pm.locator('strong')).toHaveText('weary halfling');
+  await expect(bubble.locator('[data-role="bold"]')).toHaveClass(/is-active/);
+  await bubble.locator('[data-role="bold"]').click(); // toggle back off
+  await expect(pm.locator('strong')).toHaveCount(0);
+
+  // Link the same selection to Frodo — chip keeps the SELECTED words as its
+  // label, and the label is recorded as an alias so chip-label sync can't
+  // rename it to "Frodo" on the next data tick.
+  await bubble.locator('[data-role="link"]').click();
+  await page.locator('.atlas-picker-row', { hasText: 'Frodo' }).click();
+  const chip = pm.locator('.atlas-element-chip');
+  await expect(chip).toHaveText('weary halfling');
+  await expect.poll(async () => await page.evaluate(() => {
+    const el = (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.name === 'Frodo');
+    return el?.atlas_aliases ?? null;
+  })).toEqual(['weary halfling']);
+  await expect(chip).toHaveText('weary halfling');
+
+  // Right-click menu offers the same action for discoverability.
+  await page.evaluate(() => {
+    const host = document.querySelector('.atlas-share-prose-rich .ProseMirror')!;
+    const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+    const tn = walker.nextNode()!;
+    const range = document.createRange();
+    range.setStart(tn, 0);
+    range.setEnd(tn, 1);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.dispatchEvent(new Event('selectionchange'));
+  });
+  await pm.click({ button: 'right', position: { x: 8, y: 10 } });
+  await expect(page.locator('.atlas-prose-context-menu-item', { hasText: 'Link to existing element' })).toBeVisible();
+  await page.keyboard.press('Escape');
+});

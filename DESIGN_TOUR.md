@@ -17,12 +17,14 @@ at the 'online' step as the deeper schema story).
   tour" / "Set up a folder") on black. Settings stays live at the
   `#/settings` route. After a completed tour (`atlas_tour_done_v1`) the doors
   swap emphasis: folder primary, tour reads "Replay the tour".
-- **One narrator, two positions**: a single glass panel (cyan top rail, tint,
-  fixed min-height so the dock NEVER changes shape between steps). At step 1
-  it sits screen-centered with the sentence at vignette scale, an eyebrow
-  ("One sentence, one world") and the cite "Hyperion, Dan Simmons (1989)" —
-  the safe book-and-year form, no mortality claims. On Begin it docks
-  bottom-center. z-index 900: a modal dialog ALWAYS outranks the narrator.
+- **One narrator, ONE position** (S298 — the centered opener was retired,
+  Captain's round): a single glass panel (cyan top rail, tint, min-height
+  272px so the dock NEVER changes shape between any two steps, opener
+  included), docked bottom-center from the first second. Step 1 carries its
+  framing in the meta channel: eyebrow ("One sentence, one world") left, the
+  cite "Hyperion, Dan Simmons (1989)" right — the safe book-and-year form,
+  no mortality claims, zero extra rows. The bare stage above it fills in on
+  Next. z-index 900: a modal dialog ALWAYS outranks the narrator.
 - **The progressive build-up**: chrome appears when it is taught. The bar
   stamps `<body data-tour-stage>` (0 bare · 1 shell + worlds sidebar ·
   2 elements era · 3 + right pane/maps · 4 + writing icon · 5 + charts icon ·
@@ -58,7 +60,11 @@ throwaway world:
    "Hyperion" readonly, the folder hint replaced by the teaching line
    ("normally this becomes a folder; the tour world stays in your browser").
    Create → the shell materializes on the world's home. The sidebar's own
-   create-world icon opens the same locked modal.
+   create-world icon opens the same locked modal. SINGLE ROUTE (S298): the
+   create beats carry no watch-mode Next — the locked one-click modal is the
+   way; the consul step shows plain Next only after he exists. The stage-1
+   sidebar toggle also keeps its final geometry: a locked ghost segment
+   holds the place the world name will take.
 2. **Create the Consul** (step 3): the REAL element modal, type grid locked
    to character, name "The Consul" readonly. During this beat EVERY create
    door is scripted — the elements-sidebar + opens the same locked modal

@@ -27,6 +27,8 @@ import {
   countAutolinkHints, countChips, convertAllAutolinks, unlinkAllChips,
 } from './writing-workspace-autolink';
 import { NARRATIVE_RELATION_FIELDS } from './writing-workspace-derive';
+import { linkSelectionToExisting } from './prose-link-existing';
+import { pushRecent } from './writing-workspace-recents';
 import { WRITING_INLINE_CREATE_EVENT, WRITING_SPLIT_EVENT } from '../core/hotkeys';
 import type { Element } from '../core/types';
 import type { WorkspaceEditorHandle } from './writing-workspace-editor';
@@ -225,6 +227,15 @@ export function createProseContextMenu(deps: {
           </button>
         `);
       }
+      // Link-to-existing (2026-07-19): the picker path for selections whose
+      // words match no element name — autolink/Tab only fires on exact
+      // name/alias matches, so this was previously chip-unreachable prose.
+      items.push(`
+        <button type="button" class="atlas-prose-context-menu-item" data-role="link-existing">
+          <span class="material-symbols-outlined">add_link</span>
+          <span>Link to existing element…</span>
+        </button>
+      `);
       items.push(`
         <button type="button" class="atlas-prose-context-menu-item" data-role="create">
           <span class="material-symbols-outlined">add</span>
@@ -255,6 +266,15 @@ export function createProseContextMenu(deps: {
     menu.querySelector<HTMLElement>('[data-role="create"]')?.addEventListener('click', () => {
       dismissContextMenu();
       openInlineCreate();
+    });
+    menu.querySelector<HTMLElement>('[data-role="link-existing"]')?.addEventListener('click', () => {
+      dismissContextMenu();
+      void linkSelectionToExisting(getEditorHandle, {
+        onLinked: (id) => {
+          const worldId = getState().active?.worldId;
+          if (worldId) pushRecent(worldId, id);
+        },
+      });
     });
     menu.querySelector<HTMLElement>('[data-role="link-selection"]')?.addEventListener('click', () => {
       dismissContextMenu();
