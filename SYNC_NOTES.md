@@ -663,6 +663,62 @@ scalar and keel's passthrough had never been probed with a nested OBJECT
   second device) whenever real credentials are at hand — source truth is
   strong, wire truth is stronger.
 
+## The body cache + parallel index (speed bout, 2026-07-19)
+
+FsFolderStore keeps parsed element bodies in memory (`bodyCache`) from the
+index pass on; `listElements`/`getElement` serve structuredClone copies
+instead of re-walking disk (measured: 3.5s per call → 15ms at 1,500
+elements; cold open 18.5s → ~3s). Load-bearing rules:
+
+- **Every body write sink updates the cache** (createElement,
+  writeElementAndRename, stampServerUpdatedAt, clearServerBaseline,
+  resetSyncBaseline; unlinkElement deletes). The warm-vs-cold equivalence
+  e2e (`folder-store-fs.spec.ts`) catches a missed sink by construction.
+- **The cache owns its entries and serves clones** — callers can never
+  mutate cache internals; write sinks store clones (`cacheSet`).
+- Sound because of the one-writer lock: nothing writes element bodies
+  behind the store's back (gate-verified, zero out-of-store writers).
+  External-editor edits mid-session were never supported; they land on the
+  next open, as before.
+- **Index builds run concurrently** (64-way file reads from handles
+  collected in one enumeration; types in parallel) with an in-flight
+  promise guard per type. A closed store's in-flight build BAILS (zombie
+  guard) — it must not repopulate cleared maps or tidy-write a folder
+  whose lock was released. Activation supersede is guarded in
+  worlds-sidebar (`stillActive`): the cache hit path can't throw post-
+  close the way the disk path did, so a slow world's resolve would
+  otherwise stomp the newly-activated world's state.
+
+## Background tidy + parked locks (2026-07-19, revises the S246 open-time tidy)
+
+The filename-convergence tidy no longer runs INSIDE the open path: Captain's
+live find — a foreign folder (script-written names, 1,669 elements, OneDrive
+disk) froze activation for its entire rename run, blocking the activation
+chain. `buildIndexFor` now indexes/caches files AS THEY ARE (filenames are
+presentation; body id is identity) and `scheduleTidy` converges names in the
+background: same occupancy/id-sort/case-fold rules, each rename riding the
+per-id write chain (serializes against user edits), `this.root` re-checked
+per step, `awaitTidies()` for tests. Parked stores STALE their lock
+heartbeat on park (epoch timestamp): a parked world is takeable by another
+tab instantly, no 90s ghost-prompt after tab close; unpark still verifies
+tab_id and cold-reopens on takeover. RESIDUAL (documented, accepted): the
+lock claim/unpark read-then-write is a pre-existing TOCTOU with a
+milliseconds window; a real fix needs atomic create-if-absent semantics the
+FS Access API doesn't offer — the heartbeat-mismatch check catches the
+aftermath within one beat.
+
+## Meta step precheck on push rounds (2026-07-19, revises S262 cadence)
+
+`runPushOnly` passes `skipIfLocalClean`: when a meta_baseline exists and
+local disk meta equals it field-for-field (`metaEquals`), the round skips
+the `GET /world` entirely — element autosaves no longer pay a serial
+world-meta round-trip. Deliberate freshness narrowing: push rounds used to
+opportunistically PULL server meta as a side effect; now meta freshness
+belongs to pull/sync rounds only — the same opt-in-pull semantics elements
+have always had. Seed rounds never skip (baseline absent); a precheck
+error falls through to the full step; local-dirty meta always runs the
+full step and pushes.
+
 ---
 
 *Authored mid-session 201 (2026-05-13) after Phase 3.5 mega smoke. If you're reading this in a future chat, this is what the sync engine wanted you to know.*

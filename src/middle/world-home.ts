@@ -116,9 +116,13 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       // Empty and still-loading are different truths: during activation the
       // cache is primed async from disk, and showing onboarding meanwhile
       // reads as "your world is empty" (misleading-empty, 2026-07-10).
+      const progress = getState().data.loadingProgress;
+      const copy = progress
+        ? `Opening world… ${progress.done.toLocaleString()} / ${progress.total.toLocaleString()}`
+        : 'Opening world…';
       const loadingEl = document.createElement('section');
       loadingEl.className = 'atlas-home-loading';
-      loadingEl.innerHTML = `<p class="atlas-home-loading-copy">Opening world…</p>`;
+      loadingEl.innerHTML = `<p class="atlas-home-loading-copy">${copy}</p>`;
       root.appendChild(loadingEl);
       return;
     }

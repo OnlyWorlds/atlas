@@ -236,12 +236,14 @@ test('legacy full-uuid file tidies to canonical on open; second open is a no-op'
     const s1 = new api.FsFolderStore({ tabId: 'tab-1', disableHeartbeat: true });
     await s1.open(root);
     const list1 = await s1.listElements('character');
+    await s1.awaitTidies(); // tidy is a background pass since 2026-07-19
     const afterFirst = await listNames();
     await s1.close();
 
     const s2 = new api.FsFolderStore({ tabId: 'tab-2', disableHeartbeat: true });
     await s2.open(root);
     await s2.listElements('character');
+    await s2.awaitTidies();
     const afterSecond = await listNames();
     const fetched = await s2.getElement(legacyId);
     await s2.close();
@@ -291,6 +293,7 @@ test('tidy never overwrites a readable stranger occupying the canonical name', a
     const s1 = new api.FsFolderStore({ tabId: 'tab-1', disableHeartbeat: true });
     await s1.open(root);
     const list = await s1.listElements('character');
+    await s1.awaitTidies(); // background tidy must settle before name checks
     const hero = await s1.getElement('aaaa12345678');
     const bystander = await s1.getElement('bbbb-b1');
     await s1.close();

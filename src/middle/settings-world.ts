@@ -15,7 +15,7 @@ import {
   setWorldPaused,
 } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
-import { getActiveStore, setActiveStore } from '../core/active-store';
+import { getActiveStore, setActiveStore, evictParkedStore } from '../core/active-store';
 import { deleteWorldFolderUnderRoot } from '../setup/atlas-root-flow';
 import { MakeOnlineModal } from '../ui/make-online-modal';
 import { ToastManager } from '../ui/toast-manager';
@@ -239,6 +239,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     const store = getActiveStore();
     if (store) await store.close().catch(() => {});
     setActiveStore(null);
+    evictParkedStore(world.id);
     const next = deleteWorldEntry(getState().registry, world.id);
     saveRegistry(next);
     await deleteHandle(world.folder.handle_key).catch(() => {});
@@ -265,6 +266,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       const store = getActiveStore();
       if (store) await store.close().catch(() => {});
       setActiveStore(null);
+      evictParkedStore(world.id);
       // Detach any sync engine for this world before destroying its folder.
       detachSyncEngine();
       // Delete the on-disk folder first (we still have a working handle).

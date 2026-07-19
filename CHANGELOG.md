@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Big worlds open fast: a 1,500-element world that took ~18 seconds on first open now lands in about 3, and switching between worlds or saving edits no longer re-reads every file from disk (those dropped from seconds to instant). While a large world opens, the loading message counts: "Opening world… 600 / 1,500".
+- Linking a large OnlyWorlds world downloads noticeably faster: the element types fetch in parallel and each page carries more elements per request.
+- Routine autosaves stopped paying an extra server round-trip for world settings that had not changed.
+- The charts controls swapped their right corner: the view toggle sits on top, the now chip under it.
+- Link previews: sharing the atlas address now shows a proper title and description instead of a bare link.
+- Switching back to a world you had open is instant now: atlas keeps recently visited worlds warm instead of re-reading their folders (another tab taking a world over is still detected, and the fresh read happens then).
+- Open an existing world folder from anywhere on your disk: a new sidebar button registers a folder that already contains a world, in place. No copying, no downloading. A world copied from another machine, exported from Obsidian, or synced through Dropbox opens directly.
+- Structured data written by other tools (battle records, sidecar configs) now shows as a read-only block on the element page instead of an editable "[object Object]" row that could destroy it with one save. You can still remove such a field deliberately.
+- Battles recorded from Tactical Tangle render as real battle cards on their Event page: the sides with their fallen, every unit's numbers and fate, and the seed that can retell the same battle. The tropaion Object shows where the battle turned. Elements recorded from play carry a small swords mark in the sidebar.
+
 - The charts room gained a document view: a toggle beside the calendar chip turns the chart into a scrolling page of your history. Down is later; era names section the document; long silences read as "132 years pass" instead of empty distance; the now is a gold seam you scroll across; a corner readout tracks the date under your eye. Click a card to expand it with its links and actions. A chart saved in document view reopens in document view, and shares as the same static chart block as before.
 - The season wash settled at half its prototype strength: the lowest level where the months still read.
 - The chart view toggle holds its place at the right end of the controls instead of drifting with the type chips.

@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { patchSlice, getState } from '../../src/core/state';
 import { defaultRegistry } from '../../src/core/types';
-import { setActiveStore } from '../../src/core/active-store';
+import { setActiveStore, clearParkedStores } from '../../src/core/active-store';
 
 const events: string[] = [];
 let storeSeq = 0;
@@ -44,6 +44,15 @@ vi.mock('../../src/store/folder-store-fs', async () => {
       this.strictOpen = false;
       events.push(`close:${this.n}`);
       await super.close();
+    }
+    // Park contract (speed bout 2026-07-19): switching away parks instead of
+    // closing — the store stays open/usable, only the heartbeat stops.
+    park(): void {
+      events.push(`park:${this.n}`);
+    }
+    async unpark(): Promise<boolean> {
+      events.push(`unpark:${this.n}`);
+      return this.strictOpen;
     }
     private req(): void {
       if (!this.strictOpen) throw new Error('FsFolderStore not open');
@@ -79,6 +88,7 @@ beforeEach(() => {
   storeSeq = 0;
   localStorage.clear();
   setActiveStore(null);
+  clearParkedStores();
   patchSlice('active', null);
   patchSlice('data', { elements: [] });
   patchSlice('registry', {
@@ -102,12 +112,13 @@ describe('activateWorld — serialization under concurrent calls', () => {
     expect(r1).toBe(true);
     expect(r2).toBe(true);
     // Strictly serial: activation 1 fully completes (open 1 start→end, no
-    // second open interleaved) before activation 2 closes store 1 and opens
-    // store 2.
+    // second open interleaved) before activation 2 PARKS store 1 (the
+    // switch-away contract since the speed bout — close only on eviction)
+    // and opens store 2.
     expect(events).toEqual([
       'open-start:1',
       'open-end:1',
-      'close:1',
+      'park:1',
       'open-start:2',
       'open-end:2',
     ]);

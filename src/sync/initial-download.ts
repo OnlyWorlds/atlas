@@ -46,20 +46,37 @@ export async function initialDownloadAll(
   onProgress?: (p: InitialDownloadProgress) => void
 ): Promise<InitialDownloadResult> {
   // ---- List phase: gather all records per type so we know the total ----
+  // Type walks run concurrently in a bounded pool (speed bout 2026-07-19):
+  // the 22 per-type list walks are independent requests, and most types are
+  // tiny or empty — serializing them made list-phase wall-time the SUM of 22
+  // round-trips. Pool of 6 keeps server load polite; results land keyed by
+  // type so ordering is unaffected. Any single failure still aborts the
+  // whole download (caller surfaces + user retries), matching the old
+  // behavior.
   const recordsByType = new Map<ElementType, Array<{ id: string; updated_at: string } & Record<string, unknown>>>();
   let total = 0;
-  for (const type of ALL_ELEMENT_TYPES) {
-    onProgress?.({ done: 0, total: 0, currentType: type, phase: 'list' });
-    const records = await adapter.listElements(type);
-    recordsByType.set(type, records);
-    total += records.length;
-  }
+  const LIST_CONCURRENCY = 6;
+  let nextType = 0;
+  const listWorker = async () => {
+    while (nextType < ALL_ELEMENT_TYPES.length) {
+      const type = ALL_ELEMENT_TYPES[nextType++];
+      onProgress?.({ done: 0, total: 0, currentType: type, phase: 'list' });
+      const records = await adapter.listElements(type);
+      recordsByType.set(type, records);
+      total += records.length;
+    }
+  };
+  await Promise.all(Array.from({ length: LIST_CONCURRENCY }, listWorker));
+  // Restore the canonical type order for the write phase (Map iteration
+  // order follows insertion, which is now completion order).
+  const orderedTypes = ALL_ELEMENT_TYPES.filter(t => recordsByType.has(t));
 
   // ---- Write phase: per-element resilience ----
   let done = 0;
   const failures: PerElementFailure[] = [];
 
-  for (const [type, records] of recordsByType) {
+  for (const type of orderedTypes) {
+    const records = recordsByType.get(type)!;
     for (const record of records) {
       try {
         // `applyServerRecord` stamps both local + server timestamps to the

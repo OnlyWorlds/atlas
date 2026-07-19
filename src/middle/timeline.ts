@@ -262,7 +262,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
         .addEventListener('click', () => void setNow(null));
       nowWrap.appendChild(chip);
     }
-    controlBar.appendChild(nowWrap);
+    // Appended into the right stack below — mode toggle above, now below
+    // (Captain's call, 2026-07-19: reads cleaner than now-above-buttons).
 
     // The calendar chip (2B): shows the active lens; the menu switches lenses,
     // creates (through the world clock gate), edits, or revisits the clock.
@@ -300,7 +301,13 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     };
     mode.appendChild(modeBtn('2d', 'view_timeline', 'Canvas view: pan and zoom the chart'));
     mode.appendChild(modeBtn('scroll', 'view_agenda', 'Document view: scroll through your history'));
-    controlBar.appendChild(mode);
+
+    // Right stack: view toggle on top, the now control under it.
+    const rightStack = document.createElement('div');
+    rightStack.className = 'atlas-chart-rightstack';
+    rightStack.appendChild(mode);
+    rightStack.appendChild(nowWrap);
+    controlBar.appendChild(rightStack);
 
     renderMintOffer();
   }

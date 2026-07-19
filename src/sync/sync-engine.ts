@@ -14,6 +14,7 @@ import {
   canonicalMetaValue,
   encodeMetaFieldsForPush,
   isMetaEmpty,
+  metaEquals,
   metaFieldLengthError,
   pickSyncedMeta,
   threeWayMetaDiff,
@@ -659,7 +660,7 @@ export class SyncEngine {
    * Baseline advances PER-FIELD (sent + applied only), so server changes to
    * fields we didn't touch still surface next round.
    */
-  private async executeMetaStep(): Promise<{
+  private async executeMetaStep(opts?: { skipIfLocalClean?: boolean }): Promise<{
     meta_pushed: string[];
     meta_pulled: string[];
     failures: PerElementFailure[];
@@ -667,6 +668,31 @@ export class SyncEngine {
   }> {
     const empty = { meta_pushed: [], meta_pulled: [], failures: [], auth_blocked: false };
     if (this.stopped || this.paused) return empty;
+
+    // PUSH-round precheck (speed bout 2026-07-19): a push round's meta duty
+    // is carrying LOCAL meta edits out — that dirtiness is decidable from
+    // disk + baseline alone, no server read. When local meta is baseline-
+    // clean, skip the GET /world entirely (it added a serial round-trip to
+    // every debounced autosave). Pull/sync rounds never pass this flag: pull
+    // freshness IS the meta GET (world-meta design, S262). An absent
+    // baseline never skips — the seed round must run.
+    if (opts?.skipIfLocalClean) {
+      try {
+        const syncState = await this.folder.readSyncState();
+        const baseline = syncState.meta_baseline ?? null;
+        if (baseline) {
+          const local = await this.folder.readWorldMeta() as unknown as Record<string, unknown>;
+          const dirty = META_SYNC_FIELD_NAMES.some(
+            f => !metaEquals(META_SYNC_FIELDS[f], local[f], baseline[f])
+          );
+          if (!dirty) return empty;
+        }
+      } catch (err) {
+        // Precheck failure falls through to the normal step — never let an
+        // optimization turn into a skipped push.
+        console.warn('[atlas:sync] meta precheck failed — running full meta step', err);
+      }
+    }
 
     const metaFailure = (operation: 'read' | 'update', err: unknown): PerElementFailure => ({
       element_id: 'world',
@@ -886,7 +912,10 @@ export class SyncEngine {
     this.setState({ kind: 'syncing', phase: 'push' });
     // The meta step rides EVERY round (world-meta sync R2) — a setNow-triggered
     // debounce push is exactly the round that must carry the now to the server.
-    const meta = await this.executeMetaStep();
+    // skipIfLocalClean: when local meta matches the baseline there is nothing
+    // to carry, and the server GET is skipped (element-edit autosaves are the
+    // overwhelmingly common push round).
+    const meta = await this.executeMetaStep({ skipIfLocalClean: true });
     if (meta.auth_blocked) {
       this.setAuthError();
       const result: SyncResult = {

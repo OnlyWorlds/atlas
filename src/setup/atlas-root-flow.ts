@@ -198,6 +198,75 @@ export async function discoverWorldsInRoot(
 }
 
 /**
+ * Open an existing world folder from anywhere on disk (2026-07-19, the
+ * obsidian-alignment ask). The folder IS the world — no copy, no download:
+ * validate world.json, store the handle, register (api-linked when the meta
+ * carries an api block, exactly like root discovery). The world lives where
+ * it is ("external world" — DESIGN's advanced path, now with UI).
+ *
+ * Returns the worldId to activate, or null with a thrown Error describing
+ * why the folder was refused. A world whose id is already registered is NOT
+ * re-registered (two folders with one id would fight over the same handle
+ * slot): the caller activates the existing entry instead.
+ */
+export async function openWorldFolder(
+  picked: FileSystemDirectoryHandle
+): Promise<{ worldId: string; already: boolean }> {
+  let meta: { id?: string; name?: string; demo?: boolean; api?: { world_id?: string; api_key?: string; world_name?: string; read_only?: boolean } } | null = null;
+  try {
+    meta = await readJson(picked, 'world.json');
+  } catch (err) {
+    if (!isNotFound(err)) throw err;
+  }
+  if (!meta) {
+    throw new Error('That folder has no world.json. Pick the world folder itself (the one containing world.json, elements/, spatial/).');
+  }
+  if (typeof meta.id !== 'string' || !meta.id || typeof meta.name !== 'string') {
+    throw new Error('world.json must carry a valid id and name.');
+  }
+
+  // Registry entry ids are minted fresh (never the world.json id — existing
+  // model), so dedupe by the handle key convention `world-<meta.id>` that
+  // discovery also uses. This both catches a re-open of the same world AND
+  // protects an already-registered world's handle slot from being
+  // overwritten by a second folder carrying the same world id.
+  const handleKey = `world-${meta.id}`;
+  const existing = getState().registry.worlds.find(w => w.folder.handle_key === handleKey);
+  if (existing) {
+    return { worldId: existing.id, already: true };
+  }
+
+  await storeHandle(handleKey, picked);
+  const reg = getState().registry;
+  const hasApi = !!(meta.api && typeof meta.api.world_id === 'string' && typeof meta.api.api_key === 'string');
+  let next: typeof reg;
+  let entry: { id: string };
+  if (hasApi) {
+    ({ next, entry } = createApiLinkedWorld(reg, {
+      name: meta.name,
+      apiWorldId: meta.api!.world_id!,
+      apiKey: meta.api!.api_key!,
+      folderName: picked.name,
+      handleKey,
+      pathHint: picked.name,
+      apiWorldName: meta.api!.world_name,
+      readOnly: !!meta.api!.read_only,
+    }));
+  } else {
+    ({ next, entry } = createLocalWorld(reg, {
+      name: meta.name,
+      folderName: picked.name,
+      handleKey,
+      pathHint: picked.name,
+      demo: meta.demo === true,
+    }));
+  }
+  saveRegistry(next);
+  patchSlice('registry', next);
+  return { worldId: entry.id, already: false };
+}
+
+/**
  * Given a user-picked folder, return the handle to the actual atlas root.
  * Either picked itself (already a root), an existing wrapper subfolder
  * (current or legacy name), or a freshly-created wrapper.

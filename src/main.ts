@@ -111,6 +111,10 @@ if (import.meta.env.DEV) {
      * (handle-vault), OPFS. Lets each Playwright test start clean.
      */
     async resetAll(): Promise<void> {
+      // Parked stores hold handles into the OPFS being wiped — drop them
+      // first (their heartbeats are already stopped by park()).
+      const { clearParkedStores } = await import('./core/active-store');
+      clearParkedStores();
       localStorage.clear();
       // wipe IDB databases atlas knows about
       const dbs = ['atlas-handles'];

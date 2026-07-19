@@ -949,9 +949,12 @@ export function exitEditMode(mode: 'commit' | 'cancel'): void {
  * Captain smoke session 219: "if I refresh page in edit mode; it seems to
  * store the changes, instead of reverting them, after reload."
  */
-export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts?: ToastManager): Promise<void> {
+export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts?: ToastManager): Promise<boolean> {
   const persisted = readPersistedSnapshot(activatedWorldId);
-  if (!persisted) return;
+  // Returns whether a recovery was ATTEMPTED — the caller re-primes the
+  // elements cache only then (speed bout 2026-07-19: the unconditional
+  // re-prime cost a full disk walk on every normal activation).
+  if (!persisted) return false;
   // Build a temporary session shape just enough for restoreFromSnapshot.
   const fakeSession: EditSession = {
     zoneId: persisted.zoneId,
@@ -973,6 +976,7 @@ export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts
   } finally {
     clearPersistedSnapshot(activatedWorldId);
   }
+  return true;
 }
 
 async function restoreFromSnapshot(session: EditSession): Promise<void> {

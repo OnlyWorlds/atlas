@@ -90,6 +90,12 @@ export interface DataState {
    * different truths (the misleading empty-home flash, 2026-07-10).
    */
   loading?: boolean;
+  /**
+   * Live count while a COLD open walks the disk ("Opening world… 340 / 1,500").
+   * Null/absent when idle or when the open is warm/fast. Total is a ceiling
+   * (raw file count), not a promise of the final element count.
+   */
+  loadingProgress?: { done: number; total: number } | null;
 }
 
 /**

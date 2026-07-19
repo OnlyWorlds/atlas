@@ -308,3 +308,99 @@ test('applyServerRecord writes both timestamps from the server value', async ({ 
   expect(result.server).toBe('2026-03-15T10:00:00.000Z');
   expect(result.pendingCount).toBe(0);
 });
+
+// ---- Body cache (speed bout, 2026-07-19) ----
+// The store keeps parsed bodies in memory and serves clones; every write sink
+// must update BOTH disk and cache. The decisive lock: a warm store's view and
+// a fresh store's cold-from-disk view must be identical after any mix of
+// writes — if a sink skips either side, the two views diverge here.
+
+test('body cache: warm view equals cold-from-disk view after every write kind', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+
+    const a = await store.createElement('character', { name: 'Warm', description: 'v1' });
+    await store.updateElement(a.id, { description: 'v2' });
+    await store.stampServerUpdatedAt(a.id, 'character', '2026-07-19T10:00:00.000Z');
+    const b = await store.createElement('location', { name: 'Doomed' });
+    await store.deleteElement(b.id);
+    await store.applyServerRecord('character', { id: crypto.randomUUID(), name: 'Pulled', description: 'from server' }, '2026-07-19T11:00:00.000Z');
+
+    const norm = (els: any[]) => els
+      .map((e: any) => ({ id: e.id, type: e.type, name: e.name, description: e.description, server: e.server_updated_at ?? null }))
+      .sort((x: any, y: any) => x.id < y.id ? -1 : 1);
+    const warm = norm(await store.listElements());
+    await store.close();
+
+    const fresh = new api.FsFolderStore({ tabId: 'test-tab-2', disableHeartbeat: true });
+    await fresh.open(root);
+    const cold = norm(await fresh.listElements());
+    await fresh.close();
+    return { warm, cold };
+  });
+  expect(result.warm.length).toBe(2);
+  expect(result.warm).toEqual(result.cold);
+});
+
+test('body cache: returned elements are clones — caller mutation never leaks into later reads', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+
+    const a = await store.createElement('character', { name: 'Pure', species: ['orc-1'] });
+    const first = await store.getElement(a.id);
+    first.name = 'MUTATED';
+    (first.species as string[]).push('orc-2');
+    const second = await store.getElement(a.id);
+    const listed = (await store.listElements('character'))[0];
+    await store.close();
+    return {
+      secondName: second.name,
+      secondSpecies: second.species,
+      listedName: listed.name,
+    };
+  });
+  expect(result.secondName).toBe('Pure');
+  expect(result.secondSpecies).toEqual(['orc-1']);
+  expect(result.listedName).toBe('Pure');
+});
+
+test('listElements onProgress: cold walk reports monotonic counts ending at done === total', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const seeder = new api.FsFolderStore({ tabId: 'seed-tab', disableHeartbeat: true });
+    await seeder.open(root);
+    for (let i = 0; i < 12; i++) {
+      await seeder.createElement('character', { name: 'p' + i });
+    }
+    await seeder.close();
+
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    const ticks: Array<[number, number]> = [];
+    const cold = await store.listElements(undefined, { onProgress: (done: number, total: number) => ticks.push([done, total]) });
+    const warmTicks: Array<[number, number]> = [];
+    await store.listElements(undefined, { onProgress: (done: number, total: number) => warmTicks.push([done, total]) });
+    await store.close();
+    const monotonic = ticks.every(([d], i) => i === 0 || d >= ticks[i - 1][0]);
+    return {
+      count: cold.length,
+      firstTick: ticks[0],
+      lastTick: ticks[ticks.length - 1],
+      monotonic,
+      warmTickCount: warmTicks.length,
+    };
+  });
+  expect(result.count).toBe(12);
+  expect(result.firstTick).toEqual([0, 12]);
+  expect(result.lastTick).toEqual([12, 12]);
+  expect(result.monotonic).toBe(true);
+  // Warm calls are cache-served — no cold walk, no progress ticks.
+  expect(result.warmTickCount).toBe(0);
+});

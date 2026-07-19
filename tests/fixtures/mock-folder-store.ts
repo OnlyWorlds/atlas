@@ -6,7 +6,7 @@
  * `server_updated_at` mirror what the real one will do.
  */
 
-import type { FolderStore } from '../../src/store/folder-store';
+import type { FolderStore, ListElementsOptions } from '../../src/store/folder-store';
 import { newId, nowIso } from '../../src/store/folder-store';
 import { PerIdWriteChain } from '../../src/store/write-chain';
 import { ATLAS_LOCAL_ONLY_FIELDS, ATLAS_WIRE_EXTENSION_FIELDS } from '../../src/core/constants';
@@ -78,8 +78,11 @@ export class MockFolderStore implements FolderStore {
 
   // ---- Elements (content + spatial unified) ----
 
-  async listElements(type?: ElementType): Promise<Element[]> {
+  async listElements(type?: ElementType, _opts?: ListElementsOptions): Promise<Element[]> {
     const all = Array.from(this.elements.values());
+    // onProgress contract (matches FsFolderStore): ticks fire ONLY during a
+    // cold disk walk. The in-memory store is always warm, so it fires none —
+    // callers must never rely on a terminal tick (close-gate finding).
     return type ? all.filter(e => e.type === type) : all;
   }
 

@@ -55,9 +55,17 @@ import type {
   WorldMeta,
   Zone,
 } from '../core/types';
-import type { FolderStore } from './folder-store';
+import type { FolderStore, ListElementsOptions } from './folder-store';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { newId, nowIso } from './folder-store';
+
+/**
+ * Bounded concurrency for the index-pass file reads. FS Access API calls
+ * have per-op latency; batching turns sum-of-latencies into rounds. Kept
+ * modest — the browser serializes some of this internally anyway, and the
+ * dedupe/tidy pass after the reads is strictly sequential regardless.
+ */
+const INDEX_READ_CONCURRENCY = 64;
 import { PerIdWriteChain } from './write-chain';
 import {
   elementDirSegments,
@@ -146,6 +154,39 @@ export class FsFolderStore implements FolderStore {
   private fileIndex: Map<string, { type: ElementType; filename: string }> = new Map();
   /** Set of types whose dirs have been scanned into fileIndex. */
   private indexedTypes: Set<ElementType> = new Set();
+  /**
+   * Parsed element bodies, id → body (speed bout, 2026-07-19). The index pass
+   * already parses every file to key on body.id; keeping the bodies makes
+   * listElements/getElement memory reads instead of a full disk re-walk
+   * (measured 3.5s per call on a 1500-element world before this cache).
+   *
+   * Coherence: every body write funnels through this store (one writer per
+   * folder via the lock file), so the cache is updated at the write sinks
+   * (createElement / writeElementAndRename / stampServerUpdatedAt /
+   * clearServerBaseline / resetSyncBaseline) and dropped in unlinkElement.
+   * OWNERSHIP RULE: the cache stores objects nothing else holds a reference
+   * to (parsed bodies, or clones at the write sinks) and SERVES clones —
+   * callers can never mutate cache internals, preserving the old
+   * fresh-objects-per-read semantics. Cleared in close().
+   */
+  private bodyCache: Map<string, Element> = new Map();
+  /** In-flight index builds, type → shared promise (concurrent-caller guard). */
+  private indexBuilds: Map<ElementType, Promise<void>> = new Map();
+  /** In-flight background tidy passes (awaitTidies drains them). */
+  private pendingTidies: Set<Promise<void>> = new Set();
+  /**
+   * Store-level per-file tick during index builds. A LISTENER, not a param:
+   * builds are shared across concurrent callers (indexBuilds), so a
+   * per-call callback silently dies whenever another caller started the
+   * build first (getElement's cold-start warm loop raced exactly this way).
+   * Every build reports here; whoever holds the listener gets every tick.
+   */
+  private indexTick: (() => void) | null = null;
+
+  /** Cache an element body, cloning so the cache owns its entry outright. */
+  private cacheSet(body: Element): void {
+    this.bodyCache.set(body.id, structuredClone(body));
+  }
   /** Per-id serialization for update/delete (convention #79 — lost-update class). */
   private writeChain = new PerIdWriteChain();
   /**
@@ -215,11 +256,79 @@ export class FsFolderStore implements FolderStore {
     }
     if (this.root) {
       const atlasDir = await tryGetDir(this.root, [ATLAS_INTERNAL_DIR]);
-      if (atlasDir) await removeFile(atlasDir, LOCK_FILE);
+      // Remove the lock only while it is still OURS. A parked store can be
+      // evicted long after another tab legitimately took the world over
+      // (stale-TTL takeover) — deleting unconditionally would destroy the
+      // OTHER tab's live lock (parking bout, 2026-07-19).
+      if (atlasDir) {
+        const lock = await readJson<LockPayload>(atlasDir, LOCK_FILE).catch(() => null);
+        if (lock && lock.tab_id === this.tabId) await removeFile(atlasDir, LOCK_FILE);
+      }
     }
     this.root = null;
     this.fileIndex.clear();
     this.indexedTypes.clear();
+    this.bodyCache.clear();
+    this.indexBuilds.clear();
+  }
+
+  /**
+   * Park (speed bout, 2026-07-19): stop heartbeating but KEEP the root, lock
+   * file, and all caches — the store can be revived near-instantly on
+   * switch-back. The lock stays ON DISK deliberately: it goes stale after
+   * LOCK_STALE_MS (90s), so another tab can take the world over exactly as
+   * if this tab had crashed — and that takeover is precisely what unpark()
+   * detects. Within the stale window another tab gets the normal consent
+   * prompt, same as a live lock.
+   */
+  park(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    // Stale the on-disk heartbeat immediately (close-gate MED, 2026-07-19):
+    // a parked lock with a fresh-looking heartbeat would make other tabs
+    // (including a relaunch after tab close) sit behind the 90s wall with a
+    // scary "open in another tab — take over?" prompt for worlds no tab is
+    // using. Parked = takeable instantly; unpark still verifies tab_id, so
+    // a takeover is detected and forces the cold reopen. Best-effort.
+    void (async () => {
+      try {
+        if (!this.root) return;
+        const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
+        const lock = await readJson<LockPayload>(atlasDir, LOCK_FILE);
+        if (lock && lock.tab_id === this.tabId) {
+          await writeJsonAtomic(atlasDir, LOCK_FILE, { ...lock, last_heartbeat: new Date(0).toISOString() });
+        }
+      } catch { /* parked lock staling is best-effort */ }
+    })();
+  }
+
+  /**
+   * Revive a parked store. Valid ONLY when the on-disk lock still carries
+   * OUR tab_id — a missing or foreign lock means another tab held the world
+   * while we were parked (its writes bypassed our caches), so the caches
+   * cannot be trusted: the caller must close() and re-open cold. External
+   * (non-atlas) file edits made while parked are missed until a real
+   * reopen — the same posture close/open always had for edits made while a
+   * world sat inactive in the sidebar, now with a longer window.
+   */
+  async unpark(): Promise<boolean> {
+    if (!this.root) return false;
+    try {
+      const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
+      const lock = await readJson<LockPayload>(atlasDir, LOCK_FILE);
+      if (!lock || lock.tab_id !== this.tabId) return false;
+      await writeJsonAtomic(atlasDir, LOCK_FILE, { ...lock, last_heartbeat: this.clock() });
+    } catch {
+      return false;
+    }
+    if (!this.opts.disableHeartbeat && !this.heartbeatTimer) {
+      this.heartbeatTimer = setInterval(() => {
+        this.refreshHeartbeat().catch(err => console.warn('[fs-folder-store] heartbeat:', err));
+      }, LOCK_HEARTBEAT_MS);
+    }
+    return true;
   }
 
   // ---- Layout setup + lock ----
@@ -298,17 +407,62 @@ export class FsFolderStore implements FolderStore {
    *   `<slug>--<tail>` form (legacy full-uuid files, hand-renamed files) is
    *   rewritten to the canonical name, once per type per open.
    */
-  private async ensureIndexFor(type: ElementType): Promise<void> {
-    if (this.indexedTypes.has(type)) return;
+  private ensureIndexFor(type: ElementType): Promise<void> {
+    if (this.indexedTypes.has(type)) return Promise.resolve();
+    // In-flight guard: type indexes build CONCURRENTLY across types (speed
+    // bout), so two callers racing the same type must share one build — a
+    // duplicated build would run the tidy pass twice over the same dir.
+    // Progress reporting rides the store-level indexTick listener, so it
+    // survives regardless of which caller started the build.
+    const inFlight = this.indexBuilds.get(type);
+    if (inFlight) return inFlight;
+    const build = this.buildIndexFor(type).finally(() => { this.indexBuilds.delete(type); });
+    this.indexBuilds.set(type, build);
+    return build;
+  }
+
+  private async buildIndexFor(type: ElementType): Promise<void> {
     const dir = await tryGetDir(this.requireRoot(), elementDirSegments(type));
     if (!dir) { this.indexedTypes.add(type); return; }
-    const files = await listFiles(dir);
+    // Read pass (speed bout, 2026-07-19): ONE directory enumeration collects
+    // file handles (no per-file getFileHandle round-trip), then bounded-
+    // concurrency workers read + parse. 1500 serialized awaits used to
+    // dominate first-open wall-time; results land at their file's index so
+    // the grouping below stays order-deterministic.
+    const files: Array<{ name: string; handle: FileSystemFileHandle }> = [];
+    for await (const entry of (dir as unknown as { values(): AsyncIterable<FileSystemHandle> }).values()) {
+      if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+        files.push({ name: entry.name, handle: entry as FileSystemFileHandle });
+      }
+    }
+    files.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
     type Rec = { filename: string; body: Element };
+    const bodies: Array<Element | null> = new Array(files.length);
+    let cursor = 0;
+    const readWorker = async () => {
+      while (cursor < files.length) {
+        const i = cursor++;
+        try {
+          const file = await files[i].handle.getFile();
+          bodies[i] = JSON.parse(await file.text()) as Element;
+        } catch {
+          bodies[i] = null; // unreadable/corrupt — same null contract as readJson
+        }
+        this.indexTick?.();
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(INDEX_READ_CONCURRENCY, files.length) }, readWorker));
+    // ZOMBIE GUARD (close-gate finding, 2026-07-19): the store may have been
+    // closed mid-read (rapid world switch closes the prior store without
+    // awaiting builds). The captured dir handle keeps working after close,
+    // so without this bail the build would repopulate the cleared maps and
+    // run tidy WRITES on a folder whose lock was already released.
+    if (!this.root) return;
     const grouped = new Map<string, Rec[]>();
     const unreadable = new Set<string>();
-    for (const filename of files) {
-      if (!filename.endsWith('.json')) continue;
-      const body = await readJson<Element>(dir, filename);
+    for (let i = 0; i < files.length; i++) {
+      const filename = files[i].name;
+      const body = bodies[i];
       if (!body || typeof body.id !== 'string' || !body.id) {
         unreadable.add(filename);
         console.warn(`[fs-folder-store] index(${type}): skipping unreadable/id-less file ${filename}`);
@@ -322,6 +476,7 @@ export class FsFolderStore implements FolderStore {
     // same-named stranger can never be a "loser"), building the survivor set.
     const survivors = new Map<string, Rec>();
     for (const [id, recs] of grouped) {
+      if (!this.root) return; // closed mid-dedupe — stop unlinking losers
       recs.sort((a, b) =>
         (a.body.local_updated_at ?? '') < (b.body.local_updated_at ?? '') ? 1
         : (a.body.local_updated_at ?? '') > (b.body.local_updated_at ?? '') ? -1 : 0);
@@ -335,58 +490,102 @@ export class FsFolderStore implements FolderStore {
       survivors.set(id, survivor);
     }
 
-    // FULL occupancy view before any tidy write (gate finding, 2026-07-03,
-    // 3-lens convergent): the tidy target must never be a name ANY other
-    // survivor currently holds — checking only already-processed ids lets an
-    // early id overwrite a later sibling's live file, then lose its own.
-    // Keys are LOWERCASED: case-folding filesystems (NTFS/APFS) treat case
-    // variants as the same physical entry, and OPFS-based tests can't see
-    // that — so equivalence is by lowercase throughout.
-    const occupied = new Map<string, string>(); // lc(filename) → id
+    // Index + cache from the files AS THEY ARE — filenames are presentation,
+    // the body id is identity, so nothing about serving needs canonical
+    // names. The convergence tidy is DEFERRED to a background pass (below):
+    // inline it blocked the open path for its whole rename run — a foreign
+    // folder with 1,600 non-canonical names froze activation for a minute+
+    // on slow/synced disks (Captain's live find, 2026-07-19).
     for (const [id, rec] of survivors) {
-      if (!occupied.has(rec.filename.toLowerCase())) occupied.set(rec.filename.toLowerCase(), id);
-    }
-    const unreadableLc = new Set([...unreadable].map(n => n.toLowerCase()));
-    const isFree = (candidate: string, forId: string): boolean => {
-      const lc = candidate.toLowerCase();
-      const owner = occupied.get(lc);
-      return (owner === undefined || owner === forId) && !unreadableLc.has(lc);
-    };
-
-    // Converge toward the short canonical form, id-sorted so which of two
-    // colliding ids keeps the short name is DETERMINISTIC (lower id wins) —
-    // two machines produce the same layout from the same world data.
-    let tidied = 0;
-    for (const id of [...survivors.keys()].sort()) {
-      const survivor = survivors.get(id)!;
-      const filename = survivor.filename;
-      const short = elementFilename(id, survivor.body.name);
-      const fullForm = elementFilenameFullId(id, survivor.body.name);
-      // Pick the target: short when free; a file already on the full-id
-      // fallback keeps it while the short form is taken (and converges once
-      // the collision clears — the one sanctioned sibling-dependent rename).
-      const target = isFree(short, id) ? short
-        : sameFsName(filename, fullForm) || isFree(fullForm, id) ? fullForm
-        : filename; // both forms taken (pathological) — leave the file alone
-      if (!sameFsName(filename, target)) {
-        // Distinct entries by construction (target is free, and lc-equality
-        // was excluded above), so write-new + remove-old cannot self-delete
-        // on a case-folding filesystem.
-        await writeJsonAtomic(dir, target, survivor.body);
-        await removeFile(dir, filename).catch(() => {});
-        occupied.delete(filename.toLowerCase());
-        occupied.set(target.toLowerCase(), id);
-        survivor.filename = target;
-        tidied++;
-      } else {
-        occupied.set(filename.toLowerCase(), id);
-      }
-      this.fileIndex.set(id, { type, filename: survivor.filename });
-    }
-    if (tidied > 0) {
-      console.info(`[fs-folder-store] tidy(${type}): ${tidied} file(s) renamed to canonical form`);
+      this.fileIndex.set(id, { type, filename: rec.filename });
+      // The index pass owns these freshly-parsed bodies outright — cache
+      // them without a clone (serve-side clones protect them from callers).
+      this.bodyCache.set(id, rec.body);
     }
     this.indexedTypes.add(type);
+    this.scheduleTidy(type, dir, new Set([...unreadable].map(n => n.toLowerCase())));
+  }
+
+  /**
+   * Background filename-convergence pass (the S246 lazy tidy, deferred OUT
+   * of the open path 2026-07-19). Same contract as always: FULL occupancy
+   * view before any write, lowercase equivalence (case-folding
+   * filesystems), id-sorted so two machines converge identically, full-id
+   * fallback when the short form is taken. New here: each rename rides the
+   * per-id write chain, so a user edit landing mid-tidy serializes instead
+   * of racing the write-new/remove-old pair; and every step re-checks
+   * `this.root`, so a closed store stops writing immediately.
+   */
+  private scheduleTidy(type: ElementType, dir: FileSystemDirectoryHandle, unreadableLc: Set<string>): void {
+    const run = (async () => {
+      await new Promise(r => setTimeout(r, 0)); // yield: never blocks the open
+      {
+        if (!this.root) return;
+        // Occupancy from the LIVE index (user writes may have landed since
+        // the build): lc(filename) → id, this type only.
+        const ids: string[] = [];
+        const occupied = new Map<string, string>();
+        for (const [id, entry] of this.fileIndex) {
+          if (entry.type !== type) continue;
+          ids.push(id);
+          if (!occupied.has(entry.filename.toLowerCase())) occupied.set(entry.filename.toLowerCase(), id);
+        }
+        const isFree = (candidate: string, forId: string): boolean => {
+          const lc = candidate.toLowerCase();
+          const owner = occupied.get(lc);
+          return (owner === undefined || owner === forId) && !unreadableLc.has(lc);
+        };
+        let tidied = 0;
+        for (const id of ids.sort()) {
+          if (!this.root) return;
+          await this.writeChain.run(id, async () => {
+            if (!this.root) return;
+            const entry = this.fileIndex.get(id);
+            const body = this.bodyCache.get(id);
+            if (!entry || entry.type !== type || !body) return; // deleted meanwhile
+            const filename = entry.filename;
+            const short = elementFilename(id, body.name);
+            const fullForm = elementFilenameFullId(id, body.name);
+            const target = isFree(short, id) ? short
+              : sameFsName(filename, fullForm) || isFree(fullForm, id) ? fullForm
+              : filename; // both forms taken (pathological) — leave it alone
+            if (sameFsName(filename, target)) {
+              occupied.set(filename.toLowerCase(), id);
+              return;
+            }
+            // Distinct entries by construction (target is free, lc-equality
+            // excluded), so write-new + remove-old cannot self-delete on a
+            // case-folding filesystem.
+            await writeJsonAtomic(dir, target, body);
+            await removeFile(dir, filename).catch(() => {});
+            occupied.delete(filename.toLowerCase());
+            occupied.set(target.toLowerCase(), id);
+            this.fileIndex.set(id, { type, filename: target });
+            tidied++;
+          }).catch(err => console.warn(`[fs-folder-store] tidy(${type}) skipped ${id}:`, err));
+        }
+        if (tidied > 0) {
+          console.info(`[fs-folder-store] tidy(${type}): ${tidied} file(s) renamed to canonical form (background)`);
+        }
+      }
+    })();
+    this.pendingTidies.add(run);
+    void run.catch(() => {}).finally(() => this.pendingTidies.delete(run));
+  }
+
+  /** Resolve when all background tidy passes settle (tests + shutdown). */
+  async awaitTidies(): Promise<void> {
+    while (this.pendingTidies.size > 0) {
+      await Promise.all([...this.pendingTidies]).catch(() => {});
+    }
+  }
+
+  /** Cheap .json count for a not-yet-indexed type dir (progress totals). */
+  private async countPendingFiles(type: ElementType): Promise<number> {
+    if (this.indexedTypes.has(type)) return 0;
+    const dir = await tryGetDir(this.requireRoot(), elementDirSegments(type));
+    if (!dir) return 0;
+    return (await listFiles(dir)).filter(f => f.endsWith('.json')).length;
   }
 
   /**
@@ -437,19 +636,58 @@ export class FsFolderStore implements FolderStore {
 
   // ---- Elements (unified content + spatial) ----
 
-  async listElements(type?: ElementType): Promise<Element[]> {
+  async listElements(type?: ElementType, opts?: ListElementsOptions): Promise<Element[]> {
     const types = type ? [type] : (ALL_ELEMENT_TYPES as readonly ElementType[]);
-    const out: Element[] = [];
-    for (const t of types) {
-      await this.ensureIndexFor(t);
-      const dir = await tryGetDir(this.requireRoot(), elementDirSegments(t));
+    // Progress plumbing (speed bout): totals come from a cheap pre-count of
+    // pending dirs (directory enumeration only, no parse) so the caller can
+    // show "N of M" while the expensive body reads run.
+    const onProgress = opts?.onProgress;
+    const pending = types.filter(t => !this.indexedTypes.has(t));
+    if (onProgress && pending.length > 0) {
+      const counts = await Promise.all(pending.map(t => this.countPendingFiles(t)));
+      const total = counts.reduce((a, b) => a + b, 0);
+      let done = 0;
+      onProgress(0, total);
+      // Listen for every build's ticks — including builds another caller
+      // already started (done can end short of total then; it's a courtesy
+      // counter, the caller clears it on resolve).
+      const tick = () => onProgress(++done, total);
+      this.indexTick = tick;
+      try {
+        await Promise.all(pending.map(t => this.ensureIndexFor(t)));
+      } finally {
+        // Only clear our OWN listener — a concurrent progress caller may
+        // have replaced it, and nulling theirs would freeze their counter
+        // (close-gate finding, 2026-07-19).
+        if (this.indexTick === tick) this.indexTick = null;
+      }
+    } else {
+      await Promise.all(types.map(t => this.ensureIndexFor(t)));
+    }
+    // Serve from the body cache in one pass over the index, bucketed so the
+    // result keeps the historical grouped-by-type order. Misses (shouldn't
+    // happen; resilience only) fall back to a disk read and re-warm.
+    const buckets = new Map<ElementType, Element[]>();
+    for (const t of types) buckets.set(t, []);
+    const misses: Array<{ id: string; type: ElementType; filename: string }> = [];
+    for (const [id, entry] of this.fileIndex) {
+      const bucket = buckets.get(entry.type);
+      if (!bucket) continue;
+      const body = this.bodyCache.get(id);
+      if (body) bucket.push(structuredClone(body));
+      else misses.push({ id, type: entry.type, filename: entry.filename });
+    }
+    for (const miss of misses) {
+      const dir = await tryGetDir(this.requireRoot(), elementDirSegments(miss.type));
       if (!dir) continue;
-      for (const [, entry] of this.fileIndex) {
-        if (entry.type !== t) continue;
-        const elem = await readJson<Element>(dir, entry.filename);
-        if (elem) out.push(elem);
+      const elem = await readJson<Element>(dir, miss.filename);
+      if (elem) {
+        this.bodyCache.set(miss.id, elem);
+        buckets.get(miss.type)!.push(structuredClone(elem));
       }
     }
+    const out: Element[] = [];
+    for (const t of types) out.push(...buckets.get(t)!);
     return out;
   }
 
@@ -468,14 +706,19 @@ export class FsFolderStore implements FolderStore {
       }
     }
     if (!entry) return null;
+    const cached = this.bodyCache.get(id);
+    if (cached) return structuredClone(cached);
     const dir = await tryGetDir(this.requireRoot(), elementDirSegments(entry.type));
     if (!dir) return null;
     const elem = await readJson<Element>(dir, entry.filename);
     if (!elem) {
       // File vanished out from under us — drop the stale index entry.
       this.fileIndex.delete(id);
+      this.bodyCache.delete(id);
+      return null;
     }
-    return elem;
+    this.bodyCache.set(id, elem);
+    return structuredClone(elem);
   }
 
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
@@ -493,6 +736,7 @@ export class FsFolderStore implements FolderStore {
     const filename = this.resolveFilename(type, id, elem.name);
     await writeJsonAtomic(dir, filename, elem);
     this.setIndex(id, type, filename);
+    this.cacheSet(elem);
     return elem;
   }
 
@@ -545,6 +789,7 @@ export class FsFolderStore implements FolderStore {
     if (validElementFilenames(id, next.name).some(f => sameFsName(f, currentFilename))) {
       await writeJsonAtomic(dir, currentFilename, next);
       this.setIndex(id, type, currentFilename);
+      this.cacheSet(next);
       return;
     }
     // Name genuinely changed — write the new file first, then remove the old.
@@ -555,6 +800,7 @@ export class FsFolderStore implements FolderStore {
     const newFilename = this.resolveFilename(type, id, next.name);
     await writeJsonAtomic(dir, newFilename, next);
     this.setIndex(id, type, newFilename);
+    this.cacheSet(next);
     await removeFile(dir, currentFilename).catch(err => {
       console.warn(`[fs-folder-store] rename: failed to remove old file ${currentFilename}`, err);
     });
@@ -649,6 +895,7 @@ export class FsFolderStore implements FolderStore {
     const filename = entry?.filename ?? elementFilename(elem.id, elem.name);
     await removeFile(dir, filename);
     this.fileIndex.delete(elem.id);
+    this.bodyCache.delete(elem.id);
   }
 
   // ---- Spatial wrappers (typed accessors over the unified element store) ----
@@ -859,6 +1106,7 @@ export class FsFolderStore implements FolderStore {
       const filename = entry?.filename ?? elementFilename(id, existing.name);
       const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
       await writeJsonAtomic(dir, filename, next);
+      this.cacheSet(next);
     });
   }
 
@@ -871,6 +1119,7 @@ export class FsFolderStore implements FolderStore {
       const filename = entry?.filename ?? elementFilename(id, existing.name);
       const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
       await writeJsonAtomic(dir, filename, rest as Element);
+      this.cacheSet(rest as Element);
     });
   }
 
@@ -888,6 +1137,7 @@ export class FsFolderStore implements FolderStore {
       const filename = entry?.filename ?? elementFilename(elem.id, elem.name);
       const dir = await getDir(this.requireRoot(), elementDirSegments(elem.type));
       await writeJsonAtomic(dir, filename, rest as Element);
+      this.cacheSet(rest as Element);
       cleared++;
     }
     // 2. Drop every tombstone — they target ids on the now-defunct api world.

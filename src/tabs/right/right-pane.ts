@@ -22,7 +22,7 @@ import { mountContextTab } from './context-tab';
 import { mapTabCache } from './map-tab-cache';
 import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map-visual-settings-popover';
 import { navigate, parseHash, worldHash, elementHash } from '../../core/router';
-import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount } from '../../sync/sync-attach';
+import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount, diagnoseSyncUnavailable } from '../../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../../ui/sync-toasts';
 import { ConflictReviewModal } from '../../ui/conflict-review-modal';
 import { savePersistedRightTabs } from './right-tabs-persistence';
@@ -476,6 +476,17 @@ function mapEngineStateToPill(
   engine: ReturnType<typeof getState>['sync']['activeSync']
 ): { dataState: string; label: string; title: string } {
   if (!engine) {
+    // No engine state — distinguish "still spinning up" from "can never
+    // spin up" (Captain's find, 2026-07-19: a linked world with no PIN
+    // said 'engine starting up' forever). diagnoseSyncUnavailable knows.
+    const reason = diagnoseSyncUnavailable();
+    if (reason?.kind === 'pin-missing') {
+      return {
+        dataState: 'error',
+        label: 'No PIN',
+        title: 'This world is linked but cannot sync: no PIN is set. Add your PIN in Settings, then reopen the world.',
+      };
+    }
     return {
       dataState: 'api',
       label: 'Linked',

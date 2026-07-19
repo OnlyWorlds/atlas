@@ -26,6 +26,17 @@ import type {
 } from '../core/types';
 import type { ChartConfig } from '../visualization/timeline/types';
 
+/**
+ * Options for listElements. `onProgress(done, total)` fires per file during a
+ * COLD index build (the expensive disk walk) so callers can render a real
+ * loading count; warm calls (cache-served) never fire it. Total is the raw
+ * .json file count, so it can slightly overshoot the returned element count
+ * (unreadable files, crash-twin dedupe) — treat it as a ceiling, not a promise.
+ */
+export interface ListElementsOptions {
+  onProgress?: (done: number, total: number) => void;
+}
+
 export interface FolderStore {
   // ---- Lifecycle ----
 
@@ -53,7 +64,7 @@ export interface FolderStore {
 
   // ---- Content elements ----
 
-  listElements(type?: ElementType): Promise<Element[]>;
+  listElements(type?: ElementType, opts?: ListElementsOptions): Promise<Element[]>;
   getElement(id: string): Promise<Element | null>;
   /**
    * Create an element. FolderStore generates an id if not provided AND stamps

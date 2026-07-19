@@ -499,8 +499,11 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       // Empty ≠ loading: during activation the cache is priming from disk.
       // Empty world says nothing here — the pulsing + button and the home
       // onboarding tiles carry it (S255v3).
+      const progress = state.data.loadingProgress;
       const msg = state.data.loading
-        ? 'Opening world…'
+        ? (progress
+            ? `Opening world… ${progress.done.toLocaleString()} / ${progress.total.toLocaleString()}`
+            : 'Opening world…')
         : elements.length === 0
           ? ''
           : 'No elements match the current filter.';
@@ -621,12 +624,19 @@ function renderElementRow(
   const reservedBadge = reserved
     ? `<span class="material-symbols-outlined atlas-row-reserved" title="${escapeAttr(reserved)}">auto_awesome</span>`
     : '';
+  // Chronicle sparkle (2026-07-19): elements recorded from play (tangle
+  // battle Events, tropaion Objects, chronicle Narratives — supertype
+  // 'Chronicle' by the registered convention) carry a quiet mark.
+  const chronicleBadge = (el as { supertype?: unknown }).supertype === 'Chronicle'
+    ? `<span class="material-symbols-outlined atlas-row-chronicle" title="A chronicle recorded from play">swords</span>`
+    : '';
   return `
     <div class="${cls}" ${draggable} data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}"${flashAttr} role="button" tabindex="0">
       <span class="material-symbols-outlined">${icon}</span>
       <span class="atlas-row-main">${escapeText(el.name || '(unnamed)')}</span>
       ${mapBadge}
       ${onMapBadge}
+      ${chronicleBadge}
       ${reservedBadge}
       <span class="atlas-row-meta">${escapeText(el.type)}</span>
     </div>

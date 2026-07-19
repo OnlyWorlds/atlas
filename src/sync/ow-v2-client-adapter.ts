@@ -345,7 +345,11 @@ export class OwV2ClientAdapter implements OwApiClient {
     let complete = false;
 
     for (let page = 0; page < SAFETY_CAP_PAGES; page++) {
-      const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+      // limit=500 asks for the wire's max page (speed bout 2026-07-19); the
+      // server honors what it allows (currently caps at 250, S265 runbook)
+      // and silently ignores unknown params, so this can only shrink the
+      // round-trip count vs the default 100 — never break the walk.
+      const qs = `?limit=500${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
       const response = await this.request('GET', `/${type}${qs}`) as {
         data?: unknown[];
         has_more?: boolean;

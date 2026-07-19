@@ -88,6 +88,30 @@ describe('isWritingInitialized', () => {
     ];
     expect(isWritingInitialized(entry, elements)).toBe(true);
   });
+
+  it('a tangle chronicle record chain never trips setup (recorded artifacts, 2026-07-19)', () => {
+    const entry = { id: 'w', name: 'w', state: 'local-only' } as unknown as WorldRegistryEntry;
+    // The exact shape tangle's record writer mints: chronicle Narrative +
+    // Battle Story children chained via parent_narrative, all supertype
+    // 'Chronicle' — an unlabeled parent chain that used to hijack the room.
+    const elements = [
+      n('chron', 'The chronicle of the Two Rivers', { supertype: 'Chronicle' }),
+      n('s1', 'Lysandra at the Two Rivers', { supertype: 'Chronicle', parent_narrative: 'chron' }),
+      n('s2', 'Theron at the Two Rivers', { supertype: 'Chronicle', parent_narrative: 'chron' }),
+    ];
+    expect(isWritingInitialized(entry, elements)).toBe(true);
+  });
+
+  it('a chronicle chain beside a genuinely foreign chain still gates on the foreign one', () => {
+    const entry = { id: 'w', name: 'w', state: 'local-only' } as unknown as WorldRegistryEntry;
+    const elements = [
+      n('chron', 'Chronicle', { supertype: 'Chronicle' }),
+      n('s1', 'Story', { supertype: 'Chronicle', parent_narrative: 'chron' }),
+      n('tome', 'Tome A', { supertype: 'Tome' }), // foreign import, unlabeled tiers
+      n('part', 'Part 1', { supertype: 'Part', parent_narrative: 'tome' }),
+    ];
+    expect(isWritingInitialized(entry, elements)).toBe(false);
+  });
 });
 
 describe('buildPromoteCandidates', () => {

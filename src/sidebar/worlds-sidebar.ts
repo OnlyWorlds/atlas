@@ -18,7 +18,7 @@ import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused, deleteWorldE
 import { loadHandle, ensureWritable, queryWritable, deleteHandle } from '../store/handle-vault';
 import { FsFolderStore, ELockHeld } from '../store/folder-store-fs';
 import { CreateWorldModal } from '../ui/create-world-modal';
-import { setActiveStore, getActiveStore } from '../core/active-store';
+import { setActiveStore, getActiveStore, parkStore, takeParkedStore, evictParkedStore, awaitEviction } from '../core/active-store';
 import { LinkWorldModal } from '../ui/link-world-modal';
 import { escapeText, escapeAttr } from '../core/dom-utils';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
@@ -61,6 +61,10 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
         </button>
+        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="open-folder" title="Open an existing world folder from your disk (no copy, no download)">
+          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
+          <span class="material-symbols-outlined atlas-add-glyph-main">folder_open</span>
+        </button>
         <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="new-api" title="New API world (creates on onlyworlds.com AND locally)">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">cloud_upload</span>
@@ -99,6 +103,39 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       void import('../ui/view-world-modal').then(({ ViewWorldModal }) => {
         new ViewWorldModal(toasts).open();
       });
+    });
+    const openFolderBtn = header.querySelector<HTMLButtonElement>('[data-action="open-folder"]');
+    openFolderBtn?.addEventListener('click', () => {
+      void (async () => {
+        let picked: FileSystemDirectoryHandle;
+        try {
+          picked = await (window as unknown as { showDirectoryPicker(opts?: { mode?: string }): Promise<FileSystemDirectoryHandle> })
+            .showDirectoryPicker({ mode: 'readwrite' });
+        } catch { return; } // user cancelled the picker
+        try {
+          const { openWorldFolder } = await import('../setup/atlas-root-flow');
+          const { worldId, already } = await openWorldFolder(picked);
+          if (already) toasts.info('That world is already in atlas — opening it');
+          else toasts.success(`Opened "${picked.name}" in place — the folder stays where it is`);
+          const ok = await activateWorld(worldId, toasts);
+          // Rollback a JUST-registered folder whose first open failed
+          // (read-only media, dead handle) so it doesn't sit permanently
+          // unopenable in the sidebar (close-gate LOW). Guarded against the
+          // supersede case: never roll back a world that became active.
+          if (!ok && !already && getState().active?.worldId !== worldId) {
+            const entry = getState().registry.worlds.find(w => w.id === worldId);
+            if (entry) {
+              await deleteHandle(entry.folder.handle_key).catch(() => {});
+              const cleaned = deleteWorldEntry(getState().registry, worldId);
+              saveRegistry(cleaned);
+              patchSlice('registry', cleaned);
+              toasts.info('Removed the folder from the list — it could not be opened');
+            }
+          }
+        } catch (err) {
+          toasts.error(err instanceof Error ? err.message : String(err));
+        }
+      })();
     });
 
     // Hover trail (S255v2): hovering a create button paints its explanation
@@ -507,7 +544,7 @@ async function doActivateWorld(
   if (!preserveSelection) {
     // loading:true — the cache is about to be primed async; empty ≠ loading
     // (the misleading empty-home flash, 2026-07-10).
-    patchSlice('data', { elements: [], loading: true });
+    patchSlice('data', { elements: [], loading: true, loadingProgress: null });
     // knowledgeLens + castAssign cleared too — both reference the OLD world.
     patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, castAssign: null });
     const currentRoute = parseHash(window.location.hash);
@@ -544,7 +581,7 @@ async function doActivateWorld(
       }
     }
   } else {
-    patchSlice('data', { ...getState().data, loading: true });
+    patchSlice('data', { ...getState().data, loading: true, loadingProgress: null });
   }
 
   const handle = await loadHandle(entry.folder.handle_key);
@@ -562,22 +599,49 @@ async function doActivateWorld(
     return false;
   }
 
-  // Close prior active store if any.
+  // PARK the prior store instead of closing it (speed bout, 2026-07-19):
+  // heartbeat stops, caches + lock stay — switching back revives it without
+  // re-walking the folder. Falls back to close when we can't name it.
   const prior = getActiveStore();
-  if (prior) await prior.close().catch(() => {});
+  if (prior) {
+    const priorWorldId = getState().active?.worldId ?? null;
+    if (priorWorldId && priorWorldId !== worldId) parkStore(priorWorldId, prior);
+    else await prior.close().catch(() => {});
+  }
   // World switch: drop scroll memory so stale element ids from the previous
   // world don't survive into this one.
   resetElementDetailScrollMemory();
 
-  let store = new FsFolderStore();
+  // Revive a parked store when its lock is still ours; a missing/foreign
+  // lock means another tab held the world — close and re-open cold.
+  let store: FsFolderStore;
+  let revived = false;
+  const parked = takeParkedStore(worldId);
+  if (parked) {
+    if (await parked.unpark()) {
+      store = parked;
+      revived = true;
+    } else {
+      await parked.close().catch(() => {});
+      store = new FsFolderStore();
+    }
+  } else {
+    store = new FsFolderStore();
+  }
   try {
-    await store.open(handle);
+    if (!revived) {
+      // A just-evicted parked store's async close may still be deleting the
+      // lock file — opening before it finishes would race our fresh claim.
+      await awaitEviction(worldId);
+      await store.open(handle);
+    }
   } catch (err) {
     // Folder gone from disk (user deleted it outside atlas). The handle in
     // IDB is now a dead reference — clean up the registry entry + handle so
     // the world stops appearing in the sidebar. No data loss: the folder is
     // already gone; we're just removing the pointer to it.
     if (isFolderMissing(err)) {
+      evictParkedStore(worldId);
       await deleteHandle(entry.folder.handle_key).catch(() => {});
       const cleaned = deleteWorldEntry(getState().registry, worldId);
       saveRegistry(cleaned);
@@ -625,24 +689,46 @@ async function doActivateWorld(
   patchSlice('registry', nextRegistry);
   patchSlice('active', { worldId, meta, opened: true });
 
-  // Prime the elements cache for this world.
+  // Prime the elements cache for this world. Cold opens report progress —
+  // throttled: every patchSlice re-renders subscribers, so per-file patches
+  // on a 1500-element walk would burn the win they're reporting on.
+  // SUPERSEDE GUARD (close-gate finding, 2026-07-19): if the user activates
+  // another world mid-walk, this store is closed and replaced — but the
+  // body-cache hit path can still resolve with THIS world's elements (it no
+  // longer touches root, so it can't throw the way the disk path did).
+  // Without the guard the slower world's resolve stomps the new world's
+  // state. Every patch below is gated on this store still being active.
+  const stillActive = () => getActiveStore() === store;
   try {
-    const elements = await store.listElements();
-    patchSlice('data', { elements, loading: false });
+    const elements = await store.listElements(undefined, {
+      onProgress: (done, total) => {
+        if (total < 100 || !stillActive()) return; // fast opens never flash a counter
+        // Count-based throttle (not time): parallel FS reads resolve in
+        // bursts, so time windows can swallow the whole spread. Every 100
+        // files = ≤ ~15 renders on the biggest worlds, evenly spaced by work.
+        if (done % 100 !== 0 && done !== total && done !== 0) return;
+        patchSlice('data', { ...getState().data, loadingProgress: { done, total } });
+      },
+    });
+    if (stillActive()) patchSlice('data', { elements, loading: false, loadingProgress: null });
   } catch (err) {
     console.warn('[worlds-sidebar] failed to prime elements:', err);
-    patchSlice('data', { elements: [], loading: false });
+    if (stillActive()) patchSlice('data', { elements: [], loading: false, loadingProgress: null });
   }
+  if (!stillActive()) return true; // superseded — the newer activation owns state now
   // Orphan-snapshot recovery (Captain smoke session 219): if the user
   // refreshed the page mid-zone-edit, the in-flight snapshot persisted to
   // localStorage. Replay revert via 3-way diff before sync engine attaches
   // so the autosave that fires on the diff doesn't fight with a fresh pull.
   try {
     const { recoverFromOrphanSnapshot } = await import('../tabs/right/zone-edit-mode');
-    await recoverFromOrphanSnapshot(worldId, toasts);
-    // Re-prime elements after revert so UI reflects the rollback.
-    const fresh = await store.listElements();
-    patchSlice('data', { elements: fresh });
+    const recovered = await recoverFromOrphanSnapshot(worldId, toasts);
+    if (recovered) {
+      // Re-prime elements after an ACTUAL revert so UI reflects the rollback
+      // (cheap now — the body cache absorbed the revert writes).
+      const fresh = await store.listElements();
+      patchSlice('data', { elements: fresh });
+    }
   } catch (err) {
     console.warn('[worlds-sidebar] orphan-snapshot recovery failed:', err);
   }

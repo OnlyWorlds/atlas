@@ -25,6 +25,7 @@ import { knownFieldsFor, type FieldMeta, type WidgetKind, type SectionLayout } f
 import { renderSection, humanizeFieldName } from './element-detail-fields';
 import { customFieldNameSuggestions } from '../core/taxonomy';
 import { toastManager } from '../ui/toast-manager';
+import { TANGLE_CARD_RENDERERS } from './tangle-cards';
 
 const SECTION_NAME = 'Custom fields';
 const MAX_FIELD_NAME_LEN = 60;
@@ -36,13 +37,32 @@ const MAX_FIELD_NAME_LEN = 60;
  */
 let pendingEdit: { elementId: string; fieldName: string } | null = null;
 
-/** Custom-field rows for an element: non-machinery extension keys, null = deleted (hidden). */
+/**
+ * Custom-field rows for an element: non-machinery extension keys, null =
+ * deleted (hidden). SCALAR values only — object/array values are STRUCTURED
+ * data written by other tools (tangle battle records, magelet sidecars) and
+ * must never render as an editable text row: `String(value)` shows
+ * "[object Object]" and one save destroys the structure (gate A13, the
+ * extension-edit hazard). Those render via structuredFieldEntriesFor.
+ */
 export function customFieldMetasFor(el: Element): FieldMeta[] {
   const out: FieldMeta[] = [];
   for (const [k, v] of Object.entries(el)) {
     if (!isCustomEditableField(k)) continue;
     if (v === null || v === undefined) continue;
+    if (typeof v === 'object') continue; // structured — read-only row below
     out.push({ name: k, widget: inferWidget(v) });
+  }
+  return out;
+}
+
+/** Object/array-valued extension fields: shown read-only, deletable, never editable. */
+export function structuredFieldEntriesFor(el: Element): Array<{ name: string; value: unknown }> {
+  const out: Array<{ name: string; value: unknown }> = [];
+  for (const [k, v] of Object.entries(el)) {
+    if (!isCustomEditableField(k)) continue;
+    if (v === null || v === undefined || typeof v !== 'object') continue;
+    out.push({ name: k, value: v });
   }
   return out;
 }
@@ -116,7 +136,53 @@ export function buildCustomFieldsSection(el: Element): HTMLElement {
 
   // The add row lives inside the section body (collapsed section hides it too).
   const body = section.querySelector<HTMLElement>('.atlas-detail-section-body');
-  if (body) body.appendChild(buildAddRow(el));
+  if (body) {
+    // Structured (object/array) extension fields: read-only rows ABOVE the
+    // add row. Label + pretty JSON in a quiet mono block; deletable with the
+    // same confirm as scalar rows, never editable (the destruction class).
+    for (const entry of structuredFieldEntriesFor(el)) {
+      // Known tool records get a real card (tangle battles, tropaia) —
+      // still read-only, still deletable below via the same confirmed ×.
+      const renderCard = TANGLE_CARD_RENDERERS[entry.name];
+      const cardEl = renderCard ? renderCard(entry.value) : null;
+      if (cardEl) {
+        const wrap = document.createElement('div');
+        wrap.className = 'atlas-custom-structured-row atlas-custom-structured-card';
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'atlas-custom-structured-remove';
+        del.title = `Remove ${humanizeFieldName(entry.name)} from this element`;
+        del.textContent = '×';
+        del.addEventListener('click', () => { void removeField(el, entry.name, { alwaysConfirm: true }); });
+        wrap.appendChild(del);
+        wrap.appendChild(cardEl);
+        body.appendChild(wrap);
+        continue;
+      }
+      const row = document.createElement('div');
+      row.className = 'atlas-custom-structured-row';
+      const label = document.createElement('div');
+      label.className = 'atlas-custom-structured-label';
+      label.textContent = humanizeFieldName(entry.name);
+      label.title = `${entry.name} — structured data written by another tool. Atlas shows it read-only so it can't be damaged here.`;
+      const pre = document.createElement('pre');
+      pre.className = 'atlas-custom-structured-value';
+      let text: string;
+      try { text = JSON.stringify(entry.value, null, 2); } catch { text = String(entry.value); }
+      pre.textContent = text;
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'atlas-custom-structured-remove';
+      del.title = `Remove ${humanizeFieldName(entry.name)} from this element`;
+      del.textContent = '×';
+      del.addEventListener('click', () => { void removeField(el, entry.name, { alwaysConfirm: true }); });
+      row.appendChild(label);
+      row.appendChild(del);
+      row.appendChild(pre);
+      body.appendChild(row);
+    }
+    body.appendChild(buildAddRow(el));
+  }
 
   // Add-flow continuation: open the value editor on the just-created row.
   // Timing matters: element-detail restores the pane's scrollTop in a
@@ -138,9 +204,13 @@ export function buildCustomFieldsSection(el: Element): HTMLElement {
   return section;
 }
 
-async function removeField(el: Element, fieldName: string): Promise<void> {
+async function removeField(el: Element, fieldName: string, opts?: { alwaysConfirm?: boolean }): Promise<void> {
   const value = (el as Record<string, unknown>)[fieldName];
-  if (isPopulatedCustomValue(value)) {
+  // alwaysConfirm: structured (object) values return FALSE from
+  // isPopulatedCustomValue, which silently skipped the confirm on exactly
+  // the data the read-only row exists to protect (close-gate BLOCKER,
+  // 2026-07-19). The structured × passes it explicitly.
+  if (isPopulatedCustomValue(value) || opts?.alwaysConfirm) {
     const ok = window.confirm(`Remove "${humanizeFieldName(fieldName)}" and its value from this element?`);
     if (!ok) return;
   }
