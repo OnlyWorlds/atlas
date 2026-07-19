@@ -925,7 +925,9 @@ html {
 .atlas-filter-btn .atlas-filter-count {
   position: absolute;
   top: -4px;
-  right: -4px;
+  /* -2px keeps the badge inside the 2px strip gap — at -4px it sat on the
+     NEIGHBOR's active border (Captain's launch-day sshot) */
+  right: -2px;
   padding: 1px;
   font-size: 8px;
   font-weight: 600;
@@ -1555,6 +1557,43 @@ html {
   color: rgba(255, 255, 255, 0.30);
   font-size: 10px;
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+/* Character war record — recorded battles as a service-record strip
+   (element-detail-war-record.ts, 2026-07-19). */
+/* Header-scoped so the section-header's generic icon color loses the
+   specificity race (it did — the swords rendered white at one class deep). */
+.atlas-detail-section-header .atlas-war-record-swords {
+  font-size: 14px;
+  color: rgba(34, 211, 238, 0.75);
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+.atlas-war-record-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.atlas-war-record-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.atlas-war-record-name {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+}
+.atlas-war-record-date {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.atlas-war-record-outcome {
+  color: rgba(34, 211, 238, 0.55);
+  font-size: 10.5px;
+  margin-left: auto;
 }
 
 /* Chronicle sparkle — sidebar rows for elements recorded from play. */
@@ -2251,6 +2290,25 @@ html {
 .atlas-map-canvas-container.leaflet-container,
 .atlas-map-canvas-container.leaflet-grab {
   cursor: default !important;
+}
+
+/* First-open decode hint for URL-sourced map images (2026-07-19). The
+   container is the leaflet root (position: relative via leaflet.css);
+   z-index clears leaflet panes (~400) and controls (~1000). */
+.atlas-map-loading-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1100;
+  padding: 6px 14px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--atlas-text-muted);
+  font-size: 12px;
+  pointer-events: none;
 }
 
 /* Preserve grabbing affordance DURING an active pan. Leaflet adds
@@ -3641,6 +3699,12 @@ html {
 }
 
 .atlas-settings-debounce-input {
+  width: 80px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Settings → Maps: small numeric inputs in the defaults editor (2026-07-19). */
+.atlas-settings-num-input {
   width: 80px;
   font-variant-numeric: tabular-nums;
 }

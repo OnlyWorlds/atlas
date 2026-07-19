@@ -103,7 +103,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'connect your OnlyWorlds account for sync and publishing',
       'choose how sync behaves, or keep a world fully local',
       'rename the writing tiers',
-      'tune editing and context-pane behavior',
+      'tune editing and web-pane behavior',
     ],
   },
 };

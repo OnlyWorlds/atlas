@@ -111,6 +111,10 @@ export function extractTemporalNodes(elements: Element[]): TimelineNode[] {
       // invented ongoing tenure), and the type means "runs until ended".
       openEnded: fields.openEnd === true && !endRecorded ? true : undefined,
       dateSpec: { kind: 'exact', value: startDate },
+      // Chronicle-supertype elements are recorded-from-play artifacts (the
+      // tangle seam); their dots carry the swords glyph the sidebar sparkle
+      // uses. Presentation-only — never persisted, not in the publish payload.
+      glyph: (el as Record<string, unknown>).supertype === 'Chronicle' ? 'swords' : undefined,
       color: ELEMENT_TYPE_COLORS[el.type as ElementType] ?? FALLBACK_COLOR,
       links: resolveLinks(el, byId),
       degree: 0, // filled below once every node exists (bidirectional read)

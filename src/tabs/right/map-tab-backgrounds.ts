@@ -77,7 +77,12 @@ export async function applyMapBackground(
     if (typeof map.width === 'number' && typeof map.height === 'number' && map.width > 0 && map.height > 0) {
       dims = { w: map.width, h: map.height };
     } else {
-      const decoded = await decodeImageDims(source.url);
+      // First-ever open of a URL-sourced map: the apply blocks on a full
+      // decode of the (possibly large, remote) image to learn its dims.
+      // Show an honest hint for that window — after this, width/height are
+      // persisted on the Map element and the decode never runs again.
+      const hint = showLoadingHint(container);
+      const decoded = await decodeImageDims(source.url).finally(hint.remove);
       dims = decoded ?? { w: defaultWidth, h: defaultHeight };
       if (decoded) {
         const store = getActiveStore();
@@ -132,6 +137,19 @@ export function refreshCachedBackgrounds(): void {
       applyMapBackground(entry, map, entry.manager.getConfig().canvasWidth, entry.manager.getConfig().canvasHeight)
     );
   }
+}
+
+/**
+ * Small centered "loading map image…" chip over the map container while a
+ * remote image decode is in flight. Self-removing; safe if the container
+ * unmounts first (remove() on a detached node is a no-op).
+ */
+function showLoadingHint(container: HTMLElement): { remove: () => void } {
+  const el = document.createElement('div');
+  el.className = 'atlas-map-loading-hint';
+  el.textContent = 'loading map image…';
+  container.appendChild(el);
+  return { remove: () => el.remove() };
 }
 
 async function decodeImageDims(url: string): Promise<{ w: number; h: number } | null> {

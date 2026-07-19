@@ -4,13 +4,14 @@
  * rail, last-tab restore, and dispatch to each tab's render/wire pair.
  *
  * ATLAS (tool-wide, apply to every world):
- *   account  — global PIN + email          → settings-account.ts
- *   storage  — atlas root folder + sync     → settings-storage.ts
- *   editing  — field-edit mode + maps       → settings-editing.ts
+ *   onlyworlds — account + waypoints + links → settings-onlyworlds.ts (+account.ts)
+ *   storage    — atlas root folder + sync    → settings-storage.ts
+ *   elements   — field-edit mode + display   → settings-elements.ts
+ *   maps       — affordances + view defaults → settings-maps.ts
  * THIS WORLD (follow the active world):
  *   world    — rename / online / delete     → settings-world.ts
  *   writing  — tier labels / font / spell   → settings-writing.ts
- *   context  — context-pane graph prefs     → settings-context.ts
+ *   context  — web-pane graph prefs         → settings-context.ts (labeled "Web")
  *
  * Route: `#/settings/:tab` or `#/w/<id>/settings/:tab` (default tab is account).
  * Legacy keys (identity/atlas/sync/maps/about) still resolve via router alias.
@@ -23,7 +24,8 @@ import { navigate, parseHash, settingsHash, SETTINGS_TABS, SETTINGS_TAB_GROUPS, 
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { renderOnlyWorldsTab, wireOnlyWorldsTab } from './settings-onlyworlds';
 import { renderStorageTab, wireStorageTab } from './settings-storage';
-import { renderEditingTab, wireEditingTab } from './settings-editing';
+import { renderElementsTab, wireElementsTab } from './settings-elements';
+import { renderMapsTab, wireMapsTab } from './settings-maps';
 import { renderWorldTab, wireWorldTab } from './settings-world';
 import { renderWritingTab, wireWritingTab } from './settings-writing';
 import { renderContextTab, wireContextTab } from './settings-context';
@@ -141,6 +143,9 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
 /** Tab display label — 'onlyworlds' is the brand name, the rest sentence-case. */
 function tabLabel(t: SettingsTab): string {
   if (t === 'onlyworlds') return 'OnlyWorlds';
+  // The right-pane graph tab is branded "Web" (2026-07-19); the settings tab
+  // id stays 'context' — label and machinery diverge deliberately.
+  if (t === 'context') return 'Web';
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
@@ -155,8 +160,10 @@ function renderTab(
       return renderOnlyWorldsTab(reg, activeWorld);
     case 'storage':
       return renderStorageTab(reg);
-    case 'editing':
-      return renderEditingTab(reg);
+    case 'elements':
+      return renderElementsTab();
+    case 'maps':
+      return renderMapsTab(reg);
     case 'world':
       return activeWorld ? renderWorldTab(activeWorld) : noWorld;
     case 'writing':
@@ -178,8 +185,11 @@ function wireTabHandlers(
     case 'storage':
       wireStorageTab(toasts);
       break;
-    case 'editing':
-      wireEditingTab(toasts);
+    case 'elements':
+      wireElementsTab(toasts);
+      break;
+    case 'maps':
+      wireMapsTab(toasts);
       break;
     case 'world':
       if (activeWorld) wireWorldTab(activeWorld, toasts);

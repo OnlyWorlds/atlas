@@ -159,3 +159,70 @@ test('object-valued extension fields render read-only, never as an editable row'
   // Chronicle sparkle: the sidebar row carries the quiet recorded-from-play mark.
   await expect(page.locator(`.atlas-row[data-element-id="${elementId}"] .atlas-row-chronicle`)).toHaveCount(1);
 });
+
+test('character war record lists recorded battles chronologically; absent without battles', async ({ page }) => {
+  await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    api.setNextDirectory(root);
+  });
+  await page.click('[data-action="setup-atlas"]');
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'Warville');
+  await page.click('[data-action="pick"]');
+  await page.waitForFunction(() => window.__atlasTestApi.getState().active?.opened);
+
+  const ids = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const store = api.getActiveStore();
+    const veteran = await store.createElement('character', { name: 'Lysandra' });
+    const civilian = await store.createElement('character', { name: 'Homebody' });
+    // Later battle created FIRST — the strip must sort by date, not creation.
+    const later = await store.createElement('event', {
+      name: 'Second Ford', supertype: 'Chronicle', subtype: 'Battle',
+      characters: [veteran.id], start_date: 320,
+    });
+    const earlier = await store.createElement('event', {
+      name: 'First Ford', supertype: 'Chronicle', subtype: 'Battle',
+      characters: [veteran.id], start_date: 300,
+      x_tangle_battle: {
+        engineVersion: '1.0', seed: 1, durationSeconds: 60, winner: 'Left',
+        sides: [{ name: 'Left', fallen: 1 }, { name: 'Right', fallen: 2 }],
+        units: [],
+      },
+    });
+    // A non-battle chronicle event must NOT enter the record.
+    await store.createElement('event', {
+      name: 'Not A Battle', supertype: 'Chronicle', subtype: 'Festival',
+      characters: [veteran.id], start_date: 310,
+    });
+    api.patchData(await store.listElements());
+    return { veteran: veteran.id, civilian: civilian.id, earlier: earlier.id, later: later.id };
+  });
+
+  await page.evaluate((id) => {
+    const wid = window.__atlasTestApi.getState().active.worldId;
+    window.location.hash = `#/w/${wid}/element/${id}`;
+  }, ids.veteran);
+
+  const section = page.locator('.atlas-war-record');
+  await expect(section).toHaveCount(1);
+  const rows = section.locator('.atlas-war-record-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0).locator('.atlas-war-record-name')).toHaveText('First Ford');
+  await expect(rows.nth(0).locator('.atlas-war-record-date')).toHaveText('300');
+  await expect(rows.nth(0).locator('.atlas-war-record-outcome')).toHaveText('Left held the field');
+  await expect(rows.nth(1).locator('.atlas-war-record-name')).toHaveText('Second Ford');
+
+  // Clicking a row opens the battle event.
+  await rows.nth(0).click();
+  await page.waitForFunction((eid) => window.location.hash.includes(`/element/${eid}`), ids.earlier);
+
+  // A character with no recorded battles gets no section.
+  await page.evaluate((id) => {
+    const wid = window.__atlasTestApi.getState().active.worldId;
+    window.location.hash = `#/w/${wid}/element/${id}`;
+  }, ids.civilian);
+  await expect(page.locator('.atlas-middle-header h2')).toContainText('Homebody');
+  await expect(page.locator('.atlas-war-record')).toHaveCount(0);
+});

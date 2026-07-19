@@ -16,9 +16,9 @@ export function renderContextTab(entry: WorldRegistryEntry): string {
   const edgeColorOn = entry.context_edge_color === true;
   return `
     <section class="atlas-settings-section">
-      <h3>Context pane</h3>
+      <h3>Web pane</h3>
       <p class="atlas-settings-hint">
-        Preferences for the right-pane Context tab: the graph + element preview
+        Preferences for the right-pane Web tab: the graph + element preview
         / cast lists. Per-world. The same toolbar controls live above the graph
         and write to the same settings.
       </p>
@@ -77,12 +77,12 @@ export function wireContextTab(entry: WorldRegistryEntry, toasts: ToastManager):
     else if (raw === '3') next = 3;
     else if (raw === '4') next = 4;
     else next = undefined;
-    commit({ context_hop_depth: next }, `Context hop set to ${next === undefined ? 'auto' : `${next}-hop`}`);
+    commit({ context_hop_depth: next }, `Web hop set to ${next === undefined ? 'auto' : `${next}-hop`}`);
   });
 
   const lockCb = document.querySelector<HTMLInputElement>(`.atlas-settings input[data-setting="context_lock_layout"]`);
   lockCb?.addEventListener('change', () => {
-    commit({ context_lock_layout: lockCb.checked }, `Context layout ${lockCb.checked ? 'locked' : 'free'}`);
+    commit({ context_lock_layout: lockCb.checked }, `Web layout ${lockCb.checked ? 'locked' : 'free'}`);
   });
 
   const colorCb = document.querySelector<HTMLInputElement>(`.atlas-settings input[data-setting="context_edge_color"]`);

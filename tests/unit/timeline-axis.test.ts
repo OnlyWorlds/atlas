@@ -105,6 +105,30 @@ describe('timeline data-normalizer', () => {
     expect(nodes[0].endDate).toBe(200);
   });
 
+  it('stamps the swords glyph on Chronicle-supertype nodes only (the tangle seam)', () => {
+    const elements: Element[] = [
+      {
+        id: 'e1',
+        type: 'event',
+        name: 'Battle of the Ford',
+        supertype: 'Chronicle',
+        local_updated_at: '2026-01-01',
+        start_date: 300,
+      } as Element & { start_date: number },
+      {
+        id: 'e2',
+        type: 'event',
+        name: 'Coronation',
+        supertype: 'Political',
+        local_updated_at: '2026-01-01',
+        start_date: 310,
+      } as Element & { start_date: number },
+    ];
+    const nodes = extractTemporalNodes(elements);
+    expect(nodes.find(n => n.id === 'e1')?.glyph).toBe('swords');
+    expect(nodes.find(n => n.id === 'e2')?.glyph).toBeUndefined();
+  });
+
   it('drops an inverted end_date (end before start) rather than drawing backwards', () => {
     const elements: Element[] = [
       {

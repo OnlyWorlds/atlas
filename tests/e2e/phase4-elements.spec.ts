@@ -100,9 +100,9 @@ test('create element from elements sidebar → row + detail view', async ({ page
 test('default new-element type from settings preselects the create modal category', async ({ page }) => {
   await setupWorldA(page);
 
-  // Set the default create type to 'location' via Settings → Editing.
+  // Set the default create type to 'location' via Settings → Elements.
   await page.click('[data-action="open-settings"]');
-  await page.click('[data-settings-tab="editing"]');
+  await page.click('[data-settings-tab="elements"]');
   await page.selectOption('.atlas-settings select[name="default-create-type"]', 'location');
 
   // Persists to the ui-prefs localStorage object.

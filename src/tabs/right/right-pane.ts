@@ -192,8 +192,8 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       }
       if (tab.kind === 'context') {
         btn.setAttribute('data-tab-kind', 'context');
-        btn.innerHTML = `<span class="material-symbols-outlined">hub</span><span>Context</span>`;
-        btn.title = 'Context · graph + details for the active element or narrative';
+        btn.innerHTML = `<span class="material-symbols-outlined">hub</span><span>Web</span>`;
+        btn.title = 'Web · graph + details for the active element or narrative';
         btn.addEventListener('click', () => {
           patchSlice('ui', { ...getState().ui, rightActiveIndex: idx });
         });

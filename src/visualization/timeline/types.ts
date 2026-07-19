@@ -82,6 +82,14 @@ export interface TimelineNode {
   /** Grouping key for swimlanes (narrative id etc.) — used by the lanes bout. */
   laneKey?: string;
   /**
+   * Presentational icon override (Material Symbols name). Set by the
+   * normalizer for recorded-from-play artifacts (supertype 'Chronicle' →
+   * 'swords', the tangle seam — matches the sidebar sparkle). Renderers use
+   * `glyph ?? ELEMENT_ICONS[elementType]`. A pure render cache, never
+   * serialized; the publish payload keeps standard type icons.
+   */
+  glyph?: string;
+  /**
    * Open-end semantics (Act 2A): the type records spans and this node has a
    * start but NO recorded end — the span is still running (a held title). The
    * renderer resolves the effective end against the live now at draw time

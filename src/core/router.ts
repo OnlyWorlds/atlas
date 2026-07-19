@@ -51,9 +51,9 @@ export type RouteMode =
   | 'share'
   | 'import';
 
-export type SettingsTab = 'onlyworlds' | 'storage' | 'editing' | 'world' | 'writing' | 'context';
+export type SettingsTab = 'onlyworlds' | 'storage' | 'elements' | 'maps' | 'world' | 'writing' | 'context';
 
-export const SETTINGS_TABS: SettingsTab[] = ['onlyworlds', 'storage', 'editing', 'world', 'writing', 'context'];
+export const SETTINGS_TABS: SettingsTab[] = ['onlyworlds', 'storage', 'elements', 'maps', 'world', 'writing', 'context'];
 
 /**
  * Settings tabs grouped by scope for the nav rail. 'atlas' scope applies to
@@ -61,17 +61,22 @@ export const SETTINGS_TABS: SettingsTab[] = ['onlyworlds', 'storage', 'editing',
  * tabs disable when no world is active).
  */
 export const SETTINGS_TAB_GROUPS: ReadonlyArray<{ scope: 'atlas' | 'world'; tabs: SettingsTab[] }> = [
-  { scope: 'atlas', tabs: ['onlyworlds', 'storage', 'editing'] },
+  { scope: 'atlas', tabs: ['onlyworlds', 'storage', 'elements', 'maps'] },
   { scope: 'world', tabs: ['world', 'writing', 'context'] },
 ];
 
-/** Legacy settings-tab keys → current keys (pre-session-232 deep links / stored last-tab; 'account' renamed to 'onlyworlds' in Bout OW). */
+/**
+ * Legacy settings-tab keys → current keys (pre-session-232 deep links / stored
+ * last-tab; 'account' renamed to 'onlyworlds' in Bout OW; 'editing' split into
+ * 'elements' + 'maps' 2026-07-19 — 'maps' resolves as a REAL tab now, so its
+ * old alias-to-editing entry is gone).
+ */
 const LEGACY_SETTINGS_TABS: Record<string, SettingsTab> = {
   identity: 'onlyworlds',
   account: 'onlyworlds',
   atlas: 'storage',
   sync: 'storage',
-  maps: 'editing',
+  editing: 'elements',
   about: 'onlyworlds',
 };
 

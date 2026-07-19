@@ -70,10 +70,16 @@ test('clicking tabs updates url + visible content', async ({ page }) => {
   await expect(page.locator('.atlas-settings')).toContainText('phase35-root');
   await expect(page.locator('.atlas-settings input[name="pause-all"]')).toBeVisible();
 
-  // Editing tab: field-edit mode radios.
-  await page.click('[data-settings-tab="editing"]');
-  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings\/editing$/);
+  // Elements tab: field-edit mode radios.
+  await page.click('[data-settings-tab="elements"]');
+  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings\/elements$/);
   await expect(page.locator('.atlas-settings input[name="field-edit-mode"]').first()).toBeVisible();
+
+  // Maps tab: affordance toggles + view defaults (split out of Editing 2026-07-19).
+  await page.click('[data-settings-tab="maps"]');
+  expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings\/maps$/);
+  await expect(page.locator('.atlas-settings input[name="show-map-names-in-header"]')).toBeVisible();
+  await expect(page.locator('.atlas-settings select[data-map-default="pin_style"]')).toBeVisible();
 });
 
 test('storage tab — sync toggles persist to localStorage', async ({ page }) => {

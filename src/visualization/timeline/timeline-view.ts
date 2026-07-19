@@ -1008,7 +1008,7 @@ function draw(state: ViewState): void {
       ctx.lineWidth = 2;
       ctx.stroke();
     }
-    const icon = ELEMENT_ICONS[dot.node.elementType as ElementType] ?? 'category';
+    const icon = dot.node.glyph ?? ELEMENT_ICONS[dot.node.elementType as ElementType] ?? 'category';
     ctx.font = `${size}px "Material Symbols Outlined"`;
     // Dark backing stroke keeps overlapping glyphs legible on the near-black canvas.
     ctx.lineWidth = 2.5;
@@ -1669,7 +1669,7 @@ function renderCard(state: ViewState): void {
   if (!node) { renderAmbientRail(state); return; }
 
   const dateStr = temporalMetaLine(node, state.now, state.calendar);
-  const icon = ELEMENT_ICONS[node.elementType as ElementType] ?? 'category';
+  const icon = node.glyph ?? ELEMENT_ICONS[node.elementType as ElementType] ?? 'category';
 
   card.innerHTML = '';
   card.classList.remove('atlas-timeline-card-blank');

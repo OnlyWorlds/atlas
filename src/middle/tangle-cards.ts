@@ -65,6 +65,17 @@ function parseBattle(value: unknown): {
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+/**
+ * One-line outcome for a battle payload (plain TEXT, not HTML) — the war-record
+ * strip's summary. Shares parseBattle + the wording of the card's outcome line
+ * so the two surfaces can't drift. Null when the shape surprises.
+ */
+export function battleOutcomeLine(value: unknown): string | null {
+  const b = parseBattle(value);
+  if (!b) return null;
+  return b.winner ? `${b.winner} held the field` : 'The armies parted without decision';
+}
+
 /** Battle card for Event.x_tangle_battle, or null when the shape surprises. */
 export function renderTangleBattleCard(value: unknown): HTMLElement | null {
   const b = parseBattle(value);
@@ -73,9 +84,7 @@ export function renderTangleBattleCard(value: unknown): HTMLElement | null {
   const card = document.createElement('div');
   card.className = 'atlas-tangle-card';
 
-  const outcome = b.winner
-    ? `${esc(b.winner)} held the field`
-    : 'The armies parted without decision';
+  const outcome = esc(battleOutcomeLine(value) ?? '');
   const sidesHtml = b.sides.map(s =>
     `<div class="atlas-tangle-side${b.winner === s.name ? ' atlas-tangle-side-winner' : ''}">
        <span class="atlas-tangle-side-name">${esc(s.name)}</span>

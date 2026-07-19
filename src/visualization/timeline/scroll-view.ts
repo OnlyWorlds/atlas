@@ -106,7 +106,7 @@ export function mountScrollView(target: HTMLElement, opts: ScrollViewOptions): T
     if (node.id === cast.protagonistId || node.id === cast.nexusId) card.classList.add('cast');
     card.style.top = `${Math.round(y)}px`;
 
-    const icon = (ELEMENT_ICONS as Record<string, string>)[node.elementType] ?? 'category';
+    const icon = node.glyph ?? (ELEMENT_ICONS as Record<string, string>)[node.elementType] ?? 'category';
     const dateLine = node.endDate != null && node.endDate > node.startDate
       ? `${speak(node.startDate)} → ${node.endDate != null ? speak(node.endDate) : ''}`
       : node.openEnded && now != null && now > node.startDate

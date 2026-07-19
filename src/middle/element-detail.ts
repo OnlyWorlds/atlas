@@ -26,6 +26,7 @@ import { buildZoneSections } from './element-detail-zone-sections';
 import { buildCustomFieldsSection } from './element-detail-custom-fields';
 import { buildMapLocalImageRow } from './element-detail-map-image';
 import { renderReferencedBy } from './element-detail-refs';
+import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
 import { renderHeader } from './element-detail-header';
 import { renderElementImage } from '../ui/element-image';
@@ -182,6 +183,11 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // what's there, let the user add more. Always present (the add row is
     // the feature's discoverability).
     detail.appendChild(buildCustomFieldsSection(el));
+
+    // Character war record (2026-07-19): recorded battles as a curated strip,
+    // above the exhaustive reverse-reference scan.
+    const warRecord = buildWarRecordSection(el);
+    if (warRecord) detail.appendChild(warRecord);
 
     const refs = renderReferencedBy(el);
     if (refs) detail.appendChild(refs);

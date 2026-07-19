@@ -1,41 +1,27 @@
 /**
- * Settings → Editing tab (extracted from settings-panel session 233). Two
- * sections: element field-edit mode (modal / inline-single / inline-multi)
- * plus element-detail display toggles ("Referenced by" grouping,
- * confirm-before-delete), and the Maps header-label toggles.
+ * Settings → Elements tab (renamed from the Editing tab 2026-07-19; the Maps
+ * section it used to carry moved to settings-maps.ts). Element field-edit mode
+ * (modal / inline-single / inline-multi), default new-element type, and
+ * element-detail display toggles ("Referenced by" grouping,
+ * confirm-before-delete, element images).
  */
 
 import { getState, patchSlice } from '../core/state';
 import {
   saveRegistry,
-  setMapsSettings,
   setEditorSettings,
   getEditorSettings,
   type FieldEditMode,
 } from '../registry/registry';
 import { ToastManager } from '../ui/toast-manager';
-import { CONTENT_ELEMENT_TYPES, type ElementType, type WorldsRegistry } from '../core/types';
+import { CONTENT_ELEMENT_TYPES, type ElementType } from '../core/types';
 import { ELEMENT_LABELS } from '../core/constants';
 import { loadUiPrefs, setDefaultCreateTypePref } from '../core/ui-prefs';
 
 /** Types the create modal can default to — content types plus 'map'. */
 const CREATABLE_TYPES: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map'];
 
-export function renderEditingTab(reg: WorldsRegistry): string {
-  return `
-    ${renderEditingFieldModeSection()}
-    ${renderMapsSection(reg)}
-  `;
-}
-
-export function wireEditingTab(toasts: ToastManager): void {
-  wireEditingFieldMode(toasts);
-  wireMapsSection();
-}
-
-// ---- Element editing (field edit mode + element-detail display) ----
-
-function renderEditingFieldModeSection(): string {
+export function renderElementsTab(): string {
   const editor = getEditorSettings(getState().registry);
   const fieldMode = editor.field_edit_mode;
   const refsByField = editor.refs_group_by_field;
@@ -88,13 +74,13 @@ function renderEditingFieldModeSection(): string {
       </label>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="show-element-images" ${showImages ? 'checked' : ''} />
-        <span>Show element images (detail view banner + context pane thumbnail)</span>
+        <span>Show element images (detail view banner + web pane thumbnail)</span>
       </label>
     </section>
   `;
 }
 
-function wireEditingFieldMode(toasts: ToastManager): void {
+export function wireElementsTab(toasts: ToastManager): void {
   // Field edit mode radio (session 219). Persists to registry.editor_settings.
   // The element-detail click handler reads this on every click — no reload
   // needed; the next field click uses the new mode immediately.
@@ -150,51 +136,4 @@ function wireEditingFieldMode(toasts: ToastManager): void {
     setDefaultCreateTypePref(t);
     toasts.info(`Default new-element type: ${ELEMENT_LABELS[t].singular}`);
   });
-}
-
-// ---- Maps subsystem settings (DESIGN_MAPS.md §3.5) ----
-
-function renderMapsSection(reg: WorldsRegistry): string {
-  const s = reg.maps_settings ?? {};
-  const showMaps = !!s.show_map_names_in_header;
-  const showPinMaps = !!s.show_pin_map_names_in_header;
-  const showPinnedEls = !!s.show_pinned_element_names_in_header;
-  return `
-    <section class="atlas-settings-section">
-      <h3>Maps</h3>
-      <p class="atlas-settings-hint">How atlas renders maps and map affordances across the UI. Label toggles default off for a tighter icon-only layout; flip on for explicit names.</p>
-      <label class="atlas-settings-toggle">
-        <input type="checkbox" name="show-map-names-in-header" ${showMaps ? 'checked' : ''} />
-        <span>Show map names alongside map icons in element header</span>
-      </label>
-      <label class="atlas-settings-toggle">
-        <input type="checkbox" name="show-pin-map-names-in-header" ${showPinMaps ? 'checked' : ''} />
-        <span>Show map names alongside pin icons in element header</span>
-      </label>
-      <label class="atlas-settings-toggle">
-        <input type="checkbox" name="show-pinned-element-names-in-header" ${showPinnedEls ? 'checked' : ''} />
-        <span>Show element names alongside category icons on Map detail</span>
-      </label>
-    </section>
-  `;
-}
-
-function wireMapsSection(): void {
-  // Three independent toggles all stored on registry.maps_settings via the
-  // partial-merge setMapsSettings helper. No info toasts — the visible state
-  // change in element-detail headers is its own feedback.
-  const wireToggle = (
-    name: string,
-    key: 'show_map_names_in_header' | 'show_pin_map_names_in_header' | 'show_pinned_element_names_in_header',
-  ): void => {
-    const el = document.querySelector<HTMLInputElement>(`.atlas-settings input[name="${name}"]`);
-    el?.addEventListener('change', () => {
-      const next = setMapsSettings(getState().registry, { [key]: el.checked });
-      saveRegistry(next);
-      patchSlice('registry', next);
-    });
-  };
-  wireToggle('show-map-names-in-header', 'show_map_names_in_header');
-  wireToggle('show-pin-map-names-in-header', 'show_pin_map_names_in_header');
-  wireToggle('show-pinned-element-names-in-header', 'show_pinned_element_names_in_header');
 }

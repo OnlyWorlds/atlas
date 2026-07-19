@@ -67,6 +67,10 @@ No `api-only` mode. Every world has a folder. The folder is the truth. If you wa
 - `local-only` → `api-linked`: **Make Online** flow (two routes, see Workflows).
 - `api-linked` → `local-only`: detach api credentials. Folder remains, sync stops. Reversible at any time without data loss. The server world id is remembered as `former_api_world_id` so the account-mode remote list knows the world is already here.
 
+**Open world folder (2026-07-19)**: the 5th worlds-sidebar action (`+folder_open`) registers ANY folder containing a `world.json` IN PLACE — no copy, no download (`openWorldFolder`, atlas-root-flow.ts). An `api` block in the meta registers it api-linked with sync intact; dedupe by the `world-<meta.id>` handle-key convention; a failed first open rolls the entry back. This is the external-worlds "advanced path" with UI, and the obsidian/Dropbox/other-machine carry-a-folder story.
+
+**Store parking (2026-07-19)**: switching worlds PARKS the prior FsFolderStore (LRU-3; caches kept, heartbeat stopped, on-disk lock retained but heartbeat-staled so other tabs can take over instantly). Switch-back revives in ~80ms iff the lock still carries our tab id; a takeover forces a cold reopen, so a stale cache is never trusted. Details + residuals: SYNC_NOTES "Background tidy + parked locks".
+
 ## Account mode (session 260 — design + gate record: `Forge/Notes/2026-07-13-account-mode-design.md`)
 
 Atlas can hold an OnlyWorlds **account token** (`ow_a_`, minted in the portal's Tokens UI, pasted in Settings → Account). The token is a key-minting authority, never a sync credential — sync always runs on per-world keys in `world.json`, exactly as above.
@@ -180,7 +184,7 @@ User picks a root folder once per world (persisted via `FileSystemDirectoryHandl
 | tail collision (same slug + same tail, different ids, ~2^-32) | the later writer falls back to `<slug>--<full-id>.json`; at open-time tidy the LOWER full id keeps the short form (deterministic — two machines produce identical layouts from the same data) |
 | Windows reserved names | non-issue by construction: the always-present `--<tail>` means the base name is never exactly `con`/`prn`/`aux`/… |
 | index & dedupe | the store indexes by reading file BODIES; rename-crash twins (same body id, two files) resolve to the latest `local_updated_at`, the loser is unlinked — grouping is by body id, so a same-named stranger can never be deleted |
-| tidy | non-canonical filenames (legacy full-uuid tails, hand-renamed files) converge to canonical form lazily at first index per type per open, processed id-sorted with a FULL occupancy view (a target name held by ANY other survivor — case-insensitively — forces the full-id fallback; both taken → the file is left alone). Unreadable/id-less files are skipped and never deleted or overwritten; a second open is a no-op |
+| tidy | non-canonical filenames (legacy full-uuid tails, hand-renamed files) converge to canonical form in a BACKGROUND pass shortly after first index per type per open (deferred out of the open path 2026-07-19 — an inline tidy froze activation on foreign folders with thousands of non-canonical names); processed id-sorted with a FULL occupancy view (a target name held by ANY other survivor — case-insensitively — forces the full-id fallback; both taken → the file is left alone), each rename serialized against user edits via the per-id write chain. Unreadable/id-less files are skipped and never deleted or overwritten; a converged open is a no-op. CONSUMER RULE unchanged: filenames are presentation — a consumer must never require canonical names |
 
 Implementation: `src/store/fs-utils.ts` (`slugify`, `idTail`, `elementFilename`, `elementFilenameFullId`) + `FsFolderStore.ensureIndexFor`/`resolveFilename`. Contract tests: `tests/unit/fs-utils.slug.test.ts`, `tests/e2e/folder-store-slug.spec.ts`.
 
@@ -747,7 +751,7 @@ Hash-based, no server rewrites needed (Cloudflare Pages friendly).
 #/w/<worldId>/import                        → import room
 #/w/<worldId>/templates                     → templates room
 #/w/<worldId>/settings                      → settings (default tab)
-#/w/<worldId>/settings/<tab>                → settings deep-link (account/storage/editing/world/writing/context; legacy keys alias)
+#/w/<worldId>/settings/<tab>                → settings deep-link (onlyworlds/storage/elements/maps/world/writing/context; legacy keys alias, incl. editing→elements. 'context' is labeled "Web" in the UI)
 #/demo                                      → view-only example-page presentation (no world, no registry)
 ```
 
