@@ -15,10 +15,7 @@ import { startApp } from './app';
 import { getState as _getState, patchSlice as _patchSlice } from './core/state';
 import { getActiveStore as _getActiveStore } from './core/active-store';
 import { registerServiceWorker } from './core/offline';
-
-function isFolderModeSupported(): boolean {
-  return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
-}
+import { hasFolderMode, hasOpfsMode } from './core/capabilities';
 
 function renderUnsupportedPage(root: HTMLElement): void {
   root.innerHTML = '';
@@ -32,16 +29,17 @@ function renderUnsupportedPage(root: HTMLElement): void {
       <h1>Atlas needs a Chromium browser</h1>
       <p>
         Atlas stores your worlds as real files on your computer using the
-        <b>File System Access API</b>, which is currently only available in Chrome
-        and Edge (and other Chromium-based browsers).
+        <b>File System Access API</b>, which is currently only available in
+        Chromium browsers.
       </p>
       <p>
-        Open this page in <b>Chrome</b> or <b>Edge</b> to use Atlas. Firefox and
-        Safari can browse but not edit local worlds.
+        Open this page in <b>Chrome</b> or <b>Brave</b> (or Edge) to use Atlas.
+        Recent Safari and Firefox can take the guided tour, which runs in
+        browser storage: if you are seeing this page, your browser has neither.
       </p>
       <div class="atlas-unsupported-actions">
         <a href="https://www.google.com/chrome/" target="_blank" rel="noopener">Download Chrome →</a>
-        <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener">Download Edge →</a>
+        <a href="https://brave.com/" target="_blank" rel="noopener">Download Brave →</a>
       </div>
     </div>
   `;
@@ -54,7 +52,11 @@ function boot(): void {
     console.error('[atlas] #app element missing');
     return;
   }
-  if (!isFolderModeSupported()) {
+  // Folder-mode browsers (Chromium) get the full app. OPFS-capable browsers
+  // (Safari 18.2+, Firefox 111+) boot in tour-capable mode — the guided tour
+  // and browser-storage worlds work; folder pickers stay honestly gated in
+  // the UI (welcome-panel folder CTA + directory-picker's clean error).
+  if (!hasFolderMode() && !hasOpfsMode()) {
     renderUnsupportedPage(root);
     return;
   }

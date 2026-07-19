@@ -110,6 +110,19 @@ The world owns the clock, calendars own the language. Every dated element stores
 
 ---
 
+## The Guided Tour (S296-297 — full design: `DESIGN_TOUR.md`)
+
+The onboarding: the opening sentence of *Hyperion* becomes a 36-element
+linked world while the workspace builds itself around the user (bare splash →
+one narrator panel → chrome appears per act → real-modal hands-on beats →
+exit tears everything down, no residue). Lives in `src/tour/`; the bundle in
+`src/demo/hyperion-world.json`. Two architectural exports beyond the tour
+itself: `core/capabilities.ts` (folder-mode vs OPFS-mode boot gating —
+Safari/Firefox run tour-capable) and `body.atlas-preroot` (the bare splash
+state). DESIGN_TOUR.md v2.2 is the authoritative document.
+
+---
+
 ## On-Disk Layout
 
 User picks a root folder once per world (persisted via `FileSystemDirectoryHandle` in IndexedDB; the only IDB use case in atlas). Atlas writes (wrapper folder is `onlyworlds-atlas/` — `atlas-worlds/` is the recognized legacy name):

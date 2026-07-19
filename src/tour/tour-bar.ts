@@ -1,0 +1,365 @@
+/**
+ * Tour bar — the guided tour's ONE narrator component, two positions:
+ *
+ *   STEP 1 (stage 0, the bare stage): the same panel, screen-CENTERED, the
+ *   sentence at vignette scale, eyebrow + attribution + Begin. No app chrome
+ *   exists yet.
+ *
+ *   STEPS 2+ : the panel DOCKS bottom-center (fixed min-height so the dock
+ *   never jumps between steps). Same rows throughout — the user learns "that
+ *   panel is my guide" in the first second, and the descend is structural.
+ *
+ * Rows: the annotated sentence · hairline · body copy (+ meta subtext,
+ * ✦ deeper flyout) · controls. Steps carry no titles (v2.1): the act label
+ * orients, the divider separates material from narration.
+ *
+ * The sentence is the progress bar (Skeld's grammar): parsed words carry
+ * their element-type color; every span's end word carries an inline glyph,
+ * PRE-SPACED from step 0 as a dim ghost and LIT (pop-in) when its step is
+ * reached — zero reflow. Clicking a parsed word jumps to its step.
+ *
+ * The ✦ deeper content opens as a scrollable FLYOUT above the panel — the
+ * dock's height never changes (Captain's rule).
+ *
+ * The bar stamps <body data-tour-stage="N"> — atlas.css hides not-yet-earned
+ * app chrome per stage (the progressive build-up).
+ */
+
+import { ELEMENT_TYPE_COLORS, ELEMENT_ICONS } from '../core/constants';
+import { hasFolderMode } from '../core/capabilities';
+import type { ElementType } from '../core/types';
+import {
+  TOUR_SENTENCE, TOUR_STEPS, TOUR_ACT_NAMES, tourStageFor,
+  TOUR_OPENER_EYEBROW, TOUR_ATTRIBUTION, TOUR_ATTRIBUTION_URL, TOUR_EXPLORER_URL,
+  type TourStep,
+} from './tour-data';
+import {
+  onTourChange, isTourActive, currentStepIndex, consulCreated,
+  nextStep, backStep, enterStep, exitTour, setupFolderFromTour,
+} from './tour-engine';
+
+let root: HTMLElement | null = null;
+let unsub: (() => void) | null = null;
+
+export function ensureTourBar(container: HTMLElement): void {
+  if (isTourActive() && !root) mount(container);
+  else if (!isTourActive() && root) unmount();
+}
+
+function mount(container: HTMLElement): void {
+  root = document.createElement('div');
+  root.className = 'atlas-tour-root';
+  container.appendChild(root);
+  document.body.classList.add('atlas-touring');
+  unsub = onTourChange(() => {
+    if (!isTourActive()) { unmount(); return; }
+    render();
+  });
+  render();
+}
+
+function unmount(): void {
+  unsub?.();
+  unsub = null;
+  root?.remove();
+  root = null;
+  document.body.classList.remove('atlas-touring');
+  delete document.body.dataset.tourStage;
+}
+
+/** Word index → {type, stepIndex} for every step at or before `upTo`. */
+function fillMap(upTo: number): Map<number, { type: ElementType; step: number }> {
+  const map = new Map<number, { type: ElementType; step: number }>();
+  for (let i = 0; i <= Math.min(upTo, TOUR_STEPS.length - 1); i++) {
+    for (const span of TOUR_STEPS[i].spans ?? []) {
+      for (let w = span.from; w <= span.to; w++) {
+        map.set(w, { type: span.type, step: i });
+      }
+    }
+  }
+  return map;
+}
+
+/** Word index → glyphs anchored after it (every span's END word), all steps. */
+function glyphMap(): Map<number, Array<{ type: ElementType; step: number }>> {
+  const map = new Map<number, Array<{ type: ElementType; step: number }>>();
+  TOUR_STEPS.forEach((step, i) => {
+    for (const span of step.spans ?? []) {
+      const list = map.get(span.to) ?? [];
+      list.push({ type: span.type, step: i });
+      map.set(span.to, list);
+    }
+  });
+  return map;
+}
+
+/**
+ * Build the annotated sentence: serif italic words, type-colored fill for
+ * parsed words, pre-spaced ghost glyphs lighting up as steps are reached.
+ */
+function buildSentence(idx: number, step: TourStep): HTMLElement {
+  const fills = fillMap(idx);
+  const glyphs = glyphMap();
+  const fillRestActive = TOUR_STEPS.slice(0, Math.min(idx, TOUR_STEPS.length - 1) + 1)
+    .some(s => s.fillRest);
+  const activeWords = new Set<number>();
+  for (const span of step.spans ?? []) {
+    for (let w = span.from; w <= span.to; w++) activeWords.add(w);
+  }
+
+  const sentence = document.createElement('div');
+  sentence.className = 'atlas-tour-sentence';
+  TOUR_SENTENCE.forEach((word, w) => {
+    const span = document.createElement('span');
+    span.className = 'atlas-tour-word';
+    span.textContent = word;
+    const fill = fills.get(w);
+    if (fill) {
+      span.classList.add('parsed');
+      span.style.setProperty('--tour-word-color', ELEMENT_TYPE_COLORS[fill.type] ?? '#22d3ee');
+      span.title = `${fill.type} · jump to that step`;
+      span.addEventListener('click', () => { void enterStep(fill.step); });
+    } else if (fillRestActive) {
+      span.classList.add('parsed', 'rest');
+      span.style.setProperty('--tour-word-color', 'rgba(255, 255, 255, 0.45)');
+    }
+    if (activeWords.has(w)) span.classList.add('active');
+    sentence.appendChild(span);
+    for (const g of glyphs.get(w) ?? []) {
+      const glyph = document.createElement('span');
+      const lit = g.step <= idx;
+      glyph.className = 'material-symbols-outlined atlas-tour-glyph' + (lit ? ' lit' : '');
+      if (lit && g.step === idx) glyph.classList.add('pop');
+      glyph.textContent = ELEMENT_ICONS[g.type] ?? 'circle';
+      glyph.style.setProperty('--tour-glyph-color', ELEMENT_TYPE_COLORS[g.type] ?? '#22d3ee');
+      glyph.title = g.type;
+      if (lit) glyph.addEventListener('click', () => { void enterStep(g.step); });
+      sentence.appendChild(glyph);
+    }
+    sentence.appendChild(document.createTextNode(' '));
+  });
+  return sentence;
+}
+
+function render(): void {
+  if (!root) return;
+  const idx = currentStepIndex();
+  const step = TOUR_STEPS[Math.min(idx, TOUR_STEPS.length - 1)];
+  const stage = tourStageFor(idx);
+  document.body.dataset.tourStage = String(stage);
+  const opener = stage === 0;
+
+  root.innerHTML = '';
+  const panel = document.createElement('div');
+  panel.className = 'atlas-tour-bar' + (opener ? ' centered' : '');
+
+  if (opener) {
+    const eyebrow = document.createElement('div');
+    eyebrow.className = 'atlas-tour-eyebrow';
+    eyebrow.textContent = TOUR_OPENER_EYEBROW;
+    panel.appendChild(eyebrow);
+  }
+
+  panel.appendChild(buildSentence(idx, step));
+
+  if (opener) {
+    const attr = document.createElement('a');
+    attr.className = 'atlas-tour-attribution';
+    attr.href = TOUR_ATTRIBUTION_URL;
+    attr.target = '_blank';
+    attr.rel = 'noopener';
+    attr.textContent = TOUR_ATTRIBUTION;
+    panel.appendChild(attr);
+  }
+
+  // Row 2 — step copy, under a hairline (the material/narration divider).
+  const copy = document.createElement('div');
+  copy.className = 'atlas-tour-copy';
+  const body = document.createElement('div');
+  body.className = 'atlas-tour-body';
+  body.textContent = step.body;
+  copy.appendChild(body);
+  if (step.deeper) {
+    const bulb = document.createElement('button');
+    bulb.type = 'button';
+    bulb.className = 'atlas-tour-deeper-toggle';
+    bulb.innerHTML = '<span class="material-symbols-outlined">emoji_objects</span> deeper';
+    const deeper = document.createElement('div');
+    deeper.className = 'atlas-tour-deeper';
+    // Paragraph breaks (\n\n in the step data) render as real paragraphs —
+    // a wall of text defeats the point of going deeper.
+    for (const para of step.deeper.split('\n\n')) {
+      const p = document.createElement('p');
+      p.textContent = para;
+      deeper.appendChild(p);
+    }
+    deeper.hidden = true;
+    bulb.addEventListener('click', () => { deeper.hidden = !deeper.hidden; });
+    copy.appendChild(bulb);
+    panel.appendChild(deeper); // flyout anchors to the PANEL, above it
+  }
+  if (step.id === 'online') {
+    // The legacy sentence tutorial, as the deeper schema story — same row
+    // and metrics as the deeper toggle so it never changes the dock's shape.
+    // A link to Captain's Hyperion share page joins here when it exists.
+    const explorer = document.createElement('a');
+    explorer.className = 'atlas-tour-inline-link';
+    explorer.href = TOUR_EXPLORER_URL;
+    explorer.target = '_blank';
+    explorer.rel = 'noopener';
+    explorer.innerHTML = '<span class="material-symbols-outlined">travel_explore</span> ecosystem explorer';
+    copy.appendChild(explorer);
+  }
+  // The meta row ALWAYS renders (nbsp when the step has none) — steps with
+  // and without subtext keep the exact same panel shape.
+  const meta = document.createElement('p');
+  meta.className = 'atlas-tour-meta';
+  meta.textContent = step.meta ?? ' ';
+  copy.appendChild(meta);
+  panel.appendChild(copy);
+
+  // Row 3 — controls.
+  const controls = document.createElement('div');
+  controls.className = 'atlas-tour-controls';
+
+  const act = document.createElement('span');
+  act.className = 'atlas-tour-act';
+  act.textContent = `${TOUR_ACT_NAMES[step.act] ?? ''} · Step ${idx + 1} of ${TOUR_STEPS.length}`;
+  controls.appendChild(act);
+
+  const spacer = document.createElement('span');
+  spacer.className = 'atlas-tour-spacer';
+  controls.appendChild(spacer);
+
+  if (opener) {
+    const begin = document.createElement('button');
+    begin.type = 'button';
+    begin.className = 'atlas-btn-primary atlas-tour-begin';
+    begin.textContent = 'Begin';
+    begin.addEventListener('click', () => { void nextStep(); });
+    controls.appendChild(begin);
+    appendExit(controls);
+    panel.appendChild(controls);
+    root!.appendChild(panel);
+    return;
+  }
+
+  if (idx > 0) {
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'atlas-btn-ghost';
+    back.textContent = 'Back';
+    back.addEventListener('click', () => { void backStep(); });
+    controls.appendChild(back);
+  }
+
+  // Hands-on steps: the real gesture (primary) OR Next (watch-mode — the
+  // engine performs the gesture and advances).
+  if (step.handsOn === 'create-world') {
+    const doBtn = document.createElement('button');
+    doBtn.type = 'button';
+    doBtn.className = 'atlas-btn-primary';
+    doBtn.setAttribute('data-tour-action', 'create-world');
+    doBtn.textContent = 'Create the world';
+    doBtn.addEventListener('click', () => {
+      void (async () => {
+        const [{ CreateWorldModal }, { toastManager }] = await Promise.all([
+          import('../ui/create-world-modal'),
+          import('../ui/toast-manager'),
+        ]);
+        const { createWorldFromTour } = await import('./tour-engine');
+        new CreateWorldModal(toastManager, undefined, {
+          lockedName: 'Hyperion',
+          hint: 'Normally this becomes a folder inside your OnlyWorlds folder. The tour world stays in your browser and folds away when the tour ends.',
+          overrideCreate: async () => { await createWorldFromTour(); },
+        }).open();
+      })();
+    });
+    controls.appendChild(doBtn);
+    appendWatchNext(controls);
+  } else if (step.handsOn === 'create-consul' && !consulCreated()) {
+    const doBtn = document.createElement('button');
+    doBtn.type = 'button';
+    doBtn.className = 'atlas-btn-primary';
+    doBtn.setAttribute('data-tour-action', 'create-consul');
+    doBtn.textContent = 'Create the Consul';
+    doBtn.addEventListener('click', () => {
+      void (async () => {
+        const [{ ElementCreateModal }, { toastManager }] = await Promise.all([
+          import('../ui/element-create-modal'),
+          import('../ui/toast-manager'),
+        ]);
+        const { createConsul } = await import('./tour-engine');
+        new ElementCreateModal(toastManager, {
+          initialType: 'character',
+          initialName: 'The Consul',
+          lockAll: true,
+          overrideCreate: async () => { await createConsul(); },
+          suppressToast: true,
+        }).open();
+      })();
+    });
+    controls.appendChild(doBtn);
+    appendWatchNext(controls);
+  } else if (step.handsOn === 'setup-folder') {
+    // The finale: Finish (ghost) ends the tour — the world folds away
+    // (residue contract); the primary hands over to the real folder setup.
+    // OPFS-only browsers (Safari/Firefox tour mode) have no folder picker:
+    // Finish is the primary there.
+    const folderMode = hasFolderMode();
+    const finish = document.createElement('button');
+    finish.type = 'button';
+    finish.className = folderMode ? 'atlas-btn-ghost' : 'atlas-btn-primary';
+    finish.title = 'End the tour (the tour world folds away)';
+    finish.textContent = 'Finish';
+    finish.addEventListener('click', () => { void exitTour(); });
+    controls.appendChild(finish);
+
+    if (folderMode) {
+      const setup = document.createElement('button');
+      setup.type = 'button';
+      setup.className = 'atlas-btn-primary';
+      setup.textContent = 'Set up a folder';
+      setup.addEventListener('click', () => {
+        setup.disabled = true;
+        void setupFolderFromTour().finally(() => { setup.disabled = false; });
+      });
+      controls.appendChild(setup);
+    }
+    panel.appendChild(controls);
+    root!.appendChild(panel);
+    return;
+  } else {
+    const next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'atlas-btn-primary';
+    next.textContent = 'Next';
+    next.addEventListener('click', () => { void nextStep(); });
+    controls.appendChild(next);
+  }
+
+  appendExit(controls);
+  panel.appendChild(controls);
+  root!.appendChild(panel);
+}
+
+function appendExit(controls: HTMLElement): void {
+  const exit = document.createElement('button');
+  exit.type = 'button';
+  exit.className = 'atlas-btn-ghost atlas-tour-exit';
+  exit.title = 'Leave the tour (the tour world folds away)';
+  exit.textContent = 'Exit tour';
+  exit.addEventListener('click', () => { void exitTour(); });
+  controls.appendChild(exit);
+}
+
+/** The watch-mode Next beside a hands-on primary — quieter, still forward. */
+function appendWatchNext(controls: HTMLElement): void {
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'atlas-btn-ghost';
+  next.title = 'Skip the gesture — the tour does it for you';
+  next.textContent = 'Next';
+  next.addEventListener('click', () => { void nextStep(); });
+  controls.appendChild(next);
+}

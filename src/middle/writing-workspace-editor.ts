@@ -218,6 +218,11 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
       }) as any,
     ],
     content: initial,
+    // A bare string is HTML to TipTap unless told otherwise — the markdown
+    // fallback (no atlas_richtext_json sidecar) rendered LITERAL `[x](ow://…)`
+    // text without this. Found by the tour's baked chapter, the first
+    // sidecar-less narrative to ever hit the path (2026-07-19).
+    contentType: typeof initial === 'string' ? 'markdown' : 'json',
     autofocus: false,
     editable: true,
     onUpdate: ({ editor }) => {
@@ -330,7 +335,7 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
       if (json && !isEmptyJsonDoc(json)) {
         editor.commands.setContent(json, { emitUpdate: false });
       } else if (markdown && markdown.trim().length > 0) {
-        editor.commands.setContent(markdown, { emitUpdate: false });
+        editor.commands.setContent(markdown, { emitUpdate: false, contentType: 'markdown' });
         // Convert ow:// link marks → chips after markdown parse.
         const converted = convertLinkMarksToChips(editor.getJSON());
         editor.commands.setContent(converted, { emitUpdate: false });

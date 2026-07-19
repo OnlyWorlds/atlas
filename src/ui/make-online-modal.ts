@@ -104,7 +104,7 @@ export class MakeOnlineModal extends BaseModal {
           </label>
           <label class="atlas-modal-field">
             <span>PIN</span>
-            <input class="atlas-input" type="text" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="8" autocomplete="off" />
+            <input class="atlas-input" type="password" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="8" autocomplete="off" />
           </label>
           <div class="atlas-modal-error" data-role="create-error" hidden></div>
           <div class="atlas-modal-progress" data-role="create-progress" hidden></div>
@@ -126,7 +126,7 @@ export class MakeOnlineModal extends BaseModal {
           </label>
           <label class="atlas-modal-field">
             <span>PIN</span>
-            <input class="atlas-input" type="text" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="8" autocomplete="off" />
+            <input class="atlas-input" type="password" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="8" autocomplete="off" />
           </label>
           <fieldset class="atlas-modal-field atlas-policy-fieldset">
             <legend>On duplicate (same name + type)</legend>

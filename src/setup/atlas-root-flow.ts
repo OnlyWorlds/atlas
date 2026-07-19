@@ -419,7 +419,7 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
  * writes world.json, registers, and activates. Shared by createWorldInRoot
  * (empty world) and createWorldFromImportedData (populated from an import).
  */
-async function scaffoldWorldInRoot(
+export async function scaffoldWorldInRoot(
   name: string,
   // Sample-world path (Bout DEMO): scaffold under an explicit parent handle
   // (OPFS on first launch) instead of the atlas root — no folder pick, no

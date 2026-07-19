@@ -74,7 +74,7 @@ beforeEach(() => {
 describe('discoverWorldsInRoot — demo re-mirror from world.json', () => {
   it('re-mirrors demo:true into the registry entry (localStorage-wipe recovery)', async () => {
     const root = fakeRoot([
-      fakeWorldDir('sample-abc123', { id: 'w-sample', name: 'Moppetopia (sample)', demo: true }),
+      fakeWorldDir('sample-abc123', { id: 'w-sample', name: 'Hyperion (tour)', demo: true }),
       fakeWorldDir('real-def456', { id: 'w-real', name: 'My World' }),
     ]);
 
@@ -82,7 +82,7 @@ describe('discoverWorldsInRoot — demo re-mirror from world.json', () => {
 
     expect(imported).toBe(2);
     const worlds = getState().registry.worlds;
-    const sample = worlds.find(w => w.name === 'Moppetopia (sample)');
+    const sample = worlds.find(w => w.name === 'Hyperion (tour)');
     const real = worlds.find(w => w.name === 'My World');
     expect(sample?.demo).toBe(true);
     expect(real?.demo).toBeFalsy();

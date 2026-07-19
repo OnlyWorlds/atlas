@@ -11,6 +11,8 @@
 import { getState, subscribe } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
+import { hasFolderMode } from '../core/capabilities';
+import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
 import { navigate, timelineHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
@@ -30,6 +32,14 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     hoverCleanup = null;
     const state = getState();
     const { active, atlasRoot, atlasRootRecoverable } = state;
+
+    // Pre-setup the splash is a BARE stage: no sidebar, no nav, no panes —
+    // the same empty black the tour opens on, so starting the tour is
+    // continuous (Captain's call, 2026-07-19). The class drops the moment a
+    // root exists, a world is active, or the tour itself is running (the
+    // tour's build-up owns the chrome then).
+    const bare = !atlasRoot && !active && !isTourFlagActive();
+    document.body.classList.toggle('atlas-preroot', bare);
 
     // Recoverable: vault has an orphan atlas-root handle (typically after a
     // localStorage clear). Surface a single restore button before falling
@@ -68,22 +78,64 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       return;
     }
 
-    // First-launch: no atlas folder yet. The landing (session 255, minimal
-    // final form): wordmark + tagline carry identity, ONE filled CTA carries
-    // the action. The rooms preview lives in the nav strip, not here.
+    // First-launch: no atlas folder yet. The landing (session 255 minimal
+    // form; tour door added 2026-07-19 — Freek's "jarring first screen"): the
+    // tour needs NO folder (browser storage), so it leads; the folder CTA
+    // carries honest context about where worlds live; about-link for depth.
     if (!atlasRoot) {
+      // OPFS-only browsers (Safari 18.2+, Firefox: tour-capable boot) have no
+      // folder picker — the folder door becomes an honest line instead of a
+      // button that would fail on click. After a completed tour the emphasis
+      // swaps: the folder is the primary door, the tour a replay.
+      const folderMode = hasFolderMode();
+      let tourDone = false;
+      try { tourDone = localStorage.getItem('atlas_tour_done_v1') === '1'; } catch { /* private mode */ }
+      const tourBtnClass = tourDone ? 'atlas-btn-ghost' : 'atlas-btn-primary';
+      const folderBtnClass = tourDone ? 'atlas-btn-primary' : 'atlas-btn-ghost';
+      const folderDoor = folderMode
+        ? `
+          <div class="atlas-landing-door">
+            <h3>Set up your folder</h3>
+            <p>Your worlds live in a folder you choose, on your computer, as plain files: yours to keep.</p>
+            <button class="${folderBtnClass} atlas-landing-btn" data-action="setup-atlas">Set up a folder</button>
+          </div>`
+        : `
+          <div class="atlas-landing-door">
+            <h3>Set up your folder</h3>
+            <p>Folder mode (your worlds as real files) needs a Chromium browser: Chrome or Brave. This browser can take the tour.</p>
+          </div>`;
       root.innerHTML = `
         <div class="atlas-landing">
           <div class="atlas-landing-hero">
             <div class="atlas-landing-mark">Atlas</div>
             <p class="atlas-landing-tag">A free, local-first worldbuilding studio.</p>
           </div>
-          <div class="atlas-landing-cta">
-            <button class="atlas-btn-primary atlas-landing-btn" data-action="setup-atlas">Set up a local folder</button>
+          <div class="atlas-landing-doors">
+            <div class="atlas-landing-door">
+              <h3>${tourDone ? 'Replay the tour' : 'Take the tour'}</h3>
+              <p>Five minutes: one famous sentence becomes a small linked world. Nothing touches your files.</p>
+              <button class="${tourBtnClass} atlas-landing-btn" data-action="start-tour">${tourDone ? 'Replay the tour' : 'Take the tour'}</button>
+            </div>
+            ${folderDoor}
           </div>
+          <p class="atlas-landing-context"><a href="https://www.onlyworlds.com/about" target="_blank" rel="noopener">More about OnlyWorlds</a></p>
         </div>
       `;
-      const btn = root.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]')!;
+      const tourBtn = root.querySelector<HTMLButtonElement>('[data-action="start-tour"]')!;
+      tourBtn.addEventListener('click', async () => {
+        tourBtn.disabled = true;
+        tourBtn.textContent = 'Starting…';
+        try {
+          const engine = await import('../tour/tour-engine');
+          await engine.launchTour();
+        } catch (err) {
+          toastManager.error(err instanceof Error ? err.message : String(err));
+          tourBtn.disabled = false;
+          tourBtn.textContent = 'Take the tour';
+        }
+      });
+      const btn = root.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]');
+      if (!btn) return;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         btn.textContent = 'Picking…';
@@ -102,7 +154,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           // On success a state change re-renders this panel away; on cancel
           // the button stays visible, so restore its original label.
           btn.disabled = false;
-          btn.textContent = 'Set up a local folder';
+          btn.textContent = 'Set up your OnlyWorlds folder';
         }
       });
       return;
@@ -216,6 +268,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
   return () => {
     hoverCleanup?.();
     hoverCleanup = null;
+    document.body.classList.remove('atlas-preroot');
     unsub();
   };
 }

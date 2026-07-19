@@ -102,6 +102,20 @@ export interface ElementCreateOptions {
    * body, so the new element lands on the chart immediately.
    */
   temporalContext?: { defaultDate: number };
+  /**
+   * Guided-tour mode: the REAL dialog with the script locked — the type grid
+   * offers only `initialType` and the name input is read-only. Pair with
+   * `overrideCreate`.
+   */
+  lockAll?: boolean;
+  /**
+   * Replace the create path entirely: the tour writes its baked element
+   * (fixed id + fields) instead of minting a fresh one. The modal validates,
+   * calls this, and closes; no toast, no navigate (the override routes).
+   */
+  overrideCreate?: () => Promise<void>;
+  /** Skip the modal's own success toast (override flows toast or route themselves). */
+  suppressToast?: boolean;
 }
 
 export class ElementCreateModal extends BaseModal {
@@ -138,6 +152,8 @@ export class ElementCreateModal extends BaseModal {
    *  but are not selectable — so they're excluded here, and renderTypeGrid
    *  draws them disabled separately. */
   private effectiveTypes(): ElementType[] {
+    // Tour lock: the grid offers exactly the scripted type.
+    if (this.opts.lockAll && this.opts.initialType) return [this.opts.initialType];
     let types = CREATE_TYPES;
     if (this.opts.excludeTypes?.length) {
       const excluded = new Set(this.opts.excludeTypes);
@@ -198,7 +214,7 @@ export class ElementCreateModal extends BaseModal {
         </label>`
       : `<label class="atlas-modal-field">
           <span>Name</span>
-          <input class="atlas-input" type="text" name="element-name" placeholder="Element name" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}" />
+          <input class="atlas-input" type="text" name="element-name" placeholder="Element name" autocomplete="off" value="${escapeAttr(this.opts.initialName ?? '')}"${this.opts.lockAll ? ' readonly' : ''} />
         </label>`;
 
     // Charts-context (S263): the Date row, prefilled; its label names the
@@ -306,6 +322,22 @@ export class ElementCreateModal extends BaseModal {
       if (!this.effectiveTypes().includes(this.selected)) {
         errorBox.textContent = 'Pick a category';
         errorBox.hidden = false;
+        return;
+      }
+
+      // Tour override: the tour writes its baked element instead of minting
+      // one. Validated above; close and hand off — the override routes.
+      if (this.opts.overrideCreate) {
+        const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Creating…'; }
+        try {
+          await this.opts.overrideCreate();
+          this.hide();
+        } catch (err) {
+          errorBox.textContent = err instanceof Error ? err.message : String(err);
+          errorBox.hidden = false;
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Create'; }
+        }
         return;
       }
 

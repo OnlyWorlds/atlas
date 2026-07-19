@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- The guided tour: one famous sentence becomes a small linked world, and atlas builds itself around it. From a bare page you create the world, then its first character through the real dialogs, and the workspace appears piece by piece as each room earns its place: elements and links, a map with a pin and a zone, the sentence itself as a chapter full of live chips, two dated events on a chart, and finally the whole thing at once. The sentence rides along the bottom the entire time, coloring in as you go: each parsed word takes its element type's color and a small icon lights up in place.
+- The tour needs nothing from you: no folder, no account, nothing touches your files. It runs in browser storage and folds away completely when it ends, and every hands-on step also works as watch mode: press Next and the tour performs the step for you. Replay it anytime from settings.
+- The first screen slimmed down to match: two doors on a bare page, take the tour or set up a folder. After a finished tour the folder door takes the lead.
+- Safari and Firefox can take the tour now: atlas boots in browsers without folder support and says honestly which parts need Chrome or Brave.
+- PIN fields show dots while you type, in every dialog that asks for one.
+
 - Big worlds open fast: a 1,500-element world that took ~18 seconds on first open now lands in about 3, and switching between worlds or saving edits no longer re-reads every file from disk (those dropped from seconds to instant). While a large world opens, the loading message counts: "Opening world… 600 / 1,500".
 - Linking a large OnlyWorlds world downloads noticeably faster: the element types fetch in parallel and each page carries more elements per request.
 - Routine autosaves stopped paying an extra server round-trip for world settings that had not changed.

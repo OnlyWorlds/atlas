@@ -16,6 +16,7 @@ import { onHashChange, parseHash, navigate, elementHash, settingsHash } from '..
 // elementsHash removed from imports — session 223 decoupling no longer routes
 // through the /elements URL on toggle clicks or gear-toggle exit.
 import { setSidebarModePref } from '../core/ui-prefs';
+import { isTourFlagActive } from '../tour/tour-flag';
 import type { ActiveWorldRef } from '../core/state';
 import { mountWorldsBody } from './worlds-sidebar';
 import { mountElementsBody } from './elements-sidebar';
@@ -113,8 +114,12 @@ export function mountSidebar(mount: SidebarMount): () => void {
     const entry = worldId ? reg.worlds.find(w => w.id === worldId) : undefined;
     // Pre-setup (no atlas root) the whole sidebar is silent — a lit "Worlds"
     // tab over an empty rail competed with the landing, the screen's one
-    // voice (S255). The header appears once a root exists.
-    if (!getState().atlasRoot) return;
+    // voice (S255). The header appears once a root exists — OR once a world
+    // is live on the route (the guided tour's OPFS world has no root, and
+    // hiding the toggle left the tour stuck in worlds mode, 2026-07-19) —
+    // OR during the tour's world-create step (the sidebar must appear in its
+    // exact final structure, Worlds tab included).
+    if (!getState().atlasRoot && !entry && !isTourFlagActive()) return;
     // When the writing-room takeover is active, neither toggle button is lit —
     // the body is the writing tree, the toggle is an escape hatch.
     const effective = resolveEffectiveBody();

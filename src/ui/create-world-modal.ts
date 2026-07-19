@@ -27,14 +27,27 @@ export interface CreateWorldResult {
   entry: WorldRegistryEntry;
 }
 
+/**
+ * Tour mode: the REAL dialog shown once with the script locked — name fixed,
+ * a teaching hint replacing the folder line, and Create handing off to the
+ * tour engine (browser-storage world) instead of createWorldInRoot.
+ */
+export interface CreateWorldTourOptions {
+  lockedName: string;
+  hint: string;
+  overrideCreate: () => Promise<void>;
+}
+
 export class CreateWorldModal extends BaseModal {
   private onCreated?: (result: CreateWorldResult) => void;
   private toasts: ToastManager;
+  private tour?: CreateWorldTourOptions;
 
-  constructor(toasts: ToastManager, onCreated?: (r: CreateWorldResult) => void) {
+  constructor(toasts: ToastManager, onCreated?: (r: CreateWorldResult) => void, tour?: CreateWorldTourOptions) {
     super();
     this.toasts = toasts;
     this.onCreated = onCreated;
+    this.tour = tour;
   }
 
   open(): void {
@@ -54,21 +67,24 @@ export class CreateWorldModal extends BaseModal {
 
     const atlasRoot = getState().atlasRoot;
     const rootDisplay = atlasRoot?.pathHint ?? atlasRoot?.folderName;
+    const tour = this.tour;
+    const hint = tour
+      ? escapeText(tour.hint)
+      : rootDisplay
+        ? `Creates a new world folder inside your OnlyWorlds folder (<code>${escapeText(rootDisplay)}</code>). You can move it online (sync with OnlyWorlds API) later.`
+        : 'Atlas needs an OnlyWorlds folder before creating worlds. Set one up from the welcome panel.';
     body.innerHTML = `
       <form data-form="create-world">
         <label class="atlas-modal-field">
           <span>Name</span>
-          <input class="atlas-input" type="text" name="world-name" placeholder="Untitled world" autocomplete="off" />
+          <input class="atlas-input" type="text" name="world-name" placeholder="Untitled world" autocomplete="off"
+            ${tour ? `value="${escapeText(tour.lockedName)}" readonly` : ''} />
         </label>
-        <p class="atlas-modal-hint">
-          ${rootDisplay
-            ? `Creates a new world folder inside your OnlyWorlds folder (<code>${escapeText(rootDisplay)}</code>). You can move it online (sync with OnlyWorlds API) later.`
-            : 'Atlas needs an OnlyWorlds folder before creating worlds. Set one up from the welcome panel.'}
-        </p>
+        <p class="atlas-modal-hint">${hint}</p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
           <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="pick" ${rootDisplay ? '' : 'disabled'}>Create</button>
+          <button type="submit" class="atlas-btn-primary" data-action="pick" ${(rootDisplay || tour) ? '' : 'disabled'}>Create</button>
         </div>
       </form>
     `;
@@ -85,6 +101,24 @@ export class CreateWorldModal extends BaseModal {
       errorBox.hidden = true;
       const nameInput = form.querySelector<HTMLInputElement>('input[name="world-name"]')!;
       const name = nameInput.value.trim() || 'Untitled world';
+
+      // Tour mode: hand the create to the tour engine and close. No folder,
+      // no waypoint, no navigation of our own — the tour routes.
+      if (this.tour) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating…';
+        cancelBtn.hidden = true;
+        try {
+          await this.tour.overrideCreate();
+          this.hide();
+        } catch (err) {
+          this.showError(errorBox, err instanceof Error ? err.message : String(err));
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Create';
+          cancelBtn.hidden = false;
+        }
+        return;
+      }
 
       submitBtn.disabled = true;
       submitBtn.textContent = 'Creating…';

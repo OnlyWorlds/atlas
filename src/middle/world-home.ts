@@ -32,6 +32,7 @@ import { isWritingNarrative } from './writing-helpers';
 import { escapeText, relativeTime } from '../core/dom-utils';
 import { setWorldFavoriteElement, dismissTourCard, saveRegistry } from '../registry/registry';
 import { computeTourCards, type TourWaveEntry } from './home-tour';
+import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
 import { timelineHash } from '../core/router';
 import { tableauScope } from '../visualization/timeline/chart-recipe';
@@ -554,6 +555,11 @@ function buildTour(
   worldId: string,
   toasts: ToastManager,
 ): HTMLElement | null {
+  // While the GUIDED tour is running, the home onboarding cards stay silent —
+  // "Your world is empty · Create something new" beside a bar saying "click
+  // Next" is two onboardings talking at once (the S264 intersection class).
+  // Read the persisted flag directly: cheap, and no tour-engine import here.
+  if (isTourFlagActive()) return null;
   const reg = getState().registry.worlds.find(w => w.id === worldId);
   const dismissed = new Set(reg?.tour_dismissed ?? []);
   const cards = computeTourCards(counts, dismissed);

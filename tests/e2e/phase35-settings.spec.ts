@@ -52,7 +52,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('settings opens to onlyworlds tab; world tab disabled without active world', async ({ page }) => {
-  await page.click('[data-action="open-settings"]');
+  // Pre-root the bare splash hides the gear; the settings route stays live.
+  await page.evaluate(() => { window.location.hash = '#/settings'; });
   await expect(page.locator('.atlas-settings')).toBeVisible();
   await expect(page.locator('[data-settings-tab="onlyworlds"]')).toHaveClass(/active/);
   await expect(page.locator('[data-settings-tab="world"]')).toBeDisabled();

@@ -33,6 +33,13 @@ import type { WorldRegistryEntry } from '../core/types';
 /** One-time "start here" tour tag on +folder — dismissed forever on first hover. */
 const TOUR_CREATE_SEEN_KEY = 'atlas_tour_create_seen';
 
+import { isTourFlagActive } from '../tour/tour-flag';
+
+/** Guided tour running with no atlas root. */
+function isTouringNoRoot(): boolean {
+  return !getState().atlasRoot && isTourFlagActive();
+}
+
 export interface WorldsBodyMount {
   content: HTMLElement;
   toasts: ToastManager;
@@ -78,6 +85,45 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           <span class="material-symbols-outlined atlas-add-glyph-main">visibility</span>
         </button>
       `;
+    } else if (isTouringNoRoot()) {
+      // Guided tour, stage 1 (no atlas root): the sidebar shows its TRUE
+      // final structure — all five action icons in their real places — with
+      // only create-world live and the rest greyed (Captain's call: the
+      // landscape appears once, in its exact geometry; nothing jumps into
+      // existence later).
+      header.innerHTML = `
+        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="create-local" title="Create the tour world">
+          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
+          <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
+        </button>
+        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" disabled title="After the tour">
+          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
+          <span class="material-symbols-outlined atlas-add-glyph-main">folder_open</span>
+        </button>
+        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" disabled title="After the tour">
+          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
+          <span class="material-symbols-outlined atlas-add-glyph-main">cloud_upload</span>
+        </button>
+        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" disabled title="After the tour">
+          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
+          <span class="material-symbols-outlined atlas-add-glyph-main">link</span>
+        </button>
+        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" disabled title="After the tour">
+          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
+          <span class="material-symbols-outlined atlas-add-glyph-main">visibility</span>
+        </button>
+      `;
+      header.querySelector<HTMLButtonElement>('[data-action="create-local"]')
+        ?.addEventListener('click', () => {
+          void import('../tour/tour-engine').then(async (engine) => {
+            new CreateWorldModal(toasts, undefined, {
+              lockedName: 'Hyperion',
+              hint: 'Normally this becomes a folder inside your OnlyWorlds folder. The tour world stays in your browser and folds away when the tour ends.',
+              overrideCreate: async () => { await engine.createWorldFromTour(); },
+            }).open();
+          });
+        });
+      return;
     } else {
       // No atlas root (recoverable or first-launch): the sidebar header has
       // no actions. The welcome panel in the middle pane is the single CTA

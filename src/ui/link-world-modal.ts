@@ -62,7 +62,7 @@ export class LinkWorldModal extends BaseModal {
         </label>
         <label class="atlas-modal-field">
           <span>PIN</span>
-          <input class="atlas-input" type="text" name="api-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" autocomplete="off" maxlength="8" />
+          <input class="atlas-input" type="password" name="api-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" autocomplete="off" maxlength="8" />
         </label>
         <label class="atlas-modal-field">
           <span>Display name (optional)</span>

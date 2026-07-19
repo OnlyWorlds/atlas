@@ -53,7 +53,7 @@ export class NewApiWorldModal extends BaseModal {
       `}
       <label class="atlas-modal-field">
         <span>PIN</span>
-        <input class="atlas-input" type="text" name="api-pin" placeholder="OnlyWorlds PIN (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
+        <input class="atlas-input" type="password" name="api-pin" placeholder="OnlyWorlds PIN (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
       </label>
       <p class="atlas-modal-error" data-role="error" hidden></p>
       <div class="atlas-modal-progress" data-role="progress" hidden></div>

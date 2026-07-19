@@ -47,7 +47,9 @@ test('first launch shows the setup-atlas CTA, not create-local', async ({ page }
   await expect(page.locator('[data-action="create-local"]')).toHaveCount(0);
   await expect(page.locator('.atlas-landing-mark')).toHaveText('Atlas');
   await expect(page.locator('.atlas-middle')).toContainText('A free, local-first worldbuilding studio.');
-  await expect(page.locator('.atlas-middle')).toContainText('Set up a local folder');
+  await expect(page.locator('.atlas-middle')).toContainText('Set up a folder');
+  // The tour door (2026-07-19) leads the landing.
+  await expect(page.locator('[data-action="start-tour"]')).toBeVisible();
 });
 
 test('set up atlas folder flips the UI into create-local mode', async ({ page }) => {
@@ -387,9 +389,10 @@ test('change atlas folder swaps the root without losing existing worlds', async 
 });
 
 test('settings gear opens panel without an active world', async ({ page }) => {
-  // No atlas root, no worlds — clicking settings should still navigate to the
-  // settings panel and let the user set up an atlas folder.
-  await page.click('[data-action="open-settings"]');
+  // No atlas root, no worlds — the bare splash hides the sidebar (and its
+  // gear), but the settings ROUTE stays live: navigate directly and the
+  // storage tab still offers the set-up-atlas path.
+  await page.evaluate(() => { window.location.hash = '#/settings'; });
   await expect(page.locator('.atlas-settings')).toBeVisible();
   await expect(page.locator('.atlas-settings h1')).toContainText(/settings/i);
   // Click the storage tab to verify the "not set up" prompt is in there.

@@ -18,6 +18,7 @@ import { lensKnownSet } from '../core/knowledge';
 import { reservedRowHint } from '../core/taxonomy';
 import { ToastManager } from '../ui/toast-manager';
 import { ElementCreateModal } from '../ui/element-create-modal';
+import { isTourFlagActive } from '../tour/tour-flag';
 import { getCurrentSyncEngine, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
 import { escapeText, escapeAttr } from '../core/dom-utils';
@@ -104,21 +105,43 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   // name (S255v3): searched-for-it-and-it's-missing flows straight into
   // making it, and the empty-world "Create an element…" placeholder keeps
   // its promise.
-  createBtn.addEventListener('click', () => new ElementCreateModal(toasts, {
-    initialName: searchInput.value.trim() || undefined,
-    // A single active type filter carries into the modal as the preselected
-    // category (S265, Captain) — filtering to characters then hitting + means
-    // "another character" far more often than not.
-    initialType: getState().ui.elementFilters?.size === 1
-      ? [...getState().ui.elementFilters][0]
-      : undefined,
-    // The search text became the element's name — clear the filter so the
-    // new element isn't the only visible row (S255v4, Captain).
-    afterCreate: () => {
-      searchInput.value = '';
-      patchSlice('ui', { ...getState().ui, search: '' });
-    },
-  }).open());
+  createBtn.addEventListener('click', () => {
+    // During the tour's consul beat, EVERY create door leads to the scripted
+    // consul (Captain: the free modal mid-script broke the railroad). Once
+    // the consul exists the sandbox is free again.
+    if (isTourFlagActive()) {
+      void import('../tour/tour-engine').then((engine) => {
+        if (engine.consulCreated()) { openNormalCreate(); return; }
+        new ElementCreateModal(toasts, {
+          initialType: 'character',
+          initialName: 'The Consul',
+          lockAll: true,
+          overrideCreate: async () => { await engine.createConsul(); },
+          suppressToast: true,
+        }).open();
+      });
+      return;
+    }
+    openNormalCreate();
+  });
+
+  function openNormalCreate(): void {
+    new ElementCreateModal(toasts, {
+      initialName: searchInput.value.trim() || undefined,
+      // A single active type filter carries into the modal as the preselected
+      // category (S265, Captain) — filtering to characters then hitting + means
+      // "another character" far more often than not.
+      initialType: getState().ui.elementFilters?.size === 1
+        ? [...getState().ui.elementFilters][0]
+        : undefined,
+      // The search text became the element's name — clear the filter so the
+      // new element isn't the only visible row (S255v4, Captain).
+      afterCreate: () => {
+        searchInput.value = '';
+        patchSlice('ui', { ...getState().ui, search: '' });
+      },
+    }).open();
+  }
   searchRow.appendChild(createBtn);
 
   content.appendChild(searchRow);

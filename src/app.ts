@@ -83,6 +83,20 @@ export function startApp(container: HTMLElement): AppHandle {
   // Mount shell.
   const shell = mountAppShell(container);
 
+  // Guided tour (2026-07-19): lazy — the chunk loads only when a persisted
+  // tour is active. ensureTourBar mounts/unmounts on tour-state changes; the
+  // resume path reactivates the tour's demo world after a reload.
+  try {
+    if (localStorage.getItem('atlas_tour_v1')) {
+      void import('./tour/tour-engine').then(async (engine) => {
+        if (!engine.isTourActive()) return;
+        await engine.resumeTour();
+        const { ensureTourBar } = await import('./tour/tour-bar');
+        ensureTourBar(document.body);
+      });
+    }
+  } catch { /* private mode */ }
+
   // Sidebar driver (owns mode toggle + body + footer gear).
   const unsubSidebar = mountSidebar({
     toggle: shell.sidebarToggle,

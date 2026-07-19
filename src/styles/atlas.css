@@ -1596,6 +1596,310 @@ html {
   margin-left: auto;
 }
 
+/* ===== Guided tour v2 (2026-07-19) — bare stage + floating narrator =====
+   Stage 0: a full-viewport dark stage; the sentence center-page in the
+   vignette treatment (serif italic, cyan rail, ghost glyphs). Steps 1+: a
+   floating bottom-center glass panel with a body (rail + tint + margin) and
+   a FIXED min-height so the dock never jumps between steps. The sentence is
+   the progress bar: type-colored fill + pre-spaced glyphs lighting up. */
+:root {
+  --tour-serif: 'Crimson Text', Georgia, 'Times New Roman', serif;
+}
+
+/* --- The opener (step 1): the SAME panel, screen-centered, sentence at
+   vignette scale. One component, two positions — the descend is structural. */
+.atlas-tour-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 11.5px;
+  color: var(--atlas-cyan);
+}
+.atlas-tour-bar.centered {
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  min-height: 0;
+  padding: 34px 38px 26px;
+  gap: 18px;
+}
+.atlas-tour-bar.centered .atlas-tour-sentence {
+  font-size: 20px;
+  line-height: 1.8;
+}
+/* The opener has no app behind it — hide the whole shell at stage 0. */
+body.atlas-touring[data-tour-stage="0"] .atlas-shell {
+  visibility: hidden;
+}
+
+/* --- The narrator panel --- */
+.atlas-tour-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 16px;
+  /* Below modals (z 1000): a dialog always outranks the narrator. */
+  z-index: 900;
+  width: min(960px, calc(100vw - 48px));
+  min-height: 148px;
+  box-sizing: border-box;
+  background: rgba(8, 13, 18, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  border-top: 2px solid var(--atlas-cyan);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  padding: 14px 22px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12.5px;
+}
+/* Reserve the narrator's strip so app content stays reachable above it. */
+body.atlas-touring .atlas-shell {
+  height: calc(100vh - 180px);
+}
+.atlas-tour-sentence {
+  font-family: var(--tour-serif);
+  font-style: italic;
+  line-height: 1.9;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 14.5px;
+  max-width: 75ch;
+}
+.atlas-tour-word.parsed {
+  color: rgba(255, 255, 255, 0.92);
+  border-bottom: 2px solid var(--tour-word-color, var(--atlas-cyan));
+  cursor: pointer;
+}
+.atlas-tour-word.active {
+  background: rgba(34, 211, 238, 0.16);
+  border-radius: 2px;
+  color: #fff;
+}
+/* Ghost glyphs — pre-spaced from step 0 (zero reflow), lit when earned. */
+.atlas-tour-sentence .atlas-tour-glyph {
+  font-size: 13px;
+  font-style: normal;
+  vertical-align: baseline;
+  margin-left: 3px;
+  opacity: 0.22;
+  color: rgba(255, 255, 255, 0.8);
+}
+.atlas-tour-sentence .atlas-tour-glyph.lit {
+  opacity: 1;
+  color: var(--tour-glyph-color, var(--atlas-cyan));
+  cursor: pointer;
+}
+.atlas-tour-sentence .atlas-tour-glyph.pop {
+  animation: atlas-tour-glyph-pop 0.45s ease-out;
+}
+@keyframes atlas-tour-glyph-pop {
+  0% { transform: scale(0.4); opacity: 0.2; }
+  60% { transform: scale(1.35); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.atlas-tour-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  max-width: 75ch;
+  /* The hairline: material (the sentence) above, narration below. */
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  padding-top: 9px;
+}
+.atlas-tour-body {
+  color: rgba(255, 255, 255, 0.78);
+  flex: 1 1 480px;
+  min-width: 0;
+}
+.atlas-tour-meta {
+  flex-basis: 100%;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 11px;
+  margin: 0;
+}
+.atlas-tour-deeper-toggle {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.atlas-tour-deeper-toggle .material-symbols-outlined { font-size: 13px; }
+.atlas-tour-deeper-toggle:hover { color: var(--atlas-cyan); }
+/* Inline links in the copy row (the explorer) share the deeper toggle's
+   metrics exactly — same line, same height, no dock reshape. */
+.atlas-tour-inline-link {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.atlas-tour-inline-link .material-symbols-outlined { font-size: 13px; }
+.atlas-tour-inline-link:hover { color: var(--atlas-cyan); }
+/* The deeper FLYOUT: anchors above the panel, scrolls inside itself — the
+   dock's height never changes (Captain's rule, v2.1). */
+.atlas-tour-deeper {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  max-height: 38vh;
+  overflow-y: auto;
+  background: rgba(8, 13, 18, 0.96);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  padding: 14px 18px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.atlas-tour-deeper p { margin: 0 0 9px; }
+.atlas-tour-deeper p:last-child { margin-bottom: 0; }
+.atlas-tour-attribution {
+  flex-basis: 100%;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 10.5px;
+  text-decoration: none;
+}
+.atlas-tour-attribution:hover { color: rgba(255, 255, 255, 0.55); }
+.atlas-tour-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.atlas-tour-act {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+}
+.atlas-tour-spacer { flex: 1; }
+.atlas-tour-consul-widget {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.atlas-tour-consul-widget .atlas-input { width: 200px; }
+.atlas-tour-exit {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+}
+
+/* --- The progressive build-up: chrome appears when it is taught. ---
+   Stage stamped on <body data-tour-stage>: 0 bare stage · 1 shell + worlds
+   create · 2 elements era · 3 + right pane (maps) · 4 + writing · 5 + charts
+   · 6 everything. The sidebar footer stays hidden for the WHOLE tour
+   (Captain: the settings row under the narrator read as noise). */
+body.atlas-touring .atlas-sidebar-footer { display: none; }
+/* Right pane + its divider exist from the maps act. */
+body.atlas-touring[data-tour-stage="1"] .atlas-right,
+body.atlas-touring[data-tour-stage="2"] .atlas-right,
+body.atlas-touring[data-tour-stage="1"] .atlas-middle ~ .atlas-divider,
+body.atlas-touring[data-tour-stage="2"] .atlas-middle ~ .atlas-divider {
+  display: none;
+}
+/* Room icons: home always; writing from stage 4; charts from stage 5; the
+   rest (knowledge, pages, import, expander) only at stage 6. */
+body.atlas-touring .atlas-room-nav-strip [data-room],
+body.atlas-touring .atlas-room-nav-expand,
+body.atlas-touring .atlas-room-nav-strip.is-preview {
+  display: none;
+}
+body.atlas-touring .atlas-room-nav-strip [data-room="home"] { display: inline-flex; }
+body.atlas-touring[data-tour-stage="4"] .atlas-room-nav-strip [data-room="writing"],
+body.atlas-touring[data-tour-stage="5"] .atlas-room-nav-strip [data-room="writing"],
+body.atlas-touring[data-tour-stage="6"] .atlas-room-nav-strip [data-room="writing"] {
+  display: inline-flex;
+}
+body.atlas-touring[data-tour-stage="5"] .atlas-room-nav-strip [data-room="timeline"],
+body.atlas-touring[data-tour-stage="6"] .atlas-room-nav-strip [data-room="timeline"] {
+  display: inline-flex;
+}
+body.atlas-touring[data-tour-stage="6"] .atlas-room-nav-strip [data-room] {
+  display: inline-flex;
+}
+/* Stage 1 shows the landing's middle — quiet it; the narrator is the voice. */
+body.atlas-touring[data-tour-stage="1"] .atlas-landing { display: none; }
+/* Greyed siblings in the stage-1 worlds header: the landscape in its exact
+   geometry, capabilities dimmed until the tour ends. */
+.atlas-tour-locked {
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+/* Pre-setup: the splash is a BARE stage — nothing but the doors on black,
+   continuous into the tour's opener (Captain's ruling: the footer goes too;
+   settings stays reachable at the #/settings route). */
+body.atlas-preroot .atlas-sidebar,
+body.atlas-preroot .atlas-divider,
+body.atlas-preroot .atlas-right,
+body.atlas-preroot .atlas-middle-room-nav {
+  display: none;
+}
+body.atlas-preroot .atlas-middle {
+  /* The shell stamps pane widths as inline flex-basis (divider ratios) —
+     override them for the bare stage so the splash owns the viewport. */
+  flex: 1 1 100% !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Landing doors — tour + folder side by side (2026-07-19 v2). */
+.atlas-landing-doors {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  align-items: stretch;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.atlas-landing-door {
+  flex: 0 1 300px;
+  background: rgba(8, 13, 18, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.atlas-landing-door h3 {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.92);
+}
+.atlas-landing-door p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  flex: 1;
+}
+.atlas-landing-door .atlas-landing-btn {
+  margin-top: 10px;
+  align-self: flex-start;
+}
+
+.atlas-landing-tour-hint {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin: 6px 0 18px;
+}
+.atlas-landing-context {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11.5px;
+  margin-top: 8px;
+  max-width: 420px;
+}
+.atlas-landing-context a { color: rgba(34, 211, 238, 0.7); }
+
 /* Chronicle sparkle — sidebar rows for elements recorded from play. */
 .atlas-row-chronicle {
   font-size: 12px;
@@ -2290,6 +2594,31 @@ html {
 .atlas-map-canvas-container.leaflet-container,
 .atlas-map-canvas-container.leaflet-grab {
   cursor: default !important;
+}
+
+/* Visibility toggles: hidden state dims the subject glyph and shows a small
+   slash-eye badge at the corner (2026-07-19 — the old identical-eye pair).
+   Scoped to the two visibility buttons: `.is-active` on OTHER toolbar buttons
+   is the draw-mode cyan state and must keep its look; here it means "layer
+   hidden", which wants neutral-dim, not cyan-on. */
+.atlas-map-toolbar-btn { position: relative; }
+.atlas-map-toolbar-zones-btn.is-active,
+.atlas-map-toolbar-pins-btn.is-active {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--atlas-text-muted);
+  border-color: transparent;
+}
+.atlas-map-toolbar-zones-btn.is-active .material-symbols-outlined:first-child,
+.atlas-map-toolbar-pins-btn.is-active .material-symbols-outlined:first-child {
+  opacity: 0.35;
+}
+.atlas-map-toolbar-eyeoff {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  font-size: 11px !important;
+  color: var(--atlas-text-muted);
+  pointer-events: none;
 }
 
 /* First-open decode hint for URL-sourced map images (2026-07-19). The

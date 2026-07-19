@@ -10,6 +10,8 @@
  */
 
 import { ToastManager } from '../../ui/toast-manager';
+import { getState, patchSlice } from '../../core/state';
+import { navigate, elementHash } from '../../core/router';
 import { mapTabCache } from './map-tab-cache';
 import { toggleVisualSettingsPopover } from './map-visual-settings-popover';
 import { startDrawing, getActiveDraft, cancelDrawing } from './zone-drawing';
@@ -29,6 +31,8 @@ export interface CanvasToolbarRefs {
    * zone-dropdown.ts.
    */
   zonesDropdownBtn: HTMLButtonElement;
+  /** Far-right map glyph → navigates to the map element's edit page. */
+  editMapBtn: HTMLButtonElement;
 }
 
 export function buildCanvasToolbar(): CanvasToolbarRefs {
@@ -39,15 +43,22 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
   const settingsBtn = makeButton('settings', 'Map visual settings', 'map-visual-settings');
   const drawPolygonBtn = makeButton('hexagon', 'Draw polygon zone', 'draw-polygon');
   const drawLineBtn = makeButton('show_chart', 'Draw line zone', 'draw-line');
-  const toggleZonesBtn = makeButton('visibility', 'Show/hide zones', 'toggle-zones-visibility');
-  const togglePinsBtn = makeButton('visibility', 'Show/hide pins', 'toggle-pins-visibility');
+  // Visibility toggles show the SUBJECT (zones / pins), not an identical eye
+  // pair (Captain, 2026-07-19: "identical icons — a bit confusing"). Hidden
+  // state = a small slash-eye badge + dimmed button, wired below.
+  const toggleZonesBtn = makeButton('pentagon', 'Show/hide zones', 'toggle-zones-visibility');
+  const togglePinsBtn = makeButton('location_on', 'Show/hide pins', 'toggle-pins-visibility');
   const fitToImageBtn = makeButton('fit_screen', 'Fit map to image', 'fit-to-image');
 
-  // The pins-visibility button keeps the same glyph as zones-visibility but
-  // differentiates via a small pin glyph overlay. Two-glyph composition
-  // mirroring the [+map]/[+pin] pattern used in element-detail header.
   togglePinsBtn.classList.add('atlas-map-toolbar-pins-btn');
   toggleZonesBtn.classList.add('atlas-map-toolbar-zones-btn');
+  for (const b of [toggleZonesBtn, togglePinsBtn]) {
+    const badge = document.createElement('span');
+    badge.className = 'material-symbols-outlined atlas-map-toolbar-eyeoff';
+    badge.textContent = 'visibility_off';
+    badge.hidden = true;
+    b.appendChild(badge);
+  }
 
   // Right-side zones dropdown (ZC9). Anchored right via margin-left:auto on
   // the spacer below. The button itself shows a count badge of how many
@@ -76,6 +87,10 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
   spacer.className = 'atlas-map-toolbar-spacer';
   spacer.setAttribute('aria-hidden', 'true');
 
+  // Far right, past the zones dropdown: open the map ELEMENT's edit page
+  // (Captain, 2026-07-19 — the canvas had no route to the map's own editor).
+  const editMapBtn = makeButton('map', 'Open this map element', 'open-map-element');
+
   root.append(
     settingsBtn,
     divider(),
@@ -88,6 +103,7 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
     fitToImageBtn,
     spacer,
     zonesDropdownBtn,
+    editMapBtn,
   );
 
   return {
@@ -99,6 +115,7 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
     togglePinsBtn,
     fitToImageBtn,
     zonesDropdownBtn,
+    editMapBtn,
   };
 }
 
@@ -121,33 +138,42 @@ export function wireCanvasToolbar(
 
   // Visibility toggles (transient, not persisted to prefs). State held in
   // the button's `is-active` class; default = visible (button not active).
+  // Hidden state = is-active class (dims the subject glyph via CSS) + the
+  // small slash-eye badge. The subject glyph itself never swaps.
+  const setHiddenLook = (btn: HTMLButtonElement, hidden: boolean): void => {
+    btn.classList.toggle('is-active', hidden);
+    const badge = btn.querySelector<HTMLElement>('.atlas-map-toolbar-eyeoff');
+    if (badge) badge.hidden = !hidden;
+  };
+
   refs.toggleZonesBtn.addEventListener('click', () => {
     const e = mapTabCache.get(mapId);
     if (!e?.zoneOverlay) return;
     const wasVisible = e.zoneOverlay.isLayerVisible();
     e.zoneOverlay.setLayerVisible(!wasVisible);
-    refs.toggleZonesBtn.classList.toggle('is-active', wasVisible);
-    // Glyph swap: visibility ↔ visibility_off mirrors the state.
-    const icon = refs.toggleZonesBtn.querySelector('.material-symbols-outlined');
-    if (icon) icon.textContent = wasVisible ? 'visibility_off' : 'visibility';
+    setHiddenLook(refs.toggleZonesBtn, wasVisible);
   });
 
   refs.togglePinsBtn.addEventListener('click', () => {
     const e = mapTabCache.get(mapId);
     if (!e) return;
-    const currentlyActive = refs.togglePinsBtn.classList.contains('is-active');
-    // Active class indicates "pins hidden" — flip.
-    const nextHidden = !currentlyActive;
+    const nextHidden = !refs.togglePinsBtn.classList.contains('is-active');
     e.manager.setPinsLayerVisible(!nextHidden);
-    refs.togglePinsBtn.classList.toggle('is-active', nextHidden);
-    const icon = refs.togglePinsBtn.querySelector('.material-symbols-outlined');
-    if (icon) icon.textContent = nextHidden ? 'visibility_off' : 'visibility';
+    setHiddenLook(refs.togglePinsBtn, nextHidden);
   });
 
   refs.fitToImageBtn.addEventListener('click', () => {
     const e = mapTabCache.get(mapId);
     if (!e) return;
     e.manager.fitToCanvas();
+  });
+
+  // Map glyph, far right → the map element's own edit page.
+  refs.editMapBtn.addEventListener('click', () => {
+    const worldId = getState().active?.worldId;
+    if (!worldId) return;
+    patchSlice('ui', { ...getState().ui, selectedElementId: mapId });
+    navigate(elementHash(worldId, mapId));
   });
 
   // Draw buttons → toggle drawing mode for this map.
