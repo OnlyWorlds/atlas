@@ -1655,12 +1655,22 @@ body.atlas-touring[data-tour-stage="0"] .atlas-shell {
   visibility: hidden;
 }
 
-/* --- The narrator panel --- */
+/* --- The narrator panel ---
+ *
+ * The dock's height is a VARIABLE because two things must agree on it: the
+ * panel itself and the shell's reserved strip (see body.atlas-touring
+ * .atlas-shell). They were hardcoded separately and drifted 126px apart,
+ * which is what put app content under the narrator (S301).
+ */
+:root {
+  --tour-dock-h: 290px;
+  --tour-dock-gap: 16px;
+}
 .atlas-tour-bar {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 16px;
+  bottom: var(--tour-dock-gap);
   /* Below modals (z 1000): a dialog always outranks the narrator. */
   z-index: 900;
   width: min(960px, calc(100vw - 48px));
@@ -1670,7 +1680,7 @@ body.atlas-touring[data-tour-stage="0"] .atlas-shell {
      pass evens the body lengths, this drops and the dead space shrinks with
      it (constant-size and no-slack both come from even copy). Deeper content
      is a flyout, so the dock's own content never exceeds this. */
-  height: 290px;
+  height: var(--tour-dock-h);
   box-sizing: border-box;
   background: rgba(8, 13, 18, 0.92);
   backdrop-filter: blur(12px);
@@ -1684,27 +1694,48 @@ body.atlas-touring[data-tour-stage="0"] .atlas-shell {
   gap: 8px;
   font-size: 12.5px;
 }
-/* Reserve the narrator's strip so app content stays reachable above it. */
+/* Reserve the narrator's strip so app content stays reachable above it.
+ *
+ * S301: this reserved 180px while the dock occupied 290 + 16 bottom = 306,
+ * and that 126px mismatch WAS the occlusion — the Consul's fields, the
+ * charts rail and the bottom of the map the user is told to click all ran
+ * underneath the narrator (measured: 172px of the right pane covered on
+ * every step). Deriving the reserve from the dock's own height makes the
+ * two impossible to drift apart again: app content simply ends above the
+ * narrator, and the map RESIZES instead of hiding. Change the dock height in
+ * one place and the shell follows.
+ */
 body.atlas-touring .atlas-shell {
-  height: calc(100vh - 180px);
+  height: calc(100vh - var(--tour-dock-h) - var(--tour-dock-gap) * 2);
 }
 .atlas-tour-sentence {
   font-family: var(--tour-serif);
   font-style: italic;
   line-height: 1.9;
   color: rgba(255, 255, 255, 0.42);
-  font-size: 14.5px;
-  max-width: 75ch;
+  /* ONE size in the dock, always (S301, Captain: "should stay constant size").
+     It used to grow to 15.5px on the first two steps via .is-fresh and shrink
+     from step 3, which read as the panel resizing under the reader. The big
+     presentation of the sentence is step 0's job (center stage); once it
+     docks it never changes size again. */
+  font-size: 15.5px;
+  /* Was 75ch, which left ~200px of dead space to the right of the sentence
+     inside a 914px panel (measured, S301). The panel governs the width. */
+  max-width: none;
 }
-/* The first two steps: the sentence jumps out bright (Freek's round) —
-   the material leads before the parsing dims it into a progress surface. */
+/* The first two steps: the sentence reads BRIGHT (Freek's round) — the
+   material leads before the parsing dims it into a progress surface. Colour
+   only; size is constant (above). */
 .atlas-tour-bar.is-fresh .atlas-tour-sentence {
   color: rgba(255, 255, 255, 0.88);
-  font-size: 15.5px;
 }
 .atlas-tour-word.parsed {
-  color: rgba(255, 255, 255, 0.92);
-  border-bottom: 2px solid var(--tour-word-color, var(--atlas-cyan));
+  /* The type colour used to live ONLY in the underline, so the words were
+     uniformly white and the sentence became a thicket of underlines by the
+     finale — the payoff state looked worse than the opener (S301). The colour
+     moves into the text and the border goes: colour plus the lit glyph say
+     "this word became an element" without the ink. */
+  color: var(--tour-word-color, var(--atlas-cyan));
   cursor: pointer;
 }
 .atlas-tour-word.active {
@@ -1712,13 +1743,18 @@ body.atlas-touring .atlas-shell {
   border-radius: 2px;
   color: #fff;
 }
-/* Ghost glyphs — pre-spaced from step 0 (zero reflow), lit when earned. */
+/* Ghost glyphs — pre-spaced from step 0 (zero reflow), lit when earned.
+   S301 (Captain): unlit glyphs go practically invisible rather than grey. The
+   SPACE is still reserved, so lighting one still causes zero reflow; what
+   dies is Skeld's "the ghosts promise the journey" read, traded for a calmer
+   sentence. A hair above zero so the shape is faintly there on a bright
+   display rather than popping from nothing. */
 .atlas-tour-sentence .atlas-tour-glyph {
   font-size: 13px;
   font-style: normal;
   vertical-align: baseline;
   margin-left: 3px;
-  opacity: 0.22;
+  opacity: 0.05;
   color: rgba(255, 255, 255, 0.8);
 }
 .atlas-tour-sentence .atlas-tour-glyph.lit {
@@ -1913,7 +1949,13 @@ body.atlas-touring.atlas-tour-preweb .atlas-right [data-tab-kind="context"] {
    geometry, capabilities dimmed until the tour ends. */
 .atlas-tour-locked {
   opacity: 0.28;
-  pointer-events: none;
+  /* NOT pointer-events:none, and the buttons carry aria-disabled rather than
+     the disabled attribute (S301): Captain asked for tour-mode tooltips on
+     these greyed icons explaining what each will do, and a browser fires no
+     hover events on a disabled control OR on a pointer-events:none one — the
+     tooltip would have been written and never seen. They stay inert because
+     nothing binds a handler to them and they carry no data-action. */
+  cursor: default;
 }
 
 /* Pre-setup: the splash is a BARE stage — nothing but the doors on black,

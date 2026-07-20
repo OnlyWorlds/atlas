@@ -330,19 +330,53 @@ async function aliasesOnFor(revealed: Set<string>): Promise<boolean> {
   return !!chapter && revealed.has(chapter.el.id);
 }
 
+/**
+ * The set of bundle ids a LINK may point at, which is NOT the same as the set
+ * of elements this step creates (gate R1/R2, S301).
+ *
+ * Stripping exists for one reason: never render a chip pointing at something
+ * that is not there. So the honest rule is **never strip a link whose target
+ * is present on disk**, whoever put it there. Two bugs die with it:
+ *
+ *  - a user-minted element (the `creates` door) linked to another element
+ *    minted seconds earlier had that link deleted, so the objects step
+ *    taught "the balcony's parent object is the spaceship" on a page whose
+ *    Parent object was empty;
+ *  - stepping BACK into a completed step re-stripped links off elements that
+ *    still exist, so the chips the user had just watched appear vanished and
+ *    oscillated on every back/forward.
+ *
+ * The CREATE set stays strictly step-keyed (below) — this only widens what a
+ * surviving link may reference.
+ */
+async function linkableIds(universe: Set<string>, revealed: Set<string>): Promise<Set<string>> {
+  const store = getActiveStore();
+  if (!store) return revealed;
+  const effective = new Set(revealed);
+  try {
+    for (const el of await store.listElements()) {
+      if (universe.has(el.id)) effective.add(el.id);
+    }
+  } catch { /* store closing mid-teardown — the step-keyed set still serves */ }
+  return effective;
+}
+
 /** Idempotently ensure everything up to `stepIndex` is on disk, links healed. */
 async function revealUpTo(stepIndex: number): Promise<void> {
   const universe = await bundleIds();
   const revealed = await idsUpTo(stepIndex);
-  const aliasesOn = await aliasesOnFor(revealed);
+  const linkable = await linkableIds(universe, revealed);
+  const aliasesOn = await aliasesOnFor(linkable);
   const bundle = await loadBundle();
   let wrote = false;
   for (const el of bundle.elements) {
+    // CREATION is step-keyed: a hands-on/creates element is the USER's to
+    // make on its own step. `linkable` never widens what gets written.
     if (!revealed.has(el.id)) continue;
-    if (await revealOne(el, universe, revealed, aliasesOn)) wrote = true;
+    if (await revealOne(el, universe, linkable, aliasesOn)) wrote = true;
   }
-  const healed = await healLinks(universe, revealed, aliasesOn);
-  const mediaHealed = await healMedia(revealed);
+  const healed = await healLinks(universe, linkable, aliasesOn);
+  const mediaHealed = await healMedia(linkable);
   // ANY heal write refreshes in the same step-enter (gate C5, two lenses
   // convergent on the media leg) — a healed link or re-attached image must
   // be visible on the surface the user is looking at, not next tick.
@@ -475,6 +509,20 @@ async function enterStepNow(index: number): Promise<void> {
   // re-renders each step (the force-render idiom, convention #2).
   patchSlice('ui', { ...getState().ui });
   emit();
+}
+
+/**
+ * Drain the step chain — the settle signal for tests.
+ *
+ * A step's own `data-tour-step` attribute is NOT a settle signal: the panel
+ * re-renders from `writeTourState`'s emit, which fires BEFORE `revealUpTo`
+ * heals and before `routeFor` navigates. A test that syncs on the attribute
+ * therefore reads the world mid-step and can pass whatever the code does
+ * (this is exactly how a back-navigation regression test passed against the
+ * bug it was written for). Mirrors `FsFolderStore.awaitTidies`.
+ */
+export function awaitTourSettled(): Promise<void> {
+  return stepChain.catch(() => { /* a failed step still settles */ });
 }
 
 export function nextStep(): Promise<void> {

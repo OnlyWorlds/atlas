@@ -1,7 +1,9 @@
 # Atlas — Guided Tour Design
 
-**Version**: 2.4 (2026-07-20, S299 — the resilience contract, 3-lens gated;
-supersedes v2.3)
+**Version**: 2.5 (2026-07-20, S301 — the phase kernel + the strip invariant,
+3-lens gated; supersedes v2.4). The full rework this serves is Captain's dump
+of 2026-07-20: plan + positions in `Notes/2026-07-20-s301-tour-rework-plan.md`,
+contract + gate amendments in `Notes/2026-07-20-s301-phase-contract.md`.
 **Concept**: Freek + Captain, 2026-07-19. The opening sentence of *Hyperion*
 by Dan Simmons becomes a small linked world, step by railroaded step,
 teaching OnlyWorlds AND atlas at once — while the workspace BUILDS ITSELF
@@ -197,12 +199,57 @@ on a live heal (the railroad heals before the room mounts, so targets always
 exist by mount time).
 
 **The reveal system**: the world starts empty; each step writes its bundle
-elements. Link values pointing at not-yet-revealed bundle ids are STRIPPED
-at write time (never the element's own `id` — identity, not a link) and
-HEALED when targets reveal. `atlas_aliases` defer the same way until the
-CHAPTER reveals (they keep the prose chips word-exact; on a beginner's first
-element page they are noise). A hands-on element only auto-reveals for steps
-strictly past its own.
+elements. Link values pointing at absent bundle ids are STRIPPED at write
+time (never the element's own `id` — identity, not a link) and HEALED when
+targets arrive. `atlas_aliases` defer the same way until the CHAPTER reveals
+(they keep the prose chips word-exact; on a beginner's first element page
+they are noise). A hands-on element only auto-reveals for steps strictly past
+its own.
+
+**TWO SETS, NOT ONE (S301, gate R1/R2 — convergent from two lenses)**: the
+set of elements a step CREATES is step-keyed, but the set a surviving LINK
+may point at is `step-keyed ∪ whatever is on disk` (`linkableIds`). The rule
+is **never strip a link whose target is present on disk**, because stripping
+only ever existed to stop a chip dangling, and a link to a present element
+cannot dangle. Consequence accepted deliberately: the reference set is no
+longer a pure function of the step index. That resolves in favour of the
+world, which is the same philosophy as derived phases — state is truth,
+indices are hints. Two bugs die with it:
+- user-minted elements (the coming `creates` door) losing links to EACH OTHER,
+  which would have had the objects step teach "the balcony's parent object is
+  the spaceship" on a page whose Parent object was empty;
+- back-navigation *deleting* links off elements that still exist, so the
+  payoff chips the user had just watched appear vanished and oscillated on
+  every back/forward.
+
+## Phases (S301 — the kernel is in, the wiring is next)
+
+A step's narration changes as the user acts, and its forward control appears
+only once the deed is done. **A phase is DERIVED from world state, never
+stored**: a stored phase index would be a second source of truth that can
+disagree with the world after a reload, a back-nav, or a deletion, and the
+tour already heals the world on every step-enter.
+
+`src/tour/tour-view.ts` is the kernel: store-free, DOM-free, unit-tested.
+- **Prefix semantics**: the winning phase is the last one whose `when` holds
+  AND all earlier phases' `when` also hold. Plain last-match picks a
+  contradictory phase when the user deletes something mid-step (phase C's
+  "all three are here" copy while the ship is gone).
+- **Suspension**: when the tour's world is not the ACTIVE world (`tourIsLive`
+  false — a mid-tour world switch, or teardown), resolution holds the opening
+  phase and `canAdvance` is forced false. Without it the narration reads the
+  user's OWN world: collapsing to "create the Hegemony" while they look at
+  their own novel, or resolving TRUE against foreign data and claiming a deed
+  they never did.
+- **Shorthand**: `data-tour-step` + `data-tour-phase` are stamped on the
+  panel, so a step's second state is "4b" in conversation and in e2e.
+
+**`data-tour-step` IS NOT A SETTLE SIGNAL.** The panel re-renders from
+`writeTourState`'s emit, which fires BEFORE `revealUpTo` heals and before
+`routeFor` navigates. A test that syncs on the attribute reads the world
+mid-step and will pass whatever the code does — this is exactly how the first
+draft of the back-nav regression passed against the bug it was written for.
+Use `__atlasTestApi.awaitTourSettled()` (mirrors `awaitTidies`).
 
 **Safety layer**: the tour world is `demo: true` (waypoint law holds); every
 engine write path re-checks `tourWorldIsActive()`. While touring, the home
@@ -236,7 +283,35 @@ Windows WebKit has no OPFS at all, so real-Safari verification is owed on a
 Mac. Full Safari support = the browser-storage-worlds project (banked,
 post-launch).
 
-## Open work (reconciled S299)
+## The rework in flight (S301 → next bouts)
+
+Captain's dump restructures the whole tour: a new step 0 (sentence centre
+stage, no sidebar, then it hands off into the dock), acts reordered so
+location and map come BEFORE objects (which also lights "sat" in sentence
+order), institution+title combined, a scripted `+` door minting elements one
+at a time instead of modals, a writing beat that teaches the room's tiers and
+has the user link three words, a charts act built element by element
+(including a user CHOICE of event-vs-narrative that teaches the schema's real
+ambiguity), and an exit modal showing which rooms you saw. Positions,
+rulings and open questions live in the plan note; the phase contract carries
+the engineering.
+
+Standing decisions from that round:
+- Create buttons never return to the widget: the narrator narrates, the app
+  is where you act.
+- A pin landing outside the swamps gets a soft correction, not a refusal
+  loop; Next appears once it sits over the zone.
+- The tour world still folds away on exit. RESUME is wanted, and is cheap
+  because `revealUpTo` is idempotent: persist the step + a small choices
+  record (pin position, branch choice, dates, tier labels) and rebuild.
+- The share beat publishes nothing: build the page, add your chart, then meet
+  the real account wall, with a pre-published example page shown honestly as
+  a spoof. Publishing is hard-blocked for a local throwaway world.
+- Dates: one monthless calendar with two eras (**Old Earth** counting down,
+  **PC** counting up — both in-text terms). Atlas already supports monthless
+  calendars and down-eras, so nothing to build. No invented month names.
+
+## Open work (reconciled S301)
 
 - Captain's copy pass over the 17 bodies + meta lines + deeper paragraphs
   (flag sheet `Notes/2026-07-19-s298-tour-flag-sheet.md`).

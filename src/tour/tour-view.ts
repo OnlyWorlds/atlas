@@ -1,0 +1,134 @@
+/**
+ * The tour's view of the world, and phase resolution over it.
+ *
+ * DELIBERATELY STORE-FREE AND DOM-FREE: everything here is a pure function of
+ * a plain snapshot, so the predicates that decide what the narrator says can
+ * be unit-tested without a browser, a store, or a tour. Lifts verbatim.
+ *
+ * WHY DERIVED, NOT STORED (the load-bearing decision, S301): a phase like
+ * "the Hegemony now exists" is a FACT ABOUT THE WORLD. Storing a phase index
+ * beside the step index would create a second source of truth that can
+ * disagree with the world after a reload, a back-navigation, or the user
+ * deleting the element — and the tour already heals the world on every
+ * step-enter, so a derived phase composes with that for free and a stored one
+ * would have to be reconciled against it.
+ *
+ * PREFIX SEMANTICS (gate R10): the winning phase is the last one whose `when`
+ * holds AND all earlier phases' `when` also hold. "Last match wins" alone
+ * picks a contradictory phase when the user deletes something mid-step: with
+ * phases a/b(ship exists)/c(steinway exists), deleting the ship after minting
+ * all three would keep showing c's "all three are here" copy. Prefix reading
+ * is also how an author writes phases: top to bottom, each one further along.
+ *
+ * SUSPENSION (gate R4): when the tour's world is not the ACTIVE world, every
+ * predicate would read someone else's world — collapsing the narration to
+ * phase A ("create the Hegemony") while the user looks at their own novel, or
+ * worse, resolving TRUE against foreign data and claiming a deed they never
+ * did. `tourIsLive` false suspends resolution entirely.
+ */
+
+import type { ElementType } from '../core/types';
+
+/** The snapshot phase predicates read. Built by the caller from app state. */
+export interface TourWorldView {
+  /** The tour's own world exists in the registry. */
+  worldExists: boolean;
+  /**
+   * The tour's world is the ACTIVE one. False after a mid-tour world switch
+   * and during teardown: predicates must not speak about a foreign world.
+   */
+  tourIsLive: boolean;
+  /** A bundle ref ("institution:The Hegemony") is present on disk. */
+  hasRef(ref: string): boolean;
+  /** How many elements of a type the tour world holds. */
+  countOfType(type: ElementType): number;
+  /** The world's clock has a `time_current` (the charts act's now-line beat). */
+  nowIsSet: boolean;
+}
+
+export interface TourPhase {
+  /** 'a' | 'b' | 'c' — stamped as data-tour-phase; the "4b" shorthand. */
+  id: string;
+  body: string;
+  meta?: string;
+  deeper?: string;
+  /** This phase applies when true. Absent = always (the opening phase). */
+  when?: (w: TourWorldView) => boolean;
+  /** Next renders only when true. Absent = always advanceable. */
+  advanceWhen?: (w: TourWorldView) => boolean;
+}
+
+/**
+ * The phase a step is in, given the world. Prefix semantics: walk the phases
+ * in order and stop at the first one whose `when` fails.
+ *
+ * Suspended (`tourIsLive` false) → always the opening phase, because the
+ * predicates cannot see the tour's world to say anything truer.
+ */
+export function resolvePhase(phases: readonly TourPhase[], w: TourWorldView): TourPhase {
+  if (phases.length === 0) {
+    throw new Error('[tour] a step must declare at least one phase');
+  }
+  if (!w.tourIsLive) return phases[0];
+  let winner = phases[0];
+  for (let i = 1; i < phases.length; i++) {
+    const phase = phases[i];
+    if (phase.when && !phase.when(w)) break;
+    winner = phase;
+  }
+  return winner;
+}
+
+/**
+ * Whether the forward control should render for this step.
+ *
+ * Suspended → never: a user looking at their own world must not be able to
+ * advance the tour past a beat they have not performed (and the narrator is
+ * showing the opening phase's copy, which would be advancing on a lie).
+ */
+export function canAdvance(phase: TourPhase, w: TourWorldView): boolean {
+  if (!w.tourIsLive) return false;
+  return phase.advanceWhen ? phase.advanceWhen(w) : true;
+}
+
+/**
+ * Build the view from a plain snapshot. `refToId` resolves bundle refs and
+ * returns undefined before the bundle chunk has loaded — every `hasRef` then
+ * reads false, which is why the opening phase must never claim a deed (the
+ * bundle-load window, upheld by the gate as a real but benign flash).
+ */
+export function buildTourWorldView(input: {
+  elements: ReadonlyArray<{ id: string; type: string }>;
+  worldExists: boolean;
+  tourIsLive: boolean;
+  timeCurrent?: number | null;
+  refToId: (ref: string) => string | undefined;
+}): TourWorldView {
+  const ids = new Set(input.elements.map(e => e.id));
+  const byType = new Map<string, number>();
+  for (const el of input.elements) {
+    byType.set(el.type, (byType.get(el.type) ?? 0) + 1);
+  }
+  return {
+    worldExists: input.worldExists,
+    tourIsLive: input.tourIsLive,
+    hasRef(ref) {
+      const id = input.refToId(ref);
+      return id !== undefined && ids.has(id);
+    },
+    countOfType(type) {
+      return byType.get(type) ?? 0;
+    },
+    nowIsSet: input.timeCurrent != null,
+  };
+}
+
+/** Every ref in `refs` is present. The `creates` gate, and a handy predicate. */
+export function hasAll(refs: readonly string[]): (w: TourWorldView) => boolean {
+  return (w) => refs.every(r => w.hasRef(r));
+}
+
+/** How many of `refs` are present — the signature term for partial progress. */
+export function countPresent(refs: readonly string[], w: TourWorldView): number {
+  return refs.reduce((n, r) => n + (w.hasRef(r) ? 1 : 0), 0);
+}

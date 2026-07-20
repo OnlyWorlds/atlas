@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- The first screen is quieter: no boxes, no headings repeating their own buttons, just the mark, the name, what atlas is, and two small buttons. The OnlyWorlds mark opens onlyworlds.com.
+- The tour no longer sits on top of the app. The workspace now ends above the narrator instead of running underneath it, so the map you are asked to click, and the fields you are asked to read, are fully visible.
+- The tour's sentence reads better as it fills: words that became elements now carry their element type's colour instead of a coloured underline, so the finished sentence is a calm ribbon rather than a wall of underlines. Icons that have not been earned yet are invisible rather than grey, and the sentence keeps one size throughout.
+- The tour's create buttons moved out of the narrator: you use the app's own controls, which light up when it is their turn.
+- Hovering a greyed-out sidebar icon during the tour now explains what it will do once the tour ends.
+- A chart with a single dated element (or several sharing one date) centres it instead of pinning it to the far left edge with empty space to the right.
+- A world opened with a public demo key now links correctly as a view-only world, instead of asking for a PIN it cannot have, or linking as editable and then failing to sync.
+- The tour cleans up after itself completely: it no longer leaves a stale map tab behind that showed up in the first world you made afterwards.
+
 - Selecting text in a page's text block now raises a small toolbar: bold, italic, and a link button that connects the selection to any existing element. Bold and italic always worked from the keyboard (Ctrl+B, Ctrl+I); now they are visible, and they render on the published page too.
 - Link any words to any element: right-click a selection (in page text blocks AND the writing room) and choose "Link to existing element". The words you selected stay exactly as written; they become a chip pointing where you chose, and atlas remembers them as an alias of that element so future mentions auto-link too.
 - A map block on a page follows the world live now: move a pin on the map and the block shows the new position immediately, no re-adding the block needed. (Published pages update on republish, as before.)

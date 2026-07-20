@@ -39,12 +39,41 @@ describe('timeline axis-calculator', () => {
     expect(r.max).toBeCloseTo(200 + 3.8, 4);
   });
 
-  it('calculateTimeRange expands single-point range', () => {
+  it('calculateTimeRange CENTERS a single dated element (S301)', () => {
     const r = calculateTimeRange([
       { id: 'a', elementType: 'event', name: 'A', startDate: 42, endDate: null, dateSpec: { kind: 'exact', value: 42 }, color: '#fff', links: [], degree: 0, contentMass: 0 },
     ]);
-    // After max <= min fallback (max = min + 100) → padding kicks in too
-    expect(r.max).toBeGreaterThan(r.min);
+    // The old rule (max = min + 100, then 2% padding) put the only dot at
+    // ~1.9% across — jammed against the left edge. This test asserted only
+    // `max > min`, which is exactly the kind of wide assertion that
+    // accommodates a bug. The contract now is: a zero-span range has no
+    // direction, so the moment sits in the MIDDLE.
+    expect(r.min).toBe(42 - 50);
+    expect(r.max).toBe(42 + 50);
+    expect((r.min + r.max) / 2).toBe(42);
+  });
+
+  it('calculateTimeRange centers several elements sharing ONE date', () => {
+    // The guided tour's charts act deliberately puts two events at the same
+    // moment before a third pulls the axis open; they must not stack in a
+    // corner while it does.
+    const at = (id: string) => ({
+      id, elementType: 'event' as const, name: id, startDate: 7, endDate: null,
+      dateSpec: { kind: 'exact' as const, value: 7 }, color: '#fff', links: [], degree: 0, contentMass: 0,
+    });
+    const r = calculateTimeRange([at('a'), at('b')]);
+    expect((r.min + r.max) / 2).toBe(7);
+    expect(r.max - r.min).toBe(100);
+  });
+
+  it('a real span is unaffected by the zero-span rule', () => {
+    const r = calculateTimeRange([
+      { id: 'a', elementType: 'event', name: 'A', startDate: 10, endDate: null, dateSpec: { kind: 'exact', value: 10 }, color: '#fff', links: [], degree: 0, contentMass: 0 },
+      { id: 'b', elementType: 'event', name: 'B', startDate: 12, endDate: null, dateSpec: { kind: 'exact', value: 12 }, color: '#fff', links: [], degree: 0, contentMass: 0 },
+    ]);
+    // span 2, padding 0.04 → the tour's current event pair, untouched.
+    expect(r.min).toBeCloseTo(9.96, 5);
+    expect(r.max).toBeCloseTo(12.04, 5);
   });
 
   it('calculateTicks picks an interval matching ~100px tick spacing', () => {

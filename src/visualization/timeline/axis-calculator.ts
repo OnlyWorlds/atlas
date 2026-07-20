@@ -11,6 +11,8 @@ import type { TimelineNode, TimeRange } from './types';
 const PADDING_LEFT = 32;
 const PADDING_RIGHT = 16;
 const TIME_RANGE_PADDING = 0.02;
+/** Half-width of the window drawn around a zero-span range (see below). */
+const ZERO_SPAN_HALF_WINDOW = 50;
 const TICK_TARGETS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000];
 const IDEAL_TICK_PX = 100;
 
@@ -35,7 +37,20 @@ export function calculateTimeRange(nodes: TimelineNode[]): TimeRange {
 
   // All nodes non-finite (or none) → safe default range.
   if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: 0, max: 100 };
-  if (max <= min) max = min + 100;
+  // ZERO-SPAN (one dated element, or several sharing one date): CENTER it.
+  //
+  // This used to read `max = min + 100`, which with the 2% padding put the
+  // only dot at ~1.9% across — jammed against the left edge with the whole
+  // width empty to its right (S301). Every young world hits this: the moment
+  // you date your first element the chart looks broken, and the guided tour
+  // builds a chart up one element at a time, so it would hit it twice before
+  // anything read correctly. A zero-span range has no information about
+  // direction, so the honest rendering puts the moment in the middle and
+  // shows equal time either side of it.
+  if (max <= min) {
+    const half = ZERO_SPAN_HALF_WINDOW;
+    return { min: min - half, max: min + half };
+  }
 
   const span = max - min;
   const padding = span * TIME_RANGE_PADDING;

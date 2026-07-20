@@ -270,49 +270,14 @@ function render(): void {
   // Hands-on steps: the real gesture (primary) OR Next (watch-mode — the
   // engine performs the gesture and advances).
   if (step.handsOn === 'create-world' && !tourWorldExists()) {
-    const doBtn = document.createElement('button');
-    doBtn.type = 'button';
-    doBtn.className = 'atlas-btn-primary';
-    doBtn.setAttribute('data-tour-action', 'create-world');
-    doBtn.textContent = 'Create the world';
-    doBtn.addEventListener('click', () => {
-      void (async () => {
-        const [{ CreateWorldModal }, { toastManager }] = await Promise.all([
-          import('../ui/create-world-modal'),
-          import('../ui/toast-manager'),
-        ]);
-        const { createWorldFromTour } = await import('./tour-engine');
-        new CreateWorldModal(toastManager, undefined, {
-          lockedName: 'Hyperion',
-          hint: 'Normally this becomes a folder, but this tour world is temporary.',
-          overrideCreate: async () => { await createWorldFromTour(); },
-        }).open();
-      })();
-    });
-    controls.appendChild(doBtn);
+    // NO dock button (S301, Captain: "remove the create x buttons from the
+    // widget entirely, force users to use the proper UI"). The route is the
+    // worlds sidebar's own create icon, which the tour renders pulsing and
+    // scripted to the locked Hyperion modal. The narrator narrates; the app
+    // is where you act. Next appears once the world exists (the gate).
   } else if (step.handsOn === 'create-consul' && !consulCreated()) {
-    const doBtn = document.createElement('button');
-    doBtn.type = 'button';
-    doBtn.className = 'atlas-btn-primary';
-    doBtn.setAttribute('data-tour-action', 'create-consul');
-    doBtn.textContent = 'Create the Consul';
-    doBtn.addEventListener('click', () => {
-      void (async () => {
-        const [{ ElementCreateModal }, { toastManager }] = await Promise.all([
-          import('../ui/element-create-modal'),
-          import('../ui/toast-manager'),
-        ]);
-        const { createConsul } = await import('./tour-engine');
-        new ElementCreateModal(toastManager, {
-          initialType: 'character',
-          initialName: 'The Consul',
-          lockAll: true,
-          overrideCreate: async () => { await createConsul(); },
-          suppressToast: true,
-        }).open();
-      })();
-    });
-    controls.appendChild(doBtn);
+    // Same: the elements sidebar's + is the route (it pulses on an empty
+    // world) and is scripted to the locked Consul modal until he exists.
   } else if (step.handsOn === 'place-pin' && !tourPinPlaced()) {
     // NO dock button (Captain's round S299): the user places via the REAL
     // +pin button on the Consul's header — highlighted by the

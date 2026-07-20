@@ -36,7 +36,9 @@ async function openStage0(page: Page) {
 
 /** The consul beat's single route: the locked element modal (no Next until he exists). */
 async function createConsulViaModal(page: Page) {
-  await page.locator('[data-tour-action="create-consul"]').click();
+  // S301: the dock has no create button — the elements sidebar's + is the
+  // route (scripted to the locked Consul modal until he exists).
+  await page.locator('[data-action="create-element"]').click();
   await page.locator('.atlas-modal-overlay button', { hasText: /^Create$/ }).click();
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
 }
@@ -60,7 +62,7 @@ async function createWorldViaModal(page: Page) {
   // four siblings greyed.
   await expect(page.locator('.atlas-worlds-header [data-action="create-local"]')).toBeVisible();
   await expect(page.locator('.atlas-worlds-header .atlas-tour-locked')).toHaveCount(4);
-  await page.locator('[data-tour-action="create-world"]').click();
+  await page.locator('.atlas-worlds-header [data-action="create-local"]').click();
   const nameInput = page.locator('[data-modal="create-world"] input[name="world-name"]');
   await expect(nameInput).toHaveValue('Hyperion');
   await expect(nameInput).toHaveAttribute('readonly', '');
@@ -89,8 +91,8 @@ test('full walk: bare stage → real-modal beats → acts → finish tears down'
   await page.keyboard.press('Escape');
   await expect(page.locator('.atlas-modal-overlay')).toHaveCount(0);
 
-  // The Consul via the REAL element modal, locked.
-  await page.locator('[data-tour-action="create-consul"]').click();
+  // The Consul via the REAL element modal, locked (sidebar + is the route).
+  await page.locator('[data-action="create-element"]').click();
   const consulName = page.locator('.atlas-modal-overlay input[name="element-name"]');
   await expect(consulName).toHaveValue('The Consul');
   await expect(consulName).toHaveAttribute('readonly', '');
@@ -175,6 +177,15 @@ test('full walk: bare stage → real-modal beats → acts → finish tears down'
   // (The ecosystem-explorer link was cut in S298 — nothing to assert here.)
   await nextStep(page, 17); // finale
 
+  // The finale's control set, asserted POSITIVELY (S301 gate, MED): the
+  // shipped early-return renders Finish + the folder button and NO Exit, and
+  // nothing covered that — a migration could quietly add a second Exit beside
+  // Finish (both call exitTour) and every spec would stay green. This also
+  // makes the OPFS spec's absence-assertion honest, since the same string is
+  // required to be present here under folder mode.
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Set up a folder$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Exit tour$/ })).toHaveCount(0);
+
   // Finish: the residue contract — world gone, landing back, emphasis swapped.
   await page.locator('.atlas-tour-controls button', { hasText: /^Finish$/ }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
@@ -195,18 +206,22 @@ test('the create beats are single-route: no watch-mode Next, the gesture is the 
   await freshBoot(page);
   await openStage0(page);
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '1');
-  await expect(page.locator('[data-tour-action="create-world"]')).toBeVisible();
+  // S301: the dock carries NO create button at all now — the app's own
+  // control is the only route, and it pulses.
+  await expect(page.locator('[data-tour-action]')).toHaveCount(0);
+  await expect(page.locator('.atlas-worlds-header [data-action="create-local"].atlas-create-pulse')).toBeVisible();
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
 
   // Through the locked modal → auto-advance to the consul beat: same rule.
-  await page.locator('[data-tour-action="create-world"]').click();
+  await page.locator('.atlas-worlds-header [data-action="create-local"]').click();
   await page.locator('[data-modal="create-world"] [data-action="pick"]').click();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '2');
-  await expect(page.locator('[data-tour-action="create-consul"]')).toBeVisible();
+  await expect(page.locator('[data-tour-action]')).toHaveCount(0);
+  await expect(page.locator('[data-action="create-element"]')).toBeVisible();
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
 
   // Create him → the step STAYS (the payoff is his page) and Next appears.
-  await page.locator('[data-tour-action="create-consul"]').click();
+  await page.locator('[data-action="create-element"]').click();
   await page.locator('.atlas-modal-overlay button', { hasText: /^Create$/ }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '2');
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
@@ -348,6 +363,49 @@ test('exit tears down mid-tour and returns to the landing', async ({ page }) => 
   expect(state).toEqual({ worlds: 0, active: false });
 });
 
+test('back-navigation does not strip links off elements that still exist (S301 gate R2)', async ({ page }) => {
+  // Stripping exists so a chip never points at something absent. It used to
+  // key off "revealed for this step index", so stepping BACK across a reveal
+  // boundary deleted links whose targets were still sitting in the sidebar:
+  // the Consul's Possessions chips the user had just watched appear vanished,
+  // and every back/forward rewrote the file. The rule is now "never strip a
+  // link whose target is on disk".
+  await freshBoot(page);
+  await openStage0(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+  for (let step = 3; step <= 6; step++) await nextStep(page, step); // through objects → linking
+
+  // Sync on the tour's own settle signal, NOT on data-tour-step: the panel
+  // re-renders with the new step number BEFORE revealUpTo heals, so an
+  // attribute-synced read happens mid-step and passes whatever the code does
+  // (this test did exactly that on its first draft, and its revert-check
+  // caught it).
+  const possessionsAt = async () => page.evaluate(async () => {
+    await (window as any).__atlasTestApi.awaitTourSettled();
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    const consul = els.find((e: any) => e.name === 'The Consul');
+    return (consul?.objects ?? []).length;
+  });
+
+  const atPayoff = await possessionsAt();
+  expect(atPayoff).toBeGreaterThan(0); // the linking step's whole point
+
+  // Back across the boundary that used to retract them, twice.
+  await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '5');
+  expect(await possessionsAt()).toBe(atPayoff);
+
+  await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '4');
+  expect(await possessionsAt()).toBe(atPayoff);
+
+  // And forward again: no oscillation, no rewrite.
+  await nextStep(page, 5);
+  await nextStep(page, 6);
+  expect(await possessionsAt()).toBe(atPayoff);
+});
+
 test('the residue contract covers the map UI keys, not just the world (S301)', async ({ page }) => {
   // The contract promised "nothing behind" and tore down registry + handle +
   // OPFS — but `atlas_right_tabs` kept a map tab stamped with the tour
@@ -419,6 +477,12 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
     await nextStep(page, step);
     if (step === 9) await placePinViaMap(page);
   }
-  await expect(page.locator('.atlas-tour-controls button', { hasText: 'Set up your folder' })).toHaveCount(0);
+  // The label is 'Set up a folder' (tour-bar.ts). This assertion used to hunt
+  // 'Set up your folder', a string the app has never rendered, so it passed
+  // vacuously and would have stayed green if the picker button DID appear on
+  // a browser with no picker (S301 gate, LOW). The full-walk spec asserts the
+  // same string is PRESENT under folder mode, so a future rename breaks one
+  // of the pair loudly instead of silently disarming this one.
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Set up a folder$/ })).toHaveCount(0);
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Finish$/ })).toBeVisible();
 });

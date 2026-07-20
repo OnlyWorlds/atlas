@@ -92,23 +92,23 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // landscape appears once, in its exact geometry; nothing jumps into
       // existence later).
       header.innerHTML = `
-        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-create-pulse" data-action="create-local" title="Create the tour world">
+        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-create-pulse" data-action="create-local" title="Create a world. This one is the tour’s: Hyperion.">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
         </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" disabled title="After the tour">
+        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" aria-disabled="true" title="Open a world folder already on your drive. Yours to use after the tour.">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">folder_open</span>
         </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" disabled title="After the tour">
+        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" aria-disabled="true" title="Create a world that lives on onlyworlds.com as well as on your drive. Yours to use after the tour.">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">cloud_upload</span>
         </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" disabled title="After the tour">
+        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" aria-disabled="true" title="Bring in a world you already keep on onlyworlds.com. Yours to use after the tour.">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">link</span>
         </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" disabled title="After the tour">
+        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" aria-disabled="true" title="Open someone else's world with a read key, look but do not touch. Yours to use after the tour.">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">visibility</span>
         </button>

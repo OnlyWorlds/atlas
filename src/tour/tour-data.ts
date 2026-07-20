@@ -92,7 +92,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     body:
       'Every world starts with someone. The Consul is this sentence’s ' +
       'character: create him and he becomes your first element.',
-    meta: 'The real element dialog, locked to the tour’s script this once. In your own world you pick any of 22 types and any name.',
+    // (The "real element dialog, locked to the tour's script this once…" meta
+    // was cut S301, Captain's round — the dialog speaks for itself.)
     spans: [{ from: 2, to: 2, type: 'character' }],
     handsOn: 'create-consul',
   },

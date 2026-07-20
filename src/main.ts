@@ -113,6 +113,16 @@ if (import.meta.env.DEV) {
       api.pickDirectory = async () => handle;
     },
     /**
+     * Wait until any in-flight guided-tour step has finished revealing,
+     * healing and routing. The `data-tour-step` attribute flips before that
+     * work runs, so it is not a valid sync point for anything that inspects
+     * the world after a step change (S301).
+     */
+    async awaitTourSettled(): Promise<void> {
+      const { awaitTourSettled } = await import('./tour/tour-engine');
+      await awaitTourSettled();
+    },
+    /**
      * Reset everything Atlas owns: localStorage (registry, ui prefs), IDB
      * (handle-vault), OPFS. Lets each Playwright test start clean.
      */
