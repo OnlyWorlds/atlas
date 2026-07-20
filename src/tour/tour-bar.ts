@@ -22,17 +22,25 @@
  * app chrome per stage (the progressive build-up).
  */
 
-import { ELEMENT_TYPE_COLORS, ELEMENT_ICONS } from '../core/constants';
 import { hasFolderMode } from '../core/capabilities';
+import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../core/constants';
 import type { ElementType } from '../core/types';
 import {
-  TOUR_SENTENCE, TOUR_STEPS, tourStageFor,
   TOUR_ATTRIBUTION, TOUR_ATTRIBUTION_URL,
+  TOUR_SENTENCE, TOUR_STEPS, tourStageFor,
   type TourStep,
 } from './tour-data';
 import {
-  onTourChange, isTourActive, currentStepIndex, consulCreated, tourWorldExists,
-  tourPinPlaced, nextStep, backStep, enterStep, exitTour, setupFolderFromTour,
+  backStep,
+  consulCreated,
+  currentStepIndex,
+  enterStep, exitTour,
+  isTourActive,
+  nextStep,
+  onTourChange,
+  setupFolderFromTour,
+  tourPinPlaced,
+  tourWorldExists,
 } from './tour-engine';
 
 let root: HTMLElement | null = null;
@@ -276,7 +284,7 @@ function render(): void {
         const { createWorldFromTour } = await import('./tour-engine');
         new CreateWorldModal(toastManager, undefined, {
           lockedName: 'Hyperion',
-          hint: 'Normally this becomes a folder inside your OnlyWorlds folder. The tour world stays in your browser and folds away when the tour ends.',
+          hint: 'Normally this becomes a folder, but this tour world is temporary.',
           overrideCreate: async () => { await createWorldFromTour(); },
         }).open();
       })();

@@ -86,6 +86,43 @@ export function loadPersistedRightTabs(): PersistedRightTabs | null {
   }
 }
 
+/**
+ * Drop every persisted map tab belonging to one world, adjusting the active
+ * index for what was removed. Idempotent.
+ *
+ * For worlds that are DELETED rather than switched away from (the guided
+ * tour's teardown — the residue contract): a tab pointing at a world that no
+ * longer exists renders as the stale-map pane on the next world the user
+ * opens, which for a tour-finisher is a ghost "Hyperion" tab on the first
+ * world they make. Ordinary world switches must NOT use this — tabs persist
+ * across switches by design (DESIGN_MAPS.md §5).
+ *
+ * Writes localStorage directly rather than leaning on the render-time
+ * persist: right-pane returns early when there is no active world, which is
+ * exactly the state teardown leaves behind, so the subscriber never fires.
+ */
+export function dropPersistedTabsForWorld(worldId: string): void {
+  try {
+    const snapshot = loadPersistedRightTabs();
+    if (!snapshot) return;
+    const doomed = (t: RightTabRef): boolean =>
+      t.kind === 'map' && t.worldId === worldId;
+    if (!snapshot.tabs.some(doomed)) return;
+    let droppedBeforeActive = 0;
+    for (let i = 0; i <= snapshot.activeIndex && i < snapshot.tabs.length; i++) {
+      if (doomed(snapshot.tabs[i])) droppedBeforeActive++;
+    }
+    const tabs = snapshot.tabs.filter(t => !doomed(t));
+    const activeIndex = Math.max(0, Math.min(
+      snapshot.activeIndex - droppedBeforeActive,
+      tabs.length - 1,
+    ));
+    savePersistedRightTabs(tabs, activeIndex);
+  } catch (err) {
+    console.warn('[right-tabs-persistence] world prune failed:', err);
+  }
+}
+
 /** Save the snapshot to localStorage. Idempotent; safe to spam. */
 export function savePersistedRightTabs(tabs: readonly RightTabRef[], activeIndex: number): void {
   try {

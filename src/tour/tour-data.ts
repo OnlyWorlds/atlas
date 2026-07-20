@@ -82,8 +82,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: 'the-world',
     act: 1,
     body:
-      'A whole small world hides in this sentence. Everything in atlas lives ' +
-      'inside a world: create this one, named for the sentence that fills it.',
+      'Atlas creates a folder per world. For the novel Hyperion, we will create a world of the same name.' ,
     meta: 'This is the real create dialog. Normally you would name the world and it would become a folder; the tour world stays in your browser.',
     handsOn: 'create-world',
   },

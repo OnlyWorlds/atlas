@@ -8,14 +8,14 @@
  *   elements list lands in Phase 4).
  */
 
-import { getState, subscribe } from '../core/state';
 import { getActiveStore } from '../core/active-store';
-import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
 import { hasFolderMode } from '../core/capabilities';
+import { escapeText } from '../core/dom-utils';
+import { navigate, timelineHash } from '../core/router';
+import { getState, subscribe } from '../core/state';
+import { recoverAtlasRoot, setupAtlasRoot } from '../setup/atlas-root-flow';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
-import { navigate, timelineHash } from '../core/router';
-import { escapeText } from '../core/dom-utils';
 
 export function mountWelcomePanel(target: HTMLElement): () => void {
   target.innerHTML = '';
@@ -92,39 +92,40 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       try { tourDone = localStorage.getItem('atlas_tour_done_v1') === '1'; } catch { /* private mode */ }
       const tourBtnClass = tourDone ? 'atlas-btn-ghost' : 'atlas-btn-primary';
       const folderBtnClass = tourDone ? 'atlas-btn-primary' : 'atlas-btn-ghost';
+      // S301 (Captain's round): the doors lost their headings and their boxes
+      // — a heading that repeats its own button is noise, and the panels made
+      // two small actions look like a decision. What is left is a compact
+      // button pair sitting with the tagline, plus the honest folder line on
+      // browsers that cannot pick a folder.
       const folderDoor = folderMode
-        ? `
-          <div class="atlas-landing-door">
-            <h3>Set up your folder</h3>
-            <p>Your worlds live in a folder you choose, on your computer, as plain files: yours to keep.</p>
-            <button class="${folderBtnClass} atlas-landing-btn" data-action="setup-atlas">Set up a folder</button>
-          </div>`
-        : `
-          <div class="atlas-landing-door">
-            <h3>Set up your folder</h3>
-            <p>Folder mode (your worlds as real files) needs a Chromium browser: Chrome or Brave. This browser can take the tour.</p>
-          </div>`;
+        ? `<button class="${folderBtnClass} atlas-landing-btn" data-action="setup-atlas">set up a folder</button>`
+        : '';
+      const folderNote = folderMode
+        ? ''
+        : `<p class="atlas-landing-note">Folder mode (your worlds as real files) needs a Chromium browser: Chrome or Brave. This browser can take the tour.</p>`;
       // The OnlyWorlds sigil + eyebrow (Skeld's opener note, Captain's nod,
       // 2026-07-19): users routed here from onlyworlds.com need the mark and
       // the stated relationship to read "same universe". Bundled local copy
       // of the animated logo — local-first app, local asset.
+      // The sigil is the OnlyWorlds mark and now behaves like one: clicking it
+      // opens onlyworlds.com (S301). Users arriving from there get the way
+      // back; users arriving cold get the context.
       root.innerHTML = `
-        <div class="atlas-landing">
+        <div class="atlas-landing atlas-landing-compact">
           <div class="atlas-landing-hero">
-            <video class="atlas-landing-sigil" autoplay loop muted playsinline
-              src="${import.meta.env.BASE_URL}ow-logo.mp4" aria-hidden="true"></video>
+            <a class="atlas-landing-siglink" href="https://www.onlyworlds.com" target="_blank"
+              rel="noopener noreferrer" title="onlyworlds.com" aria-label="Open onlyworlds.com in a new tab">
+              <video class="atlas-landing-sigil" autoplay loop muted playsinline
+                src="${import.meta.env.BASE_URL}ow-logo.mp4" aria-hidden="true"></video>
+            </a>
             <div class="atlas-landing-mark">Atlas</div>
-            <p class="atlas-landing-tag">A free, local-first worldbuilding studio.</p>
-          </div>
-          <div class="atlas-landing-doors">
-            <div class="atlas-landing-door">
-              <h3>${tourDone ? 'Replay the tour' : 'Take the tour'}</h3>
-              <p>Five minutes: one famous sentence becomes a small linked world. Nothing touches your files.</p>
-              <button class="${tourBtnClass} atlas-landing-btn" data-action="start-tour">${tourDone ? 'Replay the tour' : 'Take the tour'}</button>
+            <div class="atlas-landing-actions">
+              <button class="${tourBtnClass} atlas-landing-btn" data-action="start-tour">${tourDone ? 'replay the tour' : 'take the tour'}</button>
+              ${folderDoor}
             </div>
-            ${folderDoor}
+            <p class="atlas-landing-tag">A free, local-first worldbuilding studio.</p>
+            ${folderNote}
           </div>
-          <p class="atlas-landing-context"><a href="https://www.onlyworlds.com/about" target="_blank" rel="noopener">More about OnlyWorlds</a></p>
         </div>
       `;
       const tourBtn = root.querySelector<HTMLButtonElement>('[data-action="start-tour"]')!;

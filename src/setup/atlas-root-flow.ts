@@ -16,6 +16,7 @@ import {
   ATLAS_ROOT_MARKER,
   ATLAS_ROOT_SUBFOLDER,
   ATLAS_ROOT_SUBFOLDER_LEGACY_NAMES,
+  isDemoKey,
 } from '../core/constants';
 import { getState, patchSlice } from '../core/state';
 import { pickDirectory } from '../ui/directory-picker';
@@ -626,10 +627,25 @@ export async function linkExistingApiWorldInRoot(
     throw new Error('OnlyWorlds folder is not set up. Pick a folder first');
   }
   const apiKey = opts.apiKey.trim();
-  const apiPin = opts.apiPin.trim();
   if (!apiKey) throw new Error('API key is required');
+  // Demo-range keys are READ scope SERVER-side (keel resolves 0000000000-
+  // 0000000009 to read, so nothing can write with them on any route). Linking
+  // one is therefore always a view-only link, whatever the caller asked for:
+  //   - it carries no PIN, so the check below would refuse it outright, and
+  //   - the link modal PREFILLS a saved PIN, which used to sail a demo key
+  //     past that check into a WRITABLE registration whose first push 403s
+  //     and strands the world in the read-only error pill.
+  // Normalizing here (not at the call sites) makes every downstream guard —
+  // the registry flag, the world.json mirror, the store arm, the engine's
+  // pull-only attach — fire correctly from one decision.
+  const readOnly = !!opts.readOnly || isDemoKey(apiKey);
+  // A view-only link carries NO PIN, structurally: the link modal prefills a
+  // saved PIN, and letting that ride would send an irrelevant credential on
+  // the wire and persist it globally below (which the registry comment there
+  // already says must never happen from a view-only link).
+  const apiPin = readOnly ? '' : opts.apiPin.trim();
   // View-only links run on a READ key — keel reads are keyless-PIN (S264).
-  if (!apiPin && !opts.readOnly) throw new Error('PIN is required');
+  if (!apiPin && !readOnly) throw new Error('PIN is required');
 
   // Validate creds via v2 GET /world (live 2026-07-12; replaced the v1 SDK
   // lane). OwV2Error keeps the "API Error NNN: ..." prefix these regexes read.
@@ -728,7 +744,7 @@ export async function linkExistingApiWorldInRoot(
       api_key: apiKey,
       ...(world.name ? { world_name: world.name } : {}),
       // Mirrored so root discovery restores view-only status (S264).
-      ...(opts.readOnly ? { read_only: true } : {}),
+      ...(readOnly ? { read_only: true } : {}),
     },
   });
 
@@ -749,7 +765,7 @@ export async function linkExistingApiWorldInRoot(
     handleKey,
     pathHint: `${reg.atlas_root.folder_name}/${subName}`,
     apiWorldName: world.name,
-    readOnly: !!opts.readOnly,
+    readOnly,
   });
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);
@@ -757,7 +773,7 @@ export async function linkExistingApiWorldInRoot(
   patchSlice('active', { worldId: entry.id, meta: { id: localWorldUuid, name: displayName }, opened: true });
   // Arm the view-only guard AFTER the setup writes above (they are this
   // flow's own, legitimate writes) and BEFORE the store reaches the UI.
-  if (opts.readOnly) store.setViewOnly(true);
+  if (readOnly) store.setViewOnly(true);
   setActiveStore(store);
 
   // Prime the elements cache from the newly-downloaded folder.

@@ -178,13 +178,14 @@ test('full walk: bare stage → real-modal beats → acts → finish tears down'
   // Finish: the residue contract — world gone, landing back, emphasis swapped.
   await page.locator('.atlas-tour-controls button', { hasText: /^Finish$/ }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
-  await expect(page.locator('.atlas-landing-doors')).toBeVisible();
+  await expect(page.locator('.atlas-landing-actions')).toBeVisible();
   const after = await page.evaluate(() => {
     const s = (window as any).__atlasTestApi.getState();
     return { worlds: s.registry.worlds.length, active: !!s.active, done: localStorage.getItem('atlas_tour_done_v1') };
   });
   expect(after).toEqual({ worlds: 0, active: false, done: '1' });
-  await expect(page.locator('.atlas-landing-doors h3').first()).toContainText('Replay the tour');
+  // S301: the doors lost their headings — the button IS the label now.
+  await expect(page.locator('[data-action="start-tour"]')).toContainText('replay the tour');
 });
 
 test('the create beats are single-route: no watch-mode Next, the gesture is the way', async ({ page }) => {
@@ -339,12 +340,60 @@ test('exit tears down mid-tour and returns to the landing', async ({ page }) => 
   await createWorldViaModal(page);
   await page.locator('.atlas-tour-controls button', { hasText: 'Exit tour' }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
-  await expect(page.locator('.atlas-landing-doors')).toBeVisible();
+  await expect(page.locator('.atlas-landing-actions')).toBeVisible();
   const state = await page.evaluate(() => {
     const s = (window as any).__atlasTestApi.getState();
     return { worlds: s.registry.worlds.length, active: !!s.active };
   });
   expect(state).toEqual({ worlds: 0, active: false });
+});
+
+test('the residue contract covers the map UI keys, not just the world (S301)', async ({ page }) => {
+  // The contract promised "nothing behind" and tore down registry + handle +
+  // OPFS — but `atlas_right_tabs` kept a map tab stamped with the tour
+  // world's id and `atlas_map_camera_state` kept its camera. Cost: the FIRST
+  // world a tour-finisher creates opened with a ghost "Hyperion" tab reading
+  // "This map isn't in the current world". Walk far enough to open the map,
+  // then exit and prove both keys forgot it.
+  await freshBoot(page);
+  await openStage0(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+  for (let step = 3; step <= 8; step++) await nextStep(page, step);
+  await expect(page).toHaveURL(/\/map\//);
+
+  const worldId = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId);
+  // Precondition: the tab and camera really are there to be cleaned (without
+  // this the test could pass by never having created them at all).
+  const before = await page.evaluate((wid) => {
+    const tabs = JSON.parse(localStorage.getItem('atlas_right_tabs') ?? '{"tabs":[]}');
+    return {
+      mapTabs: tabs.tabs.filter((t: any) => t.kind === 'map' && t.worldId === wid).length,
+      cameras: Object.keys(JSON.parse(localStorage.getItem('atlas_map_camera_state') ?? '{}')).length,
+    };
+  }, worldId);
+  expect(before.mapTabs).toBe(1);
+
+  await page.locator('.atlas-tour-controls button', { hasText: 'Exit tour' }).click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
+
+  const after = await page.evaluate((wid) => {
+    const raw = localStorage.getItem('atlas_right_tabs');
+    const tabs = raw ? JSON.parse(raw) : { tabs: [], activeIndex: 0 };
+    return {
+      tourMapTabs: tabs.tabs.filter((t: any) => t.kind === 'map' && t.worldId === wid).length,
+      cameras: Object.keys(JSON.parse(localStorage.getItem('atlas_map_camera_state') ?? '{}')).length,
+      activeIndexInRange: tabs.activeIndex >= 0 && tabs.activeIndex < Math.max(tabs.tabs.length, 1),
+      worlds: (window as any).__atlasTestApi.getState().registry.worlds.length,
+    };
+  }, worldId);
+  expect(after.tourMapTabs).toBe(0);
+  expect(after.cameras).toBe(0);
+  expect(after.activeIndexInRange).toBe(true); // no dangling index after the prune
+  expect(after.worlds).toBe(0);
+
+  // And the live pane the user is looking at carries no ghost tab either.
+  await expect(page.locator('.atlas-right-tab', { hasText: 'Hyperion' })).toHaveCount(0);
 });
 
 test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door honest', async ({ page }) => {
@@ -360,7 +409,7 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   // Landing: tour leads; the folder door is an honest line, not a button.
   await expect(page.locator('[data-action="start-tour"]')).toBeVisible();
   await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
-  await expect(page.locator('.atlas-landing-doors')).toContainText('needs a Chromium browser');
+  await expect(page.locator('.atlas-landing-note')).toContainText('needs a Chromium browser');
   // The tour boots and walks.
   await openStage0(page);
   await createWorldViaModal(page);

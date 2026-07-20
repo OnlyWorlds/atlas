@@ -121,6 +121,21 @@ export const LOCK_HEARTBEAT_MS = 30_000;
 export const LOCK_STALE_MS = 90_000;
 
 /**
+ * The public OnlyWorlds demo keys, `0000000000`-`0000000009`.
+ *
+ * A protocol fact, not an atlas policy: keel resolves this range to READ
+ * scope, so nothing can write with one of these keys on any route (a write
+ * attempt earns a 403). They also skip PIN enforcement on reads, which is
+ * why linking one must take the view-only branch — it has no PIN to give.
+ *
+ * Legacy non-demo keys are also 10 digits, so the range check is exact
+ * rather than length-based.
+ */
+export function isDemoKey(apiKey: string): boolean {
+  return /^000000000[0-9]$/.test(apiKey.trim());
+}
+
+/**
  * Atlas-extension field policy (split 2026-07-12, v2 port gate 10.3).
  *
  * Two buckets with DIFFERENT wire + pull semantics:

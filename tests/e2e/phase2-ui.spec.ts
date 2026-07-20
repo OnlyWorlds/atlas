@@ -47,7 +47,9 @@ test('first launch shows the setup-atlas CTA, not create-local', async ({ page }
   await expect(page.locator('[data-action="create-local"]')).toHaveCount(0);
   await expect(page.locator('.atlas-landing-mark')).toHaveText('Atlas');
   await expect(page.locator('.atlas-middle')).toContainText('A free, local-first worldbuilding studio.');
-  await expect(page.locator('.atlas-middle')).toContainText('Set up a folder');
+  // S301: the landing doors lost their headings and boxes; the buttons carry
+  // the label, in the tool's lowercase voice.
+  await expect(page.locator('.atlas-middle')).toContainText('set up a folder');
   // The tour door (2026-07-19) leads the landing.
   await expect(page.locator('[data-action="start-tour"]')).toBeVisible();
 });

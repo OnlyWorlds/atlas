@@ -99,11 +99,36 @@ throwaway world:
 ## The residue contract
 
 The tour leaves NOTHING behind. The world is created at step 1 (not boot)
-and exit or Finish — anywhere, anytime — tears it down completely: registry
-entry, handle, OPFS folder. Exit returns to the launch location
-(`returnHash`: the landing for fresh users, the exact prior route for a
-settings replay). `atlas_tour_done_v1` survives as the only trace, driving
-the landing's emphasis swap.
+and exit or Finish — anywhere, anytime — tears it down completely. Exit
+returns to the launch location (`returnHash`: the landing for fresh users,
+the exact prior route for a settings replay). `atlas_tour_done_v1` survives
+as the only trace, driving the landing's emphasis swap.
+
+**Teardown is a checklist, and the checklist is the contract** (S301): the
+first version of this clause said "registry entry, handle, OPFS folder" and
+those three were honoured, while two keys nobody had enumerated outlived the
+world — `atlas_right_tabs` kept a map tab stamped with the tour world's id,
+and `atlas_map_camera_state` kept that map's camera. The visible cost was a
+ghost "Hyperion" tab on the FIRST world a tour-finisher created, reading
+"This map isn't in the current world". Every store the tour can write must be
+named here, or the next one leaks the same way:
+
+| what | where | cleaned by |
+|---|---|---|
+| registry entry | `atlas_worlds_registry` | `deleteWorldEntry` |
+| directory handle | handle vault (IDB) | `deleteHandle` |
+| world folder | OPFS `hyperion-tour-*` | `removeEntry(recursive)` |
+| right-pane map tabs | `atlas_right_tabs` | `dropPersistedTabsForWorld` |
+| per-map cameras | `atlas_map_camera_state` | `clearCameraState` per bundle map |
+| tour step state | `atlas_tour_v1` | `writeTourState(null)` |
+
+The persisted tabs are pruned by writing localStorage DIRECTLY, not by
+patching `ui.rightTabs` and trusting the render-time persist: right-pane
+returns early when no world is active, which is exactly the state teardown
+leaves behind, so that subscriber never fires. Both halves run (live slice
+for the pane in front of the user, storage for the next boot). E2e-locked in
+`tour.spec.ts` with a precondition assert, so the test cannot pass by never
+having created the tab.
 
 ## Acts (17 steps — the intro was cut in S298; the tour opens on create-world)
 

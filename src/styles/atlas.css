@@ -3789,9 +3789,61 @@ body.atlas-preroot .atlas-middle {
 
 .atlas-landing-mark-sm { font-size: 26px; }
 
+/* The sigil is a link out to onlyworlds.com (S301). No chrome of its own —
+   the mark is the affordance; the cursor and title carry the rest. */
+.atlas-landing-siglink {
+  display: block;
+  line-height: 0;
+  border-radius: 50%;
+  transition: opacity 120ms ease;
+}
+.atlas-landing-siglink:hover { opacity: 0.85; }
+.atlas-landing-siglink:focus-visible {
+  outline: 1px solid rgba(34, 211, 238, 0.55);
+  outline-offset: 6px;
+}
+
 .atlas-landing-tag {
   margin: 16px 0 0;
   font-size: 15px;
+  color: var(--atlas-text-soft);
+}
+
+/* S301 (Captain's round): the two doors lost their headings and boxes — a
+   heading repeating its own button is noise, and the panels made two small
+   actions look like a weighty decision. What remains is a compact pair,
+   centered, sitting directly ABOVE the tagline so the eye reads mark →
+   action → context. Buttons are deliberately smaller and lowercase, in the
+   tool's own voice rather than a marketing hero's. */
+.atlas-landing-compact .atlas-landing-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  /* BELOW the tagline (both orders were built and shot; S301): the eye reads
+     mark → name → what it is → what you can do. Placed above, the buttons
+     interrupt before the reader knows what Atlas is, and the tagline then
+     trails the actions as an afterthought. Flip by dropping these orders. */
+  order: 3;
+  margin-top: 20px;
+}
+.atlas-landing-compact .atlas-landing-tag { order: 2; }
+.atlas-landing-compact .atlas-landing-btn {
+  padding: 7px 18px;
+  font-size: 12.5px;
+  letter-spacing: 0.1px;
+  border-radius: 4px;
+}
+.atlas-landing-compact .atlas-landing-tag {
+  margin-top: 18px;
+  font-size: 13.5px;
+}
+.atlas-landing-note {
+  margin: 12px 0 0;
+  max-width: 46ch;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.6;
   color: var(--atlas-text-soft);
 }
 

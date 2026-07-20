@@ -662,6 +662,48 @@ export async function setupFolderFromTour(): Promise<boolean> {
   return true;
 }
 
+/**
+ * Forget the per-map UI state the tour world leaves in localStorage: its
+ * right-pane map tabs and their saved cameras.
+ *
+ * The residue contract said "registry entry, handle, OPFS folder" and those
+ * three were honoured, but two keys outlive them: `atlas_right_tabs` keeps a
+ * map tab stamped with the tour world's id, and `atlas_map_camera_state`
+ * keeps that map's camera. The visible cost is a ghost "Hyperion" tab on the
+ * FIRST world a tour-finisher creates, reading "This map isn't in the current
+ * world / It may have been deleted" — the first minute of real use, right
+ * after a tour that promised to leave nothing behind.
+ *
+ * Bundle-driven rather than reading live state: teardown also runs on paths
+ * where the elements slice is already gone (restart, resume-of-a-dead-world).
+ */
+async function forgetTourMapUiState(worldId: string): Promise<void> {
+  try {
+    const [{ dropPersistedTabsForWorld }, { clearCameraState }] = await Promise.all([
+      import('../tabs/right/right-tabs-persistence'),
+      import('../core/map-camera-persist'),
+    ]);
+    if (worldId) dropPersistedTabsForWorld(worldId);
+    const bundle = await loadBundle();
+    for (const el of bundle.elements) {
+      if (el.type === 'map') clearCameraState(el.id);
+    }
+    // Drop the live tabs too: the persisted copy above is what survives a
+    // reload, but the pane in front of the user right now reads from state.
+    const ui = getState().ui;
+    const tabs = ui.rightTabs.filter(t => !(t.kind === 'map' && t.worldId === worldId));
+    if (tabs.length !== ui.rightTabs.length) {
+      patchSlice('ui', {
+        ...ui,
+        rightTabs: tabs,
+        rightActiveIndex: Math.max(0, Math.min(ui.rightActiveIndex, tabs.length - 1)),
+      });
+    }
+  } catch (err) {
+    console.warn('[tour] map ui cleanup failed:', err);
+  }
+}
+
 /** Remove the tour world entirely (registry entry + handle + OPFS folder). */
 async function teardownPriorTourWorld(): Promise<void> {
   // Disarm any pending pin placement (gate MED scenario B, S299): a restart
@@ -686,6 +728,7 @@ async function teardownPriorTourWorld(): Promise<void> {
     saveRegistry(next);
     patchSlice('registry', next);
     await deleteHandle(entry.folder.handle_key).catch(() => {});
+    await forgetTourMapUiState(entry.id);
   }
   try {
     const opfs = await navigator.storage.getDirectory();
