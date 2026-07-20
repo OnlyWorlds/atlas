@@ -25,6 +25,7 @@ import { pinVisualFor, onPinVisualsReady } from './pin-visuals';
 import { hasLinkedSubMap } from './auto-open-map';
 import { disposeGhostsForMap } from './ghost-pins';
 import { ToastManager } from '../../ui/toast-manager';
+import { IMAGELESS_MAP_SIZE } from '../../ui/image-dims';
 import { navigate, elementHash } from '../../core/router';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { syncPins, refreshActiveMapPins } from './map-tab-pins';
@@ -130,8 +131,11 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
   chipStrip.className = 'atlas-pin-filter-strip';
   container.appendChild(chipStrip);
 
-  const width = map.width ?? 2000;
-  const height = map.height ?? 2000;
+  // Legacy imageless maps may lack stored dims — the flat-canvas default is
+  // the shared IMAGELESS_MAP_SIZE square (applyMapBackground persists it on
+  // first open so the space becomes durable; DESIGN_MAPS.md §4.2).
+  const width = map.width ?? IMAGELESS_MAP_SIZE;
+  const height = map.height ?? IMAGELESS_MAP_SIZE;
 
   const manager = new Leaflet2DManager({
     containerId: container.id,
@@ -386,7 +390,14 @@ subscribe(() => {
   lastElementsRef = elements;
   lastSelectedRef = selected;
   refreshActiveMapPins();
-  refreshCachedBackgrounds();
+  // Dims drifted under a BACKGROUND tab (image attached / dims corrected
+  // while the tab wasn't active): evict its cache so the next activation
+  // mounts a fresh manager in the new coordinate space. The ACTIVE tab's
+  // dims-flip is handled by right-pane's dispose+remount machinery (its
+  // lastActiveMapDimsKey block) — refreshCachedBackgrounds excludes it, and
+  // a second dispose here would race that remount into an empty pane
+  // (S300 close-gate follow-up; found by the regression e2e).
+  for (const id of refreshCachedBackgrounds()) disposeMapTab(id);
   refreshActiveMapZones();
   syncEditMode();
 });

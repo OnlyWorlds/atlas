@@ -21,7 +21,7 @@ import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
-import { readImageDimsFromFile, readImageDimsFromUrl } from './image-dims';
+import { readImageDimsFromFile, readImageDimsFromUrl, IMAGELESS_MAP_SIZE, smallMapImageHint } from './image-dims';
 import { openMapTab } from '../tabs/right/map-index-tab';
 import type { WorldMap } from '../core/types';
 import { escapeText, escapeAttr } from '../core/dom-utils';
@@ -50,15 +50,10 @@ export function createMapDialog(
 ): Promise<MapCreateResult | null> {
   return new Promise((resolve) => {
     const modal = new MapCreateModal(toasts, (result) => {
-      // Auto-open the new map's tab when it has any image source — the
-      // typical create flow is "name + image → see it." Image-less maps
-      // skip auto-open since their canvas is the grid fallback and the
-      // user is more likely still configuring (parent_map, hierarchy, etc).
-      if (result?.map) {
-        const m = result.map;
-        const hasImage = !!(m.image_url || m.image_media_id);
-        if (hasImage) openMapTab(m);
-      }
+      // Auto-open the new map's tab — the create flow is "name (+ image) →
+      // see it." Imageless maps open too since S300: their flat canvas is a
+      // real working surface (place pins now, add art later).
+      if (result?.map) openMapTab(result.map);
       resolve(result);
     }, {
       initialName: opts.initialName,
@@ -359,6 +354,17 @@ class MapCreateModal extends BaseModal {
         if (initialDims) {
           patch.width = initialDims.w;
           patch.height = initialDims.h;
+        } else if (!isConfigure && !url && !file) {
+          // Imageless create → stamp the square flat-canvas dims so the
+          // coordinate space is durable across devices (DESIGN_MAPS.md §4.2).
+          patch.width = IMAGELESS_MAP_SIZE;
+          patch.height = IMAGELESS_MAP_SIZE;
+        }
+        // Soft smallness hint (never a block): a tiny image makes pin
+        // placement coarse — say so once, at attach time.
+        if (initialDims) {
+          const hint = smallMapImageHint(initialDims);
+          if (hint) this.toasts.info(hint);
         }
 
         let map: WorldMap;

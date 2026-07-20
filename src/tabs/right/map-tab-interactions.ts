@@ -19,7 +19,7 @@ import { navigate, elementHash } from '../../core/router';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManager';
-import type { Pin, WorldMap } from '../../core/types';
+import type { Pin } from '../../core/types';
 import { ToastManager } from '../../ui/toast-manager';
 import { ElementCreateModal } from '../../ui/element-create-modal';
 import { toggleGhostsAtSourcePin } from './ghost-pins';
@@ -73,14 +73,9 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     }
     const placement = getState().ui.pinPlacement;
     if (!placement) return;
-    // Gate: pin placement requires a map image (DESIGN_MAPS.md §4.1).
-    const currentMap = getState().data.elements.find(
-      (e): e is WorldMap => e.type === 'map' && e.id === entry.mapId,
-    );
-    if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
-      toasts.info('Set a map image first; pins anchor to the image');
-      return;
-    }
+    // Imageless maps accept pins since S300 — the flat canvas has stored
+    // width/height, so the coordinate space is as stable as an image's
+    // (DESIGN_MAPS.md §4.2). No image gate.
     try {
       const store = getActiveStore();
       if (!store) return;
@@ -183,14 +178,6 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     // user has to exit edit explicitly first.
     if (isEditing() && getEditingMapId() === entry.mapId) {
       toasts.info('Finish zone edit first (Done or Esc)');
-      return;
-    }
-    // Same gate as the placement-banner map-click path.
-    const currentMap = getState().data.elements.find(
-      (em): em is WorldMap => em.type === 'map' && em.id === entry.mapId,
-    );
-    if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
-      toasts.info('Set a map image first; pins anchor to the image');
       return;
     }
     const point = leafletToStorage(latlng, height);
@@ -313,13 +300,6 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     // gate at the drop site too so the rule lives where pins are created).
     if (payload.type === 'zone' || payload.type === 'map') {
       toasts.info(`${payload.type}s can't be pinned`);
-      return;
-    }
-    const currentMap = getState().data.elements.find(
-      (em): em is WorldMap => em.type === 'map' && em.id === entry.mapId,
-    );
-    if (!currentMap || (!currentMap.image_url && !currentMap.image_media_id)) {
-      toasts.info('Set a map image first; pins anchor to the image');
       return;
     }
     const lMap = manager.getMap();

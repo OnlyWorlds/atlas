@@ -458,10 +458,6 @@ function renderRow(node: MapTreeNode, depth: number, parentId: string | null, ct
   const main = document.createElement('span');
   main.className = 'atlas-row-main';
   if (ctx.openMapIds.has(m.id)) main.classList.add('atlas-map-tree-row-open');
-  // Imageless maps get a muted name to signal "this isn't ready to view yet."
-  // Pairs with openMapTab's refusal to open the tab for image-less maps —
-  // grey label, click toasts + opens element detail to configure.
-  if (!hasImage) main.classList.add('atlas-map-tree-row-imageless');
   main.textContent = m.name || '(untitled map)';
   row.appendChild(main);
 
@@ -605,21 +601,9 @@ export function openMapTab(m: WorldMap, preserveElementId?: string): void {
   const ui = getState().ui;
   const activeWorldId = getState().active?.worldId;
 
-  // Imageless maps have nothing meaningful to render on canvas — the grid
-  // fallback is jarring and the user almost certainly meant to edit the map's
-  // fields. Refuse to open the tab; if the caller wasn't already navigating
-  // (no preserveElementId), divert to the map's element detail so the user
-  // lands somewhere actionable.
-  const hasImage = !!(m.image_url || m.image_media_id);
-  if (!hasImage) {
-    toastManager.info('set a map image to view its canvas');
-    if (!preserveElementId && activeWorldId) {
-      patchSlice('ui', { ...ui, selectedElementId: m.id, sidebarMode: 'elements' });
-      navigate(elementHash(activeWorldId, m.id));
-    }
-    return;
-  }
-
+  // Imageless maps open like any other since S300 — they render the sized
+  // flat canvas and accept pins/zones (DESIGN_MAPS.md §4.2). The old refusal
+  // + divert-to-element-detail is gone.
   const existingIndex = ui.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === m.id);
   if (existingIndex >= 0) {
     patchSlice('ui', { ...ui, rightActiveIndex: existingIndex });

@@ -198,8 +198,10 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
     // Custom fields (D9): user-defined x_/shadow_ extension fields — render
     // what's there, let the user add more. Always present (the add row is
-    // the feature's discoverability).
-    detail.appendChild(buildCustomFieldsSection(el));
+    // the feature's discoverability) — EXCEPT during the tour: a beginner's
+    // first pages should not offer schema extension (precision audit #2,
+    // Captain-blessed 2026-07-20).
+    if (!isTourFlagActive()) detail.appendChild(buildCustomFieldsSection(el));
 
     // Character war record (2026-07-19): recorded battles as a curated strip,
     // above the exhaustive reverse-reference scan.

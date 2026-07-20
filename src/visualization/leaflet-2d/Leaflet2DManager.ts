@@ -219,9 +219,11 @@ export class Leaflet2DManager {
   // ============================================
 
   /**
-   * Set a background image
+   * Set a background image. `onError` fires once if the browser cannot load
+   * the URL (404, CORS, dead host) — callers can fall back to the flat
+   * canvas instead of leaving Leaflet's broken-image void (S300b).
    */
-  setBackgroundImage(url: string, width?: number, height?: number): void {
+  setBackgroundImage(url: string, width?: number, height?: number, onError?: () => void): void {
     if (!this.map || !this.backgroundLayer) return;
 
     this.backgroundLayer.clearLayers();
@@ -237,7 +239,9 @@ export class Leaflet2DManager {
 
     // Render into the low-z custom pane so the image never obscures zones,
     // pins, grid, or transient drawing UI regardless of DOM insertion order.
-    L.imageOverlay(url, bounds, { pane: 'atlasBgImagePane' }).addTo(this.backgroundLayer);
+    const overlay = L.imageOverlay(url, bounds, { pane: 'atlasBgImagePane' });
+    if (onError) overlay.once('error', onError);
+    overlay.addTo(this.backgroundLayer);
     this.log('Background image set:', url);
   }
 
@@ -256,6 +260,29 @@ export class Leaflet2DManager {
     this.drawGridLines(this.backgroundLayer, spacing, color);
 
     this.log('Background grid set');
+  }
+
+  /**
+   * Render a flat colored canvas as the SOLE background (replaces any image).
+   *
+   * The imageless-map backdrop (DESIGN_MAPS.md §4.2): one rectangle spanning
+   * the full canvas bounds — fill delineates the map space against the app
+   * background, hairline stroke marks the edge. The ⚙ grid overlay composes
+   * on top via setGridOverlay (separate layer) for users who want scaffolding.
+   */
+  setBackgroundFlat(
+    fillColor: string = 'rgba(255, 255, 255, 0.04)',
+    strokeColor: string = 'rgba(34, 211, 238, 0.22)',
+  ): void {
+    if (!this.map || !this.backgroundLayer) return;
+    this.backgroundLayer.clearLayers();
+    // interactive: false — the rect spans the whole canvas; if it captured
+    // pointer events it would sit under every pin-placement click.
+    L.rectangle(
+      [[0, 0], [this.config.canvasHeight, this.config.canvasWidth]],
+      { color: strokeColor, weight: 1, fillColor, fillOpacity: 1, pane: 'atlasBgImagePane', interactive: false },
+    ).addTo(this.backgroundLayer);
+    this.log('Background flat canvas set');
   }
 
   /**

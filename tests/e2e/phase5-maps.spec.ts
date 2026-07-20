@@ -245,3 +245,134 @@ test('map create modal — location picker integration', async ({ page }) => {
   });
   expect(stored.mapLocation).toBe(stored.shireId);
 });
+
+test('imageless map is first-class: flat canvas opens, pin places, zone draft starts (S300)', async ({ page }) => {
+  // Create WITHOUT any image source → auto-opens its tab (new S300 behavior)
+  // and the record carries the stamped square flat-canvas dims.
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', 'Blank Canvas');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Blank Canvas' })).toBeVisible();
+
+  const dims = await page.evaluate(() => {
+    const state = (window as any).__atlasTestApi.getState();
+    const map = state.data.elements.find((e: any) => e.type === 'map' && e.name === 'Blank Canvas');
+    return { width: map?.width, height: map?.height, image: map?.image_url ?? null };
+  });
+  expect(dims).toEqual({ width: 2000, height: 2000, image: null });
+
+  // Pin placement works on the flat canvas: create an element, arm the +pin
+  // button, click the visible canvas → a real pin lands (the old
+  // "set a map image first" gate is gone).
+  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
+  await page.click('[data-action="create-element"]');
+  await page.fill('input[name="element-name"]', 'Sketch Marker');
+  await page.click('[data-modal="create-element"] [data-action="create"]');
+  const pinBtn = page.locator('[data-action="pin-element"]');
+  await expect(pinBtn).toBeVisible();
+  await pinBtn.click();
+  await expect(page.locator('.atlas-map-placement-hint')).toBeVisible();
+  // Leaflet stamps .leaflet-container onto the canvas-container div itself —
+  // select via the wrapper (same form as tour.spec).
+  const canvas = page.locator('.atlas-map-tab-wrapper .leaflet-container').first();
+  await canvas.click({ position: { x: 200, y: 150 } });
+  await expect(page.locator('.ow-toast', { hasText: 'Pin placed' })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: 'Set a map image first' })).toHaveCount(0);
+  const pin = await page.evaluate(() => {
+    const state = (window as any).__atlasTestApi.getState();
+    const map = state.data.elements.find((e: any) => e.type === 'map' && e.name === 'Blank Canvas');
+    const p = state.data.elements.find((e: any) => e.type === 'pin' && e.map_id === map.id);
+    return p ? { x: p.x, y: p.y } : null;
+  });
+  expect(pin).not.toBeNull();
+  expect(pin!.x).toBeGreaterThanOrEqual(0);
+  expect(pin!.y).toBeGreaterThanOrEqual(0);
+
+  // Zone drafting enters cleanly on the imageless canvas (gate removed).
+  await page.click('[data-action="draw-polygon"]');
+  await expect(page.locator('[data-zone-draft-overlay]')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-zone-draft-overlay]')).toHaveCount(0);
+
+  // "Add art later": attaching an image whose dims differ from the stamped
+  // 2000x2000 square must REMOUNT the open tab into the image's coordinate
+  // space (S300 close gate — a background re-apply alone leaves the manager
+  // converting clicks in the old space, corrupting later pin y-coords).
+  const containerBefore = await page.evaluate(() =>
+    document.querySelector('.atlas-map-tab-wrapper .leaflet-container')?.id ?? null);
+  const pinBefore = await page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    const p = els.find((e: any) => e.type === 'pin');
+    return { x: p.x, y: p.y };
+  });
+  // Attach through the REAL user path (the Image URL field on the map's
+  // element page) so the §4.2 sketch-rescale hook runs — a raw store write
+  // would bypass it.
+  const dataUrl = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 300; c.height = 200;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#123456';
+    ctx.fillRect(0, 0, 300, 200);
+    return c.toDataURL();
+  });
+  await page.click('[data-element-id]:has-text("Blank Canvas")');
+  const urlRow = page.locator('.atlas-field', { has: page.locator('.atlas-field-label', { hasText: 'Image URL' }) });
+  await urlRow.locator('.atlas-field-value').click();
+  const urlInput = page.locator('.atlas-edit-popover input');
+  await urlInput.fill(dataUrl);
+  await urlInput.press('Enter');
+  // Decode → dims persist → sketch rescale: the blank-canvas pin scales
+  // proportionally into the 300x200 image space (§4.2).
+  await expect.poll(async () => page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    const m = els.find((e: any) => e.type === 'map' && e.name === 'Blank Canvas');
+    return m.width;
+  })).toBe(300);
+  await expect.poll(async () => page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    const p = els.find((e: any) => e.type === 'pin');
+    return { x: p.x, y: p.y };
+  })).toEqual({
+    x: Math.min(300, Math.round(pinBefore.x * (300 / 2000))),
+    y: Math.min(200, Math.round(pinBefore.y * (200 / 2000))),
+  });
+  // The dims flip must REMOUNT the active tab (right-pane's lastActiveMapDimsKey
+  // machinery) — a fresh leaflet container is the observable.
+  await expect
+    .poll(async () => page.evaluate(() =>
+      document.querySelector('.atlas-map-tab-wrapper .leaflet-container')?.id ?? null))
+    .not.toBe(containerBefore);
+  // The remount lands the manager in the 300x200 space; a pin placed at the
+  // canvas center must carry coords inside it (the stale 2000-space would
+  // put y in the hundreds-to-thousands). Re-select the element first — the
+  // zone-draft Escape above also fired the deselect-to-home hotkey, so the
+  // +pin button (element-detail top bar) left the page.
+  await page.click('.atlas-element-row:has-text("Sketch Marker"), [data-element-id]:has-text("Sketch Marker")');
+  const pinIdsBefore = await page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    return els.filter((e: any) => e.type === 'pin').map((p: any) => p.id);
+  });
+  await page.locator('[data-action="pin-element"]').click();
+  await expect(page.locator('.atlas-map-placement-hint')).toBeVisible();
+  const canvas2 = page.locator('.atlas-map-tab-wrapper .leaflet-container').first();
+  await canvas2.click({ position: { x: 230, y: 220 } });
+  // Identify the NEW pin by id diff — listElements order is not creation
+  // order ("last in list" selects the wrong pin), and the first placement's
+  // toast can still be visible (a toast wait races the async createPin) —
+  // this test's own first two red runs proved both. Poll the store.
+  let newPin: { x: number; y: number } | null = null;
+  await expect.poll(async () => {
+    newPin = await page.evaluate(async (before: string[]) => {
+      const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+      const p = els.find((e: any) => e.type === 'pin' && !before.includes(e.id));
+      return p ? { x: p.x, y: p.y } : null;
+    }, pinIdsBefore);
+    return newPin;
+  }).not.toBeNull();
+  expect(newPin!.x).toBeGreaterThanOrEqual(0);
+  expect(newPin!.x).toBeLessThanOrEqual(300);
+  expect(newPin!.y).toBeGreaterThanOrEqual(0);
+  expect(newPin!.y).toBeLessThanOrEqual(200);
+});

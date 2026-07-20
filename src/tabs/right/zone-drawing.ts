@@ -119,19 +119,12 @@ export function getActiveDraft(): { mode: DrawMode; mapId: string; markerCount: 
 
 /**
  * Enter draft mode. Cancels any in-progress draft first (one global slot).
- * Map must have an image (pins/markers anchor to image coords — same gate
- * as pin placement per DESIGN_MAPS.md §4.1).
+ * Works on imageless maps too — the flat canvas has stored width/height, so
+ * marker coords anchor to a stable space (DESIGN_MAPS.md §4.2, S300).
  */
 export function startDrawing(entry: MapTabCacheEntry, mode: DrawMode, toasts: ToastManager): void {
   ensureKeyListeners();
   cancelDrawing(); // clear any stale draft
-
-  const state = getState();
-  const map = state.data.elements.find(e => e.type === 'map' && e.id === entry.mapId);
-  if (!map || (!(map as { image_url?: string }).image_url && !(map as { image_media_id?: string }).image_media_id)) {
-    toasts.info('Set a map image first; zones anchor to the image');
-    return;
-  }
 
   const lMap = entry.manager.getMap();
   if (!lMap) return;

@@ -19,7 +19,7 @@
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { getWritingLabels } from './writing-helpers';
-import { CONTENT_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
+import { CONTENT_ELEMENT_TYPES, type Element, type ElementType, type WorldMap } from '../core/types';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { ELEMENT_LABELS } from '../core/constants';
 import { ELEMENT_ICONS, EXTENSION_FIELD_NAMESPACES, isExtensionField, isCustomEditableField } from '../core/constants';
@@ -34,7 +34,8 @@ import { completeWaypoint, completeTaxonomyHalf } from '../core/waypoints';
 import { getFieldDescription } from '../editor/field-descriptions';
 import { pickElement } from '../ui/element-picker-modal';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
-import { readImageDimsFromUrl } from '../ui/image-dims';
+import { readImageDimsFromUrl, smallMapImageHint, IMAGELESS_MAP_SIZE } from '../ui/image-dims';
+import { countSpatialOnMap, spatialPhrase, rescaleSketchOntoImage } from './map-attach-scale';
 import { getEditorSettings } from '../registry/registry';
 import { suggestionsForField, reservedValueHint } from '../core/taxonomy';
 
@@ -583,7 +584,21 @@ async function persistFieldPatch(el: Element, fieldName: string, nextValue: unkn
     // pinned to whatever the prior image was (or the 2000-default), and
     // pins end up off-image when image dimensions change.
     if (el.type === 'map' && fieldName === 'image_url' && typeof nextValue === 'string' && nextValue.trim()) {
-      void autoUpdateMapDims(el.id, nextValue.trim());
+      // Blank-canvas → image via the URL field: the write is already
+      // committed (field popovers save-then-notify), so no veto here — the
+      // sketch's pins/zone points scale onto the image once the URL's dims
+      // decode (DESIGN_MAPS.md §4.2; the local-image row, which CAN veto
+      // pre-write, confirms first). `el` is the pre-edit snapshot, so its
+      // empty image fields + old dims are exactly the blank-canvas state.
+      const prior = el as WorldMap;
+      const wasImageless = !prior.image_url && !prior.image_media_id;
+      const fromDims = wasImageless
+        ? {
+            w: typeof prior.width === 'number' && prior.width > 0 ? prior.width : IMAGELESS_MAP_SIZE,
+            h: typeof prior.height === 'number' && prior.height > 0 ? prior.height : IMAGELESS_MAP_SIZE,
+          }
+        : null;
+      void autoUpdateMapDims(el.id, nextValue.trim(), fromDims);
     }
   } catch (err) {
     console.error('[element-detail] update failed:', err);
@@ -597,16 +612,31 @@ async function persistFieldPatch(el: Element, fieldName: string, nextValue: unkn
  * map's width/height. Silent on failure (CORS, 404, etc.) — pins keep
  * working with stale dims; user can manually edit width/height fields
  * if the auto-detect can't reach the image.
+ *
+ * `sketchFrom` set = this attach came from a BLANK canvas (§4.2): after the
+ * dims persist, every pin/zone point scales proportionally from the old
+ * square into the image space, then one refresh carries both.
  */
-async function autoUpdateMapDims(mapId: string, url: string): Promise<void> {
+async function autoUpdateMapDims(
+  mapId: string,
+  url: string,
+  sketchFrom: { w: number; h: number } | null = null,
+): Promise<void> {
   const dims = await readImageDimsFromUrl(url);
   if (!dims) return;
   const store = getActiveStore();
   if (!store) return;
   try {
     await store.updateMap(mapId, { width: dims.w, height: dims.h });
+    if (sketchFrom) {
+      const counts = await countSpatialOnMap(store, mapId);
+      const scaled = await rescaleSketchOntoImage(store, mapId, sketchFrom, dims);
+      if (scaled > 0) toastManager.info(`${spatialPhrase(counts)} scaled onto the image`);
+    }
     const elements = await refreshElementsAfterWrite(store);
     toastManager.info(`Map dimensions updated to ${dims.w}×${dims.h}`);
+    const hint = smallMapImageHint(dims);
+    if (hint) toastManager.info(hint);
   } catch (err) {
     console.error('[element-detail] map dim auto-update failed:', err);
   }

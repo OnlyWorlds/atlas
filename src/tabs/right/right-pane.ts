@@ -26,6 +26,7 @@ import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount, diagnos
 import { surfaceSyncUnavailable } from '../../ui/sync-toasts';
 import { ConflictReviewModal } from '../../ui/conflict-review-modal';
 import { savePersistedRightTabs } from './right-tabs-persistence';
+import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText } from '../../core/dom-utils';
 
 export interface RightPaneMount {
@@ -135,6 +136,10 @@ export function mountRightPane(mount: RightPaneMount): () => void {
       const m = state.data.elements.find((e): e is WorldMap => e.type === 'map' && e.id === activeTab.mapId);
       const newDimsKey = m ? `${m.width ?? 2000}x${m.height ?? 2000}` : null;
       if (lastActiveMapDimsKey !== null && newDimsKey !== null && lastActiveMapDimsKey !== newDimsKey) {
+        // The saved camera targets the OLD coordinate space — restoring it
+        // after the remount teleports the view somewhere meaningless on the
+        // new canvas (S300b tidy). Clear it so the remount lands fit-to-image.
+        clearCameraState(activeTab.mapId);
         disposeMapTab(activeTab.mapId);
         lastTabKey = null;
       }

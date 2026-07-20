@@ -533,6 +533,20 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
         <span class="atlas-home-continue-time">${isFirst ? 'your first element · click to keep shaping it' : relativeTime(row.el.local_updated_at)}</span>
       `;
       btn.addEventListener('click', () => openDeskTarget(row.el, row.hash));
+      // Drag-onto-map (S300): recent rows carry the same payload as sidebar
+      // rows, so they drop onto any open map tab as a pin. Maps/zones are
+      // excluded (not pinnable — the sidebar's rule, DESIGN_MAPS.md §1.4;
+      // the drop site double-checks).
+      if (row.el.type !== 'map' && row.el.type !== 'zone') {
+        btn.draggable = true;
+        btn.addEventListener('dragstart', (e) => {
+          e.dataTransfer?.setData('application/x-atlas-element', JSON.stringify({ id: row.el.id, type: row.el.type }));
+          e.dataTransfer?.setData('text/plain', row.el.id);
+          e.dataTransfer!.effectAllowed = 'copy';
+          btn.classList.add('atlas-row-dragging');
+        });
+        btn.addEventListener('dragend', () => btn.classList.remove('atlas-row-dragging'));
+      }
       section.appendChild(btn);
     }
     desk.appendChild(section);

@@ -13,6 +13,26 @@ export interface ImageDims {
   h: number;
 }
 
+/**
+ * Canvas size (square) stamped on maps created WITHOUT an image — the flat
+ * canvas contract (DESIGN_MAPS.md §4.2). Persisted on the element so the
+ * coordinate space is identical on every device; changing this constant
+ * never moves existing pins because existing maps carry their own dims.
+ */
+export const IMAGELESS_MAP_SIZE = 2000;
+
+/**
+ * Below this shorter-side pixel count a map image gets a soft "coarse
+ * placement" hint at attach time (Freek's ask, S300). Never a block.
+ */
+export const SMALL_MAP_IMAGE_MIN_SIDE = 600;
+
+/** Hint line for small map images, or null when the image is big enough. */
+export function smallMapImageHint(dims: ImageDims): string | null {
+  if (Math.min(dims.w, dims.h) >= SMALL_MAP_IMAGE_MIN_SIDE) return null;
+  return `Small image (${dims.w}×${dims.h}): pin placement will be coarse. A larger image gives finer positioning.`;
+}
+
 /** Decode a File (local upload) → natural dimensions, or null on failure. */
 export async function readImageDimsFromFile(file: File): Promise<ImageDims | null> {
   try {

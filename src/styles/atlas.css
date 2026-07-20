@@ -324,6 +324,33 @@ html {
   border-right: 1px solid var(--atlas-divider);
   white-space: nowrap;
   transition: color 120ms ease, background 120ms ease;
+  /* Crowding behavior (Freek, S300): tabs compress before the bar scrolls —
+     labels ellipsize down to a floor that keeps ~5 characters readable
+     (a 76px floor left one-letter tabs — own-eyes); scroll is the last
+     resort beyond that. */
+  flex: 0 1 auto;
+  min-width: 112px;
+  max-width: 168px;
+}
+
+/* The label span shrinks with ellipsis; icon + close keep their size. */
+.atlas-tab > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.atlas-tab > .material-symbols-outlined,
+.atlas-tab > .atlas-tab-close {
+  flex-shrink: 0;
+}
+
+/* The pinned map-index tab never compresses — it is the way home. */
+.atlas-tab[data-tab-kind="map-index"] {
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .atlas-tab:hover {
@@ -2273,12 +2300,9 @@ body.atlas-preroot .atlas-middle {
   font-weight: 500;
 }
 
-/* Imageless maps — muted name to signal "not viewable as canvas yet." Pairs
- * with openMapTab's refusal to open these as tabs; click opens element
- * detail so the user can add an image_url or upload. */
-.atlas-row-main.atlas-map-tree-row-imageless {
-  color: rgba(255, 255, 255, 0.35);
-  font-style: italic;
+/* Home recent rows drag onto maps (S300) — same carry dim as sidebar rows. */
+.atlas-home-continue-row.atlas-row-dragging {
+  opacity: 0.45;
 }
 
 /* Drag-to-reorder visual feedback on map tree rows. Drop indicator is a
@@ -5221,8 +5245,11 @@ body.atlas-preroot .atlas-middle {
   overflow-y: auto;
   background: rgba(10, 10, 10, 0.94);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(34, 211, 238, 0.18);
-  border-radius: 6px;
+  /* Squircle + neutral hairline (Freek, S300): the cyan-tinted 6px border
+     read grainy against the canvas; 12px radius + soft white edge matches
+     the app's glass-panel language (modals, help overlay). */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   color: rgba(255, 255, 255, 0.92);
   font-size: 12px;
@@ -5347,13 +5374,15 @@ body.atlas-preroot .atlas-middle {
 }
 
 .atlas-popover-section-divider {
+  /* Softened (Freek, S300): the dashed cyan rule + cyan caps text shouted;
+     a solid hairline + quiet label matches the section-label voice. */
   margin-top: 4px;
   margin-bottom: 8px;
-  font-size: 10px;
-  color: rgba(34, 211, 238, 0.55);
-  letter-spacing: 0.08em;
-  border-top: 1px dashed rgba(34, 211, 238, 0.18);
-  padding-top: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.04em;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
 }
 
 .atlas-popover-radio-row {

@@ -363,7 +363,12 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     for (const el of elements) countByType.set(el.type, (countByType.get(el.type) ?? 0) + 1);
 
     strip.innerHTML = '';
+    // During the tour the strip shows only types the world actually holds —
+    // it GROWS as the world does, matching the reveal grammar (precision
+    // audit #1, Captain-blessed 2026-07-20). Outside the tour: all types.
+    const touring = isTourFlagActive();
     FILTER_TYPES_WITH_MAP.forEach(type => {
+      if (touring && !(countByType.get(type) ?? 0)) return;
       const btn = document.createElement('button');
       btn.className = 'atlas-filter-btn' + (filters.has(type) ? ' active' : '');
       // Instant CSS tooltip (S264, Captain: the category label should appear

@@ -418,7 +418,7 @@ Current behavior: right-click → opens element-create modal → new element + d
 **Display precedence** (same in local-only AND api-linked worlds):
 1. If `image_url` is non-empty → load and display it.
 2. Else if `image_media_id` is set → load the local blob and display it.
-3. Else → fall back to grid canvas (today's behavior).
+3. Else → the sized FLAT CANVAS (§4.2) — imageless maps are first-class since S300 (the pre-S300 grid fallback + view/placement refusals are retired).
 
 **Edge-color extraction** runs on whichever image actually rendered. Cached per URL (avoid network re-fetch on every mount).
 
@@ -433,13 +433,27 @@ Current behavior: right-click → opens element-create modal → new element + d
 
 **Implication**: a user with only `image_media_id` (no URL) on an api-linked world has a map that displays locally but shows as image-less on other machines. We surface this in the maps tab row as a soft hint: *"local-only image — set a URL to share."* Same hint used for orphan loc-bound surfaces — non-blocking, just informational.
 
-### 4.1 Pin placement is gated on image presence (session 209)
+### 4.1 Pin coordinates anchor to the stored canvas dims (session 209, reshaped S300)
 
-Pins anchor to the map's image coordinate system. To prevent the "pins-placed-on-default-2000-grid-then-canvas-shrinks-to-image" bug, **pin placement is refused when a map has neither `image_url` nor `image_media_id`**. The grid canvas still renders as visual fallback for image-less maps, but the placement banner and the right-click contextual-create flow both early-return with an info toast (`"set a map image first — pins anchor to the image"`).
+Pins anchor to the map's coordinate system, whose size is the stored `width`/`height`. The session-209 image gate ("pin placement refused without an image") existed to prevent the "pins-placed-on-default-2000-grid-then-canvas-shrinks-to-image" bug; since S300 that protection comes from **durable stored dims** instead of a refusal — every map carries `width`/`height` (decoded from its image, or the §4.2 imageless default), so the coordinate space never silently changes shape under the pins. The gate and its toasts are removed from all four sites (placement click, contextual right-click, sidebar drag-drop, zone drawing).
 
 **Implication when changing an image**: pins keep their stored coordinates. If the new image has different dimensions, pin display positions may look "off" relative to image content — but the pins didn't move; the world under them did. Atlas does not auto-rescale pin coords on image change, by design. Users can manually adjust or accept the new positions.
 
-**Existing broken pins** (placed before this gate landed): not auto-migrated. They render wherever their stored coords place them on the now-image-sized canvas. Delete and re-place to fix.
+**Adding an image to a blank canvas (S300b — the ONE exception to coords-kept)**: the blank square was never geography, so the sketch's RELATIVE layout is its meaning. Pins AND zone markers scale proportionally (`core/map-spatial-scale.ts` kernel, applied via `middle/map-attach-scale.ts` through the per-id chains) from the old canvas into the decoded image dims — no options fork (border-clamp piles pins on edges, keep-outside strands them invisibly, remove is what delete is for; Captain's call 2026-07-20). The local-image row (which can veto pre-write) confirms first ("N pins and M zone points will scale with the canvas onto the image"); the `image_url` field edit (already committed at hook time) scales after decode and toasts. Both paths re-persist `width`/`height` from the decoded image (the local-attach path previously skipped this when dims were already stored — the stretch trap, closed in S300). Image→image swaps still never scale.
+
+**Small images (S300, Freek)**: when an attached image's shorter side is under `SMALL_MAP_IMAGE_MIN_SIDE` (600px), attach paths show a soft "pin placement will be coarse" hint. Never a block.
+
+### 4.2 Imageless maps — the flat canvas (S300)
+
+An imageless map is a first-class working surface, not a config-pending state:
+
+- **Stored size**: maps created without an image are stamped `width = height = IMAGELESS_MAP_SIZE` (2000, square — Captain's call 2026-07-20). Legacy imageless maps get the same dims persisted once on first tab open (mirrors the URL-decode persist). Stored dims make the space identical on every device; the constant can change without moving anyone's pins.
+- **Backdrop**: one flat rectangle spanning the canvas — `background_color` when set, a quiet translucent panel tone otherwise, hairline cyan edge marking the bounds. No default grid (flat, Captain's call); the ⚙ "Show grid" pref composes a grid overlay on top for users who want scaffolding. `sourceKey` includes `background_color` so edits re-apply live.
+- **Full capability**: the tab opens normally (openMapTab refusal + element-detail divert removed; the S254 `ensureMapTabOpen` recursion guard is gone with it), pins place, zones draw, drag-drop works. The map-index row's muted-imageless treatment is retired.
+- **Create flow**: the create modal auto-opens the tab with or without an image ("place pins now, add art later" — and when the art arrives, the sketch scales onto it, §4.1).
+- **Broken image URLs** (S300b): when the browser can't load a map's `image_url` (404, CORS, dead host), the tab falls back to the flat canvas + an honest chip instead of Leaflet's white void (`setBackgroundImage`'s `onError`). Stored dims keep the coordinate space; nothing moves.
+- **Dims-flip remount** (right-pane `lastActiveMapDimsKey`): when the active map's stored dims change, the tab disposes + remounts so the manager/interactions/zone overlay convert in the new space; the saved camera is CLEARED first (it targeted the old space — S300b). Background tabs get cache-evicted by `refreshCachedBackgrounds` instead; do not add a second active-tab remount path (it races this one into an empty pane — S300 close-gate follow-up).
+- **Sharing**: unchanged — `freezeMapBlock` ships only maps with a public `https` image_url (D3), so imageless maps don't publish as map blocks; local-media maps were already in that boat. Revisit if a "flat canvas on the published page" ask ever sharpens.
 
 **Placement-mode feedback (S299)**: arming placement (the +pin button, or the tour) now gives real feedback — the +pin icon lights cyan (`[data-action="pin-element"].active`), a "Click the map to place <name>" banner floats over the active map (`src/tabs/right/map-placement-hint.ts`, a boot-installed state watcher), the map cursor becomes a crosshair (`body.atlas-placing` — the class was defined since session 219 but never applied until now), and **Esc cancels** (owned via a skip in the deselect-to-home hotkey guard). Before S299 clicking +pin gave no visible state at all.
 

@@ -115,6 +115,20 @@ test('full walk: bare stage → real-modal beats → acts → finish tears down'
     return els.find((e: any) => e.name === 'The Consul')?.atlas_aliases ?? null;
   });
   expect(aliasesEarly).toBeNull();
+  // Precision staging (S300, Captain-blessed): no Custom-fields section during
+  // the tour, and the filter strip shows ONLY types the world holds (every
+  // rendered button carries a count badge; far fewer than the full 20).
+  await expect(page.locator('.atlas-custom-fields-section')).toHaveCount(0);
+  const stripState = await page.evaluate(() => {
+    const btns = [...document.querySelectorAll('.atlas-filter-btn')];
+    return {
+      total: btns.length,
+      badged: btns.filter(b => b.querySelector('.atlas-filter-count')).length,
+    };
+  });
+  expect(stripState.total).toBeGreaterThan(0);
+  expect(stripState.total).toBeLessThan(10);
+  expect(stripState.badged).toBe(stripState.total);
 
   await nextStep(page, 3); // hegemony
   await expect(page.locator('.atlas-sidebar')).toContainText('The Hegemony');

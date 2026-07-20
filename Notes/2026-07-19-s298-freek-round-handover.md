@@ -37,10 +37,10 @@ Round 3 (the Freek batch):
 **Share/app bouts:**
 9. ✅ **Zones on the share map block** — DONE S299, with per-zone curation (`MapBlock.zoneIds` include-list mirroring pins) + show re-lift + a11y/NaN guards. DESIGN_SHARING updated.
 10. ~~og:image~~ — CUT (Captain: link-preview thumbnail, his to handle / screenshots for the launch post).
-11. Map ⚙ visual-settings popover restyle (grainy borders → squircle per Freek; soft "Zones" title) — OPEN, align with app language.
-12. Maps-in-Maps-tab clarity (smaller tabs? collapsible) — OPEN, design conversation.
-13. ~~Drag elements from sidebar onto the map~~ — already exists (Captain confirmed S299); "home recents → map" is the only enhancement left, minor.
-14. Imageless maps (default size, warn on small image) — OPEN, design/discussion.
+11. ✅ Map ⚙ visual-settings popover restyle — DONE S300 (12px squircle, neutral hairline, soft Zones divider).
+12. ✅ Maps-in-Maps-tab clarity — DONE S300 as tab compression (min 112 / max 168px, ellipsis, index tab exempt); Captain review on next look.
+13. ✅ ~~Drag elements from sidebar onto the map~~ — existed; home-recents → map DONE S300.
+14. ✅ Imageless maps — DONE S300 (square 2000 default, flat backdrop, pins+zones unlocked, small-image hint, attach-art-later contract; DESIGN_MAPS §4.2; 3-lens close-gated).
 
 **Standing (pre-existing)**: Crimson Text bundling (if serif blessed) · real-Safari smoke (Mac) · Hyperion share-page URL into the 'online' step extras row (slot commented in tour-bar.ts) · settings-overlay routing (parked) · browser-storage-worlds project (post-launch).
 

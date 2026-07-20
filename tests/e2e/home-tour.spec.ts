@@ -115,15 +115,16 @@ test('both cores → the next wave; a created type flips to its room CTA; dismis
   await expect(page.locator('[data-tour-cta="event"]')).toHaveCount(0);
 });
 
-test('desk map rows: imageless map diverts with a toast, never a dead click (S265)', async ({ page }) => {
+test('desk map rows: imageless map opens its flat canvas tab (S300, was the S265 divert)', async ({ page }) => {
   await setupWorld(page);
   await createViaStore(page, 'map', { name: 'Blank Atlas' });
   const mapRow = page.locator('.atlas-home-continue-row', { hasText: 'Blank Atlas' });
   await expect(mapRow).toBeVisible();
   await mapRow.click();
-  // openMapTab's imageless path: toast + divert to the map's element detail.
-  await expect(page.locator('.ow-toast', { hasText: 'set a map image' })).toBeVisible();
-  await expect(page).toHaveURL(/\/element\//);
+  // Imageless maps are first-class: the tab opens and renders the sized flat
+  // canvas (no toast, no divert — DESIGN_MAPS.md §4.2).
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Blank Atlas' })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: 'set a map image' })).toHaveCount(0);
 });
 
 test('desk map rows: an already-open background map tab re-activates on click (S265)', async ({ page }) => {

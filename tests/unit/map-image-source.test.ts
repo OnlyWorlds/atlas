@@ -9,8 +9,8 @@ import { describe, it, expect } from 'vitest';
 import { pickMapImageSource } from '../../src/tabs/right/map-image-source';
 
 describe('pickMapImageSource', () => {
-  it('returns grid when neither field is set', () => {
-    expect(pickMapImageSource({})).toEqual({ kind: 'grid' });
+  it('returns flat (the sized imageless canvas) when neither field is set', () => {
+    expect(pickMapImageSource({})).toEqual({ kind: 'flat' });
   });
 
   it('returns url when only image_url is set', () => {
@@ -53,7 +53,7 @@ describe('pickMapImageSource', () => {
     })).toEqual({ kind: 'local', mediaId: 'media-fallback' });
   });
 
-  it('whitespace-only image_url with no media falls through to grid', () => {
-    expect(pickMapImageSource({ image_url: '\t\n  ' })).toEqual({ kind: 'grid' });
+  it('whitespace-only image_url with no media falls through to flat', () => {
+    expect(pickMapImageSource({ image_url: '\t\n  ' })).toEqual({ kind: 'flat' });
   });
 });
