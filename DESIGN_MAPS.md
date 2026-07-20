@@ -441,6 +441,10 @@ Pins anchor to the map's image coordinate system. To prevent the "pins-placed-on
 
 **Existing broken pins** (placed before this gate landed): not auto-migrated. They render wherever their stored coords place them on the now-image-sized canvas. Delete and re-place to fix.
 
+**Placement-mode feedback (S299)**: arming placement (the +pin button, or the tour) now gives real feedback — the +pin icon lights cyan (`[data-action="pin-element"].active`), a "Click the map to place <name>" banner floats over the active map (`src/tabs/right/map-placement-hint.ts`, a boot-installed state watcher), the map cursor becomes a crosshair (`body.atlas-placing` — the class was defined since session 219 but never applied until now), and **Esc cancels** (owned via a skip in the deselect-to-home hotkey guard). Before S299 clicking +pin gave no visible state at all.
+
+**Pin labels default (S299)**: `FACTORY_DEFAULTS.pin_labels` is now `'always'` (was `'hover'`), matching `zone_labels` — pins are discoverable at a glance out of the box. Per-map ⚙ / the settings Maps-defaults editor can dial back to `'hover'`/`'threshold'`/`'never'`; existing saved user defaults are untouched.
+
 ---
 
 ## 5. Tab state across world switches (revised session 209)

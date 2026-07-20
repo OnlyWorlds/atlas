@@ -420,6 +420,41 @@ export function renderMapView(
   img.alt = frozen.title;
   img.loading = 'lazy';
   frame.appendChild(img);
+  // Zone overlays under the pins (S299): %-space SVG stretched over the
+  // image; hover names via <title>, click-through when the zone element is
+  // included (same rule as pins).
+  if (frozen.zones && frozen.zones.length > 0) {
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('class', 'atlas-share-map-zones');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    for (const zone of frozen.zones) {
+      const isLine = zone.shape === 'line';
+      const shapeEl = document.createElementNS(svgNS, isLine ? 'polyline' : 'polygon');
+      shapeEl.setAttribute('points', zone.points.map(p => `${p.xPct},${p.yPct}`).join(' '));
+      shapeEl.setAttribute('class', 'atlas-share-map-zone' + (isLine ? ' is-line' : ''));
+      shapeEl.setAttribute('vector-effect', 'non-scaling-stroke');
+      const title = document.createElementNS(svgNS, 'title');
+      title.textContent = zone.name;
+      shapeEl.appendChild(title);
+      const entry = zone.ref ? getEntry(zone.ref) : null;
+      if (entry) {
+        shapeEl.classList.add('is-openable');
+        shapeEl.setAttribute('role', 'button');
+        shapeEl.setAttribute('tabindex', '0');
+        const open = (): void => openPinModal(entry, entriesForModal);
+        shapeEl.addEventListener('click', open);
+        shapeEl.addEventListener('keydown', (e) => {
+          if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') {
+            e.preventDefault(); open();
+          }
+        });
+      }
+      svg.appendChild(shapeEl);
+    }
+    frame.appendChild(svg);
+  }
   for (const pin of frozen.pins) {
     const entry = pin.ref ? getEntry(pin.ref) : null;
     const dot = document.createElement('span');

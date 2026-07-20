@@ -32,7 +32,6 @@ export const TOUR_SENTENCE: readonly string[] =
    'Steinway while great, green, saurian things surged and bellowed in the swamps below.').split(' ');
 
 /** The opener's eyebrow line (step 1 only — steps carry no titles). */
-export const TOUR_OPENER_EYEBROW = 'One sentence, one world';
 
 /** The standard cite — book and year, no mortality claims (Skeld's check). */
 export const TOUR_ATTRIBUTION = 'Hyperion, Dan Simmons (1989)';
@@ -63,13 +62,16 @@ export interface TourStep {
     | { kind: 'home' }
     | { kind: 'elements' }
     | { kind: 'element'; ref: string }
-    | { kind: 'map'; ref: string }
+    // `elementRef` opens the map AND selects an element in the middle (the
+    // combined map/element route) — the pin beat needs the element's header
+    // visible so its real +pin button shows.
+    | { kind: 'map'; ref: string; elementRef?: string }
     | { kind: 'writing'; ref: string }
     | { kind: 'chart' };
   /** Switch the right pane to the Web (context) tab on step enter. */
   webTab?: boolean;
   /** Hands-on steps: the real gesture OR Next does it for you (watch-mode). */
-  handsOn?: 'create-world' | 'create-consul' | 'setup-folder';
+  handsOn?: 'create-world' | 'create-consul' | 'place-pin' | 'setup-folder';
 }
 
 export const TOUR_STEPS: readonly TourStep[] = [
@@ -177,8 +179,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: 'the-pin',
     act: 2,
     body:
-      'Pins place elements on maps. This one marks where the Consul sat: ' +
-      'hover it to see what it holds, click it to travel there.',
+      'Pins place elements on maps. Click the highlighted pin button on the ' +
+      'Consul, then click the map where his balcony seat should sit.',
+    handsOn: 'place-pin',
     deeper:
       'A sharp eye notices the pin holds the Consul, not his spaceship: a pin ' +
       'records where an ELEMENT is, and the schema has no field yet that says a ' +
@@ -190,8 +193,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
       'can raise and argue. A motion to give characters a vehicle or equipment ' +
       'field would close exactly this gap, for every tool at once.',
     spans: [{ from: 3, to: 3, type: 'pin' }],
-    reveal: ["pin:The Consul's balcony seat"],
-    route: { kind: 'map', ref: 'map:Hyperion' },
+    reveal: [],
+    // Map open (right) + the Consul selected (middle) so his +pin button shows.
+    route: { kind: 'map', ref: 'map:Hyperion', elementRef: 'character:The Consul' },
   },
   {
     id: 'the-swamps',

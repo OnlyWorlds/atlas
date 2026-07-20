@@ -69,6 +69,10 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     cached.ready.then(() => {
       cached.manager.getMap()?.invalidateSize();
       syncPins(cached);
+      // Zones too (resilience gate, S299): elements-slice changes while the
+      // tab was cached (zone deleted + tour-healed, edited elsewhere) never
+      // reached the overlay — pins re-synced on re-entry, zones didn't.
+      syncZones(cached);
     });
     return;
   }

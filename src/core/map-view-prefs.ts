@@ -43,7 +43,11 @@ export interface MapViewPrefs {
  */
 export const FACTORY_DEFAULTS: MapViewPrefs = {
   pin_style: 'icon',
-  pin_labels: 'hover',
+  // 'always' out of the box (S299, Captain) — pins are discoverable at a
+  // glance without a hover; matches zone_labels. Per-map ⚙ / settings can
+  // dial it back to 'hover'/'threshold' on a dense map. Existing saved user
+  // defaults are untouched (this is only the factory floor).
+  pin_labels: 'always',
   pin_label_threshold: 6,
   pin_tint: 'type-color',
   show_grid: false,

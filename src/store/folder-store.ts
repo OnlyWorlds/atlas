@@ -78,6 +78,18 @@ export interface FolderStore {
    */
   updateElement(id: string, patch: Partial<Element>): Promise<Element>;
   /**
+   * Read-merge-write INSIDE the per-id write chain: `mutate` receives the
+   * on-disk element as read within the lock and returns the patch to apply,
+   * or null for "no write" (no stamp, no file touch). Returns null when the
+   * element does not exist. Use whenever a patch is COMPUTED FROM current
+   * state — a patch built from a pre-chain snapshot can silently revert a
+   * concurrent writer's fields (the tour heal gate's TOCTOU finding, S299).
+   */
+  updateElementWith(
+    id: string,
+    mutate: (existing: Element) => Partial<Element> | null,
+  ): Promise<Element | null>;
+  /**
    * Delete an element. Writes a tombstone, then removes the file.
    *
    * Cascade rules (default `opts.cascade = true`):

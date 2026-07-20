@@ -184,7 +184,22 @@ test('pin button appears in element detail when a map tab is active', async ({ p
   await pinBtn.click();
   await expect(pinBtn).toHaveClass(/active/);
 
-  // Toggle off.
+  // Placement feedback (S299): the map shows a banner naming the element +
+  // the crosshair state on body; the armed button is lit (the .active class,
+  // now styled).
+  await expect(page.locator('.atlas-map-placement-hint')).toBeVisible();
+  await expect(page.locator('.atlas-map-placement-hint-text')).toContainText('Pin-able');
+  expect(await page.evaluate(() => document.body.classList.contains('atlas-placing'))).toBe(true);
+
+  // Esc cancels placement — button un-lights, banner + crosshair clear.
+  await page.keyboard.press('Escape');
+  await expect(pinBtn).not.toHaveClass(/active/);
+  await expect(page.locator('.atlas-map-placement-hint')).toHaveCount(0);
+  expect(await page.evaluate(() => document.body.classList.contains('atlas-placing'))).toBe(false);
+
+  // Toggle via the button still works too.
+  await pinBtn.click();
+  await expect(pinBtn).toHaveClass(/active/);
   await pinBtn.click();
   await expect(pinBtn).not.toHaveClass(/active/);
 });

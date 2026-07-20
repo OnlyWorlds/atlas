@@ -1637,10 +1637,13 @@ body.atlas-touring[data-tour-stage="0"] .atlas-shell {
   /* Below modals (z 1000): a dialog always outranks the narrator. */
   z-index: 900;
   width: min(960px, calc(100vw - 48px));
-  /* Covers the tallest step's content (measured 269px, S298) so the dock is
-     ONE shape across all 17 docked steps — 2-line metas and 3-line bodies
-     included, not just the deeper/meta rows the reserves already hold. */
-  min-height: 272px;
+  /* FIXED height (S299, Captain: "keep the widget exact same size ALWAYS") —
+     min-height let the one 4-line step (6, 'linking') grow to 289; a fixed
+     height never resizes. Pinned to the current tallest body; when the copy
+     pass evens the body lengths, this drops and the dead space shrinks with
+     it (constant-size and no-slack both come from even copy). Deeper content
+     is a flyout, so the dock's own content never exceeds this. */
+  height: 290px;
   box-sizing: border-box;
   background: rgba(8, 13, 18, 0.92);
   backdrop-filter: blur(12px);
@@ -1807,6 +1810,14 @@ body.atlas-touring .atlas-shell {
   font-size: 11px;
 }
 .atlas-tour-spacer { flex: 1; }
+/* Step counter — a quiet working aid (re-added S299), not the user's progress
+   cue (the sentence is). Muted + small so it reads as reference, not chrome. */
+.atlas-tour-stepcount {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.32);
+  letter-spacing: 0.02em;
+  align-self: center;
+}
 .atlas-tour-consul-widget {
   display: inline-flex;
   gap: 8px;
@@ -1853,6 +1864,24 @@ body.atlas-touring[data-tour-stage="6"] .atlas-room-nav-strip [data-room] {
 }
 /* Stage 1 shows the landing's middle — quiet it; the narrator is the voice. */
 body.atlas-touring[data-tour-stage="1"] .atlas-landing { display: none; }
+/* Pin beat (S299): highlight the REAL +pin button so the user finds it and
+   uses the actual control. Pulses cyan until the pin is placed. */
+body.atlas-tour-pinstep [data-action="pin-element"] {
+  color: var(--atlas-cyan) !important;
+  border-color: var(--atlas-cyan-soft) !important;
+  animation: atlas-tour-pulse 2.2s ease-in-out infinite;
+}
+/* Progressive precision (S299): tool chrome waits for its teaching step, not
+   just its act. The bar stamps step-scoped classes alongside the stage. */
+body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="draw-polygon"],
+body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="draw-line"],
+body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="toggle-zones-visibility"],
+body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="zones-dropdown"] {
+  display: none;
+}
+body.atlas-touring.atlas-tour-preweb .atlas-right [data-tab-kind="context"] {
+  display: none;
+}
 /* Greyed siblings in the stage-1 worlds header: the landscape in its exact
    geometry, capabilities dimmed until the tour ends. */
 .atlas-tour-locked {
@@ -2597,6 +2626,60 @@ body.atlas-preroot .atlas-middle {
 .atlas-placing .atlas-map-pane,
 .atlas-placing .leaflet-container {
   cursor: crosshair !important;
+}
+
+/* The +pin button's ARMED state (S299) — clicking it enters placement mode;
+   the lit cyan glow is the "you're placing" feedback that was missing. The
+   .active class is applied by element-detail-header when ui.pinPlacement
+   targets this element. */
+[data-action="pin-element"].active {
+  color: var(--atlas-cyan) !important;
+  background: rgba(34, 211, 238, 0.14) !important;
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.4), 0 0 8px rgba(34, 211, 238, 0.3);
+}
+
+/* Placement banner — floats top-center over the active map while armed.
+   Clear but quiet (Captain: "subtle but clear"). */
+.atlas-map-placement-hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  background: rgba(8, 13, 18, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(34, 211, 238, 0.5);
+  border-radius: 999px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 12px rgba(34, 211, 238, 0.2);
+  animation: atlas-placement-hint-in 160ms ease-out;
+  pointer-events: auto;
+}
+@keyframes atlas-placement-hint-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.atlas-map-placement-hint .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--atlas-cyan);
+}
+.atlas-map-placement-hint-cancel {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  padding: 2px 9px;
+  cursor: pointer;
+}
+.atlas-map-placement-hint-cancel:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--atlas-text);
 }
 
 /* Default map cursor is the OS arrow, not Leaflet's open hand. Captain found
@@ -9742,6 +9825,31 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
   display: block;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Zone overlays on the published map (S299) — %-space SVG over the image,
+   under the pins. Theme accent, quiet fill; lines carry stroke only. */
+.atlas-share-map-zones {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.atlas-share-map-zone {
+  fill: rgba(34, 211, 238, 0.13);
+  stroke: rgba(34, 211, 238, 0.55);
+  stroke-width: 1.5px;
+}
+.atlas-share-map-zone.is-line { fill: none; }
+.atlas-share-map-zone.is-openable {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.atlas-share-map-zone.is-openable:hover { fill: rgba(34, 211, 238, 0.24); }
+.atlas-share-map-zone.is-line.is-openable:hover {
+  fill: none;
+  stroke: rgba(34, 211, 238, 0.85);
 }
 
 .atlas-share-map-pin {

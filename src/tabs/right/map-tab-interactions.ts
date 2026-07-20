@@ -94,12 +94,20 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
         toasts.error('Cannot place pin: element not found');
         return;
       }
+      // Tour beat (S299): a placement in the tour world adopts the bundle
+      // pin's identity (locked name + id — the reveal/heal handle) at the
+      // user's own coordinates. The class check keeps the tour chunk out of
+      // ordinary sessions; tourPinBake itself re-verifies the tour world.
+      const tourMod = document.body.classList.contains('atlas-touring')
+        ? await import('../../tour/tour-engine') : null;
+      const bake = tourMod ? await tourMod.tourPinBake(placement.elementId, entry.mapId) : null;
       await store.createPin({
         map_id: entry.mapId,
         element_id: placement.elementId,
         element_type: pinned.type,
         x: clampToCanvas(Math.round(ev.point.x), width),
         y: clampToCanvas(Math.round(ev.point.y), height),
+        ...(bake ?? {}),
       });
       const elements = await store.listElements();
       patchSlice('data', { elements });
@@ -107,6 +115,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       requestPushIfLinked();
       toasts.success('Pin placed');
       completeWaypoint('maps');
+      if (bake) tourMod?.notifyTourPinPlaced();
     } catch (err) {
       console.error('[map-tab] create pin failed:', err);
       toasts.error('Failed to place pin');

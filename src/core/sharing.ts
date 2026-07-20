@@ -210,6 +210,14 @@ export interface MapBlock {
   /** Always-visible pin labels. ABSENT = true (only explicit false stored). */
   showLabels?: boolean;
   /**
+   * Zone overlays to render, as an INCLUDE-list mirroring `pinIds` (S299).
+   * ABSENT = all zones on the map (the friendly default + legacy blocks that
+   * predate zones); PRESENT (even empty) = exactly these zones. Initialized
+   * to all the map's zones at block creation, so new zones never auto-join a
+   * curated map. Joins the refs mirror (healed on id-swap, count-aware).
+   */
+  zoneIds?: string[];
+  /**
    * Pins opted INTO full-profile disclosure (B6, settled 2026-07-03 —
    * supersedes the session-239 full-fields-by-default call): an included pin
    * ships its element as identity + description (+ image) only; pins listed
@@ -299,6 +307,10 @@ export function parsePageBlocks(raw: unknown): PageBlock[] {
             ? b.pinIds.filter((v): v is string => typeof v === 'string' && v.length > 0) : [],
         };
         if (b.showLabels === false) mapBlock.showLabels = false; // absent = true
+        if (Array.isArray(b.zoneIds)) {
+          // Present (even empty) is meaningful — absent = all zones.
+          mapBlock.zoneIds = b.zoneIds.filter((v): v is string => typeof v === 'string' && v.length > 0);
+        }
         if (Array.isArray(b.fullPinIds)) {
           const full = b.fullPinIds.filter((v): v is string => typeof v === 'string' && v.length > 0);
           if (full.length > 0) mapBlock.fullPinIds = full;
@@ -365,6 +377,15 @@ export function blocksOf(el: Element): PageBlock[] {
         }
         refIndex++;
       }
+      // Zone include-list heals the same way (S299), after the pins. Absent =
+      // all zones, so it consumes zero refs — matching pageRefsFor.
+      if (b.zoneIds) {
+        for (let i = 0; i < b.zoneIds.length; i++) {
+          const mirrored = refs[refIndex];
+          if (mirrored && mirrored !== b.zoneIds[i]) b.zoneIds[i] = mirrored;
+          refIndex++;
+        }
+      }
     }
   }
   return blocks;
@@ -380,7 +401,7 @@ export function pageRefsFor(blocks: readonly PageBlock[]): string[] {
     if (b.kind === 'element-card') out.push(b.elementId);
     else if (b.kind === 'circle') out.push(b.knowerId);
     else if (b.kind === 'collection') out.push(...b.elementIds);
-    else if (b.kind === 'map') out.push(b.mapId, ...b.pinIds);
+    else if (b.kind === 'map') out.push(b.mapId, ...b.pinIds, ...(b.zoneIds ?? []));
   }
   return out;
 }

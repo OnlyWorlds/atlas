@@ -104,6 +104,33 @@ export class MockFolderStore implements FolderStore {
     return { ...elem };
   }
 
+  async updateElementWith(
+    id: string,
+    mutate: (existing: Element) => Partial<Element> | null,
+  ): Promise<Element | null> {
+    this.assertWritable();
+    return this.writeChain.run(id, async () => {
+      const existing = this.elements.get(id);
+      if (!existing) return null;
+      await Promise.resolve(); // mirror the real store's in-chain read gap
+      // Deep-clone like the real store's getElement (structuredClone) — the
+      // mutate callback must not be able to reach the mock's stored nested
+      // refs (fakes encode the real store's isolation, convention #20).
+      const patch = mutate(structuredClone(existing));
+      if (patch === null || Object.keys(patch).length === 0) return structuredClone(existing);
+      const next: Element = {
+        ...existing,
+        ...patch,
+        id: existing.id,
+        type: existing.type,
+        local_updated_at: this.clock(),
+        server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
+      };
+      this.elements.set(id, next);
+      return { ...next };
+    });
+  }
+
   async updateElement(id: string, patch: Partial<Element>): Promise<Element> {
     this.assertWritable();
     return this.writeChain.run(id, async () => {

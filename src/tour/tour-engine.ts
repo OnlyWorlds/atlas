@@ -34,6 +34,7 @@ import { deleteHandle } from '../store/handle-vault';
 import { detachSyncEngine } from '../sync/sync-attach';
 import type { Element, ElementType } from '../core/types';
 import { TOUR_STEPS, type TourStep } from './tour-data';
+import { mergeHealArray } from './tour-heal';
 
 const TOUR_STATE_KEY = 'atlas_tour_v1';
 const TOUR_DONE_KEY = 'atlas_tour_done_v1';
@@ -211,42 +212,98 @@ async function revealOne(
 }
 
 /**
- * Back-fill previously-stripped links (and, once aliasesOn, aliases) on
- * already-revealed elements once their targets exist. Cheap at tour scale.
+ * Heal the bundle's link weave on already-revealed elements: back-fill
+ * previously-stripped links, re-assert bundle scalar links, re-add links the
+ * user removed — while PRESERVING the user's own link additions (the merge
+ * kernel, `tour-heal.ts`). The patch is computed INSIDE the per-id write
+ * chain (updateElementWith), so a concurrent user edit is never reverted
+ * from a stale snapshot. Returns how many elements were patched.
  */
-async function healLinks(universe: Set<string>, revealed: Set<string>, aliasesOn: boolean): Promise<void> {
+async function healLinks(universe: Set<string>, revealed: Set<string>, aliasesOn: boolean): Promise<number> {
   const store = getActiveStore();
-  if (!store || !tourWorldIsActive()) return;
+  if (!store || !tourWorldIsActive()) return 0;
   const bundle = await loadBundle();
+  let patched = 0;
   for (const el of bundle.elements) {
     if (!revealed.has(el.id)) continue;
-    const onDisk = await store.getElement(el.id);
-    if (!onDisk) continue;
-    const patch: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(el)) {
-      if (k === 'type' || k === 'x_tour_media') continue;
-      if (k === 'atlas_aliases') {
-        if (aliasesOn && Array.isArray(v)
-            && JSON.stringify(v) !== JSON.stringify((onDisk as Record<string, unknown>)[k] ?? null)) {
-          patch[k] = v;
+    // Per-write guard: exit/world-switch mid-loop stops the heal cold rather
+    // than letting queued writes land on a closing store.
+    if (!tourWorldIsActive() || getActiveStore() !== store) break;
+    let wrote = false;
+    await store.updateElementWith(el.id, (onDisk) => {
+      const rec = onDisk as Record<string, unknown>;
+      const patch: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(el)) {
+        if (k === 'id' || k === 'type' || k === 'x_tour_media') continue;
+        if (k === 'atlas_aliases') {
+          if (aliasesOn && Array.isArray(v)
+              && JSON.stringify(v) !== JSON.stringify(rec[k] ?? null)) {
+            patch[k] = v;
+          }
+          continue;
         }
-        continue;
+        if (typeof v === 'string' && universe.has(v) && revealed.has(v) && rec[k] !== v) {
+          patch[k] = v;
+        } else if (Array.isArray(v) && v.some(i => typeof i === 'string' && universe.has(i))) {
+          const have = Array.isArray(rec[k]) ? rec[k] as unknown[] : [];
+          const { merged, changed } = mergeHealArray(v, have, revealed);
+          if (changed) patch[k] = merged;
+        }
       }
-      if (typeof v === 'string' && universe.has(v) && revealed.has(v) && (onDisk as Record<string, unknown>)[k] !== v) {
-        patch[k] = v;
-      } else if (Array.isArray(v) && v.some(i => typeof i === 'string' && universe.has(i))) {
-        const want = v.filter(i => !(typeof i === 'string' && universe.has(i) && !revealed.has(i)));
-        const have = (onDisk as Record<string, unknown>)[k];
-        if (JSON.stringify(want) !== JSON.stringify(have ?? [])) patch[k] = want;
-      }
-    }
-    if (Object.keys(patch).length > 0) {
-      await store.updateElement(el.id, patch as Partial<Element>);
-    }
+      wrote = Object.keys(patch).length > 0;
+      return wrote ? (patch as Partial<Element>) : null;
+    });
+    if (wrote) patched++;
   }
+  return patched;
 }
 
-/** Ids of everything revealed by steps 0..i (plus the hands-on consul). */
+/**
+ * Media heal: the two x_tour_media elements (map, location) whose element
+ * survived but whose image is gone (image_media_id unset — a cache-cheap
+ * predicate; listMedia would put OPFS dir enumeration on the hot per-step
+ * path) get the asset re-fetched and re-attached. Absent elements are
+ * revealOne's job (its create path attaches media). Returns writes made.
+ */
+async function healMedia(revealed: Set<string>): Promise<number> {
+  const store = getActiveStore();
+  if (!store || !tourWorldIsActive()) return 0;
+  const bundle = await loadBundle();
+  let patched = 0;
+  for (const el of bundle.elements) {
+    const asset = (el as Record<string, unknown>).x_tour_media;
+    if (typeof asset !== 'string' || !TOUR_MEDIA_URLS[asset]) continue;
+    if (!revealed.has(el.id)) continue;
+    if (!tourWorldIsActive() || getActiveStore() !== store) break;
+    const onDisk = await store.getElement(el.id);
+    if (!onDisk || (onDisk as Record<string, unknown>).image_media_id) continue;
+    try {
+      const resp = await fetch(TOUR_MEDIA_URLS[asset]());
+      const blob = await resp.blob();
+      // Re-check AFTER the (arbitrarily slow) fetch (gate MED, S299): a
+      // teardown from startTour/launchTour — not serialized behind the step
+      // chain like exitTour — could have swapped the store while we awaited.
+      // Writing to the captured, now-closed store would land on a dead world.
+      if (!tourWorldIsActive() || getActiveStore() !== store) break;
+      const file = new File([blob], asset, { type: 'image/webp' });
+      const media = await store.addMedia(el.id, file, 'base-image');
+      await store.updateElement(el.id, { image_media_id: media.id } as Partial<Element>);
+      patched++;
+    } catch (err) {
+      console.warn('[tour] media heal failed:', err);
+    }
+  }
+  return patched;
+}
+
+/** Bundle refs the USER creates on a hands-on step (never auto-revealed on
+ *  their own step; backfilled once the tour is strictly past). */
+const HANDS_ON_REFS: Partial<Record<NonNullable<TourStep['handsOn']>, string>> = {
+  'create-consul': 'character:The Consul',
+  'place-pin': "pin:The Consul's balcony seat",
+};
+
+/** Ids of everything revealed by steps 0..i (plus passed hands-on elements). */
 async function idsUpTo(stepIndex: number): Promise<Set<string>> {
   const revealed = new Set<string>();
   for (let i = 0; i <= Math.min(stepIndex, TOUR_STEPS.length - 1); i++) {
@@ -254,8 +311,9 @@ async function idsUpTo(stepIndex: number): Promise<Set<string>> {
     // A hands-on element is created by the USER on its own step — the
     // generic reveal only backfills it once the tour has moved past
     // (watch-mode Next, resume after reload, back-then-forward navigation).
-    if (step.handsOn === 'create-consul' && i < stepIndex) {
-      const r = await resolveRef('character:The Consul');
+    const handsOnRef = step.handsOn && HANDS_ON_REFS[step.handsOn];
+    if (handsOnRef && i < stepIndex) {
+      const r = await resolveRef(handsOnRef);
       if (r) revealed.add(r.el.id);
     }
     for (const ref of step.reveal ?? []) {
@@ -283,8 +341,12 @@ async function revealUpTo(stepIndex: number): Promise<void> {
     if (!revealed.has(el.id)) continue;
     if (await revealOne(el, universe, revealed, aliasesOn)) wrote = true;
   }
-  await healLinks(universe, revealed, aliasesOn);
-  if (wrote) await refreshElements();
+  const healed = await healLinks(universe, revealed, aliasesOn);
+  const mediaHealed = await healMedia(revealed);
+  // ANY heal write refreshes in the same step-enter (gate C5, two lenses
+  // convergent on the media leg) — a healed link or re-attached image must
+  // be visible on the surface the user is looking at, not next tick.
+  if (wrote || healed > 0 || mediaHealed > 0) await refreshElements();
 }
 
 async function refreshElements(): Promise<void> {
@@ -307,7 +369,15 @@ async function routeFor(step: TourStep): Promise<void> {
       const r = await resolveRef(route.ref);
       if (r) {
         if (route.kind === 'map') {
-          navigate(mapHash(worldId, r.el.id));
+          // Optional element selection (the pin beat): open the map AND show
+          // the element's detail in the middle so its +pin button appears.
+          const elRef = route.elementRef ? await resolveRef(route.elementRef) : null;
+          if (elRef) {
+            patchSlice('ui', { ...getState().ui, selectedElementId: elRef.el.id });
+            navigate(mapHash(worldId, r.el.id, elRef.el.id));
+          } else {
+            navigate(mapHash(worldId, r.el.id));
+          }
         } else if (route.kind === 'writing') {
           navigate(writingHash(worldId, r.el.id));
         } else {
@@ -344,7 +414,16 @@ export async function createTourWorld(): Promise<void> {
   if (!p) return;
   const { scaffoldTourWorld } = await import('./tour-world');
   const { entry } = await scaffoldTourWorld();
-  writeTourState({ ...readTourState()!, worldId: entry.id });
+  // Exit can race the scaffold await (gate HIGH-1): if the tour was torn
+  // down meanwhile, the just-created world would linger as a phantom demo
+  // entry with isTourActive() false — the residue contract's one leak.
+  // Teardown's demo+prefix sweep is exactly the rollback.
+  const after = readTourState();
+  if (!after?.active) {
+    await teardownPriorTourWorld();
+    return;
+  }
+  writeTourState({ ...after, worldId: entry.id });
   // The tour narrates elements appearing in the left sidebar — elements mode
   // (UI state only, never the persisted pref). Land on the world's home: the
   // shell materializing IS the payoff of the create.
@@ -382,6 +461,13 @@ async function enterStepNow(index: number): Promise<void> {
     await createTourWorld();
   }
   writeTourState({ ...readTourState()!, step: clamped });
+  // A pin placement armed on a prior step must not survive a navigation
+  // (gate MED, S299): a leftover arm + a map click on a later map step mints
+  // a SECOND consul pin (tourPinBake declines once the bundle pin exists).
+  // Leaving the pin step disarms; re-entering it re-offers the button.
+  if (getState().ui.pinPlacement) {
+    patchSlice('ui', { ...getState().ui, pinPlacement: null });
+  }
   await revealUpTo(clamped);
   await routeFor(TOUR_STEPS[clamped]);
   // Tour state lives in localStorage, invisible to state subscribers — tick
@@ -435,6 +521,46 @@ export function consulCreated(): boolean {
     b => b.type === 'character' && b.name === 'The Consul')?.id);
 }
 
+// ---------------------------------------------------------------------------
+// The place-pin hands-on beat (S299): rides the app's REAL pin-placement
+// mode (ui.pinPlacement → map-click drops the pin) — the tour teaches the
+// actual gesture, not a tour-only imitation. The tour's contribution is
+// IDENTITY: the placed pin is the bundle pin (locked name + id, the
+// reveal/heal system's handle), at the user's own coordinates (theirs to
+// keep — C3, positions are user data).
+// ---------------------------------------------------------------------------
+
+/**
+ * Baked identity for a tour placement: when the armed element is the consul
+ * on the tour map and the bundle pin is absent, the created pin IS the
+ * bundle pin. Null = ordinary placement (no override).
+ */
+export async function tourPinBake(
+  elementId: string,
+  mapId: string,
+): Promise<{ id: string; name: string } | null> {
+  if (!tourWorldIsActive()) return null;
+  const consul = await resolveRef('character:The Consul');
+  const pin = await resolveRef("pin:The Consul's balcony seat");
+  const map = await resolveRef('map:Hyperion');
+  if (!consul || !pin || !map) return null;
+  if (elementId !== consul.el.id || mapId !== map.el.id) return null;
+  if (getState().data.elements.some(e => e.id === pin.el.id)) return null;
+  return { id: pin.el.id, name: pin.el.name ?? '' };
+}
+
+/** Post-placement notify — lights the glyph, re-renders the bar. */
+export function notifyTourPinPlaced(): void {
+  emit();
+}
+
+export function tourPinPlaced(): boolean {
+  const p = readTourState();
+  if (!p) return false;
+  return getState().data.elements.some(e => e.id === bundleCache?.elements.find(
+    b => b.type === 'pin' && b.name === "The Consul's balcony seat")?.id);
+}
+
 /**
  * Start (or restart) the tour: tear down any prior tour world, enter the
  * bare stage at step 0. The world is NOT created here — that is the first
@@ -482,13 +608,28 @@ export async function resumeTour(): Promise<void> {
  * (registry + handle + OPFS), remember completion for the landing's
  * emphasis swap, and return to wherever the tour was launched from.
  */
-export async function exitTour(): Promise<void> {
+export function exitTour(): Promise<void> {
+  // Serialized behind any in-flight step (gate HIGH-1/MED-3): teardown never
+  // interleaves a running reveal/heal — the step finishes (its per-write
+  // guards see the flag flip and bail), THEN the world comes down.
+  stepChain = stepChain
+    .catch(() => { /* prior step failed — exit proceeds regardless */ })
+    .then(() => exitTourNow());
+  return stepChain;
+}
+
+async function exitTourNow(): Promise<void> {
   const p = readTourState();
   if (!p) return;
   const returnTo = p.returnHash || '#/';
   // Flag BEFORE teardown: the teardown's registry patch is the state tick
   // the landing re-renders on — set after, the emphasis swap misses it.
   try { localStorage.setItem(TOUR_DONE_KEY, '1'); } catch { /* private mode */ }
+  // A still-armed pin placement must not survive into the next world (a
+  // stray map click there would toast "element not found").
+  if (getState().ui.pinPlacement) {
+    patchSlice('ui', { ...getState().ui, pinPlacement: null });
+  }
   await teardownPriorTourWorld();
   navigate(returnTo);
   // The teardown's state ticks ran while the tour flag was still set — tick
@@ -523,6 +664,12 @@ export async function setupFolderFromTour(): Promise<boolean> {
 
 /** Remove the tour world entirely (registry entry + handle + OPFS folder). */
 async function teardownPriorTourWorld(): Promise<void> {
+  // Disarm any pending pin placement (gate MED scenario B, S299): a restart
+  // that leaves it armed would toast "element not found" on the next run's
+  // pre-consul map click.
+  if (getState().ui.pinPlacement) {
+    patchSlice('ui', { ...getState().ui, pinPlacement: null });
+  }
   const prior = readTourState();
   const reg = getState().registry;
   const entry = reg.worlds.find(w => (prior && prior.worldId && w.id === prior.worldId) || (w.demo === true && w.folder.folder_name.startsWith(TOUR_FOLDER)));

@@ -16,6 +16,7 @@ import { getState as _getState, patchSlice as _patchSlice } from './core/state';
 import { getActiveStore as _getActiveStore } from './core/active-store';
 import { registerServiceWorker } from './core/offline';
 import { hasFolderMode, hasOpfsMode } from './core/capabilities';
+import { installPlacementHintWatcher } from './tabs/right/map-placement-hint';
 
 function renderUnsupportedPage(root: HTMLElement): void {
   root.innerHTML = '';
@@ -61,6 +62,9 @@ function boot(): void {
     return;
   }
   startApp(root);
+  // Pin-placement feedback (crosshair + map banner + Esc). State-driven, one
+  // subscriber; safe to install once here after the app mounts.
+  installPlacementHintWatcher();
 }
 
 if (document.readyState === 'loading') {

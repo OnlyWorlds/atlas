@@ -271,6 +271,10 @@ export function defaultBindings(): HotkeyBinding[] {
       when: () => {
         if (!getCallbacks().hasSelectedElement?.()) return false;
         if (isAnyOverlayActive()) return false;
+        // Pin-placement mode owns Esc while armed (cancel placement, not
+        // deselect-to-home) — same "each mode owns its Esc" rule as overlays.
+        // The watcher stamps body.atlas-placing when ui.pinPlacement is set.
+        if (typeof document !== 'undefined' && document.body.classList.contains('atlas-placing')) return false;
         const hash = typeof window !== 'undefined' ? window.location.hash : '';
         if (hash.includes('/writing') || hash.includes('/knowledge') || hash.includes('/share')) return false;
         return true;

@@ -92,7 +92,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // landscape appears once, in its exact geometry; nothing jumps into
       // existence later).
       header.innerHTML = `
-        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="create-local" title="Create the tour world">
+        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-create-pulse" data-action="create-local" title="Create the tour world">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
         </button>

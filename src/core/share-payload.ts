@@ -30,6 +30,9 @@ import {
   type CollectionBlock, type MapBlock, type HeadingBlock, type ProseBlock, type PageTheme,
 } from './sharing';
 import { knowledgeHeldBy } from './knowledge';
+// Pure shape/geometry helpers (no DOM) — one resolver for zone shape across
+// canvas, builder, and payload; the tabs/right location is historical.
+import { getZoneShape } from '../tabs/right/zone-derived';
 import { freezeChartBlock, type PayloadChartBlock } from '../visualization/timeline/chart-freeze';
 import type { ChartConfig } from '../visualization/timeline/types';
 
@@ -87,6 +90,18 @@ export interface PayloadMapBlock {
   /** Always-visible pin labels (absent = true; hover-only when false). */
   showLabels?: boolean;
   pins: Array<{ xPct: number; yPct: number; name: string; type: string; ref?: string }>;
+  /**
+   * Zone overlays (S299, additive — old payloads/viewers unaffected):
+   * %-normalized polygon/line geometry compiled from the zone's markers on
+   * this map. `ref` present only when the zone element is itself included
+   * (the standard disclosure rule).
+   */
+  zones?: Array<{
+    name: string;
+    shape: 'polygon' | 'line';
+    points: Array<{ xPct: number; yPct: number }>;
+    ref?: string;
+  }>;
 }
 
 /** A block as it appears in the PAYLOAD (circle/map blocks are frozen-compiled). */
@@ -415,6 +430,42 @@ export function freezeMapBlock(
     pins,
   };
   if (block.showLabels === false) frozen.showLabels = false;
+
+  // Zone overlays (S299): markers are the only spatial truth (a zone
+  // "appears" on a map iff its markers do — DESIGN_ZONES.md §1); geometry
+  // normalizes exactly like pins. Shape resolution shares the app's one
+  // helper (getZoneShape) so builder, payload, and canvas can never disagree.
+  // zoneIds is an include-list (absent = all — legacy/friendly default).
+  {
+    const includeAll = block.zoneIds === undefined;
+    const zoneAllow = new Set(block.zoneIds ?? []);
+    const markers: Array<Record<string, unknown>> = [];
+    const zoneEls: Element[] = [];
+    for (const el of byId.values()) {
+      if (el.type === 'marker') markers.push(el as Record<string, unknown>);
+      else if (el.type === 'zone') zoneEls.push(el);
+    }
+    const zones: NonNullable<PayloadMapBlock['zones']> = [];
+    for (const zone of zoneEls) {
+      if (!includeAll && !zoneAllow.has(zone.id)) continue;
+      const points = markers
+        .filter(m => m.zone_id === zone.id && m.map_id === block.mapId
+          && Number.isFinite(m.x as number) && Number.isFinite(m.y as number))
+        .sort((a, b) => ((a.order as number | undefined) ?? 0) - ((b.order as number | undefined) ?? 0))
+        .map(m => ({
+          xPct: Math.round(Math.min(100, Math.max(0, ((m.x as number) / width) * 100)) * 100) / 100,
+          yPct: Math.round(Math.min(100, Math.max(0, ((m.y as number) / height) * 100)) * 100) / 100,
+        }));
+      const shape = getZoneShape(zone as Parameters<typeof getZoneShape>[0]);
+      if (points.length < (shape === 'line' ? 2 : 3)) continue; // degenerate geometry drops
+      const token: NonNullable<PayloadMapBlock['zones']>[number] = {
+        name: zone.name || '(unnamed)', shape, points,
+      };
+      if (includedIds.has(zone.id)) token.ref = zone.id;
+      zones.push(token);
+    }
+    if (zones.length > 0) frozen.zones = zones;
+  }
   return frozen;
 }
 

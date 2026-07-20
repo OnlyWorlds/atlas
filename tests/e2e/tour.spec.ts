@@ -41,6 +41,18 @@ async function createConsulViaModal(page: Page) {
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
 }
 
+/** The pin beat (step 9) is single-route via the REAL +pin button on the
+ *  Consul (highlighted by the tour), then a map click. No dock button; Next
+ *  appears once the pin exists (the gate). */
+async function placePinViaMap(page: Page) {
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  const pinBtn = page.locator('[data-action="pin-element"]');
+  await expect(pinBtn).toBeVisible(); // the map+Consul route surfaced it
+  await pinBtn.click();
+  await page.locator('.atlas-map-tab-wrapper .leaflet-container').click({ position: { x: 220, y: 160 } });
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+}
+
 /** Stage 0 → step 2 via the REAL create-world modal (locked to Hyperion). */
 async function createWorldViaModal(page: Page) {
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '1');
@@ -84,6 +96,19 @@ test('full walk: bare stage → real-modal beats → acts → finish tears down'
   await expect(consulName).toHaveAttribute('readonly', '');
   await page.locator('.atlas-modal-overlay button', { hasText: /^Create$/ }).click();
   await expect(page.locator('.atlas-element-name').first()).toContainText('The Consul');
+  // During the tour, all-empty schema sections HIDE (S299, the Freek round):
+  // every rendered section carrying field rows has at least one populated one.
+  const emptySectionLeak = await page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    const consul = els.find((e: any) => e.name === 'The Consul');
+    const populated = (v: any) => v !== null && v !== undefined
+      && !(typeof v === 'string' && v.trim() === '') && !(Array.isArray(v) && v.length === 0);
+    return [...document.querySelectorAll('.atlas-detail-section')]
+      .filter(s => s.querySelectorAll('[data-field]').length > 0)
+      .some(s => ![...s.querySelectorAll('[data-field]')]
+        .some(r => populated(consul[r.getAttribute('data-field') as string])));
+  });
+  expect(emptySectionLeak).toBe(false);
   // Aliases are DEFERRED — a beginner's first element page stays clean.
   const aliasesEarly = await page.evaluate(async () => {
     const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
@@ -101,7 +126,13 @@ test('full walk: bare stage → real-modal beats → acts → finish tears down'
   await expect(page.locator('.atlas-right')).toBeVisible();
   await nextStep(page, 8); // the map
   await expect(page).toHaveURL(/\/map\//);
-  await nextStep(page, 9); // pin
+  await nextStep(page, 9); // pin — the hands-on placement beat
+  await placePinViaMap(page);
+  const placedPin = await page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    return els.find((e: any) => e.type === 'pin');
+  });
+  expect(placedPin?.name).toBe("The Consul's balcony seat"); // locked identity
   await nextStep(page, 10); // swamps
 
   // Writing act: the icon appears; the chapter renders the sentence verbatim
@@ -170,6 +201,110 @@ test('the create beats are single-route: no watch-mode Next, the gesture is the 
   })).toBe(true);
 });
 
+test('resilience: the world heals user mess on step-enter, user work survives', async ({ page }) => {
+  await freshBoot(page);
+  await openStage0(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+  for (let step = 3; step <= 10; step++) {
+    await nextStep(page, step); // walk to the swamps (map + pin + zone live)
+    if (step === 9) await placePinViaMap(page);
+  }
+  // The step attribute flips before the reveal's writes land — wait for the
+  // swamps step's freshest element before messing with the world.
+  await expect.poll(async () => page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    return els.some((e: any) => e.name === 'The Swamps');
+  })).toBe(true);
+
+  // Mess with everything (the Freek scenario: users CAN break the sandbox):
+  // delete the Hegemony, wreck the Consul's objects field but ADD a manual
+  // link of our own, delete the pin, delete the zone (while the map tab is
+  // live), and strip the map's image.
+  const ids = await page.evaluate(async () => {
+    const store = (window as any).__atlasTestApi.getActiveStore();
+    const els = await store.listElements();
+    const by = (n: string) => els.find((e: any) => e.name === n);
+    const consul = by('The Consul');
+    const heg = by('The Hegemony');
+    const zone = by('The Swamps');
+    const planet = by('Planet Hyperion');
+    const ship = by('Ebony Spaceship');
+    const map = els.find((e: any) => e.type === 'map' && e.name === 'Hyperion');
+    const pin = els.find((e: any) => e.type === 'pin');
+    await store.deleteElement(heg.id);
+    await store.deleteElement(pin.id);
+    await store.deleteElement(zone.id);
+    // The bundle authors consul.objects (the ship rides there, S298); replace
+    // it wholesale with a USER link the bundle does not author.
+    await store.updateElement(consul.id, { objects: [planet.id] });
+    await store.updateElement(map.id, { image_media_id: null });
+    return { consul: consul.id, heg: heg.id, zone: zone.id, planet: planet.id, ship: ship.id, map: map.id, pin: pin.id };
+  });
+
+  // Next (heal runs on step-enter) then Back onto the map (the CACHED tab
+  // re-entry path — zones must re-sync there too, not just pins).
+  await nextStep(page, 11);
+  await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '10');
+
+  await expect.poll(async () => page.evaluate(async (ids: any) => {
+    const store = (window as any).__atlasTestApi.getActiveStore();
+    const els = await store.listElements();
+    const get = (id: string) => els.find((e: any) => e.id === id);
+    const consul = get(ids.consul);
+    return {
+      hegemonyBack: Boolean(get(ids.heg)),
+      pinBack: Boolean(get(ids.pin)),
+      zoneBack: Boolean(get(ids.zone)),
+      shipRelinked: Boolean(consul?.objects?.includes(ids.ship)),
+      userLinkSurvives: Boolean(consul?.objects?.includes(ids.planet)),
+      mapImageBack: Boolean(get(ids.map)?.image_media_id),
+    };
+  }, ids)).toEqual({
+    hegemonyBack: true,
+    pinBack: true,
+    zoneBack: true,
+    shipRelinked: true,
+    userLinkSurvives: true,
+    mapImageBack: true,
+  });
+
+  // The healed truth reaches the SURFACES in the same step-enter: sidebar
+  // row, and the zone polygon on the re-entered (cached) map tab.
+  await expect(page.locator('.atlas-sidebar')).toContainText('The Hegemony');
+  await expect(page.locator('.atlas-map-tab-wrapper path').first()).toBeVisible();
+});
+
+test('armed pin placement disarms on navigation — no stray second pin (S299 close gate)', async ({ page }) => {
+  await freshBoot(page);
+  await openStage0(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+  for (let s = 3; s <= 8; s++) await nextStep(page, s);
+  await nextStep(page, 9); // the-pin (single-route: no Next until placed)
+
+  // Arm placement via the real +pin button, then NAVIGATE AWAY without
+  // placing (Back exists here; the unplaced pin step has no Next). A leftover
+  // arm on the map-routed step 8 would let a later map click mint a stray pin.
+  await page.locator('[data-action="pin-element"]').click();
+  await expect.poll(() => page.evaluate(() =>
+    Boolean((window as any).__atlasTestApi.getState().ui.pinPlacement))).toBe(true);
+  await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '8');
+
+  // The navigation disarmed it; a map click now creates NOTHING.
+  expect(await page.evaluate(() =>
+    (window as any).__atlasTestApi.getState().ui.pinPlacement)).toBeNull();
+  await page.locator('.atlas-map-tab-wrapper .leaflet-container').click({ position: { x: 300, y: 240 } });
+  await page.waitForTimeout(300);
+  const pinCount = await page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    return els.filter((e: any) => e.type === 'pin').length;
+  });
+  expect(pinCount).toBe(0); // no pin placed yet, and no stray from the dead arm
+});
+
 test('resume after reload lands on the same step with the world active', async ({ page }) => {
   await freshBoot(page);
   await openStage0(page);
@@ -219,6 +354,7 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   await createConsulViaModal(page);
   for (let step = 3; step <= 17; step++) {
     await nextStep(page, step);
+    if (step === 9) await placePinViaMap(page);
   }
   await expect(page.locator('.atlas-tour-controls button', { hasText: 'Set up your folder' })).toHaveCount(0);
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Finish$/ })).toBeVisible();

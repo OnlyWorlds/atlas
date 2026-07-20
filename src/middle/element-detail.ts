@@ -22,6 +22,7 @@ import type { Element } from '../core/types';
 import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/registry';
 import { toastManager } from '../ui/toast-manager';
 import { sectionsFor } from '../editor/field-schema';
+import { isTourFlagActive } from '../tour/tour-flag';
 import { buildZoneSections } from './element-detail-zone-sections';
 import { buildCustomFieldsSection } from './element-detail-custom-fields';
 import { buildMapLocalImageRow } from './element-detail-map-image';
@@ -155,9 +156,25 @@ export function mountElementDetail(target: HTMLElement): () => void {
 
     // The element NAME is the header's click-to-edit title (convention #80) — so
     // drop the duplicate "Name" field from the schema-rendered Base section (F1).
-    const sections = sectionsFor(el.type)
+    let sections = sectionsFor(el.type)
       .map(section => ({ ...section, fields: section.fields.filter(f => f.name !== 'name') }))
       .filter(section => section.fields.length > 0);
+    // During the tour, all-empty sections HIDE (not collapse — the Freek
+    // round, S299): a beginner's first element pages show only sections that
+    // carry content. If nothing is populated, the first section stays so the
+    // page never renders fieldless.
+    if (isTourFlagActive()) {
+      const rec = el as Record<string, unknown>;
+      const populated = (name: string) => {
+        const v = rec[name];
+        if (v === null || v === undefined) return false;
+        if (typeof v === 'string') return v.trim().length > 0;
+        if (Array.isArray(v)) return v.length > 0;
+        return true;
+      };
+      const kept = sections.filter(s => s.fields.some(f => populated(f.name)));
+      sections = kept.length > 0 ? kept : sections.slice(0, 1);
+    }
     sections.forEach((section, idx) => {
       const sectionEl = renderSection(section, el, idx === 0);
       if (sectionEl) detail.appendChild(sectionEl);

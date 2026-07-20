@@ -414,7 +414,14 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const allPins = getState().data.elements
       .filter(e => e.type === 'pin' && (e as Record<string, unknown>).map_id === picked.id)
       .map(e => e.id);
-    const block: PageBlock = { id: newBlockId(), kind: 'map', mapId: picked.id, pinIds: allPins };
+    // Zones on the map = distinct zones referenced by a marker on this map
+    // (markers are the only spatial truth). Initialized all-in like pins, so
+    // new zones never auto-join a curated map.
+    const allZones = [...new Set(getState().data.elements
+      .filter(e => e.type === 'marker' && (e as Record<string, unknown>).map_id === picked.id)
+      .map(e => (e as Record<string, unknown>).zone_id)
+      .filter((z): z is string => typeof z === 'string' && z.length > 0))];
+    const block: PageBlock = { id: newBlockId(), kind: 'map', mapId: picked.id, pinIds: allPins, zoneIds: allZones };
     await saveBlocks(pageId, [...blocksOf(page), block]);
     editingBlockId = block.id;
     renderBlocks(pageId);
@@ -874,6 +881,60 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     labelsText.textContent = 'Show pin labels (off = on hover only)';
     labelsRow.appendChild(labelsText);
     wrap.appendChild(labelsRow);
+
+    // Zone checklist (S299) — per-zone include-list, mirroring the pin
+    // checklist. A zone "on this map" is one a marker on this map references.
+    // block.zoneIds absent = all shown (legacy/friendly default); the first
+    // toggle materializes the explicit list. Only rendered when the map
+    // carries zones.
+    const mapZones = (() => {
+      const zoneIdsOnMap = new Set(getState().data.elements
+        .filter(e => e.type === 'marker' && (e as Record<string, unknown>).map_id === block.mapId)
+        .map(e => (e as Record<string, unknown>).zone_id)
+        .filter((z): z is string => typeof z === 'string' && z.length > 0));
+      return getState().data.elements.filter(e => e.type === 'zone' && zoneIdsOnMap.has(e.id));
+    })();
+    if (mapZones.length > 0) {
+      const zoneAllIds = mapZones.map(z => z.id);
+      const isZoneIncluded = (id: string): boolean =>
+        block.zoneIds === undefined || block.zoneIds.includes(id);
+      const zonesWrap = document.createElement('div');
+      zonesWrap.className = 'atlas-share-card-edit-fields';
+      const zLabelRow = document.createElement('div');
+      zLabelRow.className = 'atlas-share-field-label';
+      zLabelRow.textContent = 'Visible zones';
+      const zAllBtn = document.createElement('button');
+      zAllBtn.type = 'button';
+      zAllBtn.className = 'atlas-share-map-pins-toggle';
+      const zAllOn = zoneAllIds.every(isZoneIncluded);
+      zAllBtn.textContent = zAllOn ? 'none' : 'all';
+      zAllBtn.addEventListener('click', () => {
+        void patchMapBlock({ zoneIds: zAllOn ? [] : [...zoneAllIds] });
+      });
+      zLabelRow.appendChild(zAllBtn);
+      zonesWrap.appendChild(zLabelRow);
+      for (const zone of mapZones) {
+        const row = document.createElement('label');
+        row.className = 'atlas-share-card-edit-fieldrow';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = isZoneIncluded(zone.id);
+        cb.addEventListener('change', () => {
+          // Materialize the explicit list from the current effective set.
+          const current = block.zoneIds ?? zoneAllIds;
+          const next = cb.checked
+            ? [...new Set([...current, zone.id])]
+            : current.filter(id => id !== zone.id);
+          void patchMapBlock({ zoneIds: next });
+        });
+        row.appendChild(cb);
+        const name = document.createElement('span');
+        name.textContent = zone.name || '(unnamed zone)';
+        row.appendChild(name);
+        zonesWrap.appendChild(row);
+      }
+      wrap.appendChild(zonesWrap);
+    }
 
     // Pin checklist — the disclosure primitive for maps: only checked pins
     // appear on the published snapshot.

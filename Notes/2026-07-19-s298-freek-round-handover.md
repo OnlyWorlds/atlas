@@ -22,25 +22,27 @@ Round 3 (the Freek batch):
 
 ## Queued for tomorrow+ (Captain-blessed, from the Freek list)
 
+**RECONCILED 2026-07-20 (S299 close)** — done items struck, ✅ marks what shipped. Open items carry to the live queue in PROGRESS.md CURRENT STATE.
+
 **Tour bouts (roughly in order):**
-1. **Tour resilience** ("pop back cheeky"): re-assert baked elements/links idempotently on step-enter — users can mess (unlink, delete), the world heals. The consul pin too. Design: run the reveal/heal pass for all ids ≤ current step on every step-enter.
-2. **Hands-on pin drag** — the user places the pin themselves (map interaction beat).
-3. **Charts-step redesign** (design round with Captain FIRST): only the right elements visible, drag-from-rail beat, set-world-date beat, possibly a Rachmaninov-composes-Prelude event ~5k years back. TENSION to resolve: we removed his 1873 birth_date because it stretched the axis; a far-past event re-stretches it — maybe that IS the zoom-out lesson. Captain resolves during copy pass.
-4. **Progressive-precision audit** (one sweep + a per-stage chrome table for Captain's bless): right-pane top icons, map toolbar staging (zones button appears at the swamps step), sidebar filter icons per step.
-5. **Staggered reveals**: multi-element steps pop one at a time, maybe word-then-icon. Polish after structure settles.
-6. **Chart-steps dock dodge**: dock narrower / slides aside on chart steps (the sentence's empty right space), pleasant/animated.
-7. **Keep-the-world finale option**: quiet affordance beside "Set up a folder" that exports the tour world into the new real folder. Freek was against, Captain mildly for — build SMALL and hidden-away; Finish stays the residue-contract path.
-8. **Hide empty element sections during tour** (not collapsed — hidden).
+1. ✅ **Tour resilience** — DONE S299 (3-lens gated; merge kernel `tour-heal.ts`, `updateElementWith`, heal on step-enter). DESIGN_TOUR v2.4.
+2. ✅ **Hands-on pin** — DONE S299, reworked to use the REAL +pin button (highlighted, gated) + app-wide placement feedback (lit icon, map banner, crosshair, Esc). NOT drag (drag-to-map already exists separately; click-via-real-button is the taught flow).
+3. **Charts-step redesign** — OPEN, held for Captain (his look first). Tension unchanged (far-past event vs axis stretch).
+4. ✅ **Progressive-precision audit** — DONE S299: empty sections hidden in tour, zone chrome staged to the swamps step, Web tab to where-it-lives. Remaining proposals (filter-strip growth, custom-fields hide) in `Notes/2026-07-20-s299-precision-audit.md` for Captain's bless.
+5. **Staggered reveals** — OPEN, held (re-measures the dock; wants copy settled first).
+6. **Chart-steps dock dodge** — OPEN, held (same; and charts-step redesign lands first).
+7. ~~Keep-the-world finale option~~ — CUT (Captain's call S299; residue contract stands).
+8. ✅ **Hide empty element sections during tour** — DONE S299 (part of the precision bout).
 
 **Share/app bouts:**
-9. **Zones on the share map block** (Captain's find — "no zones in share page!").
-10. og:image asset.
-11. Map ⚙ visual-settings popover restyle (grainy highlight borders → squircle per Freek; panel styleover, e.g. soft "Zones" title) — align with app language.
-12. Maps-in-Maps-tab clarity (smaller tabs? collapsible into maps) — design conversation.
-13. Drag elements from sidebar (and maybe home recents) onto the map — feature, maps arc.
-14. Imageless maps (default size, warn on small image) — design/discussion.
+9. ✅ **Zones on the share map block** — DONE S299, with per-zone curation (`MapBlock.zoneIds` include-list mirroring pins) + show re-lift + a11y/NaN guards. DESIGN_SHARING updated.
+10. ~~og:image~~ — CUT (Captain: link-preview thumbnail, his to handle / screenshots for the launch post).
+11. Map ⚙ visual-settings popover restyle (grainy borders → squircle per Freek; soft "Zones" title) — OPEN, align with app language.
+12. Maps-in-Maps-tab clarity (smaller tabs? collapsible) — OPEN, design conversation.
+13. ~~Drag elements from sidebar onto the map~~ — already exists (Captain confirmed S299); "home recents → map" is the only enhancement left, minor.
+14. Imageless maps (default size, warn on small image) — OPEN, design/discussion.
 
-**Standing (pre-existing)**: Crimson Text bundling (if serif blessed) · real-Safari smoke (Mac) · Hyperion share-page URL into the 'online' step extras row (slot is commented in tour-bar.ts) · settings-overlay routing (parked) · browser-storage-worlds project (post-launch).
+**Standing (pre-existing)**: Crimson Text bundling (if serif blessed) · real-Safari smoke (Mac) · Hyperion share-page URL into the 'online' step extras row (slot commented in tour-bar.ts) · settings-overlay routing (parked) · browser-storage-worlds project (post-launch).
 
 **Captain's lane**: copy pass over the 17 bodies + "more information" texts (flag sheet: `Notes/2026-07-19-s298-tour-flag-sheet.md`, still valid minus the intro row) · the council motion (vehicle/equipment) · Hyperion share page · commit + Boss redeploy briefing.
 

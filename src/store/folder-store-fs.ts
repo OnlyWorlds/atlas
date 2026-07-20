@@ -755,9 +755,29 @@ export class FsFolderStore implements FolderStore {
     return this.writeChain.run(id, () => this.updateElementUnchained(id, patch));
   }
 
+  async updateElementWith(
+    id: string,
+    mutate: (existing: Element) => Partial<Element> | null,
+  ): Promise<Element | null> {
+    this.assertWritable();
+    // Same chain as updateElement; the read happens INSIDE the lock so the
+    // mutate callback always sees the latest committed state (no TOCTOU).
+    return this.writeChain.run(id, async () => {
+      const existing = await this.getElement(id);
+      if (!existing) return null;
+      const patch = mutate(existing);
+      if (patch === null || Object.keys(patch).length === 0) return existing;
+      return this.applyPatchUnchained(existing, patch);
+    });
+  }
+
   private async updateElementUnchained(id: string, patch: Partial<Element>): Promise<Element> {
     const existing = await this.getElement(id);
     if (!existing) throw new Error(`element ${id} not found`);
+    return this.applyPatchUnchained(existing, patch);
+  }
+
+  private async applyPatchUnchained(existing: Element, patch: Partial<Element>): Promise<Element> {
     const next: Element = {
       ...existing,
       ...patch,
@@ -766,7 +786,7 @@ export class FsFolderStore implements FolderStore {
       local_updated_at: this.clock(),
       server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
     };
-    await this.writeElementAndRename(existing.type, id, next, existing.name);
+    await this.writeElementAndRename(existing.type, existing.id, next, existing.name);
     return next;
   }
 

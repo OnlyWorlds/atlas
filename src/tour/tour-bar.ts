@@ -27,12 +27,12 @@ import { hasFolderMode } from '../core/capabilities';
 import type { ElementType } from '../core/types';
 import {
   TOUR_SENTENCE, TOUR_STEPS, tourStageFor,
-  TOUR_OPENER_EYEBROW, TOUR_ATTRIBUTION, TOUR_ATTRIBUTION_URL,
+  TOUR_ATTRIBUTION, TOUR_ATTRIBUTION_URL,
   type TourStep,
 } from './tour-data';
 import {
   onTourChange, isTourActive, currentStepIndex, consulCreated, tourWorldExists,
-  nextStep, backStep, enterStep, exitTour, setupFolderFromTour,
+  tourPinPlaced, nextStep, backStep, enterStep, exitTour, setupFolderFromTour,
 } from './tour-engine';
 
 let root: HTMLElement | null = null;
@@ -60,7 +60,7 @@ function unmount(): void {
   unsub = null;
   root?.remove();
   root = null;
-  document.body.classList.remove('atlas-touring');
+  document.body.classList.remove('atlas-touring', 'atlas-tour-prezone', 'atlas-tour-preweb', 'atlas-tour-pinstep');
   delete document.body.dataset.tourStage;
 }
 
@@ -121,8 +121,9 @@ function buildSentence(idx: number, step: TourStep): HTMLElement {
       const glyph = document.createElement('span');
       // A hands-on step's own glyph waits for the CREATE, not the step-enter
       // — the light is the payoff of the user's gesture (banked S297 nuance).
-      const handsOnPending = g.step === idx
-        && step.handsOn === 'create-consul' && !consulCreated();
+      const handsOnPending = g.step === idx && (
+        (step.handsOn === 'create-consul' && !consulCreated())
+        || (step.handsOn === 'place-pin' && !tourPinPlaced()));
       const lit = g.step <= idx && !handsOnPending;
       glyph.className = 'material-symbols-outlined atlas-tour-glyph' + (lit ? ' lit' : '');
       if (lit && g.step === idx) glyph.classList.add('pop');
@@ -143,6 +144,17 @@ function render(): void {
   const step = TOUR_STEPS[Math.min(idx, TOUR_STEPS.length - 1)];
   const stage = tourStageFor(idx);
   document.body.dataset.tourStage = String(stage);
+  // Step-scoped precision (S299): zone chrome waits for the swamps step, the
+  // Web tab for where-it-lives — the act-level stage can't distinguish steps
+  // inside one act.
+  const swampsIdx = TOUR_STEPS.findIndex(s => s.id === 'the-swamps');
+  const webIdx = TOUR_STEPS.findIndex(s => s.id === 'where-it-lives');
+  document.body.classList.toggle('atlas-tour-prezone', idx < swampsIdx);
+  document.body.classList.toggle('atlas-tour-preweb', idx < webIdx);
+  // Highlight the REAL +pin button on the Consul during the pin beat (until
+  // placed) — the "use the actual control, highlighted" flow (Captain S299).
+  document.body.classList.toggle('atlas-tour-pinstep',
+    step.handsOn === 'place-pin' && !tourPinPlaced());
   const opener = idx === 0;
 
   root.innerHTML = '';
@@ -209,16 +221,16 @@ function render(): void {
   meta.className = 'atlas-tour-meta';
   if (opener) {
     meta.classList.add('atlas-tour-meta-opener');
-    const eyebrow = document.createElement('span');
-    eyebrow.className = 'atlas-tour-eyebrow';
-    eyebrow.textContent = TOUR_OPENER_EYEBROW;
+    // The "One sentence, one world" eyebrow was cut S299 (Captain: "why still
+    // this blue header, remove it") — the sentence itself already frames it.
+    // Just the book cite rides the opener's meta channel now.
     const attr = document.createElement('a');
     attr.className = 'atlas-tour-attribution';
     attr.href = TOUR_ATTRIBUTION_URL;
     attr.target = '_blank';
     attr.rel = 'noopener';
     attr.textContent = TOUR_ATTRIBUTION;
-    meta.append(eyebrow, attr);
+    meta.append(attr);
   } else {
     meta.textContent = step.meta ?? ' ';
   }
@@ -229,11 +241,14 @@ function render(): void {
   const controls = document.createElement('div');
   controls.className = 'atlas-tour-controls';
 
-  // (The act/step label was CUT in S298, Freek's round — the sentence IS the
-  // progress; the step number survives as data-tour-step for tests.)
-  const spacer = document.createElement('span');
-  spacer.className = 'atlas-tour-spacer';
-  controls.appendChild(spacer);
+  // Step counter (re-added S299 as a working aid — the visible label was cut
+  // in the Freek round; the sentence is still the user-facing progress, this
+  // is a quiet dev/collab reference. Takes the spacer's flex role so the
+  // controls layout is unchanged). data-tour-step remains the test contract.
+  const counter = document.createElement('span');
+  counter.className = 'atlas-tour-spacer atlas-tour-stepcount';
+  counter.textContent = `Step ${idx + 1} of ${TOUR_STEPS.length}`;
+  controls.appendChild(counter);
 
   if (idx > 0) {
     const back = document.createElement('button');
@@ -290,6 +305,12 @@ function render(): void {
       })();
     });
     controls.appendChild(doBtn);
+  } else if (step.handsOn === 'place-pin' && !tourPinPlaced()) {
+    // NO dock button (Captain's round S299): the user places via the REAL
+    // +pin button on the Consul's header — highlighted by the
+    // `atlas-tour-pinstep` body class, using the actual app control. The map
+    // click does the rest (tourPinBake locks the pin's identity). Single-
+    // route: Next appears only once the pin exists (the gate).
   } else if (step.handsOn === 'setup-folder') {
     // The finale: Finish (ghost) ends the tour — the world folds away
     // (residue contract); the primary hands over to the real folder setup.

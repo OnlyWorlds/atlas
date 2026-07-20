@@ -1,7 +1,7 @@
 # Atlas — Guided Tour Design
 
-**Version**: 2.3 (2026-07-19, S298 — the Freek round: 17 steps, docked-only
-narrator, single-route creates; supersedes v2.2)
+**Version**: 2.4 (2026-07-20, S299 — the resilience contract, 3-lens gated;
+supersedes v2.3)
 **Concept**: Freek + Captain, 2026-07-19. The opening sentence of *Hyperion*
 by Dan Simmons becomes a small linked world, step by railroaded step,
 teaching OnlyWorlds AND atlas at once — while the workspace BUILDS ITSELF
@@ -18,13 +18,15 @@ at the 'online' step as the deeper schema story).
   `#/settings` route. After a completed tour (`atlas_tour_done_v1`) the doors
   swap emphasis: folder primary, tour reads "Replay the tour".
 - **One narrator, ONE position** (S298 — the centered opener was retired,
-  Captain's round): a single glass panel (cyan top rail, tint, min-height
-  272px so the dock NEVER changes shape between any two steps, opener
-  included), docked bottom-center from the first second. Step 1 carries its
-  framing in the meta channel: eyebrow ("One sentence, one world") left, the
-  cite "Hyperion, Dan Simmons (1989)" right — the safe book-and-year form,
-  no mortality claims, zero extra rows. The bare stage above it fills in on
-  Next. z-index 900: a modal dialog ALWAYS outranks the narrator.
+  Captain's round): a single glass panel (cyan top rail, tint), docked
+  bottom-center from the first second. FIXED height 290px (S299 — was
+  min-height 272; the one 4-line step grew past it, so a fixed height keeps
+  the dock the exact same size on every step; drops when the copy pass evens
+  body lengths). Step 1 carries its framing in the meta channel: just the
+  cite "Hyperion, Dan Simmons (1989)" (the "One sentence, one world" eyebrow
+  was cut S299 — Captain: "why still this blue header"; the sentence frames
+  itself), zero extra rows. The bare stage above it fills in on Next.
+  z-index 900: a modal dialog ALWAYS outranks the narrator.
 - **The progressive build-up**: chrome appears when it is taught. The bar
   stamps `<body data-tour-stage>` (0 bare · 1 shell + worlds sidebar ·
   2 elements era · 3 + right pane/maps · 4 + writing icon · 5 + charts icon ·
@@ -34,8 +36,11 @@ at the 'online' step as the deeper schema story).
   create-world live and the other four greyed (`.atlas-tour-locked`).
 - **Panel rows**: the annotated sentence · hairline · body copy (+ the meta
   subtext channel, always rendered — nbsp when a step has none — so the shape
-  holds; ✦ deeper; inline links) · controls (the visible act/step label was CUT in S298 — the sentence IS
-  the progress; `data-tour-step` on the panel is the test contract). The
+  holds; ✦ deeper; inline links) · controls (the ACT label stays cut — the
+  sentence IS the user's progress; a quiet muted "Step N of 17" counter was
+  re-added S299 as a working/collab reference at Captain's ask,
+  `.atlas-tour-stepcount`; `data-tour-step` on the panel remains the test
+  contract). The
   hairline divides material from narration; the sentence renders BRIGHT on
   the first two steps (`.is-fresh`).
 - **The annotated sentence** (the progress bar, ow.com vignette grammar):
@@ -73,7 +78,21 @@ throwaway world:
    to character, name "The Consul" readonly. During this beat EVERY create
    door is scripted — the elements-sidebar + opens the same locked modal
    until the Consul exists; after that the sandbox is free.
-3. **Set up your folder** (step 17, finale): the real `setupAtlasRoot`
+3. **Place the pin** (step 9, S299 — reworked to use the ACTUAL control,
+   Captain's round): the step routes to the combined map+element view (map
+   open right, Consul selected middle) so the Consul's REAL +pin button
+   shows; the `atlas-tour-pinstep` body class pulses it cyan. The user clicks
+   that real button (arming `ui.pinPlacement` — the app-wide placement
+   feedback then fires: lit button, a "Click the map to place …" banner over
+   the map, crosshair cursor, Esc to cancel), then clicks the map; the pin
+   lands THERE with the bundle pin's locked identity (name + id, via
+   `tourPinBake`). Position is the user's to keep (heal never touches x/y —
+   C3). NO dock button — single-route, gated: Next appears only once the pin
+   exists; the pin glyph lights on the create. The app-wide placement
+   feedback lives in `src/tabs/right/map-placement-hint.ts` (installed at
+   boot) + the `[data-action="pin-element"].active` style; Esc-owns-placement
+   is a skip in the deselect-to-home hotkey guard.
+4. **Set up your folder** (step 17, finale): the real `setupAtlasRoot`
    picker; success ends the tour. On OPFS-only browsers Finish is primary
    and no folder button renders.
 
@@ -94,7 +113,8 @@ the landing's emphasis swap.
    chips when the copy says "everything connects"; deeper: two-way links,
    Web, Knowledge).
 2. **Maps** (4): Planet Hyperion location · the map (bundled art, right pane
-   appears) · the balcony-seat pin · The Swamps zone + saurians/species/pack.
+   appears) · the balcony-seat pin (HANDS-ON, S299: the user places it) ·
+   The Swamps zone + saurians/species/pack.
 3. **Writing** (2): Chapter 1 = the sentence VERBATIM with 9 live chips
    (baked Book "Hyperion" + "Chapter 1") · the two events (+ Rachmaninov +
    the Prelude — chip targets must exist by chapter time).
@@ -129,6 +149,27 @@ the landing's emphasis swap.
 - **`tour-flag.ts`** — pure localStorage read for chrome that must know "is
   the tour running" without importing the tour chunk (welcome, world-home,
   worlds-sidebar, elements-sidebar).
+
+**The resilience contract (v2.4, S299 — "pop back cheeky")**: users can mess
+with the sandbox (delete, unlink, wreck fields) and the world heals on every
+step-enter. Clauses: (C1) revealed-but-absent bundle elements re-create
+(spatial included, media re-attached); (C2) link heal MERGES via the pure
+kernel `tour-heal.ts` — remove only bundle-AUTHORED unrevealed ids, preserve
+everything else on disk verbatim (a user's manual link to an unrevealed
+bundle element survives back-nav), append missing revealed ids; the patch is
+computed INSIDE the per-id write chain (`FolderStore.updateElementWith`, the
+gate's TOCTOU fix); (C3) user edits to non-bundle-link fields survive
+(names, descriptions, dates, pin positions); (C4) the two `x_tour_media`
+elements re-attach their image when `image_media_id` is unset (a cache-cheap
+predicate — no OPFS enumeration on the hot path); (C5) ANY heal write
+refreshes `state.data.elements` in the same step-enter; (C6) per-write
+`tourWorldIsActive()` guards — exit/world-switch mid-loop bails the heal.
+Exit is serialized behind the step chain (a mid-create exit rolls the
+scaffold back — no phantom demo world). Accepted limits (gated, documented):
+a media re-attach re-fits the map camera (the image just arrived; fitting is
+correct); writing-room prose chips are static in the doc and don't re-resolve
+on a live heal (the railroad heals before the room mounts, so targets always
+exist by mount time).
 
 **The reveal system**: the world starts empty; each step writes its bundle
 elements. Link values pointing at not-yet-revealed bundle ids are STRIPPED
@@ -170,20 +211,32 @@ Windows WebKit has no OPFS at all, so real-Safari verification is owed on a
 Mac. Full Safari support = the browser-storage-worlds project (banked,
 post-launch).
 
-## Open work
+## Open work (reconciled S299)
 
-- Captain's copy pass over all 18 bodies + meta lines + deeper paragraphs.
-- Skeld's parallel HTML mocks (narrator/sentence/landing) — compare + graft.
+- Captain's copy pass over the 17 bodies + meta lines + deeper paragraphs
+  (flag sheet `Notes/2026-07-19-s298-tour-flag-sheet.md`).
 - Captain's Hyperion share-page link on the 'online' step (URL owed).
+- Charts-step redesign (design round with Captain first — held).
 - Crimson Text bundling if the serif look is blessed (Georgia fallback now).
-- Glyph timing nuance: hands-on glyphs light on step-enter, not on-create.
 - Bar polish: dodge when the right pane is the subject · reduced-height on
-  small viewports.
+  small viewports (held — re-measures the fixed dock; wants copy settled).
+- Staggered reveals (held, same reason).
+- Precision-audit proposals for Captain's bless (`Notes/2026-07-20-s299-precision-audit.md`).
 - Real-Safari smoke (needs a Mac).
+- DONE S299 (was open): resilience heal · real-control pin beat + placement
+  feedback · precision staging (empty-section hide, zone/web chrome) · fixed
+  290px dock · eyebrow cut · glyph-on-create · step counter re-added.
 
 ## Tests
 
-`tests/e2e/tour.spec.ts` (5): full 18-step walk (staged chrome, locked
-modals incl. the sidebar + door, chips, alias timing, rest-fill, web cameo,
-teardown + emphasis swap) · watch-mode · resume-after-reload ·
-exit-teardown · OPFS-only boot.
+`tests/e2e/tour.spec.ts` (7): full 17-step walk (staged chrome, locked
+modals incl. the sidebar + door, the real-button pin placement + locked
+identity, chips, alias timing, web cameo, teardown + emphasis swap) ·
+single-route create beats · the resilience mess-walk (delete/unlink/wreck →
+heal, user link + media + cached-tab zone overlay) · armed-pin-disarms-on-nav
+(no stray pin) · resume-after-reload · exit-teardown · OPFS-only boot.
+Kernel: `tests/unit/tour-heal.test.ts` (9) +
+`tests/integration/folder-store.updateElementWith.test.ts` (4). App-wide
+placement feedback: `tests/e2e/phase5-maps.spec.ts` (banner + crosshair +
+Esc-cancel). Per-zone share curation: `tests/e2e/share.spec.ts` +
+`tests/unit/sharing.test.ts` (mirror count-aware heal).

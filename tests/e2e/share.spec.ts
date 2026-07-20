@@ -498,6 +498,69 @@ test('map block: a pin moved elsewhere re-renders on the open page (no re-add ne
   await expect(page.locator('.atlas-share-map-pin')).toHaveAttribute('style', /top: 75%/);
 });
 
+async function readPayloadMapZones(page: Page) {
+  return page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const els = await api.getActiveStore().listElements();
+    const pageId = window.location.hash.match(/\/share\/([0-9a-f-]+)/)?.[1];
+    const pageEl = els.find((e: any) => e.id === pageId);
+    const { buildPagePayload } = await import('/src/core/share-payload.ts');
+    const mapBlock = buildPagePayload(pageEl, els, []).blocks.find((b: any) => b.kind === 'map');
+    return (mapBlock?.zones ?? []).map((z: any) => z.name);
+  });
+}
+
+test('map block: per-zone include-list — render, curate one off, freeze the rest', async ({ page }) => {
+  await setupWorld(page);
+
+  // Seed: web-imaged map + TWO polygon zones (The Marsh, The Ridge).
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = await store.createElement('map', {
+      name: 'Overworld', image_url: 'https://example.com/map.png', width: 1000, height: 800,
+    });
+    const mk = async (zoneName: string, pts: number[][]) => {
+      const zone = await store.createElement('zone', { name: zoneName, atlas_shape: 'polygon' });
+      for (let i = 0; i < pts.length; i++) {
+        await store.createMarker({
+          name: `${zoneName} - Point ${i}`, map_id: map.id, zone_id: zone.id,
+          x: pts[i][0], y: pts[i][1], order: i,
+        });
+      }
+    };
+    await mk('The Marsh', [[100, 100], [400, 100], [250, 350]]);
+    await mk('The Ridge', [[600, 500], [900, 500], [750, 750]]);
+    api.patchData(await store.listElements());
+  });
+
+  await openShare(page);
+  await page.click('button.atlas-share-new');
+  await page.click('.atlas-share-block-add-btn:has-text("map")');
+  await page.locator('.atlas-picker-row', { hasText: 'Overworld' }).click();
+
+  // Default: all zones checked, both render, both freeze.
+  await page.click('.atlas-share-block-done');
+  await expect(page.locator('.atlas-share-map-zone')).toHaveCount(2);
+  await expect(page.locator('.atlas-share-map-zones title')).toHaveText(['The Marsh', 'The Ridge']);
+  expect(await readPayloadMapZones(page)).toEqual(['The Marsh', 'The Ridge']);
+
+  // Curate: uncheck The Marsh in the per-zone checklist — only The Ridge survives.
+  await page.locator('.atlas-share-map').click();
+  await page.locator('.atlas-share-card-edit-fieldrow', { hasText: 'The Marsh' }).locator('input').uncheck();
+  await page.click('.atlas-share-block-done');
+  await expect(page.locator('.atlas-share-map-zone')).toHaveCount(1);
+  await expect(page.locator('.atlas-share-map-zones title')).toHaveText(['The Ridge']);
+  expect(await readPayloadMapZones(page)).toEqual(['The Ridge']);
+
+  // Uncheck the last one too — empty include-list = no zones on the wire.
+  await page.locator('.atlas-share-map').click();
+  await page.locator('.atlas-share-card-edit-fieldrow', { hasText: 'The Ridge' }).locator('input').uncheck();
+  await page.click('.atlas-share-block-done');
+  await expect(page.locator('.atlas-share-map-zone')).toHaveCount(0);
+  expect(await readPayloadMapZones(page)).toEqual([]);
+});
+
 test('prose selection bubble: bold + link-to-existing with preserved label (alias recorded)', async ({ page }) => {
   await setupWorld(page);
   await page.evaluate(async () => {

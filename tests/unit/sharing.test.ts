@@ -148,6 +148,39 @@ describe('blocksOf — refs-mirror heal (id-swap correctness)', () => {
     expect((healed[2] as { elementId: string }).elementId).toBe('new-b');
   });
 
+  it('map block mirrors mapId + pinIds + zoneIds, count-aware, and heals a following block positionally', () => {
+    const mixed: PageBlock[] = [
+      { id: 'm1', kind: 'map', mapId: 'old-map', pinIds: ['old-p1', 'old-p2'], zoneIds: ['old-z1'] },
+      { id: 'c1', kind: 'element-card', elementId: 'old-a', variant: 'compact', fields: [] },
+    ];
+    // [mapId, ...pins, ...zones, card] — the card sits AFTER the zone refs.
+    expect(pageRefsFor(mixed)).toEqual(['old-map', 'old-p1', 'old-p2', 'old-z1', 'old-a']);
+    const healed = blocksOf(el({
+      atlas_page_blocks: mixed,
+      atlas_page_refs: ['new-map', 'new-p1', 'new-p2', 'new-z1', 'new-a'],
+    }));
+    const map = healed[0] as { mapId: string; pinIds: string[]; zoneIds: string[] };
+    expect(map.mapId).toBe('new-map');
+    expect(map.pinIds).toEqual(['new-p1', 'new-p2']);
+    expect(map.zoneIds).toEqual(['new-z1']);
+    // The zone refs did NOT shift the card's position — it healed correctly.
+    expect((healed[1] as { elementId: string }).elementId).toBe('new-a');
+  });
+
+  it('a map block with ABSENT zoneIds consumes zero zone refs (legacy alignment)', () => {
+    const legacy: PageBlock[] = [
+      { id: 'm1', kind: 'map', mapId: 'old-map', pinIds: ['old-p1'] }, // no zoneIds
+      { id: 'c1', kind: 'element-card', elementId: 'old-a', variant: 'compact', fields: [] },
+    ];
+    expect(pageRefsFor(legacy)).toEqual(['old-map', 'old-p1', 'old-a']);
+    const healed = blocksOf(el({
+      atlas_page_blocks: legacy,
+      atlas_page_refs: ['new-map', 'new-p1', 'new-a'],
+    }));
+    expect((healed[0] as { zoneIds?: string[] }).zoneIds).toBeUndefined();
+    expect((healed[1] as { elementId: string }).elementId).toBe('new-a');
+  });
+
   it('parsePageBlocks accepts circle blocks; drops them without a knowerId', () => {
     const blocks = parsePageBlocks([
       { id: 'k1', kind: 'circle', knowerId: 'c-1' },
