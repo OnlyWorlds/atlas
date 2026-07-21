@@ -23,6 +23,7 @@ import { getCurrentSyncEngine, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
 import { escapeText, escapeAttr } from '../core/dom-utils';
 import { elementMatchesQuery } from '../core/element-search';
+import { roomOf } from '../core/element-room';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
 const FILTER_TYPES_WITH_MAP: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
@@ -298,8 +299,35 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       }
       // Mismatched type (user cleared the filter): fall through to normal open.
     }
-    patchSlice('ui', { ...getState().ui, selectedElementId: id });
-    navigate(elementHash(worldId, id));
+    // Route to the room the element LIVES in (S306), the same answer the
+    // palette and the home desk give. This list is the palette's OWN handoff
+    // target — "see all →" hands its query straight here, and the two already
+    // share their match language deliberately (see the filter above). Leaving
+    // this as a bare `elementHash` meant one query, one surface, two
+    // destinations: Enter in the palette opened the map/page/chapter, while
+    // clicking the identical row here opened the field editor. When surface A
+    // hands work to surface B, B has to keep A's promise.
+    const clicked = getState().data.elements.find(x => x.id === id);
+    const room = clicked ? roomOf(clicked, worldId) : { hash: '', label: '' };
+    // MAPS ARE DELIBERATELY EXCLUDED HERE, and it is not an oversight.
+    //
+    // A map is the one type with BOTH a canvas (a right-pane tab) and an
+    // editable record. This list is the browse-and-EDIT surface: clicking a map
+    // here is how you reach its element page to set the name, the parent, or
+    // the Image URL — and that last one is the real user path the S300
+    // sketch-rescale hook hangs off (attaching art to a blank canvas rescales
+    // its pins and zone markers). Routing map rows to the canvas instead took
+    // that path away, which an existing spec caught immediately.
+    //
+    // The narratives have no such split — the knowledge / share / writing room
+    // IS their editor, so sending them there loses nothing and is the whole
+    // point of the fix.
+    if (!clicked || room.label === '' || room.label === 'map') {
+      patchSlice('ui', { ...getState().ui, selectedElementId: id });
+      navigate(elementHash(worldId, id));
+      return;
+    }
+    navigate(room.hash);
     // Sidebar-click no longer auto-opens an associated map (DESIGN_MAPS.md
     // §3.6 revised session 209). Auto-open from pin-click stays; the top-bar
     // affordances from MW will be the explicit path from element detail.

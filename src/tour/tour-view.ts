@@ -55,6 +55,16 @@ export interface TourWorldView {
    * tested there); this only assembles the polygon and reads the pin.
    */
   pinInZone(pinRef: string, zoneRef: string): boolean;
+  /**
+   * How many `ow://` chips the narrative `ref` currently holds in its `story`
+   * markdown — the writing beat's gate (S306).
+   *
+   * Reads `story` and NOT the `atlas_richtext_json` sidecar because the
+   * workspace autosave writes BOTH halves together (writing-workspace.ts:344),
+   * and `story` is the half the bundle bakes. 0 when the ref is absent or its
+   * story is empty.
+   */
+  chipCount(ref: string): number;
 }
 
 export interface TourPhase {
@@ -155,6 +165,14 @@ export function buildTourWorldView(input: {
         { x: pin.x, y: pin.y },
         markers.map(m => ({ x: m.x as number, y: m.y as number })),
       );
+    },
+    chipCount(ref) {
+      const id = input.refToId(ref);
+      if (!id) return 0;
+      const el = input.elements.find(e => e.id === id);
+      const story = el?.story;
+      if (typeof story !== 'string' || story.length === 0) return 0;
+      return (story.match(/\]\(ow:\/\//g) ?? []).length;
     },
   };
 }

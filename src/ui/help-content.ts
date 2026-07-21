@@ -106,6 +106,20 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'tune editing and web-pane behavior',
     ],
   },
+  // `map` is a real router mode (router.ts:207) and was the ONLY one with no
+  // entry here, so `?` on a map resolved to null and opened nothing at all —
+  // in the subsystem carrying the most concepts a user has to be taught.
+  map: {
+    name: 'Maps',
+    purpose: 'Place your world in space: maps, the pins that put elements on them, and zones that give regions a shape.',
+    can: [
+      'create a map with no image at all and sketch on a blank canvas; attach a picture later and your pins and zones scale to fit it',
+      'place an element with the + pin button on its header, then click the map (drag a pin to move it, and click one any time to travel back to the element)',
+      'draw a zone with the polygon or line tool, then double-click it to reshape it by its handles',
+      'nest maps under a parent map or a location, and switch between them from the map list',
+      'tune what a map shows from its settings: pin style and labels, zone opacity, the grid',
+    ],
+  },
 };
 
 /** Resolve help for a router middle-mode; null = no help surface (welcome). */

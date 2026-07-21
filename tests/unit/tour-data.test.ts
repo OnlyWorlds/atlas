@@ -10,8 +10,12 @@ import { resolve } from 'node:path';
 import {
   TOUR_STEPS, capabilitiesUpTo, TOUR_CAPABILITIES,
   TOUR_PIN_REF, TOUR_SWAMPS_ZONE_REF,
+  TOUR_CHAPTER_REF, TOUR_WRITING_LINKABLE,
 } from '../../src/tour/tour-data';
 import { buildTourWorldView } from '../../src/tour/tour-view';
+import { handsOnRefFor } from '../../src/tour/tour-engine';
+import { buildAutolinkIndex } from '../../src/core/prose-autolink';
+import type { Element } from '../../src/core/types';
 import bundle from '../../src/demo/hyperion-world.json';
 
 describe('TOUR_STEPS structure', () => {
@@ -282,5 +286,102 @@ describe('the charts act (S305)', () => {
     expect(deep!.reveal ?? []).toContain("construct:Rachmaninov's Prelude");
     // ...and its spans light on the same beat as its elements.
     expect((deep!.spans ?? []).length).toBeGreaterThan(0);
+  });
+});
+
+describe('the writing beat (S306)', () => {
+  const chapterName = TOUR_CHAPTER_REF.slice(TOUR_CHAPTER_REF.indexOf(':') + 1);
+
+  /** Elements on disk when a given step is ENTERED: everything revealed, created
+   *  or hands-on-minted by any strictly earlier step, plus this step's reveals. */
+  function elementsOnDiskAt(stepId: string): Element[] {
+    const idx = TOUR_STEPS.findIndex(s => s.id === stepId);
+    expect(idx, `no step "${stepId}"`).toBeGreaterThanOrEqual(0);
+    const refs = new Set<string>();
+    for (let i = 0; i <= idx; i++) {
+      const step = TOUR_STEPS[i];
+      for (const r of step.reveal ?? []) refs.add(r);
+      for (const r of step.creates ?? []) refs.add(r);
+      // The consul/pin arrive by gesture, not by `reveal` — by the writing beat
+      // the user has performed both, so they are genuinely present.
+      const handsOn = handsOnRefFor(step);
+      if (handsOn && i < idx) refs.add(handsOn);
+    }
+    const els = bundle.elements as Array<Record<string, unknown>>;
+    return [...refs].map(ref => {
+      const [type, ...rest] = ref.split(':');
+      const name = rest.join(':');
+      const el = els.find(e => e.type === type && e.name === name);
+      expect(el, `bundle is missing "${ref}"`).toBeDefined();
+      return el as unknown as Element;
+    });
+  }
+
+  it('the chapter is baked WITHOUT chips, or there is nothing to link', () => {
+    // The whole beat is "the sentence arrives plain and you wire it up". A
+    // re-bake that restores the ow:// chips leaves phase a asking for a gesture
+    // the doc has already had done to it, and Next appears immediately.
+    const chapter = bundleElement(chapterName);
+    expect(chapter.story).toBeTypeOf('string');
+    expect(chapter.story as string).not.toContain('ow://');
+  });
+
+  it('every surface form in the sentence resolves to exactly ONE element', () => {
+    // THE AMBIGUITY GUARD. autolink and bulk-link both skip any key with 2+
+    // candidates (prose-autolink: `cands.length !== 1`), silently. This caught
+    // the real collision that shipped in the bundle: a character NAMED
+    // "Steinway" beside the "Steinway" alias on the Consul's piano meant that
+    // word could never link, and nothing anywhere would have said so.
+    //
+    // Runs the REAL index over the REAL sentence rather than restating the
+    // rules here, so it tracks prose-autolink instead of my memory of it.
+    const chapter = bundleElement(chapterName);
+    const index = buildAutolinkIndex(bundle.elements as unknown as Element[]);
+    expect(index.scanner).not.toBeNull();
+    const scanner = new RegExp(index.scanner!.source, 'g');
+    const story = chapter.story as string;
+
+    const blocked: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = scanner.exec(story)) !== null) {
+      const cands = index.byName.get(m[0]);
+      if (cands && cands.length > 1) {
+        blocked.push(`"${m[0]}" -> ${cands.map(c => `${c.type}:${c.displayName}`).join(' + ')}`);
+      }
+    }
+    expect(blocked, `ambiguous surface forms can never link:\n  ${blocked.join('\n  ')}`)
+      .toEqual([]);
+  });
+
+  it('TOUR_WRITING_LINKABLE is what is ACTUALLY linkable at that beat', () => {
+    // Phase c fires on this number. Rachmaninov and his Prelude are revealed
+    // three steps later at `deep-time`, so they cannot be linked here and the
+    // copy says so. If a reveal moves, this fails rather than stranding phase c
+    // at a count no user can reach.
+    const present = elementsOnDiskAt('the-writing');
+    const chapter = bundleElement(chapterName);
+    const index = buildAutolinkIndex(present);
+    expect(index.scanner).not.toBeNull();
+    const scanner = new RegExp(index.scanner!.source, 'g');
+
+    const linkable = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = scanner.exec(chapter.story as string)) !== null) {
+      const cands = index.byName.get(m[0]);
+      if (cands && cands.length === 1) linkable.add(cands[0].id);
+    }
+    expect(linkable.size).toBe(TOUR_WRITING_LINKABLE);
+  });
+
+  it('the writing step is hands-on and routes to the chapter it links', () => {
+    const step = TOUR_STEPS.find(s => s.id === 'the-writing')!;
+    expect(step.handsOn).toBe('link-word');
+    expect(step.route).toEqual({ kind: 'writing', ref: TOUR_CHAPTER_REF });
+    // The chapter must be revealed BY this step at the latest, or the route
+    // lands on a narrative that is not on disk.
+    const revealedByNow = TOUR_STEPS
+      .slice(0, TOUR_STEPS.findIndex(s => s.id === 'the-writing') + 1)
+      .flatMap(s => s.reveal ?? []);
+    expect(revealedByNow).toContain(TOUR_CHAPTER_REF);
   });
 });

@@ -50,6 +50,63 @@ async function setNowViaButton(page: Page) {
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'b');
 }
 
+/** The writing beat (step 11) is SINGLE ROUTE (S306): the chapter is baked as
+ *  plain prose and Next appears only once a chip exists in it.
+ *
+ *  Drives the REAL gesture: a real click to put the cursor inside the dotted
+ *  word, then a REAL `keyboard.press('Tab')` through ProseMirror's own
+ *  handleKeyDown. Deliberately NOT a dispatched KeyboardEvent — a synthetic
+ *  event does not reproduce a library's own event routing, which is exactly
+ *  the proxy that lied green about the zone-click in S304.
+ *
+ *  The forward gate reads the chapter's `story` from the STORE, so it waits on
+ *  the workspace's ~1s save debounce; the phase assertion polls it out. */
+async function linkWordViaTab(page: Page) {
+  // THE SETTLE, and the reason this is not a sleep: `data-tour-step` flips
+  // BEFORE the step's reveal/heal runs, and the heal writes elements, which
+  // swaps `state.data.elements` and refreshes the writing workspace — taking
+  // the editor's selection (and a just-made chip) with it. Clicking into prose
+  // before the heal lands is a real race that reads as "Tab did nothing".
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.awaitTourSettled(); });
+  // The step's reveal/heal must be DONE before the decorations mean anything:
+  // `data-tour-step` flips before it runs (the S301 trap), and the reveal is
+  // what puts the linkable elements on disk. Seven is the beat's premise
+  // (TOUR_WRITING_LINKABLE), so this doubles as an assertion that every surface
+  // form this world can resolve is actually offered to the user.
+  await expect(page.locator('.ProseMirror .atlas-autolink-hint')).toHaveCount(7);
+  const hint = page.locator('.ProseMirror .atlas-autolink-hint').first();
+  await expect(hint).toBeVisible();
+  // Retried as a unit: under 4 workers a single attempt is not reliable.
+  // (Measured, not assumed: when it fails the chip count sits at 0 for the
+  // whole timeout, and when it succeeds the chip is present immediately and
+  // STAYS — sampled over 7s, with `story` carrying the ow:// link. So nothing
+  // is racing the chip away after the fact; attempts either land or are lost.)
+  await expect(async () => {
+    await hint.click();
+    // THE REAL PRECONDITION, and the one I got wrong twice before measuring.
+    // `handleKeyDown` promotes the decoration CONTAINING THE CURSOR, so what
+    // must be true is not "the editor has focus" but "the collapsed selection
+    // sits inside a hint span". The focus-class assertion resolves from a
+    // cached snapshot without a round-trip, so the key could be sent before the
+    // click's selection had been applied; the handler then found no decoration
+    // at the cursor, returned false, and Tab just moved focus. Every green run
+    // I got before this traced back to some incidental round-trip buying the
+    // time — this waits on the condition itself.
+    await page.waitForFunction(() => {
+      const sel = window.getSelection();
+      if (!sel || !sel.isCollapsed || sel.rangeCount === 0) return false;
+      const node = sel.anchorNode;
+      if (!node) return false;
+      const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);
+      return Boolean(el && el.closest('.atlas-autolink-hint'));
+    });
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.ProseMirror .atlas-element-chip'))
+      .toHaveCount(1, { timeout: 4_000 });
+  }).toPass({ timeout: 45_000 });
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'b');
+}
+
 /** Landing → the tour opens on the centre-stage OPENER (step 1): the sentence
  *  at vignette scale on black, the shell hidden, "Begin" the only forward. */
 async function openOpener(page: Page) {
@@ -292,18 +349,20 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await nextStep(page, 10); // linking payoff
 
   // Writing act: the icon appears; the chapter renders the sentence verbatim
-  // with chips (the markdown-fallback path), and aliases healed in.
+  // as PLAIN prose (S306 — the user links it), with aliases healed in so
+  // autolink can recognise every surface form.
   await nextStep(page, 11);
   await expect(page.locator('.atlas-room-nav-strip [data-room="writing"]')).toBeVisible();
   await expect(page).toHaveURL(/\/writing\//);
   const prose = page.locator('.ProseMirror');
-  await expect(prose.locator('.atlas-element-chip')).toHaveCount(9);
+  await expect(prose.locator('.atlas-element-chip')).toHaveCount(0);
   await expect(prose).toContainText('The Hegemony Consul sat on the balcony');
   const aliasesLate = await page.evaluate(async () => {
     const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
     return els.find((e: any) => e.name === 'The Consul')?.atlas_aliases ?? null;
   });
   expect(aliasesLate).toEqual(['Consul', 'the Consul']);
+  await linkWordViaTab(page);
 
   await nextStep(page, 12); // events
   await nextStep(page, 13); // chart — the now beat, SINGLE ROUTE (no watch Next)
@@ -828,6 +887,7 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
     await nextStep(page, step);
     if (step === 7) await placePinViaMap(page);
     if (step === 9) await mintObjectRun(page);
+    if (step === 11) await linkWordViaTab(page);
     if (step === 13) await setNowViaButton(page);
   }
   // The label is 'Set up a folder' (tour-bar.ts); on an OPFS-only browser no
@@ -868,4 +928,51 @@ test('the exit confirm names the rooms the tour never reached, and can be declin
   await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
   await expect(page.locator('.atlas-landing-actions')).toBeVisible();
   expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(0);
+});
+
+test('the writing beat: the sentence arrives plain, Tab links it, Next waits for a chip', async ({ page }) => {
+  await freshBoot(page);
+  await openOpener(page);
+  await beginToWorld(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+  for (let step = 4; step <= 11; step++) {
+    await nextStep(page, step);
+    if (step === 7) await placePinViaMap(page);
+    if (step === 9) await mintObjectRun(page);
+  }
+
+  const bar = page.locator('.atlas-tour-bar');
+  const prose = page.locator('.ProseMirror');
+
+  // Phase a: plain prose, SINGLE ROUTE — no Next until a chip exists.
+  await expect(bar).toHaveAttribute('data-tour-phase', 'a');
+  await expect(prose.locator('.atlas-element-chip')).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+
+  // The suggestions the beat depends on: autolink resolves the sentence's
+  // baked surface forms, so there is something to press Tab on at all.
+  await expect(prose.locator('.atlas-autolink-hint').first()).toBeVisible();
+
+  // The real gesture.
+  await linkWordViaTab(page);
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+
+  // The chip is a real link, not styled text: it carries the element's id
+  // (`data-id` — the ElementChip node's own attribute, not a guessed name).
+  const chipId = await prose.locator('.atlas-element-chip').first()
+    .getAttribute('data-id');
+  expect(chipId, 'the chip points at a real element').toBeTruthy();
+  const known = await page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    return els.map((e: any) => e.id);
+  });
+  expect(known, 'the chip id resolves to a real element in the world').toContain(chipId);
+
+  // ...and it reached the STORE (the gate reads `story`, not the editor DOM).
+  const storyAfter = await page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    return els.find((e: any) => e.name === 'Chapter 1')?.story ?? '';
+  });
+  expect(storyAfter).toContain('ow://');
 });

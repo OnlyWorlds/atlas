@@ -421,15 +421,28 @@ const DEFAULT_FORMAT_INTERCALARY = '{intercalary}, {year} {era}';
  * separators collapse; UNKNOWN tokens render literally (visible, never
  * swallowed).
  */
+/**
+ * Placeholder for a KNOWN token that resolved to nothing, so the collapse pass
+ * can find and absorb it along with any separators hugging it.
+ *
+ * U+E000 is a private-use code point, deliberately NOT a raw NUL. A NUL byte
+ * makes ripgrep classify this entire file as BINARY, so every content search
+ * over it silently returns no matches — while `--count` still returns a
+ * plausible number, which is worse than an obvious failure. 704 lines of
+ * calendar logic were invisible to search until this changed. Whatever this
+ * sentinel becomes, it must never be NUL.
+ */
+const EMPTY_KNOWN = '\uE000';
+
 function renderTemplate(template: string, values: Record<string, string | null>): string {
   let out = template.replace(/\{([a-z_]+)\}/g, (whole, token: string) => {
     if (!(KNOWN_TOKENS as readonly string[]).includes(token)) return whole; // unknown: literal
     const v = values[token];
-    return v == null || v === '' ? ' ' : v; // marker for empty-known
+    return v == null || v === '' ? EMPTY_KNOWN : v;
   });
   // Collapse around empty-known markers: absorb adjacent separators/spaces.
   out = out
-    .replace(/\s*[,;·]?\s* \s*[,;·]?\s*/g, ' ')
+    .replace(/\s*[,;·]?\s*\uE000\s*[,;·]?\s*/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim()
     .replace(/^[\s,;·]+|[\s,;·]+$/g, '');

@@ -27,7 +27,6 @@ import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import type { Element, ElementType, WorldMap } from '../core/types';
-import { narrativeKindOf } from '../core/narrative-kind';
 import { isWritingNarrative } from './writing-helpers';
 import { escapeText, relativeTime } from '../core/dom-utils';
 import { setWorldFavoriteElement, dismissTourCard, saveRegistry } from '../registry/registry';
@@ -36,6 +35,8 @@ import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
 import { timelineHash } from '../core/router';
 import { tableauScope } from '../visualization/timeline/chart-recipe';
+import { roomOf, openElementTarget } from '../core/element-room';
+import { resolveCalendarLens } from '../core/calendar-lens';
 import { extractTemporalNodes } from '../visualization/timeline/data-normalizer';
 import { freezeChartBlock } from '../visualization/timeline/chart-freeze';
 import { renderChartView } from '../visualization/timeline/chart-static';
@@ -47,28 +48,24 @@ const CONTENT_ELEMENT_TYPES: ElementType[] = [
   'law', 'ability', 'trait', 'title', 'construct', 'relation', 'map',
 ];
 
-/** Room an element "lives in" — for Recent routing + labels. */
-function roomOf(el: Element, worldId: string): { hash: string; label: string } {
-  if (el.type === 'narrative') {
-    const kind = narrativeKindOf(el);
-    if (kind === 'knowledge') return { hash: knowledgeHash(worldId, el.id), label: 'knowledge' };
-    if (kind === 'page') return { hash: shareHash(worldId, el.id), label: 'share' };
-    if (isWritingNarrative(el, worldId)) return { hash: writingHash(worldId, el.id), label: 'writing' };
-  }
-  if (el.type === 'map') return { hash: mapHash(worldId, el.id), label: 'map' };
-  return { hash: elementHash(worldId, el.id), label: '' };
+// `roomOf` + the desk click-through moved to `core/element-room.ts` (S306):
+// the command palette had re-implemented the jump WITHOUT them and dropped
+// every room-owning element into the generic editor. Shared so the two
+// surfaces cannot answer the same question differently again.
+
+/** The desk row's verb, derived from the room the row actually opens, so the
+ *  label can never promise a room the click does not go to. */
+function verbFor(el: Element, worldId: string): string {
+  const label = roomOf(el, worldId).label;
+  return label === 'writing' ? 'Write' : label === 'map' ? 'Map' : 'Edit';
 }
 
-/**
- * Desk/recent/CTA click-through. Maps go through openMapTab, not navigation —
- * navigate(mapHash) alone can't activate an already-open background tab
- * (ensureMapTabOpen early-returns on exists), and imageless maps need the
- * toast + divert-to-element feedback instead of a silent dead click (S265,
- * Captain's find: "recent map does nothing").
- */
-function openDeskTarget(el: Element, hash: string): void {
-  if (el.type === 'map') { openMapTab(el as WorldMap); return; }
-  navigate(hash);
+/** Matching icon, same rule. */
+function verbIconFor(el: Element, worldId: string): string {
+  const label = roomOf(el, worldId).label;
+  if (label === 'writing') return 'edit_note';
+  if (label === 'map') return 'map';
+  return ELEMENT_ICONS[el.type] ?? 'category';
 }
 
 export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () => void {
@@ -177,6 +174,16 @@ function buildChartStrip(elements: readonly Element[], worldId: string, savedCha
   // Saved charts no longer hijack the strip (savedCharts[0] used to replace it
   // wholesale, so an old experiment silently owned the home); they ride below
   // as chips into the room's gallery.
+  // The strip must SPEAK THE SAME CALENDAR as the room it previews. The freeze
+  // resolves a chart's own `calendarId` strictly (correct there: a saved chart
+  // must not adopt a calendar minted after it was saved), so a synthetic chart
+  // with no id froze to bare numbers while the Charts room — which resolves the
+  // world's active lens with `fallbackToOnly` — showed era words. Same world,
+  // two answers, one screen apart, and first-run visible on any world holding
+  // exactly one calendar. Resolving it here keeps "home is the zoomed-out
+  // truth, the room is the same picture with controls" actually true.
+  const activeCalendarId = getState().registry.worlds.find(w => w.id === worldId)?.active_calendar_id;
+  const homeLens = resolveCalendarLens([...elements], activeCalendarId, { fallbackToOnly: true });
   const chart: ChartConfig = {
     schema_version: 1,
     id: 'home-tableau',
@@ -187,6 +194,7 @@ function buildChartStrip(elements: readonly Element[], worldId: string, savedCha
       [cast.protagonistId, cast.nexusId].filter((x): x is string => !!x),
     ),
     render: '2d',
+    ...(homeLens ? { calendarId: homeLens.id } : {}),
   };
   const frozen = freezeChartBlock(chart.id, 'home-chart-strip', [chart], [...elements], new Set(elements.map(e => e.id)), { cast });
   if (!frozen || frozen.nodes.length < 3) return null;
@@ -476,10 +484,19 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   const lastEdited = byRecency.find(el => el !== lastWriting && el !== lastMap);
   // Verbs are plain (S264, Captain: "Continue editing" implied a prior
   // session that may not exist — "Edit X" is always true).
-  const continueRows: { icon: string; verb: string; el: Element; hash: string }[] = [];
-  if (lastWriting) continueRows.push({ icon: 'edit_note', verb: 'Write', el: lastWriting, hash: writingHash(worldId, lastWriting.id) });
-  if (lastMap) continueRows.push({ icon: 'map', verb: 'Map', el: lastMap, hash: mapHash(worldId, lastMap.id) });
-  if (lastEdited) continueRows.push({ icon: ELEMENT_ICONS[lastEdited.type] ?? 'category', verb: 'Edit', el: lastEdited, hash: roomOf(lastEdited, worldId).hash });
+  // `hash` was dropped from the row (S306): rows now open through
+  // `openElementTarget(el, worldId)`, which resolves the destination itself,
+  // so a stored hash was written three times per render and read nowhere.
+  const continueRows: { icon: string; verb: string; el: Element }[] = [];
+  // The verb comes from `roomOf` here too, NOT from which finder matched.
+  // `isWritingNarrative` tests SUPERTYPE while the knowledge/page predicates
+  // test SUBTYPE, and subtype is free user text — so a narrative can be both
+  // writing-shaped and subtype 'knowledge'. `roomOf` gives knowledge/page
+  // precedence, so the pinned row's hardcoded "Write" could label a row that
+  // opens the knowledge room (close gate, S306).
+  if (lastWriting) continueRows.push({ icon: verbIconFor(lastWriting, worldId), verb: verbFor(lastWriting, worldId), el: lastWriting });
+  if (lastMap) continueRows.push({ icon: 'map', verb: 'Map', el: lastMap });
+  if (lastEdited) continueRows.push({ icon: ELEMENT_ICONS[lastEdited.type] ?? 'category', verb: verbFor(lastEdited, worldId), el: lastEdited });
 
   // The remaining recent elements join the SAME list in the SAME row style
   // (S265, Captain's sshot: the old element rows beside the verb rows read as
@@ -488,9 +505,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   // so every row speaks the identical language.
   const continueIds = new Set(continueRows.map(r => r.el.id));
   for (const el of byRecency.filter(e => !continueIds.has(e.id)).slice(0, 5)) {
-    const room = roomOf(el, worldId);
-    const verb = room.label === 'writing' ? 'Write' : room.label === 'map' ? 'Map' : 'Edit';
-    continueRows.push({ icon: ELEMENT_ICONS[el.type] ?? 'category', verb, el, hash: room.hash });
+    continueRows.push({ icon: ELEMENT_ICONS[el.type] ?? 'category', verb: verbFor(el, worldId), el });
   }
 
   // A row whose element was never touched since birth says Created, not Edit
@@ -532,7 +547,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
         <span class="atlas-home-continue-kind">${escapeText(row.el.type)}</span>
         <span class="atlas-home-continue-time">${isFirst ? 'your first element · click to keep shaping it' : relativeTime(row.el.local_updated_at)}</span>
       `;
-      btn.addEventListener('click', () => openDeskTarget(row.el, row.hash));
+      btn.addEventListener('click', () => openElementTarget(row.el, worldId));
       // Drag-onto-map (S300): recent rows carry the same payload as sidebar
       // rows, so they drop onto any open map tab as a pin. Maps/zones are
       // excluded (not pinnable — the sidebar's rule, DESIGN_MAPS.md §1.4;

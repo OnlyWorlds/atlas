@@ -13,7 +13,10 @@
     "title 'Consul of the Hegemony' given grant_date 3 and deliberately NO revoke_date (S305): an open-ended title renders as a span running to the world's now with a fade cap, which is the tour's range/open-end lesson",
     "Rachmaninov birth_date -320 and his Prelude start_date -318 (S305): placed in the Old Earth era for the deep-time beat. EDITORIAL -- the books never state the PC epoch, so no conversion from Earth's calendar is asserted anywhere in copy; the depth is chosen for teaching, not for canon",
     "world time_current REMOVED (S305) so the user sets the now themselves in the charts act; time_range_min widened to -400 to cover the Old Earth era",
-    "calendar construct 'Hegemony Standard' minted (S305): two eras sharing the pivot at 0 (Old Earth counting down, PC counting up). Both terms are in-text; PC is never glossed because the novels never expand it"
+    "calendar construct 'Hegemony Standard' minted (S305): two eras sharing the pivot at 0 (Old Earth counting down, PC counting up). Both terms are in-text; PC is never glossed because the novels never expand it",
+    "character 'Steinway' renamed to 'Mr. Steinway' (S306): the bare key collided with the 'Steinway' alias on object \"The Consul's Steinway\", and autolink/bulk-link skip any key with 2+ candidates (prose-autolink.ts) -- the sentence's Steinway could never link",
+    "Chapter 1 story baked with NO ow:// chips (S306): the writing beat is hands-on, the user Tab-links the recognised words themselves and bulk-links the rest. The aliases above are what make every surface form recognisable",
+    "'Story of the old piano' given supertype 'Draft' (S306): without a writing-label supertype getTierForNarrative returns null and the narrative is INVISIBLE in the writing room. Not revealed during the tour; a curious user finds it after"
   ],
   "world": {
     "name": "Hyperion",
@@ -59,7 +62,7 @@
     {
       "type": "character",
       "id": "068e92dc-10ec-7225-8000-7efd678bd862",
-      "name": "Steinway",
+      "name": "Mr. Steinway",
       "description": "Some old piano maker"
     },
     {
@@ -267,7 +270,8 @@
       ],
       "characters": [
         "068e2ddb-83c6-71a7-8000-a45b8b711e25"
-      ]
+      ],
+      "supertype": "Draft"
     },
     {
       "type": "phenomenon",
@@ -409,7 +413,7 @@
       "supertype": "Chapter",
       "parent_narrative": "2d16c352-6c2d-4d1f-9bab-8345bb17eaba",
       "order": 0,
-      "story": "The [Hegemony](ow://institution/068e2f37-840a-7b3b-8000-41b6b6872c95) [Consul](ow://character/068e2ddb-83c6-71a7-8000-a45b8b711e25) sat on the [balcony](ow://object/068e2e8d-a92f-720d-8000-6df2dd75923a) of his ebony [spaceship](ow://object/068e2e8c-e2f4-7e4c-8000-8abcf4e8e286) and played [Rachmaninov's](ow://character/068e92db-4c40-79eb-8000-8ef44c0d52b4) [Prelude in C-sharp Minor](ow://construct/068e2e55-18da-7cb9-8000-8ccd6ebf1c1e) on an ancient but well-maintained [Steinway](ow://object/068e2e56-d4b9-7c40-8000-173975bfd994) while great, green, [saurian](ow://species/068e2e72-3d17-7a23-8000-b8f0d24e2d1e) things surged and bellowed in [the swamps](ow://zone/068e92f5-24b4-7462-8000-0c567b9104fb) below."
+      "story": "The Hegemony Consul sat on the balcony of his ebony spaceship and played Rachmaninov's Prelude in C-sharp Minor on an ancient but well-maintained Steinway while great, green, saurian things surged and bellowed in the swamps below."
     },
     {
       "type": "construct",

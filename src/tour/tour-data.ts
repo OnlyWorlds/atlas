@@ -127,7 +127,7 @@ export interface TourStep {
    * kind needs its own branch in `tour-bar`'s forward gate; a kind with no
    * bundle ref that falls through to the default is un-advanceable forever.
    */
-  handsOn?: 'create-world' | 'create-consul' | 'place-pin' | 'set-now' | 'setup-folder';
+  handsOn?: 'create-world' | 'create-consul' | 'place-pin' | 'set-now' | 'setup-folder' | 'link-word';
   /**
    * For a `place-pin` step: the forward gate ALSO requires the pin to sit
    * inside this zone (the soft correction — Captain's ruling). The pin can be
@@ -142,6 +142,20 @@ export interface TourStep {
 export const TOUR_PIN_REF = "pin:The Consul's balcony seat";
 export const TOUR_SWAMPS_ZONE_REF = 'zone:The Swamps';
 
+/** The chapter the writing beat links (baked chip-free — see the-writing). */
+export const TOUR_CHAPTER_REF = 'narrative:Chapter 1';
+/**
+ * How many of the sentence's phrases can be linked AT THE WRITING BEAT.
+ *
+ * The sentence carries nine linkable surface forms, but `character:Rachmaninov`
+ * and `construct:Rachmaninov's Prelude` are not revealed until `deep-time`,
+ * three steps later, so autolink cannot resolve them here. Seven is therefore
+ * "everything this world currently knows", and the phase-c copy says exactly
+ * that. A unit test recomputes this from the bundle + the reveal order, so a
+ * re-bake or a reveal move fails loudly instead of stranding phase c.
+ */
+export const TOUR_WRITING_LINKABLE = 7;
+
 export const TOUR_STEPS: readonly TourStep[] = [
   // ---------------------------------------------------------------- Opener
   // Step 0 (S303 rework): the sentence centre-stage on black, then it hands
@@ -154,9 +168,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The first sentence of Hyperion, by Dan Simmons. Read it, and decide ' +
-        'what in it is worth naming. We will build every one of those together, ' +
-        'starting with the world that holds them.',
+        'The opening sentence of Hyperion (1989) by the late Dan Simmons.' +
+        'What elements do you see that should have a name in this world?' 
     }],
   },
   // ---------------------------------------------------------------- Act 1
@@ -167,8 +180,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Atlas creates a folder per world. For the novel Hyperion, we will create a world of the same name.' ,
-      meta: 'This is the real create dialog. Normally you would name the world and it would become a folder; the tour world stays in your browser.',
+        'Each world needs a folder. Click in the top left to create one for our sentence.' ,
+      meta: 'Normally this would create a local folder, but the tour world stays in your browser.',
     }],
     handsOn: 'create-world',
   },
@@ -178,8 +191,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Every world starts with someone. The Consul is this sentence’s ' +
-        'character: create him and he becomes your first element.',
+        'The Consul seems pre-eminent in this tiny world. Create him in the sidebar.',
       // (The "real element dialog, locked to the tour's script this once…" meta
       // was cut S301, Captain's round — the dialog speaks for itself.)
     }],
@@ -383,10 +395,12 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'an issuer and holders), and every link is two-way: set it on one side and the ' +
         'other side shows it under Referenced-by automatically.' +
         '\n\n' +
-        'The Web tab in the right pane draws this as a live graph around whatever you ' +
-        'are looking at: click any node to travel. And when you want to go further, the ' +
-        'Knowledge room tracks which characters KNOW each fact, so what the reader knows ' +
-        'and what the villain knows can differ.' +
+        // The Web tab used to be named here (S304 gate, banked LOW): it stays
+        // HIDDEN until `where-it-lives` five steps later, which introduces it
+        // properly against the folder. Naming a tab the user cannot see yet is
+        // a promise the chrome does not keep.
+        'When you want to go further, the Knowledge room tracks which characters KNOW ' +
+        'each fact, so what the reader knows and what the villain knows can differ.' +
         '\n\n' +
         'Tools across the OnlyWorlds ecosystem read these same links.',
     }],
@@ -398,13 +412,55 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: 'the-writing',
     act: 3,
     unlocks: ['writing'],
-    phases: [{
-      id: 'a',
-      body:
-        'The Writing room holds books, chapters, and scenes. Here is Chapter 1 ' +
-        'of Hyperion: the sentence itself, where every colored chip is a link into the world you just built. ' +
-        'Your own writing links the same way: type @ and pick.',
-    }],
+    // HANDS-ON (S306): the chapter is baked as PLAIN prose (no ow:// chips) and
+    // the user links the sentence themselves. Every surface form in it carries a
+    // baked alias, so autolink underlines each one it can resolve.
+    //
+    // Only SEVEN of the sentence's nine phrases are linkable HERE: Rachmaninov
+    // and his Prelude are not revealed until `deep-time`, three steps later. The
+    // phase-c copy says so rather than promising a fully linked sentence, and
+    // TOUR_WRITING_LINKABLE locks the number so a reveal change fails loudly.
+    phases: [
+      {
+        id: 'a',
+        body:
+          'The Writing room holds your long-form work: books, chapters, scenes. ' +
+          'This is Chapter 1 of Hyperion, the sentence itself, and it is plain text. ' +
+          'Atlas already recognises the names it knows: hover a dotted word and press ' +
+          'Tab to turn it into a link. Try a few.',
+        deeper:
+          'Chips are live: click one to travel to its element, and the link shows on ' +
+          'the other side too, under Referenced-by.' +
+          '\n\n' +
+          'The words in your prose rarely match an element’s full name. Atlas already ' +
+          'knows “Steinway” is one of the names the Consul’s piano goes by, which is ' +
+          'why it recognised the word at all. In your own writing, linking a phrase ' +
+          'that is not an element’s name records it as an alias on that element: your ' +
+          'prose keeps reading exactly as you wrote it, and the next mention is ' +
+          'recognised on its own.' +
+          '\n\n' +
+          'Right-click a selection to choose the element yourself. The tree on the ' +
+          'left holds tiers you name (Book, Chapter, Scene) plus a flexible Draft that ' +
+          'floats beside them.',
+      },
+      {
+        id: 'b',
+        when: (w) => w.chipCount(TOUR_CHAPTER_REF) >= 1,
+        body:
+          'That word is a chip now, pointing at the element itself. Keep going by ' +
+          'hand, or right-click Chapter 1 in the tree and choose “Link mentions in ' +
+          'this chapter” to catch the rest at once.',
+      },
+      {
+        id: 'c',
+        when: (w) => w.chipCount(TOUR_CHAPTER_REF) >= TOUR_WRITING_LINKABLE,
+        body:
+          'Every name this world knows so far is wired into the sentence. ' +
+          'Rachmaninov and his Prelude are still to come, and the same Tab will ' +
+          'catch them when they arrive.',
+      },
+    ],
+    handsOn: 'link-word',
     reveal: ['narrative:Hyperion', 'narrative:Chapter 1'],
     route: { kind: 'writing', ref: 'narrative:Chapter 1' },
   },
@@ -526,7 +582,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // on the same beat.
     spans: [],
     reveal: [
-      'character:Steinway', 'construct:Steinway Piano', 'ability:Piano Playing',
+      'character:Mr. Steinway', 'construct:Steinway Piano', 'ability:Piano Playing',
       'trait:Swamp Rage', 'language:Western Musical Notation', 'phenomenon:Piano Music',
       'narrative:Story of the old piano',
     ],
@@ -581,7 +637,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       body:
         'That is the tour: when it ends, this world folds away. Your own worlds ' +
         'live in a folder you choose. Pick one and start building, or finish here.',
-      meta: 'The tour world leaves nothing behind: no folder, no files. Replay it anytime from settings.',
+      meta: 'The tour world leaves nothing behind. Replay it anytime from settings.',
     }],
     handsOn: 'setup-folder',
   },

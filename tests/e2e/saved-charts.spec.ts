@@ -134,9 +134,37 @@ test('deleting the applied chart releases its lens (S265, the ghost-scope bug)',
   await expect(page.locator('.atlas-timeline-rail-head')).toHaveText(savedName);
 
   await chip.hover();
+  // Deleting a saved chart now CONFIRMS first (S306): it was the only
+  // destructive action on a user-authored artifact with no guard, while the map
+  // row and the zone chip both ask. Playwright auto-DISMISSES dialogs, so
+  // without this the delete simply never happens.
+  page.once('dialog', d => void d.accept());
   await chip.locator('.atlas-saved-chart-action[title="Delete chart"]').click();
   await expect(page.locator('.atlas-saved-chart')).toHaveCount(0);
   // The lens released with it — the rail no longer carries the dead chart's
   // name (a stale appliedSelection kept scoping the room invisibly).
   await expect(page.locator('.atlas-timeline-rail-head')).not.toHaveText(savedName);
+});
+
+test('declining the delete confirm KEEPS the chart (S306)', async ({ page }) => {
+  // The accept-side test above would stay green if the confirm were removed
+  // entirely, so it cannot guard the guard. This is the other half of the pair:
+  // dismiss the dialog and the chart must survive. There is no undo anywhere in
+  // atlas, which is what makes the confirm load-bearing rather than polite.
+  await setupWorld(page);
+  await createElement(page, 'event', { name: 'Alpha', start_date: 10 });
+  await createElement(page, 'event', { name: 'Beta', start_date: 20 });
+  await openCharts(page);
+
+  await page.click('[data-action="save-chart"]');
+  const chip = page.locator('.atlas-saved-chart');
+  await expect(chip).toHaveCount(1);
+
+  let asked = false;
+  page.once('dialog', d => { asked = true; void d.dismiss(); });
+  await chip.hover();
+  await chip.locator('.atlas-saved-chart-action[title="Delete chart"]').click();
+
+  await expect(page.locator('.atlas-saved-chart')).toHaveCount(1);
+  expect(asked, 'deleting a saved chart must ask first').toBe(true);
 });

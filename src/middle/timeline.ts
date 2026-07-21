@@ -157,7 +157,20 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     const store = getActiveStore();
     const active = getState().active;
     if (!store || !active) return;
-    await store.writeWorldMeta({ time_current: value ?? undefined });
+    // The write is REPORTED on failure. Every call site fires this as
+    // `void setNow(...)`, so a rejected meta write used to vanish entirely: the
+    // clock stayed unset, the room re-rendered identically, and the user saw a
+    // button that simply did nothing. That is worst at the tour's now beat,
+    // where the same write is the step's only forward gate — a silent failure
+    // there strands the user with no Next and no explanation. Mirrors the
+    // drag-to-date handler's shape below.
+    try {
+      await store.writeWorldMeta({ time_current: value ?? undefined });
+    } catch (err) {
+      console.error('[charts] now write failed:', err);
+      toasts.error('could not save the now');
+      return;
+    }
     patchSlice('active', {
       ...active,
       meta: { ...active.meta, time_current: value ?? undefined },
@@ -745,6 +758,11 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   }
 
   async function deleteChart(chart: ChartConfig): Promise<void> {
+    // A saved chart is a user-authored artifact and this was the only delete in
+    // the app that took it with no confirmation at all, while the map row and
+    // the zone chip both ask first. There is no undo anywhere in atlas, so the
+    // confirm IS the safety. Same `window.confirm` shape as those two.
+    if (!window.confirm(`Delete chart "${chart.name ?? 'untitled'}"?`)) return;
     savedCharts = removeChart(savedCharts, chart.id);
     const store = getActiveStore();
     if (store) await store.writeCharts(savedCharts);

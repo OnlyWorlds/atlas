@@ -30,7 +30,7 @@ import type { ElementType } from '../core/types';
 import {
   capabilitiesUpTo,
   TOUR_ATTRIBUTION, TOUR_ATTRIBUTION_URL,
-  TOUR_CAPABILITIES,
+  TOUR_CAPABILITIES, TOUR_CHAPTER_REF,
   TOUR_SENTENCE, TOUR_STEPS,
   type TourStep,
 } from './tour-data';
@@ -272,6 +272,12 @@ function signatureFor(
     // on the phase id, because relying on a term moving "by coincidence" is
     // exactly what left the hands-on gate uncovered before (close gate, S302).
     step.handsOn === 'set-now' ? String(view.nowIsSet) : '',
+    // Same reasoning for the writing beat: each Tab-link changes only the
+    // chapter's `story`, which moves no ref, no glyph and no `creates`
+    // progress. Without this term the FIRST link would not repaint (no Next,
+    // no phase b) and every later link would be invisible — the S302 memo bug
+    // exactly. Carried as the count, so 1 -> 7 each repaint.
+    step.handsOn === 'link-word' ? String(view.chipCount(TOUR_CHAPTER_REF)) : '',
     view.tourIsLive ? 'live' : 'suspended',
   ].join(',');
   return [idx, phase.id, advance, stage, glyphs, created, gates].join('|');
@@ -500,6 +506,11 @@ function render(): void {
       // permanently false here and leave the step with no forward control at
       // all — the default branch below is a trap for any refless hands-on kind).
       : step.handsOn === 'set-now' ? view.nowIsSet
+      // Same shape as set-now: the writing beat's deed is a chip inside an
+      // existing narrative, not a new element, so `handsOnDone` would be
+      // permanently false. ONE chip opens Next — the user is never stuck at a
+      // partly-linked sentence, and phases b/c narrate the rest.
+      : step.handsOn === 'link-word' ? view.chipCount(TOUR_CHAPTER_REF) >= 1
       : handsOnDone)
     : true;
   if (step.handsOn && step.handsOn !== 'setup-folder' && !handsOnGate) {

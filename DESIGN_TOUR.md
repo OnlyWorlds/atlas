@@ -1,9 +1,15 @@
 # Atlas — Guided Tour Design
 
-**Version**: 2.9 (2026-07-21, S305 — THE CHARTS ACT: one shared event date, the
-now beat, deep time + two eras; the event-vs-narrative branch CUT by Captain in
-favour of a "more information" note, which removed the reveal-slot kernel change
-entirely). Prior: 2.8 (S304 — THE ACT RESTRUCTURE: step-0 opener, maps
+**Version**: 3.0 (2026-07-21, S306 — THE WRITING BEAT: Chapter 1 baked as plain
+prose and linked BY THE USER via autolink's Tab; the tier choice cut as
+unreachable and the selection bubble cut as unnecessary; `Mr. Steinway` renamed
+out of an autolink key collision. Also this pass: the act table, step count,
+bundle count, test count and the "STILL TO BUILD" list were all corrected
+against the code — every one of them was stale, and the STILL-TO-BUILD list was
+naming three things that had already shipped). Prior: 2.9 (S305 — THE CHARTS
+ACT: one shared event date, the now beat, deep time + two eras; the
+event-vs-narrative branch CUT by Captain in favour of a "more information" note,
+which removed the reveal-slot kernel change entirely). Prior: 2.8 (S304 — THE ACT RESTRUCTURE: step-0 opener, maps
 before objects, institution+title merged, the pin's soft correction;
 supersedes v2.7). Prior: S303 capability-class staging + landing captions; S302
 phases WIRED + the scripted create door. The full rework this serves is
@@ -172,7 +178,7 @@ for the pane in front of the user, storage for the next boot). E2e-locked in
 `tour.spec.ts` with a precondition assert, so the test cannot pass by never
 having created the tab.
 
-## Acts (17 steps — S304 order; `data-tour-step` = step number below)
+## Acts (18 steps — S306; `data-tour-step` = step number below)
 
 The reorder (Captain's dump): the sentence gets its own opener, the maps act
 comes BEFORE the objects so the pin's "sat" (word 3) lights in reading order
@@ -192,12 +198,21 @@ already drawn).
    balcony, Steinway — one + click each) · linking payoff (objects BEFORE
    linking so the Consul's page carries real chips; deeper: two-way links, Web,
    Knowledge).
-4. **Writing** (step 11): Chapter 1 = the sentence VERBATIM with 9 live chips.
-5. **Time** (steps 12-13): the events (Rachmaninov + Prelude) · the chart; events
-   at years 7/12, zoom-out finds the gold now at 15 (deeper: drag-to-date, saved
-   charts, calendars).
-6. **Your world** (steps 14-17): the sweep · where-it-lives (files story; Web-tab
-   cameo via `webTab`) · online (demo key 0000000000) · finale.
+4. **Writing** (step 11): Chapter 1 = the sentence VERBATIM, baked as PLAIN
+   prose with NO chips (S306). **HANDS-ON** (`link-word`): autolink underlines
+   the surface forms it can resolve and the user presses Tab to link one; Next
+   appears at the first chip. Only SEVEN of the nine phrases are linkable here
+   (`TOUR_WRITING_LINKABLE`) because Rachmaninov and his Prelude arrive at
+   `deep-time`, three steps later; phase c says so instead of promising a fully
+   linked sentence. Phase b points at the tree's right-click "Link mentions in
+   this chapter" for the rest.
+5. **Time** (steps 12-14): the events, BOTH at the shared year 7 (he plays while
+   they surge) · the chart = the **now beat** (HANDS-ON `set-now`; the bundle
+   ships no `time_current`, so the room's real button is pressable) · deep time
+   (Rachmaninov -320 and his Prelude -318 in the Old Earth era).
+6. **Your world** (steps 15-18): the sweep · where-it-lives (files story; the Web
+   tab appears here via `webTab`, and it is NOT named earlier) · online (demo key
+   0000000000) · finale.
 
 **Cut from the tour** (stay as waypoints): knowledge room visit, import.
 
@@ -357,14 +372,23 @@ room's onboarding cards stay silent (S264 intersection class).
 
 ## The bundle (`src/demo/hyperion-world.json` + webps)
 
-Baked from OnlyWorlds demo world (key `0000000000`), **36 elements**
-(34 upstream-derived + minted Book/Chapter), offline; images ship as webp
+Baked from OnlyWorlds demo world (key `0000000000`), **37 elements**
+(upstream-derived + minted Book/Chapter), offline; images ship as webp
 and attach as LOCAL media at reveal. `_bake_notes` lists every editorial
-deviation: zone-twin merge, event dates (7, 12), the link weave, pin rename,
-book+chapter mint, atlas_aliases for the sentence's surface forms,
-Rachmaninov's 1873 Earth birth_date removed (it stretched the chart axis).
-The chapter's `story` is markdown with `ow://` chips and NO richtext
-sidecar — the first sidecar-less narrative ever to hit the markdown-fallback
+deviation: zone-twin merge, the SHARED event date (both at 7, S305), the link
+weave, pin rename, book+chapter mint, atlas_aliases for the sentence's surface
+forms, Rachmaninov's 1873 Earth birth_date removed (it stretched the chart axis),
+and the S306 writing-beat bake (below).
+**S306**: the character `Steinway` was renamed **`Mr. Steinway`** because the bare
+key collided with the `Steinway` alias on `The Consul's Steinway`, and both
+autolink and bulk-link skip any key with 2+ candidates — that word could never
+have linked, silently. `Story of the old piano` gained `supertype: 'Draft'` so it
+is visible in the writing tree at all (a narrative with no writing-label
+supertype is filtered out by `getTierForNarrative`); it is not revealed during
+the tour. Both changes were mirrored to the live world.
+The chapter's `story` is markdown and carries **NO** `ow://` chips (the user
+links them) with NO richtext sidecar — the first sidecar-less narrative ever to
+hit the markdown-fallback
 path (which was silently broken until it did; fixed with
 `contentType: 'markdown'`).
 **Skeld asks owed**: adopt link weave + event dates server-side; freeze
@@ -411,17 +435,31 @@ chart beat: **objects are not dateable at all**, and **characters carry
 render a range. `title` is the only type with open-end semantics (grant to now,
 fade cap), which is why the Consul's title is the act's range subject.
 
-**STILL TO BUILD** (from the same dump): the WRITING beat (teach the room's
-tiers, have the user link three words — the room's setup screen already offers
-the tier choice; needs a "link a word" hands-on kind + an unlinked chapter
-variant in the bundle + the selection bubble wired into the writing room, which
-is share-only today), the CHARTS act built element by element (LANDED S305 — see above; the room's set-now button gained a
-`data-action` hook, and the branch was cut rather than built — see the S302 handover for the dug constraints, incl. the
-event-vs-narrative branch which needs the reveal/heal kernel to treat two bundle
-entries as one logical slot — Captain greenlit it, gate before build), the
-two-era Old Earth/PC calendar baked into the bundle, and the EXIT MODAL showing
-which rooms you saw. Positions, rulings and open questions live in the plan note;
-the phase contract carries the engineering.
+**ALL LANDED** (this list previously named four things as unbuilt while three of
+them had already shipped in the very session the doc claimed to document — a doc
+asserting intent as fact, which is exactly how a future session builds the wrong
+thing):
+
+- the CHARTS act, element by element — **LANDED S305** (the event-vs-narrative
+  branch was CUT by Captain in favour of a "more information" note, which removed
+  the reveal-slot kernel change entirely; no gate was needed)
+- the two-era Old Earth/PC calendar baked into the bundle — **LANDED S305**
+- the EXIT MODAL showing which rooms you saw — **LANDED S305**
+  (`tour-exit-summary.ts` + `tour-exit-modal.ts`)
+- the WRITING beat — **LANDED S306**, though not as this list imagined it. The
+  tier choice was CUT: `isWritingInitialized` (writing-helpers.ts) correctly
+  suppresses the setup screen when every chain member's supertype matches a
+  writing label, which the bundle's Book/Chapter do, so the screen cannot appear
+  without baking a world that misrepresents itself. The selection bubble was
+  also dropped as unnecessary: the gesture is autolink's **Tab-on-hover** (with
+  right-click as the alternate), both of which the writing room already had. No
+  unlinked chapter variant was needed either — Chapter 1 itself is baked plain.
+
+Positions, rulings and open questions live in the plan note; the phase contract
+carries the engineering.
+
+**STILL OPEN**: resume-after-exit (below), and the reverted chart-framing fix
+(spec in the S305 handover addendum).
 
 Standing decisions from that round:
 - Create buttons never return to the widget: the narrator narrates, the app
@@ -471,14 +509,24 @@ Standing decisions from that round:
 
 ## Tests
 
-`tests/e2e/tour.spec.ts` (14, S304 order): the centre-stage opener + Begin
-hand-off · full 17-step walk (staged chrome, locked modals incl. the sidebar +
-door, the real-button pin placement + locked identity, chips, alias timing, web
-cameo, teardown + emphasis swap) · **the pin SOFT correction** (place outside →
-phase b, no Next; drag onto the swamps → phase c, Next) · single-route create
-beats · the resilience mess-walk (delete/unlink/wreck → heal, user link + media
-+ cached-tab zone overlay) · armed-pin-disarms-on-nav (no stray pin) ·
-resume-after-reload · exit-teardown · OPFS-only boot.
+`tests/e2e/tour.spec.ts` (17, S306 order — count with `grep -c '^test('`, never
+from this line): the centre-stage opener + Begin hand-off · full 18-step walk
+(staged chrome, locked modals incl. the sidebar + door, the real-button pin
+placement + locked identity, alias timing, web cameo, teardown + emphasis swap) ·
+**the pin SOFT correction** (place outside → phase b, no Next; drag onto the
+swamps → phase c, Next) · **the writing beat** (plain prose, no Next until a
+chip; a REAL click + `keyboard.press('Tab')`, never a synthetic KeyboardEvent) ·
+single-route create beats · the resilience mess-walk (delete/unlink/wreck → heal,
+user link + media + cached-tab zone overlay) · armed-pin-disarms-on-nav (no stray
+pin) · resume-after-reload · exit-teardown · the exit confirm · OPFS-only boot.
+
+**Trap for the writing beat's gesture**: `handleKeyDown` promotes the decoration
+containing the CURSOR, so the press only lands once the click's selection has
+actually been applied. Waiting on `ProseMirror-focused` is NOT enough — that
+resolves from a cached snapshot without a round-trip, and the key then arrives
+before the selection exists. Wait on the selection sitting inside an
+`.atlas-autolink-hint`, and retry the click+Tab pair (under 4 workers a single
+attempt is not reliable).
 Unit: `tour-view.test.ts` adds `pinInZone` (synthetic geometry incl.
 order-sensitivity + foreign-zone markers); `tour-data.test.ts` adds the
 baked-pin-in-swamps guard + a "zone revealed no later than its place-pin step"

@@ -23,6 +23,7 @@ import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash, homeHash } from '../core/router';
 import { setSidebarModePref } from '../core/ui-prefs';
 import { scoreElementMatch } from '../core/element-search';
+import { roomOf, openElementTarget } from '../core/element-room';
 import { ELEMENT_ICONS } from '../core/constants';
 import type { Element, ElementType } from '../core/types';
 
@@ -264,8 +265,30 @@ class CommandPalette extends BaseModal {
       navigate(r.id === '' ? homeHash(this.worldId) : `#/w/${this.worldId}/${r.id}`);
       return;
     }
-    patchSlice('ui', { ...getState().ui, selectedElementId: r.id });
-    navigate(elementHash(this.worldId, r.id));
+    // Route to the room the element actually LIVES in (S306). This used to be
+    // a bare `navigate(elementHash(...))` for every non-room result, so Cmd+K
+    // on a map, a page, a knowledge entry or a chapter landed in the generic
+    // field editor instead of the room that owns it — the palette is the app's
+    // only global jump, so it flattened all four, app-wide, while the world
+    // home twenty lines away resolved them correctly. `core/element-room.ts`
+    // is now the single answer both surfaces ask.
+    const el = getState().data.elements.find(e => e.id === r.id);
+    if (!el) {
+      // Result outsurvived its element (deleted mid-search): the generic hash
+      // at least lands on the app's own not-found card rather than nothing.
+      patchSlice('ui', { ...getState().ui, selectedElementId: r.id });
+      navigate(elementHash(this.worldId, r.id));
+      return;
+    }
+    // Selection is only meaningful for the generic element view; a room-owning
+    // element opens its room instead, exactly as the home's desk rows do.
+    if (roomOf(el, this.worldId).label === '') {
+      patchSlice('ui', { ...getState().ui, selectedElementId: r.id });
+    }
+    // `routeToMap`: the palette is global and fires from inside the writing
+    // editor, where focus/reading mode hides the right pane — a tab-only jump
+    // there is a dead click. The home desk deliberately does not route.
+    openElementTarget(el, this.worldId, { routeToMap: true });
   }
 }
 

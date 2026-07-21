@@ -2,7 +2,7 @@
 
 Folder-first OnlyWorlds world browser and editor with optional API sync.
 
-**Status**: Feature-complete, v1.0.0, in release prep (rebuild ran 2026-05-12 to 2026-07). See `DESIGN.md` for architecture, `PROGRESS.md` for operational state, `CHANGELOG.md` for releases.
+**Status**: **LAUNCHED** 2026-07-19 at [atlas.onlyworlds.com](https://atlas.onlyworlds.com) (rebuild ran 2026-05-12 to 2026-07); post-launch work continues on the guided tour. See `DESIGN.md` for architecture, `PROGRESS.md` for operational state, `CHANGELOG.md` for releases.
 **Legacy**: Previous IDB-cached design lives at `tools/atlas-deprecated/` — UI/UX reference only. See its `DEPRECATED.md` for what to port vs drop.
 
 ## Run
@@ -20,7 +20,7 @@ npm run e2e:ui       # Playwright UI mode
 
 ## Stack
 
-TypeScript + Vite + `@onlyworlds/sdk` 2.2+ + Leaflet 1.9 + Vitest + MSW + fake-indexeddb + Playwright. Vanilla DOM, no React. `base: './'` for Cloudflare Pages compatibility. Chromium-only (File System Access API for folder mode).
+TypeScript + Vite + `@onlyworlds/sdk` ^3.0.0 + Leaflet 1.9 + Vitest + MSW + fake-indexeddb + Playwright. Vanilla DOM, no React. `base: './'` for Cloudflare Pages compatibility. Chromium-only (File System Access API for folder mode).
 
 ## Architecture (one-line)
 
