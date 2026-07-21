@@ -39,7 +39,7 @@ export const TOUR_WAVE: TourWaveEntry[] = [
   { type: 'narrative',  room: 'writing',   verb: 'Write',  icon: 'menu_book',     line: 'tell it as a story' },
   { type: 'map',        room: 'map',       verb: 'Map',    icon: 'map',           line: 'ground your world' },
   { type: 'collective', room: 'knowledge', verb: 'Know',   icon: 'psychology',    line: 'who knows what' },
-  { type: 'construct',  room: 'share',     verb: 'Share',  icon: 'wall_art',      line: 'a page of your world' },
+  { type: 'construct',  room: 'share',     verb: 'Share',  icon: 'wall_art',      line: 'part of your world' },
   { type: 'object',     room: 'import',    verb: 'Export', icon: 'import_export', line: 'your entire world' },
 ];
 

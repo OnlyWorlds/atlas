@@ -116,18 +116,20 @@ async function openOpener(page: Page) {
   await expect(bar).toHaveAttribute('data-tour-step', '1');
   await expect(bar).toHaveClass(/is-opener/);
   await expect(page.locator('.atlas-tour-sentence')).toBeVisible();
-  await expect(page.locator('.atlas-tour-attribution')).toContainText('Dan Simmons (1989)');
+  // The grey book cite under the opener was cut (S306) — the opener copy
+  // names Hyperion and its year itself.
+  await expect(page.locator('.atlas-tour-attribution')).toHaveCount(0);
   // The bare stage: no `shell` capability yet, so the shell is hidden behind
   // the sentence (the vignette on black).
   expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-shell'))).toBe(false);
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Begin$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Start$/ })).toBeVisible();
   // No docked Next at the opener; Begin is the hand-off.
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
 }
 
 /** Begin → the shell materializes on the create-world beat (step 2). */
 async function beginToWorld(page: Page) {
-  await page.locator('.atlas-tour-controls button', { hasText: /^Begin$/ }).click();
+  await page.locator('.atlas-tour-controls button', { hasText: /^Start$/ }).click();
   const bar = page.locator('.atlas-tour-bar');
   await expect(bar).toHaveAttribute('data-tour-step', '2');
   await expect(bar).not.toHaveClass(/is-opener/);
@@ -255,7 +257,7 @@ test('relaunch after exit mounts a WORKING bar (gate R3: the render memo must no
   // The controls are the part a stale memo eats: assert a working ladder.
   await expect(page.locator('.atlas-tour-sentence')).toBeVisible();
   await expect(page.locator('.atlas-tour-body')).not.toBeEmpty();
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Begin$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Start$/ })).toBeVisible();
   await expect(page.locator('.atlas-tour-exit')).toBeVisible();
 
   // And it still WORKS: Begin hands off to the create-world beat as usual.

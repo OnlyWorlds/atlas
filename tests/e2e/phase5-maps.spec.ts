@@ -376,3 +376,24 @@ test('imageless map is first-class: flat canvas opens, pin places, zone draft st
   expect(newPin!.y).toBeGreaterThanOrEqual(0);
   expect(newPin!.y).toBeLessThanOrEqual(200);
 });
+
+test('deleting a map closes its right-pane tab (S306)', async ({ page }) => {
+  // The tab used to survive the delete and fall through to the stale card
+  // ("Map from another world") — wrong on its face, since it WAS this world's,
+  // and it looked unclosable. Captain's find.
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', 'Doomed Map');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Doomed Map' })).toBeVisible();
+
+  // Delete it from its element page.
+  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
+  await page.click('[data-element-id]:has-text("Doomed Map")');
+  page.once('dialog', d => void d.accept());
+  await page.locator('[data-action="delete-element"]').click();
+
+  await expect(page.locator('.atlas-tab', { hasText: 'Doomed Map' })).toHaveCount(0);
+  await expect(page.locator('.atlas-map-stale-title')).toHaveCount(0);
+  // ...and we land on the map index, not an arbitrary neighbour.
+  await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toHaveClass(/active/);
+});

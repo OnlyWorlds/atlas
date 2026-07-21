@@ -832,7 +832,29 @@ async function onDelete(el: Element): Promise<void> {
     await store.deleteElement(el.id);
     const elements = await store.listElements();
     patchSlice('data', { elements });
-    patchSlice('ui', { ...getState().ui, selectedElementId: null });
+    // Deleting a MAP has to take its right-pane tab with it (Captain, S306):
+    // the tab survived the delete and fell through to the stale card reading
+    // "Map from another world", which is both wrong (it was this world's) and
+    // unclosable-looking. Land on the map index instead — the room that lists
+    // what is left — rather than an arbitrary neighbour.
+    const uiNow = getState().ui;
+    let nextUi = { ...uiNow, selectedElementId: null };
+    if (el.type === 'map') {
+      const doomed = uiNow.rightTabs.findIndex(t => t.kind === 'map' && t.mapId === el.id);
+      if (doomed >= 0) {
+        const rightTabs = uiNow.rightTabs.filter((_, i) => i !== doomed);
+        // Prefer the map index; else clamp the old index into the shorter list.
+        const indexTab = rightTabs.findIndex(t => t.kind === 'map-index');
+        const rightActiveIndex = uiNow.rightActiveIndex === doomed
+          ? (indexTab >= 0 ? indexTab : 0)
+          : Math.max(0, Math.min(
+            uiNow.rightActiveIndex > doomed ? uiNow.rightActiveIndex - 1 : uiNow.rightActiveIndex,
+            rightTabs.length - 1,
+          ));
+        nextUi = { ...nextUi, rightTabs, rightActiveIndex };
+      }
+    }
+    patchSlice('ui', nextUi);
     // Local delete + tombstones written — schedule a push to DELETE on server.
     requestPushIfLinked();
     toastManager.success(`Deleted ${el.name || 'element'}`);

@@ -169,7 +169,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
       id: 'a',
       body:
         'The opening sentence of Hyperion (1989) by the late Dan Simmons.' +
-        'What elements do you see that should have a name in this world?' 
+        '\n\n' +
+        'What elements do you see that should have a name in this world?',
     }],
   },
   // ---------------------------------------------------------------- Act 1
@@ -188,13 +189,25 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: 'the-consul',
     act: 1,
-    phases: [{
-      id: 'a',
-      body:
-        'The Consul seems pre-eminent in this tiny world. Create him in the sidebar.',
-      // (The "real element dialog, locked to the tour's script this once…" meta
-      // was cut S301, Captain's round — the dialog speaks for itself.)
-    }],
+    phases: [
+      {
+        id: 'a',
+        body:
+          'The Consul seems pre-eminent in this tiny world. Create him in the sidebar.',
+        // (The "real element dialog, locked to the tour's script this once…" meta
+        // was cut S301, Captain's round — the dialog speaks for itself.)
+      },
+      {
+        // The step used to keep asking for a deed already done (Captain, S306):
+        // after the create, Next appeared but the copy still read "Create him
+        // in the sidebar". Every other hands-on beat acknowledges its gesture.
+        id: 'b',
+        when: (w) => w.hasRef('character:The Consul'),
+        body:
+          'There he is: your first element, and the first word of the sentence ' +
+          'with a name behind it.',
+      },
+    ],
     spans: [{ from: 2, to: 2, type: 'character', ref: 'character:The Consul' }],
     handsOn: 'create-consul',
   },
@@ -213,9 +226,14 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'it. Both just appeared in the left sidebar, where every element lives, ' +
         'filterable by type.',
     }],
+    // One word per element, in reading order (Captain, S306): "The" carries the
+    // TITLE, "Hegemony" the institution, and "Consul" is left alone so the
+    // character colour it earned on the previous step survives. `fillMap`
+    // walks steps in order and later spans overwrite earlier ones, so a title
+    // span on word 2 here used to repaint the Consul away from his own colour.
     spans: [
-      { from: 0, to: 1, type: 'institution' },
-      { from: 2, to: 2, type: 'title' },
+      { from: 0, to: 0, type: 'title' },
+      { from: 1, to: 1, type: 'institution' },
     ],
     reveal: ['institution:The Hegemony', 'title:Consul of the Hegemony'],
     route: { kind: 'element', ref: 'institution:The Hegemony' },
@@ -317,8 +335,12 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
+        // "the zone you traced onto the map" was wrong (Captain, S306): the
+        // Swamps zone is REVEALED with the map at the previous beat, the user
+        // never draws it. Copy must not credit the reader with a gesture the
+        // tour performed for them.
         'The saurian things live in those swamps: two creatures, their species, ' +
-        'and one bellowing pack, all linked to the zone you traced onto the map.',
+        'and one bellowing pack, all linked to the swamps zone on the map.',
     }],
     spans: [
       { from: 27, to: 27, type: 'creature' },
@@ -424,10 +446,14 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
+          // "hover a dotted word" was WRONG and cost Captain a live confusion
+          // (S306): `handleKeyDown` promotes the decoration containing the
+          // CURSOR, so hovering does nothing and Tab just moves focus out of
+          // the editor. The gesture is click-then-Tab.
           'The Writing room holds your long-form work: books, chapters, scenes. ' +
           'This is Chapter 1 of Hyperion, the sentence itself, and it is plain text. ' +
-          'Atlas already recognises the names it knows: hover a dotted word and press ' +
-          'Tab to turn it into a link. Try a few.',
+          'Atlas already recognises the names it knows: click inside a dotted word, ' +
+          'then press Tab to turn it into a link. Try a few.',
         deeper:
           'Chips are live: click one to travel to its element, and the link shows on ' +
           'the other side too, under Referenced-by.' +

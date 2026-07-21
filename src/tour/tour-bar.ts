@@ -29,7 +29,6 @@ import { getState, subscribe } from '../core/state';
 import type { ElementType } from '../core/types';
 import {
   capabilitiesUpTo,
-  TOUR_ATTRIBUTION, TOUR_ATTRIBUTION_URL,
   TOUR_CAPABILITIES, TOUR_CHAPTER_REF,
   TOUR_SENTENCE, TOUR_STEPS,
   type TourStep,
@@ -427,15 +426,15 @@ function render(): void {
   if (opener) {
     meta.classList.add('atlas-tour-meta-opener');
     // The "One sentence, one world" eyebrow was cut S299 (Captain: "why still
-    // this blue header, remove it") — the sentence itself already frames it.
-    // Just the book cite rides the opener's meta channel now.
-    const attr = document.createElement('a');
-    attr.className = 'atlas-tour-attribution';
-    attr.href = TOUR_ATTRIBUTION_URL;
-    attr.target = '_blank';
-    attr.rel = 'noopener';
-    attr.textContent = TOUR_ATTRIBUTION;
-    meta.append(attr);
+    // this blue header, remove it"). The grey book cite under it went the same
+    // way in S306 — the opener's own copy already names Hyperion and its year,
+    // so the link was a second, quieter statement of the same fact.
+    // NOTE: this was the ONLY render of TOUR_ATTRIBUTION / _URL, so those two
+    // constants are now unreferenced by any surface (checked, not assumed —
+    // the finale does not cite the book either). Left defined in tour-data as
+    // the canonical cite if a surface wants it again; if nothing claims them by
+    // the next sweep, delete them rather than let them rot as decoration.
+    meta.textContent = ' ';
   } else {
     meta.textContent = phase.meta ?? ' ';
   }
@@ -455,7 +454,7 @@ function render(): void {
     begin.type = 'button';
     begin.className = 'atlas-btn-primary';
     begin.dataset.tourControl = 'next';
-    begin.textContent = 'Begin';
+    begin.textContent = 'Start';
     begin.addEventListener('click', () => { void nextStep(); });
     controls.appendChild(begin);
     appendExit(controls);
