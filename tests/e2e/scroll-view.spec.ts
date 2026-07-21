@@ -82,8 +82,11 @@ async function mintCalendar(page: Page): Promise<void> {
   await page.fill('#wc-unit', 'day');
   await page.fill('#wc-now', '400');
   await page.click('[data-action="save-clock"]');
-  await page.click('.atlas-cal-chip');
-  await page.locator('.atlas-cal-menu-item', { hasText: 'The Almanac' }).click();
+  // No lens selection step: this world holds exactly ONE calendar and its owner
+  // has never opened the lens menu, so the room already speaks it (S305). The
+  // menu still offers an explicit "no calendar", which is why the fallback keys
+  // on never-chosen rather than on falsiness.
+  await expect(page.locator('.atlas-cal-chip')).toContainText('The Almanac');
 }
 
 test('the toggle swaps to the document view: cards, era seam, now seam, readout — all speaking the lens', async ({ page }) => {

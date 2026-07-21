@@ -61,7 +61,28 @@ export function worldCalendars(elements: Element[]): WorldCalendar[] {
 export function resolveCalendarLens(
   elements: Element[],
   activeId: string | null | undefined,
+  opts?: {
+    /**
+     * When no lens has EVER been chosen and the world holds exactly one
+     * calendar, speak it. A user who mints a calendar has said what their
+     * world's dates mean, and answering them with bare numbers until they
+     * also pick it from a menu is a worse default than simply using it.
+     *
+     * Deliberately keyed on `undefined` (never chosen), not on falsiness:
+     * `null` is an explicit "no calendar" from the menu and must survive, or
+     * the choice would be un-makeable while one calendar exists.
+     *
+     * Opt-in, because the saved-chart restore path resolves a chart's OWN
+     * stored `calendarId`: a chart saved with no lens should reopen with no
+     * lens, not silently adopt one that was minted afterwards.
+     */
+    fallbackToOnly?: boolean;
+  },
 ): WorldCalendar | null {
+  if (activeId === undefined && opts?.fallbackToOnly) {
+    const all = worldCalendars(elements);
+    return all.length === 1 ? all[0] : null;
+  }
   if (!activeId) return null;
   return worldCalendars(elements).find(c => c.id === activeId) ?? null;
 }

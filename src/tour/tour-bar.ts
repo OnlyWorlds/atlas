@@ -23,6 +23,7 @@
  */
 
 import { hasFolderMode } from '../core/capabilities';
+import { confirmExitTour } from './tour-exit-modal';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../core/constants';
 import { getState, subscribe } from '../core/state';
 import type { ElementType } from '../core/types';
@@ -125,7 +126,7 @@ function unmount(): void {
   root?.remove();
   root = null;
   document.body.classList.remove('atlas-touring', 'atlas-tour-prezone', 'atlas-tour-preweb',
-    'atlas-tour-pinstep', 'atlas-tour-createstep');
+    'atlas-tour-pinstep', 'atlas-tour-createstep', 'atlas-tour-nowstep');
   for (const cap of TOUR_CAPABILITIES) document.body.classList.remove(`atlas-tour-cap-${cap}`);
 }
 
@@ -266,6 +267,11 @@ function signatureFor(
     // Next would never appear. The drag's `patchSlice('data')` fires the
     // subscription; this makes the signature notice the crossing.
     step.placeInZone ? String(view.pinInZone(step.placeInZone.pinRef, step.placeInZone.zoneRef)) : '',
+    // The now beat's deed is a world-meta write, not an element: no ref, no
+    // glyph, no `creates` progress. Carried explicitly rather than left to ride
+    // on the phase id, because relying on a term moving "by coincidence" is
+    // exactly what left the hands-on gate uncovered before (close gate, S302).
+    step.handsOn === 'set-now' ? String(view.nowIsSet) : '',
     view.tourIsLive ? 'live' : 'suspended',
   ].join(',');
   return [idx, phase.id, advance, stage, glyphs, created, gates].join('|');
@@ -324,6 +330,13 @@ function render(): void {
   // Found by looking at the beat, not by a test.
   document.body.classList.toggle('atlas-tour-createstep',
     !!step.creates && !hasAll(step.creates)(view) && view.tourIsLive);
+  // Same flow again for the charts act's now beat: highlight the room's REAL
+  // "set now time" button until the clock is set. The CSS also parks the
+  // canvas/document toggle for the beat, to keep one control in play while the
+  // copy names one control — NOT because the other view lacks the button (it
+  // does not; the control bar is a sibling of the view mount).
+  document.body.classList.toggle('atlas-tour-nowstep',
+    step.handsOn === 'set-now' && !view.nowIsSet && view.tourIsLive);
   const opener = idx === 0;
 
   root.innerHTML = '';
@@ -482,6 +495,11 @@ function render(): void {
   const handsOnGate = step.handsOn && step.handsOn !== 'setup-folder'
     ? (step.handsOn === 'create-world' ? tourWorldExists()
       : step.handsOn === 'place-pin' ? (handsOnDone && pinInZoneOk)
+      // The now beat has no bundle element of its own: the deed is a world-meta
+      // write, so it reads the clock rather than `handsOnDone` (which would be
+      // permanently false here and leave the step with no forward control at
+      // all — the default branch below is a trap for any refless hands-on kind).
+      : step.handsOn === 'set-now' ? view.nowIsSet
       : handsOnDone)
     : true;
   if (step.handsOn && step.handsOn !== 'setup-folder' && !handsOnGate) {
@@ -551,7 +569,13 @@ function appendExit(controls: HTMLElement): void {
   exit.className = 'atlas-btn-ghost atlas-tour-exit';
   exit.title = 'Leave the tour (the tour world folds away)';
   exit.textContent = 'Exit tour';
-  exit.addEventListener('click', () => { void exitTour(); });
+  // Exit goes through the confirm (Captain, S301): every beat is gated on a
+  // gesture, so leaving early is a legitimate move that deserves a real door —
+  // and the door doubles as a map of the rooms the tour never reached. The
+  // finale's Finish deliberately does NOT route through here.
+  exit.addEventListener('click', () => {
+    confirmExitTour(currentStepIndex(), () => { void exitTour(); });
+  });
   controls.appendChild(exit);
 }
 

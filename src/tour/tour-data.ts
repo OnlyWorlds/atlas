@@ -120,8 +120,14 @@ export interface TourStep {
     | { kind: 'chart' };
   /** Switch the right pane to the Web (context) tab on step enter. */
   webTab?: boolean;
-  /** Hands-on steps: the real gesture OR Next does it for you (watch-mode). */
-  handsOn?: 'create-world' | 'create-consul' | 'place-pin' | 'setup-folder';
+  /**
+   * Hands-on steps. The create beats and `set-now` are SINGLE ROUTE: the real
+   * gesture is the only way forward, and no watch-mode Next is rendered (two
+   * forward controls at a hands-on beat read as a fork — Captain, S298). Each
+   * kind needs its own branch in `tour-bar`'s forward gate; a kind with no
+   * bundle ref that falls through to the default is un-advanceable forever.
+   */
+  handsOn?: 'create-world' | 'create-consul' | 'place-pin' | 'set-now' | 'setup-folder';
   /**
    * For a `place-pin` step: the forward gate ALSO requires the pin to sit
    * inside this zone (the soft correction — Captain's ruling). The pin can be
@@ -409,16 +415,17 @@ export const TOUR_STEPS: readonly TourStep[] = [
       id: 'a',
       body:
         'The sentence holds two events: a performance, and the raging it stirs ' +
-        'below. Events carry dates, and dates are where time begins.',
+        'below. They carry the same date, because he plays while they surge. ' +
+        'Dates are where time begins.',
     }],
     spans: [
       { from: 12, to: 12, type: 'event' },
       { from: 29, to: 31, type: 'event' },
     ],
-    reveal: [
-      'event:The Primal Performance', 'event:The Raging of the Beasts',
-      'character:Rachmaninov', "construct:Rachmaninov's Prelude",
-    ],
+    // Rachmaninov and his Prelude moved OUT of this step (S305): they carry the
+    // Old Earth dates, and revealing them here would put centuries of deep time
+    // on the axis before the chart has taught what the axis is.
+    reveal: ['event:The Primal Performance', 'event:The Raging of the Beasts'],
     route: { kind: 'element', ref: 'event:The Primal Performance' },
   },
   // ---------------------------------------------------------------- Act 4
@@ -426,12 +433,34 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: 'the-chart',
     act: 4,
     unlocks: ['charts'],
-    phases: [{
-      id: 'a',
-      body:
-        'The Charts room lays your elements out on time: the two events sit at ' +
-        'years 7 and 12. Zoom out and the world’s whole span appears, with a gold line marking the now: year 15.',
-      deeper:
+    // The world's clock arrives UNSET (the bundle ships no `time_current`), so
+    // the "set now time" button is really there to be pressed. Setting it is
+    // what makes the gold line appear and what gives the Consul's open-ended
+    // title an end to run to: one click, and two things the room can do become
+    // visible at once.
+    handsOn: 'set-now',
+    // The calendar element itself: the eras it names are read from here, and it
+    // has to be on disk before the axis can speak them.
+    reveal: ['construct:Hegemony Standard'],
+    phases: [
+      {
+        id: 'a',
+        body:
+          'The Charts room lays your elements out on time. Both events sit on ' +
+          'the same moment, so they stack in one place. This world has no now ' +
+          'yet: set it with the highlighted button.',
+        meta: 'Atlas suggests a point and you can drag the line afterwards. A world without a now still charts.',
+        advanceWhen: (w) => w.nowIsSet,
+      },
+      {
+        id: 'b',
+        when: (w) => w.nowIsSet,
+        body:
+          'The gold line is now, and the Consul’s title now draws as a span: it ' +
+          'starts when the title was granted and runs to the present. Its soft ' +
+          'end means no end is recorded, so as far as this world knows he holds ' +
+          'it still.',
+        deeper:
         'The chart is a live view, not a picture: scroll to zoom from whole eras down ' +
         'to single days, drag any element’s dot to re-date it, and drag undated elements ' +
         'in from the rail to give them their first date. Save any arrangement as a named ' +
@@ -443,7 +472,42 @@ export const TOUR_STEPS: readonly TourStep[] = [
         '\n\n' +
         'A world with no dates at all still charts: time begins whenever you give ' +
         'something a year.',
+      },
+    ],
+    route: { kind: 'chart' },
+  },
+  {
+    // Deep time, and the eras that name it. Revealing Rachmaninov here rather
+    // than with the events is deliberate: his date sits centuries back, and the
+    // chart only teaches something once there is a present to measure it from.
+    id: 'deep-time',
+    act: 4,
+    phases: [{
+      id: 'a',
+      body:
+        'Rachmaninov and his prelude join the world, and they are old: both sit ' +
+        'far back in the Old Earth era, centuries before anything else here. ' +
+        'Watch the axis stretch to hold them. Scroll to zoom back in on the ' +
+        'present, and the strip below keeps the whole span in view.',
+      meta: 'Old Earth and PC are this world’s own eras, named by a calendar element the chart reads.',
+      deeper:
+        'A world can name its own time. Eras are the coarsest layer: a name, a ' +
+        'direction, and the point they pivot on. Old Earth counts backwards ' +
+        'towards that pivot and PC counts forwards from it, so a date can be ' +
+        'read in the language the world uses rather than as a bare number.' +
+        '\n\n' +
+        'Calendars can go further than eras: name your months, your week, your ' +
+        'festival days, and every date in atlas speaks that language.' +
+        '\n\n' +
+        'Nothing here claims a conversion between Earth’s calendar and this ' +
+        'one. The books never state it, so the tour does not invent it: the two ' +
+        'eras simply share a line.',
     }],
+    spans: [
+      { from: 13, to: 13, type: 'character' },
+      { from: 14, to: 17, type: 'construct' },
+    ],
+    reveal: ['character:Rachmaninov', "construct:Rachmaninov's Prelude"],
     route: { kind: 'chart' },
   },
   // ---------------------------------------------------------------- Act 5
@@ -454,13 +518,13 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The rest arrives at once: a composer, a piano maker, an ability, a trait, ' +
-        'a language, a phenomenon. One sentence, thirty-six elements, all linked. The sidebar holds them all.',
+        'The rest arrives at once: a piano maker, an ability, a trait, ' +
+        'a language, a phenomenon. One sentence, a whole small world, all linked. The sidebar holds them all.',
     }],
-    spans: [
-      { from: 13, to: 13, type: 'character' },
-      { from: 14, to: 17, type: 'construct' },
-    ],
+    // The Rachmaninov spans moved to the deep-time step, where those two
+    // elements are now revealed — a span's glyph and its element should light
+    // on the same beat.
+    spans: [],
     reveal: [
       'character:Steinway', 'construct:Steinway Piano', 'ability:Piano Playing',
       'trait:Swamp Rage', 'language:Western Musical Notation', 'phenomenon:Piano Music',

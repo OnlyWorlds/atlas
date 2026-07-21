@@ -1,6 +1,9 @@
 # Atlas — Guided Tour Design
 
-**Version**: 2.8 (2026-07-21, S304 — THE ACT RESTRUCTURE: step-0 opener, maps
+**Version**: 2.9 (2026-07-21, S305 — THE CHARTS ACT: one shared event date, the
+now beat, deep time + two eras; the event-vs-narrative branch CUT by Captain in
+favour of a "more information" note, which removed the reveal-slot kernel change
+entirely). Prior: 2.8 (S304 — THE ACT RESTRUCTURE: step-0 opener, maps
 before objects, institution+title merged, the pin's soft correction;
 supersedes v2.7). Prior: S303 capability-class staging + landing captions; S302
 phases WIRED + the scripted create door. The full rework this serves is
@@ -389,13 +392,31 @@ the dock, the maps act moved BEFORE the objects (lighting "sat" in reading
 order), institution+title merged, the zone revealed with the map, and the pin's
 soft correction (place anywhere, Next only over the swamps, drag to fix).
 
+**LANDED S305**: the charts act — the events share ONE date (he plays WHILE they
+surge), the chart step became a hands-on NOW beat (`handsOn: 'set-now'`, single
+route: the bundle ships no `time_current`, so the room's real button is
+pressable, and setting the clock both draws the gold line and gives the Consul's
+open-ended title an end to run to), and a new `deep-time` step puts Rachmaninov
+and his Prelude in the Old Earth era. The bundle bakes a two-era calendar
+(`Hegemony Standard`, Old Earth counting down / PC counting up, sharing pivot 0);
+no conversion to Earth's calendar is asserted anywhere. Two APP defaults were
+fixed on the way: the chart's default window is outlier-aware (a wide span with a
+tight cluster no longer smears; the strip and the pannable bounds still cover
+everything), and a world holding exactly one calendar now speaks it instead of
+falling back to bare numbers.
+
+Schema limits found while designing it, worth knowing before proposing any
+chart beat: **objects are not dateable at all**, and **characters carry
+`birth_date` with no death field**, so neither an object nor a character can
+render a range. `title` is the only type with open-end semantics (grant to now,
+fade cap), which is why the Consul's title is the act's range subject.
+
 **STILL TO BUILD** (from the same dump): the WRITING beat (teach the room's
 tiers, have the user link three words — the room's setup screen already offers
 the tier choice; needs a "link a word" hands-on kind + an unlinked chapter
 variant in the bundle + the selection bubble wired into the writing room, which
-is share-only today), the CHARTS act built element by element (HELD for
-Captain's look; the charts room has no tour branch and its controls lack
-`data-action` hooks — see the S302 handover for the dug constraints, incl. the
+is share-only today), the CHARTS act built element by element (LANDED S305 — see above; the room's set-now button gained a
+`data-action` hook, and the branch was cut rather than built — see the S302 handover for the dug constraints, incl. the
 event-vs-narrative branch which needs the reveal/heal kernel to treat two bundle
 entries as one logical slot — Captain greenlit it, gate before build), the
 two-era Old Earth/PC calendar baked into the bundle, and the EXIT MODAL showing

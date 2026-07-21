@@ -1985,6 +1985,24 @@ body.atlas-tour-createstep [data-action="create-element"] {
   border-color: var(--atlas-cyan-soft) !important;
   animation: atlas-tour-pulse 2.2s ease-in-out infinite;
 }
+/* Now beat (S305): the charts act asks the user to set the world's clock, so
+   the room's real "set now time" button is the control that has to be found.
+   Same treatment as the +pin and the sidebar + before it. */
+body.atlas-tour-nowstep [data-action="set-now"] {
+  color: var(--atlas-cyan) !important;
+  border-color: var(--atlas-cyan-soft) !important;
+  animation: atlas-tour-pulse 2.2s ease-in-out infinite;
+}
+/* ...and the canvas/document toggle goes away while that beat is live, to keep
+   one control in play at the moment the step names one control.
+   NOT because the other view lacks the button: the control bar is a SIBLING of
+   the view mount, so set-now renders in both, and the document view even reads
+   an open-ended span as "3 PC -> now" of its own accord. An earlier version of
+   this comment claimed document mode had no now control; it was wrong, and it
+   is the kind of wrong that looks load-bearing. */
+body.atlas-tour-nowstep .atlas-chart-mode {
+  display: none !important;
+}
 /* Progressive precision (S299): tool chrome waits for its teaching step, not
    just its act. The bar stamps step-scoped classes alongside the stage. */
 body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="draw-polygon"],
@@ -14025,3 +14043,55 @@ body.atlas-share-fullpreview > * {
 }
 
 .atlas-chart-mode .material-symbols-outlined { font-size: 17px; }
+
+/* ── Tour exit confirm (S305) ─────────────────────────────────────────────
+   Captain's design: leaving the tour early is legitimate, so the exit is a
+   real door — and the door doubles as a small map of the app, scoped to the
+   nav strip's rooms. Unseen rooms lead and read at full strength; visited
+   ones are quieted, because they are context rather than the offer. */
+.atlas-tour-exit-panel { max-width: 460px; }
+.atlas-tour-exit-heading {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--atlas-text-dim);
+}
+.atlas-tour-exit-rooms {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.atlas-tour-exit-room {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.atlas-tour-exit-room .material-symbols-outlined {
+  font-size: 20px;
+  line-height: 1.2;
+  color: var(--atlas-cyan);
+  flex: 0 0 auto;
+}
+.atlas-tour-exit-room-text { display: flex; flex-direction: column; min-width: 0; }
+.atlas-tour-exit-room-label { color: var(--atlas-text); font-weight: 600; }
+.atlas-tour-exit-room-blurb {
+  color: var(--atlas-text-dim);
+  font-size: 12px;
+  line-height: 1.45;
+}
+/* Visited rooms: same shape, less voice. */
+.atlas-tour-exit-room.is-seen .material-symbols-outlined { color: var(--atlas-text-dim); }
+.atlas-tour-exit-room.is-seen .atlas-tour-exit-room-label {
+  color: var(--atlas-text-dim);
+  font-weight: 500;
+}
+.atlas-tour-exit-note {
+  margin: 0 0 16px;
+  color: var(--atlas-text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+}

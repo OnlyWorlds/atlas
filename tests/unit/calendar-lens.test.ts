@@ -68,6 +68,33 @@ describe('resolveCalendarLens', () => {
     expect(resolveCalendarLens(elements, null)).toBe(null);
     expect(resolveCalendarLens([], 'c1')).toBe(null);
   });
+
+  // S305: a world holding exactly one calendar, whose owner has never opened
+  // the lens menu, should speak that calendar rather than bare numbers.
+  it('falls back to the ONLY calendar when a lens was never chosen', () => {
+    expect(resolveCalendarLens(elements, undefined, { fallbackToOnly: true })?.name)
+      .toBe('Imperial');
+  });
+
+  it('respects an EXPLICIT no-calendar choice even when one exists', () => {
+    // null is the menu's "no calendar"; falling back here would make the
+    // choice impossible to hold while the world has a calendar.
+    expect(resolveCalendarLens(elements, null, { fallbackToOnly: true })).toBe(null);
+  });
+
+  it('does not guess when the world has more than one calendar', () => {
+    const two: Element[] = [
+      ...elements,
+      el({ id: 'c2', type: 'construct', name: 'Guild', atlas_calendar: CONFIG } as never),
+    ];
+    expect(resolveCalendarLens(two, undefined, { fallbackToOnly: true })).toBe(null);
+  });
+
+  it('is opt-in: the saved-chart path keeps resolving strictly', () => {
+    // A chart saved with no lens must reopen with no lens, not adopt a
+    // calendar minted after it was saved.
+    expect(resolveCalendarLens(elements, undefined)).toBe(null);
+  });
 });
 
 describe('saved-chart lens id-swap (gate 2026-07-14)', () => {

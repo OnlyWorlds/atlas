@@ -8,8 +8,8 @@
  *
  * Step numbers (data-tour-step, 1-based): 1 opener · 2 world · 3 consul ·
  * 4 hegemony+title · 5 planet · 6 map · 7 pin · 8 swamps · 9 objects ·
- * 10 linking · 11 writing · 12 events · 13 chart · 14 the rest · 15 web ·
- * 16 online · 17 finale.
+ * 10 linking · 11 writing · 12 events · 13 chart (the now beat) · 14 deep time ·
+ * 15 the rest · 16 web · 17 online · 18 finale.
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -28,6 +28,26 @@ async function freshBoot(page: Page) {
 async function nextStep(page: Page, expectStep: number) {
   await page.locator('.atlas-tour-controls button', { hasText: /^Next$/ }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', String(expectStep));
+}
+
+/** Exit goes through the confirm screen (S305): it lists the rooms the tour
+ *  never reached, so leaving early still leaves you with a map of the app. */
+async function exitViaConfirm(page: Page) {
+  await page.locator('.atlas-tour-controls button', { hasText: 'Exit tour' }).click();
+  await expect(page.locator('[data-modal="tour-exit"]')).toBeVisible();
+  await page.click('[data-action="tour-exit-confirm"]');
+}
+
+/** The charts act's now beat (step 13) is SINGLE ROUTE: the world ships with no
+ *  clock, so the step renders no Next until the user sets one with the room's
+ *  real button. Any spec that walks past this step must perform the gesture —
+ *  assuming a Next exists is what hung four sibling specs when the objects run
+ *  gained its gate (S302). */
+async function setNowViaButton(page: Page) {
+  const setNow = page.locator('[data-action="set-now"]');
+  await expect(setNow).toBeVisible();
+  await setNow.click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'b');
 }
 
 /** Landing → the tour opens on the centre-stage OPENER (step 1): the sentence
@@ -168,7 +188,7 @@ test('relaunch after exit mounts a WORKING bar (gate R3: the render memo must no
   // its own stale signature and early-return against a dead root, leaving
   // `atlas-touring` chrome with no narrator, no Begin and no Exit, recoverable
   // only by reload. Nothing else covers relaunch-after-exit.
-  await page.locator('.atlas-tour-exit').click();
+  await exitViaConfirm(page);
   await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
 
   await page.click('[data-action="start-tour"]');
@@ -286,15 +306,30 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   expect(aliasesLate).toEqual(['Consul', 'the Consul']);
 
   await nextStep(page, 12); // events
-  await nextStep(page, 13); // chart
+  await nextStep(page, 13); // chart — the now beat, SINGLE ROUTE (no watch Next)
   await expect(page).toHaveURL(/\/timeline/);
   await expect(page.locator('.atlas-room-nav-strip [data-room="timeline"]')).toBeVisible();
 
-  await nextStep(page, 14); // the sweep
-  await nextStep(page, 15); // web cameo
+  // The clock arrives unset, so the step has NO forward control until the user
+  // sets it with the room's real button — the same single-route contract the
+  // create beats hold. Walking past with Next is exactly what hung four sibling
+  // specs when the objects run gained its gate (S302), so the walk performs the
+  // gesture instead of assuming one exists.
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  await expect(page.locator('body')).toHaveClass(/atlas-tour-nowstep/);
+  // The document-mode toggle is hidden while the beat is live: that view has no
+  // now control at all, so switching into it would strand the gesture.
+  await expect(page.locator('.atlas-chart-mode')).toBeHidden();
+  await setNowViaButton(page);
+  // Phase b: the clock is set, so the highlight releases and Next appears.
+  await expect(page.locator('body')).not.toHaveClass(/atlas-tour-nowstep/);
+
+  await nextStep(page, 14); // deep time — Rachmaninov in the Old Earth era
+  await nextStep(page, 15); // the sweep
+  await nextStep(page, 16); // web cameo
   await expect(page.locator('[data-tab-kind="context"]')).toHaveClass(/active/);
-  await nextStep(page, 16); // online
-  await nextStep(page, 17); // finale
+  await nextStep(page, 17); // online
+  await nextStep(page, 18); // finale
 
   // The finale's control set, asserted POSITIVELY (S301 gate, MED): the
   // shipped early-return renders Finish + the folder button and NO Exit.
@@ -674,7 +709,7 @@ test('exit tears down mid-tour and returns to the landing', async ({ page }) => 
   await openOpener(page);
   await beginToWorld(page);
   await createWorldViaModal(page);
-  await page.locator('.atlas-tour-controls button', { hasText: 'Exit tour' }).click();
+  await exitViaConfirm(page);
   await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
   await expect(page.locator('.atlas-landing-actions')).toBeVisible();
   const state = await page.evaluate(() => {
@@ -749,7 +784,7 @@ test('the residue contract covers the map UI keys, not just the world (S301)', a
   }, worldId);
   expect(before.mapTabs).toBe(1);
 
-  await page.locator('.atlas-tour-controls button', { hasText: 'Exit tour' }).click();
+  await exitViaConfirm(page);
   await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
 
   const after = await page.evaluate((wid) => {
@@ -789,13 +824,48 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   await beginToWorld(page);
   await createWorldViaModal(page);
   await createConsulViaModal(page);
-  for (let step = 4; step <= 17; step++) {
+  for (let step = 4; step <= 18; step++) {
     await nextStep(page, step);
     if (step === 7) await placePinViaMap(page);
     if (step === 9) await mintObjectRun(page);
+    if (step === 13) await setNowViaButton(page);
   }
   // The label is 'Set up a folder' (tour-bar.ts); on an OPFS-only browser no
   // folder button renders and Finish is primary.
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Set up a folder$/ })).toHaveCount(0);
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Finish$/ })).toBeVisible();
+});
+
+test('the exit confirm names the rooms the tour never reached, and can be declined', async ({ page }) => {
+  await freshBoot(page);
+  await openOpener(page);
+  await beginToWorld(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+
+  // Leaving early opens the door rather than dropping the user through it.
+  await page.locator('.atlas-tour-controls button', { hasText: 'Exit tour' }).click();
+  const modal = page.locator('[data-modal="tour-exit"]');
+  await expect(modal).toBeVisible();
+
+  // The offer: rooms this tour has not opened at step 3. Charts and Writing are
+  // still ahead, so they belong in the unseen list too — the screen must not
+  // credit a room the user has not actually been routed to.
+  await expect(modal).toContainText('Knowledge');
+  await expect(modal).toContainText('Pages');
+  await expect(modal).toContainText('Data');
+  await expect(modal).toContainText('Charts');
+
+  // Declining keeps the tour exactly where it was, world intact.
+  await page.click('[data-action="tour-exit-cancel"]');
+  await expect(modal).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '3');
+  expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(1);
+
+  // Confirming tears down as before: the residue contract is unchanged by the
+  // new door standing in front of it.
+  await exitViaConfirm(page);
+  await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
+  await expect(page.locator('.atlas-landing-actions')).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(0);
 });

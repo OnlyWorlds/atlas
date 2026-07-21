@@ -245,6 +245,10 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'atlas-chart-now-set';
+      // A stable hook, like every other control in this bar: the guided tour
+      // highlights this exact button during its now beat, and an e2e locates it
+      // without scraping a class that exists to carry styling.
+      btn.dataset.action = 'set-now';
       btn.title = "Set the world's current point in time. Everything after it becomes the forward half (drag the line to move it).";
       btn.innerHTML = `<span class="material-symbols-outlined">flag</span><span>set now time</span>`;
       btn.addEventListener('click', () => void setNow(suggestNow(allNodes)));
@@ -410,7 +414,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   }
 
   function activeLens(): WorldCalendar | null {
-    return resolveCalendarLens(getState().data.elements, registryEntry()?.active_calendar_id);
+    return resolveCalendarLens(getState().data.elements, registryEntry()?.active_calendar_id,
+      { fallbackToOnly: true });
   }
 
   function setLens(calendarId: string | null): void {
