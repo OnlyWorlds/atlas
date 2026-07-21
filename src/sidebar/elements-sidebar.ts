@@ -17,7 +17,7 @@ import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { lensKnownSet } from '../core/knowledge';
 import { reservedRowHint } from '../core/taxonomy';
 import { ToastManager } from '../ui/toast-manager';
-import { ElementCreateModal } from '../ui/element-create-modal';
+import { openCreateDoor } from '../ui/create-element-door';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { getCurrentSyncEngine, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
@@ -105,28 +105,13 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   // name (S255v3): searched-for-it-and-it's-missing flows straight into
   // making it, and the empty-world "Create an element…" placeholder keeps
   // its promise.
-  createBtn.addEventListener('click', () => {
-    // During the tour's consul beat, EVERY create door leads to the scripted
-    // consul (Captain: the free modal mid-script broke the railroad). Once
-    // the consul exists the sandbox is free again.
-    if (isTourFlagActive()) {
-      void import('../tour/tour-engine').then((engine) => {
-        if (engine.consulCreated()) { openNormalCreate(); return; }
-        new ElementCreateModal(toasts, {
-          initialType: 'character',
-          initialName: 'The Consul',
-          lockAll: true,
-          overrideCreate: async () => { await engine.createConsul(); },
-          suppressToast: true,
-        }).open();
-      });
-      return;
-    }
-    openNormalCreate();
-  });
+  // The tour's scripting lives in the shared door (S301), not here: this
+  // handler used to carry the only tour branch in the app while Ctrl+E and the
+  // Charts room opened a free modal beside it.
+  createBtn.addEventListener('click', () => { openNormalCreate(); });
 
   function openNormalCreate(): void {
-    new ElementCreateModal(toasts, {
+    openCreateDoor(toasts, {
       initialName: searchInput.value.trim() || undefined,
       // A single active type filter carries into the modal as the preselected
       // category (S265, Captain) — filtering to characters then hitting + means
@@ -140,7 +125,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
         searchInput.value = '';
         patchSlice('ui', { ...getState().ui, search: '' });
       },
-    }).open();
+    });
   }
   searchRow.appendChild(createBtn);
 

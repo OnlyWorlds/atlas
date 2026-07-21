@@ -18,33 +18,59 @@
  * The ✦ deeper content opens as a scrollable FLYOUT above the panel — the
  * dock's height never changes (Captain's rule).
  *
- * The bar stamps <body data-tour-stage="N"> — atlas.css hides not-yet-earned
- * app chrome per stage (the progressive build-up).
+ * The bar stamps <body class="atlas-tour-cap-*"> per unlocked capability —
+ * atlas.css hides not-yet-earned app chrome (the progressive build-up).
  */
 
 import { hasFolderMode } from '../core/capabilities';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../core/constants';
+import { getState, subscribe } from '../core/state';
 import type { ElementType } from '../core/types';
 import {
+  capabilitiesUpTo,
   TOUR_ATTRIBUTION, TOUR_ATTRIBUTION_URL,
-  TOUR_SENTENCE, TOUR_STEPS, tourStageFor,
+  TOUR_CAPABILITIES,
+  TOUR_SENTENCE, TOUR_STEPS,
   type TourStep,
 } from './tour-data';
 import {
   backStep,
-  consulCreated,
   currentStepIndex,
   enterStep, exitTour,
+  handsOnRefFor,
   isTourActive,
   nextStep,
   onTourChange,
+  refToIdSync,
   setupFolderFromTour,
-  tourPinPlaced,
+  tourIsSettling,
   tourWorldExists,
+  tourWorldIsActive,
 } from './tour-engine';
+import {
+  buildTourWorldView, canAdvance, countPresent, hasAll, resolvePhase,
+  type TourPhase, type TourWorldView,
+} from './tour-view';
 
 let root: HTMLElement | null = null;
 let unsub: (() => void) | null = null;
+let unsubState: (() => void) | null = null;
+/**
+ * The render memo (gate R3). MUST be cleared on mount and unmount, and a null
+ * root MUST count as a miss: exit at step 1 memoizes a signature, and a later
+ * replay enters step 0 BEFORE the bar mounts, so a surviving memo would match
+ * itself and early-return against a dead root — leaving `atlas-touring` chrome
+ * with no narrator, no Next and no Exit, recoverable only by reload.
+ */
+let lastSignature: string | null = null;
+/**
+ * The ✦ flyout's open state, keyed by step id (gate R11). Mid-step re-renders
+ * are new in this bout: without this, a user reading "more information" on the
+ * pin step loses it the instant they place the pin. Cleared on step change,
+ * because a new step's flyout should open closed.
+ */
+let flyoutOpenFor: string | null = null;
+let flyoutScrollTop = 0;
 
 export function ensureTourBar(container: HTMLElement): void {
   if (isTourActive() && !root) mount(container);
@@ -56,8 +82,33 @@ function mount(container: HTMLElement): void {
   root.className = 'atlas-tour-root';
   container.appendChild(root);
   document.body.classList.add('atlas-touring');
+  lastSignature = null;
   unsub = onTourChange(() => {
     if (!isTourActive()) { unmount(); return; }
+    // Settling covers this listener too: `writeTourState` emits at the TOP of
+    // a step-enter, so an unguarded render here repainted the new step's copy,
+    // stage and highlight classes before the reveal wrote anything and before
+    // `routeFor` navigated. The authoritative paint is the emit that fires
+    // once the step has fully landed.
+    if (tourIsSettling()) return;
+    render();
+  });
+  // Phases derive from the WORLD, so the panel has to hear the world change:
+  // without this every gated beat would need its own notify call threaded
+  // into an app write path (five couplings into rooms that should not know
+  // the tour exists). Guarded so it never speaks about a foreign world or
+  // repaints mid-step; the memo keeps the common case free.
+  unsubState = subscribe(() => {
+    // NOT guarded on `tourWorldIsActive()` (close gate, 3-lens convergent): a
+    // world switch IS the suspension trigger, so bailing on it made the whole
+    // suspension contract unreachable — `resolvePhase` returning phase A,
+    // `canAdvance` returning false, and the signature's live/suspended term
+    // were all written for a render that could never be invoked. The panel
+    // instead froze on tour-world narration, kept pulsing the tour's highlight
+    // on the user's OWN sidebar, and left a live Next that advanced the tour
+    // past a beat whose writes all no-op. The view layer suspends correctly;
+    // render just has to be allowed to run.
+    if (!isTourActive() || tourIsSettling()) return;
     render();
   });
   render();
@@ -66,10 +117,28 @@ function mount(container: HTMLElement): void {
 function unmount(): void {
   unsub?.();
   unsub = null;
+  unsubState?.();
+  unsubState = null;
+  lastSignature = null;
+  flyoutOpenFor = null;
+  flyoutScrollTop = 0;
   root?.remove();
   root = null;
-  document.body.classList.remove('atlas-touring', 'atlas-tour-prezone', 'atlas-tour-preweb', 'atlas-tour-pinstep');
-  delete document.body.dataset.tourStage;
+  document.body.classList.remove('atlas-touring', 'atlas-tour-prezone', 'atlas-tour-preweb',
+    'atlas-tour-pinstep', 'atlas-tour-createstep');
+  for (const cap of TOUR_CAPABILITIES) document.body.classList.remove(`atlas-tour-cap-${cap}`);
+}
+
+/** The tour's view of the world, for phase predicates. Pure read. */
+function buildView(): TourWorldView {
+  const state = getState();
+  return buildTourWorldView({
+    elements: state.data.elements,
+    worldExists: tourWorldExists(),
+    tourIsLive: tourWorldIsActive(),
+    timeCurrent: state.active?.meta?.time_current ?? null,
+    refToId: refToIdSync,
+  });
 }
 
 /** Word index → {type, stepIndex} for every step at or before `upTo`. */
@@ -86,12 +155,12 @@ function fillMap(upTo: number): Map<number, { type: ElementType; step: number }>
 }
 
 /** Word index → glyphs anchored after it (every span's END word), all steps. */
-function glyphMap(): Map<number, Array<{ type: ElementType; step: number }>> {
-  const map = new Map<number, Array<{ type: ElementType; step: number }>>();
+function glyphMap(): Map<number, Array<{ type: ElementType; step: number; ref?: string }>> {
+  const map = new Map<number, Array<{ type: ElementType; step: number; ref?: string }>>();
   TOUR_STEPS.forEach((step, i) => {
     for (const span of step.spans ?? []) {
       const list = map.get(span.to) ?? [];
-      list.push({ type: span.type, step: i });
+      list.push({ type: span.type, step: i, ref: span.ref });
       map.set(span.to, list);
     }
   });
@@ -99,10 +168,33 @@ function glyphMap(): Map<number, Array<{ type: ElementType; step: number }>> {
 }
 
 /**
+ * Is this span's glyph lit? (gate R6.)
+ *
+ * A span WITHOUT a ref keeps the original step-keyed rule: lit once its step
+ * is reached. A span WITH one lights on that element's EXISTENCE, which is
+ * what makes a scripted create pop one glyph per mint instead of lighting the
+ * whole set the moment the step opens. This one predicate replaced the two
+ * hard-coded `handsOn` names that used to live here, so the consul, the pin
+ * and every future create beat finally share a rule.
+ */
+function glyphLit(
+  g: { step: number; ref?: string },
+  idx: number,
+  view: TourWorldView,
+): boolean {
+  if (g.step > idx) return false;
+  if (!g.ref) return true;
+  // Past steps stay lit: their element was minted, and a user who deletes it
+  // gets it back on the next step-enter heal anyway.
+  if (g.step < idx) return true;
+  return view.hasRef(g.ref);
+}
+
+/**
  * Build the annotated sentence: serif italic words, type-colored fill for
  * parsed words, pre-spaced ghost glyphs lighting up as steps are reached.
  */
-function buildSentence(idx: number, step: TourStep): HTMLElement {
+function buildSentence(idx: number, step: TourStep, view: TourWorldView): HTMLElement {
   const fills = fillMap(idx);
   const glyphs = glyphMap();
   const activeWords = new Set<number>();
@@ -127,12 +219,10 @@ function buildSentence(idx: number, step: TourStep): HTMLElement {
     sentence.appendChild(span);
     for (const g of glyphs.get(w) ?? []) {
       const glyph = document.createElement('span');
-      // A hands-on step's own glyph waits for the CREATE, not the step-enter
-      // — the light is the payoff of the user's gesture (banked S297 nuance).
-      const handsOnPending = g.step === idx && (
-        (step.handsOn === 'create-consul' && !consulCreated())
-        || (step.handsOn === 'place-pin' && !tourPinPlaced()));
-      const lit = g.step <= idx && !handsOnPending;
+      // A ref-carrying glyph waits for the ELEMENT, not the step-enter — the
+      // light is the payoff of the user's gesture (banked S297 nuance,
+      // generalized to every scripted create in S301).
+      const lit = glyphLit(g, idx, view);
       glyph.className = 'material-symbols-outlined atlas-tour-glyph' + (lit ? ' lit' : '');
       if (lit && g.step === idx) glyph.classList.add('pop');
       glyph.textContent = ELEMENT_ICONS[g.type] ?? 'circle';
@@ -146,14 +236,73 @@ function buildSentence(idx: number, step: TourStep): HTMLElement {
   return sentence;
 }
 
+/**
+ * Everything the panel's DOM depends on, as one cheap string (gate R5).
+ *
+ * The per-ref progress terms are load-bearing, not decoration: minting #2 of 3
+ * changes neither the step, the phase, nor `canAdvance`, so without them the
+ * render would early-return and the middle click of a three-element run would
+ * produce no feedback at all — killing the one-at-a-time pop the whole
+ * scripted door exists for. Same for the lit-glyph state.
+ */
+function signatureFor(
+  idx: number, step: TourStep, phase: TourPhase, advance: boolean, caps: Set<string>,
+  view: TourWorldView, handsOnDone: boolean,
+): string {
+  const stage = TOUR_CAPABILITIES.filter(c => caps.has(c)).join('+');
+  const glyphs = (step.spans ?? []).map(s => (s.ref ? (view.hasRef(s.ref) ? '1' : '0') : '-')).join('');
+  const created = step.creates ? countPresent(step.creates, view) : 0;
+  const gates = [
+    step.handsOn === 'create-world' ? String(tourWorldExists()) : '',
+    // `handsOnDone` drives the pin highlight AND whether Next renders, and it
+    // used to be captured only by COINCIDENCE: the two hands-on beats happen
+    // to duplicate their ref into a sentence span, so the `glyphs` term moved
+    // with them. A hands-on beat whose word is not in the sentence would have
+    // had a Next that never appeared (close gate, MED).
+    handsOnRefFor(step) ? String(handsOnDone) : '',
+    view.tourIsLive ? 'live' : 'suspended',
+  ].join(',');
+  return [idx, phase.id, advance, stage, glyphs, created, gates].join('|');
+}
+
 function render(): void {
-  if (!root) return;
+  // A null root is ALWAYS a cache miss, never a signature comparison (R3).
+  if (!root) { lastSignature = null; return; }
   const idx = currentStepIndex();
   const step = TOUR_STEPS[Math.min(idx, TOUR_STEPS.length - 1)];
-  const stage = tourStageFor(idx);
-  document.body.dataset.tourStage = String(stage);
+  const caps = capabilitiesUpTo(idx);
+  const view = buildView();
+  const phase = resolvePhase(step.phases, view);
+  // A `creates` run gates its own Next, whatever the phase says. Making each
+  // phase author remember an `advanceWhen` would mean one forgotten line lets
+  // the user skip the run the step exists for; the gate belongs to the step.
+  const advance = canAdvance(phase, view)
+    && (step.creates ? hasAll(step.creates)(view) : true);
+  // Has this step's hands-on gesture been performed? One question, one source
+  // (the engine's HANDS_ON_REFS) — the bar used to ask it twice with two
+  // bespoke helpers.
+  const handsOnRef = handsOnRefFor(step);
+  const handsOnDone = handsOnRef ? view.hasRef(handsOnRef) : false;
+
+  const signature = signatureFor(idx, step, phase, advance, caps, view, handsOnDone);
+  if (signature === lastSignature) return;
+  // A step change closes any open flyout: it belonged to the old step.
+  if (lastSignature !== null && lastSignature.split('|')[0] !== String(idx)) {
+    flyoutOpenFor = null;
+    flyoutScrollTop = 0;
+  }
+  lastSignature = signature;
+  // Restore focus after the rebuild (gate R14): an in-flight click on a
+  // button the render replaces is otherwise silently dropped.
+  const focusedAction = document.activeElement instanceof HTMLElement
+    && root.contains(document.activeElement)
+    ? document.activeElement.dataset.tourControl ?? null
+    : null;
+  for (const cap of TOUR_CAPABILITIES) {
+    document.body.classList.toggle(`atlas-tour-cap-${cap}`, caps.has(cap));
+  }
   // Step-scoped precision (S299): zone chrome waits for the swamps step, the
-  // Web tab for where-it-lives — the act-level stage can't distinguish steps
+  // Web tab for where-it-lives — an act-level marker can't distinguish steps
   // inside one act.
   const swampsIdx = TOUR_STEPS.findIndex(s => s.id === 'the-swamps');
   const webIdx = TOUR_STEPS.findIndex(s => s.id === 'where-it-lives');
@@ -162,7 +311,13 @@ function render(): void {
   // Highlight the REAL +pin button on the Consul during the pin beat (until
   // placed) — the "use the actual control, highlighted" flow (Captain S299).
   document.body.classList.toggle('atlas-tour-pinstep',
-    step.handsOn === 'place-pin' && !tourPinPlaced());
+    step.handsOn === 'place-pin' && !handsOnDone);
+  // Same flow for a scripted run: the copy says "the + above the element
+  // list", and the sidebar's own pulse only fires on an EMPTY world (S255v3),
+  // so by the objects step the button it points at carries no signal at all.
+  // Found by looking at the beat, not by a test.
+  document.body.classList.toggle('atlas-tour-createstep',
+    !!step.creates && !hasAll(step.creates)(view) && view.tourIsLive);
   const opener = idx === 0;
 
   root.innerHTML = '';
@@ -176,14 +331,16 @@ function render(): void {
   // step number rides a data attribute instead.
   panel.dataset.tourStep = String(idx + 1);
 
-  panel.appendChild(buildSentence(idx, step));
+  panel.dataset.tourPhase = phase.id;
+
+  panel.appendChild(buildSentence(idx, step, view));
 
   // Row 2 — step copy, under a hairline (the material/narration divider).
   const copy = document.createElement('div');
   copy.className = 'atlas-tour-copy';
   const body = document.createElement('div');
   body.className = 'atlas-tour-body';
-  body.textContent = step.body;
+  body.textContent = phase.body;
   copy.appendChild(body);
   // The extras row (✦ deeper · inline links) ALWAYS renders — a step without
   // them shows an invisible placeholder at the same metrics, so the panel
@@ -192,22 +349,33 @@ function render(): void {
   // the body let long bodies wrap it onto its own line on SOME steps only).
   const extras = document.createElement('div');
   extras.className = 'atlas-tour-extras';
-  if (step.deeper) {
+  if (phase.deeper) {
     const bulb = document.createElement('button');
     bulb.type = 'button';
     bulb.className = 'atlas-tour-deeper-toggle';
+    bulb.dataset.tourControl = 'deeper';
     bulb.innerHTML = '<span class="material-symbols-outlined">emoji_objects</span> more information';
     const deeper = document.createElement('div');
     deeper.className = 'atlas-tour-deeper';
     // Paragraph breaks (\n\n in the step data) render as real paragraphs —
     // a wall of text defeats the point of going deeper.
-    for (const para of step.deeper.split('\n\n')) {
+    for (const para of phase.deeper.split('\n\n')) {
       const p = document.createElement('p');
       p.textContent = para;
       deeper.appendChild(p);
     }
-    deeper.hidden = true;
-    bulb.addEventListener('click', () => { deeper.hidden = !deeper.hidden; });
+    // Open-state survives a mid-step re-render (gate R11): placing the pin
+    // used to snatch away the paragraph the user was reading.
+    deeper.hidden = flyoutOpenFor !== step.id;
+    if (!deeper.hidden) {
+      requestAnimationFrame(() => { deeper.scrollTop = flyoutScrollTop; });
+    }
+    deeper.addEventListener('scroll', () => { flyoutScrollTop = deeper.scrollTop; });
+    bulb.addEventListener('click', () => {
+      deeper.hidden = !deeper.hidden;
+      flyoutOpenFor = deeper.hidden ? null : step.id;
+      if (deeper.hidden) flyoutScrollTop = 0;
+    });
     extras.appendChild(bulb);
     panel.appendChild(deeper); // flyout anchors to the PANEL, above it
   }
@@ -240,7 +408,7 @@ function render(): void {
     attr.textContent = TOUR_ATTRIBUTION;
     meta.append(attr);
   } else {
-    meta.textContent = step.meta ?? ' ';
+    meta.textContent = phase.meta ?? ' ';
   }
   copy.appendChild(meta);
   panel.appendChild(copy);
@@ -262,28 +430,23 @@ function render(): void {
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'atlas-btn-ghost';
+    back.dataset.tourControl = 'back';
     back.textContent = 'Back';
     back.addEventListener('click', () => { void backStep(); });
     controls.appendChild(back);
   }
 
-  // Hands-on steps: the real gesture (primary) OR Next (watch-mode — the
-  // engine performs the gesture and advances).
-  if (step.handsOn === 'create-world' && !tourWorldExists()) {
-    // NO dock button (S301, Captain: "remove the create x buttons from the
-    // widget entirely, force users to use the proper UI"). The route is the
-    // worlds sidebar's own create icon, which the tour renders pulsing and
-    // scripted to the locked Hyperion modal. The narrator narrates; the app
-    // is where you act. Next appears once the world exists (the gate).
-  } else if (step.handsOn === 'create-consul' && !consulCreated()) {
-    // Same: the elements sidebar's + is the route (it pulses on an empty
-    // world) and is scripted to the locked Consul modal until he exists.
-  } else if (step.handsOn === 'place-pin' && !tourPinPlaced()) {
-    // NO dock button (Captain's round S299): the user places via the REAL
-    // +pin button on the Consul's header — highlighted by the
-    // `atlas-tour-pinstep` body class, using the actual app control. The map
-    // click does the rest (tourPinBake locks the pin's identity). Single-
-    // route: Next appears only once the pin exists (the gate).
+  // The forward gate, in ONE place now. A hands-on beat is single-route: no
+  // dock button, because the app's own control is the route (the worlds
+  // sidebar's create icon, the elements +, the Consul's real +pin button,
+  // each highlighted by the tour). Next appears only once the deed is done —
+  // which is either the hands-on ref existing or, for a phased step, the
+  // phase's own `advanceWhen`.
+  const handsOnGate = step.handsOn && step.handsOn !== 'setup-folder'
+    ? (step.handsOn === 'create-world' ? tourWorldExists() : handsOnDone)
+    : true;
+  if (step.handsOn && step.handsOn !== 'setup-folder' && !handsOnGate) {
+    // No forward control: the gesture is the way.
   } else if (step.handsOn === 'setup-folder') {
     // The finale: Finish (ghost) ends the tour — the world folds away
     // (residue contract); the primary hands over to the real folder setup.
@@ -311,11 +474,16 @@ function render(): void {
     }
     panel.appendChild(controls);
     root!.appendChild(panel);
+    restoreFocus(focusedAction);
     return;
-  } else {
+  } else if (advance) {
+    // `advance` is the phase's own gate (absent `advanceWhen` = always true),
+    // so a phased beat withholds Next until its deed is done without needing
+    // a hands-on kind of its own.
     const next = document.createElement('button');
     next.type = 'button';
     next.className = 'atlas-btn-primary';
+    next.dataset.tourControl = 'next';
     next.textContent = 'Next';
     next.addEventListener('click', () => { void nextStep(); });
     controls.appendChild(next);
@@ -324,6 +492,18 @@ function render(): void {
   appendExit(controls);
   panel.appendChild(controls);
   root!.appendChild(panel);
+  restoreFocus(focusedAction);
+}
+
+/**
+ * Put focus back on the control the user was on (gate R14). Without it, a
+ * state tick that lands between mousedown and mouseup rebuilds the button
+ * under the pointer and the click is silently dropped.
+ */
+function restoreFocus(control: string | null): void {
+  if (!control || !root) return;
+  const target = root.querySelector<HTMLElement>(`[data-tour-control="${control}"]`);
+  target?.focus({ preventScroll: true });
 }
 
 function appendExit(controls: HTMLElement): void {

@@ -13,7 +13,7 @@
 import { getState, subscribe, patchSlice } from '../core/state';
 import { navigate, elementHash, timelineHash, parseHash, onHashChange, type Route } from '../core/router';
 import { ToastManager } from '../ui/toast-manager';
-import { ElementCreateModal } from '../ui/element-create-modal';
+import { openCreateDoor } from '../ui/create-element-door';
 import { mountTimelineView, type TimelineViewHandle, type TimelineViewExtras } from '../visualization/timeline/timeline-view';
 import { mountScrollView } from '../visualization/timeline/scroll-view';
 import { extractTemporalNodes } from '../visualization/timeline/data-normalizer';
@@ -63,7 +63,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // Set-now gesture uses), else 0 on a fresh world.
     const allNodes = extractTemporalNodes(getState().data.elements);
     const defaultDate = nowValue() ?? suggestNow(allNodes);
-    new ElementCreateModal(toasts, {
+    // Through the shared door (S301) so a scripted charts beat can take this
+    // gesture the same way the sidebar + does.
+    openCreateDoor(toasts, {
       initialType: 'event',
       // Stay in the room (Captain, 2026-07-10): the chart is the workspace here.
       suppressNavigate: true,
@@ -79,7 +81,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
           if (el && date != null) showDatedElement(id, el.name || '(unnamed)', date, 'Created');
         });
       },
-    }).open();
+    });
   });
   actions.appendChild(newEventBtn);
 

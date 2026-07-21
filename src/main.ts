@@ -123,6 +123,17 @@ if (import.meta.env.DEV) {
       await awaitTourSettled();
     },
     /**
+     * The active world's meta as it sits ON DISK, for tests that assert the
+     * in-memory `state.active.meta` mirror has not drifted from it. The tour
+     * scaffold used to hand-build that mirror from a subset of the fields it
+     * had just written, so `time_current` was missing for a whole run.
+     */
+    async worldMetaOnDisk(): Promise<unknown> {
+      const { getActiveStore } = await import('./core/active-store');
+      const store = getActiveStore();
+      return store ? await store.readWorldMeta() : null;
+    },
+    /**
      * Reset everything Atlas owns: localStorage (registry, ui prefs), IDB
      * (handle-vault), OPFS. Lets each Playwright test start clean.
      */

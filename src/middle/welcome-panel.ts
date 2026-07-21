@@ -97,8 +97,15 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // two small actions look like a decision. What is left is a compact
       // button pair sitting with the tagline, plus the honest folder line on
       // browsers that cannot pick a folder.
+      // The compact doors kept a caption each (Captain, S302): the S301 pass
+      // cut the redundant TITLES (they repeated their own buttons) but took
+      // the explanations with them, so the pair read as two bare unlabelled
+      // buttons. One muted line each, no time claim, tool voice.
       const folderDoor = folderMode
-        ? `<button class="${folderBtnClass} atlas-landing-btn" data-action="setup-atlas">set up a folder</button>`
+        ? `<span class="atlas-landing-choice">
+             <button class="${folderBtnClass} atlas-landing-btn" data-action="setup-atlas">set up a folder</button>
+             <span class="atlas-landing-choice-note">your worlds as plain files you keep</span>
+           </span>`
         : '';
       const folderNote = folderMode
         ? ''
@@ -120,7 +127,10 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             </a>
             <div class="atlas-landing-mark">Atlas</div>
             <div class="atlas-landing-actions">
-              <button class="${tourBtnClass} atlas-landing-btn" data-action="start-tour">${tourDone ? 'replay the tour' : 'take the tour'}</button>
+              <span class="atlas-landing-choice">
+                <button class="${tourBtnClass} atlas-landing-btn" data-action="start-tour">${tourDone ? 'replay the tour' : 'take the tour'}</button>
+                <span class="atlas-landing-choice-note">one sentence becomes a small linked world</span>
+              </span>
               ${folderDoor}
             </div>
             <p class="atlas-landing-tag">A free, local-first worldbuilding studio.</p>

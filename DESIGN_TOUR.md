@@ -1,7 +1,7 @@
 # Atlas — Guided Tour Design
 
-**Version**: 2.5 (2026-07-20, S301 — the phase kernel + the strip invariant,
-3-lens gated; supersedes v2.4). The full rework this serves is Captain's dump
+**Version**: 2.7 (2026-07-21, S303 — capability-class staging + landing captions;
+supersedes v2.6). Prior: S302 phases WIRED + the scripted create door. The full rework this serves is Captain's dump
 of 2026-07-20: plan + positions in `Notes/2026-07-20-s301-tour-rework-plan.md`,
 contract + gate amendments in `Notes/2026-07-20-s301-phase-contract.md`.
 **Concept**: Freek + Captain, 2026-07-19. The opening sentence of *Hyperion*
@@ -30,10 +30,13 @@ at the 'online' step as the deeper schema story).
   itself), zero extra rows. The bare stage above it fills in on Next.
   z-index 900: a modal dialog ALWAYS outranks the narrator.
 - **The progressive build-up**: chrome appears when it is taught. The bar
-  stamps `<body data-tour-stage>` (0 bare · 1 shell + worlds sidebar ·
-  2 elements era · 3 + right pane/maps · 4 + writing icon · 5 + charts icon ·
-  6 everything); atlas.css hides the rest per stage. The sidebar footer stays
-  hidden for the whole tour. At stage 1 the worlds sidebar shows its TRUE
+  stamps CUMULATIVE capability classes on `<body>` (`atlas-tour-cap-shell` /
+  `-rightpane` / `-writing` / `-charts` / `-allrooms`), declared per step via
+  `TourStep.unlocks`; atlas.css hides chrome whose capability is not yet
+  present. This replaced an ordinal `data-tour-stage` number (S303) that was
+  derived from `step.act` and would have gone non-monotonic once the act
+  restructure interleaves acts — a capability, once unlocked, only grows. The sidebar footer stays
+  hidden for the whole tour. On the create-world step the worlds sidebar shows its TRUE
   final structure — all five action icons in their real places — with only
   create-world live and the other four greyed (`.atlas-tour-locked`).
 - **Panel rows**: the annotated sentence · hairline · body copy (+ the meta
@@ -73,13 +76,16 @@ throwaway world:
    Create → the shell materializes on the world's home. The sidebar's own
    create-world icon opens the same locked modal. SINGLE ROUTE (S298): the
    create beats carry no watch-mode Next — the locked one-click modal is the
-   way; the consul step shows plain Next only after he exists. The stage-1
-   sidebar toggle also keeps its final geometry: a locked ghost segment
-   holds the place the world name will take.
+   way; the consul step shows plain Next only after he exists. The
+   create-world sidebar toggle also keeps its final geometry: a locked ghost
+   segment holds the place the world name will take.
 2. **Create the Consul** (step 2): the REAL element modal, type grid locked
-   to character, name "The Consul" readonly. During this beat EVERY create
-   door is scripted — the elements-sidebar + opens the same locked modal
-   until the Consul exists; after that the sandbox is free.
+   to character, name "The Consul" readonly. During this beat every create
+   door is scripted — and as of S302 that sentence is finally TRUE: it was
+   written when only the elements-sidebar + carried the branch, while `Ctrl+E`
+   and the Charts room opened a free-form modal right beside it. All three now
+   go through `create-element-door.ts`. After the Consul exists the sandbox is
+   free again.
 3. **Place the pin** (step 9, S299 — reworked to use the ACTUAL control,
    Captain's round): the step routes to the combined map+element view (map
    open right, Consul selected middle) so the Consul's REAL +pin button
@@ -222,7 +228,40 @@ indices are hints. Two bugs die with it:
   payoff chips the user had just watched appear vanished and oscillated on
   every back/forward.
 
-## Phases (S301 — the kernel is in, the wiring is next)
+## The scripted create door (S302)
+
+A step can declare `creates: string[]` — ordered bundle refs the USER mints
+with the app's real `+`, one per click, no dialog (Captain's ruling: the
+narrator narrates, the app is where you act, and three modals for three
+objects reads as paperwork). `advanceWhen` is implicit: **the step gates its
+own Next on all of them existing**, enforced by the bar rather than by each
+phase author, because one forgotten `advanceWhen` would let the user skip the
+run the step exists for.
+
+**One funnel, not one branch per door.** Every free-create entry point goes
+through `src/ui/create-element-door.ts` (elements sidebar `+`, `Ctrl+E`, the
+Charts room's `+ Element`), which asks `tour-door.ts` first and falls through
+to the ordinary modal on any decline. Before S302 the tour branch lived only
+in the sidebar handler while this doc claimed "EVERY create door is scripted"
+— `Ctrl+E` and the Charts room opened a free-form modal right beside the
+locked one. Contextual creates (from-selection, for-this-link-field) stay
+outside the funnel deliberately: they answer a question the user already
+asked.
+
+The guard is the feature (gate R8): tour active ∧ tour world active ∧ the step
+has creates ∧ they are not all present ∧ the bundle index resolved. Any miss
+opens the normal modal. **A silently dead `+` is worse than an unscripted
+one**, and a world-blind hijack produces exactly that the moment the user
+switches to their own world. Mints serialize with the next ref computed inside
+the chain (R9), or two fast clicks mint the same element twice and the run can
+never complete.
+
+The run's copy points at the sidebar `+`, so `body.atlas-tour-createstep`
+highlights it the way the pin beat highlights the real +pin button — the
+sidebar's own pulse only fires on an EMPTY world, so by the objects step it
+pointed at a control carrying no signal at all.
+
+## Phases (S301 kernel, S302 wired)
 
 A step's narration changes as the user acts, and its forward control appears
 only once the deed is done. **A phase is DERIVED from world state, never
@@ -243,6 +282,24 @@ tour already heals the world on every step-enter.
   they never did.
 - **Shorthand**: `data-tour-step` + `data-tour-phase` are stamped on the
   panel, so a step's second state is "4b" in conversation and in e2e.
+- **The bar subscribes to core state** (S302): phases derive from the world,
+  so the panel has to hear the world change. The alternative was a bespoke
+  notify call threaded into every gated beat — five couplings into rooms that
+  should not know the tour exists. `notifyTourPinPlaced` was the first of
+  those and is now deleted. A signature memo keeps the common case free, and
+  it MUST include per-ref progress and lit-glyph state: minting #2 of 3 moves
+  neither step nor phase nor `canAdvance`, so without those terms the middle
+  click of a run renders nothing at all.
+- **The memo resets on mount AND unmount, and a null root is always a miss**
+  (gate R3). Otherwise exit-at-step-1 memoizes a signature, the replay enters
+  step 0 before the bar mounts, and the first render matches its own stale
+  signature and early-returns against a dead root: `atlas-touring` chrome with
+  no narrator, no Next, no Exit, recoverable only by reload.
+- **Two engine flags suppress mid-flight repaints**: `enteringStep` (the panel
+  would paint the new step's copy while the old step's reveal is still writing
+  and before `routeFor` navigates) and `tearingDown` (teardown's state writes
+  land while the tour flag is still set, so the panel would visibly rewind to
+  phase A on its way out).
 
 **`data-tour-step` IS NOT A SETTLE SIGNAL.** The panel re-renders from
 `writeTourState`'s emit, which fires BEFORE `revealUpTo` heals and before
@@ -304,12 +361,27 @@ Standing decisions from that round:
 - The tour world still folds away on exit. RESUME is wanted, and is cheap
   because `revealUpTo` is idempotent: persist the step + a small choices
   record (pin position, branch choice, dates, tier labels) and rebuild.
-- The share beat publishes nothing: build the page, add your chart, then meet
-  the real account wall, with a pre-published example page shown honestly as
-  a spoof. Publishing is hard-blocked for a local throwaway world.
-- Dates: one monthless calendar with two eras (**Old Earth** counting down,
-  **PC** counting up — both in-text terms). Atlas already supports monthless
-  calendars and down-eras, so nothing to build. No invented month names.
+- **The share detour is CUT** (Captain, S302). It was the one beat that could
+  not be built honestly: publishing needs an api key AND a registry PIN, and
+  seeding fake ones would make the tour issue REAL authenticated requests to
+  production (`reconcilePubMirrors` fires on every share-room mount; republish
+  and revoke would hit a live slug) and arm the sync engine on a throwaway
+  world. The display half was nearly free — `atlas_page_pub` is a local mirror
+  — but the account half was not, so the whole beat goes.
+- **The import detour is CUT** as well; at most a "more information" foldout
+  later. It has no tour integration today, its mode radios are not individually
+  addressable, and a full-world paste defaults to creating a SECOND world that
+  the residue contract does not track.
+- Dates: one monthless calendar with two eras (**Old Earth** counting down to
+  a pivot at 0, **PC** counting up from it — both in-text terms), baked into
+  the bundle rather than taught as a step (Captain, S302). `CalendarEra`
+  already supports up/down eras sharing a pivot (unit-tested against a Dune
+  B.G./A.G. pair), so there is nothing to build. **No conversion is ever
+  asserted**: the books never state the PC epoch, so Rachmaninov sits in the
+  Old Earth era on the world's own line and the narrator says "centuries
+  before", never a mapped year. No invented month names.
+  - Known gap, banked: calendar-worded date ENTRY exists only in the charts
+    room's drag popover. On an element's own page a date is a raw integer.
 
 ## Open work (reconciled S301)
 
@@ -329,7 +401,7 @@ Standing decisions from that round:
 
 ## Tests
 
-`tests/e2e/tour.spec.ts` (7): full 17-step walk (staged chrome, locked
+`tests/e2e/tour.spec.ts` (12): full 17-step walk (staged chrome, locked
 modals incl. the sidebar + door, the real-button pin placement + locked
 identity, chips, alias timing, web cameo, teardown + emphasis swap) ·
 single-route create beats · the resilience mess-walk (delete/unlink/wreck →

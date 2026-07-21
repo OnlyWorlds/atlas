@@ -34,7 +34,7 @@ import { hydrateAtlasRoot } from './setup/atlas-root-flow';
 import { activateWorld } from './sidebar/worlds-sidebar';
 import { initAutoPullScheduler } from './sync/auto-pull-scheduler';
 import { installHotkeys, setHotkeyCallbacks } from './core/hotkeys';
-import { ElementCreateModal } from './ui/element-create-modal';
+import { openCreateDoor } from './ui/create-element-door';
 import type { WorldMap } from './core/types';
 
 export interface AppHandle {
@@ -227,7 +227,9 @@ export function startApp(container: HTMLElement): AppHandle {
     openCreateElement: () => {
       const active = getState().active;
       if (!active) return;
-      new ElementCreateModal(toasts).open();
+      // Through the shared door (S301): this hotkey used to open a free-form
+      // create modal beside the tour's scripted one.
+      openCreateDoor(toasts);
     },
     openCommandPalette: () => {
       const active = getState().active;

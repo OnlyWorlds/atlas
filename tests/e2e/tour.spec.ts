@@ -31,7 +31,10 @@ async function openStage0(page: Page) {
   await expect(page.locator('.atlas-tour-bar')).toBeVisible();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '1');
   await expect(page.locator('.atlas-tour-attribution')).toContainText('Dan Simmons (1989)');
-  expect(await page.evaluate(() => document.body.dataset.tourStage)).toBe('1');
+  // The shell is up (`shell` cap) but the right pane is not (`rightpane` waits
+  // for the maps act) — progressive build-up, now driven by capability classes.
+  expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-shell'))).toBe(true);
+  expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-rightpane'))).toBe(false);
 }
 
 /** The consul beat's single route: the locked element modal (no Next until he exists). */
@@ -55,6 +58,21 @@ async function placePinViaMap(page: Page) {
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
 }
 
+/** The objects step's scripted run: three clicks of the app's real +, one
+ *  element each, no dialog. Next appears only when all three exist. */
+async function mintObjectRun(page: Page) {
+  const bar = page.locator('.atlas-tour-bar');
+  await expect(bar).toHaveAttribute('data-tour-phase', 'a');
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  for (const phase of ['b', 'c', 'd']) {
+    await page.locator('[data-action="create-element"]').click();
+    await expect(bar).toHaveAttribute('data-tour-phase', phase);
+    // A silent mint: the create dialog never opens.
+    await expect(page.locator('.atlas-modal-overlay')).toHaveCount(0);
+  }
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+}
+
 /** Stage 0 → step 2 via the REAL create-world modal (locked to Hyperion). */
 async function createWorldViaModal(page: Page) {
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '1');
@@ -70,13 +88,63 @@ async function createWorldViaModal(page: Page) {
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '2');
 }
 
+test('the tour world mirrors its FULL meta into state, not a hand-picked subset', async ({ page }) => {
+  await freshBoot(page);
+  await openStage0(page);
+  await createWorldViaModal(page);
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.awaitTourSettled(); });
+
+  // The scaffold used to hand-build `{id, name, demo}` while having just
+  // written four time_* fields to world.json, so the charts step promised a
+  // gold now-line the room could not draw. Asserting mirror EQUALS disk locks
+  // the class rather than one field: any future meta the scaffold writes is
+  // covered without touching this test.
+  const { mirror, disk } = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const disk = await api.worldMetaOnDisk();
+    const mirror = api.getState().active?.meta ?? null;
+    return { mirror, disk };
+  });
+  expect(disk).toBeTruthy();
+  // The bundle's clock in particular: the beat that reads it is the charts act.
+  expect((disk as any).time_basic_unit).toBe('Year');
+  expect(mirror).toEqual(disk);
+});
+
+test('relaunch after exit mounts a WORKING bar (gate R3: the render memo must not outlive unmount)', async ({ page }) => {
+  await freshBoot(page);
+  await openStage0(page);
+
+  // Exit at step 1, then replay from the landing. The bar unmounts and
+  // remounts, and the second mount enters step 0 BEFORE the root element
+  // exists — so a module-level render memo that survives unmount would match
+  // its own stale signature and early-return against a dead root, leaving
+  // `atlas-touring` chrome with no narrator, no Next and no Exit, recoverable
+  // only by reload. Nothing else covers relaunch-after-exit.
+  await page.locator('.atlas-tour-exit').click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
+
+  await page.click('[data-action="start-tour"]');
+  await expect(page.locator('.atlas-tour-bar')).toBeVisible();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '1');
+  // The controls are the part a stale memo eats: assert the bar has a working
+  // ladder, not merely that it exists.
+  await expect(page.locator('.atlas-tour-sentence')).toBeVisible();
+  await expect(page.locator('.atlas-tour-body')).not.toBeEmpty();
+  await expect(page.locator('.atlas-tour-exit')).toBeVisible();
+
+  // And it still WORKS: the beat's own route advances the tour as usual.
+  await createWorldViaModal(page);
+});
+
 test('full walk: bare stage → real-modal beats → acts → finish tears down', async ({ page }) => {
   await freshBoot(page);
   await openStage0(page);
   await createWorldViaModal(page);
 
-  // The shell materialized staged: home icon only, no right pane yet.
-  expect(await page.evaluate(() => document.body.dataset.tourStage)).toBe('2');
+  // The shell materialized staged: home icon only, no right pane yet. The
+  // visibility asserts below ARE the contract — the capability class is the
+  // mechanism, these are the outcome.
   await expect(page.locator('.atlas-room-nav-strip [data-room="home"]')).toBeVisible();
   await expect(page.locator('.atlas-room-nav-strip [data-room="writing"]')).toBeHidden();
   await expect(page.locator('.atlas-right')).toBeHidden();
@@ -135,10 +203,11 @@ test('full walk: bare stage → real-modal beats → acts → finish tears down'
   await nextStep(page, 3); // hegemony
   await expect(page.locator('.atlas-sidebar')).toContainText('The Hegemony');
   await nextStep(page, 4); // title
-  await nextStep(page, 5); // objects
+  await nextStep(page, 5); // objects — the scripted run
+  await mintObjectRun(page);
   await nextStep(page, 6); // linking payoff
   await nextStep(page, 7); // planet (act 2 — right pane appears)
-  expect(await page.evaluate(() => document.body.dataset.tourStage)).toBe('3');
+  expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-rightpane'))).toBe(true);
   await expect(page.locator('.atlas-right')).toBeVisible();
   await nextStep(page, 8); // the map
   await expect(page).toHaveURL(/\/map\//);
@@ -199,6 +268,112 @@ test('full walk: bare stage → real-modal beats → acts → finish tears down'
   await expect(page.locator('[data-action="start-tour"]')).toContainText('replay the tour');
 });
 
+test('the scripted create door: links survive, no double-mint, no dead button', async ({ page }) => {
+  await freshBoot(page);
+  await openStage0(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+  await nextStep(page, 3);
+  await nextStep(page, 4);
+  await nextStep(page, 5); // objects — the scripted run
+
+  // TWO FAST CLICKS must mint TWO elements, not the same one twice (gate R9).
+  // Both compute "next un-minted" against the same snapshot unless the mint is
+  // serialized with the ref resolved inside the chain — and the failure is
+  // silent: the third ref never lands and Next never appears.
+  // NOTE the clicks are dispatched SYNCHRONOUSLY in the page: two awaited
+  // Playwright clicks are sequential enough that the first mint has already
+  // refreshed state, so they do not reproduce the race at all (this spec
+  // passed with the serialization removed until it was written this way).
+  const plus = page.locator('[data-action="create-element"]');
+  await plus.waitFor();
+  await page.evaluate(() => {
+    const btn = document.querySelector<HTMLElement>('[data-action="create-element"]')!;
+    btn.click();
+    btn.click();
+  });
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'c');
+  const afterTwo = await page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    const objects = els.filter((e: any) => e.type === 'object');
+    const balcony = objects.find((e: any) => e.name === 'Spaceship Balcony');
+    const ship = objects.find((e: any) => e.name === 'Ebony Spaceship');
+    const consul = els.find((e: any) => e.name === 'The Consul');
+    return {
+      names: objects.map((e: any) => e.name).sort(),
+      balconyParent: balcony?.parent_object ?? null,
+      shipId: ship?.id ?? null,
+      consulObjects: consul?.objects ?? [],
+    };
+  });
+  expect(afterTwo.names).toEqual(['Ebony Spaceship', 'Spaceship Balcony']);
+
+  // Gate R1, the headline: the balcony was minted while the ship was NOT in
+  // the step-keyed revealed set, so the old strip rule deleted its
+  // parent_object — and the step's own copy teaches exactly that field.
+  expect(afterTwo.balconyParent).toBe(afterTwo.shipId);
+  // And the heal ran in the same beat: the Consul owns the ship now, not
+  // after the next Next.
+  expect(afterTwo.consulObjects).toContain(afterTwo.shipId);
+
+  // The step's copy points at the sidebar +, so it has to be findable: the
+  // sidebar's own pulse only fires on an EMPTY world, which this is not.
+  expect(await page.evaluate(() =>
+    document.body.classList.contains('atlas-tour-createstep'))).toBe(true);
+
+  // Third click completes the run and Next appears.
+  await plus.click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'd');
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+  // ...and the highlight releases once there is nothing left to add.
+  expect(await page.evaluate(() =>
+    document.body.classList.contains('atlas-tour-createstep'))).toBe(false);
+
+  // A COMPLETED run must fall through to the ordinary create modal (gate R8):
+  // a + that silently does nothing is worse than an unscripted one.
+  await plus.click();
+  await expect(page.locator('.atlas-modal-overlay')).toHaveCount(1);
+  await expect(page.locator('.atlas-modal-overlay input[name="element-name"]'))
+    .not.toHaveAttribute('readonly', '');
+});
+
+test('a world switch mid-tour SUSPENDS the narrator (close gate, 3-lens convergent)', async ({ page }) => {
+  // The suspension contract existed in tour-view.ts from the start (hold the
+  // opening phase, force canAdvance false) and was UNREACHABLE: the bar's
+  // state subscription bailed on `!tourWorldIsActive()`, which is the very
+  // transition that has to paint it. So the dock kept narrating the tour world
+  // over the user's own, kept pulsing the tour's highlight on their sidebar,
+  // and left a live Next that advanced the tour past a beat whose writes all
+  // no-op (revealOne and healLinks both early-return off the tour world).
+  //
+  // The trigger here is the real one — `active` ceasing to be the tour world,
+  // which is exactly what `activateWorld` patches when a user clicks another
+  // world in the sidebar. Driving the slice keeps the spec about the WIRING
+  // (does the subscriber render at all?) rather than about world setup.
+  await freshBoot(page);
+  await openStage0(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+  await nextStep(page, 3);
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '3');
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const active = api.getState().active;
+    api.patchSlice('active', { ...active, worldId: 'some-other-world-id' });
+  });
+
+  // Suspended: the opening phase, no forward control, and no tour highlight
+  // left burning on a control that now belongs to someone else's world.
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'a');
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  expect(await page.evaluate(() =>
+    document.body.classList.contains('atlas-tour-createstep'))).toBe(false);
+  expect(await page.evaluate(() =>
+    document.body.classList.contains('atlas-tour-pinstep'))).toBe(false);
+});
+
 test('the create beats are single-route: no watch-mode Next, the gesture is the way', async ({ page }) => {
   // Captain's call (2026-07-19): two forward buttons at the first hands-on
   // beats read as a fork. The locked modals are one-click, so the gesture is
@@ -238,6 +413,7 @@ test('resilience: the world heals user mess on step-enter, user work survives', 
   await createConsulViaModal(page);
   for (let step = 3; step <= 10; step++) {
     await nextStep(page, step); // walk to the swamps (map + pin + zone live)
+    if (step === 5) await mintObjectRun(page);
     if (step === 9) await placePinViaMap(page);
   }
   // The step attribute flips before the reveal's writes land — wait for the
@@ -311,7 +487,10 @@ test('armed pin placement disarms on navigation — no stray second pin (S299 cl
   await openStage0(page);
   await createWorldViaModal(page);
   await createConsulViaModal(page);
-  for (let s = 3; s <= 8; s++) await nextStep(page, s);
+  for (let s = 3; s <= 8; s++) {
+    await nextStep(page, s);
+    if (s === 5) await mintObjectRun(page);
+  }
   await nextStep(page, 9); // the-pin (single-route: no Next until placed)
 
   // Arm placement via the real +pin button, then NAVIGATE AWAY without
@@ -374,7 +553,10 @@ test('back-navigation does not strip links off elements that still exist (S301 g
   await openStage0(page);
   await createWorldViaModal(page);
   await createConsulViaModal(page);
-  for (let step = 3; step <= 6; step++) await nextStep(page, step); // through objects → linking
+  for (let step = 3; step <= 6; step++) {
+    await nextStep(page, step); // through objects → linking
+    if (step === 5) await mintObjectRun(page);
+  }
 
   // Sync on the tour's own settle signal, NOT on data-tour-step: the panel
   // re-renders with the new step number BEFORE revealUpTo heals, so an
@@ -417,7 +599,10 @@ test('the residue contract covers the map UI keys, not just the world (S301)', a
   await openStage0(page);
   await createWorldViaModal(page);
   await createConsulViaModal(page);
-  for (let step = 3; step <= 8; step++) await nextStep(page, step);
+  for (let step = 3; step <= 8; step++) {
+    await nextStep(page, step);
+    if (step === 5) await mintObjectRun(page);
+  }
   await expect(page).toHaveURL(/\/map\//);
 
   const worldId = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId);
@@ -475,6 +660,7 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   await createConsulViaModal(page);
   for (let step = 3; step <= 17; step++) {
     await nextStep(page, step);
+    if (step === 5) await mintObjectRun(page);
     if (step === 9) await placePinViaMap(page);
   }
   // The label is 'Set up a folder' (tour-bar.ts). This assertion used to hunt

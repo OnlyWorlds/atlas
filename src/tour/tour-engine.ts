@@ -303,6 +303,30 @@ const HANDS_ON_REFS: Partial<Record<NonNullable<TourStep['handsOn']>, string>> =
   'place-pin': "pin:The Consul's balcony seat",
 };
 
+/**
+ * The bundle ref a step's hands-on gesture produces, if any — the single
+ * source for "has this beat been performed", so the bar no longer needs a
+ * bespoke `consulCreated()`/`tourPinPlaced()` pair to ask the same question.
+ */
+export function handsOnRefFor(step: TourStep): string | undefined {
+  return step.handsOn ? HANDS_ON_REFS[step.handsOn] : undefined;
+}
+
+/**
+ * Synchronous ref → id, for the phase predicates (which run inside render and
+ * cannot await). Reads the module bundle cache, so it answers `undefined`
+ * until the bundle chunk has loaded — the documented bundle-load window. Every
+ * `hasRef` therefore reads false for that instant, which is why an opening
+ * phase must never claim a deed.
+ */
+export function refToIdSync(ref: string): string | undefined {
+  if (!bundleCache) return undefined;
+  const idx = ref.indexOf(':');
+  const type = ref.slice(0, idx);
+  const name = ref.slice(idx + 1);
+  return bundleCache.elements.find(e => e.type === type && e.name === name)?.id;
+}
+
 /** Ids of everything revealed by steps 0..i (plus passed hands-on elements). */
 async function idsUpTo(stepIndex: number): Promise<Set<string>> {
   const revealed = new Set<string>();
@@ -315,6 +339,15 @@ async function idsUpTo(stepIndex: number): Promise<Set<string>> {
     if (handsOnRef && i < stepIndex) {
       const r = await resolveRef(handsOnRef);
       if (r) revealed.add(r.el.id);
+    }
+    // `creates` refs are the same shape one level up: the USER mints them via
+    // the scripted + door on their own step, and the generic reveal backfills
+    // them once the tour is strictly past.
+    if (i < stepIndex) {
+      for (const ref of step.creates ?? []) {
+        const r = await resolveRef(ref);
+        if (r) revealed.add(r.el.id);
+      }
     }
     for (const ref of step.reveal ?? []) {
       const r = await resolveRef(ref);
@@ -486,9 +519,46 @@ export function enterStep(index: number): Promise<void> {
   return enqueueStep(() => index);
 }
 
+/**
+ * Lifecycle flags the BAR reads to suppress state-driven renders (gate R4 +
+ * R13). Both exist because the bar now subscribes to core state, so every
+ * write inside a step-enter or a teardown would otherwise repaint the panel
+ * mid-flight:
+ *
+ *  - `enteringStep`: the panel would paint the NEW step's copy while the OLD
+ *    step's reveal is still writing and before `routeFor` navigates, so
+ *    narration and surface desynchronize for the length of the slowest reveal
+ *    (14 elements on the swamps step). The single emit at the end of
+ *    `enterStepNow` stays the authoritative post-step paint.
+ *  - `tearingDown`: teardown lands several state writes while the tour flag is
+ *    still set, so the panel would visibly rewind to phase A before unmounting.
+ */
+let enteringStep = false;
+let tearingDown = false;
+export function tourIsSettling(): boolean {
+  return enteringStep || tearingDown;
+}
+
 async function enterStepNow(index: number): Promise<void> {
   const p = readTourState();
   if (!p) return;
+  enteringStep = true;
+  try {
+    await enterStepInner(index);
+  } finally {
+    enteringStep = false;
+  }
+  // The single authoritative post-step paint, emitted AFTER the flag clears so
+  // the bar's own listener is allowed through (close gate, MED): the flag used
+  // to guard only the state subscription, while `writeTourState`'s emit at the
+  // TOP of enterStepInner still repainted the new step's copy — and its stage
+  // and highlight classes — before the reveal wrote anything and before
+  // `routeFor` navigated. The comment claimed that desync was prevented; it
+  // was not.
+  emit();
+}
+
+async function enterStepInner(index: number): Promise<void> {
   const clamped = Math.max(0, Math.min(index, TOUR_STEPS.length - 1));
   // Watch-mode for the world beat: advancing past it creates the world.
   if (clamped > worldStepIndex() && !tourWorldExists()) {
@@ -508,7 +578,8 @@ async function enterStepNow(index: number): Promise<void> {
   // the ui slice so stage-dependent chrome (sidebar header, welcome panel)
   // re-renders each step (the force-render idiom, convention #2).
   patchSlice('ui', { ...getState().ui });
-  emit();
+  // (The closing emit moved to enterStepNow, so it fires AFTER `enteringStep`
+  // clears and the bar's own listener is allowed through.)
 }
 
 /**
@@ -597,17 +668,83 @@ export async function tourPinBake(
   return { id: pin.el.id, name: pin.el.name ?? '' };
 }
 
-/** Post-placement notify — lights the glyph, re-renders the bar. */
-export function notifyTourPinPlaced(): void {
-  emit();
+/**
+ * Mint the next un-minted ref of the current step's `creates` run.
+ *
+ * SERIALIZED, with the next ref computed INSIDE the chain (gate R9, the
+ * `enqueueStep` idiom for the same reason): two fast clicks both computing
+ * "next un-minted" against one pre-click snapshot mint the SAME element twice,
+ * so the third ref never lands and Next never appears.
+ *
+ * Resolves false when there is nothing to mint — the caller then opens the
+ * ordinary create modal rather than leaving a dead button (gate R8).
+ */
+let mintChain: Promise<void> = Promise.resolve();
+export function mintNextCreate(): Promise<boolean> {
+  let minted = false;
+  mintChain = mintChain
+    .catch(() => { /* a failed mint must not wedge the run */ })
+    .then(async () => { minted = await mintNextCreateNow(); });
+  return mintChain.then(() => minted);
 }
 
-export function tourPinPlaced(): boolean {
-  const p = readTourState();
-  if (!p) return false;
-  return getState().data.elements.some(e => e.id === bundleCache?.elements.find(
-    b => b.type === 'pin' && b.name === "The Consul's balcony seat")?.id);
+async function mintNextCreateNow(): Promise<boolean> {
+  if (!isTourActive() || !tourWorldIsActive()) return false;
+  const step = currentStep();
+  const refs = step.creates ?? [];
+  if (refs.length === 0) return false;
+  // The bundle index must be resolved before "un-minted" means anything:
+  // pre-load every ref reads absent and we would mint the first one twice.
+  await loadBundle();
+
+  const present = new Set(getState().data.elements.map(e => e.id));
+  const nextRef = refs.find(ref => {
+    const id = refToIdSync(ref);
+    return id !== undefined && !present.has(id);
+  });
+  if (!nextRef) return false; // the run is complete
+
+  const resolved = await resolveRef(nextRef);
+  if (!resolved) return false;
+
+  const universe = await bundleIds();
+  const revealed = await idsUpTo(currentStepIndex());
+  // `linkableIds` reads what is ON DISK, so the sibling minted a moment ago is
+  // already in the set — which is the whole of gate R1: the balcony keeps its
+  // parent_object link to the spaceship the user made two clicks earlier,
+  // instead of the objects step teaching that relationship on a page whose
+  // Parent object is empty.
+  const linkable = await linkableIds(universe, revealed);
+  const aliasesOn = await aliasesOnFor(linkable);
+  // revealOne declines if the store went away or the world switched during the
+  // six awaits above, and reporting a mint that never landed is exactly the
+  // dead + button gate R8 exists to prevent: the click would be swallowed with
+  // nothing created and no modal (close gate, MED).
+  const wrote = await revealOne(resolved.el, universe, linkable, aliasesOn);
+  if (!wrote) return false;
+  await refreshElements();
+
+  // Re-heal against the NOW-wider set so already-revealed subjects backfill
+  // immediately: the Consul's Possessions gain the object in the same beat the
+  // user makes it, not on the next Next.
+  //
+  // Note for whoever prunes this later: the widened set is used TWICE here (at
+  // write time above, and in the heal below), and the e2e locks the OUTCOME,
+  // not each mechanism — reverting either one alone still leaves the balcony's
+  // parent_object intact, because the other repairs it. Revert BOTH and the
+  // link goes null, which is the gate's headline bug. So neither is dead code;
+  // they cover different orders of arrival.
+  const healed = await healLinks(universe, await linkableIds(universe, revealed), aliasesOn);
+  if (healed > 0) await refreshElements();
+  emit();
+  return true;
 }
+
+// (`tourPinPlaced()` was DELETED in S302's close gate: its last caller went
+// when the bar moved to `handsOnRefFor` + `view.hasRef`. Worse than unused, it
+// was world-BLIND — no `tourWorldIsActive()` check — so a future caller
+// reaching for the obvious-looking helper would have got a different answer
+// than the bar's predicate on the user's own world.)
 
 /**
  * Start (or restart) the tour: tear down any prior tour world, enter the
@@ -669,6 +806,18 @@ export function exitTour(): Promise<void> {
 async function exitTourNow(): Promise<void> {
   const p = readTourState();
   if (!p) return;
+  // Suppress the bar's state-driven renders for the whole teardown (gate R4):
+  // the several patchSlice calls below all land while the tour flag is still
+  // set, so a subscribed panel would visibly rewind to phase A on its way out.
+  tearingDown = true;
+  try {
+    await exitTourInner(p);
+  } finally {
+    tearingDown = false;
+  }
+}
+
+async function exitTourInner(p: TourPersist): Promise<void> {
   const returnTo = p.returnHash || '#/';
   // Flag BEFORE teardown: the teardown's registry patch is the state tick
   // the landing re-renders on — set after, the emphasis swap misses it.

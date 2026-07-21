@@ -110,7 +110,12 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       requestPushIfLinked();
       toasts.success('Pin placed');
       completeWaypoint('maps');
-      if (bake) tourMod?.notifyTourPinPlaced();
+      // (The bespoke `notifyTourPinPlaced()` call was removed in S301: the
+      // tour bar subscribes to core state now, so the `patchSlice('data')`
+      // above re-renders it like any other world change. That coupling was
+      // the reason to subscribe — every future gated beat would have needed
+      // its own notify threaded into a room that should not know the tour
+      // exists.)
     } catch (err) {
       console.error('[map-tab] create pin failed:', err);
       toasts.error('Failed to place pin');

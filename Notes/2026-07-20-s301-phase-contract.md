@@ -1,6 +1,15 @@
 # The tour phase system — contract for the adversarial gate
 
-**Written**: 2026-07-20 (S301) · **Status**: CONTRACT, pre-build. Gate this before a line ships.
+**Written**: 2026-07-20 (S301) · **Status**: BUILT (S302). §7's amendments are
+all implemented and locked by tests; this note is now the RECORD of why the
+code looks the way it does, not a plan. Deviations from §7 as built:
+ - the `creates` gate is enforced by the BAR for any step declaring `creates`,
+   rather than by a per-phase `advanceWhen` (one forgotten line would have let
+   a user skip the run the step exists for);
+ - `TourStep.creates` refs backfill through `idsUpTo` exactly like the
+   hands-on refs, which is the same mechanism one level up;
+ - the door lives in `src/ui/create-element-door.ts` as a funnel over ALL
+   free-create entry points, not as a branch in the elements sidebar.
 **Why gated**: this is a merge over user-driven and system-driven world state with new gating semantics, sitting under every future tour step. My own tests would encode my own blind spots here.
 
 ---

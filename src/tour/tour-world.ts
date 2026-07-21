@@ -26,7 +26,7 @@ export async function scaffoldTourWorld(): Promise<{ entry: WorldRegistryEntry }
     world: { name: string; description?: string; time_basic_unit?: string; time_range_min?: number; time_range_max?: number; time_current?: number };
   };
   const w = bundle.world;
-  await store.writeWorldMeta({
+  const meta = await store.writeWorldMeta({
     id: worldUuid,
     name: w.name,
     description: w.description,
@@ -36,6 +36,18 @@ export async function scaffoldTourWorld(): Promise<{ entry: WorldRegistryEntry }
     time_range_max: w.time_range_max,
     time_current: w.time_current,
   });
+
+  // The mirror below is `writeWorldMeta`'s OWN return value, never a re-listing
+  // of fields and never a second read. The first version hand-built
+  // `{id, name, demo}` while this call wrote four time_* fields too, so
+  // `active.meta.time_current` was undefined for the whole first run: the
+  // charts step promised "a gold line marking the now: year 15" while the room
+  // showed the "set now time" button and no line. It self-healed on reload
+  // (activateWorld reads world.json), which is precisely why it survived — the
+  // bug only existed on the path every real user takes. A read-back would work
+  // too, but it can miss: `readWorldMeta` falls back to `{id:'', name:''}` when
+  // world.json is unreadable, which would silently install a mirror WORSE than
+  // the hand-built one it replaced (close gate, LOW).
 
   const { next, entry } = createLocalWorld(getState().registry, {
     name: w.name,
@@ -47,7 +59,7 @@ export async function scaffoldTourWorld(): Promise<{ entry: WorldRegistryEntry }
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);
   patchSlice('registry', activated);
-  patchSlice('active', { worldId: entry.id, meta: { id: worldUuid, name: w.name, demo: true }, opened: true });
+  patchSlice('active', { worldId: entry.id, meta, opened: true });
   setActiveStore(store);
   patchSlice('data', { elements: [] });
   patchSlice('ui', { ...getState().ui, selectedElementId: null });

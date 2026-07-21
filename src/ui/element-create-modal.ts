@@ -114,7 +114,12 @@ export interface ElementCreateOptions {
    * calls this, and closes; no toast, no navigate (the override routes).
    */
   overrideCreate?: () => Promise<void>;
-  /** Skip the modal's own success toast (override flows toast or route themselves). */
+  /**
+   * Skip the modal's own success toast (override flows toast or route
+   * themselves). Read at the toast site: it used to be declared and passed
+   * and never consulted, working only by accident because `overrideCreate`
+   * returns before the toast block — a flag that lied about what it did.
+   */
   suppressToast?: boolean;
 }
 
@@ -436,7 +441,7 @@ export class ElementCreateModal extends BaseModal {
         }
         // Charts-context callers toast their own, more specific confirmation
         // ("Created X at 60" + peek) — a second generic toast here doubles it.
-        if (!this.opts.temporalContext) {
+        if (!this.opts.temporalContext && !this.opts.suppressToast) {
           this.toasts.success(`Created ${this.selected}: ${el.name}`);
         }
         this.hide();
