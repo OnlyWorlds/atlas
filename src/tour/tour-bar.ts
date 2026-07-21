@@ -3,7 +3,7 @@
  * docked bottom-center from step 1 (the centered vignette opener was retired
  * 2026-07-19, Captain's round — the dock IS the narrator from the first
  * second; the bare stage above it fills in on Next). min-height 272px keeps
- * the dock a single exact shape across all 18 steps; step 1 carries its
+ * the dock a single exact shape across every step; step 1 carries its
  * eyebrow + book cite in the always-rendered meta channel at zero extra rows.
  *
  * Rows: the annotated sentence · hairline · body copy (+ meta subtext,
@@ -12,8 +12,10 @@
  *
  * The sentence is the progress bar (Skeld's grammar): parsed words carry
  * their element-type color; every span's end word carries an inline glyph,
- * PRE-SPACED from step 0 as a dim ghost and LIT (pop-in) when its step is
- * reached — zero reflow. Clicking a parsed word jumps to its step.
+ * PRE-SPACED as a dim ghost and LIT (pop-in) when its step is reached — zero
+ * reflow. Clicking a parsed word jumps to its step. The OPENER is the one
+ * exception (S306): it renders the sentence bare, with no glyph slots at all,
+ * so the first screen is undamaged text; the slots arrive with the dock.
  *
  * The ✦ deeper content opens as a scrollable FLYOUT above the panel — the
  * dock's height never changes (Captain's rule).
@@ -194,7 +196,19 @@ function glyphLit(
  * Build the annotated sentence: serif italic words, type-colored fill for
  * parsed words, pre-spaced ghost glyphs lighting up as steps are reached.
  */
-function buildSentence(idx: number, step: TourStep, view: TourWorldView): HTMLElement {
+/**
+ * The annotated sentence.
+ *
+ * `bare` (the OPENER, step 0) renders the sentence as PLAIN TEXT: no glyph
+ * slots at all. The pre-spaced ghosts exist to keep the dock reflow-free while
+ * the reader's eye is on it, which is worth it there — but on the opening
+ * screen, where the sentence IS the whole composition, a row of dim marks and
+ * the gaps holding them read as damage rather than as promise (Captain, S306).
+ * The slots appear on the hand-off into the dock, where the layout is changing
+ * completely anyway, so the one reflow hides inside a transition the user is
+ * already watching.
+ */
+function buildSentence(idx: number, step: TourStep, view: TourWorldView, bare = false): HTMLElement {
   const fills = fillMap(idx);
   const glyphs = glyphMap();
   const activeWords = new Set<number>();
@@ -217,7 +231,7 @@ function buildSentence(idx: number, step: TourStep, view: TourWorldView): HTMLEl
     }
     if (activeWords.has(w)) span.classList.add('active');
     sentence.appendChild(span);
-    for (const g of glyphs.get(w) ?? []) {
+    for (const g of bare ? [] : glyphs.get(w) ?? []) {
       const glyph = document.createElement('span');
       // A ref-carrying glyph waits for the ELEMENT, not the step-enter — the
       // light is the payoff of the user's gesture (banked S297 nuance,
@@ -361,7 +375,7 @@ function render(): void {
 
   panel.dataset.tourPhase = phase.id;
 
-  panel.appendChild(buildSentence(idx, step, view));
+  panel.appendChild(buildSentence(idx, step, view, opener));
 
   // Row 2 — step copy, under a hairline (the material/narration divider).
   const copy = document.createElement('div');

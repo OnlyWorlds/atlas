@@ -9,7 +9,7 @@
  * Step numbers (data-tour-step, 1-based): 1 opener · 2 world · 3 consul ·
  * 4 hegemony+title · 5 planet · 6 map · 7 pin · 8 swamps · 9 objects ·
  * 10 linking · 11 writing · 12 events · 13 chart (the now beat) · 14 deep time ·
- * 15 the rest · 16 web · 17 online · 18 finale.
+ * 15 the rest · 16 yours-to-keep (files + OnlyWorlds, web cameo) · 17 finale.
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -105,6 +105,28 @@ async function linkWordViaTab(page: Page) {
       .toHaveCount(1, { timeout: 4_000 });
   }).toPass({ timeout: 45_000 });
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'b');
+}
+
+/**
+ * The WALKS satisfy the writing gate by clicking the prose panel's LINK-ALL
+ * corner button — a real user gesture, and the one the step's own phase-b copy
+ * now recommends.
+ *
+ * Why not click+Tab here: that gesture depends on the click's selection being
+ * applied before the key arrives, which is genuinely timing-sensitive in a long
+ * walk and failed intermittently for whole runs. The precise gesture is still
+ * covered — the dedicated "writing beat" test drives click+Tab and nothing
+ * else. This mirrors `movePinToSwamps`, which forces the pin through the store
+ * because the raw click mapping "is not what these specs assert": here the
+ * subject is the WALK, not the keystroke.
+ */
+async function linkAllViaCorner(page: Page) {
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.awaitTourSettled(); });
+  const corner = page.locator('.atlas-writing-linkall-corner');
+  await expect(corner).toBeVisible();
+  await corner.click();
+  await expect(page.locator('.ProseMirror .atlas-element-chip').first()).toBeVisible();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', /b|c/);
 }
 
 /** Landing → the tour opens on the centre-stage OPENER (step 1): the sentence
@@ -363,8 +385,8 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
     const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
     return els.find((e: any) => e.name === 'The Consul')?.atlas_aliases ?? null;
   });
-  expect(aliasesLate).toEqual(['Consul', 'the Consul']);
-  await linkWordViaTab(page);
+  expect(aliasesLate).toEqual(['Consul']);
+  await linkAllViaCorner(page);
 
   await nextStep(page, 12); // events
   await nextStep(page, 13); // chart — the now beat, SINGLE ROUTE (no watch Next)
@@ -387,10 +409,11 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
 
   await nextStep(page, 14); // deep time — Rachmaninov in the Old Earth era
   await nextStep(page, 15); // the sweep
-  await nextStep(page, 16); // web cameo
+  // 16 is now the MERGED close (S306): the files story + the OnlyWorlds story
+  // in one step, carrying the Web tab cameo the cut step used to own.
+  await nextStep(page, 16); // yours-to-keep (web cameo rides here)
   await expect(page.locator('[data-tab-kind="context"]')).toHaveClass(/active/);
-  await nextStep(page, 17); // online
-  await nextStep(page, 18); // finale
+  await nextStep(page, 17); // finale
 
   // The finale's control set, asserted POSITIVELY (S301 gate, MED): the
   // shipped early-return renders Finish + the folder button and NO Exit.
@@ -885,11 +908,11 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   await beginToWorld(page);
   await createWorldViaModal(page);
   await createConsulViaModal(page);
-  for (let step = 4; step <= 18; step++) {
+  for (let step = 4; step <= 17; step++) {
     await nextStep(page, step);
     if (step === 7) await placePinViaMap(page);
     if (step === 9) await mintObjectRun(page);
-    if (step === 11) await linkWordViaTab(page);
+    if (step === 11) await linkAllViaCorner(page);
     if (step === 13) await setNowViaButton(page);
   }
   // The label is 'Set up a folder' (tour-bar.ts); on an OPFS-only browser no

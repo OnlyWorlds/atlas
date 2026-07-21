@@ -472,10 +472,15 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'b',
         when: (w) => w.chipCount(TOUR_CHAPTER_REF) >= 1,
+        // Points at the LINK-ALL corner button (top-right of the prose panel,
+        // `refreshLinkAllWidget`), not the tree's right-click menu: it is in
+        // the page the user is already looking at and it carries the count.
+        // Found while chasing Captain's Tab report — the affordance was there
+        // the whole time and the copy was sending people to a context menu.
         body:
           'That word is a chip now, pointing at the element itself. Keep going by ' +
-          'hand, or right-click Chapter 1 in the tree and choose “Link mentions in ' +
-          'this chapter” to catch the rest at once.',
+          'hand, or use the link button in the top right of the page to catch the ' +
+          'rest at once.',
       },
       {
         id: 'c',
@@ -615,45 +620,39 @@ export const TOUR_STEPS: readonly TourStep[] = [
     route: { kind: 'elements' },
   },
   {
-    id: 'where-it-lives',
+    // MERGED (S306, Captain: "i do believe there are TWO final steps we can
+    // remove"). `where-it-lives` and `online` were two soft beats saying
+    // adjacent things — the files story and the OnlyWorlds story — right where
+    // the tour should be closing. One step now carries both in a sentence
+    // each, with the detail in the flyout for anyone who wants it. Keeps the
+    // Web tab's only introduction (`webTab`), which lived on the cut step.
+    id: 'yours-to-keep',
     act: 5,
     phases: [{
       id: 'a',
       body:
-        'Every element is a small file. This world sits in browser storage, but a ' +
-        'real atlas world is a folder of plain files on your computer: yours to keep, back up, or open in any tool.',
+        'Every element is a small file. A real atlas world is a folder of plain files ' +
+        'on your computer, yours to keep and open in any tool, and it can also live on ' +
+        'onlyworlds.com so other tools can read it.',
       deeper:
         'The folder IS the world: one JSON file per element, sorted into type folders, ' +
         'readable by any program. No export step, no lock-in, and it all works offline. ' +
         'Rename the folder, put it in a git repo, sync it with Dropbox: atlas does not ' +
-        'mind, because the files are the truth and atlas is just a good pair of hands on them.' +
+        'mind, because the files are the truth and atlas is just a good pair of hands on them. ' +
+        'Delete atlas tomorrow and your world is still sitting there.' +
         '\n\n' +
         'The Web tab on the right is drawing the whole link web of those files live: ' +
         'click any node to travel the graph.' +
         '\n\n' +
-        'Delete atlas tomorrow and your world is still sitting there, plain and ' +
-        'portable, which is the whole point.',
+        'OnlyWorlds is an open format: 22 element types, one schema, free accounts that ' +
+        'store worlds online. This world sits there too, under the public demo key ' +
+        '0000000000. Link an account and atlas syncs your folder with the API both ways: ' +
+        'edit on this machine, pull on another, share a read key so a friend can browse ' +
+        'without touching anything. The same world then opens in other tools: a mobile ' +
+        'editor, an Obsidian vault, games and viewers people build on the schema.',
     }],
     route: { kind: 'element', ref: 'character:The Consul' },
     webTab: true,
-  },
-  {
-    id: 'online',
-    act: 5,
-    phases: [{
-      id: 'a',
-      body:
-        'This world also lives on onlyworlds.com, under the public demo key ' +
-        '0000000000. Any OnlyWorlds tool can open it: atlas syncs your own worlds the same way once you link a free account.',
-      deeper:
-        'OnlyWorlds is an open format: 22 element types, one schema, free accounts that ' +
-        'store worlds online. Link an account and atlas syncs your folder with the API ' +
-        'both ways: edit on this machine, pull on another, share a read key so a friend ' +
-        'can browse without touching anything.' +
-        '\n\n' +
-        'The same world can then open in other tools: a mobile editor, an Obsidian ' +
-        'vault, games and viewers people build on the schema.',
-    }],
   },
   {
     id: 'finale',
