@@ -116,6 +116,14 @@ export class ZoneOverlay {
   private onClick?: ZoneClickHandler;
   private onContext?: ZoneContextHandler;
   private onDblClick?: ZoneDblClickHandler;
+  /**
+   * When this reads true, a click on a zone falls THROUGH to the map instead
+   * of selecting the zone. Set to "is pin placement armed?" so a user placing
+   * a pin over a zone lands the pin there rather than selecting the region —
+   * the zone otherwise `stopPropagation`s the click and the map never sees it.
+   * (Surfaced by the tour's pin-over-swamps beat, but correct app-wide.)
+   */
+  private clickFallsThrough?: () => boolean;
 
   constructor(
     private map: L.Map,
@@ -290,6 +298,11 @@ export class ZoneOverlay {
     this.onClick = handler;
   }
 
+  /** See `clickFallsThrough`: when `fn()` is true, zone clicks reach the map. */
+  setClickFallsThrough(fn: () => boolean): void {
+    this.clickFallsThrough = fn;
+  }
+
   onZoneContextMenu(handler: ZoneContextHandler): void {
     this.onContext = handler;
   }
@@ -358,6 +371,10 @@ export class ZoneOverlay {
     const self = this;
     const wire = (layer: L.Layer) => {
       layer.on('click', (e: L.LeafletMouseEvent) => {
+        // Pin placement armed → let the click reach the map so the pin lands
+        // here, instead of eating it to select the zone. Not stopping
+        // propagation is what lets the map's own click handler fire.
+        if (self.clickFallsThrough?.()) return;
         L.DomEvent.stopPropagation(e);
         self.onClick?.(shape.id, e);
       });

@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { TOUR_STEPS, capabilitiesUpTo, TOUR_CAPABILITIES } from '../../src/tour/tour-data';
+import {
+  TOUR_STEPS, capabilitiesUpTo, TOUR_CAPABILITIES,
+  TOUR_PIN_REF, TOUR_SWAMPS_ZONE_REF,
+} from '../../src/tour/tour-data';
+import { buildTourWorldView } from '../../src/tour/tour-view';
 import bundle from '../../src/demo/hyperion-world.json';
 
 describe('TOUR_STEPS structure', () => {
@@ -123,5 +127,40 @@ describe('TOUR_STEPS structure', () => {
         expect(known, `${step.id} span ref ${span.ref}`).toContain(span.ref);
       }
     }
+  });
+
+  it("a place-pin step's zone is revealed no later than the pin step (S303)", () => {
+    // The soft correction (pinInZone) needs the zone's markers on disk when the
+    // pin beat runs. A reorder that revealed the swamps AFTER the pin would make
+    // Next unreachable (no polygon to test the drop against) — a dead-end no e2e
+    // that happens to walk a compliant order would catch.
+    for (let i = 0; i < TOUR_STEPS.length; i++) {
+      const zoneRef = TOUR_STEPS[i].placeInZone?.zoneRef;
+      if (!zoneRef) continue;
+      const revealedBy = TOUR_STEPS.findIndex(s => (s.reveal ?? []).includes(zoneRef));
+      expect(revealedBy, `${TOUR_STEPS[i].id} zone ${zoneRef} reveal`).toBeGreaterThanOrEqual(0);
+      expect(revealedBy, `${TOUR_STEPS[i].id} places in a zone revealed later`).toBeLessThanOrEqual(i);
+    }
+  });
+});
+
+describe('the pin beat geometry (S303 soft correction)', () => {
+  it('the baked balcony pin sits inside the baked swamps zone', () => {
+    // On watch-mode Next or resume the pin is created from the bundle at its
+    // baked coordinates (a real placement uses the user's click). Those baked
+    // coordinates MUST be in-zone, or those paths dead-end with no Next. This
+    // also locks the bundle: a re-bake that moves the pin or the swamps markers
+    // out of overlap breaks the beat, and nothing else would notice.
+    const elements = (bundle as { elements: Array<{ id: string; type: string; name?: string }> }).elements;
+    const byRef = (ref: string) => {
+      const i = ref.indexOf(':');
+      return elements.find(e => e.type === ref.slice(0, i) && e.name === ref.slice(i + 1));
+    };
+    const view = buildTourWorldView({
+      elements: elements as Array<{ id: string; type: string;[k: string]: unknown }>,
+      worldExists: true, tourIsLive: true, timeCurrent: null,
+      refToId: (ref) => byRef(ref)?.id,
+    });
+    expect(view.pinInZone(TOUR_PIN_REF, TOUR_SWAMPS_ZONE_REF)).toBe(true);
   });
 });

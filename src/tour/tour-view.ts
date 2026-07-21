@@ -28,6 +28,7 @@
  */
 
 import type { ElementType } from '../core/types';
+import { pointInPolygon } from '../visualization/leaflet-2d/ZoneGeometry';
 
 /** The snapshot phase predicates read. Built by the caller from app state. */
 export interface TourWorldView {
@@ -44,6 +45,16 @@ export interface TourWorldView {
   countOfType(type: ElementType): number;
   /** The world's clock has a `time_current` (the charts act's now-line beat). */
   nowIsSet: boolean;
+  /**
+   * The pin `pinRef` sits INSIDE the polygon of zone `zoneRef` — the pin
+   * beat's soft correction (Captain's ruling: allow any placement, show Next
+   * only once the pin is over the swamps, and let a wrong drop be dragged onto
+   * them rather than refused). False if either ref is absent, the pin has no
+   * coordinates, or the zone has fewer than three markers. Pure over the
+   * snapshot's geometry (the point-in-polygon math is ZoneGeometry's, unit
+   * tested there); this only assembles the polygon and reads the pin.
+   */
+  pinInZone(pinRef: string, zoneRef: string): boolean;
 }
 
 export interface TourPhase {
@@ -98,7 +109,10 @@ export function canAdvance(phase: TourPhase, w: TourWorldView): boolean {
  * bundle-load window, upheld by the gate as a real but benign flash).
  */
 export function buildTourWorldView(input: {
-  elements: ReadonlyArray<{ id: string; type: string }>;
+  // Widened from {id, type} to carry the pin/marker geometry `pinInZone`
+  // needs. Element[] is assignable via its index signature; every geometry
+  // read below is typeof-guarded because those fields arrive as `unknown`.
+  elements: ReadonlyArray<{ id: string; type: string;[k: string]: unknown }>;
   worldExists: boolean;
   tourIsLive: boolean;
   timeCurrent?: number | null;
@@ -120,6 +134,28 @@ export function buildTourWorldView(input: {
       return byType.get(type) ?? 0;
     },
     nowIsSet: input.timeCurrent != null,
+    pinInZone(pinRef, zoneRef) {
+      const pinId = input.refToId(pinRef);
+      const zoneId = input.refToId(zoneRef);
+      if (!pinId || !zoneId) return false;
+      const pin = input.elements.find(e => e.id === pinId && e.type === 'pin');
+      if (!pin || typeof pin.x !== 'number' || typeof pin.y !== 'number') return false;
+      // A zone's geometry is its markers (zone_id → the zone), ordered by
+      // `order`. Scope to the pin's OWN map (map_id) — the same filter the
+      // renderer uses (markersForZoneOnMap): a zone whose markers span two maps
+      // would otherwise mix coordinate spaces into a polygon that matches no
+      // drawn shape. Fewer than three markers cannot enclose anything.
+      const markers = input.elements
+        .filter(e => e.type === 'marker' && e.zone_id === zoneId
+          && e.map_id === pin.map_id
+          && typeof e.x === 'number' && typeof e.y === 'number')
+        .sort((a, b) => ((a.order as number) ?? 0) - ((b.order as number) ?? 0));
+      if (markers.length < 3) return false;
+      return pointInPolygon(
+        { x: pin.x, y: pin.y },
+        markers.map(m => ({ x: m.x as number, y: m.y as number })),
+      );
+    },
   };
 }
 

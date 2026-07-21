@@ -1633,25 +1633,29 @@ html {
   --tour-serif: 'Crimson Text', Georgia, 'Times New Roman', serif;
 }
 
-/* --- The opener (step 1): the SAME panel, screen-centered, sentence at
-   vignette scale. One component, two positions — the descend is structural. */
+/* --- The opener (step 0, S303 rework): the SAME panel, screen-centered,
+   sentence at vignette scale. One component, two positions — the descend into
+   the dock on "Begin" is structural. (A centered opener existed before S298,
+   was retired when the tour opened straight on create-world, and returns here
+   as a distinct step 0 that hands off into the dock.) The `.is-opener` rules
+   live just below the base `.atlas-tour-bar`. */
 .atlas-tour-eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.22em;
   font-size: 11px;
   color: var(--atlas-cyan);
 }
-/* Step 1's meta channel: eyebrow left · book cite right, one line. */
+/* The opener's meta channel: just the book cite, centered under the sentence.
+   (On step 1 the same class carries eyebrow-left/cite-right, but the eyebrow
+   was cut S299, so only the cite rides it now.) */
 .atlas-tour-meta-opener {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
 }
-/* (The centered stage-0 variant was retired 2026-07-19, Captain's round:
-   the panel docks bottom from step 1 — one component, one position.) */
-/* The opener has no app behind it — hide the whole shell until the `shell`
-   capability unlocks (the create-world step). */
+/* Before the `shell` capability (step 0 only): no app behind the sentence —
+   hide the shell so the opener reads as a vignette on black. */
 body.atlas-touring:not(.atlas-tour-cap-shell) .atlas-shell {
   visibility: hidden;
 }
@@ -1708,6 +1712,46 @@ body.atlas-touring:not(.atlas-tour-cap-shell) .atlas-shell {
  */
 body.atlas-touring .atlas-shell {
   height: calc(100vh - var(--tour-dock-h) - var(--tour-dock-gap) * 2);
+}
+/* --- The opener (step 0): the panel, centered on black, sentence big. It
+   overrides the docked geometry — auto height, screen center, no reserved
+   strip needed (the shell is hidden). "Begin" hands off to the dock. */
+.atlas-tour-bar.is-opener {
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  height: auto;
+  max-height: calc(100vh - 96px);
+  width: min(720px, calc(100vw - 48px));
+  padding: 34px 40px 26px;
+  gap: 20px;
+  text-align: center;
+}
+.atlas-tour-bar.is-opener .atlas-tour-sentence {
+  /* Vignette scale — the whole sentence reads as material, bright, before the
+     tour ever parses a word of it. */
+  font-size: 22px;
+  line-height: 2.05;
+  color: rgba(255, 255, 255, 0.92);
+}
+.atlas-tour-bar.is-opener .atlas-tour-copy {
+  border-top: none;
+  padding-top: 4px;
+  justify-content: center;
+  max-width: none;
+}
+.atlas-tour-bar.is-opener .atlas-tour-body {
+  flex: 0 1 auto;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+}
+.atlas-tour-bar.is-opener .atlas-tour-meta,
+.atlas-tour-bar.is-opener .atlas-tour-meta-opener {
+  justify-content: center;
+  text-align: center;
+}
+.atlas-tour-bar.is-opener .atlas-tour-controls {
+  justify-content: center;
 }
 .atlas-tour-sentence {
   font-family: var(--tour-serif);

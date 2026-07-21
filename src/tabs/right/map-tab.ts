@@ -235,6 +235,21 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     const lMap = manager.getMap();
     if (lMap) {
       const overlay = new ZoneOverlay(lMap, height);
+      // While a pin is being placed, a click on a zone should place the pin
+      // there, not select the zone (the zone otherwise stops the click before
+      // the map's placement handler sees it). Correct app-wide; the tour's
+      // pin-over-swamps beat is where it first mattered.
+      //
+      // Also fall through during the tour's pin beat BEFORE placement is armed
+      // (`atlas-tour-pinstep` = place-pin step, pin not yet placed): the beat
+      // tells the user to click the swamps, and a zone click before they hit
+      // the pulsing +pin button would otherwise SELECT the zone and route away
+      // from the Consul, hiding that button. Falling through makes it a harmless
+      // no-op (the map's click handler no-ops with nothing armed) and the pulse
+      // keeps guiding them to +pin.
+      overlay.setClickFallsThrough(() =>
+        !!getState().ui.pinPlacement
+        || document.body.classList.contains('atlas-tour-pinstep'));
       // Single click → select zone AND navigate to its element-detail route
       // so the middle pane updates AND the sidebar/midpanel reflect the
       // selection (parity with pin-click flow). Without the nav step,
@@ -257,6 +272,13 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       // click select fired first but that's actually fine — selecting before
       // editing matches user intent.
       overlay.onZoneDoubleClick((zoneId) => {
+        // While a pin is being placed, a double-click on a zone must NOT enter
+        // edit mode (mirrors clickFallsThrough for the single click): the
+        // tour's pin-over-swamps beat asks the user to click the zone, and a
+        // double-click there would trap placement behind edit-mode's map-click
+        // handling AND expose vertex handles that reshape the polygon pinInZone
+        // tests against. Placing wins; edit the zone after the pin is set.
+        if (getState().ui.pinPlacement) return;
         enterEditMode(zoneId, mapId, toasts);
       });
       entry.zoneOverlay = overlay;

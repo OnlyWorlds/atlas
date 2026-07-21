@@ -1,9 +1,12 @@
 # Atlas — Guided Tour Design
 
-**Version**: 2.7 (2026-07-21, S303 — capability-class staging + landing captions;
-supersedes v2.6). Prior: S302 phases WIRED + the scripted create door. The full rework this serves is Captain's dump
-of 2026-07-20: plan + positions in `Notes/2026-07-20-s301-tour-rework-plan.md`,
-contract + gate amendments in `Notes/2026-07-20-s301-phase-contract.md`.
+**Version**: 2.8 (2026-07-21, S304 — THE ACT RESTRUCTURE: step-0 opener, maps
+before objects, institution+title merged, the pin's soft correction;
+supersedes v2.7). Prior: S303 capability-class staging + landing captions; S302
+phases WIRED + the scripted create door. The full rework this serves is
+Captain's dump of 2026-07-20: plan + positions in
+`Notes/2026-07-20-s301-tour-rework-plan.md`, contract + gate amendments in
+`Notes/2026-07-20-s301-phase-contract.md`.
 **Concept**: Freek + Captain, 2026-07-19. The opening sentence of *Hyperion*
 by Dan Simmons becomes a small linked world, step by railroaded step,
 teaching OnlyWorlds AND atlas at once — while the workspace BUILDS ITSELF
@@ -14,6 +17,16 @@ at the 'online' step as the deeper schema story).
 
 ## The shape
 
+- **The opener** (step 0, S304 — `data-tour-step="1"`): the tour opens on the
+  Hyperion sentence CENTRE-STAGE at vignette scale on black. The step declares
+  no `unlocks`, so `body.atlas-touring:not(.atlas-tour-cap-shell)` hides the
+  whole shell behind it; the bar renders with `.is-opener` (screen-centered,
+  auto height, the sentence at 22px). A single "Begin" hands off into the docked
+  narrator (the shell materializes on the create-world beat that follows). Begin
+  is a special case in the bar because `canAdvance` is false with no active
+  world — the opener is pre-world, not suspended. Copy is Captain's shorter
+  variant (rides his copy pass). The bare splash below is the pre-tour landing;
+  the opener is the tour's own first beat.
 - **The bare splash** (`body.atlas-preroot`): pre-setup, atlas shows NO shell
   chrome at all — just the Atlas mark and two side-by-side doors ("Take the
   tour" / "Set up a folder") on black. Settings stays live at the
@@ -86,20 +99,38 @@ throwaway world:
    and the Charts room opened a free-form modal right beside it. All three now
    go through `create-element-door.ts`. After the Consul exists the sandbox is
    free again.
-3. **Place the pin** (step 9, S299 — reworked to use the ACTUAL control,
-   Captain's round): the step routes to the combined map+element view (map
-   open right, Consul selected middle) so the Consul's REAL +pin button
-   shows; the `atlas-tour-pinstep` body class pulses it cyan. The user clicks
-   that real button (arming `ui.pinPlacement` — the app-wide placement
-   feedback then fires: lit button, a "Click the map to place …" banner over
-   the map, crosshair cursor, Esc to cancel), then clicks the map; the pin
-   lands THERE with the bundle pin's locked identity (name + id, via
-   `tourPinBake`). Position is the user's to keep (heal never touches x/y —
-   C3). NO dock button — single-route, gated: Next appears only once the pin
-   exists; the pin glyph lights on the create. The app-wide placement
-   feedback lives in `src/tabs/right/map-placement-hint.ts` (installed at
-   boot) + the `[data-action="pin-element"].active` style; Esc-owns-placement
-   is a skip in the deselect-to-home hotkey guard.
+3. **Place the pin** (step 6 in the S304 order; S299 real-control, S304 soft
+   correction): the step routes to the combined map+element view (map open
+   right, Consul selected middle) so the Consul's REAL +pin button shows; the
+   `atlas-tour-pinstep` body class pulses it cyan. The user clicks that real
+   button (arming `ui.pinPlacement` — the app-wide placement feedback fires: lit
+   button, a "Click the map to place …" banner, crosshair, Esc to cancel), then
+   clicks the map; the pin lands THERE with the bundle pin's locked identity
+   (name + id, via `tourPinBake`). Position is the user's to keep (heal never
+   touches x/y — C3).
+   - **The soft correction (S304, Captain's ruling: never refuse a placement).**
+     The pin can be dropped anywhere. `TourStep.placeInZone: {pinRef, zoneRef}`
+     drives the forward gate: Next appears only once the pin sits INSIDE the
+     swamps zone (`TourWorldView.pinInZone`, the zone polygon from its markers ×
+     `ZoneGeometry.pointInPolygon`). A drop outside shows phase `b` — "drag the
+     pin onto the swamps" — with no Next; dragging it in resolves phase `c` and
+     opens Next. The `atlas-tour-pinstep` +pin highlight releases as soon as the
+     pin EXISTS (the gesture is done); the correction is a drag, not a re-click.
+     The phase `when`s are prefix-nested (b: `hasRef(pin)`, c:
+     `hasRef(pin) && pinInZone`) so `resolvePhase` never breaks early. On
+     watch-mode/resume the pin is minted at its baked coords, which sit inside
+     the zone (locked by a bundle-geometry unit test), so those paths do not
+     dead-end.
+   - **The zone had to stop eating the click.** A zone polygon is `interactive`
+     and `stopPropagation`s clicks (to select the zone). With the zone now drawn
+     during the pin beat, a click on the swamps selected the region instead of
+     placing the pin. `ZoneOverlay.setClickFallsThrough(() => !!ui.pinPlacement)`
+     (wired in map-tab.ts): while a pin is being placed, a zone click falls
+     THROUGH to the map's placement handler and does not select the zone.
+     Correct app-wide, not just for the tour.
+   NO dock button — single-route, gated. The app-wide placement feedback lives
+   in `src/tabs/right/map-placement-hint.ts` + the `[data-action="pin-element"]`
+   active style; Esc-owns-placement is a skip in the deselect-to-home guard.
 4. **Set up your folder** (step 17, finale): the real `setupAtlasRoot`
    picker; success ends the tour. On OPFS-only browsers Finish is primary
    and no folder button renders.
@@ -138,35 +169,44 @@ for the pane in front of the user, storage for the next boot). E2e-locked in
 `tour.spec.ts` with a precondition assert, so the test cannot pass by never
 having created the tab.
 
-## Acts (17 steps — the intro was cut in S298; the tour opens on create-world)
+## Acts (17 steps — S304 order; `data-tour-step` = step number below)
 
-1. **Elements** (6): create the world (carries the framing; opens the tour) · create the Consul ·
-   Hegemony institution · title · objects (balcony parent_object spaceship) ·
-   linking payoff (objects BEFORE linking so the Consul's page carries real
-   chips when the copy says "everything connects"; deeper: two-way links,
-   Web, Knowledge).
-2. **Maps** (4): Planet Hyperion location · the map (bundled art, right pane
-   appears) · the balcony-seat pin (HANDS-ON, S299: the user places it) ·
-   The Swamps zone + saurians/species/pack.
-3. **Writing** (2): Chapter 1 = the sentence VERBATIM with 9 live chips
-   (baked Book "Hyperion" + "Chapter 1") · the two events (+ Rachmaninov +
-   the Prelude — chip targets must exist by chapter time).
-4. **Time** (1): the chart; events at years 7/12, zoom-out finds the gold
-   now at 15 (deeper: drag-to-date, saved charts, calendars).
-5. **Your world** (4): the sweep · where-it-lives (files
-   story; Web-tab cameo via `webTab`; deeper: folder-is-the-world, offline) ·
-   online (demo key 0000000000; deeper: sync, read keys, ecosystem;
-   Captain's Hyperion share-page link joins when it exists) · finale.
+The reorder (Captain's dump): the sentence gets its own opener, the maps act
+comes BEFORE the objects so the pin's "sat" (word 3) lights in reading order
+ahead of "balcony"/"spaceship", the institution and title merge into one step,
+and the zone reveals WITH the map (the pin's soft correction needs the region
+already drawn).
+
+0. **Opener** (step 1): the sentence centre-stage; "Begin" hands off.
+1. **Elements** (steps 2-4): create the world (opens the shell) · create the
+   Consul · **Hegemony institution + title (merged)** — both reveal, the copy
+   teaches the distinction, routes to the Hegemony.
+2. **Maps** (steps 5-8): Planet Hyperion location (right pane appears) · the map
+   (bundled art) **+ the Swamps zone drawn on it** · the balcony-seat pin
+   (HANDS-ON, **soft correction**: place anywhere, Next only over the swamps) ·
+   the swamps' living things (2 creatures, species, pack).
+3. **Objects & links** (steps 9-10): the scripted object run (spaceship,
+   balcony, Steinway — one + click each) · linking payoff (objects BEFORE
+   linking so the Consul's page carries real chips; deeper: two-way links, Web,
+   Knowledge).
+4. **Writing** (step 11): Chapter 1 = the sentence VERBATIM with 9 live chips.
+5. **Time** (steps 12-13): the events (Rachmaninov + Prelude) · the chart; events
+   at years 7/12, zoom-out finds the gold now at 15 (deeper: drag-to-date, saved
+   charts, calendars).
+6. **Your world** (steps 14-17): the sweep · where-it-lives (files story; Web-tab
+   cameo via `webTab`) · online (demo key 0000000000) · finale.
 
 **Cut from the tour** (stay as waypoints): knowledge room visit, import.
 
 ## Mechanics (`src/tour/`)
 
-- **`tour-data.ts`** — sentence + step script + `tourStageFor`. Steps
-  reference bundle elements as `"type:Name"`; spans are word-index ranges +
-  element type. Route kinds: home · elements · element · map · writing ·
-  chart; flags `webTab`, `meta`, `deeper`,
-  `handsOn: 'create-world' | 'create-consul' | 'setup-folder'`.
+- **`tour-data.ts`** — sentence + step script + `capabilitiesUpTo` (the
+  cumulative capability set per step; replaced the ordinal `tourStageFor` in
+  S303). Steps reference bundle elements as `"type:Name"`; spans are word-index
+  ranges + element type. Route kinds: home · elements · element · map · writing ·
+  chart; flags `webTab`, `unlocks`, `creates`, `placeInZone`,
+  `handsOn: 'create-world' | 'create-consul' | 'place-pin' | 'setup-folder'`.
+  `TOUR_PIN_REF` / `TOUR_SWAMPS_ZONE_REF` are the pin beat's refs.
 - **`tour-engine.ts`** — state (localStorage `atlas_tour_v1`:
   active/step/worldId/returnHash), boot/resume/exit, the reveal system,
   `launchTour()` (the ONE entry point: landing + settings replay).
@@ -340,18 +380,27 @@ Windows WebKit has no OPFS at all, so real-Safari verification is owed on a
 Mac. Full Safari support = the browser-storage-worlds project (banked,
 post-launch).
 
-## The rework in flight (S301 → next bouts)
+## The rework (S301 → S304, and what remains)
 
-Captain's dump restructures the whole tour: a new step 0 (sentence centre
-stage, no sidebar, then it hands off into the dock), acts reordered so
-location and map come BEFORE objects (which also lights "sat" in sentence
-order), institution+title combined, a scripted `+` door minting elements one
-at a time instead of modals, a writing beat that teaches the room's tiers and
-has the user link three words, a charts act built element by element
-(including a user CHOICE of event-vs-narrative that teaches the schema's real
-ambiguity), and an exit modal showing which rooms you saw. Positions,
-rulings and open questions live in the plan note; the phase contract carries
-the engineering.
+Captain's dump restructured the whole tour. **LANDED through S304**: the phase
+kernel (S301) + scripted `+` door (S302) + capability-class staging (S303), and
+now (S304) the ACT RESTRUCTURE — the step-0 sentence opener that hands off into
+the dock, the maps act moved BEFORE the objects (lighting "sat" in reading
+order), institution+title merged, the zone revealed with the map, and the pin's
+soft correction (place anywhere, Next only over the swamps, drag to fix).
+
+**STILL TO BUILD** (from the same dump): the WRITING beat (teach the room's
+tiers, have the user link three words — the room's setup screen already offers
+the tier choice; needs a "link a word" hands-on kind + an unlinked chapter
+variant in the bundle + the selection bubble wired into the writing room, which
+is share-only today), the CHARTS act built element by element (HELD for
+Captain's look; the charts room has no tour branch and its controls lack
+`data-action` hooks — see the S302 handover for the dug constraints, incl. the
+event-vs-narrative branch which needs the reveal/heal kernel to treat two bundle
+entries as one logical slot — Captain greenlit it, gate before build), the
+two-era Old Earth/PC calendar baked into the bundle, and the EXIT MODAL showing
+which rooms you saw. Positions, rulings and open questions live in the plan note;
+the phase contract carries the engineering.
 
 Standing decisions from that round:
 - Create buttons never return to the widget: the narrator narrates, the app
@@ -401,12 +450,18 @@ Standing decisions from that round:
 
 ## Tests
 
-`tests/e2e/tour.spec.ts` (12): full 17-step walk (staged chrome, locked
-modals incl. the sidebar + door, the real-button pin placement + locked
-identity, chips, alias timing, web cameo, teardown + emphasis swap) ·
-single-route create beats · the resilience mess-walk (delete/unlink/wreck →
-heal, user link + media + cached-tab zone overlay) · armed-pin-disarms-on-nav
-(no stray pin) · resume-after-reload · exit-teardown · OPFS-only boot.
+`tests/e2e/tour.spec.ts` (14, S304 order): the centre-stage opener + Begin
+hand-off · full 17-step walk (staged chrome, locked modals incl. the sidebar +
+door, the real-button pin placement + locked identity, chips, alias timing, web
+cameo, teardown + emphasis swap) · **the pin SOFT correction** (place outside →
+phase b, no Next; drag onto the swamps → phase c, Next) · single-route create
+beats · the resilience mess-walk (delete/unlink/wreck → heal, user link + media
++ cached-tab zone overlay) · armed-pin-disarms-on-nav (no stray pin) ·
+resume-after-reload · exit-teardown · OPFS-only boot.
+Unit: `tour-view.test.ts` adds `pinInZone` (synthetic geometry incl.
+order-sensitivity + foreign-zone markers); `tour-data.test.ts` adds the
+baked-pin-in-swamps guard + a "zone revealed no later than its place-pin step"
+invariant.
 Kernel: `tests/unit/tour-heal.test.ts` (9) +
 `tests/integration/folder-store.updateElementWith.test.ts` (4). App-wide
 placement feedback: `tests/e2e/phase5-maps.spec.ts` (banner + crosshair +

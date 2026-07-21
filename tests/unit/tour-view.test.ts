@@ -153,3 +153,78 @@ describe('countPresent — the partial-progress signature term (gate R5)', () =>
     expect(countPresent(refs, view({ present: refs }))).toBe(3);
   });
 });
+
+describe('pinInZone — the pin beat soft correction (S303 rework)', () => {
+  // A unit-square zone [0,0]-[10,10] as four ordered markers, plus a pin. The
+  // point-in-polygon math is ZoneGeometry's (tested there); this locks that the
+  // view assembles the polygon from the right markers and reads the pin.
+  const SQUARE = [
+    { x: 0, y: 0, order: 0 }, { x: 10, y: 0, order: 1 },
+    { x: 10, y: 10, order: 2 }, { x: 0, y: 10, order: 3 },
+  ];
+  function geoView(
+    pin: { x?: number; y?: number } | null,
+    markers: Array<{ x: number; y: number; order: number; zone_id?: string }>,
+  ): TourWorldView {
+    const elements: Array<{ id: string; type: string;[k: string]: unknown }> = [];
+    if (pin) elements.push({ id: 'id-pin', type: 'pin', ...pin });
+    markers.forEach((m, i) => elements.push({
+      id: `m${i}`, type: 'marker', zone_id: m.zone_id ?? 'id-zone', x: m.x, y: m.y, order: m.order,
+    }));
+    return buildTourWorldView({
+      elements, worldExists: true, tourIsLive: true, timeCurrent: null,
+      refToId: (ref) => (ref === 'pin:seat' ? 'id-pin' : ref === 'zone:swamp' ? 'id-zone' : undefined),
+    });
+  }
+
+  it('true when the pin sits inside the polygon', () => {
+    expect(geoView({ x: 5, y: 5 }, SQUARE).pinInZone('pin:seat', 'zone:swamp')).toBe(true);
+  });
+  it('false when the pin sits outside the polygon', () => {
+    expect(geoView({ x: 50, y: 50 }, SQUARE).pinInZone('pin:seat', 'zone:swamp')).toBe(false);
+  });
+  it('false when the pin is absent (nothing placed yet)', () => {
+    expect(geoView(null, SQUARE).pinInZone('pin:seat', 'zone:swamp')).toBe(false);
+  });
+  it('false when the pin carries no coordinates', () => {
+    expect(geoView({}, SQUARE).pinInZone('pin:seat', 'zone:swamp')).toBe(false);
+  });
+  it('false with fewer than three markers (no polygon)', () => {
+    expect(geoView({ x: 5, y: 5 }, SQUARE.slice(0, 2)).pinInZone('pin:seat', 'zone:swamp')).toBe(false);
+  });
+  it('builds the polygon only from markers of THIS zone', () => {
+    const foreign = SQUARE.map(m => ({ ...m, zone_id: 'some-other-zone' }));
+    expect(geoView({ x: 5, y: 5 }, foreign).pinInZone('pin:seat', 'zone:swamp')).toBe(false);
+  });
+  it('false when either ref is unknown to the bundle', () => {
+    expect(geoView({ x: 5, y: 5 }, SQUARE).pinInZone('pin:missing', 'zone:swamp')).toBe(false);
+    expect(geoView({ x: 5, y: 5 }, SQUARE).pinInZone('pin:seat', 'zone:missing')).toBe(false);
+  });
+  it('scopes the polygon to the pin\'s own map (a zone spanning two maps stays honest)', () => {
+    // Markers on a DIFFERENT map must not join the polygon — the renderer
+    // filters by zone_id AND map_id, so pinInZone must too, or a multi-map zone
+    // would test the pin against a shape drawn on no single map.
+    const elements: Array<{ id: string; type: string;[k: string]: unknown }> = [
+      { id: 'id-pin', type: 'pin', x: 5, y: 5, map_id: 'map-A' },
+      // the real square, but on map-B (a different map than the pin)
+      ...SQUARE.map((m, i) => ({ id: `mb${i}`, type: 'marker', zone_id: 'id-zone', map_id: 'map-B', x: m.x, y: m.y, order: m.order })),
+    ];
+    const w = buildTourWorldView({
+      elements, worldExists: true, tourIsLive: true, timeCurrent: null,
+      refToId: (ref) => (ref === 'pin:seat' ? 'id-pin' : ref === 'zone:swamp' ? 'id-zone' : undefined),
+    });
+    // The pin is geometrically inside the square, but the square is on another
+    // map, so no markers match the pin's map → no polygon → false.
+    expect(w.pinInZone('pin:seat', 'zone:swamp')).toBe(false);
+  });
+
+  it('respects marker order (a self-crossing order changes the polygon)', () => {
+    // Swapping two vertices turns the square into a bow-tie; (5,5) — the square's
+    // center — is no longer inside the crossed shape's filled lobes.
+    const bowtie = [
+      { x: 0, y: 0, order: 0 }, { x: 10, y: 10, order: 1 },
+      { x: 10, y: 0, order: 2 }, { x: 0, y: 10, order: 3 },
+    ];
+    expect(geoView({ x: 5, y: 4 }, bowtie).pinInZone('pin:seat', 'zone:swamp')).toBe(false);
+  });
+});

@@ -21,11 +21,16 @@
  * hairline divides sentence from explainer, the body speaks for itself.
  *
  * PHASES (S301): a step's narration is a list of phases, and which one speaks
- * is DERIVED from the world (`src/tour/tour-view.ts`), never stored. Every
- * step below is single-phase today; the rework's gated beats add phase b/c.
+ * is DERIVED from the world (`src/tour/tour-view.ts`), never stored. Most steps
+ * are single-phase; the scripted objects run and the pin's soft correction use
+ * b/c/d phases, and their `when` predicates are PREFIX-nested (each a
+ * refinement of the one before) so `resolvePhase` never breaks early.
  *
- * Acts: 1 elements & linking · 2 maps · 3 writing · 4 time · 5 yours.
- * The engine treats the last defined step as the finale.
+ * Order (S303 rework): opener (the sentence centre-stage) · elements (world,
+ * consul, hegemony+title) · maps (planet, map+zone, pin, swamps) · objects &
+ * links · writing · time · yours. Maps come before the objects so the pin's
+ * "sat" lights in reading order and the pin can land in the already-drawn zone.
+ * The engine treats the last defined step as the finale; step 0 has no world.
  */
 
 import type { ElementType } from '../core/types';
@@ -117,12 +122,38 @@ export interface TourStep {
   webTab?: boolean;
   /** Hands-on steps: the real gesture OR Next does it for you (watch-mode). */
   handsOn?: 'create-world' | 'create-consul' | 'place-pin' | 'setup-folder';
+  /**
+   * For a `place-pin` step: the forward gate ALSO requires the pin to sit
+   * inside this zone (the soft correction — Captain's ruling). The pin can be
+   * dropped anywhere (never refused); Next appears only once it is over the
+   * zone, and a wrong drop is dragged onto it, which teaches dragging pins.
+   * The phase copy narrates the correction; this drives whether Next shows.
+   */
+  placeInZone?: { pinRef: string; zoneRef: string };
 }
 
+/** The pin the balcony-seat beat places, and the zone it must land inside. */
+export const TOUR_PIN_REF = "pin:The Consul's balcony seat";
+export const TOUR_SWAMPS_ZONE_REF = 'zone:The Swamps';
+
 export const TOUR_STEPS: readonly TourStep[] = [
+  // ---------------------------------------------------------------- Opener
+  // Step 0 (S303 rework): the sentence centre-stage on black, then it hands
+  // off into the dock on "Begin". No `unlocks` at all, so
+  // `:not(.atlas-tour-cap-shell)` hides the shell behind the big sentence.
+  // Copy is Captain's shorter variant and rides his copy pass.
+  {
+    id: 'the-sentence',
+    act: 1,
+    phases: [{
+      id: 'a',
+      body:
+        'The first sentence of Hyperion, by Dan Simmons. Read it, and decide ' +
+        'what in it is worth naming. We will build every one of those together, ' +
+        'starting with the world that holds them.',
+    }],
+  },
   // ---------------------------------------------------------------- Act 1
-  // (The standalone intro step was CUT in S298 — Freek's round: the tour
-  // opens on the create-world beat directly; its body carries the framing.)
   {
     id: 'the-world',
     act: 1,
@@ -150,31 +181,139 @@ export const TOUR_STEPS: readonly TourStep[] = [
     handsOn: 'create-consul',
   },
   {
+    // MERGED (S303 rework): the institution and the title were two steps; a
+    // title is just a name of the institution beat here — one step reveals
+    // both and teaches the distinction. Routes to the Hegemony (a rich element
+    // page); the title rides the sidebar and the copy.
     id: 'the-hegemony',
     act: 1,
     phases: [{
       id: 'a',
       body:
-        'Organizations are elements too: the Hegemony is an institution. ' +
-        'It just appeared in the left sidebar, where every element of a world lives, filterable by type.',
+        'Two more elements: the Hegemony is an institution, an organization in ' +
+        'the world, and “Consul” is a title, its own element, connecting him to ' +
+        'it. Both just appeared in the left sidebar, where every element lives, ' +
+        'filterable by type.',
     }],
-    spans: [{ from: 0, to: 1, type: 'institution' }],
-    reveal: ['institution:The Hegemony'],
+    spans: [
+      { from: 0, to: 1, type: 'institution' },
+      { from: 2, to: 2, type: 'title' },
+    ],
+    reveal: ['institution:The Hegemony', 'title:Consul of the Hegemony'],
     route: { kind: 'element', ref: 'institution:The Hegemony' },
   },
+  // ---------------------------------------------------------------- Act 2 (maps)
+  // Locations and the map now come BEFORE the objects (S303 rework): this lights
+  // "sat" (the pin, word 3) in reading order ahead of "balcony" and "spaceship",
+  // and it lets the pin beat's soft correction land the seat over the swamps —
+  // which requires the zone to already be on the map, so the zone reveals here.
   {
-    id: 'the-title',
-    act: 1,
+    id: 'the-planet',
+    act: 2,
+    unlocks: ['rightpane'],
     phases: [{
       id: 'a',
       body:
-        '“Consul” is not just a name: it is a title, its own element, ' +
-        'connecting a person to an institution. Small distinctions like this are what let tools understand your world.',
+        'What is below the balcony? A world. Locations hold the places of your ' +
+        'setting, and they nest: a city sits on a continent, a continent on a planet.',
     }],
-    spans: [{ from: 2, to: 2, type: 'title' }],
-    reveal: ['title:Consul of the Hegemony'],
-    route: { kind: 'element', ref: 'title:Consul of the Hegemony' },
+    spans: [{ from: 35, to: 35, type: 'location' }],
+    reveal: ['location:Planet Hyperion'],
+    route: { kind: 'element', ref: 'location:Planet Hyperion' },
   },
+  {
+    id: 'the-map',
+    act: 2,
+    phases: [{
+      id: 'a',
+      body:
+        'A map is an element that carries an image: this one shows Hyperion, and ' +
+        'a new pane just opened on the right to hold it. Regions can be traced ' +
+        'onto it too: the swamps are a zone, drawn right there.',
+    }],
+    // The swamps zone (and its markers) reveal WITH the map — the pin beat's
+    // soft correction needs the region present to test the drop against, and
+    // the geography reads as one thing. The living things stay for the-swamps.
+    spans: [{ from: 32, to: 34, type: 'zone' }],
+    reveal: [
+      'map:Hyperion',
+      'zone:The Swamps',
+      'marker:The Swamps - Point 0', 'marker:The Swamps - Point 1', 'marker:The Swamps - Point 2',
+      'marker:The Swamps - Point 3', 'marker:The Swamps - Point 4', 'marker:The Swamps - Point 5',
+      'marker:The Swamps - Point 6', 'marker:The Swamps - Point 7', 'marker:The Swamps - Point 8',
+    ],
+    route: { kind: 'map', ref: 'map:Hyperion' },
+  },
+  {
+    id: 'the-pin',
+    act: 2,
+    // The soft correction (Captain's ruling): place anywhere, Next appears only
+    // once the pin is over the swamps; a wrong drop is dragged onto them, which
+    // teaches dragging pins. `placeInZone` drives the gate; the phases narrate.
+    placeInZone: { pinRef: TOUR_PIN_REF, zoneRef: TOUR_SWAMPS_ZONE_REF },
+    phases: [
+      {
+        id: 'a',
+        body:
+          'Pins place elements on maps. Click the highlighted pin button on the ' +
+          'Consul, then click the swamps below to set his balcony seat over them.',
+        deeper:
+          'A sharp eye notices the pin holds the Consul, not his spaceship: a pin ' +
+          'records where an ELEMENT is, and the schema has no field yet that says a ' +
+          'character is aboard a vehicle. So we know where the Consul sat, and the ' +
+          'ship is wherever he is.' +
+          '\n\n' +
+          'That kind of gap is not fixed by one tool inventing a field: the ' +
+          'OnlyWorlds schema grows through council motions, public proposals anyone ' +
+          'can raise and argue. A motion to give characters a vehicle or equipment ' +
+          'field would close exactly this gap, for every tool at once.',
+      },
+      {
+        // Placed, but the gate (pinInZone) has not passed — the correction.
+        // `when: hasRef` is a PREFIX of phase c's `hasRef && pinInZone`, so a
+        // good drop resolves straight to c and a wrong one holds here.
+        id: 'b',
+        when: (w) => w.hasRef(TOUR_PIN_REF),
+        body:
+          'The seat is on the map. If it is not over the swamps, drag the pin onto ' +
+          'them: he is looking down at the saurians below, so the seat sits above ' +
+          'the zone.',
+      },
+      {
+        id: 'c',
+        when: (w) => w.hasRef(TOUR_PIN_REF) && w.pinInZone(TOUR_PIN_REF, TOUR_SWAMPS_ZONE_REF),
+        body:
+          'Placed. His balcony seat sits over the swamps, and the pin holds the ' +
+          'Consul’s identity: click it any time to travel back to him.',
+      },
+    ],
+    handsOn: 'place-pin',
+    spans: [{ from: 3, to: 3, type: 'pin', ref: TOUR_PIN_REF }],
+    reveal: [],
+    // Map open (right) + the Consul selected (middle) so his +pin button shows.
+    route: { kind: 'map', ref: 'map:Hyperion', elementRef: 'character:The Consul' },
+  },
+  {
+    id: 'the-swamps',
+    act: 2,
+    phases: [{
+      id: 'a',
+      body:
+        'The saurian things live in those swamps: two creatures, their species, ' +
+        'and one bellowing pack, all linked to the zone you traced onto the map.',
+    }],
+    spans: [
+      { from: 27, to: 27, type: 'creature' },
+    ],
+    reveal: [
+      'creature:Great Green Saurian', 'creature:Greater Green Saurian',
+      'species:Saurians', 'collective:Saurian Pack',
+    ],
+    route: { kind: 'map', ref: 'map:Hyperion' },
+  },
+  // ------------------------------------------------------- Act 1 (objects & links)
+  // Objects and linking now follow the maps act (S303 rework) so the pin lights
+  // "sat" before these light "balcony" / "spaceship".
   {
     id: 'objects',
     act: 1,
@@ -247,81 +386,6 @@ export const TOUR_STEPS: readonly TourStep[] = [
     }],
     reveal: [],
     route: { kind: 'element', ref: 'character:The Consul' },
-  },
-  // ---------------------------------------------------------------- Act 2
-  {
-    id: 'the-planet',
-    act: 2,
-    unlocks: ['rightpane'],
-    phases: [{
-      id: 'a',
-      body:
-        'What is below the balcony? A world. Locations hold the places of your ' +
-        'setting, and they nest: a city sits on a continent, a continent on a planet.',
-    }],
-    spans: [{ from: 35, to: 35, type: 'location' }],
-    reveal: ['location:Planet Hyperion'],
-    route: { kind: 'element', ref: 'location:Planet Hyperion' },
-  },
-  {
-    id: 'the-map',
-    act: 2,
-    phases: [{
-      id: 'a',
-      body:
-        'A map is an element that carries an image: this one shows Hyperion, and ' +
-        'a new pane just opened on the right to hold it. Zoom, pan, and drop things onto it.',
-    }],
-    reveal: ['map:Hyperion'],
-    route: { kind: 'map', ref: 'map:Hyperion' },
-  },
-  {
-    id: 'the-pin',
-    act: 2,
-    phases: [{
-      id: 'a',
-      body:
-        'Pins place elements on maps. Click the highlighted pin button on the ' +
-        'Consul, then click the map where his balcony seat should sit.',
-      deeper:
-        'A sharp eye notices the pin holds the Consul, not his spaceship: a pin ' +
-        'records where an ELEMENT is, and the schema has no field yet that says a ' +
-        'character is aboard a vehicle. So we know where the Consul sat, and the ' +
-        'ship is wherever he is.' +
-        '\n\n' +
-        'That kind of gap is not fixed by one tool inventing a field: the ' +
-        'OnlyWorlds schema grows through council motions, public proposals anyone ' +
-        'can raise and argue. A motion to give characters a vehicle or equipment ' +
-        'field would close exactly this gap, for every tool at once.',
-    }],
-    handsOn: 'place-pin',
-    spans: [{ from: 3, to: 3, type: 'pin', ref: "pin:The Consul's balcony seat" }],
-    reveal: [],
-    // Map open (right) + the Consul selected (middle) so his +pin button shows.
-    route: { kind: 'map', ref: 'map:Hyperion', elementRef: 'character:The Consul' },
-  },
-  {
-    id: 'the-swamps',
-    act: 2,
-    phases: [{
-      id: 'a',
-      body:
-        'Zones are drawn regions: The Swamps are traced right onto the map. ' +
-        'The saurian things live there: two creatures, their species, and one bellowing pack, all linked to the zone.',
-    }],
-    spans: [
-      { from: 27, to: 27, type: 'creature' },
-      { from: 32, to: 34, type: 'zone' },
-    ],
-    reveal: [
-      'zone:The Swamps',
-      'marker:The Swamps - Point 0', 'marker:The Swamps - Point 1', 'marker:The Swamps - Point 2',
-      'marker:The Swamps - Point 3', 'marker:The Swamps - Point 4', 'marker:The Swamps - Point 5',
-      'marker:The Swamps - Point 6', 'marker:The Swamps - Point 7', 'marker:The Swamps - Point 8',
-      'creature:Great Green Saurian', 'creature:Greater Green Saurian',
-      'species:Saurians', 'collective:Saurian Pack',
-    ],
-    route: { kind: 'map', ref: 'map:Hyperion' },
   },
   // ---------------------------------------------------------------- Act 3
   {
@@ -459,14 +523,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
 ];
 
-/** Steps grouped for the act label ("Elements · Step 1 of 18"). */
-export const TOUR_ACT_NAMES: Record<number, string> = {
-  1: 'Elements',
-  2: 'Maps',
-  3: 'Writing',
-  4: 'Time',
-  5: 'Your world',
-};
+// (TOUR_ACT_NAMES was deleted S304: the visible act label was cut in the Freek
+// round and nothing consumed the map since. The reorder also broke its premise
+// — act:1 steps like objects/linking now sit physically after the act:2 maps —
+// so a revived consumer would render acts out of order. The `act` field on each
+// step is now loose grouping metadata only, not rendered.)
 
 /**
  * Every capability unlocked by steps 0..stepIndex — the progressive build-up,

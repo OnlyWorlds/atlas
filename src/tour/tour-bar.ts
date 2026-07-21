@@ -260,6 +260,12 @@ function signatureFor(
     // with them. A hands-on beat whose word is not in the sentence would have
     // had a Next that never appeared (close gate, MED).
     handsOnRefFor(step) ? String(handsOnDone) : '',
+    // The pin's soft correction: dragging the placed pin into the zone changes
+    // neither step, phase-id (both b and c are already possible), nor
+    // `handsOnDone` — so without this term the drag would not re-render and
+    // Next would never appear. The drag's `patchSlice('data')` fires the
+    // subscription; this makes the signature notice the crossing.
+    step.placeInZone ? String(view.pinInZone(step.placeInZone.pinRef, step.placeInZone.zoneRef)) : '',
     view.tourIsLive ? 'live' : 'suspended',
   ].join(',');
   return [idx, phase.id, advance, stage, glyphs, created, gates].join('|');
@@ -322,11 +328,15 @@ function render(): void {
 
   root.innerHTML = '';
   const panel = document.createElement('div');
-  // ONE position for the panel — docked bottom from step 1 (Captain's round,
-  // 2026-07-19: the centered vignette opener read as a different component;
-  // now the dock IS the narrator from the first second, and the app builds
-  // above it on Next).
-  panel.className = 'atlas-tour-bar' + (idx <= 1 ? ' is-fresh' : '');
+  // The panel has TWO positions again (S303 rework): step 0 is the centre-stage
+  // opener (`is-opener`) — the sentence at vignette scale on black, no shell
+  // behind it — and it hands off into the docked narrator on "Begin". The dock
+  // is one fixed shape for every step after. The first two DOCKED steps read
+  // bright (`is-fresh`) before the parsing dims the sentence into a progress
+  // surface.
+  panel.className = 'atlas-tour-bar'
+    + (opener ? ' is-opener' : '')
+    + (idx === 1 || idx === 2 ? ' is-fresh' : '');
   // e2e locator contract: the visible act label is gone (Freek's round), the
   // step number rides a data attribute instead.
   panel.dataset.tourStep = String(idx + 1);
@@ -417,6 +427,25 @@ function render(): void {
   const controls = document.createElement('div');
   controls.className = 'atlas-tour-controls';
 
+  // The opener (step 0): the sentence has no world yet, so the phase-`advance`
+  // path can't render a forward control (`canAdvance` is false with no active
+  // tour world — it reads as suspended). "Begin" is the explicit hand-off into
+  // the dock. No counter, no Back — just Begin and the ever-present Exit.
+  if (opener) {
+    const begin = document.createElement('button');
+    begin.type = 'button';
+    begin.className = 'atlas-btn-primary';
+    begin.dataset.tourControl = 'next';
+    begin.textContent = 'Begin';
+    begin.addEventListener('click', () => { void nextStep(); });
+    controls.appendChild(begin);
+    appendExit(controls);
+    panel.appendChild(controls);
+    root!.appendChild(panel);
+    restoreFocus(focusedAction);
+    return;
+  }
+
   // Step counter (re-added S299 as a working aid — the visible label was cut
   // in the Freek round; the sentence is still the user-facing progress, this
   // is a quiet dev/collab reference. Takes the spacer's flex role so the
@@ -442,8 +471,18 @@ function render(): void {
   // each highlighted by the tour). Next appears only once the deed is done —
   // which is either the hands-on ref existing or, for a phased step, the
   // phase's own `advanceWhen`.
+  // The pin beat's soft correction: placing the pin is not enough — it has to
+  // sit over the zone (Captain's ruling). `handsOnDone` (pin exists) still
+  // drives the +pin highlight release; this only gates whether Next appears,
+  // so a wrong drop shows the correction phase with no Next until it is
+  // dragged onto the swamps.
+  const pinInZoneOk = step.placeInZone
+    ? view.pinInZone(step.placeInZone.pinRef, step.placeInZone.zoneRef)
+    : true;
   const handsOnGate = step.handsOn && step.handsOn !== 'setup-folder'
-    ? (step.handsOn === 'create-world' ? tourWorldExists() : handsOnDone)
+    ? (step.handsOn === 'create-world' ? tourWorldExists()
+      : step.handsOn === 'place-pin' ? (handsOnDone && pinInZoneOk)
+      : handsOnDone)
     : true;
   if (step.handsOn && step.handsOn !== 'setup-folder' && !handsOnGate) {
     // No forward control: the gesture is the way.
