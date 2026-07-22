@@ -144,6 +144,34 @@ describe('SyncEngine push phase', () => {
     expect(result.pushed.creates).toBe(1);
   });
 
+  /**
+   * S308 — a push-phase throw must restore idle, exactly as the pull path does.
+   *
+   * `runPullOnly` has wrapped its phase in try/catch-and-restore-idle since it
+   * was written, with a comment saying "we MUST restore idle state first or the
+   * pill stays stuck at 'fetching...' forever". `runPushOnly` never got the same
+   * guard, so any throw outside the per-element catch left the sync pill reading
+   * "Saving…" indefinitely — on the path EVERY user edit takes.
+   *
+   * The state assertion is the load-bearing half. The rejection alone would pass
+   * with the fix reverted; only `kind === 'idle'` distinguishes "threw and
+   * cleaned up" from "threw and left the UI lying".
+   */
+  it('restores idle state when the push phase throws, instead of stranding the pill at Saving', async () => {
+    await folder.createElement('character', { name: 'Hank' });
+
+    // pushPhase's FIRST folder read (sync-engine.ts:1443). Injecting at
+    // listElements does not work: pushPhase never calls it, and the round
+    // succeeds — the instrument has to hit the path actually under test.
+    const boom = new Error('disk went away mid-push');
+    folder.listLocallyChangedSince = async () => { throw boom; };
+
+    await expect(engine.pushOnce()).rejects.toThrow('disk went away mid-push');
+
+    // The bug: this read 'syncing' forever, and the pill renders straight from it.
+    expect(engine.getState().kind).toBe('idle');
+  });
+
   it('does not re-push an element whose local_updated_at equals server_updated_at', async () => {
     const local = await folder.createElement('character', { name: 'Hank' });
     await engine.syncNow(); // initial push, server_updated_at stamped

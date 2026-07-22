@@ -925,7 +925,22 @@ export class SyncEngine {
       this.onSyncResult('push', result);
       return result;
     }
-    const pushResult = await this.pushPhase();
+    let pushResult: Awaited<ReturnType<SyncEngine['pushPhase']>>;
+    try {
+      pushResult = await this.pushPhase();
+    } catch (err) {
+      // Mirrors runPullOnly (S308). The pull path has carried this guard, with
+      // a comment saying why, since it was written; the push path never got it,
+      // so ANY throw here left the pill reading 'Saving…' forever — on the path
+      // every single user edit takes (element save -> requestPushIfLinked).
+      // Hardening applied to one side of a symmetric surface is a defect class,
+      // not a fix.
+      this.setState({ kind: 'idle', last_sync_at: null });
+      throw err;
+    }
+    // STILL OPEN, both paths: executeMetaStep above is unguarded here and in
+    // runPullOnly. Same class, lower traffic; deliberately not widened days
+    // before release.
     // Only persist under pause-and-review. Under local-wins, conflicts are
     // informational (server already overwritten) — persisting would falsely
     // fire the badge for resolved divergence.

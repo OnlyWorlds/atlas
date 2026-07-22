@@ -43,14 +43,21 @@ export interface PaletteResult {
   score: number;
 }
 
-/** Rooms reachable by name. Route segment '' = the world home. */
-const ROOMS: Array<{ label: string; segment: string; icon: string }> = [
+/**
+ * Rooms reachable by name. Route segment '' = the world home.
+ *
+ * `aliases` exist because a room's LABEL and its ROUTE SEGMENT can diverge:
+ * the Data room still routes on `import`, and "import"/"export" are what a user
+ * actually types. Before S308 this list keyed on the segment word, so the room
+ * was branded "Data" everywhere else and searching "data" here found nothing.
+ */
+const ROOMS: Array<{ label: string; segment: string; icon: string; aliases?: string[] }> = [
   { label: 'home', segment: '', icon: 'home' },
   { label: 'writing', segment: 'writing', icon: 'edit_note' },
   { label: 'knowledge', segment: 'knowledge', icon: 'psychology' },
-  { label: 'charts', segment: 'timeline', icon: 'timeline' },
-  { label: 'pages', segment: 'share', icon: 'wall_art' },
-  { label: 'import', segment: 'import', icon: 'swap_vert' },
+  { label: 'charts', segment: 'timeline', icon: 'timeline', aliases: ['timeline'] },
+  { label: 'pages', segment: 'share', icon: 'wall_art', aliases: ['share'] },
+  { label: 'data', segment: 'import', icon: 'swap_vert', aliases: ['import', 'export'] },
   { label: 'settings', segment: 'settings', icon: 'settings' },
 ];
 
@@ -66,9 +73,12 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
   const out: PaletteResult[] = [];
 
   for (const room of ROOMS) {
-    if (room.label.startsWith(q)) {
+    // Match the label AND its aliases, but always DISPLAY the label — typing
+    // "import" should find the room and then teach you it is called Data.
+    const names = [room.label, ...(room.aliases ?? [])];
+    if (names.some(n => n.startsWith(q))) {
       out.push({ kind: 'room', id: room.segment, name: room.label, hint: 'room', score: 90 });
-    } else if (room.label.includes(q)) {
+    } else if (names.some(n => n.includes(q))) {
       out.push({ kind: 'room', id: room.segment, name: room.label, hint: 'room', score: 55 });
     }
   }
@@ -93,11 +103,11 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
     });
   }
 
-  out.sort((a, b) => (b.score - a.score) || a.name.localeCompare(b.name));
+  out.sort((a, b) => (b.score - a.score) || (a.name ?? '').localeCompare(b.name ?? ''));
 
   const rooms = out.filter(r => r.kind === 'room').slice(0, MAX_ROOM_RESULTS);
   const els = out.filter(r => r.kind === 'element').slice(0, MAX_ELEMENT_RESULTS);
-  return [...rooms, ...els].sort((a, b) => (b.score - a.score) || a.name.localeCompare(b.name));
+  return [...rooms, ...els].sort((a, b) => (b.score - a.score) || (a.name ?? '').localeCompare(b.name ?? ''));
 }
 
 // ---------------------------------------------------------------------------

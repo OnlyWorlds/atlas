@@ -13,45 +13,23 @@
 
 import type { ElementType } from '../../core/types';
 import { ELEMENT_ICONS } from '../../core/constants';
+import { ELEMENT_FAMILIES, elementColor } from '../../core/element-colors';
 import type { PinTint, PinStyle } from '../../core/map-view-prefs';
 import { ensureIconFont } from '../../visualization/timeline/canvas-utils';
 
 const ACCENT_COLOR = '#22d3ee';
 const MUTED_COLOR = '#6b7280';
 
-const CATEGORY: Record<ElementType, string> = {
-  // Agents — warm
-  character: '#f97316',
-  creature: '#ea580c',
-  species: '#c2410c',
-  family: '#fbbf24',
-  collective: '#f59e0b',
-  institution: '#d97706',
-
-  // World — earth
-  location: '#84cc16',
-  object: '#a3a3a3',
-  construct: '#78716c',
-
-  // Abstract — cool
-  ability: '#60a5fa',
-  trait: '#3b82f6',
-  title: '#8b5cf6',
-  language: '#a78bfa',
-  law: '#6366f1',
-
-  // Temporal — pink/purple
-  event: '#ec4899',
-  narrative: '#db2777',
-  phenomenon: '#be185d',
-  relation: '#f472b6',
-
-  // Spatial — cyan
-  map: '#22d3ee',
-  pin: '#06b6d4',
-  marker: '#0891b2',
-  zone: '#0e7490',
-};
+/**
+ * S308: this WAS a second, unrelated 22-entry palette — the one that made a
+ * Character orange on the map and gold in a chart at the same moment. Its
+ * semantic grouping (Agents/World/Abstract/Temporal/Spatial) was the right
+ * structure and survives in `core/element-colors.ts`; its hand-picked hues did
+ * not survive measurement and are gone. Spatial folded into World.
+ */
+const CATEGORY: Record<ElementType, string> = Object.fromEntries(
+  (Object.keys(ELEMENT_FAMILIES) as ElementType[]).map(t => [t, elementColor(t)]),
+) as Record<ElementType, string>;
 
 const cache = new Map<string, string>();
 

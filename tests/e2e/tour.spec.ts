@@ -372,6 +372,23 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await mintObjectRun(page);
   await nextStep(page, 10); // linking payoff
 
+  // S308 — the ABSENT half of the Web-tab pair (the PRESENT half is asserted at
+  // step 16 below). `linking`'s copy deliberately withholds the Web tab's name,
+  // citing "naming a tab the user cannot see yet is a promise the chrome does
+  // not keep" — so the tab must genuinely not be on screen here.
+  //
+  // It was. `tour-bar.ts` looked up `atlas-tour-preweb` by the step id
+  // 'where-it-lives', which S306c MERGED into 'yours-to-keep': findIndex
+  // returned -1, `idx < -1` was false for every step, the gate never applied,
+  // and the tab had been visible since step 5 for three sessions. Nothing
+  // caught it because only the PRESENT half was ever asserted — a rename
+  // silently disarmed the gate, and a one-sided assertion cannot see that.
+  //
+  // toBeHidden, not toHaveCount(0): the gate is a CSS `display: none`
+  // (atlas.css:2016), so the tab stays in the DOM and only stops rendering.
+  // My first draft asserted removal and failed against the WORKING fix.
+  await expect(page.locator('.atlas-right [data-tab-kind="context"]')).toBeHidden();
+
   // Writing act: the icon appears; the chapter renders the sentence verbatim
   // as PLAIN prose (S306 — the user links it), with aliases healed in so
   // autolink can recognise every surface form.

@@ -343,10 +343,17 @@ function render(): void {
     document.body.classList.toggle(`atlas-tour-cap-${cap}`, caps.has(cap));
   }
   // Step-scoped precision (S299): zone chrome waits for the swamps step, the
-  // Web tab for where-it-lives — an act-level marker can't distinguish steps
+  // Web tab for yours-to-keep — an act-level marker can't distinguish steps
   // inside one act.
+  //
+  // S308: this read `'where-it-lives'`, a step id S306c MERGED into
+  // `yours-to-keep`. findIndex returned -1, so `idx < -1` was false for every
+  // step and `atlas-tour-preweb` never applied — the Web tab has been visible
+  // from step 5 since S306c, while two copy decisions (withholding its name at
+  // `linking`, introducing it here) are written on the premise it is hidden.
+  // A renamed step id silently disables the gate that keys on it.
   const swampsIdx = TOUR_STEPS.findIndex(s => s.id === 'the-swamps');
-  const webIdx = TOUR_STEPS.findIndex(s => s.id === 'where-it-lives');
+  const webIdx = TOUR_STEPS.findIndex(s => s.id === 'yours-to-keep');
   document.body.classList.toggle('atlas-tour-prezone', idx < swampsIdx);
   document.body.classList.toggle('atlas-tour-preweb', idx < webIdx);
   // Highlight the REAL +pin button on the Consul during the pin beat (until

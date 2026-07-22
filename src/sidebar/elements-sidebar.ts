@@ -534,7 +534,12 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       // description) — its "see all →" hands queries here and must never
       // under-deliver (core/element-search.ts).
       .filter(el => !query || elementMatchesQuery(el, query))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      // `name` is typed non-optional, but the Folder Format welcomes files
+      // written by other tools, and a JSON file on disk with no name key is
+      // `undefined` at runtime — which threw here and broke the whole list.
+      // Every sibling sort site already guards (writing-sidebar, worlds-sidebar,
+      // context-pane-lists); this was the one that did not.
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
 
     if (filtered.length === 0) {
       // Empty ≠ loading: during activation the cache is priming from disk.

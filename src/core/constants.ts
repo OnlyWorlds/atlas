@@ -4,6 +4,7 @@
 
 import { ELEMENT_ICONS as SDK_ELEMENT_ICONS } from '@onlyworlds/sdk';
 import type { ElementType } from './types';
+import { ELEMENT_FAMILIES, elementColor } from './element-colors';
 
 /** Material Symbol name per element type (re-exported from SDK with strict typing). */
 export const ELEMENT_ICONS = SDK_ELEMENT_ICONS as Record<ElementType, string>;
@@ -18,30 +19,18 @@ export const ELEMENT_ICONS = SDK_ELEMENT_ICONS as Record<ElementType, string>;
  * Spatial types (map / pin / marker / zone) get a neutral fallback — they
  * don't appear as graph nodes in the context pane anyway.
  */
-export const ELEMENT_TYPE_COLORS: Record<ElementType, string> = {
-  character:   '#ffd700',
-  creature:    '#e8653a',
-  species:     '#34d399',
-  family:      '#f59e0b',
-  collective:  '#8b5cf6',
-  institution: '#818cf8',
-  location:    '#14b8a6',
-  object:      '#c0c0c0',
-  construct:   '#64748b',
-  ability:     '#a3e635',
-  trait:       '#a855f7',
-  title:       '#ec4899',
-  language:    '#06b6d4',
-  law:         '#78716c',
-  event:       '#3b82f6',
-  narrative:   '#f97316',
-  phenomenon:  '#f43f5e',
-  relation:    '#f472b6',
-  map:         '#94a3b8',
-  pin:         '#94a3b8',
-  marker:      '#94a3b8',
-  zone:        '#94a3b8',
-};
+/**
+ * S308: the 22 hand-picked hues are GONE. This is now derived from the single
+ * family palette in `core/element-colors.ts` — see that file for the measured
+ * reason (the old set failed CVD separation: Title vs Trait were ΔE 1.3 apart
+ * for deutan viewers, Object and Construct read as grey).
+ *
+ * Kept as a named export so existing call sites keep working; new code should
+ * call `elementColor(type)` directly.
+ */
+export const ELEMENT_TYPE_COLORS: Record<ElementType, string> = Object.fromEntries(
+  (Object.keys(ELEMENT_FAMILIES) as ElementType[]).map(t => [t, elementColor(t)]),
+) as Record<ElementType, string>;
 
 /** Friendly singular/plural per element type. */
 export const ELEMENT_LABELS: Record<ElementType, { singular: string; plural: string }> = {

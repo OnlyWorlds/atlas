@@ -80,4 +80,35 @@ describe('searchPalette ranking', () => {
     const [r] = searchPalette('vael', [el({ name: 'Vaelin', supertype: 'Noble', subtype: 'Exile' })]);
     expect(r.hint).toBe('character · Noble · Exile');
   });
+
+  /**
+   * S308 — the Data room. It is BRANDED "Data" (nav tooltip, help overlay, tour
+   * exit summary, waypoints) but still ROUTES on the segment `import`. The
+   * palette used to key on the segment word, so the one word a user would type
+   * after reading the UI found nothing.
+   *
+   * A present/absent PAIR (the S301 law): asserting only that "data" works
+   * would go quietly green again if someone dropped the aliases and renamed the
+   * label back, and asserting only "import" would not have caught the original
+   * bug at all. Both halves, so a regression breaks one loudly.
+   */
+  describe('the Data room is reachable by its label AND its legacy names', () => {
+    const roomOf = (q: string) =>
+      searchPalette(q, []).find(r => r.kind === 'room' && r.id === 'import');
+
+    it('finds it by the branded label the UI everywhere else shows', () => {
+      expect(roomOf('data')).toBeTruthy();
+    });
+
+    it('still finds it by the words a user actually types', () => {
+      expect(roomOf('import')).toBeTruthy();
+      expect(roomOf('export')).toBeTruthy();
+    });
+
+    it('DISPLAYS the branded label whichever word was typed', () => {
+      // Typing the old word should find the room and then teach its new name.
+      expect(roomOf('import')!.name).toBe('data');
+      expect(roomOf('data')!.name).toBe('data');
+    });
+  });
 });
