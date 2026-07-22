@@ -8,27 +8,34 @@
  * and the footer gear (in shell.sidebarFooter).
  */
 
-import { getState, subscribe, patchSlice } from '../core/state';
-import { enqueueActivation, currentActivationGen } from '../core/activation-chain';
+import { currentActivationGen, enqueueActivation } from '../core/activation-chain';
+import { awaitEviction, evictParkedStore, getActiveStore, parkStore, setActiveStore, takeParkedStore } from '../core/active-store';
+import { escapeAttr, escapeText, installRowKeydownActivation } from '../core/dom-utils';
 import {
-  onHashChange, parseHash, navigate, worldHash, settingsHash,
-  writingHash, knowledgeHash, timelineHash, shareHash, importHash,
+  importHash,
+  knowledgeHash,
+  navigate,
+  onHashChange, parseHash,
+  settingsHash,
+  shareHash,
+  timelineHash,
+  worldHash,
+  writingHash,
 } from '../core/router';
-import { setActiveWorld, saveRegistry, setFavorite, setWorldPaused, deleteWorldEntry } from '../registry/registry';
-import { loadHandle, ensureWritable, queryWritable, deleteHandle } from '../store/handle-vault';
-import { FsFolderStore, ELockHeld } from '../store/folder-store-fs';
+import { getState, patchSlice, subscribe } from '../core/state';
+import { deleteWorldEntry, saveRegistry, setActiveWorld, setFavorite, setWorldPaused } from '../registry/registry';
+import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
+import { deleteHandle, ensureWritable, loadHandle, queryWritable } from '../store/handle-vault';
 import { CreateWorldModal } from '../ui/create-world-modal';
-import { setActiveStore, getActiveStore, parkStore, takeParkedStore, evictParkedStore, awaitEviction } from '../core/active-store';
 import { LinkWorldModal } from '../ui/link-world-modal';
-import { escapeText, escapeAttr, installRowKeydownActivation } from '../core/dom-utils';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
+import type { WorldRegistryEntry } from '../core/types';
+import { resetElementDetailScrollMemory } from '../middle/element-detail';
+import { openAccountWorld, refreshAccountWorlds, remoteAccountWorlds } from '../sync/account-worlds';
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
-import { resetElementDetailScrollMemory } from '../middle/element-detail';
-import { refreshAccountWorlds, remoteAccountWorlds, openAccountWorld } from '../sync/account-worlds';
-import { rightTabHashFor } from './sidebar';
 import { ToastManager } from '../ui/toast-manager';
-import type { WorldRegistryEntry } from '../core/types';
+import { rightTabHashFor } from './sidebar';
 
 /** One-time "start here" tour tag on +folder — dismissed forever on first hover. */
 const TOUR_CREATE_SEEN_KEY = 'atlas_tour_create_seen';
@@ -133,7 +140,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           void import('../tour/tour-engine').then(async (engine) => {
             new CreateWorldModal(toasts, undefined, {
               lockedName: 'Hyperion',
-              hint: 'Normally this becomes a folder inside your OnlyWorlds folder. The tour world stays in your browser and folds away when the tour ends.',
+              hint: '',
               overrideCreate: async () => { await engine.createWorldFromTour(); },
             }).open();
           });

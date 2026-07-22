@@ -17,8 +17,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve, join } from 'node:path';
 import { TOUR_STEPS } from '../../src/tour/tour-data';
 
 /**
@@ -116,4 +116,62 @@ describe('tour.spec.ts numbering, read from the actual file', () => {
     // and the new step ships with no e2e coverage at all.
     expect(Math.max(...drivenSteps)).toBe(TOUR_STEPS.length);
   });
+});
+
+/**
+ * EVERY STRING-KEYED STEP LOOKUP IN src/tour/ MUST RESOLVE.
+ *
+ * This is the S308 bug's permanent guard. `tour-bar.ts` hides chrome with
+ * `TOUR_STEPS.findIndex(s => s.id === 'where-it-lives')`, and when S306c merged
+ * that step away `findIndex` returned -1, so `idx < -1` was false for every
+ * step: the guard silently stopped firing and the Web tab sat visible eleven
+ * steps early for three sessions. A renamed identifier does not error, it
+ * quietly evaluates to "never".
+ *
+ * The id list is EXTRACTED FROM THE SOURCE rather than restated here, so this
+ * cannot drift: it guards whatever ids the file actually uses today, including
+ * ones added after this test was written. The map above protects the e2e's
+ * numbering; this protects the app's own gates, and updating one must not be
+ * able to silently satisfy the other.
+ *
+ * Written S310, immediately before a copy pass — the session most likely to
+ * rename a step.
+ */
+describe('string-keyed step lookups in src/tour resolve to real steps', () => {
+  const tourDir = resolve(__dirname, '../../src/tour');
+  const ids = new Set(TOUR_STEPS.map(s => s.id));
+
+  const files = readdirSync(tourDir).filter(f => f.endsWith('.ts'));
+  const scanned = files
+    .map(f => ({ file: f, src: readFileSync(join(tourDir, f), 'utf8') }))
+    .map(({ file, src }) => ({
+      file,
+      referenced: [...src.matchAll(/\b\w*\.id\s*===\s*['"]([a-z0-9-]+)['"]/g)].map(m => m[1]),
+    }))
+    .filter(x => x.referenced.length > 0);
+
+  it('found tour source files to scan', () => {
+    expect(files.length).toBeGreaterThan(5);
+  });
+
+  it('the lookup pattern still matches something (guard the guard)', () => {
+    // If the comparison shape changes (a helper, a Map, optional chaining),
+    // every per-file test below silently stops being generated and this block
+    // asserts nothing at all. `tour-bar.ts` is the known holder today.
+    expect(scanned.length).toBeGreaterThan(0);
+    expect(scanned.flatMap(s => s.referenced).length).toBeGreaterThan(0);
+  });
+
+  for (const file of files) {
+    const src = readFileSync(join(tourDir, file), 'utf8');
+    // `s.id === 'x'` / `step.id === "x"` — the comparison shape that fails open.
+    const referenced = [...src.matchAll(/\b\w*\.id\s*===\s*['"]([a-z0-9-]+)['"]/g)]
+      .map(m => m[1]);
+    if (referenced.length === 0) continue;
+    it(`${file} references only ids that exist in TOUR_STEPS`, () => {
+      for (const id of referenced) {
+        expect(ids.has(id), `${file} looks up step id "${id}", which no longer exists in TOUR_STEPS — the lookup silently returns -1 and its gate stops firing`).toBe(true);
+      }
+    });
+  }
 });

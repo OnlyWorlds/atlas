@@ -177,9 +177,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The opening sentence of Hyperion (1989) by the late Dan Simmons.' +
-        '\n\n' +
-        'What elements do you see that should have a name in this world?',
+        'The opening sentence of the novel Hyperion[hyperlink pls to wiki page] (1989) by the late Dan Simmons.'  ,
     }],
   },
   // ---------------------------------------------------------------- Act 1
@@ -190,7 +188,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Each world needs a folder. Click in the top left to create one for our sentence.' ,
+        'Atlas treats worlds as folders of text files. Let\'s make a world that can capture this sentence.\nClick the [create local world]bold icon in the top left. We\'ll call it Hyperion after the novel.' ,
       meta: 'Normally this would create a local folder, but the tour world stays in your browser.',
     }],
     handsOn: 'create-world',
@@ -202,7 +200,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'The Consul seems pre-eminent in this tiny world. Create him in the sidebar.',
+          'Worlds are made of elements, and this Consul seems pre-eminent.\nClick the highlighted + to create it as a character element.',
         // (The "real element dialog, locked to the tour’s script this once…" meta
         // was cut S301, Captain’s round — the dialog speaks for itself.)
       },
@@ -213,8 +211,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'b',
         when: (w) => w.hasRef('character:The Consul'),
         body:
-          'There he is: your first element, and the first word of the sentence ' +
-          'with a name behind it.',
+          'Here we see the consul\'s page, with a set of shared \'base\' fields, and some that are specific to characters.' +
+          '\nBut there\'s more to this person. You get the next two for free.',
       },
     ],
     spans: [{ from: 2, to: 2, type: 'character', ref: 'character:The Consul' }],
@@ -241,10 +239,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Two more elements: the Hegemony is an institution, an organization in ' +
-        'the world, and “Consul” is a title, its own element, connecting him to ' +
-        'it. Both just appeared in the left sidebar, where every element lives, ' +
-        'filterable by type.',
+        'The Hegemony is an institution: any kind of organized body.' +
+        '\nThe title gets its own element, issued by the Hegemony, held by our character.' ,
     }],
     // One word per element, in reading order (Captain, S306): "The" carries the
     // TITLE, "Hegemony" the institution, and "Consul" is left alone so the
