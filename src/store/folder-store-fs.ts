@@ -913,8 +913,37 @@ export class FsFolderStore implements FolderStore {
       const deps = await this.findDependents(id);
       for (const dep of deps) {
         const tomb: Tombstone = { id: dep.id, type: dep.type, deleted_at: this.clock() };
-        await this.appendTombstone(tomb);
-        await this.unlinkElement(dep);
+        // EACH DEPENDENT GOES THROUGH ITS OWN WRITE CHAIN (S310).
+        //
+        // `deleteElement` serializes on the TARGET's id only. The cascade used
+        // to unlink descendants directly from inside that slot, and
+        // `PerIdWriteChain` is per-id by design ("operations on DIFFERENT
+        // elements stay concurrent"), so a concurrent `updateElement(dep.id)`
+        // was NOT serialized against that dependent's deletion.
+        //
+        // The interleaving that loses data: the update's read resolves before
+        // `unlinkElement(dep)` removes the file, and its `writeJsonAtomic`
+        // lands after — RECREATING the file and restoring it to `fileIndex`
+        // and `bodyCache`, while the tombstone is already logged. The next
+        // sync round then pushes a DELETE for an element that still exists
+        // locally: permanent divergence, and atlas has no undo.
+        //
+        // Realistic trigger: the writing workspace flushes a debounced save
+        // for the narrative you just switched away from (`flushPendingSave` is
+        // fired-and-forgotten on switch and unmount), and a subtree delete
+        // lands in that window. Found by the S310 integration gate — the
+        // keeper had noticed the bypass and moved on without following it.
+        //
+        // The guard below matters: we are already INSIDE `run(id, ...)`, so
+        // re-entering the same id would await our own tail and deadlock.
+        // `findDependents` never returns the target today; this keeps that
+        // from becoming a silent hang if it ever does.
+        const unlinkDep = async (): Promise<void> => {
+          await this.appendTombstone(tomb);
+          await this.unlinkElement(dep);
+        };
+        if (dep.id === id) await unlinkDep();
+        else await this.writeChain.run(dep.id, unlinkDep);
         written.push(tomb);
       }
     }

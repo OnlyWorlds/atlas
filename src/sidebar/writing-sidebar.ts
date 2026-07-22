@@ -15,7 +15,7 @@ import { ToastManager } from '../ui/toast-manager';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
-import { saveRegistry, toggleWritingTreeCollapsed } from '../registry/registry';
+import { saveRegistry, toggleWritingTreeCollapsed, getEditorSettings } from '../registry/registry';
 import {
   getWritingLabels,
   iconForTier,
@@ -30,6 +30,9 @@ import {
 import type { Element } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { bulkLinkNarratives } from '../middle/writing-bulk-link';
+import { decideDeleteConfirm } from '../core/delete-confirm';
+import { requestPushIfLinked } from '../sync/sync-attach';
+import { isTourFlagActive } from '../tour/tour-flag';
 
 async function createNarrativeAtTier(
   tier: 'l1' | 'l2' | 'l3' | 'l4',
@@ -580,6 +583,29 @@ function openTreeContextMenu(
       <span>Unlink mentions in ${escapeText(scope)}</span>
     </button>
   `;
+
+  // NOT DURING THE TOUR (S310, integration gate).
+  //
+  // The tour's `the-writing` step reveals the Hyperion book and its Chapter 1
+  // and gates advance on the chip count inside that chapter's story. The
+  // writing tree is fully reachable while touring (there is no overlay and
+  // `.atlas-tour-locked` is deliberately not pointer-events:none), so a
+  // right-click Delete on the book would cascade the chapter away, leave the
+  // advance gate permanently unsatisfiable, and render no Next — a soft-locked
+  // tour whose only escape is stepping back and redoing the user's linking
+  // work. `revealOne` re-creates only on step ENTRY, so there is no self-heal.
+  //
+  // A scripted walkthrough has no business offering destruction of its own
+  // scaffolding. The link/unlink items above stay: they are reversible and the
+  // step is about linking.
+  if (!isTourFlagActive()) {
+    menu.insertAdjacentHTML('beforeend', `
+      <button type="button" class="atlas-prose-context-menu-item atlas-context-menu-item-danger" data-role="delete-narrative">
+        <span class="material-symbols-outlined">delete</span>
+        <span>Delete ${escapeText(tierLabel.toLowerCase())}</span>
+      </button>
+    `);
+  }
   menu.style.position = 'fixed';
   menu.style.left = `${e.clientX}px`;
   menu.style.top = `${e.clientY}px`;
@@ -609,8 +635,65 @@ function openTreeContextMenu(
     });
   });
 
+  menu.querySelector<HTMLElement>('[data-role="delete-narrative"]')?.addEventListener('click', () => {
+    dismissTreeMenu();
+    void deleteNarrativeSubtree(node, toasts);
+  });
+
   queueMicrotask(() => {
     document.addEventListener('mousedown', onTreeMenuOutside, true);
     document.addEventListener('keydown', onTreeMenuKey, true);
   });
+}
+
+/**
+ * Delete a narrative and everything beneath it, from the tree's right-click
+ * menu (S310).
+ *
+ * Routed through `decideDeleteConfirm` so this gesture and the workspace
+ * header trash cannot drift apart — they are the same destructive act reached
+ * two ways, and the confirm text is the user's only warning before an
+ * irreversible loss.
+ *
+ * ORDER MATTERS. The URL is the source of truth for which narrative the
+ * workspace renders (convention #46). If the open narrative is inside the
+ * doomed subtree we navigate AWAY FIRST, so the workspace unmounts its editor
+ * before the element disappears from under it. Deleting first would leave the
+ * middle pane mounted on a element that no longer exists, and — worse — the
+ * editor's debounced save could still be holding the deleted narrative.
+ */
+async function deleteNarrativeSubtree(node: NarrativeNode, toasts: ToastManager): Promise<void> {
+  const store = getActiveStore();
+  const worldId = getState().active?.worldId;
+  if (!store || !worldId) return;
+  const el = node.el;
+
+  let dependents: Element[] = [];
+  try {
+    dependents = await store.findDependents(el.id);
+  } catch { /* fall through with none */ }
+
+  const decision = decideDeleteConfirm({
+    el,
+    dependents,
+    allElements: getState().data.elements,
+    labels: getWritingLabels(worldId),
+    confirmPref: getEditorSettings(getState().registry).confirm_before_delete,
+  });
+  if (decision.needed && !window.confirm(decision.message)) return;
+
+  // Navigate away BEFORE the delete if the open narrative is going with it.
+  const doomed = new Set<string>([el.id, ...dependents.map(d => d.id)]);
+  const openId = parseHash(window.location.hash).narrativeId;
+  if (openId && doomed.has(openId)) navigate(writingHash(worldId));
+
+  try {
+    await store.deleteElement(el.id);
+    await refreshElementsAfterWrite(store);
+    requestPushIfLinked();
+    toasts.success(`Deleted ${el.name || 'narrative'}`);
+  } catch (err) {
+    console.error('[writing-sidebar] delete failed', err);
+    toasts.error(err instanceof Error ? err.message : String(err));
+  }
 }

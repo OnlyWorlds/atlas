@@ -35,8 +35,9 @@ import { buildMentionItems } from './writing-workspace-mention-items';
 import { createWordCount } from './writing-workspace-word-count';
 import { createStickyBar } from './writing-workspace-sticky-bar';
 import { createProseContextMenu } from './writing-workspace-context-menu';
-import { countAutolinkHints, convertAllAutolinks, unlinkAllChips } from './writing-workspace-autolink';
+import { convertAllAutolinks, unlinkAllChips } from './writing-workspace-autolink';
 import { setLiveEditorOps } from './writing-live-editor-ops';
+import { createLinkAllCorner } from './prose-linkall-corner';
 import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { JSONContent } from '@tiptap/core';
 
@@ -594,43 +595,18 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   }
 
   /**
-   * The link-all corner button — created lazily on the workspace root,
-   * shown only while the live editor has ≥1 autolink hint. The count rides
-   * in a small badge; the title names the gesture.
+   * The link-all corner button. Lifted to `prose-linkall-corner.ts` in S310 so
+   * the KNOWLEDGE room can mount the same affordance — it mounts the same
+   * editor into a host carrying the same prose class and had been missing this
+   * button since S265. Behavior here is unchanged.
    */
+  const linkAllCorner = createLinkAllCorner({
+    getHost: () => root.querySelector<HTMLElement>('.atlas-writing-workspace-prose'),
+    getView: () => editorHandle?.editor.view,
+    toasts: toastManager,
+  });
   function refreshLinkAllWidget(): void {
-    // Anchored INSIDE the prose panel's top-right (Captain, S265) — the panel
-    // is position:relative; the pill rides its background, not the workspace
-    // edge.
-    const host = root.querySelector<HTMLElement>('.atlas-writing-workspace-prose');
-    if (!host) return;
-    let btn = host.querySelector<HTMLButtonElement>(':scope > .atlas-writing-linkall-corner');
-    const view = editorHandle?.editor.view;
-    const count = view ? countAutolinkHints(view) : 0;
-    if (count === 0) {
-      btn?.setAttribute('data-active', 'false');
-      return;
-    }
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'atlas-writing-linkall-corner';
-      btn.innerHTML = `
-        <span class="material-symbols-outlined">link</span>
-        <span class="atlas-writing-linkall-count"></span>
-      `;
-      btn.addEventListener('click', () => {
-        const v = editorHandle?.editor.view;
-        if (!v) return;
-        const n = convertAllAutolinks(v);
-        if (n > 0) toastManager.info(`Linked ${n} element${n === 1 ? '' : 's'} · Ctrl+Z undoes`);
-      });
-      host.appendChild(btn);
-    }
-    btn.setAttribute('data-active', 'true');
-    btn.title = `Link ${count} mentioned element${count === 1 ? '' : 's'}`;
-    const badge = btn.querySelector<HTMLElement>('.atlas-writing-linkall-count');
-    if (badge) badge.textContent = String(count);
+    linkAllCorner.refresh();
   }
 
   function teardownEditor(): void {
@@ -639,7 +615,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       editorHandle = null;
     }
     setLiveEditorOps(null);
-    root.querySelector('.atlas-writing-linkall-corner')?.setAttribute('data-active', 'false');
+    linkAllCorner.deactivate();
     mountedForId = null;
     lastSavedMarkdown = null;
     lastRefreshEl = null;

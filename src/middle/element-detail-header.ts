@@ -39,6 +39,7 @@ import { panMapTabTo } from '../tabs/right/map-tab';
 import { createMapDialog } from '../ui/map-create-modal';
 import { getMapsSettings } from '../registry/registry';
 import { escapeText } from '../core/dom-utils';
+import { decideDeleteConfirm } from '../core/delete-confirm';
 
 /**
  * Pending "auto-edit on next render" signal. When set to an element id, the
@@ -816,18 +817,28 @@ async function deletePinFromHeader(pinId: string, mapName: string): Promise<void
 async function onDelete(el: Element): Promise<void> {
   const store = getActiveStore();
   if (!store) return;
-  // Confirmation is gated by the Editing setting (default on). When on, the
-  // dialog also surfaces the cascade count so the cost is concrete.
-  if (getEditorSettings(getState().registry).confirm_before_delete) {
-    let dependentCount = 0;
-    try {
-      const dependents = await store.findDependents(el.id);
-      dependentCount = dependents.length;
-    } catch { /* fall through with 0 */ }
-    const extra = dependentCount > 0 ? ` This will also remove ${dependentCount} dependent element${dependentCount === 1 ? '' : 's'}.` : '';
-    const ok = window.confirm(`Delete "${el.name || el.id}"?${extra}`);
-    if (!ok) return;
-  }
+  // Confirmation is gated by the Editing setting (default on) — EXCEPT when the
+  // delete cascades, which always confirms (S310). See `decideDeleteConfirm`:
+  // the setting says "before deleting an element", singular, so a delete that
+  // destroys a whole subtree was never inside its opt-out, and atlas has no
+  // undo. Verified live: a Book delete with the preference off silently
+  // destroyed 8 of 9 elements.
+  //
+  // Dependents are fetched UNCONDITIONALLY now (they used to be fetched only
+  // inside the preference branch) because the cascade is what decides whether
+  // we ask at all.
+  let dependents: Element[] = [];
+  try {
+    dependents = await store.findDependents(el.id);
+  } catch { /* fall through with none — a failed probe must not block a delete */ }
+  const decision = decideDeleteConfirm({
+    el,
+    dependents,
+    allElements: getState().data.elements,
+    labels: getWritingLabels(getState().active?.worldId ?? ''),
+    confirmPref: getEditorSettings(getState().registry).confirm_before_delete,
+  });
+  if (decision.needed && !window.confirm(decision.message)) return;
   try {
     await store.deleteElement(el.id);
     const elements = await store.listElements();

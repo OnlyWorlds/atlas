@@ -104,7 +104,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       const folderDoor = folderMode
         ? `<span class="atlas-landing-choice">
              <button class="${folderBtnClass} atlas-landing-btn" data-action="setup-atlas">set up a folder</button>
-             <span class="atlas-landing-choice-note">your worlds as plain files you keep</span>
+             <span class="atlas-landing-choice-note">each world a folder with text files for elements</span>
            </span>`
         : '';
       const folderNote = folderMode
@@ -141,6 +141,15 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       const tourBtn = root.querySelector<HTMLButtonElement>('[data-action="start-tour"]')!;
       tourBtn.addEventListener('click', async () => {
         tourBtn.disabled = true;
+        // CAPTURE the rendered label rather than restating it (S310). Both
+        // restores below used to hard-code a string that no longer matched
+        // what the markup renders — the door says "take the tour" and this
+        // said "Take the tour"; the folder door says "set up a folder" and its
+        // restore said "Set up your OnlyWorlds folder". A cancelled picker or
+        // a failed launch RENAMED the landing button, on the first screen of
+        // the tool. A restated constant is a drift waiting for a quiet
+        // afternoon; read the source of truth instead.
+        const tourLabel = tourBtn.textContent ?? '';
         tourBtn.textContent = 'Starting…';
         try {
           const engine = await import('../tour/tour-engine');
@@ -148,12 +157,13 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         } catch (err) {
           toastManager.error(err instanceof Error ? err.message : String(err));
           tourBtn.disabled = false;
-          tourBtn.textContent = 'Take the tour';
+          tourBtn.textContent = tourLabel;
         }
       });
       const btn = root.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]');
       if (!btn) return;
       btn.addEventListener('click', async () => {
+        const setupLabel = btn.textContent ?? '';
         btn.disabled = true;
         btn.textContent = 'Picking…';
         try {
@@ -169,9 +179,9 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           toastManager.error(err instanceof Error ? err.message : String(err));
         } finally {
           // On success a state change re-renders this panel away; on cancel
-          // the button stays visible, so restore its original label.
+          // the button stays visible, so restore the label it actually had.
           btn.disabled = false;
-          btn.textContent = 'Set up your OnlyWorlds folder';
+          btn.textContent = setupLabel;
         }
       });
       return;

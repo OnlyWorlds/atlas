@@ -6,7 +6,22 @@
  * palette just matched by description).
  *
  * Tiers (higher = better): name prefix 100 · name substring 80 · alias 70 ·
- * supertype/subtype 60 · description 40 (with a context snippet).
+ * supertype/subtype 60 · description 40 · story 30 (both with a context
+ * snippet).
+ *
+ * STORY is the prose body of a Narrative — the writing room's actual content.
+ * It ranks LAST on purpose: a word appearing somewhere inside a chapter is the
+ * weakest possible signal that the chapter is what you meant, so a story hit
+ * must never outrank a name or even a description hit. It is included at all
+ * because "find the scene where I wrote about the swamps" is a real thing
+ * writers need and nothing else in atlas answers it.
+ *
+ * PERF (measured, S310, not assumed): on a worst-case 588-element world
+ * carrying 2 MB of prose, adding this tier moved a full-world query from
+ * 0.090 ms to 0.705 ms. That is 7.8x relative and irrelevant absolute — a
+ * keystroke has ~16 ms before it drops a frame, so this spends 4% of the
+ * budget. Re-measure before adding any further full-text tier; the ratio is
+ * the thing that will keep growing.
  */
 
 import type { Element } from './types';
@@ -36,12 +51,22 @@ export function scoreElementMatch(el: Element, q: string): ElementMatch | null {
   const desc = String((el as Record<string, unknown>).description ?? '');
   const at = desc.toLowerCase().indexOf(q);
   if (desc && at >= 0) {
-    const start = Math.max(0, at - SNIPPET_RADIUS);
-    const end = Math.min(desc.length, at + q.length + SNIPPET_RADIUS);
-    const snippet = `${start > 0 ? '…' : ''}${desc.slice(start, end).trim()}${end < desc.length ? '…' : ''}`;
-    return { score: 40, snippet };
+    return { score: 40, snippet: snippetAround(desc, at, q.length) };
+  }
+  // Prose body, last: see the tier note in the module header.
+  const story = String((el as Record<string, unknown>).story ?? '');
+  const storyAt = story.toLowerCase().indexOf(q);
+  if (story && storyAt >= 0) {
+    return { score: 30, snippet: snippetAround(story, storyAt, q.length) };
   }
   return null;
+}
+
+/** Context window around a match, elided on whichever sides were cut. */
+function snippetAround(text: string, at: number, queryLength: number): string {
+  const start = Math.max(0, at - SNIPPET_RADIUS);
+  const end = Math.min(text.length, at + queryLength + SNIPPET_RADIUS);
+  return `${start > 0 ? '…' : ''}${text.slice(start, end).trim()}${end < text.length ? '…' : ''}`;
 }
 
 /** Boolean form for filter surfaces (the elements sidebar). Query may be raw. */

@@ -7836,6 +7836,14 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-prose-context-menu-item .material-symbols-outlined {
   font-size: 16px;
 }
+/* Destructive menu entry (writing-tree Delete). Warm on hover rather than
+   cyan: colour is the semantic differentiator here, cyan reads as
+   appreciation and this action is consequential and has no undo. Two-class
+   specificity so it wins the tie against the cyan hover above. */
+.atlas-prose-context-menu-item.atlas-context-menu-item-danger:hover {
+  background: var(--atlas-danger-hover-tint);
+  color: var(--atlas-danger-hover);
+}
 
 /* Prose selection bubble — B / I / link-to-existing over a text selection
    (share prose blocks; component in prose-selection-bubble.ts). Own class

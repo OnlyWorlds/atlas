@@ -949,3 +949,242 @@ test('right-click "Link to existing element" chips the selection and records an 
   }, heroId)).toEqual(['weary halfling']);
   await expect(chip).toHaveText('weary halfling');
 });
+
+// ===========================================================================
+// Writing-tree delete (S310, Bout W)
+//
+// Guards a verified data-loss path: before S310, deleting a Book with the
+// confirm preference OFF destroyed its entire subtree with no dialog at all
+// (measured live: 8 of 9 elements gone on one click, no undo anywhere).
+// ===========================================================================
+
+/** Build Book > Chapter > 2 Scenes, plus an off-tree narrative under the chapter. */
+async function createManuscript(page: Page) {
+  const book = await createElement(page, 'narrative', { name: 'The Cycle', supertype: 'Book' });
+  const chapter = await createElement(page, 'narrative', {
+    name: 'Chapter One', supertype: 'Chapter', parent_narrative: book,
+  });
+  const sceneA = await createElement(page, 'narrative', {
+    name: 'Scene A', supertype: 'Scene', parent_narrative: chapter,
+  });
+  const sceneB = await createElement(page, 'narrative', {
+    name: 'Scene B', supertype: 'Scene', parent_narrative: chapter,
+  });
+  // Free-texted supertype: INVISIBLE in the writing tree (buildNarrativeIndex
+  // filters by tier label) but still deleted by the cascade. The confirm has
+  // to name it or the user loses prose the UI never showed them.
+  const offTree = await createElement(page, 'narrative', {
+    name: 'Interlude', supertype: 'Interlude', parent_narrative: chapter,
+  });
+  const survivor = await createElement(page, 'narrative', {
+    name: 'Other Book', supertype: 'Book',
+  });
+  return { book, chapter, sceneA, sceneB, offTree, survivor };
+}
+
+/**
+ * Mark the world's writing room as set up, the way "Save and start writing"
+ * does. Needed because `isWritingInitialized` returns FALSE for a world whose
+ * chain contains a member with a non-label supertype — our off-tree Interlude
+ * is exactly such a member, so without this the "Set up writing" screen takes
+ * the middle pane and the header (with its delete button) never renders.
+ * Read off the failed-test screenshot plus `writing-helpers.ts:260-300`,
+ * rather than guessed at.
+ *
+ * This models the realistic path to an off-tree narrative: the user sets up
+ * writing, then later free-texts one narrative's supertype, which
+ * DESIGN_WRITING.md documents as removing it from the tree.
+ */
+async function markWritingInitialized(page: Page) {
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const reg = JSON.parse(JSON.stringify(api.getState().registry));
+    const worldId = window.location.hash.match(/#\/w\/([^/]+)/)?.[1];
+    const entry = reg.worlds.find((w: any) => w.id === worldId);
+    if (entry) {
+      entry.writing_labels = { l1: 'Book', l2: 'Chapter', l3: 'Scene', l4: 'Draft' };
+      entry.writing_initialized = true;
+    }
+    localStorage.setItem('atlas_registry_v1', JSON.stringify(reg));
+    api.patchSlice('registry', reg);
+  });
+}
+
+/**
+ * Elements currently on disk, or -1 while the page is not ready to answer.
+ *
+ * Returns a SENTINEL rather than throwing because this is called inside
+ * `expect.poll`: a throw fails the poll outright, while a wrong-but-valid
+ * value lets it retry. Under a loaded 4-worker run the deleting-the-open-
+ * narrative test caught `__atlasTestApi` momentarily undefined mid-navigation
+ * and failed on a transient rather than on the behaviour under test. The
+ * assertion still has to REACH the expected count, so nothing is weakened.
+ */
+async function elementCount(page: Page): Promise<number> {
+  return await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    if (!api) return -1;
+    const store = api.getActiveStore();
+    if (!store) return -1;
+    return (await store.listElements()).length;
+  });
+}
+
+test('writing tree: delete names the whole subtree in the user vocabulary', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-delete-root');
+  await createWorld(page, 'delete world');
+  const ids = await createManuscript(page);
+  await gotoWriting(page, ids.book);
+
+  // The off-tree narrative is genuinely absent from the tree — this is what
+  // makes naming it in the confirm load-bearing rather than cosmetic.
+  await expect(page.locator('.atlas-writing-tree-row', { hasText: 'Chapter One' })).toBeVisible();
+  await expect(page.locator('.atlas-writing-tree-row', { hasText: 'Interlude' })).toHaveCount(0);
+
+  const messages: string[] = [];
+  page.on('dialog', d => { messages.push(d.message()); void d.dismiss(); });
+
+  await page.locator('.atlas-writing-tree-row', { hasText: 'Chapter One' }).first()
+    .click({ button: 'right' });
+  await page.locator('[data-role="delete-narrative"]').click();
+
+  await expect.poll(() => messages.length).toBe(1);
+  expect(messages[0]).toBe(
+    'Delete "Chapter One"? This also deletes 2 scenes and 1 other narrative. This cannot be undone.',
+  );
+  // Dismissed = nothing lost.
+  // Poll rather than read once: the helper returns -1 while the page is not
+  // ready, and a dismissed dialog means the steady state IS 6.
+  await expect.poll(() => elementCount(page)).toBe(6);
+});
+
+test('writing tree: accepting deletes the subtree and leaves siblings alone', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-delete-root-2');
+  await createWorld(page, 'delete world 2');
+  const ids = await createManuscript(page);
+  await gotoWriting(page, ids.book);
+  page.on('dialog', d => d.accept());
+
+  await page.locator('.atlas-writing-tree-row', { hasText: 'Chapter One' }).first()
+    .click({ button: 'right' });
+  await page.locator('[data-role="delete-narrative"]').click();
+
+  // chapter + 2 scenes + the off-tree interlude == 4 gone; book and the
+  // unrelated second book survive.
+  await expect.poll(() => elementCount(page)).toBe(2);
+  await expect(page.locator('.atlas-writing-tree-row', { hasText: 'The Cycle' })).toBeVisible();
+  await expect(page.locator('.atlas-writing-tree-row', { hasText: 'Other Book' })).toBeVisible();
+});
+
+test('writing tree: deleting the open narrative navigates out of the doomed subtree', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-delete-root-3');
+  await createWorld(page, 'delete world 3');
+  const ids = await createManuscript(page);
+  // Open a SCENE, then delete its parent chapter. The URL is the source of
+  // truth for what the workspace renders, so it must move before the element
+  // disappears — otherwise the middle pane sits on a deleted narrative.
+  await gotoWriting(page, ids.sceneA);
+  await markWritingInitialized(page);
+  await gotoWriting(page, ids.sceneA);
+  await waitForEditor(page);
+  page.on('dialog', d => d.accept());
+
+  await page.locator('.atlas-writing-tree-row', { hasText: 'Chapter One' }).first()
+    .click({ button: 'right' });
+  await page.locator('[data-role="delete-narrative"]').click();
+
+  await expect.poll(() => page.evaluate(() => window.location.hash))
+    .toMatch(/\/writing$/);
+  // POLL the count, never read it once: the handler navigates BEFORE it
+  // awaits the delete, so the route change is a sync point that PRECEDES the
+  // work under test. Asserting the count immediately after the route settles
+  // reads the world mid-delete and fails on correct code.
+  await expect.poll(() => elementCount(page)).toBe(2);
+});
+
+test('the confirm FLOOR fires even when the user turned confirmations off', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-delete-root-4');
+  await createWorld(page, 'delete world 4');
+  const ids = await createManuscript(page);
+
+  // Turn the preference OFF through the registry, the way Settings does.
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const reg = JSON.parse(JSON.stringify(api.getState().registry));
+    reg.editor_settings = { ...(reg.editor_settings || {}), confirm_before_delete: false };
+    localStorage.setItem('atlas_registry_v1', JSON.stringify(reg));
+    api.patchSlice('registry', reg);
+  });
+
+  await markWritingInitialized(page);
+  await gotoWriting(page, ids.book);
+  await expect(page.locator('[data-action="delete-element"]')).toBeVisible();
+  const messages: string[] = [];
+  page.on('dialog', d => { messages.push(d.message()); void d.dismiss(); });
+
+  // The header trash — the exact path that silently destroyed a manuscript.
+  await page.locator('[data-action="delete-element"]').click();
+
+  await expect.poll(() => messages.length).toBe(1);
+  expect(messages[0]).toContain('This cannot be undone.');
+  // Poll rather than read once: the helper returns -1 while the page is not
+  // ready, and a dismissed dialog means the steady state IS 6.
+  await expect.poll(() => elementCount(page)).toBe(6);
+});
+
+test('a childless narrative still honours the confirm preference being off', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-delete-root-5');
+  await createWorld(page, 'delete world 5');
+  const lone = await createElement(page, 'narrative', { name: 'Lone Scene', supertype: 'Scene' });
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const reg = JSON.parse(JSON.stringify(api.getState().registry));
+    reg.editor_settings = { ...(reg.editor_settings || {}), confirm_before_delete: false };
+    localStorage.setItem('atlas_registry_v1', JSON.stringify(reg));
+    api.patchSlice('registry', reg);
+  });
+  await gotoWriting(page, lone);
+
+  let dialogs = 0;
+  page.on('dialog', d => { dialogs += 1; void d.accept(); });
+  await page.locator('[data-action="delete-element"]').click();
+
+  // No cascade means the floor does not apply: the preference is respected.
+  await expect.poll(() => elementCount(page)).toBe(0);
+  expect(dialogs).toBe(0);
+});
+
+test('the tree Delete item is HIDDEN during the tour (it would soft-lock it)', async ({ page }) => {
+  // The absent half of the pair. The tour's writing beat reveals a Book and
+  // its Chapter and gates advance on chips inside that chapter's story, so a
+  // cascade delete of the book leaves the gate permanently unsatisfiable and
+  // renders no Next — a soft-locked tour with no self-heal (`revealOne` only
+  // re-creates on step entry). The writing tree is fully reachable while
+  // touring: there is no overlay and `.atlas-tour-locked` is deliberately not
+  // pointer-events:none.
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-delete-root-tour');
+  await createWorld(page, 'delete world tour');
+  const ids = await createManuscript(page);
+  await markWritingInitialized(page);
+
+  // Raise the tour's presence flag the way the engine does (isTourFlagActive
+  // is a pure localStorage read, deliberately engine-free).
+  await page.evaluate(() => {
+    localStorage.setItem('atlas_tour_v1', JSON.stringify({ active: true }));
+  });
+  await gotoWriting(page, ids.book);
+
+  await page.locator('.atlas-writing-tree-row', { hasText: 'Chapter One' }).first()
+    .click({ button: 'right' });
+
+  // The menu still opens with its reversible items…
+  await expect(page.locator('[data-role="bulk-link"]')).toBeVisible();
+  // …and the destructive one is simply not there.
+  await expect(page.locator('[data-role="delete-narrative"]')).toHaveCount(0);
+});

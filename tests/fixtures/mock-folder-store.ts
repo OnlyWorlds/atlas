@@ -229,7 +229,24 @@ export class MockFolderStore implements FolderStore {
         for (const dep of deps) {
           const tomb: Tombstone = { id: dep.id, type: dep.type, deleted_at: this.clock() };
           this.tombstones.push(tomb);
-          this.elements.delete(dep.id);
+          // Mirror the real store's tombstone WRITE before the unlink
+          // (`await this.appendTombstone(tomb)` — a full read-modify-write of
+          // tombstones.json). Without this yield the fake could not exhibit
+          // the cascade-vs-update race that the real store has, and a test
+          // written against it passed on unfixed code: a false green.
+          // Fakes encode real I/O gaps (convention #20).
+          await Promise.resolve();
+          // Each dependent goes through ITS OWN write chain, mirroring
+          // FsFolderStore (S310) — deleting inside the TARGET's slot leaves a
+          // concurrent update to the dependent unserialized, and its write can
+          // land after the delete and resurrect the element.
+          if (dep.id === id) {
+            this.elements.delete(dep.id);
+          } else {
+            await this.writeChain.run(dep.id, async () => {
+              this.elements.delete(dep.id);
+            });
+          }
           written.push(tomb);
         }
       }

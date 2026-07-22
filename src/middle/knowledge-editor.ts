@@ -30,6 +30,7 @@ import { getActiveStore } from '../core/active-store';
 import { mountWorkspaceEditor, type WorkspaceEditorHandle } from './writing-workspace-editor';
 import { buildMentionItems } from './writing-workspace-mention-items';
 import { createChipPreview, type ChipPreviewController } from './writing-workspace-chip-preview';
+import { createLinkAllCorner } from './prose-linkall-corner';
 import { pushRecent } from './writing-workspace-recents';
 import { findAutolinkCandidateAt, convertAutolinkAt } from './writing-workspace-autolink';
 import { ElementCreateModal } from '../ui/element-create-modal';
@@ -306,6 +307,19 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
 
   let lastSeenElementsRef: Element[] | null = getState().data.elements;
 
+  // The link-all corner (S310). The knowledge room mounts the same editor with
+  // the same autolink plugin into a host that already carries the writing
+  // prose class, so it earns the same one-click affordance the writing room
+  // has had since S265 — it was simply never lifted here (the S308 sweep's
+  // "decision applied to ONE surface" class).
+  const linkAllCorner = createLinkAllCorner({
+    getHost: () => host,
+    getView: () => editorHandle.editor.view,
+    toasts,
+  });
+  editorHandle.editor.on('transaction', () => linkAllCorner.refresh());
+  linkAllCorner.refresh();
+
   return {
     refresh(elements: Element[]): void {
       syncLabels(editorHandle, elements);
@@ -314,6 +328,9 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
         lastSeenElementsRef = elements;
       }
       applySpellcheck(editorHandle);
+      // A rebuilt autolink index changes the hint count, so the badge has to
+      // recount here as well as on transactions.
+      linkAllCorner.refresh();
     },
     getMarkdown: () => editorHandle.getMarkdown(),
     getJson: () => editorHandle.getJson(),
@@ -322,6 +339,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
       roomRoot.removeEventListener('contextmenu', onContextMenu);
       dismissMenu();
       chipPreview.destroy();
+      linkAllCorner.destroy();
       editorHandle.destroy();
     },
   };
