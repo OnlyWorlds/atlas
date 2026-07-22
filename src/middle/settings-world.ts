@@ -25,6 +25,7 @@ import {
   detachSyncEngine,
   getCurrentSyncEngine,
   pullNowAndRefresh,
+  requestPushIfLinked,
 } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
 import type { WorldRegistryEntry } from '../core/types';
@@ -53,6 +54,12 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       <label class="atlas-settings-field">
         <span>Name</span>
         <input class="atlas-input" type="text" name="world-name" value="${escapeAttr(world.name)}" />
+      </label>
+      <label class="atlas-settings-field">
+        <span>Image URL</span>
+        <input class="atlas-input" type="text" name="world-image-url"
+          value="${escapeAttr(((getState().active?.meta ?? {}) as { image_url?: string }).image_url ?? '')}"
+          placeholder="https://… (the world's cover image)" />
       </label>
       <dl class="atlas-settings-meta">
         <dt>State</dt><dd>${stateLabel}</dd>
@@ -90,6 +97,31 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     saveRegistry(next);
     patchSlice('registry', next);
     toasts.info('Renamed');
+  });
+
+  // World image URL (Captain, S311): the ONE meta field with no edit surface
+  // anywhere in the ecosystem right now. Persists like the home page's
+  // description edit — writeWorldMeta + the active.meta mirror — and rides the
+  // world-meta sync (image_url is one of the eight synced fields; the ≤1024
+  // wire guard is checked here so the failure is a field error, not a sync one).
+  const imageInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="world-image-url"]');
+  imageInput?.addEventListener('change', () => {
+    void (async () => {
+      const v = imageInput.value.trim();
+      if (v.length > 1024) { toasts.error('Image URL is too long (max 1024 characters)'); return; }
+      const store = getActiveStore();
+      const active = getState().active;
+      if (!store || !active) { toasts.error('No active world'); return; }
+      try {
+        await store.writeWorldMeta({ image_url: v });
+        patchSlice('active', { ...active, meta: { ...active.meta, image_url: v } });
+        requestPushIfLinked();
+        toasts.info(v ? 'World image saved' : 'World image cleared');
+      } catch (err) {
+        console.error('[settings] world image save failed:', err);
+        toasts.error('Failed to save world image');
+      }
+    })();
   });
 
   const pausedInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="world-paused"]');

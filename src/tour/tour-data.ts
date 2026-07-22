@@ -176,8 +176,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
     act: 1,
     phases: [{
       id: 'a',
+      // The book link renders in the extras row below (tour-bar, S311) — the
+      // body is plain text by design, so no inline anchors.
       body:
-        'The opening sentence of the novel Hyperion[hyperlink pls to wiki page] (1989) by the late Dan Simmons.'  ,
+        'The opening sentence of the novel Hyperion (1989) by the late Dan Simmons.',
     }],
   },
   // ---------------------------------------------------------------- Act 1
@@ -188,7 +190,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Atlas treats worlds as folders of text files. Let\'s make a world that can capture this sentence.\nClick the [create local world]bold icon in the top left. We\'ll call it Hyperion after the novel.' ,
+        'Atlas treats worlds as folders of text files. Let’s make a world that can capture this sentence.\n' +
+        'Click the **create local world** icon in the top left. We’ll call it Hyperion after the novel.',
       meta: 'Normally this would create a local folder, but the tour world stays in your browser.',
     }],
     handsOn: 'create-world',
@@ -211,8 +214,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'b',
         when: (w) => w.hasRef('character:The Consul'),
         body:
-          'Here we see the consul\'s page, with a set of shared \'base\' fields, and some that are specific to characters.' +
-          '\nBut there\'s more to this person. You get the next two for free.',
+          'Here we see the Consul’s page, with a set of shared “base” fields, and some that are specific to characters.' +
+          '\nBut there’s more to this person. You get the next two for free.',
       },
     ],
     spans: [{ from: 2, to: 2, type: 'character', ref: 'character:The Consul' }],
@@ -252,7 +255,13 @@ export const TOUR_STEPS: readonly TourStep[] = [
       { from: 1, to: 1, type: 'institution' },
     ],
     reveal: ['institution:The Hegemony', 'title:Consul of the Hegemony'],
-    route: { kind: 'element', ref: 'institution:The Hegemony' },
+    // Routes to the TITLE, scrolled to its Mandate section (Captain, S311):
+    // grant date, issuer, holders — the clearest link cluster in the young
+    // world, and the copy teaches issued-by/held-by against exactly those
+    // rows. (It routed to the institution before; the Hegemony's page is
+    // richer prose but its links sit below the dock at default scroll.)
+    route: { kind: 'element', ref: 'title:Consul of the Hegemony' },
+    scrollToSection: 'Mandate',
   },
   // ---------------------------------------------------------------- Act 2 (maps)
   // Locations and the map now come BEFORE the objects (S303 rework): this lights

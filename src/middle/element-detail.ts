@@ -187,11 +187,21 @@ export function mountElementDetail(target: HTMLElement): () => void {
         if (Array.isArray(v)) return v.length > 0;
         return true;
       };
-      const kept = sections.filter(s => s.fields.some(f => populated(f.name)));
+      // S311 (Captain): empty FIELDS hide too, not just empty sections — a
+      // beginner's element pages show only rows that carry content, so the
+      // step's subject (the title's issuer/holders, the Consul's filling
+      // Objects) is never pushed under the dock by blank rows. Fields appear
+      // as the tour populates them. The all-empty fallback keeps the full
+      // first section so the page never renders fieldless.
+      const kept = sections
+        .map(s => ({ ...s, fields: s.fields.filter(f => populated(f.name)) }))
+        .filter(s => s.fields.length > 0);
       sections = kept.length > 0 ? kept : sections.slice(0, 1);
     }
-    sections.forEach((section, idx) => {
-      const sectionEl = renderSection(section, el, idx === 0);
+    sections.forEach((section) => {
+      // Base collapses like every other section (Captain, S311 — it was the
+      // one hardcoded always-expanded section, in tour and tool alike).
+      const sectionEl = renderSection(section, el, false);
       if (sectionEl) detail.appendChild(sectionEl);
     });
 

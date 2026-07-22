@@ -17,11 +17,12 @@
     "character 'Steinway' renamed to 'Mr. Steinway' (S306): the bare key collided with the 'Steinway' alias on object \"The Consul’s Steinway\", and autolink/bulk-link skip any key with 2+ candidates (prose-autolink.ts) -- the sentence’s Steinway could never link",
     "Chapter 1 story baked with NO ow:// chips (S306): the writing beat is hands-on, the user Tab-links the recognised words themselves and bulk-links the rest. The aliases above are what make every surface form recognisable",
     "'Story of the old piano' given supertype 'Draft' (S306): without a writing-label supertype getTierForNarrative returns null and the narrative is INVISIBLE in the writing room. Not revealed during the tour; a curious user finds it after",
-    "the Consul alias list trimmed to ['Consul'] (S306): 'the Consul' never matched anything -- longest-first scanning consumes 'The Hegemony' at the sentence start, so the lowercase variant was dead weight cluttering the element’s field"
+    "the Consul alias list trimmed to ['Consul'] (S306): 'the Consul' never matched anything -- longest-first scanning consumes 'The Hegemony' at the sentence start, so the lowercase variant was dead weight cluttering the element’s field",
+    "world description CLEARED (S311, Captain's call): the 'One sentence of a world...' line read as clutter on the home page during the tour; minimal for now"
   ],
   "world": {
     "name": "Hyperion",
-    "description": "One sentence of a world: the opening line of Hyperion by Dan Simmons, held as OnlyWorlds elements.",
+    "description": "",
     "time_basic_unit": "Year",
     "time_range_min": -400,
     "time_range_max": 100

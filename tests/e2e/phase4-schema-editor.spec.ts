@@ -54,14 +54,22 @@ test.beforeEach(async ({ page }) => {
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');
 });
 
-test('schema-driven detail renders multiple sections with Base always-expanded', async ({ page }) => {
+test('schema-driven detail renders multiple sections with Base collapsible', async ({ page }) => {
   await createElement(page, 'character', 'Aragorn');
 
-  // Detail view has section headers — the first is "Base" without toggle.
+  // Detail view has section headers — the first is "Base", and it collapses
+  // like every other section (Captain, S311: it was the one hardcoded
+  // always-expanded section).
   const sections = page.locator('.atlas-detail-section');
   await expect(sections.first()).toBeVisible();
   await expect(sections.first().locator('.atlas-detail-section-header')).toContainText('Base');
-  await expect(sections.first().locator('.atlas-detail-section-header')).toHaveClass(/no-toggle/);
+  await expect(sections.first().locator('.atlas-detail-section-header')).not.toHaveClass(/no-toggle/);
+  await expect(sections.first().locator('.atlas-detail-section-body')).toBeVisible();
+  await sections.first().locator('.atlas-detail-section-header').click();
+  await expect(sections.first().locator('.atlas-detail-section-body')).toHaveCount(0);
+  // Re-expand so later assertions in this file never inherit a collapsed Base.
+  await sections.first().locator('.atlas-detail-section-header').click();
+  await expect(sections.first().locator('.atlas-detail-section-body')).toBeVisible();
 
   // Multiple sections exist (Base + at least one schema section).
   const count = await sections.count();

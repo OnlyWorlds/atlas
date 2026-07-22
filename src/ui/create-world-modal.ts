@@ -80,7 +80,7 @@ export class CreateWorldModal extends BaseModal {
           <input class="atlas-input" type="text" name="world-name" placeholder="Untitled world" autocomplete="off"
             ${tour ? `value="${escapeText(tour.lockedName)}" readonly` : ''} />
         </label>
-        <p class="atlas-modal-hint">${hint}</p>
+        ${hint ? `<p class="atlas-modal-hint">${hint}</p>` : ''}
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
           <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>

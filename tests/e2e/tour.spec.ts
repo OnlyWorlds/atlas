@@ -26,7 +26,7 @@ async function freshBoot(page: Page) {
 /** Click the tour bar's Next and wait for the step attribute to advance
  *  (the visible act label was cut in S298 — data-tour-step is the contract). */
 async function nextStep(page: Page, expectStep: number) {
-  await page.locator('.atlas-tour-controls button', { hasText: /^Next$/ }).click();
+  await page.locator('.atlas-tour-controls [data-tour-control="next"]').click();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', String(expectStep));
 }
 
@@ -158,8 +158,10 @@ async function openOpener(page: Page) {
   // the sentence (the vignette on black).
   expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-shell'))).toBe(false);
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Start$/ })).toBeVisible();
-  // No docked Next at the opener; Begin is the hand-off.
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  // No docked Next at the opener; Begin is the hand-off. (The opener's Start
+  // IS [data-tour-control="next"], so the absence assertion goes by TEXT here
+  // — the one place the ghost-vs-live locator split does not apply.)
+  await expect(page.locator('.atlas-tour-controls button:not(.atlas-tour-next-ghost)', { hasText: /^Next$/ })).toHaveCount(0);
   // S308, Captain: the opener carries ONE control. Asserted as a PAIR with the
   // Escape route below, because "no Exit button" and "no way out" are one
   // character apart in the implementation and only the first is intended.
@@ -198,7 +200,7 @@ async function createWorldViaModal(page: Page) {
 async function createConsulViaModal(page: Page) {
   await page.locator('[data-action="create-element"]').click();
   await page.locator('.atlas-modal-overlay button', { hasText: /^Create$/ }).click();
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 }
 
 /** Force the just-placed tour pin to the swamps zone's centroid + refresh state
@@ -223,7 +225,7 @@ async function movePinToSwamps(page: Page) {
 /** The pin beat (step 7): the REAL +pin button on the Consul (highlighted),
  *  a map click to place, then the pin over the swamps so the soft gate opens. */
 async function placePinViaMap(page: Page) {
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
   const pinBtn = page.locator('[data-action="pin-element"]');
   await expect(pinBtn).toBeVisible(); // the map+Consul route surfaced it
   await pinBtn.click();
@@ -235,7 +237,7 @@ async function placePinViaMap(page: Page) {
     return els.some((e: any) => e.type === 'pin');
   })).toBe(true);
   await movePinToSwamps(page);
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 }
 
 /** The objects step's scripted run (step 9): three clicks of the app's real +,
@@ -243,14 +245,18 @@ async function placePinViaMap(page: Page) {
 async function mintObjectRun(page: Page) {
   const bar = page.locator('.atlas-tour-bar');
   await expect(bar).toHaveAttribute('data-tour-phase', 'a');
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
+  // The reserved slot (S311): no LIVE Next, but the invisible ghost holds its
+  // geometry so Back and Exit never move when Next appears. Present/absent
+  // pair with the live-control assertions around it.
+  await expect(page.locator('.atlas-tour-controls .atlas-tour-next-ghost')).toHaveCount(1);
   for (const phase of ['b', 'c', 'd']) {
     await page.locator('[data-action="create-element"]').click();
     await expect(bar).toHaveAttribute('data-tour-phase', phase);
     // A silent mint: the create dialog never opens.
     await expect(page.locator('.atlas-modal-overlay')).toHaveCount(0);
   }
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 }
 
 test('the tour world mirrors its FULL meta into state, not a hand-picked subset', async ({ page }) => {
@@ -478,7 +484,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   // create beats hold. Walking past with Next is exactly what hung four sibling
   // specs when the objects run gained its gate (S302), so the walk performs the
   // gesture instead of assuming one exists.
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
   await expect(page.locator('body')).toHaveClass(/atlas-tour-nowstep/);
   // The document-mode toggle is hidden while the beat is live: that view has no
   // now control at all, so switching into it would strand the gesture.
@@ -545,14 +551,14 @@ test('the pin beat is a SOFT correction: place anywhere, Next only over the swam
   // The +pin highlight releases once the pin exists (the gesture is done), but
   // the gate stays closed until it is over the zone.
   await expect(bar).toHaveAttribute('data-tour-phase', 'b');
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
   expect(await page.evaluate(() =>
     document.body.classList.contains('atlas-tour-pinstep'))).toBe(false);
 
   // Drag it onto the swamps → placed phase, Next appears.
   await movePinToSwamps(page);
   await expect(bar).toHaveAttribute('data-tour-phase', 'c');
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 });
 
 test('clicking DIRECTLY on the swamps zone places the pin there (the instructed gesture, S304)', async ({ page }) => {
@@ -608,7 +614,7 @@ test('clicking DIRECTLY on the swamps zone places the pin there (the instructed 
   expect(placed.pinName).toBe("The Consul’s balcony seat"); // placed, locked identity
   expect(placed.selectedIsConsul).toBe(true); // the zone was NOT selected
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'c');
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 });
 
 test('the scripted create door: links survive, no double-mint, no dead button', async ({ page }) => {
@@ -669,7 +675,7 @@ test('the scripted create door: links survive, no double-mint, no dead button', 
   // Third click completes the run and Next appears.
   await plus.click();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'd');
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
   // ...and the highlight releases once there is nothing left to add.
   expect(await page.evaluate(() =>
     document.body.classList.contains('atlas-tour-createstep'))).toBe(false);
@@ -693,7 +699,7 @@ test('a world switch mid-tour SUSPENDS the narrator (close gate, 3-lens converge
   await createConsulViaModal(page);
   await nextStep(page, 4);
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '4');
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 
   await page.evaluate(() => {
     const api = (window as any).__atlasTestApi;
@@ -704,7 +710,7 @@ test('a world switch mid-tour SUSPENDS the narrator (close gate, 3-lens converge
   // Suspended: the opening phase, no forward control, and no tour highlight
   // left burning on a control that now belongs to someone else's world.
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'a');
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
   expect(await page.evaluate(() =>
     document.body.classList.contains('atlas-tour-createstep'))).toBe(false);
   expect(await page.evaluate(() =>
@@ -720,7 +726,7 @@ test('the create beats are single-route: no watch-mode Next, the gesture is the 
   // control is the only route, and it pulses.
   await expect(page.locator('[data-tour-action]')).toHaveCount(0);
   await expect(page.locator('.atlas-worlds-header [data-action="create-local"].atlas-create-pulse')).toBeVisible();
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
 
   // Through the locked modal → auto-advance to the consul beat: same rule.
   await page.locator('.atlas-worlds-header [data-action="create-local"]').click();
@@ -728,13 +734,13 @@ test('the create beats are single-route: no watch-mode Next, the gesture is the 
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '3');
   await expect(page.locator('[data-tour-action]')).toHaveCount(0);
   await expect(page.locator('[data-action="create-element"]')).toBeVisible();
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
 
   // Create him → the step STAYS (the payoff is his page) and Next appears.
   await page.locator('[data-action="create-element"]').click();
   await page.locator('.atlas-modal-overlay button', { hasText: /^Create$/ }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '3');
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
   await expect.poll(async () => page.evaluate(async () => {
     const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
     return els.some((e: any) => e.name === 'The Consul');
@@ -1053,7 +1059,7 @@ test('the writing beat: the sentence arrives plain, Tab links it, Next waits for
   // Phase a: plain prose, SINGLE ROUTE — no Next until a chip exists.
   await expect(bar).toHaveAttribute('data-tour-phase', 'a');
   await expect(prose.locator('.atlas-element-chip')).toHaveCount(0);
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
 
   // The suggestions the beat depends on: autolink resolves the sentence's
   // baked surface forms, so there is something to press Tab on at all.
@@ -1061,7 +1067,7 @@ test('the writing beat: the sentence arrives plain, Tab links it, Next waits for
 
   // The real gesture.
   await linkWordViaTab(page);
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 
   // The chip is a real link, not styled text: it carries the element's id
   // (`data-id` — the ElementChip node's own attribute, not a guessed name).

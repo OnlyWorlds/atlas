@@ -1753,6 +1753,9 @@ body.atlas-touring .atlas-shell {
 .atlas-tour-bar.is-opener .atlas-tour-controls {
   justify-content: center;
 }
+.atlas-tour-bar.is-opener .atlas-tour-extras {
+  justify-content: center;
+}
 .atlas-tour-sentence {
   font-family: var(--tour-serif);
   font-style: italic;
@@ -1822,7 +1825,9 @@ body.atlas-touring .atlas-shell {
   align-items: baseline;
   gap: 12px;
   flex-wrap: wrap;
-  max-width: 75ch;
+  /* No max-width cap: it sat at 75ch (~470px), which cut the explainer off at
+     half the 960px panel while the sentence above ran full width (Captain,
+     S311 — the same fix the sentence itself got in S301). The panel governs. */
   /* The hairline: material (the sentence) above, narration below. */
   border-top: 1px solid rgba(255, 255, 255, 0.09);
   padding-top: 9px;
@@ -1831,6 +1836,9 @@ body.atlas-touring .atlas-shell {
   color: rgba(255, 255, 255, 0.78);
   flex: 1 1 480px;
   min-width: 0;
+  /* Authored \n in a phase body is a real line break (Captain's multiline
+     copy, S311). Bold spans come from the ** token pass in tour-bar. */
+  white-space: pre-line;
 }
 .atlas-tour-meta {
   flex-basis: 100%;
@@ -1962,6 +1970,10 @@ body.atlas-touring .atlas-shell {
   color: rgba(255, 255, 255, 0.35);
   font-size: 11px;
 }
+/* The reserved Next slot at hands-on beats (S311): invisible, but it holds
+   the geometry so Back and Exit never move when Next comes and goes — a fast
+   Next-Next-Next click chain used to land on Back. */
+.atlas-tour-next-ghost { visibility: hidden; }
 
 /* --- The progressive build-up: chrome appears when it is taught. ---
    Driven by cumulative capability classes on <body> (atlas-tour-cap-*),
@@ -1971,6 +1983,12 @@ body.atlas-touring .atlas-shell {
    The sidebar footer stays hidden for the WHOLE tour (Captain: the settings
    row under the narrator read as noise). */
 body.atlas-touring .atlas-sidebar-footer { display: none; }
+/* The element header's protagonist / sync-dot / delete controls are noise on
+   a beginner's first element pages (Captain, S311). The map/pin cluster
+   stays: the pin beat teaches with the real +pin button. */
+body.atlas-touring [data-action="delete-element"],
+body.atlas-touring [data-action="set-cast-favorite"],
+body.atlas-touring [data-role="element-sync-dot"] { display: none; }
 /* The landing's middle is never wanted during the tour — the narrator is the
    voice (before `shell` the shell is hidden anyway; after it, a world exists). */
 body.atlas-touring .atlas-landing { display: none; }

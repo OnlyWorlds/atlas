@@ -31,6 +31,7 @@ import { getState, subscribe } from '../core/state';
 import type { ElementType } from '../core/types';
 import {
   capabilitiesUpTo,
+  TOUR_ATTRIBUTION_URL,
   TOUR_CAPABILITIES, TOUR_CHAPTER_REF,
   TOUR_SENTENCE, TOUR_STEPS,
   type TourStep,
@@ -399,7 +400,7 @@ function render(): void {
   copy.className = 'atlas-tour-copy';
   const body = document.createElement('div');
   body.className = 'atlas-tour-body';
-  body.textContent = phase.body;
+  renderBodyText(body, phase.body);
   copy.appendChild(body);
   // The extras row (✦ deeper · inline links) ALWAYS renders — a step without
   // them shows an invisible placeholder at the same metrics, so the panel
@@ -438,8 +439,21 @@ function render(): void {
     extras.appendChild(bulb);
     panel.appendChild(deeper); // flyout anchors to the PANEL, above it
   }
+  // The extras row is the ONE home for links — the body renders as plain text
+  // by design (no markup, no escaping decisions on every step's copy). The
+  // opener carries the book's Wikipedia page here (Captain's ask, S311);
+  // TOUR_ATTRIBUTION_URL finally has its surface again.
   // (The ecosystem-explorer link was CUT in S298, Freek's round. Captain's
   // Hyperion share-page link can join this extras row when it exists.)
+  if (opener) {
+    const link = document.createElement('a');
+    link.className = 'atlas-tour-inline-link';
+    link.href = TOUR_ATTRIBUTION_URL;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.innerHTML = '<span class="material-symbols-outlined">menu_book</span> Hyperion on Wikipedia';
+    extras.appendChild(link);
+  }
   if (extras.childElementCount === 0) {
     const ghost = document.createElement('span');
     ghost.className = 'atlas-tour-extras-ghost';
@@ -460,11 +474,9 @@ function render(): void {
     // this blue header, remove it"). The grey book cite under it went the same
     // way in S306 — the opener's own copy already names Hyperion and its year,
     // so the link was a second, quieter statement of the same fact.
-    // NOTE: this was the ONLY render of TOUR_ATTRIBUTION / _URL, so those two
-    // constants are now unreferenced by any surface (checked, not assumed —
-    // the finale does not cite the book either). Left defined in tour-data as
-    // the canonical cite if a surface wants it again; if nothing claims them by
-    // the next sweep, delete them rather than let them rot as decoration.
+    // NOTE: TOUR_ATTRIBUTION_URL is claimed again as of S311 — the opener's
+    // extras row renders it as the "Hyperion on Wikipedia" link. The bare
+    // TOUR_ATTRIBUTION text constant remains unreferenced.
     meta.textContent = ' ';
   } else {
     meta.textContent = phase.meta ?? ' ';
@@ -553,7 +565,9 @@ function render(): void {
       : handsOnDone)
     : true;
   if (step.handsOn && step.handsOn !== 'setup-folder' && !handsOnGate) {
-    // No forward control: the gesture is the way.
+    // No LIVE forward control: the gesture is the way. But the SLOT stays —
+    // see ghostNext below (Captain, S311).
+    controls.appendChild(ghostNext());
   } else if (step.handsOn === 'setup-folder') {
     // The finale: Finish (ghost) ends the tour — the world folds away
     // (residue contract); the primary hands over to the real folder setup.
@@ -594,12 +608,60 @@ function render(): void {
     next.textContent = 'Next';
     next.addEventListener('click', () => { void nextStep(); });
     controls.appendChild(next);
+  } else {
+    // A `creates` run mid-progress, or a phased step whose `advanceWhen` has
+    // not passed yet — no live Next either, so the slot is reserved here too.
+    // (The first cut only ghosted the handsOn branch; the mintObjectRun e2e
+    // assertion caught Back still shifting on the objects step.)
+    controls.appendChild(ghostNext());
   }
 
   appendExit(controls);
   panel.appendChild(controls);
   root!.appendChild(panel);
   restoreFocus(focusedAction);
+}
+
+/**
+ * The reserved forward slot (Captain, S311). Whenever no LIVE forward control
+ * renders — a hands-on beat, a `creates` run mid-progress, an unmet
+ * `advanceWhen` — an invisible Next holds the geometry, so Back and Exit
+ * never move when Next comes and goes: a fast Next-Next-Next click chain
+ * used to land on Back and bounce the tour backwards. Identical text and
+ * classes to the real button, so the width cannot drift from it. The opener
+ * and the finale keep their own layouts (no ghost).
+ */
+function ghostNext(): HTMLElement {
+  const ghost = document.createElement('button');
+  ghost.type = 'button';
+  ghost.className = 'atlas-btn-primary atlas-tour-next-ghost';
+  ghost.textContent = 'Next';
+  ghost.disabled = true;
+  ghost.tabIndex = -1;
+  ghost.setAttribute('aria-hidden', 'true');
+  return ghost;
+}
+
+/**
+ * Render a phase body. `\n` becomes a real line break via `white-space:
+ * pre-line` on `.atlas-tour-body`; `**bold**` spans become <strong>, built
+ * from text nodes — never innerHTML, the body is copy, not markup (the same
+ * reason links live in the extras row instead of inline). An unbalanced `**`
+ * falls back to rendering the whole string plain rather than guessing.
+ */
+function renderBodyText(host: HTMLElement, text: string): void {
+  const parts = text.split('**');
+  if (parts.length % 2 === 0) { host.textContent = text; return; }
+  parts.forEach((part, i) => {
+    if (!part) return;
+    if (i % 2 === 1) {
+      const b = document.createElement('strong');
+      b.textContent = part;
+      host.appendChild(b);
+    } else {
+      host.appendChild(document.createTextNode(part));
+    }
+  });
 }
 
 /**

@@ -134,6 +134,38 @@ test('world tab — rename + stay-offline toggle persist', async ({ page }) => {
   await expect(page.locator('[data-action="make-online"]')).toBeVisible();
 });
 
+test('world tab — image URL persists to world.json and mirrors to the home cover', async ({ page }) => {
+  await setupAtlasRoot(page);
+  await createWorld(page, 'Cover World');
+  await page.click('[data-action="open-settings"]');
+  await page.click('[data-settings-tab="world"]');
+
+  // The field exists and starts empty (S311 — the one meta field that had no
+  // edit surface anywhere in the ecosystem).
+  const input = page.locator('input[name="world-image-url"]');
+  await expect(input).toBeVisible();
+  await expect(input).toHaveValue('');
+
+  await input.fill('https://example.com/cover.png');
+  await input.blur();
+
+  // Persisted through writeWorldMeta — read it back from the store, not the UI.
+  await expect.poll(() => page.evaluate(async () => {
+    const meta = await (window as any).__atlasTestApi.getActiveStore().readWorldMeta();
+    return meta.image_url;
+  })).toBe('https://example.com/cover.png');
+
+  // The oversize guard rejects instead of writing (the wire caps at 1024).
+  await input.fill('https://example.com/' + 'x'.repeat(1100));
+  await input.blur();
+  await expect(page.locator('.ow-toast-error')).toContainText('too long');
+  const kept = await page.evaluate(async () => {
+    const meta = await (window as any).__atlasTestApi.getActiveStore().readWorldMeta();
+    return meta.image_url;
+  });
+  expect(kept).toBe('https://example.com/cover.png');
+});
+
 test('world tab — api-linked worlds get stay-offline + refresh + unlink + test', async ({ page }) => {
   await setupAtlasRoot(page);
   await createWorld(page, 'Fake API World');
