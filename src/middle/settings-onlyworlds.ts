@@ -43,10 +43,6 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
         format to your folder, so other OnlyWorlds tools can read your worlds,
         and syncs with your account when you link one.
       </p>
-      <div class="atlas-ow-links">
-        <button type="button" class="atlas-btn-ghost" data-action="replay-tour">Replay the guided tour</button>
-      </div>
-      <p class="atlas-settings-hint">The five-minute Hyperion tour: one sentence becomes a linked world. Replaying rebuilds the tour world from scratch.</p>
     </section>
     ${renderAccountTab(reg)}
     ${renderWaypointsSection(activeWorld)}
@@ -121,21 +117,8 @@ export function wireOnlyWorldsTab(toasts: ToastManager, activeWorld: WorldRegist
   const root = document.querySelector<HTMLElement>('.atlas-settings');
   if (!root) return;
 
-  // Replay the guided tour: tears down any prior tour world and starts fresh
-  // (launchTour handles teardown + bar mount + navigation into the tour world).
-  root.querySelector<HTMLButtonElement>('[data-action="replay-tour"]')?.addEventListener('click', async (e) => {
-    const btn = e.currentTarget as HTMLButtonElement;
-    btn.disabled = true;
-    btn.textContent = 'Starting…';
-    try {
-      const engine = await import('../tour/tour-engine');
-      await engine.launchTour();
-    } catch (err) {
-      toasts.error(err instanceof Error ? err.message : String(err));
-      btn.disabled = false;
-      btn.textContent = 'Replay the guided tour';
-    }
-  });
+  // (The replay control moved to the settings NAV chip in S307 — see
+  // `wireReplayChip` in settings-panel.ts. It is not an OnlyWorlds feature.)
 
   function refreshSection(): void {
     const section = root!.querySelector<HTMLElement>('[data-role="waypoints-section"]');

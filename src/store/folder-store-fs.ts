@@ -43,6 +43,7 @@ import {
   WORLD_META_FILE,
 } from '../core/constants';
 import { ALL_ELEMENT_TYPES, CONTENT_ELEMENT_TYPES, SPATIAL_ELEMENT_TYPES } from '../core/types';
+import { findDuplicatePin, DuplicatePinError } from '../core/pin-uniqueness';
 import type {
   Element,
   ElementType,
@@ -724,6 +725,17 @@ export class FsFolderStore implements FolderStore {
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
     this.assertWritable();
     const id = (data.id as string) ?? newId();
+    // ONE ELEMENT, ONE PIN, ONE MAP (S307). Guarded HERE and not in
+    // `createPin`, because the import applier bypasses that wrapper. Reads
+    // the in-memory bodies rather than re-listing: a positive match is proof
+    // the duplicate exists, so this cannot reject a legitimate create, and an
+    // incomplete corpus merely under-fires (today's behaviour).
+    if (type === 'pin') {
+      const dupe = findDuplicatePin(data as Partial<Pin>, this.bodyCache.values(), id);
+      if (dupe) {
+        throw new DuplicatePinError(dupe.id);
+      }
+    }
     // created_at is stamped locally at birth from the SAME instant as
     // local_updated_at, so "never edited since creation" is a plain equality
     // check (home's Created/Edit verb). It never reaches the wire (the

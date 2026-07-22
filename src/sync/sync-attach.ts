@@ -287,7 +287,10 @@ export type SyncUnavailableReason =
   | { kind: 'no-active-world' }
   | { kind: 'local-only'; worldId: string }
   | { kind: 'pin-missing'; worldId: string }
-  | { kind: 'attached-but-paused' }
+  // ('attached-but-paused' removed S307 — declared here and handled in
+  //  sync-toasts, but never CONSTRUCTED by the function below, so the branch
+  //  was unreachable and its toast had never fired. A definition with no
+  //  producer is not a feature.)
   | { kind: 'engine-not-ready' };
 
 export function diagnoseSyncUnavailable(): SyncUnavailableReason | null {

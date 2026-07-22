@@ -17,7 +17,7 @@
  */
 
 import { getState, subscribe, patchSlice } from '../core/state';
-import { onHashChange, parseHash } from '../core/router';
+import { onHashChange, parseHash, worldHash } from '../core/router';
 import type { Element } from '../core/types';
 import { getEditorSettings, setEditorSettings, saveRegistry } from '../registry/registry';
 import { toastManager } from '../ui/toast-manager';
@@ -99,10 +99,25 @@ export function mountElementDetail(target: HTMLElement): () => void {
       return;
     }
     if (!el) {
+      // THE INSTRUCTION HAS TO BE TRUE (S307). "Pick one from the elements
+      // sidebar" was false on an EMPTY world: that list deliberately renders
+      // nothing (S255v3 — the pulsing + and the home tiles carry the
+      // teaching), so this pane sent people to a blank pane. Two correct
+      // decisions, one lie where they met.
+      const isEmptyWorld = getState().data.elements.length === 0;
+      const worldId = state.active.worldId;
       const msg = route.elementId
         ? `Element <code>${escapeText(route.elementId)}</code> not found in this world.`
-        : 'No element selected. Pick one from the <b>elements</b> sidebar.';
-      target.innerHTML = `<div class="atlas-pane-empty">${msg}</div>`;
+        : isEmptyWorld
+          ? 'This world has no elements yet. Create the first one with the <b>+</b> above the element list.'
+          : 'No element selected. Pick one from the <b>elements</b> sidebar.';
+      // A not-found id used to be a text cul-de-sac with no way out. The share
+      // room already solves this with a drill-in back affordance; this is the
+      // same move.
+      const back = route.elementId
+        ? `<div class="atlas-pane-empty-action"><a href="${escapeText(worldHash(worldId))}">Back to ${escapeText(state.active.meta.name || 'this world')}</a></div>`
+        : '';
+      target.innerHTML = `<div class="atlas-pane-empty">${msg}${back}</div>`;
       return;
     }
     renderDetail(el);

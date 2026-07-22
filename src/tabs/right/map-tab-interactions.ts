@@ -20,6 +20,7 @@ import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-
 import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils';
 import { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManager';
 import type { Pin } from '../../core/types';
+import { isDuplicatePinError } from '../../core/pin-uniqueness';
 import { ToastManager } from '../../ui/toast-manager';
 import { ElementCreateModal } from '../../ui/element-create-modal';
 import { toggleGhostsAtSourcePin } from './ghost-pins';
@@ -38,6 +39,21 @@ export interface MapInteractionDeps {
   height: number;
   mapId: string;
   toasts: ToastManager;
+}
+
+/**
+ * ONE ELEMENT, ONE PIN, ONE MAP (S307). The store refuses a duplicate, and
+ * that refusal is an ordinary explainable outcome, not a bug — so it gets its
+ * own sentence. Reporting it as "Failed to place pin" would read as breakage
+ * for a rule the user simply cannot see.
+ */
+function reportPinFailure(err: unknown, toasts: ToastManager, where: string): void {
+  if (isDuplicatePinError(err)) {
+    toasts.info('That element already has a pin on this map.');
+    return;
+  }
+  console.error(`[map-tab] ${where}:`, err);
+  toasts.error('Failed to place pin');
 }
 
 export function wireMapInteractions(deps: MapInteractionDeps): void {
@@ -117,8 +133,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       // its own notify threaded into a room that should not know the tour
       // exists.)
     } catch (err) {
-      console.error('[map-tab] create pin failed:', err);
-      toasts.error('Failed to place pin');
+      reportPinFailure(err, toasts, 'create pin failed');
     }
   });
 
@@ -219,8 +234,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
           await writePin(elementId, elementType);
           toasts.success('Pin placed');
         } catch (err) {
-          console.error('[map-tab] contextual pin create failed:', err);
-          toasts.error('Failed to place pin');
+          reportPinFailure(err, toasts, 'contextual pin create failed');
         }
       },
       onPlaceExisting: async (elementId, elementType) => {
@@ -228,8 +242,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
           await writePin(elementId, elementType);
           toasts.success('Pin placed');
         } catch (err) {
-          console.error('[map-tab] place existing pin failed:', err);
-          toasts.error('Failed to place pin');
+          reportPinFailure(err, toasts, 'place existing pin failed');
         }
       },
     });
@@ -326,8 +339,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       toasts.success('Pin placed');
       completeWaypoint('maps');
     } catch (err) {
-      console.error('[map-tab] drag-drop create pin failed:', err);
-      toasts.error('Failed to place pin');
+      reportPinFailure(err, toasts, 'drag-drop create pin failed');
     }
   });
 }

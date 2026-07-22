@@ -232,12 +232,22 @@ function buildSentence(idx: number, step: TourStep, view: TourWorldView, bare = 
     if (activeWords.has(w)) span.classList.add('active');
     sentence.appendChild(span);
     for (const g of bare ? [] : glyphs.get(w) ?? []) {
-      const glyph = document.createElement('span');
       // A ref-carrying glyph waits for the ELEMENT, not the step-enter — the
       // light is the payoff of the user's gesture (banked S297 nuance,
       // generalized to every scripted create in S301).
       const lit = glyphLit(g, idx, view);
-      glyph.className = 'material-symbols-outlined atlas-tour-glyph' + (lit ? ' lit' : '');
+      // UNLIT GLYPHS ARE NOT RENDERED AT ALL (Captain, S307).
+      //
+      // They used to be emitted at opacity 0.05 so their WIDTH was reserved
+      // and lighting one caused zero reflow. S306c changed the decision —
+      // the opener renders bare and the sentence SHIFTS as glyphs appear,
+      // because the reflow hides inside the dock transition — but that round
+      // only applied it to step 0. Every later step still carried the
+      // reserved slots, which is what put visible gaps between the words for
+      // the whole rest of the tour. Applying the decision the rest of the way.
+      if (!lit) continue;
+      const glyph = document.createElement('span');
+      glyph.className = 'material-symbols-outlined atlas-tour-glyph lit';
       if (lit && g.step === idx) glyph.classList.add('pop');
       glyph.textContent = ELEMENT_ICONS[g.type] ?? 'circle';
       glyph.style.setProperty('--tour-glyph-color', ELEMENT_TYPE_COLORS[g.type] ?? '#22d3ee');

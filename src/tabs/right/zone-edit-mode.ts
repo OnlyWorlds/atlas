@@ -36,6 +36,7 @@ import { polygonCentroid, polylineLabelAnchor, type Point } from '../../visualiz
 import { getZoneSvgRendererForMap } from '../../visualization/leaflet-2d/ZoneOverlay';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { markersForZoneOnMap, partitionZonesAndMarkers, getZoneShape } from './zone-derived';
+import { computeInsertion, commitVertexPosition } from './zone-edit-kernels';
 import type { Marker, Zone } from '../../core/types';
 import type { ToastManager } from '../../ui/toast-manager';
 
@@ -49,6 +50,19 @@ interface MarkerSnapshot {
 interface EditSession {
   zoneId: string;
   mapId: string;
+  /**
+   * The world this session BELONGS to (S307).
+   *
+   * Without it, `exitEditMode` cleared the persisted snapshot under whatever
+   * world happened to be active at exit — and the world switch sets
+   * `active.worldId` BEFORE patching elements, so the elements patch drove
+   * `syncEditMode` → `exitEditMode('commit')` while the NEW world was
+   * already active. That cleared the new world's (empty) slot and left the
+   * old world's snapshot behind, to be replayed as a "revert" later. The
+   * comment at the clear site claimed it was keyed to the session's world;
+   * the field it needed to do that did not exist.
+   */
+  worldId: string;
   snapshot: MarkerSnapshot[];  // markers as they were on entry
   // Live Leaflet primitives — rebuilt when underlying marker set changes.
   layerGroup: L.LayerGroup;
@@ -69,6 +83,23 @@ interface EditSession {
 
 let active: EditSession | null = null;
 let escListenerInstalled = false;
+
+/**
+ * Is this event coming from somewhere the user is typing? Exported so the
+ * unit test drives the same predicate the listener does, rather than a copy
+ * of it (a test that reasons about a rule it cannot see guards nothing).
+ */
+export function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  // `isContentEditable` is not implemented everywhere (undefined in jsdom on
+  // a plain element), so coerce — the signature promises a boolean and a
+  // caller doing `=== false` would otherwise be silently wrong.
+  return tag === 'INPUT'
+    || tag === 'TEXTAREA'
+    || tag === 'SELECT'
+    || Boolean(target.isContentEditable);
+}
 
 /**
  * localStorage key for in-flight edit snapshots. One slot PER WORLD so multi-
@@ -237,6 +268,13 @@ function ensureEscListener(): void {
   escListenerInstalled = true;
   document.addEventListener('keydown', (e) => {
     if (!active) return;
+    // NOT WHILE TYPING (S307). The zone's element-detail panel stays mounted
+    // during edit mode (name, description, custom fields), so these were
+    // captured from inside text inputs: retyping the zone name and pressing
+    // Enter committed and exited the shape edit, and pressing Escape to
+    // dismiss a field CANCELLED it — reverting every vertex drag, with no
+    // undo. IME composition counts as typing too.
+    if (isTypingTarget(e.target) || e.isComposing) return;
     if (e.key === 'Escape') {
       // ESC cancels — restore snapshot.
       cancelEdit();
@@ -330,6 +368,8 @@ export function enterEditMode(
   active = {
     zoneId,
     mapId,
+    // Stamped from the world active at ENTRY, never re-read at exit.
+    worldId: worldId ?? '',
     snapshot,
     layerGroup,
     vertexMarkers: new Map(),
@@ -540,8 +580,13 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
     }
     const newLatLng = handle.getLatLng();
     const pt = leafletToStorage(newLatLng, canvasHeight);
-    const x = Math.round(pt.x);
-    const y = Math.round(pt.y);
+    // Clamp to the canvas, matching the sketch-rescale transform. CRS.Simple
+    // lets a vertex be dragged well past the edge; an out-of-bounds value
+    // survives until an image attach rescales+clamps it and deforms the
+    // polygon (S307, the S300 corruption class).
+    const cfg = active ? mapTabCache.get(active.mapId)?.manager.getConfig() : null;
+    const dims = { w: cfg?.canvasWidth ?? Number.MAX_SAFE_INTEGER, h: cfg?.canvasHeight ?? Number.MAX_SAFE_INTEGER };
+    const { x, y } = commitVertexPosition(pt, dims);
     const store = getActiveStore();
     if (!store) return;
     try {
@@ -757,17 +802,20 @@ async function insertMarkerOnSegment(segmentIndex: number): Promise<void> {
   const { markers } = partitionZonesAndMarkers(state.data.elements);
   const zoneMarkers = markersForZoneOnMap(active.zoneId, active.mapId, markers);
 
-  // segmentIndex i goes from marker[i] to marker[(i+1) % len]. The new
-  // marker lands at order = i+1; every subsequent marker bumps up by 1.
-  const insertAfterIndex = segmentIndex;
-  const a = zoneMarkers[insertAfterIndex];
-  const b = zoneMarkers[(insertAfterIndex + 1) % zoneMarkers.length];
+  // segmentIndex i goes from marker[i] to marker[(i+1) % len]. Order values
+  // are planned by the kernel, which renumbers by POSITION — the old
+  // index-as-order arithmetic put the vertex on the wrong segment whenever
+  // orders were non-contiguous, and always appended on imported zones where
+  // every order is absent (S307).
+  const a = zoneMarkers[segmentIndex];
+  const b = zoneMarkers[(segmentIndex + 1) % zoneMarkers.length];
   if (!a || !b) return;
+  const plan = computeInsertion(zoneMarkers, segmentIndex);
+  if (!plan) return;
 
   const midX = Math.round((a.x + b.x) / 2);
   const midY = Math.round((a.y + b.y) / 2);
-  const newOrder = insertAfterIndex + 1;
-  await optimisticInsertMarker({ x: midX, y: midY, order: newOrder, zoneMarkers });
+  await optimisticInsertMarker({ x: midX, y: midY, order: plan.newOrder, plan, zoneMarkers });
 }
 
 /**
@@ -786,29 +834,28 @@ async function optimisticInsertMarker(args: {
   x: number;
   y: number;
   order: number;
+  /** Order plan from `computeInsertion` — position-based, not index-as-order. */
+  plan: { newOrder: number; updates: Array<{ id: string; order: number }> };
   zoneMarkers: Marker[];
 }): Promise<void> {
   if (!active) return;
   const store = getActiveStore();
   if (!store) return;
-  const { x, y, order: newOrder, zoneMarkers } = args;
+  const { x, y, order: newOrder, plan } = args;
 
   const newId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
 
-  // Build the optimistic next element set.
-  // - Every marker with current order >= newOrder gets bumped by 1
-  // - The new marker is inserted with the chosen order
-  // Use a Set lookup so other-zone markers + non-marker elements are passed
-  // through untouched.
-  const bumpIds = new Set(
-    zoneMarkers.filter(m => (m.order ?? 0) >= newOrder).map(m => m.id),
-  );
+  // Build the optimistic next element set from the PLAN. Each affected
+  // marker gets its planned absolute order — not a blanket +1 on everything
+  // at or after a number, which is what put vertices on the wrong segment
+  // when orders were non-contiguous (S307).
+  const plannedOrder = new Map(plan.updates.map(u => [u.id, u.order]));
   const state = getState();
   const nextElements = state.data.elements.map(e => {
-    if (bumpIds.has(e.id)) {
+    if (plannedOrder.has(e.id)) {
       const m = e as Marker;
-      return { ...m, order: (m.order ?? 0) + 1, local_updated_at: nowIso } as Marker;
+      return { ...m, order: plannedOrder.get(m.id)!, local_updated_at: nowIso } as Marker;
     }
     return e;
   });
@@ -833,11 +880,11 @@ async function optimisticInsertMarker(args: {
 
   // Background: persist to FolderStore. Failures revert by re-priming from disk.
   try {
-    const bumps = zoneMarkers.filter(m => bumpIds.has(m.id));
-    // Work in reverse so we don't collide with ourselves on disk.
-    bumps.sort((p, q) => (q.order ?? 0) - (p.order ?? 0));
-    for (const m of bumps) {
-      await store.updateMarker(m.id, { order: (m.order ?? 0) + 1 });
+    // Descending by TARGET order so a renumber never transiently collides
+    // with a slot it is about to vacate.
+    const writes = [...plan.updates].sort((p, q) => q.order - p.order);
+    for (const u of writes) {
+      await store.updateMarker(u.id, { order: u.order });
     }
     await store.createMarker({
       id: newId,
@@ -907,16 +954,18 @@ export function exitEditMode(mode: 'commit' | 'cancel'): void {
   const session = active;
   active = null;
 
-  // Cancel: restore from snapshot (3-way diff).
+  // Cancel: restore from snapshot (3-way diff), THEN drop the safety net.
+  // Until S307 the clear ran immediately while `restoreFromSnapshot` was
+  // still awaiting its per-marker writes, so a refresh or crash mid-restore
+  // left the zone half-reverted with NO recovery record — precisely the
+  // failure the persisted snapshot exists to prevent.
   if (mode === 'cancel') {
-    void restoreFromSnapshot(session);
+    void restoreFromSnapshot(session).finally(() => {
+      clearPersistedSnapshot(session.worldId);
+    });
+  } else if (session.worldId) {
+    clearPersistedSnapshot(session.worldId);
   }
-
-  // Persisted snapshot is no longer needed — both commit and cancel
-  // resolve the in-flight edit. Clear under the world this session belonged
-  // to (snapshots are now keyed per-world; multi-world edits don't clobber).
-  const finishingWorldId = getState().active?.worldId;
-  if (finishingWorldId) clearPersistedSnapshot(finishingWorldId);
 
   // Tear down primitives.
   try {
@@ -959,6 +1008,9 @@ export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts
   const fakeSession: EditSession = {
     zoneId: persisted.zoneId,
     mapId: persisted.mapId,
+    // The world being ACTIVATED is the one this snapshot belongs to — that is
+    // how it was looked up.
+    worldId: activatedWorldId,
     snapshot: persisted.snapshot,
     layerGroup: L.layerGroup(), // unused in restore path
     vertexMarkers: new Map(),
@@ -1056,10 +1108,24 @@ export function syncEditMode(): void {
   }
 }
 
-/** Hook for disposeMapTab — cancel without restore (map's gone anyway). */
+/**
+ * Hook for disposeMapTab — end the session without restoring (the map tab is
+ * going away).
+ *
+ * S307, DATA LOSS: this used to null `active` and nothing else, orphaning the
+ * persisted snapshot. Its caller runs on WORLD SWITCH (disposeAllMapTabs), so
+ * the everyday sequence was: edit a zone, drag two vertices (each autosaved to
+ * disk), switch worlds. Nothing here was a cancel — the edits were committed
+ * and the user believed they were done. On returning to that world,
+ * `recoverFromOrphanSnapshot` replayed the 3-way diff and REVERTED both drags,
+ * calling them "unsaved". There is no undo anywhere in atlas.
+ *
+ * A teardown is not a cancel: the work on disk stands, so the recovery record
+ * must go with the session.
+ */
 export function abortEditModeForMap(mapId: string): void {
   if (!active || active.mapId !== mapId) return;
-  // Skip restoreFromSnapshot since the map tab is being torn down.
+  if (active.worldId) clearPersistedSnapshot(active.worldId);
   active = null;
 }
 

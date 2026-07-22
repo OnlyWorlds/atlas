@@ -210,6 +210,17 @@ export const TOUR_STEPS: readonly TourStep[] = [
     ],
     spans: [{ from: 2, to: 2, type: 'character', ref: 'character:The Consul' }],
     handsOn: 'create-consul',
+    // ROUTED, as of S307. This step used to carry no route at all: going
+    // FORWARD it looked right only because creating an element navigates to
+    // it as a side effect. Going BACK there is no create, so nothing
+    // navigated and the middle pane kept showing whatever a LATER step had
+    // opened — the narrator talking about the Consul over the institution's
+    // page. Captain saw it as the tour "jumping between the Consul and home",
+    // because which surface you landed on depended on the path you took.
+    //
+    // A step's route is a promise about what you are looking at; it must not
+    // be a side effect of a gesture that only happens once.
+    route: { kind: 'element', ref: 'character:The Consul' },
   },
   {
     // MERGED (S303 rework): the institution and the title were two steps; a
@@ -266,6 +277,17 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'A map is an element that carries an image: this one shows Hyperion, and ' +
         'a new pane just opened on the right to hold it. Regions can be traced ' +
         'onto it too: the swamps are a zone, drawn right there.',
+      // Captain, S307: the step said a map "carries an image" and never said
+      // where that image comes from, which is the first question anyone has
+      // about their OWN map. Both routes below are verified against the real
+      // controls (map-create-modal's URL field + the local-file row added in
+      // S253), because copy naming a control is a behavioural claim.
+      deeper:
+        'Your own maps take an image two ways: paste a URL, or choose a file ' +
+        'from your computer. A chosen file is copied into the world folder ' +
+        'and never uploaded anywhere, so the map keeps working offline and ' +
+        'travels with the folder. You can also make a map with no image at ' +
+        'all and draw on the blank canvas, then add the art later.',
     }],
     // The swamps zone (and its markers) reveal WITH the map — the pin beat's
     // soft correction needs the region present to test the drop against, and
@@ -659,9 +681,18 @@ export const TOUR_STEPS: readonly TourStep[] = [
     act: 5,
     phases: [{
       id: 'a',
+      // NO UNCONDITIONAL GESTURE HERE (S307). This used to end "Pick one and
+      // start building, or finish here" — but the folder picker button is
+      // gated on `hasFolderMode()`, and OPFS-only browsers (Safari 18.2+,
+      // Firefox, which `main.ts` deliberately admits in tour-capable mode)
+      // can complete all 17 steps and never see it. The code branched on the
+      // capability; the sentence did not, so it instructed a control that was
+      // not on screen. Same class as "hover a dotted word and press Tab"
+      // (S306) — copy naming a control is a behavioural claim.
+      // The buttons say what is available; the prose no longer guesses.
       body:
         'That is the tour: when it ends, this world folds away. Your own worlds ' +
-        'live in a folder you choose. Pick one and start building, or finish here.',
+        'live in a folder you choose, and they stay yours.',
       meta: 'The tour world leaves nothing behind. Replay it anytime from settings.',
     }],
     handsOn: 'setup-folder',

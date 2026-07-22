@@ -226,8 +226,39 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // mechanism-naming jargon; the type chips carry the state and the help
     // overlay explains the default view's selectivity.)
 
+    // THE CALENDAR CHIP IS PINNED, and it is built BEFORE the type chips so
+    // it can never be pushed around by them (Captain, S307).
+    //
+    // The bug: minting a calendar creates a Construct element, which makes a
+    // new TYPE CHIP appear in this bar — and the calendar chip used to be
+    // appended AFTER that variable-length list, so the very act of setting a
+    // calendar shoved its own chip sideways (and could wrap it to a new row).
+    // Its position was a function of world CONTENTS. A control that moves
+    // when you use it reads as breakage.
+    //
+    // It leads the bar now: the type chips are a content FILTER, the calendar
+    // is a display LENS over everything — a global control belongs at an
+    // edge, not floating inside a list that grows.
+    const lensEarly = activeLens();
+    const calChip = document.createElement('button');
+    calChip.type = 'button';
+    calChip.className = 'atlas-cal-chip' + (lensEarly ? ' active' : '');
+    calChip.dataset.action = 'calendar-menu';
+    calChip.title = lensEarly
+      ? `Dates read in ${lensEarly.name}. Click to switch or edit`
+      : 'These numbers could have names — create a calendar';
+    calChip.innerHTML =
+      `<span class="material-symbols-outlined">calendar_month</span>` +
+      `<span>${escapeText(lensEarly ? lensEarly.name : 'no calendar')}</span>`;
+    calChip.addEventListener('click', () => openCalendarMenu(calChip));
+    controlBar.appendChild(calChip);
+
     // Type toggle chips — the broad-view filter (null = all). While focused they
     // read inactive (focus is the lens); clicking one drops focus and applies it.
+    // Kept in their own wrapper so a growing chip set cannot displace the
+    // pinned controls on either side of it.
+    const chipStrip = document.createElement('div');
+    chipStrip.className = 'atlas-chart-chipstrip';
     for (const t of present) {
       const on = !focused && (typeFilter === null || typeFilter.has(t));
       const chip = document.createElement('button');
@@ -246,8 +277,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
         if (route.elementId && w) navigate(timelineHash(w)); // exit focus → hashchange re-renders
         else render();
       });
-      controlBar.appendChild(chip);
+      chipStrip.appendChild(chip);
     }
+    controlBar.appendChild(chipStrip);
 
     // The now control (Act 1): establish the world's now, or show + clear it.
     // Once set, the now-line is draggable directly on the canvas.
@@ -284,22 +316,6 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // Appended into the right stack below — mode toggle above, now below
     // (Captain's call, 2026-07-19: reads cleaner than now-above-buttons).
 
-    // The calendar chip (2B): shows the active lens; the menu switches lenses,
-    // creates (through the world clock gate), edits, or revisits the clock.
-    const lens = activeLens();
-    const calChip = document.createElement('button');
-    calChip.type = 'button';
-    calChip.className = 'atlas-cal-chip' + (lens ? ' active' : '');
-    calChip.dataset.action = 'calendar-menu';
-    calChip.title = lens
-      ? `Dates read in ${lens.name}. Click to switch or edit`
-      : 'These numbers could have names — create a calendar';
-    calChip.innerHTML =
-      `<span class="material-symbols-outlined">calendar_month</span>` +
-      `<span>${escapeText(lens ? lens.name : 'no calendar')}</span>`;
-    calChip.addEventListener('click', () => openCalendarMenu(calChip));
-    controlBar.appendChild(calChip);
-
     // The render-mode toggle (2C): canvas ⇄ document. Same scope, same lens,
     // same saved-chart machinery — only the render surface swaps.
     const mode = document.createElement('div');
@@ -321,12 +337,15 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     mode.appendChild(modeBtn('2d', 'view_timeline', 'Canvas view: pan and zoom the chart'));
     mode.appendChild(modeBtn('scroll', 'view_agenda', 'Document view: scroll through your history'));
 
-    // Right group, ONE line: the now control first, the view toggle to its
-    // right (the stacked layout wasted a row — Captain's round, 2026-07-19).
+    // Right group, ONE LINE with the toggles first (Captain, S307). The
+    // toggles are a FIXED pair — same two buttons, same width, always. The
+    // now control changes shape (a wide "set now time" button before it is
+    // set, a dated chip after), so it trails: a varying-width element in the
+    // leading slot shifts everything after it every time its state changes.
     const rightStack = document.createElement('div');
     rightStack.className = 'atlas-chart-rightstack';
-    rightStack.appendChild(nowWrap);
     rightStack.appendChild(mode);
+    rightStack.appendChild(nowWrap);
     controlBar.appendChild(rightStack);
 
     renderMintOffer();

@@ -1001,3 +1001,99 @@ test('the writing beat: the sentence arrives plain, Tab links it, Next waits for
   });
   expect(storyAfter).toContain('ow://');
 });
+
+/**
+ * REPLAY FROM SETTINGS, with the user's own world open and a folder set up.
+ *
+ * This is the precondition pair that NO tour spec has ever established: every
+ * other test in this file begins at `freshBoot` (registry empty, no root, no
+ * active world) and launches from the landing button. The settings replay row
+ * was shipped with zero e2e coverage, and the path it takes is the one a real
+ * user takes — finishing the tour is what sets an atlas root in the first
+ * place.
+ *
+ * Before S307 this walk failed three ways at once: the route stayed on the
+ * user's settings page (so step 2 painted the dock over it), the sidebar
+ * listed the user's real worlds, and — the blocker — the tour's scripted
+ * create button did not exist at all, because `worlds-sidebar` tested
+ * `if (root)` before the tour branch. No Next, no create: hard stuck.
+ */
+test('replay from settings with a world open clears the stage and can be completed', async ({ page }) => {
+  // --- the preconditions: a real atlas root, a real world, both live. ---
+  await freshBoot(page);
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const root = await navigator.storage.getDirectory();
+    const sub = await root.getDirectoryHandle('replay-test-root', { create: true });
+    api.setNextDirectory(sub);
+  });
+  await page.click('[data-action="setup-atlas"]');
+  await page.waitForSelector('[data-action="create-local"]');
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'my own world');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+
+  const ownWorldId = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId);
+  expect(ownWorldId, 'the user has their own world open').toBeTruthy();
+
+  // The PRESENT half of the pair below. Without this the absence assertion
+  // could pass because the selector matches nothing — which is exactly how
+  // the first draft of this test passed with the filter reverted.
+  // (Creating a world flips the sidebar into elements mode — S255v3 — and
+  // sidebar mode is its own state, not a function of the URL, so this needs
+  // the real toggle rather than a hash change.)
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
+  await expect(page.locator(`.atlas-list [data-world-id="${ownWorldId}"]`).first()).toBeVisible();
+
+  // --- launch the replay from the settings nav chip. ---
+  await page.evaluate((id) => { window.location.hash = `#/w/${id}/settings/onlyworlds`; }, ownWorldId);
+  const chip = page.locator('[data-action="replay-tour"]');
+  await expect(chip, 'the replay chip lives in the settings nav, on every tab').toBeVisible();
+  await chip.click();
+
+  const bar = page.locator('.atlas-tour-bar');
+  await expect(bar).toBeVisible();
+  await expect(bar).toHaveAttribute('data-tour-step', '1');
+
+  // LEAK 1: the launching route. Nothing in the start path used to navigate.
+  await expect
+    .poll(() => page.evaluate(() => window.location.hash), { message: 'the tour left the settings route' })
+    .not.toContain('settings');
+
+  // LEAK 2: the user's world stayed open, and stayed syncing, under the dock.
+  expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().active))
+    .toBeNull();
+
+  await beginToWorld(page);
+
+  // LEAK 3: the sidebar listed the user's real worlds while the tour narrated
+  // "your world". The ABSENT half of the pair asserted above — same selector,
+  // so a markup rename breaks one half loudly instead of quietly disarming
+  // the other.
+  await expect(page.locator(`.atlas-list [data-world-id="${ownWorldId}"]`)).toHaveCount(0);
+
+  // THE BLOCKER: the scripted create door must exist even though a root is
+  // set. `createWorldViaModal` asserts the locked-to-Hyperion modal and the
+  // four greyed siblings — i.e. the TOUR's sidebar, not the root sidebar.
+  await createWorldViaModal(page);
+  await expect(bar).toHaveAttribute('data-tour-step', '3');
+
+  // Reaching step 3 IS the proof the blocker is gone: the create-world gate
+  // reads `tourWorldExists()`, so the walk cannot leave step 2 unless the
+  // scripted door actually minted the tour world. (Step 3 is the consul beat
+  // and correctly shows NO Next — it is hands-on. Asserting a Next here would
+  // be legislating a contract the design does not have.)
+  const tourWorld = await page.evaluate(() => {
+    const st = (window as any).__atlasTestApi.getState();
+    const active = st.active;
+    return active ? st.registry.worlds.find((w: any) => w.id === active.worldId) ?? null : null;
+  });
+  expect(tourWorld, 'the tour is running on its own demo world, not the user\'s').toMatchObject({ demo: true });
+
+  // The user's own world survived the tour's stage-clearing: it is still in
+  // the registry, just not active. Clearing the stage must not delete data.
+  const stillRegistered = await page.evaluate((id) =>
+    (window as any).__atlasTestApi.getState().registry.worlds.some((w: any) => w.id === id), ownWorldId);
+  expect(stillRegistered, 'clearing the stage closes the world, never deletes it').toBe(true);
+});

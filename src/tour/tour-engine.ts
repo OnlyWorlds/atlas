@@ -434,7 +434,25 @@ async function routeFor(step: TourStep): Promise<void> {
     else if (route.kind === 'chart') { navigate(timelineHash(worldId)); }
     else {
       const r = await resolveRef(route.ref);
-      if (r) {
+      // NOT-YET-REVEALED REF → NEUTRAL SURFACE, never "leave it as it was"
+      // and never a dead element page (S307).
+      //
+      // Two traps here, and own-eyes caught the second one:
+      //   1. The old code returned SILENTLY when a route could not be taken,
+      //      leaving the PREVIOUS step's element on screen while the narrator
+      //      talked about this one — the "jumping" Captain reported.
+      //   2. `resolveRef` resolves against the BUNDLE, not the store, so it
+      //      succeeds for every scripted element whether or not it has been
+      //      revealed yet. Routing on that alone sent the hands-on consul
+      //      beat to a raw uuid reading "not found in this world" — worse
+      //      than the bug it replaced, and every e2e stayed green because
+      //      none of them assert what the middle pane SHOWS at that step.
+      //
+      // So the gate is existence ON DISK. World home is the honest answer to
+      // "that thing is not made yet".
+      const onDisk = r ? getState().data.elements.some(e => e.id === r.el.id) : false;
+      if (!onDisk) { navigate(`#/w/${worldId}`); }
+      else if (r) {
         if (route.kind === 'map') {
           // Optional element selection (the pin beat): open the map AND show
           // the element's detail in the middle so its +pin button appears.
@@ -747,12 +765,58 @@ async function mintNextCreateNow(): Promise<boolean> {
 // than the bar's predicate on the user's own world.)
 
 /**
- * Start (or restart) the tour: tear down any prior tour world, enter the
- * bare stage at step 0. The world is NOT created here — that is the first
- * hands-on beat.
+ * The tour runs on a BARE STAGE, and until S307 `startTour` only ever
+ * *assumed* one instead of establishing it. Every launch it had been tested
+ * against — the first-launch landing, every e2e — arrived with no active
+ * world, no atlas root and a `#/` route, so the assumption held by accident.
+ *
+ * The settings REPLAY row breaks all three at once: the user has their own
+ * world open, a folder set up, and a route pointing at their own settings
+ * page. None of it was cleared. Step 0 hid the evidence (no `unlocks`, so the
+ * shell is masked); step 1 unlocked the shell and revealed the previous
+ * world's settings page sitting under the tour dock, with that world still
+ * open and still syncing.
+ *
+ * So: the stage is now MADE, not assumed. Every surface listed here is one a
+ * replayer carried in.
+ */
+async function clearStageForTour(): Promise<void> {
+  const store = getActiveStore();
+  if (getState().active && store) {
+    await store.close().catch(() => {});
+    setActiveStore(null);
+    detachSyncEngine();
+  }
+  patchSlice('active', null);
+  patchSlice('data', { elements: [] });
+  const ui = getState().ui;
+  patchSlice('ui', {
+    ...ui,
+    // Only `createTourWorld` (step 2) used to set this, so steps 0-1 rendered
+    // whatever mode the user was left in — and a FINISHED tour explicitly
+    // leaves it on 'worlds', which is why the all-worlds list showed.
+    sidebarMode: 'worlds',
+    selectedElementId: null,
+    // The previous world's map tabs were live under the dock. `[]` is not the
+    // resting shape — the map index is always present (see createInitialState).
+    rightTabs: [{ kind: 'map-index' as const }],
+    rightActiveIndex: 0,
+    pinPlacement: null,
+  });
+  // `routeFor` cannot do this: it is gated on a worldId that is '' by
+  // construction until the create-world beat, and step 0 has no route at all.
+  // Nothing else in the start path navigates, so the launching route survived.
+  if (window.location.hash !== '#/') navigate('#/');
+}
+
+/**
+ * Start (or restart) the tour: tear down any prior tour world, clear the
+ * stage of whatever the launcher was doing, enter the bare stage at step 0.
+ * The world is NOT created here — that is the first hands-on beat.
  */
 export async function startTour(returnHash?: string): Promise<void> {
   await teardownPriorTourWorld();
+  await clearStageForTour();
   writeTourState({ active: true, step: 0, worldId: '', returnHash });
   await enterStep(0);
 }

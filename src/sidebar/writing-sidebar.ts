@@ -126,13 +126,28 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
 
     // Write new sequential order to every sibling whose value actually changes.
     // Sequential integers (0..N-1) keep the order field clean — no fractions.
-    for (let i = 0; i < siblings.length; i++) {
-      const current = (siblings[i] as Element & { order?: number }).order;
-      if (current !== i) {
-        await folder.updateElement(siblings[i].id, { order: i } as Partial<Element>);
+    //
+    // WRAPPED (S307). This loop writes to N elements in sequence and had no
+    // error handling at all, while its only call site invokes it as a bare
+    // `void reorderSiblings(...)`. A failure partway through (lock conflict,
+    // disk error, a rejected write) left the tree PARTIALLY reordered and
+    // produced an unhandled rejection: no toast, not even a console line.
+    // Same class as the `void setNow(...)` silence fixed in S306 — a write
+    // the user can see the result of must never fail invisibly.
+    try {
+      for (let i = 0; i < siblings.length; i++) {
+        const current = (siblings[i] as Element & { order?: number }).order;
+        if (current !== i) {
+          await folder.updateElement(siblings[i].id, { order: i } as Partial<Element>);
+        }
       }
+    } catch (err) {
+      console.error('[writing-sidebar] reorder failed:', err);
+      toasts.error('Could not reorder: the list may be partly changed. Refresh to see the saved order.');
     }
-    const fresh = await refreshElementsAfterWrite(folder);
+    // Always re-prime from disk, success or failure — after a partial write
+    // the in-memory order is a guess and the disk is the truth.
+    await refreshElementsAfterWrite(folder);
   }
 
   // Track the activeId from the LAST navigation. We force-expand ancestors

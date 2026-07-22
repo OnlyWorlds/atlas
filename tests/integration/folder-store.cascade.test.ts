@@ -24,8 +24,12 @@ describe('FolderStore.findDependents', () => {
   it('returns pins whose element_id references a content element', async () => {
     const char = await folder.createElement('character', { id: 'char-1', name: 'Alice' });
     const map = await folder.createMap({ id: 'map-1', name: 'Atlas' });
+    // Alice is pinned on TWO maps. She cannot be pinned twice on ONE map
+    // (S307's uniqueness rule), and two maps is the real shape anyway: the
+    // dependents sweep has to cross maps, which a same-map pair never tested.
+    const map2 = await folder.createMap({ id: 'map-2', name: 'The Inn' });
     await folder.createPin({ id: 'pin-1', name: 'Alice@home', element_id: char.id, map_id: map.id, x: 0, y: 0 });
-    await folder.createPin({ id: 'pin-2', name: 'Alice@inn', element_id: char.id, map_id: map.id, x: 1, y: 1 });
+    await folder.createPin({ id: 'pin-2', name: 'Alice@inn', element_id: char.id, map_id: map2.id, x: 1, y: 1 });
     // Decoy: pin for a different element.
     await folder.createPin({ id: 'pin-3', name: 'other', element_id: 'someone-else', map_id: map.id, x: 0, y: 0 });
 
@@ -79,8 +83,10 @@ describe('FolderStore.deleteElement cascade behavior', () => {
   it('cascade-deletes pins when a character is removed', async () => {
     const char = await folder.createElement('character', { id: 'char-1', name: 'Alice' });
     const map = await folder.createMap({ id: 'map-1', name: 'Atlas' });
+    // Two maps, not two pins on one — see the sibling test above (S307).
+    const map2 = await folder.createMap({ id: 'map-2', name: 'The Inn' });
     await folder.createPin({ id: 'pin-1', name: 'p1', element_id: char.id, map_id: map.id, x: 0, y: 0 });
-    await folder.createPin({ id: 'pin-2', name: 'p2', element_id: char.id, map_id: map.id, x: 1, y: 1 });
+    await folder.createPin({ id: 'pin-2', name: 'p2', element_id: char.id, map_id: map2.id, x: 1, y: 1 });
 
     const { tombstones } = await folder.deleteElement(char.id);
     expect(tombstones).toHaveLength(3);

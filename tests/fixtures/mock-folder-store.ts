@@ -10,6 +10,7 @@ import type { FolderStore, ListElementsOptions } from '../../src/store/folder-st
 import { newId, nowIso } from '../../src/store/folder-store';
 import { PerIdWriteChain } from '../../src/store/write-chain';
 import { ATLAS_LOCAL_ONLY_FIELDS, ATLAS_WIRE_EXTENSION_FIELDS } from '../../src/core/constants';
+import { findDuplicatePin, DuplicatePinError } from '../../src/core/pin-uniqueness';
 import type {
   Element,
   ElementType,
@@ -93,6 +94,15 @@ export class MockFolderStore implements FolderStore {
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
     this.assertWritable();
     const id = (data.id as string) ?? newId();
+    // Mirrors FsFolderStore's pin-uniqueness guard (S307). Convention 20: a
+    // fake that accepts what production rejects produces confident-wrong
+    // tests. Both stores read the SAME predicate so they cannot drift.
+    if (type === 'pin') {
+      const dupe = findDuplicatePin(data as Partial<Pin>, this.elements.values(), id);
+      if (dupe) {
+        throw new DuplicatePinError(dupe.id);
+      }
+    }
     const elem: Element = {
       ...data,
       id,

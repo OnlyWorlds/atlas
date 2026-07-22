@@ -54,7 +54,6 @@ class TourExitModal extends BaseModal {
     body.innerHTML = `
       ${unseenBlock}
       ${seenBlock}
-      <p class="atlas-tour-exit-note">The tour folds away when you leave. You can replay it any time from settings.</p>
       <div class="atlas-modal-actions">
         <button type="button" class="atlas-btn-ghost" data-action="tour-exit-cancel">Keep going</button>
         <button type="button" class="atlas-btn-primary" data-action="tour-exit-confirm">Leave the tour</button>

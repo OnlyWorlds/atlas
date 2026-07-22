@@ -30,15 +30,23 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
       toasts.info('No active world. Pick one from the sidebar');
       return reason;
     case 'local-only':
-      toasts.info('Sync is only available on API-linked worlds');
+      // S307: this branch NAMED a fix and left the user to find it, while
+      // `pin-missing` two lines below has navigated to the fix since S221.
+      // The file exists to stop exactly that ("users were left guessing where
+      // to fix it") — the pattern was just never applied across its own switch.
+      toasts.info('This world is local-only. Connect it to OnlyWorlds to sync');
+      navigate(settingsHash(reason.worldId, 'world'));
       return reason;
     case 'pin-missing':
       toasts.info('Enter your PIN in settings to enable sync');
       navigate(settingsHash(reason.worldId, 'onlyworlds'));
       return reason;
-    case 'attached-but-paused':
-      toasts.info('Sync is paused. Resume from settings');
-      return reason;
+    // ('attached-but-paused' was declared in the union and handled here, but
+    //  `diagnoseSyncUnavailable` never constructed it — the branch could not
+    //  fire, so its toast had never once been shown. Deleted with the variant
+    //  in S307 rather than left as decoration. If pause ever needs its own
+    //  diagnosis, add it to the producer FIRST and this switch will fail to
+    //  compile until it is handled.)
     case 'engine-not-ready':
     default:
       toasts.info('Sync engine not ready. Try again in a moment');

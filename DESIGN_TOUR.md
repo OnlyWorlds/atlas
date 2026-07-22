@@ -1,21 +1,45 @@
 # Atlas — Guided Tour Design
 
-**Version**: 3.0 (2026-07-21, S306 — THE WRITING BEAT: Chapter 1 baked as plain
-prose and linked BY THE USER via autolink's Tab; the tier choice cut as
-unreachable and the selection bubble cut as unnecessary; `Mr. Steinway` renamed
-out of an autolink key collision. Also this pass: the act table, step count,
-bundle count, test count and the "STILL TO BUILD" list were all corrected
-against the code — every one of them was stale, and the STILL-TO-BUILD list was
-naming three things that had already shipped). Prior: 2.9 (S305 — THE CHARTS
-ACT: one shared event date, the now beat, deep time + two eras; the
-event-vs-narrative branch CUT by Captain in favour of a "more information" note,
-which removed the reveal-slot kernel change entirely). Prior: 2.8 (S304 — THE ACT RESTRUCTURE: step-0 opener, maps
-before objects, institution+title merged, the pin's soft correction;
-supersedes v2.7). Prior: S303 capability-class staging + landing captions; S302
-phases WIRED + the scripted create door. The full rework this serves is
-Captain's dump of 2026-07-20: plan + positions in
-`Notes/2026-07-20-s301-tour-rework-plan.md`, contract + gate amendments in
-`Notes/2026-07-20-s301-phase-contract.md`.
+**Version**: 3.2 (2026-07-21, S307 — the consul beat is ROUTED (its view was
+a side effect of the create, so back-navigation showed a later step's
+element); unlit glyphs are no longer rendered, completing the S306c
+sentence-shift decision; the finale copy no longer promises a folder picker
+that OPFS-only browsers never get; the maps step explains where a map image
+comes from. Prior 3.1 header below.)
+
+**Version**: 3.1 (2026-07-21, S306c — Captain's smoke round: the opener renders
+the sentence BARE (no glyph slots on the first screen; they arrive with the
+dock), the grey book cite under it cut, Begin -> Start, sentence colours
+reassigned one word per element (The=title, Hegemony=institution, Consul stays
+character), the consul step acknowledges its own create, the false "zone you
+traced" line corrected, the Consul alias list trimmed to ['Consul'], and the old
+`where-it-lives` + `online` steps MERGED into one `yours-to-keep` close --
+**17 steps**. The writing beat's copy now says CLICK a dotted word (hovering
+places no cursor, so Tab could never fire -- Captain hit this live) and points
+at the prose panel's link-all corner button rather than the tree's right-click
+menu). Prior: 3.0 (S306 — THE WRITING BEAT: Chapter 1 baked as plain prose and
+linked BY THE USER via autolink's Tab; the tier choice cut as unreachable and
+the selection bubble cut as unnecessary; `Mr. Steinway` renamed out of an
+autolink key collision; the act table, step count, bundle count, test count and
+the "STILL TO BUILD" list all corrected against the code — every one was stale,
+and STILL-TO-BUILD was naming three things that had already shipped). Prior: 2.9
+(S305 — THE CHARTS ACT: one shared event date, the now beat, deep time + two
+eras; the event-vs-narrative branch CUT by Captain in favour of a "more
+information" note, which removed the reveal-slot kernel change entirely). Prior:
+2.8 (S304 — THE ACT RESTRUCTURE: step-0 opener, maps before objects,
+institution+title merged, the pin's soft correction; supersedes v2.7). Prior:
+S303 capability-class staging + landing captions; S302 phases WIRED + the
+scripted create door. The full rework this serves is Captain's dump of
+2026-07-20: plan + positions in `Notes/2026-07-20-s301-tour-rework-plan.md`,
+contract + gate amendments in `Notes/2026-07-20-s301-phase-contract.md`.
+
+**SOURCE-TEXT CHRONOLOGY** (S306, five-agent read of the whole novel):
+`Notes/2026-07-21-hyperion-source-chronology.md`. Read it before any dating or
+calendar work. Headline: the book is a RELATIVE-time novel (five absolute years
+in 19,000 lines), the Consul's tenure is a sourced ELEVEN YEARS, the Steinway is
+"Pre-Hegira", Rachmaninov is named exactly once and never dated -- and **the
+opening scene is NOT on Hyperion** (an unnamed world; keeper-verified at L307).
+
 **Concept**: Freek + Captain, 2026-07-19. The opening sentence of *Hyperion*
 by Dan Simmons becomes a small linked world, step by railroaded step,
 teaching OnlyWorlds AND atlas at once — while the workspace BUILDS ITSELF
@@ -74,9 +98,13 @@ at the 'online' step as the deeper schema story).
   serif italic (Crimson Text stack, Georgia fallback — bundling owed if the
   look is blessed); parsed words take their element-type color and click-jump
   to their step; every span's END word carries an inline element-type glyph,
-  PRE-SPACED from step 1 as a dim ghost and LIT (pop-in) when its step
-  arrives — zero reflow. (The finale's neutral fill of connective words was
-  CUT in S298 — only element words ever color.)
+  rendered ONLY once lit (pop-in) when its step arrives. **The sentence
+  reflows as glyphs appear, deliberately** (S307, completing the S306c
+  decision): glyphs used to be PRE-SPACED from step 1 as invisible ghosts so
+  lighting one caused zero reflow, but the reserved width is what spaced the
+  words apart for the whole tour. S306c made the opener bare and accepted the
+  shift; S307 applied that to every later step. (The finale's neutral fill of
+  connective words was CUT in S298 — only element words ever color.)
 - **"more information"** (the ✦ bulb, relabeled S298): real multi-paragraph
   content (`\n\n` renders as paragraphs) in a scrollable FLYOUT above the
   panel — the dock's height never changes. The extras row always renders
@@ -178,7 +206,7 @@ for the pane in front of the user, storage for the next boot). E2e-locked in
 `tour.spec.ts` with a precondition assert, so the test cannot pass by never
 having created the tab.
 
-## Acts (18 steps — S306; `data-tour-step` = step number below)
+## Acts (17 steps — S306c; `data-tour-step` = step number below)
 
 The reorder (Captain's dump): the sentence gets its own opener, the maps act
 comes BEFORE the objects so the pin's "sat" (word 3) lights in reading order
@@ -210,9 +238,10 @@ already drawn).
    they surge) · the chart = the **now beat** (HANDS-ON `set-now`; the bundle
    ships no `time_current`, so the room's real button is pressable) · deep time
    (Rachmaninov -320 and his Prelude -318 in the Old Earth era).
-6. **Your world** (steps 15-18): the sweep · where-it-lives (files story; the Web
-   tab appears here via `webTab`, and it is NOT named earlier) · online (demo key
-   0000000000) · finale.
+6. **Your world** (steps 15-17): the sweep · **yours-to-keep** (S306c MERGE of
+   the old where-it-lives + online: the files story and the OnlyWorlds story, a
+   sentence each, detail in the flyout; carries the Web tab's only introduction
+   via `webTab`, so it is NOT named earlier) · finale.
 
 **Cut from the tour** (stay as waypoints): knowledge room visit, import.
 

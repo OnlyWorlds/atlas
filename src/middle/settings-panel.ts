@@ -110,6 +110,8 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
                 <span>${groupLabel}</span>
               </div>${buttons}`;
           }).join('')}
+          <button type="button" class="atlas-settings-replay-chip" data-action="replay-tour"
+            title="Replay the guided tour. It always starts fresh: the tour world is rebuilt from scratch and folds away again at the end.">Replay the tour</button>
           <div class="atlas-settings-version">Atlas v${pkg.version} · <a href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a></div>
         </nav>
         <section class="atlas-settings-body" role="tabpanel" data-active-tab="${tab}">
@@ -119,7 +121,32 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
     `;
 
     wireTabClicks();
+    wireReplayChip();
     wireTabHandlers(tab, toasts, activeWorld);
+  }
+
+  /**
+   * The replay chip lives in the settings NAV, not in a tab (Captain, S306):
+   * it is a quiet way out of the app, not an OnlyWorlds feature, and it used
+   * to sit in the OnlyWorlds tab where its own hint already promised
+   * "rebuilds the tour world from scratch" — a promise the replay path did
+   * not keep until S307 made `startTour` clear the stage it had only assumed.
+   * Wired here so it works from whichever tab is open.
+   */
+  function wireReplayChip(): void {
+    root.querySelector<HTMLButtonElement>('[data-action="replay-tour"]')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = 'Starting…';
+      try {
+        const engine = await import('../tour/tour-engine');
+        await engine.launchTour();
+      } catch (err) {
+        toasts.error(err instanceof Error ? err.message : String(err));
+        btn.disabled = false;
+        btn.textContent = 'Replay the tour';
+      }
+    });
   }
 
   function wireTabClicks(): void {

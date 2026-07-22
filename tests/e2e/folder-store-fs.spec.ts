@@ -148,8 +148,11 @@ test('deleteElement cascades pins referencing the deleted character', async ({ p
 
     const char = await store.createElement('character', { id: 'char-1', name: 'Alice' });
     const map = await store.createMap({ id: 'map-1', name: 'Atlas' });
+    // Alice on TWO maps: one element may hold only one pin per map (S307),
+    // and crossing maps is the stronger cascade case anyway.
+    const map2 = await store.createMap({ id: 'map-2', name: 'The Inn' });
     await store.createPin({ id: 'pin-1', name: 'p1', element_id: char.id, map_id: map.id, x: 0, y: 0 });
-    await store.createPin({ id: 'pin-2', name: 'p2', element_id: char.id, map_id: map.id, x: 1, y: 1 });
+    await store.createPin({ id: 'pin-2', name: 'p2', element_id: char.id, map_id: map2.id, x: 1, y: 1 });
     await store.createPin({ id: 'pin-other', name: 'decoy', element_id: 'someone-else', map_id: map.id, x: 0, y: 0 });
 
     const preview = await store.findDependents(char.id);

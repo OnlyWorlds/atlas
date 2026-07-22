@@ -83,7 +83,7 @@ function scanDocForMatches(
     if (text.length === 0) return;
 
     // Fresh lastIndex per node — combined regex is /g but we don't share state.
-    const re = new RegExp(index.scanner!.source, 'g');
+    const re = new RegExp(index.scanner!.source, index.scanner!.flags);
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {
       const matched = m[0];
@@ -91,7 +91,7 @@ function scanDocForMatches(
         re.lastIndex++;
         continue;
       }
-      const candidates = index.byName.get(matched);
+      const candidates = index.byName.get(matched.toLowerCase());
       if (!candidates || candidates.length === 0) continue;
       // Ambiguity suppression — multiple elements share this exact key.
       if (candidates.length > 1) continue;
@@ -144,6 +144,36 @@ export const AUTOLINK_INDEX_META = 'atlas-autolink:set-index';
 /** True iff the `@` mention picker is currently visible — gate Tab handling. */
 function mentionPickerVisible(): boolean {
   return Boolean(document.querySelector('.atlas-mention-popover'));
+}
+
+/**
+ * The label a promoted chip should carry: THE WRITER'S OWN TEXT.
+ *
+ * Captain, S307: "DON'T change capitalization when we link things in the
+ * writing room." Until now every promotion path stamped
+ * `candidate.displayName` — the element's canonical name — so a sentence
+ * reading "the consul sat on the balcony" became "the Consul sat..." the
+ * moment it was linked. Autolink matches case-INSENSITIVELY (that is how it
+ * finds the word at all), and it was then silently rewriting the prose to
+ * match the record.
+ *
+ * The link is a relationship, not a spelling correction. The chip's `id` is
+ * the identity — the label is presentation, and in a writing room the
+ * writer's presentation wins. A sentence-initial "The" and a mid-sentence
+ * "the" are a real distinction in prose, and so is a deliberate lowercase
+ * style for a title.
+ *
+ * Falls back to the canonical name only if the matched range is empty, which
+ * should not happen but must never produce a blank chip.
+ */
+function labelForPromotion(view: EditorView, from: number, to: number, candidate: AutolinkCandidate): string {
+  const typed = view.state.doc.textBetween(from, to, '', '').trim();
+  if (typed.length === 0) return candidate.displayName;
+  // CASE ONLY — see the same rule in core/prose-autolink. A case-variant
+  // alias keeps the writer's casing; a genuinely different alias still
+  // resolves to the canonical name (deliberate, tested).
+  const sameWordDifferentCase = typed.toLowerCase() === candidate.displayName.trim().toLowerCase();
+  return sameWordDifferentCase ? typed : candidate.displayName;
 }
 
 export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<AutolinkPluginState> {
@@ -212,7 +242,38 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
             break;
           }
         }
-        if (!found) return false;
+        if (!found) {
+          // TAB MUST NOT ESCAPE THE EDITOR WHILE THERE IS LINKING TO DO
+          // (Captain, S307 — twice reported: "tab doesn't link, it selected
+          // the link icon top right"). Returning false here hands Tab back
+          // to the browser, which moves focus to the next control — the
+          // link-all corner button sits exactly there, so the app looked
+          // like it had done something random.
+          //
+          // The step's own copy says "press Tab to link", so Tab's job is
+          // linking: with the cursor off a dotted word, jump to the next
+          // dotted word (wrapping to the first) and promote THAT. Repeated
+          // Tab now walks the chapter linking each candidate in turn, which
+          // is what a writer means by pressing it again.
+          //
+          // Only when there is nothing left to link does Tab behave normally
+          // and move focus — at that point escaping is the correct answer,
+          // not a bug.
+          const hints = findHints(view).sort((a, b) => a.from - b.from);
+          if (hints.length === 0) return false;
+          const next = hints.find(h => h.from > pos) ?? hints[0];
+          const schema2 = view.state.schema;
+          const chipType2 = schema2.nodes.elementChip;
+          if (!chipType2) return false;
+          const chip2 = chipType2.create({
+            id: next.candidate.id,
+            type: next.candidate.type,
+            label: labelForPromotion(view, next.from, next.to, next.candidate),
+          });
+          view.dispatch(view.state.tr.replaceWith(next.from, next.to, chip2));
+          event.preventDefault();
+          return true;
+        }
         const candidate = (found.spec as { candidate?: AutolinkCandidate }).candidate;
         if (!candidate) return false;
 
@@ -226,7 +287,7 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
         const chip = chipType.create({
           id: candidate.id,
           type: candidate.type,
-          label: candidate.displayName,
+          label: labelForPromotion(view, found.from, found.to, candidate),
         });
         const tr = view.state.tr.replaceWith(found.from, found.to, chip);
         view.dispatch(tr);
@@ -282,7 +343,7 @@ export function convertAutolinkAt(view: EditorView, docPos: number): boolean {
   const chip = chipType.create({
     id: hit.candidate.id,
     type: hit.candidate.type,
-    label: hit.candidate.displayName,
+    label: labelForPromotion(view, hit.from, hit.to, hit.candidate),
   });
   const tr = view.state.tr.replaceWith(hit.from, hit.to, chip);
   view.dispatch(tr);
@@ -320,16 +381,20 @@ export function convertAllAutolinks(view: EditorView, range?: { from: number; to
   if (hints.length === 0) return 0;
   const chipType = view.state.schema.nodes.elementChip;
   if (!chipType) return 0;
+  // Labels are read from the ORIGINAL doc, before any replacement shifts
+  // positions — reading them inside the loop would sample a document the
+  // earlier replacements have already rewritten.
+  const labels = hints.map(h => labelForPromotion(view, h.from, h.to, h.candidate));
   let tr = view.state.tr;
-  for (const h of hints) {
+  hints.forEach((h, i) => {
     const from = tr.mapping.map(h.from);
     const to = tr.mapping.map(h.to);
     tr = tr.replaceWith(from, to, chipType.create({
       id: h.candidate.id,
       type: h.candidate.type,
-      label: h.candidate.displayName,
+      label: labels[i],
     }));
-  }
+  });
   view.dispatch(tr);
   return hints.length;
 }

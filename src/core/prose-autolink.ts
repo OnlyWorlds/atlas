@@ -39,10 +39,24 @@ export interface AutolinkIndex {
 
 /**
  * Build the autolink index from a snapshot of the world's elements. Includes
- * both `name` and `atlas_aliases` as match keys. Case-sensitive so "Drizzle"
- * matches "Drizzle" in prose but not "drizzling" (also blocked by the
- * word-boundary regex). Narratives + spatial artifacts excluded — writers
- * aren't linking pins or maps in body text.
+ * both `name` and `atlas_aliases` as match keys. Narratives + spatial
+ * artifacts excluded — writers aren't linking pins or maps in body text.
+ *
+ * CASE-INSENSITIVE since S307 (Captain's ask). Keys are folded to lowercase
+ * and the scanner carries the `i` flag, so prose that writes "the consul"
+ * mid-sentence links to the element named "Consul" without anyone having to
+ * register a lowercase alias for it. Word boundaries still apply, so
+ * "drizzling" does not match "Drizzle".
+ *
+ * This is SAFE ONLY BECAUSE the label rule below keeps the writer's own text
+ * (see `labelFromSource`). Folding case without that would have turned every
+ * lowercase mention into a silent capitalization edit of the prose — the two
+ * changes are one decision and must not be separated.
+ *
+ * Folding can also create NEW ambiguity (an element "Echo" and another
+ * "echo" now share a key). That resolves the correct way by itself: 2+
+ * candidates for a key is already suppressed entirely, so an ambiguous pair
+ * links to neither rather than guessing.
  */
 export function buildAutolinkIndex(elements: Element[]): AutolinkIndex {
   const byName = new Map<string, AutolinkCandidate[]>();
@@ -75,12 +89,44 @@ function addEntry(map: Map<string, AutolinkCandidate[]>, key: string | undefined
     type: el.type,
     displayName: el.name ?? trimmed,
   };
-  const existing = map.get(trimmed);
+  // Folded key — the surface form the writer typed is recovered at promotion
+  // time from the matched text, never from this key.
+  const folded = trimmed.toLowerCase();
+  const existing = map.get(folded);
   if (existing) {
     if (!existing.some(c => c.id === candidate.id)) existing.push(candidate);
   } else {
-    map.set(trimmed, [candidate]);
+    map.set(folded, [candidate]);
   }
+}
+
+/**
+ * THE WRITER'S OWN TEXT IS THE LABEL (Captain, S307).
+ *
+ * Every promotion path used to stamp `cand.displayName` — the ELEMENT's name.
+ * Matching is exact-case in both autolink engines, so a pure case variant
+ * never matches at all; what actually rewrote prose was ALIASES. An alias is
+ * indexed under its own key but carries `displayName: el.name`, so linking
+ * "the duchess" silently replaced it with "Lyra", and linking a lowercase
+ * styling of a name replaced it with the record's casing.
+ *
+ * A link is a relationship, not a spelling correction. The `id` carries
+ * identity; the label is presentation, and in a writing room the writer's
+ * presentation wins — an alias exists precisely so the prose can call
+ * something what the prose calls it.
+ */
+function labelFromSource(matched: string, cand: AutolinkCandidate): string {
+  const typed = matched.trim();
+  if (typed.length === 0) return cand.displayName;
+  // CASE ONLY, and this is now LOad-BEARING: matching folds case (S307), so
+  // without this every lowercase mention would be silently recapitalised to
+  // the record's spelling. Guarded by "THE GUARANTEE" in
+  // prose-autolink.test.ts, which sweeps four casings through both engines.
+  //
+  // A GENUINELY different alias ("the duchess" for "Lyra") still resolves to
+  // the canonical name — a deliberate, separately tested decision.
+  const sameWordDifferentCase = typed.toLowerCase() === cand.displayName.trim().toLowerCase();
+  return sameWordDifferentCase ? typed : cand.displayName;
 }
 
 function escapeRegexLiteral(text: string): string {
@@ -91,7 +137,8 @@ function buildCombinedRegex(keys: string[]): RegExp | null {
   if (keys.length === 0) return null;
   const pattern = `\\b(?:${keys.map(escapeRegexLiteral).join('|')})\\b`;
   try {
-    return new RegExp(pattern, 'g');
+    // `i` pairs with the folded index keys (S307).
+    return new RegExp(pattern, 'gi');
   } catch {
     return null;
   }
@@ -132,7 +179,9 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex): MarkdownA
   let om: RegExpExecArray | null;
   while ((om = ows.exec(story)) !== null) already.add(om[2]);
 
-  const re = new RegExp(index.scanner.source, 'g');
+  // Flags come FROM the scanner, never restated — a hardcoded 'g' here
+  // would silently drop the case-insensitivity the index depends on.
+  const re = new RegExp(index.scanner.source, index.scanner.flags);
   const replacements: Array<{ from: number; to: number; cand: AutolinkCandidate }> = [];
   const proposed = new Set<string>();
   let m: RegExpExecArray | null;
@@ -141,7 +190,7 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex): MarkdownA
     const from = m.index;
     const to = m.index + m[0].length;
     if (isProtected(from, to)) continue;
-    const cands = index.byName.get(m[0]);
+    const cands = index.byName.get(m[0].toLowerCase());
     if (!cands || cands.length !== 1) continue; // unknown or ambiguous
     const cand = cands[0];
     if (already.has(cand.id) || proposed.has(cand.id)) continue;
@@ -154,7 +203,7 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex): MarkdownA
   for (let i = replacements.length - 1; i >= 0; i--) {
     const r = replacements[i];
     out = out.slice(0, r.from)
-      + `[${r.cand.displayName}](ow://${r.cand.type}/${r.cand.id})`
+      + `[${labelFromSource(story.slice(r.from, r.to), r.cand)}](ow://${r.cand.type}/${r.cand.id})`
       + out.slice(r.to);
   }
   return { story: out, linked: replacements.map(r => r.cand) };
@@ -233,13 +282,13 @@ function splitTextNode(
   linked: AutolinkCandidate[],
 ): RtNode[] {
   const text = node.text!;
-  const re = new RegExp(index.scanner!.source, 'g');
+  const re = new RegExp(index.scanner!.source, index.scanner!.flags);
   const parts: RtNode[] = [];
   let cursor = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m[0].length === 0) { re.lastIndex++; continue; }
-    const cands = index.byName.get(m[0]);
+    const cands = index.byName.get(m[0].toLowerCase());
     if (!cands || cands.length !== 1) continue;
     const cand = cands[0];
     if (already.has(cand.id) || proposed.has(cand.id)) continue;
@@ -248,7 +297,7 @@ function splitTextNode(
     if (m.index > cursor) parts.push({ ...node, text: text.slice(cursor, m.index) });
     parts.push({
       type: 'elementChip',
-      attrs: { id: cand.id, type: cand.type, label: cand.displayName },
+      attrs: { id: cand.id, type: cand.type, label: labelFromSource(m[0], cand) },
     });
     cursor = m.index + m[0].length;
   }

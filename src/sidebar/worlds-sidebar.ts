@@ -35,9 +35,21 @@ const TOUR_CREATE_SEEN_KEY = 'atlas_tour_create_seen';
 
 import { isTourFlagActive } from '../tour/tour-flag';
 
-/** Guided tour running with no atlas root. */
-function isTouringNoRoot(): boolean {
-  return !getState().atlasRoot && isTourFlagActive();
+/**
+ * Guided tour running. The tour OWNS the sidebar while it runs, whether or
+ * not the user has an atlas root.
+ *
+ * This used to be `isTouringNoRoot` (`!atlasRoot && isTourFlagActive()`) and
+ * was tested BELOW the `if (root)` branch, which made it dead for anyone
+ * replaying the tour after finishing it — finishing is precisely what sets a
+ * root. Those users took the root branch, whose create button opens a PLAIN
+ * modal with no `overrideCreate`, while `tour-bar` gates the create-world
+ * step on `tourWorldExists()` and renders no forward control until it passes.
+ * No Next, no scripted create: hard stuck at step 1. Worse, pressing the live
+ * +folder built a REAL world in their own root and left them stuck anyway.
+ */
+function isTouring(): boolean {
+  return isTourFlagActive();
 }
 
 export interface WorldsBodyMount {
@@ -58,7 +70,10 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const state = getState();
     const root = state.atlasRoot;
     const recoverable = state.atlasRootRecoverable;
-    if (root) {
+    // ORDER IS LOAD-BEARING: the tour branch is tested FIRST. A replayer has a
+    // root (finishing the tour is what sets one), and the root branch's create
+    // button carries no tour override — see `isTouring`.
+    if (root && !isTouring()) {
       // Uniform compound-icon-button row (Captain session 219). Each button
       // reads "+target" via a small `add` glyph + a target glyph, with the
       // full action surfaced in the tooltip. Matches the [+map] / [+pin]
@@ -85,8 +100,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           <span class="material-symbols-outlined atlas-add-glyph-main">visibility</span>
         </button>
       `;
-    } else if (isTouringNoRoot()) {
-      // Guided tour, stage 1 (no atlas root): the sidebar shows its TRUE
+    } else if (isTouring()) {
+      // Guided tour, stage 1: the sidebar shows its TRUE
       // final structure — all five action icons in their real places — with
       // only create-world live and the rest greyed (Captain's call: the
       // landscape appears once, in its exact geometry; nothing jumps into
@@ -321,7 +336,13 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const state = getState();
     const route = parseHash(window.location.hash);
     const activeId = state.active?.worldId;
-    const worlds = state.registry.worlds;
+    // During the tour the list shows the TOUR's world and nothing else. On a
+    // first launch this was free (the registry was empty), which is why the
+    // filter never existed; on a replay the user's real worlds are sitting
+    // there, and the tour would narrate "your world" over a list of them.
+    const worlds = isTouring()
+      ? state.registry.worlds.filter(w => w.demo === true)
+      : state.registry.worlds;
 
     if (worlds.length === 0) {
       // Silent in both pre-root and zero-worlds states (S255v2): pre-root the
@@ -632,7 +653,12 @@ async function doActivateWorld(
 
   const handle = await loadHandle(entry.folder.handle_key);
   if (!handle) {
-    if (!silent) toasts.error(`Folder handle missing for ${entry.name}. Delete + recreate to recover.`);
+    // NEVER advise deletion here. The files are intact on disk — only the
+    // browser's handle to them is gone (cleared storage, another profile, a
+    // moved folder). "Delete + recreate to recover" (the wording until S307)
+    // pointed at the one action that actually loses the world, while the real
+    // one-click fix is the [+folder_open] button in this very header.
+    if (!silent) toasts.error(`Lost access to ${entry.name}'s folder. Your files are safe: use "open an existing world folder" in the sidebar header to point atlas at it again.`);
     if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
     return false;
   }

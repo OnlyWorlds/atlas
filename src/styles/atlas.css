@@ -1799,8 +1799,10 @@ body.atlas-touring .atlas-shell {
   font-style: normal;
   vertical-align: baseline;
   margin-left: 3px;
-  opacity: 0.05;
   color: rgba(255, 255, 255, 0.8);
+  /* No ghost state any more: unlit glyphs are not rendered (S307), so this
+     rule only ever dresses a lit one. The old `opacity: 0.05` reserved the
+     slot's WIDTH from step 0, which is what spaced the words apart. */
 }
 .atlas-tour-sentence .atlas-tour-glyph.lit {
   opacity: 1;
@@ -4505,8 +4507,34 @@ body.atlas-preroot .atlas-middle {
 
 /* Version + link footer (replaces the old About tab) — pinned to the bottom
    of the rail. */
+/* The replay chip sits at the foot of the settings nav, above the version
+   line (Captain, S306: "a quiet centred chip"). It carries the `margin-top:
+   auto` that used to push the version line down, so the pair travels together
+   as the nav's footer. */
+.atlas-settings-replay-chip {
+  margin: auto 18px 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  font: inherit;
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+.atlas-settings-replay-chip:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.75);
+}
+.atlas-settings-replay-chip:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .atlas-settings-version {
-  margin-top: auto;
+  margin-top: 0;
   padding: 12px 18px 4px;
   font-size: 10px;
   color: rgba(255, 255, 255, 0.3);
@@ -14014,6 +14042,11 @@ body.atlas-share-fullpreview > * {
 .atlas-chart-rightstack {
   margin-left: auto;
   display: flex;
+  /* ONE LINE, toggles first (Captain, S307 second pass). The stack was tried
+     and did not read well: two short rows in the bar's right corner made a
+     visual block that competed with the calendar chip on the left. Back on
+     one line, but keeping the flipped ORDER from the first pass — the fixed
+     control leads, the one that changes shape trails. */
   align-items: center;
   gap: 10px;
 }
@@ -14094,4 +14127,31 @@ body.atlas-share-fullpreview > * {
   color: var(--atlas-text-dim);
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* Recovery affordance inside an empty/not-found pane (S307). A not-found id
+   used to be a text cul-de-sac; the share room's drill-in back link is the
+   precedent this follows. */
+.atlas-pane-empty-action {
+  margin-top: 10px;
+}
+.atlas-pane-empty-action a {
+  color: var(--atlas-cyan);
+  text-decoration: none;
+  font-size: 12px;
+}
+.atlas-pane-empty-action a:hover {
+  text-decoration: underline;
+}
+
+/* The type-chip strip owns its own wrapping (S307). Before this the chips
+   were direct children of the control bar, so the set growing by one (which
+   is exactly what minting a calendar does — it adds a Construct) displaced
+   every control after it, including the calendar chip itself. */
+.atlas-chart-chipstrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }

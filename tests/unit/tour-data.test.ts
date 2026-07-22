@@ -338,13 +338,16 @@ describe('the writing beat (S306)', () => {
     const chapter = bundleElement(chapterName);
     const index = buildAutolinkIndex(bundle.elements as unknown as Element[]);
     expect(index.scanner).not.toBeNull();
-    const scanner = new RegExp(index.scanner!.source, 'g');
+    // Mirror the REAL matcher: its own flags (case-insensitive since S307)
+    // and a folded key lookup. Restating 'g' here measured a matcher the app
+    // no longer has.
+    const scanner = new RegExp(index.scanner!.source, index.scanner!.flags);
     const story = chapter.story as string;
 
     const blocked: string[] = [];
     let m: RegExpExecArray | null;
     while ((m = scanner.exec(story)) !== null) {
-      const cands = index.byName.get(m[0]);
+      const cands = index.byName.get(m[0].toLowerCase());
       if (cands && cands.length > 1) {
         blocked.push(`"${m[0]}" -> ${cands.map(c => `${c.type}:${c.displayName}`).join(' + ')}`);
       }
@@ -362,12 +365,15 @@ describe('the writing beat (S306)', () => {
     const chapter = bundleElement(chapterName);
     const index = buildAutolinkIndex(present);
     expect(index.scanner).not.toBeNull();
-    const scanner = new RegExp(index.scanner!.source, 'g');
+    // Mirror the REAL matcher: its own flags (case-insensitive since S307)
+    // and a folded key lookup. Restating 'g' here measured a matcher the app
+    // no longer has.
+    const scanner = new RegExp(index.scanner!.source, index.scanner!.flags);
 
     const linkable = new Set<string>();
     let m: RegExpExecArray | null;
     while ((m = scanner.exec(chapter.story as string)) !== null) {
-      const cands = index.byName.get(m[0]);
+      const cands = index.byName.get(m[0].toLowerCase());
       if (cands && cands.length === 1) linkable.add(cands[0].id);
     }
     expect(linkable.size).toBe(TOUR_WRITING_LINKABLE);
@@ -383,5 +389,28 @@ describe('the writing beat (S306)', () => {
       .slice(0, TOUR_STEPS.findIndex(s => s.id === 'the-writing') + 1)
       .flatMap(s => s.reveal ?? []);
     expect(revealedByNow).toContain(TOUR_CHAPTER_REF);
+  });
+});
+
+describe('a step\'s view is a function of the STEP (S307)', () => {
+  it('every step that NAMES an element in its copy routes to something', () => {
+    // The consul beat carried no `route` and looked correct only because
+    // creating an element navigates to it as a SIDE EFFECT. Going back there
+    // is no create, so the middle pane kept showing a LATER step's element
+    // while the narrator talked about the Consul — Captain saw it as the tour
+    // "jumping between the Consul and home".
+    //
+    // The invariant: a hands-on step that mints a named element must route,
+    // so the surface is determined by the step and not by how you got there.
+    const handsOnCreates = TOUR_STEPS.filter(s => s.handsOn === 'create-consul');
+    expect(handsOnCreates.length, 'the consul beat still exists').toBeGreaterThan(0);
+    for (const step of handsOnCreates) {
+      expect(step.route, `${step.id} must declare where it looks`).toBeTruthy();
+    }
+  });
+
+  it('the consul beat routes at the element it teaches', () => {
+    const consul = TOUR_STEPS.find(s => s.id === 'the-consul');
+    expect(consul?.route).toEqual({ kind: 'element', ref: 'character:The Consul' });
   });
 });

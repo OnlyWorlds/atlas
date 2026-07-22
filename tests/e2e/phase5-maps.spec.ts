@@ -349,7 +349,14 @@ test('imageless map is first-class: flat canvas opens, pin places, zone draft st
   // put y in the hundreds-to-thousands). Re-select the element first — the
   // zone-draft Escape above also fired the deselect-to-home hotkey, so the
   // +pin button (element-detail top bar) left the page.
-  await page.click('.atlas-element-row:has-text("Sketch Marker"), [data-element-id]:has-text("Sketch Marker")');
+  // A SECOND element, not Sketch Marker again: one element may hold only one
+  // pin per map (S307), and Sketch Marker is already pinned on this canvas.
+  // What this section actually asserts is the coordinate SPACE of a freshly
+  // placed pin after the dims flip, which does not care whose pin it is.
+  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
+  await page.click('[data-action="create-element"]');
+  await page.fill('input[name="element-name"]', 'Second Marker');
+  await page.click('[data-modal="create-element"] [data-action="create"]');
   const pinIdsBefore = await page.evaluate(async () => {
     const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
     return els.filter((e: any) => e.type === 'pin').map((p: any) => p.id);

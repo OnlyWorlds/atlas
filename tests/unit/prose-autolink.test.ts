@@ -40,6 +40,60 @@ describe('autolinkMarkdown', () => {
     expect(r.story).toBe('They bowed to [Aralia](ow://character/c1).');
   });
 
+  it("a CASE-VARIANT alias keeps the writer own casing (S307)", () => {
+    // Captain, S307: do not change capitalization when linking in the writing
+    // room. Matching is exact-case, so a lowercase styling only links at all
+    // when registered as an alias — and the label then snapped to the
+    // record casing, silently editing the prose. A link is a relationship,
+    // not a spelling correction.
+    const world = [el('c9', 'character', 'Consul', ['consul'])];
+    const index = buildAutolinkIndex(world);
+    const r = autolinkMarkdown('The old consul waited.', index);
+    expect(r.story).toBe('The old [consul](ow://character/c9) waited.');
+  });
+
+  it("but a GENUINELY different alias still resolves to the canonical name", () => {
+    // The paired half, stated explicitly so a future widening of the case
+    // rule cannot quietly turn into renaming every alias. The sibling test
+    // above (canonical name for "the duchess") is the shipped decision.
+    const index = buildAutolinkIndex(WORLD);
+    const r = autolinkMarkdown('They bowed to the duchess.', index);
+    expect(r.story).toContain('[Aralia](ow://character/c1)');
+  });
+
+  it("THE GUARANTEE: linking never edits the writer casing, in any form", () => {
+    // Captain, S307, named as the highest-priority property of this feature.
+    // Case-insensitive MATCHING and case-preserving LABELLING are one
+    // decision: folding case without this would silently rewrite prose on
+    // every lowercase mention.
+    //
+    // Driven as a sweep over surface forms rather than one example, so a
+    // regression in any casing shape fails here rather than in someone
+    // manuscript.
+    const index = buildAutolinkIndex(WORLD);
+    const forms = ['Aralia', 'aralia', 'ARALIA', 'ArAlIa'];
+    for (const form of forms) {
+      const r = autolinkMarkdown(`Then ${form} spoke.`, index);
+      expect(r.linked.map(c => c.id), `${form} should link`).toEqual(['c1']);
+      expect(r.story, `${form} must survive linking unchanged`)
+        .toBe(`Then [${form}](ow://character/c1) spoke.`);
+    }
+  });
+
+  it("THE GUARANTEE holds for the richtext path too, not just markdown", () => {
+    // Two engines share the index but have separate promotion sites; a fix
+    // applied to one is exactly the asymmetry the S257 law warns about.
+    const index = buildAutolinkIndex(WORLD);
+    const doc = { type: 'doc', content: [{ type: 'paragraph', content: [
+      { type: 'text', text: 'Then aralia spoke.' },
+    ] }] };
+    const out = autolinkRichtext(doc as never, index);
+    const para = (out.doc as { content: Array<{ content: Array<Record<string, unknown>> }> }).content[0];
+    const chip = para.content.find(n => n.type === 'elementChip') as { attrs: { label: string } } | undefined;
+    expect(chip, 'the lowercase mention linked').toBeTruthy();
+    expect(chip!.attrs.label, 'and kept the writer casing').toBe('aralia');
+  });
+
   it('skips ambiguous names entirely', () => {
     const index = buildAutolinkIndex(WORLD);
     const r = autolinkMarkdown('An Echo sounded.', index);
@@ -58,9 +112,18 @@ describe('autolinkMarkdown', () => {
     );
   });
 
-  it('is case-sensitive and word-bounded', () => {
+  it('is CASE-INSENSITIVE but still word-bounded (S307)', () => {
     const index = buildAutolinkIndex(WORLD);
-    expect(autolinkMarkdown('aralia is lowercase; Bramble is a shrub.', index).linked).toHaveLength(0);
+    // Lowercase now links (Captain's ask) ...
+    const lower = autolinkMarkdown('aralia walked home.', index);
+    expect(lower.linked.map(c => c.id)).toEqual(['c1']);
+    // ... and the writer's casing SURVIVES it. This is the guarantee the
+    // whole change rests on: folding case without preserving the surface
+    // form would turn every lowercase mention into a silent edit of the
+    // prose.
+    expect(lower.story).toBe('[aralia](ow://character/c1) walked home.');
+    // Word boundaries still hold: "Bramble" is not "Bram".
+    expect(autolinkMarkdown('Bramble is a shrub.', index).linked).toHaveLength(0);
   });
 
   it('links multiple distinct candidates in one pass', () => {
