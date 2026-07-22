@@ -441,6 +441,11 @@ export function compilePageStory(
         if (b.markdown.trim()) parts.push(b.markdown.trim());
         break;
       case 'element-card':
+        // NOT renamed with the UI label (S308). This is the DERIVED STORY
+        // mirror — persisted to the page's `story` field and pushed to the
+        // server, not shown in the block builder. Renaming it would rewrite
+        // every existing page's story on its next write for a cosmetic reason.
+        // The user-facing label is "+ element"; this stays the wire wording.
         parts.push(`[ ${resolveName(b.elementId) ?? b.elementId} · element card ]`);
         break;
       case 'circle':

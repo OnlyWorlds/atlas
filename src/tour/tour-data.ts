@@ -1,34 +1,34 @@
 /**
- * The guided tour's content: the Hyperion sentence + the step script.
+ * The guided tour’s content: the Hyperion sentence + the step script.
  *
  * The tour turns the opening sentence of *Hyperion* by Dan Simmons into
- * OnlyWorlds elements, teaching atlas's rooms along the way (Freek's concept,
- * 2026-07-19; the v2 progressive build-up is Captain's design round 2). The
+ * OnlyWorlds elements, teaching atlas’s rooms along the way (Freek’s concept,
+ * 2026-07-19; the v2 progressive build-up is Captain’s design round 2). The
  * world data is the baked demo bundle `src/demo/hyperion-world.json` (from
  * OnlyWorlds demo key 0000000000); steps reference bundle elements by
- * `"type:Name"` so re-bakes don't break the script.
+ * `"type:Name"` so re-bakes don’t break the script.
  *
  * Sentence channels:
  *   - cumulative FILL: words parsed by any step up to the current one carry
  *     their element-type color
- *   - GHOST GLYPHS: every span's end word carries an inline element-type icon,
+ *   - GHOST GLYPHS: every span’s end word carries an inline element-type icon,
  *     pre-spaced from step 0 (dim ghost) and LIT when its step is reached —
- *     zero reflow, and the ghosts promise what's coming (Skeld's
+ *     zero reflow, and the ghosts promise what’s coming (Skeld’s
  *     sentence-is-the-progress-bar, ow.com vignette grammar). A span carrying
- *     a `ref` lights on that element's EXISTENCE instead (the per-mint pop).
+ *     a `ref` lights on that element’s EXISTENCE instead (the per-mint pop).
  *
- * Steps carry NO titles (Captain's cut, v2.1): the act label orients, a
+ * Steps carry NO titles (Captain’s cut, v2.1): the act label orients, a
  * hairline divides sentence from explainer, the body speaks for itself.
  *
- * PHASES (S301): a step's narration is a list of phases, and which one speaks
+ * PHASES (S301): a step’s narration is a list of phases, and which one speaks
  * is DERIVED from the world (`src/tour/tour-view.ts`), never stored. Most steps
- * are single-phase; the scripted objects run and the pin's soft correction use
+ * are single-phase; the scripted objects run and the pin’s soft correction use
  * b/c/d phases, and their `when` predicates are PREFIX-nested (each a
  * refinement of the one before) so `resolvePhase` never breaks early.
  *
  * Order (S303 rework): opener (the sentence centre-stage) · elements (world,
  * consul, hegemony+title) · maps (planet, map+zone, pin, swamps) · objects &
- * links · writing · time · yours. Maps come before the objects so the pin's
+ * links · writing · time · yours. Maps come before the objects so the pin’s
  * "sat" lights in reading order and the pin can land in the already-drawn zone.
  * The engine treats the last defined step as the finale; step 0 has no world.
  */
@@ -38,22 +38,24 @@ import type { TourPhase } from './tour-view';
 
 export const TOUR_SENTENCE: readonly string[] =
   ('The Hegemony Consul sat on the balcony of his ebony spaceship and played ' +
-   "Rachmaninov's Prelude in C-sharp Minor on an ancient but well-maintained " +
+   "Rachmaninov’s Prelude in C-sharp Minor on an ancient but well-maintained " +
    'Steinway while great, green, saurian things surged and bellowed in the swamps below.').split(' ');
 
-/** The opener's eyebrow line (step 1 only — steps carry no titles). */
+/** The opener’s eyebrow line (step 1 only — steps carry no titles). */
 
-/** The standard cite — book and year, no mortality claims (Skeld's check). */
+/** The standard cite — book and year. (S308: the "no mortality claims"
+ *  annotation was removed — it wasn’t Captain’s rule, and the opener’s own copy
+ *  says "the late Dan Simmons", which is correct: he died 21 Feb 2026.) */
 export const TOUR_ATTRIBUTION = 'Hyperion, Dan Simmons (1989)';
 export const TOUR_ATTRIBUTION_URL = 'https://en.wikipedia.org/wiki/Hyperion_(Simmons_novel)';
 
-/** Inclusive word-index range painted with an element type's color. */
+/** Inclusive word-index range painted with an element type’s color. */
 export interface TourSpan {
   from: number;
   to: number;
   type: ElementType;
   /**
-   * Bundle ref ("object:Ebony Spaceship") whose EXISTENCE lights this span's
+   * Bundle ref ("object:Ebony Spaceship") whose EXISTENCE lights this span’s
    * glyph. Absent = the step-keyed rule (lit once its step is reached).
    *
    * This is what lets a `creates` step pop one glyph per mint instead of
@@ -91,18 +93,18 @@ export interface TourStep {
   /** App chrome this step turns on (cumulative). See TourCapability. */
   unlocks?: TourCapability[];
   /**
-   * The step's narration, in order. The engine shows the last phase whose
+   * The step’s narration, in order. The engine shows the last phase whose
    * `when` holds AND all earlier phases' `when` hold too (prefix semantics —
    * see tour-view.ts). Minimum one; a single-phase step behaves exactly as a
    * plain body/meta/deeper step did.
    */
   phases: TourPhase[];
-  /** Words this step parses (cumulative fill + active highlight + a lit glyph at each span's end). */
+  /** Words this step parses (cumulative fill + active highlight + a lit glyph at each span’s end). */
   spans?: TourSpan[];
   /** Bundle elements ("type:Name") revealed when this step is entered. */
   reveal?: string[];
   /**
-   * Ordered bundle refs the USER mints, one per click of the app's real `+`
+   * Ordered bundle refs the USER mints, one per click of the app’s real `+`
    * (the scripted create door). Never auto-revealed on their own step; they
    * backfill once the tour moves strictly past, exactly like `handsOn`.
    */
@@ -113,13 +115,20 @@ export interface TourStep {
     | { kind: 'elements' }
     | { kind: 'element'; ref: string }
     // `elementRef` opens the map AND selects an element in the middle (the
-    // combined map/element route) — the pin beat needs the element's header
+    // combined map/element route) — the pin beat needs the element’s header
     // visible so its real +pin button shows.
     | { kind: 'map'; ref: string; elementRef?: string }
     | { kind: 'writing'; ref: string }
     | { kind: 'chart' };
   /** Switch the right pane to the Web (context) tab on step enter. */
   webTab?: boolean;
+  /**
+   * Scroll the named element-detail section into view on step enter (S309):
+   * the linking payoff narrates the World section and Referenced by, which sit
+   * BELOW the tour dock at default scroll — a step whose subject is off-screen
+   * teaches nothing. Matches `.atlas-detail-section[data-section="<name>"]`.
+   */
+  scrollToSection?: string;
   /**
    * Hands-on steps. The create beats and `set-now` are SINGLE ROUTE: the real
    * gesture is the only way forward, and no watch-mode Next is rendered (two
@@ -130,7 +139,7 @@ export interface TourStep {
   handsOn?: 'create-world' | 'create-consul' | 'place-pin' | 'set-now' | 'setup-folder' | 'link-word';
   /**
    * For a `place-pin` step: the forward gate ALSO requires the pin to sit
-   * inside this zone (the soft correction — Captain's ruling). The pin can be
+   * inside this zone (the soft correction — Captain’s ruling). The pin can be
    * dropped anywhere (never refused); Next appears only once it is over the
    * zone, and a wrong drop is dragged onto it, which teaches dragging pins.
    * The phase copy narrates the correction; this drives whether Next shows.
@@ -139,16 +148,16 @@ export interface TourStep {
 }
 
 /** The pin the balcony-seat beat places, and the zone it must land inside. */
-export const TOUR_PIN_REF = "pin:The Consul's balcony seat";
+export const TOUR_PIN_REF = "pin:The Consul’s balcony seat";
 export const TOUR_SWAMPS_ZONE_REF = 'zone:The Swamps';
 
 /** The chapter the writing beat links (baked chip-free — see the-writing). */
 export const TOUR_CHAPTER_REF = 'narrative:Chapter 1';
 /**
- * How many of the sentence's phrases can be linked AT THE WRITING BEAT.
+ * How many of the sentence’s phrases can be linked AT THE WRITING BEAT.
  *
  * The sentence carries nine linkable surface forms, but `character:Rachmaninov`
- * and `construct:Rachmaninov's Prelude` are not revealed until `deep-time`,
+ * and `construct:Rachmaninov’s Prelude` are not revealed until `deep-time`,
  * three steps later, so autolink cannot resolve them here. Seven is therefore
  * "everything this world currently knows", and the phase-c copy says exactly
  * that. A unit test recomputes this from the bundle + the reveal order, so a
@@ -161,7 +170,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   // Step 0 (S303 rework): the sentence centre-stage on black, then it hands
   // off into the dock on "Begin". No `unlocks` at all, so
   // `:not(.atlas-tour-cap-shell)` hides the shell behind the big sentence.
-  // Copy is Captain's shorter variant and rides his copy pass.
+  // Copy is Captain’s shorter variant and rides his copy pass.
   {
     id: 'the-sentence',
     act: 1,
@@ -194,8 +203,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'a',
         body:
           'The Consul seems pre-eminent in this tiny world. Create him in the sidebar.',
-        // (The "real element dialog, locked to the tour's script this once…" meta
-        // was cut S301, Captain's round — the dialog speaks for itself.)
+        // (The "real element dialog, locked to the tour’s script this once…" meta
+        // was cut S301, Captain’s round — the dialog speaks for itself.)
       },
       {
         // The step used to keep asking for a deed already done (Captain, S306):
@@ -214,11 +223,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // FORWARD it looked right only because creating an element navigates to
     // it as a side effect. Going BACK there is no create, so nothing
     // navigated and the middle pane kept showing whatever a LATER step had
-    // opened — the narrator talking about the Consul over the institution's
+    // opened — the narrator talking about the Consul over the institution’s
     // page. Captain saw it as the tour "jumping between the Consul and home",
     // because which surface you landed on depended on the path you took.
     //
-    // A step's route is a promise about what you are looking at; it must not
+    // A step’s route is a promise about what you are looking at; it must not
     // be a side effect of a gesture that only happens once.
     route: { kind: 'element', ref: 'character:The Consul' },
   },
@@ -252,12 +261,20 @@ export const TOUR_STEPS: readonly TourStep[] = [
   // ---------------------------------------------------------------- Act 2 (maps)
   // Locations and the map now come BEFORE the objects (S303 rework): this lights
   // "sat" (the pin, word 3) in reading order ahead of "balcony" and "spaceship",
-  // and it lets the pin beat's soft correction land the seat over the swamps —
+  // and it lets the pin beat’s soft correction land the seat over the swamps —
   // which requires the zone to already be on the map, so the zone reveals here.
   {
     id: 'the-planet',
     act: 2,
-    unlocks: ['rightpane'],
+    // `unlocks: ['rightpane']` MOVED to `the-map` (S308). It sat here, so the
+    // largest single piece of chrome in the whole build-up slid in during a
+    // pure elements beat with no narration, and the NEXT step then said "a new
+    // pane just opened on the right" about something that had opened a step
+    // earlier. The tour’s promise is that the workspace builds itself around
+    // you and the narrator names each piece AS it arrives; this was the one
+    // place that promise ran a beat behind. Nothing between the two steps reads
+    // the capability, and `the-map` is the step that actually needs it (its
+    // route opens a map tab, which lives in the right pane).
     phases: [{
       id: 'a',
       body:
@@ -271,6 +288,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: 'the-map',
     act: 2,
+    unlocks: ['rightpane'],
     phases: [{
       id: 'a',
       body:
@@ -280,7 +298,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       // Captain, S307: the step said a map "carries an image" and never said
       // where that image comes from, which is the first question anyone has
       // about their OWN map. Both routes below are verified against the real
-      // controls (map-create-modal's URL field + the local-file row added in
+      // controls (map-create-modal’s URL field + the local-file row added in
       // S253), because copy naming a control is a behavioural claim.
       deeper:
         'Your own maps take an image two ways: paste a URL, or choose a file ' +
@@ -289,7 +307,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'travels with the folder. You can also make a map with no image at ' +
         'all and draw on the blank canvas, then add the art later.',
     }],
-    // The swamps zone (and its markers) reveal WITH the map — the pin beat's
+    // The swamps zone (and its markers) reveal WITH the map — the pin beat’s
     // soft correction needs the region present to test the drop against, and
     // the geography reads as one thing. The living things stay for the-swamps.
     spans: [{ from: 32, to: 34, type: 'zone' }],
@@ -305,7 +323,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: 'the-pin',
     act: 2,
-    // The soft correction (Captain's ruling): place anywhere, Next appears only
+    // The soft correction (Captain’s ruling): place anywhere, Next appears only
     // once the pin is over the swamps; a wrong drop is dragged onto them, which
     // teaches dragging pins. `placeInZone` drives the gate; the phases narrate.
     placeInZone: { pinRef: TOUR_PIN_REF, zoneRef: TOUR_SWAMPS_ZONE_REF },
@@ -328,7 +346,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       },
       {
         // Placed, but the gate (pinInZone) has not passed — the correction.
-        // `when: hasRef` is a PREFIX of phase c's `hasRef && pinInZone`, so a
+        // `when: hasRef` is a PREFIX of phase c’s `hasRef && pinInZone`, so a
         // good drop resolves straight to c and a wrong one holds here.
         id: 'b',
         when: (w) => w.hasRef(TOUR_PIN_REF),
@@ -361,8 +379,13 @@ export const TOUR_STEPS: readonly TourStep[] = [
         // Swamps zone is REVEALED with the map at the previous beat, the user
         // never draws it. Copy must not credit the reader with a gesture the
         // tour performed for them.
-        'The saurian things live in those swamps: two creatures, their species, ' +
-        'and one bellowing pack, all linked to the swamps zone on the map.',
+        // S308: "all linked to the swamps zone" was false for two of the four
+        // elements this step reveals, and schema-impossible for one — a
+        // collective has no zone field, so the old copy implied a link the
+        // model cannot express. Narrowed to what is true and checkable.
+        'The saurian things live in those swamps: two creatures in the swamps ' +
+        'zone on the map, the species they share, and one bellowing pack that ' +
+        'holds them both.',
     }],
     spans: [
       { from: 27, to: 27, type: 'creature' },
@@ -379,10 +402,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: 'objects',
     act: 1,
-    // The first scripted RUN: the user mints these three with the app's own +,
+    // The first scripted RUN: the user mints these three with the app’s own +,
     // one per click, and Next waits for all of them. Copy here is provisional
-    // and rides Captain's copy pass.
-    creates: ['object:Ebony Spaceship', 'object:Spaceship Balcony', "object:The Consul's Steinway"],
+    // and rides Captain’s copy pass.
+    creates: ['object:Ebony Spaceship', 'object:Spaceship Balcony', "object:The Consul’s Steinway"],
     phases: [
       {
         id: 'a',
@@ -395,7 +418,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         when: (w) => w.hasRef('object:Ebony Spaceship'),
         body:
           'The spaceship is in the world, and it is already on the Consul: his ' +
-          'Possessions hold it. Add the balcony next.',
+          'World section holds it under Objects. Add the balcony next.',
       },
       {
         id: 'c',
@@ -406,21 +429,21 @@ export const TOUR_STEPS: readonly TourStep[] = [
       },
       {
         id: 'd',
-        when: (w) => w.hasRef("object:The Consul's Steinway"),
+        when: (w) => w.hasRef("object:The Consul’s Steinway"),
         body:
           'Three objects, each linked as it arrived. The balcony rides along inside ' +
-          'the ship, which is why the Consul’s Possessions hold two of the three.',
+          'the ship, which is why the Consul’s Objects hold two of the three.',
       },
     ],
     spans: [
       { from: 6, to: 6, type: 'object', ref: 'object:Spaceship Balcony' },
       { from: 9, to: 10, type: 'object', ref: 'object:Ebony Spaceship' },
-      { from: 23, to: 23, type: 'object', ref: "object:The Consul's Steinway" },
+      { from: 23, to: 23, type: 'object', ref: "object:The Consul’s Steinway" },
     ],
     // NOT routed at an object it creates (gate R7): the step would open on the
-    // app's "Element not found in this world" card with the dock underneath
+    // app’s "Element not found in this world" card with the dock underneath
     // telling the user to make it. The Consul is the right surface anyway —
-    // his Possessions fill in as each object lands.
+    // his Objects fill in as each object lands.
     route: { kind: 'element', ref: 'character:The Consul' },
   },
   {
@@ -429,15 +452,15 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Back on the Consul’s page: his Possessions now hold the spaceship and the ' +
+        'The Consul’s page has filled in: under World, his Objects now hold the spaceship and the ' +
         'Steinway (the balcony rides along inside the ship), his ' +
-        'Affiliations hold the Hegemony, and Referenced-by at the bottom shows his title pointing back at him. ' +
+        'Institutions hold the Hegemony, and Referenced by at the bottom shows his title pointing back at him. ' +
         'Click any chip to travel. This web of links is the heart of OnlyWorlds.',
       deeper:
         'Links are what make a world more than a pile of notes. Every element type ' +
         'has typed link fields (a character has abilities, objects, family; a title has ' +
         'an issuer and holders), and every link is two-way: set it on one side and the ' +
-        'other side shows it under Referenced-by automatically.' +
+        'other side shows it under Referenced by automatically.' +
         '\n\n' +
         // The Web tab used to be named here (S304 gate, banked LOW): it stays
         // HIDDEN until `where-it-lives` five steps later, which introduces it
@@ -450,6 +473,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     }],
     reveal: [],
     route: { kind: 'element', ref: 'character:The Consul' },
+    // The payoff this step narrates (World section, Referenced by) sits below
+    // the dock at default scroll — bring the subject on screen (S309).
+    scrollToSection: 'World',
   },
   // ---------------------------------------------------------------- Act 3
   {
@@ -460,7 +486,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // the user links the sentence themselves. Every surface form in it carries a
     // baked alias, so autolink underlines each one it can resolve.
     //
-    // Only SEVEN of the sentence's nine phrases are linkable HERE: Rachmaninov
+    // Only SEVEN of the sentence’s nine phrases are linkable HERE: Rachmaninov
     // and his Prelude are not revealed until `deep-time`, three steps later. The
     // phase-c copy says so rather than promising a fully linked sentence, and
     // TOUR_WRITING_LINKABLE locks the number so a reveal change fails loudly.
@@ -478,7 +504,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
           'then press Tab to turn it into a link. Try a few.',
         deeper:
           'Chips are live: click one to travel to its element, and the link shows on ' +
-          'the other side too, under Referenced-by.' +
+          'the other side too, under Referenced by.' +
           '\n\n' +
           'The words in your prose rarely match an element’s full name. Atlas already ' +
           'knows “Steinway” is one of the names the Consul’s piano goes by, which is ' +
@@ -495,9 +521,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'b',
         when: (w) => w.chipCount(TOUR_CHAPTER_REF) >= 1,
         // Points at the LINK-ALL corner button (top-right of the prose panel,
-        // `refreshLinkAllWidget`), not the tree's right-click menu: it is in
+        // `refreshLinkAllWidget`), not the tree’s right-click menu: it is in
         // the page the user is already looking at and it carries the count.
-        // Found while chasing Captain's Tab report — the affordance was there
+        // Found while chasing Captain’s Tab report — the affordance was there
         // the whole time and the copy was sending people to a context menu.
         body:
           'That word is a chip now, pointing at the element itself. Keep going by ' +
@@ -542,9 +568,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: 'the-chart',
     act: 4,
     unlocks: ['charts'],
-    // The world's clock arrives UNSET (the bundle ships no `time_current`), so
+    // The world’s clock arrives UNSET (the bundle ships no `time_current`), so
     // the "set now time" button is really there to be pressed. Setting it is
-    // what makes the gold line appear and what gives the Consul's open-ended
+    // what makes the gold line appear and what gives the Consul’s open-ended
     // title an end to run to: one click, and two things the room can do become
     // visible at once.
     handsOn: 'set-now',
@@ -616,7 +642,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       { from: 13, to: 13, type: 'character' },
       { from: 14, to: 17, type: 'construct' },
     ],
-    reveal: ['character:Rachmaninov', "construct:Rachmaninov's Prelude"],
+    reveal: ['character:Rachmaninov', "construct:Rachmaninov’s Prelude"],
     route: { kind: 'chart' },
   },
   // ---------------------------------------------------------------- Act 5
@@ -631,7 +657,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'a language, a phenomenon. One sentence, a whole small world, all linked. The sidebar holds them all.',
     }],
     // The Rachmaninov spans moved to the deep-time step, where those two
-    // elements are now revealed — a span's glyph and its element should light
+    // elements are now revealed — a span’s glyph and its element should light
     // on the same beat.
     spans: [],
     reveal: [
@@ -647,7 +673,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // adjacent things — the files story and the OnlyWorlds story — right where
     // the tour should be closing. One step now carries both in a sentence
     // each, with the detail in the flyout for anyone who wants it. Keeps the
-    // Web tab's only introduction (`webTab`), which lived on the cut step.
+    // Web tab’s only introduction (`webTab`), which lived on the cut step.
     id: 'yours-to-keep',
     act: 5,
     phases: [{

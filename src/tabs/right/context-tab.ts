@@ -579,7 +579,7 @@ function emptyCopyForRoute(route: Route): string {
       return 'Create a narrative to see its connections here.';
     case 'share':
       return route.pageId
-        ? 'Add an element card to see the elements this page features.'
+        ? 'Add an element to see the elements this page features.'
         : 'Open a page to see the elements it features.';
     case 'map':
       return 'Open an element or narrative to focus the graph.';

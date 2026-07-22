@@ -164,7 +164,7 @@ export function buildCustomFieldsSection(el: Element): HTMLElement {
       const label = document.createElement('div');
       label.className = 'atlas-custom-structured-label';
       label.textContent = humanizeFieldName(entry.name);
-      label.title = `${entry.name} — structured data written by another tool. Atlas shows it read-only so it can't be damaged here.`;
+      label.title = `${entry.name}: structured data written by another tool. Atlas shows it read-only so it cannot be damaged here.`;
       const pre = document.createElement('pre');
       pre.className = 'atlas-custom-structured-value';
       let text: string;

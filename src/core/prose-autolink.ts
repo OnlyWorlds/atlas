@@ -49,7 +49,7 @@ export interface AutolinkIndex {
  * "drizzling" does not match "Drizzle".
  *
  * This is SAFE ONLY BECAUSE the label rule below keeps the writer's own text
- * (see `labelFromSource`). Folding case without that would have turned every
+ * (see `promotionLabel`). Folding case without that would have turned every
  * lowercase mention into a silent capitalization edit of the prose — the two
  * changes are one decision and must not be separated.
  *
@@ -101,32 +101,42 @@ function addEntry(map: Map<string, AutolinkCandidate[]>, key: string | undefined
 }
 
 /**
- * THE WRITER'S OWN TEXT IS THE LABEL (Captain, S307).
- *
- * Every promotion path used to stamp `cand.displayName` — the ELEMENT's name.
- * Matching is exact-case in both autolink engines, so a pure case variant
- * never matches at all; what actually rewrote prose was ALIASES. An alias is
- * indexed under its own key but carries `displayName: el.name`, so linking
- * "the duchess" silently replaced it with "Lyra", and linking a lowercase
- * styling of a name replaced it with the record's casing.
+ * THE WRITER'S OWN TEXT IS THE LABEL — for EVERY match kind (Captain's
+ * ruling, S309: "creating a link should NEVER change the text in a writing
+ * room; never"). Supersedes the S307 half-rule that kept the writer's text
+ * only for case variants while a genuinely different alias still snapped to
+ * the canonical name — which is how link-all rewrote the tour's own sentence
+ * into "The Hegemony The Consul sat on the Spaceship Balcony…".
  *
  * A link is a relationship, not a spelling correction. The `id` carries
  * identity; the label is presentation, and in a writing room the writer's
- * presentation wins — an alias exists precisely so the prose can call
- * something what the prose calls it.
+ * presentation always wins — an alias exists precisely so the prose can call
+ * something what the prose calls it. The chip still RESOLVES to the canonical
+ * element; only the visible text is sacred.
+ *
+ * Exported: the live Tab handler (writing-workspace-autolink) delegates here
+ * so the two promotion engines cannot drift (paired functions share code).
+ * Falls back to the canonical name only for an empty match, which should not
+ * happen but must never produce a blank chip.
  */
-function labelFromSource(matched: string, cand: AutolinkCandidate): string {
+export function promotionLabel(matched: string, cand: AutolinkCandidate): string {
   const typed = matched.trim();
-  if (typed.length === 0) return cand.displayName;
-  // CASE ONLY, and this is now LOad-BEARING: matching folds case (S307), so
-  // without this every lowercase mention would be silently recapitalised to
-  // the record's spelling. Guarded by "THE GUARANTEE" in
-  // prose-autolink.test.ts, which sweeps four casings through both engines.
-  //
-  // A GENUINELY different alias ("the duchess" for "Lyra") still resolves to
-  // the canonical name — a deliberate, separately tested decision.
-  const sameWordDifferentCase = typed.toLowerCase() === cand.displayName.trim().toLowerCase();
-  return sameWordDifferentCase ? typed : cand.displayName;
+  return typed.length === 0 ? cand.displayName : typed;
+}
+
+/**
+ * Is this chip label a legitimate surface form for the element — its name or
+ * any alias, compared CASE-INSENSITIVELY? Used by the editors' chip-label
+ * rename sync: only a label that fails this check is a stale pre-rename name
+ * and gets updated. Case-folding matters (S309): autolink matches
+ * case-insensitively and labels keep the writer's casing, so "the duchess",
+ * "The Duchess" and "aralia" are all valid labels the sync must not clobber.
+ */
+export function isValidChipLabel(label: unknown, surface: { name: string; aliases: string[] }): boolean {
+  if (typeof label !== 'string' || label.length === 0) return false;
+  const folded = label.toLowerCase();
+  if (folded === surface.name.trim().toLowerCase()) return true;
+  return surface.aliases.some(a => typeof a === 'string' && a.trim().toLowerCase() === folded);
 }
 
 function escapeRegexLiteral(text: string): string {
@@ -157,8 +167,8 @@ export interface MarkdownAutolinkResult {
  * Chip the first mention of every unambiguous candidate in a markdown story.
  * Existing markdown links (label AND url halves) are protected spans; ids
  * already linked anywhere in the story count as mentioned. The inserted
- * label is the candidate's canonical display name — mirrors the live Tab
- * handler, which also replaces an alias with the element's name.
+ * label is the WRITER'S MATCHED TEXT verbatim (`promotionLabel`, S309) —
+ * mirrors the live Tab handler, which delegates to the same rule.
  */
 export function autolinkMarkdown(story: string, index: AutolinkIndex): MarkdownAutolinkResult {
   if (!story || !index.scanner) return { story, linked: [] };
@@ -203,7 +213,7 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex): MarkdownA
   for (let i = replacements.length - 1; i >= 0; i--) {
     const r = replacements[i];
     out = out.slice(0, r.from)
-      + `[${labelFromSource(story.slice(r.from, r.to), r.cand)}](ow://${r.cand.type}/${r.cand.id})`
+      + `[${promotionLabel(story.slice(r.from, r.to), r.cand)}](ow://${r.cand.type}/${r.cand.id})`
       + out.slice(r.to);
   }
   return { story: out, linked: replacements.map(r => r.cand) };
@@ -297,7 +307,7 @@ function splitTextNode(
     if (m.index > cursor) parts.push({ ...node, text: text.slice(cursor, m.index) });
     parts.push({
       type: 'elementChip',
-      attrs: { id: cand.id, type: cand.type, label: labelFromSource(m[0], cand) },
+      attrs: { id: cand.id, type: cand.type, label: promotionLabel(m[0], cand) },
     });
     cursor = m.index + m[0].length;
   }

@@ -268,7 +268,7 @@ function buildCover(
       ? ''
       : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">describe your world…</p>`;
   identity.innerHTML = `
-    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="click to rename (a local name — the OnlyWorlds world name lives in settings)">${escapeText(meta.name)}</h1>
+    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="click to rename (a local name; the OnlyWorlds world name lives in settings)">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
   `;
   cover.appendChild(identity);

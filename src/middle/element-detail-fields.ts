@@ -59,6 +59,8 @@ export function renderSection(section: SectionLayout, el: Element, alwaysExpande
 
   const wrap = document.createElement('div');
   wrap.className = 'atlas-detail-section';
+  // Stable hook for scroll/measure (the tour's scrollToSection, tests).
+  wrap.dataset.section = section.name;
 
   const headerRow = document.createElement('div');
   headerRow.className = 'atlas-detail-section-header' + (alwaysExpanded ? ' no-toggle' : '');

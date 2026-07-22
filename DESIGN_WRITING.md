@@ -2,7 +2,7 @@
 
 **Version**: 3.2 (2026-05-24) — context pane promoted to tool-global (session 231)
 **Status**: v1 + v1.5 + v2 batch all shipped (sessions 227-228). Session 229 added the writing-context pane in the right tab. Session 230 polished it (Featured/Planned, click-recenter, reading-mode redesign). Session 231 promoted the context pane to a tool-global Context tab — see `DESIGN.md` "Context Pane" section for the cross-route architecture. Writing-mode behavior in the context pane (Cast + Potentials + chip-click selection + Featured/Planned semantics) is unchanged.
-**Related**: `DESIGN.md` (Rooms model, atlas-specific fields, **Context Pane**), `DESIGN_HOME.md`, `DESIGN_PUBLISHING.md`
+**Related**: `DESIGN.md` (Rooms model, atlas-specific fields, **Context Pane**), `DESIGN_HOME.md`, `DESIGN_SHARING.md`
 
 ---
 
@@ -298,7 +298,7 @@ Big-picture context-pane work moved into `DESIGN.md` "Context Pane" — that's t
 6. **Bidirectional consistency check** — "you wrote 'green eyes' but Lyra's element record says brown". Atlas's strongest long-term differentiator per research; no competitor does this. Needs its own design conversation.
 7. **Prose-first extraction** — parse existing manuscript via OW SDK → propose Characters, Locations, Objects. Fits OnlyWorlds parsing skill heritage.
 8. **Compare view** — two narratives side-by-side for revision.
-9. **Export book/chapter to markdown/PDF/EPUB** — lives in publish room per `DESIGN_PUBLISHING.md`. Writing room provides the "publish this book" affordance.
+9. **Export book/chapter to markdown/PDF/EPUB** — lives in the share room per `DESIGN_SHARING.md`. Writing room provides the "publish this book" affordance.
 
 #### Context pane (next from here, low priority)
 
@@ -330,6 +330,7 @@ Big-picture context-pane work moved into `DESIGN.md` "Context Pane" — that's t
 - **#48**: Element references in narrative prose are stored as markdown links with the OW URL scheme: `[Display Name](ow://<element-type>/<uuid>)`. Display text is resolved dynamically from the atlas store at render time (so renames propagate). Manual display-text overrides (where `displayText !== element.name`) are preserved on save.
 
 - **#49**: Atlas elements have an optional atlas-local `atlas_aliases: string[]` field. Both the `@` picker and the first-mention auto-link tokenizer match against `name` ∪ `atlas_aliases` when resolving an element by string. Aliases are stripped on API push (atlas-local extension field).
+- **#49b — THE LABEL LAW (Captain, S307 + S309)**: creating a link NEVER changes the prose text. Every promotion of existing text (Tab, link-all, selection linking, right-click) keeps the writer's matched text verbatim as the chip label — name matches, case variants, AND genuinely different aliases. The chip's `id` resolves to the canonical element; only the visible text is sacred. One rule site: `promotionLabel` in `core/prose-autolink.ts` (the live Tab handler delegates to it). The editors' chip-label rename sync tolerates any casing of name ∪ aliases (`isValidChipLabel`, same module) — it only rewrites labels stale from an element rename. Inserting NEW content (the `@` mention picker, add-to-cast at cursor) stamps the canonical name, which is consistent: no existing text is changed. Guarded by THE GUARANTEE sweep + a link-then-unlink identity property in `prose-autolink.test.ts`, and a byte-identical prose assertion across link-all in the tour walk e2e.
 
 - **#50**: On every workspace save, the auto-derive pass scans the markdown for `ow://` links, groups UUIDs by element type, and writes the UNION of (prose-derived) ∪ (existing relation field value) into each Narrative relation field. Manual relation field entries are preserved. Single `folder.updateElement` call per save.
 
@@ -373,7 +374,7 @@ If a world grows to tens of thousands of elements, switch to Aho-Corasick or a t
 
 - Not a replacement for prose tools at scale (Scrivener, Word) — atlas is *world-aware* writing, optimized for connection
 - Not a markdown power-user surface — atlas is a structured editor first, markdown is a serialization choice for portability
-- Not a publishing platform — that's the publish room (`DESIGN_PUBLISHING.md`)
+- Not a publishing platform — that's the share room (`DESIGN_SHARING.md`)
 - Not a wiki — element descriptions are the wiki; writing is narrative authorship
 
 ---

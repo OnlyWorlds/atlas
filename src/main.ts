@@ -17,6 +17,7 @@ import { getActiveStore as _getActiveStore } from './core/active-store';
 import { registerServiceWorker } from './core/offline';
 import { hasFolderMode, hasOpfsMode } from './core/capabilities';
 import { installPlacementHintWatcher } from './tabs/right/map-placement-hint';
+import { installIconA11y } from './ui/icon-a11y';
 
 function renderUnsupportedPage(root: HTMLElement): void {
   root.innerHTML = '';
@@ -65,6 +66,11 @@ function boot(): void {
   // Pin-placement feedback (crosshair + map banner + Esc). State-driven, one
   // subscriber; safe to install once here after the app mounts.
   installPlacementHintWatcher();
+  // Material Symbols render their NAME as text, so assistive tech announced
+  // "add cloud_upload" and "wall_art pages" for our controls. 253 render sites,
+  // no shared icon helper to fix at — so the boundary is one observer. See
+  // ui/icon-a11y.ts for the demolition plan.
+  installIconA11y();
 }
 
 if (document.readyState === 'loading') {

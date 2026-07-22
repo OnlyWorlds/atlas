@@ -32,8 +32,21 @@ async function nextStep(page: Page, expectStep: number) {
 
 /** Exit goes through the confirm screen (S305): it lists the rooms the tour
  *  never reached, so leaving early still leaves you with a map of the app. */
+/**
+ * Leave the tour through the confirm.
+ *
+ * The OPENER has no Exit button (Captain, S308: one control, Start) — its way
+ * out is Escape. Every later step has the visible control. This helper takes
+ * whichever route the current step actually offers, so callers do not have to
+ * know which step they are on.
+ */
 async function exitViaConfirm(page: Page) {
-  await page.locator('.atlas-tour-controls button', { hasText: 'Exit tour' }).click();
+  const exitBtn = page.locator('.atlas-tour-controls button', { hasText: 'Exit tour' });
+  if (await exitBtn.count() > 0) {
+    await exitBtn.click();
+  } else {
+    await page.keyboard.press('Escape');
+  }
   await expect(page.locator('[data-modal="tour-exit"]')).toBeVisible();
   await page.click('[data-action="tour-exit-confirm"]');
 }
@@ -147,6 +160,11 @@ async function openOpener(page: Page) {
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Start$/ })).toBeVisible();
   // No docked Next at the opener; Begin is the hand-off.
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toHaveCount(0);
+  // S308, Captain: the opener carries ONE control. Asserted as a PAIR with the
+  // Escape route below, because "no Exit button" and "no way out" are one
+  // character apart in the implementation and only the first is intended.
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Exit tour$/ })).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls button')).toHaveCount(1);
 }
 
 /** Begin → the shell materializes on the create-world beat (step 2). */
@@ -280,7 +298,15 @@ test('relaunch after exit mounts a WORKING bar (gate R3: the render memo must no
   await expect(page.locator('.atlas-tour-sentence')).toBeVisible();
   await expect(page.locator('.atlas-tour-body')).not.toBeEmpty();
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Start$/ })).toBeVisible();
-  await expect(page.locator('.atlas-tour-exit')).toBeVisible();
+  // The opener's exit is Escape, not a button (S308) — so the ladder is only
+  // proven working if the ESCAPE ROUTE survived the unmount/remount too. That
+  // binding is module-level state, exactly the kind R3 exists to catch: a
+  // handler unbound on teardown and never rebound would leave a relaunched
+  // opener with no way out at all, and no button to make the gap visible.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-modal="tour-exit"]')).toBeVisible();
+  await page.click('[data-action="tour-exit-cancel"]');
+  await expect(page.locator('[data-modal="tour-exit"]')).toHaveCount(0);
 
   // And it still WORKS: Begin hands off to the create-world beat as usual.
   await beginToWorld(page);
@@ -354,10 +380,18 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page.locator('.atlas-sidebar')).toContainText('The Hegemony');
   await expect(page.locator('.atlas-sidebar')).toContainText('Consul of the Hegemony');
 
-  await nextStep(page, 5); // planet — the maps act; right pane appears
+  // S308 — the right pane arrives WITH the map, not a step early. It used to
+  // unlock at `the-planet`, so the biggest piece of chrome in the build-up slid
+  // in during a pure elements beat and `the-map` then narrated "a new pane just
+  // opened" about something already on screen. Asserted as a PAIR so the timing
+  // is locked in both directions: moving the unlock either way breaks a half.
+  await nextStep(page, 5); // planet — an elements beat; the pane is NOT here yet
+  expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-rightpane'))).toBe(false);
+  await expect(page.locator('.atlas-right')).toBeHidden();
+
+  await nextStep(page, 6); // the map — the pane opens WITH the thing it holds
   expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-rightpane'))).toBe(true);
   await expect(page.locator('.atlas-right')).toBeVisible();
-  await nextStep(page, 6); // the map (+ swamps zone drawn on it)
   await expect(page).toHaveURL(/\/map\//);
   await expect(page.locator('.atlas-map-tab-wrapper path').first()).toBeVisible(); // the zone polygon
   await nextStep(page, 7); // pin — the hands-on placement beat, soft correction
@@ -366,11 +400,28 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
     const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
     return els.find((e: any) => e.type === 'pin');
   });
-  expect(placedPin?.name).toBe("The Consul's balcony seat"); // locked identity
+  expect(placedPin?.name).toBe("The Consul’s balcony seat"); // locked identity
   await nextStep(page, 8); // swamps — the living things
   await nextStep(page, 9); // objects — the scripted run (now AFTER the maps act)
   await mintObjectRun(page);
   await nextStep(page, 10); // linking payoff
+
+  // S309 — the payoff must be ON SCREEN. This step's copy narrates the World
+  // section and Referenced by, which sit below the tour dock at default
+  // scroll; the step now scrolls the World section into view on entry
+  // (scrollToSection). Assert the section's top lands ABOVE the dock's top —
+  // the concrete relation that failed before the fix (World at y=653 vs dock
+  // at y=572 measured live). Polled: the scroll is smooth + post-render.
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.awaitTourSettled(); });
+  await expect(async () => {
+    const worldSection = page.locator('.atlas-detail-section[data-section="World"]');
+    await expect(worldSection).toBeVisible();
+    const sectionBox = await worldSection.boundingBox();
+    const dockBox = await page.locator('.atlas-tour-bar').boundingBox();
+    expect(sectionBox, 'World section renders').toBeTruthy();
+    expect(dockBox, 'dock renders').toBeTruthy();
+    expect(sectionBox!.y, 'World section top sits above the dock top').toBeLessThan(dockBox!.y);
+  }).toPass({ timeout: 10_000 });
 
   // S308 — the ABSENT half of the Web-tab pair (the PRESENT half is asserted at
   // step 16 below). `linking`'s copy deliberately withholds the Web tab's name,
@@ -403,7 +454,19 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
     return els.find((e: any) => e.name === 'The Consul')?.atlas_aliases ?? null;
   });
   expect(aliasesLate).toEqual(['Consul']);
+  // Capture the chapter's exact plain text before linking.
+  const proseBefore = await prose.innerText();
   await linkAllViaCorner(page);
+  // THE GUARANTEE at the surface (Captain's ruling, S309): creating links
+  // NEVER changes the text. Before the fix, link-all rewrote this very
+  // sentence to "The Hegemony The Consul sat on the Spaceship Balcony of his
+  // Ebony Spaceship… well-maintained The Consul's Steinway… great, green,
+  // Saurians things" — alias promotions stamping canonical names. The plain
+  // text must be byte-identical across the linking gesture; only chips (link
+  // wrappers around the SAME words) may appear.
+  await expect(prose.locator('.atlas-element-chip').first()).toBeVisible();
+  const proseAfter = await prose.innerText();
+  expect(proseAfter, 'link-all must not change the prose text').toBe(proseBefore);
 
   await nextStep(page, 12); // events
   await nextStep(page, 13); // chart — the now beat, SINGLE ROUTE (no watch Next)
@@ -542,7 +605,7 @@ test('clicking DIRECTLY on the swamps zone places the pin there (the instructed 
     const consul = els.find((e: any) => e.name === 'The Consul');
     return { pinName: pin?.name, selectedIsConsul: api.getState().ui.selectedElementId === consul?.id };
   });
-  expect(placed.pinName).toBe("The Consul's balcony seat"); // placed, locked identity
+  expect(placed.pinName).toBe("The Consul’s balcony seat"); // placed, locked identity
   expect(placed.selectedIsConsul).toBe(true); // the zone was NOT selected
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'c');
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Next$/ })).toBeVisible();

@@ -32,6 +32,7 @@ import {
   type AutolinkIndex,
 } from './writing-workspace-autolink';
 import type { Element } from '../core/types';
+import { isValidChipLabel } from '../core/prose-autolink';
 import { completeWaypoint } from '../core/waypoints';
 import type { JSONContent } from '@tiptap/core';
 
@@ -372,14 +373,15 @@ function syncChipLabelsImpl(
     const surface = lookupSurface(id);
     if (!surface) return; // Element deleted — leave the stale label; chip still serializes correctly.
     const currentLabel = node.attrs.label;
-    // A chip label is "valid" if it matches the canonical name OR any alias.
-    // Aliases like "annoying guy" for John are how writers preserve in-prose
-    // surface forms — clobbering them with the canonical name would defeat
-    // the whole alias system. Only update when the current label is BOTH
-    // not the name AND not in the alias list (i.e., a stale name from
-    // before a rename).
-    if (currentLabel === surface.name) return;
-    if (typeof currentLabel === 'string' && surface.aliases.includes(currentLabel)) return;
+    // A chip label is "valid" if it is any casing of the canonical name OR
+    // any alias (isValidChipLabel, shared with the autolink kernel). Aliases
+    // like "annoying guy" for John are how writers preserve in-prose surface
+    // forms, and since S307/S309 the autolink matches case-insensitively and
+    // labels keep the writer's exact casing — so the comparison here MUST
+    // fold case too, or this sync would quietly undo the writer's-text rule
+    // one tick after every promotion. Only a label that matches neither name
+    // nor alias in any casing is a stale pre-rename name, and gets updated.
+    if (isValidChipLabel(currentLabel, surface)) return;
     updates.push({ pos, newLabel: surface.name });
   });
 

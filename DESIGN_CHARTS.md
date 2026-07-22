@@ -158,7 +158,7 @@ ChartScope =
 
 **The Charts room LANDS on the tableau**: no type chips lit (neutral state), `tableauScope` composing the world at a glance — protagonist + nexus always in (lead character + location stand in when unset), then the top-weighted essentials across categories (per-type cap 4, total 22, weight = degree + log content-mass, deterministic). Cast marks + the sparse-set spacing make the protagonist central and the view breathable. Ticking chips narrows to those types; all-off returns to the tableau (the old empty-filter → "everything" inversion is closed).
 
-`pickDefaultChart(elements)` (the ordered recipe list: Story → Events → Character life → Foundings → all) still names/scopes the **home chart strip** default and remains available for future recipes:
+`pickDefaultChart(elements)` was the ordered recipe list (Story → Events → Character life → Foundings → all). It is **DELETED (S256)** — it went consumer-less once the tableau became both the room default and the home-strip default (the home chart strip now runs `tableauScope`, see line ~271). The recipe list is kept below as historical rationale, not a live engine (corrected 2026-07-22, S309):
 1. **Writing spine** — a `parent_narrative` tree + dated content → narratives + events.
 2. **Story events** — dated events → events.
 3. **Character life** — most-linked character by **dated-neighbourhood size** (no lone-dot collapse).

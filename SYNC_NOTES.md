@@ -375,6 +375,8 @@ The `OwClientAdapter` maintains the paginated-types Set as part of its hot state
 
 **Full pagination support (load page 2, 3, ...) is still deferred to 3.6+**. The Bout V fix is a SAFETY guard, not a feature — atlas only sees first-page data for paginated types, but at least it doesn't actively destroy what it can't see.
 
+> **UPDATE (v2 port, 2026-07-12; noted S308):** superseded. The v2 adapter (`ow-v2-client-adapter.ts`) fully cursor-walks every page via `?cursor=`, and `getIncompleteListTypes()` suppresses server-delete detection only when a walk is genuinely incomplete. The "first-page-only" limitation above was a v1 constraint and no longer holds; a reader trusting it would re-implement pagination that already exists.
+
 ---
 
 ## Chain-CREATE FK gap in Route 2 merge (closed Bout V)

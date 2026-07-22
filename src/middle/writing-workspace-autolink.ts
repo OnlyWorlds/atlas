@@ -29,7 +29,7 @@ import type { EditorState, Transaction } from '@tiptap/pm/state';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
 import type { Element } from '../core/types';
-import { buildAutolinkIndex } from '../core/prose-autolink';
+import { buildAutolinkIndex, promotionLabel } from '../core/prose-autolink';
 import type { AutolinkCandidate, AutolinkIndex } from '../core/prose-autolink';
 
 // Index construction moved to core/prose-autolink (S265) so the bulk
@@ -147,33 +147,14 @@ function mentionPickerVisible(): boolean {
 }
 
 /**
- * The label a promoted chip should carry: THE WRITER'S OWN TEXT.
- *
- * Captain, S307: "DON'T change capitalization when we link things in the
- * writing room." Until now every promotion path stamped
- * `candidate.displayName` — the element's canonical name — so a sentence
- * reading "the consul sat on the balcony" became "the Consul sat..." the
- * moment it was linked. Autolink matches case-INSENSITIVELY (that is how it
- * finds the word at all), and it was then silently rewriting the prose to
- * match the record.
- *
- * The link is a relationship, not a spelling correction. The chip's `id` is
- * the identity — the label is presentation, and in a writing room the
- * writer's presentation wins. A sentence-initial "The" and a mid-sentence
- * "the" are a real distinction in prose, and so is a deliberate lowercase
- * style for a title.
- *
- * Falls back to the canonical name only if the matched range is empty, which
- * should not happen but must never produce a blank chip.
+ * The label a promoted chip should carry: THE WRITER'S OWN TEXT, verbatim,
+ * for every match kind (Captain's ruling, S309: creating a link NEVER changes
+ * the text in a writing room). Delegates to the kernel's `promotionLabel` so
+ * the live Tab handler and the bulk link-all engines cannot drift — the S308
+ * tour walk caught exactly that drift rewriting the flagship sentence.
  */
 function labelForPromotion(view: EditorView, from: number, to: number, candidate: AutolinkCandidate): string {
-  const typed = view.state.doc.textBetween(from, to, '', '').trim();
-  if (typed.length === 0) return candidate.displayName;
-  // CASE ONLY — see the same rule in core/prose-autolink. A case-variant
-  // alias keeps the writer's casing; a genuinely different alias still
-  // resolves to the canonical name (deliberate, tested).
-  const sameWordDifferentCase = typed.toLowerCase() === candidate.displayName.trim().toLowerCase();
-  return sameWordDifferentCase ? typed : candidate.displayName;
+  return promotionLabel(view.state.doc.textBetween(from, to, '', ''), candidate);
 }
 
 export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<AutolinkPluginState> {

@@ -276,7 +276,9 @@ export function defaultBindings(): HotkeyBinding[] {
         // The watcher stamps body.atlas-placing when ui.pinPlacement is set.
         if (typeof document !== 'undefined' && document.body.classList.contains('atlas-placing')) return false;
         const hash = typeof window !== 'undefined' ? window.location.hash : '';
-        if (hash.includes('/writing') || hash.includes('/knowledge') || hash.includes('/share')) return false;
+        // The Data room joined the list (S309): Esc navigating home there
+        // destroyed an unsaved pasted import payload — no draft, no confirm.
+        if (hash.includes('/writing') || hash.includes('/knowledge') || hash.includes('/share') || hash.includes('/import')) return false;
         return true;
       },
       action: () => { getCallbacks().deselectToHome?.(); },

@@ -300,7 +300,7 @@ async function healMedia(revealed: Set<string>): Promise<number> {
  *  their own step; backfilled once the tour is strictly past). */
 const HANDS_ON_REFS: Partial<Record<NonNullable<TourStep['handsOn']>, string>> = {
   'create-consul': 'character:The Consul',
-  'place-pin': "pin:The Consul's balcony seat",
+  'place-pin': "pin:The Consul’s balcony seat",
 };
 
 /**
@@ -596,8 +596,32 @@ async function enterStepInner(index: number): Promise<void> {
   // the ui slice so stage-dependent chrome (sidebar header, welcome panel)
   // re-renders each step (the force-render idiom, convention #2).
   patchSlice('ui', { ...getState().ui });
+  // After the route's render lands, bring the step's narrated section on
+  // screen (S309: the linking payoff sat below the dock). Fire-and-forget —
+  // scrolling must never block or fail the step chain.
+  const scrollTo = TOUR_STEPS[clamped].scrollToSection;
+  if (scrollTo) void scrollSectionIntoView(scrollTo);
   // (The closing emit moved to enterStepNow, so it fires AFTER `enteringStep`
   // clears and the bar's own listener is allowed through.)
+}
+
+/**
+ * Poll briefly for the named element-detail section, then scroll it into
+ * view. The detail pane renders on the state tick AFTER the route lands, so
+ * one immediate query would race it — a short bounded poll is the honest
+ * form (no MutationObserver machinery for a one-shot cosmetic scroll).
+ */
+async function scrollSectionIntoView(name: string): Promise<void> {
+  for (let i = 0; i < 15; i++) {
+    const el = document.querySelector<HTMLElement>(
+      `.atlas-detail-section[data-section="${name}"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      return;
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
 }
 
 /**
@@ -678,7 +702,7 @@ export async function tourPinBake(
 ): Promise<{ id: string; name: string } | null> {
   if (!tourWorldIsActive()) return null;
   const consul = await resolveRef('character:The Consul');
-  const pin = await resolveRef("pin:The Consul's balcony seat");
+  const pin = await resolveRef("pin:The Consul’s balcony seat");
   const map = await resolveRef('map:Hyperion');
   if (!consul || !pin || !map) return null;
   if (elementId !== consul.el.id || mapId !== map.el.id) return null;

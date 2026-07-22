@@ -94,9 +94,12 @@ export const ELEMENT_FAMILIES: Record<ElementType, ElementFamily> = {
  */
 export const FAMILY_COLORS: Record<ElementFamily, { light: string; dark: string }> = {
   agents:   { light: '#2a78d6', dark: '#3987e5' },
-  // dark lifted #008300 -> #009a00 pending Skeld's re-validation (S308). See
-  // the luminance note at the bottom of this file.
-  world:    { light: '#008300', dark: '#009a00' },
+  // The #009a00 lift was REFUTED by Skeld's validator (2026-07-22): ΔE 0.2
+  // against Temporal amber for protan viewers, and the green is boxed in on
+  // both sides (brighter -> amber collision, teal-er -> pink collision).
+  // Reverted to the validated value; the recession trade is Captain's call —
+  // full record in the comment at the bottom of this file.
+  world:    { light: '#008300', dark: '#008300' },
   abstract: { light: '#e87ba4', dark: '#d55181' },
   temporal: { light: '#eda100', dark: '#c98500' },
 };
@@ -139,9 +142,14 @@ export function elementColor(type: string, mode: 'light' | 'dark' = 'dark'): str
  * and drops the spread to 1.29x. Own-eyes on the charts room before and after:
  * the recession goes away.
  *
- * THIS IS A PROPOSAL, NOT A RULING. The lift has NOT been through Skeld's CVD
- * validator, and raising luminance can shrink separation from a neighbouring
- * family — exactly the constraint their set exists to satisfy. If the validator
- * rejects `#009a00`, their value wins and this comment becomes the record of
- * why it was tried. Sent to Orrery 2026-07-22.
+ * THE VERDICT (Skeld, 2026-07-22, same day): `#009a00` FAILS CVD — it collides
+ * with Temporal amber at ΔE 0.2 for protan viewers, and the margin falls off a
+ * cliff along the whole ramp (#008300 6.9 → #008e00 3.5 → #009400 1.6 →
+ * #009a00 0.2). The green is pinned at its low-contrast end BY the CVD budget:
+ * brighter moves toward amber (protan), teal-er moves toward pink (deutan).
+ * REVERTED to #008300 per his recommendation. The recession finding STANDS as
+ * a real, measured trade (perception vs accessibility on one value) and goes
+ * to Captain: keep #008300 and let icon+label carry World forward, or brighten
+ * and lose family separation for red-blind readers. Skeld's full numbers:
+ * Orrery/product/schema/element-palette-measurements.md.
  */

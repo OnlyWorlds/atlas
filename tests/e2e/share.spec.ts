@@ -312,7 +312,7 @@ test('element card: pick → compact card; full variant reveals chosen fields; p
 
   // "+ element card" → picker → pick Ireena. Card opens in edit mode with a
   // live compact preview.
-  await page.click('.atlas-share-block-add-btn:has-text("element card")');
+  await page.click('.atlas-share-block-add-btn:has-text("+ element")');
   await expect(page.locator('.atlas-picker-search')).toBeVisible();
   await expect(page.locator('.atlas-picker-row', { hasText: 'stray pin' })).toHaveCount(0);
   await page.locator('.atlas-picker-row', { hasText: 'Ireena' }).click();
@@ -355,7 +355,7 @@ test('element card: pick → compact card; full variant reveals chosen fields; p
   // birthplace token carries a ref and renders as a chip.
   await page.click('.atlas-share-preview-toggle:not([data-action])');
   await expect(page.locator('.atlas-share-block-add')).toBeVisible();
-  await page.click('.atlas-share-block-add-btn:has-text("element card")');
+  await page.click('.atlas-share-block-add-btn:has-text("+ element")');
   await page.locator('.atlas-picker-row', { hasText: 'Vallaki' }).click();
   await page.click('.atlas-share-block-done');
   await page.click('.atlas-share-preview-toggle:not([data-action])');

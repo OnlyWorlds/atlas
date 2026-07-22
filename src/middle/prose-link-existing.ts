@@ -94,6 +94,6 @@ async function recordAliasIfForeign(picked: Element, label: string): Promise<voi
     toastManager.info(`Linked to ${name || '(unnamed)'} · "${label}" saved as alias`);
   } catch (err) {
     console.error('[prose-link-existing] alias write failed', err);
-    toastManager.error(`Linked, but could not save "${label}" as an alias — the chip may rename to ${name || 'the element name'}`);
+    toastManager.error(`Linked, but could not save "${label}" as an alias. The chip may rename to ${name || 'the element name'}`);
   }
 }

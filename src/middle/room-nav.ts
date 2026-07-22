@@ -64,6 +64,12 @@ export interface RoomNavMount {
   target: HTMLElement;
 }
 
+/** Open the Cmd+K palette (dynamic import — same lazy path the hotkey uses). */
+async function openPalette(): Promise<void> {
+  const { openCommandPalette } = await import('../ui/command-palette');
+  openCommandPalette();
+}
+
 /** Rooms shown in the labeled onboarding preview (settings joins later). */
 const PREVIEW_ROOM_IDS = new Set(['home', 'writing', 'knowledge', 'timeline', 'share', 'import']);
 
@@ -92,7 +98,12 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'atlas-room-nav-btn atlas-room-nav-preview-btn';
-      btn.disabled = true;
+      // aria-disabled, NOT native disabled (S309 — finishing the S301 call):
+      // a disabled control fires no hover, so no tooltip can ever explain it.
+      // These have no click handler, so removing `disabled` changes nothing
+      // except that hover/focus now teach what the room will be.
+      btn.setAttribute('aria-disabled', 'true');
+      btn.title = `${room.label} · opens once a world exists`;
       btn.innerHTML =
         `<span class="material-symbols-outlined">${room.icon}</span>` +
         // S308: this carried `room.id === 'import' ? 'import' : ...`, a
@@ -239,6 +250,29 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
         strip.appendChild(chip);
       }
     }
+
+    // Search affordance (Captain, S309): the command palette is the app's only
+    // global search and was reachable by shortcut alone. One field-shaped
+    // control anchored at the strip's far right opens the SAME palette —
+    // one search, two doors; an inline twin would be a second search surface
+    // that can drift from the first. Sits after the transient selected-chip
+    // so its own position never moves.
+    if (!getState().ui.selectedElementId) {
+      const spacer = document.createElement('div');
+      spacer.className = 'atlas-room-nav-spacer';
+      strip.appendChild(spacer);
+    }
+    const search = document.createElement('button');
+    search.type = 'button';
+    search.className = 'atlas-room-nav-search';
+    search.title = 'Search this world · Ctrl+K';
+    search.setAttribute('aria-label', 'Search this world');
+    search.innerHTML =
+      `<span class="material-symbols-outlined">search</span>` +
+      `<span class="atlas-room-nav-search-text">search</span>` +
+      `<kbd class="atlas-room-nav-search-kbd">ctrl k</kbd>`;
+    search.addEventListener('click', () => { void openPalette(); });
+    strip.appendChild(search);
 
     if (settling) {
       // Lock re-renders out for the animation's lifetime FIRST, then collapse

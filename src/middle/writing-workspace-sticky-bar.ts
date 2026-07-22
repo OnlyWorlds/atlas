@@ -179,7 +179,10 @@ export function createStickyBar(deps: {
     openBtn.className = 'atlas-icon-btn-sm atlas-writing-workspace-action';
     openBtn.dataset.action = 'open-as-element';
     openBtn.title = 'Open as element';
-    openBtn.href = '#' + elementHash(worldId, el.id);
+    // elementHash already returns '#/w/...' — prefixing '#' again made
+    // '##/w/...', so ctrl/middle-click opened a new tab on the welcome
+    // screen (S309, last of the two S308-found sites).
+    openBtn.href = elementHash(worldId, el.id);
     openBtn.innerHTML = '<span class="material-symbols-outlined">open_in_new</span>';
     openBtn.addEventListener('click', (e) => {
       e.preventDefault();

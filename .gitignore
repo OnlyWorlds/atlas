@@ -35,3 +35,6 @@ pnpm-debug.log*
 
 # Atlas worlds — never committed (user's data)
 atlas-worlds/
+
+# UI inspection snapshots — session artifacts, never committed (kept on disk, pruned at stretch closes)
+Notes/ui-snapshots/

@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildAutolinkIndex, autolinkMarkdown, unlinkMarkdown,
-  autolinkRichtext, unlinkRichtext,
+  autolinkRichtext, unlinkRichtext, isValidChipLabel,
 } from '../../src/core/prose-autolink';
 import type { Element } from '../../src/core/types';
 
@@ -34,49 +34,69 @@ describe('autolinkMarkdown', () => {
     expect(r.linked.map(c => c.id)).toEqual(['c1']);
   });
 
-  it('matches aliases and labels the chip with the canonical name (mirrors Tab)', () => {
+  it('matches aliases and KEEPS THE WRITER\'S TEXT as the label (S309)', () => {
+    // Captain's ruling, S309: creating a link NEVER changes the text in a
+    // writing room — for every match kind. The S307 half-rule (case variants
+    // keep the writer's text, different aliases snap to the canonical name)
+    // is superseded: link-all rewrote the tour's own sentence with it.
     const index = buildAutolinkIndex(WORLD);
     const r = autolinkMarkdown('They bowed to the duchess.', index);
-    expect(r.story).toBe('They bowed to [Aralia](ow://character/c1).');
+    expect(r.story).toBe('They bowed to [the duchess](ow://character/c1).');
   });
 
   it("a CASE-VARIANT alias keeps the writer own casing (S307)", () => {
     // Captain, S307: do not change capitalization when linking in the writing
-    // room. Matching is exact-case, so a lowercase styling only links at all
-    // when registered as an alias — and the label then snapped to the
-    // record casing, silently editing the prose. A link is a relationship,
-    // not a spelling correction.
+    // room. A link is a relationship, not a spelling correction.
     const world = [el('c9', 'character', 'Consul', ['consul'])];
     const index = buildAutolinkIndex(world);
     const r = autolinkMarkdown('The old consul waited.', index);
     expect(r.story).toBe('The old [consul](ow://character/c9) waited.');
   });
 
-  it("but a GENUINELY different alias still resolves to the canonical name", () => {
-    // The paired half, stated explicitly so a future widening of the case
-    // rule cannot quietly turn into renaming every alias. The sibling test
-    // above (canonical name for "the duchess") is the shipped decision.
+  it("a GENUINELY different alias keeps its text AND resolves to the canonical ELEMENT", () => {
+    // The boundary, restated for the S309 rule: the writer's text is the
+    // LABEL, the canonical element is the TARGET. Widening the writer's-text
+    // rule must never drift into linking the wrong element — "the duchess"
+    // still points at Aralia's id, it just keeps saying "the duchess".
     const index = buildAutolinkIndex(WORLD);
     const r = autolinkMarkdown('They bowed to the duchess.', index);
-    expect(r.story).toContain('[Aralia](ow://character/c1)');
+    expect(r.linked.map(c => c.id)).toEqual(['c1']);
+    expect(r.story).toContain('(ow://character/c1)');
+    expect(r.story).not.toContain('Aralia');
   });
 
-  it("THE GUARANTEE: linking never edits the writer casing, in any form", () => {
-    // Captain, S307, named as the highest-priority property of this feature.
-    // Case-insensitive MATCHING and case-preserving LABELLING are one
-    // decision: folding case without this would silently rewrite prose on
-    // every lowercase mention.
+  it("THE GUARANTEE: linking never edits the writer text, in any form", () => {
+    // Captain, S307 then S309, named as the highest-priority property of this
+    // feature: creating a link NEVER changes the text. Case variants AND
+    // aliases — every surface form survives promotion verbatim.
     //
     // Driven as a sweep over surface forms rather than one example, so a
-    // regression in any casing shape fails here rather than in someone
-    // manuscript.
+    // regression in any shape fails here rather than in someone's manuscript.
     const index = buildAutolinkIndex(WORLD);
-    const forms = ['Aralia', 'aralia', 'ARALIA', 'ArAlIa'];
+    const forms = ['Aralia', 'aralia', 'ARALIA', 'ArAlIa', 'the duchess', 'The Duchess'];
     for (const form of forms) {
       const r = autolinkMarkdown(`Then ${form} spoke.`, index);
       expect(r.linked.map(c => c.id), `${form} should link`).toEqual(['c1']);
       expect(r.story, `${form} must survive linking unchanged`)
         .toBe(`Then [${form}](ow://character/c1) spoke.`);
+    }
+  });
+
+  it("THE GUARANTEE, strongest form: link-then-unlink is the identity", () => {
+    // If linking never changes the text, stripping the links back off must
+    // reproduce the original document byte-for-byte. This property covers
+    // every label rule at once — any future path that rewrites a label
+    // breaks the round trip loudly.
+    const index = buildAutolinkIndex(WORLD);
+    const originals = [
+      'Then aralia spoke to the duchess.',
+      'Bram met ARALIA in Vallaki. The Duchess smiled.',
+      'The old consul waited below.',
+    ];
+    for (const original of originals) {
+      const linked = autolinkMarkdown(original, index);
+      const restored = unlinkMarkdown(linked.story);
+      expect(restored.story, `round trip must restore: ${original}`).toBe(original);
     }
   });
 
@@ -92,6 +112,19 @@ describe('autolinkMarkdown', () => {
     const chip = para.content.find(n => n.type === 'elementChip') as { attrs: { label: string } } | undefined;
     expect(chip, 'the lowercase mention linked').toBeTruthy();
     expect(chip!.attrs.label, 'and kept the writer casing').toBe('aralia');
+  });
+
+  it("THE GUARANTEE holds for ALIASES in richtext (S309)", () => {
+    const index = buildAutolinkIndex(WORLD);
+    const doc = { type: 'doc', content: [{ type: 'paragraph', content: [
+      { type: 'text', text: 'They bowed to the duchess.' },
+    ] }] };
+    const out = autolinkRichtext(doc as never, index);
+    const para = (out.doc as { content: Array<{ content: Array<Record<string, unknown>> }> }).content[0];
+    const chip = para.content.find(n => n.type === 'elementChip') as { attrs: { id: string; label: string } } | undefined;
+    expect(chip, 'the alias mention linked').toBeTruthy();
+    expect(chip!.attrs.label, 'and kept the writer text').toBe('the duchess');
+    expect(chip!.attrs.id, 'while resolving to the canonical element').toBe('c1');
   });
 
   it('skips ambiguous names entirely', () => {
@@ -186,6 +219,33 @@ describe('autolinkRichtext', () => {
     const p2 = (r.doc as any).content[1];
     expect(p2.content.map((n: any) => n.type)).toEqual(['text', 'elementChip', 'text']);
     expect(p2.content[1].attrs.id).toBe('l1');
+  });
+});
+
+describe('isValidChipLabel (the chip-label sync predicate)', () => {
+  // The editors' rename sync rewrites any label that fails this check. It
+  // MUST fold case, or one tick after a promotion it would quietly undo the
+  // writer's-text rule the tests above lock in (the S309 pairing: promotion
+  // preserves, sync tolerates — two halves of one decision).
+  const surface = { name: 'Aralia', aliases: ['the duchess'] };
+
+  it('accepts the canonical name in any casing', () => {
+    for (const label of ['Aralia', 'aralia', 'ARALIA', 'ArAlIa']) {
+      expect(isValidChipLabel(label, surface), label).toBe(true);
+    }
+  });
+
+  it('accepts aliases in any casing', () => {
+    for (const label of ['the duchess', 'The Duchess', 'THE DUCHESS']) {
+      expect(isValidChipLabel(label, surface), label).toBe(true);
+    }
+  });
+
+  it('rejects a stale pre-rename label, empty labels, and non-strings', () => {
+    expect(isValidChipLabel('Old Name', surface)).toBe(false);
+    expect(isValidChipLabel('', surface)).toBe(false);
+    expect(isValidChipLabel(null, surface)).toBe(false);
+    expect(isValidChipLabel(undefined, surface)).toBe(false);
   });
 });
 

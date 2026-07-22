@@ -478,8 +478,13 @@ function render(): void {
 
   // The opener (step 0): the sentence has no world yet, so the phase-`advance`
   // path can't render a forward control (`canAdvance` is false with no active
-  // tour world — it reads as suspended). "Begin" is the explicit hand-off into
-  // the dock. No counter, no Back — just Begin and the ever-present Exit.
+  // tour world — it reads as suspended). "Start" is the explicit hand-off into
+  // the dock. No counter, no Back.
+  //
+  // And NO EXIT (Captain, S308). Exit is "leave the thing you are inside", but
+  // nobody is inside anything yet — the opener is a cover, and the way out of a
+  // cover is the door you came through. Offering to exit a tour that has not
+  // started reads as a mistake. One control, one decision.
   if (opener) {
     const begin = document.createElement('button');
     begin.type = 'button';
@@ -488,12 +493,16 @@ function render(): void {
     begin.textContent = 'Start';
     begin.addEventListener('click', () => { void nextStep(); });
     controls.appendChild(begin);
-    appendExit(controls);
+    bindOpenerEscape();
     panel.appendChild(controls);
     root!.appendChild(panel);
     restoreFocus(focusedAction);
     return;
   }
+
+  // Past the opener: the visible Exit control is back, so the opener-only
+  // Escape binding has nothing left to serve.
+  unbindOpenerEscape();
 
   // Step counter (re-added S299 as a working aid — the visible label was cut
   // in the Freek round; the sentence is still the user-facing progress, this
@@ -602,6 +611,44 @@ function restoreFocus(control: string | null): void {
   if (!control || !root) return;
   const target = root.querySelector<HTMLElement>(`[data-tour-control="${control}"]`);
   target?.focus({ preventScroll: true });
+}
+
+/**
+ * Escape leaves the OPENER, and only the opener.
+ *
+ * Captain (S308) asked for the opener to carry a single control: Start. Doing
+ * exactly that removes the only way off the cover screen — a visitor who clicks
+ * "take the tour" from the landing to see what it is would be committed to
+ * starting it. Escape restores the way out without putting chrome back on a
+ * screen whose whole point is one sentence and one button.
+ *
+ * DELIBERATELY NOT GLOBAL ACROSS THE TOUR. Mid-tour there is a visible Exit
+ * control, so a global handler would be pure duplication — and this app has
+ * already been bitten by exactly that: S307 found a globally-captured Escape in
+ * zone edit mode with no target check, which reverted every committed vertex
+ * drag when a user pressed it to dismiss a field. Escape is crowded here (field
+ * editors, modals, pin placement, the exit confirm itself); binding it only
+ * where nothing else can serve is the narrow, safe version.
+ */
+let openerEscapeHandler: ((e: KeyboardEvent) => void) | null = null;
+
+function bindOpenerEscape(): void {
+  if (openerEscapeHandler) return;
+  openerEscapeHandler = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    // Only while the opener is the live step — the bar re-renders per step and
+    // unbinds below, but guard anyway so a stray listener can never fire late.
+    if (currentStepIndex() !== 0) return;
+    e.preventDefault();
+    confirmExitTour(currentStepIndex(), () => { void exitTour(); });
+  };
+  document.addEventListener('keydown', openerEscapeHandler);
+}
+
+function unbindOpenerEscape(): void {
+  if (!openerEscapeHandler) return;
+  document.removeEventListener('keydown', openerEscapeHandler);
+  openerEscapeHandler = null;
 }
 
 function appendExit(controls: HTMLElement): void {

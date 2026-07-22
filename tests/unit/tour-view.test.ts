@@ -1,8 +1,8 @@
 /**
- * The tour's world view + phase resolution — the pure kernel.
+ * The tour’s world view + phase resolution — the pure kernel.
  *
  * These lock the decisions the S301 gate reshaped: prefix semantics over
- * last-match (R10), and full suspension when the tour's world is not the
+ * last-match (R10), and full suspension when the tour’s world is not the
  * active one (R4).
  */
 
@@ -22,7 +22,7 @@ const REFS: Record<string, string> = {
   'institution:The Hegemony': 'id-hegemony',
   'object:Ebony Spaceship': 'id-ship',
   'object:Spaceship Balcony': 'id-balcony',
-  "object:The Consul's Steinway": 'id-steinway',
+  "object:The Consul’s Steinway": 'id-steinway',
 };
 
 function view(opts: {
@@ -90,8 +90,8 @@ describe('resolvePhase — prefix semantics (gate R10)', () => {
   });
 
   it('STOPS at the first failed predicate rather than taking the last match', () => {
-    // The bug prefix semantics exists to prevent: phase c's predicate holds,
-    // but b's does not (the user deleted the Hegemony). Last-match would show
+    // The bug prefix semantics exists to prevent: phase c’s predicate holds,
+    // but b’s does not (the user deleted the Hegemony). Last-match would show
     // "and it links back to him" about a link that no longer exists.
     const w = view({ present: ['character:The Consul'] });
     expect(resolvePhase(PHASES, w).id).toBe('a');
@@ -146,7 +146,7 @@ describe('canAdvance', () => {
 
 describe('countPresent — the partial-progress signature term (gate R5)', () => {
   it('counts each minted ref so middle mints are visible to the renderer', () => {
-    const refs = ['object:Ebony Spaceship', 'object:Spaceship Balcony', "object:The Consul's Steinway"];
+    const refs = ['object:Ebony Spaceship', 'object:Spaceship Balcony', "object:The Consul’s Steinway"];
     expect(countPresent(refs, view())).toBe(0);
     expect(countPresent(refs, view({ present: [refs[0]] }))).toBe(1);
     expect(countPresent(refs, view({ present: [refs[0], refs[1]] }))).toBe(2);
@@ -156,7 +156,7 @@ describe('countPresent — the partial-progress signature term (gate R5)', () =>
 
 describe('pinInZone — the pin beat soft correction (S303 rework)', () => {
   // A unit-square zone [0,0]-[10,10] as four ordered markers, plus a pin. The
-  // point-in-polygon math is ZoneGeometry's (tested there); this locks that the
+  // point-in-polygon math is ZoneGeometry’s (tested there); this locks that the
   // view assembles the polygon from the right markers and reads the pin.
   const SQUARE = [
     { x: 0, y: 0, order: 0 }, { x: 10, y: 0, order: 1 },
@@ -214,13 +214,13 @@ describe('pinInZone — the pin beat soft correction (S303 rework)', () => {
       refToId: (ref) => (ref === 'pin:seat' ? 'id-pin' : ref === 'zone:swamp' ? 'id-zone' : undefined),
     });
     // The pin is geometrically inside the square, but the square is on another
-    // map, so no markers match the pin's map → no polygon → false.
+    // map, so no markers match the pin’s map → no polygon → false.
     expect(w.pinInZone('pin:seat', 'zone:swamp')).toBe(false);
   });
 
   it('respects marker order (a self-crossing order changes the polygon)', () => {
-    // Swapping two vertices turns the square into a bow-tie; (5,5) — the square's
-    // center — is no longer inside the crossed shape's filled lobes.
+    // Swapping two vertices turns the square into a bow-tie; (5,5) — the square’s
+    // center — is no longer inside the crossed shape’s filled lobes.
     const bowtie = [
       { x: 0, y: 0, order: 0 }, { x: 10, y: 10, order: 1 },
       { x: 10, y: 0, order: 2 }, { x: 0, y: 10, order: 3 },

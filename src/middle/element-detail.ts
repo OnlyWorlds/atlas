@@ -31,7 +31,7 @@ import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
 import { renderHeader } from './element-detail-header';
 import { renderElementImage } from '../ui/element-image';
-import { escapeText } from '../core/dom-utils';
+import { escapeText, relativeTime } from '../core/dom-utils';
 
 /**
  * Per-element scroll position memory. Survives re-renders (field edits, link
@@ -242,12 +242,20 @@ export function mountElementDetail(target: HTMLElement): () => void {
   function renderFooter(el: Element): HTMLElement {
     const meta = document.createElement('div');
     meta.className = 'atlas-detail-meta';
-    const updated = el.local_updated_at ? new Date(el.local_updated_at).toLocaleString() : '—';
-    const synced = el.server_updated_at ? new Date(el.server_updated_at).toLocaleString() : 'Not synced';
+    // relativeTime (S309): the same element read "2d ago" on home and a raw
+    // locale dump here. Tooltip keeps the exact stamp; empty/invalid fall back.
+    const updatedRel = relativeTime(el.local_updated_at);
+    const updated = updatedRel
+      ? `<span title="${escapeText(new Date(el.local_updated_at!).toLocaleString())}">${escapeText(updatedRel)}</span>`
+      : '—';
+    const syncedRel = relativeTime(el.server_updated_at);
+    const synced = syncedRel
+      ? `<span title="${escapeText(new Date(el.server_updated_at!).toLocaleString())}">${escapeText(syncedRel)}</span>`
+      : 'Not synced';
     meta.innerHTML = `
       <div>ID: <code>${escapeText(el.id)}</code></div>
-      <div>Updated locally: ${escapeText(updated)}</div>
-      <div>Server: ${escapeText(synced)}</div>
+      <div>Updated locally: ${updated}</div>
+      <div>Server: ${synced}</div>
     `;
     return meta;
   }

@@ -60,7 +60,7 @@ async function buildCalendar(page: Page) {
   // sits above it — Captain's ruling); the world clock item names the ask.
   await page.click('.atlas-cal-chip');
   await expect(page.locator('.atlas-cal-menu-item.disabled', { hasText: '+ new calendar' })).toBeVisible();
-  await page.locator('.atlas-cal-menu-item', { hasText: 'world clock — set it first' }).click();
+  await page.locator('.atlas-cal-menu-item', { hasText: 'World clock: set it first' }).click();
   await expect(page.locator('[data-modal="world-clock"]')).toBeVisible();
   await page.fill('#wc-unit', 'day');
   await page.fill('#wc-now', '400');

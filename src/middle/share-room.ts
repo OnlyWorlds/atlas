@@ -366,7 +366,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   async function addElementCard(pageId: string): Promise<void> {
     await commitOpenEdit(pageId);
     // A page can't card itself — exclude it from the pick.
-    const picked = await pickElement({ title: 'Add an element card', excludeIds: [pageId] });
+    const picked = await pickElement({ title: 'Add an element', excludeIds: [pageId] });
     if (!picked) return;
     const page = elOf(pageId);
     if (!page) return;
@@ -1273,7 +1273,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     addRow.className = 'atlas-share-block-add';
     addRow.appendChild(addBtn('title', '+ heading', () => { void addBlock(pageId, 'heading'); }, 'A section or subsection heading'));
     addRow.appendChild(addBtn('notes', '+ text', () => { void addBlock(pageId, 'prose'); }, 'A rich-text block with @-mentions'));
-    addRow.appendChild(addBtn('badge', '+ element card', () => { void addElementCard(pageId); }, 'A card for one element: identity plus the fields you choose'));
+    addRow.appendChild(addBtn('badge', '+ element', () => { void addElementCard(pageId); }, 'One element: identity plus the fields you choose'));
     addRow.appendChild(addBtn('grid_view', '+ collection', () => { void addCollectionBlock(pageId); }, 'A grid of several elements (identity only)'));
     addRow.appendChild(addBtn('map', '+ map', () => { void addMapBlock(pageId); }, 'A map image with the pins you include'));
     addRow.appendChild(addBtn('show_chart', '+ chart', () => { void addChartBlock(pageId); }, 'A saved chart from the Charts room'));
@@ -1887,7 +1887,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       empty.innerHTML = `
         <p class="atlas-share-empty-title">No pages yet.</p>
         <p class="atlas-share-hint">
-          A page is a stack of blocks: headings, prose, element cards, built
+          A page is a stack of blocks: headings, prose, elements, built
           from your world's elements. Create one to start composing.
         </p>
         <p class="atlas-share-empty-examples">a character showcase · a player handout · a world landing page</p>
@@ -1902,8 +1902,15 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     for (const page of pages) {
       const blocks = blocksOf(page);
       const pub = pagePubOf(page);
+      // Edited-since-publish, ON THE LIST (S309): the signal was computed and
+      // shown only after opening the page — the list is where you scan for it.
+      // Same sig comparison as the editor banner; string-concatenated because
+      // pubBadge is an HTML string (escapeText, never appendChild here).
+      const stale = pub && !pub.revoked && pub.content_sig && pageContentSig(page) !== pub.content_sig
+        ? `<span class="atlas-share-row-stale" title="Edited since last publish">edited</span>`
+        : '';
       const pubBadge = pub && !pub.revoked
-        ? `<span class="atlas-share-row-pub" title="${escapeText(publicUrlFor(pub.slug))}"><span class="material-symbols-outlined">public</span>live</span>`
+        ? `<span class="atlas-share-row-pub" title="${escapeText(publicUrlFor(pub.slug))}"><span class="material-symbols-outlined">public</span>live</span>${stale}`
         : pub?.revoked
           ? `<span class="atlas-share-row-pub is-revoked" title="Revoked; slug ${escapeText(pub.slug)} held">revoked</span>`
           : '';

@@ -1867,6 +1867,30 @@ body.atlas-touring .atlas-shell {
   gap: 3px;
 }
 .atlas-tour-extras-ghost .material-symbols-outlined { font-size: 13px; }
+/* Anchor "more information" to a constant place (Captain, S308). The bulb lived
+   in the copy flow right after the body, so its Y moved with every step's copy
+   length — short steps put it high, the four-line step put it low. On a fixed
+   dock with a constant-height sentence above and fixed rows below, the fix is
+   to make the DOCKED copy fill the panel as a column and push its footer to the
+   bottom: the bulb then sits one meta-line above the copy bottom on every step,
+   which is a constant Y.
+
+   Scoped to :not(.is-opener) because the opener's panel is auto-height and
+   centered, where "fill and pin to bottom" is meaningless. And every child's
+   flex is reset: the base rules use flex-basis for a wrapping ROW, and those
+   bases mean HEIGHT once the direction turns to column (body's `1 1 480px`
+   would become a 480px-tall body; the 100% bases would each want the full
+   panel height). align-items:stretch keeps the body full-width so its text
+   still wraps at the copy measure. */
+.atlas-tour-bar:not(.is-opener) .atlas-tour-copy {
+  flex: 1 1 auto;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+.atlas-tour-bar:not(.is-opener) .atlas-tour-body { flex: 0 0 auto; }
+.atlas-tour-bar:not(.is-opener) .atlas-tour-extras { flex: 0 0 auto; margin-top: auto; }
+.atlas-tour-bar:not(.is-opener) .atlas-tour-meta { flex: 0 0 auto; }
 /* Inline links in the copy row (the explorer) share the deeper toggle's
    metrics exactly — same line, same height, no dock reshape. */
 .atlas-tour-inline-link {
@@ -6684,6 +6708,55 @@ svg .atlas-zone-selected {
    border + tint when the current room IS 'element' (i.e. the chip's own
    destination is the active room — gives the always-something-highlighted
    invariant Captain wanted). */
+/* Search affordance (S309) — a field-shaped door to the Cmd+K palette,
+   anchored at the strip's far right. Looks like a compact input so its
+   function reads at a glance; clicking opens the overlay (one search, two
+   doors — never an inline twin that could drift from the palette). */
+.atlas-room-nav-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 7px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--atlas-divider-strong);
+  border-radius: 12px;
+  color: var(--atlas-text-muted);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 80ms ease, border-color 80ms ease, background 80ms ease;
+}
+
+.atlas-room-nav-search:hover {
+  color: var(--atlas-text);
+  border-color: var(--atlas-cyan-soft);
+  background: var(--atlas-bg-hover);
+}
+
+/* Two-class selector to outrank the material package's 24px rule (same
+   specificity note as the selected-chip icon below). */
+.atlas-room-nav-search .material-symbols-outlined {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.atlas-room-nav-search-text {
+  letter-spacing: 0.02em;
+}
+
+.atlas-room-nav-search-kbd {
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1;
+  padding: 2px 4px;
+  border: 1px solid var(--atlas-divider);
+  border-radius: 4px;
+  color: var(--atlas-text-dim);
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .atlas-room-nav-selected {
   display: inline-flex;
   align-items: center;
@@ -10086,6 +10159,72 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
 .atlas-share-map-zone.is-line.is-openable:hover {
   fill: none;
   stroke: rgba(34, 211, 238, 0.85);
+}
+/* S308 — Captain: "a huge weird SVG artifact, black and white, massive, over
+   the whole thing, when I CLICK it."
+   An openable zone carries role=button + tabindex=0 (share-page-render) so it
+   is keyboard-reachable, which also makes a MOUSE click focus it. Nothing in
+   atlas styled focus on an SVG path, so Chromium drew its own UA focus ring —
+   and a UA ring on a stroked path renders as a black-and-white outline tracing
+   the stroke geometry, which at a zone's scale is the blob he saw.
+   `outline: none` alone would fix the picture and silently delete the keyboard
+   affordance the tabindex exists for. `:focus-visible` is the tool that
+   distinguishes them: the browser only matches it for keyboard focus, so mouse
+   clicks get nothing and Tab gets a designed ring in the app's own language. */
+.atlas-share-map-zone.is-openable:focus { outline: none; }
+.atlas-share-map-zone.is-openable:focus-visible {
+  outline: none;
+  stroke: var(--atlas-cyan);
+  stroke-width: 3px;
+  fill: rgba(34, 211, 238, 0.3);
+}
+.atlas-share-map-zone.is-line.is-openable:focus-visible { fill: none; }
+
+/* Always-on zone label (Captain, S308). A published page is read-only: there is
+   no hover-to-learn and no click-to-select, so an unlabelled region is a
+   coloured smear. Rendered as HTML rather than SVG <text> because the zone SVG
+   uses preserveAspectRatio="none" to stretch over the image, which would
+   non-uniformly scale any glyphs drawn inside it. */
+/* The zero-worlds next step (Captain, S308). The grounded pane used to be a
+   receipt — a checkmark and a path — on the single highest-traffic screen for
+   anyone who skipped the tour. This line names the action and points at the
+   control, so the teaching does not depend on a hover that may never happen. */
+.atlas-grounded-next {
+  margin: 18px auto 0;
+  max-width: 46ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.62);
+}
+/* Two classes deep ON PURPOSE. `.atlas-welcome .material-symbols-outlined`
+   sets 48px at (0,2,0); a single-class rule here loses the tie-break and the
+   inline glyph rendered at 48px, blowing the line box apart. line-height is
+   pinned for the same reason — an inline icon that inherits a 48px line-height
+   drags the whole paragraph's leading with it. */
+.atlas-grounded-next .atlas-grounded-next-icon {
+  font-size: 15px;
+  line-height: 1;
+  vertical-align: -3px;
+  margin: 0 2px;
+  color: var(--atlas-cyan);
+}
+
+.atlas-share-map-zone-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.92);
+  /* The backdrop is the author's map art, so it can be any colour. A dark
+     scrim plus a soft shadow keeps the label legible over both a pale coast
+     and a black mountain without knowing anything about the image. */
+  background: rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  z-index: 1;
 }
 
 .atlas-share-map-pin {
@@ -14154,4 +14293,14 @@ body.atlas-share-fullpreview > * {
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+/* Edited-since-publish marker on the share list (S309) — quiet warm text
+   beside the live badge; the editor's banner carries the full sentence. */
+.atlas-share-row-stale {
+  font-size: 10px;
+  color: var(--atlas-warn, #f6b26b);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  margin-left: 4px;
 }

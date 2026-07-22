@@ -16,6 +16,7 @@
 
 import { navigate } from '../core/router';
 import { getState } from '../core/state';
+import { hasFolderMode } from '../core/capabilities';
 import type { PagePayload, PayloadElementEntry } from '../core/share-payload';
 
 interface DemoData {
@@ -56,8 +57,8 @@ export function mountDemo(): void {
     <div class="atlas-demo-scroll">
       <div class="atlas-demo-intro">
         <h1>Sikelia</h1>
-        <p>Ancient Sicily around 505 BC: 196 settlements on hand-made map art, with the political web between poleis, native peoples, and Phoenician ports recorded as linked elements.</p>
-        <p class="atlas-demo-intro-sub">A page like this is what atlas publishes: blocks built from a real world. Zoom the map, click any pin. Below it: a dozen highlights from 586 elements.</p>
+        <p>Ancient Sicily around 505 BC: <span data-role="demo-pin-count">the settlements</span> on hand-made map art, with the political web between poleis, native peoples, and Phoenician ports recorded as linked elements.</p>
+        <p class="atlas-demo-intro-sub">A page like this is what atlas publishes: blocks built from a real world. Zoom the map, click any pin. Below it: a dozen highlights from <span data-role="demo-element-count">its</span> elements.</p>
       </div>
       <div class="atlas-demo-map" data-role="demo-map"></div>
       <p class="atlas-demo-map-hint">Drag to pan · scroll to zoom · click a pin to read about the place</p>
@@ -81,7 +82,11 @@ export function mountDemo(): void {
   // Entry is the share room's example link now (S255): visitors with an
   // atlas root get "back to atlas"; rootless visitors (old links, curious
   // strangers) still get the setup CTA. Show exactly one.
-  if (getState().atlasRoot) setupBtn.remove();
+  // Capability gate (S309, third instance of the class): on OPFS-only
+  // browsers the folder picker does not exist, so the setup CTA would be a
+  // silently dead button (its catch swallows the throw by design, for
+  // user-cancel). No folder mode -> no folder CTA; the back door stays.
+  if (getState().atlasRoot || !hasFolderMode()) setupBtn.remove();
   else backBtn.remove();
   backBtn.addEventListener('click', exit);
   setupBtn.addEventListener('click', async () => {
@@ -114,6 +119,16 @@ export function mountDemo(): void {
       import('../middle/share-page-render'),
     ]);
     if (disposed || !overlay) return;
+
+    // Counts DERIVED from the payload (S309): this copy shipped a hardcoded
+    // "586 elements" against a payload carrying 196 — a rotting number is
+    // worse than none. The payload is the source; the copy reads it.
+    const pinCount = data.map.pins.length;
+    const elementCount = Object.keys(data.payload.elements ?? {}).length;
+    const pinCountEl = overlay.querySelector<HTMLElement>('[data-role="demo-pin-count"]');
+    if (pinCountEl) pinCountEl.textContent = `${pinCount} settlements`;
+    const elCountEl = overlay.querySelector<HTMLElement>('[data-role="demo-element-count"]');
+    if (elCountEl) elCountEl.textContent = String(elementCount);
 
     // Cards through the real payload renderer (view-only by construction).
     const cardsMount = overlay.querySelector<HTMLElement>('[data-role="demo-cards"]')!;

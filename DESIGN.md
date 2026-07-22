@@ -641,7 +641,7 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 | Room | Route | Content | Status |
 |---|---|---|---|
 | `welcome` | `#/` | First-launch atlas-root setup CTA | shipped |
-| `home` | `#/w/<id>` | World home — identity, stats, charts (timeline-bar) preview, recent, quick actions. **Default landing for active worlds.** | shipped |
+| `home` | `#/w/<id>` | World home — identity, stats, charts preview, recent, quick actions. **Default landing for active worlds.** | shipped |
 | `element` | `#/w/<id>/element/<eid>` | Schema-driven element detail | shipped |
 | `writing` | `#/w/<id>/writing[/<narrativeId>]` | Book/chapter/scene/draft authorship (any tier; ancestry derived from `parent_narrative`). See `DESIGN_WRITING.md`. Legacy long-form URL still parsed. | shipped |
 | `knowledge` | `#/w/<id>/knowledge[/<entryId>\|/new\|/knower/<id>]` | Knowledge entries — who knows what. [Entries \| Knowers] tabs, draft editor (persists nothing until create), embedded TipTap prose w/ mentions, known-view per knower. See `DESIGN_KNOWLEDGE.md` | shipped (phase 1) |
@@ -669,7 +669,7 @@ A **room** is a top-level mode of the middle pane. The room nav strip is always 
 
 Rule of thumb: **big title = you're in a room; compact band = you're looking at one thing.** Titles are white; cyan is for accents/links, not headings.
 
-**Search** (240 → 256 → 258): the dedicated search ROOM was nav-hidden pre-release (240, weakest surface) and DELETED in 256 (`search.ts` + `templates-room.ts` removed; `/search` + `/templates` URLs parse to home). **The replacement SHIPPED in 258: the command palette** (`src/ui/command-palette.ts`, lazy chunk) — Ctrl/Cmd+K or `/` from any room, ranked tiers (name prefix > name substring > alias > supertype/subtype > description-with-snippet), room jumps by name (an element name-prefix outranks a room; rooms outrank weaker tiers), Enter/click navigates, "see all →" hands the query to the elements-sidebar filter. **One search language**: the sidebar filter and the palette share `core/element-search.ts` (name/alias/taxonomy/description) so see-all always shows a superset of the palette's capped 12 — a name-only sidebar filter would show "no matches" for a query the palette just matched. Pins/markers excluded from both (map artifacts, not browse targets). Bindings: `command-palette` + `command-palette-slash` in hotkeys.ts (replaced the old focus-search Ctrl+K).
+**Search** (240 → 256 → 258): the dedicated search ROOM was nav-hidden pre-release (240, weakest surface) and DELETED in 256 (`search.ts` + `templates-room.ts` removed; `/search` + `/templates` URLs parse to home). **The replacement SHIPPED in 258: the command palette** (`src/ui/command-palette.ts`, lazy chunk) — Ctrl/Cmd+K or `/` from any room, ranked tiers (name prefix > name substring > alias > supertype/subtype > description-with-snippet), room jumps by name (an element name-prefix outranks a room; rooms outrank weaker tiers), Enter/click navigates, "see all →" hands the query to the elements-sidebar filter. **One search language**: the sidebar filter and the palette share `core/element-search.ts` (name/alias/taxonomy/description) so see-all always shows a superset of the palette's capped 12 — a name-only sidebar filter would show "no matches" for a query the palette just matched. Pins/markers excluded from both (map artifacts, not browse targets). Bindings: `command-palette` + `command-palette-slash` in hotkeys.ts (replaced the old focus-search Ctrl+K). **Since S309** the room-nav strip carries a field-shaped search pill anchored right that opens the same palette — one search, two doors.
 
 Per-room design docs:
 - World Home: `DESIGN_HOME.md`
@@ -1029,9 +1029,9 @@ src/
 ├── registry/      # localStorage registry + per-world helpers
 ├── layout/        # 3-pane app-shell
 ├── sidebar/       # sidebar driver + worlds / elements / writing bodies
-├── middle/        # rooms: element-detail(+header/fields/refs), world-home, writing-workspace(+modules), knowledge-room(+editor), share-room(+editor/+page-render), timeline, search, settings-panel(+per-tab modules)
+├── middle/        # rooms: element-detail(+header/fields/refs), world-home, writing-workspace(+modules), knowledge-room(+editor), share-room(+editor/+page-render), timeline, settings-panel(+per-tab modules)
 ├── tabs/right/    # map-index, map-tab(+concern modules), context-tab(+graph/toolbar/lists/preview), zone-drawing/edit, ghost-pins
-├── visualization/ # leaflet-2d (Leaflet2DManager, ZoneOverlay, ZoneGeometry) + timeline-bar
+├── visualization/ # leaflet-2d (Leaflet2DManager, ZoneOverlay, ZoneGeometry) + timeline/ (chart pipeline)
 ├── editor/        # field-schema (SDK adapter) + field-descriptions
 ├── import/        # import & export room engine (parse, validate, reconcile, export shapes)
 ├── demo/          # bundled sample world + the #/demo view-only presentation

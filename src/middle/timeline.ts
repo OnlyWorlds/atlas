@@ -246,7 +246,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     calChip.dataset.action = 'calendar-menu';
     calChip.title = lensEarly
       ? `Dates read in ${lensEarly.name}. Click to switch or edit`
-      : 'These numbers could have names — create a calendar';
+      : 'These numbers could have names. Create a calendar';
     calChip.innerHTML =
       `<span class="material-symbols-outlined">calendar_month</span>` +
       `<span>${escapeText(lensEarly ? lensEarly.name : 'no calendar')}</span>`;
@@ -488,7 +488,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       const store = getActiveStore();
       const syncState = store ? await store.readSyncState() : null;
       if (!syncState?.meta_baseline) {
-        toasts.show('world settings are still syncing — try again in a moment', 'info');
+        toasts.show('World settings are still syncing. Try again in a moment', 'info');
         return;
       }
     }
@@ -499,7 +499,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
    *  guard here is a backstop, not the flow. */
   function openCalendarCreate(): void {
     if (!clockIsSet()) {
-      toasts.show('set the world clock first — one step of time needs a meaning', 'info');
+      toasts.show('Set the world clock first: one step of time needs a meaning', 'info');
       return;
     }
     new CalendarBuilderModal(toasts, {
@@ -555,7 +555,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       // The clock sits ABOVE create (Captain's ruling): it is the prerequisite,
       // and the order teaches it. Create greys out until the clock exists.
       const clockSet = clockIsSet();
-      item(clockSet ? 'world clock' : 'world clock — set it first', {
+      item(clockSet ? 'world clock' : 'World clock: set it first', {
         icon: 'schedule',
         action: () => void openWorldClock(),
       });
@@ -633,7 +633,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
    *  from the seed → save mints the construct → the fields clear. */
   async function startMint(): Promise<void> {
     if (!(await metaBaselineReady())) {
-      toasts.show('world settings are still syncing — try again in a moment', 'info');
+      toasts.show('World settings are still syncing. Try again in a moment', 'info');
       return;
     }
     const seed = legacySeed();

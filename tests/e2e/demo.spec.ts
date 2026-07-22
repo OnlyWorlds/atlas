@@ -8,6 +8,10 @@
  */
 
 import { test, expect, Page } from '@playwright/test';
+// The payload is the single source for counts (S309): the demo copy derives
+// its numbers from it at render, and so do these assertions.
+import demoData from '../../src/demo/demo-page.json';
+const DEMO_PIN_COUNT = (demoData as { map: { pins: unknown[] } }).map.pins.length;
 
 async function freshBoot(page: Page) {
   await page.goto('/');
@@ -42,7 +46,7 @@ test('the share room links into the demo; the demo renders map, pins, and cards'
   await expect(page).toHaveURL(/#\/demo/);
   await expect(page.locator('.atlas-demo-band-title')).toHaveText('Sikelia · example page · view only');
   // The Leaflet hero with all 196 pins (lazy chunks: generous timeout).
-  await expect(page.locator('.atlas-demo-map path.leaflet-interactive')).toHaveCount(196, { timeout: 20000 });
+  await expect(page.locator('.atlas-demo-map path.leaflet-interactive')).toHaveCount(DEMO_PIN_COUNT, { timeout: 20000 });
   // The curated cards render through the payload renderer.
   await expect(page.locator('.atlas-demo-cards')).toContainText('Syrakousai');
   await expect(page.locator('.atlas-demo-cards')).toContainText('Pantalika');
@@ -54,7 +58,7 @@ test('pin click opens the read-only entry modal', async ({ page }) => {
   await freshBoot(page);
   await page.goto('/#/demo');
   const pins = page.locator('.atlas-demo-map path.leaflet-interactive');
-  await expect(pins).toHaveCount(196, { timeout: 20000 });
+  await expect(pins).toHaveCount(DEMO_PIN_COUNT, { timeout: 20000 });
   await pins.nth(40).click({ force: true });
   const modal = page.locator('.atlas-share-pin-modal, .atlas-modal-overlay.visible');
   await expect(modal.first()).toBeVisible();

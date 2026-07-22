@@ -1,7 +1,7 @@
 # Atlas — Maps Subsystem Design
 
 **Version**: 1.1 (2026-05-18) — foundation design; bout-sequence history archived to `docs-archive/PROGRESS-history.md`.
-**Status**: All M1-M7 + N1/N2/MR + L0/S/MW/NPM bouts shipped (sessions 208-210). XR (ghost pins) dropped session 221.
+**Status**: All M1-M7 + N1/N2/MR + L0/S/MW/NPM bouts shipped (sessions 208-210). XR (ghost pins) **shipped** — see §3.8 (`src/tabs/right/ghost-pins.ts`) (corrected 2026-07-22, S309; the earlier "dropped session 221" line was stale).
 **Supersedes**: the "Map Images in API Mode" section in `DESIGN.md` (image precedence has changed — `image_url` now wins).
 **Scope**: The map subsystem — domain model, tree organization, UI surfaces, image sources, test fixtures, and the deferred-work pile. Does not cover pin styling (a later pass), zone semantics beyond deferral notes, or marker work.
 
@@ -625,14 +625,14 @@ Schema:
 ```ts
 interface MapViewPrefs {
   pin_style:         'icon' | 'round-icon' | 'pin-shape';   // default: 'icon'
-  pin_labels:        'always' | 'hover' | 'threshold' | 'never';  // default: 'hover'
+  pin_labels:        'always' | 'hover' | 'threshold' | 'never';  // default: 'always' (S299)
   pin_label_threshold: number;                              // default: 6 (used iff pin_labels === 'threshold')
   pin_tint:          'type-color' | 'accent' | 'muted';     // default: 'type-color'
   show_grid:         boolean;                               // default: false
   grid_spacing:      50 | 100 | 200;                        // default: 100
   lock_pin_drag:     boolean;                               // default: false
   zone_fill_opacity: number;                                // default: 0.4
-  zone_labels:       'always' | 'hover' | 'never';          // default: 'hover'
+  zone_labels:       'always' | 'hover' | 'never';          // default: 'always'
 }
 ```
 
@@ -716,7 +716,7 @@ A thin row (~36px tall) docked at the top of each map tab's body, above the leaf
 | Button | Tooltip | Behavior |
 |---|---|---|
 | ⚙ | "Map visual settings" | Toggles the §11 popover |
-| ⬡ | "Draw polygon" | Enters drawing mode (DESIGN_ZONES.md §2). Active state styled when `ui.zoneDrafting?.mode === 'polygon'`. Disabled if the map has no image (per §4.1 pin gate, same logic). |
+| ⬡ | "Draw polygon" | Enters drawing mode (DESIGN_ZONES.md §2). Active state styled when `ui.zoneDrafting?.mode === 'polygon'`. Always enabled — the no-image gate was **removed in S300** (zones draw on imageless maps; stored dims replace the refusal, see §4.2) (corrected 2026-07-22, S309). |
 | ╱ | "Draw line" | Same, for line mode. |
 | 👁 zones | "Show/hide zones" | Toggles zonesLayer visibility on Leaflet2DManager. Transient (not persisted). |
 | 👁 pins | "Show/hide pins" | Toggles pinsLayer visibility. Transient. |

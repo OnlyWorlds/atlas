@@ -194,7 +194,7 @@ While `ui.zoneDrafting` is present, the canvas is in drawing mode for that map. 
 
 ### 2.2 Entry
 
-User clicks ⬡ Draw Polygon or ╱ Draw Line in the canvas toolbar (DESIGN_MAPS.md §12). Toolbar gates: drawing is disabled if the map has no image (per DESIGN_MAPS.md §4.1 — markers anchor to image coordinates).
+User clicks ⬡ Draw Polygon or ╱ Draw Line in the canvas toolbar (DESIGN_MAPS.md §12). Drawing works on **imageless maps too** — the no-image gate was **removed in S300** (markers anchor to the map's stored `width`/`height`, which every map now carries; see DESIGN_MAPS.md §4.2) (corrected 2026-07-22, S309).
 
 `ui.zoneDrafting = { mode, mapId, points: [] }`. The drawing overlay strip mounts (see §4.2). Cursor changes (crosshair). Toolbar buttons reflect active state.
 

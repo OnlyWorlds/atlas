@@ -23,7 +23,7 @@ import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { buildMapTree, filterTreeByName, type MapTreeNode, type LocationLike } from './map-tree';
 import { clearCameraState } from '../../core/map-camera-persist';
-import { escapeText } from '../../core/dom-utils';
+import { escapeText, installRowKeydownActivation } from '../../core/dom-utils';
 
 // ---- Collapsed tree-node state ----
 
@@ -116,6 +116,8 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     const rect = row.getBoundingClientRect();
     return clientY < rect.top + rect.height / 2 ? 'before' : 'after';
   }
+
+  installRowKeydownActivation(root);
 
   root.addEventListener('dragstart', (e) => {
     const row = (e.target as HTMLElement).closest<HTMLElement>('.atlas-map-tree-row');

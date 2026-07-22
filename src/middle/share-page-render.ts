@@ -396,6 +396,27 @@ export function openPinModal(
  * honest hint when the block can't freeze (builder-only path — frozen nulls
  * never reach the payload).
  */
+/**
+ * Centroid of a zone's %-space points — where its always-on label sits.
+ *
+ * Deliberately the ARITHMETIC MEAN of the vertices, not the polygon area
+ * centroid. For the shapes atlas produces (hand-traced regions, generally
+ * convex-ish and evenly sampled) the two agree closely, and the mean cannot
+ * fail: the area formula divides by signed area, which is ZERO for a
+ * degenerate or self-intersecting trace and would place the label at NaN%.
+ * A label slightly off-centre beats a label that vanishes.
+ *
+ * Kept local rather than imported from core: this module is store-free BY
+ * CONTRACT because `tools/show` lifts it near-verbatim, and an import from
+ * core/ would not travel with it.
+ */
+function centroidOf(points: Array<{ xPct: number; yPct: number }>): { xPct: number; yPct: number } {
+  if (points.length === 0) return { xPct: 50, yPct: 50 };
+  let sx = 0, sy = 0;
+  for (const p of points) { sx += p.xPct; sy += p.yPct; }
+  return { xPct: sx / points.length, yPct: sy / points.length };
+}
+
 export function renderMapView(
   frozen: PayloadMapBlock | null,
   getEntry: (id: string) => PayloadElementEntry | null,
@@ -429,6 +450,7 @@ export function renderMapView(
     svg.setAttribute('class', 'atlas-share-map-zones');
     svg.setAttribute('viewBox', '0 0 100 100');
     svg.setAttribute('preserveAspectRatio', 'none');
+    const zoneLabels: Array<{ name: string; xPct: number; yPct: number }> = [];
     for (const zone of frozen.zones) {
       const isLine = zone.shape === 'line';
       const shapeEl = document.createElementNS(svgNS, isLine ? 'polyline' : 'polygon');
@@ -452,8 +474,30 @@ export function renderMapView(
         });
       }
       svg.appendChild(shapeEl);
+
+      // Always-on zone label (Captain, S308). A published page is a read-only
+      // artifact: in the app you can hover a zone or click it to learn what it
+      // is, but a visitor to a page has no such affordance, so an unnamed
+      // region is just a coloured smear. The name was already in the payload
+      // and only reachable through the <title> hover.
+      //
+      // preserveAspectRatio="none" stretches this SVG's 0-100 box over the
+      // image, so glyphs drawn inside it would be scaled non-uniformly. The
+      // label is therefore positioned in %-space but rendered in SCREEN space
+      // via a counter-scaled transform... which SVG cannot express here, so it
+      // rides in a sibling HTML layer instead (below), where the font is
+      // simply a font.
+      zoneLabels.push({ name: zone.name, ...centroidOf(zone.points) });
     }
     frame.appendChild(svg);
+    for (const zl of zoneLabels) {
+      const el = document.createElement('span');
+      el.className = 'atlas-share-map-zone-label';
+      el.textContent = zl.name;
+      el.style.left = `${zl.xPct}%`;
+      el.style.top = `${zl.yPct}%`;
+      frame.appendChild(el);
+    }
   }
   for (const pin of frozen.pins) {
     const entry = pin.ref ? getEntry(pin.ref) : null;

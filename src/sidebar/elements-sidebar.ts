@@ -21,7 +21,7 @@ import { openCreateDoor } from '../ui/create-element-door';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { getCurrentSyncEngine, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
-import { escapeText, escapeAttr } from '../core/dom-utils';
+import { escapeText, escapeAttr, installRowKeydownActivation } from '../core/dom-utils';
 import { elementMatchesQuery } from '../core/element-search';
 import { roomOf } from '../core/element-room';
 
@@ -276,6 +276,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   listEl.className = 'atlas-list';
   content.appendChild(listEl);
 
+  installRowKeydownActivation(listEl);
   listEl.addEventListener('click', (e) => {
     const row = (e.target as HTMLElement).closest<HTMLElement>('[data-element-id]');
     if (!row) return;
@@ -388,6 +389,12 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       // the moment you hover) — data-tip drives a ::after pseudo; no native
       // title (its OS delay is the complaint, and doubling would ghost).
       btn.dataset.tip = ELEMENT_LABELS[type].plural;
+      // ...and the SAME text as the accessible name. `data-tip` is invisible to
+      // assistive tech, so with the icon ligature correctly hidden (S308) these
+      // buttons would otherwise have no accessible name at all — my own
+      // icon-a11y sweep created that gap and its audit caught it. A visual
+      // tooltip is not a label.
+      btn.setAttribute('aria-label', ELEMENT_LABELS[type].plural);
       btn.setAttribute('data-filter-type', type);
 
       const icon = document.createElement('span');

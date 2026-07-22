@@ -1,7 +1,9 @@
 # Atlas — Import & Export Design
 
-**Version**: 0.1 (2026-06-18) — design, pre-build
-**Status**: DESIGN — awaiting Captain ratification before B1
+**Version**: 0.1 (2026-06-18, design) — **built and shipped; see PROGRESS.md**
+**Status**: SHIPPED (bouts B0-B4). The room is live and branded **Data** in the
+UI (route segment stays `import`). The header below is the original pre-build
+design; treat PROGRESS.md as current for what actually shipped.
 **Owner**: Temper
 **Relationship**: companion to `DESIGN.md` (folder-first model, FolderStore, SyncEngine). Import is the last main data pillar. This doc is the stable reference for the import/export subsystem; operational state goes to `PROGRESS.md`.
 

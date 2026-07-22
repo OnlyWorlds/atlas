@@ -25,6 +25,7 @@ import {
 } from '../sync/sync-attach';
 import type { WorldsRegistry } from '../core/types';
 import { escapeText } from '../core/dom-utils';
+import { hasFolderMode } from '../core/capabilities';
 
 const CADENCE_OPTIONS: Array<{ label: string; ms: number | null }> = [
   { label: 'Off', ms: null },
@@ -88,10 +89,13 @@ function renderStorageDeviceSection(): string {
                <button class="atlas-btn-primary" data-action="recover-atlas-root">Re-link folder</button>
              </div>
              <p class="atlas-settings-hint-sub"><button class="atlas-btn-link" data-action="change-atlas-root">Or set up a different folder</button></p>`
-          : `<p>Not set up yet.</p>
+          : hasFolderMode()
+            ? `<p>Not set up yet.</p>
              <div class="atlas-settings-actions">
                <button class="atlas-btn-primary" data-action="change-atlas-root">Set up OnlyWorlds folder</button>
-             </div>`}
+             </div>`
+            : `<p>Not set up yet. This browser cannot open local folders (Chrome, Edge and other
+               Chromium browsers can); worlds here live in browser storage instead.</p>`}
     </section>
   `;
 }

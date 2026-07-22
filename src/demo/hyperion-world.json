@@ -10,14 +10,14 @@
     "Rachmaninov birth_date (1873, Earth chronology) removed -- it stretched the chart axis to 0..1873 and crushed the dated events; the world clock runs 0..100",
     "S298 (Freek round): consul.objects gains Ebony Spaceship (balcony implied via parent_object, deliberately not listed); collective renamed Pack of Bellowing Saurians -> Saurian Pack (the word \"bellowed\" reveals after the collective does).",
     "events re-dated to a SHARED year 7 (S305): the sentence has him playing WHILE the saurians surge, so two different dates contradicted the prose the tour is built on",
-    "title 'Consul of the Hegemony' given grant_date 3 and deliberately NO revoke_date (S305): an open-ended title renders as a span running to the world's now with a fade cap, which is the tour's range/open-end lesson",
-    "Rachmaninov birth_date -320 and his Prelude start_date -318 (S305): placed in the Old Earth era for the deep-time beat. EDITORIAL -- the books never state the PC epoch, so no conversion from Earth's calendar is asserted anywhere in copy; the depth is chosen for teaching, not for canon",
+    "title 'Consul of the Hegemony' given grant_date 3 and deliberately NO revoke_date (S305): an open-ended title renders as a span running to the world’s now with a fade cap, which is the tour’s range/open-end lesson",
+    "Rachmaninov birth_date -320 and his Prelude start_date -318 (S305): placed in the Old Earth era for the deep-time beat. EDITORIAL -- the books never state the PC epoch, so no conversion from Earth’s calendar is asserted anywhere in copy; the depth is chosen for teaching, not for canon",
     "world time_current REMOVED (S305) so the user sets the now themselves in the charts act; time_range_min widened to -400 to cover the Old Earth era",
     "calendar construct 'Hegemony Standard' minted (S305): two eras sharing the pivot at 0 (Old Earth counting down, PC counting up). Both terms are in-text; PC is never glossed because the novels never expand it",
-    "character 'Steinway' renamed to 'Mr. Steinway' (S306): the bare key collided with the 'Steinway' alias on object \"The Consul's Steinway\", and autolink/bulk-link skip any key with 2+ candidates (prose-autolink.ts) -- the sentence's Steinway could never link",
+    "character 'Steinway' renamed to 'Mr. Steinway' (S306): the bare key collided with the 'Steinway' alias on object \"The Consul’s Steinway\", and autolink/bulk-link skip any key with 2+ candidates (prose-autolink.ts) -- the sentence’s Steinway could never link",
     "Chapter 1 story baked with NO ow:// chips (S306): the writing beat is hands-on, the user Tab-links the recognised words themselves and bulk-links the rest. The aliases above are what make every surface form recognisable",
     "'Story of the old piano' given supertype 'Draft' (S306): without a writing-label supertype getTierForNarrative returns null and the narrative is INVISIBLE in the writing room. Not revealed during the tour; a curious user finds it after",
-    "the Consul alias list trimmed to ['Consul'] (S306): 'the Consul' never matched anything -- longest-first scanning consumes 'The Hegemony' at the sentence start, so the lowercase variant was dead weight cluttering the element's field"
+    "the Consul alias list trimmed to ['Consul'] (S306): 'the Consul' never matched anything -- longest-first scanning consumes 'The Hegemony' at the sentence start, so the lowercase variant was dead weight cluttering the element’s field"
   ],
   "world": {
     "name": "Hyperion",
@@ -55,7 +55,7 @@
       "id": "068e92db-4c40-79eb-8000-8ef44c0d52b4",
       "name": "Rachmaninov",
       "atlas_aliases": [
-        "Rachmaninov's"
+        "Rachmaninov’s"
       ],
       "birth_date": -320
     },
@@ -133,7 +133,7 @@
     {
       "type": "object",
       "id": "068e2e56-d4b9-7c40-8000-173975bfd994",
-      "name": "The Consul's Steinway",
+      "name": "The Consul’s Steinway",
       "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",
       "atlas_aliases": [
         "Steinway"
@@ -159,7 +159,7 @@
     {
       "type": "construct",
       "id": "068e2e55-18da-7cb9-8000-8ccd6ebf1c1e",
-      "name": "Rachmaninov's Prelude",
+      "name": "Rachmaninov’s Prelude",
       "characters": [
         "068e92db-4c40-79eb-8000-8ef44c0d52b4"
       ],
@@ -290,7 +290,7 @@
     {
       "type": "pin",
       "id": "069458de-0293-7765-8000-e3cf3687dd5c",
-      "name": "The Consul's balcony seat",
+      "name": "The Consul’s balcony seat",
       "x": 221,
       "y": 295,
       "element_type": "character",
@@ -413,14 +413,14 @@
       "supertype": "Chapter",
       "parent_narrative": "2d16c352-6c2d-4d1f-9bab-8345bb17eaba",
       "order": 0,
-      "story": "The Hegemony Consul sat on the balcony of his ebony spaceship and played Rachmaninov's Prelude in C-sharp Minor on an ancient but well-maintained Steinway while great, green, saurian things surged and bellowed in the swamps below."
+      "story": "The Hegemony Consul sat on the balcony of his ebony spaceship and played Rachmaninov’s Prelude in C-sharp Minor on an ancient but well-maintained Steinway while great, green, saurian things surged and bellowed in the swamps below."
     },
     {
       "type": "construct",
       "id": "068e92e1-63df-7d1f-8000-4ca1e40d0001",
       "name": "Hegemony Standard",
       "supertype": "Calendar",
-      "description": "The Hegemony's standard reckoning: years counted from the pivot, with everything before it dated in the Old Earth era.",
+      "description": "The Hegemony’s standard reckoning: years counted from the pivot, with everything before it dated in the Old Earth era.",
       "atlas_calendar": {
         "version": 1,
         "grain": "Year",

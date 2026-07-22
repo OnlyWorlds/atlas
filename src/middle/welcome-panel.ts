@@ -193,6 +193,11 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             <div class="atlas-landing-hero">
               <p class="atlas-grounded-check"><span class="material-symbols-outlined">check_circle</span>Your OnlyWorlds folder is ready</p>
               <p class="atlas-grounded-path"><code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
+              <p class="atlas-grounded-next">Now make a world to put in it. The
+                <span class="material-symbols-outlined atlas-grounded-next-icon">create_new_folder</span>
+                button in the top left creates one; the others beside it open a
+                folder you already have, or bring a world down from
+                onlyworlds.com.</p>
             </div>
             <div class="atlas-grounded-detail" data-role="path-detail"></div>
           </div>
@@ -226,6 +231,13 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             <h3>view a shared world</h3>
             <p>Someone shared a read key with you? Paste it: atlas downloads their world to browse, view only. No PIN needed.</p>
             ${owLine}
+            <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
+          // S309: open-folder was the ONE create button with no entry here —
+          // untaught on every input path, hover included.
+          'open-folder': `
+            <span class="material-symbols-outlined atlas-grounded-detail-icon">folder_open</span>
+            <h3>open a world folder</h3>
+            <p>Already have a world as files on your drive, from atlas or another OnlyWorlds tool? Point at its folder and atlas opens it in place. Nothing is copied or moved.</p>
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
         };
         const onPathHover = (e: Event): void => {

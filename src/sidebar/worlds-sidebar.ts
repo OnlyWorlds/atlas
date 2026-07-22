@@ -20,7 +20,7 @@ import { FsFolderStore, ELockHeld } from '../store/folder-store-fs';
 import { CreateWorldModal } from '../ui/create-world-modal';
 import { setActiveStore, getActiveStore, parkStore, takeParkedStore, evictParkedStore, awaitEviction } from '../core/active-store';
 import { LinkWorldModal } from '../ui/link-world-modal';
-import { escapeText, escapeAttr } from '../core/dom-utils';
+import { escapeText, escapeAttr, installRowKeydownActivation } from '../core/dom-utils';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
@@ -176,8 +176,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         try {
           const { openWorldFolder } = await import('../setup/atlas-root-flow');
           const { worldId, already } = await openWorldFolder(picked);
-          if (already) toasts.info('That world is already in atlas — opening it');
-          else toasts.success(`Opened "${picked.name}" in place — the folder stays where it is`);
+          if (already) toasts.info('That world is already in atlas. Opening it');
+          else toasts.success(`Opened "${picked.name}" in place. The folder stays where it is`);
           const ok = await activateWorld(worldId, toasts);
           // Rollback a JUST-registered folder whose first open failed
           // (read-only media, dead handle) so it doesn't sit permanently
@@ -190,7 +190,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
               const cleaned = deleteWorldEntry(getState().registry, worldId);
               saveRegistry(cleaned);
               patchSlice('registry', cleaned);
-              toasts.info('Removed the folder from the list — it could not be opened');
+              toasts.info('Removed the folder from the list: it could not be opened');
             }
           }
         } catch (err) {
@@ -205,28 +205,41 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const dispatchHover = (path: string | null): void => {
       window.dispatchEvent(new CustomEvent('atlas:worlds-path-hover', { detail: { path } }));
     };
-    for (const btn of [createBtn, newApiBtn, linkBtn, viewBtn]) {
+    // Focus teaches too (S309): a keyboard user tabbing the row gets the same
+    // trail — and open-folder joins the loop, which had NO teaching on any
+    // input path (its DETAILS entry lives with the welcome panel's map).
+    for (const btn of [createBtn, newApiBtn, linkBtn, viewBtn, openFolderBtn]) {
       if (!btn) continue;
       const path = btn.getAttribute('data-action');
       btn.addEventListener('mouseenter', () => dispatchHover(path));
       btn.addEventListener('mouseleave', () => dispatchHover(null));
+      btn.addEventListener('focus', () => dispatchHover(path));
+      btn.addEventListener('blur', () => dispatchHover(null));
     }
 
-    // One-time tour tag: with a fresh root and zero worlds, a small floating
-    // label points at +folder — the always-start-here action. First hover
-    // dismisses it for good (the detail zone takes over the teaching).
-    if (root && getState().registry.worlds.length === 0
-        && !localStorage.getItem(TOUR_CREATE_SEEN_KEY) && createBtn) {
+    // ZERO WORLDS: the create action is highlighted for as long as the state
+    // lasts (Captain, S308). This used to be a one-time tag dismissed FOREVER
+    // on first hover — so a user who set up a folder, brushed the button with
+    // the cursor and came back the next day found an unexplained row of five
+    // icons and the largest pane on screen saying only "your folder is ready".
+    // The state it teaches ("you have nowhere to put anything yet") does not
+    // expire on hover, so neither should the signal.
+    //
+    // The floating "start here" tag KEEPS its one-time behaviour — a label that
+    // reappears every session reads as nagging. The persistent half is the
+    // quiet highlight on the button; the loud half still fires once.
+    if (root && getState().registry.worlds.length === 0 && createBtn) {
       createBtn.classList.add('atlas-tour-target');
-      const tag = document.createElement('span');
-      tag.className = 'atlas-tour-tag';
-      tag.textContent = 'start here';
-      header.appendChild(tag);
-      createBtn.addEventListener('mouseenter', () => {
-        localStorage.setItem(TOUR_CREATE_SEEN_KEY, '1');
-        createBtn.classList.remove('atlas-tour-target');
-        tag.remove();
-      }, { once: true });
+      if (!localStorage.getItem(TOUR_CREATE_SEEN_KEY)) {
+        const tag = document.createElement('span');
+        tag.className = 'atlas-tour-tag';
+        tag.textContent = 'start here';
+        header.appendChild(tag);
+        createBtn.addEventListener('mouseenter', () => {
+          localStorage.setItem(TOUR_CREATE_SEEN_KEY, '1');
+          tag.remove();
+        }, { once: true });
+      }
     }
     // Setup/recover-atlas buttons moved exclusively to the welcome panel
     // (session 221 W2). The sidebar no longer renders them; their handlers
@@ -267,6 +280,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   });
 
   // Click delegation — separate the favorite-toggle from the row click.
+  installRowKeydownActivation(listEl);
   listEl.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
     const favBtn = target.closest<HTMLElement>('[data-role="fav-toggle"]');
@@ -404,7 +418,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         : '';
       return `
         <div class="atlas-row atlas-remote-row ${opening ? 'is-opening' : ''}" data-remote-world-id="${escapeAttr(r.id)}" role="button" tabindex="0"
-             title="${r.role === 'collaborator' ? 'Shared with you — link with a key from its owner' : 'Open: download this world into your OnlyWorlds folder'}">
+             title="${r.role === 'collaborator' ? 'Shared with you: link with a key from its owner' : 'Open: download this world into your OnlyWorlds folder'}">
           <span class="material-symbols-outlined">${opening ? 'downloading' : 'cloud'}</span>
           <span class="atlas-row-main">${escapeText(r.name)}</span>
           ${roleChip}

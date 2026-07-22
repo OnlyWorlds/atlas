@@ -39,7 +39,7 @@ describe('TOUR_STEPS structure', () => {
   });
 
   it('no step routes to an element it also creates (gate R7)', () => {
-    // Otherwise the step opens on the app's "Element … not found in this
+    // Otherwise the step opens on the app’s "Element … not found in this
     // world" card while the dock underneath says "click + to add it".
     for (const step of TOUR_STEPS) {
       const creates = step.creates ?? [];
@@ -82,15 +82,15 @@ describe('TOUR_STEPS structure', () => {
       if (route && 'ref' in route) check(route.ref, `${step.id}.route`);
       if (route && 'elementRef' in route) check(route.elementRef, `${step.id}.route.elementRef`);
     }
-    // The engine's two hands-on refs ride the same contract.
+    // The engine’s two hands-on refs ride the same contract.
     check('character:The Consul', 'HANDS_ON_REFS.create-consul');
-    check("pin:The Consul's balcony seat", 'HANDS_ON_REFS.place-pin');
+    check("pin:The Consul’s balcony seat", 'HANDS_ON_REFS.place-pin');
   });
 
   it('capabilities only ever GROW across the step order (the reorder-safety invariant)', () => {
     // The whole reason capabilities replaced the ordinal stage number: an act
-    // restructure must never flip chrome off. Each step's set must be a
-    // superset of the previous step's.
+    // restructure must never flip chrome off. Each step’s set must be a
+    // superset of the previous step’s.
     let prev = new Set<string>();
     for (let i = 0; i < TOUR_STEPS.length; i++) {
       const caps = capabilitiesUpTo(i);
@@ -124,9 +124,9 @@ describe('TOUR_STEPS structure', () => {
       for (const r of step.reveal ?? []) known.add(r);
       for (const r of step.creates ?? []) known.add(r);
     }
-    // The two hands-on refs live in the engine's HANDS_ON_REFS map.
+    // The two hands-on refs live in the engine’s HANDS_ON_REFS map.
     known.add('character:The Consul');
-    known.add("pin:The Consul's balcony seat");
+    known.add("pin:The Consul’s balcony seat");
     for (const step of TOUR_STEPS) {
       for (const span of step.spans ?? []) {
         if (!span.ref) continue;
@@ -135,8 +135,8 @@ describe('TOUR_STEPS structure', () => {
     }
   });
 
-  it("a place-pin step's zone is revealed no later than the pin step (S303)", () => {
-    // The soft correction (pinInZone) needs the zone's markers on disk when the
+  it("a place-pin step’s zone is revealed no later than the pin step (S303)", () => {
+    // The soft correction (pinInZone) needs the zone’s markers on disk when the
     // pin beat runs. A reorder that revealed the swamps AFTER the pin would make
     // Next unreachable (no polygon to test the drop against) — a dead-end no e2e
     // that happens to walk a compliant order would catch.
@@ -153,7 +153,7 @@ describe('TOUR_STEPS structure', () => {
 describe('the pin beat geometry (S303 soft correction)', () => {
   it('the baked balcony pin sits inside the baked swamps zone', () => {
     // On watch-mode Next or resume the pin is created from the bundle at its
-    // baked coordinates (a real placement uses the user's click). Those baked
+    // baked coordinates (a real placement uses the user’s click). Those baked
     // coordinates MUST be in-zone, or those paths dead-end with no Next. This
     // also locks the bundle: a re-bake that moves the pin or the swamps markers
     // out of overlap breaks the beat, and nothing else would notice.
@@ -186,7 +186,7 @@ function bundleElement(name: string): Record<string, unknown> {
 
 describe('the charts act (S305)', () => {
   it('the world ships with NO now, or the set-now beat has no button to press', () => {
-    // The step's forward control is gated on the clock being set by the USER.
+    // The step’s forward control is gated on the clock being set by the USER.
     // A baked `time_current` renders the chip instead of the button, so the
     // gesture becomes impossible and the step strands with no Next at all.
     expect((bundle.world as Record<string, unknown>).time_current).toBeUndefined();
@@ -220,7 +220,7 @@ describe('the charts act (S305)', () => {
     // Negative absolute years ARE the Old Earth era (it counts down to the
     // pivot at 0). A positive date would put him in PC and the copy would lie.
     expect(bundleElement('Rachmaninov').birth_date as number).toBeLessThan(0);
-    expect(bundleElement("Rachmaninov's Prelude").start_date as number).toBeLessThan(0);
+    expect(bundleElement("Rachmaninov’s Prelude").start_date as number).toBeLessThan(0);
   });
 
   it('the world range covers the Old Earth era', () => {
@@ -259,7 +259,7 @@ describe('the charts act (S305)', () => {
   it('every hands-on kind has a forward gate branch in the BAR ITSELF', () => {
     // The previous version of this test compared `step.handsOn` against a
     // hardcoded list in this file — which is a closed TypeScript union checked
-    // against a copy of itself. Deleting the `set-now` branch from tour-bar's
+    // against a copy of itself. Deleting the `set-now` branch from tour-bar’s
     // gate left it green while the step became permanently un-advanceable
     // (found by the S305 close gate). So read the SOURCE of the gate instead:
     // a kind with no bundle ref that falls through to the default `handsOnDone`
@@ -273,7 +273,7 @@ describe('the charts act (S305)', () => {
     for (const step of TOUR_STEPS) {
       if (!step.handsOn || !refless.has(step.handsOn)) continue;
       expect(gate.includes(`'${step.handsOn}'`),
-        `handsOn "${step.handsOn}" has no branch in tour-bar's handsOnGate`).toBe(true);
+        `handsOn "${step.handsOn}" has no branch in tour-bar’s handsOnGate`).toBe(true);
     }
   });
 
@@ -283,7 +283,7 @@ describe('the charts act (S305)', () => {
     const deep = TOUR_STEPS.find(s => s.id === 'deep-time');
     expect(deep, 'the deep-time step').toBeDefined();
     expect(deep!.reveal ?? []).toContain('character:Rachmaninov');
-    expect(deep!.reveal ?? []).toContain("construct:Rachmaninov's Prelude");
+    expect(deep!.reveal ?? []).toContain("construct:Rachmaninov’s Prelude");
     // ...and its spans light on the same beat as its elements.
     expect((deep!.spans ?? []).length).toBeGreaterThan(0);
   });
@@ -293,7 +293,7 @@ describe('the writing beat (S306)', () => {
   const chapterName = TOUR_CHAPTER_REF.slice(TOUR_CHAPTER_REF.indexOf(':') + 1);
 
   /** Elements on disk when a given step is ENTERED: everything revealed, created
-   *  or hands-on-minted by any strictly earlier step, plus this step's reveals. */
+   *  or hands-on-minted by any strictly earlier step, plus this step’s reveals. */
   function elementsOnDiskAt(stepId: string): Element[] {
     const idx = TOUR_STEPS.findIndex(s => s.id === stepId);
     expect(idx, `no step "${stepId}"`).toBeGreaterThanOrEqual(0);
@@ -330,7 +330,7 @@ describe('the writing beat (S306)', () => {
     // THE AMBIGUITY GUARD. autolink and bulk-link both skip any key with 2+
     // candidates (prose-autolink: `cands.length !== 1`), silently. This caught
     // the real collision that shipped in the bundle: a character NAMED
-    // "Steinway" beside the "Steinway" alias on the Consul's piano meant that
+    // "Steinway" beside the "Steinway" alias on the Consul’s piano meant that
     // word could never link, and nothing anywhere would have said so.
     //
     // Runs the REAL index over the REAL sentence rather than restating the
@@ -396,7 +396,7 @@ describe('a step\'s view is a function of the STEP (S307)', () => {
   it('every step that NAMES an element in its copy routes to something', () => {
     // The consul beat carried no `route` and looked correct only because
     // creating an element navigates to it as a SIDE EFFECT. Going back there
-    // is no create, so the middle pane kept showing a LATER step's element
+    // is no create, so the middle pane kept showing a LATER step’s element
     // while the narrator talked about the Consul — Captain saw it as the tour
     // "jumping between the Consul and home".
     //

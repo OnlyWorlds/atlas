@@ -199,3 +199,22 @@ test('see-all hands off to the sidebar, and the sidebar routes the same way (S30
   await row.click();
   await expect(page).toHaveURL(/\/knowledge\//);
 });
+
+/**
+ * S309 (Captain's ask): the palette was reachable by shortcut ALONE — the
+ * app's only global search had no visible affordance. The room-nav strip now
+ * carries a field-shaped search pill anchored right; clicking it opens the
+ * SAME palette (one search, two doors — an inline twin could drift). Both
+ * halves asserted: the pill exists when a world is active, and its click
+ * opens the overlay.
+ */
+test('the room-nav search pill opens the command palette (S309)', async ({ page }) => {
+  await setupWorld(page);
+  const pill = page.locator('.atlas-room-nav-search');
+  await expect(pill).toBeVisible();
+  await pill.click();
+  await expect(page.locator('[data-role="cmdk-input"]')).toBeVisible();
+  // And it is the real palette, not a twin: typing filters as the palette does.
+  await page.locator('[data-role="cmdk-input"]').fill('zzz-no-such-element');
+  await expect(page.locator('.atlas-cmdk-empty, .atlas-cmdk-row').first()).toBeVisible();
+});

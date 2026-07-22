@@ -31,3 +31,25 @@ export function relativeTime(iso: string | null | undefined): string {
   if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)}d ago`;
   return new Date(iso).toLocaleDateString();
 }
+
+/**
+ * Keyboard activation for div-rows that declare `role="button" tabindex="0"`
+ * (S309). The role PROMISES Enter/Space work — a promise the innerHTML list
+ * rows never kept: a keyboard user tabbed in, heard "button", pressed Enter,
+ * nothing. One delegated listener per list root synthesizes the row's click
+ * (which the root's existing click delegation then handles normally).
+ *
+ * Real interactive descendants (button/a/input) keep their native key
+ * handling — the helper steps aside for them so nothing double-fires.
+ */
+export function installRowKeydownActivation(root: HTMLElement, selector = '[role="button"]'): void {
+  root.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button, a, input, textarea, select')) return;
+    const row = target.closest<HTMLElement>(selector);
+    if (!row || !root.contains(row)) return;
+    e.preventDefault(); // Space must not scroll the pane.
+    row.click();
+  });
+}

@@ -1125,7 +1125,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     const whoSection = document.createElement('section');
     whoSection.className = 'atlas-knowledge-section atlas-knowledge-zone-who';
     whoSection.innerHTML = `<h2 class="atlas-knowledge-section-title">Who knows this
-      <span class="material-symbols-outlined atlas-section-hint" data-tip="One character can hold knowledge directly. Two or more knowers become a circle: any collective can hold knowledge, and its members inherit it.">help</span></h2>`;
+      <span class="material-symbols-outlined atlas-section-hint" role="note" aria-label="One character can hold knowledge directly. Two or more knowers become a circle: any collective can hold knowledge, and its members inherit it." data-tip="One character can hold knowledge directly. Two or more knowers become a circle: any collective can hold knowledge, and its members inherit it.">help</span></h2>`;
     heldByMount = document.createElement('div');
     whoSection.appendChild(heldByMount);
     body.appendChild(whoSection);
