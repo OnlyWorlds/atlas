@@ -112,6 +112,11 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
 
         // Extension-namespace fields (atlas_/x_/shadow_) are legal custom
         // data — keel v2 round-trips them; never cry wolf on them.
+        // Envelope imports (spec §8c) MUST ignore unknown element fields — a
+        // future additive bump ships fields this build's schema doesn't know,
+        // and warning on them is crying wolf about valid data (they are kept,
+        // not dropped, on the envelope path). Hand-pasted JSON keeps the warn.
+        if (parsed.envelope === true) continue;
         if (!known.has(k) && !isExtensionField(k) && !SERVER_STAMPS.has(k) && !(isSpatial && SPATIAL_SAFE.has(k))) {
           issues.push({
             path: `${path}.${k}`,

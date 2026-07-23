@@ -234,3 +234,24 @@ test('unlink-from-api flips state back to local-only', async ({ page }) => {
   expect(world.state).toBe('local-only');
   expect(world.api).toBeUndefined();
 });
+
+test('general tab: theme toggle flips data-theme, persists across reload, dark restores (S315)', async ({ page }) => {
+  await freshBoot(page);
+  await page.goto('/#/settings/general');
+  await expect(page.locator('input[name="app-theme"][value="dark"]')).toBeChecked();
+  // The absent half of the pair: no theme attribute in dark mode.
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme', 'light');
+
+  await page.check('input[name="app-theme"][value="light"]');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  // Persists: a fresh load stamps the attribute pre-paint from localStorage.
+  await page.reload();
+  await page.waitForSelector('.atlas-shell');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  await page.goto('/#/settings/general');
+  await expect(page.locator('input[name="app-theme"][value="light"]')).toBeChecked();
+  await page.check('input[name="app-theme"][value="dark"]');
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme', 'light');
+});

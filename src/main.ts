@@ -18,6 +18,7 @@ import { registerServiceWorker } from './core/offline';
 import { hasFolderMode, hasOpfsMode } from './core/capabilities';
 import { installPlacementHintWatcher } from './tabs/right/map-placement-hint';
 import { installIconA11y } from './ui/icon-a11y';
+import { applyTheme } from './core/theme';
 
 function renderUnsupportedPage(root: HTMLElement): void {
   root.innerHTML = '';
@@ -49,6 +50,10 @@ function renderUnsupportedPage(root: HTMLElement): void {
 }
 
 function boot(): void {
+  // Re-assert the theme (index.html's pre-paint script stamped it; this keeps
+  // the meta theme-color in sync and covers any embed that skipped the inline
+  // script).
+  applyTheme();
   const root = document.getElementById('app');
   if (!root) {
     console.error('[atlas] #app element missing');

@@ -126,7 +126,13 @@ test('re-importing a world that already exists offers merge-or-new and merges wi
   await page.fill('[data-role="paste"]', JSON.stringify(ENVELOPE));
   await page.click('[data-action="load"]');
   await page.click('[data-action="import"]');
-  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  // Completion signal: the ADOPTED world is active. The old wait (elements
+  // search visible) was vacuous — it is already visible from setupWorld's
+  // Barovia, so the test raced on and loaded the second payload while the
+  // first import was still writing (S315 flake; the S301 sync-point class).
+  await expect.poll(async () => page.evaluate(() =>
+    (window as any).__atlasTestApi.getState().active?.meta?.id ?? null,
+  )).toBe('068e012b-52a9-79bf-8000-26bb67891425');
 
   // Re-open import and load the SAME world, now grown by one element. Its id
   // matches a local world, so the mode choice becomes merge-or-separate-copy.

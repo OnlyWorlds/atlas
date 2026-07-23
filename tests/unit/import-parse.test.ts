@@ -149,4 +149,37 @@ describe('parsePayload — keel world-export envelope (onlyworlds-world-export)'
     expect(r.totalElements).toBe(0);
     expect(r.world?.id).toBe('w');
   });
+
+  it('marks envelope results with the envelope flag; non-envelope shapes stay unflagged (§8c pair)', () => {
+    expect(parsePayload(envelope()).envelope).toBe(true);
+    const legacy = parsePayload({ World: { name: 'Old' }, Character: [{ name: 'C' }] });
+    expect(legacy.ok).toBe(true);
+    expect(legacy.envelope).not.toBe(true);
+  });
+
+  it('ignores unknown TOP-LEVEL envelope keys (future additive bump; §8c MUST)', () => {
+    const e = envelope() as Record<string, unknown>;
+    e.schema_version = '9.99.99';
+    e.some_future_key = { anything: true };
+    const r = parsePayload(e);
+    expect(r.ok).toBe(true);
+    expect(r.totalElements).toBe(4);
+    expect(r.unknownBuckets).toEqual([]);
+  });
+
+  it('treats a valid type slug with a null value as zero elements, never an unknown type (§8c)', () => {
+    const e = envelope();
+    (e.elements as Record<string, unknown>).character = null;
+    const r = parsePayload(e);
+    expect(r.ok).toBe(true);
+    expect(r.unknownBuckets).toEqual([]);
+    expect(r.byType.has('character' as never)).toBe(false);
+  });
+
+  it('does not structurally mistake a non-keel {world, elements} object for an envelope', () => {
+    // Tag-less fallback requires at least one type-keyed ARRAY inside
+    // elements — this used to parse as a phantom 0-element world.
+    const r = parsePayload({ world: { name: 'x' }, elements: { config: { nested: true } } });
+    expect(r.ok).toBe(false);
+  });
 });

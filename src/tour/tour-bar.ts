@@ -558,6 +558,11 @@ function render(): void {
   // until each element lands, lit in its type colour after. A quiet "this is
   // what is about to happen" indicator; the sentence glyphs stay the payoff.
   const createStack = buildCreateStack(step, view);
+  // The stack floats up out of the controls row, so on long-copy steps it can
+  // climb into the body text / extras row (S315 gate). When a stack exists,
+  // the panel reserves a right-hand lane for it — the copy simply never
+  // occupies the column the icons rise through.
+  panel.classList.toggle('has-create-stack', Boolean(createStack));
   const mountForward = (btn: HTMLElement) => {
     if (!createStack) { controls.appendChild(btn); return; }
     const wrap = document.createElement('div');

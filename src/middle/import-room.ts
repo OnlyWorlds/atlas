@@ -28,6 +28,7 @@ import {
   importIntoActiveWorld,
 } from '../setup/atlas-root-flow';
 import { activateWorld } from '../sidebar/worlds-sidebar';
+import { findWorldByOwIdentity } from '../registry/registry';
 import type { ParseResult, ImportPlan, ValidationIssue } from '../import/types';
 import { ToastManager } from '../ui/toast-manager';
 import { completeWaypoint } from '../core/waypoints';
@@ -223,15 +224,18 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     return typeof id === 'string' && id.trim() ? id.trim() : null;
   };
   /**
-   * The local world (if any) that already carries the export's world id — the
-   * `world-<id>` handle-key convention every registered world follows. Its
-   * presence turns the mode choice into merge-into-it vs import-a-separate-copy
-   * (Captain, S313); its absence lets a new import ADOPT the id (lossless).
+   * The local world (if any) that already carries the export's world id — via
+   * the handle-key convention OR the api-link fields (see
+   * `findWorldByOwIdentity`; checking only the handle key let re-importing an
+   * api-linked world's own export fork its identity, S315 gate HIGH). The
+   * match's presence turns the mode choice into merge-into-it vs
+   * import-a-separate-copy (Captain, S313); its absence lets a new import
+   * ADOPT the id (lossless).
    */
   const idMatchWorld = () => {
     const id = exportWorldId();
     if (!id) return null;
-    return getState().registry.worlds.find(w => w.folder?.handle_key === `world-${id}`) ?? null;
+    return findWorldByOwIdentity(getState().registry, id) ?? null;
   };
 
   // ---------------------------------------------------------------------------
@@ -364,6 +368,11 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     // we state intent instead of counts.
     const mergeTargetIsActive = idMatch ? idMatch.id === aw?.worldId : true;
     const mergeTargetName = idMatch ? idMatch.name : (aw?.meta?.name ?? 'the current world');
+    // A view-only world blocks every store mutation at the seam, so a merge
+    // into it would surface as N per-element write failures (S315 gate) —
+    // say it once, up front, instead.
+    const mergeTargetEntry = idMatch ?? getState().registry.worlds.find(w => w.id === aw?.worldId) ?? null;
+    const mergeTargetViewOnly = mode === 'merge' && mergeTargetEntry?.api?.read_only === true;
     const accuratePreview = mode !== 'merge' || mergeTargetIsActive;
     const issues = validatePayload(parsed, mode === 'merge' && mergeTargetIsActive ? activeElements() : []);
     const plan = buildPlan();
@@ -432,7 +441,10 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           <p class="atlas-import-subnote"><span class="material-symbols-outlined">info</span> Opens ${escapeText(mergeTargetName)} and merges these ${parsed.totalElements} element${parsed.totalElements === 1 ? '' : 's'} in. Existing elements are kept (choose overwrite once it's open to replace them).</p>
           `}
 
-          <button type="button" class="atlas-btn-primary" data-action="import" ${importing ? 'disabled' : ''}>
+          ${mergeTargetViewOnly ? `
+          <p class="atlas-import-subnote is-warn"><span class="material-symbols-outlined">visibility</span> ${escapeText(mergeTargetName)} is view-only — nothing can be written into it. Import as a separate copy instead.</p>
+          ` : ''}
+          <button type="button" class="atlas-btn-primary" data-action="import" ${importing || mergeTargetViewOnly ? 'disabled' : ''}>
             ${importing ? 'importing…' : (mode === 'new' ? 'create world' : `merge into ${escapeText(mergeTargetName)}`)}
           </button>
           ${importing ? `<div class="atlas-import-progress" data-role="import-progress"><div class="atlas-import-progress-fill"></div><span class="atlas-import-progress-label">writing 0 / ${r.created + r.updated}</span></div>` : ''}
@@ -497,6 +509,12 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       if (fill) fill.style.width = `${pct}%`;
       if (label) label.textContent = `writing ${p.done} / ${p.total}`;
     };
+    // If the user loads ANOTHER payload while this import is still writing,
+    // the completion path below must not stomp their fresh review — `parsed`
+    // identity is the guard (S315: the first import's clearLoaded() wiped a
+    // second payload loaded mid-flight).
+    const runParsed = parsed;
+    const stillMine = () => parsed === runParsed;
     try {
       if (mode === 'new') {
         // Adopt the exported world id ONLY when nothing local already uses it —
@@ -510,9 +528,11 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         reportFailures(applied.failures.length, plan.report.droppedLinks.length);
         // The file carried API credentials — guide to the (separate, consent-gated) sync link.
         if (hadCreds) toasts.info('Imported as a local world. To sync it, use "make online" in settings.');
-        clearLoaded();
-        // New world is now active — refresh the export side.
-        renderExport();
+        if (stillMine()) {
+          clearLoaded();
+          // New world is now active — refresh the export side.
+          renderExport();
+        }
       } else {
         // Merge target: the id-matched world, else the active world. Open the
         // match first if it isn't already active, so the reconcile runs against
@@ -522,6 +542,13 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         const targetId = idMatch?.id ?? activeWorld()?.worldId ?? null;
         if (!targetId) throw new Error('No world to merge into');
         const targetName = idMatch?.name ?? activeWorld()?.meta?.name ?? 'world';
+        // Fail fast on a view-only target (the UI disables the button, but the
+        // room can be driven by keyboard/state races — one clear message beats
+        // N per-element write failures).
+        const targetEntry = getState().registry.worlds.find(w => w.id === targetId);
+        if (targetEntry?.api?.read_only === true) {
+          throw new Error(`"${targetName}" is view-only — import as a separate copy instead`);
+        }
         if (targetId !== activeWorld()?.worldId) {
           const ok = await activateWorld(targetId, toasts);
           if (!ok) throw new Error(`Could not open "${targetName}" to merge into`);
@@ -533,7 +560,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         if (plan.report.skipped) bits.push(`${plan.report.skipped} skipped`);
         toasts.success(`Merged into ${targetName} · ${bits.join(', ')}`);
         reportFailures(applied.failures.length, plan.report.droppedLinks.length);
-        if (reviewMount.isConnected) { clearLoaded(); renderExport(); }
+        if (reviewMount.isConnected && stillMine()) { clearLoaded(); renderExport(); }
       }
       // Waypoint (hookmap wp7): the import BUTTON gesture is the waypoint —
       // ungated (portability class). The imported DATA completes nothing.

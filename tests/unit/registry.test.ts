@@ -6,6 +6,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { defaultRegistry } from '../../src/core/types';
 import {
   attachApi,
@@ -17,6 +19,7 @@ import {
   findLinkedWorld,
   findWorld,
   findWorldByServerId,
+  findWorldByOwIdentity,
   isDescendantOf,
   setAccountToken,
   loadRegistry,
@@ -608,5 +611,46 @@ describe('registry — former-link tracking (detach/attach + findWorldByServerId
     // No live api block anymore, but the former-link memory keeps it findable.
     expect(findLinkedWorld(r2, 'srv-1')).toBeUndefined();
     expect(findWorldByServerId(r2, 'srv-1')?.id).toBe(entry.id);
+  });
+});
+
+describe('registry — findWorldByOwIdentity (the import collision predicate)', () => {
+  it('matches an adopt-imported world by its world-<id> handle key', () => {
+    const { next } = createLocalWorld(defaultRegistry(), {
+      name: 'W', folderName: 'w', handleKey: 'world-ow-123',
+    });
+    expect(findWorldByOwIdentity(next, 'ow-123')?.name).toBe('W');
+    expect(findWorldByOwIdentity(next, 'ow-999')).toBeUndefined();
+  });
+
+  it('matches an api-linked world by api.world_id even though its handle key is a local uuid (S315 gate HIGH)', () => {
+    // The link flow mints a DISTINCT local uuid for the handle key; the OW
+    // identity lives only in api.world_id. The handle-key convention alone
+    // must NOT be trusted to find this world.
+    const { next } = createApiLinkedWorld(defaultRegistry(), {
+      name: 'Linked', apiWorldId: 'srv-9', apiKey: 'k',
+      folderName: 'linked', handleKey: 'world-local-uuid-not-srv9',
+    });
+    expect(next.worlds[0].folder?.handle_key).not.toBe('world-srv-9');
+    expect(findWorldByOwIdentity(next, 'srv-9')?.name).toBe('Linked');
+  });
+
+  it('matches an unlinked world via former_api_world_id (re-import after unlink is still the same world)', () => {
+    const { next: r1, entry } = createApiLinkedWorld(defaultRegistry(), {
+      name: 'W', apiWorldId: 'srv-1', apiKey: 'k', folderName: 'w', handleKey: 'h',
+    });
+    const r2 = detachApi(r1, entry.id);
+    expect(findWorldByOwIdentity(r2, 'srv-1')?.id).toBe(entry.id);
+  });
+
+  it('the import room rides findWorldByOwIdentity, not a bare handle-key find (source scan)', () => {
+    // An invariant about two files must open both (S305). The predicate above
+    // is only a fix if the import room actually calls it — a re-inlined
+    // handle-key-only find would resurrect the identity fork with these units
+    // still green.
+    const src = fs.readFileSync(
+      path.join(__dirname, '../../src/middle/import-room.ts'), 'utf-8');
+    expect(src).toContain('findWorldByOwIdentity(');
+    expect(src).not.toMatch(/registry\.worlds\.find\(\s*w\s*=>\s*w\.folder\?\.handle_key/);
   });
 });

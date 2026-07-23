@@ -35,7 +35,12 @@ function isRecord(r: unknown): r is RawRecord {
  */
 function isExportEnvelope(obj: Record<string, unknown>): boolean {
   if (obj.format === 'onlyworlds-world-export') return true;
-  return isRecord(obj.world) && isRecord(obj.elements);
+  // Structural fallback: beyond `world` + `elements` both being objects,
+  // require at least one type-keyed ARRAY inside elements — a tag-less
+  // non-keel JSON that merely has those two keys used to parse as a phantom
+  // 0-element world (S315 gate LOW).
+  return isRecord(obj.world) && isRecord(obj.elements)
+    && Object.values(obj.elements).some(v => Array.isArray(v));
 }
 
 /**
@@ -58,6 +63,9 @@ function parseEnvelope(
         const existing = byType.get(lower as ElementType) ?? [];
         byType.set(lower as ElementType, [...existing, ...records]);
         total += records.length;
+      } else if (TYPE_SET.has(lower)) {
+        // A valid type slug with a null/absent-array value means zero elements
+        // (spec §8c: absent key = zero, never an error) — not an unknown type.
       } else {
         unknownBuckets.push(key);
       }
@@ -74,7 +82,7 @@ function parseEnvelope(
     };
   }
   // Always full-world: the envelope's whole purpose is a complete world.
-  return { ok: true, format: 'full-world', world, byType, unknownBuckets, totalElements: total };
+  return { ok: true, format: 'full-world', envelope: true, world, byType, unknownBuckets, totalElements: total };
 }
 
 export function parsePayload(data: unknown): ParseResult {

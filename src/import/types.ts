@@ -19,6 +19,14 @@ export interface ParseResult {
   /** Set when the payload isn't recognizable OnlyWorlds data. */
   error?: string;
   format?: ImportFormat;
+  /**
+   * True when the payload is the keel `onlyworlds-world-export` envelope
+   * (spec §8c). An envelope reader MUST ignore unknown top-level keys AND
+   * unknown element fields rather than reject — so envelope imports keep
+   * unknown first-class fields (a future additive schema bump) and suppress
+   * the unknown-field warning class that hand-pasted JSON still gets.
+   */
+  envelope?: boolean;
   /** Raw World block (full-world only). */
   world?: RawRecord;
   /** Element records grouped by lowercased element type. */

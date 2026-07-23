@@ -216,6 +216,23 @@ export function findWorldByServerId(
   );
 }
 
+/**
+ * The local world (if any) that already carries an OW world id, wherever that
+ * identity lives: the `world-<id>` handle-key convention (adopt-imported and
+ * created-local worlds) OR the api link fields (api-linked worlds mint a
+ * DISTINCT local uuid for their handle key and keep the server id in
+ * `api.world_id`/`former_api_world_id`). The import room's merge-vs-copy
+ * collision detection rides this; checking only the handle key let re-importing
+ * an api-linked world's own export fork its identity (S315 gate HIGH).
+ */
+export function findWorldByOwIdentity(
+  reg: WorldsRegistry,
+  owWorldId: string
+): WorldRegistryEntry | undefined {
+  return reg.worlds.find(w => w.folder?.handle_key === `world-${owWorldId}`)
+    ?? findWorldByServerId(reg, owWorldId);
+}
+
 // ---- Lookups ----
 
 export function findWorld(reg: WorldsRegistry, worldId: string): WorldRegistryEntry | undefined {

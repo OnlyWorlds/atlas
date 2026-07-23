@@ -36,3 +36,28 @@ describe('normalizeRecord', () => {
     expect(droppedUnknown).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('normalizeRecord — keepUnknown (envelope §8c passthrough)', () => {
+  it('keeps unknown non-extension fields when keepUnknown is set, without counting them dropped', () => {
+    const { record, droppedUnknown } = normalizeRecord(
+      { name: 'A', future_field: 'kept' }, 'character' as never, { keepUnknown: true });
+    expect(record.future_field).toBe('kept');
+    expect(droppedUnknown).toBe(0);
+  });
+
+  it('still strips server stamps under keepUnknown', () => {
+    const { record } = normalizeRecord(
+      { name: 'A', updated_at: 'x', change_seq: 9, future_field: 'kept' },
+      'character' as never, { keepUnknown: true });
+    expect(record.updated_at).toBeUndefined();
+    expect(record.change_seq).toBeUndefined();
+    expect(record.future_field).toBe('kept');
+  });
+
+  it('default path still drops and counts unknown fields (the pair)', () => {
+    const { record, droppedUnknown } = normalizeRecord(
+      { name: 'A', future_field: 'dropped' }, 'character' as never);
+    expect(record.future_field).toBeUndefined();
+    expect(droppedUnknown).toBeGreaterThanOrEqual(1);
+  });
+});

@@ -417,6 +417,29 @@ function centroidOf(points: Array<{ xPct: number; yPct: number }>): { xPct: numb
   return { xPct: sx / points.length, yPct: sy / points.length };
 }
 
+/**
+ * Bottom-centre of the points' bounding box in %-space — where a polygon
+ * zone's label hangs, matching the app's `zone_label_position: 'below'`
+ * default (S313; a centred label sits on the fill and markers and gets
+ * blocked — the same occlusion on a published page, where labels are
+ * always-on). Line zones keep the centroid mean (a line has no interior for
+ * the label to block). Kept local for the same store-free lift contract as
+ * `centroidOf` above.
+ */
+function labelAnchorOf(
+  points: Array<{ xPct: number; yPct: number }>,
+  isLine: boolean,
+): { xPct: number; yPct: number } {
+  if (isLine || points.length === 0) return centroidOf(points);
+  let minX = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    if (p.xPct < minX) minX = p.xPct;
+    if (p.xPct > maxX) maxX = p.xPct;
+    if (p.yPct > maxY) maxY = p.yPct;
+  }
+  return { xPct: (minX + maxX) / 2, yPct: maxY };
+}
+
 export function renderMapView(
   frozen: PayloadMapBlock | null,
   getEntry: (id: string) => PayloadElementEntry | null,
@@ -450,7 +473,7 @@ export function renderMapView(
     svg.setAttribute('class', 'atlas-share-map-zones');
     svg.setAttribute('viewBox', '0 0 100 100');
     svg.setAttribute('preserveAspectRatio', 'none');
-    const zoneLabels: Array<{ name: string; xPct: number; yPct: number }> = [];
+    const zoneLabels: Array<{ name: string; below: boolean; xPct: number; yPct: number }> = [];
     for (const zone of frozen.zones) {
       const isLine = zone.shape === 'line';
       const shapeEl = document.createElementNS(svgNS, isLine ? 'polyline' : 'polygon');
@@ -487,12 +510,15 @@ export function renderMapView(
       // via a counter-scaled transform... which SVG cannot express here, so it
       // rides in a sibling HTML layer instead (below), where the font is
       // simply a font.
-      zoneLabels.push({ name: zone.name, ...centroidOf(zone.points) });
+      // Anchored below the zone (bounding-box bottom-centre) for polygons —
+      // the app's S313 labels-below default, applied to the published surface
+      // too (Captain, S315: "ideally, yes"). tools/show re-lift owed.
+      zoneLabels.push({ name: zone.name, below: !isLine, ...labelAnchorOf(zone.points, isLine) });
     }
     frame.appendChild(svg);
     for (const zl of zoneLabels) {
       const el = document.createElement('span');
-      el.className = 'atlas-share-map-zone-label';
+      el.className = 'atlas-share-map-zone-label' + (zl.below ? ' is-below' : '');
       el.textContent = zl.name;
       el.style.left = `${zl.xPct}%`;
       el.style.top = `${zl.yPct}%`;

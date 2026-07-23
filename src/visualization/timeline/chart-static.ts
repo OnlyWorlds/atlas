@@ -108,6 +108,11 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, height);
+    // The frozen chart is a dark artifact by design (it matches the published
+    // page look) — paint its own floor instead of inheriting the container,
+    // or light mode renders its white-literal labels invisible (S315).
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, cssW, height);
 
     const span = Math.max(1, block.axisMax - block.axisMin);
     const plotW = cssW - 2 * PAD_X;

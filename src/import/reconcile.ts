@@ -87,7 +87,7 @@ export function reconcile(
         report.invalidRecords++;
         continue;
       }
-      const { record, droppedUnknown } = normalizeRecord(raw, type);
+      const { record, droppedUnknown } = normalizeRecord(raw, type, { keepUnknown: parsed.envelope === true });
       report.unknownFieldsDropped += droppedUnknown;
 
       const rawId = typeof record.id === 'string' && isUuid(record.id) ? record.id : undefined;

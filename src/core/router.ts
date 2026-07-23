@@ -51,9 +51,9 @@ export type RouteMode =
   | 'share'
   | 'import';
 
-export type SettingsTab = 'onlyworlds' | 'storage' | 'elements' | 'maps' | 'world' | 'writing' | 'context';
+export type SettingsTab = 'general' | 'onlyworlds' | 'storage' | 'elements' | 'maps' | 'world' | 'writing' | 'context';
 
-export const SETTINGS_TABS: SettingsTab[] = ['onlyworlds', 'storage', 'elements', 'maps', 'world', 'writing', 'context'];
+export const SETTINGS_TABS: SettingsTab[] = ['general', 'onlyworlds', 'storage', 'elements', 'maps', 'world', 'writing', 'context'];
 
 /**
  * Settings tabs grouped by scope for the nav rail. 'atlas' scope applies to
@@ -61,7 +61,7 @@ export const SETTINGS_TABS: SettingsTab[] = ['onlyworlds', 'storage', 'elements'
  * tabs disable when no world is active).
  */
 export const SETTINGS_TAB_GROUPS: ReadonlyArray<{ scope: 'atlas' | 'world'; tabs: SettingsTab[] }> = [
-  { scope: 'atlas', tabs: ['onlyworlds', 'storage', 'elements', 'maps'] },
+  { scope: 'atlas', tabs: ['general', 'onlyworlds', 'storage', 'elements', 'maps'] },
   { scope: 'world', tabs: ['world', 'writing', 'context'] },
 ];
 

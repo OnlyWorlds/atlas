@@ -88,3 +88,26 @@ describe('generateFixPrompt', () => {
     expect(prompt).toMatch(/Once fixed, provide the complete corrected JSON\.$/);
   });
 });
+
+describe('validatePayload — §8c envelope forward-compat (unknown fields, present/absent pair)', () => {
+  const envelopeWith = (rec: Record<string, unknown>) => parsePayload({
+    format: 'onlyworlds-world-export',
+    world: { id: 'w1', name: 'W' },
+    elements: { character: [rec] },
+  });
+
+  it('does NOT flag unknown element fields on an envelope import (future additive bump)', () => {
+    const issues = validatePayload(envelopeWith({ name: 'A', future_field: 'from a newer keel' }));
+    expect(issues.some(i => /unknown field/i.test(i.issue))).toBe(false);
+  });
+
+  it('STILL flags unknown fields on hand-pasted non-envelope JSON (the pair)', () => {
+    const issues = validatePayload(parsePayload({ Character: [{ name: 'A', future_field: 'x' }] }));
+    expect(issues.some(i => i.field === 'future_field' && /unknown field/i.test(i.issue))).toBe(true);
+  });
+
+  it('still runs name and relation checks on envelope records (only the unknown-field class is suppressed)', () => {
+    const issues = validatePayload(envelopeWith({ description: 'nameless' }));
+    expect(issues.some(i => i.field === 'name')).toBe(true);
+  });
+});

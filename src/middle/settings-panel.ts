@@ -22,6 +22,7 @@ import { getState, subscribe } from '../core/state';
 import { ToastManager } from '../ui/toast-manager';
 import { navigate, parseHash, settingsHash, SETTINGS_TABS, SETTINGS_TAB_GROUPS, onHashChange, type SettingsTab } from '../core/router';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
+import { renderGeneralTab, wireGeneralTab } from './settings-general';
 import { renderOnlyWorldsTab, wireOnlyWorldsTab } from './settings-onlyworlds';
 import { renderStorageTab, wireStorageTab } from './settings-storage';
 import { renderElementsTab, wireElementsTab } from './settings-elements';
@@ -183,6 +184,8 @@ function renderTab(
 ): string {
   const noWorld = '<p class="atlas-settings-hint">No world is active.</p>';
   switch (tab) {
+    case 'general':
+      return renderGeneralTab();
     case 'onlyworlds':
       return renderOnlyWorldsTab(reg, activeWorld);
     case 'storage':
@@ -206,6 +209,9 @@ function wireTabHandlers(
   activeWorld: WorldRegistryEntry | undefined
 ): void {
   switch (tab) {
+    case 'general':
+      wireGeneralTab(toasts);
+      break;
     case 'onlyworlds':
       wireOnlyWorldsTab(toasts, activeWorld);
       break;

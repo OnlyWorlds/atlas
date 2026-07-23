@@ -22,9 +22,21 @@
        Material Symbols icons are imported via main.ts from the bundled
        material-symbols npm package, no Google Fonts CDN dependency. -->
   <link rel="stylesheet" href="/src/styles/atlas.css" />
+  <script>
+    /* Pre-paint theme stamp (S315): reads the same key src/core/theme.ts owns.
+       Must run before first paint or light-mode users get a black flash. */
+    try {
+      if (localStorage.getItem('atlas_theme') === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    } catch (e) { /* private mode: dark default */ }
+  </script>
   <style>
     /* Browser default body margin = 8px; without this reset the shell overflows
        and leaves a thin border of body background visible on right/bottom. */
+    html[data-theme='light'], html[data-theme='light'] body {
+      background: #fbfbfa;
+    }
     html, body {
       margin: 0;
       padding: 0;

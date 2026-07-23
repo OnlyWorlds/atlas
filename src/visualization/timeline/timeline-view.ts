@@ -1245,6 +1245,11 @@ function drawCalendarTexture(
   ctx.font = '10px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  // The wash exists to DIFFERENTIATE eras — the colour change at a pivot is
+  // the signal. A single-era calendar has no pivot to mark, and washing its
+  // whole plot lavender is a full-canvas cast with no boundary to explain it
+  // (S315 gate): seams + labels still draw, the wash gates on >= 2 eras.
+  const washEras = (cal.eras?.length ?? 0) >= 2;
   for (const band of eraBandsInRange(cal, range.min, range.max)) {
     const x0 = Math.max(0, dateToX(band.lo));
     const x1 = Math.min(w, dateToX(band.hi));
@@ -1254,10 +1259,12 @@ function drawCalendarTexture(
     // so the switch reads and the O.E span's extent is legible as its own
     // region. The first pass (S313, 0.05) was invisible — bumped so it actually
     // reads, with a firm boundary line at the pivot (Captain: "don't see it").
-    ctx.fillStyle = band.index % 2 === 1
-      ? 'rgba(120, 165, 245, 0.10)'   // cool blue
-      : 'rgba(205, 150, 225, 0.10)';  // warm lavender
-    ctx.fillRect(x0, TOP_PAD, x1 - x0, axisY - TOP_PAD);
+    if (washEras) {
+      ctx.fillStyle = band.index % 2 === 1
+        ? 'rgba(120, 165, 245, 0.10)'   // cool blue
+        : 'rgba(205, 150, 225, 0.10)';  // warm lavender
+      ctx.fillRect(x0, TOP_PAD, x1 - x0, axisY - TOP_PAD);
+    }
     if (band.lo > range.min) {
       ctx.strokeStyle = 'rgba(255,255,255,0.32)';
       ctx.lineWidth = 1;
@@ -1292,6 +1299,8 @@ function drawStripEraBands(
   ctx.font = '9px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  // Same single-era guard as the main plot (S315 gate): no pivot, no wash.
+  const washEras = (cal.eras?.length ?? 0) >= 2;
   for (const band of eraBandsInRange(cal, scale.bounds.min, scale.bounds.max)) {
     const x0 = Math.max(capMin, scale.toX(band.lo));
     const x1 = Math.min(capMax, scale.toX(band.hi));
@@ -1300,10 +1309,12 @@ function drawStripEraBands(
     // (Captain, S313). Bold enough (0.30) to show THROUGH the cyan viewport
     // band drawn over it; same hues as the main plot so a glance connects the
     // two. The seam marks the pivot even where an era is a thin sliver.
-    ctx.fillStyle = band.index % 2 === 1
-      ? 'rgba(120, 165, 245, 0.30)'   // cool blue
-      : 'rgba(205, 150, 225, 0.30)';  // warm lavender
-    ctx.fillRect(x0, top + 1, x1 - x0, STRIP_H - 2);
+    if (washEras) {
+      ctx.fillStyle = band.index % 2 === 1
+        ? 'rgba(120, 165, 245, 0.30)'   // cool blue
+        : 'rgba(205, 150, 225, 0.30)';  // warm lavender
+      ctx.fillRect(x0, top + 1, x1 - x0, STRIP_H - 2);
+    }
     if (scale.toX(band.lo) > capMin) {
       ctx.strokeStyle = 'rgba(255,255,255,0.38)';
       ctx.lineWidth = 1;
