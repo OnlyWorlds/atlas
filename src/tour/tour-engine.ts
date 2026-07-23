@@ -33,7 +33,7 @@ import { saveRegistry, deleteWorldEntry } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
 import { detachSyncEngine } from '../sync/sync-attach';
 import type { Element, ElementType } from '../core/types';
-import { TOUR_STEPS, type TourStep } from './tour-data';
+import { TOUR_MAP_REF, TOUR_PIN_REF, TOUR_STEPS, type TourStep } from './tour-data';
 import { mergeHealArray } from './tour-heal';
 
 const TOUR_STATE_KEY = 'atlas_tour_v1';
@@ -172,9 +172,13 @@ function stripUnrevealed(
   return out;
 }
 
-/** Media assets the bundle references via `x_tour_media`. */
+/** Media assets the bundle references via `x_tour_media`.
+ *  ⚠ An x_tour_media filename NOT in this map is silently skipped — when the
+ *  bundle gains or renames an asset, this registry moves in the same commit
+ *  (S312: the re-snapshot's new map webp was missed until the resilience e2e
+ *  caught the map healing back imageless). */
 const TOUR_MEDIA_URLS: Record<string, () => string> = {
-  'hyperion-map.webp': () => new URL('../demo/hyperion-map.webp', import.meta.url).href,
+  'unnamed-planet.webp': () => new URL('../demo/unnamed-planet.webp', import.meta.url).href,
   'hyperion-location.webp': () => new URL('../demo/hyperion-location.webp', import.meta.url).href,
 };
 
@@ -610,14 +614,35 @@ async function enterStepInner(index: number): Promise<void> {
  * view. The detail pane renders on the state tick AFTER the route lands, so
  * one immediate query would race it — a short bounded poll is the honest
  * form (no MutationObserver machinery for a one-shot cosmetic scroll).
+ *
+ * S312: this used a smooth `scrollIntoView` and the walk caught it landing at
+ * scrollTop 0 — a step-enter heal re-renders the pane moments later and the
+ * detail's scroll-preservation memory restores the STALE saved position,
+ * silently undoing the animation. Setting the scroller's scrollTop directly
+ * fires the scroll listener, so the memory records the tour's position and
+ * later re-renders restore exactly it; the re-applies cover a heal that
+ * rebuilds before the first assignment is recorded.
  */
 async function scrollSectionIntoView(name: string): Promise<void> {
-  for (let i = 0; i < 15; i++) {
-    const el = document.querySelector<HTMLElement>(
+  const apply = () => {
+    const target = document.querySelector<HTMLElement>(
       `.atlas-detail-section[data-section="${name}"]`,
     );
-    if (el) {
-      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (!target) return;
+    let s: HTMLElement | null = target.parentElement;
+    while (s && s !== document.body) {
+      const st = getComputedStyle(s);
+      if (/(auto|scroll)/.test(st.overflowY) && s.scrollHeight > s.clientHeight + 1) break;
+      s = s.parentElement;
+    }
+    if (!s || s === document.body) { target.scrollIntoView({ block: 'start' }); return; }
+    s.scrollTop = target.getBoundingClientRect().top - s.getBoundingClientRect().top + s.scrollTop;
+  };
+  for (let i = 0; i < 15; i++) {
+    if (document.querySelector(`.atlas-detail-section[data-section="${name}"]`)) {
+      apply();
+      setTimeout(apply, 250);
+      setTimeout(apply, 700);
       return;
     }
     await new Promise(r => setTimeout(r, 100));
@@ -701,9 +726,14 @@ export async function tourPinBake(
   mapId: string,
 ): Promise<{ id: string; name: string } | null> {
   if (!tourWorldIsActive()) return null;
+  // Refs via the shared constants (S312): this held a hardcoded
+  // 'map:Hyperion' literal, and when the map was renamed in the re-snapshot
+  // the lookup failed OPEN — bake declined, and the pin beat minted a
+  // nameless ordinary pin that could never satisfy hasRef(TOUR_PIN_REF).
+  // The S308 dead-gate class, in engine clothing; the e2e caught it.
   const consul = await resolveRef('character:The Consul');
-  const pin = await resolveRef("pin:The Consul’s balcony seat");
-  const map = await resolveRef('map:Hyperion');
+  const pin = await resolveRef(TOUR_PIN_REF);
+  const map = await resolveRef(TOUR_MAP_REF);
   if (!consul || !pin || !map) return null;
   if (elementId !== consul.el.id || mapId !== map.el.id) return null;
   if (getState().data.elements.some(e => e.id === pin.el.id)) return null;
@@ -778,6 +808,14 @@ async function mintNextCreateNow(): Promise<boolean> {
   // they cover different orders of arrival.
   const healed = await healLinks(universe, await linkableIds(universe, revealed), aliasesOn);
   if (healed > 0) await refreshElements();
+  // Open the page of what was just made (Captain, S312) — a silent mint used
+  // to leave the middle pane parked on the step's route (the Consul), so the
+  // freshly created object was only visible as a sidebar row. Navigating is
+  // the app's honest create behaviour, and with empty fields hidden the new
+  // page shows exactly its links (the balcony's parent object, etc.). The
+  // step's own route still fires on step-enter, so back-nav is unaffected.
+  const tourWorldId = getState().active?.worldId;
+  if (tourWorldId && tourWorldIsActive()) navigate(elementHash(tourWorldId, resolved.el.id));
   emit();
   return true;
 }

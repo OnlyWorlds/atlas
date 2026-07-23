@@ -47,7 +47,9 @@ export const TOUR_SENTENCE: readonly string[] =
  *  annotation was removed — it wasn’t Captain’s rule, and the opener’s own copy
  *  says "the late Dan Simmons", which is correct: he died 21 Feb 2026.) */
 export const TOUR_ATTRIBUTION = 'Hyperion, Dan Simmons (1989)';
-export const TOUR_ATTRIBUTION_URL = 'https://en.wikipedia.org/wiki/Hyperion_(Simmons_novel)';
+// Percent-encoded parens: the copy link token `[text](url)` ends its URL at
+// the first `)`, so a raw-paren wiki URL would truncate (tour-bar COPY_LINK_RE).
+export const TOUR_ATTRIBUTION_URL = 'https://en.wikipedia.org/wiki/Hyperion_%28Simmons_novel%29';
 
 /** Inclusive word-index range painted with an element type’s color. */
 export interface TourSpan {
@@ -147,9 +149,12 @@ export interface TourStep {
   placeInZone?: { pinRef: string; zoneRef: string };
 }
 
-/** The pin the balcony-seat beat places, and the zone it must land inside. */
+/** The pin the balcony-seat beat places, and the zone it must land inside.
+ *  (S312: the spatial layer is Captain's live rebuild — map "Unnamed planet",
+ *  zone "Swamps" — the unnamed-world resolution, hyperion.txt L307.) */
 export const TOUR_PIN_REF = "pin:The Consul’s balcony seat";
-export const TOUR_SWAMPS_ZONE_REF = 'zone:The Swamps';
+export const TOUR_SWAMPS_ZONE_REF = 'zone:Swamps';
+export const TOUR_MAP_REF = 'map:Unnamed planet';
 
 /** The chapter the writing beat links (baked chip-free — see the-writing). */
 export const TOUR_CHAPTER_REF = 'narrative:Chapter 1';
@@ -176,10 +181,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
     act: 1,
     phases: [{
       id: 'a',
-      // The book link renders in the extras row below (tour-bar, S311) — the
-      // body is plain text by design, so no inline anchors.
+      // S312: the book link is INLINE on the word (Captain's ask) — the copy
+      // token pass renders [text](url) safely, so the separate extras link
+      // is retired.
       body:
-        'The opening sentence of the novel Hyperion (1989) by the late Dan Simmons.',
+        'The opening sentence of the novel [Hyperion](' + TOUR_ATTRIBUTION_URL + ') (1989) by the late Dan Simmons.',
     }],
   },
   // ---------------------------------------------------------------- Act 1
@@ -289,8 +295,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
           meta: 'Locations can be nested: a city on a continent on a planet.',
     }],
     spans: [{ from: 35, to: 35, type: 'location' }],
-    reveal: ['location:Planet Hyperion'],
-    route: { kind: 'element', ref: 'location:Planet Hyperion' },
+    reveal: ['location:Unnamed Planet'],
+    route: { kind: 'element', ref: 'location:Unnamed Planet' },
   },
   {
     id: 'the-map',
@@ -313,13 +319,12 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // the geography reads as one thing. The living things stay for the-swamps.
     spans: [{ from: 32, to: 34, type: 'zone' }],
     reveal: [
-      'map:Hyperion',
-      'zone:The Swamps',
-      'marker:The Swamps - Point 0', 'marker:The Swamps - Point 1', 'marker:The Swamps - Point 2',
-      'marker:The Swamps - Point 3', 'marker:The Swamps - Point 4', 'marker:The Swamps - Point 5',
-      'marker:The Swamps - Point 6', 'marker:The Swamps - Point 7', 'marker:The Swamps - Point 8',
+      TOUR_MAP_REF,
+      TOUR_SWAMPS_ZONE_REF,
+      'marker:Swamps - Point 0', 'marker:Swamps - Point 1', 'marker:Swamps - Point 2',
+      'marker:Swamps - Point 3', 'marker:Swamps - Point 4', 'marker:Swamps - Point 5',
     ],
-    route: { kind: 'map', ref: 'map:Hyperion' },
+    route: { kind: 'map', ref: TOUR_MAP_REF },
   },
   {
     id: 'the-pin',
@@ -366,7 +371,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     spans: [{ from: 3, to: 3, type: 'pin', ref: TOUR_PIN_REF }],
     reveal: [],
     // Map open (right) + the Consul selected (middle) so his +pin button shows.
-    route: { kind: 'map', ref: 'map:Hyperion', elementRef: 'character:The Consul' },
+    route: { kind: 'map', ref: TOUR_MAP_REF, elementRef: 'character:The Consul' },
   },
   {
     id: 'the-swamps',
@@ -390,9 +395,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     ],
     reveal: [
       'creature:Great Green Saurian', 'creature:Greater Green Saurian',
-      'species:Saurians', 'collective:Saurian Pack',
+      'species:Saurians', 'collective:Pack of Bellowing Saurians',
     ],
-    route: { kind: 'map', ref: 'map:Hyperion' },
+    route: { kind: 'map', ref: TOUR_MAP_REF },
   },
   // ------------------------------------------------------- Act 1 (objects & links)
   // Objects and linking now follow the maps act (S303 rework) so the pin lights
@@ -430,7 +435,17 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'd',
         when: (w) => w.hasRef("object:The Consul’s Steinway"),
         body:
-          'Three objects that are linked to each other and their owner. Let\'s carry on.',
+          'Three objects that are linked to each other and their owner. Let’s carry on.',
+        // PLACEHOLDER deeper (S312, Captain's ask): he will link a council
+        // motion here once it exists. The text below is scaffolding for his
+        // pass — the [text](url) token renders as a real link.
+        deeper:
+          'Objects nest through the *parent object* field: the balcony is part ' +
+          'of the ship, the piano stands inside it. Where the schema could say ' +
+          'more about containment and ownership, a council motion is the way to ' +
+          'propose it.' +
+          '\n\n' +
+          '[Placeholder: link to the council motion once made](https://www.onlyworlds.com/)',
       },
     ],
     spans: [
@@ -484,7 +499,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
           'The writing room supports long-form work by organizing your stories and linking your elements into them.' +
           '\nA system of three customizable "tiers", where the default is Book - Chapter - Scene, can be used to organize your work.' +
           '\nHere we\'ll make a start on Hyperion\'s first chapter with the opening sentence.' +
-          '\nNote the blue underlines for auto-detected links: hover one and press the Tab button to create the link.',
+          // "hover one and press Tab" would be the S306 trap reborn: the
+          // handler promotes the decoration containing the CURSOR, so hovering
+          // does nothing. The gesture is click-inside-then-Tab, verified live.
+          '\nNote the blue underlines for auto-detected links: click inside one and press Tab to create the link.',
         deeper:
           'Chips are live: click one to travel to its element, and the link shows on ' +
           'the other side too, under Referenced by.' +
@@ -615,9 +633,15 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'Calendars can go further than eras: name your months, your week, your ' +
         'festival days, and every date in atlas speaks that language.' +
         '\n\n' +
-        'Nothing here claims a conversion between Earth’s calendar and this ' +
-        'one. The books never state it, so the tour does not invent it: the two ' +
-        'eras simply share a line.',
+        // S312: the no-conversion claim retired — the dates ARE derived now.
+        // One line in the novel (Duré's journal) reconciles four calendars:
+        // AD 2732 = 589 P.C., so P.C. year 0 sits near AD 2143. Rachmaninov
+        // (born 1873) lands at -270, his Prelude (1892) at -251. Copy states
+        // the derivation honestly instead of denying it. Rides Captain's pass.
+        'The bridge between Earth’s calendar and this one rests on a single ' +
+        'line in the book, where a journal entry gives one day in four ' +
+        'calendars at once. From it, Rachmaninov’s dates can be placed: born ' +
+        '270 years before the pivot, the Prelude written nineteen years later.',
     }],
     spans: [
       { from: 13, to: 13, type: 'character' },

@@ -98,6 +98,13 @@ export function renderHeader(el: Element): HTMLElement {
   title.tabIndex = 0;
   title.addEventListener('click', () => startInlineNameEdit(title, el));
   title.addEventListener('keydown', (e) => {
+    // Only the title itself opens edit mode (the guard editable-title.ts has
+    // always had, missing here until S312): while the rename input is mounted
+    // INSIDE this h2, its keys bubble up — without this check every Space was
+    // preventDefault'ed (unable to type a space; Captain pasted names instead)
+    // and Enter committed then instantly reopened the editor with the stale
+    // name, so Enter "did not work".
+    if (e.target !== title) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       startInlineNameEdit(title, el);

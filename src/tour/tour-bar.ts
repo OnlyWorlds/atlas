@@ -31,7 +31,6 @@ import { getState, subscribe } from '../core/state';
 import type { ElementType } from '../core/types';
 import {
   capabilitiesUpTo,
-  TOUR_ATTRIBUTION_URL,
   TOUR_CAPABILITIES, TOUR_CHAPTER_REF,
   TOUR_SENTENCE, TOUR_STEPS,
   type TourStep,
@@ -418,10 +417,11 @@ function render(): void {
     const deeper = document.createElement('div');
     deeper.className = 'atlas-tour-deeper';
     // Paragraph breaks (\n\n in the step data) render as real paragraphs —
-    // a wall of text defeats the point of going deeper.
+    // a wall of text defeats the point of going deeper. Paragraphs get the
+    // same token pass as bodies (S312: Captain links council motions here).
     for (const para of phase.deeper.split('\n\n')) {
       const p = document.createElement('p');
-      p.textContent = para;
+      renderBodyText(p, para);
       deeper.appendChild(p);
     }
     // Open-state survives a mid-step re-render (gate R11): placing the pin
@@ -439,21 +439,10 @@ function render(): void {
     extras.appendChild(bulb);
     panel.appendChild(deeper); // flyout anchors to the PANEL, above it
   }
-  // The extras row is the ONE home for links — the body renders as plain text
-  // by design (no markup, no escaping decisions on every step's copy). The
-  // opener carries the book's Wikipedia page here (Captain's ask, S311);
-  // TOUR_ATTRIBUTION_URL finally has its surface again.
-  // (The ecosystem-explorer link was CUT in S298, Freek's round. Captain's
-  // Hyperion share-page link can join this extras row when it exists.)
-  if (opener) {
-    const link = document.createElement('a');
-    link.className = 'atlas-tour-inline-link';
-    link.href = TOUR_ATTRIBUTION_URL;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    link.innerHTML = '<span class="material-symbols-outlined">menu_book</span> Hyperion on Wikipedia';
-    extras.appendChild(link);
-  }
+  // (The S311 opener wiki link moved INLINE onto the word "Hyperion" in the
+  // step-1 body — the copy token pass renders [text](url) now, S312. The
+  // extras row remains available for future links beside the deeper bulb;
+  // the ecosystem-explorer link was CUT in S298, Freek's round.)
   if (extras.childElementCount === 0) {
     const ghost = document.createElement('span');
     ghost.className = 'atlas-tour-extras-ghost';
@@ -564,10 +553,24 @@ function render(): void {
       : step.handsOn === 'link-word' ? view.chipCount(TOUR_CHAPTER_REF) >= 1
       : handsOnDone)
     : true;
+  // The create-preview stack (Captain, S312): on a beat that mints elements,
+  // a small column of their type icons sits above the forward slot — dim
+  // until each element lands, lit in its type colour after. A quiet "this is
+  // what is about to happen" indicator; the sentence glyphs stay the payoff.
+  const createStack = buildCreateStack(step, view);
+  const mountForward = (btn: HTMLElement) => {
+    if (!createStack) { controls.appendChild(btn); return; }
+    const wrap = document.createElement('div');
+    wrap.className = 'atlas-tour-forward-slot';
+    wrap.appendChild(createStack);
+    wrap.appendChild(btn);
+    controls.appendChild(wrap);
+  };
+
   if (step.handsOn && step.handsOn !== 'setup-folder' && !handsOnGate) {
     // No LIVE forward control: the gesture is the way. But the SLOT stays —
     // see ghostNext below (Captain, S311).
-    controls.appendChild(ghostNext());
+    mountForward(ghostNext());
   } else if (step.handsOn === 'setup-folder') {
     // The finale: Finish (ghost) ends the tour — the world folds away
     // (residue contract); the primary hands over to the real folder setup.
@@ -607,19 +610,43 @@ function render(): void {
     next.dataset.tourControl = 'next';
     next.textContent = 'Next';
     next.addEventListener('click', () => { void nextStep(); });
-    controls.appendChild(next);
+    mountForward(next);
   } else {
     // A `creates` run mid-progress, or a phased step whose `advanceWhen` has
     // not passed yet — no live Next either, so the slot is reserved here too.
     // (The first cut only ghosted the handsOn branch; the mintObjectRun e2e
     // assertion caught Back still shifting on the objects step.)
-    controls.appendChild(ghostNext());
+    mountForward(ghostNext());
   }
 
   appendExit(controls);
   panel.appendChild(controls);
   root!.appendChild(panel);
   restoreFocus(focusedAction);
+}
+
+/**
+ * The create-preview stack (Captain, S312): one type icon per element the
+ * step mints (a `creates` run, or the consul beat), dim until that element
+ * exists, lit in its type colour after. Returns null when the step mints
+ * nothing, so the forward slot stays a bare button everywhere else.
+ */
+function buildCreateStack(step: TourStep, view: TourWorldView): HTMLElement | null {
+  const refs = step.creates ?? (step.handsOn === 'create-consul' ? ['character:The Consul'] : []);
+  if (refs.length === 0) return null;
+  const stack = document.createElement('div');
+  stack.className = 'atlas-tour-create-stack';
+  for (const ref of refs) {
+    const [type, name] = [ref.slice(0, ref.indexOf(':')), ref.slice(ref.indexOf(':') + 1)];
+    const done = view.hasRef(ref);
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined atlas-tour-create-glyph' + (done ? ' done' : '');
+    icon.textContent = ELEMENT_ICONS[type as ElementType] ?? 'circle';
+    icon.title = `${name} (${type})` + (done ? ' · created' : ' · to create');
+    icon.style.setProperty('--tour-glyph-color', ELEMENT_TYPE_COLORS[type as ElementType] ?? '#22d3ee');
+    stack.appendChild(icon);
+  }
+  return stack;
 }
 
 /**
@@ -643,21 +670,57 @@ function ghostNext(): HTMLElement {
 }
 
 /**
- * Render a phase body. `\n` becomes a real line break via `white-space:
- * pre-line` on `.atlas-tour-body`; `**bold**` spans become <strong>, built
- * from text nodes — never innerHTML, the body is copy, not markup (the same
- * reason links live in the extras row instead of inline). An unbalanced `**`
- * falls back to rendering the whole string plain rather than guessing.
+ * The copy token pass (S311 bold; S312 italic + links), shared by phase
+ * bodies and deeper paragraphs. `\n` becomes a real line break via
+ * `white-space: pre-line`; `**bold**` marks the control you click; `*italic*`
+ * marks a field name; `[text](url)` becomes a link. Everything is built from
+ * text nodes and elements — never innerHTML; the copy is copy, not markup.
+ * A URL must be parenthesis-free (percent-encode them). Unbalanced markers
+ * fall back to plain text for their segment rather than guessing.
  */
+const COPY_LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+
 function renderBodyText(host: HTMLElement, text: string): void {
+  let last = 0;
+  for (const m of text.matchAll(COPY_LINK_RE)) {
+    if (m.index! > last) appendEmphasis(host, text.slice(last, m.index));
+    const a = document.createElement('a');
+    a.className = 'atlas-tour-copy-link';
+    a.href = m[2];
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = m[1];
+    host.appendChild(a);
+    last = m.index! + m[0].length;
+  }
+  if (last < text.length) appendEmphasis(host, text.slice(last));
+}
+
+/** `**bold**` then `*italic*` within a link-free segment. */
+function appendEmphasis(host: HTMLElement, text: string): void {
   const parts = text.split('**');
-  if (parts.length % 2 === 0) { host.textContent = text; return; }
+  if (parts.length % 2 === 0) { appendItalic(host, text); return; }
   parts.forEach((part, i) => {
     if (!part) return;
     if (i % 2 === 1) {
       const b = document.createElement('strong');
       b.textContent = part;
       host.appendChild(b);
+    } else {
+      appendItalic(host, part);
+    }
+  });
+}
+
+function appendItalic(host: HTMLElement, text: string): void {
+  const parts = text.split('*');
+  if (parts.length % 2 === 0) { host.appendChild(document.createTextNode(text)); return; }
+  parts.forEach((part, i) => {
+    if (!part) return;
+    if (i % 2 === 1) {
+      const em = document.createElement('em');
+      em.textContent = part;
+      host.appendChild(em);
     } else {
       host.appendChild(document.createTextNode(part));
     }

@@ -218,10 +218,13 @@ already drawn).
 1. **Elements** (steps 2-4): create the world (opens the shell) · create the
    Consul · **Hegemony institution + title (merged)** — both reveal, the copy
    teaches the distinction, routes to the Hegemony.
-2. **Maps** (steps 5-8): Planet Hyperion location (right pane appears) · the map
-   (bundled art) **+ the Swamps zone drawn on it** · the balcony-seat pin
+2. **Maps** (steps 5-8): the **Unnamed Planet** location (right pane appears —
+   S312: the unnamed-world resolution; the opening scene is NOT on Hyperion,
+   hyperion.txt L307, so Captain rebuilt the spatial layer live and the bundle
+   adopted it) · the map "Unnamed planet" (bundled art) **+ the Swamps zone
+   drawn on it** (zone name is now `Swamps`, 6 markers) · the balcony-seat pin
    (HANDS-ON, **soft correction**: place anywhere, Next only over the swamps) ·
-   the swamps' living things (2 creatures, species, pack).
+   the swamps' living things (2 creatures, species, Pack of Bellowing Saurians).
 3. **Objects & links** (steps 9-10): the scripted object run (spaceship,
    balcony, Steinway — one + click each) · linking payoff (objects BEFORE
    linking so the Consul's page carries real chips; deeper: two-way links, Web,
@@ -234,10 +237,15 @@ already drawn).
    `deep-time`, three steps later; phase c says so instead of promising a fully
    linked sentence. Phase b points at the tree's right-click "Link mentions in
    this chapter" for the rest.
-5. **Time** (steps 12-14): the events, BOTH at the shared year 7 (he plays while
-   they surge) · the chart = the **now beat** (HANDS-ON `set-now`; the bundle
-   ships no `time_current`, so the room's real button is pressable) · deep time
-   (Rachmaninov -320 and his Prelude -318 in the Old Earth era).
+5. **Time** (steps 12-14): the events, BOTH at the shared year **12** (he plays
+   while they surge) · the chart = the **now beat** (HANDS-ON `set-now`; the
+   bundle ships no `time_current`, so the room's real button is pressable) ·
+   deep time (Rachmaninov **-270** and his Prelude **-251** in the Old Earth
+   era). **Dates are SOURCE-DERIVED since S312**: title grant_date 1 + events
+   at 12 = the Consul's sourced eleven-year tenure (L327/L3823); deep time via
+   the L1130 epoch (AD 2732 = 589 P.C. → P.C. 0 ≈ AD 2143 → 1873 = -270,
+   1892 = -251). The old "no Earth↔PC conversion asserted" rule is RETIRED —
+   the deep-time deeper states the derivation honestly.
 6. **Your world** (steps 15-17): the sweep · **yours-to-keep** (S306c MERGE of
    the old where-it-lives + online: the files story and the OnlyWorlds story, a
    sentence each, detail in the flyout; carries the Web tab's only introduction
@@ -401,9 +409,14 @@ room's onboarding cards stay silent (S264 intersection class).
 
 ## The bundle (`src/demo/hyperion-world.json` + webps)
 
-Baked from OnlyWorlds demo world (key `0000000000`), **37 elements**
-(upstream-derived + minted Book/Chapter), offline; images ship as webp
-and attach as LOCAL media at reveal. `_bake_notes` lists every editorial
+Baked from OnlyWorlds demo world (key `0000000000`), **34 elements** since the
+S312 re-snapshot (Captain's live spatial rebuild adopted wholesale: map
+"Unnamed planet" with his art baked to `unnamed-planet.webp`, zone `Swamps`
+with 6 named markers, his pin; the old map/zone/9-markers are gone, and the
+LIVE world was aligned back — curly names, aliases, dates, book/chapter/
+calendar pushed, orphan zone deleted). ⚠ `TOUR_MEDIA_URLS` in tour-engine must
+name every `x_tour_media` asset or the attach silently skips (S312's e2e
+catch). Offline; images ship as webp and attach as LOCAL media at reveal. `_bake_notes` lists every editorial
 deviation: zone-twin merge, the SHARED event date (both at 7, S305), the link
 weave, pin rename, book+chapter mint, atlas_aliases for the sentence's surface
 forms, Rachmaninov's 1873 Earth birth_date removed (it stretched the chart axis),

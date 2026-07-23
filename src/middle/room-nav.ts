@@ -255,13 +255,15 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     // global search and was reachable by shortcut alone. One field-shaped
     // control anchored at the strip's far right opens the SAME palette —
     // one search, two doors; an inline twin would be a second search surface
-    // that can drift from the first. Sits after the transient selected-chip
-    // so its own position never moves.
-    if (!getState().ui.selectedElementId) {
-      const spacer = document.createElement('div');
-      spacer.className = 'atlas-room-nav-spacer';
-      strip.appendChild(spacer);
-    }
+    // that can drift from the first.
+    //
+    // The spacer renders UNCONDITIONALLY (S312): it used to be skipped when an
+    // element chip was present, which parked the search pill immediately after
+    // the chip — mid-strip on prod, exactly where Captain found it. The pill's
+    // anchor is the strip's right edge, chip or no chip.
+    const spacer = document.createElement('div');
+    spacer.className = 'atlas-room-nav-spacer';
+    strip.appendChild(spacer);
     const search = document.createElement('button');
     search.type = 'button';
     search.className = 'atlas-room-nav-search';

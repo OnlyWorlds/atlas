@@ -40,7 +40,9 @@ const BASE_FIELDS: Array<{ name: string; widget: WidgetKind; required?: boolean 
   { name: 'supertype', widget: 'text-short' },
   { name: 'subtype', widget: 'text-short' },
   { name: 'image_url', widget: 'text-short' },
-  { name: 'atlas_aliases', widget: 'text-short' },
+  // atlas_aliases moved to its own trailing "Aliases" section (Captain, S312):
+  // it is an atlas convenience, not an OnlyWorlds base field, and it sat in
+  // Base implying otherwise. See sectionsFor.
 ];
 
 /** Field names that should use a short text input even when type is `text`. */
@@ -88,12 +90,24 @@ export function sectionsFor(type: ElementType): SectionLayout[] {
       }),
     }));
 
-  return [base, ...schemaSections.sort((a, b) => a.order - b.order)];
+  // Aliases trail the schema sections (directly above the custom-fields
+  // section, which element-detail renders after these) — an atlas-local
+  // linking convenience, deliberately NOT presented as an OnlyWorlds field.
+  const aliases: SectionLayout = {
+    name: 'Aliases',
+    order: 999,
+    fields: [{ name: 'atlas_aliases', widget: 'text-short' }],
+  };
+
+  return [base, ...schemaSections.sort((a, b) => a.order - b.order), aliases];
 }
 
 /** Known field names across this element type (base + schema). */
 export function knownFieldsFor(type: ElementType): Set<string> {
   const names = new Set<string>(BASE_FIELDS.map(f => f.name));
+  // Not in BASE_FIELDS since S312 (it renders in its own trailing section),
+  // but still a known atlas field — never a user custom field.
+  names.add('atlas_aliases');
   const schema = (FIELD_SCHEMA as any)[type];
   if (schema) for (const k of Object.keys(schema)) names.add(k);
   return names;

@@ -1,5 +1,13 @@
 # Hyperion (Simmons) — what the SOURCE TEXT actually says about time
 
+> **APPLIED (S312, 2026-07-23)**: Captain ordered the source update. The bundle
+> and the live world now carry: title grant_date **1** + both events at **12**
+> (= the sourced eleven-year tenure, §3), Rachmaninov **-270** and the Prelude
+> **-251** via the L1130 epoch (§2 derivable epochs), and the unnamed-world
+> resolution (§5) — the location is "Unnamed Planet", the map "Unnamed planet"
+> (Captain's live rebuild, adopted into the bundle). The S305 no-conversion
+> ruling is retired; the deep-time deeper states the derivation honestly.
+
 **Written**: 2026-07-21 (S306). **Method**: five agents over the full novel
 (`Forge/hyperion.txt`, ~19,000 lines) — four reading quarters, one running
 targeted searches across the whole. Every claim below carries a line number.

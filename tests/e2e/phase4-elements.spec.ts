@@ -199,6 +199,19 @@ test('edit element name via the header title persists to FolderStore', async ({ 
   await expect(title).toContainText('Renamed');
   // Sidebar row reflects rename.
   await expect(page.locator('.atlas-row[data-element-id]', { hasText: 'Renamed' })).toBeVisible();
+
+  // TYPED rename with a SPACE (S312 regression): the h2's activation listener
+  // used to swallow every Space typed inside the mounted rename input
+  // (preventDefault before the input saw it — Captain had to PASTE names with
+  // spaces) and re-open the editor on Enter. fill() bypasses per-key handling,
+  // which is exactly why the assertion above never caught it — this leg types
+  // real keystrokes.
+  await title.click();
+  await input.waitFor({ state: 'visible' });
+  await input.press('ControlOrMeta+a');
+  await input.pressSequentially('Frodo of the Shire');
+  await input.press('Enter');
+  await expect(title).toContainText('Frodo of the Shire');
 });
 
 test('edit element description via field popover (textarea)', async ({ page }) => {

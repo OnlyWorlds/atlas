@@ -1837,9 +1837,19 @@ body.atlas-touring .atlas-shell {
   flex: 1 1 480px;
   min-width: 0;
   /* Authored \n in a phase body is a real line break (Captain's multiline
-     copy, S311). Bold spans come from the ** token pass in tour-bar. */
+     copy, S311). Bold/italic/link spans come from the token pass in tour-bar. */
   white-space: pre-line;
+  /* A touch more air between wrapped lines (Captain, S312). */
+  line-height: 1.62;
 }
+/* Inline copy links ([text](url) token) — quiet cyan, present in body and
+   deeper paragraphs alike. */
+.atlas-tour-copy-link {
+  color: var(--atlas-cyan);
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(34, 211, 238, 0.5);
+}
+.atlas-tour-copy-link:hover { border-bottom-style: solid; }
 .atlas-tour-meta {
   flex-basis: 100%;
   color: rgba(255, 255, 255, 0.42);
@@ -1941,11 +1951,35 @@ body.atlas-touring .atlas-shell {
 .atlas-tour-attribution:hover { color: rgba(255, 255, 255, 0.55); }
 .atlas-tour-controls {
   display: flex;
-  align-items: center;
+  /* flex-end, not center (S312): the create-preview stack grows the forward
+     slot upward, and the buttons must stay on one bottom line when it does.
+     With no stack every child is button-height, so nothing moves. */
+  align-items: flex-end;
   gap: 10px;
   /* Pin to the dock's bottom edge — shorter steps leave their slack between
      copy and controls, so the buttons never travel between steps. */
   margin-top: auto;
+}
+/* The forward slot: optional create-preview icons stacked above Next/ghost. */
+.atlas-tour-forward-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.atlas-tour-create-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.atlas-tour-create-glyph {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.26);
+  transition: color 200ms ease;
+}
+.atlas-tour-create-glyph.done {
+  color: var(--tour-glyph-color, var(--atlas-cyan));
 }
 .atlas-tour-act {
   color: rgba(255, 255, 255, 0.35);
@@ -1958,7 +1992,9 @@ body.atlas-touring .atlas-shell {
   font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.32);
   letter-spacing: 0.02em;
-  align-self: center;
+  /* Sit on the button line (controls align flex-end since S312). */
+  align-self: flex-end;
+  padding-bottom: 6px;
 }
 .atlas-tour-consul-widget {
   display: inline-flex;
@@ -1983,6 +2019,11 @@ body.atlas-touring .atlas-shell {
    The sidebar footer stays hidden for the WHOLE tour (Captain: the settings
    row under the narrator read as noise). */
 body.atlas-touring .atlas-sidebar-footer { display: none; }
+/* Tail room for scrollToSection (S312): a short element page maxes out its
+   scroll a few px shy of putting the target section at the top of the strip
+   above the dock (the walk measured 6.5px short on the Consul's World
+   section). Tour-only padding gives the scroll somewhere to go. */
+body.atlas-touring .atlas-detail { padding-bottom: 56px; }
 /* The element header's protagonist / sync-dot / delete controls are noise on
    a beginner's first element pages (Captain, S311). The map/pin cluster
    stays: the pin beat teaches with the real +pin button. */

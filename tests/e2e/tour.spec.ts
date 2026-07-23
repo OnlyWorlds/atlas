@@ -779,10 +779,10 @@ test('resilience: the world heals user mess on step-enter, user work survives', 
     const by = (n: string) => els.find((e: any) => e.name === n);
     const consul = by('The Consul');
     const heg = by('The Hegemony');
-    const zone = by('The Swamps');
-    const planet = by('Planet Hyperion');
+    const zone = by('Swamps');
+    const planet = by('Unnamed Planet');
     const ship = by('Ebony Spaceship');
-    const map = els.find((e: any) => e.type === 'map' && e.name === 'Hyperion');
+    const map = els.find((e: any) => e.type === 'map' && e.name === 'Unnamed planet');
     const pin = els.find((e: any) => e.type === 'pin');
     await store.deleteElement(heg.id);
     await store.deleteElement(pin.id);
