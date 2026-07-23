@@ -83,3 +83,70 @@ describe('parsePayload — bucketing', () => {
     expect(r.totalElements).toBe(1);
   });
 });
+
+describe('parsePayload — keel world-export envelope (onlyworlds-world-export)', () => {
+  // The shape ow.com emits today (keel portal/views.py; canonical, Orrery
+  // spec § world-export). Lowercase `world` with id present, nested lowercase
+  // `elements`, plus the format/schema_version/exported_at wrapper.
+  const envelope = () => ({
+    format: 'onlyworlds-world-export',
+    schema_version: '0.30.00',
+    exported_at: '2026-07-22T19:05:12.662490+00:00',
+    world: {
+      id: '068e012b-52a9-79bf-8000-26bb67891425',
+      name: 'Hyperion',
+      created_at: '2025-10-03T18:15:17Z',
+      updated_at: '2025-12-21T12:23:37Z',
+    },
+    elements: {
+      ability: [{ type: 'ability', id: 'a1', name: 'Piano Playing', change_seq: 1 }],
+      character: [{ type: 'character', id: 'c1', name: 'The Consul' }, { type: 'character', id: 'c2', name: 'Kassad' }],
+      marker: [{ type: 'marker', id: 'm1', name: 'Swamps - Point 0' }],
+    },
+  });
+
+  it('detects the envelope as a full-world and captures the world block WITH its id', () => {
+    const r = parsePayload(envelope());
+    expect(r.ok).toBe(true);
+    expect(r.format).toBe('full-world');
+    expect(r.world?.id).toBe('068e012b-52a9-79bf-8000-26bb67891425');
+    expect(r.world?.name).toBe('Hyperion');
+    expect(r.totalElements).toBe(4);
+  });
+
+  it('unwraps the nested lowercase `elements` object into byType', () => {
+    const r = parsePayload(envelope());
+    expect([...r.byType.keys()].sort()).toEqual(['ability', 'character', 'marker']);
+    expect(r.byType.get('character' as never)?.length).toBe(2);
+  });
+
+  it('does NOT bucket the wrapper keys (format/schema_version/exported_at) as unknown', () => {
+    const r = parsePayload(envelope());
+    expect(r.unknownBuckets).toEqual([]);
+  });
+
+  it('routes an unknown type slug inside `elements` aside', () => {
+    const e = envelope();
+    (e.elements as Record<string, unknown>).widget = [{ name: 'W' }];
+    const r = parsePayload(e);
+    expect(r.unknownBuckets).toContain('widget');
+    expect(r.byType.has('widget' as never)).toBe(false);
+  });
+
+  it('detects the envelope structurally even without the format tag', () => {
+    const e = envelope() as Record<string, unknown>;
+    delete e.format;
+    const r = parsePayload(e);
+    expect(r.ok).toBe(true);
+    expect(r.format).toBe('full-world');
+    expect(r.world?.id).toBe('068e012b-52a9-79bf-8000-26bb67891425');
+  });
+
+  it('rejects an envelope with a world block but no parseable elements as empty-but-valid', () => {
+    // A world with an empty elements object is still a legitimate (empty) world.
+    const r = parsePayload({ format: 'onlyworlds-world-export', world: { id: 'w', name: 'Empty' }, elements: {} });
+    expect(r.ok).toBe(true);
+    expect(r.totalElements).toBe(0);
+    expect(r.world?.id).toBe('w');
+  });
+});

@@ -54,11 +54,12 @@ So the import core is: **detect format → validate → resolve identity (ids + 
 ### Detection (decide once, per payload, top-level)
 
 1. Parse JSON. Not an object → reject ("unrecognized format").
-2. Has a `World` key → **full-world format**. Element buckets are the other top-level keys (PascalCase).
-3. No `World` key, but keys (lowercased) are mostly in `ALL_ELEMENT_TYPES` with array values → **loose type-keyed format** (no world metadata; targets the current world).
-4. Otherwise (flat array, single bare element, garbage) → reject with a clear message.
+2. **keel world-export ENVELOPE** (checked first): `format: "onlyworlds-world-export"`, OR structurally a `world` object beside an `elements` object. → **full-world**. `elements` is nested and keyed by **lowercase** type slug; `world` carries the world id. This is what ow.com emits today. See "keel world-export envelope" below.
+3. Has a `World` key (PascalCase, at root) → **full-world format**. Element buckets are the other top-level keys. The older shape (atlas base-tool lineage); kept for backward compatibility.
+4. No `World` key, but keys (lowercased) are mostly in `ALL_ELEMENT_TYPES` with array values → **loose type-keyed format** (no world metadata; targets the current world). AI-assistant output.
+5. Otherwise (flat array, single bare element, garbage) → reject with a clear message.
 
-Top-level bucket keys are **PascalCase** in OW exports (`Character`, `Object`, `Pin`, …, plus `Species` singular). Atlas's `ElementType` union is lowercase. **Always lowercase the bucket key** and validate membership in `ALL_ELEMENT_TYPES` (`src/core/types.ts`). Unknown bucket → invalid type, rejected.
+The envelope MUST be detected before shapes 3–4: its `world`/`elements` keys are not element types, so a naive root-key scan would bucket them as "unknown" and call the file unrecognizable. Bucket keys are **PascalCase** in the old shape and **lowercase** in the envelope; atlas's `ElementType` union is lowercase. **Always lowercase the bucket key** and validate membership in `ALL_ELEMENT_TYPES` (`src/core/types.ts`). Unknown bucket → routed aside, not imported.
 
 ### Path selection (per element, payload-level default)
 
@@ -72,9 +73,26 @@ A full ow.com export is uniformly keep-ids (uuid-v7 throughout, bare relation na
 
 OW export content elements use **bare** relation names (`location`, `objects`, `birthplace`) — identical to atlas's on-disk content shape. **Pins and markers are stored on disk with `_id`/`_ids` suffix** (`map_id`, `zone_id`, `element_id`) per the adapter's disk-shape contract, so the importer renames the incoming bare names to disk shape (done in the reconcile core via `relationFieldsFor`'s `schemaField`→`diskField`).
 
-### ow.com export format (VERIFIED — `django/ow/worldsync/services.py`)
+### keel world-export envelope (CURRENT — `keel portal/views.py:509-560`, Orrery spec § world-export)
 
-Authoritative, confirmed from the live backend (session 241 dig):
+**This is what ow.com's "Export JSON" button emits today** (keel rebuild; registry `world_export`; confirmed with Skeld 2026-07-23, canonical, spec § being frozen). It SUPERSEDES the session-241 `services.py` note below, which described the retired Django backend.
+
+```
+{ format: "onlyworlds-world-export",
+  schema_version: "0.30.00",          // _EXPORT_SCHEMA_VERSION module constant
+  exported_at: "<iso>",
+  world: { id, name, created_at, updated_at },        // lowercase; id PRESENT
+  elements: { "<lowercase-type>": [ <serialize()'d v2 element>, … ] } }   // only types with ≥1 element
+```
+
+- **World id is PRESENT now** (the old backend dropped it "for security"; the rebuild keeps it so a round-trip is lossless). Element bodies come through the same `serialize` the API uses: uuid ids, **bare-name v2 relations** (`location`, `map`, `zone`, `element_id`), extension fields (`atlas_*`/`x_*`/`shadow_*`) intact, `type`/`change_seq`/timestamps present.
+- **Only types with ≥1 element appear** (unlike the old always-emit-22).
+- **Atlas reads it** (`parseEnvelope` in `parse.ts`). **World-id adoption on import is RULED (Skeld) but NOT yet wired** — atlas currently mints a fresh world id; element ids are kept verbatim (keep-ids path), so `ow://element` refs already survive. Adopting the world id (lossless world identity + same-id→same-world) is a tracked follow-up (needs the scaffold path + a collision decision).
+- **Atlas's EXPORT still writes the old `World`+PascalCase shape**; converging it onto this envelope is ruled (Skeld, Q2) but **post-launch**.
+
+### legacy ow.com export format (RETIRED backend — `django/ow/worldsync/services.py`)
+
+Kept for the record; describes the pre-keel Django backend (session 241 dig). Atlas still *reads* this `World`+PascalCase shape for backward compatibility, but ow.com no longer emits it.
 
 - Top-level: one `World` block + **all 22 PascalCase element arrays always emitted** (even empty). Each element starts `{"id": "<uuid>", ...}`.
 - **World block: 11 fields, NO world id** (removed "for security" — worlds are keyed by `api_key`): `api_key`, `name`, `description`, `version`, `image_url`, `time_format_names`, `time_format_equivalents`, `time_basic_unit`, `time_current`, `time_range_min`, `time_range_max`.

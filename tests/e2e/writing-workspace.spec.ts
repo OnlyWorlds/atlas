@@ -712,6 +712,95 @@ test('autolink: ambiguous names are suppressed (no hint when 2+ matches)', async
   await expect(page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'John' })).toHaveCount(0);
 });
 
+test('autolink: a plain CLICK on a dotted word links it (S313 click-to-link)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page);
+  await createWorld(page, 'click world');
+  const charId = await createElement(page, 'character', { name: 'Marigold' });
+  const narrId = await createElement(page, 'narrative', { name: 'click scene', supertype: 'Book' });
+  await gotoWriting(page, narrId);
+  await waitForEditor(page);
+
+  const prose = page.locator('.atlas-writing-workspace-prose .ProseMirror');
+  await prose.click();
+  await page.keyboard.type('and then Marigold arrived');
+
+  const hint = page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'Marigold' });
+  await expect(hint).toBeVisible();
+  // The whole point of S313: no Tab, no cursor-in-hint precondition, no focus
+  // dance — one click on the dotted word promotes it. This is the gesture that
+  // works "even if the page isn't selected".
+  await hint.click();
+
+  const chip = page.locator(`.atlas-writing-workspace-prose .atlas-element-chip[data-id="${charId}"]`);
+  await expect(chip).toBeVisible();
+  await expect(chip).toHaveText('Marigold');
+  await expect(page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'Marigold' })).toHaveCount(0);
+});
+
+test('autolink: HOVERING a dotted word makes Tab link THAT word, not the first (S313)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page);
+  await createWorld(page, 'hover world');
+  await createElement(page, 'character', { name: 'Alderly' });
+  const borrowId = await createElement(page, 'character', { name: 'Borrow' });
+  const narrId = await createElement(page, 'narrative', { name: 'hover scene', supertype: 'Book' });
+  await gotoWriting(page, narrId);
+  await waitForEditor(page);
+
+  const prose = page.locator('.atlas-writing-workspace-prose .ProseMirror');
+  await prose.click();
+  // Two unambiguous names; the caret ends after "dawn", off BOTH hints — so a
+  // cursor/order-based Tab would grab the first (Alderly). The bug Captain hit.
+  await page.keyboard.type('Alderly met Borrow at dawn');
+  const hintBorrow = page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'Borrow' });
+  await expect(hintBorrow).toBeVisible();
+
+  // Hover the SECOND word, then Tab. Hover authority means the hovered word
+  // links — real `.hover()` fires the mouseover the plugin tracks; Tab is
+  // dispatched to ProseMirror's handler (same synthetic-keydown route the
+  // sibling autolink test uses, since keyboard.press('Tab') is flaky in CE).
+  await hintBorrow.hover();
+  await page.evaluate(() => {
+    const pm = document.querySelector('.atlas-writing-workspace-prose .ProseMirror') as HTMLElement | null;
+    pm?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', bubbles: true, cancelable: true }));
+  });
+
+  // Borrow linked; Alderly (the first) stays a hint — proof hover, not order, chose.
+  await expect(page.locator(`.atlas-writing-workspace-prose .atlas-element-chip[data-id="${borrowId}"]`)).toBeVisible();
+  await expect(page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'Alderly' })).toBeVisible();
+});
+
+test('chip preview: right-clicking a chip dismisses the hover preview so the menu is not obscured (S313)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page);
+  await createWorld(page, 'menu world');
+  await createElement(page, 'character', { name: 'Quill', description: 'a scribe of the tower' });
+  const narrId = await createElement(page, 'narrative', { name: 'menu scene', supertype: 'Book' });
+  await gotoWriting(page, narrId);
+  await waitForEditor(page);
+
+  const prose = page.locator('.atlas-writing-workspace-prose .ProseMirror');
+  await prose.click();
+  await page.keyboard.type('here is Quill today');
+  const hint = page.locator('.atlas-writing-workspace-prose .atlas-autolink-hint', { hasText: 'Quill' });
+  await expect(hint).toBeVisible();
+  await hint.click(); // link it → a chip
+
+  const chip = page.locator('.atlas-writing-workspace-prose .atlas-element-chip', { hasText: 'Quill' });
+  await expect(chip).toBeVisible();
+
+  // Hover opens the preview card (z-index 9500, above the menu's 1000).
+  await chip.hover();
+  await expect(page.locator('.atlas-chip-preview[data-state="shown"]')).toBeVisible();
+
+  // Right-click: the context menu must appear AND the preview must vanish, so
+  // the Unlink action is never hidden behind the card (Captain's report).
+  await chip.click({ button: 'right' });
+  await expect(page.locator('.atlas-prose-context-menu')).toBeVisible();
+  await expect(page.locator('.atlas-chip-preview[data-state="shown"]')).toHaveCount(0);
+});
+
 test('split: divides current narrative at cursor into a new sibling', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page);

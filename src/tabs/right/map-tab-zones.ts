@@ -63,6 +63,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
       opacity,
       labelText,
       labelHoverOnly,
+      labelBelow: prefs.zone_label_position === 'below',
     });
   }
 

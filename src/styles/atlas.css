@@ -1962,24 +1962,43 @@ body.atlas-touring .atlas-shell {
 }
 /* The forward slot: optional create-preview icons stacked above Next/ghost. */
 .atlas-tour-forward-slot {
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 5px;
 }
+/* The create-preview icons float ABOVE-RIGHT of the forward control, OUT of the
+   flow — so a run of three never grows the controls row or shoves Back/Exit
+   down (Captain, S313; it used to be a vertical column that did exactly that).
+   Small, subtle, horizontal; the sentence glyphs stay the real payoff. */
+/* A vertical column of create-preview icons, right-anchored, growing UP from
+   just above the forward control — out of flow (Captain, S313: sideways read
+   poorly; one-over-the-other on the right, capped with a +N chip). */
 .atlas-tour-create-stack {
+  position: absolute;
+  right: 2px;
+  bottom: calc(100% + 4px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 .atlas-tour-create-glyph {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.26);
+  color: rgba(255, 255, 255, 0.22);
   transition: color 200ms ease;
 }
 .atlas-tour-create-glyph.done {
   color: var(--tour-glyph-color, var(--atlas-cyan));
+}
+.atlas-tour-create-more {
+  font-size: 11px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.32);
+  font-variant-numeric: tabular-nums;
+  transition: color 200ms ease;
+}
+.atlas-tour-create-more.done {
+  color: rgba(255, 255, 255, 0.6);
 }
 .atlas-tour-act {
   color: rgba(255, 255, 255, 0.35);
@@ -2074,8 +2093,12 @@ body.atlas-tour-createstep [data-action="create-element"] {
    the room's real "set now time" button is the control that has to be found.
    Same treatment as the +pin and the sidebar + before it. */
 body.atlas-tour-nowstep [data-action="set-now"] {
-  color: var(--atlas-cyan) !important;
-  border-color: var(--atlas-cyan-soft) !important;
+  /* Was a transparent cyan pulse — barely visible, and it fought the warm-gold
+     "now" the button sets (Captain, S313). A FILLED warm-gold highlight is
+     spotted at a glance and reads as "this makes the now". */
+  color: rgba(255, 255, 255, 0.96) !important;
+  background: rgba(245, 180, 90, 0.28) !important;
+  border-color: rgba(245, 180, 90, 0.95) !important;
   animation: atlas-tour-pulse 2.2s ease-in-out infinite;
 }
 /* ...and the canvas/document toggle goes away while that beat is live, to keep
@@ -2382,6 +2405,11 @@ body.atlas-preroot .atlas-middle {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* Empty link field: the whole row is a click target for the picker (S313), so
+   the body reads as clickable and its pick icon brightens on row hover. */
+.atlas-link-row-clickable { cursor: pointer; }
+.atlas-link-row-clickable:hover .atlas-link-pick-empty { opacity: 1; }
 
 /* Link picker icon — sits at the far right of a single/multi-link row, low-key. */
 .atlas-link-pick {
@@ -5518,6 +5546,13 @@ body.atlas-preroot .atlas-middle {
   transform: translate(-50%, -50%);
 }
 
+/* Below-placement (S313, default): the anchor is the zone's bottom-centre, so
+   the label hangs just under that edge instead of centring on it — centre
+   placement sat on the fill and markers and got blocked. */
+.atlas-zone-label-below span {
+  transform: translate(-50%, 6px);
+}
+
 /* ============================================================
    Map visual settings popover (DESIGN_MAPS.md §11, V1)
 
@@ -7842,7 +7877,10 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-writing-workspace-prose .ProseMirror .atlas-autolink-hint {
   text-decoration: underline dotted rgba(34, 211, 238, 0.5);
   text-underline-offset: 3px;
-  cursor: help;
+  /* Click-to-link (S313): the dotted word is an affordance, so a pointer reads
+     "clickable" rather than the old `help` (which promised a tooltip, not an
+     action). */
+  cursor: pointer;
 }
 .atlas-writing-workspace-prose .ProseMirror .atlas-autolink-hint:hover {
   text-decoration-color: rgba(34, 211, 238, 0.85);
@@ -8480,6 +8518,27 @@ a.atlas-writing-workspace-crumb-seg:hover {
 .atlas-writing-tree-row-add .material-symbols-outlined {
   font-size: 18px;
 }
+
+/* Link-count badge (S313): a muted size cue at the right of each tree row.
+   `order` keeps it rightmost regardless of DOM order, so the hover "+" sits
+   just to its left rather than shoving it. */
+.atlas-writing-tree-linkcount {
+  order: 10;
+  flex: 0 0 auto;
+  margin-left: auto;
+  margin-right: 10px;
+  min-width: 15px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  text-align: center;
+  color: var(--atlas-text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 7px;
+  opacity: 0.7;
+}
+.atlas-writing-tree-row:hover .atlas-writing-tree-linkcount { opacity: 1; }
 
 /* Tune glyph reads heavier than the elements sidebar's "+" — match the
    visual weight by using a thinner wght axis and slightly smaller size.
@@ -9737,6 +9796,10 @@ td.atlas-writing-setup-promote-count {
 .atlas-import-ok .material-symbols-outlined { font-size: 16px; }
 .atlas-import-warn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--atlas-text-soft); margin: 0; line-height: 1.5; }
 .atlas-import-warn .material-symbols-outlined { font-size: 18px; color: var(--atlas-cyan); }
+/* Sub-note under the mode choice: the adopt-id reassurance, and the
+   opens-then-merges intent line when the merge target isn't the open world. */
+.atlas-import-subnote { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--atlas-text-muted); margin: 2px 0 0; line-height: 1.5; }
+.atlas-import-subnote .material-symbols-outlined { font-size: 16px; color: var(--atlas-cyan); }
 
 .atlas-import-preview { display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline; padding-top: 2px; }
 .atlas-import-stat { font-size: 12px; color: var(--atlas-text-soft); }
@@ -11791,10 +11854,12 @@ a.atlas-share-map-pin { cursor: pointer; }
   height: 24px; /* LOCKED equal to .atlas-chart-now-chip — toggling set/unset
                    must never resize the bar and jump the UI below (S263) */
   padding: 0 10px 0 7px;
-  border: 1px solid rgba(245, 180, 90, 0.4);
+  border: 1px solid rgba(245, 180, 90, 0.5);
   border-radius: 999px;
-  background: transparent;
-  color: rgba(245, 180, 90, 0.85);
+  /* A subtle warm fill (S313) so the one control that sets the world clock is
+     spottable, not a ghost outline. */
+  background: rgba(245, 180, 90, 0.10);
+  color: rgba(245, 180, 90, 0.9);
   font-size: 11px;
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;

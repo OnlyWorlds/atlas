@@ -214,6 +214,57 @@ test('pin button is hidden when no map tab is active', async ({ page }) => {
   await expect(page.locator('[data-action="pin-element"]')).toHaveCount(0);
 });
 
+test('+pin hides once the element has a pin on the active map; a pin detail opens its map (S313)', async ({ page }) => {
+  // Map with an image auto-opens as the active right tab.
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', 'Pin Home');
+  await page.fill('input[name="map-image-url"]', 'https://example.com/home.png');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('[data-modal="create-map"]')).toHaveCount(0);
+
+  // A pinnable character; creating it lands on its detail with the map active.
+  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
+  await page.click('[data-action="create-element"]');
+  await page.fill('input[name="element-name"]', 'Pinnable One');
+  await page.click('[data-modal="create-element"] [data-action="create"]');
+  await expect(page.locator('[data-modal="create-element"]')).toHaveCount(0);
+
+  // Before any pin: +pin is offered.
+  const pinBtn = page.locator('[data-action="pin-element"]');
+  await expect(pinBtn).toBeVisible();
+
+  const ids = await page.evaluate(() => {
+    const st = (window as any).__atlasTestApi.getState();
+    return {
+      wid: st.active.worldId,
+      charId: st.data.elements.find((e: any) => e.name === 'Pinnable One')?.id,
+      mapId: st.data.elements.find((e: any) => e.type === 'map' && e.name === 'Pin Home')?.id,
+    };
+  });
+  expect(ids.charId && ids.mapId).toBeTruthy();
+
+  // Place a pin for this character on the active map (store, not Leaflet).
+  const pinId = await page.evaluate(async ({ mapId, charId }) => {
+    const store = (window as any).__atlasTestApi.getActiveStore();
+    const pin = await store.createPin({ map_id: mapId, element_id: charId, x: 100, y: 100 });
+    (window as any).__atlasTestApi.patchData(await store.listElements());
+    return pin.id as string;
+  }, { mapId: ids.mapId, charId: ids.charId });
+  expect(pinId).toBeTruthy();
+
+  // The re-render drops +pin (already pinned HERE) and shows the existing-pin
+  // affordance instead — a second +pin would only hit the store's uniqueness wall.
+  await expect(pinBtn).toHaveCount(0);
+  await expect(page.locator('[data-action="goto-pin"]')).toBeVisible();
+
+  // The pin element's OWN detail: it can open its map, and it is not itself
+  // pinnable (no +pin on a spatial artifact).
+  await page.evaluate(({ wid, pinId }) => { window.location.hash = `#/w/${wid}/element/${pinId}`; },
+    { wid: ids.wid, pinId });
+  await expect(page.locator('[data-action="open-map"]')).toBeVisible();
+  await expect(page.locator('[data-action="pin-element"]')).toHaveCount(0);
+});
+
 test('map create modal — location picker integration', async ({ page }) => {
   // Create a location first.
   await page.click('.atlas-mode-btn[data-action="mode-elements"]');

@@ -189,8 +189,8 @@ Fallback if TipTap's markdown beta bites us: drop to raw ProseMirror + `prosemir
 **Writer experience — first-mention auto-link (v1 stretch, see Bout H)**:
 1. Writer types "Drizzle did not own a calendar" — no trigger.
 2. Background tokenizer matches "Drizzle" against the element name+alias index for the active world.
-3. Atlas shows a subtle ghost underline + Tab hint under the word.
-4. Writer presses Tab → suggestion accepted, word becomes a chip. OR keeps typing → suggestion fades, word stays plain text.
+3. Atlas shows a subtle dotted underline (pointer cursor) under the word.
+4. **Promote it (S313, `writing-workspace-autolink.ts`): CLICK the dotted word (primary — works even if the editor isn't focused), or HOVER it and press Tab (hover-authoritative: the hovered word links, not "the first"), or Tab with the caret inside it, or right-click → "Link to X".** OR keep typing → suggestion fades, word stays plain text. Tab never escapes the editor while there is a hint to link. Shared plugin, so identical in the knowledge + share editors.
 5. Once Drizzle is linked once in this narrative, atlas does NOT suggest linking subsequent mentions. First-mention rule (Loreteller's universal pattern).
 6. For ambiguous names (2+ matches), suggestion is suppressed — writer must use `@` to pick explicitly.
 

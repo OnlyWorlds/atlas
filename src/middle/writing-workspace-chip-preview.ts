@@ -20,7 +20,9 @@ import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import type { Element, ElementType } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 
-const HOVER_OPEN_DELAY_MS = 220;
+// A longer open delay (Captain, S313) — the card popped a touch eagerly at
+// 220ms while reading past linked words; 480ms waits for a deliberate rest.
+const HOVER_OPEN_DELAY_MS = 480;
 const HOVER_CLOSE_DELAY_MS = 140;
 
 export interface ChipPreviewController {
@@ -178,6 +180,17 @@ export function createChipPreview(workspaceRoot: HTMLElement): ChipPreviewContro
   };
   document.addEventListener('keydown', onKey, true);
 
+  // Right-click lets the context menu win (Captain, S313). The preview sits at
+  // z-index 9500, the prose context menu at 1000 — so a hover/sticky card drew
+  // OVER the "Unlink" menu and hid it. On any contextmenu outside the card
+  // itself, dismiss the preview so the menu is never obscured. Capture phase so
+  // it fires before the menu builds.
+  const onContextMenu = (e: MouseEvent) => {
+    if (card.contains(e.target as Node)) return; // right-clicking inside the card is fine
+    hide();
+  };
+  document.addEventListener('contextmenu', onContextMenu, true);
+
   // Hide when the workspace unmounts (the workspace owns the controller).
   return {
     scheduleHoverShow,
@@ -188,6 +201,7 @@ export function createChipPreview(workspaceRoot: HTMLElement): ChipPreviewContro
       clearTimers();
       document.removeEventListener('mousedown', onDocClick, true);
       document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('contextmenu', onContextMenu, true);
       card.remove();
     },
   };

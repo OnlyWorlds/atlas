@@ -27,6 +27,7 @@ import {
   createWorldFromImportedData,
   importIntoActiveWorld,
 } from '../setup/atlas-root-flow';
+import { activateWorld } from '../sidebar/worlds-sidebar';
 import type { ParseResult, ImportPlan, ValidationIssue } from '../import/types';
 import { ToastManager } from '../ui/toast-manager';
 import { completeWaypoint } from '../core/waypoints';
@@ -216,6 +217,23 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   const activeWorld = () => getState().active;
   const activeElements = (): Element[] => getState().data.elements;
 
+  /** The exported world's id, when the payload carries one (envelope only). */
+  const exportWorldId = (): string | null => {
+    const id = parsed?.world?.id;
+    return typeof id === 'string' && id.trim() ? id.trim() : null;
+  };
+  /**
+   * The local world (if any) that already carries the export's world id — the
+   * `world-<id>` handle-key convention every registered world follows. Its
+   * presence turns the mode choice into merge-into-it vs import-a-separate-copy
+   * (Captain, S313); its absence lets a new import ADOPT the id (lossless).
+   */
+  const idMatchWorld = () => {
+    const id = exportWorldId();
+    if (!id) return null;
+    return getState().registry.worlds.find(w => w.folder?.handle_key === `world-${id}`) ?? null;
+  };
+
   // ---------------------------------------------------------------------------
   // Bring in
   // ---------------------------------------------------------------------------
@@ -245,8 +263,12 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     parsed = result;
     clearBtn.hidden = false;
     liveEl.hidden = true; // the review summary now carries the format read-out
-    // Default mode: full-world → new world; loose → merge into current.
-    mode = result.format === 'full-world' ? 'new' : 'merge';
+    // Default mode: a full world whose id already exists locally defaults to
+    // MERGE (updating it is the usual intent on re-import); an unseen full world
+    // → new; loose lists → merge into current.
+    mode = result.format === 'full-world'
+      ? (idMatchWorld() ? 'merge' : 'new')
+      : 'merge';
     conflict = 'skip';
     worldName = (typeof result.world?.name === 'string' && result.world.name.trim())
       ? result.world.name.trim()
@@ -335,7 +357,15 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     if (!parsed) { reviewMount.innerHTML = ''; return; }
 
     const aw = activeWorld();
-    const issues = validatePayload(parsed, mode === 'merge' ? activeElements() : []);
+    const idMatch = idMatchWorld();
+    // The numeric preview is reconciled against the ACTIVE world's elements, so
+    // it is only accurate when the merge target IS the active world. Merging
+    // into a matched-but-not-open world opens it first (at import time), so here
+    // we state intent instead of counts.
+    const mergeTargetIsActive = idMatch ? idMatch.id === aw?.worldId : true;
+    const mergeTargetName = idMatch ? idMatch.name : (aw?.meta?.name ?? 'the current world');
+    const accuratePreview = mode !== 'merge' || mergeTargetIsActive;
+    const issues = validatePayload(parsed, mode === 'merge' && mergeTargetIsActive ? activeElements() : []);
     const plan = buildPlan();
     const r = plan.report;
     const typeCount = parsed.byType.size;
@@ -344,6 +374,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const canMerge = !!aw;
     // Loose with no active world is a dead end — guide the user.
     const looseBlocked = !isFull && !canMerge;
+    const adopting = isFull && !!exportWorldId() && !idMatch;
 
     reviewMount.innerHTML = `
       <div class="atlas-import-review">
@@ -356,11 +387,17 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         ${looseBlocked ? `
           <p class="atlas-import-warn"><span class="material-symbols-outlined">info</span> Loose elements merge into an open world. Open or create a world first, then come back.</p>
         ` : `
+          ${idMatch ? `
+            <p class="atlas-import-warn"><span class="material-symbols-outlined">info</span> A world with this id already exists here as <b>${escapeText(idMatch.name)}</b>. Update it, or bring this in as a separate copy.</p>
+          ` : ''}
           <div class="atlas-import-mode" data-role="mode">
-            ${isFull ? `
-              <label class="atlas-import-radio"><input type="radio" name="imp-mode" value="new" ${mode === 'new' ? 'checked' : ''}/> <span>Import as a new world</span></label>
-              <label class="atlas-import-radio ${canMerge ? '' : 'is-disabled'}"><input type="radio" name="imp-mode" value="merge" ${mode === 'merge' ? 'checked' : ''} ${canMerge ? '' : 'disabled'}/> <span>Merge into ${canMerge ? escapeText(aw!.meta?.name ?? 'the current world') : 'the current world'}</span></label>
+            ${isFull ? (idMatch ? `
+              <label class="atlas-import-radio"><input type="radio" name="imp-mode" value="merge" ${mode === 'merge' ? 'checked' : ''}/> <span>Merge into ${escapeText(idMatch.name)} (update the existing world)</span></label>
+              <label class="atlas-import-radio"><input type="radio" name="imp-mode" value="new" ${mode === 'new' ? 'checked' : ''}/> <span>Import as a separate new world</span></label>
             ` : `
+              <label class="atlas-import-radio"><input type="radio" name="imp-mode" value="new" ${mode === 'new' ? 'checked' : ''}/> <span>Import as a new world</span></label>
+              ${canMerge ? `<label class="atlas-import-radio"><input type="radio" name="imp-mode" value="merge" ${mode === 'merge' ? 'checked' : ''}/> <span>Merge into ${escapeText(aw!.meta?.name ?? 'the current world')}</span></label>` : ''}
+            `) : `
               <p class="atlas-import-mode-fixed">Merge into <b>${escapeText(aw!.meta?.name ?? 'the current world')}</b></p>
             `}
           </div>
@@ -370,9 +407,10 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
               <span>New world name</span>
               <input type="text" class="atlas-import-name" data-role="world-name" value="${escapeText(worldName)}" />
             </label>
+            ${adopting ? `<p class="atlas-import-subnote">Keeps its original world id, so it round-trips cleanly back to onlyworlds.com.</p>` : ''}
           ` : ''}
 
-          ${mode === 'merge' && r.updated + r.skipped > 0 ? `
+          ${mode === 'merge' && mergeTargetIsActive && r.updated + r.skipped > 0 ? `
             <div class="atlas-import-conflict" data-role="conflict">
               <span class="atlas-import-conflict-count">${r.updated + r.skipped} already exist${r.updated + r.skipped === 1 ? 's' : ''} in this world</span>
               <label class="atlas-import-radio"><input type="radio" name="imp-conflict" value="skip" ${conflict === 'skip' ? 'checked' : ''}/> <span>Keep mine (skip duplicates)</span></label>
@@ -382,6 +420,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
           ${renderValidation(issues)}
 
+          ${accuratePreview ? `
           <div class="atlas-import-preview">
             <span class="atlas-import-stat"><b>${r.created}</b> create</span>
             ${r.updated ? `<span class="atlas-import-stat"><b>${r.updated}</b> update</span>` : ''}
@@ -389,9 +428,12 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
             ${r.invalidRecords ? `<span class="atlas-import-stat is-warn"><b>${r.invalidRecords}</b> invalid</span>` : ''}
             ${r.droppedLinks.length ? `<span class="atlas-import-stat is-warn" title="Links to other elements not found in this import. The connection is dropped; each element is still created.">${r.droppedLinks.length} link${r.droppedLinks.length === 1 ? '' : 's'} dropped</span>` : ''}
           </div>
+          ` : `
+          <p class="atlas-import-subnote"><span class="material-symbols-outlined">info</span> Opens ${escapeText(mergeTargetName)} and merges these ${parsed.totalElements} element${parsed.totalElements === 1 ? '' : 's'} in. Existing elements are kept (choose overwrite once it's open to replace them).</p>
+          `}
 
           <button type="button" class="atlas-btn-primary" data-action="import" ${importing ? 'disabled' : ''}>
-            ${importing ? 'importing…' : (mode === 'new' ? 'create world' : 'import into world')}
+            ${importing ? 'importing…' : (mode === 'new' ? 'create world' : `merge into ${escapeText(mergeTargetName)}`)}
           </button>
           ${importing ? `<div class="atlas-import-progress" data-role="import-progress"><div class="atlas-import-progress-fill"></div><span class="atlas-import-progress-label">writing 0 / ${r.created + r.updated}</span></div>` : ''}
         `}
@@ -443,7 +485,9 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     importing = true;
     const hadCreds = typeof parsed.world?.api_key === 'string' && parsed.world.api_key.trim().length > 0;
     renderReview(); // re-renders with the disabled button + progress bar
-    const plan = buildPlan();
+    // The plan is (re)built inside each branch — a merge into a matched world
+    // rebuilds it AFTER opening that world, so it reconciles against the right
+    // element set.
     const onProgress = (p: { done: number; total: number }) => {
       const el = reviewMount.querySelector<HTMLElement>('[data-role="import-progress"]');
       if (!el) return;
@@ -455,7 +499,13 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     };
     try {
       if (mode === 'new') {
-        const { applied } = await createWorldFromImportedData(plan, { name: worldName, onProgress });
+        // Adopt the exported world id ONLY when nothing local already uses it —
+        // otherwise a separate copy would collide with the existing world's
+        // identity. The collision case chooses merge (below) or a fresh mint here.
+        const eid = exportWorldId();
+        const adoptWorldId = (parsed.format === 'full-world' && eid && !idMatchWorld()) ? eid : undefined;
+        const plan = buildPlan();
+        const { applied } = await createWorldFromImportedData(plan, { name: worldName, onProgress, adoptWorldId });
         toasts.success(`Created "${plan.worldMeta?.name ?? 'world'}" · ${applied.created} element${applied.created === 1 ? '' : 's'}`);
         reportFailures(applied.failures.length, plan.report.droppedLinks.length);
         // The file carried API credentials — guide to the (separate, consent-gated) sync link.
@@ -464,14 +514,26 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         // New world is now active — refresh the export side.
         renderExport();
       } else {
+        // Merge target: the id-matched world, else the active world. Open the
+        // match first if it isn't already active, so the reconcile runs against
+        // ITS elements — activation navigates to it, so the import room may
+        // unmount; guard the DOM touches afterward (toasts are global).
+        const idMatch = idMatchWorld();
+        const targetId = idMatch?.id ?? activeWorld()?.worldId ?? null;
+        if (!targetId) throw new Error('No world to merge into');
+        const targetName = idMatch?.name ?? activeWorld()?.meta?.name ?? 'world';
+        if (targetId !== activeWorld()?.worldId) {
+          const ok = await activateWorld(targetId, toasts);
+          if (!ok) throw new Error(`Could not open "${targetName}" to merge into`);
+        }
+        const plan = buildPlan(); // existing = the now-active target's elements
         const applied = await importIntoActiveWorld(plan, { onProgress });
         const bits = [`${applied.created} created`];
         if (applied.updated) bits.push(`${applied.updated} updated`);
         if (plan.report.skipped) bits.push(`${plan.report.skipped} skipped`);
-        toasts.success(`Imported · ${bits.join(', ')}`);
+        toasts.success(`Merged into ${targetName} · ${bits.join(', ')}`);
         reportFailures(applied.failures.length, plan.report.droppedLinks.length);
-        clearLoaded();
-        renderExport();
+        if (reviewMount.isConnected) { clearLoaded(); renderExport(); }
       }
       // Waypoint (hookmap wp7): the import BUTTON gesture is the waypoint —
       // ungated (portability class). The imported DATA completes nothing.

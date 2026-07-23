@@ -411,7 +411,7 @@ Zones support three atlas-extension fields, stored on disk in the element JSON b
 
 These are stored on the Zone element itself (single source of truth per zone), folder-only. Multiple atlas instances accessing the same api-linked world each maintain their own per-zone visuals — like image_media_id today.
 
-Map-wide defaults (DESIGN_MAPS.md §11 visual settings popover): `zone_fill_opacity`, `zone_labels` ('always'|'hover'|'never'). A zone's `atlas_opacity` overrides the map default; if unset, map default applies. Same pattern as pin label threshold.
+Map-wide defaults (DESIGN_MAPS.md §11 visual settings popover): `zone_fill_opacity`, `zone_labels` ('always'|'hover'|'never'), **`zone_label_position` ('below'|'center', default 'below' — S313)**. A zone's `atlas_opacity` overrides the map default; if unset, map default applies. Same pattern as pin label threshold. `zone_label_position` 'below' anchors the label at the zone's bottom-centre (bounding-box max-y) so it hangs off the shape instead of sitting on the fill/markers (`ZoneOverlay.labelAnchorFor`/`bottomCenter`); it's a view pref only (never on the element).
 
 ---
 

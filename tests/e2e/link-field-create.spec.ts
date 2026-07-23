@@ -107,3 +107,17 @@ test('with candidates present the click opens the picker, not the create modal',
   await expect(page.locator('.atlas-picker-panel')).toBeVisible();
   await expect(page.locator('[data-modal="create-element"]')).toHaveCount(0);
 });
+
+test('clicking an empty link field BODY (not just the icon) opens the picker (S313)', async ({ page }) => {
+  await setupWorld(page);
+  await createElement(page, 'location', { name: 'Old Harbor' });
+  const galeId = await createElement(page, 'character', { name: 'Gale' });
+  await openElement(page, galeId);
+
+  const row = page.locator('.atlas-field[data-field="birthplace"] .atlas-link-row');
+  await expect(row).toHaveClass(/atlas-link-row-clickable/);
+  // Click the row body toward the LEFT edge — away from the pick icon, which
+  // sits margin-left:auto at the far right. Proves the body itself is the target.
+  await row.click({ position: { x: 8, y: 8 } });
+  await expect(page.locator('.atlas-picker-panel')).toBeVisible();
+});

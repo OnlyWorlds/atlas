@@ -29,6 +29,7 @@ import {
   type PinLabels,
   type PinTint,
   type ZoneLabels,
+  type ZoneLabelPosition,
 } from '../core/map-view-prefs';
 import { mapTabCache } from '../tabs/right/map-tab-cache';
 import { applyLivePrefs } from '../tabs/right/map-visual-settings-popover';
@@ -131,6 +132,10 @@ function renderDefaultsSection(): string {
         ${sel('zone_labels', [['always', 'Always'], ['hover', 'On hover'], ['never', 'Never']], d.zone_labels)}
       </div>
       <div class="atlas-settings-row">
+        <label class="atlas-settings-label">Zone label position</label>
+        ${sel('zone_label_position', [['below', 'Below the zone'], ['center', 'Centered']], d.zone_label_position)}
+      </div>
+      <div class="atlas-settings-row">
         <label class="atlas-settings-label">Zone fill opacity (%)</label>
         <input class="atlas-input atlas-settings-num-input" type="number" min="0" max="100" step="5" value="${Math.round(d.zone_fill_opacity * 100)}" data-map-default="zone_fill_opacity" />
       </div>
@@ -166,6 +171,7 @@ function wireDefaultsSection(toasts: ToastManager): void {
         if (row) row.hidden = v !== 'threshold';
       } else if (field === 'pin_tint') commit({ pin_tint: v as PinTint }, `Default pin tint: ${v}`);
       else if (field === 'zone_labels') commit({ zone_labels: v as ZoneLabels }, `Default zone labels: ${v}`);
+      else if (field === 'zone_label_position') commit({ zone_label_position: v as ZoneLabelPosition }, `Default zone label position: ${v}`);
     });
   });
 

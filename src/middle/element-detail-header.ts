@@ -28,7 +28,7 @@ import {
 } from './writing-helpers';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import type { Element, WorldMap } from '../core/types';
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
+import { ELEMENT_ICONS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { toastManager } from '../ui/toast-manager';
 import { pickElement } from '../ui/element-picker-modal';
@@ -443,6 +443,27 @@ function renderMapPinClusters(el: Element, header: HTMLElement): void {
     return;
   }
 
+  // Pin / marker detail (Captain, S313): surface the MAP this artifact lives on,
+  // clickable to open (and pan to it). Before this a pin's own page showed no
+  // way to reach its map. Pins and markers are spatial artifacts, not pin
+  // TARGETS, so they get no existing-pins cluster and — critically — no +pin
+  // button (you cannot pin a pin); we render the one affordance that matters
+  // and return.
+  if (el.type === 'pin' || el.type === 'marker') {
+    const rec = el as Record<string, unknown>;
+    const mapId = typeof rec.map_id === 'string' ? rec.map_id : undefined;
+    const m = mapId ? elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId) : undefined;
+    if (m) {
+      const cluster = document.createElement('div');
+      cluster.className = 'atlas-header-cluster atlas-header-existing';
+      const x = typeof rec.x === 'number' ? rec.x : undefined;
+      const y = typeof rec.y === 'number' ? rec.y : undefined;
+      cluster.appendChild(buildOpenMapButton(m, el.id, x, y));
+      header.appendChild(cluster);
+    }
+    return;
+  }
+
   // Existing maps anchored to / hosting this element.
   //   - Location → maps with map.location === el.id
   //   - Zone     → distinct maps that hold any marker for this zone
@@ -522,12 +543,20 @@ function renderMapPinClusters(el: Element, header: HTMLElement): void {
 
   // [+pin] retains its existing gating: only renders when a map tab is
   // active in the right pane. Without an active map there's nowhere to
-  // drop the pin. Same as before MW. ALSO: zones are never pinnable —
-  // they're constructed via markers (DESIGN_MAPS.md §1.4 extension).
+  // drop the pin.
   const ui = state.ui;
   const active = ui.rightTabs[ui.rightActiveIndex];
   const activeMapId = active && active.kind === 'map' ? active.mapId : null;
-  if (activeMapId && el.type !== 'zone') {
+  // Only PINNABLE elements get +pin: content types (incl. locations), never
+  // spatial artifacts (maps/pins/markers/zones — they are not pin targets;
+  // zones are constructed via markers, DESIGN_MAPS §1.4), and never once this
+  // element already has a pin on the ACTIVE map. Double-pin is blocked at the
+  // store (uniqueness is per element+map), so a second +pin would only error —
+  // hiding it is the honest affordance (Captain, S313). pinsForElement holds
+  // this element's pins across every map.
+  const alreadyPinnedHere = !!activeMapId
+    && pinsForElement.some(p => (p as Record<string, unknown>).map_id === activeMapId);
+  if (activeMapId && !SPATIAL_TYPES.has(el.type) && !alreadyPinnedHere) {
     const placing = ui.pinPlacement?.elementId === el.id;
     const pinBtn = document.createElement('button');
     pinBtn.type = 'button';
@@ -749,6 +778,34 @@ function buildMapAffordance(
         panMapTabTo(m.id, cx, cy);
       }
     }
+  });
+  return btn;
+}
+
+/**
+ * "Open the map this pin/marker lives on" — used on a pin/marker's OWN detail
+ * page (S313). Opens the map in the right pane, chains the artifact's id so the
+ * middle pane keeps element-detail mounted, and pans to the artifact's point.
+ */
+function buildOpenMapButton(
+  m: WorldMap,
+  sourceElementId: string,
+  x?: number,
+  y?: number,
+): HTMLElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'atlas-icon-btn-sm atlas-header-map-affordance atlas-header-map-affordance-labeled';
+  if (m.image_url || m.image_media_id) btn.classList.add('atlas-map-tree-icon-has-image');
+  btn.setAttribute('data-action', 'open-map');
+  btn.setAttribute('data-map-id', m.id);
+  btn.title = `Open map: ${m.name || '(untitled)'}`;
+  btn.innerHTML =
+    '<span class="material-symbols-outlined">map</span>'
+    + `<span class="atlas-header-map-label">${escapeText(m.name || '(untitled)')}</span>`;
+  btn.addEventListener('click', () => {
+    openMapTab(m, sourceElementId);
+    if (typeof x === 'number' && typeof y === 'number') panMapTabTo(m.id, x, y);
   });
   return btn;
 }

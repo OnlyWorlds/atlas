@@ -60,6 +60,13 @@ export interface ZoneShape {
    * 'hover' zone_labels mode now actually does something.
    */
   labelHoverOnly?: boolean;
+  /**
+   * When true, the label sits just BELOW the zone (its bottom edge, centred)
+   * rather than over the centroid — the default (Captain, S313): a centred
+   * label sits on top of the fill and markers and gets blocked. `'center'`
+   * keeps the old behaviour.
+   */
+  labelBelow?: boolean;
 }
 
 interface ZoneEntry {
@@ -182,9 +189,7 @@ export class ZoneOverlay {
         if (entry.selected) this.showVertexDots(entry);
         // Label position should follow centroid/midpoint for selected zones.
         if (entry.labelMarker && nextShape.labelText) {
-          const anchor = nextShape.mode === 'polygon'
-            ? centroid(nextShape.points)
-            : lineMidAnchor(nextShape.points);
+          const anchor = labelAnchorFor(nextShape);
           entry.labelMarker.setLatLng(storageToLeaflet(anchor, this.canvasHeight));
         }
         return;
@@ -208,7 +213,8 @@ export class ZoneOverlay {
     if (patch.labelText !== undefined || ('labelText' in patch)) {
       const desired = nextShape.labelText;
       if (desired && entry.labelMarker) {
-        entry.labelMarker.setIcon(this.buildLabelIcon(desired));
+        entry.labelMarker.setIcon(this.buildLabelIcon(desired, nextShape.labelBelow));
+        entry.labelMarker.setLatLng(storageToLeaflet(labelAnchorFor(nextShape), this.canvasHeight));
       } else if (desired && !entry.labelMarker) {
         entry.labelMarker = this.buildLabelMarker(nextShape);
         entry.labelMarker.addTo(this.layerGroup);
@@ -554,26 +560,45 @@ export class ZoneOverlay {
   }
 
   private buildLabelMarker(shape: ZoneShape): L.Marker {
-    const anchor = shape.mode === 'polygon'
-      ? centroid(shape.points)
-      : lineMidAnchor(shape.points);
+    const anchor = labelAnchorFor(shape);
     const latlng = storageToLeaflet(anchor, this.canvasHeight);
     return L.marker(latlng, {
-      icon: this.buildLabelIcon(shape.labelText ?? ''),
+      icon: this.buildLabelIcon(shape.labelText ?? '', shape.labelBelow),
       interactive: false,
       keyboard: false,
     });
   }
 
-  private buildLabelIcon(text: string): L.DivIcon {
+  private buildLabelIcon(text: string, below?: boolean): L.DivIcon {
     const safe = escapeText(text);
     return L.divIcon({
-      className: 'atlas-zone-label',
+      className: 'atlas-zone-label' + (below ? ' atlas-zone-label-below' : ''),
       html: `<span>${safe}</span>`,
       iconSize: undefined as unknown as L.PointExpression,
       iconAnchor: [0, 0] as L.PointTuple,
     });
   }
+}
+
+/** Where a zone's label anchors: bottom-centre when `labelBelow`, else the
+ *  centroid (polygon) / longest-segment midpoint (line). */
+function labelAnchorFor(shape: ZoneShape): Point {
+  if (shape.labelBelow) return bottomCenter(shape.points);
+  return shape.mode === 'polygon' ? centroid(shape.points) : lineMidAnchor(shape.points);
+}
+
+/** Bottom-centre of the points' bounding box. Screen-bottom = MAX storage-y
+ *  (storageToLeaflet flips: lat = canvasHeight - y), so the label hangs off the
+ *  zone's lowest edge, horizontally centred. */
+function bottomCenter(points: Point[]): Point {
+  if (points.length === 0) return { x: 0, y: 0 };
+  let minX = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { x: (minX + maxX) / 2, y: maxY };
 }
 
 function pointsEqual(a: Point[], b: Point[]): boolean {

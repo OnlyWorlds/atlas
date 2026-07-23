@@ -1249,12 +1249,17 @@ function drawCalendarTexture(
     const x0 = Math.max(0, dateToX(band.lo));
     const x1 = Math.min(w, dateToX(band.hi));
     if (x1 <= x0) continue;
-    if (band.index % 2 === 1) {
-      ctx.fillStyle = 'rgba(160, 190, 255, 0.045)';
-      ctx.fillRect(x0, TOP_PAD, x1 - x0, axisY - TOP_PAD);
-    }
+    // Each era carries its OWN wash (not one-shaded-one-blank): the CHANGE of
+    // colour at a pivot is what shows where one era ends and the next begins,
+    // so the switch reads and the O.E span's extent is legible as its own
+    // region. The first pass (S313, 0.05) was invisible — bumped so it actually
+    // reads, with a firm boundary line at the pivot (Captain: "don't see it").
+    ctx.fillStyle = band.index % 2 === 1
+      ? 'rgba(120, 165, 245, 0.10)'   // cool blue
+      : 'rgba(205, 150, 225, 0.10)';  // warm lavender
+    ctx.fillRect(x0, TOP_PAD, x1 - x0, axisY - TOP_PAD);
     if (band.lo > range.min) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.32)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(x0, TOP_PAD);
@@ -1291,12 +1296,16 @@ function drawStripEraBands(
     const x0 = Math.max(capMin, scale.toX(band.lo));
     const x1 = Math.min(capMax, scale.toX(band.hi));
     if (x1 <= x0) continue;
-    if (band.index % 2 === 1) {
-      ctx.fillStyle = 'rgba(160, 190, 255, 0.07)';
-      ctx.fillRect(x0, top + 1, x1 - x0, STRIP_H - 2);
-    }
+    // Distinct washes so the eras read as different regions in the strip too
+    // (Captain, S313). Bold enough (0.30) to show THROUGH the cyan viewport
+    // band drawn over it; same hues as the main plot so a glance connects the
+    // two. The seam marks the pivot even where an era is a thin sliver.
+    ctx.fillStyle = band.index % 2 === 1
+      ? 'rgba(120, 165, 245, 0.30)'   // cool blue
+      : 'rgba(205, 150, 225, 0.30)';  // warm lavender
+    ctx.fillRect(x0, top + 1, x1 - x0, STRIP_H - 2);
     if (scale.toX(band.lo) > capMin) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.38)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(x0, top + 1);

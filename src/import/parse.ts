@@ -1,19 +1,81 @@
 /**
  * Parse + detect an import payload. Pure; takes already-JSON-parsed data.
  *
- * Format detection (DESIGN_IMPORT.md "Format model"):
- *   - has a "World" key (object) → full-world
- *   - else keys (lowercased) in ALL_ELEMENT_TYPES with array values → loose
- *   - else → not recognizable OnlyWorlds data
+ * THREE recognized shapes (DESIGN_IMPORT.md "Format model"):
  *
- * Top-level bucket keys are PascalCase in OW exports ("Character"); atlas types
- * are lowercase. We always lowercase before testing membership.
+ *   1. keel world-export ENVELOPE — `{format:"onlyworlds-world-export",
+ *      schema_version, world:{id,...}, elements:{ <type>: [...] }}`. What
+ *      ow.com emits today (keel `portal/views.py`; canonical, Orrery spec
+ *      § world-export). Nested lowercase `elements`, world id PRESENT.
+ *   2. `World`+PascalCase-at-root — `{World:{...}, Character:[...]}`. The
+ *      older shape atlas's base-tool lineage used; kept for backward compat
+ *      (Captain, 2026-07-23) so files from the old exporter still import.
+ *   3. loose type-keyed lists — `{Character:[...]}` (no World). AI-assistant
+ *      output; targets the current world.
+ *
+ * Bucket keys are PascalCase in OW exports and lowercase in atlas's type union,
+ * so we always lowercase before testing membership. Envelope detection runs
+ * FIRST because its `world`/`elements` keys are not element types and would
+ * otherwise fall through to "unrecognized".
  */
 
 import { ALL_ELEMENT_TYPES, type ElementType } from '../core/types';
 import type { ParseResult, RawRecord } from './types';
 
 const TYPE_SET = new Set<string>(ALL_ELEMENT_TYPES);
+
+function isRecord(r: unknown): r is RawRecord {
+  return !!r && typeof r === 'object' && !Array.isArray(r);
+}
+
+/**
+ * The keel world-export envelope, by its self-describing `format` tag (the
+ * reliable signal — Skeld) with a structural fallback (a `world` object beside
+ * an `elements` object) so a future emitter that drops the tag still reads.
+ */
+function isExportEnvelope(obj: Record<string, unknown>): boolean {
+  if (obj.format === 'onlyworlds-world-export') return true;
+  return isRecord(obj.world) && isRecord(obj.elements);
+}
+
+/**
+ * Unwrap the envelope: `elements` is an object keyed by lowercase type slug,
+ * each holding an array of keel-native element records (uuid ids, bare-name v2
+ * relations, extension fields intact). `world` carries the id + meta.
+ */
+function parseEnvelope(
+  obj: Record<string, unknown>,
+  byType: Map<ElementType, RawRecord[]>,
+  unknownBuckets: string[],
+): ParseResult {
+  let total = 0;
+  const elements = obj.elements;
+  if (isRecord(elements)) {
+    for (const [key, value] of Object.entries(elements)) {
+      const lower = key.toLowerCase();
+      if (TYPE_SET.has(lower) && Array.isArray(value)) {
+        const records = value.filter(isRecord);
+        const existing = byType.get(lower as ElementType) ?? [];
+        byType.set(lower as ElementType, [...existing, ...records]);
+        total += records.length;
+      } else {
+        unknownBuckets.push(key);
+      }
+    }
+  }
+  const world = isRecord(obj.world) ? obj.world : undefined;
+  if (!world && total === 0) {
+    return {
+      ok: false,
+      error: 'This looks like an onlyworlds.com world export, but it carries no world block or elements.',
+      byType,
+      unknownBuckets,
+      totalElements: 0,
+    };
+  }
+  // Always full-world: the envelope's whole purpose is a complete world.
+  return { ok: true, format: 'full-world', world, byType, unknownBuckets, totalElements: total };
+}
 
 export function parsePayload(data: unknown): ParseResult {
   const byType = new Map<ElementType, RawRecord[]>();
@@ -30,6 +92,14 @@ export function parsePayload(data: unknown): ParseResult {
   }
 
   const obj = data as Record<string, unknown>;
+
+  // Shape 1: the keel world-export envelope. Detected first — its `world` and
+  // `elements` keys are not element types, so the root-key scan below would
+  // bucket them as unknown and report the file unrecognizable.
+  if (isExportEnvelope(obj)) {
+    return parseEnvelope(obj, byType, unknownBuckets);
+  }
+
   const hasWorld = !!obj.World && typeof obj.World === 'object' && !Array.isArray(obj.World);
 
   let total = 0;

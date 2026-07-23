@@ -413,7 +413,7 @@ function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
   // still uses the `atlas-link-pick-empty` class for muted styling (was a
   // generic `+` before, which hid which category the field targeted).
   pickBtn.innerHTML = `<span class="material-symbols-outlined">${pickIconFor(meta.target)}</span>`;
-  pickBtn.addEventListener('click', async () => {
+  const runPick = async (): Promise<void> => {
     if (offerCreate) { openCreateForLink(el, meta, []); return; }
     // Exclude the current element itself and any value already linked here.
     // Self-linking is never meaningful — a Character pointing at itself via
@@ -428,8 +428,16 @@ function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
     });
     if (!picked) return;
     await persistFieldPatch(el, meta.name, picked.id);
-  });
+  };
+  pickBtn.addEventListener('click', (e) => { e.stopPropagation(); void runPick(); });
   row.appendChild(pickBtn);
+  // Empty link field: clicking anywhere in the row body opens the picker, not
+  // only the icon (Captain, S313 — "link into empty fields by clicking the
+  // body"). The button stops propagation so it never double-fires.
+  if (!raw) {
+    row.classList.add('atlas-link-row-clickable');
+    row.addEventListener('click', () => { void runPick(); });
+  }
   return row;
 }
 
@@ -463,7 +471,7 @@ function renderMultiLink(meta: FieldMeta, el: Element): HTMLElement {
   // multi-link field targets at a glance. `margin-left: auto` keeps the
   // button anchored right past any existing chips.
   addBtn.innerHTML = `<span class="material-symbols-outlined">${pickIconFor(meta.target)}</span>`;
-  addBtn.addEventListener('click', async () => {
+  const runAdd = async (): Promise<void> => {
     if (offerCreate) { openCreateForLink(el, meta, ids); return; }
     // Exclude the current element + everything already in the list. Same
     // self-link rule as renderSingleLink — A Character's `friends` shouldn't
@@ -476,8 +484,15 @@ function renderMultiLink(meta: FieldMeta, el: Element): HTMLElement {
     if (!picked) return;
     const next = [...ids, picked.id];
     await persistFieldPatch(el, meta.name, next);
-  });
+  };
+  addBtn.addEventListener('click', (e) => { e.stopPropagation(); void runAdd(); });
   wrap.appendChild(addBtn);
+  // Empty multi-link: clicking the row body opens the picker too (Captain,
+  // S313). Only when empty — once chips exist, row clicks belong to them.
+  if (ids.length === 0) {
+    wrap.classList.add('atlas-link-row-clickable');
+    wrap.addEventListener('click', () => { void runAdd(); });
+  }
   return wrap;
 }
 

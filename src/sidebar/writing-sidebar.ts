@@ -359,6 +359,23 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     return node.children.some(c => containsAnyMatch(c, matches));
   }
 
+  /** Count ow:// chips (links) in a story markdown blob. */
+  function countOwLinks(story: unknown): number {
+    if (typeof story !== 'string' || story.length === 0) return 0;
+    const m = story.match(/\]\(ow:\/\//g);
+    return m ? m.length : 0;
+  }
+  /**
+   * Total links in this node's prose PLUS every descendant's — a size cue that
+   * still means something on a Book (the sum across its chapters and scenes),
+   * not just on a leaf Scene.
+   */
+  function subtreeLinkCount(node: NarrativeNode): number {
+    let n = countOwLinks((node.el as Record<string, unknown>).story);
+    for (const c of node.children) n += subtreeLinkCount(c);
+    return n;
+  }
+
   function renderNode(
     node: NarrativeNode,
     parent: HTMLElement,
@@ -470,6 +487,20 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
       navigate(writingHash(worldId, node.el.id));
     });
     row.appendChild(body);
+
+    // Link-count badge (Captain, S313): a small right-aligned number = how many
+    // links live in this narrative and everything under it — a size cue at a
+    // glance. Hidden at zero so an empty tree stays clean.
+    const linkCount = subtreeLinkCount(node);
+    if (linkCount > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'atlas-writing-tree-linkcount';
+      badge.textContent = String(linkCount);
+      badge.title = hasChildren
+        ? `${linkCount} link${linkCount === 1 ? '' : 's'} in this ${tierLabel.toLowerCase()} and below`
+        : `${linkCount} link${linkCount === 1 ? '' : 's'}`;
+      row.appendChild(badge);
+    }
 
     // Hover "+" (S265): create the child tier INSIDE this row — a book row
     // makes a chapter, a chapter row a scene. The container question answers

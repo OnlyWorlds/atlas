@@ -26,6 +26,7 @@ import {
   type PinLabels,
   type PinTint,
   type ZoneLabels,
+  type ZoneLabelPosition,
   type GridSpacing,
 } from '../../core/map-view-prefs';
 import type { MapTabCacheEntry } from './map-tab-cache';
@@ -257,6 +258,12 @@ function template(prefs: MapViewPrefs, hasOverride: boolean): string {
           ${radio('zone_labels', 'hover',  'On hover',   prefs.zone_labels)}
           ${radio('zone_labels', 'never',  'Never',      prefs.zone_labels)}
         </div>
+
+        <label class="atlas-popover-section-label">Zone label position</label>
+        <div class="atlas-popover-radio-row" data-field="zone_label_position">
+          ${radio('zone_label_position', 'below',  'Below',    prefs.zone_label_position)}
+          ${radio('zone_label_position', 'center', 'Centered', prefs.zone_label_position)}
+        </div>
       </section>
     </div>
 
@@ -297,6 +304,7 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
       else if (field === 'pin_labels') patch.pin_labels = value as PinLabels;
       else if (field === 'pin_tint') patch.pin_tint = value as PinTint;
       else if (field === 'zone_labels') patch.zone_labels = value as ZoneLabels;
+      else if (field === 'zone_label_position') patch.zone_label_position = value as ZoneLabelPosition;
       else if (field === 'grid_spacing') patch.grid_spacing = Number(value) as GridSpacing;
       apply(patch);
     });

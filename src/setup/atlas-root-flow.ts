@@ -426,6 +426,12 @@ export async function scaffoldWorldInRoot(
   // (OPFS on first launch) instead of the atlas root — no folder pick, no
   // permission prompt (OPFS needs none).
   parentOverride?: { handle: FileSystemDirectoryHandle; label: string },
+  // Import round-trip: adopt the exported world id verbatim instead of minting
+  // a fresh one, so a world re-imported into atlas keeps its identity and any
+  // cross-tool `ow://` reference resolves (Skeld's id-is-identity law, S313).
+  // The caller guarantees no local world already uses this id (collision is a
+  // merge-or-new choice made upstream in the import room).
+  adoptId?: string,
 ): Promise<{
   store: FsFolderStore;
   worldUuid: string;
@@ -462,7 +468,7 @@ export async function scaffoldWorldInRoot(
   setActiveStore(null);
 
   const trimmed = name.trim() || 'Untitled world';
-  const worldUuid = newId();
+  const worldUuid = adoptId ?? newId();
   const slug = slugify(trimmed);
   const subName = `${slug}-${worldUuid.slice(0, 8)}`;
 
@@ -522,12 +528,18 @@ export async function createWorldFromImportedData(
     parentHandle?: { handle: FileSystemDirectoryHandle; label: string };
     /** ONLY the bundled sample world sets this (Bout OW demo-origin contract). */
     demo?: boolean;
+    /** Adopt this world id (the exported envelope's) instead of minting a fresh
+     *  one — a lossless round-trip. The import room passes it only when no local
+     *  world already uses it (S313). */
+    adoptWorldId?: string;
   } = {},
 ): Promise<{ entry: WorldRegistryEntry; applied: ApplyResult }> {
   const name = (plan.worldMeta?.name ?? opts.name ?? '').trim() || 'Imported world';
-  const { store, worldUuid, subName, handleKey, rootFolderName } = await scaffoldWorldInRoot(name, opts.parentHandle);
+  const { store, worldUuid, subName, handleKey, rootFolderName } =
+    await scaffoldWorldInRoot(name, opts.parentHandle, opts.adoptWorldId);
 
-  // World metadata from the import; id/name forced (export carries no world id).
+  // World metadata from the import; id/name forced to the scaffolded worldUuid
+  // (which is the adopted id when the caller adopted one, else a fresh mint).
   // `demo` never rides an import plan — only the explicit sample-world opt sets
   // it (an exported demo world must re-import as an ordinary world, or its
   // gestures would silently stop completing waypoints).

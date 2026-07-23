@@ -380,12 +380,12 @@ function render(): void {
   // The panel has TWO positions again (S303 rework): step 0 is the centre-stage
   // opener (`is-opener`) — the sentence at vignette scale on black, no shell
   // behind it — and it hands off into the docked narrator on "Begin". The dock
-  // is one fixed shape for every step after. The first two DOCKED steps read
-  // bright (`is-fresh`) before the parsing dims the sentence into a progress
-  // surface.
+  // is one fixed shape for every step after. Only the FIRST docked step (step 2,
+  // idx 1) reads bright (`is-fresh`); from step 3 on the sentence dims into the
+  // progress surface (Captain, S313 — the grey used to start a step too late).
   panel.className = 'atlas-tour-bar'
     + (opener ? ' is-opener' : '')
-    + (idx === 1 || idx === 2 ? ' is-fresh' : '');
+    + (idx === 1 ? ' is-fresh' : '');
   // e2e locator contract: the visible act label is gone (Freek's round), the
   // step number rides a data attribute instead.
   panel.dataset.tourStep = String(idx + 1);
@@ -632,11 +632,22 @@ function render(): void {
  * nothing, so the forward slot stays a bare button everywhere else.
  */
 function buildCreateStack(step: TourStep, view: TourWorldView): HTMLElement | null {
-  const refs = step.creates ?? (step.handsOn === 'create-consul' ? ['character:The Consul'] : []);
+  // Preview the elements that ARRIVE by clicking Next — scripted `creates`
+  // (minted one-by-one on the objects run) and `reveal` lists (appear on
+  // step-enter, e.g. deep-time's Rachmaninov, the-rest's ability/trait/…).
+  // NOT the hands-on beats: the consul, the pin, the link are made BY HAND, so
+  // previewing them is noise — the create-consul special case is gone (Captain,
+  // S313: "preview for any created by clicking next, not those by hand").
+  const refs = [...(step.creates ?? []), ...(step.reveal ?? [])];
   if (refs.length === 0) return null;
   const stack = document.createElement('div');
   stack.className = 'atlas-tour-create-stack';
-  for (const ref of refs) {
+  // A vertical column, right-anchored (Captain, S313). Capped so a step that
+  // reveals many elements (the map beat: a map + zone + six markers) stays a
+  // short stack, not a tower — the rest fold into a "+N" chip.
+  const overflow = refs.length > CREATE_STACK_MAX ? refs.length - (CREATE_STACK_MAX - 1) : 0;
+  const shown = overflow ? refs.slice(0, CREATE_STACK_MAX - 1) : refs;
+  for (const ref of shown) {
     const [type, name] = [ref.slice(0, ref.indexOf(':')), ref.slice(ref.indexOf(':') + 1)];
     const done = view.hasRef(ref);
     const icon = document.createElement('span');
@@ -646,8 +657,19 @@ function buildCreateStack(step: TourStep, view: TourWorldView): HTMLElement | nu
     icon.style.setProperty('--tour-glyph-color', ELEMENT_TYPE_COLORS[type as ElementType] ?? '#22d3ee');
     stack.appendChild(icon);
   }
+  if (overflow) {
+    const more = document.createElement('span');
+    more.className = 'atlas-tour-create-more';
+    // Lit once every folded element exists (reveals/mints land together).
+    if (refs.slice(CREATE_STACK_MAX - 1).every(r => view.hasRef(r))) more.classList.add('done');
+    more.textContent = `+${overflow}`;
+    more.title = `${overflow} more`;
+    stack.appendChild(more);
+  }
   return stack;
 }
+
+const CREATE_STACK_MAX = 5;
 
 /**
  * The reserved forward slot (Captain, S311). Whenever no LIVE forward control

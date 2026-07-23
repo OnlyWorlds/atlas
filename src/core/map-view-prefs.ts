@@ -18,6 +18,7 @@ export type PinStyle = 'icon' | 'round-icon' | 'pin-shape';
 export type PinLabels = 'always' | 'hover' | 'threshold' | 'never';
 export type PinTint = 'type-color' | 'accent' | 'muted';
 export type ZoneLabels = 'always' | 'hover' | 'never';
+export type ZoneLabelPosition = 'center' | 'below';
 /**
  * Grid spacing in storage-coord pixels. Common presets are 50/100/200 (shown
  * as radio chips in the popover), but any positive integer is valid via the
@@ -35,6 +36,7 @@ export interface MapViewPrefs {
   lock_pin_drag: boolean;
   zone_fill_opacity: number;
   zone_labels: ZoneLabels;
+  zone_label_position: ZoneLabelPosition;
 }
 
 /**
@@ -58,6 +60,10 @@ export const FACTORY_DEFAULTS: MapViewPrefs = {
   // ZoneOverlay) = labels fade in only when the zone is hovered. 'never' =
   // never shown. Default 'always' so users see them out of the box.
   zone_labels: 'always',
+  // 'below' (default, Captain S313) = the label hangs off the zone's bottom
+  // edge, so it never sits on the fill/markers and gets blocked. 'center' =
+  // the old centroid placement.
+  zone_label_position: 'below',
 };
 
 /**

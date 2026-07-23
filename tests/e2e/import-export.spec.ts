@@ -90,6 +90,70 @@ test('import loose elements merges into the current world (Mode B)', async ({ pa
   )).toBe(true);
 });
 
+const ENVELOPE = {
+  format: 'onlyworlds-world-export',
+  schema_version: '0.30.00',
+  exported_at: '2026-07-22T19:05:12Z',
+  world: { id: '068e012b-52a9-79bf-8000-26bb67891425', name: 'Hyperion' },
+  elements: {
+    character: [{ type: 'character', id: '068e2e60-fc37-789e-8000-a64560195ff8', name: 'The Consul', change_seq: 1 }],
+    location: [{ type: 'location', id: '068e2e70-1111-7000-8000-000000000001', name: 'Hegemony' }],
+  },
+};
+
+test('import the keel envelope creates a world and ADOPTS its world id (S313)', async ({ page }) => {
+  await setupWorld(page);
+  await openImport(page);
+  await page.fill('[data-role="paste"]', JSON.stringify(ENVELOPE));
+  await page.click('[data-action="load"]');
+
+  await expect(page.locator('.atlas-import-badge')).toHaveText('full world');
+  await expect(page.locator('input[name="imp-mode"][value="new"]')).toBeChecked();
+  await page.click('[data-action="import"]');
+
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  // The created world carries the EXPORTED id verbatim — a lossless round-trip,
+  // not a fresh mint.
+  await expect.poll(async () => page.evaluate(() =>
+    (window as any).__atlasTestApi.getState().active?.meta?.id ?? null,
+  )).toBe('068e012b-52a9-79bf-8000-26bb67891425');
+});
+
+test('re-importing a world that already exists offers merge-or-new and merges without duplicating (S313)', async ({ page }) => {
+  await setupWorld(page);
+  await openImport(page);
+  // First import adopts the id, creating + activating the world.
+  await page.fill('[data-role="paste"]', JSON.stringify(ENVELOPE));
+  await page.click('[data-action="load"]');
+  await page.click('[data-action="import"]');
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+
+  // Re-open import and load the SAME world, now grown by one element. Its id
+  // matches a local world, so the mode choice becomes merge-or-separate-copy.
+  await openImport(page);
+  const grown = {
+    ...ENVELOPE,
+    elements: {
+      ...ENVELOPE.elements,
+      object: [{ type: 'object', id: '068e5012-d77c-799d-8000-0000000000c3', name: 'The Steinway' }],
+    },
+  };
+  await page.fill('[data-role="paste"]', JSON.stringify(grown));
+  await page.click('[data-action="load"]');
+
+  await expect(page.locator('.atlas-import-warn', { hasText: 'already exists' })).toBeVisible();
+  await expect(page.locator('input[name="imp-mode"][value="merge"]')).toBeChecked();
+  await page.click('[data-action="import"]');
+
+  // The new element merged in, and no second Hyperion was created.
+  await expect.poll(async () => page.evaluate(() =>
+    (window as any).__atlasTestApi.getState().data.elements.some((e: any) => e.name === 'The Steinway'),
+  )).toBe(true);
+  const hyperionCount = await page.evaluate(() =>
+    (window as any).__atlasTestApi.getState().registry.worlds.filter((w: any) => w.name === 'Hyperion').length);
+  expect(hyperionCount).toBe(1);
+});
+
 test('validation surfaces issues and a fix prompt', async ({ page }) => {
   await setupWorld(page);
   await openImport(page);

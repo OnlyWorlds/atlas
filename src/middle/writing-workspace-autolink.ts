@@ -157,6 +157,34 @@ function labelForPromotion(view: EditorView, from: number, to: number, candidate
   return promotionLabel(view.state.doc.textBetween(from, to, '', ''), candidate);
 }
 
+/**
+ * Promote a hint range into an ElementChip. The single write path shared by
+ * Tab (cursor + hover + walk), click-to-link and the context menu — so the
+ * label rule (S309, the writer's own text via `promotionLabel`) and the
+ * replace semantics can never drift between gestures.
+ */
+function promoteHint(view: EditorView, from: number, to: number, candidate: AutolinkCandidate): boolean {
+  const chipType = view.state.schema.nodes.elementChip;
+  if (!chipType) return false;
+  const chip = chipType.create({
+    id: candidate.id,
+    type: candidate.type,
+    label: labelForPromotion(view, from, to, candidate),
+  });
+  view.dispatch(view.state.tr.replaceWith(from, to, chip));
+  return true;
+}
+
+/**
+ * The doc position under the mouse while it rests on a dotted hint (Captain,
+ * S313). Set on mouseover, cleared on mouseout. Makes Tab HOVER-AUTHORITATIVE:
+ * hovering a word and pressing Tab links THAT word, which is the model the copy
+ * always described and the fix for "no matter which I hover it links the first
+ * unlinked one". Re-resolved fresh in the handler, never trusted as a range, so
+ * an edit since mouseover cannot promote stale positions.
+ */
+let lastHintPos: number | null = null;
+
 export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<AutolinkPluginState> {
   return new Plugin<AutolinkPluginState>({
     key: AUTOLINK_PLUGIN_KEY,
@@ -202,78 +230,95 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
       decorations(state) {
         return AUTOLINK_PLUGIN_KEY.getState(state)?.decorations ?? null;
       },
+      // CLICK A DOTTED WORD TO LINK IT (Captain, S313). The most reliable
+      // gesture — one click focuses the editor and promotes in the same motion,
+      // so it works "even if the page isn't selected" (the reliability ask that
+      // Tab, which needs the editor already focused, could not meet). Only a
+      // plain left-click ON the hint span promotes; a click in adjacent
+      // whitespace resolves off the span and places the cursor as normal.
+      handleClick(view: EditorView, pos: number, event: MouseEvent): boolean {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+          return false;
+        }
+        const target = event.target as HTMLElement | null;
+        if (!target?.closest?.('.atlas-autolink-hint')) return false;
+        const hit = findAutolinkCandidateAt(view, pos);
+        if (!hit) return false;
+        if (!promoteHint(view, hit.from, hit.to, hit.candidate)) return false;
+        lastHintPos = null;
+        event.preventDefault();
+        return true;
+      },
+      handleDOMEvents: {
+        // Track the hint under the mouse so Tab can be hover-authoritative.
+        mouseover(view: EditorView, event: Event): boolean {
+          const me = event as MouseEvent;
+          const t = me.target as HTMLElement | null;
+          if (t?.closest?.('.atlas-autolink-hint')) {
+            const probe = view.posAtCoords({ left: me.clientX, top: me.clientY });
+            lastHintPos = probe ? probe.pos : null;
+          }
+          return false;
+        },
+        mouseout(_view: EditorView, event: Event): boolean {
+          const t = (event as MouseEvent).target as HTMLElement | null;
+          if (t?.closest?.('.atlas-autolink-hint')) lastHintPos = null;
+          return false;
+        },
+      },
       handleKeyDown(view: EditorView, event: KeyboardEvent): boolean {
         if (event.key !== 'Tab' || event.shiftKey) return false;
         // Suppress while the mention picker has its own Tab handling.
         if (mentionPickerVisible()) return false;
-        // Find a decoration containing or immediately adjacent to the cursor.
+
+        // 1) HOVER WINS (Captain, S313). If the mouse is resting on a dotted
+        // word, Tab links THAT word — the "hover a dotted word and press Tab"
+        // model, and the fix for "no matter which I hover it links the first".
+        // Re-resolve the candidate at the hovered position so a doc edit since
+        // mouseover can never promote a stale range.
+        if (lastHintPos !== null) {
+          const hovered = findAutolinkCandidateAt(view, lastHintPos);
+          if (hovered && promoteHint(view, hovered.from, hovered.to, hovered.candidate)) {
+            event.preventDefault();
+            return true;
+          }
+        }
+
+        // 2) CURSOR. A decoration containing or immediately adjacent to the
+        // caret (end of word, inside it, or just before it).
         const sel = view.state.selection;
         if (!sel.empty) return false;
         const pos = sel.from;
         const decos = AUTOLINK_PLUGIN_KEY.getState(view.state)?.decorations;
         if (!decos) return false;
-        // Iterate any decoration whose range touches or is one position away
-        // from the cursor. Lets us catch cursor sitting at the end of the word
-        // (pos === deco.to), inside the word, or just before it.
         const candidates = decos.find(Math.max(0, pos - 1), pos + 1);
         let found: typeof candidates[0] | undefined;
         for (const d of candidates) {
-          if (pos >= d.from && pos <= d.to) {
-            found = d;
-            break;
-          }
+          if (pos >= d.from && pos <= d.to) { found = d; break; }
         }
-        if (!found) {
-          // TAB MUST NOT ESCAPE THE EDITOR WHILE THERE IS LINKING TO DO
-          // (Captain, S307 — twice reported: "tab doesn't link, it selected
-          // the link icon top right"). Returning false here hands Tab back
-          // to the browser, which moves focus to the next control — the
-          // link-all corner button sits exactly there, so the app looked
-          // like it had done something random.
-          //
-          // The step's own copy says "press Tab to link", so Tab's job is
-          // linking: with the cursor off a dotted word, jump to the next
-          // dotted word (wrapping to the first) and promote THAT. Repeated
-          // Tab now walks the chapter linking each candidate in turn, which
-          // is what a writer means by pressing it again.
-          //
-          // Only when there is nothing left to link does Tab behave normally
-          // and move focus — at that point escaping is the correct answer,
-          // not a bug.
-          const hints = findHints(view).sort((a, b) => a.from - b.from);
-          if (hints.length === 0) return false;
-          const next = hints.find(h => h.from > pos) ?? hints[0];
-          const schema2 = view.state.schema;
-          const chipType2 = schema2.nodes.elementChip;
-          if (!chipType2) return false;
-          const chip2 = chipType2.create({
-            id: next.candidate.id,
-            type: next.candidate.type,
-            label: labelForPromotion(view, next.from, next.to, next.candidate),
-          });
-          view.dispatch(view.state.tr.replaceWith(next.from, next.to, chip2));
+        if (found) {
+          const candidate = (found.spec as { candidate?: AutolinkCandidate }).candidate;
+          if (candidate && promoteHint(view, found.from, found.to, candidate)) {
+            event.preventDefault();
+            return true;
+          }
+          return false;
+        }
+
+        // 3) WALK. Cursor off any hint: promote the next dotted word after it
+        // (wrapping to the first). Repeated Tab walks the chapter linking each
+        // in turn — and TAB MUST NOT ESCAPE while there is linking to do (S307:
+        // returning false hands Tab to the browser, which lands focus on the
+        // link-all corner button and reads as "Tab did something random").
+        // Only an empty hint set lets Tab move focus, which is then correct.
+        const hints = findHints(view).sort((a, b) => a.from - b.from);
+        if (hints.length === 0) return false;
+        const next = hints.find(h => h.from > pos) ?? hints[0];
+        if (promoteHint(view, next.from, next.to, next.candidate)) {
           event.preventDefault();
           return true;
         }
-        const candidate = (found.spec as { candidate?: AutolinkCandidate }).candidate;
-        if (!candidate) return false;
-
-        // Replace the decorated text with an ElementChip node. No trailing
-        // space inserted — the cursor naturally lands after the chip, and
-        // the user already has whatever whitespace was after the original
-        // word (autolink only matches up to the word boundary).
-        const schema = view.state.schema;
-        const chipType = schema.nodes.elementChip;
-        if (!chipType) return false; // Editor schema doesn't include the chip — bail.
-        const chip = chipType.create({
-          id: candidate.id,
-          type: candidate.type,
-          label: labelForPromotion(view, found.from, found.to, candidate),
-        });
-        const tr = view.state.tr.replaceWith(found.from, found.to, chip);
-        view.dispatch(tr);
-        event.preventDefault();
-        return true;
+        return false;
       },
     },
   });

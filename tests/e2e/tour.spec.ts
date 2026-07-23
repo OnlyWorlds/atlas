@@ -66,20 +66,21 @@ async function setNowViaButton(page: Page) {
 /** The writing beat (step 11) is SINGLE ROUTE (S306): the chapter is baked as
  *  plain prose and Next appears only once a chip exists in it.
  *
- *  Drives the REAL gesture: a real click to put the cursor inside the dotted
- *  word, then a REAL `keyboard.press('Tab')` through ProseMirror's own
- *  handleKeyDown. Deliberately NOT a dispatched KeyboardEvent — a synthetic
- *  event does not reproduce a library's own event routing, which is exactly
- *  the proxy that lied green about the zone-click in S304.
+ *  Drives the REAL gesture, S313 version: a plain CLICK on a dotted word, which
+ *  promotes it to a chip in one motion (`handleClick` in the autolink plugin).
+ *  This replaces the old click-then-Tab pair whose "cursor inside a hint before
+ *  the key arrives" precondition was the S306 documented flake — one click has
+ *  no such race. Still a real click through ProseMirror's own event routing, not
+ *  a dispatched synthetic (the proxy that lied green in S304).
  *
  *  The forward gate reads the chapter's `story` from the STORE, so it waits on
  *  the workspace's ~1s save debounce; the phase assertion polls it out. */
-async function linkWordViaTab(page: Page) {
+async function linkWordViaClick(page: Page) {
   // THE SETTLE, and the reason this is not a sleep: `data-tour-step` flips
   // BEFORE the step's reveal/heal runs, and the heal writes elements, which
   // swaps `state.data.elements` and refreshes the writing workspace — taking
   // the editor's selection (and a just-made chip) with it. Clicking into prose
-  // before the heal lands is a real race that reads as "Tab did nothing".
+  // before the heal lands is a real race that reads as "the click did nothing".
   await page.evaluate(async () => { await (window as any).__atlasTestApi.awaitTourSettled(); });
   // The step's reveal/heal must be DONE before the decorations mean anything:
   // `data-tour-step` flips before it runs (the S301 trap), and the reveal is
@@ -89,34 +90,11 @@ async function linkWordViaTab(page: Page) {
   await expect(page.locator('.ProseMirror .atlas-autolink-hint')).toHaveCount(7);
   const hint = page.locator('.ProseMirror .atlas-autolink-hint').first();
   await expect(hint).toBeVisible();
-  // Retried as a unit: under 4 workers a single attempt is not reliable.
-  // (Measured, not assumed: when it fails the chip count sits at 0 for the
-  // whole timeout, and when it succeeds the chip is present immediately and
-  // STAYS — sampled over 7s, with `story` carrying the ow:// link. So nothing
-  // is racing the chip away after the fact; attempts either land or are lost.)
-  await expect(async () => {
-    await hint.click();
-    // THE REAL PRECONDITION, and the one I got wrong twice before measuring.
-    // `handleKeyDown` promotes the decoration CONTAINING THE CURSOR, so what
-    // must be true is not "the editor has focus" but "the collapsed selection
-    // sits inside a hint span". The focus-class assertion resolves from a
-    // cached snapshot without a round-trip, so the key could be sent before the
-    // click's selection had been applied; the handler then found no decoration
-    // at the cursor, returned false, and Tab just moved focus. Every green run
-    // I got before this traced back to some incidental round-trip buying the
-    // time — this waits on the condition itself.
-    await page.waitForFunction(() => {
-      const sel = window.getSelection();
-      if (!sel || !sel.isCollapsed || sel.rangeCount === 0) return false;
-      const node = sel.anchorNode;
-      if (!node) return false;
-      const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);
-      return Boolean(el && el.closest('.atlas-autolink-hint'));
-    });
-    await page.keyboard.press('Tab');
-    await expect(page.locator('.ProseMirror .atlas-element-chip'))
-      .toHaveCount(1, { timeout: 4_000 });
-  }).toPass({ timeout: 45_000 });
+  // One click links it — deterministic, so no retry loop. The chip appears
+  // and STAYS (the heal preserves user chips), and the gate flips to phase b
+  // once the ~1s save debounce carries `story` to the store.
+  await hint.click();
+  await expect(page.locator('.ProseMirror .atlas-element-chip')).toHaveCount(1);
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-phase', 'b');
 }
 
@@ -1041,7 +1019,7 @@ test('the exit confirm names the rooms the tour never reached, and can be declin
   expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(0);
 });
 
-test('the writing beat: the sentence arrives plain, Tab links it, Next waits for a chip', async ({ page }) => {
+test('the writing beat: the sentence arrives plain, a click links it, Next waits for a chip', async ({ page }) => {
   await freshBoot(page);
   await openOpener(page);
   await beginToWorld(page);
@@ -1062,11 +1040,11 @@ test('the writing beat: the sentence arrives plain, Tab links it, Next waits for
   await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
 
   // The suggestions the beat depends on: autolink resolves the sentence's
-  // baked surface forms, so there is something to press Tab on at all.
+  // baked surface forms, so there is a dotted word to click at all.
   await expect(prose.locator('.atlas-autolink-hint').first()).toBeVisible();
 
-  // The real gesture.
-  await linkWordViaTab(page);
+  // The real gesture: click a dotted word to link it (S313).
+  await linkWordViaClick(page);
   await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 
   // The chip is a real link, not styled text: it carries the element's id
