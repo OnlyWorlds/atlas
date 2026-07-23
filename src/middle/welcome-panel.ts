@@ -104,7 +104,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       const folderDoor = folderMode
         ? `<span class="atlas-landing-choice">
              <button class="${folderBtnClass} atlas-landing-btn" data-action="setup-atlas">set up a folder</button>
-             <span class="atlas-landing-choice-note">each world a folder with text files for elements</span>
+             <span class="atlas-landing-choice-note">Atlas works with text files on your local drive</span>
            </span>`
         : '';
       const folderNote = folderMode

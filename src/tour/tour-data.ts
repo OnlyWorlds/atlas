@@ -190,9 +190,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Atlas treats worlds as folders of text files. Let’s make a world that can capture this sentence.\n' +
+        'Worlds are containers for any number of elements. Let’s make a world that can capture this sentence.\n' +
         'Click the **create local world** icon in the top left. We’ll call it Hyperion after the novel.',
-      meta: 'Normally this would create a local folder, but the tour world stays in your browser.',
+      meta: 'Normally this would create a folder on your drive, but the tour world is temporarily stored in your browser.',
     }],
     handsOn: 'create-world',
   },
@@ -203,7 +203,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'Worlds are made of elements, and this Consul seems pre-eminent.\nClick the highlighted + to create it as a character element.',
+          'Worlds are made of elements, and this Consul seems pre-eminent.\nClick the highlighted + to create it as a character.',
         // (The "real element dialog, locked to the tour’s script this once…" meta
         // was cut S301, Captain’s round — the dialog speaks for itself.)
       },
@@ -214,8 +214,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'b',
         when: (w) => w.hasRef('character:The Consul'),
         body:
-          'Here we see the Consul’s page, with a set of shared “base” fields, and some that are specific to characters.' +
-          '\nBut there’s more to this person. You get the next two for free.',
+          'Here we see the Consul’s page, where we can edit fields that shape this character.' +
+          '\nIn this tour, empty fields are hidden for clarity.' + 
+          '\nSo how do we model the diplomatic standing this character has?', 
+                meta: 'Each of the 22 element categories has its own set of fields. They all share the "base" fields you see at the top here.',
       },
     ],
     spans: [{ from: 2, to: 2, type: 'character', ref: 'character:The Consul' }],
@@ -242,8 +244,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The Hegemony is an institution: any kind of organized body.' +
-        '\nThe title gets its own element, issued by the Hegemony, held by our character.' ,
+        'The Hegemony is an institution: a category that represents any kind of organized body.' +
+        '\nTitle is another category. Here\'s one that was issued by the Hegemony and is held by our character.' ,
     }],
     // One word per element, in reading order (Captain, S306): "The" carries the
     // TITLE, "Hegemony" the institution, and "Consul" is left alone so the
@@ -283,8 +285,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'What is below the balcony? A world. Locations hold the places of your ' +
-        'setting, and they nest: a city sits on a continent, a continent on a planet.',
+        'He\'s above some sort of planet we don\'t know the name of. Physical locations of any size can get their own element.',
+          meta: 'Locations can be nested: a city on a continent on a planet.',
     }],
     spans: [{ from: 35, to: 35, type: 'location' }],
     reveal: ['location:Planet Hyperion'],
@@ -297,20 +299,14 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'A map is an element that carries an image: this one shows Hyperion, and ' +
-        'a new pane just opened on the right to hold it. Regions can be traced ' +
-        'onto it too: the swamps are a zone, drawn right there.',
+        'Maps are elements that act as 2d or 3d canvases onto which you can place other elements.' +
+        '\nThey take a pre-existing map image (using the image_url field, or a local uploaded file).' +
+        '\nHere, we have a map that represents the unnamed planet, with a zone element drawn onto it that represents the swamps.' ,
       // Captain, S307: the step said a map "carries an image" and never said
       // where that image comes from, which is the first question anyone has
       // about their OWN map. Both routes below are verified against the real
       // controls (map-create-modal’s URL field + the local-file row added in
-      // S253), because copy naming a control is a behavioural claim.
-      deeper:
-        'Your own maps take an image two ways: paste a URL, or choose a file ' +
-        'from your computer. A chosen file is copied into the world folder ' +
-        'and never uploaded anywhere, so the map keeps working offline and ' +
-        'travels with the folder. You can also make a map with no image at ' +
-        'all and draw on the blank canvas, then add the art later.',
+      // S253), because copy naming a control is a behavioural claim. 
     }],
     // The swamps zone (and its markers) reveal WITH the map — the pin beat’s
     // soft correction needs the region present to test the drop against, and
@@ -336,8 +332,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'Pins place elements on maps. Click the highlighted pin button on the ' +
-          'Consul, then click the swamps below to set his balcony seat over them.',
+          'Besides zones, that are created by placing markers on maps, you can place elements on maps using pins.' + 
+          '\nIn the consul edit screen, click the + pin icon at the top, then click on the map to place the consul. Put him somewhere over the swamps, per canon.',
+  
         deeper:
           'A sharp eye notices the pin holds the Consul, not his spaceship: a pin ' +
           'records where an ELEMENT is, and the schema has no field yet that says a ' +
@@ -356,16 +353,13 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'b',
         when: (w) => w.hasRef(TOUR_PIN_REF),
         body:
-          'The seat is on the map. If it is not over the swamps, drag the pin onto ' +
-          'them: he is looking down at the saurians below, so the seat sits above ' +
-          'the zone.',
+          'Drag the pin onto the zone, so that the consul can observe the saurians below.', 
       },
       {
         id: 'c',
         when: (w) => w.hasRef(TOUR_PIN_REF) && w.pinInZone(TOUR_PIN_REF, TOUR_SWAMPS_ZONE_REF),
         body:
-          'Placed. His balcony seat sits over the swamps, and the pin holds the ' +
-          'Consul’s identity: click it any time to travel back to him.',
+          'Placed. Click the pin any time to select the consul again.' ,
       },
     ],
     handsOn: 'place-pin',
@@ -388,10 +382,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
         // elements this step reveals, and schema-impossible for one — a
         // collective has no zone field, so the old copy implied a link the
         // model cannot express. Narrowed to what is true and checkable.
-        'The saurian things live in those swamps: two creatures in the swamps ' +
-        'zone on the map, the species they share, and one bellowing pack that ' +
-        'holds them both.',
-    }],
+        'We know there are at least two creatures in the swamps below, so we\'ll create two creature elements.' +
+        '\nPhysical bodies can be grouped into a collective, one of which will represent the entire pack of the saurian things.'  ,
+          }],
     spans: [
       { from: 27, to: 27, type: 'creature' },
     ],
@@ -415,29 +408,29 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'Three objects sit in this sentence. Add them yourself: the + above the ' +
-          'element list adds the next one, starting with the ebony spaceship.',
+          'Three objects sit in the sentence, with particular relations: the balcony is part of the spaceship, and the piano is inside of it.' +
+          '\nWe can model this situation by setting the spaceship as parent_object of the balcony and piano.'+
+          '\nClick the create element button three more times to create them.',
       },
       {
         id: 'b',
         when: (w) => w.hasRef('object:Ebony Spaceship'),
         body:
-          'The spaceship is in the world, and it is already on the Consul: his ' +
-          'World section holds it under Objects. Add the balcony next.',
+          'The spaceship is in the world, and it is already on the Consul: it is linked in his objects field.' +
+          '\nAdd the balcony next.',
       },
       {
         id: 'c',
         when: (w) => w.hasRef('object:Spaceship Balcony'),
         body:
           'The balcony’s “parent object” is the spaceship: objects nest in objects, ' +
-          'the same way locations nest in locations. One more, the Steinway.',
+          'the same way locations nest in locations. One more click for the piano.',
       },
       {
         id: 'd',
         when: (w) => w.hasRef("object:The Consul’s Steinway"),
         body:
-          'Three objects, each linked as it arrived. The balcony rides along inside ' +
-          'the ship, which is why the Consul’s Objects hold two of the three.',
+          'Three objects that are linked to each other and their owner. Let\'s carry on.',
       },
     ],
     spans: [
@@ -457,24 +450,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The Consul’s page has filled in: under World, his Objects now hold the spaceship and the ' +
-        'Steinway (the balcony rides along inside the ship), his ' +
-        'Institutions hold the Hegemony, and Referenced by at the bottom shows his title pointing back at him. ' +
-        'Click any chip to travel. This web of links is the heart of OnlyWorlds.',
-      deeper:
-        'Links are what make a world more than a pile of notes. Every element type ' +
-        'has typed link fields (a character has abilities, objects, family; a title has ' +
-        'an issuer and holders), and every link is two-way: set it on one side and the ' +
-        'other side shows it under Referenced by automatically.' +
-        '\n\n' +
-        // The Web tab used to be named here (S304 gate, banked LOW): it stays
-        // HIDDEN until `where-it-lives` five steps later, which introduces it
-        // properly against the folder. Naming a tab the user cannot see yet is
-        // a promise the chrome does not keep.
-        'When you want to go further, the Knowledge room tracks which characters KNOW ' +
-        'each fact, so what the reader knows and what the villain knows can differ.' +
-        '\n\n' +
-        'Tools across the OnlyWorlds ecosystem read these same links.',
+        'Back to the Consul: a man of the world, clearly, as we see by the links he holds to other elements. Click any chip to travel to that element.' +
+        '\nThe spaceship and Steinway as objects in his possession, and the "referenced by" section shows which other elements link to the Consul.' ,
+ 
     }],
     reveal: [],
     route: { kind: 'element', ref: 'character:The Consul' },
@@ -503,10 +481,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
           // (S306): `handleKeyDown` promotes the decoration containing the
           // CURSOR, so hovering does nothing and Tab just moves focus out of
           // the editor. The gesture is click-then-Tab.
-          'The Writing room holds your long-form work: books, chapters, scenes. ' +
-          'This is Chapter 1 of Hyperion, the sentence itself, and it is plain text. ' +
-          'Atlas already recognises the names it knows: click inside a dotted word, ' +
-          'then press Tab to turn it into a link. Try a few.',
+          'The writing room supports long-form work by organizing your stories and linking your elements into them.' +
+          '\nA system of three customizable "tiers", where the default is Book - Chapter - Scene, can be used to organize your work.' +
+          '\nHere we\'ll make a start on Hyperion\'s first chapter with the opening sentence.' +
+          '\nNote the blue underlines for auto-detected links: hover one and press the Tab button to create the link.',
         deeper:
           'Chips are live: click one to travel to its element, and the link shows on ' +
           'the other side too, under Referenced by.' +
@@ -518,9 +496,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
           'prose keeps reading exactly as you wrote it, and the next mention is ' +
           'recognised on its own.' +
           '\n\n' +
-          'Right-click a selection to choose the element yourself. The tree on the ' +
-          'left holds tiers you name (Book, Chapter, Scene) plus a flexible Draft that ' +
-          'floats beside them.',
+          'Right-click a selection to choose the element yourself.',
       },
       {
         id: 'b',
