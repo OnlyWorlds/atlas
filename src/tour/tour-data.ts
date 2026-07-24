@@ -229,7 +229,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       body:
         'How do you create a world for something as big or as small as a single sentence?\nAtlas uses a folder per world, that contains elements as text files.' +
         '\n\nClick the **create local world** icon in the top left. Call it Hyperion after the novel.',
-      meta: 'This tour world does not create a local folder, the world is stored temporarily in your browser.',
+      meta: 'This tour world does not create a local folder, it is stored temporarily in your browser.',
     }],
     handsOn: 'create-world',
   },
