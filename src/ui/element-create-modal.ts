@@ -187,6 +187,13 @@ export class ElementCreateModal extends BaseModal {
     this.modal = this.buildModal();
     this.show();
     queueMicrotask(() => {
+      // Tour lock (Captain, S318): the name is readonly and scripted, so the
+      // usual focus+select — a blue selection inviting typing — misleads.
+      // Focus the Create button instead; Enter still advances.
+      if (this.opts.lockAll) {
+        this.modal?.querySelector<HTMLButtonElement>('[data-action="create"]')?.focus();
+        return;
+      }
       const input = this.modal?.querySelector<HTMLInputElement>('input[name="element-name"]');
       input?.focus();
       input?.select();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderChangelog, assertUniqueEntryIds } from '../../src/changelog/render-changelog';
+import { renderChangelog, renderChangelogFeed, assertUniqueEntryIds } from '../../src/changelog/render-changelog';
 import { CHANGELOG, type ChangelogRelease } from '../../src/changelog/changelog.data';
 
 describe('renderChangelog — seed data', () => {
@@ -77,5 +77,45 @@ describe('renderChangelog — credit + escaping contract', () => {
     expect(html).not.toContain('<script>alert(1)</script>');
     expect(html).toContain('&lt;script&gt;');
     expect(html).toContain('safe &amp; &lt;sound&gt;');
+  });
+});
+
+describe('renderChangelogFeed — the RSS half (S318)', () => {
+  const feed = renderChangelogFeed(CHANGELOG);
+
+  it('is RSS 2.0 with one item per entry, permalink guids', () => {
+    expect(feed.startsWith('<?xml version="1.0"')).toBe(true);
+    expect(feed).toContain('<rss version="2.0"');
+    const entryCount = CHANGELOG.reduce((n, r) => n + r.entries.length, 0);
+    expect((feed.match(/<item>/g) ?? []).length).toBe(entryCount);
+    for (const r of CHANGELOG) {
+      for (const e of r.entries) {
+        expect(feed).toContain(`changelog.html#${e.id}`);
+      }
+    }
+    expect(feed).toContain('<guid isPermaLink="true">');
+  });
+
+  it('carries RFC822 pubDates from the release day', () => {
+    // 2026-07-24 is a Friday; a wrong date-mapping breaks this loudly.
+    expect(feed).toContain('Fri, 24 Jul 2026');
+  });
+
+  it('escapes markup in fed content', () => {
+    const fixture: ChangelogRelease[] = [{
+      version: '9.9', date: '2026-01-01', theme: 't',
+      entries: [{ id: 'esc', title: 'a < b & c', tags: ['<b>'], body: '"q"' }],
+    }];
+    const xml = renderChangelogFeed(fixture);
+    expect(xml).toContain('a &lt; b &amp; c');
+    expect(xml).not.toContain('<b>');
+  });
+
+  it('the seed data is the fresh v1: exactly one release, launch-dated', () => {
+    // Captain's S318 ruling — one clean v1.0 block, ready to changelog on
+    // top of. A second release reappearing here should be a conscious act.
+    expect(CHANGELOG.length).toBe(1);
+    expect(CHANGELOG[0].version).toBe('1.0');
+    expect(CHANGELOG[0].date).toBe('2026-07-24');
   });
 });

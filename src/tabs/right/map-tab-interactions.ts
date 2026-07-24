@@ -328,12 +328,22 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
     try {
       const store = getActiveStore();
       if (!store) return;
+      // Tour beat (S318): the map step's copy offers BOTH gestures ("clicking
+      // the + pin icon ... or dragging him in from the sidebar"), but only the
+      // click path adopted the bundle pin's identity — a dragged-in pin was an
+      // ordinary nameless pin that could never satisfy hasRef(TOUR_PIN_REF),
+      // and with the element then pinned, +pin hid and the user was STUCK.
+      // Same bake, same guard shape as the placement path above.
+      const tourMod = document.body.classList.contains('atlas-touring')
+        ? await import('../../tour/tour-engine') : null;
+      const bake = tourMod ? await tourMod.tourPinBake(payload.id, entry.mapId) : null;
       await store.createPin({
         map_id: entry.mapId,
         element_id: payload.id,
         element_type: payload.type,
         x: clampToCanvas(Math.round(point.x), width),
         y: clampToCanvas(Math.round(point.y), height),
+        ...(bake ?? {}),
       });
       await refreshElementsAfterWrite(store);
       toasts.success('Pin placed');

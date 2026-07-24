@@ -10,11 +10,16 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CHANGELOG } from '../src/changelog/changelog.data';
-import { renderChangelog } from '../src/changelog/render-changelog';
+import { renderChangelog, renderChangelogFeed } from '../src/changelog/render-changelog';
 
 const outPath = fileURLToPath(new URL('../changelog.html', import.meta.url));
 const html = renderChangelog(CHANGELOG);
 writeFileSync(outPath, html, 'utf8');
 
+// The RSS feed rides public/ so Vite copies it verbatim into dist (S318;
+// Skeld's ecosystem what's-new feed shares the item shape).
+const feedPath = fileURLToPath(new URL('../public/changelog-feed.xml', import.meta.url));
+writeFileSync(feedPath, renderChangelogFeed(CHANGELOG), 'utf8');
+
 const entries = CHANGELOG.reduce((n, r) => n + r.entries.length, 0);
-console.log(`changelog: wrote ${outPath} (${CHANGELOG.length} releases, ${entries} entries)`);
+console.log(`changelog: wrote ${outPath} + changelog-feed.xml (${CHANGELOG.length} releases, ${entries} entries)`);

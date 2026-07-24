@@ -3128,6 +3128,22 @@ body.atlas-preroot .atlas-middle {
 .atlas-map-canvas-container.leaflet-grab {
   cursor: default !important;
 }
+/* Round 4 (S318, empirical again): the special states this block's comment
+   PROMISED still won were in fact beaten by the default rule above — equal
+   specificity, both !important, and this one sits later in the sheet, so
+   "crosshair while placing" silently never showed (Captain: "should the
+   mouse be a different cursor in pin place mode?" — it always should have
+   been, and the rule existed since S299). The overrides live HERE, after the
+   default, with strictly higher specificity, so the cascade agrees with the
+   comment at last. */
+body.atlas-placing .leaflet-container,
+body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
+  cursor: crosshair !important;
+}
+.atlas-map-canvas-container.leaflet-container.atlas-zone-editing,
+.atlas-map-canvas-container.leaflet-grab.atlas-zone-editing {
+  cursor: crosshair !important;
+}
 
 /* Visibility toggles: hidden state dims the subject glyph and shows a small
    slash-eye badge at the corner (2026-07-19 — the old identical-eye pair).

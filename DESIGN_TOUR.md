@@ -167,10 +167,21 @@ throwaway world:
      Correct app-wide, not just for the tour.
    NO dock button — single-route, gated. The app-wide placement feedback lives
    in `src/tabs/right/map-placement-hint.ts` + the `[data-action="pin-element"]`
-   active style; Esc-owns-placement is a skip in the deselect-to-home guard.
-4. **Set up your folder** (step 17, finale): the real `setupAtlasRoot`
+   active style (armed = crosshair cursor, an outcome asserted in e2e since
+   S318 — the rule existed from S299 but lost the cascade to the S219 default
+   cursor for three months); Esc-owns-placement is a skip in the
+   deselect-to-home guard.
+   **BOTH copy gestures satisfy the gate (S318)**: the +pin click AND the
+   drag-from-sidebar drop each route through `tourPinBake`, so either way the
+   placed pin IS the bundle pin. The drop path missed the bake until S318 —
+   a dragged-in pin was nameless, the gate never opened, and +pin (hidden
+   once the element is pinned) left no retry; revert-checked e2e locks it.
+4. **Set up your folder** (step 16, finale): the real `setupAtlasRoot`
    picker; success ends the tour. On OPFS-only browsers Finish is primary
-   and no folder button renders.
+   and no folder button renders. The finale ROUTES to `object:Ebony
+   Spaceship` (Captain, S318): the closing view is the sentence's grandest
+   object, links radiating back. The exit confirm carries no title and ends
+   with "Replay the tour any time from the settings."
 
 ## The residue contract
 

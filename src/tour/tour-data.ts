@@ -377,7 +377,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         when: (w) => w.hasRef(TOUR_PIN_REF) && w.pinInZone(TOUR_PIN_REF, TOUR_SWAMPS_ZONE_REF),
         body:
           'You can click the pin any time to select the Consul.' +
-          'Maps can be nested into each other using a hierarchy system.\nMaps can be assigned a specific location to represent, like this particuar map has.' ,
+          '\nMaps can be nested into each other using a hierarchy system.\nMaps can be assigned a specific location to represent, like this particular map has.' ,
       },
     ],
     handsOn: 'place-pin',
@@ -716,6 +716,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'the [feedback tracker](https://github.com/OnlyWorlds/feedback), or email at info@onlyworlds.com.',
       meta: 'The tour world leaves nothing behind. Replay it anytime from settings.',
     }],
+    // The closing view is the ebony spaceship (Captain, S318 — "just for
+    // cools"): the tour ends looking at the sentence's grandest object, its
+    // links radiating back through everything the user just built.
+    route: { kind: 'element', ref: 'object:Ebony Spaceship' },
     handsOn: 'setup-folder',
   },
 ];

@@ -8,6 +8,7 @@ dist/
 # Generated from src/changelog/changelog.data.ts by `npm run changelog`
 # (regenerated on every build + predev; the data file is the edit surface).
 changelog.html
+public/changelog-feed.xml
 
 # Test output
 coverage/

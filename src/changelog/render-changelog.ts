@@ -219,6 +219,49 @@ export function assertUniqueEntryIds(releases: ChangelogRelease[]): void {
   }
 }
 
+/** RFC 822 date for RSS pubDate, from an ISO day (noon UTC — the changelog
+ *  records days, not moments; a fixed hour keeps the output stable). */
+function rfc822(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  return dt.toUTCString();
+}
+
+/**
+ * RSS 2.0 feed — one item per ENTRY, so a combined ecosystem feed (Skeld's
+ * what's-new, 2026-07-24) can interleave items across tools without
+ * unpacking releases. Item shape, kept deliberately boring and shareable:
+ * title = entry title, link + guid = the entry's permalink anchor,
+ * description = body, category = tags, pubDate = the release day.
+ * Pure like renderChangelog; the build script writes it to
+ * public/changelog-feed.xml.
+ */
+export function renderChangelogFeed(releases: ChangelogRelease[]): string {
+  assertUniqueEntryIds(releases);
+  const items = releases.flatMap(r => r.entries.map(e => `
+    <item>
+      <title>${esc(e.title)}</title>
+      <link>${PAGE_URL}.html#${esc(e.id)}</link>
+      <guid isPermaLink="true">${PAGE_URL}.html#${esc(e.id)}</guid>
+      <pubDate>${rfc822(r.date)}</pubDate>
+      ${e.body ? `<description>${esc(e.body)}</description>` : ''}
+      ${e.tags.map(t => `<category>${esc(t)}</category>`).join('')}
+    </item>`));
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Atlas Changelog</title>
+    <link>${PAGE_URL}.html</link>
+    <atom:link href="${SITE_URL}/changelog-feed.xml" rel="self" type="application/rss+xml" />
+    <description>What is new in Atlas, the local-first OnlyWorlds world editor. Every change, credited.</description>
+    <language>en</language>
+    ${releases.length ? `<lastBuildDate>${rfc822(releases[0].date)}</lastBuildDate>` : ''}
+    ${items.join('')}
+  </channel>
+</rss>
+`;
+}
+
 export function renderChangelog(releases: ChangelogRelease[]): string {
   assertUniqueEntryIds(releases);
   const body = releases.map(renderRelease).join('');
@@ -245,6 +288,7 @@ export function renderChangelog(releases: ChangelogRelease[]): string {
   <meta name="twitter:title" content="Atlas Changelog" />
   <meta name="twitter:description" content="${esc(desc)}" />
   <meta name="twitter:image" content="${SITE_URL}/og.png" />
+  <link rel="alternate" type="application/rss+xml" title="Atlas Changelog" href="${SITE_URL}/changelog-feed.xml" />
   <style>${STYLE}</style>
 </head>
 <body>

@@ -45,54 +45,19 @@ export interface ChangelogRelease {
   entries: ChangelogEntry[];
 }
 
-/** Newest release first. */
+/**
+ * Newest release first.
+ *
+ * v1 RESET (Captain, S318 launch day): the page opens as ONE clean v1.0
+ * block — the launch state, dated launch day — ready to changelog on top of.
+ * The pre-launch drops (the old 1.0 of 2026-07-19 and the 1.1 polish set)
+ * were folded in: nothing had shipped publicly yet, so a history of drops
+ * nobody could have used was noise wearing a version number.
+ */
 export const CHANGELOG: ChangelogRelease[] = [
   {
-    version: '1.1',
-    date: '2026-07-24',
-    theme: 'working in daylight',
-    entries: [
-      {
-        id: 'light-mode',
-        title: 'Light mode',
-        body: 'A full daylight theme across the whole app. Pick it in Settings, General, and atlas remembers your choice.',
-        tags: ['appearance'],
-      },
-      {
-        id: 'import-world-export',
-        title: 'Import reads OnlyWorlds exports directly',
-        body: 'Drop or paste a world exported from onlyworlds.com and atlas adopts it whole, keeping fields it does not yet know about.',
-        tags: ['import'],
-      },
-      {
-        id: 'autolink-reliable',
-        title: 'Linking words in your prose, made reliable',
-        body: 'Click a highlighted word to link it to an element, or hover a word and press Tab. Creating a link never rewrites your text.',
-        tags: ['writing'],
-      },
-      {
-        id: 'zone-labels-below',
-        title: 'Zone labels sit below the zone',
-        body: 'Labels hang under their zone by default instead of hiding beneath the shape and its markers.',
-        tags: ['maps'],
-      },
-      {
-        id: 'chart-eras',
-        title: 'Chart eras read at a glance',
-        body: 'Each era carries its own tint, so the pivots in your timeline are visible without reading every date.',
-        tags: ['charts'],
-      },
-      {
-        id: 'general-settings',
-        title: 'A General settings tab',
-        body: 'Home to the theme toggle and an About panel with version and links.',
-        tags: ['settings'],
-      },
-    ],
-  },
-  {
     version: '1.0',
-    date: '2026-07-19',
+    date: '2026-07-24',
     theme: 'the folder is the world',
     entries: [
       {
@@ -137,6 +102,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'A walkthrough that builds a tiny world one sentence at a time, so a first look teaches the whole shape of the tool.',
         tags: ['tour'],
         credit: { handle: 'Freek', platform: 'collaborator' },
+      },
+      {
+        id: 'light-mode',
+        title: 'Light and dark',
+        body: 'A full daylight theme across the whole app. Pick it in Settings, General, and atlas remembers your choice.',
+        tags: ['appearance'],
       },
     ],
   },

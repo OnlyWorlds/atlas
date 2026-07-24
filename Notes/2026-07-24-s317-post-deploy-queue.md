@@ -15,7 +15,7 @@
 
 - The chart step (phase b) and deep-time carry **byte-identical deeper flyouts** (the full chart explainer twice) — intentional?
 - The objects phases a–d each repeat the same *parent_object* deeper; only phase b's carries the council LINK, the others say "file a motion" without one.
-- "dragging him in from the sidebar" (map step copy) — VERIFIED real: sidebar rows drag onto maps via `application/x-atlas-element`; both gestures satisfy the pin gate.
+- "dragging him in from the sidebar" (map step copy) — the drag MECHANISM was real, but "both gestures satisfy the pin gate" was WRONG (verified the drag exists, not the gate): the drop path minted an ordinary pin that never satisfied the gate and left the user stuck. Fixed S318 (drop path rides `tourPinBake`), locked by a revert-checked e2e.
 
 ## Standing owed (unchanged)
 

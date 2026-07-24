@@ -508,6 +508,10 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page.locator('[data-tab-kind="context"]')).toHaveClass(/active/);
   await nextStep(page, 16); // finale
 
+  // The finale lands on the Ebony Spaceship (Captain, S318): the closing view
+  // is the sentence's grandest object with its links radiating back.
+  await expect(page.locator('.atlas-room-nav-selected')).toContainText('Ebony Spaceship');
+
   // The finale's control set, asserted POSITIVELY (S301 gate, MED): the
   // shipped early-return renders Finish + the folder button and NO Exit.
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Set up a folder$/ })).toBeVisible();
@@ -852,6 +856,12 @@ test('armed pin placement disarms on navigation — no stray second pin (S299 cl
   await page.locator('[data-action="pin-element"]').click();
   await expect.poll(() => page.evaluate(() =>
     Boolean((window as any).__atlasTestApi.getState().ui.pinPlacement))).toBe(true);
+  // The armed cursor is a cascade OUTCOME, not a rule (S318): the crosshair
+  // rule existed since S299 and was silently beaten by the S219 default-cursor
+  // rule for three months. Assert the computed value, which no restatement of
+  // the rule can fake.
+  expect(await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.leaflet-container')!).cursor)).toBe('crosshair');
   await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '5');
 
@@ -869,6 +879,36 @@ test('armed pin placement disarms on navigation — no stray second pin (S299 cl
     return els.filter((e: any) => e.type === 'pin').length;
   });
   expect(pinCount).toBe(0); // no pin placed yet, and no stray from the dead arm
+});
+
+test('the DRAG gesture satisfies the pin gate — a dragged-in Consul adopts the bundle pin (S318)', async ({ page }) => {
+  // The map step's copy offers TWO gestures ("clicking the + pin icon ... or
+  // dragging him in from the sidebar"). The drop path used to mint an
+  // ordinary nameless pin: the gate (hasRef on the bundle pin) never opened,
+  // and with the element then pinned, +pin hid — the user was STUCK with no
+  // way forward and no way to retry. Both gestures now ride tourPinBake.
+  await freshBoot(page);
+  await openOpener(page);
+  await beginToWorld(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+  await nextStep(page, 4);
+  await nextStep(page, 5);
+  await nextStep(page, 6); // the merged map/pin beat
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
+
+  const row = page.locator('.atlas-sidebar-content .atlas-row', { hasText: 'The Consul' }).first();
+  const map = page.locator('.atlas-map-tab-wrapper .leaflet-container');
+  await row.dragTo(map, { targetPosition: { x: 220, y: 160 } });
+
+  // The dropped pin IS the bundle pin — locked identity, not a nameless stray.
+  await expect.poll(async () => page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    return els.find((e: any) => e.type === 'pin')?.name ?? null;
+  })).toBe('The Consul’s balcony seat');
+
+  await movePinToSwamps(page);
+  await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 });
 
 test('resume after reload lands on the same step with the world active', async ({ page }) => {
