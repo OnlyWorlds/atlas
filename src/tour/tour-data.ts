@@ -227,7 +227,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       body:
         'In Atlas, worlds are folders on your local drive that contain any number of elements. Let’s make a world that can capture this sentence.' +
         '\n\nClick the **create local world** icon in the top left. We’ll call it Hyperion after the novel.',
-      meta: 'Normally this would create a folder on your drive, but this tour world is stored temporarily in your browser.',
+      meta: 'This tour world does not create a local folder, but is stored temporarily in your browser.',
     }],
     handsOn: 'create-world',
   },
@@ -251,10 +251,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
         body:
           'Here we see the Consul’s page, and a few of the fields that define him.' +
           '\nAll elements share a set of \'base\' fields that you see at the top, ' + 
-          'besides category-specific fields (hidden for the tour).' + 
-          '\n' + 
-          '\nSo how do we model the diplomatic standing this character has?\nWe can write something in their *description* field. ' +
-          'But this Hegemony sounds important enough to be an element.\nClick next to create it as an institution, and a title for the consulship.',
+          'besides category-specific fields (hidden for the tour).' +  
+          '\n\nSo how do we model the diplomatic standing this character has?\nWe can write something in their *description* field. ' +
+          'But this Hegemony sounds important enough to be an element.\n\nClick next to create it as an institution, and a title for the consulship.',
       },
     ],
     spans: [{ from: 2, to: 2, type: 'character', ref: 'character:The Consul' }],
@@ -281,7 +280,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'This title creates a relation between the Consul and the organization in your world, through the two link fields you see above.' ,
+        'This title creates a relation between the Consul and the organization, through the two link fields you see above.' ,
       meta: 'There are two types of link fields: single-link (*issuer*) and multi-link (*holders*).',
 
  
@@ -326,8 +325,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The Consul is above what sounds like a planet. Here\'s a location for it. These are the physical building blocks of your world.' +
-        '\n\nThe Consul has a field *location* to which it was assigned, so that we can know who is on (or hovering over) the planet.',
+        'The Consul is above what sounds like a planet. Locations are the physical building blocks of your world, in various sizes.' +
+        '\nThe Consul has a field *location* to which it was assigned, so that we can know who is on (or hovering over) the planet.',
           meta: 'Locations can be nested through a field called *parent_location*: a park in a city on a continent on a planet.',
     }],
     spans: [{ from: 35, to: 35, type: 'location' }],
@@ -439,7 +438,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         body:
           'Objects for the physical inanimate world: here a balcony that is part of a spaceship, and an old piano aboard.' +
           '\nThe balcony gets the spaceship as a *parent object*, and so does the piano.'+
-          '\nClick the **create element** button three more times to set this up.',
+          '\n\nClick the **create element** button three more times to set this up.',
             deeper:
           'The current definition of *parent_object* is "Larger object that this one is part of or contained within"' +
           '\n\nSame as for the *objects* field, you might want another approach, like a split into structural and spatial. Please feel free to file a motion for it.',
@@ -494,8 +493,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Back to the Consul: clearly a man of the world, going by his many links.\nClick any chip to travel to that element.' +
-        '\n\nYou can click these chips to travel around the elements. We\'ll see a few writing features next.' ,
+        'Back to the Consul: clearly a man of the world, going by his many links.' +
+        '\n\nYou can click these chips to travel around your world. We\'ll see a few writing features next.' ,
  
     }],
     reveal: [],
@@ -527,7 +526,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
           // the editor. The gesture is click-then-Tab.
           'The writing room is where you write and organize long-form stories.' +
           '\nStories organize in three customizable tiers: Book, Chapter, Scene as defaults.' +
-          '\n\nElements are recognized and suggested for linking. Try clicking one of the blue underlined words, or hover + Tab.',
+          '\nThe text detectes elements by names and lets you link to them.' +
+          '\n\nClick one of the blue underlined words, or hover + Tab to make one.',
  
    
       },
@@ -560,8 +560,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Events are your world\'s temporal anchors. The sentence holds two that are clearly linked: the Consul\'s performance, and the raging it stirs ' +
-        'below.\n'  ,
+        'Events are the temporal anchors of your world.\nThe sentence holds two that are clearly linked: the Consul\'s performance, and the raging it stirs ' +
+        'below.'  +
+        '\n\nClick next to open the charts room, where we can create timelines for events and other elements.'  ,
     }],
     spans: [
       { from: 12, to: 12, type: 'event' },
@@ -591,8 +592,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'The Charts room acts as temporal navigator for your elements, with customizable calendars and settings.' +
-          '\n\nSuch as setting an optional \'now\' time for your world. Try it with the highlighted orange button.',
+          'The main view shows all elements that have date values across a given span.' +
+          '\nYou can navigate these elements and create custom calendars and views (\'charts\').' +
+          '\n\nTry setting the \'now\' time for this world. Try it with the highlighted orange button.',
         advanceWhen: (w) => w.nowIsSet,
       },
       {
@@ -653,7 +655,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'There is still more to find in the sentence: a piano-making character, a piano-related ability, a piano-related trait, ' +
+        'There is still more to the story: a piano-making character, a piano-related ability, a piano-related trait, ' +
         'a musical language, a piano-related phenomenon.'   ,
 
     }],
@@ -680,8 +682,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'That\'s it for this tour. Atlas uses OnlyWorlds for the categories and their fields, and allows custom fields on top of them.' +
-        '\nCreate a [free OnlyWorlds account](https://onlyworlds.com/worlds) to sync atlas worlds online and into other applications.'  ,
+        'There\'s more to the tool, so please give it a try.\nAtlas uses OnlyWorlds for the categories and their fields, and allows custom fields on top of them.' +
+        '\n\nCreate a [free account](https://onlyworlds.com/worlds) to sync atlas worlds online and into other applications.'  +
+        '\nQuestions, bugs, requests all welcome: through [Discord](https://discord.gg/twCjqvVBwb),the [feedback tracker](https://github.com/OnlyWorlds/feedback), or info@onlyworlds.com.' ,
  
     }],
     route: { kind: 'element', ref: 'character:The Consul' },
