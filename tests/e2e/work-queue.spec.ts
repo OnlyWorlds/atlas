@@ -82,3 +82,26 @@ test('the undated backlog lists dateable elements, excludes non-dateable types, 
   await items.filter({ hasText: 'The Prophecy' }).click();
   await expect(page).toHaveURL(/\/element\//);
 });
+
+test('the undated backlog excludes non-story narratives (share pages, knowledge entries) but keeps story narratives', async ({ page }) => {
+  await setupWorld(page);
+  // One dated element so the chart renders at all.
+  await createElement(page, 'event', { name: 'The Sundering', start_date: -20 });
+  // A plain (story) narrative with no date IS chronological backlog → appears.
+  await createElement(page, 'narrative', { name: 'Chapter One' });
+  // A share page and a knowledge entry are Narratives by type (so they pass the
+  // dateable gate) but are non-chronological atlas constructs → never backlog.
+  await createElement(page, 'narrative', { name: 'My Shared Page', subtype: 'page' });
+  await createElement(page, 'narrative', { name: 'A Lore Entry', subtype: 'knowledge' });
+  await openCharts(page);
+
+  // Exactly one undated backlog item: the story narrative.
+  const head = page.locator('.atlas-timeline-rail-undated-head');
+  await expect(head).toBeVisible();
+  await expect(head.locator('.atlas-timeline-rail-undated-count')).toHaveText('1');
+  const items = page.locator('.atlas-timeline-rail-undated-item');
+  await expect(items).toHaveCount(1);
+  await expect(items.filter({ hasText: 'Chapter One' })).toHaveCount(1);
+  await expect(page.locator('.atlas-timeline-rail-undated', { hasText: 'My Shared Page' })).toHaveCount(0);
+  await expect(page.locator('.atlas-timeline-rail-undated', { hasText: 'A Lore Entry' })).toHaveCount(0);
+});

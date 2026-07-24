@@ -190,16 +190,19 @@ export function placeMarkerAt(rawPoint: Point, canvasWidth: number, canvasHeight
     point = snapToAxis(anchor, point);
   }
 
-  // ZD5: shape-preserving insertion. If we already have ≥2 markers AND the
-  // click lands near an existing segment, splice the new marker between the
-  // segment's endpoints instead of appending to the end. Mirrors edit-mode's
-  // segment-click behavior so create-mode polygons stay tidy when the user
-  // realizes mid-draw that they need a marker between earlier ones.
+  // ZD5: shape-preserving insertion, POLYGONS ONLY. If a polygon already has
+  // ≥2 markers AND the click lands near an existing segment, splice the new
+  // marker between the segment's endpoints instead of appending. Mirrors
+  // edit-mode's segment-click behavior so create-mode polygons stay tidy when
+  // the user realizes mid-draw that they need a marker between earlier ones.
   //
-  // Polygon includes the wrap segment (last→first) for the threshold check
-  // ONCE a polygon outline exists (3+ markers). Lines never wrap.
-  if (active.points.length >= 2) {
-    const isPolygon = active.mode === 'polygon' && active.points.length >= 3;
+  // A LINE is drawn as a sequence: a click near an earlier segment means
+  // "continue the line here", never "splice a point into the middle" — the
+  // splice is exactly what made line points come out wrong-ordered (Captain's
+  // launch note). Lines always append. Polygon includes the wrap segment
+  // (last→first) for the threshold check ONCE an outline exists (3+ markers).
+  if (active.mode === 'polygon' && active.points.length >= 2) {
+    const isPolygon = active.points.length >= 3;
     const closest = findClosestSegment(point, active.points, isPolygon);
     if (closest && closest.distance <= CREATE_INSERT_THRESHOLD) {
       // Insert at segmentIndex + 1 — splice into the array, no need for

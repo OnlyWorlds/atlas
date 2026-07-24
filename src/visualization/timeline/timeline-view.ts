@@ -47,7 +47,13 @@ const TOP_PAD = 20;
 const AXIS_LABEL_HEIGHT = 22;
 const NODE_X_GAP = 42;           // density-fan: x-window within which nodes bloom vertically
 const NODE_Y_GAP = 34;           // density-fan: vertical step between stacked nodes (breathing room)
-const LABEL_MAX_CHARS = 24;
+// Labels write in full (Captain's launch note: "Moistened Valley Massacre"
+// truncated at 24). The collision engine already sizes each label box to its
+// MEASURED width and drops any that cannot place, so a long name claims its
+// real space or is hidden — never cut mid-word. The cap is now a sanity bound
+// against degenerate data (a name that is a whole paragraph), not a display
+// budget; every realistic element name renders whole.
+const LABEL_MAX_CHARS = 60;
 const LABEL_NEAR_RADIUS = 150;   // px — cursor neighbourhood that gets labels
 const LABEL_NEAR_MAX = 9;        // most labels to reveal around the cursor
 // S4 label budget: fan columns are NODE_X_GAP wide; each column may label at

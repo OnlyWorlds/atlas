@@ -918,7 +918,12 @@ html {
 .atlas-select {
   appearance: none;
   -webkit-appearance: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  /* Scrim token, not a bare dark literal: black in dark (unchanged), white in
+     light so the select reads as a light card like the text inputs. The S315
+     light round converted the `background: rgba(0,0,0,X)` chips but missed this
+     `background-color` LONGHAND form, so every dropdown stayed dark-tinted in
+     light mode until the launch sweep. */
+  background-color: rgba(var(--atlas-scrim-rgb), 0.3);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2322d3ee' d='M0 0l5 6 5-6z' opacity='0.7'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
@@ -6273,7 +6278,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   flex-direction: column;
   gap: 4px;
   padding: 6px;
-  background: rgba(10, 10, 10, 0.96);
+  background: rgba(var(--atlas-scrim-rgb), 0.96);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.32);
   border-radius: 6px;
@@ -6442,7 +6447,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 /* Chip context menu (right-click on a zone chip) */
 .atlas-zone-chip-context {
   position: fixed;
-  background: rgba(10, 10, 10, 0.96);
+  background: rgba(var(--atlas-scrim-rgb), 0.96);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.32);
   border-radius: 4px;
@@ -6806,6 +6811,34 @@ svg .atlas-zone-selected {
   font-size: 14px;
 }
 
+/* Delete zone — same pill as Edit shape, danger tint (matches the cancel
+   button's red family; red reads on both themes so no scrim needed). The one
+   VISIBLE way to delete a zone (Captain's launch note); routes through the
+   cascade-aware confirm. */
+.atlas-zone-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding: 3px 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 12px;
+  color: rgba(248, 113, 113, 0.95);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.atlas-zone-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+.atlas-zone-delete-btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
 /* Read-only vertex dots on a selected zone (DESIGN_ZONES.md §4.3, session 215).
    L.marker + divIcon so the dots render in markerPane alongside the edit-mode
    draggable handles (which use the same primitive). This guarantees identical
@@ -6830,6 +6863,15 @@ svg .atlas-zone-selected {
   color: rgba(var(--atlas-accent-rgb), 0.85);
   opacity: 0.9;
   margin-right: 4px;
+  /* A locate control: click to pan the open map to this element (Captain's
+     launch note). Cursor + hover lift say "clickable" without a chrome box. */
+  cursor: pointer;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.atlas-elements-row-onmap-badge:hover {
+  opacity: 1;
+  transform: scale(1.15);
 }
 
 /* Number labels inside vertex dots (read-only) + edit handles (interactive).

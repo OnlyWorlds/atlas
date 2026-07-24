@@ -24,6 +24,8 @@ import { surfaceSyncUnavailable } from '../ui/sync-toasts';
 import { escapeText, escapeAttr, installRowKeydownActivation } from '../core/dom-utils';
 import { elementMatchesQuery } from '../core/element-search';
 import { roomOf } from '../core/element-room';
+import { panMapTabTo } from '../tabs/right/map-tab';
+import { locateTargetFor } from './pin-locate';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
 const FILTER_TYPES_WITH_MAP: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
@@ -286,6 +288,17 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const id = row.getAttribute('data-element-id')!;
     const worldId = getState().active?.worldId;
     if (!worldId) return;
+    // The on-map badge (the `place` glyph) is a LOCATE control (Captain's
+    // launch note): click it to pan the open map to this element's pin, or a
+    // zone's marker centroid, instead of routing to the element's room. The
+    // badge only renders for active-map presence, so a target exists by
+    // construction; if we somehow can't resolve one we fall through to the
+    // normal open. Suppressed during cast-assign (a click there means assign).
+    if (!getState().ui.castAssign
+        && (e.target as HTMLElement).closest('.atlas-elements-row-onmap-badge')
+        && locateOnActiveMap(id)) {
+      return;
+    }
     // Assignment mode: a click on a MATCHING row assigns the cast slot and
     // returns home to show the result (the loop the ghost card opened).
     const assign = getState().ui.castAssign;
@@ -661,6 +674,21 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   };
 }
 
+/** Pan the active map tab to an element's on-map placement (a pin's coords or a
+ *  zone's marker centroid). Returns true iff a target resolved and a pan was
+ *  issued; the caller falls through to opening the element otherwise. The
+ *  active-map resolution mirrors the render pass that decides the badge. */
+function locateOnActiveMap(id: string): boolean {
+  const ui = getState().ui;
+  const active = ui.rightTabs[ui.rightActiveIndex];
+  const activeMapId = active && active.kind === 'map' ? active.mapId : null;
+  if (!activeMapId) return false;
+  const target = locateTargetFor(getState().data.elements, id, activeMapId);
+  if (!target) return false;
+  panMapTabTo(activeMapId, target.x, target.y);
+  return true;
+}
+
 function renderElementRow(
   el: Element,
   selected: boolean,
@@ -686,7 +714,7 @@ function renderElementRow(
   // says "this element is rendered on the map you're looking at right now."
   // Rendered just left of the type chip, anchored right.
   const onMapBadge = onActiveMap
-    ? `<span class="material-symbols-outlined atlas-elements-row-onmap-badge" title="This element is on the open map">place</span>`
+    ? `<span class="material-symbols-outlined atlas-elements-row-onmap-badge" title="Locate on the open map">place</span>`
     : '';
   // draggable=true on every row except maps and zones. Map elements appear
   // in the list but can't be pin targets (DESIGN_MAPS.md §1.4); zones can't

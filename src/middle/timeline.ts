@@ -32,6 +32,7 @@ import { formatStep } from '../core/calendar';
 import { setWorldActiveCalendar, saveRegistry } from '../registry/registry';
 import { WorldClockModal } from '../ui/world-clock-modal';
 import { CalendarBuilderModal } from '../ui/calendar-builder-modal';
+import { narrativeKindOf } from '../core/narrative-kind';
 
 /** A sensible first "now": the LATEST recorded moment (Captain, S318 —
  *  "snap to the center of whatever elements are at the latest date"). The
@@ -366,6 +367,12 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     for (const el of getState().data.elements) {
       const map = TEMPORAL_TYPE_FIELDS[el.type];
       if (!map) continue; // not a dateable type — never counts as "undated"
+      // Share pages and knowledge entries are Narratives by TYPE (so they pass
+      // the dateable gate above) but are non-chronological atlas constructs,
+      // never timeline backlog — a page or knowledge card sitting in the work
+      // queue reads as nagging, not as datable material (Captain's launch note:
+      // share pages appeared here). Only STORY narratives are chronological.
+      if (el.type === 'narrative' && narrativeKindOf(el) !== 'story') continue;
       if (parseTemporalValue((el as Record<string, unknown>)[map.start]) != null) continue;
       // Calendars are complete without an adoption date — a lens construct
       // sitting in the work queue forever reads as nagging, not backlog

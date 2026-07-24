@@ -16,12 +16,16 @@
 import { getState, patchSlice } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
-import type { Zone, Marker, WorldMap } from '../core/types';
+import type { Zone, Marker, WorldMap, Element } from '../core/types';
 import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
 import { enterEditMode, isEditing, getEditingZoneId, doneEdit, cancelEdit } from '../tabs/right/zone-edit-mode';
 import type { ToastManager } from '../ui/toast-manager';
 import { escapeText } from '../core/dom-utils';
+import { decideDeleteConfirm } from '../core/delete-confirm';
+import { getEditorSettings } from '../registry/registry';
+import { getWritingLabels } from './writing-helpers';
+import { navigate, elementsHash } from '../core/router';
 
 export function buildZoneSections(zone: Zone, toasts: ToastManager): HTMLElement[] {
   return [
@@ -124,6 +128,46 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
   return section;
 }
 
+/**
+ * Delete a zone (and its markers) from its element-detail section — Captain's
+ * launch note: there was no VISIBLE way to delete a zone (the generic element
+ * trash exists but reads "Delete element" in the header and is easy to miss on
+ * a map-centric type). This routes through the SAME cascade-aware decision as
+ * that trash: `decideDeleteConfirm` honours the S310 confirm-floor (a delete
+ * that cascades always confirms) and names the markers that go with it, then
+ * the standard delete → refresh → clear-selection → push, landing on the
+ * elements list. `store.deleteZone` IS `deleteElement`, so this is the blessed
+ * delete path with a discoverable, zone-labelled entry point.
+ */
+async function deleteZone(zone: Zone, toasts: ToastManager): Promise<void> {
+  const store = getActiveStore();
+  if (!store) return;
+  let dependents: Element[] = [];
+  try { dependents = await store.findDependents(zone.id); }
+  catch { /* a failed probe must not block the delete */ }
+  const worldId = getState().active?.worldId ?? '';
+  const decision = decideDeleteConfirm({
+    el: zone,
+    dependents,
+    allElements: getState().data.elements,
+    labels: getWritingLabels(worldId),
+    confirmPref: getEditorSettings(getState().registry).confirm_before_delete,
+  });
+  if (decision.needed && !window.confirm(decision.message)) return;
+  try {
+    await store.deleteElement(zone.id);
+    const elements = await store.listElements();
+    patchSlice('data', { elements });
+    patchSlice('ui', { ...getState().ui, selectedElementId: null });
+    requestPushIfLinked();
+    toasts.success(`Deleted ${zone.name || 'zone'}`);
+    if (worldId) navigate(elementsHash(worldId));
+  } catch (err) {
+    console.error('[zone-sections] delete zone failed:', err);
+    toasts.error('Failed to delete zone');
+  }
+}
+
 function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement {
   const section = document.createElement('div');
   section.className = 'atlas-detail-section atlas-zone-markers-section';
@@ -145,7 +189,12 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
       <button type="button" class="atlas-zone-edit-cancel-btn" data-action="cancel-edit" title="Discard changes (ESC)">
         <span class="material-symbols-outlined">close</span>
       </button>
-    ` : ''}
+    ` : `
+      <button type="button" class="atlas-zone-delete-btn" data-action="delete-zone" title="Delete this zone and its markers">
+        <span class="material-symbols-outlined">delete</span>
+        Delete zone
+      </button>
+    `}
   `;
 
   header.querySelector<HTMLButtonElement>('[data-action="toggle-edit"]')?.addEventListener('click', () => {
@@ -173,6 +222,10 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
 
   header.querySelector<HTMLButtonElement>('[data-action="cancel-edit"]')?.addEventListener('click', () => {
     cancelEdit();
+  });
+
+  header.querySelector<HTMLButtonElement>('[data-action="delete-zone"]')?.addEventListener('click', () => {
+    void deleteZone(zone, toasts);
   });
 
   section.appendChild(header);

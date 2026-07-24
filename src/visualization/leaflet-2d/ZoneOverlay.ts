@@ -583,8 +583,15 @@ export class ZoneOverlay {
 /** Where a zone's label anchors: bottom-centre when `labelBelow`, else the
  *  centroid (polygon) / longest-segment midpoint (line). */
 function labelAnchorFor(shape: ZoneShape): Point {
+  // A LINE always anchors at its midpoint. The `below` anchor is a bounding-box
+  // bottom edge, which for a line drifts the label far under the lowest
+  // endpoint (Captain's launch note: the line label sat too far below the
+  // line). A line has no interior to sit a label "inside", so midpoint + the
+  // small CSS below-nudge keeps it reading against the line itself. Polygons
+  // keep the below/centroid choice.
+  if (shape.mode === 'line') return lineMidAnchor(shape.points);
   if (shape.labelBelow) return bottomCenter(shape.points);
-  return shape.mode === 'polygon' ? centroid(shape.points) : lineMidAnchor(shape.points);
+  return centroid(shape.points);
 }
 
 /** Bottom-centre of the points' bounding box. Screen-bottom = MAX storage-y
