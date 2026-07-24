@@ -4,7 +4,16 @@ Operational state. Architecture in **DESIGN.md**; per-room design in `DESIGN_{MA
 
 ---
 
-## CURRENT STATE (2026-07-24 — SESSION 315: **THE FABLED SWEEP → BOUTS A+B → LIGHT ROUND 2 + THE GENERAL TAB** — an 11-agent critical+creative fleet, the gate fixes, light mode Phase 0+1, and the new Settings→General tab; gates: typecheck 0 + **1519 vitest** + **271 e2e, PLAYWRIGHT_EXIT=0, zero flaky** + build clean; UNCOMMITTED)
+## CURRENT STATE (2026-07-24 — SESSIONS 316–317: **THE TOUR FINISH LINE** — Captain's two fix rounds + Skeld's copy notes built end to end; the tour is **16 steps** (pin beat merged into the map step); gates: typecheck 0 + **1540 vitest** + **271/271 e2e, PLAYWRIGHT_EXIT=0, count = `--list`, quiet machine** + build clean; UNCOMMITTED)
+
+**Full record + the NEXT (last) tour push list: `Notes/2026-07-24-s317-handover.md`** · post-deploy non-tour queue: `Notes/2026-07-24-s317-post-deploy-queue.md`. Headlines:
+
+- **TOUR**: preview stack = what NEXT brings (quiet refs excluded, only while a live Next exists, far right) · step counter cut; deeper-bulb + meta share the bottom-left foot slot · − / + dock collapse · field highlights (`highlightFields`, injected style tag, wash only) · category words in copy tinted by family colour · sticky per-step reveal tint in the sidebar (`atlas:tour-fresh-ids`) · writing beat: phase c cut (one Next from first chip), editor AUTOFOCUSED (hover+Tab works bare), Web pane opens with the room and stays incl. back-nav (sticky `webSeen`) · empty Base rows hide after the consul step (`atlas-tour-basefull`) · footer visible at finale only · tour map toolbar simplified + zone drawing from the map step · Hegemony Standard tour-quiet.
+- **APP-WIDE**: map pan snap-back fixed (maxBoundsViscosity 1.0 + padded bounds, measured before/after) · **"Located here"** section on location pages above Referenced by (`REF_SECTION_SPLITS` framework in element-detail-refs.ts, unit-locked) · sidebar footer overlap fixed (`.atlas-sidebar-content min-height:0`, measured — but see handover OPEN item 5: Captain may still see it) · home statline count-sorted + singletons grouped · section-body bottom padding tightened.
+- **COPY**: Captain's sharpened pass preserved verbatim; only mechanical fixes + real finale links (Discord/tracker/email). Flags held: duplicated deeper flyouts (chart/deep-time; objects a–d).
+- ⚡ **NEXT (the LAST tour push — handover §"THE NEXT TOUR PUSH")**: create-modal category de-highlight · modal full-click-outside close discipline · sentence +1pt & 3-line height lock · **re-bake the demo bundle** (S312 rename traps listed) · verify/re-dig the sidebar-half-obscured report · charts set-now default → latest-elements center · Captain's word on the held flags. Then deploy; non-tour queue after.
+
+## PRIOR (2026-07-24 — SESSION 315: **THE FABLED SWEEP → BOUTS A+B → LIGHT ROUND 2 + THE GENERAL TAB** — an 11-agent critical+creative fleet, the gate fixes, light mode Phase 0+1, and the new Settings→General tab; gates: typecheck 0 + **1519 vitest** + **271 e2e, PLAYWRIGHT_EXIT=0, zero flaky** + build clean; UNCOMMITTED)
 
 Session laydown + all design questions: `Forge/Notes/2026-07-23-atlas-s315-laydown.md`. Parking handover for the next session: `Forge/Notes/2026-07-24-s315-handover.md` (changelog page · copy pass · tour minimize · loose-ends design · light remainders).
 

@@ -26,11 +26,12 @@
  * b/c/d phases, and their `when` predicates are PREFIX-nested (each a
  * refinement of the one before) so `resolvePhase` never breaks early.
  *
- * Order (S303 rework): opener (the sentence centre-stage) · elements (world,
- * consul, hegemony+title) · maps (planet, map+zone, pin, swamps) · objects &
- * links · writing · time · yours. Maps come before the objects so the pin’s
- * "sat" lights in reading order and the pin can land in the already-drawn zone.
- * The engine treats the last defined step as the finale; step 0 has no world.
+ * Order (S303 rework; S317 merge): opener (the sentence centre-stage) ·
+ * elements (world, consul, hegemony+title) · maps (planet, map+zone+PIN in one
+ * hands-on beat, swamps) · objects & links · writing · time · yours — 16 steps.
+ * Maps come before the objects so the pin’s "sat" lights in reading order and
+ * the pin lands in the already-revealed zone. The engine treats the last
+ * defined step as the finale; step 0 has no world.
  */
 
 import type { ElementType } from '../core/types';
