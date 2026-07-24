@@ -271,6 +271,46 @@ function buildRefChip(src: Element, navigateTo: NavTarget): HTMLElement {
 // ====== Scanning ======
 
 /**
+ * Every element id referenced by SOME OTHER element, collected in one pass.
+ * The inverse of findIncomingReferences done wholesale: an id absent from this
+ * set is referenced by nothing (a "loose thread"). Shape-agnostic like the rest
+ * of this module (convention #5); self-references don't count. Text-field
+ * strings land in the set too, but they can't collide with a real id, so
+ * membership tests (`has(el.id)`) stay correct. O(N · fields), not O(N²).
+ */
+export function collectReferencedIds(elements: readonly Element[]): Set<string> {
+  const out = new Set<string>();
+  for (const el of elements) {
+    for (const [key, value] of Object.entries(el)) {
+      if (META_KEYS.has(key)) continue;
+      collectIdsFromValue(value, el.id, out);
+    }
+  }
+  return out;
+}
+
+function collectIdsFromValue(value: unknown, selfId: string, out: Set<string>): void {
+  if (typeof value === 'string') {
+    if (value !== selfId) out.add(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (typeof item === 'string') { if (item !== selfId) out.add(item); }
+      else if (item && typeof item === 'object') {
+        const id = (item as { id?: string }).id;
+        if (id && id !== selfId) out.add(id);
+      }
+    }
+    return;
+  }
+  if (value && typeof value === 'object') {
+    const id = (value as { id?: string }).id;
+    if (id && id !== selfId) out.add(id);
+  }
+}
+
+/**
  * Find all elements in `state.data.elements` that reference `targetId` somewhere
  * in their field values. Excludes the target itself. Exported for unit testing.
  */

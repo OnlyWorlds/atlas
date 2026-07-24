@@ -182,8 +182,14 @@ function promoteHint(view: EditorView, from: number, to: number, candidate: Auto
  * always described and the fix for "no matter which I hover it links the first
  * unlinked one". Re-resolved fresh in the handler, never trusted as a range, so
  * an edit since mouseover cannot promote stale positions.
+ *
+ * TAGGED WITH ITS VIEW: this is a module singleton shared by every autolink
+ * editor (writing / knowledge / share). A hover in one editor followed by a
+ * switch to another without a mouseout (unmount, blur) would otherwise let the
+ * new editor's Tab honour the old position and promote the wrong word — so the
+ * Tab handler only trusts a hint tagged to the SAME view, and blur clears it.
  */
-let lastHintPos: number | null = null;
+let lastHint: { view: EditorView; pos: number } | null = null;
 
 export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<AutolinkPluginState> {
   return new Plugin<AutolinkPluginState>({
@@ -245,7 +251,7 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
         const hit = findAutolinkCandidateAt(view, pos);
         if (!hit) return false;
         if (!promoteHint(view, hit.from, hit.to, hit.candidate)) return false;
-        lastHintPos = null;
+        lastHint = null;
         event.preventDefault();
         return true;
       },
@@ -256,13 +262,19 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
           const t = me.target as HTMLElement | null;
           if (t?.closest?.('.atlas-autolink-hint')) {
             const probe = view.posAtCoords({ left: me.clientX, top: me.clientY });
-            lastHintPos = probe ? probe.pos : null;
+            lastHint = probe ? { view, pos: probe.pos } : null;
           }
           return false;
         },
         mouseout(_view: EditorView, event: Event): boolean {
           const t = (event as MouseEvent).target as HTMLElement | null;
-          if (t?.closest?.('.atlas-autolink-hint')) lastHintPos = null;
+          if (t?.closest?.('.atlas-autolink-hint')) lastHint = null;
+          return false;
+        },
+        // The hint is a singleton across editors; drop it when this editor
+        // loses focus so a later Tab elsewhere can never honour a stale hover.
+        blur(): boolean {
+          lastHint = null;
           return false;
         },
       },
@@ -276,8 +288,8 @@ export function createAutolinkPlugin(initialIndex: AutolinkIndex): Plugin<Autoli
         // model, and the fix for "no matter which I hover it links the first".
         // Re-resolve the candidate at the hovered position so a doc edit since
         // mouseover can never promote a stale range.
-        if (lastHintPos !== null) {
-          const hovered = findAutolinkCandidateAt(view, lastHintPos);
+        if (lastHint && lastHint.view === view) {
+          const hovered = findAutolinkCandidateAt(view, lastHint.pos);
           if (hovered && promoteHint(view, hovered.from, hovered.to, hovered.candidate)) {
             event.preventDefault();
             return true;

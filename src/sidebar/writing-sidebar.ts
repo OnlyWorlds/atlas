@@ -161,12 +161,18 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
   // toggle would be silently re-overridden on the next render.
   let lastExpandedForActiveId: string | null = null;
 
+  // Per-render memo for subtree link counts (reset at each render below), so
+  // the badge pass costs O(N) instead of re-walking every subtree once per row
+  // (O(N·depth) — the same prose was rescanned by every ancestor).
+  let subtreeLinkMemo = new Map<string, number>();
+
   function render(): void {
     const active = getState().active;
     if (!active) {
       root.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
       return;
     }
+    subtreeLinkMemo = new Map();
     const labels = getWritingLabels(active.worldId);
     const elements = getState().data.elements;
     const idx = buildNarrativeIndex(elements, active.worldId);
@@ -371,8 +377,11 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
    * not just on a leaf Scene.
    */
   function subtreeLinkCount(node: NarrativeNode): number {
+    const cached = subtreeLinkMemo.get(node.el.id);
+    if (cached !== undefined) return cached;
     let n = countOwLinks((node.el as Record<string, unknown>).story);
     for (const c of node.children) n += subtreeLinkCount(c);
+    subtreeLinkMemo.set(node.el.id, n);
     return n;
   }
 

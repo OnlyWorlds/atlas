@@ -15,6 +15,7 @@
  */
 
 import { getState, patchSlice, subscribe } from '../core/state';
+import { buildLooseThreads } from './home-loose-threads';
 import { setSidebarModePref } from '../core/ui-prefs';
 import { ToastManager } from '../ui/toast-manager';
 import {
@@ -141,6 +142,12 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     if (chartStrip) root.appendChild(chartStrip);
     const desk = buildDesk(elements, worldId);
     if (desk) root.appendChild(desk);
+    // Loose threads (2026-07-24) — a quiet band of the world's cheap gaps
+    // (unmapped locations, undated events, unlinked characters), each expanding
+    // to the exact flagged elements. Sits at the very bottom of home (Captain's
+    // placement call); renders nothing when the world is fully woven.
+    const threads = buildLooseThreads(elements, worldId);
+    if (threads) root.appendChild(threads);
   }
 
   const onChartsChanged = (): void => refreshSavedCharts();

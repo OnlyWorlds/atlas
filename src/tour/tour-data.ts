@@ -185,7 +185,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       // token pass renders [text](url) safely, so the separate extras link
       // is retired.
       body:
-        'The opening sentence of the novel [Hyperion](' + TOUR_ATTRIBUTION_URL + ') (1989) by the late Dan Simmons.',
+        'The opening sentence of the novel [Hyperion](' + TOUR_ATTRIBUTION_URL + ') by the late Dan Simmons.',
     }],
   },
   // ---------------------------------------------------------------- Act 1
@@ -196,9 +196,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Worlds are containers for any number of elements. Let’s make a world that can capture this sentence.\n' +
-        'Click the **create local world** icon in the top left. We’ll call it Hyperion after the novel.',
-      meta: 'Normally this would create a folder on your drive, but the tour world is temporarily stored in your browser.',
+        'In Atlas, worlds are folders on your local drive that contain any number of elements. Let’s make a world that can capture this sentence.' +
+        '\n\nClick the **create local world** icon in the top left. We’ll call it Hyperion after the novel.',
+      meta: 'Normally this would create a folder on your drive, but this tour world is stored temporarily in your browser.',
     }],
     handsOn: 'create-world',
   },
@@ -220,10 +220,12 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'b',
         when: (w) => w.hasRef('character:The Consul'),
         body:
-          'Here we see the Consul’s page, where we can edit fields that shape this character.' +
-          '\nIn this tour, empty fields are hidden for clarity.' + 
-          '\nSo how do we model the diplomatic standing this character has?', 
-                meta: 'Each of the 22 element categories has its own set of fields. They all share the "base" fields you see at the top here.',
+          'Here we see the Consul’s page, with empty fields through which you can define it.' +
+          '\nAll elements share a set of \'base\' fields that you see at the top,' + 
+          'and each category has a set of specialized fields.\nEmpty fields are hidden during this tour for easier navigation.' + 
+          '\n' + 
+          '\nSo how do we model the diplomatic standing this character has? We can write something in their *description* field.' +
+          '\nBut this Hegemony sounds like it deserves its own element. We\'ll create one for it, and for the title it bestowed.',  
       },
     ],
     spans: [{ from: 2, to: 2, type: 'character', ref: 'character:The Consul' }],
@@ -250,8 +252,12 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The Hegemony is an institution: a category that represents any kind of organized body.' +
-        '\nTitle is another category. Here\'s one that was issued by the Hegemony and is held by our character.' ,
+        'The Hegemony is an institution, an element that can represent any kind of organized body.' +
+        '\n\nTitle is another category. Here\'s one that was issued by the Hegemony and is held by our character, as seen through its *issuer* and *holders* fields.' +
+        '\nThis creates a traceable link between the Consul and the Hegemony.' ,
+      meta: 'There are two types of link fields: single-link (like *issuer*) and multi-link, that can hold any number (like *holders*).',
+
+ 
     }],
     // One word per element, in reading order (Captain, S306): "The" carries the
     // TITLE, "Hegemony" the institution, and "Consul" is left alone so the
@@ -291,7 +297,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'He\'s above some sort of planet we don\'t know the name of. Physical locations of any size can get their own element.',
+        'The consul is above what sounds like a planet. So we\'ll create a location for it: any physical place in a world that can be named or, in this cased, unnamed.' +
+        '\n\nThe consul has a *location* field that we can assign this planet to, so that we see it is now referenced by the Consul.',
           meta: 'Locations can be nested: a city on a continent on a planet.',
     }],
     spans: [{ from: 35, to: 35, type: 'location' }],
@@ -306,8 +313,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
       id: 'a',
       body:
         'Maps are elements that act as 2d or 3d canvases onto which you can place other elements.' +
-        '\nThey take a pre-existing map image (using the image_url field, or a local uploaded file).' +
-        '\nHere, we have a map that represents the unnamed planet, with a zone element drawn onto it that represents the swamps.' ,
+        '\nThey take a pre-existing image and let you place pins on it, for specific elements, or markers, which combine into zones.' +
+        '\n\nThis map shows part of the unnamed planet, with the swamps laid on top as a zone.' ,
+      meta: 'Zones are physical boundaries of natural or cultural siginificance. Two drawing shapes: polygons (e.g. swamps, territories) and lines (e.g. roads, rivers).',
+
       // Captain, S307: the step said a map "carries an image" and never said
       // where that image comes from, which is the first question anyone has
       // about their OWN map. Both routes below are verified against the real
@@ -337,19 +346,19 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'Besides zones, that are created by placing markers on maps, you can place elements on maps using pins.' + 
-          '\nIn the consul edit screen, click the + pin icon at the top, then click on the map to place the consul. Put him somewhere over the swamps, per canon.',
+          'Let\'s place the Consul on the map using a pin.' + 
+          '\nClick the + pin icon opposite the Consul\'s name, then click on the map to place the consul.\nPut him somewhere over the swamps, per canon.',
   
         deeper:
-          'A sharp eye notices the pin holds the Consul, not his spaceship: a pin ' +
-          'records where an ELEMENT is, and the schema has no field yet that says a ' +
-          'character is aboard a vehicle. So we know where the Consul sat, and the ' +
-          'ship is wherever he is.' +
+          'So why not create a pin for the spaceship, instead? ' +
+          'There would be no certainty, then, of where the Consul is,' +
+          'as there is currently no field that says ' +
+          '\'this character is in this object\'.' +
           '\n\n' +
-          'That kind of gap is not fixed by one tool inventing a field: the ' +
-          'OnlyWorlds schema grows through council motions, public proposals anyone ' +
-          'can raise and argue. A motion to give characters a vehicle or equipment ' +
-          'field would close exactly this gap, for every tool at once.',
+          'Unlike, for example, if we pinned a city on the map, and linked that city in the Consul\'s' +
+          '*location* field; this lets us infer with certainty that the consul is at the same place as that city\'s pin.' +
+          '\n\nThis is a limitation of the language as it is now. For [cases like this](https://council.onlyworlds.com/#/chamber/character/3b6bdcff-06a7-4c26-be60-497b042d4763), ' +
+          'the council is a place to discuss, vote, then act to improve the language.',
       },
       {
         // Placed, but the gate (pinInZone) has not passed — the correction.
@@ -387,8 +396,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
         // elements this step reveals, and schema-impossible for one — a
         // collective has no zone field, so the old copy implied a link the
         // model cannot express. Narrowed to what is true and checkable.
-        'We know there are at least two creatures in the swamps below, so we\'ll create two creature elements.' +
-        '\nPhysical bodies can be grouped into a collective, one of which will represent the entire pack of the saurian things.'  ,
+        'There\'s saurian things below, so we created two creatures, one of which must inevitable be greater than the other.' +
+        '\nPhysical bodies can be grouped into collectives; one was created to represent the pack of them.'  +
+        '\nSpecies are elements that can represent any kind of cultural or, in this case, biological classification.'  ,
           }],
     spans: [
       { from: 27, to: 27, type: 'creature' },
@@ -413,9 +423,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'Three objects sit in the sentence, with particular relations: the balcony is part of the spaceship, and the piano is inside of it.' +
+          'Three objects sit in the sentence, with particular relations: the balcony is part of the spaceship, and the piano is inside of the ship.' +
           '\nWe can model this situation by setting the spaceship as parent_object of the balcony and piano.'+
-          '\nClick the create element button three more times to create them.',
+          '\nClick the create element button three more times to set this up.',
       },
       {
         id: 'b',
@@ -435,17 +445,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'd',
         when: (w) => w.hasRef("object:The Consul’s Steinway"),
         body:
-          'Three objects that are linked to each other and their owner. Let’s carry on.',
-        // PLACEHOLDER deeper (S312, Captain's ask): he will link a council
-        // motion here once it exists. The text below is scaffolding for his
-        // pass — the [text](url) token renders as a real link.
-        deeper:
-          'Objects nest through the *parent object* field: the balcony is part ' +
-          'of the ship, the piano stands inside it. Where the schema could say ' +
-          'more about containment and ownership, a council motion is the way to ' +
-          'propose it.' +
-          '\n\n' +
-          '[Placeholder: link to the council motion once made](https://www.onlyworlds.com/)',
+          'Three objects that are now linked to each other and their owner. Let’s carry on.',
+   
+ 
       },
     ],
     spans: [
@@ -465,8 +467,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Back to the Consul: a man of the world, clearly, as we see by the links he holds to other elements. Click any chip to travel to that element.' +
-        '\nThe spaceship and Steinway as objects in his possession, and the "referenced by" section shows which other elements link to the Consul.' ,
+        'Back to the Consul: a man of the world, clearly, going by his many links.\nClick any chip to travel to that element.' ,
  
     }],
     reveal: [],
@@ -496,25 +497,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
           // (S306): `handleKeyDown` promotes the decoration containing the
           // CURSOR, so hovering does nothing and Tab just moves focus out of
           // the editor. The gesture is click-then-Tab.
-          'The writing room supports long-form work by organizing your stories and linking your elements into them.' +
-          '\nA system of three customizable "tiers", where the default is Book - Chapter - Scene, can be used to organize your work.' +
-          '\nHere we\'ll make a start on Hyperion\'s first chapter with the opening sentence.' +
-          // "hover one and press Tab" would be the S306 trap reborn: the
-          // handler promotes the decoration containing the CURSOR, so hovering
-          // does nothing. The gesture is click-inside-then-Tab, verified live.
-          '\nNote the blue underlines for auto-detected links: click inside one and press Tab to create the link.',
-        deeper:
-          'Chips are live: click one to travel to its element, and the link shows on ' +
-          'the other side too, under Referenced by.' +
-          '\n\n' +
-          'The words in your prose rarely match an element’s full name. Atlas already ' +
-          'knows “Steinway” is one of the names the Consul’s piano goes by, which is ' +
-          'why it recognised the word at all. In your own writing, linking a phrase ' +
-          'that is not an element’s name records it as an alias on that element: your ' +
-          'prose keeps reading exactly as you wrote it, and the next mention is ' +
-          'recognised on its own.' +
-          '\n\n' +
-          'Right-click a selection to choose the element yourself.',
+          'The writing room is for long-form story organization and integration.' +
+          '\nIt displays stories through three customizable "tiers", where the default is Book - Chapter - Scene.' +
+          '\nWorld elements can be linked while you write. Try clicking, or hover-then-press-tab, on the blue underlined words.',
+ 
+   
       },
       {
         id: 'b',
@@ -533,9 +520,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'c',
         when: (w) => w.chipCount(TOUR_CHAPTER_REF) >= TOUR_WRITING_LINKABLE,
         body:
-          'Every name this world knows so far is wired into the sentence. ' +
-          'Rachmaninov and his Prelude are still to come, and the same Tab will ' +
-          'catch them when they arrive.',
+          'You can unlink elements, or create new ones, by selecting and right-clicking '  +
+          'The writing room uses layered narrative elements to organize these stories and the links within them.' , 
       },
     ],
     handsOn: 'link-word',
@@ -548,9 +534,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The sentence holds two events: a performance, and the raging it stirs ' +
-        'below. They carry the same date, because he plays while they surge. ' +
-        'Dates are where time begins.',
+        'Events are your world\'s temporal anchors. The sentence holds two that are clearly linked: the Consul\'s performance, and the raging it stirs ' +
+        'below.\n'  ,
     }],
     spans: [
       { from: 12, to: 12, type: 'event' },
@@ -580,19 +565,17 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'The Charts room lays your elements out on time. Both events sit on ' +
-          'the same moment, so they stack in one place. This world has no now ' +
-          'yet: set it with the highlighted button.',
-        meta: 'Atlas suggests a point and you can drag the line afterwards. A world without a now still charts.',
+          'The Charts room makes your elements navigable across time.\nBoth events sit on ' +
+          'the same moment, as you see above.\nYou can set a \'now\' time for your world; try it with the highlighted button.', 
         advanceWhen: (w) => w.nowIsSet,
       },
       {
         id: 'b',
         when: (w) => w.nowIsSet,
         body:
-          'The gold line is now, and the Consul’s title now draws as a span: it ' +
-          'starts when the title was granted and runs to the present. Its soft ' +
-          'end means no end is recorded, so as far as this world knows he holds ' +
+          'The gold line signifies the now, and the Consul’s title draws as a span: it ' +
+          'starts when the title was granted and runs to the present.\nIts soft ' +
+          'end means no end is recorded, so as far as we know he holds ' +
           'it still.',
         deeper:
         'The chart is a live view, not a picture: scroll to zoom from whole eras down ' +
@@ -600,12 +583,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'in from the rail to give them their first date. Save any arrangement as a named ' +
         'chart and it remembers its window, its cast, and its lens.' +
         '\n\n' +
-        'Worlds can also carry their own CALENDARS: name your months, eras, festival ' +
-        'days and week, and every date in atlas speaks that language: "11 Greening, ' +
-        'Year 454" instead of a bare number.' +
-        '\n\n' +
-        'A world with no dates at all still charts: time begins whenever you give ' +
-        'something a year.',
+        'Worlds can also carry their own calendars: a way to name months, eras, festivals, basic time units.'+
+        '\n\nClick the \'Hegemony Standard\' chip above the chart view to have a look at this.',
+   
+   
       },
     ],
     route: { kind: 'chart' },
@@ -621,27 +602,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
       body:
         'Rachmaninov and his prelude join the world, and they are old: both sit ' +
         'far back in the Old Earth era, centuries before anything else here. ' +
-        'Watch the axis stretch to hold them. Scroll to zoom back in on the ' +
-        'present, and the strip below keeps the whole span in view.',
-      meta: 'Old Earth and PC are this world’s own eras, named by a calendar element the chart reads.',
-      deeper:
-        'A world can name its own time. Eras are the coarsest layer: a name, a ' +
-        'direction, and the point they pivot on. Old Earth counts backwards ' +
-        'towards that pivot and PC counts forwards from it, so a date can be ' +
-        'read in the language the world uses rather than as a bare number.' +
-        '\n\n' +
-        'Calendars can go further than eras: name your months, your week, your ' +
-        'festival days, and every date in atlas speaks that language.' +
-        '\n\n' +
-        // S312: the no-conversion claim retired — the dates ARE derived now.
-        // One line in the novel (Duré's journal) reconciles four calendars:
-        // AD 2732 = 589 P.C., so P.C. year 0 sits near AD 2143. Rachmaninov
-        // (born 1873) lands at -270, his Prelude (1892) at -251. Copy states
-        // the derivation honestly instead of denying it. Rides Captain's pass.
-        'The bridge between Earth’s calendar and this one rests on a single ' +
-        'line in the book, where a journal entry gives one day in four ' +
-        'calendars at once. From it, Rachmaninov’s dates can be placed: born ' +
-        '270 years before the pivot, the Prelude written nineteen years later.',
+        '\nThe axis stretched out to hold them. You can scroll to zoom back in on the ' +
+        'present.',
+   
     }],
     spans: [
       { from: 13, to: 13, type: 'character' },
@@ -658,8 +621,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The rest arrives at once: a piano maker, an ability, a trait, ' +
-        'a language, a phenomenon. One sentence, a whole small world, all linked. The sidebar holds them all.',
+        'We can find more in the sentence: a piano-making character, a piano-related ability, a piano-related trait, ' +
+        'a musical language, a piano-related phenomenon.' +
+        '\nThe construct category can represent concepts and technology such as \'piano\', but we skip that one: only create what is relevant for your world.',
     }],
     // The Rachmaninov spans moved to the deep-time step, where those two
     // elements are now revealed — a span’s glyph and its element should light
@@ -684,25 +648,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'Every element is a small file. A real atlas world is a folder of plain files ' +
-        'on your computer, yours to keep and open in any tool, and it can also live on ' +
-        'onlyworlds.com so other tools can read it.',
-      deeper:
-        'The folder IS the world: one JSON file per element, sorted into type folders, ' +
-        'readable by any program. No export step, no lock-in, and it all works offline. ' +
-        'Rename the folder, put it in a git repo, sync it with Dropbox: atlas does not ' +
-        'mind, because the files are the truth and atlas is just a good pair of hands on them. ' +
-        'Delete atlas tomorrow and your world is still sitting there.' +
-        '\n\n' +
-        'The Web tab on the right is drawing the whole link web of those files live: ' +
-        'click any node to travel the graph.' +
-        '\n\n' +
-        'OnlyWorlds is an open format: 22 element types, one schema, free accounts that ' +
-        'store worlds online. This world sits there too, under the public demo key ' +
-        '0000000000. Link an account and atlas syncs your folder with the API both ways: ' +
-        'edit on this machine, pull on another, share a read key so a friend can browse ' +
-        'without touching anything. The same world then opens in other tools: a mobile ' +
-        'editor, an Obsidian vault, games and viewers people build on the schema.',
+        'Atlas is powered by OnlyWorlds, from which it gets the categories and their fields. You can use custom fields on top of these.' +
+        '\nCreate a free OnlyWorlds account to sync your worlds online and into other applications.' +
+        '\nManage and share them through world-specific keys that you can mint.' +
+        '\nThis Hyperion world can be accessed at any time using the read-only key 0000000000.',
+ 
     }],
     route: { kind: 'element', ref: 'character:The Consul' },
     webTab: true,
@@ -722,8 +672,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
       // (S306) — copy naming a control is a behavioural claim.
       // The buttons say what is available; the prose no longer guesses.
       body:
-        'That is the tour: when it ends, this world folds away. Your own worlds ' +
-        'live in a folder you choose, and they stay yours.',
+        'That\'s all you get from the tour. Click the help icon in the footer to get some room-specific information.' +
+        '\nDon\'t hesitate to reach out for questions, bugs, and feature requests: through discord[url], email[info@onlyworlds.com], or the public feedback tracker[feedback repo]',
       meta: 'The tour world leaves nothing behind. Replay it anytime from settings.',
     }],
     handsOn: 'setup-folder',

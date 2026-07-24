@@ -9,7 +9,17 @@ export default defineConfig({
   server: { port: 3045 },
   build: {
     target: 'es2020',
-    outDir: 'dist'
+    outDir: 'dist',
+    rollupOptions: {
+      // Two HTML entries: the app (index.html) and the static public
+      // changelog (changelog.html, emitted by `npm run changelog` before
+      // build). The changelog carries no module scripts, so Vite just emits
+      // it to dist/changelog.html.
+      input: {
+        main: 'index.html',
+        changelog: 'changelog.html',
+      },
+    },
   },
   plugins: [
     VitePWA({

@@ -4,8 +4,10 @@
   "private": true,
   "description": "Atlas — folder-first OnlyWorlds world browser and editor with optional API sync",
   "scripts": {
+    "changelog": "vite-node scripts/build-changelog.mts",
+    "predev": "npm run changelog",
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run changelog && tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
@@ -14,7 +16,7 @@
     "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@onlyworlds/sdk": "^3.0.0",
+    "@onlyworlds/sdk": "^4.0.0",
     "@tiptap/core": "^3.23.5",
     "@tiptap/extension-mention": "^3.23.5",
     "@tiptap/markdown": "^3.23.5",

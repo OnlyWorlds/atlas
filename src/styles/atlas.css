@@ -2905,7 +2905,8 @@ body.atlas-preroot .atlas-middle {
   align-items: center;
   gap: 10px;
   padding: 26px 38px;
-  background: rgba(10, 14, 16, 0.92);
+  /* scrim triplet: light card in light mode (title/status use themed ink). */
+  background: rgba(var(--atlas-scrim-rgb), 0.92);
   border: 1px solid rgba(var(--atlas-ink-rgb), 0.08);
   border-radius: 10px;
   min-width: 280px;
@@ -3253,7 +3254,10 @@ body.atlas-preroot .atlas-middle {
    ============================================================ */
 
 .ow-toast {
-  background: rgba(15, 15, 15, 0.95);
+  /* scrim triplet: near-black frost in dark, near-white frost in light.
+     Was rgba(15,15,15,0.95) — a fixed dark literal that put dark ink on a
+     dark card in light mode (illegible). Text/border/icon already theme. */
+  background: rgba(var(--atlas-scrim-rgb), 0.95);
   border: 1px solid var(--atlas-divider-strong);
   border-left-width: 3px;
   border-radius: 4px;
@@ -6918,7 +6922,9 @@ svg .atlas-zone-selected {
   position: absolute;
   top: calc(100% + 4px);
   left: -1px; /* left-anchored — a centered tip clips off-viewport on column 1 */
-  background: rgba(10, 14, 18, 0.96);
+  /* scrim triplet: text is themed ink, so a fixed dark bg was dark-on-dark in
+     light (the filter row lives on the light sidebar). */
+  background: rgba(var(--atlas-scrim-rgb), 0.96);
   border: 1px solid rgba(var(--atlas-ink-rgb), 0.12);
   color: rgba(var(--atlas-ink-rgb), 0.85);
   font-size: 10.5px;
@@ -8409,7 +8415,10 @@ a.atlas-writing-workspace-crumb-seg:hover {
   z-index: 9500;
   min-width: 280px;
   max-width: 340px;
-  background: rgba(10, 10, 10, 0.96);
+  /* scrim triplet (see .ow-toast): floats over the LIGHT prose rooms
+     (writing/knowledge/share); a fixed dark bg made the hover card
+     dark-ink-on-dark in light mode. */
+  background: rgba(var(--atlas-scrim-rgb), 0.96);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--atlas-divider-strong);
@@ -12453,7 +12462,10 @@ a.atlas-share-map-pin { cursor: pointer; }
   white-space: nowrap;
   pointer-events: none;
   letter-spacing: 0.01em;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.6);
+  /* scrim halo: black lifts the light label off the dark canvas; in light
+     it flips to a white halo that lifts the dark label off the light canvas.
+     A fixed black halo smeared behind dark text in light mode (Captain, S315). */
+  text-shadow: 0 1px 3px rgba(var(--atlas-scrim-rgb), 0.85), 0 0 6px rgba(var(--atlas-scrim-rgb), 0.6);
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -13261,7 +13273,9 @@ a.atlas-share-map-pin { cursor: pointer; }
   line-height: 1.45;
   letter-spacing: normal;
   color: var(--atlas-text);
-  background: rgba(8, 8, 8, 0.96);
+  /* scrim triplet: themed ink text, so a fixed dark bg was illegible in light
+     (this help tip lives in the knowledge room). */
+  background: rgba(var(--atlas-scrim-rgb), 0.96);
   border: 1px solid var(--atlas-divider);
   border-radius: 4px;
   padding: 7px 10px;
@@ -13395,6 +13409,70 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-home-statline-seg:hover { color: var(--atlas-cyan); }
 .atlas-home-statline-seg:hover b { color: var(--atlas-cyan); }
 .atlas-home-statline-sep { opacity: 0.45; }
+
+/* Loose threads band (2026-07-24) — the world's cheap gaps, quiet under the
+   stat line. Warm-soft count signals "wants attention" without alarm; theme
+   tokens carry both light and dark. */
+.atlas-home-threads { margin-top: 14px; }
+.atlas-home-threads-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--atlas-text-muted);
+}
+.atlas-home-threads-lead {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--atlas-text-dim);
+  margin-right: 2px;
+}
+.atlas-home-thread {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.atlas-home-thread b { color: var(--atlas-warn-soft); font-weight: 600; }
+.atlas-home-thread:hover,
+.atlas-home-thread.is-open { color: var(--atlas-text); }
+.atlas-home-threads-sep { opacity: 0.4; }
+
+.atlas-home-thread-expand { margin-top: 10px; }
+.atlas-home-thread-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--atlas-warn-soft-border);
+  background: var(--atlas-warn-soft-tint);
+  border-radius: 8px;
+}
+.atlas-home-thread-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(var(--atlas-ink-rgb), 0.04);
+  border: 1px solid rgba(var(--atlas-ink-rgb), 0.12);
+  border-radius: 999px;
+  padding: 3px 10px 3px 8px;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--atlas-text-soft);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.atlas-home-thread-chip:hover {
+  color: var(--atlas-text);
+  border-color: var(--atlas-warn-soft);
+}
+.atlas-home-thread-chip-icon { font-size: 15px !important; color: var(--atlas-warn-soft); }
 
 /* The chart strip (S15) — the world's history shape on the cover.
    S256: always the tableau; saved charts ride below as chips. */
@@ -13897,7 +13975,9 @@ body.atlas-share-fullpreview > * {
   padding: 4px;
   border: 1px solid var(--atlas-divider);
   border-radius: 8px;
-  background: rgba(12, 14, 18, 0.97);
+  /* scrim triplet: the calendar dropdown floats over the light charts chrome;
+     its items use themed ink, so a fixed dark bg was illegible in light. */
+  background: rgba(var(--atlas-scrim-rgb), 0.97);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
   display: flex;
   flex-direction: column;

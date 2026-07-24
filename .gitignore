@@ -5,6 +5,9 @@ node_modules/
 # Build output
 dist/
 .vite/
+# Generated from src/changelog/changelog.data.ts by `npm run changelog`
+# (regenerated on every build + predev; the data file is the edit surface).
+changelog.html
 
 # Test output
 coverage/
