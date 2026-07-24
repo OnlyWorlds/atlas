@@ -161,11 +161,12 @@ export interface TourStep {
 }
 
 /** The pin the balcony-seat beat places, and the zone it must land inside.
- *  (S312: the spatial layer is Captain's live rebuild — map "Unnamed planet",
- *  zone "Swamps" — the unnamed-world resolution, hyperion.txt L307.) */
+ *  (S312: the spatial layer is Captain's live rebuild — zone "Swamps" — the
+ *  unnamed-world resolution, hyperion.txt L307. S318: map renamed live to
+ *  "Map of Unnamed planet", adopted.) */
 export const TOUR_PIN_REF = "pin:The Consul’s balcony seat";
 export const TOUR_SWAMPS_ZONE_REF = 'zone:Swamps';
-export const TOUR_MAP_REF = 'map:Unnamed planet';
+export const TOUR_MAP_REF = 'map:Map of Unnamed planet';
 
 /** The chapter the writing beat links (baked chip-free — see the-writing). */
 export const TOUR_CHAPTER_REF = 'narrative:Chapter 1';
@@ -226,9 +227,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'In Atlas, worlds are folders on your local drive that contain any number of elements. Let’s make a world that can capture this sentence.' +
-        '\n\nClick the **create local world** icon in the top left. We’ll call it Hyperion after the novel.',
-      meta: 'This tour world does not create a local folder, but is stored temporarily in your browser.',
+        'How do you create a world for something as big or as small as a single sentence?\nAtlas uses a folder per world, that contains elements as text files.' +
+        '\n\nClick the **create local world** icon in the top left. Call it Hyperion after the novel.',
+      meta: 'This tour world does not create a local folder, the world is stored temporarily in your browser.',
     }],
     handsOn: 'create-world',
   },
@@ -249,12 +250,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
         // in the sidebar". Every other hands-on beat acknowledges its gesture.
         id: 'b',
         when: (w) => w.hasRef('character:The Consul'),
-        body:
-          'Here we see the Consul’s page, and a few of the fields that define him.' +
-          '\nAll elements share a set of \'base\' fields that you see at the top, ' + 
+        body: 
+          'All elements share a set of \'base\' fields that you see at the top, ' + 
           'besides category-specific fields (hidden for the tour).' +  
-          '\n\nSo how do we model the diplomatic standing this character has?\nWe can write something in their *description* field. ' +
-          'But this Hegemony sounds important enough to be an element.\n\nClick next to create it as an institution, and a title for the consulship.',
+          '\nSo how do we model the diplomatic standing this character has?\nWe can write something in their *description* field. ' +
+          'But this Hegemony sounds important enough to be an element.\n\nClick next to create it as an institution, as well as the consulship title.',
       },
     ],
     spans: [{ from: 2, to: 2, type: 'character', ref: 'character:The Consul' }],
@@ -281,7 +281,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'This title creates a relation between the Consul and the organization, through the two link fields you see above.' ,
+        'We see a relation between the Consul and the organization in the form of this title now, through its two link fields.' ,
       meta: 'There are two types of link fields: single-link (*issuer*) and multi-link (*holders*).',
 
  
@@ -326,7 +326,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The Consul is above what sounds like a planet. Locations are the physical building blocks of your world, in various sizes.' +
+        'The Consul is above what sounds like a planet. Locations are the physical building blocks of your world and come in various sizes.' +
         '\nThe Consul has a field *location* to which it was assigned, so that we can know who is on (or hovering over) the planet.',
           meta: 'Locations can be nested through a field called *parent_location*: a park in a city on a continent on a planet.',
     }],
@@ -351,10 +351,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'Maps act as a layer on top of any images you want to bring (as url or local upload). These become 2D canvases onto which you can place other elements using markers and pins.' +
-          '\nMarkers combine to form zones, like you see here on the map: swamps, territories, roads (polygons or lines).' +
-          '\n\nPins place a specific element to a specific map. Create one now for the Consul by clicking the + pin icon in the middle pane, or dragging him in from the sidebar. Make sure to land him over the swamps.' ,
-        meta: 'Maps also support a 3D coordinate system: pins and markers have x, y, optional z fields. A 3D map editor is coming to Atlas.',
+          'Maps are like layers on top of images that you create elsewhere. (as url or local upload). Turns them into a canvas on which you can place things.' +
+          '\nMarkers combine to form zones, as seen in the map pane.' +
+          '\nPins point an element to a coordinate on a map.\n\nCreate one now for the Consul by clicking the + pin icon in the middle pane, or dragging him in from the sidebar. Make sure to land him over the swamps.' ,
         deeper:
           'So why not create a pin for the spaceship, instead? ' +
           'There would be no relational certainty, then, of where the Consul is, ' +
@@ -370,12 +369,15 @@ export const TOUR_STEPS: readonly TourStep[] = [
         when: (w) => w.hasRef(TOUR_PIN_REF),
         body:
           'Drag the pin onto the zone, so that the Consul can observe the saurians below.',
+        meta: 'Maps also support a 3D coordinate system: pins and markers have x, y, optional z fields. A 3D map editor is coming to Atlas.',
+
       },
       {
         id: 'c',
         when: (w) => w.hasRef(TOUR_PIN_REF) && w.pinInZone(TOUR_PIN_REF, TOUR_SWAMPS_ZONE_REF),
         body:
-          'Click the pin any time to select the Consul again.' ,
+          'You can click the pin any time to select the Consul.' +
+          'Maps can be nested into each other using a hierarchy system.\nMaps can be assigned a specific location to represent, like this particuar map has.' ,
       },
     ],
     handsOn: 'place-pin',
@@ -656,7 +658,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'There is still more to the story: a piano-making character, a piano-related ability, a piano-related trait, ' +
+        // S318 claim fix: the trait this step reveals is Swamp Rage, which is
+        // not piano-related — the modifier was a false claim on screen
+        // (Skeld's verify round; minimal edit, flagged to Captain).
+        'There is still more to the story: a piano-making character, a piano-related ability, a trait, ' +
         'a musical language, a piano-related phenomenon.'   ,
 
     }],
@@ -685,7 +690,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       body:
         'There\'s more to the tool, so please give it a try.\nAtlas uses OnlyWorlds for the categories and their fields, and allows custom fields on top of them.' +
         '\n\nCreate a [free account](https://onlyworlds.com/worlds) to sync atlas worlds online and into other applications.'  +
-        '\nQuestions, bugs, requests all welcome: through [Discord](https://discord.gg/twCjqvVBwb),the [feedback tracker](https://github.com/OnlyWorlds/feedback), or info@onlyworlds.com.' ,
+        '\nQuestions, bugs, requests all welcome: through [Discord](https://discord.gg/twCjqvVBwb), the [feedback tracker](https://github.com/OnlyWorlds/feedback), or info@onlyworlds.com.' ,
  
     }],
     route: { kind: 'element', ref: 'character:The Consul' },

@@ -33,6 +33,22 @@ import { setWorldActiveCalendar, saveRegistry } from '../registry/registry';
 import { WorldClockModal } from '../ui/world-clock-modal';
 import { CalendarBuilderModal } from '../ui/calendar-builder-modal';
 
+/** A sensible first "now": the LATEST recorded moment (Captain, S318 —
+ *  "snap to the center of whatever elements are at the latest date"). The
+ *  world's present sits where its record ends: the max over start dates and
+ *  recorded end dates, so the now lands ON the newest elements instead of
+ *  the old median default, which read as arbitrary mid-history. Open ends
+ *  don't count — they run TO the now, so they can't define it. The user
+ *  drags it from there. Pure; exported for the unit lock. */
+export function suggestNow(nodes: Pick<TimelineNode, 'startDate' | 'endDate'>[]): number {
+  let latest = -Infinity;
+  for (const n of nodes) {
+    if (Number.isFinite(n.startDate) && n.startDate > latest) latest = n.startDate;
+    if (n.endDate != null && Number.isFinite(n.endDate) && n.endDate > latest) latest = n.endDate;
+  }
+  return Number.isFinite(latest) ? Math.round(latest) : 0;
+}
+
 export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
   const wrap = document.createElement('div');
@@ -176,17 +192,6 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       meta: { ...active.meta, time_current: value ?? undefined },
     });
     requestPushIfLinked();
-  }
-
-  /** A sensible first "now": the MEDIAN dated point, so roughly half the world
-   *  sits on each side (a mid-range average gets skewed early by one ancient
-   *  outlier). The user drags it from there. */
-  function suggestNow(nodes: TimelineNode[]): number {
-    const dates = nodes.map(n => n.startDate).sort((a, b) => a - b);
-    if (dates.length === 0) return 0;
-    const mid = Math.floor(dates.length / 2);
-    const median = dates.length % 2 === 0 ? (dates[mid - 1] + dates[mid]) / 2 : dates[mid];
-    return Math.round(median);
   }
 
   /** Temporal types actually present, first-seen order (stable enough). */

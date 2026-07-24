@@ -9,7 +9,9 @@ import {
   calculateTimeRange,
   calculateTicks,
   createDateToX,
+  createXToDate,
 } from '../../src/visualization/timeline/axis-calculator';
+import { suggestNow } from '../../src/middle/timeline';
 import { extractTemporalNodes } from '../../src/visualization/timeline/data-normalizer';
 import type { Element } from '../../src/core/types';
 
@@ -97,6 +99,47 @@ describe('timeline axis-calculator', () => {
     const dateToX = createDateToX({ min: 5, max: 5 }, 1000);
     const x = dateToX(5);
     expect(x).toBeGreaterThan(0); // PADDING_LEFT
+  });
+
+  it('createXToDate is the exact inverse of createDateToX (S318 — one padded space)', () => {
+    // The view layer used to hold an UNPADDED x↔date twin, so the now-line
+    // (drawn via date→x) landed PADDING_RIGHT px right of the node rendered
+    // at the same date. The round-trip through the shared pair must be
+    // identity — that property fails against any parallel-constants twin.
+    const range = { min: -270, max: 12.04 };
+    const w = 937;
+    const toX = createDateToX(range, w);
+    const toDate = createXToDate(range, w);
+    for (const d of [-270, -251, 0, 1, 12, 12.04]) {
+      expect(toDate(toX(d))).toBeCloseTo(d, 9);
+    }
+    for (const x of [32, 100, 500, w - 16]) {
+      expect(toX(toDate(x))).toBeCloseTo(x, 9);
+    }
+  });
+});
+
+describe('suggestNow — the set-now default (S318)', () => {
+  const node = (startDate: number, endDate: number | null = null) => ({ startDate, endDate });
+
+  it('defaults to the LATEST start date (the tour: title 1, events 12+12 → 12)', () => {
+    expect(suggestNow([node(1), node(12), node(12)])).toBe(12);
+  });
+
+  it('a recorded end date later than any start defines the present', () => {
+    expect(suggestNow([node(1, 20), node(12)])).toBe(20);
+  });
+
+  it('open ends (null) do not count', () => {
+    expect(suggestNow([node(3, null), node(7)])).toBe(7);
+  });
+
+  it('empty input falls back to 0', () => {
+    expect(suggestNow([])).toBe(0);
+  });
+
+  it('rounds a fractional latest date', () => {
+    expect(suggestNow([node(11.6)])).toBe(12);
   });
 });
 

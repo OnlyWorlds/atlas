@@ -1808,6 +1808,29 @@ body.atlas-touring:not(.atlas-tour-cap-shell) .atlas-shell {
 body.atlas-touring .atlas-shell {
   height: calc(100vh - var(--tour-dock-h) - var(--tour-dock-gap) * 2);
 }
+/* S318 (Captain: "the element sidebar is obscured for half by the bar under
+ * it"): the reserve above shrinks the WHOLE shell, but the dock is a
+ * centered 960px panel that never horizontally reaches the sidebar on wide
+ * screens — so the sidebar was amputated by a strip that only the middle
+ * and right panes needed (322px gone at every height; half the column on a
+ * short laptop window). The sidebar escapes the reserve: full viewport
+ * height, painting into the strip the shell gave up. The shell must not
+ * clip it (overflow), and on widths where the centered dock DOES reach the
+ * sidebar column (< ~1600px), the list gets bottom clearance so every row
+ * can still scroll out from behind the dock. Middle/right keep the reserve:
+ * the map resizing instead of hiding is the S301 law and the pin/zone beats
+ * depend on it. */
+body.atlas-touring:not(.atlas-tour-collapsed) .atlas-shell {
+  overflow: visible;
+}
+body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
+  height: 100vh;
+}
+@media (max-width: 1599px) {
+  body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar-content {
+    padding-bottom: calc(var(--tour-dock-h) + var(--tour-dock-gap) * 2);
+  }
+}
 /* --- The opener (step 0): the panel, centered on black, sentence big. It
    overrides the docked geometry — auto height, screen center, no reserved
    strip needed (the shell is hidden). "Begin" hands off to the dock. */
@@ -1849,14 +1872,25 @@ body.atlas-touring .atlas-shell {
   line-height: 1.9;
   color: rgba(var(--atlas-ink-rgb), 0.42);
   /* ONE size in the dock, always (S301, Captain: "should stay constant size").
-     It used to grow to 15.5px on the first two steps via .is-fresh and shrink
-     from step 3, which read as the panel resizing under the reader. The big
+     It used to grow on the first two steps via .is-fresh and shrink from
+     step 3, which read as the panel resizing under the reader. The big
      presentation of the sentence is step 0's job (center stage); once it
-     docks it never changes size again. */
-  font-size: 15.5px;
+     docks it never changes size again. 15.5 -> 16.5 in S318 (Captain: +1pt,
+     paired with the 3-line height lock below). */
+  font-size: 16.5px;
   /* Was 75ch, which left ~200px of dead space to the right of the sentence
      inside a 914px panel (measured, S301). The panel governs the width. */
   max-width: none;
+}
+/* The docked sentence area is LOCKED at three lines (Captain, S318): lit
+   glyphs widen words, so the same sentence wraps to 2 or 3 lines depending
+   on progress, and the whole dock used to jump ~29px when a step crossed
+   that boundary (measured: 58.9 -> 88.3px at step 9). Reserving the 3-line
+   height kills the jitter; min- not fixed height, so a narrow viewport that
+   wraps to 4 lines degrades by growing instead of clipping. Scoped off the
+   opener, whose centered vignette sizes itself. */
+.atlas-tour-bar:not(.is-opener) .atlas-tour-sentence {
+  min-height: calc(3 * 1.9em);
 }
 /* The first two steps: the sentence reads BRIGHT (Freek's round) — the
    material leads before the parsing dims it into a progress surface. Colour
@@ -3683,6 +3717,22 @@ body.atlas-preroot .atlas-middle {
   letter-spacing: 0.08em;
   color: var(--atlas-text-muted);
   font-weight: 500;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+/* The field's description, quietly behind the label (S318). One line, fades
+   at overflow — a hint, not a paragraph. */
+.atlas-edit-popover-desc {
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: rgba(var(--atlas-ink-rgb), 0.38);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .atlas-edit-popover-footer {
@@ -4218,7 +4268,9 @@ body.atlas-preroot .atlas-middle {
      interrupt before the reader knows what Atlas is, and the tagline then
      trails the actions as an afterthought. Flip by dropping these orders. */
   order: 3;
-  margin-top: 20px;
+  /* 20 -> 34 (Captain, S318): more air between the tagline and the doors —
+     the statement gets its beat before the actions ask for a decision. */
+  margin-top: 34px;
 }
 .atlas-landing-compact .atlas-landing-tag { order: 2; }
 /* Each door is a button over its own caption (S302). The captions balance the
@@ -14632,6 +14684,13 @@ body.atlas-share-fullpreview > * {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--atlas-text-dim);
+}
+/* The way back, said clearly (Captain, S318: "clear, not too grey") — brighter
+   than the dim headings, quieter than a button. */
+.atlas-tour-exit-replay {
+  margin: 14px 0 4px;
+  font-size: 12.5px;
+  color: rgba(var(--atlas-ink-rgb), 0.8);
 }
 .atlas-tour-exit-rooms {
   list-style: none;

@@ -114,8 +114,20 @@ export class BaseModal {
 
     /** Base behaviors: click outside to close, ESC to close. */
     private attachBaseEventListeners(): void {
-        this.modal?.addEventListener('click', (e) => {
-            if (e.target === this.modal) this.hide();
+        // Close only on a FULL outside click: both the press AND the release
+        // must land on the overlay itself (Captain, S318). A `click` listener
+        // alone closes on drag-out — mousedown in an input, drag past the
+        // panel edge, release: the click event fires on the common ancestor
+        // (the overlay) and eats the user's half-typed modal. Pointer events
+        // target the element actually under the cursor at each end, so the
+        // pair check kills that class without touching Escape or Cancel.
+        let pressedOnOverlay = false;
+        this.modal?.addEventListener('pointerdown', (e) => {
+            pressedOnOverlay = e.target === this.modal;
+        });
+        this.modal?.addEventListener('pointerup', (e) => {
+            if (pressedOnOverlay && e.target === this.modal) this.hide();
+            pressedOnOverlay = false;
         });
 
         const escapeHandler = (e: KeyboardEvent) => {

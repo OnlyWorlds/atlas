@@ -4,7 +4,11 @@ Operational state. Architecture in **DESIGN.md**; per-room design in `DESIGN_{MA
 
 ---
 
-## CURRENT STATE (2026-07-24 — SESSIONS 316–317: **THE TOUR FINISH LINE** — Captain's two fix rounds + Skeld's copy notes built end to end; the tour is **16 steps** (pin beat merged into the map step); gates: typecheck 0 + **1540 vitest** + **271/271 e2e, PLAYWRIGHT_EXIT=0, count = `--list`, quiet machine** + build clean; UNCOMMITTED)
+## CURRENT STATE (2026-07-24 — SESSION 318: **THE LAST TOUR PUSH, BUILT** — all six S317 handover items + Skeld's copy blockers + field-edit safety; gates: typecheck 0 + **1560 vitest** + full e2e quiet-machine (see `Notes/2026-07-24-s318-handover.md` for the count) + build clean; UNCOMMITTED with the S316-317 pile)
+
+**Full record: `Notes/2026-07-24-s318-handover.md`** · queue: `Notes/2026-07-24-s317-post-deploy-queue.md` (item 6 shipped). Headlines: tour create-modal de-highlight · **modal full-click-outside discipline app-wide** (pointer-pair in modal-base; drag-out can't eat typed text) · sentence +1pt with a 3-line height lock (dock never resizes) · **bundle re-verified vs live** (one change: Captain's live map rename "Map of Unnamed planet" adopted; constants + spec follow) · **sidebar-obscured ROOT fixed** (the tour dock reserve shrank the whole shell; the sidebar now escapes it, full height) · **charts set-now** (the now line drew in an UNPADDED twin of the node mapping — collapsed into one shared padded pair, pixel-verified threading the events; default = latest recorded moment, not median) · **field-edit safety** (outside click COMMITS changed non-empty text; description behind the header label) · copy round (one concat fix, one false-claim minimal fix flagged; `tour-copy-hygiene.test.ts` locks the class). Changelog swept read-only: healthy, Captain's calls pending (Skeld's dark-launch question + shared category vocabulary + S316-318 entries).
+
+## PRIOR (2026-07-24 — SESSIONS 316–317: **THE TOUR FINISH LINE** — Captain's two fix rounds + Skeld's copy notes built end to end; the tour is **16 steps** (pin beat merged into the map step); gates: typecheck 0 + **1540 vitest** + **271/271 e2e, PLAYWRIGHT_EXIT=0, count = `--list`, quiet machine** + build clean; UNCOMMITTED)
 
 **Full record + the NEXT (last) tour push list: `Notes/2026-07-24-s317-handover.md`** · post-deploy non-tour queue: `Notes/2026-07-24-s317-post-deploy-queue.md`. Headlines:
 

@@ -282,9 +282,11 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
     }
     // mode === 'modal' (default)
     const suggestions = suggestionsForField(el, meta.name);
+    const fieldDesc = getFieldDescription(el.type, meta.name);
     openFieldEditPopover({
       anchor: valueEl,
       label: humanizeFieldName(meta.name),
+      ...(fieldDesc ? { description: fieldDesc } : {}),
       value: initialValue,
       widget: editWidget,
       ...(suggestions ? { suggestions } : {}),

@@ -133,7 +133,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
               </span>
               ${folderDoor}
             </div>
-            <p class="atlas-landing-tag">A free, local-first worldbuilding studio.</p>
+            <p class="atlas-landing-tag">An OnlyWorlds worldbuilding solution.</p>
             ${folderNote}
           </div>
         </div>

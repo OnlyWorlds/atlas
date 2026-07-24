@@ -478,7 +478,7 @@ export class ElementCreateModal extends BaseModal {
 
   private setType(type: ElementType): void {
     this.selected = type;
-    this.typeButtons.forEach((btn, t) => btn.classList.toggle('active', t === type));
+    this.typeButtons.forEach((btn, t) => btn.classList.toggle('active', t === type && !this.opts.lockAll));
     this.updateDateLabel();
     // Category change invalidates any accepted place-existing selection — the
     // selected element belonged to the prior category. Drop back to Create.
@@ -581,7 +581,11 @@ export class ElementCreateModal extends BaseModal {
     this.effectiveTypes().forEach(type => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'atlas-create-type-btn' + (type === this.selected ? ' active' : '');
+      // Tour lock: the single scripted tile renders in the normal grey, not
+      // the selected cyan — a locked choice needs no selection signal
+      // (Captain, S318).
+      const showActive = type === this.selected && !this.opts.lockAll;
+      btn.className = 'atlas-create-type-btn' + (showActive ? ' active' : '');
       btn.setAttribute('data-type', type);
       btn.title = ELEMENT_LABELS[type].singular;
       btn.innerHTML = `

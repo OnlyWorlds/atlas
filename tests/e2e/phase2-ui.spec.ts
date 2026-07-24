@@ -46,7 +46,9 @@ test('first launch shows the setup-atlas CTA, not create-local', async ({ page }
   await expect(page.locator('[data-action="setup-atlas"]').first()).toBeVisible();
   await expect(page.locator('[data-action="create-local"]')).toHaveCount(0);
   await expect(page.locator('.atlas-landing-mark')).toHaveText('Atlas');
-  await expect(page.locator('.atlas-middle')).toContainText('A free, local-first worldbuilding studio.');
+  // Tagline = Captain's copy (rewritten 2026-07-24 launch day); the assertion
+  // follows his `atlas-landing-tag` text, not the other way round.
+  await expect(page.locator('.atlas-middle')).toContainText('An OnlyWorlds worldbuilding solution.');
   // S301: the landing doors lost their headings and boxes; the buttons carry
   // the label, in the tool's lowercase voice.
   await expect(page.locator('.atlas-middle')).toContainText('set up a folder');

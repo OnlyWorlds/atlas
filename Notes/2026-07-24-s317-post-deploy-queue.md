@@ -1,6 +1,6 @@
 # Post-deploy queue — banked from the S317 tour finish-line session
 
-**Written**: 2026-07-24 15:40 · Captain's non-tour items from the S317 round, deferred so the tour could ship first. Each line re-verified against his words; strike lines as they land.
+**Written**: 2026-07-24 15:40 · **Updated**: 2026-07-24 (S318: item 6 SHIPPED — field-edit safety + description in header; commit-on-outside-click shape, unit-locked. Charts set-now default also shipped in S318 as part of the tour push.) · Captain's non-tour items from the S317 round, deferred so the tour could ship first. Each line re-verified against his words; strike lines as they land.
 
 ## Captain's banked items
 
@@ -9,7 +9,7 @@
 3. **Charts rail** — share PAGES currently appear in the undated drag-into-view list; exclude them.
 4. **Page delete vs published object** — verify what happens to the published server object when its page is deleted locally; then DISCUSS the wanted behaviour (Temper's lean: deleting the page should revoke the publication, never orphan it silently). Investigate before proposing.
 5. **Chart label truncation** — e.g. "Moistened Valley Massacre" truncates; write labels in full.
-6. **Field-edit safety (Captain: important)** — when a text-field editor holds NON-EMPTY text, click-outside must NOT close it (only close on empty); the text still saves. Captain left the exact shape open to discussion (alternative: save-on-outside-click). Companion: show the FIELD DESCRIPTION in the editor header behind the field name (space exists, would be useful). Consider a cheap catch-most temp-storage net for typed-but-lost text.
+6. ~~**Field-edit safety (Captain: important)**~~ **SHIPPED S318**: a full outside click (press + release both on the backdrop) COMMITS changed non-empty text exactly like Enter — typed work is never lost to a stray click; unchanged/emptied closes without writing; Escape stays the discard; drag-out does nothing (pointer-pair discipline, shared with modal-base). Field description now renders behind the label in the popover header. Unit-locked (`field-edit-popover.test.ts`); no temp-storage net needed under the commit shape.
 
 ## Flags from the copy pass (Captain to rule, no action taken)
 

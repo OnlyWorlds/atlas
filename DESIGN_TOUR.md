@@ -221,7 +221,7 @@ already drawn).
 2. **Maps** (steps 5-8): the **Unnamed Planet** location (right pane appears —
    S312: the unnamed-world resolution; the opening scene is NOT on Hyperion,
    hyperion.txt L307, so Captain rebuilt the spatial layer live and the bundle
-   adopted it) · the map "Unnamed planet" (bundled art) **+ the Swamps zone
+   adopted it) · the map "Map of Unnamed planet" (bundled art; renamed live by Captain, adopted S318) **+ the Swamps zone
    drawn on it** (zone name is now `Swamps`, 6 markers) · the balcony-seat pin
    (HANDS-ON, **soft correction**: place anywhere, Next only over the swamps) ·
    the swamps' living things (2 creatures, species, Pack of Bellowing Saurians).
@@ -411,7 +411,7 @@ room's onboarding cards stay silent (S264 intersection class).
 
 Baked from OnlyWorlds demo world (key `0000000000`), **34 elements** since the
 S312 re-snapshot (Captain's live spatial rebuild adopted wholesale: map
-"Unnamed planet" with his art baked to `unnamed-planet.webp`, zone `Swamps`
+"Map of Unnamed planet" (so named since his S318 live rename) with his art baked to `unnamed-planet.webp`, zone `Swamps`
 with 6 named markers, his pin; the old map/zone/9-markers are gone, and the
 LIVE world was aligned back — curly names, aliases, dates, book/chapter/
 calendar pushed, orphan zone deleted). ⚠ `TOUR_MEDIA_URLS` in tour-engine must

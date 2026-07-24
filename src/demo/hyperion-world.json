@@ -1,5 +1,5 @@
 {
- "_source": "OnlyWorlds demo world 0000000000 (world 068e012b-52a9-79bf-8000-26bb67891425), fetched 2026-07-19",
+ "_source": "OnlyWorlds demo world 0000000000 (world 068e012b-52a9-79bf-8000-26bb67891425), fetched 2026-07-19; re-verified against live 2026-07-24",
  "_bake_notes": [
   "legacy marker-based zone twin merged into the creature-referenced zone (markers retargeted, order from names)",
   "imgur image_urls replaced by bundled webp via x_tour_media (offline tour); boot writes them as local media",
@@ -24,7 +24,8 @@
   "collective renamed 'Pack of Bellowing Saurians' (Captain, live)",
   "Steinway parent_object = Ebony Spaceship, location cleared (Captain, live): objects nest like the balcony does",
   "DATES RE-DERIVED from the source (S312): title grant_date 1 + both events at 12 = the Consul's SOURCED eleven-year tenure (L327 + L3823, two witnesses); events share one date (Captain's S305 ruling -- he plays WHILE they surge). Deep time via the L1130 epoch (AD 2732 = 589 P.C. -> P.C. 0 ~ AD 2143): Rachmaninov born AD 1873 -> -270, Prelude composed AD 1892 -> -251. time_range_min -300. The Earth<->PC conversion IS asserted now (one line in the book reconciles four calendars); the S305 no-conversion ruling was made before L1130 was found and Captain ordered the source update",
-  "Captain's live 'new book' / 'new page' narratives are test artifacts: left live, excluded from the bundle"
+  "Captain's live 'new book' / 'new page' narratives are test artifacts: left live, excluded from the bundle",
+  "S318 re-verify vs live (2026-07-24): map renamed 'Unnamed planet' -> 'Map of Unnamed planet' (Captain's live edit, adopted; TOUR_MAP_REF + specs follow). Everything else identical modulo the disk dialect (map_id/zone_id) and the documented editorial layer (link weave, reputation, no time_current -- live's time_range_current=0 deliberately NOT adopted, the set-now beat needs an unset clock). Captain's live test narratives ('new book'/'new page') stay excluded."
  ],
  "world": {
   "name": "Hyperion",
@@ -332,7 +333,7 @@
   {
    "type": "map",
    "id": "2d277ba6-22e4-440b-9ef3-7f28153cd291",
-   "name": "Unnamed planet",
+   "name": "Map of Unnamed planet",
    "width": 1054,
    "height": 1492,
    "location": "068e2e4b-a594-71b2-8000-cd7b6283dd71",

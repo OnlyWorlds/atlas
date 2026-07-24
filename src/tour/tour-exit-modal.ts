@@ -32,8 +32,9 @@ function roomRow(room: TourRoom, seen: boolean): string {
 
 class TourExitModal extends BaseModal {
   open(stepIndex: number, onConfirm: () => void): void {
+    // No title (Captain, S318): the room summary IS the screen; a "leave the
+    // tour" heading above it duplicated the confirm button's own label.
     const { overlay, body } = this.buildModalShell({
-      title: 'leave the tour',
       dataModal: 'tour-exit',
       panelClass: 'atlas-tour-exit-panel',
     });
@@ -54,6 +55,7 @@ class TourExitModal extends BaseModal {
     body.innerHTML = `
       ${unseenBlock}
       ${seenBlock}
+      <p class="atlas-tour-exit-replay">Replay the tour any time from the settings.</p>
       <div class="atlas-modal-actions">
         <button type="button" class="atlas-btn-ghost" data-action="tour-exit-cancel">Keep going</button>
         <button type="button" class="atlas-btn-primary" data-action="tour-exit-confirm">Leave the tour</button>

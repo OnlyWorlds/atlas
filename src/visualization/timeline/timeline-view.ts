@@ -18,7 +18,7 @@
 import type { ElementType } from '../../core/types';
 import type { LinkedRef, PlacedDot, TimelineNode } from './types';
 import { effectiveEndDate, TEMPORAL_TYPE_FIELDS } from './temporal-fields';
-import { calculateTicks, calculateTimeRange, createDateToX } from './axis-calculator';
+import { calculateTicks, calculateTimeRange, createDateToX, createXToDate } from './axis-calculator';
 import { escapeText } from '../../core/dom-utils';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { rankAnchors, ANCHOR_CAP } from './degree';
@@ -612,12 +612,14 @@ function axisTicksFor(
 function axisYOf(h: number): number { return h - AXIS_LABEL_HEIGHT - STRIP_H - STRIP_GAP; }
 
 /** Canvas x for a world date under the current on-screen window (inverse of
- *  dateAtX). null when there's no view yet. */
+ *  dateAtX). null when there's no view yet.
+ *  Delegates to the axis-calculator's PADDED mapping — the same one nodes and
+ *  ticks draw with. An unpadded twin lived here until S318 and put the
+ *  now-line PADDING_RIGHT px right of the events it was set to. */
 function xAtDate(state: ViewState, date: number, w: number): number | null {
   const view = currentViewRange(state);
   if (!view) return null;
-  const span = view.end - view.start;
-  return span > 0 ? ((date - view.start) / span) * w : 0;
+  return createDateToX({ min: view.start, max: view.end }, w)(date);
 }
 
 /** A default axis range for an EMPTY chart (no dated nodes) so the first
@@ -2233,12 +2235,13 @@ function nearNowLine(state: ViewState, mx: number, my: number, w: number, h: num
   return my >= TOP_PAD - 6 && my <= axisYOf(h) && Math.abs(mx - x) <= NOW_GRAB_PX;
 }
 
-/** The date under a main-canvas x (uses the current on-screen window). */
+/** The date under a main-canvas x (uses the current on-screen window).
+ *  Inverse of xAtDate via the SHARED padded mapping (S318) — drags and hover
+ *  reads land on the date whose node sits under the cursor, not a few px off. */
 function dateAtX(state: ViewState, x: number, w: number): number | null {
   const view = currentViewRange(state);
-  if (!view) return null;
-  const span = view.end - view.start;
-  return span > 0 && w > 0 ? view.start + (x / w) * span : view.start;
+  if (!view || w <= 0) return null;
+  return createXToDate({ min: view.start, max: view.end }, w)(x);
 }
 
 function handleMouseMove(state: ViewState, e: MouseEvent): void {

@@ -93,3 +93,20 @@ export function createDateToX(range: TimeRange, canvasWidth: number): (date: num
     return PADDING_LEFT + ratio * usableWidth;
   };
 }
+
+/**
+ * Inverse of `createDateToX` — the ONE place the padded x→date math lives.
+ * The view layer used to hold its own unpadded `(x / w) * span` twin, which
+ * drew the now-line (and read drag/hover dates) PADDING_RIGHT px away from
+ * where the same date's node renders — the S318 "now not on the events" gap.
+ * Paired functions share code, never parallel constants.
+ */
+export function createXToDate(range: TimeRange, canvasWidth: number): (x: number) => number {
+  const usableWidth = Math.max(1, canvasWidth - PADDING_LEFT - PADDING_RIGHT);
+  const span = range.max - range.min;
+
+  return (x: number): number => {
+    if (span === 0) return range.min;
+    return range.min + ((x - PADDING_LEFT) / usableWidth) * span;
+  };
+}

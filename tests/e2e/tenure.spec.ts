@@ -55,9 +55,9 @@ async function focusInCharts(page: Page, elementId: string) {
 
 test('tenure and life vocabulary on the chart card, with and without a now', async ({ page }) => {
   await setupWorld(page);
-  // Dated spread whose MEDIAN is 38, so the real "Set current" gesture lands
-  // the now exactly where the assertions need it: sorted dates
-  // [5, 12, 28, 38, 38, 38] + revoke 31 don't shift the median window.
+  // Dated spread: the set-now default is the LATEST recorded moment (S318,
+  // Captain's rule — was the median): max over starts [5,12,28,38,38,48] and
+  // the recorded revoke 31 is 48, so the real gesture lands the now there.
   const revoked = await createElement(page, 'title', { name: 'Warden', grant_date: 12, revoke_date: 31 });
   const ongoing = await createElement(page, 'title', { name: 'Chronicler', grant_date: 28 });
   const chara = await createElement(page, 'character', { name: 'Serra', birth_date: 5 });
@@ -74,16 +74,16 @@ test('tenure and life vocabulary on the chart card, with and without a now', asy
   await focusInCharts(page, chara);
   await expect(meta).toHaveText('character · born 5');
 
-  // Establish the now via the real control (median of [5,12,28,38,38,48] = 33).
+  // Establish the now via the real control (latest of the spread = 48).
   await page.locator('.atlas-chart-now-set').click();
-  await expect(page.locator('.atlas-chart-now-chip')).toContainText('33'); // bare date (S263)
+  await expect(page.locator('.atlas-chart-now-chip')).toContainText('48'); // bare date (S263)
 
   // Ongoing tenure: held to the now. Closed tenure: recorded ends win, the now
   // is irrelevant. Character: age against the now.
   await focusInCharts(page, ongoing);
-  await expect(meta).toHaveText('title · granted 28 · held 5 so far');
+  await expect(meta).toHaveText('title · granted 28 · held 20 so far');
   await focusInCharts(page, revoked);
   await expect(meta).toHaveText('title · granted 12 · revoked 31 · held 19');
   await focusInCharts(page, chara);
-  await expect(meta).toHaveText('character · born 5 · age 28');
+  await expect(meta).toHaveText('character · born 5 · age 43');
 });

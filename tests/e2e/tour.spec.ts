@@ -790,7 +790,8 @@ test('resilience: the world heals user mess on step-enter, user work survives', 
     const zone = by('Swamps');
     const planet = by('Unnamed Planet');
     const ship = by('Ebony Spaceship');
-    const map = els.find((e: any) => e.type === 'map' && e.name === 'Unnamed planet');
+    // the bundle ships exactly one map; matching by type survives renames (S318)
+    const map = els.find((e: any) => e.type === 'map');
     const pin = els.find((e: any) => e.type === 'pin');
     await store.deleteElement(heg.id);
     await store.deleteElement(pin.id);

@@ -12,7 +12,9 @@
  * Keys:
  *   - Short input: Enter = Save, Escape = Cancel
  *   - Long textarea: Ctrl/Cmd+Enter = Save, Escape = Cancel
- *   - Click outside (on backdrop) = Cancel
+ *   - Full click outside (press + release on backdrop): commits changed
+ *     non-empty text like Enter; otherwise closes without writing (S318 —
+ *     typed work is never lost to a stray click; Escape stays the discard)
  *
  * Save semantics (session 224): the popover closes OPTIMISTICALLY on submit —
  * the overlay tears down before awaiting `opts.onSave`. The rest of the UI
@@ -28,6 +30,9 @@ export interface FieldEditOptions {
   anchor: HTMLElement;
   /** Field display label (shown as popover title). */
   label: string;
+  /** Optional field description, rendered quietly behind the label in the
+   *  header (Captain, S318: "we have space for it, would be useful"). */
+  description?: string;
   /** Initial value (string-ified). */
   value: string;
   /** Widget kind controls input vs textarea + parsing. */
@@ -57,10 +62,18 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
   const panel = document.createElement('div');
   panel.className = 'atlas-edit-popover';
 
-  // Header
+  // Header — the label, with the field's description quietly behind it.
   const header = document.createElement('div');
   header.className = 'atlas-edit-popover-header';
-  header.textContent = opts.label;
+  const labelSpan = document.createElement('span');
+  labelSpan.textContent = opts.label;
+  header.appendChild(labelSpan);
+  if (opts.description) {
+    const desc = document.createElement('span');
+    desc.className = 'atlas-edit-popover-desc';
+    desc.textContent = opts.description;
+    header.appendChild(desc);
+  }
   panel.appendChild(header);
 
   // Input
@@ -206,9 +219,26 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
   cancelBtn.addEventListener('click', cancel);
   saveBtn.addEventListener('click', () => { save(); });
 
-  // Click-outside on backdrop cancels
-  overlay.addEventListener('mousedown', (e) => {
-    if (e.target === overlay) cancel();
+  // Click-outside discipline (Captain, S318 — "seems a risky way to have
+  // people lose writing"). The old rule cancelled on backdrop MOUSEDOWN and
+  // silently discarded whatever was typed. Now:
+  //   - a full outside click (press AND release on the backdrop — the
+  //     modal-base pair, so a text-selection drag that slips off the panel
+  //     never triggers anything) with CHANGED, NON-EMPTY text COMMITS it,
+  //     exactly like Enter; typed work is never lost to a stray click.
+  //   - unchanged text, or an emptied input, closes without writing — a
+  //     deliberate clear still commits via Enter/Save, never by accident.
+  let pressedOnBackdrop = false;
+  overlay.addEventListener('pointerdown', (e) => {
+    pressedOnBackdrop = e.target === overlay;
+  });
+  overlay.addEventListener('pointerup', (e) => {
+    const fullOutsideClick = pressedOnBackdrop && e.target === overlay;
+    pressedOnBackdrop = false;
+    if (!fullOutsideClick) return;
+    const changed = input.value !== opts.value;
+    if (changed && input.value.trim() !== '') save();
+    else cancel();
   });
 
   const keyHandler = (e: KeyboardEvent) => {
