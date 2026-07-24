@@ -207,6 +207,10 @@ function buildSection(opts: SectionOpts): HTMLElement {
   const { headerLabel, count, groups, navigateTo, sectionClass } = opts;
   const section = document.createElement('div');
   section.className = sectionClass;
+  // Same hook the field sections carry (element-detail-fields stamps
+  // dataset.section) — lets the tour's field-highlight and scroll target
+  // refs sections ("Referenced by") by name too.
+  section.dataset.section = headerLabel;
 
   const header = document.createElement('div');
   header.className = 'atlas-detail-section-header no-toggle';

@@ -133,6 +133,13 @@ export class Leaflet2DManager {
       zoomDelta: 0.5,
       wheelPxPerZoomLevel: 120,
       zoomAnimation: true,
+      // SOLID bounds, not elastic (S316, the pan snap-back). Leaflet's
+      // default viscosity 0 ALLOWS dragging past maxBounds and then
+      // rubber-bands the view back on release — with bounds set to the exact
+      // image rect, every pan appeared to work and then snapped back
+      // (measured: a 120px drag settling at 0). Viscosity 1.0 makes the edge
+      // firm during the drag itself: the map stops instead of bouncing.
+      maxBoundsViscosity: 1.0,
     };
 
     // Fixed zoom disables all zoom interactions
@@ -176,7 +183,12 @@ export class Leaflet2DManager {
         { x: this.config.maxBounds[1][0], y: this.config.maxBounds[0][1] },
         this.config.canvasHeight
       );
-      this.map.setMaxBounds(L.latLngBounds(sw, ne));
+      // Padded 15% per side (S316): exact-rect bounds leave ZERO pannable
+      // slack whenever the viewport exceeds the image on an axis, which reads
+      // as "panning is broken". The pad is view breathing room only — stored
+      // pin/vertex coords stay guarded by their own clamps (pin-drag,
+      // commitVertexPosition), never by the camera.
+      this.map.setMaxBounds(L.latLngBounds(sw, ne).pad(0.15));
     }
 
     // Custom pane for the background image — sits BELOW Leaflet's default

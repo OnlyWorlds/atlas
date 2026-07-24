@@ -309,6 +309,9 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page.locator('.atlas-room-nav-strip [data-room="home"]')).toBeVisible();
   await expect(page.locator('.atlas-room-nav-strip [data-room="writing"]')).toBeHidden();
   await expect(page.locator('.atlas-right')).toBeHidden();
+  // S316 — the sidebar footer (the help icon's home) is tour-hidden here; its
+  // PRESENT half is asserted at the finale, whose copy names the help icon.
+  await expect(page.locator('.atlas-sidebar-footer')).toBeHidden();
 
   // EVERY create door is scripted during the consul beat: the elements
   // sidebar's + opens the same locked modal (Captain's catch — the free
@@ -364,6 +367,14 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page.locator('.atlas-sidebar')).toContainText('The Hegemony');
   await expect(page.locator('.atlas-sidebar')).toContainText('Consul of the Hegemony');
 
+  // S316 — the narrated-field highlight: the injected style tag targets
+  // exactly the rows this step's copy teaches (issuer/holders), and the
+  // issuer row is genuinely on screen to receive it. The ABSENT half (no tag
+  // on a step with no highlightFields) is asserted at the map step.
+  await expect(page.locator('#atlas-tour-field-hl')).toHaveCount(1);
+  expect(await page.locator('#atlas-tour-field-hl').textContent()).toContain('data-field="issuer"');
+  await expect(page.locator('.atlas-field[data-field="issuer"]')).toBeVisible();
+
   // S308 — the right pane arrives WITH the map, not a step early. It used to
   // unlock at `the-planet`, so the biggest piece of chrome in the build-up slid
   // in during a pure elements beat and `the-map` then narrated "a new pane just
@@ -378,6 +389,14 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page.locator('.atlas-right')).toBeVisible();
   await expect(page).toHaveURL(/\/map\//);
   await expect(page.locator('.atlas-map-tab-wrapper path').first()).toBeVisible(); // the zone polygon
+  // S316 — zone drawing arrives WITH the map (the prezone boundary moved from
+  // the-swamps to here), while fit-to-image and hide-pins stay hidden for the
+  // whole tour (the simplified toolbar).
+  await expect(page.locator('[data-map-tab-toolbar] [data-action="draw-polygon"]')).toBeVisible();
+  await expect(page.locator('[data-map-tab-toolbar] [data-action="fit-to-image"]')).toBeHidden();
+  await expect(page.locator('[data-map-tab-toolbar] [data-action="toggle-pins-visibility"]')).toBeHidden();
+  // The highlight tag's ABSENT half: this step narrates no field rows.
+  await expect(page.locator('#atlas-tour-field-hl')).toHaveCount(0);
   await nextStep(page, 7); // pin — the hands-on placement beat, soft correction
   await placePinViaMap(page);
   const placedPin = await page.evaluate(async () => {
@@ -457,6 +476,16 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page).toHaveURL(/\/timeline/);
   await expect(page.locator('.atlas-room-nav-strip [data-room="timeline"]')).toBeVisible();
 
+  // S316 — the calendar construct is tour-QUIET: revealed on disk (the axis
+  // reads its eras) yet absent from the elements sidebar while touring. Both
+  // halves asserted, so neither the reveal nor the hide can silently die.
+  const calendarOnDisk = await page.evaluate(async () => {
+    const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
+    return els.some((e: any) => e.name === 'Hegemony Standard');
+  });
+  expect(calendarOnDisk, 'the calendar construct is revealed on disk').toBe(true);
+  await expect(page.locator('.atlas-sidebar')).not.toContainText('Hegemony Standard');
+
   // The clock arrives unset, so the step has NO forward control until the user
   // sets it with the room's real button — the same single-route contract the
   // create beats hold. Walking past with Next is exactly what hung four sibling
@@ -483,6 +512,11 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   // shipped early-return renders Finish + the folder button and NO Exit.
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Set up a folder$/ })).toBeVisible();
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Exit tour$/ })).toHaveCount(0);
+
+  // S316 — the finale's copy names the help icon in the footer, so the footer
+  // must exist when the sentence does (the hidden half sits at the top of
+  // this walk). Copy naming a control is a behavioural claim.
+  await expect(page.locator('.atlas-sidebar-footer')).toBeVisible();
 
   // Finish: the residue contract — world gone, landing back, emphasis swapped.
   await page.locator('.atlas-tour-controls button', { hasText: /^Finish$/ }).click();

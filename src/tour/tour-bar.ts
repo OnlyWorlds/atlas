@@ -30,7 +30,7 @@ import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../core/constants';
 import { getState, subscribe } from '../core/state';
 import type { ElementType } from '../core/types';
 import {
-  capabilitiesUpTo,
+  capabilitiesUpTo, previewRefsFor,
   TOUR_CAPABILITIES, TOUR_CHAPTER_REF,
   TOUR_SENTENCE, TOUR_STEPS,
   type TourStep,
@@ -127,8 +127,9 @@ function unmount(): void {
   root?.remove();
   root = null;
   document.body.classList.remove('atlas-touring', 'atlas-tour-prezone', 'atlas-tour-preweb',
-    'atlas-tour-pinstep', 'atlas-tour-createstep', 'atlas-tour-nowstep');
+    'atlas-tour-pinstep', 'atlas-tour-createstep', 'atlas-tour-nowstep', 'atlas-tour-finalstep');
   for (const cap of TOUR_CAPABILITIES) document.body.classList.remove(`atlas-tour-cap-${cap}`);
+  document.getElementById(FIELD_HL_STYLE_ID)?.remove();
 }
 
 /** The tour's view of the world, for phase predicates. Pure read. */
@@ -352,9 +353,12 @@ function render(): void {
   // from step 5 since S306c, while two copy decisions (withholding its name at
   // `linking`, introducing it here) are written on the premise it is hidden.
   // A renamed step id silently disables the gate that keys on it.
-  const swampsIdx = TOUR_STEPS.findIndex(s => s.id === 'the-swamps');
+  // Zone chrome arrives WITH the map (Captain, S316: "add zone drawing right
+  // away — might as well let people try it"): the prezone boundary moved from
+  // the-swamps to the-map. Draw buttons show as soon as a map exists.
+  const mapIdx = TOUR_STEPS.findIndex(s => s.id === 'the-map');
   const webIdx = TOUR_STEPS.findIndex(s => s.id === 'yours-to-keep');
-  document.body.classList.toggle('atlas-tour-prezone', idx < swampsIdx);
+  document.body.classList.toggle('atlas-tour-prezone', idx < mapIdx);
   document.body.classList.toggle('atlas-tour-preweb', idx < webIdx);
   // Highlight the REAL +pin button on the Consul during the pin beat (until
   // placed) — the "use the actual control, highlighted" flow (Captain S299).
@@ -373,6 +377,12 @@ function render(): void {
   // does not; the control bar is a sibling of the view mount).
   document.body.classList.toggle('atlas-tour-nowstep',
     step.handsOn === 'set-now' && !view.nowIsSet && view.tourIsLive);
+  // The finale un-hides the sidebar footer: its copy names the help icon that
+  // lives there, and copy naming a control is a behavioural claim (S316).
+  document.body.classList.toggle('atlas-tour-finalstep', idx === TOUR_STEPS.length - 1);
+  // Field rows the step narrates glow subtly (Captain, S316) — injected as a
+  // style tag so detail re-renders can never wipe the highlight.
+  applyFieldHighlights(step);
   const opener = idx === 0;
 
   root.innerHTML = '';
@@ -401,11 +411,12 @@ function render(): void {
   body.className = 'atlas-tour-body';
   renderBodyText(body, phase.body);
   copy.appendChild(body);
-  // The extras row (✦ deeper · inline links) ALWAYS renders — a step without
-  // them shows an invisible placeholder at the same metrics, so the panel
-  // keeps one shape whether or not a deeper widget exists (the constant-dock
-  // law, extended to this row 2026-07-19: baseline-floating the bulb beside
-  // the body let long bodies wrap it onto its own line on SOME steps only).
+  // THE ONE FOOT ROW (Captain, S316): "more information" and the meta line
+  // share a single slot at the same position — a step shows the deeper bulb
+  // OR its meta subtext, never both (a unit test in tour-preview.test.ts
+  // makes the exclusivity structural, so it cannot drift back). A step with
+  // neither shows an invisible placeholder at the same metrics, so the panel
+  // keeps one shape across all three cases (the constant-dock law).
   const extras = document.createElement('div');
   extras.className = 'atlas-tour-extras';
   if (phase.deeper) {
@@ -439,10 +450,20 @@ function render(): void {
     extras.appendChild(bulb);
     panel.appendChild(deeper); // flyout anchors to the PANEL, above it
   }
-  // (The S311 opener wiki link moved INLINE onto the word "Hyperion" in the
-  // step-1 body — the copy token pass renders [text](url) now, S312. The
-  // extras row remains available for future links beside the deeper bulb;
-  // the ecosystem-explorer link was CUT in S298, Freek's round.)
+  // Meta rides the SAME slot when there is no deeper widget (the merged foot
+  // row, S316). The opener shows neither: its copy carries the book link
+  // inline (S312), and the duplicate-cite cut (S306) stands. The old separate
+  // always-rendered meta row is gone: one row, one occupant, one position,
+  // structurally exclusive (tour-preview.test.ts asserts no phase has both).
+  if (extras.childElementCount === 0 && !opener && phase.meta) {
+    const meta = document.createElement('p');
+    meta.className = 'atlas-tour-meta';
+    // The same token pass as bodies — the hegemony meta names *issuer* and
+    // *holders*, which rendered as literal asterisks under textContent
+    // (own-eyes, S316 walk).
+    renderBodyText(meta, phase.meta);
+    extras.appendChild(meta);
+  }
   if (extras.childElementCount === 0) {
     const ghost = document.createElement('span');
     ghost.className = 'atlas-tour-extras-ghost';
@@ -450,27 +471,6 @@ function render(): void {
     extras.appendChild(ghost);
   }
   copy.appendChild(extras);
-  // The meta row ALWAYS renders (nbsp when the step has none) — steps with
-  // and without subtext keep the exact same panel shape. Step 1 uses the
-  // channel for its framing: eyebrow left, the book cite right — the opener
-  // carries them at ZERO extra rows, so the panel never reshapes on the
-  // first Next (Captain's docked-from-start round, 2026-07-19).
-  const meta = document.createElement('p');
-  meta.className = 'atlas-tour-meta';
-  if (opener) {
-    meta.classList.add('atlas-tour-meta-opener');
-    // The "One sentence, one world" eyebrow was cut S299 (Captain: "why still
-    // this blue header, remove it"). The grey book cite under it went the same
-    // way in S306 — the opener's own copy already names Hyperion and its year,
-    // so the link was a second, quieter statement of the same fact.
-    // NOTE: TOUR_ATTRIBUTION_URL is claimed again as of S311 — the opener's
-    // extras row renders it as the "Hyperion on Wikipedia" link. The bare
-    // TOUR_ATTRIBUTION text constant remains unreferenced.
-    meta.textContent = ' ';
-  } else {
-    meta.textContent = phase.meta ?? ' ';
-  }
-  copy.appendChild(meta);
   panel.appendChild(copy);
 
   // Row 3 — controls.
@@ -553,24 +553,19 @@ function render(): void {
       : step.handsOn === 'link-word' ? view.chipCount(TOUR_CHAPTER_REF) >= 1
       : handsOnDone)
     : true;
-  // The create-preview stack (Captain, S312): on a beat that mints elements,
-  // a small column of their type icons sits above the forward slot — dim
-  // until each element lands, lit in its type colour after. A quiet "this is
-  // what is about to happen" indicator; the sentence glyphs stay the payoff.
-  const createStack = buildCreateStack(step, view);
-  // The stack floats up out of the controls row, so on long-copy steps it can
-  // climb into the body text / extras row (S315 gate). When a stack exists,
-  // the panel reserves a right-hand lane for it — the copy simply never
-  // occupies the column the icons rise through.
-  panel.classList.toggle('has-create-stack', Boolean(createStack));
-  const mountForward = (btn: HTMLElement) => {
-    if (!createStack) { controls.appendChild(btn); return; }
-    const wrap = document.createElement('div');
-    wrap.className = 'atlas-tour-forward-slot';
-    wrap.appendChild(createStack);
-    wrap.appendChild(btn);
-    controls.appendChild(wrap);
-  };
+  // The preview stack (Captain, S316 — the semantics flip): a right-anchored
+  // column of type icons showing what the NEXT click of Next brings into the
+  // world (the following step's reveals and creates, quiet machinery
+  // excluded). Hands-on and creates beats preview nothing on their own step —
+  // the gesture is its own preview, and arrival feedback moved to the sidebar
+  // flash (tour-engine dispatches the pulled-ids event on reveal). The stack
+  // is static per step, so no signature term is needed for it.
+  const previewStack = buildPreviewStack(idx);
+  // When a stack exists, the copy reserves the right-hand lane the icons
+  // occupy — long bodies never collide with the column (S315 gate).
+  panel.classList.toggle('has-create-stack', Boolean(previewStack));
+  if (previewStack) panel.appendChild(previewStack);
+  const mountForward = (btn: HTMLElement) => { controls.appendChild(btn); };
 
   if (step.handsOn && step.handsOn !== 'setup-folder' && !handsOnGate) {
     // No LIVE forward control: the gesture is the way. But the SLOT stays —
@@ -631,42 +626,35 @@ function render(): void {
 }
 
 /**
- * The create-preview stack (Captain, S312): one type icon per element the
- * step mints (a `creates` run, or the consul beat), dim until that element
- * exists, lit in its type colour after. Returns null when the step mints
- * nothing, so the forward slot stays a bare button everywhere else.
+ * The preview stack (Captain, S316): one dim type icon per element the NEXT
+ * step brings — `previewRefsFor` holds the rule (next step's reveals ∪
+ * creates, minus markers and the calendar construct). "It is what you are
+ * about to create": the icons are always the not-yet state, because the
+ * moment those elements exist the tour is on their step and the stack shows
+ * the step after. Returns null when the next step brings nothing (or there
+ * is no next step), so the dock stays bare everywhere else.
  */
-function buildCreateStack(step: TourStep, view: TourWorldView): HTMLElement | null {
-  // Preview the elements that ARRIVE by clicking Next — scripted `creates`
-  // (minted one-by-one on the objects run) and `reveal` lists (appear on
-  // step-enter, e.g. deep-time's Rachmaninov, the-rest's ability/trait/…).
-  // NOT the hands-on beats: the consul, the pin, the link are made BY HAND, so
-  // previewing them is noise — the create-consul special case is gone (Captain,
-  // S313: "preview for any created by clicking next, not those by hand").
-  const refs = [...(step.creates ?? []), ...(step.reveal ?? [])];
+function buildPreviewStack(idx: number): HTMLElement | null {
+  const refs = previewRefsFor(idx);
   if (refs.length === 0) return null;
   const stack = document.createElement('div');
   stack.className = 'atlas-tour-create-stack';
-  // A vertical column, right-anchored (Captain, S313). Capped so a step that
-  // reveals many elements (the map beat: a map + zone + six markers) stays a
-  // short stack, not a tower — the rest fold into a "+N" chip.
+  // Capped so a step that previews many elements (the-rest: seven) stays a
+  // short column, not a tower — the rest fold into a "+N" chip.
   const overflow = refs.length > CREATE_STACK_MAX ? refs.length - (CREATE_STACK_MAX - 1) : 0;
   const shown = overflow ? refs.slice(0, CREATE_STACK_MAX - 1) : refs;
   for (const ref of shown) {
     const [type, name] = [ref.slice(0, ref.indexOf(':')), ref.slice(ref.indexOf(':') + 1)];
-    const done = view.hasRef(ref);
     const icon = document.createElement('span');
-    icon.className = 'material-symbols-outlined atlas-tour-create-glyph' + (done ? ' done' : '');
+    icon.className = 'material-symbols-outlined atlas-tour-create-glyph';
     icon.textContent = ELEMENT_ICONS[type as ElementType] ?? 'circle';
-    icon.title = `${name} (${type})` + (done ? ' · created' : ' · to create');
+    icon.title = `${name} (${type}) · up next`;
     icon.style.setProperty('--tour-glyph-color', ELEMENT_TYPE_COLORS[type as ElementType] ?? '#22d3ee');
     stack.appendChild(icon);
   }
   if (overflow) {
     const more = document.createElement('span');
     more.className = 'atlas-tour-create-more';
-    // Lit once every folded element exists (reveals/mints land together).
-    if (refs.slice(CREATE_STACK_MAX - 1).every(r => view.hasRef(r))) more.classList.add('done');
     more.textContent = `+${overflow}`;
     more.title = `${overflow} more`;
     stack.appendChild(more);
@@ -675,6 +663,37 @@ function buildCreateStack(step: TourStep, view: TourWorldView): HTMLElement | nu
 }
 
 const CREATE_STACK_MAX = 5;
+
+/**
+ * The step's narrated-field highlight (Captain, S316). One injected style tag
+ * keyed off the step script: `field` entries match the `data-field` attribute
+ * every detail row renders; `section:` entries match a detail section by its
+ * `data-section` name ("Referenced by"). A style tag rather than stamped
+ * classes because the detail pane re-renders on every state tick and would
+ * wipe any class the tour put on its rows. Names are whitelisted to a safe
+ * character set — the script is static, but a selector is still a selector.
+ */
+const FIELD_HL_STYLE_ID = 'atlas-tour-field-hl';
+
+function applyFieldHighlights(step: TourStep): void {
+  const names = (step.highlightFields ?? []).filter(n => /^[A-Za-z0-9_: -]+$/.test(n));
+  let tag = document.getElementById(FIELD_HL_STYLE_ID) as HTMLStyleElement | null;
+  if (names.length === 0) { tag?.remove(); return; }
+  if (!tag) {
+    tag = document.createElement('style');
+    tag.id = FIELD_HL_STYLE_ID;
+    document.head.appendChild(tag);
+  }
+  tag.textContent = names.map(n => {
+    const sel = n.startsWith('section:')
+      ? `body.atlas-touring .atlas-detail-section[data-section="${n.slice('section:'.length)}"]`
+      : `body.atlas-touring .atlas-field[data-field="${n}"]`;
+    // Quiet, not pulsing: a wash + a hairline accent — the row is pointed at,
+    // never shouted at (the tour's control highlights keep the pulse).
+    return `${sel} { background: rgba(var(--atlas-accent-rgb), 0.07); `
+      + 'box-shadow: inset 2px 0 0 var(--atlas-cyan); border-radius: 4px; }';
+  }).join('\n');
+}
 
 /**
  * The reserved forward slot (Captain, S311). Whenever no LIVE forward control

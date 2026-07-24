@@ -33,7 +33,7 @@ import { saveRegistry, deleteWorldEntry } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
 import { detachSyncEngine } from '../sync/sync-attach';
 import type { Element, ElementType } from '../core/types';
-import { TOUR_MAP_REF, TOUR_PIN_REF, TOUR_STEPS, type TourStep } from './tour-data';
+import { isQuietRef, TOUR_MAP_REF, TOUR_PIN_REF, TOUR_STEPS, type TourStep } from './tour-data';
 import { mergeHealArray } from './tour-heal';
 
 const TOUR_STATE_KEY = 'atlas_tour_v1';
@@ -406,11 +406,18 @@ async function revealUpTo(stepIndex: number): Promise<void> {
   const aliasesOn = await aliasesOnFor(linkable);
   const bundle = await loadBundle();
   let wrote = false;
+  // Newly-written NON-QUIET elements flash in the sidebar (Captain, S316):
+  // the preview stack promises them one step ahead, the flash marks their
+  // arrival. Quiet machinery (markers, the calendar construct) lands silently.
+  const flashIds: string[] = [];
   for (const el of bundle.elements) {
     // CREATION is step-keyed: a hands-on/creates element is the USER's to
     // make on its own step. `linkable` never widens what gets written.
     if (!revealed.has(el.id)) continue;
-    if (await revealOne(el, universe, linkable, aliasesOn)) wrote = true;
+    if (await revealOne(el, universe, linkable, aliasesOn)) {
+      wrote = true;
+      if (!isQuietRef(`${el.type}:${el.name}`)) flashIds.push(el.id);
+    }
   }
   const healed = await healLinks(universe, linkable, aliasesOn);
   const mediaHealed = await healMedia(linkable);
@@ -418,6 +425,13 @@ async function revealUpTo(stepIndex: number): Promise<void> {
   // convergent on the media leg) — a healed link or re-attached image must
   // be visible on the surface the user is looking at, not next tick.
   if (wrote || healed > 0 || mediaHealed > 0) await refreshElements();
+  // AFTER the refresh, so the rows exist when the flash paints them. Reuses
+  // the auto-pull flash channel (elements-sidebar listens document-wide);
+  // the DOM event keeps the engine from importing UI modules, same as
+  // sync-attach's dispatch.
+  if (flashIds.length > 0) {
+    document.dispatchEvent(new CustomEvent('atlas:pulled-ids', { detail: { ids: flashIds } }));
+  }
 }
 
 async function refreshElements(): Promise<void> {

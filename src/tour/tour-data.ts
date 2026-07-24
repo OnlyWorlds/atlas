@@ -132,6 +132,15 @@ export interface TourStep {
    */
   scrollToSection?: string;
   /**
+   * Field rows the step's copy narrates get a subtle highlight while the step
+   * is live (Captain, S316): each entry matches `.atlas-field[data-field=X]`
+   * — the row attribute every field renders — or, prefixed `section:`, an
+   * `.atlas-detail-section[data-section=X]` (for "Referenced by", which is a
+   * section, not a field). Applied via one injected style tag (tour-bar), so
+   * detail re-renders can never wipe it. Names must be [A-Za-z0-9_ -] only.
+   */
+  highlightFields?: string[];
+  /**
    * Hands-on steps. The create beats and `set-now` are SINGLE ROUTE: the real
    * gesture is the only way forward, and no watch-mode Next is rendered (two
    * forward controls at a hands-on beat read as a fork — Captain, S298). Each
@@ -158,6 +167,26 @@ export const TOUR_MAP_REF = 'map:Unnamed planet';
 
 /** The chapter the writing beat links (baked chip-free — see the-writing). */
 export const TOUR_CHAPTER_REF = 'narrative:Chapter 1';
+
+// The quiet-element list lives in tour-flag (the static-import-safe module —
+// the elements sidebar needs it without pulling the lazy tour chunk);
+// re-exported here so tour code and tests keep one import surface.
+export { isQuietRef, TOUR_QUIET_REFS, TOUR_QUIET_TYPES } from './tour-flag';
+import { isQuietRef } from './tour-flag';
+
+/**
+ * The preview stack's refs for step `stepIndex` (Captain, S316): what the
+ * NEXT click of Next brings into the world — the FOLLOWING step's `reveal`
+ * and `creates` lists, minus the quiet machinery above. "It is what you are
+ * about to create." Hands-on elements (the consul, the pin, the linked word)
+ * are never previewed: the gesture is its own preview, and the copy names it.
+ * The last step previews nothing.
+ */
+export function previewRefsFor(stepIndex: number): string[] {
+  const next = TOUR_STEPS[stepIndex + 1];
+  if (!next) return [];
+  return [...(next.creates ?? []), ...(next.reveal ?? [])].filter(r => !isQuietRef(r));
+}
 /**
  * How many of the sentence’s phrases can be linked AT THE WRITING BEAT.
  *
@@ -209,7 +238,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'Worlds are made of elements, and this Consul seems pre-eminent.\nClick the highlighted + to create it as a character.',
+          'Worlds are made of elements, and this Consul seems pre-eminent.\nClick the highlighted **+** to create him as a character.',
         // (The "real element dialog, locked to the tour’s script this once…" meta
         // was cut S301, Captain’s round — the dialog speaks for itself.)
       },
@@ -220,7 +249,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'b',
         when: (w) => w.hasRef('character:The Consul'),
         body:
-          'Here we see the Consul’s page, with empty fields through which you can define it.' +
+          'Here we see the Consul’s page, with empty fields through which you can define him.' +
           '\nAll elements share a set of \'base\' fields that you see at the top, ' + 
           'and each category has a set of specialized fields.\nEmpty fields are hidden during this tour for easier navigation.' + 
           '\n' + 
@@ -252,10 +281,10 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The Hegemony is an institution, an element that can represent any kind of organized body.' +
+        'The Hegemony is an institution: a category that represents any kind of organized body.' +
         '\n\nTitle is another category. Here\'s one that was issued by the Hegemony and is held by our character, as seen through its *issuer* and *holders* fields.' +
         '\nThis creates a traceable link between the Consul and the Hegemony.' ,
-      meta: 'There are two types of link fields: single-link (like *issuer*) and multi-link, that can hold any number (like *holders*).',
+      meta: 'There are two types of link fields: single-link (like *issuer*) and multi-link, which can hold any number (like *holders*).',
 
  
     }],
@@ -276,6 +305,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // richer prose but its links sit below the dock at default scroll.)
     route: { kind: 'element', ref: 'title:Consul of the Hegemony' },
     scrollToSection: 'Mandate',
+    // The copy teaches issued-by/held-by against exactly these rows (S316).
+    highlightFields: ['issuer', 'holders'],
   },
   // ---------------------------------------------------------------- Act 2 (maps)
   // Locations and the map now come BEFORE the objects (S303 rework): this lights
@@ -297,13 +328,16 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The consul is above what sounds like a planet. So we\'ll create a location for it: any physical place in a world that can be named or, in this case, unnamed.' +
-        '\n\nThe consul has a *location* field that we can assign this planet to, so that we see it is now referenced by the Consul.',
+        'The Consul is above what sounds like a planet. So we\'ll create a location for it: any physical place in a world that can be named or, in this case, unnamed.' +
+        '\n\nWe\'ve assigned it in the Consul\'s *location* field: the planet\'s page now lists him under Referenced by.',
           meta: 'Locations can be nested: a city on a continent on a planet.',
     }],
     spans: [{ from: 35, to: 35, type: 'location' }],
     reveal: ['location:Unnamed Planet'],
     route: { kind: 'element', ref: 'location:Unnamed Planet' },
+    // The copy narrates the *location* assignment and the Referenced-by
+    // payoff; the planet's page shows the latter (S316).
+    highlightFields: ['section:Referenced by'],
   },
   {
     id: 'the-map',
@@ -326,7 +360,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // The swamps zone (and its markers) reveal WITH the map — the pin beat’s
     // soft correction needs the region present to test the drop against, and
     // the geography reads as one thing. The living things stay for the-swamps.
-    spans: [{ from: 32, to: 34, type: 'zone' }],
+    // Span starts at "the" (33), not "in" (32): the zone is the swamps, the
+    // preposition stays plain (Captain, S316).
+    spans: [{ from: 33, to: 34, type: 'zone' }],
     reveal: [
       TOUR_MAP_REF,
       TOUR_SWAMPS_ZONE_REF,
@@ -346,8 +382,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'Let\'s place the Consul on the map using a pin.' + 
-          '\nClick the + pin icon opposite the Consul\'s name, then click on the map to place the consul.\nPut him somewhere over the swamps, per canon.',
+          'Let\'s place the Consul on the map using a pin.' +
+          '\nClick the **+ pin** icon opposite the Consul\'s name, then click on the map to place him.\nPut him somewhere over the swamps, per canon.',
   
         deeper:
           'So why not create a pin for the spaceship, instead? ' +
@@ -356,7 +392,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
           '\'this character is in this object\'.' +
           '\n\n' +
           'Unlike, for example, if we pinned a city on the map, and linked that city in the Consul\'s ' +
-          '*location* field; this lets us infer with certainty that the consul is at the same place as that city\'s pin.' +
+          '*location* field; this lets us infer with certainty that the Consul is at the same place as that city\'s pin.' +
           '\n\nThis is a limitation of the language as it is now. For [cases like this](https://council.onlyworlds.com/#/chamber/character/3b6bdcff-06a7-4c26-be60-497b042d4763), ' +
           'the council is a place to discuss, vote, then act to improve the language.',
       },
@@ -367,13 +403,13 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'b',
         when: (w) => w.hasRef(TOUR_PIN_REF),
         body:
-          'Drag the pin onto the zone, so that the consul can observe the saurians below.', 
+          'Drag the pin onto the zone, so that the Consul can observe the saurians below.',
       },
       {
         id: 'c',
         when: (w) => w.hasRef(TOUR_PIN_REF) && w.pinInZone(TOUR_PIN_REF, TOUR_SWAMPS_ZONE_REF),
         body:
-          'Placed. Click the pin any time to select the consul again.' ,
+          'Placed. Click the pin any time to select the Consul again.' ,
       },
     ],
     handsOn: 'place-pin',
@@ -398,7 +434,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         // model cannot express. Narrowed to what is true and checkable.
         'There are saurian things below, so we created two creatures, one of which must inevitably be greater than the other.' +
         '\nPhysical bodies can be grouped into collectives; one was created to represent the pack of them.'  +
-        '\nSpecies are elements that can represent any kind of cultural or, in this case, biological classification.'  ,
+        '\nSpecies capture a cultural or, in this case, biological classification.'  ,
           }],
     spans: [
       { from: 27, to: 27, type: 'creature' },
@@ -423,9 +459,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
       {
         id: 'a',
         body:
-          'Three objects sit in the sentence, with particular relations: the balcony is part of the spaceship, and the piano is inside of the ship.' +
-          '\nWe can model this situation by setting the spaceship as parent_object of the balcony and piano.'+
-          '\nClick the create element button three more times to set this up.',
+          'Three objects sit in the sentence, with particular relations: the balcony is part of the spaceship, and the piano is inside the ship.' +
+          '\nWe can model this situation by setting the spaceship as the *parent object* of the balcony and piano.'+
+          '\nClick the **create element** button three more times to set this up.',
       },
       {
         id: 'b',
@@ -438,7 +474,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'c',
         when: (w) => w.hasRef('object:Spaceship Balcony'),
         body:
-          'The balcony’s “parent object” is the spaceship: objects nest in objects, ' +
+          'The balcony’s *parent object* is the spaceship: objects nest in objects, ' +
           'the same way locations nest in locations. One more click for the piano.',
       },
       {
@@ -460,6 +496,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // telling the user to make it. The Consul is the right surface anyway —
     // his Objects fill in as each object lands.
     route: { kind: 'element', ref: 'character:The Consul' },
+    // Per-mint navigation opens each new object's page; the copy teaches
+    // *parent object* there (S316).
+    highlightFields: ['parent_object'],
   },
   {
     id: 'linking',
@@ -497,9 +536,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
           // (S306): `handleKeyDown` promotes the decoration containing the
           // CURSOR, so hovering does nothing and Tab just moves focus out of
           // the editor. The gesture is click-then-Tab.
-          'The writing room is for long-form story organization and integration.' +
-          '\nIt displays stories through three customizable "tiers", where the default is Book - Chapter - Scene.' +
-          '\nWorld elements can be linked while you write. Try clicking, or hover-then-press-tab, on the blue underlined words.',
+          'The writing room is where you write and organize long-form stories.' +
+          '\nStories organize in three customizable tiers: Book, Chapter and Scene by default.' +
+          '\nWorld elements can be linked while you write. Try clicking one of the blue underlined words, or hovering one and pressing Tab.',
  
    
       },
@@ -566,14 +605,14 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'a',
         body:
           'The Charts room makes your elements navigable across time.\nBoth events sit on ' +
-          'the same moment, as you see above.\nYou can set a \'now\' time for your world; try it with the highlighted button.', 
+          'the same moment, as you see above.\nYou can set a \'now\' time for your world; try it with the highlighted **set now time** button.',
         advanceWhen: (w) => w.nowIsSet,
       },
       {
         id: 'b',
         when: (w) => w.nowIsSet,
         body:
-          'The gold line signifies the now, and the Consul’s title draws as a span: it ' +
+          'The gold line marks the now, and the Consul’s title draws as a span: it ' +
           'starts when the title was granted and runs to the present.\nIts soft ' +
           'end means no end is recorded, so as far as we know he holds ' +
           'it still.',
@@ -584,7 +623,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'chart and it remembers its window, its cast, and its lens.' +
         '\n\n' +
         'Worlds can also carry their own calendars: a way to name months, eras, festivals, basic time units.'+
-        '\n\nClick the \'Hegemony Standard\' chip above the chart view to have a look at this.',
+        '\n\nClick the \'Hegemony Standard\' chip above the chart view to see one.',
    
    
       },
@@ -671,8 +710,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
       // (S306) — copy naming a control is a behavioural claim.
       // The buttons say what is available; the prose no longer guesses.
       body:
-        'That\'s all you get from the tour. Click the help icon in the footer to get some room-specific information.' +
-        '\nDon\'t hesitate to reach out for questions, bugs, and feature requests: through discord[url], email[info@onlyworlds.com], or the public feedback tracker[feedback repo]',
+        'That\'s the tour. Each room\'s help icon in the footer has more.' +
+        '\nQuestions, bugs and feature requests are welcome: through [Discord](https://discord.gg/twCjqvVBwb), ' +
+        'the [feedback tracker](https://github.com/OnlyWorlds/feedback), or email at info@onlyworlds.com.',
       meta: 'The tour world leaves nothing behind. Replay it anytime from settings.',
     }],
     handsOn: 'setup-folder',

@@ -299,16 +299,37 @@ function buildCover(
   {
     const statline = document.createElement('div');
     statline.className = 'atlas-home-statline';
-    let first = true;
-    for (const type of CONTENT_ELEMENT_TYPES) {
-      const count = counts.get(type) ?? 0;
-      if (count === 0) continue;
-      if (!first) {
-        const sep = document.createElement('span');
-        sep.className = 'atlas-home-statline-sep';
-        sep.textContent = '·';
-        statline.appendChild(sep);
+    // S316 (Captain): ordered by COUNT descending (schema order said nothing
+    // about this world), ties keeping schema order; and the long tail of
+    // one-of types folds into a single trailing "1 each:" segment so a rich
+    // world's line leads with what the world is actually made of. The
+    // grouped segment filters the sidebar to the WHOLE singleton set —
+    // elementFilters is a Set, so the multi-filter comes free.
+    const present = CONTENT_ELEMENT_TYPES
+      .map(type => ({ type, count: counts.get(type) ?? 0 }))
+      .filter(e => e.count > 0)
+      .sort((a, b) => b.count - a.count);
+    const singles = present.filter(e => e.count === 1);
+    const grouped = singles.length >= 2;
+    const listed = grouped ? present.filter(e => e.count > 1) : present;
+    const filterSidebarTo = (types: ElementType[]) => {
+      const ui = getState().ui;
+      if (ui.sidebarMode !== 'elements') {
+        patchSlice('ui', { ...ui, sidebarMode: 'elements', elementFilters: new Set(types) });
+        setSidebarModePref('elements');
+      } else {
+        patchSlice('ui', { ...ui, elementFilters: new Set(types) });
       }
+    };
+    const addSep = () => {
+      const sep = document.createElement('span');
+      sep.className = 'atlas-home-statline-sep';
+      sep.textContent = '·';
+      statline.appendChild(sep);
+    };
+    let first = true;
+    for (const { type, count } of listed) {
+      if (!first) addSep();
       first = false;
       const seg = document.createElement('button');
       seg.type = 'button';
@@ -317,15 +338,18 @@ function buildCover(
       seg.innerHTML = `<b>${count}</b> ${escapeText((count === 1
         ? ELEMENT_LABELS[type]?.singular
         : ELEMENT_LABELS[type]?.plural) ?? type)}`;
-      seg.addEventListener('click', () => {
-        const ui = getState().ui;
-        if (ui.sidebarMode !== 'elements') {
-          patchSlice('ui', { ...ui, sidebarMode: 'elements', elementFilters: new Set([type]) });
-          setSidebarModePref('elements');
-        } else {
-          patchSlice('ui', { ...ui, elementFilters: new Set([type]) });
-        }
-      });
+      seg.addEventListener('click', () => filterSidebarTo([type]));
+      statline.appendChild(seg);
+    }
+    if (grouped && singles.length > 0) {
+      if (!first) addSep();
+      const seg = document.createElement('button');
+      seg.type = 'button';
+      seg.className = 'atlas-home-statline-seg';
+      seg.title = 'Show these in the sidebar';
+      const names = singles.map(e => escapeText(ELEMENT_LABELS[e.type]?.singular ?? e.type)).join(', ');
+      seg.innerHTML = `<b>1</b> each: ${names}`;
+      seg.addEventListener('click', () => filterSidebarTo(singles.map(e => e.type)));
       statline.appendChild(seg);
     }
     cover.appendChild(statline);

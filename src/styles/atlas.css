@@ -1740,15 +1740,8 @@ html {
   font-size: 11px;
   color: var(--atlas-cyan);
 }
-/* The opener's meta channel: just the book cite, centered under the sentence.
-   (On step 1 the same class carries eyebrow-left/cite-right, but the eyebrow
-   was cut S299, so only the cite rides it now.) */
-.atlas-tour-meta-opener {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-}
+/* (.atlas-tour-meta-opener retired S316 — the opener renders no meta row at
+   all since the merged foot row; its book link rides the body copy inline.) */
 /* Before the `shell` capability (step 0 only): no app behind the sentence —
    hide the shell so the opener reads as a vignette on black. */
 body.atlas-touring:not(.atlas-tour-cap-shell) .atlas-shell {
@@ -1839,11 +1832,6 @@ body.atlas-touring .atlas-shell {
   flex: 0 1 auto;
   text-align: center;
   color: rgba(var(--atlas-ink-rgb), 0.72);
-}
-.atlas-tour-bar.is-opener .atlas-tour-meta,
-.atlas-tour-bar.is-opener .atlas-tour-meta-opener {
-  justify-content: center;
-  text-align: center;
 }
 .atlas-tour-bar.is-opener .atlas-tour-controls {
   justify-content: center;
@@ -2000,10 +1988,20 @@ body.atlas-touring .atlas-shell {
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: stretch;
+  /* THE CONTROLS LOCK (Captain, S316): the dock is fixed-height, so copy that
+     outgrows its share must never push the controls row below the panel edge
+     — the copy column shrinks to the space available and the BODY scrolls
+     inside itself. Copy is budgeted at ~6 lines (the agreed max); a scrollbar
+     appearing is the visible tell that a step's copy is over budget, where
+     the old overflow silently shoved Next out of the widget. */
+  min-height: 0;
 }
-.atlas-tour-bar:not(.is-opener) .atlas-tour-body { flex: 0 0 auto; }
+.atlas-tour-bar:not(.is-opener) .atlas-tour-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
 .atlas-tour-bar:not(.is-opener) .atlas-tour-extras { flex: 0 0 auto; margin-top: auto; }
-.atlas-tour-bar:not(.is-opener) .atlas-tour-meta { flex: 0 0 auto; }
 /* Inline links in the copy row (the explorer) share the deeper toggle's
    metrics exactly — same line, same height, no dock reshape. */
 .atlas-tour-inline-link {
@@ -2055,53 +2053,38 @@ body.atlas-touring .atlas-shell {
      copy and controls, so the buttons never travel between steps. */
   margin-top: auto;
 }
-/* The forward slot: optional create-preview icons stacked above Next/ghost. */
-.atlas-tour-forward-slot {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-/* The create-preview icons float ABOVE-RIGHT of the forward control, OUT of the
-   flow — so a run of three never grows the controls row or shoves Back/Exit
-   down (Captain, S313; it used to be a vertical column that did exactly that).
-   Small, subtle, horizontal; the sentence glyphs stay the real payoff. */
-/* A vertical column of create-preview icons, right-anchored, growing UP from
-   just above the forward control — out of flow (Captain, S313: sideways read
-   poorly; one-over-the-other on the right, capped with a +N chip). */
+/* The preview stack (S316): a vertical column of type icons at the PANEL's
+   far right — what the next click of Next brings (Captain: "all the way on
+   the right, not above the next button"). Anchored to the dock itself, out
+   of every flow; grows upward from just above the controls row. Icons carry
+   their type colour at reduced presence — recognizable, but the sentence
+   glyphs stay the real payoff. */
 .atlas-tour-create-stack {
   position: absolute;
-  right: 2px;
-  bottom: calc(100% + 4px);
+  right: 16px;
+  bottom: 50px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   pointer-events: none;
 }
-/* When a create-stack rises out of the controls row, the copy above reserves
-   the right-hand lane it climbs through — long bodies never collide with the
-   icon column (S315 gate). */
+/* When a stack is present, the copy reserves the right-hand lane it occupies —
+   long bodies never collide with the icon column (S315 gate). */
 .atlas-tour-bar.has-create-stack .atlas-tour-body,
 .atlas-tour-bar.has-create-stack .atlas-tour-extras {
   padding-right: 44px;
 }
 .atlas-tour-create-glyph {
   font-size: 14px;
-  color: rgba(var(--atlas-ink-rgb), 0.22);
-  transition: color 200ms ease;
-}
-.atlas-tour-create-glyph.done {
   color: var(--tour-glyph-color, var(--atlas-cyan));
+  opacity: 0.55;
 }
 .atlas-tour-create-more {
   font-size: 11px;
   line-height: 1;
-  color: rgba(var(--atlas-ink-rgb), 0.32);
+  color: rgba(var(--atlas-ink-rgb), 0.4);
   font-variant-numeric: tabular-nums;
-  transition: color 200ms ease;
-}
-.atlas-tour-create-more.done {
-  color: rgba(var(--atlas-ink-rgb), 0.6);
 }
 .atlas-tour-act {
   color: rgba(var(--atlas-ink-rgb), 0.35);
@@ -2140,7 +2123,10 @@ body.atlas-touring .atlas-shell {
    acts would have flipped chrome on then off; a capability only ever grows.
    The sidebar footer stays hidden for the WHOLE tour (Captain: the settings
    row under the narrator read as noise). */
-body.atlas-touring .atlas-sidebar-footer { display: none; }
+/* The sidebar footer (help icon lives there) stays hidden until the FINALE,
+   whose copy names the help icon — copy naming a control is a behavioural
+   claim, so the control must exist when the sentence does (S316). */
+body.atlas-touring:not(.atlas-tour-finalstep) .atlas-sidebar-footer { display: none; }
 /* Tail room for scrollToSection (S312): a short element page maxes out its
    scroll a few px shy of putting the target section at the top of the strip
    above the dock (the walk measured 6.5px short on the Consul's World
@@ -2215,11 +2201,19 @@ body.atlas-tour-nowstep .atlas-chart-mode {
   display: none !important;
 }
 /* Progressive precision (S299): tool chrome waits for its teaching step, not
-   just its act. The bar stamps step-scoped classes alongside the stage. */
+   just its act. The bar stamps step-scoped classes alongside the stage.
+   (S316: the prezone boundary moved from the-swamps to the-map — zone drawing
+   is available as soon as a map exists, Captain's "let people try it".) */
 body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="draw-polygon"],
 body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="draw-line"],
 body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="toggle-zones-visibility"],
 body.atlas-touring.atlas-tour-prezone [data-map-tab-toolbar] [data-action="zones-dropdown"] {
+  display: none;
+}
+/* Tour map toolbar, simplified (Captain, S316): fit-to-image and hide-pins
+   are power chrome a first-timer never needs — the whole tour, not a step. */
+body.atlas-touring [data-map-tab-toolbar] [data-action="fit-to-image"],
+body.atlas-touring [data-map-tab-toolbar] [data-action="toggle-pins-visibility"] {
   display: none;
 }
 body.atlas-touring.atlas-tour-preweb .atlas-right [data-tab-kind="context"] {

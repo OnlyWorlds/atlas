@@ -109,7 +109,11 @@ export async function applyMapBackground(
     const lMap = manager.getMap();
     if (lMap) {
       const bounds = L.latLngBounds(L.latLng(0, 0), L.latLng(dims.h, dims.w));
-      lMap.setMaxBounds(bounds);
+      // Padded like the construction-time bounds (S316): exact-rect bounds +
+      // solid viscosity would pin a small image immovably; the pad restores
+      // breathing room while the edge stays firm. Fit still targets the
+      // UNPADDED image rect so the landing view is the image, not the margin.
+      lMap.setMaxBounds(bounds.pad(0.15));
       lMap.fitBounds(bounds, { padding: [20, 20], animate: false });
     }
     extractEdgeColor(url).then(color => {

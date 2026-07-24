@@ -18,7 +18,7 @@ import { lensKnownSet } from '../core/knowledge';
 import { reservedRowHint } from '../core/taxonomy';
 import { ToastManager } from '../ui/toast-manager';
 import { openCreateDoor } from '../ui/create-element-door';
-import { isTourFlagActive } from '../tour/tour-flag';
+import { isQuietRef, isTourFlagActive } from '../tour/tour-flag';
 import { getCurrentSyncEngine, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
 import { escapeText, escapeAttr, installRowKeydownActivation } from '../core/dom-utils';
@@ -534,6 +534,10 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // legacy convention from when zones lacked their own UI.
     const filtered = elements
       .filter(el => el.type !== 'pin' && el.type !== 'marker')
+      // Tour-quiet machinery (the calendar construct) stays out of the list
+      // while touring — an element appearing unannounced in the sidebar is
+      // exactly the confusion the progressive build-up prevents (S316).
+      .filter(el => !isTourFlagActive() || !isQuietRef(`${el.type}:${el.name}`))
       .filter(el => filters.size === 0 || filters.has(el.type))
       .filter(el => !superFilter || String((el as Record<string, unknown>).supertype ?? '').trim() === superFilter)
       .filter(el => !subtypeFilter || String((el as Record<string, unknown>).subtype ?? '').trim() === subtypeFilter)
