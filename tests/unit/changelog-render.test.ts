@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderChangelog } from '../../src/changelog/render-changelog';
+import { renderChangelog, assertUniqueEntryIds } from '../../src/changelog/render-changelog';
 import { CHANGELOG, type ChangelogRelease } from '../../src/changelog/changelog.data';
 
 describe('renderChangelog — seed data', () => {
@@ -16,16 +16,9 @@ describe('renderChangelog — seed data', () => {
     }
   });
 
-  it('counts credited entries into the community stat', () => {
-    const credited = CHANGELOG.reduce(
-      (n, r) => n + r.entries.filter(e => e.credit).length,
-      0,
-    );
-    // Seed carries exactly one collaborator credit (Freek); keep the stat honest.
-    expect(credited).toBe(1);
-    expect(html).toContain(`<b>${credited}</b>`);
+  it('renders a collaborator credit as shaped-with, never requested-by', () => {
     expect(html).toContain('with Freek');
-    // A collaborator is shaped-with, never "requested by".
+    // A collaborator is shaped-with; only reddit/discord are "requested by".
     expect(html).not.toContain('requested by Freek');
   });
 
@@ -56,6 +49,16 @@ describe('renderChangelog — credit + escaping contract', () => {
     expect(html).toContain('requested by u/worldsmith');
     expect(html).toContain('href="https://reddit.com/r/x/comments/abc"');
     expect(html).toContain('rel="ugc noopener"');
+  });
+
+  it('throws on a duplicate entry id (anchors are global permalinks)', () => {
+    const dup: ChangelogRelease[] = [
+      { version: '1.1', date: '2026-02-01', theme: 't', entries: [{ id: 'writing', title: 'A', tags: [] }] },
+      { version: '1.0', date: '2026-01-01', theme: 't', entries: [{ id: 'writing', title: 'B', tags: [] }] },
+    ];
+    expect(() => assertUniqueEntryIds(dup)).toThrow(/duplicate entry id "writing"/);
+    // The real seed data must be collision-free.
+    expect(() => assertUniqueEntryIds(CHANGELOG)).not.toThrow();
   });
 
   it('escapes HTML in user-authored fields', () => {

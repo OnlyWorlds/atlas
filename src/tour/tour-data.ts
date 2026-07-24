@@ -221,7 +221,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         when: (w) => w.hasRef('character:The Consul'),
         body:
           'Here we see the Consul’s page, with empty fields through which you can define it.' +
-          '\nAll elements share a set of \'base\' fields that you see at the top,' + 
+          '\nAll elements share a set of \'base\' fields that you see at the top, ' + 
           'and each category has a set of specialized fields.\nEmpty fields are hidden during this tour for easier navigation.' + 
           '\n' + 
           '\nSo how do we model the diplomatic standing this character has? We can write something in their *description* field.' +
@@ -297,7 +297,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'The consul is above what sounds like a planet. So we\'ll create a location for it: any physical place in a world that can be named or, in this cased, unnamed.' +
+        'The consul is above what sounds like a planet. So we\'ll create a location for it: any physical place in a world that can be named or, in this case, unnamed.' +
         '\n\nThe consul has a *location* field that we can assign this planet to, so that we see it is now referenced by the Consul.',
           meta: 'Locations can be nested: a city on a continent on a planet.',
     }],
@@ -315,7 +315,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'Maps are elements that act as 2d or 3d canvases onto which you can place other elements.' +
         '\nThey take a pre-existing image and let you place pins on it, for specific elements, or markers, which combine into zones.' +
         '\n\nThis map shows part of the unnamed planet, with the swamps laid on top as a zone.' ,
-      meta: 'Zones are physical boundaries of natural or cultural siginificance. Two drawing shapes: polygons (e.g. swamps, territories) and lines (e.g. roads, rivers).',
+      meta: 'Zones are physical boundaries of natural or cultural significance. Two drawing shapes: polygons (e.g. swamps, territories) and lines (e.g. roads, rivers).',
 
       // Captain, S307: the step said a map "carries an image" and never said
       // where that image comes from, which is the first question anyone has
@@ -351,11 +351,11 @@ export const TOUR_STEPS: readonly TourStep[] = [
   
         deeper:
           'So why not create a pin for the spaceship, instead? ' +
-          'There would be no certainty, then, of where the Consul is,' +
+          'There would be no certainty, then, of where the Consul is, ' +
           'as there is currently no field that says ' +
           '\'this character is in this object\'.' +
           '\n\n' +
-          'Unlike, for example, if we pinned a city on the map, and linked that city in the Consul\'s' +
+          'Unlike, for example, if we pinned a city on the map, and linked that city in the Consul\'s ' +
           '*location* field; this lets us infer with certainty that the consul is at the same place as that city\'s pin.' +
           '\n\nThis is a limitation of the language as it is now. For [cases like this](https://council.onlyworlds.com/#/chamber/character/3b6bdcff-06a7-4c26-be60-497b042d4763), ' +
           'the council is a place to discuss, vote, then act to improve the language.',
@@ -396,7 +396,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         // elements this step reveals, and schema-impossible for one — a
         // collective has no zone field, so the old copy implied a link the
         // model cannot express. Narrowed to what is true and checkable.
-        'There\'s saurian things below, so we created two creatures, one of which must inevitable be greater than the other.' +
+        'There are saurian things below, so we created two creatures, one of which must inevitably be greater than the other.' +
         '\nPhysical bodies can be grouped into collectives; one was created to represent the pack of them.'  +
         '\nSpecies are elements that can represent any kind of cultural or, in this case, biological classification.'  ,
           }],
@@ -520,8 +520,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'c',
         when: (w) => w.chipCount(TOUR_CHAPTER_REF) >= TOUR_WRITING_LINKABLE,
         body:
-          'You can unlink elements, or create new ones, by selecting and right-clicking '  +
-          'The writing room uses layered narrative elements to organize these stories and the links within them.' , 
+          'You can unlink elements, or create new ones, by selecting and right-clicking.'  +
+          '\nThe writing room uses layered narrative elements to organize these stories and the links within them.' , 
       },
     ],
     handsOn: 'link-word',
@@ -622,8 +622,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       id: 'a',
       body:
         'We can find more in the sentence: a piano-making character, a piano-related ability, a piano-related trait, ' +
-        'a musical language, a piano-related phenomenon.' +
-        '\nThe construct category can represent concepts and technology such as \'piano\', but we skip that one: only create what is relevant for your world.',
+        'a musical language, a piano-related phenomenon.'  ,
     }],
     // The Rachmaninov spans moved to the deep-time step, where those two
     // elements are now revealed — a span’s glyph and its element should light

@@ -21,15 +21,15 @@ export function renderGeneralTab(): string {
           <label class="atlas-settings-radio"><input type="radio" name="app-theme" value="light" ${theme === 'light' ? 'checked' : ''}> light</label>
         </div>
       </div>
-      <p class="atlas-settings-hint">Light mode is new: charts keep their dark canvas, the tour keeps its dark stage, and published pages keep their own look. This preference stays on this device.</p>
     </section>
     <section class="atlas-settings-section">
       <h3>About</h3>
       <p class="atlas-settings-hint">Atlas v${pkg.version} — the OnlyWorlds world browser and editor. Your worlds live as files on your own disk; syncing with onlyworlds.com is optional.</p>
       <div class="atlas-settings-row">
+        <a class="atlas-settings-link" href="changelog.html" target="_blank" rel="noopener">what's new</a>
         <a class="atlas-settings-link" href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a>
         <a class="atlas-settings-link" href="https://onlyworlds.github.io" target="_blank" rel="noopener">documentation</a>
-        <a class="atlas-settings-link" href="https://github.com/OnlyWorlds/atlas/issues" target="_blank" rel="noopener">report an issue</a>
+        <a class="atlas-settings-link" href="https://github.com/OnlyWorlds/feedback" target="_blank" rel="noopener">report an issue</a>
       </div>
     </section>
   `;

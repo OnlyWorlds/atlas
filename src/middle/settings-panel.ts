@@ -22,6 +22,7 @@ import { getState, subscribe } from '../core/state';
 import { ToastManager } from '../ui/toast-manager';
 import { navigate, parseHash, settingsHash, SETTINGS_TABS, SETTINGS_TAB_GROUPS, onHashChange, type SettingsTab } from '../core/router';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
+import { escapeText } from '../core/dom-utils';
 import { renderGeneralTab, wireGeneralTab } from './settings-general';
 import { renderOnlyWorldsTab, wireOnlyWorldsTab } from './settings-onlyworlds';
 import { renderStorageTab, wireStorageTab } from './settings-storage';
@@ -104,7 +105,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
                 role="tab"
                 data-settings-tab="${t}"
                 ${enabled ? '' : 'disabled aria-disabled="true"'}
-                aria-selected="${active}">${tabLabel(t)}</button>`;
+                aria-selected="${active}">${tabLabel(t, activeWorld)}</button>`;
             }).join('');
             return `<div class="atlas-settings-tab-group-label">
                 <span class="material-symbols-outlined">${groupIcon}</span>
@@ -169,11 +170,18 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
 }
 
 /** Tab display label — 'onlyworlds' is the brand name, the rest sentence-case. */
-function tabLabel(t: SettingsTab): string {
+function tabLabel(t: SettingsTab, activeWorld?: WorldRegistryEntry): string {
   if (t === 'onlyworlds') return 'OnlyWorlds';
   // The right-pane graph tab is branded "Web" (2026-07-19); the settings tab
   // id stays 'context' — label and machinery diverge deliberately.
   if (t === 'context') return 'Web';
+  // The 'world' tab wears the active world's name when one is open (Captain,
+  // 2026-07-24) — "Sikelia" reads truer than a generic "World". Escaped (user
+  // content) and length-capped so a long name can't blow out the tab row.
+  if (t === 'world' && activeWorld?.name?.trim()) {
+    const name = activeWorld.name.trim();
+    return escapeText(name.length > 22 ? name.slice(0, 21) + '…' : name);
+  }
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 

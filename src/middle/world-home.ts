@@ -628,7 +628,9 @@ function buildTour(
   } else if (corePhase) {
     section.innerHTML = `<p class="atlas-home-onboarding-copy">Every world starts with someone, somewhere.</p>`;
   } else {
-    section.innerHTML = `<p class="atlas-home-onboarding-copy atlas-home-tour-label">build your world and explore atlas rooms</p>`;
+    // No header on the built-out room cards (Captain, 2026-07-24) — the cards
+    // speak for themselves; the label read as filler.
+    section.innerHTML = '';
   }
 
   const grid = document.createElement('div');

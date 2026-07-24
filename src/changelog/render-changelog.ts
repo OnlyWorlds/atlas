@@ -103,7 +103,7 @@ const STYLE = `
   .cl-masthead { margin-bottom: 40px; }
   .cl-brandrow { display: flex; align-items: baseline; gap: 12px; }
   .cl-brand {
-    font-size: 26px; font-weight: 600; letter-spacing: -0.01em; text-transform: lowercase;
+    font-size: 26px; font-weight: 600; letter-spacing: -0.01em;
   }
   .cl-brand a { text-decoration: none; }
   .cl-brand .cl-slash { color: var(--cl-dim); font-weight: 400; margin: 0 2px; }
@@ -196,39 +196,31 @@ const STYLE = `
   }
 `;
 
-const FILTER_SCRIPT = `
-  (function () {
-    var buttons = document.querySelectorAll('.cl-filter');
-    function apply(mode) {
-      document.body.classList.toggle('cl-filtered', mode === 'community');
-      buttons.forEach(function (b) {
-        b.setAttribute('aria-pressed', b.dataset.filter === mode ? 'true' : 'false');
-      });
+/**
+ * Entry ids are global permalinks (#anchor). Two entries sharing an id would
+ * make that anchor ambiguous (it jumps to whichever renders first), so the
+ * build fails loudly here rather than shipping a silent collision. This is what
+ * long-terms the anchors: a generic slug reused in a later release is a build
+ * error naming both versions, not a duplicate nobody notices.
+ */
+export function assertUniqueEntryIds(releases: ChangelogRelease[]): void {
+  const seen = new Map<string, string>();
+  for (const r of releases) {
+    for (const e of r.entries) {
+      const prior = seen.get(e.id);
+      if (prior) {
+        throw new Error(
+          `changelog: duplicate entry id "${e.id}" (in v${prior} and v${r.version}). ` +
+          `Ids are permalinks and must be globally unique across all releases.`,
+        );
+      }
+      seen.set(e.id, r.version);
     }
-    buttons.forEach(function (b) {
-      b.addEventListener('click', function () { apply(b.dataset.filter); });
-    });
-  })();
-`;
+  }
+}
 
 export function renderChangelog(releases: ChangelogRelease[]): string {
-  const communityCount = releases.reduce(
-    (n, r) => n + r.entries.filter(e => e.credit).length,
-    0,
-  );
-  const communityStat = communityCount > 0
-    ? `<span class="cl-community-stat"><b>${communityCount}</b> ${communityCount === 1 ? 'change' : 'changes'} shaped with the community</span>`
-    : '';
-  const filters = communityCount > 0
-    ? `<div class="cl-filters" role="group" aria-label="filter changes">
-          <button class="cl-filter" data-filter="all" aria-pressed="true">all</button>
-          <button class="cl-filter" data-filter="community" aria-pressed="false">community</button>
-        </div>`
-    : '';
-  const toolbar = (communityStat || filters)
-    ? `<div class="cl-toolbar">${communityStat}${filters}</div>`
-    : '';
-
+  assertUniqueEntryIds(releases);
   const body = releases.map(renderRelease).join('');
   const desc = 'What is new in Atlas, the local-first OnlyWorlds world editor. Every change, credited.';
 
@@ -246,27 +238,27 @@ export function renderChangelog(releases: ChangelogRelease[]): string {
   <meta property="og:description" content="${esc(desc)}" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="${PAGE_URL}" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content="${SITE_URL}/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Atlas Changelog" />
   <meta name="twitter:description" content="${esc(desc)}" />
-  <!-- og:image lands with the shared 1200x630 card asset (owed, Captain's pick). -->
+  <meta name="twitter:image" content="${SITE_URL}/og.png" />
   <style>${STYLE}</style>
 </head>
 <body>
   <main class="cl-wrap">
     <header class="cl-masthead">
       <div class="cl-brandrow">
-        <div class="cl-brand"><a href="${SITE_URL}">atlas<span class="cl-slash">/</span><span class="cl-word">changelog</span></a></div>
+        <div class="cl-brand"><a href="${SITE_URL}">Atlas<span class="cl-slash">/</span><span class="cl-word">changelog</span></a></div>
       </div>
-      <p class="cl-tagline">Every change to Atlas, newest first. Anything shaped by a request is credited.</p>
-      ${toolbar}
     </header>
     ${body}
     <footer class="cl-foot">
       <a href="${SITE_URL}">atlas.onlyworlds.com</a> · a local-first OnlyWorlds world editor
     </footer>
   </main>
-  <script>${FILTER_SCRIPT}</script>
 </body>
 </html>
 `;
