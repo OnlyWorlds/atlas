@@ -26,7 +26,7 @@ import { toastManager } from '../ui/toast-manager';
 import { renderHeader } from './element-detail-header';
 import { mountWorkspaceEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
 import { createFindBar, type FindBarHandle } from './writing-workspace-find-bar';
-import { mountCompiledView, narrativeHasChildren } from './writing-compiled';
+import { compiledWordCount, mountCompiledView, narrativeHasChildren } from './writing-compiled';
 import { handleAddToCast, type AddToCastDetail } from './writing-workspace-add-to-cast';
 import { computeRelationPatch } from './writing-workspace-derive';
 import { createChipPreview, type ChipPreviewController } from './writing-workspace-chip-preview';
@@ -108,11 +108,20 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   // sticky-on-click peek of linked elements (DESIGN_WRITING.md §Click + hover).
   const chipPreview: ChipPreviewController = createChipPreview(root);
 
-  // Ambient word-count widget controller. The factory closes over root + the
-  // live editor handle so the indicator tracks edits without re-reading state.
+  // Set by mountForNarrative to the mounted narrative when the COMPILED view
+  // is showing, null in this-level mode. The compiled view has no editor, so
+  // its count comes from the assembled tree instead of an editor handle.
+  let compiledCountFor: Element | null = null;
+
+  // Ambient word-count widget controller. The factory closes over root + a
+  // count accessor, so the indicator tracks whichever prose surface is
+  // mounted without owning the difference between them.
+
   const wordCount = createWordCount({
     root,
-    getEditorHandle: () => editorHandle,
+    getCount: () => (compiledCountFor
+      ? compiledWordCount(compiledCountFor, getState().data.elements)
+      : editorHandle?.getWordCount() ?? 0),
     getMountedForId: () => mountedForId,
   });
 
@@ -465,8 +474,10 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       // Compiled view — read-only assembly. No editor handle; save paths and
       // mention picker stay dormant. Auto-revert to this-level if a structure
       // change leaves the narrative with no children.
+      compiledCountFor = el;
       mountCompiledView(proseHost, el);
     } else {
+      compiledCountFor = null;
       const initialJson = parseRichtextJson(el.atlas_richtext_json);
       const initialMarkdown = typeof el.story === 'string' ? el.story : '';
 
@@ -616,6 +627,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     }
     setLiveEditorOps(null);
     linkAllCorner.deactivate();
+    compiledCountFor = null;
     mountedForId = null;
     lastSavedMarkdown = null;
     lastRefreshEl = null;

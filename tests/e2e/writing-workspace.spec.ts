@@ -1277,3 +1277,37 @@ test('the tree Delete item is HIDDEN during the tour (it would soft-lock it)', a
   // …and the destructive one is simply not there.
   await expect(page.locator('[data-role="delete-narrative"]')).toHaveCount(0);
 });
+
+test('compiled view counts the whole assembled tree, not zero', async ({ page }) => {
+  // The compiled view has no editor handle. The ambient widget used to read
+  // its count straight off that handle, so every parent narrative reported
+  // "0 words" under a fully assembled manuscript (visible in the launch
+  // screenshots). The count now walks the compiled tree.
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-compiled-wc-root');
+  await createWorld(page, 'compiled wc world');
+
+  const book = await createElement(page, 'narrative', {
+    name: 'The Counted Book', supertype: 'Book', story: 'Two words.',
+  });
+  await createElement(page, 'narrative', {
+    name: 'Counted Chapter', supertype: 'Chapter', parent_narrative: book,
+    story: 'Exactly five more words here.',
+  });
+  await createElement(page, 'narrative', {
+    name: 'Counted Scene', supertype: 'Scene', parent_narrative: book,
+    // A chip counts as the words a reader sees: "the Counted Chapter" = 3.
+    story: 'See [the Counted Chapter](ow://narrative/nope-missing) now.',
+  });
+  await markWritingInitialized(page);
+
+  await gotoWriting(page, book);
+
+  // A parent defaults to the compiled view: read-only assembly, no editor.
+  await expect(page.locator('.atlas-writing-compiled')).toBeVisible();
+  await expect(page.locator('.atlas-writing-workspace-prose .ProseMirror')).toHaveCount(0);
+
+  // 2 (book) + 5 (chapter) + 5 (scene, chip label counted, target dropped).
+  await expect(page.locator('.atlas-writing-workspace-wc')).toContainText('12 words');
+  await expect(page.locator('.atlas-writing-workspace-wc')).not.toContainText('0 words');
+});

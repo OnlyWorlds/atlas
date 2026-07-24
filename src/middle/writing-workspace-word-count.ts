@@ -10,7 +10,6 @@
 
 import { getState } from '../core/state';
 import type { Element } from '../core/types';
-import type { WorkspaceEditorHandle } from './writing-workspace-editor';
 import {
   getWordGoal,
   setWordGoal,
@@ -28,16 +27,22 @@ export interface WordCountController {
 
 export function createWordCount(deps: {
   root: HTMLElement;
-  getEditorHandle: () => WorkspaceEditorHandle | null;
+  /**
+   * The live count for whatever prose surface is mounted. The caller owns this
+   * because the two surfaces answer differently: the editor counts its own
+   * text, the compiled view counts the assembled tree. Reading the editor
+   * handle directly here is what made compiled views report "0 words".
+   */
+  getCount: () => number;
   getMountedForId: () => string | null;
 }): WordCountController {
-  const { root, getEditorHandle, getMountedForId } = deps;
+  const { root, getCount, getMountedForId } = deps;
 
   function renderWidget(el: Element): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'atlas-writing-workspace-wc-corner';
 
-    const wordCount = getEditorHandle()?.getWordCount() ?? 0;
+    const wordCount = getCount();
     const worldId = getState().active!.worldId;
     const goal = getWordGoal(worldId, el.id);
 
@@ -55,13 +60,13 @@ export function createWordCount(deps: {
         currentGoal: getWordGoal(worldId, el.id),
         onSet: (next) => {
           setWordGoal(worldId, el.id, next);
-          const liveCount = getEditorHandle()?.getWordCount() ?? 0;
+          const liveCount = getCount();
           renderWordCountInto(wcBtn, liveCount, next);
           wcBtn.dataset.hasGoal = 'true';
         },
         onClear: () => {
           clearWordGoal(worldId, el.id);
-          const liveCount = getEditorHandle()?.getWordCount() ?? 0;
+          const liveCount = getCount();
           renderWordCountInto(wcBtn, liveCount, null);
           delete wcBtn.dataset.hasGoal;
         },

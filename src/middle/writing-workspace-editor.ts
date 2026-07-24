@@ -16,6 +16,7 @@ import { Markdown } from '@tiptap/markdown';
 import { renderMentionSuggestion, type MentionSuggestionItem } from './writing-workspace-mention';
 import { ElementChip } from './writing-workspace-element-chip';
 import { serializeDocToMarkdown } from './writing-workspace-markdown';
+import { countWords } from './writing-word-count';
 import { convertLinkMarksToChips } from './writing-workspace-load';
 import {
   createSearchPlugin,
@@ -413,8 +414,11 @@ function isEmptyJsonDoc(json: JSONContent | null | undefined): boolean {
   return false;
 }
 
+/**
+ * The editor's word count is the SHARED `countWords` — the compiled view
+ * reports the same number over the same prose, and it can only do that if
+ * neither side owns its own rule.
+ */
 function computeWordCount(text: string): number {
-  const trimmed = text.trim();
-  if (!trimmed) return 0;
-  return trimmed.split(/\s+/).length;
+  return countWords(text);
 }

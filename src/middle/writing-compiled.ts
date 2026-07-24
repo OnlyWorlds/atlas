@@ -24,6 +24,7 @@ import { getState } from '../core/state';
 import { navigate, writingHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
 import { getTierForNarrative, getWritingLabels, iconForTier } from './writing-helpers';
+import { countMarkdownWords } from './writing-word-count';
 
 export interface CompiledSection {
   el: Element;
@@ -62,6 +63,23 @@ export function buildCompiledTree(root: Element, allElements: readonly Element[]
     prose: typeof root.story === 'string' ? root.story : '',
     children: kids.map(child => buildCompiledTree(child, allElements)),
   };
+}
+
+/**
+ * Total words in a compiled view: the narrative's own prose plus every
+ * descendant's, counted as a reader sees them (chip and link labels count,
+ * markdown syntax does not).
+ *
+ * The compiled view has no editor, so before this existed the ambient
+ * word-count widget read its count off a null editor handle and displayed
+ * "0 words" under a fully assembled manuscript. Pure and store-free so it can
+ * be unit-tested on a plain element list.
+ */
+export function compiledWordCount(root: Element, allElements: readonly Element[]): number {
+  const walk = (section: CompiledSection): number =>
+    countMarkdownWords(section.prose)
+    + section.children.reduce((sum, child) => sum + walk(child), 0);
+  return walk(buildCompiledTree(root, allElements));
 }
 
 /** Does this narrative have any narrative children? */
