@@ -47,6 +47,9 @@ let refreshInFlight = false;
  */
 const flashingIds = new Map<string, ReturnType<typeof setTimeout>>();
 
+/** Tour arrivals for the current step (S317) — sticky, replaced per dispatch. */
+const tourFreshIds = new Set<string>();
+
 /** All currently-mounted elements bodies (re-render hooks for the flash set). */
 const mountedRerenders = new Set<() => void>();
 
@@ -615,6 +618,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
           elementsOnActiveMap.has(el.id),
           flashingIds.has(el.id),
           knownSet ? !knownSet.has(el.id) : false,
+          tourFreshIds.has(el.id) && isTourFlagActive(),
         ),
       )
       .join('');
@@ -631,6 +635,18 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     triggerFlashForIds(ids);
   }
   document.addEventListener('atlas:pulled-ids', handlePulledIds);
+  // Tour arrivals (S317): a SUBTLE, STICKY highlight on the step's newly
+  // revealed rows — replaced wholesale on every step-enter dispatch (an empty
+  // list clears it), no timer, no animation. Distinct channel from the
+  // auto-pull flash: the flash says "changed under your nose", this says
+  // "these just joined the world you are being shown".
+  function handleTourFresh(ev: Event): void {
+    const ids = (ev as CustomEvent<{ ids?: string[] }>).detail?.ids ?? [];
+    tourFreshIds.clear();
+    for (const id of ids) tourFreshIds.add(id);
+    for (const fn of mountedRerenders) fn();
+  }
+  document.addEventListener('atlas:tour-fresh-ids', handleTourFresh);
   mountedRerenders.add(render);
 
   const unsubState = subscribe(render);
@@ -641,6 +657,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     unsubHash();
     mountedRerenders.delete(render);
     document.removeEventListener('atlas:pulled-ids', handlePulledIds);
+    document.removeEventListener('atlas:tour-fresh-ids', handleTourFresh);
   };
 }
 
@@ -651,11 +668,13 @@ function renderElementRow(
   onActiveMap: boolean,
   flash: boolean,
   lensDimmed: boolean,
+  tourFresh = false,
 ): string {
   const icon = ELEMENT_ICONS[el.type] ?? 'category';
   const cls = ['atlas-row', selected ? 'selected' : '', lensDimmed ? 'atlas-row-lens-dim' : '']
     .filter(Boolean).join(' ');
-  const flashAttr = flash ? ' data-flash="true"' : '';
+  const flashAttr = (flash ? ' data-flash="true"' : '')
+    + (tourFresh ? ' data-tour-fresh="true"' : '');
   // hasMap is set only for Location rows that have at least one map anchored.
   // Renders a small cyan-tinted map glyph between the name and the type chip.
   const mapBadge = hasMap

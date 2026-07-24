@@ -85,15 +85,6 @@ describe('previewRefsFor — the next-step rule', () => {
   });
 });
 
-describe('the merged foot row — meta XOR deeper (S316)', () => {
-  it('no phase carries both a meta line and a deeper flyout', () => {
-    for (const step of TOUR_STEPS) {
-      for (const phase of step.phases) {
-        expect(
-          Boolean(phase.meta && phase.deeper),
-          `step "${step.id}" phase "${phase.id}" must not define both meta and deeper — they share one slot`,
-        ).toBe(false);
-      }
-    }
-  });
-});
+// (The S316 meta-XOR-deeper rule was RETIRED in S317: Captain's merged map
+// step legitimately carries both, and the foot row renders them side by side
+// — bulb first, meta text beside it. No structural exclusivity to lock.)

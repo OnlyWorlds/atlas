@@ -33,18 +33,17 @@ export const E2E_STEP_INDEX_TO_ID: Record<number, string> = {
   3: 'the-consul',
   4: 'the-hegemony',
   5: 'the-planet',
-  6: 'the-map',
-  7: 'the-pin',
-  8: 'the-swamps',
-  9: 'objects',
-  10: 'linking',
-  11: 'the-writing',
-  12: 'the-events',
-  13: 'the-chart',
-  14: 'deep-time',
-  15: 'the-rest',
-  16: 'yours-to-keep',
-  17: 'finale',
+  6: 'the-map', // the pin beat merged in here (S317) — hands-on, place-in-zone gated
+  7: 'the-swamps',
+  8: 'objects',
+  9: 'linking',
+  10: 'the-writing',
+  11: 'the-events',
+  12: 'the-chart',
+  13: 'deep-time',
+  14: 'the-rest',
+  15: 'yours-to-keep',
+  16: 'finale',
 };
 
 describe('TOUR_STEPS structural invariants (the numbering tour.spec.ts trusts)', () => {
@@ -60,8 +59,8 @@ describe('TOUR_STEPS structural invariants (the numbering tour.spec.ts trusts)',
     }
   });
 
-  it('the step count matches what tour.spec.ts assumes (17 steps, 1-based)', () => {
-    expect(TOUR_STEPS.length).toBe(17);
+  it('the step count matches what tour.spec.ts assumes (16 steps since the S317 merge, 1-based)', () => {
+    expect(TOUR_STEPS.length).toBe(16);
     expect(Object.keys(E2E_STEP_INDEX_TO_ID).length).toBe(TOUR_STEPS.length);
   });
 

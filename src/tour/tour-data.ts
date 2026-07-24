@@ -192,10 +192,10 @@ export function previewRefsFor(stepIndex: number): string[] {
  *
  * The sentence carries nine linkable surface forms, but `character:Rachmaninov`
  * and `construct:Rachmaninov’s Prelude` are not revealed until `deep-time`,
- * three steps later, so autolink cannot resolve them here. Seven is therefore
- * "everything this world currently knows", and the phase-c copy says exactly
- * that. A unit test recomputes this from the bundle + the reveal order, so a
- * re-bake or a reveal move fails loudly instead of stranding phase c.
+ * three steps later, so autolink cannot resolve them here. No step copy
+ * depends on the number since S317 (the all-linked phase c was cut), but the
+ * unit test still recomputes it from the bundle + the reveal order — it locks
+ * the bundle/alias/reveal consistency the writing beat rests on.
  */
 export const TOUR_WRITING_LINKABLE = 7;
 
@@ -254,7 +254,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
           'besides category-specific fields (hidden for the tour).' + 
           '\n' + 
           '\nSo how do we model the diplomatic standing this character has?\nWe can write something in their *description* field. ' +
-          'But this Hegemony sounds important enough to be an element.\nClick next to create i as an institution, and a title for the consulship.',   
+          'But this Hegemony sounds important enough to be an element.\nClick next to create it as an institution, and a title for the consulship.',
       },
     ],
     spans: [{ from: 2, to: 2, type: 'character', ref: 'character:The Consul' }],
@@ -333,58 +333,34 @@ export const TOUR_STEPS: readonly TourStep[] = [
     spans: [{ from: 35, to: 35, type: 'location' }],
     reveal: ['location:Unnamed Planet'],
     route: { kind: 'element', ref: 'location:Unnamed Planet' },
-    // The copy narrates the *location* assignment and the Referenced-by
-    // payoff; the planet's page shows the latter (S316).
-    highlightFields: ['section:Referenced by'],
+    // The copy narrates the *location* assignment; the payoff is the planet's
+    // new "Located here" section — the Consul standing on it (S317).
+    highlightFields: ['section:Located here'],
   },
   {
+    // THE MERGED MAP+PIN BEAT (Captain, S317): the pin is required HERE — the
+    // old separate pin step folded in. Phase a carries the whole instruction
+    // (Captain's copy names both real gestures: the +pin click and the
+    // sidebar drag — both verified live); b/c are the old soft-correction
+    // phases. The step is hands-on: no Next until the pin sits in the zone.
     id: 'the-map',
     act: 2,
     unlocks: ['rightpane'],
-    phases: [{
-      id: 'a',
-      body:
-        'Maps act as a layer on top any images you want to bring (as url or local upload). These become 2D canvases onto which you can place other elements using markers and pins.' +
-        '\nMarkers combine to form zones, like you see here on the map: swamps, territories, roads (polygons or lines).' +
-        '\n\nPins place a specific element to a specific map. Craete one now for the consul by clicking the + pin icon in the middle pane, or dragging him in from the sidebar. Make sure to land him over the swamps.' ,
-      meta: 'Maps also support a 3D coordinate system: pins and markers have x, y, optional z fields. A 3D map editor is coming to Atlas.',
-        deeper:
-          'So why not create a pin for the spaceship, instead? ' +
-          'There would be no relational certainty, then, of where the Consul is, ' +
-          'as the *objects* field that links the ship to the Consul does not guarantee proximity.' +  
-          '\n\nThis might be a case for altering or adding a field. The [council](https://council.onlyworlds.com/#/chamber/character/3b6bdcff-06a7-4c26-be60-497b042d4763) ' +
-          'is a channel to discuss, vote, govern the schema together.',
-  
-    }],
-    // The swamps zone (and its markers) reveal WITH the map — the pin beat’s
-    // soft correction needs the region present to test the drop against, and
-    // the geography reads as one thing. The living things stay for the-swamps.
-    // Span starts at "the" (33), not "in" (32): the zone is the swamps, the
-    // preposition stays plain (Captain, S316).
-    spans: [{ from: 33, to: 34, type: 'zone' }],
-    reveal: [
-      TOUR_MAP_REF,
-      TOUR_SWAMPS_ZONE_REF,
-      'marker:Swamps - Point 0', 'marker:Swamps - Point 1', 'marker:Swamps - Point 2',
-      'marker:Swamps - Point 3', 'marker:Swamps - Point 4', 'marker:Swamps - Point 5',
-    ],
-    route: { kind: 'map', ref: TOUR_MAP_REF },
-  },
-  {
-    id: 'the-pin',
-    act: 2,
-    // The soft correction (Captain’s ruling): place anywhere, Next appears only
-    // once the pin is over the swamps; a wrong drop is dragged onto them, which
-    // teaches dragging pins. `placeInZone` drives the gate; the phases narrate.
     placeInZone: { pinRef: TOUR_PIN_REF, zoneRef: TOUR_SWAMPS_ZONE_REF },
     phases: [
       {
         id: 'a',
         body:
-          'Let\'s place the Consul on the map using a pin.' +
-          '\nClick the **+ pin** icon opposite the Consul\'s name, then click on the map to place him.\nPut him somewhere over the swamps, per canon.',
-  
-
+          'Maps act as a layer on top of any images you want to bring (as url or local upload). These become 2D canvases onto which you can place other elements using markers and pins.' +
+          '\nMarkers combine to form zones, like you see here on the map: swamps, territories, roads (polygons or lines).' +
+          '\n\nPins place a specific element to a specific map. Create one now for the Consul by clicking the + pin icon in the middle pane, or dragging him in from the sidebar. Make sure to land him over the swamps.' ,
+        meta: 'Maps also support a 3D coordinate system: pins and markers have x, y, optional z fields. A 3D map editor is coming to Atlas.',
+        deeper:
+          'So why not create a pin for the spaceship, instead? ' +
+          'There would be no relational certainty, then, of where the Consul is, ' +
+          'as the *objects* field that links the ship to the Consul does not guarantee proximity.' +
+          '\n\nThis might be a case for altering or adding a field. The [council](https://council.onlyworlds.com/#/chamber/character/3b6bdcff-06a7-4c26-be60-497b042d4763) ' +
+          'is a channel to discuss, vote, govern the schema together.',
       },
       {
         // Placed, but the gate (pinInZone) has not passed — the correction.
@@ -403,8 +379,21 @@ export const TOUR_STEPS: readonly TourStep[] = [
       },
     ],
     handsOn: 'place-pin',
-    spans: [{ from: 3, to: 3, type: 'pin', ref: TOUR_PIN_REF }],
-    reveal: [],
+    // The swamps zone (and its markers) reveal WITH the map — the soft
+    // correction needs the region present to test the drop against, and the
+    // geography reads as one thing. The living things stay for the-swamps.
+    // Span starts at "the" (33), not "in" (32): the zone is the swamps, the
+    // preposition stays plain (Captain, S316).
+    spans: [
+      { from: 33, to: 34, type: 'zone' },
+      { from: 3, to: 3, type: 'pin', ref: TOUR_PIN_REF },
+    ],
+    reveal: [
+      TOUR_MAP_REF,
+      TOUR_SWAMPS_ZONE_REF,
+      'marker:Swamps - Point 0', 'marker:Swamps - Point 1', 'marker:Swamps - Point 2',
+      'marker:Swamps - Point 3', 'marker:Swamps - Point 4', 'marker:Swamps - Point 5',
+    ],
     // Map open (right) + the Consul selected (middle) so his +pin button shows.
     route: { kind: 'map', ref: TOUR_MAP_REF, elementRef: 'character:The Consul' },
   },
@@ -469,7 +458,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         id: 'c',
         when: (w) => w.hasRef('object:Spaceship Balcony'),
         body:
-          'The balcony’s has the spaceship as its *parent object*: objects can nest in objects.' ,
+          'The balcony has the spaceship as its *parent object*: objects can nest in objects.' ,
                       deeper:
           'The current definition of *parent_object* is "Larger object that this one is part of or contained within"' +
           '\n\nSame as for the *objects* field, you might want another approach, like a split into structural and spatial. Please feel free to file a motion for it.',
@@ -543,28 +532,27 @@ export const TOUR_STEPS: readonly TourStep[] = [
    
       },
       {
+        // ONE step forward from the first link (Captain, S317 — the old
+        // phase c waited for all seven and its body went blank under the
+        // copy pass; c folded into b, Next lives from the first chip).
         id: 'b',
         when: (w) => w.chipCount(TOUR_CHAPTER_REF) >= 1,
         // Points at the LINK-ALL corner button (top-right of the prose panel,
         // `refreshLinkAllWidget`), not the tree’s right-click menu: it is in
         // the page the user is already looking at and it carries the count.
-        // Found while chasing Captain’s Tab report — the affordance was there
-        // the whole time and the copy was sending people to a context menu.
         body:
           'The link button in the top right of the page catches all at once.' +
           '\nYou can create new elements by selecting text and right-clicking.' ,
           meta:'The web pane on the right shows element relation graphs, tailored to the room you are in.',
       },
-      {
-        id: 'c',
-        when: (w) => w.chipCount(TOUR_CHAPTER_REF) >= TOUR_WRITING_LINKABLE,
-        body:
-          ''   , 
-      },
     ],
     handsOn: 'link-word',
     reveal: ['narrative:Hyperion', 'narrative:Chapter 1'],
     route: { kind: 'writing', ref: 'narrative:Chapter 1' },
+    // The Web pane arrives WITH the writing room (Captain, S317): shown and
+    // switched to on step enter, and it stays for the rest of the tour —
+    // including back-navigation (the sticky preweb boundary in tour-bar).
+    webTab: true,
   },
   {
     id: 'the-events',
@@ -616,7 +604,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
           'end means no end date is recorded, so as far as we know he holds ' +
           'it still.',
         deeper:
-        'The chart works off specific fields that elements have such as birth_date for characters and founding_date for locaiton.' +
+        'The chart works off specific fields that elements have such as birth_date for characters and founding_date for locations.' +
         '\n\nThe chart is a live view, not a picture: scroll to zoom from whole eras down ' +
         'to single days, drag any element’s dot to re-date it, and drag undated elements ' +
         'in from the rail to give them their first date. Save any arrangement as a named ' +
@@ -642,7 +630,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
         '\nThe axis stretched out to hold them. You can scroll to zoom back in on the ' +
         'present.',
             deeper:
-        'The chart works off specific fields that elements have such as birth_date for characters and founding_date for locaiton.' +
+        'The chart works off specific fields that elements have such as birth_date for characters and founding_date for locations.' +
         '\n\nThe chart is a live view, not a picture: scroll to zoom from whole eras down ' +
         'to single days, drag any element’s dot to re-date it, and drag undated elements ' +
         'in from the rail to give them their first date. Save any arrangement as a named ' +
@@ -692,7 +680,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     phases: [{
       id: 'a',
       body:
-        'That\'s it for this tour. Atlas used the OnlyWorlds for the categories and their fields, and allows custom fields on top of them.' +
+        'That\'s it for this tour. Atlas uses OnlyWorlds for the categories and their fields, and allows custom fields on top of them.' +
         '\nCreate a [free OnlyWorlds account](https://onlyworlds.com/worlds) to sync atlas worlds online and into other applications.'  ,
  
     }],

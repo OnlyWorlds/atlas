@@ -12,7 +12,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { humanizeFieldName, formatValue } from '../../src/middle/element-detail-fields';
-import { refersTo, findIncomingReferences } from '../../src/middle/element-detail-refs';
+import { refersTo, findIncomingReferences, renderReferencedBy } from '../../src/middle/element-detail-refs';
 import { patchSlice } from '../../src/core/state';
 import type { Element } from '../../src/core/types';
 
@@ -303,5 +303,61 @@ describe('reservedValueHint (D9b reserved-value awareness)', () => {
     expect(reservedValueHint(col, 'subtype')).toMatch(/knowledge circle/);
     expect(reservedValueHint(chr('x', { subtype: 'circle' }), 'subtype')).toBeNull();
     expect(reservedValueHint(chr('x', { supertype: 'Book' }), 'supertype')).toBeNull();
+  });
+});
+
+describe('REF_SECTION_SPLITS - Located here (S317)', () => {
+  const mk = (id: string, type: string, name: string, extra: Record<string, unknown> = {}) =>
+    ({ id, type, name, ...extra }) as unknown as Element;
+
+  it('pulls location-field sources into "Located here" above Referenced by, typed groups in order', () => {
+    const planet = mk('loc1', 'location', 'Planet');
+    const consul = mk('c1', 'character', 'Consul', { location: 'loc1' });
+    const beast = mk('cr1', 'creature', 'Beast', { location: 'loc1' });
+    const perf = mk('e1', 'event', 'Perf', { location: 'loc1' }); // context, not presence
+    const dual = mk('c2', 'character', 'Dual', { location: 'loc1', birthplace: 'loc1' });
+    patchSlice('data', { elements: [planet, consul, beast, perf, dual] });
+
+    const wrap = renderReferencedBy(planet)!;
+    expect(wrap).toBeTruthy();
+    const sections = [...wrap.querySelectorAll('.atlas-detail-section')];
+    const labels = sections.map(s => s.getAttribute('data-section'));
+    expect(labels).toContain('Located here');
+    expect(labels).toContain('Referenced by');
+    expect(labels.indexOf('Located here'), 'Located here renders ABOVE Referenced by')
+      .toBeLessThan(labels.indexOf('Referenced by'));
+
+    const located = sections[labels.indexOf('Located here')]!;
+    // Real things present; the event (context) is not.
+    for (const name of ['Consul', 'Beast', 'Dual']) expect(located.textContent).toContain(name);
+    expect(located.textContent).not.toContain('Perf');
+    // Group order: characters lead, creatures follow (the split's sourceTypes order).
+    const groupLabels = [...located.querySelectorAll('.atlas-field-label')].map(g => g.textContent);
+    expect(groupLabels.indexOf('Characters')).toBeLessThan(groupLabels.indexOf('Creatures'));
+
+    const refby = sections[labels.indexOf('Referenced by')]!;
+    expect(refby.textContent).toContain('Perf'); // event stays in the generic bucket
+    expect(refby.textContent).toContain('Dual'); // kept for its OTHER field (birthplace)
+    expect(refby.textContent).not.toContain('Consul'); // fully moved
+    expect(refby.textContent).not.toContain('Beast');
+  });
+
+  it('a source referencing ONLY via location leaves Referenced by entirely (no empty bucket)', () => {
+    const planet = mk('loc9', 'location', 'Lonely');
+    const consul = mk('c9', 'character', 'OnlyOne', { location: 'loc9' });
+    patchSlice('data', { elements: [planet, consul] });
+    const wrap = renderReferencedBy(planet)!;
+    const labels = [...wrap.querySelectorAll('.atlas-detail-section')].map(s => s.getAttribute('data-section'));
+    expect(labels).toContain('Located here');
+    expect(labels).not.toContain('Referenced by');
+  });
+
+  it('non-location pages never grow the section', () => {
+    const hero = mk('h1', 'character', 'Hero');
+    const fan = mk('f1', 'character', 'Fan', { location: 'h1' }); // nonsense link, but generic scan sees it
+    patchSlice('data', { elements: [hero, fan] });
+    const wrap = renderReferencedBy(hero)!;
+    const labels = [...wrap.querySelectorAll('.atlas-detail-section')].map(s => s.getAttribute('data-section'));
+    expect(labels).not.toContain('Located here');
   });
 });

@@ -200,8 +200,9 @@ async function movePinToSwamps(page: Page) {
   });
 }
 
-/** The pin beat (step 7): the REAL +pin button on the Consul (highlighted),
- *  a map click to place, then the pin over the swamps so the soft gate opens. */
+/** The pin beat (merged into the MAP step, S317): the REAL +pin button on the
+ *  Consul (highlighted), a map click to place, then the pin over the swamps so
+ *  the soft gate opens. */
 async function placePinViaMap(page: Page) {
   await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toHaveCount(0);
   const pinBtn = page.locator('[data-action="pin-element"]');
@@ -218,7 +219,7 @@ async function placePinViaMap(page: Page) {
   await expect(page.locator('.atlas-tour-controls [data-tour-control="next"]')).toBeVisible();
 }
 
-/** The objects step's scripted run (step 9): three clicks of the app's real +,
+/** The objects step's scripted run (step 8 since the S317 merge): three clicks of the app's real +,
  *  one element each, no dialog. Next appears only when all three exist. */
 async function mintObjectRun(page: Page) {
   const bar = page.locator('.atlas-tour-bar');
@@ -384,7 +385,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-rightpane'))).toBe(false);
   await expect(page.locator('.atlas-right')).toBeHidden();
 
-  await nextStep(page, 6); // the map — the pane opens WITH the thing it holds
+  await nextStep(page, 6); // the map — the pane opens WITH the thing it holds (pin beat merged here, S317)
   expect(await page.evaluate(() => document.body.classList.contains('atlas-tour-cap-rightpane'))).toBe(true);
   await expect(page.locator('.atlas-right')).toBeVisible();
   await expect(page).toHaveURL(/\/map\//);
@@ -397,17 +398,16 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page.locator('[data-map-tab-toolbar] [data-action="toggle-pins-visibility"]')).toBeHidden();
   // The highlight tag's ABSENT half: this step narrates no field rows.
   await expect(page.locator('#atlas-tour-field-hl')).toHaveCount(0);
-  await nextStep(page, 7); // pin — the hands-on placement beat, soft correction
-  await placePinViaMap(page);
+  await placePinViaMap(page); // the hands-on placement, ON the map step now
   const placedPin = await page.evaluate(async () => {
     const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
     return els.find((e: any) => e.type === 'pin');
   });
   expect(placedPin?.name).toBe("The Consul’s balcony seat"); // locked identity
-  await nextStep(page, 8); // swamps — the living things
-  await nextStep(page, 9); // objects — the scripted run (now AFTER the maps act)
+  await nextStep(page, 7); // swamps — the living things
+  await nextStep(page, 8); // objects — the scripted run (now AFTER the maps act)
   await mintObjectRun(page);
-  await nextStep(page, 10); // linking payoff
+  await nextStep(page, 9); // linking payoff
 
   // S309 — the payoff must be ON SCREEN. This step's copy narrates the World
   // section and Referenced by, which sit below the tour dock at default
@@ -446,7 +446,7 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   // Writing act: the icon appears; the chapter renders the sentence verbatim
   // as PLAIN prose (S306 — the user links it), with aliases healed in so
   // autolink can recognise every surface form.
-  await nextStep(page, 11);
+  await nextStep(page, 10);
   await expect(page.locator('.atlas-room-nav-strip [data-room="writing"]')).toBeVisible();
   await expect(page).toHaveURL(/\/writing\//);
   const prose = page.locator('.ProseMirror');
@@ -471,8 +471,8 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   const proseAfter = await prose.innerText();
   expect(proseAfter, 'link-all must not change the prose text').toBe(proseBefore);
 
-  await nextStep(page, 12); // events
-  await nextStep(page, 13); // chart — the now beat, SINGLE ROUTE (no watch Next)
+  await nextStep(page, 11); // events
+  await nextStep(page, 12); // chart — the now beat, SINGLE ROUTE (no watch Next)
   await expect(page).toHaveURL(/\/timeline/);
   await expect(page.locator('.atlas-room-nav-strip [data-room="timeline"]')).toBeVisible();
 
@@ -500,13 +500,13 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   // Phase b: the clock is set, so the highlight releases and Next appears.
   await expect(page.locator('body')).not.toHaveClass(/atlas-tour-nowstep/);
 
-  await nextStep(page, 14); // deep time — Rachmaninov in the Old Earth era
-  await nextStep(page, 15); // the sweep
-  // 16 is now the MERGED close (S306): the files story + the OnlyWorlds story
+  await nextStep(page, 13); // deep time — Rachmaninov in the Old Earth era
+  await nextStep(page, 14); // the sweep
+  // 15 is the MERGED close (S306): the files story + the OnlyWorlds story
   // in one step, carrying the Web tab cameo the cut step used to own.
-  await nextStep(page, 16); // yours-to-keep (web cameo rides here)
+  await nextStep(page, 15); // yours-to-keep (web cameo rides here)
   await expect(page.locator('[data-tab-kind="context"]')).toHaveClass(/active/);
-  await nextStep(page, 17); // finale
+  await nextStep(page, 16); // finale
 
   // The finale's control set, asserted POSITIVELY (S301 gate, MED): the
   // shipped early-return renders Finish + the folder button and NO Exit.
@@ -541,8 +541,7 @@ test('the pin beat is a SOFT correction: place anywhere, Next only over the swam
   await createConsulViaModal(page);
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map (zone drawn)
-  await nextStep(page, 7); // pin
+  await nextStep(page, 6); // map — the pin beat lives HERE now (S317)
 
   const bar = page.locator('.atlas-tour-bar');
   // Arm + place; then force the pin OUTSIDE the swamps → correction, no Next.
@@ -588,8 +587,7 @@ test('clicking DIRECTLY on the swamps zone places the pin there (the instructed 
   await createConsulViaModal(page);
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map (the swamps zone is drawn)
-  await nextStep(page, 7); // pin
+  await nextStep(page, 6); // map (the swamps zone is drawn; pin beat merged here, S317)
 
   const zone = page.locator('.atlas-map-tab-wrapper path.leaflet-interactive').first();
   await expect(zone).toBeVisible();
@@ -637,11 +635,10 @@ test('the scripted create door: links survive, no double-mint, no dead button', 
   await createConsulViaModal(page);
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map
-  await nextStep(page, 7); // pin
+  await nextStep(page, 6); // map — pin beat merged here (S317)
   await placePinViaMap(page);
-  await nextStep(page, 8); // swamps
-  await nextStep(page, 9); // objects — the scripted run
+  await nextStep(page, 7); // swamps
+  await nextStep(page, 8); // objects — the scripted run
 
   // TWO FAST CLICKS must mint TWO elements, not the same one twice (gate R9).
   // Both compute "next un-minted" against the same snapshot unless the mint is
@@ -769,13 +766,12 @@ test('resilience: the world heals user mess on step-enter, user work survives', 
   // be re-linked, and the map tab is cached for the re-entry test.
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map (zone + markers live)
-  await nextStep(page, 7); // pin
+  await nextStep(page, 6); // map (zone + markers live; pin beat merged, S317)
   await placePinViaMap(page);
-  await nextStep(page, 8); // swamps
-  await nextStep(page, 9); // objects
+  await nextStep(page, 7); // swamps
+  await nextStep(page, 8); // objects
   await mintObjectRun(page);
-  await nextStep(page, 10); // linking
+  await nextStep(page, 9); // linking
   await expect.poll(async () => page.evaluate(async () => {
     const els = await (window as any).__atlasTestApi.getActiveStore().listElements();
     return els.some((e: any) => e.name === 'Ebony Spaceship');
@@ -807,9 +803,9 @@ test('resilience: the world heals user mess on step-enter, user work survives', 
   // Back onto the swamps (map-routed) — heals run on step-enter, and the CACHED
   // map tab re-entry must re-sync zones (not just pins). Two Backs from linking.
   await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
-  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '9');
-  await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '8');
+  await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '7');
 
   await expect.poll(async () => page.evaluate(async (ids: any) => {
     const store = (window as any).__atlasTestApi.getActiveStore();
@@ -847,21 +843,24 @@ test('armed pin placement disarms on navigation — no stray second pin (S299 cl
   await createConsulViaModal(page);
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map
-  await nextStep(page, 7); // the-pin (single-route: no Next until placed in-zone)
+  await nextStep(page, 6); // map — the merged hands-on pin beat (S317)
 
   // Arm placement via the real +pin button, then NAVIGATE AWAY without
-  // placing (Back exists here; the unplaced pin step has no Next). A leftover
-  // arm on the map-routed step 6 would let a later map click mint a stray pin.
+  // placing (Back exists here; the unplaced beat has no Next). A leftover
+  // arm surviving navigation would let a later map click mint a stray pin.
   await page.locator('[data-action="pin-element"]').click();
   await expect.poll(() => page.evaluate(() =>
     Boolean((window as any).__atlasTestApi.getState().ui.pinPlacement))).toBe(true);
   await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
-  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '6');
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '5');
 
-  // The navigation disarmed it; a map click now creates NOTHING.
+  // The navigation disarmed it.
   expect(await page.evaluate(() =>
     (window as any).__atlasTestApi.getState().ui.pinPlacement)).toBeNull();
+
+  // Forward onto the map again WITHOUT re-arming: a map click creates NOTHING
+  // (the dead arm did not survive the round trip).
+  await nextStep(page, 6);
   await page.locator('.atlas-map-tab-wrapper .leaflet-container').click({ position: { x: 300, y: 240 } });
   await page.waitForTimeout(300);
   const pinCount = await page.evaluate(async () => {
@@ -910,13 +909,12 @@ test('back-navigation does not strip links off elements that still exist (S301 g
   // Walk to linking (objects now follow the maps act).
   await nextStep(page, 4); // hegemony
   await nextStep(page, 5); // planet
-  await nextStep(page, 6); // map
-  await nextStep(page, 7); // pin
+  await nextStep(page, 6); // map — pin beat merged here (S317)
   await placePinViaMap(page);
-  await nextStep(page, 8); // swamps
-  await nextStep(page, 9); // objects
+  await nextStep(page, 7); // swamps
+  await nextStep(page, 8); // objects
   await mintObjectRun(page);
-  await nextStep(page, 10); // linking
+  await nextStep(page, 9); // linking
 
   // Sync on the tour's own settle signal, NOT on data-tour-step: the panel
   // re-renders with the new step number BEFORE revealUpTo heals.
@@ -932,16 +930,16 @@ test('back-navigation does not strip links off elements that still exist (S301 g
 
   // Back across the boundary that used to retract them, twice.
   await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
-  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '9');
-  expect(await possessionsAt()).toBe(atPayoff);
-
-  await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '8');
   expect(await possessionsAt()).toBe(atPayoff);
 
+  await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '7');
+  expect(await possessionsAt()).toBe(atPayoff);
+
   // And forward again: no oscillation, no rewrite.
+  await nextStep(page, 8);
   await nextStep(page, 9);
-  await nextStep(page, 10);
   expect(await possessionsAt()).toBe(atPayoff);
 });
 
@@ -1006,12 +1004,12 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   await beginToWorld(page);
   await createWorldViaModal(page);
   await createConsulViaModal(page);
-  for (let step = 4; step <= 17; step++) {
+  for (let step = 4; step <= 16; step++) {
     await nextStep(page, step);
-    if (step === 7) await placePinViaMap(page);
-    if (step === 9) await mintObjectRun(page);
-    if (step === 11) await linkAllViaCorner(page);
-    if (step === 13) await setNowViaButton(page);
+    if (step === 6) await placePinViaMap(page);
+    if (step === 8) await mintObjectRun(page);
+    if (step === 10) await linkAllViaCorner(page);
+    if (step === 12) await setNowViaButton(page);
   }
   // The label is 'Set up a folder' (tour-bar.ts); on an OPFS-only browser no
   // folder button renders and Finish is primary.
@@ -1059,10 +1057,10 @@ test('the writing beat: the sentence arrives plain, a click links it, Next waits
   await beginToWorld(page);
   await createWorldViaModal(page);
   await createConsulViaModal(page);
-  for (let step = 4; step <= 11; step++) {
+  for (let step = 4; step <= 10; step++) {
     await nextStep(page, step);
-    if (step === 7) await placePinViaMap(page);
-    if (step === 9) await mintObjectRun(page);
+    if (step === 6) await placePinViaMap(page);
+    if (step === 8) await mintObjectRun(page);
   }
 
   const bar = page.locator('.atlas-tour-bar');

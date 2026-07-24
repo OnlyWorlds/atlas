@@ -34,6 +34,40 @@ import { getEditorSettings } from '../registry/registry';
 /** Field names that never encode a relationship — skipped by the reverse scan. */
 const META_KEYS = new Set(['id', 'name', 'description', 'type', 'local_updated_at', 'server_updated_at']);
 
+/**
+ * REF SECTION SPLITS (S317, Captain): named sections that pull specific
+ * incoming references OUT of the generic "Referenced by" bucket and render
+ * ABOVE it, nicely grouped. The first case: a location's **Located here** —
+ * elements whose `location` field points at this place, which indicates
+ * physical presence. Only "real things" belong (characters first, then
+ * creatures, then the rest of the order below); an event or construct
+ * referencing a location is context, not presence, and stays in
+ * Referenced by. A source that ALSO references the target through other
+ * fields keeps its Referenced-by listing for those.
+ *
+ * Future splitoffs are ONE entry each: target page types, qualifying
+ * incoming fields, member source types (the array doubles as display
+ * order), and the header.
+ */
+interface RefSectionSplit {
+  headerLabel: string;
+  /** Element types whose DETAIL PAGE shows this section. */
+  targetTypes: readonly ElementType[];
+  /** Incoming field names that qualify a source for the section. */
+  viaFields: readonly string[];
+  /** Source types that belong; order here IS the display order. */
+  sourceTypes: readonly ElementType[];
+}
+
+const REF_SECTION_SPLITS: readonly RefSectionSplit[] = [
+  {
+    headerLabel: 'Located here',
+    targetTypes: ['location'],
+    viaFields: ['location'],
+    sourceTypes: ['character', 'creature', 'collective', 'object'],
+  },
+];
+
 /** Where a ref chip navigates. Sections set a default; groups may override. */
 type NavTarget = 'element' | 'writing' | 'knowledge-entry' | 'knowledge-knower' | 'share-page';
 
@@ -114,12 +148,44 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
     }));
   }
 
-  if (others.length > 0) {
+  // Split sections (S317) — "Located here" and future kin — render ABOVE the
+  // generic bucket. A qualified source leaves Referenced by unless it also
+  // references the target through non-split fields.
+  let remaining = others;
+  for (const split of REF_SECTION_SPLITS) {
+    if (!split.targetTypes.includes(el.type)) continue;
+    const qualified = remaining.filter(src =>
+      split.sourceTypes.includes(src.type)
+      && matchingFields(src, el.id).some(f => split.viaFields.includes(f)));
+    if (qualified.length === 0) continue;
+    const groups: RefGroup[] = [];
+    for (const type of split.sourceTypes) {
+      const sources = qualified.filter(src => src.type === type);
+      if (sources.length > 0) {
+        // Same label style as the generic type grouping (titleCaseFirst).
+        groups.push({ label: titleCaseFirst(ELEMENT_LABELS[type]?.plural ?? type), sources });
+      }
+    }
+    wrap.appendChild(buildSection({
+      headerLabel: split.headerLabel,
+      count: qualified.length,
+      groups,
+      navigateTo: 'element',
+      sectionClass: 'atlas-detail-section atlas-detail-refs-split',
+    }));
+    // Keep a source in Referenced by only for its OTHER referencing fields.
+    remaining = remaining.filter(src => {
+      if (!qualified.includes(src)) return true;
+      return matchingFields(src, el.id).some(f => !split.viaFields.includes(f));
+    });
+  }
+
+  if (remaining.length > 0) {
     const groupByField = getEditorSettings(getState().registry).refs_group_by_field;
     wrap.appendChild(buildSection({
       headerLabel: 'Referenced by',
-      count: others.length,
-      groups: groupByField ? groupOthersByField(el.id, others) : groupOthersByType(others),
+      count: remaining.length,
+      groups: groupByField ? groupOthersByField(el.id, remaining) : groupOthersByType(remaining),
       navigateTo: 'element',
       sectionClass: 'atlas-detail-section',
     }));

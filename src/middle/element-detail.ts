@@ -188,15 +188,14 @@ export function mountElementDetail(target: HTMLElement): () => void {
         return true;
       };
       // S311 (Captain): empty FIELDS hide too, not just empty sections — a
-      // beginner's element pages show only rows that carry content, so the
-      // step's subject (the title's issuer/holders, the Consul's filling
-      // Objects) is never pushed under the dock by blank rows. Fields appear
-      // as the tour populates them. S312 refinement (Captain): BASE always
-      // shows ALL its fields — the consul beat teaches "a set of shared base
-      // fields", so Base must look like the set it is; only the other
-      // sections hide their empty rows.
+      // beginner's element pages show only rows that carry content. S317
+      // refinement (Captain): Base shows its FULL field set only on the
+      // consul step, where the copy teaches "a set of shared base fields" —
+      // the tour-bar stamps `atlas-tour-basefull` for exactly that step.
+      // Every later step hides Base's empty rows like any other section.
+      const baseFull = document.body.classList.contains('atlas-tour-basefull');
       const kept = sections
-        .map((s, i) => i === 0 ? s : ({ ...s, fields: s.fields.filter(f => populated(f.name)) }))
+        .map((s, i) => (i === 0 && baseFull) ? s : ({ ...s, fields: s.fields.filter(f => populated(f.name)) }))
         .filter(s => s.fields.length > 0);
       sections = kept.length > 0 ? kept : sections.slice(0, 1);
     }

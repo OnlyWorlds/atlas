@@ -26,7 +26,7 @@
 
 import { hasFolderMode } from '../core/capabilities';
 import { confirmExitTour } from './tour-exit-modal';
-import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../core/constants';
+import { ELEMENT_ICONS, ELEMENT_LABELS, ELEMENT_TYPE_COLORS } from '../core/constants';
 import { getState, subscribe } from '../core/state';
 import type { ElementType } from '../core/types';
 import {
@@ -73,6 +73,23 @@ let lastSignature: string | null = null;
  */
 let flyoutOpenFor: string | null = null;
 let flyoutScrollTop = 0;
+/**
+ * The dock's collapsed state (Captain, S317): the − control top-right hides
+ * the panel to a small floating + pill so the app underneath is fully
+ * visible; + brings it back. Pure CSS via a body class — the click handlers
+ * toggle directly (no re-render needed), and render re-applies from this
+ * flag so a mid-collapse state tick cannot silently expand the dock.
+ */
+let dockCollapsed = false;
+
+function setDockCollapsed(v: boolean): void {
+  dockCollapsed = v;
+  document.body.classList.toggle('atlas-tour-collapsed', v);
+}
+
+/** The Web pane's sticky unlock (S317) — true once the writing beat has been
+ *  reached this run; back-navigation keeps the pane. Reset on unmount. */
+let webSeen = false;
 
 export function ensureTourBar(container: HTMLElement): void {
   if (isTourActive() && !root) mount(container);
@@ -126,8 +143,11 @@ function unmount(): void {
   flyoutScrollTop = 0;
   root?.remove();
   root = null;
+  dockCollapsed = false;
+  webSeen = false;
   document.body.classList.remove('atlas-touring', 'atlas-tour-prezone', 'atlas-tour-preweb',
-    'atlas-tour-pinstep', 'atlas-tour-createstep', 'atlas-tour-nowstep', 'atlas-tour-finalstep');
+    'atlas-tour-pinstep', 'atlas-tour-createstep', 'atlas-tour-nowstep', 'atlas-tour-finalstep',
+    'atlas-tour-collapsed', 'atlas-tour-basefull');
   for (const cap of TOUR_CAPABILITIES) document.body.classList.remove(`atlas-tour-cap-${cap}`);
   document.getElementById(FIELD_HL_STYLE_ID)?.remove();
 }
@@ -357,9 +377,14 @@ function render(): void {
   // away — might as well let people try it"): the prezone boundary moved from
   // the-swamps to the-map. Draw buttons show as soon as a map exists.
   const mapIdx = TOUR_STEPS.findIndex(s => s.id === 'the-map');
-  const webIdx = TOUR_STEPS.findIndex(s => s.id === 'yours-to-keep');
+  // The Web tab arrives WITH the writing room (Captain, S317) and then STAYS
+  // for the rest of the run — including back-navigation, which is why the
+  // boundary is STICKY (a bare idx comparison would re-hide the pane the
+  // moment the user steps back before the writing beat). Reset on unmount.
+  const webIdx = TOUR_STEPS.findIndex(s => s.id === 'the-writing');
+  if (idx >= webIdx) webSeen = true;
   document.body.classList.toggle('atlas-tour-prezone', idx < mapIdx);
-  document.body.classList.toggle('atlas-tour-preweb', idx < webIdx);
+  document.body.classList.toggle('atlas-tour-preweb', idx < webIdx && !webSeen);
   // Highlight the REAL +pin button on the Consul during the pin beat (until
   // placed) — the "use the actual control, highlighted" flow (Captain S299).
   document.body.classList.toggle('atlas-tour-pinstep',
@@ -380,9 +405,15 @@ function render(): void {
   // The finale un-hides the sidebar footer: its copy names the help icon that
   // lives there, and copy naming a control is a behavioural claim (S316).
   document.body.classList.toggle('atlas-tour-finalstep', idx === TOUR_STEPS.length - 1);
+  // Base shows its FULL field set only on the consul step (S317) — the copy
+  // there teaches the shared base fields; element-detail reads this class.
+  document.body.classList.toggle('atlas-tour-basefull', step.id === 'the-consul');
   // Field rows the step narrates glow subtly (Captain, S316) — injected as a
   // style tag so detail re-renders can never wipe the highlight.
   applyFieldHighlights(step);
+  // Re-assert the collapse state (the handlers toggle it directly; render
+  // must agree with the flag after any state tick).
+  document.body.classList.toggle('atlas-tour-collapsed', dockCollapsed);
   const opener = idx === 0;
 
   root.innerHTML = '';
@@ -411,14 +442,15 @@ function render(): void {
   body.className = 'atlas-tour-body';
   renderBodyText(body, phase.body);
   copy.appendChild(body);
-  // THE ONE FOOT ROW (Captain, S316): "more information" and the meta line
-  // share a single slot at the same position — a step shows the deeper bulb
-  // OR its meta subtext, never both (a unit test in tour-preview.test.ts
-  // makes the exclusivity structural, so it cannot drift back). A step with
-  // neither shows an invisible placeholder at the same metrics, so the panel
-  // keeps one shape across all three cases (the constant-dock law).
+  panel.appendChild(copy);
+  // THE FOOT SLOT (S317): "more information" and the meta line live at the
+  // far BOTTOM-LEFT of the dock — inside the controls row, in the flex slot
+  // the step counter used to hold (the counter is gone, Captain's cut; the
+  // e2e contract stays on data-tour-step). Bulb and meta can COEXIST (the
+  // merged map step carries both): bulb first, meta text beside it. Built
+  // here, mounted into the controls row below; the opener renders neither.
   const extras = document.createElement('div');
-  extras.className = 'atlas-tour-extras';
+  extras.className = 'atlas-tour-extras atlas-tour-spacer';
   if (phase.deeper) {
     const bulb = document.createElement('button');
     bulb.type = 'button';
@@ -450,12 +482,9 @@ function render(): void {
     extras.appendChild(bulb);
     panel.appendChild(deeper); // flyout anchors to the PANEL, above it
   }
-  // Meta rides the SAME slot when there is no deeper widget (the merged foot
-  // row, S316). The opener shows neither: its copy carries the book link
-  // inline (S312), and the duplicate-cite cut (S306) stands. The old separate
-  // always-rendered meta row is gone: one row, one occupant, one position,
-  // structurally exclusive (tour-preview.test.ts asserts no phase has both).
-  if (extras.childElementCount === 0 && !opener && phase.meta) {
+  // Meta rides BESIDE the bulb (S317 — no more exclusivity; the opener shows
+  // neither: its copy carries the book link inline, S312).
+  if (!opener && phase.meta) {
     const meta = document.createElement('p');
     meta.className = 'atlas-tour-meta';
     // The same token pass as bodies — the hegemony meta names *issuer* and
@@ -464,14 +493,6 @@ function render(): void {
     renderBodyText(meta, phase.meta);
     extras.appendChild(meta);
   }
-  if (extras.childElementCount === 0) {
-    const ghost = document.createElement('span');
-    ghost.className = 'atlas-tour-extras-ghost';
-    ghost.innerHTML = '<span class="material-symbols-outlined">emoji_objects</span> more information';
-    extras.appendChild(ghost);
-  }
-  copy.appendChild(extras);
-  panel.appendChild(copy);
 
   // Row 3 — controls.
   const controls = document.createElement('div');
@@ -505,14 +526,10 @@ function render(): void {
   // Escape binding has nothing left to serve.
   unbindOpenerEscape();
 
-  // Step counter (re-added S299 as a working aid — the visible label was cut
-  // in the Freek round; the sentence is still the user-facing progress, this
-  // is a quiet dev/collab reference. Takes the spacer's flex role so the
-  // controls layout is unchanged). data-tour-step remains the test contract.
-  const counter = document.createElement('span');
-  counter.className = 'atlas-tour-spacer atlas-tour-stepcount';
-  counter.textContent = `Step ${idx + 1} of ${TOUR_STEPS.length}`;
-  controls.appendChild(counter);
+  // The foot slot leads the controls row, bottom-left (S317): the deeper
+  // bulb + meta line took the counter's spacer role. (The visible step
+  // counter was cut — Captain; data-tour-step remains the test contract.)
+  controls.appendChild(extras);
 
   if (idx > 0) {
     const back = document.createElement('button');
@@ -556,11 +573,13 @@ function render(): void {
   // The preview stack (Captain, S316 — the semantics flip): a right-anchored
   // column of type icons showing what the NEXT click of Next brings into the
   // world (the following step's reveals and creates, quiet machinery
-  // excluded). Hands-on and creates beats preview nothing on their own step —
-  // the gesture is its own preview, and arrival feedback moved to the sidebar
-  // flash (tour-engine dispatches the pulled-ids event on reveal). The stack
-  // is static per step, so no signature term is needed for it.
-  const previewStack = buildPreviewStack(idx);
+  // excluded). S317 refinement (Captain): the stack renders ONLY while a
+  // LIVE Next exists — seeing "what Next brings" before Next can be pressed
+  // read as confusion on the hands-on beats. It rides the same conditions as
+  // the live forward control, so the icons and the button appear together.
+  const forwardLive = advance
+    && !(step.handsOn && step.handsOn !== 'setup-folder' && !handsOnGate);
+  const previewStack = forwardLive && !opener ? buildPreviewStack(idx) : null;
   // When a stack exists, the copy reserves the right-hand lane the icons
   // occupy — long bodies never collide with the column (S315 gate).
   panel.classList.toggle('has-create-stack', Boolean(previewStack));
@@ -621,6 +640,25 @@ function render(): void {
 
   appendExit(controls);
   panel.appendChild(controls);
+  // The collapse control (Captain, S317): a quiet − in the dock's top-right;
+  // when collapsed, the panel hides entirely and a floating + pill (on the
+  // ROOT, so it survives the panel's display:none) brings it back.
+  const collapse = document.createElement('button');
+  collapse.type = 'button';
+  collapse.className = 'atlas-tour-collapse';
+  collapse.title = 'Hide the tour panel';
+  collapse.setAttribute('aria-label', 'Hide the tour panel');
+  collapse.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">remove</span>';
+  collapse.addEventListener('click', () => setDockCollapsed(true));
+  panel.appendChild(collapse);
+  const restore = document.createElement('button');
+  restore.type = 'button';
+  restore.className = 'atlas-tour-restore';
+  restore.title = 'Show the tour panel';
+  restore.setAttribute('aria-label', 'Show the tour panel');
+  restore.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">add</span>';
+  restore.addEventListener('click', () => setDockCollapsed(false));
+  root!.appendChild(restore);
   root!.appendChild(panel);
   restoreFocus(focusedAction);
 }
@@ -688,10 +726,8 @@ function applyFieldHighlights(step: TourStep): void {
     const sel = n.startsWith('section:')
       ? `body.atlas-touring .atlas-detail-section[data-section="${n.slice('section:'.length)}"]`
       : `body.atlas-touring .atlas-field[data-field="${n}"]`;
-    // Quiet, not pulsing: a wash + a hairline accent — the row is pointed at,
-    // never shouted at (the tour's control highlights keep the pulse).
-    return `${sel} { background: rgba(var(--atlas-accent-rgb), 0.07); `
-      + 'box-shadow: inset 2px 0 0 var(--atlas-cyan); border-radius: 4px; }';
+    // Quiet: the wash alone (S317 — the left accent bar obscured row text).
+    return `${sel} { background: rgba(var(--atlas-accent-rgb), 0.07); border-radius: 4px; }`;
   }).join('\n');
 }
 
@@ -760,7 +796,7 @@ function appendEmphasis(host: HTMLElement, text: string): void {
 
 function appendItalic(host: HTMLElement, text: string): void {
   const parts = text.split('*');
-  if (parts.length % 2 === 0) { host.appendChild(document.createTextNode(text)); return; }
+  if (parts.length % 2 === 0) { appendCategoryText(host, text); return; }
   parts.forEach((part, i) => {
     if (!part) return;
     if (i % 2 === 1) {
@@ -768,9 +804,59 @@ function appendItalic(host: HTMLElement, text: string): void {
       em.textContent = part;
       host.appendChild(em);
     } else {
-      host.appendChild(document.createTextNode(part));
+      appendCategoryText(host, part);
     }
   });
+}
+
+/**
+ * Category words in plain copy get their FAMILY colour (Captain, S317): the
+ * copy teaches by naming categories, and tinting the words visually links
+ * them to the preview icons and the sentence glyphs — SOME indication that
+ * these are categories, in the 4-family scheme. The word list is built from
+ * the categories the TOUR actually brings (its reveal/creates refs plus the
+ * two hands-on elements), so generic English words that happen to be type
+ * names elsewhere in the schema ("relation", "family", "law") are never
+ * painted. Longest alternative first, so plurals win over contained
+ * singulars. Plain text segments only — words inside *field names*,
+ * **controls** and [links] stay unpainted.
+ */
+const CATEGORY_WORDS: ReadonlyMap<string, ElementType> = (() => {
+  const types = new Set<string>(['character', 'pin']); // the hands-on pair
+  for (const step of TOUR_STEPS) {
+    for (const ref of [...(step.reveal ?? []), ...(step.creates ?? [])]) {
+      types.add(ref.slice(0, ref.indexOf(':')));
+    }
+  }
+  const map = new Map<string, ElementType>();
+  for (const t of types) {
+    const labels = ELEMENT_LABELS[t as ElementType];
+    if (!labels) continue;
+    map.set(labels.singular.toLowerCase(), t as ElementType);
+    map.set(labels.plural.toLowerCase(), t as ElementType);
+  }
+  return map;
+})();
+
+const CATEGORY_RE = new RegExp(
+  '\\b(' + [...CATEGORY_WORDS.keys()].sort((a, b) => b.length - a.length).join('|') + ')\\b',
+  'gi',
+);
+
+function appendCategoryText(host: HTMLElement, text: string): void {
+  let last = 0;
+  for (const m of text.matchAll(CATEGORY_RE)) {
+    const type = CATEGORY_WORDS.get(m[1].toLowerCase());
+    if (!type) continue;
+    if (m.index! > last) host.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const span = document.createElement('span');
+    span.className = 'atlas-tour-cat';
+    span.style.setProperty('--tour-cat-color', ELEMENT_TYPE_COLORS[type] ?? '#22d3ee');
+    span.textContent = m[1];
+    host.appendChild(span);
+    last = m.index! + m[0].length;
+  }
+  if (last < text.length) host.appendChild(document.createTextNode(text.slice(last)));
 }
 
 /**

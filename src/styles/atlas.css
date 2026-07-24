@@ -330,6 +330,11 @@ html {
 
 .atlas-sidebar-content {
   flex: 1 1 auto;
+  /* S317 (measured live): without an explicit minimum this child sized past
+     its share of the column (797px where 780 fit) and its last ~17px of rows
+     painted BEHIND the transparent sidebar footer — Captain's "footer big,
+     overlapping, dark" report. Convention #4's law on the height axis. */
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   /* G11: reserve the scrollbar gutter so the list overflowing never shifts
@@ -1469,7 +1474,9 @@ html {
 }
 
 .atlas-detail-section-body {
-  padding: 10px 12px 14px;
+  /* Bottom tightened 14→7 (S317, Captain: dead space under the last row —
+     Image URL in Base being the visible case, tour and tool alike). */
+  padding: 10px 12px 7px;
 }
 
 /* Field row */
@@ -1836,9 +1843,6 @@ body.atlas-touring .atlas-shell {
 .atlas-tour-bar.is-opener .atlas-tour-controls {
   justify-content: center;
 }
-.atlas-tour-bar.is-opener .atlas-tour-extras {
-  justify-content: center;
-}
 .atlas-tour-sentence {
   font-family: var(--tour-serif);
   font-style: italic;
@@ -1934,9 +1938,13 @@ body.atlas-touring .atlas-shell {
 }
 .atlas-tour-copy-link:hover { border-bottom-style: solid; }
 .atlas-tour-meta {
-  flex-basis: 100%;
+  /* Lives in the controls-row foot slot since S317 — flows beside the bulb,
+     wraps to two small lines at most, never pushes the buttons. */
+  flex: 1 1 auto;
+  min-width: 0;
   color: rgba(var(--atlas-ink-rgb), 0.42);
   font-size: 11px;
+  line-height: 1.4;
   margin: 0;
 }
 .atlas-tour-deeper-toggle {
@@ -1951,23 +1959,16 @@ body.atlas-touring .atlas-shell {
 }
 .atlas-tour-deeper-toggle .material-symbols-outlined { font-size: 13px; }
 .atlas-tour-deeper-toggle:hover { color: var(--atlas-cyan); }
-/* The extras row (deeper bulb · inline links) renders on EVERY step — an
-   invisible placeholder holds the line when a step has neither, so the
-   panel never reshapes between deeper and non-deeper steps. */
+/* The foot slot (S317): deeper bulb + meta at the controls row's far LEFT,
+   in the flex-spacer role the step counter used to hold. The bulb never
+   wraps; the meta text takes the remaining width. */
 .atlas-tour-extras {
-  flex-basis: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
+  align-self: center;
 }
-.atlas-tour-extras-ghost {
-  visibility: hidden;
-  font-size: 11px;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-.atlas-tour-extras-ghost .material-symbols-outlined { font-size: 13px; }
+.atlas-tour-extras .atlas-tour-deeper-toggle { flex: 0 0 auto; white-space: nowrap; }
 /* Anchor "more information" to a constant place (Captain, S308). The bulb lived
    in the copy flow right after the body, so its Y moved with every step's copy
    length — short steps put it high, the four-line step put it low. On a fixed
@@ -2001,7 +2002,6 @@ body.atlas-touring .atlas-shell {
   min-height: 0;
   overflow-y: auto;
 }
-.atlas-tour-bar:not(.is-opener) .atlas-tour-extras { flex: 0 0 auto; margin-top: auto; }
 /* Inline links in the copy row (the explorer) share the deeper toggle's
    metrics exactly — same line, same height, no dock reshape. */
 .atlas-tour-inline-link {
@@ -2086,21 +2086,64 @@ body.atlas-touring .atlas-shell {
   color: rgba(var(--atlas-ink-rgb), 0.4);
   font-variant-numeric: tabular-nums;
 }
+/* Category words in the copy (S317): the family colour, quiet — a tint plus a
+   soft glow, linking the word to the preview icons and sentence glyphs. */
+.atlas-tour-cat {
+  color: var(--tour-cat-color, var(--atlas-cyan));
+  text-shadow: 0 0 9px color-mix(in srgb, currentColor 35%, transparent);
+}
+/* The dock collapse (S317): − in the panel's top-right hides the whole dock;
+   a floating + pill brings it back. The shell reclaims the reserved strip
+   while collapsed, so the app is fully visible underneath. */
+.atlas-tour-collapse {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: rgba(var(--atlas-ink-rgb), 0.35);
+  cursor: pointer;
+  padding: 2px;
+  line-height: 0;
+}
+.atlas-tour-collapse .material-symbols-outlined { font-size: 16px; }
+.atlas-tour-collapse:hover { color: var(--atlas-cyan); }
+body.atlas-tour-collapsed .atlas-tour-bar { display: none; }
+.atlas-tour-restore {
+  display: none;
+  position: fixed;
+  right: 18px;
+  bottom: 14px;
+  z-index: 900;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 13, 18, 0.92);
+  border: 1px solid rgba(var(--atlas-accent-rgb), 0.35);
+  border-radius: 50%;
+  color: var(--atlas-cyan);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+.atlas-tour-restore .material-symbols-outlined { font-size: 22px; }
+body.atlas-tour-collapsed .atlas-tour-restore { display: inline-flex; }
+body.atlas-touring.atlas-tour-collapsed .atlas-shell {
+  height: calc(100vh - 12px);
+}
+/* Tour arrivals (S317): a subtle STICKY tint on rows revealed by the current
+   step — no animation, no timer; it simply marks "these just joined" until
+   the next step replaces the set. Quieter than the auto-pull flash. */
+.atlas-row[data-tour-fresh="true"] {
+  background: rgba(var(--atlas-accent-rgb), 0.07);
+}
 .atlas-tour-act {
   color: rgba(var(--atlas-ink-rgb), 0.35);
   font-size: 11px;
 }
-.atlas-tour-spacer { flex: 1; }
-/* Step counter — a quiet working aid (re-added S299), not the user's progress
-   cue (the sentence is). Muted + small so it reads as reference, not chrome. */
-.atlas-tour-stepcount {
-  font-size: 0.72rem;
-  color: rgba(var(--atlas-ink-rgb), 0.32);
-  letter-spacing: 0.02em;
-  /* Sit on the button line (controls align flex-end since S312). */
-  align-self: flex-end;
-  padding-bottom: 6px;
-}
+.atlas-tour-spacer { flex: 1; min-width: 0; }
+/* (The visible step counter was cut in S317 — Captain; data-tour-step stays
+   as the e2e contract. The foot slot took its place in the controls row.) */
 .atlas-tour-consul-widget {
   display: inline-flex;
   gap: 8px;

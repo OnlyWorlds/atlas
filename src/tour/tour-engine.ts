@@ -425,13 +425,13 @@ async function revealUpTo(stepIndex: number): Promise<void> {
   // convergent on the media leg) — a healed link or re-attached image must
   // be visible on the surface the user is looking at, not next tick.
   if (wrote || healed > 0 || mediaHealed > 0) await refreshElements();
-  // AFTER the refresh, so the rows exist when the flash paints them. Reuses
-  // the auto-pull flash channel (elements-sidebar listens document-wide);
-  // the DOM event keeps the engine from importing UI modules, same as
-  // sync-attach's dispatch.
-  if (flashIds.length > 0) {
-    document.dispatchEvent(new CustomEvent('atlas:pulled-ids', { detail: { ids: flashIds } }));
-  }
+  // AFTER the refresh, so the rows exist when the highlight paints them.
+  // S317 (Captain): not the 1.4s pulse — a SUBTLE, STICKY highlight that
+  // stays on the step's new arrivals for as long as the step is live. The
+  // dispatch is unconditional: a step that reveals nothing CLEARS the
+  // previous step's set. The DOM event keeps the engine from importing UI
+  // modules, same as sync-attach's dispatch.
+  document.dispatchEvent(new CustomEvent('atlas:tour-fresh-ids', { detail: { ids: flashIds } }));
 }
 
 async function refreshElements(): Promise<void> {
@@ -619,6 +619,11 @@ async function enterStepInner(index: number): Promise<void> {
   // scrolling must never block or fail the step chain.
   const scrollTo = TOUR_STEPS[clamped].scrollToSection;
   if (scrollTo) void scrollSectionIntoView(scrollTo);
+  // The writing beat autofocuses the editor (Captain, S317): hover+Tab only
+  // works once the editor holds a selection, and asking a beginner to "click
+  // in first" is exactly the confusion the beat teaches around. Tour-only —
+  // app-wide autofocus would steal focus on every room switch.
+  if (TOUR_STEPS[clamped].route?.kind === 'writing') void focusWritingEditor();
   // (The closing emit moved to enterStepNow, so it fires AFTER `enteringStep`
   // clears and the bar's own listener is allowed through.)
 }
@@ -659,6 +664,20 @@ async function scrollSectionIntoView(name: string): Promise<void> {
       setTimeout(apply, 700);
       return;
     }
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
+
+/**
+ * Focus the writing editor once it mounts (bounded poll, same shape as
+ * scrollSectionIntoView — the room renders on the state tick after the route
+ * lands). Focusing the ProseMirror host gives it a real selection at the doc
+ * start, which is what makes hover+Tab work without a click-in first.
+ */
+async function focusWritingEditor(): Promise<void> {
+  for (let i = 0; i < 15; i++) {
+    const pm = document.querySelector<HTMLElement>('.ProseMirror');
+    if (pm) { pm.focus(); return; }
     await new Promise(r => setTimeout(r, 100));
   }
 }
