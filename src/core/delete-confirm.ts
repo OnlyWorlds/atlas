@@ -55,6 +55,17 @@ export interface DeleteConfirmInput {
   labels: WritingLabels;
   /** The user's `confirm_before_delete` setting. */
   confirmPref: boolean;
+  /**
+   * True when the dependents probe THREW, so `dependents` is empty because we
+   * could not look, not because nothing depends on this element.
+   *
+   * The two cases are opposite in consequence and were indistinguishable: an
+   * empty list means `cascades` is false, which switches off the S310 confirm
+   * floor, so with `confirm_before_delete` turned off a failed probe deleted
+   * a whole subtree with no prompt at all. Unknown is not the same as none
+   * (S323).
+   */
+  dependentsUnknown?: boolean;
 }
 
 /**
@@ -66,8 +77,21 @@ export interface DeleteConfirmInput {
  * speak.
  */
 export function decideDeleteConfirm(input: DeleteConfirmInput): DeleteConfirmDecision {
-  const { el, dependents, allElements, labels, confirmPref } = input;
+  const { el, dependents, allElements, labels, confirmPref, dependentsUnknown } = input;
   const cascades = dependents.length > 0;
+
+  // Could not determine the blast radius: always ask, and say so plainly.
+  // The store still cascades by default, so proceeding silently here would be
+  // the confirm floor failing in exactly the case it exists for.
+  if (dependentsUnknown) {
+    const subjectName = (el.name ?? '').trim() || el.id;
+    return {
+      needed: true,
+      message: `Delete "${subjectName}"? Atlas could not check what else this would delete, so anything filed under it may go too. This cannot be undone.`,
+      cascades: true,
+    };
+  }
+
   const needed = confirmPref || cascades;
   if (!needed) return { needed: false, message: '', cascades };
 

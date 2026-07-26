@@ -352,7 +352,7 @@ Useful sequences:
 
 Some fields live ONLY on local element files — the OW server has no concept of them. Today: `image_media_id`. Future: anything else atlas adds. The canonical list is `ATLAS_LOCAL_EXTENSION_FIELDS` in `src/core/constants.ts`. Two contracts depend on it:
 
-1. **Adapter strips on WRITE** (`OwClientAdapter.toWireShape` via the local `ATLAS_LOCAL_FIELDS` Set). Otherwise the server 422s on unknown fields.
+1. **Adapter strips on WRITE** — but only the LOCAL-ONLY half. Under v2 (`OwV2ClientAdapter`, the production dialect since 2026-07-12) the list is split in `src/core/constants.ts`: `ATLAS_LOCAL_ONLY_FIELDS` are stripped, while `ATLAS_WIRE_EXTENSION_FIELDS` (the zone visuals) are SENT and round-trip through keel's extension passthrough. The retired v1 `OwClientAdapter.toWireShape` stripped the combined list, because that server 422'd on every unknown field; do not carry the v1 rule forward. *(Corrected 2026-07-26: this line named the dead adapter and stated the dead rule.)*
 2. **Both stores preserve on `applyServerRecord`**. Read existing element first; preserve every field in `ATLAS_LOCAL_EXTENSION_FIELDS` that has a value; then overlay the server record. Otherwise pulling an update silently destroys the local binding — e.g. a Map's `image_media_id` would vanish on every server-side description edit, orphaning the local media file.
 
 When adding a new atlas-only field: add it to `ATLAS_LOCAL_EXTENSION_FIELDS`. Both ends pick it up automatically (write strip + pull preservation). No per-field code changes needed elsewhere.

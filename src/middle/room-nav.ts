@@ -25,6 +25,7 @@ import {
   type RouteMode,
 } from '../core/router';
 import { writingHashForNarrative } from './writing-helpers';
+import { isDrawerOpen, onNarrowChange, toggleDrawer, type DrawerName } from '../layout/narrow-layout';
 import { ELEMENT_ICONS } from '../core/constants';
 import { elementHash } from '../core/router';
 import { escapeText } from '../core/dom-utils';
@@ -141,6 +142,12 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     wasPreview = false;
     strip.innerHTML = '';
     strip.classList.remove('is-preview');
+
+    // Narrow-window drawer toggles (S323). Rendered ALWAYS and hidden by CSS
+    // above the breakpoints, so the strip's markup does not change shape when
+    // a window is resized across one — a re-render race on a resize is the
+    // kind of thing that leaves a control missing until the next navigation.
+    strip.appendChild(drawerToggle('sidebar', 'left_panel_open', 'Worlds and elements'));
 
     for (const room of ROOMS) {
       const btn = document.createElement('button');
@@ -276,6 +283,8 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     search.addEventListener('click', () => { void openPalette(); });
     strip.appendChild(search);
 
+    strip.appendChild(drawerToggle('right', 'right_panel_open', 'Web, maps and charts'));
+
     if (settling) {
       // Lock re-renders out for the animation's lifetime FIRST, then collapse
       // the labels two frames later (they need one paint at full width).
@@ -293,12 +302,32 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     return name.slice(0, max - 1).trimEnd() + '…';
   }
 
+  /**
+   * A drawer toggle for one of the side panes. Only visible under the narrow
+   * breakpoints (CSS), where that pane has stopped being a column.
+   */
+  function drawerToggle(name: DrawerName, icon: string, label: string): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `atlas-room-nav-drawer-btn is-${name}`;
+    btn.setAttribute('data-drawer', name);
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-expanded', String(isDrawerOpen(name)));
+    btn.title = label;
+    btn.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">${icon}</span>`;
+    btn.addEventListener('click', () => { toggleDrawer(name); });
+    return btn;
+  }
+
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
+  // Re-render so the toggles' aria-expanded tracks the drawer state.
+  const unsubNarrow = onNarrowChange(render);
   render();
 
   return () => {
     unsubState();
     unsubHash();
+    unsubNarrow();
   };
 }

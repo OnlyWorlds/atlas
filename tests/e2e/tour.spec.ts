@@ -1039,7 +1039,16 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   // Landing: tour leads; the folder door is an honest line, not a button.
   await expect(page.locator('[data-action="start-tour"]')).toBeVisible();
   await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
-  await expect(page.locator('.atlas-landing-note')).toContainText('needs a Chromium browser');
+  // The note must be HONEST about the capability, not merely present. It used
+  // to say "needs a Chromium browser", which is what every phone visitor on
+  // mobile Chrome was reading (S323) — the gate is the folder picker, which
+  // is a DESKTOP capability. Assert the load-bearing word rather than the
+  // whole sentence, so a copy polish does not fail this test but dropping the
+  // honesty does.
+  await expect(page.locator('.atlas-landing-note')).toContainText('desktop');
+  await expect(page.locator('.atlas-landing-note')).toContainText('Chromium');
+  // And this browser is given somewhere to GO, not just something it cannot do.
+  await expect(page.locator('[data-action="see-example"]')).toBeVisible();
   // The tour boots and walks.
   await openOpener(page);
   await beginToWorld(page);

@@ -59,6 +59,17 @@ html {
   /* Scrim triplet: floating chips/bars/wells over content (background uses of
      the old black-alpha literals). Shadows stay literal black in both themes. */
   --atlas-scrim-rgb: 0, 0, 0;
+  /* CANVAS scrim — for chrome that floats over the MAP or CHART canvas rather
+     than over an app surface. Those canvases are deliberate dark islands, and
+     a map's background is the user's own artwork, so this triplet must NOT
+     flip with the theme: it stays dark under light mode, and the text on it
+     stays light. Its own inverse is given as a pair so neither half can be
+     written as a fresh literal. Same category as shadows, above.
+     (S323: pin labels and pin tooltips used the app scrim, which flips white
+     under light, while keeping a literal white foreground — every label on
+     the map was white on white.) */
+  --atlas-canvas-scrim-rgb: 0, 0, 0;
+  --atlas-canvas-ink-rgb: 255, 255, 255;
   --atlas-input-bg: rgba(0, 0, 0, 0.3);
   --atlas-input-bg-focus: rgba(0, 0, 0, 0.45);
 
@@ -201,6 +212,8 @@ html {
   color: var(--atlas-text);
   font-size: 13px;
   line-height: 1.4;
+  /* The narrow layer positions the side panes as drawers against this box. */
+  position: relative;
 }
 
 .atlas-sidebar {
@@ -406,6 +419,13 @@ html {
   background: var(--atlas-bg-panel);
   border-bottom: 1px solid var(--atlas-divider);
   overflow-x: auto;
+  /* A lone `overflow-x: auto` COMPUTES overflow-y to auto (CSS overflow rule),
+     so this 39px strip was a vertical scroll container. On a fractional device
+     pixel ratio a tab's content rounds a hair taller than the client box and
+     Chromium paints a tiny vertical scrollbar down the bar's right edge —
+     visible in the v1.0 launch screenshots. The bar must never scroll
+     vertically; say so, rather than relying on content never rounding up. */
+  overflow-y: hidden;
   scrollbar-width: thin;
 }
 
@@ -1222,6 +1242,19 @@ html {
   font-size: 15px;
   font-weight: 600;
   color: var(--atlas-text);
+  /* The name is the ONE child allowed to give way. Everything else in this
+     band is flex-shrink:0 inside an `overflow: hidden` row, so before this
+     rule a long element name pushed the trailing controls — the sync dot,
+     +pin, +map and DELETE — past a clipped edge with no scroll and no way to
+     reach them. Not hypothetical at 1280: the middle pane is ~51% of the
+     window, and long names are ordinary worldbuilding data. The same header
+     serves the element, knowledge and share rooms, so this one rule covers
+     all three (S323). */
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Element type icon size unified above (.atlas-middle-header .material-symbols-outlined). */
@@ -1915,7 +1948,7 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
 .atlas-tour-word.active {
   background: rgba(var(--atlas-accent-rgb), 0.16);
   border-radius: 2px;
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 /* Ghost glyphs — pre-spaced from step 0 (zero reflow), lit when earned.
    S301 (Captain): unlit glyphs go practically invisible rather than grey. The
@@ -3211,8 +3244,10 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-map-pane .leaflet-2d-pin-label .pin-label-text {
   display: inline-block;
   padding: 1px 6px;
-  background: rgba(var(--atlas-scrim-rgb), 0.7);
-  color: #fff;
+  /* Canvas chrome: floats over the user's map artwork, so it holds its own
+     dark scrim in both themes (see --atlas-canvas-scrim-rgb). */
+  background: rgba(var(--atlas-canvas-scrim-rgb), 0.7);
+  color: rgb(var(--atlas-canvas-ink-rgb));
   font-size: 11px;
   border-radius: 3px;
   white-space: nowrap;
@@ -3224,10 +3259,11 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   z-index: 800;
   pointer-events: none;
   padding: 3px 7px;
-  background: rgba(var(--atlas-scrim-rgb), 0.88);
+  /* Canvas chrome, like the pin label above: theme-independent dark scrim. */
+  background: rgba(var(--atlas-canvas-scrim-rgb), 0.88);
   border: 1px solid var(--atlas-cyan-soft);
   border-radius: 3px;
-  color: #fff;
+  color: rgb(var(--atlas-canvas-ink-rgb));
   font-size: 11px;
   line-height: 1.35;
   max-width: 220px;
@@ -3235,7 +3271,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 .atlas-pin-tooltip-name {
-  color: #fff;
+  color: rgb(var(--atlas-canvas-ink-rgb));
   font-weight: 500;
 }
 
@@ -4520,7 +4556,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   border-radius: 4px;
 }
 
-.atlas-demo-exit:hover { color: #fff; background: rgba(var(--atlas-ink-rgb), 0.06); }
+.atlas-demo-exit:hover { color: rgb(var(--atlas-ink-rgb)); background: rgba(var(--atlas-ink-rgb), 0.06); }
 .atlas-demo-exit .material-symbols-outlined { font-size: 16px; }
 
 .atlas-demo-scroll {
@@ -4539,7 +4575,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-demo-intro h1 {
   font-size: 26px;
   font-weight: 600;
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
   margin: 0 0 10px;
 }
 
@@ -4576,20 +4612,24 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   box-shadow: none;
 }
 
+/* The demo map is CANVAS chrome over the bundled artwork, so these controls
+   keep a dark chip in both themes. They used to mix a literal near-black
+   background with the THEMED ink, which reads as dark-on-dark in light mode
+   (S323); the canvas triplets carry both halves now. */
 .atlas-demo-map .leaflet-control-zoom a {
   background: rgba(12, 14, 16, 0.88);
-  color: rgba(var(--atlas-ink-rgb), 0.75);
-  border-bottom-color: rgba(var(--atlas-ink-rgb), 0.12);
+  color: rgba(var(--atlas-canvas-ink-rgb), 0.75);
+  border-bottom-color: rgba(var(--atlas-canvas-ink-rgb), 0.12);
 }
 
 .atlas-demo-map .leaflet-control-zoom a:hover {
   background: rgba(var(--atlas-accent-rgb), 0.12);
-  color: #fff;
+  color: rgb(var(--atlas-canvas-ink-rgb));
 }
 
 .atlas-demo-map .leaflet-tooltip {
   background: rgba(12, 16, 18, 0.92);
-  color: rgba(var(--atlas-ink-rgb), 0.85);
+  color: rgba(var(--atlas-canvas-ink-rgb), 0.85);
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.25);
   border-radius: 3px;
   font-size: 12px;
@@ -5532,7 +5572,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-size: 22px;
   font-weight: 600;
   margin: 0 0 16px;
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 
 .atlas-unsupported p {
@@ -6163,7 +6203,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 .atlas-zone-draft-overlay.shift-held .atlas-zone-draft-hint kbd {
   background: rgba(var(--atlas-accent-rgb), 0.25);
-  color: #ffffff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 
 .atlas-zone-draft-spacer {
@@ -6331,7 +6371,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 .atlas-zones-dropdown-btn.is-open .atlas-zones-dropdown-count {
   background: rgba(var(--atlas-accent-rgb), 0.35);
-  color: #ffffff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 
 .atlas-zones-dropdown-caret {
@@ -6385,7 +6425,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-zone-chip.is-selected {
   background: rgba(var(--atlas-accent-rgb), 0.32);
   border-color: rgba(var(--atlas-accent-rgb), 1);
-  color: #ffffff;
+  color: rgb(var(--atlas-ink-rgb));
   font-weight: 600;
   box-shadow: 0 0 0 1px rgba(var(--atlas-accent-rgb), 0.55), 0 0 8px rgba(var(--atlas-accent-rgb), 0.35);
 }
@@ -6399,6 +6439,12 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   color: var(--atlas-cyan);
 }
 
+/* The definition ring around a COLOUR SWATCH stays literal black in both
+   themes, deliberately: the swatch shows a user-chosen zone colour, and the
+   ring exists to separate that colour from whatever is behind it. A themed
+   ring would vanish against pale zone colours in light mode, which is the
+   one job it has. Same reasoning as shadows. Documented so the next
+   light-mode audit does not re-flag it (S323). */
 .atlas-zone-chip-dot {
   display: inline-block;
   width: 8px;
@@ -6734,7 +6780,7 @@ svg .atlas-zone-selected {
   background: rgba(var(--atlas-accent-rgb), 0.32);
   box-shadow: 0 0 14px rgba(var(--atlas-accent-rgb), 1), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
   transform: scale(1.1);
-  color: #ffffff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 
 .atlas-zone-centroid-handle:active {
@@ -7446,7 +7492,7 @@ svg .atlas-zone-selected {
   transition: opacity 100ms ease, color 100ms ease;
 }
 .atlas-home-onboarding-tile:hover .atlas-home-tile-dismiss { opacity: 0.7; }
-.atlas-home-tile-dismiss:hover { opacity: 1 !important; color: #fff; background: rgba(var(--atlas-ink-rgb), 0.08); }
+.atlas-home-tile-dismiss:hover { opacity: 1 !important; color: rgb(var(--atlas-ink-rgb)); background: rgba(var(--atlas-ink-rgb), 0.08); }
 
 /* The next-wave phase label — quieter than a section title. */
 .atlas-home-tour-label {
@@ -10641,6 +10687,28 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
   color: var(--atlas-cyan);
 }
 
+/* The inline glyph must be the SAME pair the sidebar button actually draws
+   (add + folder). It used to be a single `create_new_folder` ligature, an
+   icon that appears nowhere in the app, so the sentence pointed at a button
+   the user could not find by its picture (S323). */
+.atlas-grounded-next .atlas-grounded-next-glyph {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: -3px;
+  margin: 0 2px;
+  color: var(--atlas-cyan);
+}
+
+.atlas-grounded-next .atlas-grounded-next-glyph .atlas-add-glyph-plus {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.atlas-grounded-next .atlas-grounded-next-glyph .atlas-add-glyph-main {
+  font-size: 15px;
+  line-height: 1;
+}
+
 .atlas-share-map-zone-label {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -10674,6 +10742,8 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
   height: 12px;
   border-radius: 50%;
   background: var(--page-accent, var(--atlas-cyan, #22d3ee));
+  /* Definition ring over the author's map image: literal in both themes, for
+     the same reason as .atlas-zone-chip-dot above. */
   border: 2px solid rgba(0, 0, 0, 0.65);
   transform: translate(-50%, -50%);
   cursor: default;
@@ -11084,7 +11154,50 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-share-page-view[data-density='compact'] { --page-space: 8px; }
 .atlas-share-page-view[data-density='airy'] { --page-space: 24px; }
 
-/* Light mode — page article only (the surrounding shell stays atlas-dark). */
+/* A published page carries its OWN mode, independent of the app theme, and
+   the preview's whole job is to show the artifact a visitor will get.
+   `data-mode='dark'` used to have no rules at all — dark was inherited free
+   from a shell that was always dark, and light mode falsified that premise:
+   a dark page previewed as light ink on the light app background, while the
+   same payload rendered correctly dark in the `show` viewer. So the preview
+   showed a different artifact than the one that publishes. Dark is now
+   PINNED, the way the tour root is (S323). Keep the two viewers in step:
+   the reference values live in show/src/styles.css. */
+/* THE DARK-ISLAND RE-PIN. Any surface that paints its own dark floor while
+   the app around it may be light needs the whole token family restated, not
+   just the triplets: the light block defines --atlas-text* as flat literals
+   rather than deriving them from the ink triplet, so a triplet-only re-pin
+   leaves card field values, type labels and close buttons at light ink on
+   black. Measured, not assumed (S323). Keep these values in step with :root.
+   Add a selector here rather than writing literals into a new island. */
+.atlas-share-page-view[data-mode='dark'],
+.atlas-share-pin-modal {
+  --atlas-ink-rgb: 255, 255, 255;
+  --atlas-scrim-rgb: 0, 0, 0;
+  --atlas-text: #e8e8e8;
+  --atlas-text-soft: rgba(var(--atlas-ink-rgb), 0.72);
+  --atlas-text-muted: rgba(var(--atlas-ink-rgb), 0.48);
+  --atlas-text-dim: rgba(var(--atlas-ink-rgb), 0.28);
+  --atlas-divider: rgba(var(--atlas-ink-rgb), 0.06);
+  --atlas-bg-hover: rgba(var(--atlas-ink-rgb), 0.05);
+  /* The element's own `color` is INHERITED, and inheritance is not variable
+     substitution — the re-pin above fixes descendants that read
+     `var(--atlas-text)` but not this element's own text. Derive it so the
+     dark case stays exactly what it inherited before. */
+  color: var(--atlas-text);
+}
+
+.atlas-share-page-view[data-mode='dark'] {
+  background: #0a0a0a; /* = the dark app --atlas-bg, so dark mode is unchanged */
+  border-radius: 8px;
+}
+/* No per-element colour overrides are needed on the dark side: titles,
+   headings and card names all read `var(--atlas-text)`, which the re-pin
+   above already resolves to the dark value. Adding literals here would
+   BRIGHTEN dark mode relative to what shipped (#fff vs #e8e8e8) — the light
+   block below needs its own rules only because it paints its own paper. */
+
+/* Light mode — page article only (the surrounding shell is either theme). */
 .atlas-share-page-view[data-mode='light'] {
   background: #f6f5f2;
   color: #1c1917;
@@ -11649,7 +11762,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 .atlas-timeline-rail-undated-item:hover {
   background: rgba(var(--atlas-ink-rgb), 0.06);
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 .atlas-timeline-rail-undated-item:active { cursor: grabbing; }
 .atlas-timeline-rail-undated-grip {
@@ -11683,7 +11796,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   background: rgba(12, 16, 22, 0.96);
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.5);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
   font-size: 11.5px;
   white-space: nowrap;
 }
@@ -11724,7 +11837,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   min-width: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -11746,7 +11859,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 
 .atlas-timeline-card-close:hover {
   background: rgba(var(--atlas-ink-rgb), 0.08);
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 
 .atlas-timeline-card-meta {
@@ -11945,7 +12058,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 .atlas-saved-chart:hover .atlas-saved-chart-name,
 .atlas-saved-chart.active .atlas-saved-chart-name {
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 
 /* Controls stay visible at low opacity (full on hover) — never hover-only. */
@@ -11978,7 +12091,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   font-size: 13px;
 }
 .atlas-saved-chart-action:hover {
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
   background: rgba(var(--atlas-ink-rgb), 0.1);
 }
 .atlas-saved-chart-action:last-child:hover {
@@ -11988,7 +12101,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 .atlas-saved-chart-rename {
   font-family: inherit;
   font-size: 11px;
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
   background: rgba(var(--atlas-ink-rgb), 0.08);
   border: 1px solid var(--atlas-cyan-soft);
   border-radius: 999px;
@@ -12050,11 +12163,11 @@ a.atlas-share-map-pin { cursor: pointer; }
   transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 .atlas-share-chart-option:hover {
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
   border-color: rgba(var(--atlas-ink-rgb), 0.25);
 }
 .atlas-share-chart-option.selected {
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
   border-color: rgba(var(--atlas-accent-rgb), 0.5);
   background: rgba(var(--atlas-accent-rgb), 0.12);
 }
@@ -12092,7 +12205,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 
 .atlas-chart-type-chip.active {
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
   border-color: rgba(var(--atlas-accent-rgb), 0.5);
   background: rgba(var(--atlas-accent-rgb), 0.12);
 }
@@ -12109,7 +12222,7 @@ a.atlas-share-map-pin { cursor: pointer; }
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.45);
   border-radius: 999px;
   background: rgba(var(--atlas-accent-rgb), 0.12);
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
   font-size: 11px;
 }
 
@@ -12135,7 +12248,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 
 .atlas-chart-focus-clear:hover {
   background: rgba(var(--atlas-ink-rgb), 0.15);
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 
 /* Charts-context create (S263): dateless types stay visible but disabled —
@@ -12222,7 +12335,7 @@ a.atlas-share-map-pin { cursor: pointer; }
 
 .atlas-chart-now-clear:hover {
   background: rgba(var(--atlas-ink-rgb), 0.15);
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 
 /* ============================================================================
@@ -14543,7 +14656,7 @@ body.atlas-share-fullpreview > * {
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
 }
 
-.atlas-scroll-card.focused .atlas-scroll-card-name { color: #fff; }
+.atlas-scroll-card.focused .atlas-scroll-card-name { color: rgb(var(--atlas-ink-rgb)); }
 
 .atlas-scroll-card.cast .atlas-scroll-card-dot {
   box-shadow: 0 0 0 3px rgba(var(--atlas-accent-rgb), 0.35);
@@ -14611,7 +14724,7 @@ body.atlas-share-fullpreview > * {
 
 .atlas-scroll-card-chip:hover {
   border-color: rgba(var(--atlas-accent-rgb), 0.4);
-  color: #fff;
+  color: rgb(var(--atlas-ink-rgb));
 }
 
 .atlas-scroll-card-chip .material-symbols-outlined { font-size: 13px; }
@@ -14824,4 +14937,226 @@ body.atlas-share-fullpreview > * {
   letter-spacing: 0.02em;
   flex-shrink: 0;
   margin-left: 4px;
+}
+
+/* ============================================================
+   THE NARROW-WINDOW LAYER (S323) — see src/layout/narrow-layout.ts
+
+   Atlas is a three-pane shell with hard pixel floors (180 + 280 + 240 plus
+   two dividers = ~706px). Below that the row overflowed a container that
+   hides overflow, with no scrollbar anywhere, so panes did not shrink: they
+   left the screen. At 768 the map pane lost ~50px; at 640 the whole right
+   pane was gone; at 390 the guided tour, which the landing offers to phone
+   visitors, collapsed into unreadable overlap.
+
+   Below a breakpoint a side pane stops being a COLUMN and becomes a DRAWER
+   over the middle pane, reached from a toggle in the room-nav strip. No
+   capability is removed. Above 1100px nothing here applies, so every desktop
+   screenshot in the repo still holds.
+
+   `!important` is load-bearing here and only here: app-shell.ts writes the
+   pane widths as INLINE `flex` from the persisted ratios, and an inline style
+   beats any stylesheet rule. The alternative was teaching the ratio code
+   about breakpoints, which puts the same decision in two places.
+   ============================================================ */
+
+/* ---- Shared drawer behaviour ---- */
+body.atlas-narrow .atlas-shell > .atlas-divider {
+  display: none;
+}
+
+/* The scrim. Present always, inert until a drawer opens. */
+.atlas-drawer-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+body.atlas-drawer-right-open .atlas-drawer-scrim,
+body.atlas-drawer-sidebar-open .atlas-drawer-scrim {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-drawer-scrim { transition: none; }
+}
+
+body.atlas-narrow .atlas-right {
+  /* An OPAQUE floor. As a column this pane sat on the app background and its
+     translucent panel tint was enough; as a drawer it floats over live
+     content, and the first build of this layer showed the element editor
+     straight through the maps pane. */
+  background: var(--atlas-bg);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 60;
+  width: min(420px, 88vw) !important;
+  min-width: 0 !important;
+  flex: none !important;
+  border-left: 1px solid var(--atlas-divider);
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45);
+  transform: translateX(101%);
+  transition: transform 160ms ease;
+  /* Kept in the layout (not display:none) so Leaflet and the charts canvas
+     keep a real box and do not need a re-measure on every open. */
+  visibility: hidden;
+}
+
+body.atlas-narrow.atlas-drawer-right-open .atlas-right {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+body.atlas-narrow .atlas-middle {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+body.atlas-narrow-sidebar .atlas-sidebar {
+  background: var(--atlas-bg);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 60;
+  width: min(320px, 86vw) !important;
+  min-width: 0 !important;
+  flex: none !important;
+  border-right: 1px solid var(--atlas-divider);
+  box-shadow: 12px 0 32px rgba(0, 0, 0, 0.45);
+  transform: translateX(-101%);
+  transition: transform 160ms ease;
+  visibility: hidden;
+}
+
+body.atlas-narrow-sidebar.atlas-drawer-sidebar-open .atlas-sidebar {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.atlas-narrow .atlas-right,
+  body.atlas-narrow-sidebar .atlas-sidebar {
+    transition: none;
+  }
+}
+
+/* ---- The toggles ---- */
+.atlas-room-nav-drawer-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.atlas-room-nav-drawer-btn .material-symbols-outlined {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.atlas-room-nav-drawer-btn:hover {
+  color: var(--atlas-text);
+  background: rgba(var(--atlas-ink-rgb), 0.06);
+}
+
+.atlas-room-nav-drawer-btn[aria-expanded='true'] {
+  color: var(--atlas-cyan);
+  background: rgba(var(--atlas-accent-rgb), 0.1);
+}
+
+/* Each toggle appears only once its own pane has become a drawer. */
+body.atlas-narrow .atlas-room-nav-drawer-btn.is-right { display: inline-flex; }
+body.atlas-narrow-sidebar .atlas-room-nav-drawer-btn.is-sidebar { display: inline-flex; }
+
+/* The tour owns the whole screen and drives its own navigation; a drawer
+   toggle during a tour step is a door out of the script. */
+body.atlas-touring .atlas-room-nav-drawer-btn { display: none !important; }
+
+/* The toggles must never be the thing that scrolls out of reach — that would
+   be this layer reintroducing its own bug. Measured at 390px: the strip
+   overflowed by 42px and parked the right toggle at x=404 (S323). Two moves:
+   pin both toggles to the strip's edges, and drop the search pill to its icon
+   on the narrowest tier, where the "ctrl k" hint is meaningless anyway. */
+body.atlas-narrow .atlas-room-nav-drawer-btn.is-right {
+  position: sticky;
+  right: 4px;
+  background: var(--atlas-bg-panel);
+}
+
+body.atlas-narrow-sidebar .atlas-room-nav-drawer-btn.is-sidebar {
+  position: sticky;
+  left: 4px;
+  z-index: 1;
+  background: var(--atlas-bg-panel);
+}
+
+body.atlas-narrow-sidebar .atlas-room-nav-search-text,
+body.atlas-narrow-sidebar .atlas-room-nav-search-kbd {
+  display: none;
+}
+
+/* ---- The guided tour on a narrow screen (S323) ----
+
+   The dock is FIXED height (`--tour-dock-h`) because Captain asked for a
+   widget that never resizes as you step (S299), and the sentence carries a
+   3-line min-height for the same reason. Both are right at desktop width.
+   At 390px the sentence wraps to six lines, the copy needs its own room, and
+   the fixed box cannot hold either: the children overflowed and PAINTED OVER
+   EACH OTHER, with the forward control pushed out of the box entirely. That
+   is the phone-tour collapse the launch banked, and no test could see it —
+   Playwright counts an off-screen element as visible, so the tour suite ran
+   green at 390px on a screen no human could read.
+
+   On the phone tier the dock grows to its content and scrolls inside a
+   viewport cap instead. The no-jitter promise is a desktop promise; on a
+   phone, readable beats motionless. */
+body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) {
+  height: auto;
+  max-height: calc(100vh - var(--tour-dock-gap) * 2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-sentence {
+  min-height: 0;
+}
+
+/* The controls must stay reachable at the bottom of a scrolling dock. */
+body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-controls {
+  position: sticky;
+  bottom: 0;
+  background: rgba(8, 13, 18, 0.96);
+  padding-top: 6px;
+}
+
+/* The controls row is a single line of [meta … buttons] at desktop. At 390
+   the meta squeezes into a four-word column beside the buttons. Let it take
+   its own full-width line above them instead (S323). */
+body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-controls {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+/* The meta lives inside the .atlas-tour-extras foot slot, not directly in
+   the controls row, so the full-width rule belongs on the SLOT. Measured:
+   targeting the meta alone left it a 102px column beside the buttons. */
+body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
+  flex: 1 0 100%;
+  order: -1;
 }

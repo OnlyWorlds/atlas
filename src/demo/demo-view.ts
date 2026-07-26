@@ -57,7 +57,7 @@ export function mountDemo(): void {
     <div class="atlas-demo-scroll">
       <div class="atlas-demo-intro">
         <h1>Sikelia</h1>
-        <p>Ancient Sicily around 505 BC: <span data-role="demo-pin-count">the settlements</span> on hand-made map art, with the political web between poleis, native peoples, and Phoenician ports recorded as linked elements.</p>
+        <p>Ancient Sicily around 505 BC: <span data-role="demo-pin-count">the settlements</span> on hand-made map art, each one placed, described, and sorted by what kind of place it was, from Greek poleis to native strongholds and Phoenician ports.</p>
         <p class="atlas-demo-intro-sub">A page like this is what atlas publishes: blocks built from a real world. Zoom the map, click any pin. Below it: a dozen highlights from <span data-role="demo-element-count">its</span> elements.</p>
       </div>
       <div class="atlas-demo-map" data-role="demo-map"></div>

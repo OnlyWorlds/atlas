@@ -48,6 +48,10 @@ export default defineConfig({
         // Vite into /assets and matched by this glob, so the font is offline-
         // available after first load.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // og.png is the social card: crawlers fetch it, the app never does,
+        // and a visitor should not pay 100 KB of precache for an image their
+        // browser will never request (S323).
+        globIgnores: ['**/og.png'],
         // The Material Symbols outlined font is ~4 MB (covers thousands of
         // icons). Subsetting to atlas's ~40 used icons would drop it to
         // ~50 KB — deferred optimization. For now, bump the precache size

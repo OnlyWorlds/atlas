@@ -115,7 +115,7 @@ Three layers, clean seam between pure and IO:
         │                    └─► ChatGPT-fix prompt (kept feature)
         ▼
   reconcile (pure) ──►  ImportPlan             src/import/reconcile.ts
-        │                                       (+ src/import/ref-resolve.ts)
+        │                                       (name to id resolution: resolveRelations in reconcile.ts)
         ▼
   apply (IO)        ──►  folder writes          src/import/apply-import-plan.ts
         │                + requestPushIfLinked once
@@ -154,7 +154,7 @@ function reconcileElement(
 
 **Match priority** (fixes base-tool's case-sensitivity flaw): (1) by UUID if `incoming.id` exists and is found; (2) by **normalized** name+type — `name.trim().toLowerCase()` — within the same type; (3) else insert. Lookup maps are keyed on the normalized name (original preserved for display). Names normalized **once** at lookup-build time, used consistently across detect/resolve/write.
 
-**Name → id resolution** (`src/import/ref-resolve.ts`): uses `FIELD_SCHEMA[type][field].target` to know the target type — **never** base-tool's `inferTargetType()` string-guessing (that mis-targets `species`, `birthplace`, `founders`, etc.). Resolution priority: import payload first, then existing world (so self-contained imports resolve internally). Unresolved single-links drop with a `droppedLinks` report entry; unresolved multi-link entries are filtered. One shared relation-introspection helper used by both validate and resolve, so target logic lives in exactly one place.
+**Name → id resolution** (`resolveRelations` in `src/import/reconcile.ts` — the planned standalone `ref-resolve.ts` module was never cut; corrected 2026-07-26): uses `FIELD_SCHEMA[type][field].target` to know the target type — **never** base-tool's `inferTargetType()` string-guessing (that mis-targets `species`, `birthplace`, `founders`, etc.). Resolution priority: import payload first, then existing world (so self-contained imports resolve internally). Unresolved single-links drop with a `droppedLinks` report entry; unresolved multi-link entries are filtered. One shared relation-introspection helper used by both validate and resolve, so target logic lives in exactly one place.
 
 **Shared with sync, reused (pure):** `deepEqual` (content diff to decide whether a matched element actually differs before issuing an update); the `FIELD_SCHEMA` relation introspection. **Not reused:** topo-sort, id-swap, rewriteIdReferences, applyIdSwapsToBody — sync-push concerns, not import-to-folder concerns.
 

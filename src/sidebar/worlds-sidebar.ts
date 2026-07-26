@@ -734,12 +734,27 @@ async function doActivateWorld(
     // the world stops appearing in the sidebar. No data loss: the folder is
     // already gone; we're just removing the pointer to it.
     if (isFolderMissing(err)) {
+      // Confirm against the filesystem before destroying anything. The error
+      // name alone is not evidence: it can come from any one of the ~30
+      // directory calls inside store.open(). Only a root that is really gone
+      // earns the cleanup.
+      if (await rootDirectoryIsGone(handle)) {
+        evictParkedStore(worldId);
+        await deleteHandle(entry.folder.handle_key).catch(() => {});
+        const cleaned = deleteWorldEntry(getState().registry, worldId);
+        saveRegistry(cleaned);
+        patchSlice('registry', cleaned);
+        if (!silent) toasts.info(`"${entry.name}" folder is gone; removed from atlas`);
+        if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+        return false;
+      }
+      // The folder is there; something inside the open failed. Keep the entry
+      // and the handle, and say what we actually know.
+      console.error('[worlds-sidebar] open failed but the root directory exists', err);
       evictParkedStore(worldId);
-      await deleteHandle(entry.folder.handle_key).catch(() => {});
-      const cleaned = deleteWorldEntry(getState().registry, worldId);
-      saveRegistry(cleaned);
-      patchSlice('registry', cleaned);
-      if (!silent) toasts.info(`"${entry.name}" folder is gone; removed from atlas`);
+      if (!silent) {
+        toasts.error(`Could not open ${entry.name}. The folder is still there, so nothing was removed. Try again, and check that no other atlas tab has it open.`);
+      }
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }
@@ -870,5 +885,33 @@ function isFolderMissing(err: unknown): boolean {
   // Chrome occasionally throws as a generic Error with a message that names
   // the underlying cause. Best-effort string match for robustness.
   return typeof e.message === 'string' && /not\s*found|no such (file|directory)/i.test(e.message);
+}
+
+/**
+ * Ask the FILESYSTEM whether the world's root directory is really gone,
+ * rather than inferring it from an error's name.
+ *
+ * `isFolderMissing` is a guess about a string: `store.open()` makes some
+ * thirty directory calls building the layout and claiming the lock, and ANY
+ * NotFoundError among them — or any error whose message merely contains "not
+ * found" — used to be read as "the whole folder was deleted". The action
+ * taken on that guess is destructive and irreversible from the UI: it drops
+ * the registry entry (which for an api-linked world carries its credentials)
+ * and deletes the saved handle, so a transient failure cost the user their
+ * world listing and their key.
+ *
+ * Reading one entry off the root touches the directory itself. If that
+ * succeeds, the folder exists and the original error was something else, so
+ * nothing gets destroyed (S323).
+ */
+async function rootDirectoryIsGone(handle: FileSystemDirectoryHandle): Promise<boolean> {
+  try {
+    // `values()` yields lazily; one step is enough to touch the directory.
+    const iterator = (handle as unknown as { values(): AsyncIterableIterator<unknown> }).values();
+    await iterator.next();
+    return false;
+  } catch (probeErr) {
+    return isFolderMissing(probeErr);
+  }
 }
 

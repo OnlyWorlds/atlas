@@ -192,10 +192,24 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
         toasts.success(`Connected: ${liveName ?? 'world'}`);
       }
     } catch (err) {
+      // Branch on the TYPED code, not on the status number. A revoked key and
+      // a wrong PIN are both 401, and telling someone to check their PIN when
+      // their key was revoked sends them to a control that cannot fix it. The
+      // engine has distinguished these for a while (sync-engine noteAuthBail);
+      // "test connection" was still giving one answer for three causes (S323).
+      const code = (err as { code?: string } | null)?.code;
       const msg = err instanceof Error ? err.message : String(err);
-      if (/401|403/.test(msg)) toasts.error('API key or PIN invalid');
-      else if (/404/.test(msg)) toasts.error('No world for that API key');
-      else toasts.error(msg);
+      if (code === 'key_revoked') {
+        toasts.error('This world\'s access key was revoked. Unlink it here, then reopen it from the sidebar to get a new key.');
+      } else if (code === 'permission_error') {
+        toasts.error('This access key is read-only, so edits can\'t sync. Reopen the world with a write key.');
+      } else if (code === 'invalid_credentials' || /401|403/.test(msg)) {
+        toasts.error('API key or PIN invalid');
+      } else if (/404/.test(msg)) {
+        toasts.error('No world for that API key');
+      } else {
+        toasts.error(msg);
+      }
     } finally {
       testBtn.disabled = false;
     }

@@ -442,7 +442,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           `}
 
           ${mergeTargetViewOnly ? `
-          <p class="atlas-import-subnote is-warn"><span class="material-symbols-outlined">visibility</span> ${escapeText(mergeTargetName)} is view-only — nothing can be written into it. Import as a separate copy instead.</p>
+          <p class="atlas-import-subnote is-warn"><span class="material-symbols-outlined">visibility</span> ${escapeText(mergeTargetName)} is view-only. Nothing can be written into it, so import as a separate copy instead.</p>
           ` : ''}
           <button type="button" class="atlas-btn-primary" data-action="import" ${importing || mergeTargetViewOnly ? 'disabled' : ''}>
             ${importing ? 'importing…' : (mode === 'new' ? 'create world' : `merge into ${escapeText(mergeTargetName)}`)}
@@ -547,7 +547,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         // N per-element write failures).
         const targetEntry = getState().registry.worlds.find(w => w.id === targetId);
         if (targetEntry?.api?.read_only === true) {
-          throw new Error(`"${targetName}" is view-only — import as a separate copy instead`);
+          throw new Error(`"${targetName}" is view-only. Import as a separate copy instead`);
         }
         if (targetId !== activeWorld()?.worldId) {
           const ok = await activateWorld(targetId, toasts);

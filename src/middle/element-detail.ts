@@ -162,7 +162,7 @@ export function mountElementDetail(target: HTMLElement): () => void {
           const next = setEditorSettings(getState().registry, { show_element_images: false });
           saveRegistry(next);
           patchSlice('registry', next);
-          toastManager.info('Element images hidden. Click the type icon (or Settings → Editing) to show them again');
+          toastManager.info('Element images hidden. Click the type icon (or Settings → Elements) to show them again');
         });
         wrap.appendChild(hide);
         detail.appendChild(wrap);

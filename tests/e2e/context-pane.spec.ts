@@ -572,3 +572,40 @@ test('right-click "Add to story" appears in writing mode only', async ({ page })
   const menu = page.locator('.atlas-context-graph-node-menu');
   await expect(menu.locator('.atlas-context-graph-node-menu-item', { hasText: 'Add to story' })).toBeVisible();
 });
+
+test('the right-pane tab bar never becomes a vertical scroll container', async ({ page }) => {
+  // `overflow-x: auto` alone COMPUTES overflow-y to auto, which made this 39px
+  // strip a vertical scroll container. On a fractional device pixel ratio a tab
+  // rounds a hair taller than the client box and Chromium paints a hairline
+  // vertical scrollbar down the bar's right edge — visible in the v1.0 launch
+  // screenshots. Asserted as an OUTCOME (no vertical scroll room, no scrollbar
+  // width) rather than a restatement of the CSS rule, including under a tab
+  // forced taller than the bar.
+  await freshBoot(page);
+  await setupAtlasRoot(page);
+  await createWorld(page, 'tabbar world');
+  await openContextTab(page);
+
+  const measured = await page.evaluate(() => {
+    const bar = document.querySelector('.atlas-tab-bar') as HTMLElement;
+    if (!bar) throw new Error('no tab bar');
+    const tab = bar.querySelector('.atlas-tab') as HTMLElement;
+    const natural = {
+      vRoom: bar.scrollHeight - bar.clientHeight,
+      barWidthLostToScrollbar: bar.offsetWidth - bar.clientWidth,
+    };
+    // Force the exact rounding condition the artifact needs.
+    tab.style.paddingTop = '8px';
+    const forced = {
+      vRoom: bar.scrollHeight - bar.clientHeight,
+      barWidthLostToScrollbar: bar.offsetWidth - bar.clientWidth,
+    };
+    tab.style.paddingTop = '';
+    return { natural, forced, overflowY: getComputedStyle(bar).overflowY };
+  });
+
+  expect(measured.overflowY).toBe('hidden');
+  expect(measured.natural.vRoom).toBe(0);
+  expect(measured.forced.vRoom).toBe(0);
+  expect(measured.forced.barWidthLostToScrollbar).toBe(0);
+});

@@ -1621,7 +1621,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       const hint = document.createElement('p');
       hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
       hint.append('Publishing to a public URL needs an online world. Use ');
-      hint.appendChild(settingsLink(worldId, 'world', '"Make online" in Settings → World'));
+      // Not "Settings → World": that tab wears the WORLD'S OWN NAME in the
+      // settings nav (Captain, 2026-07-24), so the label named a tab nobody
+      // can see. Describe the destination instead of restating a label that
+      // is computed elsewhere (S323).
+      hint.appendChild(settingsLink(worldId, 'world', '"Make online" in this world\'s settings'));
       hint.append(' first.');
       section.appendChild(hint);
       return section;

@@ -1,0 +1,227 @@
+/**
+ * The narrow-window layer (S323).
+ *
+ * Before this layer the three-pane shell had a ~706px hard floor of pane
+ * min-widths and no media query touching it, inside containers that hide
+ * overflow at every level. Panes did not shrink below the floor, they LEFT
+ * THE SCREEN, with no scrollbar and no affordance: 768 clipped the map pane,
+ * 640 lost the entire right pane, 390 collapsed the guided tour into
+ * unreadable overlap.
+ *
+ * Every other e2e spec in this suite runs at exactly one viewport width, so
+ * the whole class was invisible to 273 passing tests. These assert the thing
+ * that actually matters at each width: is any of it OFF SCREEN, and can the
+ * user still reach it.
+ *
+ * Note what is NOT asserted: that anything "looks right". Playwright counts
+ * off-screen elements as visible, which is precisely how the tour suite ran
+ * green at 390px on a screen no human could read. The assertions here are
+ * geometric (measured boxes against the viewport), and the look was checked
+ * by keeper own-eyes at 1440 / 1024 / 760 / 390 (Notes/ui-snapshots/).
+ */
+
+import { test, expect, Page } from '@playwright/test';
+
+async function freshBoot(page: Page) {
+  await page.goto('/');
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.resetAll(); });
+  await page.goto('/');
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+  await page.waitForSelector('.atlas-shell');
+}
+
+/**
+ * Boot and create a world at DESKTOP width, then narrow to the target.
+ *
+ * Setting up inside a narrow viewport means driving the sidebar controls
+ * while the sidebar is a closed drawer. That is not the story under test:
+ * the real user shrinks a window (or opens a phone) on a world that already
+ * exists. Build wide, then narrow.
+ */
+async function bootThenNarrow(page: Page, root: string, width: number, height: number) {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await freshBoot(page);
+  await setupWorld(page, root);
+  await page.setViewportSize({ width, height });
+  // One frame for the resize listener to stamp the breakpoint classes.
+  await page.waitForTimeout(150);
+}
+
+async function setupWorld(page: Page, root: string) {
+  await page.evaluate(async (dir) => {
+    const api = (window as any).__atlasTestApi;
+    const fsRoot = await navigator.storage.getDirectory();
+    api.setNextDirectory(await fsRoot.getDirectoryHandle(dir, { create: true }));
+  }, root);
+  await page.click('[data-action="setup-atlas"]');
+  await page.waitForSelector('[data-action="create-local"]');
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'narrow world');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+}
+
+/**
+ * The right edge of a locator's box, polled until the 160ms drawer slide has
+ * settled. Reading a boundingBox the instant a class lands measures the
+ * animation's FIRST frame, which reported the drawer still parked off-screen
+ * even though it arrives correctly.
+ */
+async function settledBox(page: Page, selector: string) {
+  let last = { x: NaN, width: NaN };
+  await expect.poll(async () => {
+    const b = await page.locator(selector).boundingBox();
+    if (!b) return 'none';
+    const stable = Math.abs(b.x - last.x) < 0.5;
+    last = { x: b.x, width: b.width };
+    return stable ? 'settled' : 'moving';
+  }, { timeout: 5000, intervals: [80, 80, 80, 120, 200] }).toBe('settled');
+  return last;
+}
+
+/** Nothing anywhere in the shell may sit outside the viewport horizontally. */
+async function horizontalOverflow(page: Page): Promise<number> {
+  return await page.evaluate(() => {
+    const de = document.documentElement;
+    return de.scrollWidth - de.clientWidth;
+  });
+}
+
+test.describe('narrow windows', () => {
+  test('at 1024 the right pane becomes a reachable drawer', async ({ page }) => {
+    await bootThenNarrow(page, 'narrow-1024-root', 1024, 768);
+
+    await expect(page.locator('body')).toHaveClass(/atlas-narrow/);
+    // The sidebar is still a column at this width.
+    await expect(page.locator('body')).not.toHaveClass(/atlas-narrow-sidebar/);
+    expect(await horizontalOverflow(page)).toBe(0);
+
+    const toggle = page.locator('.atlas-room-nav-drawer-btn.is-right');
+    await expect(toggle).toBeVisible();
+
+    // Closed: the pane is parked off the right edge.
+    const closed = await settledBox(page, '.atlas-right');
+    expect(closed.x).toBeGreaterThanOrEqual(1024);
+
+    // Open: fully on screen.
+    await toggle.click();
+    await expect(page.locator('body')).toHaveClass(/atlas-drawer-right-open/);
+    const open = await settledBox(page, '.atlas-right');
+    expect(open.x).toBeGreaterThanOrEqual(0);
+    expect(open.x + open.width).toBeLessThanOrEqual(1024 + 1);
+
+    // Escape closes it, like every other dismissible surface.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('body')).not.toHaveClass(/atlas-drawer-right-open/);
+  });
+
+  test('at 760 both side panes are drawers and the middle keeps the window', async ({ page }) => {
+    await bootThenNarrow(page, 'narrow-760-root', 760, 800);
+
+    await expect(page.locator('body')).toHaveClass(/atlas-narrow-sidebar/);
+    expect(await horizontalOverflow(page)).toBe(0);
+
+    const middle = await page.locator('.atlas-middle').boundingBox();
+    expect(Math.round(middle!.width)).toBe(760);
+
+    const sidebarToggle = page.locator('.atlas-room-nav-drawer-btn.is-sidebar');
+    await expect(sidebarToggle).toBeVisible();
+    await sidebarToggle.click();
+    const drawer = await settledBox(page, '.atlas-sidebar');
+    expect(drawer.x).toBeGreaterThanOrEqual(-1);
+
+    // With a drawer open the scrim covers the nav, so the other toggle is
+    // deliberately not clickable: you dismiss first. (Discovered by this test
+    // timing out on that click, which is the design answering back.)
+    await page.locator('.atlas-drawer-scrim').click();
+    await expect(page.locator('body')).not.toHaveClass(/atlas-drawer-sidebar-open/);
+
+    // Only ONE drawer at a time: two overlapping drawers on a small screen
+    // would leave no middle pane visible at all.
+    await page.locator('.atlas-room-nav-drawer-btn.is-right').click();
+    await expect(page.locator('body')).toHaveClass(/atlas-drawer-right-open/);
+    await expect(page.locator('body')).not.toHaveClass(/atlas-drawer-sidebar-open/);
+  });
+
+  test('at 390 both drawer toggles stay on screen', async ({ page }) => {
+    // The first build of this layer pushed the right toggle to x=404 on a
+    // 390px screen, which would have been this layer reintroducing its own
+    // bug: a control you cannot reach.
+    await bootThenNarrow(page, 'narrow-390-root', 390, 780);
+
+    expect(await horizontalOverflow(page)).toBe(0);
+
+    for (const which of ['is-sidebar', 'is-right']) {
+      const box = await page.locator(`.atlas-room-nav-drawer-btn.${which}`).boundingBox();
+      expect(box, which).not.toBeNull();
+      expect(box!.x, which).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width, which).toBeLessThanOrEqual(390);
+    }
+  });
+
+  test('above the breakpoint nothing changes', async ({ page }) => {
+    await bootThenNarrow(page, 'narrow-wide-root', 1440, 900);
+
+    await expect(page.locator('body')).not.toHaveClass(/atlas-narrow/);
+    await expect(page.locator('.atlas-room-nav-drawer-btn.is-right')).toBeHidden();
+    await expect(page.locator('.atlas-room-nav-drawer-btn.is-sidebar')).toBeHidden();
+
+    // All three panes are columns, side by side, inside the window.
+    const boxes = await Promise.all(
+      ['.atlas-sidebar', '.atlas-middle', '.atlas-right'].map(sel => page.locator(sel).boundingBox()),
+    );
+    expect(boxes[0]!.x).toBeLessThan(boxes[1]!.x);
+    expect(boxes[1]!.x).toBeLessThan(boxes[2]!.x);
+    expect(boxes[2]!.x + boxes[2]!.width).toBeLessThanOrEqual(1441);
+  });
+
+  test('the tour dock fits a phone screen instead of painting over itself', async ({ page }) => {
+    // THE banked launch item. The dock is fixed-height for desktop no-jitter;
+    // at 390 the sentence wraps to six lines and the children overflowed the
+    // box and overlapped. Asserted as geometry: each child below the last,
+    // and the whole dock inside the viewport.
+    await page.setViewportSize({ width: 390, height: 780 });
+    await freshBoot(page);
+    await page.evaluate(async () => {
+      const engine = await import('/src/tour/tour-engine.ts');
+      await (engine as any).launchTour();
+    });
+    await expect(page.locator('.atlas-tour-bar')).toBeVisible();
+    await page.locator('.atlas-tour-root button', { hasText: 'Start' }).click();
+    await expect(page.locator('.atlas-tour-copy')).toBeVisible();
+
+    const geo = await page.evaluate(() => {
+      const bar = document.querySelector('.atlas-tour-bar') as HTMLElement;
+      const box = (sel: string) => {
+        const el = bar.querySelector(sel) as HTMLElement | null;
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom };
+      };
+      // The RENDERED extent of the sentence, not its box. The words are laid
+      // out inside a container with a reserved height and `overflow: visible`,
+      // so when they wrap past that height they PAINT OUTSIDE IT while the
+      // box stays exactly as tall as it was told to be. Comparing boxes said
+      // everything was fine on a screen where the text was unreadable, which
+      // is this suite's own founding lesson wearing a new hat.
+      const words = Array.from(bar.querySelectorAll('.atlas-tour-word'));
+      const inkBottom = words.reduce((m, w) => Math.max(m, w.getBoundingClientRect().bottom), 0);
+      const r = bar.getBoundingClientRect();
+      return {
+        barTop: r.top, barBottom: r.bottom, vh: window.innerHeight,
+        inkBottom,
+        sentence: box('.atlas-tour-sentence'),
+        copy: box('.atlas-tour-copy'),
+        controls: box('.atlas-tour-controls'),
+      };
+    });
+
+    expect(geo.barTop).toBeGreaterThanOrEqual(0);
+    expect(geo.barBottom).toBeLessThanOrEqual(geo.vh + 1);
+    // The overlap that shipped: the sentence's WORDS ran over the copy.
+    expect(geo.inkBottom).toBeGreaterThan(0);
+    expect(geo.inkBottom).toBeLessThanOrEqual(geo.copy!.top + 1);
+    expect(geo.copy!.bottom).toBeLessThanOrEqual(geo.controls!.top + 1);
+  });
+});

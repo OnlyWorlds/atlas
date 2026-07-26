@@ -56,6 +56,85 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.1',
+    date: '2026-07-26',
+    theme: 'the first sweep after launch',
+    entries: [
+      {
+        id: 'writing-save-on-leaving-room',
+        title: 'Writing no longer loses the last thing you typed',
+        body: 'Leaving the writing room within a second of typing could discard those words, because the save was addressed to whatever the page was showing rather than to the text you wrote. It now goes to the right narrative every time.',
+        tags: ['writing', 'fix'],
+      },
+      {
+        id: 'light-mode-map-labels',
+        title: 'Map pin labels are readable in light mode',
+        body: 'Pin labels and their hover tooltips were white text on a white chip. They now keep a dark chip in both themes, the way map chrome should.',
+        tags: ['maps', 'light mode', 'fix'],
+      },
+      {
+        id: 'light-mode-page-preview',
+        title: 'Page previews show what a visitor will actually see',
+        body: 'A dark page previewed as a light page while the app was in light mode, so the preview and the published page disagreed. The page now keeps its own look regardless of your theme.',
+        tags: ['sharing', 'light mode', 'fix'],
+      },
+      {
+        id: 'header-long-names',
+        title: 'Long element names no longer push the delete button off screen',
+        body: 'A long name filled the header and clipped the controls beside it. The name shortens with an ellipsis instead.',
+        tags: ['elements', 'fix'],
+      },
+      {
+        id: 'pane-divider-clamp',
+        title: 'Dragging a pane divider keeps the third pane on screen',
+        body: 'Widening the middle pane far enough used to push the right pane past the window edge, taking the map controls with it, and the layout was remembered. It now stops at the point where all three panes still fit.',
+        tags: ['layout', 'fix'],
+      },
+      {
+        id: 'delete-confirm-unknown',
+        title: 'Deletes always ask when atlas cannot tell what else would go',
+        body: 'If the check for dependent elements failed, a delete could proceed silently and still cascade. It now confirms and says the check did not complete.',
+        tags: ['elements', 'safety'],
+      },
+      {
+        id: 'world-open-failure-keeps-entry',
+        title: 'A failed world open no longer removes the world from your list',
+        body: 'Any error naming a missing file was read as the whole folder being gone, which dropped the world and its saved access. Atlas now checks the folder itself before removing anything.',
+        tags: ['worlds', 'safety'],
+      },
+      {
+        id: 'sync-pill-unsticks',
+        title: 'The sync indicator no longer sticks on Saving',
+        body: 'A disk error during a sync round could leave the indicator reading Saving for the rest of the session, which also blocked the refresh button. It returns to idle now.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'first-load-lighter',
+        title: 'Lighter first load',
+        body: 'The OnlyWorlds mark shipped at 4748 pixels square to draw a 15 pixel icon, and the social card image was cached for offline use though the app never asks for it. Together that is about half a megabyte off a first visit.',
+        tags: ['performance'],
+      },
+      {
+        id: 'narrow-window-layer',
+        title: 'Atlas works in a narrow window',
+        body: 'The three panes needed about 700 pixels of width, and below that the side panes went off screen with no way to reach them. On a narrow window or a phone they now become drawers you open from the top bar, and the middle pane keeps the whole width.',
+        tags: ['layout'],
+      },
+      {
+        id: 'tour-on-a-phone',
+        title: 'The guided tour is readable on a phone',
+        body: 'On a narrow screen the tour panel could not grow to fit its own text, so the sentence and the step notes printed on top of each other. The panel now sizes to its content and scrolls.',
+        tags: ['tour', 'fix'],
+      },
+      {
+        id: 'honest-browser-copy',
+        title: 'Clearer wording about which browsers can open folders',
+        body: 'The landing told phone visitors on Chrome that they needed Chrome. It now names the real requirement, a desktop Chromium browser, and offers the tour and an example page to everyone else.',
+        tags: ['copy'],
+      },
+    ],
+  },
+  {
     version: '1.0',
     date: '2026-07-24',
     theme: 'the folder is the world',

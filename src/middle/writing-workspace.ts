@@ -82,6 +82,20 @@ const PROSE_FONT_STACKS: Record<'sans' | 'serif' | 'slab' | 'mono', string> = {
   mono: `ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', Consolas, 'Liberation Mono', monospace`,
 };
 
+/**
+ * A prose write in flight. `id` is the narrative the text was typed into and
+ * `baseline` is what was last known saved for THAT narrative — both captured
+ * when the save was scheduled, never re-derived later. The route, the mounted
+ * editor and the workspace itself may all have moved on by the time this
+ * lands; none of them are consulted (S323).
+ */
+type PendingWrite = {
+  id: string;
+  baseline: string | null;
+  markdown: string;
+  json: JSONContent;
+};
+
 export function mountWritingWorkspace(target: HTMLElement): () => void {
   target.innerHTML = '';
   const root = document.createElement('div');
@@ -95,7 +109,13 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   let mountedForId: string | null = null;
   let lastSavedMarkdown: string | null = null;
   let pendingSaveTimer: number | null = null;
-  let pendingSnapshot: { markdown: string; json: JSONContent } | null = null;
+  /**
+   * The pending write carries the id of the narrative the text CAME FROM, and
+   * the baseline it was typed against. Both are captured at schedule time, so
+   * a flush that runs after the route has already moved still writes to the
+   * right element (S323 — the room-exit data-loss class; see persistSnapshot).
+   */
+  let pendingSnapshot: PendingWrite | null = null;
   // Track last-seen elements array reference so we only rebuild the autolink
   // index (and dispatch a tx) when state.data.elements actually swaps.
   let lastSeenElementsRef: Element[] | null = null;
@@ -273,7 +293,9 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   }
 
   function scheduleSave(snapshot: { markdown: string; json: JSONContent }): void {
-    pendingSnapshot = snapshot;
+    // Address the write NOW, while we still know who it belongs to.
+    if (mountedForId === null) return;
+    pendingSnapshot = { id: mountedForId, baseline: lastSavedMarkdown, ...snapshot };
     if (pendingSaveTimer !== null) {
       window.clearTimeout(pendingSaveTimer);
     }
@@ -313,7 +335,12 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     if (editorHandle && mountedForId !== null && !pendingSnapshot) {
       const markdown = editorHandle.getMarkdown();
       if (lastSavedMarkdown !== null && markdown !== lastSavedMarkdown) {
-        pendingSnapshot = { markdown, json: editorHandle.getJson() };
+        pendingSnapshot = {
+          id: mountedForId,
+          baseline: lastSavedMarkdown,
+          markdown,
+          json: editorHandle.getJson(),
+        };
       }
     }
     void flushPendingSave();
@@ -340,14 +367,31 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     }
   }
 
-  async function persistSnapshot(snap: { markdown: string; json: JSONContent }): Promise<void> {
-    const el = getActiveNarrative();
-    if (!el || el.id !== mountedForId) return;
+  /**
+   * Write a pending snapshot to the element it came from.
+   *
+   * This used to resolve its target from the LIVE url (`getActiveNarrative()`)
+   * and bail when that disagreed with the mounted editor. Both readings move
+   * before the flush does: leaving the writing room empties the route of any
+   * narrative id, so the lookup returned null and the guard dropped the write
+   * — and `flushPendingSave` had already cleared `pendingSnapshot`, so the
+   * text was gone from the editor, from state and from disk, silently. Atlas
+   * has no undo. (S323, reproduced live: type, then click another room inside
+   * the debounce window.)
+   *
+   * The write is now addressed by the id captured at schedule time, so the
+   * route and the mounted editor are simply not consulted.
+   */
+  async function persistSnapshot(snap: PendingWrite): Promise<void> {
+    const el = getState().data.elements.find(e => e.id === snap.id) ?? null;
+    if (!el) return; // deleted out from under us — nothing to write to
     const folder = getActiveStore();
     if (!folder) return;
 
-    // Skip no-op writes — markdown unchanged from last save.
-    if (lastSavedMarkdown !== null && snap.markdown === lastSavedMarkdown) return;
+    // Skip no-op writes — markdown unchanged from what THIS narrative last
+    // saved (the baseline travels with the snapshot; `lastSavedMarkdown` may
+    // already belong to a different narrative by now).
+    if (snap.baseline !== null && snap.markdown === snap.baseline) return;
 
     const relationPatch = computeRelationPatch(el, snap.markdown);
     const patch: Partial<Element> = {
@@ -357,8 +401,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     };
 
     try {
-      await folder.updateElement(el.id, patch);
-      lastSavedMarkdown = snap.markdown;
+      await folder.updateElement(snap.id, patch);
+      // Only advance the mount's baseline if this write BELONGS to the
+      // currently mounted narrative — a late flush for the previous one must
+      // not tell the new editor its text is already saved.
+      if (mountedForId === snap.id) lastSavedMarkdown = snap.markdown;
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
       // Save-state indicator no longer rendered here — the element-header's
@@ -696,19 +743,24 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   render();
 
   return () => {
-    // Cleanup contract is synchronous, but the folder write inside
-    // persistSnapshot is async. We initiate the write FIRST (with a defensive
-    // snapshot capture in case onUpdate hasn't run for the latest transaction),
-    // then run the rest of the teardown. persistSnapshot reads its inputs
-    // through closure-captured locals (folder, lastSavedMarkdown), so the
-    // write itself completes after teardown without depending on still-alive
-    // workspace state. teardownEditor nulls `mountedForId`, but that check in
-    // persistSnapshot runs BEFORE the first `await`, so the in-flight write
-    // proceeds even though new persists won't.
+    // Cleanup is synchronous, the folder write inside persistSnapshot is not.
+    // We initiate the write FIRST (with a defensive snapshot capture in case
+    // onUpdate has not run for the latest transaction), then tear down. The
+    // write carries its own target id and baseline, so it completes correctly
+    // after teardown has nulled `mountedForId` and after the route has already
+    // moved to another room — which is exactly the case that used to lose it
+    // (S323). This comment previously claimed the pre-await guard made the
+    // in-flight write safe; it did not, because the other half of that guard
+    // read the live url. Addressing the write fixed it; the claim is now true.
     if (editorHandle && mountedForId !== null && !pendingSnapshot) {
       const markdown = editorHandle.getMarkdown();
       if (lastSavedMarkdown !== null && markdown !== lastSavedMarkdown) {
-        pendingSnapshot = { markdown, json: editorHandle.getJson() };
+        pendingSnapshot = {
+          id: mountedForId,
+          baseline: lastSavedMarkdown,
+          markdown,
+          json: editorHandle.getJson(),
+        };
       }
     }
     void flushPendingSave();

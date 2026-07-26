@@ -74,6 +74,31 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+/**
+ * The right pane's floor, in real pixels — it must match `.atlas-right`'s
+ * `min-width` in atlas.css, plus the divider it sits behind.
+ *
+ * Why pixels: the dividers clamp in FRACTIONS while the pane clamps in
+ * PIXELS, and the two disagree on any window narrow enough for the fraction
+ * to fall below the min-width. Dragging the middle divider right on a 1280
+ * laptop used to push the shell past the viewport — `overflow: hidden` then
+ * clipped the map's right-anchored controls (the pin trash, the zones
+ * dropdown) off-screen with no scrollbar and no cue, and the ratio persists,
+ * so the broken state survived a reload (S323).
+ */
+export const RIGHT_PANE_MIN_PX = 240 + 3;
+
+/**
+ * The largest middle fraction that still leaves the right pane its pixel
+ * floor. Returns the caller's own cap when the window is wide enough for the
+ * fraction limits to bind first.
+ */
+export function middleCapFor(shellWidthPx: number, sidebarFraction: number, fractionCap: number): number {
+  if (shellWidthPx <= 0) return fractionCap;
+  const available = shellWidthPx - shellWidthPx * sidebarFraction - RIGHT_PANE_MIN_PX;
+  return Math.min(fractionCap, Math.max(0.2, available / shellWidthPx));
+}
+
 export function mountAppShell(container: HTMLElement): AppShell {
   container.innerHTML = '';
 
@@ -141,11 +166,17 @@ export function mountAppShell(container: HTMLElement): AppShell {
   }
   applyRatios();
 
+  // Both dividers end by squeezing the SAME pane, so both run the same pixel
+  // cap. They used to carry different fraction guards (0.85 here, 0.88 below)
+  // and neither knew about the right pane's 240px floor.
   attachDivider(divider1, shell, (clientX) => {
     const rect = shell.getBoundingClientRect();
     const fraction = (clientX - rect.left) / rect.width;
-    ratios = { sidebar: clamp(fraction, 0.12, 0.40), middle: ratios.middle };
-    if (ratios.sidebar + ratios.middle > 0.85) ratios.middle = 0.85 - ratios.sidebar;
+    const sidebarNext = clamp(fraction, 0.12, 0.40);
+    ratios = {
+      sidebar: sidebarNext,
+      middle: Math.min(ratios.middle, middleCapFor(rect.width, sidebarNext, 0.70)),
+    };
     applyRatios();
   }, () => saveRatios(ratios));
 
@@ -154,10 +185,23 @@ export function mountAppShell(container: HTMLElement): AppShell {
     const sidebarPx = rect.width * ratios.sidebar;
     const middlePx = clientX - rect.left - sidebarPx;
     const middleFraction = middlePx / rect.width;
-    ratios = { sidebar: ratios.sidebar, middle: clamp(middleFraction, 0.20, 0.70) };
-    if (ratios.sidebar + ratios.middle > 0.88) ratios.middle = 0.88 - ratios.sidebar;
+    ratios = {
+      sidebar: ratios.sidebar,
+      middle: clamp(middleFraction, 0.20, middleCapFor(rect.width, ratios.sidebar, 0.70)),
+    };
     applyRatios();
   }, () => saveRatios(ratios));
+
+  // A stored ratio that fits at 1920 can overflow at 1280, so re-clamp when
+  // the window changes rather than only when a divider is dragged.
+  window.addEventListener('resize', () => {
+    const rect = shell.getBoundingClientRect();
+    const capped = Math.min(ratios.middle, middleCapFor(rect.width, ratios.sidebar, 0.70));
+    if (Math.abs(capped - ratios.middle) > 0.0005) {
+      ratios = { sidebar: ratios.sidebar, middle: capped };
+      applyRatios();
+    }
+  });
 
   function resetRatios(): void {
     ratios = { ...DEFAULT_RATIOS };

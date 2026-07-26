@@ -711,7 +711,13 @@ export const TOUR_STEPS: readonly TourStep[] = [
       // (S306) — copy naming a control is a behavioural claim.
       // The buttons say what is available; the prose no longer guesses.
       body:
-        'That\'s the tour. Each room\'s help icon in the footer has more.' +
+        // S323: this used to send the finisher to "each room's help icon in
+        // the footer". A finisher without an atlas root lands on the
+        // pre-root screen, where `.atlas-preroot .atlas-sidebar` is hidden —
+        // footer, help icon and all. Same class as the control-naming bug the
+        // comment above already describes, one line further down: the copy
+        // named chrome that the landing state does not render.
+        'That\'s the tour. Every room has a help icon once you open a world.' +
         '\nQuestions, bugs and feature requests are welcome: through [Discord](https://discord.gg/twCjqvVBwb), ' +
         'the [feedback tracker](https://github.com/OnlyWorlds/feedback), or email at info@onlyworlds.com.',
       meta: 'The tour world leaves nothing behind. Replay it anytime from settings.',

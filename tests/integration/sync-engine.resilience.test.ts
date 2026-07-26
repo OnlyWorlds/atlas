@@ -157,3 +157,34 @@ describe('SyncEngine push resilience — per-element failures', () => {
     expect(client.__server_get('character', e2.id)).toBeDefined();
   });
 });
+
+/**
+ * S323 — a throw in the META step must not pin the engine at 'syncing'.
+ *
+ * `executeMetaStep` does real disk I/O and ran outside any try on all three
+ * round entry points, while the push and pull PHASES each had an idle-restore
+ * with a comment explaining why. So a dead directory handle during the meta
+ * step left `activeSync` reading 'syncing' for the whole session: the pill
+ * says "Saving…" forever, the manual pull button no-ops on
+ * `kind === 'syncing'`, and the auto-pull scheduler skips every tick as busy.
+ * The engine's own source named this hole and deferred it before release.
+ *
+ * Asserted on the STATE the UI reads, not on the throw, because the stuck
+ * state is the damage. This is the S308 class in its third location:
+ * hardening applied to one side of a symmetric surface is a defect class.
+ */
+describe('meta-step failure leaves the engine usable', () => {
+  for (const entry of ['pushOnce', 'pullNow', 'syncNow'] as const) {
+    it(`restores idle when the meta step throws during ${entry}`, async () => {
+      await folder.createElement('character', { name: 'Mona' });
+      // The first thing executeMetaStep touches on disk.
+      folder.readSyncState = async () => { throw new Error('directory handle is dead'); };
+
+      await expect((engine as unknown as Record<string, () => Promise<unknown>>)[entry]()).rejects.toThrow();
+
+      // The pill, the manual pull button and the auto-pull scheduler all read
+      // this one field.
+      expect(engine.getState().kind).toBe('idle');
+    });
+  }
+});

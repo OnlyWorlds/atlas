@@ -1311,3 +1311,116 @@ test('compiled view counts the whole assembled tree, not zero', async ({ page })
   await expect(page.locator('.atlas-writing-workspace-wc')).toContainText('12 words');
   await expect(page.locator('.atlas-writing-workspace-wc')).not.toContainText('0 words');
 });
+
+/**
+ * S323 — the room-exit data-loss class.
+ *
+ * `persistSnapshot` used to resolve its write target from the LIVE url and
+ * bail when that disagreed with the mounted editor. Leaving the writing room
+ * empties the route of any narrative id, so the lookup returned null, the
+ * guard dropped the write, and `flushPendingSave` had already cleared the
+ * pending snapshot — the text was gone from the editor, from state and from
+ * disk, with no toast. Atlas has no undo.
+ *
+ * The gesture matters: switching to another narrative INSIDE the tree always
+ * worked (the route still carries a narrative id), so a test built on that
+ * route passes against the broken code. This drives the gesture that actually
+ * lost text — type, then click another ROOM inside the debounce window.
+ *
+ * Revert-checked: restoring the `getActiveNarrative()`-derived guard fails
+ * this test on the disk assertion.
+ */
+test('prose typed before leaving the writing ROOM still reaches disk', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-roomexit-root');
+  await createWorld(page, 'room exit world');
+
+  const id = await createElement(page, 'narrative', {
+    name: 'Exit Chapter',
+    supertype: 'Book',
+    story: 'first line.',
+  });
+  await markWritingInitialized(page);
+
+  // Widen the debounce so the flush is genuinely pending when we navigate —
+  // this is a real user-facing setting, not a test hook, and the default
+  // (1000ms) is reachable by any fast typist.
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const reg = JSON.parse(JSON.stringify(api.getState().registry));
+    reg.sync_debounce_ms = 8000;
+    api.patchSlice('registry', reg);
+  });
+
+  await gotoWriting(page, id);
+  await waitForEditor(page);
+
+  const prose = page.locator('.atlas-writing-workspace-prose .ProseMirror');
+  await prose.click();
+  await page.keyboard.press('End');
+  await prose.pressSequentially(' canary text');
+
+  // Leave the room while the save is still pending.
+  await page.locator('.atlas-room-nav-btn[data-room="home"]').click();
+  await expect(page.locator('.atlas-writing-workspace')).toHaveCount(0);
+
+  // The write is addressed to the element it came from, so it lands even
+  // though the route no longer names any narrative.
+  await expect.poll(async () => await page.evaluate(async (nid) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    if (!store) return '';
+    const els = await store.listElements();
+    return (els.find((e: any) => e.id === nid)?.story as string) ?? '';
+  }, id), { timeout: 15000 }).toContain('canary text');
+});
+
+/**
+ * The other half of the same contract: a late write for the PREVIOUS
+ * narrative must not touch the one now open, and must not tell the new
+ * editor its text is already saved (the baseline travels with the snapshot).
+ */
+test('switching narratives saves the old one without polluting the new one', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-switch-root');
+  await createWorld(page, 'switch world');
+
+  const alpha = await createElement(page, 'narrative', {
+    name: 'Alpha Book', supertype: 'Book', story: 'alpha start.',
+  });
+  const beta = await createElement(page, 'narrative', {
+    name: 'Beta Book', supertype: 'Book',
+  });
+  await markWritingInitialized(page);
+
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const reg = JSON.parse(JSON.stringify(api.getState().registry));
+    reg.sync_debounce_ms = 8000;
+    api.patchSlice('registry', reg);
+  });
+
+  await gotoWriting(page, alpha);
+  await waitForEditor(page);
+  const prose = page.locator('.atlas-writing-workspace-prose .ProseMirror');
+  await prose.click();
+  await page.keyboard.press('End');
+  await prose.pressSequentially(' alpha canary');
+
+  await page.locator('.atlas-writing-tree-name', { hasText: 'Beta Book' }).click();
+  await expect(page).toHaveURL(new RegExp(`/writing/${beta}`));
+
+  const stories = async () => await page.evaluate(async (ids) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    if (!store) return { a: '', b: '' };
+    const els = await store.listElements();
+    return {
+      a: (els.find((e: any) => e.id === ids.alpha)?.story as string) ?? '',
+      b: (els.find((e: any) => e.id === ids.beta)?.story as string) ?? '',
+    };
+  }, { alpha, beta });
+
+  await expect.poll(async () => (await stories()).a, { timeout: 15000 }).toContain('alpha canary');
+  expect((await stories()).b).toBe('');
+});

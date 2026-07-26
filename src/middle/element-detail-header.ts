@@ -892,12 +892,21 @@ async function onDelete(el: Element): Promise<void> {
   // inside the preference branch) because the cascade is what decides whether
   // we ask at all.
   let dependents: Element[] = [];
+  let dependentsUnknown = false;
   try {
     dependents = await store.findDependents(el.id);
-  } catch { /* fall through with none — a failed probe must not block a delete */ }
+  } catch (probeErr) {
+    // A failed probe must not BLOCK the delete, but it must not be read as
+    // "nothing depends on this" either: an empty list switches off the
+    // cascade confirm floor, so a thrown probe used to make a subtree delete
+    // silent whenever the confirm preference was off (S323).
+    console.error('[element-detail-header] dependents probe failed', probeErr);
+    dependentsUnknown = true;
+  }
   const decision = decideDeleteConfirm({
     el,
     dependents,
+    dependentsUnknown,
     allElements: getState().data.elements,
     labels: getWritingLabels(getState().active?.worldId ?? ''),
     confirmPref: getEditorSettings(getState().registry).confirm_before_delete,

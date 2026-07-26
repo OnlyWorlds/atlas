@@ -167,3 +167,50 @@ describe('copy hygiene', () => {
     expect(d.message).toBe('Delete "abc-123"?');
   });
 });
+
+/**
+ * S323 — "we could not look" is not "there is nothing there".
+ *
+ * `findDependents` can throw. The caller swallowed it and passed an empty
+ * array, which makes `cascades` false, which switches OFF the S310 confirm
+ * floor — so with `confirm_before_delete` turned off, a failed probe deleted
+ * a whole subtree with no prompt at all, while the store went on cascading by
+ * default. The unknown case now always asks and says why.
+ */
+describe('unknown blast radius', () => {
+  it('confirms even when the preference is off and the list came back empty', () => {
+    const d = decideDeleteConfirm({
+      el: MANUSCRIPT[0],
+      dependents: [],
+      dependentsUnknown: true,
+      allElements: MANUSCRIPT,
+      labels: L,
+      confirmPref: false,
+    });
+    expect(d.needed).toBe(true);
+    expect(d.cascades).toBe(true);
+  });
+
+  it('says plainly that the check failed rather than implying nothing else dies', () => {
+    const d = decideDeleteConfirm({
+      el: MANUSCRIPT[0],
+      dependents: [],
+      dependentsUnknown: true,
+      allElements: MANUSCRIPT,
+      labels: L,
+      confirmPref: true,
+    });
+    expect(d.message).toContain('could not check');
+    expect(d.message).toContain('This cannot be undone.');
+    expect(d.message).not.toContain('—');
+  });
+
+  it('is not triggered on a successful probe that genuinely found nothing', () => {
+    const lone = { id: 'lone-1', type: 'character', name: 'Alone' } as unknown as Element;
+    const d = decideDeleteConfirm({
+      el: lone, dependents: [], allElements: [lone], labels: L, confirmPref: false,
+    });
+    expect(d.needed).toBe(false);
+    expect(d.cascades).toBe(false);
+  });
+});

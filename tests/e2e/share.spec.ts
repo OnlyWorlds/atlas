@@ -631,3 +631,67 @@ test('prose selection bubble: bold + link-to-existing with preserved label (alia
   await expect(page.locator('.atlas-prose-context-menu-item', { hasText: 'Link to existing element' })).toBeVisible();
   await page.keyboard.press('Escape');
 });
+
+/**
+ * S323 — the preview must show the ARTIFACT, not the app theme.
+ *
+ * A page carries its own `data-mode`; the app carries a separate theme. Dark
+ * had no CSS rules at all until now — it was inherited free from a shell that
+ * was always dark — so once light mode shipped, a dark page previewed as dark
+ * ink on light paper while the same payload rendered correctly dark in the
+ * `show` viewer. The preview was showing a different artifact than the one
+ * that publishes, which is the one thing a payload-true preview may not do.
+ *
+ * Asserted as an OUTCOME (measured luminance of the rendered article) rather
+ * than a restatement of the CSS, and in BOTH themes so the dark path cannot
+ * silently drift either.
+ */
+test('a dark page previews dark even while the app is in light mode', async ({ page }) => {
+  await setupWorld(page);
+  await createElement(page, 'character', { name: 'Ireena', description: 'The daughter.' });
+
+  await openShare(page);
+  await page.click('button.atlas-share-new');
+  await page.click('.atlas-share-block-add-btn:has-text("+ element")');
+  await page.locator('.atlas-picker-row', { hasText: 'Ireena' }).click();
+  await page.click('.atlas-share-block-done');
+  await page.click('.atlas-share-preview-toggle');
+
+  const article = page.locator('.atlas-share-page-view');
+  await expect(article).toHaveAttribute('data-mode', 'dark');
+
+  const read = async () => await article.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    const value = el.querySelector('.atlas-share-card-field-value');
+    const lum = (c: string) => {
+      const m = c.match(/\d+(\.\d+)?/g);
+      if (!m) return -1;
+      return (Number(m[0]) * 0.299 + Number(m[1]) * 0.587 + Number(m[2]) * 0.114);
+    };
+    return {
+      bgLum: lum(cs.backgroundColor),
+      textLum: lum(cs.color),
+      fieldLum: value ? lum(getComputedStyle(value).color) : -1,
+    };
+  });
+
+  // Dark theme: the article and every token-driven descendant read light-on-dark.
+  const inDark = await read();
+  expect(inDark.bgLum).toBeLessThan(40);
+  expect(inDark.textLum).toBeGreaterThan(150);
+  expect(inDark.fieldLum).toBeGreaterThan(150);
+
+  // Flip the APP to light. The page is still a dark page.
+  await page.evaluate(() => {
+    localStorage.setItem('atlas_theme', 'light');
+    document.documentElement.setAttribute('data-theme', 'light');
+  });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  const inLight = await read();
+  expect(inLight.bgLum).toBeLessThan(40);
+  expect(inLight.textLum).toBeGreaterThan(150);
+  // The token-driven card field is the one the triplet re-pin alone missed:
+  // the light block defines --atlas-text as a flat literal.
+  expect(inLight.fieldLum).toBeGreaterThan(150);
+});

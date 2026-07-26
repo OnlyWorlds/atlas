@@ -10,6 +10,7 @@
  */
 
 import { mountAppShell, AppShell } from './layout/app-shell';
+import { installNarrowLayout } from './layout/narrow-layout';
 import { mountSidebar } from './sidebar/sidebar';
 import { mountWelcomePanel } from './middle/welcome-panel';
 import { mountSettingsPanel } from './middle/settings-panel';
@@ -82,6 +83,11 @@ export function startApp(container: HTMLElement): AppHandle {
 
   // Mount shell.
   const shell = mountAppShell(container);
+
+  // Narrow-window layer (S323): stamps the breakpoint classes that turn the
+  // side panes into drawers below 1100 / 820px. Must run before the first
+  // paint of the nav so its drawer toggles read the right state.
+  installNarrowLayout();
 
   // Guided tour (2026-07-19): lazy — the chunk loads only when a persisted
   // tour is active. ensureTourBar mounts/unmounts on tour-state changes; the

@@ -47,9 +47,10 @@ function renderEntry(entry: ChangelogEntry): string {
     .join('');
   const body = entry.body ? `<p class="cl-entry-body">${esc(entry.body)}</p>` : '';
   const credit = entry.credit ? `<div class="cl-entry-credit">${renderCredit(entry.credit)}</div>` : '';
-  const communityAttr = entry.credit ? ' data-community="1"' : '';
+  // No `data-community` hook: its only consumer was the unrendered filter,
+  // removed in S323. The credit itself still renders, visibly, below.
   return `
-        <li class="cl-entry" id="${esc(entry.id)}"${communityAttr}>
+        <li class="cl-entry" id="${esc(entry.id)}">
           <div class="cl-entry-head">
             <a class="cl-entry-anchor" href="#${esc(entry.id)}" aria-label="link to this change">#</a>
             <h3 class="cl-entry-title">${esc(entry.title)}</h3>
@@ -108,24 +109,13 @@ const STYLE = `
   .cl-brand a { text-decoration: none; }
   .cl-brand .cl-slash { color: var(--cl-dim); font-weight: 400; margin: 0 2px; }
   .cl-brand .cl-word { color: var(--cl-cyan); }
-  .cl-tagline { color: var(--cl-soft); margin: 10px 0 0; font-size: 14.5px; }
-
-  .cl-toolbar {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--cl-line);
-  }
-  .cl-community-stat { color: var(--cl-soft); font-size: 13px; }
-  .cl-community-stat b { color: var(--cl-ink); font-weight: 600; }
-  .cl-filters { display: inline-flex; gap: 6px; margin-left: auto; }
-  .cl-filter {
-    appearance: none; border: 1px solid var(--cl-line); background: transparent;
-    color: var(--cl-soft); font: inherit; font-size: 12.5px; text-transform: lowercase;
-    padding: 4px 12px; border-radius: 999px; cursor: pointer; transition: all 120ms ease;
-  }
-  .cl-filter:hover { color: var(--cl-ink); border-color: var(--cl-soft); }
-  .cl-filter[aria-pressed='true'] {
-    color: var(--cl-cyan); border-color: var(--cl-cyan); background: var(--cl-cyan-soft);
-  }
+  /* S323: the masthead toolbar (community stat + an all/community filter
+     pair) had a full set of styles, a body.cl-filtered mechanism and a
+     per-entry data-community hook, and was never rendered by any code path.
+     Removed rather than built: there is one credited entry in the whole log,
+     so a filter would be chrome standing in front of a single result. The
+     styles are in git if community entries ever earn the toolbar back.
+     NOTE: this block lives inside a template literal, so no backticks. */
 
   .cl-release { margin-top: 44px; }
   .cl-release-head {
@@ -176,10 +166,6 @@ const STYLE = `
     0% { box-shadow: 0 0 0 1px var(--cl-cyan), 0 0 40px rgba(34, 211, 238, 0.5); }
     100% { box-shadow: 0 0 0 1px var(--cl-cyan), 0 0 28px rgba(34, 211, 238, 0.22); }
   }
-
-  /* Community filter (progressive enhancement; no JS => all entries show). */
-  body.cl-filtered .cl-entry:not([data-community]) { display: none; }
-  body.cl-filtered .cl-release:not(:has(.cl-entry[data-community])) { display: none; }
 
   .cl-foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--cl-line); color: var(--cl-dim); font-size: 12.5px; }
   .cl-foot a { color: var(--cl-soft); text-decoration: none; }

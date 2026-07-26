@@ -111,11 +111,27 @@ describe('renderChangelogFeed — the RSS half (S318)', () => {
     expect(xml).not.toContain('<b>');
   });
 
-  it('the seed data is the fresh v1: exactly one release, launch-dated', () => {
-    // Captain's S318 ruling — one clean v1.0 block, ready to changelog on
-    // top of. A second release reappearing here should be a conscious act.
-    expect(CHANGELOG.length).toBe(1);
-    expect(CHANGELOG[0].version).toBe('1.0');
-    expect(CHANGELOG[0].date).toBe('2026-07-24');
+  it('keeps the launch block intact at the bottom of the log', () => {
+    // Captain's S318 ruling seeded ONE clean v1.0 block, and this test used to
+    // pin the count at 1 as a tripwire: "a second release reappearing here
+    // should be a conscious act." S323 is that conscious act (the first
+    // post-launch sweep shipped as 1.1), so the assertion moves from "there is
+    // only one" to what actually has to stay true: v1.0 is the oldest entry,
+    // still dated launch day, and releases run newest-first.
+    const launch = CHANGELOG[CHANGELOG.length - 1];
+    expect(launch.version).toBe('1.0');
+    expect(launch.date).toBe('2026-07-24');
+    const dates = CHANGELOG.map(r => r.date);
+    expect([...dates].sort().reverse()).toEqual(dates);
+  });
+
+  it('every entry id is unique across the whole log (they are permalinks)', () => {
+    const ids = CHANGELOG.flatMap(r => r.entries.map(e => e.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('no entry copy carries an em-dash (voice law)', () => {
+    const copy = CHANGELOG.flatMap(r => [r.theme, ...r.entries.flatMap(e => [e.title, e.body ?? ''])]);
+    expect(copy.filter(s => s.includes('—'))).toEqual([]);
   });
 });

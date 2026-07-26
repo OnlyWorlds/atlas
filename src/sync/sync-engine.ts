@@ -358,7 +358,7 @@ export class SyncEngine {
       message: this.lastAuthReason === 'key_revoked'
         ? 'this world\'s access key was revoked. Reopen it from the sidebar, or unlink'
         : this.lastAuthReason === 'read_only_key'
-          ? 'this world\'s access key is read-only — edits can\'t sync. Reopen it from the sidebar with a write key, or unlink'
+          ? 'this world\'s access key is read-only, so edits can\'t sync. Reopen it from the sidebar with a write key, or unlink'
           : 'authentication failed. Verify pin in settings, test connection, or unlink',
       recoverable: true,
     });
@@ -660,6 +660,35 @@ export class SyncEngine {
    * Baseline advances PER-FIELD (sent + applied only), so server changes to
    * fields we didn't touch still surface next round.
    */
+  /**
+   * The meta step, with the same idle-restore the push and pull phases carry.
+   *
+   * `executeMetaStep` does real disk I/O (readSyncState, readWorldMeta,
+   * writeWorldMeta, updateSyncState), all of which throw when the directory
+   * handle dies. It ran outside any try on all three round entry points, so a
+   * throw left `activeSync` pinned at 'syncing' for the life of the session:
+   * the pill reads "Saving…" forever, the manual pull button silently no-ops
+   * on `cur?.kind === 'syncing'`, and the auto-pull scheduler skips every
+   * tick as busy. The code named this hole itself and deferred it days before
+   * release; this closes it (S323).
+   *
+   * The throw still propagates — callers decide what to surface. Only the
+   * stuck STATE is fixed.
+   */
+  private async executeMetaStepGuarded(opts?: { skipIfLocalClean?: boolean }): Promise<{
+    meta_pushed: string[];
+    meta_pulled: string[];
+    failures: PerElementFailure[];
+    auth_blocked: boolean;
+  }> {
+    try {
+      return await this.executeMetaStep(opts);
+    } catch (err) {
+      this.setState({ kind: 'idle', last_sync_at: null });
+      throw err;
+    }
+  }
+
   private async executeMetaStep(opts?: { skipIfLocalClean?: boolean }): Promise<{
     meta_pushed: string[];
     meta_pulled: string[];
@@ -915,7 +944,7 @@ export class SyncEngine {
     // skipIfLocalClean: when local meta matches the baseline there is nothing
     // to carry, and the server GET is skipped (element-edit autosaves are the
     // overwhelmingly common push round).
-    const meta = await this.executeMetaStep({ skipIfLocalClean: true });
+    const meta = await this.executeMetaStepGuarded({ skipIfLocalClean: true });
     if (meta.auth_blocked) {
       this.setAuthError();
       const result: SyncResult = {
@@ -938,9 +967,6 @@ export class SyncEngine {
       this.setState({ kind: 'idle', last_sync_at: null });
       throw err;
     }
-    // STILL OPEN, both paths: executeMetaStep above is unguarded here and in
-    // runPullOnly. Same class, lower traffic; deliberately not widened days
-    // before release.
     // Only persist under pause-and-review. Under local-wins, conflicts are
     // informational (server already overwritten) — persisting would falsely
     // fire the badge for resolved divergence.
@@ -969,7 +995,7 @@ export class SyncEngine {
   private async runPullOnly(): Promise<SyncResult> {
     if (this.paused) return emptyResult();
     this.setState({ kind: 'syncing', phase: 'pull' });
-    const meta = await this.executeMetaStep();
+    const meta = await this.executeMetaStepGuarded();
     if (meta.auth_blocked) {
       this.setAuthError();
       const result: SyncResult = {
@@ -1014,7 +1040,7 @@ export class SyncEngine {
       return emptyResult();
     }
     this.setState({ kind: 'syncing', phase: 'push' });
-    const meta = await this.executeMetaStep();
+    const meta = await this.executeMetaStepGuarded();
     if (meta.auth_blocked) {
       this.setAuthError();
       const result: SyncResult = {
@@ -1551,7 +1577,7 @@ export class SyncEngine {
               element_id: current.id,
               type: current.type,
               operation: 'create',
-              message: `server reassigned id on create (${current.id} → ${response.id}) — v2 contract violation`,
+              message: `server reassigned id on create (${current.id} → ${response.id}): v2 contract violation`,
             });
             continue;
           }

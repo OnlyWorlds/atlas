@@ -107,9 +107,24 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
              <span class="atlas-landing-choice-note">Atlas works with text files on your local drive</span>
            </span>`
         : '';
+      // The note names the DESKTOP part of the constraint (S323). The gate is
+      // capability-based (`showDirectoryPicker`), and mobile Chrome does not
+      // have it — so a phone visitor, arguably our most common cold arrival
+      // since launch, was being told to go and get the browser they were
+      // already using. No UA sniffing needed; the sentence just has to be true.
       const folderNote = folderMode
         ? ''
-        : `<p class="atlas-landing-note">Folder mode (your worlds as real files) needs a Chromium browser: Chrome or Brave. This browser can take the tour.</p>`;
+        : `<p class="atlas-landing-note">Keeping worlds as real files on your drive needs a desktop Chromium browser: Chrome, Edge or Brave. Here you can take the tour and read an example page.</p>`;
+      // After the tour, a browser without folder mode had nowhere left to go:
+      // a de-emphasised replay button and an outbound link on the sigil. Give
+      // it a real forward door to the example page, which is view-only and
+      // works everywhere (S323).
+      const exampleDoor = folderMode && !tourDone
+        ? ''
+        : `<span class="atlas-landing-choice">
+             <button class="${tourDone && !folderMode ? 'atlas-btn-primary' : 'atlas-btn-ghost'} atlas-landing-btn" data-action="see-example">see an example page</button>
+             <span class="atlas-landing-choice-note">a published world, as a visitor sees it</span>
+           </span>`;
       // The OnlyWorlds sigil + eyebrow (Skeld's opener note, Captain's nod,
       // 2026-07-19): users routed here from onlyworlds.com need the mark and
       // the stated relationship to read "same universe". Bundled local copy
@@ -132,12 +147,15 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
                 <span class="atlas-landing-choice-note">one sentence becomes a small linked world</span>
               </span>
               ${folderDoor}
+              ${exampleDoor}
             </div>
             <p class="atlas-landing-tag">An OnlyWorlds worldbuilding solution.</p>
             ${folderNote}
           </div>
         </div>
       `;
+      root.querySelector<HTMLButtonElement>('[data-action="see-example"]')
+        ?.addEventListener('click', () => { window.location.hash = '#/demo'; });
       const tourBtn = root.querySelector<HTMLButtonElement>('[data-action="start-tour"]')!;
       tourBtn.addEventListener('click', async () => {
         tourBtn.disabled = true;
@@ -204,10 +222,12 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
               <p class="atlas-grounded-check"><span class="material-symbols-outlined">check_circle</span>Your OnlyWorlds folder is ready</p>
               <p class="atlas-grounded-path"><code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
               <p class="atlas-grounded-next">Now make a world to put in it. The
-                <span class="material-symbols-outlined atlas-grounded-next-icon">create_new_folder</span>
+                <span class="atlas-grounded-next-glyph"
+                  ><span class="material-symbols-outlined atlas-add-glyph-plus">add</span
+                  ><span class="material-symbols-outlined atlas-add-glyph-main">folder</span></span>
                 button in the top left creates one; the others beside it open a
-                folder you already have, or bring a world down from
-                onlyworlds.com.</p>
+                folder you already have, create a world on onlyworlds.com, or
+                bring one down from there.</p>
             </div>
             <div class="atlas-grounded-detail" data-role="path-detail"></div>
           </div>
