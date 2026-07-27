@@ -13,25 +13,25 @@
  * folder; Mode B merges into the active world (convention #81-85).
  */
 
-import { getState, subscribe } from '../core/state';
 import { getActiveStore } from '../core/active-store';
+import { ELEMENT_ICONS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
 import { escapeText } from '../core/dom-utils';
+import { getState, subscribe } from '../core/state';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
-import { ELEMENT_LABELS, ELEMENT_ICONS, SPATIAL_TYPES } from '../core/constants';
+import { completeWaypoint } from '../core/waypoints';
 import { sectionsFor } from '../editor/field-schema';
-import { parsePayload } from '../import/parse';
-import { validatePayload, generateFixPrompt } from '../import/validate';
-import { reconcile } from '../import/reconcile';
 import { buildWorldExport } from '../import/export-world';
+import { parsePayload } from '../import/parse';
+import { reconcile } from '../import/reconcile';
+import type { ImportPlan, ParseResult, ValidationIssue } from '../import/types';
+import { generateFixPrompt, validatePayload } from '../import/validate';
+import { findWorldByOwIdentity } from '../registry/registry';
 import {
   createWorldFromImportedData,
   importIntoActiveWorld,
 } from '../setup/atlas-root-flow';
 import { activateWorld } from '../sidebar/worlds-sidebar';
-import { findWorldByOwIdentity } from '../registry/registry';
-import type { ParseResult, ImportPlan, ValidationIssue } from '../import/types';
 import { ToastManager } from '../ui/toast-manager';
-import { completeWaypoint } from '../core/waypoints';
 
 type Mode = 'new' | 'merge';
 
@@ -149,7 +149,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     </div>
     <div class="atlas-import-body">
       <div class="atlas-import-panel" data-panel="in" role="tabpanel">
-        <p class="atlas-import-lead">Bring in a world exported from onlyworlds.com, or loose elements from an AI assistant. Drop a file or paste the JSON, then review before it lands.</p>
+        <p class="atlas-import-lead">Bring in a world exported from onlyworlds.com, or loose elements. Drop a file or paste the JSON, then it gets reviewedbefore it lands.</p>
         <div class="atlas-import-drop" data-role="drop" tabindex="0" title="drop or click to choose a .json file">
           <span class="material-symbols-outlined">place_item</span>
           <p>drop a world or elements <b>.json</b> here</p>
