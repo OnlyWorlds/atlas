@@ -1,6 +1,6 @@
 # Atlas — Design Document
 
-**Version**: 1.8 (2026-07-20) — folder-first rebuild
+**Version**: 1.9 (2026-07-28) — folder-first rebuild · the union read + the conformance fixture (see "On-Disk Layout")
 **Status**: **LAUNCHED (2026-07-19, atlas.onlyworlds.com).** The guided Hyperion tour is the onboarding (`DESIGN_TOUR.md`); the full share pipeline is live (import · publish · pin/zone disclosure · chart block · republish/revoke, verified on deployed atlas + show + production keel). This doc is the stable ARCHITECTURAL reference; **for current operational state, gates, and the live work queue always read `PROGRESS.md` (CURRENT STATE block) — that is the truth, this Status line is a pointer.** Post-launch work runs in sessions logged there (S296-297 tour · S298 Freek round · S299 tour resilience + placement feedback + per-zone share curation). Architecture sections below (folder-first store, sync engine, account mode, world-meta sync, calendars, the tour) are current; the historical build record lives in `docs-archive/PROGRESS-history.md`. Decision records: release `Forge/Notes/2026-07-03-atlas-release-plan.md`; the S298 tour queue `tools/atlas/Notes/2026-07-19-s298-freek-round-handover.md` (partly executed in S299 — see PROGRESS).
 **Predecessor**: `tools/atlas-deprecated/` (IDB-cached architecture, retained as UI/UX reference)
 
@@ -135,23 +135,15 @@ User picks a root folder once per world (persisted via `FileSystemDirectoryHandl
       sync-state.json                ← last_synced_at per element, conflict log
       tombstones.json                ← deletion log (id, type, deleted_at)
       lock                           ← presence indicates a writer is active
-    elements/
-      character/                     ← one subfolder per element type
+    elements/                        ← ALL 22 element types, one subfolder each
+      character/
         <name-slug>--<id-tail8>.json   ← e.g. aragorn--0d2a8c2b.json (unnamed: <full-id>.json)
       location/
         <name-slug>--<id-tail8>.json
-      institution/
-        <name-slug>--<id-tail8>.json
-      ... (18 content element types)
-    spatial/                         ← map artifacts (one file per element, like content)
-      map/
-        <name-slug>--<id-tail8>.json
-      pin/
-        <name-slug>--<id-tail8>.json
-      zone/
-        <name-slug>--<id-tail8>.json
-      marker/
-        <name-slug>--<id-tail8>.json
+      map/ pin/ zone/ marker/        ← spatial types live here too (see below)
+      ... (22 types)
+    spatial/                         ← LEGACY ONLY (atlas ≤ v1.0). Read, never created.
+      map/ pin/ zone/ marker/
     media/
       <element-id>/
         <folder-name>/
@@ -177,6 +169,42 @@ User picks a root folder once per world (persisted via `FileSystemDirectoryHandl
 - `local_updated_at` is the source of truth for "this changed locally at time T." Stamped by FolderStore on every save.
 - `server_updated_at` is the last value the server confirmed. Used to detect server-side changes (server `updated_at > server_updated_at` means someone else edited).
 - For `local-only` worlds, `server_updated_at` is omitted.
+
+### Directory layout: THE UNION READ (settled 2026-07-28, spec v0.3)
+
+**`elements/<type>/` is the format for all 22 types.** `spatial/{map,pin,zone,marker}/`
+is a **named, dated legacy path**: atlas through v1.0 wrote the four spatial
+types there and no other implementation ever did. The split carried no
+semantics — it was the Leaflet subsystem's convenience leaking into the
+serialization.
+
+| Behaviour | Rule |
+|---|---|
+| read | **BOTH layouts, unioned** (`buildIndexFor` scans `elements/<type>/` then `spatial/<type>/` for spatial types). A world written either way opens whole |
+| write, new world | `elements/` for all 22. `spatial/` is never created |
+| write, legacy world | **sticky**: a folder that already holds spatial files under `spatial/` keeps receiving them there, so one world never straddles two directories. Detected once at open (`detectSpatialLayout`) by FILE presence, never by directory presence — an empty `spatial/map/` is litter from the old `ensureLayout`, not a layout |
+| existing element | rewritten **where it was found** (`fileIndex` records each element's `layout`). An edit never migrates a file between layouts |
+| same id in BOTH layouts | newest `local_updated_at` is served, ties go to `elements/`, a warning names both paths, and **neither file is touched**. Same-directory twins are a rename crash and get deduped; cross-directory twins are two tools writing legitimately, and resolving someone else's folder by deleting half of it is not atlas's call |
+| tidy | scheduled per (type, layout) — two directories are two occupancy spaces. A file shadowed by the merge is absent from the index and therefore never renamed |
+
+**Why it matters**: before this, a world written to spec opened in atlas
+showing every content element, a clean UI, and no maps, pins, zones or markers
+at all, with no warning anywhere. Guards: `tests/e2e/folder-store-fs.spec.ts`
+(both halves revert-checked) and the conformance fixture below.
+
+### The conformance fixture (2026-07-28)
+
+`tests/fixtures/folder-conformance/` is an **ecosystem artifact**: one tiny
+world folder plus a machine-readable `expected.json`, which any Folder Format
+reader can run against and report what it found. Its README states the
+contract (only `name` required · body type beats directory · id-less files
+skipped and left · unknown `x_*` round-trips · mapless pins are legal ·
+filenames are presentation). `tests/e2e/folder-conformance.spec.ts` is atlas
+answering it, so "shipped atlas reads the format" is a failing test rather
+than a claim in a document someone quotes six weeks later. Proposed by Kael,
+adopted by every pass of Skeld's review round; destined for a public sibling
+repo beside the spec, so it is built portable — plain files, nothing generated
+at read time.
 
 ### File naming (Folder Format spec source — settled 2026-07-03)
 
@@ -262,7 +290,7 @@ This sandboxes atlas data in a known subfolder when the user picks a busy folder
       world.json
       .atlas/{lock, sync-state.json, tombstones.json}
       elements/<type>/<id>.json
-      spatial/<type>/<id>.json
+      elements/<type>/<id>.json     ← all 22 types; spatial/ only in ≤v1.0 folders
       media/<element-id>/<folder>/<filename>
     another-world-92b4ee01/
       ...
@@ -452,7 +480,7 @@ HISTORY: the pre-keel Django server assigned its own UUID v7 on CREATE, which is
 
 1. User clicks "+ Create Local" in sidebar Worlds mode (or Welcome CTA).
 2. Modal asks for name; "Pick Folder" button opens the OS folder picker.
-3. Atlas writes `world.json`, empty `elements/`, `spatial/`, `media/`, `.atlas/`.
+3. Atlas writes `world.json`, empty `elements/<type>/` for all 22, `media/`, `.atlas/`. (No `spatial/` — see the union read.)
 4. Registry entry added with `state: 'local-only'`, folder handle stored in handle-vault.
 5. World activated. Middle shows the world home room (sidebar mode is independent — convention #37).
 

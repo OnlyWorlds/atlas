@@ -48,7 +48,30 @@ test('opens an OPFS handle and creates the atlas folder layout', async ({ page }
     }
     return dirs.sort();
   });
-  expect(layout).toEqual(['.atlas', 'elements', 'media', 'spatial']);
+  // `spatial/` is NOT created for a fresh world (the union read, 2026-07-28):
+  // `elements/<type>/` is the format for all 22 types, and atlas no longer
+  // mints a legacy directory tree inside a folder it was asked to open.
+  expect(layout).toEqual(['.atlas', 'elements', 'media']);
+});
+
+test('a fresh world creates every element type under elements/, spatial types included', async ({ page }) => {
+  const dirs = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    await store.close();
+    const elements = await root.getDirectoryHandle('elements');
+    const names: string[] = [];
+    // @ts-ignore values()
+    for await (const entry of (elements as any).values()) {
+      if (entry.kind === 'directory') names.push(entry.name);
+    }
+    return names.sort();
+  });
+  for (const t of ['map', 'pin', 'zone', 'marker', 'character', 'location']) {
+    expect(dirs).toContain(t);
+  }
 });
 
 test('round-trips a character through create / read / list', async ({ page }) => {
@@ -406,4 +429,224 @@ test('listElements onProgress: cold walk reports monotonic counts ending at done
   expect(result.monotonic).toBe(true);
   // Warm calls are cache-served — no cold walk, no progress ticks.
   expect(result.warmTickCount).toBe(0);
+});
+
+/**
+ * FOREIGN-WRITER TOLERANCE (2026-07-28). The folder format is an interop
+ * surface: other OW tools, export scripts and hand edits write into it, and
+ * they do not all stamp the in-body `type`. Before this guard, ONE such file
+ * blanked the entire elements sidebar and the home desk — `renderElementRow`
+ * escapes `el.type` unguarded, so `undefined` threw inside the list's `.map()`
+ * and the room rendered empty with nothing but a console error.
+ *
+ * The directory already carries the type, so the store stamps it. Fill-only:
+ * a body that DECLARES a type keeps it even when it contradicts its directory
+ * (convention #14 — the body is the schema).
+ */
+test('indexing stamps a missing in-body type from the directory, and never overrides a declared one', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const writeJson = async (dir: FileSystemDirectoryHandle, name: string, obj: unknown) => {
+      const fh = await dir.getFileHandle(name, { create: true });
+      const ws = await fh.createWritable();
+      await ws.write(JSON.stringify(obj));
+      await ws.close();
+    };
+    const elements = await root.getDirectoryHandle('elements', { create: true });
+    const chars = await elements.getDirectoryHandle('character', { create: true });
+    // Bare: id + name only. No type, no created_at, no local_updated_at.
+    await writeJson(chars, 'bare.json', { id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', name: 'Bare' });
+    // Declares a type that disagrees with its directory — the body wins.
+    await writeJson(chars, 'declared.json', { id: 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb', name: 'Declared', type: 'location' });
+    // No id at all — skipped entirely, left on disk (existing contract).
+    await writeJson(chars, 'idless.json', { name: 'Idless' });
+
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    const listed = await store.listElements('character');
+    const bare = listed.find((e: any) => e.name === 'Bare');
+    const declared = listed.find((e: any) => e.name === 'Declared');
+    await store.close();
+    return {
+      count: listed.length,
+      bareType: bare?.type ?? null,
+      bareLocalUpdatedAt: bare?.local_updated_at ?? null,
+      declaredType: declared?.type ?? null,
+      names: listed.map((e: any) => e.name).sort(),
+    };
+  });
+  // The id-less file is skipped; the other two both serve.
+  expect(result.count).toBe(2);
+  expect(result.names).toEqual(['Bare', 'Declared']);
+  // Stamped from the directory it was found in.
+  expect(result.bareType).toBe('character');
+  // Timestamps stay genuinely optional — nothing synthesises them on read.
+  expect(result.bareLocalUpdatedAt).toBeNull();
+  // Declared type survives even though the file sits in elements/character/.
+  expect(result.declaredType).toBe('location');
+});
+
+/**
+ * ── THE UNION READ (2026-07-28) ───────────────────────────────────────────
+ *
+ * Atlas through v1.0 was the only implementation that split maps, pins, zones
+ * and markers into `spatial/<type>/`. Folder Format spec v0.3 rules
+ * `elements/<type>/` for all 22 types; every other writer already did that.
+ *
+ * The failure being guarded is SILENT: before these tests, a world written by
+ * any other tool opened in atlas showing every content element, a clean UI,
+ * and no maps, pins, zones or markers at all, with no warning anywhere. A
+ * world that looks complete while missing an entire subsystem is the exact
+ * shape the folder format exists to prevent.
+ */
+
+const MAP_A = 'cccccccc-1111-4111-8111-cccccccccccc';
+const MAP_B = 'dddddddd-1111-4111-8111-dddddddddddd';
+
+/** Write a raw element file into <layout>/<type>/, bypassing the store. */
+async function seedRawElement(
+  page: import('@playwright/test').Page,
+  layout: string,
+  type: string,
+  filename: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  await page.evaluate(async (args: { layout: string; type: string; filename: string; body: unknown }) => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const outer = await root.getDirectoryHandle(args.layout, { create: true });
+    const dir = await outer.getDirectoryHandle(args.type, { create: true });
+    const fh = await dir.getFileHandle(args.filename, { create: true });
+    const ws = await fh.createWritable();
+    await ws.write(JSON.stringify(args.body));
+    await ws.close();
+  }, { layout, type, filename, body });
+}
+
+/** Names of the *.json files in <layout>/<type>/, or null when the dir is absent. */
+async function listLayoutFiles(
+  page: import('@playwright/test').Page,
+  layout: string,
+  type: string,
+): Promise<string[] | null> {
+  return page.evaluate(async (args: { layout: string; type: string }) => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    try {
+      const outer = await root.getDirectoryHandle(args.layout);
+      const dir = await outer.getDirectoryHandle(args.type);
+      const names: string[] = [];
+      // @ts-ignore values()
+      for await (const entry of (dir as any).values()) {
+        if (entry.kind === 'file' && entry.name.endsWith('.json')) names.push(entry.name);
+      }
+      return names.sort();
+    } catch {
+      return null;
+    }
+  }, { layout, type });
+}
+
+test('reads a map written to elements/map/ — the layout every other tool writes', async ({ page }) => {
+  await seedRawElement(page, 'elements', 'map', 'shipped-world--cccccccc.json', {
+    id: MAP_A, type: 'map', name: 'Shipped World',
+  });
+  const result = await page.evaluate(async (mapId: string) => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    const maps = await store.listMaps();
+    const direct = await store.getElement(mapId);
+    await store.close();
+    return { count: maps.length, name: maps[0]?.name ?? null, directName: direct?.name ?? null };
+  }, MAP_A);
+  expect(result.count).toBe(1);
+  expect(result.name).toBe('Shipped World');
+  // getElement's cold-start warm loop must find it too, not only listMaps.
+  expect(result.directName).toBe('Shipped World');
+});
+
+test('still reads a legacy spatial/map/, and keeps writing that world there', async ({ page }) => {
+  await seedRawElement(page, 'spatial', 'map', 'legacy--dddddddd.json', {
+    id: MAP_B, type: 'map', name: 'Legacy World',
+  });
+  const result = await page.evaluate(async (mapId: string) => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    const maps = await store.listMaps();
+    // A NEW map in a legacy-layout world joins its siblings rather than
+    // splitting one world across two directories.
+    await store.createMap({ name: 'Second Legacy' });
+    // An EDIT to the existing one rewrites it where it lives.
+    await store.updateElement(mapId, { description: 'edited' });
+    await store.awaitTidies();
+    const reread = await store.getElement(mapId);
+    await store.close();
+    return { count: maps.length, name: maps[0]?.name ?? null, desc: reread?.description ?? null };
+  }, MAP_B);
+  expect(result.count).toBe(1);
+  expect(result.name).toBe('Legacy World');
+  expect(result.desc).toBe('edited');
+  // Two maps in the legacy home; the canonical map dir was never created.
+  expect(await listLayoutFiles(page, 'spatial', 'map')).toHaveLength(2);
+  expect((await listLayoutFiles(page, 'elements', 'map')) ?? []).toHaveLength(0);
+});
+
+test('an id present in BOTH layouts serves one copy and deletes neither file', async ({ page }) => {
+  // Both seeded at their CANONICAL filenames, so the open-time tidy is a
+  // no-op and this test measures deletion only (Kael's differential, 998
+  // comparisons: a name that already matches short-circuits before any I/O).
+  await seedRawElement(page, 'elements', 'map', 'canonical-copy--cccccccc.json', {
+    id: MAP_A, type: 'map', name: 'Canonical Copy', local_updated_at: '2026-07-28T10:00:00.000Z',
+  });
+  await seedRawElement(page, 'spatial', 'map', 'legacy-copy--cccccccc.json', {
+    id: MAP_A, type: 'map', name: 'Legacy Copy', local_updated_at: '2026-07-28T12:00:00.000Z',
+  });
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    const maps = await store.listMaps();
+    await store.awaitTidies();
+    await store.close();
+    return { count: maps.length, name: maps[0]?.name ?? null };
+  });
+  // One element, not two — the id is the identity.
+  expect(result.count).toBe(1);
+  // The newer stamp wins.
+  expect(result.name).toBe('Legacy Copy');
+  // NEITHER file is removed. Same-directory twins are a rename crash and get
+  // deduped; cross-directory twins are two tools writing legitimately, and
+  // atlas does not resolve someone else's folder by destroying half of it.
+  expect(await listLayoutFiles(page, 'elements', 'map')).toEqual(['canonical-copy--cccccccc.json']);
+  expect(await listLayoutFiles(page, 'spatial', 'map')).toEqual(['legacy-copy--cccccccc.json']);
+});
+
+test('a foreign capture serves its content AND spatial elements in one list', async ({ page }) => {
+  await seedRawElement(page, 'elements', 'character', 'kid--eeeeeeee.json', {
+    id: 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee', type: 'character', name: 'The Kid',
+  });
+  await seedRawElement(page, 'elements', 'map', 'territory--cccccccc.json', {
+    id: MAP_A, type: 'map', name: 'The Territory',
+  });
+  await seedRawElement(page, 'elements', 'zone', 'border--ffffffff.json', {
+    id: 'ffffffff-1111-4111-8111-ffffffffffff', type: 'zone', name: 'The Border',
+  });
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    const all = await store.listElements();
+    await store.close();
+    return { count: all.length, types: all.map((e: any) => e.type).sort() };
+  });
+  // The capture opens WHOLE: 3 of 3, not 1 of 3 with a clean UI.
+  expect(result.count).toBe(3);
+  expect(result.types).toEqual(['character', 'map', 'zone']);
 });

@@ -1,0 +1,66 @@
+{
+  "fixture_version": "1.0.0",
+  "spec_version": "0.3.3",
+  "created": "2026-07-28",
+  "world": {
+    "id": "0f01d3ea-0000-4000-8000-000000000001",
+    "name": "Conformance"
+  },
+  "elements": [
+    {
+      "id": "11111111-2222-4333-8444-555555555501",
+      "name": "Only Name",
+      "type": "character",
+      "note": "type is ABSENT in the body; a reader may infer it from the directory or serve it untyped, but must not invent timestamps",
+      "must_not_have": ["created_at", "local_updated_at", "server_updated_at"]
+    },
+    {
+      "id": "11111111-2222-4333-8444-555555555502",
+      "name": "Declared Elsewhere",
+      "type": "location",
+      "note": "sits in elements/character/ and declares location — the body wins"
+    },
+    {
+      "id": "11111111-2222-4333-8444-555555555507",
+      "name": "Extension Carrier",
+      "type": "character",
+      "note": "x_probe_note must survive a read-write round trip unchanged"
+    },
+    {
+      "id": "11111111-2222-4333-8444-555555555503",
+      "name": "The Territory",
+      "type": "map"
+    },
+    {
+      "id": "11111111-2222-4333-8444-555555555504",
+      "name": "The Border",
+      "type": "zone"
+    },
+    {
+      "id": "11111111-2222-4333-8444-555555555505",
+      "name": "Wandering Pin",
+      "type": "pin",
+      "note": "MAPLESS by design — no map, no element. Must not crash, must not be given one"
+    }
+  ],
+  "legacy_elements": [
+    {
+      "id": "11111111-2222-4333-8444-555555555506",
+      "name": "Legacy Map",
+      "type": "map",
+      "note": "lives in spatial/map/ — NOT normative. A reader that covers only elements/ is conforming and reports 6; a legacy-tolerant reader (atlas) reports 7"
+    }
+  ],
+  "skipped_files": [
+    {
+      "path": "elements/character/idless.json",
+      "reason": "no id — not an element",
+      "must_remain_on_disk": true
+    }
+  ],
+  "reader_report_shape": {
+    "found": "count of elements[] your reader loaded",
+    "found_legacy": "count of legacy_elements[] your reader additionally loaded (0 is conforming)",
+    "deleted_or_renamed": "files your reader wrote to, moved or removed — should be empty for a read"
+  }
+}

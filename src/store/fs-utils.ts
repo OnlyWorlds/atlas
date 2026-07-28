@@ -11,7 +11,7 @@
  * rather than throwing. Callers decide how to handle missing/bad payloads.
  */
 
-import { ELEMENTS_DIR, SPATIAL_DIR, SPATIAL_TYPES } from '../core/constants';
+import type { LayoutDir } from '../core/constants';
 import type { ElementType } from '../core/types';
 
 const TMP_SUFFIX = '.tmp';
@@ -19,12 +19,17 @@ const TMP_SUFFIX = '.tmp';
 // ---- Path resolution ----
 
 /**
- * Where does this type's element files live?
- * - Spatial types (map/pin/zone/marker) → spatial/<type>/
- * - Content types (character/location/...) → elements/<type>/
+ * Where this type's element files live, in a STATED layout.
+ *
+ * There is deliberately no "work it out from the type" overload. The old
+ * `elementDirSegments(type)` inferred `spatial/` for the four spatial types,
+ * which made the layout an invisible property of the type rather than of the
+ * FOLDER — so a folder written by another tool lost its maps with nobody
+ * having decided that. Every caller now names the layout it means: the one
+ * recorded for that element on disk, or the world's write layout.
  */
-export function elementDirSegments(type: ElementType): [string, string] {
-  return SPATIAL_TYPES.has(type) ? [SPATIAL_DIR, type] : [ELEMENTS_DIR, type];
+export function elementDirSegmentsIn(layout: LayoutDir, type: ElementType): [string, string] {
+  return [layout, type];
 }
 
 /**

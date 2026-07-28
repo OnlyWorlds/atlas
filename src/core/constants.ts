@@ -98,11 +98,27 @@ export const TOMBSTONES_FILE = 'tombstones.json';
 export const CHARTS_FILE = 'charts.json';
 export const LOCK_FILE = 'lock';
 export const WORLD_META_FILE = 'world.json';
-export const ELEMENTS_DIR = 'elements';
-export const SPATIAL_DIR = 'spatial';
+export const ELEMENTS_DIR = 'elements' as const;
+export const SPATIAL_DIR = 'spatial' as const;
 export const MEDIA_DIR = 'media';
 
-// Spatial element types live under SPATIAL_DIR/<type>/, content under ELEMENTS_DIR/<type>/.
+/**
+ * The two top-level homes an element file can have.
+ *
+ * THE LAYOUT RULE (Folder Format spec v0.3, 2026-07-28): `elements/<type>/`
+ * is the format for ALL 22 types. `spatial/<type>/` is a NAMED, DATED LEGACY
+ * path — atlas through v1.0 wrote maps, pins, zones and markers there, and
+ * no other implementation ever did.
+ *
+ * Atlas therefore READS BOTH (the union read) and WRITES whichever layout the
+ * world already uses, defaulting to `elements/` for anything new. Before the
+ * union read, a world written by any other tool lost all four spatial types
+ * SILENTLY and looked complete — the failure shape the format exists to
+ * prevent.
+ */
+export type LayoutDir = typeof ELEMENTS_DIR | typeof SPATIAL_DIR;
+
+/** Types that a legacy-layout folder keeps under SPATIAL_DIR/<type>/. */
 export const SPATIAL_TYPES = new Set(['map', 'pin', 'zone', 'marker']);
 
 // Lock file lifecycle

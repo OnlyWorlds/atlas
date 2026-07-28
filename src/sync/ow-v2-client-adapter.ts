@@ -152,7 +152,16 @@ export function toV2WireShape(
 /**
  * v2 wire shape → disk shape. The server echoes bare schema names and every
  * extension field verbatim; disk wants pin/marker relations re-suffixed and
- * the `type` stamped (per-type endpoints omit it).
+ * the `type` stamped.
+ *
+ * ⚑ CORRECTED 2026-07-28: this comment used to say "per-type endpoints omit
+ * `type`". They do not — probed live against a demo world, every list body
+ * carries its own `type`. The stamp below is therefore a harmless overwrite
+ * with an identical value, not a fill. Left in place because it is the
+ * cheapest guarantee that disk bodies always carry a type, and because the
+ * value is trivially known here; but do not cite it as evidence that the wire
+ * omits the field. (It misled a folder-writer design in Assembly before it
+ * was caught.)
  */
 export function adaptV2Record(raw: unknown, type: ElementType): ServerRecord {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {

@@ -42,6 +42,7 @@ import {
   TOMBSTONES_FILE,
   WORLD_META_FILE,
 } from '../core/constants';
+import type { LayoutDir } from '../core/constants';
 import { ALL_ELEMENT_TYPES, CONTENT_ELEMENT_TYPES, SPATIAL_ELEMENT_TYPES } from '../core/types';
 import { findDuplicatePin, DuplicatePinError } from '../core/pin-uniqueness';
 import type {
@@ -67,9 +68,18 @@ import { newId, nowIso } from './folder-store';
  * dedupe/tidy pass after the reads is strictly sequential regardless.
  */
 const INDEX_READ_CONCURRENCY = 64;
+
+/** One (type, layout) directory's scan result — see `scanLayoutFor`. */
+interface LayoutScan {
+  dir: FileSystemDirectoryHandle;
+  /** id → the file that survived same-directory crash-twin dedupe. */
+  survivors: Map<string, { filename: string; body: Element }>;
+  /** Lowercased names of files the scan could not read — never a tidy target. */
+  unreadableLc: Set<string>;
+}
 import { PerIdWriteChain } from './write-chain';
 import {
-  elementDirSegments,
+  elementDirSegmentsIn,
   elementFilename,
   elementFilenameFullId,
   getDir,
@@ -144,15 +154,28 @@ export class FsFolderStore implements FolderStore {
   }
 
   /**
-   * Per-element filename index. Maps `id → { type, filename }` so reads and
-   * writes can locate the on-disk file without scanning directories. Critical
-   * because filenames are no longer derivable from id alone — they encode the
-   * element's name as a slug prefix (`<slug>--<uuid>.json`).
+   * Per-element file index. Maps `id → { type, layout, filename }` so reads
+   * and writes can locate the on-disk file without scanning directories.
+   * Critical because filenames are no longer derivable from id alone — they
+   * encode the element's name as a slug prefix (`<slug>--<uuid>.json`).
+   *
+   * `layout` is the element's ACTUAL top-level directory, recorded from where
+   * the file was found (the union read, 2026-07-28). Every write and unlink
+   * goes back to the file it read — an element found in `spatial/map/` is
+   * updated in `spatial/map/`, never copied into `elements/map/` behind the
+   * user's back.
    *
    * Built lazily per type on first read/write that needs it. Updated in-place
    * on create/update/delete. Cleared in close().
    */
-  private fileIndex: Map<string, { type: ElementType; filename: string }> = new Map();
+  private fileIndex: Map<string, { type: ElementType; layout: LayoutDir; filename: string }> = new Map();
+  /**
+   * Where NEW spatial elements go in THIS world. Detected once at open:
+   * `spatial/` when the folder already keeps spatial files there (an atlas
+   * v1.0-era world), `elements/` otherwise — which is every world any other
+   * tool writes, and every world atlas creates from now on.
+   */
+  private spatialWriteLayout: LayoutDir = ELEMENTS_DIR;
   /** Set of types whose dirs have been scanned into fileIndex. */
   private indexedTypes: Set<ElementType> = new Set();
   /**
@@ -241,6 +264,7 @@ export class FsFolderStore implements FolderStore {
   async open(handle: FileSystemDirectoryHandle | null): Promise<void> {
     if (!handle) throw new Error('FsFolderStore.open requires a directory handle');
     this.root = handle;
+    await this.detectSpatialLayout();
     await this.ensureLayout();
     await this.claimLock();
     if (!this.opts.disableHeartbeat) {
@@ -334,14 +358,43 @@ export class FsFolderStore implements FolderStore {
 
   // ---- Layout setup + lock ----
 
+  /**
+   * Decide where this world's NEW spatial elements go, BEFORE ensureLayout
+   * creates anything (otherwise every world would look legacy the moment we
+   * made the directories).
+   *
+   * The test is FILES, not directories: an atlas world that never had a map
+   * still carries four empty `spatial/` dirs from the old ensureLayout, and
+   * an empty legacy dir is not a layout — it is litter. One `.json` under
+   * `spatial/<type>/` means this folder's maps genuinely live there, so we
+   * keep writing there and the folder stays internally coherent for whatever
+   * other tool reads it next.
+   */
+  private async detectSpatialLayout(): Promise<void> {
+    const root = this.requireRoot();
+    for (const t of SPATIAL_ELEMENT_TYPES) {
+      const dir = await tryGetDir(root, [SPATIAL_DIR, t]);
+      if (!dir) continue;
+      const files = await listFiles(dir);
+      if (files.some(f => f.endsWith('.json'))) {
+        this.spatialWriteLayout = SPATIAL_DIR;
+        return;
+      }
+    }
+    this.spatialWriteLayout = ELEMENTS_DIR;
+  }
+
   private async ensureLayout(): Promise<void> {
     const root = this.requireRoot();
     await getDir(root, [ATLAS_INTERNAL_DIR]);
     await getDir(root, [ELEMENTS_DIR]);
-    await getDir(root, [SPATIAL_DIR]);
     await getDir(root, [MEDIA_DIR]);
     for (const t of CONTENT_ELEMENT_TYPES) await getDir(root, [ELEMENTS_DIR, t]);
-    for (const t of SPATIAL_ELEMENT_TYPES) await getDir(root, [SPATIAL_DIR, t]);
+    // Spatial dirs are created in whichever layout this world uses. A world
+    // that has never held a map gets `elements/<type>/` for all 22 and no
+    // `spatial/` at all — atlas stops minting a legacy directory tree inside
+    // folders it was merely asked to open.
+    for (const t of SPATIAL_ELEMENT_TYPES) await getDir(root, [this.spatialWriteLayout, t]);
   }
 
   private async claimLock(): Promise<void> {
@@ -422,9 +475,77 @@ export class FsFolderStore implements FolderStore {
     return build;
   }
 
+  /**
+   * THE UNION READ (2026-07-28). A spatial type is scanned in BOTH layouts —
+   * `elements/<type>/` (the format) and `spatial/<type>/` (atlas's legacy
+   * home) — and the results merge into one index. Content types have only
+   * ever had one home, so they scan one directory as before.
+   *
+   * Order matters: `elements/` is scanned FIRST, so when the same element id
+   * exists in both layouts and the tie cannot be broken by timestamp, the
+   * canonical copy is the one served.
+   */
   private async buildIndexFor(type: ElementType): Promise<void> {
-    const dir = await tryGetDir(this.requireRoot(), elementDirSegments(type));
-    if (!dir) { this.indexedTypes.add(type); return; }
+    const layouts: LayoutDir[] = SPATIAL_TYPES.has(type)
+      ? [ELEMENTS_DIR, SPATIAL_DIR]
+      : [ELEMENTS_DIR];
+    const perLayout: Array<{ layout: LayoutDir; scan: LayoutScan }> = [];
+    for (const layout of layouts) {
+      const scan = await this.scanLayoutFor(type, layout);
+      if (!this.root) return; // closed mid-scan — the scan already bailed
+      if (scan) perLayout.push({ layout, scan });
+    }
+
+    // MERGE ACROSS LAYOUTS. Within one directory a duplicate id is a
+    // rename-crash twin and the loser is deleted (scanLayoutFor's job).
+    // Across directories it is nothing of the sort: two tools, or one tool
+    // across a format change, each wrote a legitimate file. **Nothing is
+    // deleted here** — atlas does not get to resolve someone else's folder by
+    // destroying half of it. Newest `local_updated_at` is served, ties go to
+    // `elements/`, and the shadowed copy is named in a warning so the state
+    // is discoverable rather than mysterious.
+    for (const { layout, scan } of perLayout) {
+      for (const [id, rec] of scan.survivors) {
+        const existing = this.fileIndex.get(id);
+        if (existing && existing.type === type) {
+          const kept = this.bodyCache.get(id);
+          const keptStamp = kept?.local_updated_at ?? '';
+          const challengerStamp = rec.body.local_updated_at ?? '';
+          const challengerWins = challengerStamp > keptStamp;
+          console.warn(
+            `[fs-folder-store] index(${type}): id ${id} exists in BOTH layouts ` +
+            `(${existing.layout}/${existing.filename} and ${layout}/${rec.filename}); ` +
+            `serving the ${challengerWins ? layout : existing.layout} copy. Neither file was touched.`
+          );
+          if (!challengerWins) continue;
+        }
+        this.fileIndex.set(id, { type, layout, filename: rec.filename });
+        // The index pass owns these freshly-parsed bodies outright — cache
+        // them without a clone (serve-side clones protect them from callers).
+        this.bodyCache.set(id, rec.body);
+      }
+    }
+    this.indexedTypes.add(type);
+    // Tidy runs LAST, once the index is populated: its occupancy view is read
+    // from `this.fileIndex`, so scheduling it inside the scan would hand it an
+    // empty world and it would quietly converge nothing. Files shadowed by the
+    // cross-layout merge are absent from the index and therefore never tidied,
+    // which is the right answer — atlas does not rename what it did not serve.
+    for (const { layout, scan } of perLayout) {
+      this.scheduleTidy(type, layout, scan.dir, scan.unreadableLc);
+    }
+  }
+
+  /**
+   * Scan ONE (type, layout) directory: read every `*.json`, group by body id,
+   * resolve rename-crash twins. Returns null when the directory does not exist.
+   */
+  private async scanLayoutFor(
+    type: ElementType,
+    layout: LayoutDir,
+  ): Promise<LayoutScan | null> {
+    const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
+    if (!dir) return null;
     // Read pass (speed bout, 2026-07-19): ONE directory enumeration collects
     // file handles (no per-file getFileHandle round-trip), then bounded-
     // concurrency workers read + parse. 1500 serialized awaits used to
@@ -458,7 +579,7 @@ export class FsFolderStore implements FolderStore {
     // awaiting builds). The captured dir handle keeps working after close,
     // so without this bail the build would repopulate the cleared maps and
     // run tidy WRITES on a folder whose lock was already released.
-    if (!this.root) return;
+    if (!this.root) return null;
     const grouped = new Map<string, Rec[]>();
     const unreadable = new Set<string>();
     for (let i = 0; i < files.length; i++) {
@@ -466,8 +587,31 @@ export class FsFolderStore implements FolderStore {
       const body = bodies[i];
       if (!body || typeof body.id !== 'string' || !body.id) {
         unreadable.add(filename);
-        console.warn(`[fs-folder-store] index(${type}): skipping unreadable/id-less file ${filename}`);
+        console.warn(`[fs-folder-store] index(${type}@${layout}): skipping unreadable/id-less file ${filename}`);
         continue;
+      }
+      // TYPE FALLBACK (2026-07-28). A foreign writer (another OW tool, a
+      // folder-export script, a hand-edited file) may omit the in-body `type`
+      // — the directory already carries it, so the file is not ambiguous.
+      // Stamp it rather than serving a type-less element, because a single
+      // one used to take out the WHOLE elements sidebar and the home desk:
+      // `renderElementRow` escapes `el.type` unguarded, so `undefined` threw
+      // inside the list's `.map` and the room rendered EMPTY, console-only.
+      // Silent blanking on one imperfect file is the wrong failure mode for a
+      // format whose whole point is that other tools write it.
+      //
+      // Fill-only, never override: a body that DECLARES a type keeps it even
+      // when it disagrees with its directory (the body is the schema —
+      // convention #14).
+      //
+      // ⚑ Same SHAPE as `adaptV2Record`'s stamp, but not the same reason, and
+      // that adapter's own comment is stale: probed 2026-07-28 against a demo
+      // world, the v2 per-type list DOES return `type` in every body, so the
+      // adapter's stamp is a harmless overwrite with an identical value rather
+      // than a fill. Here the fill is load-bearing: a foreign writer really can
+      // omit it, and nothing upstream of this line would supply it.
+      if (typeof body.type !== 'string' || !body.type) {
+        body.type = type;
       }
       const list = grouped.get(body.id);
       if (list) list.push({ filename, body });
@@ -477,7 +621,7 @@ export class FsFolderStore implements FolderStore {
     // same-named stranger can never be a "loser"), building the survivor set.
     const survivors = new Map<string, Rec>();
     for (const [id, recs] of grouped) {
-      if (!this.root) return; // closed mid-dedupe — stop unlinking losers
+      if (!this.root) return null; // closed mid-dedupe — stop unlinking losers
       recs.sort((a, b) =>
         (a.body.local_updated_at ?? '') < (b.body.local_updated_at ?? '') ? 1
         : (a.body.local_updated_at ?? '') > (b.body.local_updated_at ?? '') ? -1 : 0);
@@ -486,25 +630,15 @@ export class FsFolderStore implements FolderStore {
         await removeFile(dir, loser.filename).catch(() => {});
       }
       if (losers.length > 0) {
-        console.warn(`[fs-folder-store] dedupe(${type}): kept ${survivor.filename}, removed ${losers.map(l => l.filename).join(', ')}`);
+        console.warn(`[fs-folder-store] dedupe(${type}@${layout}): kept ${survivor.filename}, removed ${losers.map(l => l.filename).join(', ')}`);
       }
       survivors.set(id, survivor);
     }
 
-    // Index + cache from the files AS THEY ARE — filenames are presentation,
-    // the body id is identity, so nothing about serving needs canonical
-    // names. The convergence tidy is DEFERRED to a background pass (below):
-    // inline it blocked the open path for its whole rename run — a foreign
-    // folder with 1,600 non-canonical names froze activation for a minute+
-    // on slow/synced disks (Captain's live find, 2026-07-19).
-    for (const [id, rec] of survivors) {
-      this.fileIndex.set(id, { type, filename: rec.filename });
-      // The index pass owns these freshly-parsed bodies outright — cache
-      // them without a clone (serve-side clones protect them from callers).
-      this.bodyCache.set(id, rec.body);
-    }
-    this.indexedTypes.add(type);
-    this.scheduleTidy(type, dir, new Set([...unreadable].map(n => n.toLowerCase())));
+    // Index + cache happen in the caller AS THE FILES ARE — filenames are
+    // presentation, the body id is identity, so nothing about serving needs
+    // canonical names. The caller also schedules this directory's tidy.
+    return { dir, survivors, unreadableLc: new Set([...unreadable].map(n => n.toLowerCase())) };
   }
 
   /**
@@ -517,17 +651,19 @@ export class FsFolderStore implements FolderStore {
    * of racing the write-new/remove-old pair; and every step re-checks
    * `this.root`, so a closed store stops writing immediately.
    */
-  private scheduleTidy(type: ElementType, dir: FileSystemDirectoryHandle, unreadableLc: Set<string>): void {
+  private scheduleTidy(type: ElementType, layout: LayoutDir, dir: FileSystemDirectoryHandle, unreadableLc: Set<string>): void {
     const run = (async () => {
       await new Promise(r => setTimeout(r, 0)); // yield: never blocks the open
       {
         if (!this.root) return;
         // Occupancy from the LIVE index (user writes may have landed since
-        // the build): lc(filename) → id, this type only.
+        // the build): lc(filename) → id, this type IN THIS LAYOUT only. Two
+        // layouts are two directories, so their filename spaces are disjoint
+        // and a name taken in one must never force a fallback in the other.
         const ids: string[] = [];
         const occupied = new Map<string, string>();
         for (const [id, entry] of this.fileIndex) {
-          if (entry.type !== type) continue;
+          if (entry.type !== type || entry.layout !== layout) continue;
           ids.push(id);
           if (!occupied.has(entry.filename.toLowerCase())) occupied.set(entry.filename.toLowerCase(), id);
         }
@@ -543,7 +679,7 @@ export class FsFolderStore implements FolderStore {
             if (!this.root) return;
             const entry = this.fileIndex.get(id);
             const body = this.bodyCache.get(id);
-            if (!entry || entry.type !== type || !body) return; // deleted meanwhile
+            if (!entry || entry.type !== type || entry.layout !== layout || !body) return; // deleted or re-homed meanwhile
             const filename = entry.filename;
             const short = elementFilename(id, body.name);
             const fullForm = elementFilenameFullId(id, body.name);
@@ -561,12 +697,12 @@ export class FsFolderStore implements FolderStore {
             await removeFile(dir, filename).catch(() => {});
             occupied.delete(filename.toLowerCase());
             occupied.set(target.toLowerCase(), id);
-            this.fileIndex.set(id, { type, filename: target });
+            this.fileIndex.set(id, { type, layout, filename: target });
             tidied++;
-          }).catch(err => console.warn(`[fs-folder-store] tidy(${type}) skipped ${id}:`, err));
+          }).catch(err => console.warn(`[fs-folder-store] tidy(${type}@${layout}) skipped ${id}:`, err));
         }
         if (tidied > 0) {
-          console.info(`[fs-folder-store] tidy(${type}): ${tidied} file(s) renamed to canonical form (background)`);
+          console.info(`[fs-folder-store] tidy(${type}@${layout}): ${tidied} file(s) renamed to canonical form (background)`);
         }
       }
     })();
@@ -584,35 +720,55 @@ export class FsFolderStore implements FolderStore {
   /** Cheap .json count for a not-yet-indexed type dir (progress totals). */
   private async countPendingFiles(type: ElementType): Promise<number> {
     if (this.indexedTypes.has(type)) return 0;
-    const dir = await tryGetDir(this.requireRoot(), elementDirSegments(type));
-    if (!dir) return 0;
-    return (await listFiles(dir)).filter(f => f.endsWith('.json')).length;
+    const layouts: LayoutDir[] = SPATIAL_TYPES.has(type) ? [ELEMENTS_DIR, SPATIAL_DIR] : [ELEMENTS_DIR];
+    let total = 0;
+    for (const layout of layouts) {
+      const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
+      if (!dir) continue;
+      total += (await listFiles(dir)).filter(f => f.endsWith('.json')).length;
+    }
+    return total;
+  }
+
+  /** Where NEW elements of this type are written in THIS world. */
+  private writeLayoutFor(type: ElementType): LayoutDir {
+    return SPATIAL_TYPES.has(type) ? this.spatialWriteLayout : ELEMENTS_DIR;
+  }
+
+  /** The layout an element ACTUALLY lives in: its recorded one, else the write default. */
+  private layoutOf(id: string, type: ElementType): LayoutDir {
+    return this.fileIndex.get(id)?.layout ?? this.writeLayoutFor(type);
+  }
+
+  /** Directory handle for an existing element, created if the layout dir is absent. */
+  private async dirForElement(id: string, type: ElementType): Promise<FileSystemDirectoryHandle> {
+    return getDir(this.requireRoot(), elementDirSegmentsIn(this.layoutOf(id, type), type));
   }
 
   /**
    * Filename for a NEW write of (id, name): the short canonical unless a
-   * DIFFERENT id of the same type already holds it (case-insensitively) —
-   * then the full-id fallback. Runtime stickiness for EXISTING files is
-   * handled by writeElementAndRename, not here.
+   * DIFFERENT id of the same type IN THE SAME LAYOUT already holds it
+   * (case-insensitively) — then the full-id fallback. Runtime stickiness for
+   * EXISTING files is handled by writeElementAndRename, not here.
    */
-  private resolveFilename(type: ElementType, id: string, name: string | null | undefined): string {
+  private resolveFilename(type: ElementType, layout: LayoutDir, id: string, name: string | null | undefined): string {
     const candidate = elementFilename(id, name);
     for (const [otherId, entry] of this.fileIndex) {
-      if (otherId !== id && entry.type === type && sameFsName(entry.filename, candidate)) {
+      if (otherId !== id && entry.type === type && entry.layout === layout && sameFsName(entry.filename, candidate)) {
         return elementFilenameFullId(id, name);
       }
     }
     return candidate;
   }
 
-  /** Resolve the on-disk filename for an id. Returns null if not indexed. */
-  private indexEntry(id: string): { type: ElementType; filename: string } | undefined {
+  /** Resolve the on-disk location for an id. Returns undefined if not indexed. */
+  private indexEntry(id: string): { type: ElementType; layout: LayoutDir; filename: string } | undefined {
     return this.fileIndex.get(id);
   }
 
-  /** Record a new or updated filename binding. */
-  private setIndex(id: string, type: ElementType, filename: string): void {
-    this.fileIndex.set(id, { type, filename });
+  /** Record a new or updated file binding. */
+  private setIndex(id: string, type: ElementType, layout: LayoutDir, filename: string): void {
+    this.fileIndex.set(id, { type, layout, filename });
   }
 
   // ---- World meta ----
@@ -670,16 +826,16 @@ export class FsFolderStore implements FolderStore {
     // happen; resilience only) fall back to a disk read and re-warm.
     const buckets = new Map<ElementType, Element[]>();
     for (const t of types) buckets.set(t, []);
-    const misses: Array<{ id: string; type: ElementType; filename: string }> = [];
+    const misses: Array<{ id: string; type: ElementType; layout: LayoutDir; filename: string }> = [];
     for (const [id, entry] of this.fileIndex) {
       const bucket = buckets.get(entry.type);
       if (!bucket) continue;
       const body = this.bodyCache.get(id);
       if (body) bucket.push(structuredClone(body));
-      else misses.push({ id, type: entry.type, filename: entry.filename });
+      else misses.push({ id, type: entry.type, layout: entry.layout, filename: entry.filename });
     }
     for (const miss of misses) {
-      const dir = await tryGetDir(this.requireRoot(), elementDirSegments(miss.type));
+      const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(miss.layout, miss.type));
       if (!dir) continue;
       const elem = await readJson<Element>(dir, miss.filename);
       if (elem) {
@@ -709,7 +865,7 @@ export class FsFolderStore implements FolderStore {
     if (!entry) return null;
     const cached = this.bodyCache.get(id);
     if (cached) return structuredClone(cached);
-    const dir = await tryGetDir(this.requireRoot(), elementDirSegments(entry.type));
+    const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(entry.layout, entry.type));
     if (!dir) return null;
     const elem = await readJson<Element>(dir, entry.filename);
     if (!elem) {
@@ -751,10 +907,11 @@ export class FsFolderStore implements FolderStore {
       local_updated_at: now,
     };
     await this.ensureIndexFor(type);
-    const dir = await getDir(this.requireRoot(), elementDirSegments(type));
-    const filename = this.resolveFilename(type, id, elem.name);
+    const layout = this.writeLayoutFor(type);
+    const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
+    const filename = this.resolveFilename(type, layout, id, elem.name);
     await writeJsonAtomic(dir, filename, elem);
-    this.setIndex(id, type, filename);
+    this.setIndex(id, type, layout, filename);
     this.cacheSet(elem);
     return elem;
   }
@@ -822,12 +979,17 @@ export class FsFolderStore implements FolderStore {
     next: Element,
     previousName: string,
   ): Promise<void> {
-    const dir = await getDir(this.requireRoot(), elementDirSegments(type));
+    // An existing element is rewritten WHERE IT LIVES — a map found in a
+    // legacy `spatial/` folder stays there rather than silently migrating to
+    // `elements/` on its next edit. Only a brand-new element uses the world's
+    // write layout.
     const entry = this.indexEntry(id);
+    const layout = entry?.layout ?? this.writeLayoutFor(type);
+    const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
     const currentFilename = entry?.filename ?? elementFilename(id, previousName);
     if (validElementFilenames(id, next.name).some(f => sameFsName(f, currentFilename))) {
       await writeJsonAtomic(dir, currentFilename, next);
-      this.setIndex(id, type, currentFilename);
+      this.setIndex(id, type, layout, currentFilename);
       this.cacheSet(next);
       return;
     }
@@ -836,9 +998,9 @@ export class FsFolderStore implements FolderStore {
     // name was excluded above, so old and new are DISTINCT physical entries
     // even on case-folding filesystems. A crash between the two steps is
     // covered by ensureIndexFor's dedupe (latest local_updated_at wins).
-    const newFilename = this.resolveFilename(type, id, next.name);
+    const newFilename = this.resolveFilename(type, layout, id, next.name);
     await writeJsonAtomic(dir, newFilename, next);
-    this.setIndex(id, type, newFilename);
+    this.setIndex(id, type, layout, newFilename);
     this.cacheSet(next);
     await removeFile(dir, currentFilename).catch(err => {
       console.warn(`[fs-folder-store] rename: failed to remove old file ${currentFilename}`, err);
@@ -957,7 +1119,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   private async unlinkElement(elem: Element): Promise<void> {
-    const dir = await tryGetDir(this.requireRoot(), elementDirSegments(elem.type));
+    const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(this.layoutOf(elem.id, elem.type), elem.type));
     if (!dir) return;
     const entry = this.indexEntry(elem.id);
     const filename = entry?.filename ?? elementFilename(elem.id, elem.name);
@@ -1172,7 +1334,7 @@ export class FsFolderStore implements FolderStore {
       const next: Element = { ...existing, server_updated_at };
       const entry = this.indexEntry(id);
       const filename = entry?.filename ?? elementFilename(id, existing.name);
-      const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
+      const dir = await this.dirForElement(id, existing.type);
       await writeJsonAtomic(dir, filename, next);
       this.cacheSet(next);
     });
@@ -1185,7 +1347,7 @@ export class FsFolderStore implements FolderStore {
       const { server_updated_at: _drop, ...rest } = existing;
       const entry = this.indexEntry(id);
       const filename = entry?.filename ?? elementFilename(id, existing.name);
-      const dir = await getDir(this.requireRoot(), elementDirSegments(existing.type));
+      const dir = await this.dirForElement(id, existing.type);
       await writeJsonAtomic(dir, filename, rest as Element);
       this.cacheSet(rest as Element);
     });
@@ -1203,7 +1365,7 @@ export class FsFolderStore implements FolderStore {
       const { server_updated_at: _drop, ...rest } = elem;
       const entry = this.indexEntry(elem.id);
       const filename = entry?.filename ?? elementFilename(elem.id, elem.name);
-      const dir = await getDir(this.requireRoot(), elementDirSegments(elem.type));
+      const dir = await this.dirForElement(elem.id, elem.type);
       await writeJsonAtomic(dir, filename, rest as Element);
       this.cacheSet(rest as Element);
       cleared++;
@@ -1280,7 +1442,7 @@ export class FsFolderStore implements FolderStore {
     // Catches "write reports success but disk content didn't change" Chromium
     // quirks that the in-flight write-buffer can mask.
     try {
-      const dir = await getDir(this.requireRoot(), elementDirSegments(type));
+      const dir = await this.dirForElement(id, type);
       const entry = this.indexEntry(id);
       const filename = entry?.filename ?? elementFilename(id, elem.name);
       const readback = await readJson<Element>(dir, filename);
