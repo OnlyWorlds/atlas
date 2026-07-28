@@ -173,6 +173,8 @@ The legacy had no real FolderStore — its store layer was IDB-cached, not folde
 
 **Layout decision**: pins/zones/markers stored as one file per element under `spatial/<type>/<id>.json` (not bundled per map as the legacy DESIGN suggested). Bundle-per-map was never implemented; uniform one-file-per-element is simpler and works fine for OW scale.
 
+> **SUPERSEDED 2026-07-28 (S334)**, recorded rather than rewritten because this file is a decision log. The one-file-per-element half stands and is now the format. The `spatial/` directory half was overturned: `elements/<type>/` is the Folder Format for all 22 types, atlas reads both as a union and writes `elements/` for new worlds. The split was never semantic, and it silently hid maps, pins, zones and markers in worlds written by any other tool. See DESIGN.md "Directory layout".
+
 ---
 
 ## Phase 1.5 (UI primitive ports, 2026-05-12)

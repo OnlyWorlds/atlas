@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.2',
+    date: '2026-07-28',
+    theme: 'worlds from other tools',
+    entries: [
+      {
+        id: 'union-read-foreign-worlds',
+        title: 'Worlds written by other tools open completely',
+        body: 'Atlas kept maps, pins, zones and markers in their own folder, and every other OnlyWorlds tool keeps them beside the rest of the elements. Opening one of those worlds showed all the characters and locations with none of the maps, and said nothing about it. Atlas now reads both arrangements, so a world made anywhere opens whole.',
+        tags: ['folders', 'fix'],
+      },
+      {
+        id: 'new-worlds-one-folder-shape',
+        title: 'New worlds use one folder shape for everything',
+        body: 'A world atlas creates now keeps all twenty two element types under elements, maps included. Worlds you already have keep the shape they have, and both open the same way.',
+        tags: ['folders'],
+      },
+    ],
+  },
+  {
     version: '1.1',
     date: '2026-07-26',
     theme: 'the first sweep after launch',
