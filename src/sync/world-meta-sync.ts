@@ -39,7 +39,23 @@ export const META_SYNC_FIELDS: Readonly<Record<string, MetaFieldKind>> = {
 
 export const META_SYNC_FIELD_NAMES: readonly string[] = Object.keys(META_SYNC_FIELDS);
 
-/** The one disk↔wire rename (keel calls the now `time_range_current`). */
+/**
+ * The one disk↔wire rename, and the direction matters (ruled 2026-07-28,
+ * folder-format v0.3.5).
+ *
+ * **`time_current` is the CANONICAL SCHEMA's name** (`schema/world.yaml:59`,
+ * public GitHub and keel's copy alike). Atlas's disk name is the standard's
+ * name; keel renamed the column in its v1→v2 migration
+ * (`rehearsal/transform.py:249`, `# RENAME (R5)`) and never updated the
+ * standard, so the WIRE carries the deviation. This table translates the
+ * server's dialect back to the standard on the way in, rather than being an
+ * atlas-ism on the way out.
+ *
+ * Do not "fix" this by adopting the wire spelling on disk. A capture written
+ * straight from the wire is handled by the read-tolerance in
+ * `FsFolderStore.readWorldMeta`, which fills the canonical key and never
+ * rewrites the foreign one.
+ */
 export const META_WIRE_RENAME: Readonly<Record<string, string>> = {
   time_current: 'time_range_current',
 };

@@ -131,7 +131,19 @@ export interface RelationField {
   target: ElementType | null;
 }
 
-/** Spatial types whose disk shape suffixes relation fields with _id / _ids. */
+/**
+ * Spatial types whose disk shape suffixes relation fields with _id / _ids.
+ *
+ * ⚠ THIS IS A GENERATOR, NOT A TABLE (census 2026-07-28). It does not rename
+ * two known fields — it suffixes EVERY link field on these two types, present
+ * and future. The day the Council adds a link field to pin or marker, atlas
+ * will silently invent a private `_id` disk name for it that no other
+ * implementation writes, with nobody having decided that. Folder-format §5
+ * already rules the disk names should be bare schema names (Temper, ruled
+ * 2026-07-13, unbuilt): write-bare, read-accept-both forever, open-time tidy
+ * converges old files. Until that lands this set is an open tap, and it fires
+ * on schema growth rather than on anything atlas does.
+ */
 const WIRE_SHAPE_TYPES = new Set<ElementType>(['pin', 'marker']);
 
 /**

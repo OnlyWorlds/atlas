@@ -775,7 +775,29 @@ export class FsFolderStore implements FolderStore {
 
   async readWorldMeta(): Promise<WorldMeta> {
     const meta = await readJson<WorldMeta>(this.requireRoot(), WORLD_META_FILE);
-    return meta ?? { ...DEFAULT_META };
+    if (!meta) return { ...DEFAULT_META };
+    // THE NOW, UNDER EITHER SPELLING (folder-format v0.3.5, 2026-07-28).
+    //
+    // Canonical `schema/world.yaml` names this field `time_current`, which is
+    // what atlas has always written — the deviation is keel's, which renamed
+    // the column in its v1→v2 migration and never updated the standard. A
+    // capture written straight from the v2 wire therefore carries
+    // `time_range_current`, and its world would open here with no now at all:
+    // no now-line on the charts, and a "set now time" button offering to set a
+    // value the folder already holds. Measured against a real capture from
+    // another implementation before this line existed.
+    //
+    // FILL ONLY, NEVER REWRITE. The foreign key stays exactly where it was:
+    // spec v0.3.5 rules that a reader MUST NOT rewrite an existing file's key
+    // spelling to the canonical one as a side effect of opening it, and
+    // `writeWorldMeta` is a read-merge-write of this whole object — so
+    // normalizing by DELETING the old key would silently rename a key inside
+    // somebody's frozen capture on the next unrelated meta write.
+    const raw = meta as WorldMeta & { time_range_current?: number | null };
+    if (raw.time_current === undefined && raw.time_range_current !== undefined) {
+      return { ...raw, time_current: raw.time_range_current ?? undefined };
+    }
+    return meta;
   }
 
   async writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta> {

@@ -70,7 +70,11 @@ test.beforeEach(async ({ page }) => {
   }, readFixtureFiles(WORLD_DIR));
 });
 
-test('atlas reads the conformance fixture: 6 normative elements + 1 legacy, nothing invented', async ({ page }) => {
+// The counts come from `expected.json` and are never written into this title:
+// an earlier title said "6 normative + 1 legacy", was true when written, and
+// went stale the moment the answer key grew while the assertion below (derived)
+// stayed correct. A test name is a claim like any other.
+test('atlas reads the conformance fixture: every element in the answer key, nothing invented', async ({ page }) => {
   const report = await page.evaluate(async () => {
     const api = window.__atlasTestApi;
     const root = await api.opfsRoot();
@@ -121,6 +125,60 @@ test('atlas reads the conformance fixture: 6 normative elements + 1 legacy, noth
   // A mapless pin is a legitimate app pattern (Captain's ruling, 2026-07-28):
   // it loads, and atlas does not invent a map for it.
   expect(byId.get('11111111-2222-4333-8444-555555555505')!.pinMap).toBeNull();
+});
+
+/**
+ * THE NOW, UNDER EITHER SPELLING (folder-format v0.3.5).
+ *
+ * Canonical `schema/world.yaml` names this field `time_current` — atlas's disk
+ * name is the standard's name, and keel's `time_range_current` is the
+ * deviation (renamed in its v1→v2 migration, standard never updated). A
+ * capture written straight from the v2 wire therefore carries the wire's
+ * spelling, and before this guard its world opened with no now at all.
+ *
+ * The second assertion is the load-bearing one: the foreign key is NOT
+ * rewritten. A reader must not migrate a key spelling as a side effect of
+ * being pointed at a folder.
+ */
+test('a capture written with the wire spelling still has its now, and keeps its own key', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    // Overwrite the fixture's world.json with a capture-shaped one: the wire
+    // spelling only, exactly as another implementation's writer emits it.
+    const fh = await root.getFileHandle('world.json', { create: true });
+    const ws = await fh.createWritable();
+    await ws.write(JSON.stringify({
+      id: '0f01d3ea-0000-4000-8000-000000000001',
+      name: 'Conformance',
+      time_basic_unit: 'Year',
+      time_range_min: -300,
+      time_range_max: 100,
+      time_range_current: 42,
+      snapshot_label: 'ch05',
+    }, null, 2));
+    await ws.close();
+
+    const store = new api.FsFolderStore({ tabId: 'conformance', disableHeartbeat: true });
+    await store.open(root);
+    const meta = await store.readWorldMeta();
+    await store.close();
+
+    const onDisk = JSON.parse(await (await (await root.getFileHandle('world.json')).getFile()).text());
+    return {
+      now: meta.time_current ?? null,
+      diskHasWireKey: Object.prototype.hasOwnProperty.call(onDisk, 'time_range_current'),
+      diskHasCanonicalKey: Object.prototype.hasOwnProperty.call(onDisk, 'time_current'),
+      unit: meta.time_basic_unit ?? null,
+    };
+  });
+  // The now is READ, under the canonical name the rest of atlas consumes.
+  expect(result.now).toBe(42);
+  expect(result.unit).toBe('Year');
+  // And the file is untouched: its own spelling survives, no canonical key
+  // was invented on disk. Opening a capture must never migrate it.
+  expect(result.diskHasWireKey).toBe(true);
+  expect(result.diskHasCanonicalKey).toBe(false);
 });
 
 test('a read leaves the fixture folder byte-identical, id-less file included', async ({ page }) => {
