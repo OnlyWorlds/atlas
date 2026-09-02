@@ -13,9 +13,26 @@ import { hasFolderMode } from '../core/capabilities';
 import { escapeText } from '../core/dom-utils';
 import { navigate, timelineHash } from '../core/router';
 import { getState, subscribe } from '../core/state';
-import { recoverAtlasRoot, setupAtlasRoot } from '../setup/atlas-root-flow';
+import { recoverAtlasRoot, setupAtlasRoot, adoptPickedWorldFolder, WORLD_FOLDER_PICKED_HINT } from '../setup/atlas-root-flow';
+
+/**
+ * A setup door was pointed at a world folder (S354). With a root already in
+ * place, open the world where it is; on a first launch there is no root to
+ * stand beside it yet, so say which door was meant.
+ */
+async function handlePickedWorldFolder(picked: FileSystemDirectoryHandle): Promise<void> {
+  const worldId = await adoptPickedWorldFolder(picked);
+  if (!worldId) {
+    toastManager.info(WORLD_FOLDER_PICKED_HINT);
+    return;
+  }
+  toastManager.success(`"${picked.name}" is a world folder. Opened it in place; the folder stays where it is`);
+  const { activateWorld } = await import('../sidebar/worlds-sidebar');
+  await activateWorld(worldId, toastManager);
+}
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
+import { PICKER_CANCELLED_HINT } from '../ui/directory-picker';
 
 export function mountWelcomePanel(target: HTMLElement): () => void {
   target.innerHTML = '';
@@ -53,8 +70,35 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           <div class="atlas-welcome-actions">
             <button class="atlas-btn-primary" data-action="recover-atlas">Re-link OnlyWorlds folder</button>
           </div>
+          <p class="atlas-welcome-hint"><button class="atlas-btn-link" data-action="setup-atlas">Or set up a different folder</button></p>
         </div>
       `;
+      // The second door (Captain, S354): after a storage clear this screen
+      // offered ONLY the re-link, so choosing a new place meant re-linking
+      // the old one first and then changing it in Settings. Settings already
+      // had both doors; the welcome now matches it.
+      const altBtn = root.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]')!;
+      altBtn.addEventListener('click', async () => {
+        altBtn.disabled = true;
+        try {
+          const result = await setupAtlasRoot();
+          if (result?.worldFolder) {
+            await handlePickedWorldFolder(result.worldFolder);
+          } else if (result) {
+            toastManager.success(
+              result.imported > 0
+                ? `OnlyWorlds folder set up: found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
+                : 'OnlyWorlds folder is set up'
+            );
+          } else {
+            toastManager.info(PICKER_CANCELLED_HINT);
+          }
+        } catch (err) {
+          toastManager.error(err instanceof Error ? err.message : String(err));
+        } finally {
+          altBtn.disabled = false;
+        }
+      });
       const btn = root.querySelector<HTMLButtonElement>('[data-action="recover-atlas"]')!;
       btn.addEventListener('click', async () => {
         btn.disabled = true;
@@ -186,12 +230,16 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         btn.textContent = 'Picking…';
         try {
           const result = await setupAtlasRoot();
-          if (result) {
+          if (result?.worldFolder) {
+            await handlePickedWorldFolder(result.worldFolder);
+          } else if (result) {
             toastManager.success(
               result.imported > 0
                 ? `OnlyWorlds folder set up: found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
                 : 'OnlyWorlds folder is set up'
             );
+          } else {
+            toastManager.info(PICKER_CANCELLED_HINT);
           }
         } catch (err) {
           toastManager.error(err instanceof Error ? err.message : String(err));

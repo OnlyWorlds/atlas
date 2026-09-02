@@ -16,8 +16,9 @@ import {
   setSyncConfirmServerDeletes,
   setSyncPauseAll,
 } from '../registry/registry';
-import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
+import { setupAtlasRoot, recoverAtlasRoot, adoptPickedWorldFolder, WORLD_FOLDER_PICKED_HINT } from '../setup/atlas-root-flow';
 import { ToastManager } from '../ui/toast-manager';
+import { PICKER_CANCELLED_HINT } from '../ui/directory-picker';
 import {
   getCurrentSyncEngine,
   getCurrentSyncFolder,
@@ -107,12 +108,26 @@ function wireStorageDeviceActions(toasts: ToastManager): void {
     btn.disabled = true;
     try {
       const result = await setupAtlasRoot();
-      if (result) {
+      if (result?.worldFolder) {
+        // The pick was a world, not a place for worlds (S354). With a root
+        // in place, do what was meant: open it where it is.
+        const worldId = await adoptPickedWorldFolder(result.worldFolder);
+        if (worldId) {
+          toasts.success(`"${result.worldFolder.name}" is a world folder. Opened it in place; the folder stays where it is`);
+          const { activateWorld } = await import('../sidebar/worlds-sidebar');
+          await activateWorld(worldId, toasts);
+        } else {
+          toasts.info(WORLD_FOLDER_PICKED_HINT);
+        }
+      } else if (result) {
         toasts.success(
           result.imported > 0
             ? `OnlyWorlds folder updated: found ${result.imported} world${result.imported === 1 ? '' : 's'} there`
             : 'OnlyWorlds folder updated'
         );
+      } else {
+        // A silent cancel read as "the button does nothing" (Captain, S354).
+        toasts.info(PICKER_CANCELLED_HINT);
       }
     } catch (err) {
       toasts.error(err instanceof Error ? err.message : String(err));

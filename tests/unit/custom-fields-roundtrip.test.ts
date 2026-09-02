@@ -72,12 +72,12 @@ describe('custom extension fields (atlas_/x_/shadow_) survive the import layer',
       atlas_aliases: ['H'],          // LOCAL_ONLY — strip
       atlas_richtext_json: { doc: 1 }, // LOCAL_ONLY — strip
     });
-    const exported = await buildWorldExport(store) as Record<string, Array<Record<string, unknown>>>;
-    const zone = exported.Zone[0];
+    const exported = (await buildWorldExport(store) as { elements: Record<string, Array<Record<string, unknown>>> }).elements;
+    const zone = exported.zone[0];
     expect(zone.atlas_shape).toBe('polygon');
     expect(zone.atlas_color).toBe('#22d3ee');
     expect(zone.x_founded_by).toBe('the old kings');
-    const hero = exported.Character[0];
+    const hero = exported.character[0];
     expect(hero.x_mood).toBe('grim');
     expect(hero.atlas_aliases).toBeUndefined();
     expect(hero.atlas_richtext_json).toBeUndefined();
@@ -88,8 +88,8 @@ describe('custom extension fields (atlas_/x_/shadow_) survive the import layer',
     const store = new MockFolderStore();
     await store.open(null);
     await store.createElement('character', { name: 'Hero', x_mood: 'grim' });
-    const exported = await buildWorldExport(store) as Record<string, unknown>;
-    const record = (exported.Character as Array<Record<string, unknown>>)[0];
+    const exported = (await buildWorldExport(store) as { elements: Record<string, unknown> }).elements;
+    const record = (exported.character as Array<Record<string, unknown>>)[0];
     const { record: reimported } = normalizeRecord(record, 'character');
     expect(reimported.x_mood).toBe('grim');
     expect(reimported.name).toBe('Hero');

@@ -215,7 +215,12 @@ export async function writeJsonAtomic(
   value: unknown
 ): Promise<void> {
   const tmpName = `${name}${TMP_SUFFIX}`;
-  const json = JSON.stringify(value, null, 2);
+  // Trailing newline (S354, the git hop of the migration bout): every other
+  // writer of the format ends a file with one, and git shows "no newline at
+  // end of file" plus a phantom last-line change for each atlas edit in a
+  // world repo without it. Key order and two-space indent were already the
+  // same; this was the only byte-level difference an edit introduced.
+  const json = JSON.stringify(value, null, 2) + '\n';
 
   // Quick read of the existing file (if any) so we can detect "write succeeded
   // but content didn't actually change" — a Chromium FS Access API quirk

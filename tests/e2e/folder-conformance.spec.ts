@@ -125,6 +125,78 @@ test('atlas reads the conformance fixture: every element in the answer key, noth
   // A mapless pin is a legitimate app pattern (Captain's ruling, 2026-07-28):
   // it loads, and atlas does not invent a map for it.
   expect(byId.get('11111111-2222-4333-8444-555555555505')!.pinMap).toBeNull();
+
+  // A pin linked under the SPEC spelling (`map`, §5 bare link names) resolves
+  // to its map in memory (S354). Before this, a folder written by another
+  // tool opened with every pin missing and the map index reading 0.
+  expect(byId.get('11111111-2222-4333-8444-555555555508')!.pinMap).toBe('11111111-2222-4333-8444-555555555503');
+});
+
+/**
+ * THE LINK SPELLING IS PER FILE AND STICKY (S354, §5).
+ *
+ * Editing a bare-spelled pin must write `map` back, not `map_id`; creating a
+ * new pin in a folder whose pins are all bare must follow the folder; and an
+ * atlas-spelled file keeps its suffix. In memory every pin reads `map_id`.
+ * Runs on a COPY of the fixture (this test writes), so the byte-identical
+ * test below still sees the pristine seed.
+ */
+test('a bare-spelled pin keeps its spelling through an edit, and a new pin follows the folder', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'conformance-spelling', disableHeartbeat: true });
+    await store.open(root);
+    const bareId = '11111111-2222-4333-8444-555555555508';
+    const mapId = '11111111-2222-4333-8444-555555555503';
+    await store.listElements();
+    await store.awaitTidies();
+    // Edit the bare pin: a plain field change, nothing about its map.
+    await store.updateElement(bareId, { description: 'moved a little' });
+    // Create a new pin: the folder's pins are all bare, so it follows.
+    const created = await store.createElement('pin', { name: 'Newcomer', map_id: mapId, x: 1, y: 2 });
+    const inMemory = await store.getElement(bareId);
+    const fresh = await store.getElement(created.id);
+    await store.close();
+    // Read the bytes back, bypassing the store.
+    const pinDir = await (await root.getDirectoryHandle('elements')).getDirectoryHandle('pin');
+    const readRaw = async (name: string) => JSON.parse(await (await (await pinDir.getFileHandle(name)).getFile()).text());
+    const bareRaw = await readRaw('on-the-map--55555508.json');
+    // The fixture carries a legacy `spatial/` directory, so the union read's
+    // sticky layout sends NEW spatial files there (convention #91). The
+    // spelling rule is layout-independent; look in both homes.
+    let newRaw: Record<string, unknown> | null = null;
+    for (const segments of [['elements', 'pin'], ['spatial', 'pin']]) {
+      let dir: FileSystemDirectoryHandle | null = root;
+      for (const s of segments) {
+        try { dir = await dir!.getDirectoryHandle(s); } catch { dir = null; break; }
+      }
+      if (!dir) continue;
+      for await (const entry of (dir as any).values()) {
+        if (entry.kind === 'file' && entry.name.startsWith('newcomer--')) {
+          newRaw = JSON.parse(await (await (await dir.getFileHandle(entry.name)).getFile()).text());
+        }
+      }
+    }
+    return {
+      memoryMap: inMemory?.map_id ?? null,
+      memoryHasBare: inMemory ? 'map' in inMemory : null,
+      freshMap: fresh?.map_id ?? null,
+      bareRawMap: bareRaw.map ?? null,
+      bareRawHasSuffix: 'map_id' in bareRaw,
+      bareRawDescription: bareRaw.description ?? null,
+      newRawMap: newRaw?.map ?? null,
+      newRawHasSuffix: newRaw ? 'map_id' in newRaw : null,
+    };
+  });
+  expect(result.memoryMap).toBe('11111111-2222-4333-8444-555555555503');
+  expect(result.memoryHasBare).toBe(false);
+  expect(result.freshMap).toBe('11111111-2222-4333-8444-555555555503');
+  expect(result.bareRawDescription).toBe('moved a little');
+  expect(result.bareRawMap).toBe('11111111-2222-4333-8444-555555555503');
+  expect(result.bareRawHasSuffix).toBe(false);
+  expect(result.newRawMap).toBe('11111111-2222-4333-8444-555555555503');
+  expect(result.newRawHasSuffix).toBe(false);
 });
 
 /**

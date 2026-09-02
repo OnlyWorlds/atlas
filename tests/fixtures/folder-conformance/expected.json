@@ -1,5 +1,5 @@
 {
-  "fixture_version": "1.1.0",
+  "fixture_version": "1.2.0",
   "spec_version": "0.3.5",
   "created": "2026-07-28",
   "fixture_history": [
@@ -18,6 +18,14 @@
       "elements": 8,
       "legacy_elements": 1,
       "change": "ADDITIVE: the empty-string name and the explicit-nulls element joined elements[], and not-json.json joined skipped_files[], during the S334 session on 2026-07-28. They shipped under the UNCHANGED string 1.0.0 for three days, so 'fixture v1.0.0' named two different artifacts and any pass reported against it is ambiguous. Versioned retroactively here: a reader that found 8 ran 1.1.0. Same defect class as the stale prose count below, one layer down — the field that exists to make divergence honest was itself not maintained."
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-09-02",
+      "spec_version": "0.3.5",
+      "elements": 9,
+      "legacy_elements": 1,
+      "change": "ADDITIVE: on-the-map, a pin whose map link uses the format's BARE spelling (`map`, not atlas's `map_id`). The first folder another tool wrote with pins on it opened in atlas with every pin missing and the map index reading 0: atlas keyed on its own suffixed name and never looked under the spec's. A reader must resolve the link under the spec spelling; a writer must not rewrite the key as a side effect of opening the folder."
     }
   ],
   "world": {
@@ -30,7 +38,11 @@
       "name": "Only Name",
       "type": "character",
       "note": "type is ABSENT in the body; a reader may infer it from the directory or serve it untyped, but must not invent timestamps. RECOMMENDED READING (Quillon, Armature, adopted 2026-07-29): infer from the directory but FLAG the inference rather than presenting it as a declaration, and never write it back. See README 'Where two readings are permitted'",
-      "must_not_have": ["created_at", "local_updated_at", "server_updated_at"]
+      "must_not_have": [
+        "created_at",
+        "local_updated_at",
+        "server_updated_at"
+      ]
     },
     {
       "id": "11111111-2222-4333-8444-555555555502",
@@ -71,6 +83,15 @@
       "name": "Null Fields",
       "type": "character",
       "note": "explicit nulls on single links, multi links, a date and a text field. null means UNSET and is never the same claim as 0 or empty-string; a reader must not collapse it"
+    },
+    {
+      "id": "11111111-2222-4333-8444-555555555508",
+      "name": "On the Map",
+      "type": "pin",
+      "note": "links its map under the SPEC spelling `map` (bare link names, §5), never `map_id`. A reader must resolve it to The Territory. A writer that touches this file for any other reason must keep the key as `map`; a reader must not migrate it",
+      "links": {
+        "map": "11111111-2222-4333-8444-555555555503"
+      }
     }
   ],
   "legacy_elements": [

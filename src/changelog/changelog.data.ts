@@ -56,6 +56,66 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.3',
+    date: '2026-09-02',
+    theme: 'the web shows who links here',
+    entries: [
+      {
+        id: 'web-backlinks',
+        title: 'The web shows every element that links to the one you are on',
+        body: 'An element that was only ever pointed at, a regime named by its titles and houses, used to show an empty web. Those links now appear as muted nodes below the center, each with an arrow pointing in, alongside the links the element makes itself.',
+        tags: ['web'],
+      },
+      {
+        id: 'pins-under-the-format-spelling',
+        title: 'Pins and markers written by other tools show on their maps',
+        body: 'The folder format names a pin\'s map as "map" and atlas has always written "map_id". A folder from another tool opened with every pin missing and the map count reading zero. Atlas now reads both names and writes each file back the way it found it.',
+        tags: ['folders', 'maps', 'fix'],
+      },
+      {
+        id: 'recover-offers-a-new-folder',
+        title: 'After a browser storage clear you can set up a different folder',
+        body: 'The welcome screen offered only the re-link of the old folder. It now also offers a fresh setup, the same two doors Settings already had. Worlds you opened in place outside the atlas folder come back with the re-link too.',
+        tags: ['folders', 'fix'],
+      },
+      {
+        id: 'folder-picker-says-when-refused',
+        title: 'A refused or cancelled folder pick says so',
+        body: 'Chrome will not open the top of Desktop, Documents or Downloads, and the refusal used to look like the button doing nothing. Change folder and open folder now say when no folder was chosen and suggest a subfolder.',
+        tags: ['folders'],
+      },
+      {
+        id: 'landing-doors-one-shape',
+        title: 'The two landing buttons share one shape in every browser',
+        tags: ['layout', 'fix'],
+      },
+      {
+        id: 'change-folder-knows-a-world',
+        title: 'Pointing Change folder at a world opens the world',
+        body: 'Set up and Change folder expect a place to keep worlds. Given a folder that is itself a world, they used to nest an empty atlas folder inside it. Now they recognise the world and open it in place, or say which button does that on a first launch.',
+        tags: ['folders', 'fix'],
+      },
+      {
+        id: 'map-chips-one-rule-light',
+        title: 'Every label over the map keeps the same dark chip in light mode',
+        body: 'Pin labels went dark in light mode weeks ago and zone labels stayed white beside them. Zone labels, the placement banner and the pin tooltip\'s small print all follow the same rule now. The chart plot keeps its dark panel and gains a frame on the light page.',
+        tags: ['lightmode', 'maps', 'fix'],
+      },
+      {
+        id: 'web-preview-linked-from',
+        title: 'The web preview lists everything that links to an element',
+        body: 'It used to name only the narratives an element appears in. It now names every element that links to it, narratives first, with the count.',
+        tags: ['web'],
+      },
+      {
+        id: 'export-writes-the-onlyworlds-envelope',
+        title: 'Export writes the same file onlyworlds.com exports',
+        body: 'Atlas used to write an older shape with capitalised type names and no world id. It now writes the onlyworlds.com world export exactly, world id included, so a file can travel between the two and back without loss. Older files still import.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.2',
     date: '2026-07-28',
     theme: 'worlds from other tools',

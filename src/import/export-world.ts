@@ -16,6 +16,7 @@
 import { ALL_ELEMENT_TYPES, type ElementType } from '../core/types';
 import { ATLAS_LOCAL_ONLY_FIELDS } from '../core/constants';
 import { relationFieldsFor } from '../editor/field-schema';
+import { ONLYWORLDS_VERSION } from '@onlyworlds/sdk';
 import type { FolderStore } from '../store/folder-store';
 import type { RawRecord } from './types';
 
@@ -31,10 +32,6 @@ export interface ExportOptions {
   types?: ReadonlySet<ElementType>;
   /** Include the world's api_key in the World block (for re-upload to onlyworlds.com). */
   includeCredentials?: boolean;
-}
-
-function cap(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function toExportRecord(el: Record<string, unknown>, type: ElementType): RawRecord {
@@ -69,11 +66,29 @@ export async function buildWorldExport(
   if (meta.time_range_min !== undefined) world.time_range_min = meta.time_range_min;
   if (meta.time_range_max !== undefined) world.time_range_max = meta.time_range_max;
 
-  const out: Record<string, unknown> = { World: world };
+  // THE ENVELOPE (S354, converging on keel's `onlyworlds-world-export`, owed
+  // to Skeld since S313). One shape both ways now: keel exports it, atlas
+  // imports it (parse.ts), and atlas exports it. The world keeps its id: the
+  // envelope's whole point is a lossless round-trip (id-is-identity), and
+  // atlas's import already offers merge-or-copy when the id is known. The
+  // legacy `World` + PascalCase shape is still READ by parse.ts and is no
+  // longer written.
+  if (meta.id) world.id = meta.id;
+  const elements: Record<string, RawRecord[]> = {};
   const types = opts.types ? ALL_ELEMENT_TYPES.filter(t => opts.types!.has(t)) : ALL_ELEMENT_TYPES;
   for (const type of types) {
     const els = await store.listElements(type);
-    out[cap(type)] = els.map(el => toExportRecord(el as Record<string, unknown>, type));
+    elements[type] = els.map(el => toExportRecord(el as Record<string, unknown>, type));
   }
-  return out;
+  return {
+    format: EXPORT_FORMAT,
+    schema_version: ONLYWORLDS_VERSION,
+    exported_at: new Date().toISOString(),
+    exporter: 'atlas',
+    world,
+    elements,
+  };
 }
+
+/** The self-describing tag keel writes and `parse.ts` keys on. */
+export const EXPORT_FORMAT = 'onlyworlds-world-export';

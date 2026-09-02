@@ -60,6 +60,19 @@ import type {
 import type { FolderStore, ListElementsOptions } from './folder-store';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { newId, nowIso } from './folder-store';
+import { normalizeDiskLinks, denormalizeDiskLinks, type LinkSpelling } from './disk-link-names';
+
+/**
+ * One file's binding: where it lives and how its link fields are spelled
+ * there (S354). `spelling` is per FILE, never per world: a folder can hold
+ * pins from two writers, and each file keeps its own.
+ */
+interface IndexEntry {
+  type: ElementType;
+  layout: LayoutDir;
+  filename: string;
+  spelling: LinkSpelling;
+}
 
 /**
  * Bounded concurrency for the index-pass file reads. FS Access API calls
@@ -72,8 +85,8 @@ const INDEX_READ_CONCURRENCY = 64;
 /** One (type, layout) directory's scan result — see `scanLayoutFor`. */
 interface LayoutScan {
   dir: FileSystemDirectoryHandle;
-  /** id → the file that survived same-directory crash-twin dedupe. */
-  survivors: Map<string, { filename: string; body: Element }>;
+  /** id → the file that survived same-directory crash-twin dedupe. `spelling` null = the file declares none. */
+  survivors: Map<string, { filename: string; body: Element; spelling: LinkSpelling | null }>;
   /** Lowercased names of files the scan could not read — never a tidy target. */
   unreadableLc: Set<string>;
 }
@@ -168,7 +181,15 @@ export class FsFolderStore implements FolderStore {
    * Built lazily per type on first read/write that needs it. Updated in-place
    * on create/update/delete. Cleared in close().
    */
-  private fileIndex: Map<string, { type: ElementType; layout: LayoutDir; filename: string }> = new Map();
+  private fileIndex: Map<string, IndexEntry> = new Map();
+  /**
+   * Types whose files in THIS folder all use the bare (schema) link spelling
+   * (S354). A NEW file of such a type is written bare too, so a folder another
+   * tool made stays one dialect after atlas adds a pin to it. Any other
+   * folder (mixed, empty, atlas-made) gets atlas's spelling for new files.
+   * Detected per type at index time; cleared in close().
+   */
+  private bareSpellingTypes = new Set<ElementType>();
   /**
    * Where NEW spatial elements go in THIS world. Detected once at open:
    * `spatial/` when the folder already keeps spatial files there (an atlas
@@ -292,6 +313,7 @@ export class FsFolderStore implements FolderStore {
     }
     this.root = null;
     this.fileIndex.clear();
+    this.bareSpellingTypes.clear();
     this.indexedTypes.clear();
     this.bodyCache.clear();
     this.indexBuilds.clear();
@@ -504,6 +526,22 @@ export class FsFolderStore implements FolderStore {
     // destroying half of it. Newest `local_updated_at` is served, ties go to
     // `elements/`, and the shadowed copy is named in a warning so the state
     // is discoverable rather than mysterious.
+    // New-file spelling for this type (S354): bare only when every file that
+    // DECLARES a spelling is bare. Files that declare none (a mapless pin)
+    // cast no vote and take this default. Recomputed per index build so a
+    // folder that changes hands re-detects on next open.
+    let bare = 0;
+    let total = 0;
+    for (const { scan } of perLayout) {
+      for (const rec of scan.survivors.values()) {
+        if (rec.spelling === null) continue;
+        total++;
+        if (rec.spelling === 'bare') bare++;
+      }
+    }
+    if (total > 0 && bare === total) this.bareSpellingTypes.add(type);
+    else this.bareSpellingTypes.delete(type);
+
     for (const { layout, scan } of perLayout) {
       for (const [id, rec] of scan.survivors) {
         const existing = this.fileIndex.get(id);
@@ -519,7 +557,7 @@ export class FsFolderStore implements FolderStore {
           );
           if (!challengerWins) continue;
         }
-        this.fileIndex.set(id, { type, layout, filename: rec.filename });
+        this.fileIndex.set(id, { type, layout, filename: rec.filename, spelling: rec.spelling ?? this.writeSpellingFor(type) });
         // The index pass owns these freshly-parsed bodies outright — cache
         // them without a clone (serve-side clones protect them from callers).
         this.bodyCache.set(id, rec.body);
@@ -558,8 +596,9 @@ export class FsFolderStore implements FolderStore {
       }
     }
     files.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-    type Rec = { filename: string; body: Element };
+    type Rec = { filename: string; body: Element; spelling: LinkSpelling | null };
     const bodies: Array<Element | null> = new Array(files.length);
+    const spellings: Array<LinkSpelling | null> = new Array(files.length).fill(null);
     let cursor = 0;
     const readWorker = async () => {
       while (cursor < files.length) {
@@ -613,9 +652,13 @@ export class FsFolderStore implements FolderStore {
       if (typeof body.type !== 'string' || !body.type) {
         body.type = type;
       }
+      // LINK SPELLING (S354, §5): a pin written by the format carries `map`;
+      // atlas keys on `map_id`. Normalise in memory and remember which
+      // spelling the FILE used, so a write goes back the way it came.
+      spellings[i] = normalizeDiskLinks(body);
       const list = grouped.get(body.id);
-      if (list) list.push({ filename, body });
-      else grouped.set(body.id, [{ filename, body }]);
+      if (list) list.push({ filename, body, spelling: spellings[i] });
+      else grouped.set(body.id, [{ filename, body, spelling: spellings[i] }]);
     }
     // Dedupe crash-twins FIRST for every group (grouping is by body id, so a
     // same-named stranger can never be a "loser"), building the survivor set.
@@ -693,11 +736,11 @@ export class FsFolderStore implements FolderStore {
             // Distinct entries by construction (target is free, lc-equality
             // excluded), so write-new + remove-old cannot self-delete on a
             // case-folding filesystem.
-            await writeJsonAtomic(dir, target, body);
+            await this.writeElementFile(dir, target, body);
             await removeFile(dir, filename).catch(() => {});
             occupied.delete(filename.toLowerCase());
             occupied.set(target.toLowerCase(), id);
-            this.fileIndex.set(id, { type, layout, filename: target });
+            this.setIndex(id, type, layout, target);
             tidied++;
           }).catch(err => console.warn(`[fs-folder-store] tidy(${type}@${layout}) skipped ${id}:`, err));
         }
@@ -735,6 +778,33 @@ export class FsFolderStore implements FolderStore {
     return SPATIAL_TYPES.has(type) ? this.spatialWriteLayout : ELEMENTS_DIR;
   }
 
+  /** Link spelling for a NEW file of `type` in this folder (S354). */
+  private writeSpellingFor(type: ElementType): LinkSpelling {
+    return this.bareSpellingTypes.has(type) ? 'bare' : 'atlas';
+  }
+
+  /**
+   * THE ONE ELEMENT-FILE WRITE (S354). Every element body reaches disk
+   * through here so the file's own link spelling is honoured: an existing
+   * file keeps the spelling it was read with, a new file takes the folder's.
+   * The cache keeps the in-memory spelling; only the bytes on disk differ.
+   */
+  private async writeElementFile(dir: FileSystemDirectoryHandle, filename: string, body: Element): Promise<void> {
+    const spelling = this.fileIndex.get(body.id)?.spelling ?? this.writeSpellingFor(body.type);
+    await writeJsonAtomic(dir, filename, denormalizeDiskLinks(body, spelling));
+  }
+
+  /**
+   * A body just read from disk OUTSIDE the index pass (cache miss): bring it
+   * to the in-memory spelling and record what the file used, so a later
+   * write of this element does not silently change its dialect.
+   */
+  private adoptDiskBody(id: string, elem: Element): void {
+    const spelling = normalizeDiskLinks(elem);
+    const entry = this.fileIndex.get(id);
+    if (spelling && entry && entry.spelling !== spelling) this.fileIndex.set(id, { ...entry, spelling });
+  }
+
   /** The layout an element ACTUALLY lives in: its recorded one, else the write default. */
   private layoutOf(id: string, type: ElementType): LayoutDir {
     return this.fileIndex.get(id)?.layout ?? this.writeLayoutFor(type);
@@ -762,13 +832,18 @@ export class FsFolderStore implements FolderStore {
   }
 
   /** Resolve the on-disk location for an id. Returns undefined if not indexed. */
-  private indexEntry(id: string): { type: ElementType; layout: LayoutDir; filename: string } | undefined {
+  private indexEntry(id: string): IndexEntry | undefined {
     return this.fileIndex.get(id);
   }
 
-  /** Record a new or updated file binding. */
+  /**
+   * Record a new or updated file binding. The spelling is STICKY: an entry
+   * that already exists keeps the spelling its file was read with; only a
+   * brand-new binding takes the folder's default for the type.
+   */
   private setIndex(id: string, type: ElementType, layout: LayoutDir, filename: string): void {
-    this.fileIndex.set(id, { type, layout, filename });
+    const spelling = this.fileIndex.get(id)?.spelling ?? this.writeSpellingFor(type);
+    this.fileIndex.set(id, { type, layout, filename, spelling });
   }
 
   // ---- World meta ----
@@ -848,19 +923,20 @@ export class FsFolderStore implements FolderStore {
     // happen; resilience only) fall back to a disk read and re-warm.
     const buckets = new Map<ElementType, Element[]>();
     for (const t of types) buckets.set(t, []);
-    const misses: Array<{ id: string; type: ElementType; layout: LayoutDir; filename: string }> = [];
+    const misses: Array<IndexEntry & { id: string }> = [];
     for (const [id, entry] of this.fileIndex) {
       const bucket = buckets.get(entry.type);
       if (!bucket) continue;
       const body = this.bodyCache.get(id);
       if (body) bucket.push(structuredClone(body));
-      else misses.push({ id, type: entry.type, layout: entry.layout, filename: entry.filename });
+      else misses.push({ id, ...entry });
     }
     for (const miss of misses) {
       const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(miss.layout, miss.type));
       if (!dir) continue;
       const elem = await readJson<Element>(dir, miss.filename);
       if (elem) {
+        this.adoptDiskBody(miss.id, elem);
         this.bodyCache.set(miss.id, elem);
         buckets.get(miss.type)!.push(structuredClone(elem));
       }
@@ -896,6 +972,7 @@ export class FsFolderStore implements FolderStore {
       this.bodyCache.delete(id);
       return null;
     }
+    this.adoptDiskBody(id, elem);
     this.bodyCache.set(id, elem);
     return structuredClone(elem);
   }
@@ -932,7 +1009,7 @@ export class FsFolderStore implements FolderStore {
     const layout = this.writeLayoutFor(type);
     const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
     const filename = this.resolveFilename(type, layout, id, elem.name);
-    await writeJsonAtomic(dir, filename, elem);
+    await this.writeElementFile(dir, filename, elem);
     this.setIndex(id, type, layout, filename);
     this.cacheSet(elem);
     return elem;
@@ -1010,7 +1087,7 @@ export class FsFolderStore implements FolderStore {
     const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
     const currentFilename = entry?.filename ?? elementFilename(id, previousName);
     if (validElementFilenames(id, next.name).some(f => sameFsName(f, currentFilename))) {
-      await writeJsonAtomic(dir, currentFilename, next);
+      await this.writeElementFile(dir, currentFilename, next);
       this.setIndex(id, type, layout, currentFilename);
       this.cacheSet(next);
       return;
@@ -1021,7 +1098,7 @@ export class FsFolderStore implements FolderStore {
     // even on case-folding filesystems. A crash between the two steps is
     // covered by ensureIndexFor's dedupe (latest local_updated_at wins).
     const newFilename = this.resolveFilename(type, layout, id, next.name);
-    await writeJsonAtomic(dir, newFilename, next);
+    await this.writeElementFile(dir, newFilename, next);
     this.setIndex(id, type, layout, newFilename);
     this.cacheSet(next);
     await removeFile(dir, currentFilename).catch(err => {
@@ -1357,7 +1434,7 @@ export class FsFolderStore implements FolderStore {
       const entry = this.indexEntry(id);
       const filename = entry?.filename ?? elementFilename(id, existing.name);
       const dir = await this.dirForElement(id, existing.type);
-      await writeJsonAtomic(dir, filename, next);
+      await this.writeElementFile(dir, filename, next);
       this.cacheSet(next);
     });
   }
@@ -1370,7 +1447,7 @@ export class FsFolderStore implements FolderStore {
       const entry = this.indexEntry(id);
       const filename = entry?.filename ?? elementFilename(id, existing.name);
       const dir = await this.dirForElement(id, existing.type);
-      await writeJsonAtomic(dir, filename, rest as Element);
+      await this.writeElementFile(dir, filename, rest as Element);
       this.cacheSet(rest as Element);
     });
   }
@@ -1388,7 +1465,7 @@ export class FsFolderStore implements FolderStore {
       const entry = this.indexEntry(elem.id);
       const filename = entry?.filename ?? elementFilename(elem.id, elem.name);
       const dir = await this.dirForElement(elem.id, elem.type);
-      await writeJsonAtomic(dir, filename, rest as Element);
+      await this.writeElementFile(dir, filename, rest as Element);
       this.cacheSet(rest as Element);
       cleared++;
     }

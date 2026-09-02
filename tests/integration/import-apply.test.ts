@@ -168,20 +168,25 @@ describe('buildWorldExport — ow.com shape + round-trip', () => {
     return src;
   }
 
-  it('emits the ow.com shape: no world id, bare spatial relations, atlas-local fields stripped', async () => {
+  it('emits the keel envelope: format tag, world WITH id, lowercase type buckets, bare spatial relations, atlas-local fields stripped', async () => {
     const src = await seedSource();
     const json = await buildWorldExport(src) as Record<string, unknown>;
 
-    const world = json.World as Record<string, unknown>;
+    // S354: the envelope keel writes and parse.ts reads. One shape both ways.
+    expect(json.format).toBe('onlyworlds-world-export');
+    expect(typeof json.schema_version).toBe('string');
+    const world = json.world as Record<string, unknown>;
     expect(world.name).toBe('Barovia');
-    expect('id' in world).toBe(false);   // ow.com export carries no world id
+    expect(world.id).toBe('w-src');      // lossless round-trip: id is identity
     expect('api_key' in world).toBe(false); // local-only world → no creds
 
-    // All 22 type buckets present (ow.com parity), PascalCase.
-    expect(Array.isArray(json.Character)).toBe(true);
-    expect(Array.isArray(json.Pin)).toBe(true);
+    // All 22 type buckets present, lowercase, under `elements`.
+    const elements = json.elements as Record<string, unknown[]>;
+    expect(Array.isArray(elements.character)).toBe(true);
+    expect(Array.isArray(elements.pin)).toBe(true);
+    expect('Character' in json).toBe(false); // the legacy PascalCase shape is read, never written
 
-    const pin = (json.Pin as Record<string, unknown>[])[0];
+    const pin = (elements.pin as Record<string, unknown>[])[0];
     expect(pin.map).toBe(U.map);          // disk map_id → bare map
     expect('map_id' in pin).toBe(false);
     expect('local_updated_at' in pin).toBe(false); // sync fields stripped
@@ -210,9 +215,10 @@ describe('buildWorldExport — ow.com shape + round-trip', () => {
   it('exports only the requested subset of types', async () => {
     const src = await seedSource();
     const json = await buildWorldExport(src, { types: new Set(['character'] as ElementType[]) }) as Record<string, unknown>;
-    expect(Array.isArray(json.Character)).toBe(true);
-    expect((json.Character as unknown[]).length).toBe(1);
-    expect('Location' in json).toBe(false);
-    expect('Pin' in json).toBe(false);
+    const elements = json.elements as Record<string, unknown[]>;
+    expect(Array.isArray(elements.character)).toBe(true);
+    expect(elements.character.length).toBe(1);
+    expect('location' in elements).toBe(false);
+    expect('pin' in elements).toBe(false);
   });
 });

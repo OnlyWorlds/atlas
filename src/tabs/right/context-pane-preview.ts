@@ -28,6 +28,7 @@ import { getEditorSettings } from '../../registry/registry';
 import { navigate, elementHash } from '../../core/router';
 import { renderElementImage } from '../../ui/element-image';
 import { narrativeKindOf } from '../../core/narrative-kind';
+import { findIncomingReferences } from '../../middle/element-detail-refs';
 
 export interface ContextPreviewHandle {
   show(el: Element): void;
@@ -171,16 +172,18 @@ function buildPreview(
     body.appendChild(descEl);
   }
 
-  // Backlinks — narratives that reference this element. Folded summary.
-  const backlinks = findBacklinkingNarratives(el.id);
+  // Backlinks — every element that references this one, narratives first
+  // (S354: was narratives only). Folded summary; the count names the rest.
+  const backlinks = findBacklinkingElements(el.id);
   if (backlinks.length > 0) {
     const bl = document.createElement('div');
     bl.className = 'atlas-context-preview-backlinks';
-    bl.innerHTML = `<span class="atlas-context-preview-backlinks-label">Appears in:</span> `;
+    bl.innerHTML = `<span class="atlas-context-preview-backlinks-label">Linked from (${backlinks.length}):</span> `;
     backlinks.slice(0, 5).forEach((n, i) => {
       const link = document.createElement('a');
       link.href = '#';
       link.textContent = n.name || '(unnamed)';
+      link.title = ELEMENT_LABELS[n.type]?.singular ?? n.type;
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const worldId = getState().active?.worldId;
@@ -260,28 +263,19 @@ function escapeRegex(s: string): string {
   return s.replace(/[\\^$.*+?()\[\]{}|]/g, '\\$&');
 }
 
-function findBacklinkingNarratives(elementId: string): Element[] {
-  const elements = getState().data.elements;
-  const out: Element[] = [];
-  const MULTI_LINK_FIELDS = [
-    'characters', 'locations', 'objects', 'events', 'creatures',
-    'species', 'institutions', 'collectives', 'phenomena', 'languages',
-    'titles', 'traits', 'abilities', 'constructs', 'laws', 'families',
-    'narratives', 'relations',
-  ];
-  for (const e of elements) {
-    if (e.type !== 'narrative') continue;
-    let hit = false;
-    for (const f of MULTI_LINK_FIELDS) {
-      const raw = (e as Record<string, unknown>)[f];
-      if (!Array.isArray(raw)) continue;
-      for (const item of raw) {
-        const id = typeof item === 'string' ? item : (item as { id?: string })?.id;
-        if (id === elementId) { hit = true; break; }
-      }
-      if (hit) break;
-    }
-    if (hit) out.push(e);
-  }
-  return out;
+/**
+ * Everything that links TO this element, narratives first (S354). This used
+ * to be narratives only, read through a private copy of the graph's
+ * eighteen-name multi-link list, so a title held by a character or a family
+ * governing a regime never appeared here while the element page's
+ * "Referenced by" section listed them. One reader now: the same
+ * all-fields scan the element page uses.
+ */
+function findBacklinkingElements(elementId: string): Element[] {
+  const incoming = findIncomingReferences(elementId);
+  return incoming.sort((a, b) => {
+    const an = a.type === 'narrative' ? 0 : 1;
+    const bn = b.type === 'narrative' ? 0 : 1;
+    return an - bn || (a.name || '').localeCompare(b.name || '');
+  });
 }

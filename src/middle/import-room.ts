@@ -5,8 +5,8 @@
  *               counts, target world, validation + copy-fix-prompt, conflicts)
  *               → import. Full-world JSON defaults to a NEW world; loose lists
  *               (or "merge" mode) reconcile into the current world.
- *   Take out  — export the current world (or a by-type subset) to an
- *               ow.com-compatible JSON file.
+ *   Take out  — export the current world (or a by-type subset) as the
+ *               onlyworlds.com world export (the keel envelope, S354).
  *
  * The reconcile core (parse → validate → reconcile → ImportPlan) is pure and
  * lives in src/import/; this room is its surface. Mode A writes a new world
@@ -615,7 +615,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       </label>`;
 
     exportMount.innerHTML = `
-      <p class="atlas-share-section-hint">Download <b>${escapeText(aw.meta?.name ?? 'this world')}</b> as an ow.com-compatible JSON. Untick types to export a subset.</p>
+      <p class="atlas-share-section-hint">Download <b>${escapeText(aw.meta?.name ?? 'this world')}</b> as an onlyworlds.com world export, the same file the site downloads. Untick types to export a subset.</p>
       <div class="atlas-import-typelist">
         <label class="atlas-import-type-all">
           <input type="checkbox" data-role="all" checked />

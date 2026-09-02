@@ -114,6 +114,14 @@ const PARAMS = {
   iters: 500,
   collisionPasses: 8,
   collisionMinDist: 56,
+  /**
+   * Hemisphere bias for ring 1 (S354): a constant downward push on backlink
+   * nodes and an equal upward push on the subject's own links, so the two
+   * halves of the ring settle above and below the center. Against the k_g
+   * spring the equilibrium offset is k_h / k_g, about 75px, which reads as
+   * "linked from below" without pinning anything to a fixed slot.
+   */
+  k_h: 0.9,
 };
 
 const NODE_DIAMETER = 36;
@@ -158,11 +166,21 @@ interface SimNode {
   vy: number;
   isCenter: boolean;
   isCast: boolean;
+  /**
+   * Ring-1 node that links TO the center without the center linking back
+   * (S354). Rendered muted with an arrow into the center; seeded and biased
+   * into the lower hemisphere. A mutual link is cast, never backlink.
+   */
+  isBacklink: boolean;
 }
 
 interface SimEdge {
+  /** The element whose field carries the link. */
   fromId: string;
+  /** The element it points at. */
   toId: string;
+  /** True when the reverse link also exists (drawn as a plain line). */
+  mutual: boolean;
 }
 
 const MULTI_LINK_FIELDS = [
@@ -219,13 +237,50 @@ export function collectDirectNeighbors(el: Element): string[] {
     if (SINGLE_LINK_SKIP_KEYS.has(key)) continue;
     if (typeof value === 'string') {
       if (looksLikeId(value)) seen.add(value);
-    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+    } else if (Array.isArray(value)) {
+      // Multi-links OUTSIDE the named list (S354): `governs`, `populations`,
+      // `holders`, `allies`, `members`... the schema has dozens of multi-link
+      // names and the list above holds eighteen. A family that `governs` a
+      // regime was invisible to the regime's web. Any array of id-shaped
+      // strings is a link list; the caller's `byId` filter still decides.
+      for (const item of value) {
+        if (typeof item === 'string' && looksLikeId(item)) seen.add(item);
+      }
+    } else if (value && typeof value === 'object') {
       const id = (value as { id?: unknown }).id;
       if (typeof id === 'string' && looksLikeId(id)) seen.add(id);
     }
   }
   seen.delete(el.id);
   return Array.from(seen);
+}
+
+/**
+ * Reverse adjacency for a world: for every element id, the ids of elements
+ * whose fields point at it (S354). Built once per render from the same
+ * `collectDirectNeighbors` read that draws the forward edges, so a link
+ * counts in exactly one direction per pair and the two never disagree.
+ * O(N × fields) over the loaded world; a 600-element world is well under a
+ * millisecond.
+ */
+export function buildReverseIndex(elements: readonly Element[]): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const el of elements) {
+    for (const target of collectDirectNeighbors(el)) {
+      let set = out.get(target);
+      if (!set) { set = new Set(); out.set(target, set); }
+      set.add(el.id);
+    }
+  }
+  return out;
+}
+
+/** Ids of elements linking TO `targetId`, excluding itself. Test seam. */
+export function collectIncomingNeighbors(targetId: string, elements: readonly Element[]): string[] {
+  const set = buildReverseIndex(elements).get(targetId);
+  if (!set) return [];
+  set.delete(targetId);
+  return Array.from(set);
 }
 
 export function mountContextGraph(opts: GraphOpts): GraphHandle {
@@ -343,18 +398,35 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // Build rings outward from the subject. rings[0] = subject only; each
     // subsequent ring scores candidates by how many edges connect them back
     // to the previous ring, then takes the top-N per the cap.
+    //
+    // Ring 1 is the UNION of both directions (S354, Captain's ask): what the
+    // subject links to (cast) plus everything that links to the subject
+    // (backlinks). An element that is only ever pointed at, a regime named
+    // by ten titles and three houses, used to draw an empty web. Backlinks
+    // are uncapped, like cast; the label budget keeps a hub readable.
+    const reverse = buildReverseIndex(elements);
     const allCastIds = collectDirectNeighbors(centerEl).filter(id => byId.has(id));
-    const rings: string[][] = [[centerEl.id], allCastIds];
-    const inAnyRing = new Set<string>([centerEl.id, ...allCastIds]);
+    const castSet = new Set(allCastIds);
+    const backlinkIds = Array.from(reverse.get(centerEl.id) ?? [])
+      .filter(id => id !== centerEl.id && byId.has(id) && !castSet.has(id));
+    const backlinkSet = new Set(backlinkIds);
+    const rings: string[][] = [[centerEl.id], [...allCastIds, ...backlinkIds]];
+    const inAnyRing = new Set<string>([centerEl.id, ...allCastIds, ...backlinkIds]);
+    // Outer rings walk the web undirected: a backlink's own links and
+    // linkers are as much "one hop out" as a cast member's.
+    const undirected = (id: string): string[] => {
+      const el = byId.get(id);
+      const out = el ? collectDirectNeighbors(el) : [];
+      const inc = reverse.get(id);
+      return inc ? [...out, ...inc] : out;
+    };
 
     for (let depth = 2; depth <= effectiveHop; depth++) {
       const previousRing = rings[depth - 1];
       const cap = depth === 2 ? ring2Cap : RING_CAPS[depth as 3 | 4];
       const scores = new Map<string, number>();
       for (const prevId of previousRing) {
-        const prevEl = byId.get(prevId);
-        if (!prevEl) continue;
-        for (const adj of collectDirectNeighbors(prevEl)) {
+        for (const adj of undirected(prevId)) {
           if (inAnyRing.has(adj)) continue;
           if (!byId.has(adj)) continue;
           scores.set(adj, (scores.get(adj) ?? 0) + 1);
@@ -395,7 +467,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     const center: SimNode = {
       id: centerEl.id, el: centerEl,
       x: 0, y: 0, vx: 0, vy: 0,
-      isCenter: true, isCast: false,
+      isCenter: true, isCast: false, isBacklink: false,
     };
     nodes.push(center);
     const ringRadius = (depth: number): number => 120 * depth;
@@ -403,6 +475,33 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       const ring = visibleRings[d];
       const radius = ringRadius(d);
       const baseAngle = d * Math.PI / 6; // offset rings so they don't align
+      if (d === 1) {
+        // Ring 1 seeds by hemisphere: cast across the upper arc, backlinks
+        // across the lower arc (screen y grows downward). The sim's k_h bias
+        // keeps the halves apart once the springs settle.
+        const cast = ring.filter(id => !backlinkSet.has(id));
+        const back = ring.filter(id => backlinkSet.has(id));
+        const seedArc = (ids: string[], from: number, to: number, isBack: boolean): void => {
+          ids.forEach((id, i) => {
+            const t = ids.length === 1 ? 0.5 : (i + 0.5) / ids.length;
+            const angle = from + t * (to - from);
+            nodes.push({
+              id, el: byId.get(id) ?? null,
+              x: Math.cos(angle) * radius,
+              y: Math.sin(angle) * radius,
+              vx: 0, vy: 0,
+              isCenter: false, isCast: !isBack, isBacklink: isBack,
+            });
+          });
+        };
+        // Upper arc runs from just past 9 o'clock over the top to 3 o'clock;
+        // lower arc the mirror. Each arc widens to the full half when the
+        // other side is empty, so a subject with only backlinks still fans
+        // out rather than crowding one quadrant.
+        seedArc(cast, back.length ? -Math.PI * 0.95 : -Math.PI, back.length ? -Math.PI * 0.05 : Math.PI, false);
+        seedArc(back, cast.length ? Math.PI * 0.05 : 0, cast.length ? Math.PI * 0.95 : Math.PI * 2, true);
+        continue;
+      }
       ring.forEach((id, i) => {
         const angle = baseAngle + (i / Math.max(1, ring.length)) * Math.PI * 2;
         nodes.push({
@@ -411,32 +510,44 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
           y: Math.sin(angle) * radius,
           vx: 0, vy: 0,
           isCenter: false,
-          isCast: d === 1,
+          isCast: false,
+          isBacklink: false,
         });
       });
     }
     const idToNode = new Map<string, SimNode>();
     for (const n of nodes) idToNode.set(n.id, n);
 
-    // Edges: every relation between two visible nodes draws once. Direction
-    // doesn't matter for rendering, but we dedupe symmetric pairs by id
-    // ordering so the canvas doesn't draw both A→B and B→A.
+    // Edges: every relation between two visible nodes draws once, keeping
+    // its direction (S354): `from` is the element whose field holds the
+    // link, `to` is the one it names. A pair linked both ways is one
+    // `mutual` edge. The renderer only draws arrowheads on edges INTO the
+    // center, so direction is visible exactly where the question "who links
+    // here?" is asked, and the rest of the web stays a plain line.
     const edges: SimEdge[] = [];
-    const seenPair = new Set<string>();
+    const edgeByPair = new Map<string, SimEdge>();
     for (const id of visibleSet) {
       const el = byId.get(id);
       if (!el) continue;
       for (const adj of collectDirectNeighbors(el)) {
         if (!visibleSet.has(adj)) continue;
         const key = id < adj ? `${id}|${adj}` : `${adj}|${id}`;
-        if (seenPair.has(key)) continue;
-        seenPair.add(key);
-        edges.push({ fromId: id, toId: adj });
+        const existing = edgeByPair.get(key);
+        if (existing) {
+          if (existing.fromId !== id) existing.mutual = true;
+          continue;
+        }
+        const edge: SimEdge = { fromId: id, toId: adj, mutual: false };
+        edgeByPair.set(key, edge);
+        edges.push(edge);
       }
     }
 
-    // Run physics sim.
-    runSim(nodes, edges, idToNode);
+    // Run physics sim. The hemisphere bias only earns its keep when BOTH
+    // halves of ring 1 exist; with backlinks alone it would crowd the whole
+    // ring into the bottom of the canvas for no contrast.
+    const biased = nodes.some(n => n.isCast) && nodes.some(n => n.isBacklink);
+    runSim(nodes, edges, idToNode, biased);
 
     // Compute per-node neighbor sets for hover-fade.
     const neighborSets = new Map<string, Set<string>>();
@@ -449,6 +560,20 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // Paint.
     host.innerHTML = '';
     paint(host, nodes, edges, neighborSets);
+
+    // Legend for the muted half of the ring (S354): one quiet line, only
+    // when backlinks are on the canvas, so a first-time reader has the key
+    // without a settings trip. Pointer-events off; it is not a control.
+    const backlinkCount = nodes.filter(n => n.isBacklink).length;
+    if (backlinkCount > 0) {
+      const legend = document.createElement('div');
+      legend.className = 'atlas-context-graph-legend';
+      legend.setAttribute('aria-hidden', 'true');
+      legend.innerHTML =
+        `<span class="atlas-context-graph-legend-swatch"></span>` +
+        `<span>${backlinkCount} link${backlinkCount === 1 ? 's' : ''} here</span>`;
+      host.appendChild(legend);
+    }
 
     // Recent-centers breadcrumb — only renders when we've recentered away from
     // home. Home is the implicit leftmost chip; each stack entry is a clickable
@@ -494,6 +619,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       nodeEl.className = 'atlas-context-graph-node';
       if (n.isCenter) nodeEl.classList.add('is-center');
       else if (n.isCast) nodeEl.classList.add('is-cast');
+      else if (n.isBacklink) nodeEl.classList.add('is-backlink');
       else nodeEl.classList.add('is-adjacent');
       nodeEl.dataset.elementId = n.id;
       const cx = n.x * scale + offsetX;
@@ -511,7 +637,11 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       // the writer can peek at "what is this" without clicking.
       const desc = typeof n.el?.description === 'string' ? n.el.description.trim() : '';
       const descSnippet = desc.length > 200 ? desc.slice(0, 197) + '…' : desc;
-      nodeEl.title = descSnippet ? `${rawName}\n\n${descSnippet}` : rawName;
+      // A backlink's tooltip says so in words, for the reader who has not
+      // yet learned the muted ring + arrow (S354).
+      const centerName = nodes.find(c => c.isCenter)?.el?.name || 'this element';
+      const heading = n.isBacklink ? `${rawName}\nlinks to ${centerName}` : rawName;
+      nodeEl.title = descSnippet ? `${heading}\n\n${descSnippet}` : heading;
 
       nodeEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -650,20 +780,60 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.lineWidth = 1;
     const defaultStroke = 'rgba(34, 211, 238, 0.25)';
+    // Backlink edges read from the app ink rather than the accent (S354):
+    // they belong to the muted half of the ring. The canvas cannot read a
+    // CSS variable directly, so resolve the ink triplet once per draw and
+    // fall back to the dark-theme white.
+    const inkRgb = getComputedStyle(canvas).getPropertyValue('--atlas-ink-rgb').trim() || '255, 255, 255';
+    const backlinkStroke = `rgba(${inkRgb}, 0.22)`;
     const idToNode = new Map<string, SimNode>();
     for (const n of nodes) idToNode.set(n.id, n);
     for (const e of edges) {
       const a = idToNode.get(e.fromId);
       const b = idToNode.get(e.toId);
       if (!a || !b) continue;
-      ctx.strokeStyle = currentEdgeColor
-        ? edgeStrokeFor(a, b)
-        : defaultStroke;
+      // An edge INTO the center from a backlink node is the one that carries
+      // direction: grey line, small arrowhead at the center's rim.
+      const intoCenter = b.isCenter && a.isBacklink && !e.mutual;
+      ctx.strokeStyle = intoCenter
+        ? (currentEdgeColor ? edgeStrokeFor(a, b) : backlinkStroke)
+        : currentEdgeColor ? edgeStrokeFor(a, b) : defaultStroke;
+      const ax = a.x * scale + offsetX;
+      const ay = a.y * scale + offsetY;
+      const bx = b.x * scale + offsetX;
+      const by = b.y * scale + offsetY;
       ctx.beginPath();
-      ctx.moveTo(a.x * scale + offsetX, a.y * scale + offsetY);
-      ctx.lineTo(b.x * scale + offsetX, b.y * scale + offsetY);
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
       ctx.stroke();
+      if (intoCenter) drawArrowhead(ctx, ax, ay, bx, by, (diameterFor(b) / 2) * scale + 2);
     }
+  }
+
+  /**
+   * Small open chevron on the line from (ax,ay) to (bx,by), its tip pulled
+   * back `inset` px from the far end so it sits on the target node's rim
+   * instead of under it. Stroke colour is whatever the caller left set.
+   */
+  function drawArrowhead(
+    ctx: CanvasRenderingContext2D,
+    ax: number, ay: number, bx: number, by: number, inset: number,
+  ): void {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    if (len < inset + 6) return;
+    const ux = dx / len;
+    const uy = dy / len;
+    const tipX = bx - ux * inset;
+    const tipY = by - uy * inset;
+    const size = 5;
+    const wing = 0.5; // half-angle in radians, roughly 29 degrees
+    ctx.beginPath();
+    ctx.moveTo(tipX - size * (ux * Math.cos(wing) - uy * Math.sin(wing)), tipY - size * (uy * Math.cos(wing) + ux * Math.sin(wing)));
+    ctx.lineTo(tipX, tipY);
+    ctx.lineTo(tipX - size * (ux * Math.cos(wing) + uy * Math.sin(wing)), tipY - size * (uy * Math.cos(wing) - ux * Math.sin(wing)));
+    ctx.stroke();
   }
 
   /**
@@ -1116,7 +1286,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
   };
 }
 
-function runSim(nodes: SimNode[], edges: SimEdge[], idToNode: Map<string, SimNode>): void {
+function runSim(nodes: SimNode[], edges: SimEdge[], idToNode: Map<string, SimNode>, hemisphereBias = false): void {
   for (let iter = 0; iter < PARAMS.iters; iter++) {
     for (let a = 0; a < nodes.length; a++) {
       for (let b = a + 1; b < nodes.length; b++) {
@@ -1148,6 +1318,11 @@ function runSim(nodes: SimNode[], edges: SimEdge[], idToNode: Map<string, SimNod
       if (n.isCenter) continue;
       n.vx -= n.x * PARAMS.k_g;
       n.vy -= n.y * PARAMS.k_g;
+      // Hemisphere bias, ring 1 only: backlinks settle below the center,
+      // the subject's own links above (S354).
+      if (!hemisphereBias) continue;
+      if (n.isBacklink) n.vy += PARAMS.k_h;
+      else if (n.isCast) n.vy -= PARAMS.k_h;
     }
     for (const n of nodes) {
       if (n.isCenter) continue;

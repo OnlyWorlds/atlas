@@ -3111,12 +3111,14 @@ body.atlas-preroot .atlas-middle {
   align-items: center;
   gap: 8px;
   padding: 6px 8px 6px 12px;
-  background: rgba(8, 13, 18, 0.92);
+  /* Canvas chrome (S354, the S324 census): it floats over the user's map
+     artwork, so it holds the dark chip in both themes like the pin chips. */
+  background: rgba(var(--atlas-canvas-scrim-rgb), 0.85);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.5);
   border-radius: 999px;
   font-size: 12px;
-  color: rgba(var(--atlas-ink-rgb), 0.9);
+  color: rgba(var(--atlas-canvas-ink-rgb), 0.9);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 12px rgba(var(--atlas-accent-rgb), 0.2);
   animation: atlas-placement-hint-in 160ms ease-out;
   pointer-events: auto;
@@ -3275,14 +3277,17 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-weight: 500;
 }
 
+/* Type + description ride the CANVAS ink like the chip they sit in (S354,
+   the S324 census): they were on the app ink, so in light mode they went
+   dark on the tooltip's dark scrim, two lines under a perfectly legible name. */
 .atlas-pin-tooltip-type {
-  color: rgba(var(--atlas-ink-rgb), 0.55);
+  color: rgba(var(--atlas-canvas-ink-rgb), 0.55);
   font-size: 10px;
   margin-top: 1px;
 }
 
 .atlas-pin-tooltip-desc {
-  color: rgba(var(--atlas-ink-rgb), 0.75);
+  color: rgba(var(--atlas-canvas-ink-rgb), 0.75);
   font-size: 11px;
   margin-top: 4px;
   line-height: 1.4;
@@ -3985,6 +3990,12 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 :root[data-theme='light'] .atlas-timeline-view {
   background: #0a0a0a;
   border-radius: 8px;
+  /* The FRAME (S354, the S324 middle option): the plot stays a dark
+     instrument panel by design, and on the light page it now looks placed
+     rather than unpainted: a hairline in the page's ink and a soft lift. The
+     canvas palette itself is untouched (56 JS literals; a session, banked). */
+  border: 1px solid rgba(28, 27, 24, 0.14);
+  box-shadow: 0 1px 2px rgba(28, 27, 24, 0.10), 0 6px 18px rgba(28, 27, 24, 0.08);
 }
 
 .atlas-timeline-axis {
@@ -4351,6 +4362,20 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-size: 12.5px;
   letter-spacing: 0.1px;
   border-radius: 4px;
+  /* ONE SHAPE for both doors (Captain, S354: the right button sat higher
+     than the left on a non-Chromium landing). The primary and ghost classes
+     carry different line-heights and weights, and Firefox's default button
+     line-height differs from Chromium's, so the pair drifted by a pixel or
+     two depending on the browser. Pin every dimension that a class or a
+     browser default could vary. */
+  box-sizing: border-box;
+  height: 34px;
+  min-width: 152px;
+  line-height: 1.4;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .atlas-landing-compact .atlas-landing-tag {
   margin-top: 18px;
@@ -5831,10 +5856,14 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-zone-label span {
   display: inline-block;
   padding: 1px 6px;
-  background: rgba(var(--atlas-scrim-rgb), 0.7);
+  /* Canvas chrome (S354, closing the S324 opener's item 1): the zone label
+     floats over the user's artwork exactly like the pin label 200px away,
+     and for six weeks they were opposite in light mode: dark chip beside a
+     white one. Convention #90, now applied to every chip over the map. */
+  background: rgba(var(--atlas-canvas-scrim-rgb), 0.7);
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.4);
   border-radius: 3px;
-  color: rgba(var(--atlas-ink-rgb), 0.92);
+  color: rgba(var(--atlas-canvas-ink-rgb), 0.92);
   font-size: 11px;
   white-space: nowrap;
   transform: translate(-50%, -50%);
@@ -12585,6 +12614,45 @@ a.atlas-share-map-pin { cursor: pointer; }
   border-style: dashed;
   border-color: rgba(var(--atlas-accent-rgb), 0.5);
 }
+/* Backlink nodes (S354): ring-1 elements that link TO the subject without
+   being linked back. The muted half of the web: ink-grey ring instead of
+   accent, dimmed glyph, settled below the center by the sim. Hover restores
+   full presence so the node is never second-class to interact with. */
+.atlas-context-graph-node.is-backlink {
+  background: rgba(var(--atlas-ink-rgb), 0.05);
+  border-style: solid;
+  border-color: rgba(var(--atlas-ink-rgb), 0.28);
+  color: rgba(var(--atlas-ink-rgb), 0.62);
+}
+.atlas-context-graph-node.is-backlink:hover {
+  background: rgba(var(--atlas-accent-rgb), 0.3);
+  border-color: rgba(var(--atlas-accent-rgb), 0.6);
+  color: var(--atlas-cyan);
+}
+.atlas-context-graph-node.is-backlink .atlas-context-graph-node-label {
+  opacity: 0.62;
+}
+/* The legend: bottom-left, one muted line, present only when backlinks
+   are drawn. */
+.atlas-context-graph-legend {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--atlas-text-muted);
+  pointer-events: none;
+  z-index: 2;
+}
+.atlas-context-graph-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--atlas-ink-rgb), 0.28);
+  background: rgba(var(--atlas-ink-rgb), 0.05);
+}
 .atlas-context-graph-node.is-highlighted {
   box-shadow: 0 0 0 3px rgba(var(--atlas-accent-rgb), 0.35);
   z-index: 2;
@@ -14079,7 +14147,12 @@ body.atlas-share-fullpreview > * {
   gap: 0;
   padding: 0;
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.35);
-  background: rgba(8, 20, 24, 0.92);
+  /* A DELIBERATE dark chip in both themes (S354, the S324 census ruling):
+     the waypoint toast is the one celebratory surface with the OW sigil and
+     its own voice, so it keeps a distinct dark ground next to the themed
+     toasts. It says so with the canvas tokens, the same way the tour root
+     and the pin chips do, instead of a bare literal that read as a miss. */
+  background: rgba(var(--atlas-canvas-scrim-rgb), 0.92);
   cursor: default;
 }
 .atlas-waypoint-toast-body {

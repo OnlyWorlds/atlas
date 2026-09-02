@@ -5,7 +5,7 @@ imperfect, that any implementation claiming to READ the OnlyWorlds Folder
 Format can run against. It answers "does your reader handle X?" with a failing
 test instead of a question asked of a person.
 
-**Created**: 2026-07-28 (Temper, Forge) · fixture **v1.1.0** · built to
+**Created**: 2026-07-28 (Temper, Forge) · fixture **v1.2.0** · built to
 folder-format spec **v0.3.5** · proposed by Kael (Assembly), adopted by every
 pass of Skeld's review round. **Report the fixture version you ran** —
 `expected.json`'s `fixture_history` says what each one contained, and 1.0.0
@@ -37,6 +37,7 @@ world/
     map/    the-territory--55555503.json
     zone/   the-border--55555504.json
     pin/    wandering-pin--55555505.json        a MAPLESS pin
+            on-the-map--55555508.json           links its map as `map` (the SPEC spelling)
   spatial/
     map/    legacy-map--55555506.json           LEGACY layout (see below)
 ```
@@ -46,7 +47,7 @@ world/
 1. **Find every element under `elements/`** — including `map`, `zone` and
    `pin`. `elements/<type>/` is the format for all 22 types. **The count is
    `expected.json`'s `elements[]`, never a number written in this prose.** (It
-   is 8 at fixture v1.1.0. That sentence is here to be checked against the
+   is 9 at fixture v1.2.0. That sentence is here to be checked against the
    array, not believed: an earlier draft of this README said 6, was right when
    written, and rotted the moment the array grew. Derive, or expect prose to
    lie.)
@@ -74,6 +75,12 @@ world/
    canonical (Captain's product ruling, 2026-07-28) — mapless pins are a
    legitimate app pattern and the wire has always accepted them. A reader must
    not crash, and must not invent a map.
+6b. **Resolve links under the spec spelling.** `on-the-map` names its map as
+   `map`, the bare schema name (§5). Atlas's own files say `map_id`; a reader
+   that knows only one spelling loses every pin the other writer made, silently
+   (atlas did, until fixture v1.2.0). Read both. A writer keeps whichever the
+   file already uses and never migrates a key as a side effect of opening a
+   folder.
 7. **Never parse a filename for meaning.** The filename is presentation; the
    `id` inside the file is identity. Every filename here happens to be in
    atlas's canonical `<slug>--<id-tail8>.json` form, which means a conforming

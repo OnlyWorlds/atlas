@@ -88,7 +88,7 @@ OW export content elements use **bare** relation names (`location`, `objects`, `
 - **World id is PRESENT now** (the old backend dropped it "for security"; the rebuild keeps it so a round-trip is lossless). Element bodies come through the same `serialize` the API uses: uuid ids, **bare-name v2 relations** (`location`, `map`, `zone`, `element_id`), extension fields (`atlas_*`/`x_*`/`shadow_*`) intact, `type`/`change_seq`/timestamps present.
 - **Only types with ≥1 element appear** (unlike the old always-emit-22).
 - **Atlas reads it** (`parseEnvelope` in `parse.ts`). **World-id adoption on import is RULED (Skeld) but NOT yet wired** — atlas currently mints a fresh world id; element ids are kept verbatim (keep-ids path), so `ow://element` refs already survive. Adopting the world id (lossless world identity + same-id→same-world) is a tracked follow-up (needs the scaffold path + a collision decision).
-- **Atlas's EXPORT still writes the old `World`+PascalCase shape**; converging it onto this envelope is ruled (Skeld, Q2) but **post-launch**.
+- **Atlas's EXPORT writes this envelope too (S354, 2026-09-02)**: `format`, `schema_version` (the SDK's `ONLYWORLDS_VERSION`), `exported_at`, `exporter: 'atlas'`, `world` WITH id, lowercase `elements` buckets (all 22 by default, the requested subset otherwise). The old `World`+PascalCase shape is read forever and written never. Q2 closed.
 
 ### legacy ow.com export format (RETIRED backend — `django/ow/worldsync/services.py`)
 

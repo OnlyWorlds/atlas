@@ -69,3 +69,48 @@ describe('collectDirectNeighbors', () => {
     expect(n.filter(x => x === ID.a)).toHaveLength(1);
   });
 });
+
+// S354: the reverse read behind the web's backlinks — who links TO an element.
+import { buildReverseIndex, collectIncomingNeighbors } from '../../src/tabs/right/context-pane-graph';
+
+describe('buildReverseIndex / collectIncomingNeighbors', () => {
+  const linker = { id: ID.a, type: 'title', name: 'Presiding Gamoros', local_updated_at: '2026-01-01', institutions: [ID.self] } as unknown as Element;
+  const other = { id: ID.b, type: 'family', name: 'House', local_updated_at: '2026-01-01', location: ID.loc } as unknown as Element;
+  const subject = el({});
+
+  it('lists elements whose fields name the target, and nothing else', () => {
+    const inc = collectIncomingNeighbors(ID.self, [subject, linker, other]);
+    expect(inc).toEqual([ID.a]);
+    expect(collectIncomingNeighbors(ID.loc, [subject, linker, other])).toEqual([ID.b]);
+  });
+
+  it('is the exact mirror of collectDirectNeighbors (one read, two directions)', () => {
+    const world = [subject, linker, other];
+    const reverse = buildReverseIndex(world);
+    for (const e of world) {
+      for (const target of collectDirectNeighbors(e)) {
+        expect(reverse.get(target)?.has(e.id)).toBe(true);
+      }
+    }
+  });
+
+  it('never lists the target as its own backlink', () => {
+    const selfRef = el({ characters: [ID.self] });
+    expect(collectIncomingNeighbors(ID.self, [selfRef])).toEqual([]);
+  });
+
+  it('returns an empty list for an element nothing points at', () => {
+    expect(collectIncomingNeighbors(ID.parent, [subject, linker, other])).toEqual([]);
+  });
+});
+
+describe('collectDirectNeighbors — multi-links outside the named list (S354)', () => {
+  it('reads an unlisted array-of-ids field like `governs`', () => {
+    const n = collectDirectNeighbors(el({ governs: [ID.a, ID.b] }));
+    expect(n).toEqual(expect.arrayContaining([ID.a, ID.b]));
+  });
+  it('ignores arrays of non-id strings', () => {
+    const n = collectDirectNeighbors(el({ tags: ['alpha', 'beta'] }));
+    expect(n).toEqual([]);
+  });
+});

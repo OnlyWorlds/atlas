@@ -20,7 +20,7 @@ import {
 } from '../core/constants';
 import { getState, patchSlice } from '../core/state';
 import { pickDirectory } from '../ui/directory-picker';
-import { storeHandle, loadHandle, ensureWritable, deleteHandle } from '../store/handle-vault';
+import { storeHandle, loadHandle, ensureWritable, deleteHandle, listHandleKeys, queryWritable } from '../store/handle-vault';
 import {
   setAtlasRoot,
   createLocalWorld,
@@ -56,6 +56,15 @@ import type { WorldRegistryEntry, PerElementFailure } from '../core/types';
  */
 export interface SetupAtlasRootResult {
   imported: number;
+  /**
+   * Set when the picked folder IS a world (it holds a `world.json`) rather
+   * than a place to keep worlds (S354, Captain pointed "Change folder" at
+   * Skeld's `sikelia-world` and expected an import). No root was created and
+   * nothing was written: nesting an atlas root inside someone's world repo is
+   * exactly the litter this guards against. The caller decides what to do
+   * with the handle: open it in place when a root already exists, or explain.
+   */
+  worldFolder?: FileSystemDirectoryHandle;
 }
 
 export async function setupAtlasRoot(): Promise<SetupAtlasRootResult | null> {
@@ -65,6 +74,13 @@ export async function setupAtlasRoot(): Promise<SetupAtlasRootResult | null> {
   const granted = await ensureWritable(picked);
   if (!granted) {
     throw new Error('Folder is read-only; atlas needs write access');
+  }
+
+  // A world folder is the wrong kind of thing for this door. Detect BEFORE
+  // resolveOrCreateRoot, which would otherwise create `onlyworlds-atlas/`
+  // plus a marker inside it.
+  if (await isWorldFolder(picked)) {
+    return { imported: 0, worldFolder: picked };
   }
 
   const rootHandle = await resolveOrCreateRoot(picked);
@@ -300,6 +316,34 @@ async function resolveOrCreateRoot(picked: FileSystemDirectoryHandle): Promise<F
   return newChild;
 }
 
+/** True when `dir` holds a readable `world.json` with an id: it IS a world. */
+async function isWorldFolder(dir: FileSystemDirectoryHandle): Promise<boolean> {
+  try {
+    const meta = await readJson<{ id?: unknown }>(dir, 'world.json');
+    return !!meta && typeof meta.id === 'string' && meta.id.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The sentence both setup doors say when the pick was a world folder (S354).
+ * Names the right door so the next click lands.
+ */
+export const WORLD_FOLDER_PICKED_HINT =
+  'That folder is a world, not a place to keep worlds. To open it, use the open-folder button next to the + in the worlds sidebar.';
+
+/**
+ * Open a world folder that was picked through a setup door, in place, when
+ * a root already exists (S354). Returns the world id to activate, or null
+ * when there is no root yet (the caller explains instead).
+ */
+export async function adoptPickedWorldFolder(picked: FileSystemDirectoryHandle): Promise<string | null> {
+  if (!getState().atlasRoot) return null;
+  const { worldId } = await openWorldFolder(picked);
+  return worldId;
+}
+
 async function hasAtlasRootMarker(dir: FileSystemDirectoryHandle): Promise<boolean> {
   const marker = await readJson<unknown>(dir, ATLAS_ROOT_MARKER);
   return marker !== null;
@@ -392,6 +436,13 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
   } catch (err) {
     console.warn('[atlas-root] recover-time discovery failed:', err);
   }
+  // Worlds opened IN PLACE live outside the root, so root discovery cannot
+  // see them; their handles are still in the vault (S354). Re-adopt those.
+  try {
+    imported += await readoptOrphanWorldHandles();
+  } catch (err) {
+    console.warn('[atlas-root] recover-time orphan re-adoption failed:', err);
+  }
   // Post-recovery URL hygiene: if the hash still points at a deep route
   // (`/w/<id>/...`) from before the localStorage wipe, sidebar mode would
   // stay 'elements' showing the "no active world" empty state — the just-
@@ -401,6 +452,67 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
     window.location.hash = '#/';
   }
   return { imported };
+}
+
+/**
+ * Re-register worlds whose folder handle survived a localStorage clear but
+ * whose registry entry did not (S354). Root discovery only scans INSIDE the
+ * root; a world opened in place (`openWorldFolder`, the obsidian / other-tool
+ * / other-machine carry-a-folder path) sits anywhere on disk and was simply
+ * gone from the list after a clear, handle and all, with no way back short
+ * of finding the folder again by hand.
+ *
+ * Every vault key of the form `world-<id>` that no registry entry claims is
+ * re-adopted. Permission is NOT requested here: the browser needs a user
+ * gesture per handle and this runs deep inside the re-link click, so a
+ * second prompt chain is not reliably available. When the handle is still
+ * readable (persisted permission) the entry takes its name and api block
+ * from world.json exactly like discovery; otherwise the folder's own name
+ * stands in until the first activation reads the meta, the same way any
+ * world reads after a reload.
+ */
+export async function readoptOrphanWorldHandles(): Promise<number> {
+  const keys = await listHandleKeys();
+  let adopted = 0;
+  for (const key of keys) {
+    if (!key.startsWith('world-')) continue;
+    const reg = getState().registry;
+    if (reg.worlds.some(w => w.folder.handle_key === key)) continue;
+    const handle = await loadHandle(key);
+    if (!handle) continue;
+    let meta: { id?: string; name?: string; demo?: boolean; api?: { world_id?: string; api_key?: string; world_name?: string; read_only?: boolean } } | null = null;
+    try {
+      if (await queryWritable(handle)) meta = await readJson(handle, 'world.json');
+    } catch { meta = null; }
+    const hasApi = !!(meta?.api && typeof meta.api.world_id === 'string' && typeof meta.api.api_key === 'string');
+    const name = (typeof meta?.name === 'string' && meta.name) ? meta.name : handle.name;
+    let next: typeof reg;
+    if (hasApi) {
+      ({ next } = createApiLinkedWorld(reg, {
+        name,
+        apiWorldId: meta!.api!.world_id!,
+        apiKey: meta!.api!.api_key!,
+        folderName: handle.name,
+        handleKey: key,
+        pathHint: handle.name,
+        apiWorldName: meta!.api!.world_name,
+        readOnly: !!meta!.api!.read_only,
+      }));
+    } else {
+      ({ next } = createLocalWorld(reg, {
+        name,
+        folderName: handle.name,
+        handleKey: key,
+        pathHint: handle.name,
+        demo: meta?.demo === true,
+      }));
+    }
+    saveRegistry(next);
+    patchSlice('registry', next);
+    adopted++;
+  }
+  if (adopted > 0) console.info(`[atlas-root] re-adopted ${adopted} world folder(s) opened in place`);
+  return adopted;
 }
 
 /**

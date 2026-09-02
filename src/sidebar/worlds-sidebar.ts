@@ -28,6 +28,7 @@ import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
 import { deleteHandle, ensureWritable, loadHandle, queryWritable } from '../store/handle-vault';
 import { CreateWorldModal } from '../ui/create-world-modal';
 import { LinkWorldModal } from '../ui/link-world-modal';
+import { PICKER_CANCELLED_HINT } from '../ui/directory-picker';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
 import type { WorldRegistryEntry } from '../core/types';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
@@ -175,11 +176,22 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     const openFolderBtn = header.querySelector<HTMLButtonElement>('[data-action="open-folder"]');
     openFolderBtn?.addEventListener('click', () => {
       void (async () => {
-        let picked: FileSystemDirectoryHandle;
+        // Through the one picker seam (S354): the test API can inject a
+        // handle, and a picker failure surfaces instead of vanishing. This
+        // used to call `showDirectoryPicker` directly and swallow EVERY
+        // error as "cancelled", so a refused folder looked like nothing.
+        let picked: FileSystemDirectoryHandle | null;
         try {
-          picked = await (window as unknown as { showDirectoryPicker(opts?: { mode?: string }): Promise<FileSystemDirectoryHandle> })
-            .showDirectoryPicker({ mode: 'readwrite' });
-        } catch { return; } // user cancelled the picker
+          const { pickDirectory } = await import('../ui/directory-picker');
+          picked = await pickDirectory();
+        } catch (err) {
+          toasts.error(err instanceof Error ? err.message : String(err));
+          return;
+        }
+        if (!picked) {
+          toasts.info(PICKER_CANCELLED_HINT);
+          return;
+        }
         try {
           const { openWorldFolder } = await import('../setup/atlas-root-flow');
           const { worldId, already } = await openWorldFolder(picked);
