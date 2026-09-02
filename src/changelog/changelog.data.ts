@@ -90,6 +90,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['layout', 'fix'],
       },
       {
+        id: 'non-chromium-splash-offers-the-tour',
+        title: 'On browsers without folder access the splash offers the tour only',
+        body: 'The example-page button is gone from that splash. It still appears on Chromium after the tour.',
+        tags: ['layout'],
+      },
+      {
         id: 'change-folder-knows-a-world',
         title: 'Pointing Change folder at a world opens the world',
         body: 'Set up and Change folder expect a place to keep worlds. Given a folder that is itself a world, they used to nest an empty atlas folder inside it. Now they recognise the world and open it in place, or say which button does that on a first launch.',

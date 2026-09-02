@@ -1047,8 +1047,9 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   // honesty does.
   await expect(page.locator('.atlas-landing-note')).toContainText('desktop');
   await expect(page.locator('.atlas-landing-note')).toContainText('Chromium');
-  // And this browser is given somewhere to GO, not just something it cannot do.
-  await expect(page.locator('[data-action="see-example"]')).toBeVisible();
+  // The splash offers the tour and nothing else on a folder-less browser
+  // (Captain, S354): the example-page door is Chromium-after-tour only.
+  await expect(page.locator('[data-action="see-example"]')).toHaveCount(0);
   // The tour boots and walks.
   await openOpener(page);
   await beginToWorld(page);

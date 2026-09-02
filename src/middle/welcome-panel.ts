@@ -158,17 +158,18 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // already using. No UA sniffing needed; the sentence just has to be true.
       const folderNote = folderMode
         ? ''
-        : `<p class="atlas-landing-note">Keeping worlds as real files on your drive needs a desktop Chromium browser: Chrome, Edge or Brave. Here you can take the tour and read an example page.</p>`;
-      // After the tour, a browser without folder mode had nowhere left to go:
-      // a de-emphasised replay button and an outbound link on the sigil. Give
-      // it a real forward door to the example page, which is view-only and
-      // works everywhere (S323).
-      const exampleDoor = folderMode && !tourDone
-        ? ''
-        : `<span class="atlas-landing-choice">
-             <button class="${tourDone && !folderMode ? 'atlas-btn-primary' : 'atlas-btn-ghost'} atlas-landing-btn" data-action="see-example">see an example page</button>
+        : `<p class="atlas-landing-note">Keeping worlds as real files on your drive needs a desktop Chromium browser: Chrome, Edge or Brave. Here you can take the tour.</p>`;
+      // The example-page door shows ONLY on a folder-mode browser after the
+      // tour is done (Captain, S354: a non-Chromium splash offers the tour and
+      // nothing else). The S323 reading, that a phone visitor after the tour
+      // needed a forward door, is retired by that call; the sigil still links
+      // out to onlyworlds.com.
+      const exampleDoor = folderMode && tourDone
+        ? `<span class="atlas-landing-choice">
+             <button class="atlas-btn-ghost atlas-landing-btn" data-action="see-example">see an example page</button>
              <span class="atlas-landing-choice-note">a published world, as a visitor sees it</span>
-           </span>`;
+           </span>`
+        : '';
       // The OnlyWorlds sigil + eyebrow (Skeld's opener note, Captain's nod,
       // 2026-07-19): users routed here from onlyworlds.com need the mark and
       // the stated relationship to read "same universe". Bundled local copy
