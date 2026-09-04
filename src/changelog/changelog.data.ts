@@ -56,6 +56,57 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.4',
+    date: '2026-09-04',
+    theme: 'find a word, link every one of them',
+    entries: [
+      {
+        id: 'find-bar-link-to-element',
+        title: 'The find bar links every match to an element you pick',
+        body: 'Ctrl+F in the writing room now has a "Link to element" button. Type a word, pick the element, and every match in the scene becomes a link in one undoable step. The word is saved as an alias so later scenes recognise it too. Your text is never changed, only linked.',
+        tags: ['writing'],
+        credit: { handle: 'mika', platform: 'discord' },
+      },
+      {
+        id: 'compiled-view-find-and-link',
+        title: 'Find works on chapters and books, and links across every scene inside',
+        body: 'The compiled view of a chapter or book had no find at all. It now searches the whole assembled text, and "Link to element" links every match in every scene underneath, written straight to the files.',
+        tags: ['writing'],
+        credit: { handle: 'mika', platform: 'discord' },
+      },
+      {
+        id: 'unlinked-mentions-link-all',
+        title: 'An element shows where it is mentioned but not linked, with one button to link them all',
+        body: 'The element preview in the Web tab now lists every scene that mentions the element by name or alias as plain text, and "Link all" turns every one into a link. Creating an element whose name already sits in your prose says so in the confirmation.',
+        tags: ['writing', 'web'],
+        credit: { handle: 'mika', platform: 'discord' },
+      },
+      {
+        id: 'compiled-view-keeps-your-words',
+        title: 'Chapters and books show a link by the words you wrote, not the element name',
+        body: 'A scene that read "only an orc already linked" compiled as "only an Orc Chief already linked". The compiled view, the share preview and the published page now all show the label you wrote. Links never change your text.',
+        tags: ['writing', 'fix'],
+      },
+      {
+        id: 'compiled-view-stays-current',
+        title: 'The compiled view redraws when its scenes change',
+        body: 'Linking from the Web tab or a sync pull used to leave an open chapter showing old text until you left and came back. It follows every change now.',
+        tags: ['writing', 'fix'],
+      },
+      {
+        id: 'find-bar-below-the-crumb',
+        title: 'The find bar no longer covers the date pill',
+        tags: ['writing', 'fix'],
+      },
+      {
+        id: 'find-bar-after-scene-switch',
+        title: 'Ctrl+F opens after switching scenes',
+        body: 'Moving between scenes without leaving the writing room left the find bar detached, so the shortcut did nothing until you left and came back. Fixed.',
+        tags: ['writing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.3',
     date: '2026-09-02',
     theme: 'the web shows who links here',

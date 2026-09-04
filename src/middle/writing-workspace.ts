@@ -24,7 +24,7 @@ import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
 import { renderHeader } from './element-detail-header';
-import { mountWorkspaceEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
+import { mountWorkspaceEditor, linkTermInEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
 import { createFindBar, type FindBarHandle } from './writing-workspace-find-bar';
 import { compiledWordCount, mountCompiledView, narrativeHasChildren } from './writing-compiled';
 import { handleAddToCast, type AddToCastDetail } from './writing-workspace-add-to-cast';
@@ -38,6 +38,11 @@ import { createProseContextMenu } from './writing-workspace-context-menu';
 import { convertAllAutolinks, unlinkAllChips } from './writing-workspace-autolink';
 import { setLiveEditorOps } from './writing-live-editor-ops';
 import { createLinkAllCorner } from './prose-linkall-corner';
+import { createCompiledSearch } from './writing-compiled-search';
+import { bulkLinkTerm } from './writing-bulk-link';
+import { recordAliasIfForeign } from './prose-link-existing';
+import { collectNarrativeDescendants } from '../core/narrative-delete';
+import { pickElement } from '../ui/element-picker-modal';
 import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { JSONContent } from '@tiptap/core';
 
@@ -164,22 +169,103 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     getActiveNarrative,
   });
 
-  // Find-bar controller proxies onto the CURRENT editor handle's search
-  // controller. Editor handles get recreated on narrative switch, so we
-  // can't keep a direct reference — the proxy stays valid across switches.
+  // Find in the COMPILED view (S355): a DOM-marking controller over the
+  // read-only rendering, so Ctrl+F and "Link to element" work at chapter and
+  // book level, not only in scenes.
+  const compiledSearch = createCompiledSearch(
+    () => root.querySelector<HTMLElement>('.atlas-writing-compiled'),
+  );
+
+  // Find-bar controller proxies onto whichever surface is mounted: the
+  // CURRENT editor handle's search controller in this-level mode, the
+  // compiled DOM controller in compiled mode. Handles get recreated on
+  // narrative switch, so we can't keep a direct reference — the proxy stays
+  // valid across switches.
+  const activeSearch = (): SearchController | null =>
+    editorHandle?.search ?? (compiledCountFor ? compiledSearch : null);
   const findBarSearchProxy: SearchController = {
-    setQuery: (opts) => editorHandle?.search.setQuery(opts),
-    next: () => editorHandle?.search.next(),
-    prev: () => editorHandle?.search.prev(),
-    replaceCurrent: (text) => editorHandle?.search.replaceCurrent(text) ?? false,
-    replaceAll: (text) => editorHandle?.search.replaceAll(text) ?? 0,
-    clear: () => editorHandle?.search.clear(),
-    getInfo: () => editorHandle?.search.getInfo() ?? {
+    setQuery: (opts) => activeSearch()?.setQuery(opts),
+    next: () => activeSearch()?.next(),
+    prev: () => activeSearch()?.prev(),
+    replaceCurrent: (text) => activeSearch()?.replaceCurrent(text) ?? false,
+    replaceAll: (text) => activeSearch()?.replaceAll(text) ?? 0,
+    linkAllMatches: (target) => activeSearch()?.linkAllMatches(target) ?? 0,
+    clear: () => activeSearch()?.clear(),
+    getInfo: () => activeSearch()?.getInfo() ?? {
       total: 0, currentIndex: 0, query: '', caseSensitive: false, wholeWord: false,
     },
   };
+
+  /**
+   * "Link to element…" from the find bar (S355). One picker, then:
+   *   - this-level: every match in the live doc becomes a chip in one
+   *     undoable transaction;
+   *   - compiled: every match across the narrative AND its descendants is
+   *     linked on disk (both story and sidecar), the view re-renders, the
+   *     highlight re-applies to whatever is left.
+   * The matched word is recorded as an alias on the element when it is not
+   * already its name or an alias, so first-mention autolink recognises it in
+   * later scenes (same rule as linking a selection to an existing element).
+   */
+  async function linkFindMatchesToElement(): Promise<void> {
+    const info = findBarSearchProxy.getInfo();
+    if (!info.query || info.total === 0) return;
+    const picked = await pickElement({ title: `Link every "${info.query}" to which element?` });
+    if (!picked) return;
+    const target = { id: picked.id, type: picked.type };
+    const opts = { caseSensitive: info.caseSensitive, wholeWord: info.wholeWord };
+    const name = picked.name || '(unnamed)';
+
+    // Alias FIRST, chips second: the chip-label sync runs on the next state
+    // tick and rewrites any label that is not yet the name or an alias, so
+    // recording after linking is a race the writer loses (Captain saw it).
+    const term = info.query.trim();
+    if (editorHandle) {
+      await recordAliasIfForeign(picked, term);
+      const n = editorHandle.search.linkAllMatches(target);
+      if (n === 0) return;
+      toastManager.info(`Linked ${n} mention${n === 1 ? '' : 's'} to ${name}`);
+      return;
+    }
+
+    const rootEl = compiledCountFor;
+    if (!rootEl) return;
+    const ids = [rootEl.id, ...collectNarrativeDescendants(getState().data.elements, rootEl.id)];
+    await recordAliasIfForeign(picked, term);
+    const { changed, count } = await bulkLinkTerm(ids, info.query, target, opts);
+    if (count === 0) {
+      toastManager.info('Nothing to link');
+      return;
+    }
+    remountCompiledView();
+    toastManager.info(
+      `Linked ${count} mention${count === 1 ? '' : 's'} to ${name} across `
+      + `${changed} narrative${changed === 1 ? '' : 's'} (written to disk, no undo)`,
+    );
+  }
+
+  /** Re-render the compiled view from fresh state and re-apply any search. */
+  function remountCompiledView(): void {
+    const rootEl = compiledCountFor;
+    // mountCompiledView replaces the host's class with its own, so the prose
+    // class is gone after the first mount; find the host by what it became.
+    const host = root.querySelector<HTMLElement>('.atlas-writing-compiled');
+    if (!rootEl || !host) return;
+    const fresh = getState().data.elements.find(e => e.id === rootEl.id) ?? rootEl;
+    compiledCountFor = fresh;
+    mountCompiledView(host, fresh);
+    host.tabIndex = -1;
+    compiledSearch.reapply();
+  }
+
   let findBar: FindBarHandle | null = null;
   function ensureFindBar(): FindBarHandle {
+    // mountForNarrative wipes root.innerHTML, which detaches a bar built for
+    // an earlier narrative; a detached bar opens invisibly. Rebuild it.
+    if (findBar && !root.querySelector('.atlas-find-bar')) {
+      findBar.destroy();
+      findBar = null;
+    }
     if (findBar) return findBar;
     findBar = createFindBar(root, {
       search: findBarSearchProxy,
@@ -187,8 +273,27 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         // Editor regains focus so typing resumes immediately.
         editorHandle?.editor.commands.focus();
       },
+      onLinkMatches: linkFindMatchesToElement,
     });
     return findBar;
+  }
+
+  /**
+   * The selected text on whichever surface is mounted, for the find box.
+   * The DOM selection is what the writer SEES and is read first: ProseMirror
+   * syncs its own selection from the DOM on a later tick, so a shortcut
+   * pressed right after a keyboard selection can find the editor state one
+   * step behind (own-eyes at S355: two of three runs). The editor state is
+   * the fallback, for a selection made programmatically.
+   */
+  function currentSelectionText(): string {
+    const dom = window.getSelection()?.toString() ?? '';
+    if (dom.trim()) return dom;
+    if (editorHandle) {
+      const { from, to } = editorHandle.editor.state.selection;
+      return from === to ? '' : editorHandle.editor.state.doc.textBetween(from, to, ' ', ' ');
+    }
+    return '';
   }
 
   /**
@@ -200,12 +305,15 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   const onWorkspaceHotkey = (e: KeyboardEvent): void => {
     const isMeta = e.ctrlKey || e.metaKey;
     if (!isMeta) return;
+    // The compiled view is a rendering, not the source: find works, replace
+    // is hidden (Ctrl+H opens find there), linking writes the subtree.
+    const readOnly = !editorHandle && compiledCountFor !== null;
     if (e.key === 'f' || e.key === 'F') {
       e.preventDefault();
-      ensureFindBar().open('find');
+      ensureFindBar().open('find', { readOnly, prefill: currentSelectionText() });
     } else if (e.key === 'h' || e.key === 'H') {
       e.preventDefault();
-      ensureFindBar().open('replace');
+      ensureFindBar().open('replace', { readOnly, prefill: currentSelectionText() });
     }
   };
   root.addEventListener('keydown', onWorkspaceHotkey);
@@ -448,6 +556,18 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     applyProseFontSize(root);
     applySpellcheck();
 
+    // The compiled view is a rendering of OTHER narratives too, so it goes
+    // stale whenever the elements array swaps (a sync pull, a link from the
+    // context pane, a scene edited elsewhere). Re-render it on that tick
+    // (S355; before this it only redrew on narrative switch).
+    if (!editorHandle && compiledCountFor) {
+      const elements = getState().data.elements;
+      if (elements !== lastSeenElementsRef) {
+        lastSeenElementsRef = elements;
+        remountCompiledView();
+      }
+    }
+
     // Live chip label sync — propagate any element renames into the editor's
     // chip nodes. No-op when nothing changed; a single state-driven tick.
     if (editorHandle) {
@@ -523,6 +643,10 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       // change leaves the narrative with no children.
       compiledCountFor = el;
       mountCompiledView(proseHost, el);
+      // Focusable so Ctrl+F reaches the workspace's keydown listener (a
+      // click on a plain div moves focus nowhere; the editor was focusable
+      // by nature, the rendering is not).
+      proseHost.tabIndex = -1;
     } else {
       compiledCountFor = null;
       const initialJson = parseRichtextJson(el.atlas_richtext_json);
@@ -595,6 +719,10 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         unlinkAll: () => {
           const v = editorHandle?.editor.view;
           return v ? unlinkAllChips(v) : 0;
+        },
+        linkTerm: (term, target, opts) => {
+          const ed = editorHandle?.editor;
+          return ed ? linkTermInEditor(ed, term, target, opts) : 0;
         },
       });
     }
@@ -674,6 +802,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     }
     setLiveEditorOps(null);
     linkAllCorner.deactivate();
+    compiledSearch.clear();
     compiledCountFor = null;
     mountedForId = null;
     lastSavedMarkdown = null;

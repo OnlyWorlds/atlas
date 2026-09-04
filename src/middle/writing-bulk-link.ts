@@ -18,6 +18,8 @@ import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import {
   buildAutolinkIndex, autolinkMarkdown, autolinkRichtext, unlinkMarkdown, unlinkRichtext,
+  linkTermMarkdown, linkTermRichtext,
+  type TermLinkTarget, type TermMatchOptions,
 } from '../core/prose-autolink';
 import { computeRelationPatch } from './writing-workspace-derive';
 import { getLiveEditorOps } from './writing-live-editor-ops';
@@ -78,6 +80,58 @@ export async function bulkLinkNarratives(
       await folder.updateElement(id, patch);
       changed++; count += n; wroteDisk = true;
     }
+  }
+
+  if (wroteDisk) {
+    await refreshElementsAfterWrite(folder);
+    requestPushIfLinked();
+  }
+  return { changed, count };
+}
+
+/**
+ * S355: link EVERY match of one term to one element across a set of
+ * narratives (the compiled view's "Link to element"). Same routing as
+ * {@link bulkLinkNarratives}: the live narrative (if any) goes through the
+ * editor transaction, every other one gets both halves rewritten on disk,
+ * and the convention-#50 relation derive runs on each new story.
+ */
+export async function bulkLinkTerm(
+  ids: readonly string[],
+  term: string | readonly string[],
+  target: TermLinkTarget,
+  opts: TermMatchOptions,
+): Promise<BulkLinkSummary> {
+  const folder = getActiveStore();
+  if (!folder) return { changed: 0, count: 0 };
+  const live = getLiveEditorOps();
+
+  let changed = 0;
+  let count = 0;
+  let wroteDisk = false;
+
+  for (const id of ids) {
+    if (live && live.narrativeId === id) {
+      const n = live.linkTerm(term, target, opts);
+      if (n > 0) { changed++; count += n; }
+      continue;
+    }
+    const el = await folder.getElement(id);
+    if (!el || el.type !== 'narrative') continue;
+    const story = typeof el.story === 'string' ? el.story : '';
+    const sidecar = (el as Record<string, unknown>).atlas_richtext_json;
+
+    const md = linkTermMarkdown(story, term, target, opts);
+    const rt = sidecar ? linkTermRichtext(sidecar, term, target, opts) : { doc: sidecar, linked: 0 };
+    const n = Math.max(md.linked, rt.linked);
+    if (n === 0) continue;
+    const patch: Partial<Element> = {
+      story: md.story,
+      ...(sidecar ? { atlas_richtext_json: rt.doc } : {}),
+      ...computeRelationPatch(el, md.story),
+    };
+    await folder.updateElement(id, patch);
+    changed++; count += n; wroteDisk = true;
   }
 
   if (wroteDisk) {

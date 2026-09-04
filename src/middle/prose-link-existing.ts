@@ -75,23 +75,20 @@ export async function linkSelectionToExisting(
  * tick and the prose changes under the user). Failure degrades honestly:
  * the chip stays, the toast says the label won't stick.
  */
-async function recordAliasIfForeign(picked: Element, label: string): Promise<void> {
+export async function recordAliasIfForeign(picked: Element, label: string): Promise<void> {
   const live = getState().data.elements.find(e => e.id === picked.id) ?? picked;
   const name = live.name || '';
   const aliases = Array.isArray(live.atlas_aliases)
     ? live.atlas_aliases.filter((a): a is string => typeof a === 'string')
     : [];
-  if (label === name || aliases.includes(label)) {
-    toastManager.info(`Linked to ${name || '(unnamed)'}`);
-    return;
-  }
+  if (label === name || aliases.includes(label)) return;
   const folder = getActiveStore();
   if (!folder) return;
   try {
     await folder.updateElement(picked.id, { atlas_aliases: [...aliases, label] } as Partial<Element>);
     await refreshElementsAfterWrite(folder);
     requestPushIfLinked();
-    toastManager.info(`Linked to ${name || '(unnamed)'} · "${label}" saved as alias`);
+    toastManager.info(`"${label}" saved as an alias of ${name || '(unnamed)'}`);
   } catch (err) {
     console.error('[prose-link-existing] alias write failed', err);
     toastManager.error(`Linked, but could not save "${label}" as an alias. The chip may rename to ${name || 'the element name'}`);

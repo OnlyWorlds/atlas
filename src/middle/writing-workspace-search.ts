@@ -16,6 +16,7 @@
 import { Plugin, PluginKey, EditorState, Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { Node as PmNode } from '@tiptap/pm/model';
+import { buildTermScanner } from '../core/prose-autolink';
 
 export interface SearchMatch {
   from: number;
@@ -60,19 +61,13 @@ function emptyState(doc: PmNode): SearchPluginState {
   };
 }
 
-function escapeRegexLiteral(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function buildScanner(query: string, caseSensitive: boolean, wholeWord: boolean): RegExp | null {
-  if (!query) return null;
-  const escaped = escapeRegexLiteral(query);
-  const pattern = wholeWord ? `\\b${escaped}\\b` : escaped;
-  try {
-    return new RegExp(pattern, caseSensitive ? 'g' : 'gi');
-  } catch {
-    return null;
-  }
+/**
+ * One scanner, two homes: the kernel's `buildTermScanner` is the same regex
+ * the find bar's "Link to element" transforms use on closed narratives, so
+ * what the bar highlights is exactly what links (paired functions share code).
+ */
+function buildScanner(query: string | readonly string[], caseSensitive: boolean, wholeWord: boolean): RegExp | null {
+  return buildTermScanner(query, { caseSensitive, wholeWord });
 }
 
 /**
@@ -81,7 +76,7 @@ function buildScanner(query: string, caseSensitive: boolean, wholeWord: boolean)
  */
 export function findAllMatches(
   doc: PmNode,
-  query: string,
+  query: string | readonly string[],
   caseSensitive: boolean,
   wholeWord: boolean,
 ): SearchMatch[] {
@@ -102,21 +97,6 @@ export function findAllMatches(
     }
   });
   return matches;
-}
-
-function decorationsFor(matches: SearchMatch[], currentIndex: number): DecorationSet {
-  if (matches.length === 0) return DecorationSet.empty;
-  return DecorationSet.create(
-    // The plugin's `apply` receives the new doc; we map from the new state.
-    // We can't reference the doc from inside this helper, so the caller has
-    // to pass it. Build per-state via plain inline decorations.
-    null as unknown as PmNode, // placeholder; we use Decoration.inline which doesn't need a doc
-    matches.map((m, i) =>
-      Decoration.inline(m.from, m.to, {
-        class: 'atlas-search-match' + (i === currentIndex ? ' is-current' : ''),
-      }),
-    ),
-  );
 }
 
 // DecorationSet.create wants a doc — supply it from the caller.

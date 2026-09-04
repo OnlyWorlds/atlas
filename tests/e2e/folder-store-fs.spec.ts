@@ -54,6 +54,42 @@ test('opens an OPFS handle and creates the atlas folder layout', async ({ page }
   expect(layout).toEqual(['.atlas', 'elements', 'media']);
 });
 
+test('world.json is born with format_version and a foreign world.json is never given one', async ({ page }) => {
+  // Folder-format §4.2 (v0.3.6): a writer SHOULD record the spec version it
+  // wrote against. Atlas stamps it once, when it creates the file, and never
+  // adds it to a folder it merely opened and edited (a reader must not
+  // rewrite keys as a side effect; an edit is not a capture).
+  const r = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'fv-tab', disableHeartbeat: true });
+    await store.open(root);
+    await store.writeWorldMeta({ id: 'w-born', name: 'Born here' });
+    const born = await store.readWorldMeta();
+    await store.writeWorldMeta({ name: 'Renamed' });
+    const edited = await store.readWorldMeta();
+    await store.close();
+
+    // A foreign folder: world.json written by another tool, no version key.
+    const foreign = await root.getDirectoryHandle('foreign', { create: true });
+    const fh = await foreign.getFileHandle('world.json', { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify({ id: 'w-foreign', name: 'Theirs' }));
+    await w.close();
+    const store2 = new api.FsFolderStore({ tabId: 'fv-tab-2', disableHeartbeat: true });
+    await store2.open(foreign);
+    await store2.writeWorldMeta({ name: 'Theirs, edited' });
+    const theirs = await store2.readWorldMeta();
+    await store2.close();
+    return { born, edited, theirs };
+  });
+  expect(r.born.format_version).toBe('0.3.6');
+  expect(r.edited.format_version).toBe('0.3.6');
+  expect(r.edited.name).toBe('Renamed');
+  expect(r.theirs.name).toBe('Theirs, edited');
+  expect(r.theirs.format_version).toBeUndefined();
+});
+
 test('a fresh world creates every element type under elements/, spatial types included', async ({ page }) => {
   const dirs = await page.evaluate(async () => {
     const api = window.__atlasTestApi;

@@ -25,10 +25,14 @@ import type { Element } from '../../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../../core/constants';
 import { getState } from '../../core/state';
 import { getEditorSettings } from '../../registry/registry';
-import { navigate, elementHash } from '../../core/router';
+import { navigate, elementHash, writingHash } from '../../core/router';
 import { renderElementImage } from '../../ui/element-image';
 import { narrativeKindOf } from '../../core/narrative-kind';
 import { findIncomingReferences } from '../../middle/element-detail-refs';
+import { findUnlinkedMentions, mentionsPhrase, MENTION_MATCH } from '../../core/unlinked-mentions';
+import { bulkLinkTerm } from '../../middle/writing-bulk-link';
+import { getWritingLabels } from '../../middle/writing-helpers';
+import { toastManager } from '../../ui/toast-manager';
 
 export interface ContextPreviewHandle {
   show(el: Element): void;
@@ -200,6 +204,64 @@ function buildPreview(
       bl.appendChild(more);
     }
     body.appendChild(bl);
+  }
+
+  // Unlinked mentions (S355): where the name or an alias sits in prose as
+  // plain text. The standing home for "link every mention of this element"
+  // (a Discord ask); it is on the element page you land on after creating
+  // one, and on every existing element too. "Link all" writes the subtree
+  // machinery over every narrative listed, then this card rebuilds.
+  const mentions = findUnlinkedMentions(el, getState().data.elements);
+  if (mentions.total > 0) {
+    const worldId = getState().active?.worldId;
+    const word = worldId ? getWritingLabels(worldId).l3.toLowerCase() : 'scene';
+    const mn = document.createElement('div');
+    mn.className = 'atlas-context-preview-mentions';
+    mn.dataset.total = String(mentions.total);
+    const label = document.createElement('span');
+    label.className = 'atlas-context-preview-mentions-label';
+    label.textContent = `Mentioned, unlinked (${mentionsPhrase(mentions, word)}): `;
+    mn.appendChild(label);
+    mentions.narratives.slice(0, 4).forEach((n, i) => {
+      const link = document.createElement('a');
+      link.href = '#';
+      link.textContent = n.count > 1 ? `${n.name} (${n.count})` : n.name;
+      link.title = 'Open in the writing room';
+      link.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        if (worldId) navigate(writingHash(worldId, n.id));
+      });
+      mn.appendChild(link);
+      if (i < Math.min(mentions.narratives.length, 4) - 1) mn.appendChild(document.createTextNode(', '));
+    });
+    if (mentions.narratives.length > 4) {
+      mn.appendChild(document.createTextNode(` +${mentions.narratives.length - 4} more`));
+    }
+    const linkAll = document.createElement('button');
+    linkAll.type = 'button';
+    linkAll.className = 'atlas-btn-ghost atlas-context-preview-mentions-link';
+    linkAll.dataset.action = 'link-mentions';
+    linkAll.textContent = 'Link all';
+    linkAll.title = `Link every mention of ${el.name || 'this element'} in ${mentions.narratives.length} ${word}${mentions.narratives.length === 1 ? '' : 's'}. Written to the files; no undo.`;
+    linkAll.addEventListener('click', () => {
+      linkAll.disabled = true;
+      const ids = mentions.narratives.map(n => n.id);
+      void bulkLinkTerm(ids, mentions.terms, { id: el.id, type: el.type }, MENTION_MATCH).then(({ changed, count }) => {
+        toastManager.info(count > 0
+          ? `Linked ${count} mention${count === 1 ? '' : 's'} of ${el.name || '(unnamed)'} across ${changed} ${word}${changed === 1 ? '' : 's'}`
+          : 'Nothing to link');
+        // Rebuild from fresh state: the line is gone, the backlinks grew.
+        const fresh = getState().data.elements.find(e => e.id === el.id) ?? el;
+        card.replaceWith(buildPreview(fresh, subject, mode, onClose));
+      }).catch((err) => {
+        console.error('[context-preview] link mentions failed', err);
+        toastManager.error('Could not link the mentions');
+        linkAll.disabled = false;
+      });
+    });
+    mn.appendChild(document.createTextNode(' · '));
+    mn.appendChild(linkAll);
+    body.appendChild(mn);
   }
 
   card.appendChild(body);

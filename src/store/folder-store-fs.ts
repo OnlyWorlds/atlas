@@ -41,6 +41,7 @@ import {
   SYNC_STATE_FILE,
   TOMBSTONES_FILE,
   WORLD_META_FILE,
+  FOLDER_FORMAT_VERSION,
 } from '../core/constants';
 import type { LayoutDir } from '../core/constants';
 import { ALL_ELEMENT_TYPES, CONTENT_ELEMENT_TYPES, SPATIAL_ELEMENT_TYPES } from '../core/types';
@@ -849,7 +850,7 @@ export class FsFolderStore implements FolderStore {
   // ---- World meta ----
 
   async readWorldMeta(): Promise<WorldMeta> {
-    const meta = await readJson<WorldMeta>(this.requireRoot(), WORLD_META_FILE);
+    const meta = await this.readWorldMetaFile();
     if (!meta) return { ...DEFAULT_META };
     // THE NOW, UNDER EITHER SPELLING (folder-format v0.3.5, 2026-07-28).
     //
@@ -881,11 +882,24 @@ export class FsFolderStore implements FolderStore {
     // write happen atomically relative to every other meta writer, so a
     // background pull-apply can never erase a concurrent user edit.
     return this.runWorldMetaOp(async () => {
+      const born = (await this.readWorldMetaFile()) === null;
       const current = await this.readWorldMeta();
-      const next: WorldMeta = { ...current, ...patch };
+      // THE BIRTH STAMP (folder-format §4.2, S355): a folder atlas creates
+      // records the spec version it was written against. Only when no
+      // world.json existed yet; a folder from another tool keeps whatever it
+      // carries, absent included (opening or editing is not capturing).
+      const stamp = born && patch.format_version === undefined
+        ? { format_version: FOLDER_FORMAT_VERSION }
+        : {};
+      const next: WorldMeta = { ...current, ...stamp, ...patch };
       await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, next);
       return next;
     });
+  }
+
+  /** The file as it is on disk, or null when the folder has no world.json yet. */
+  private readWorldMetaFile(): Promise<WorldMeta | null> {
+    return readJson<WorldMeta>(this.requireRoot(), WORLD_META_FILE);
   }
 
   // ---- Elements (unified content + spatial) ----

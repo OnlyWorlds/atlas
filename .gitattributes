@@ -1,0 +1,5 @@
+# Line endings: LF in the repo for everything git treats as text (S354, after a
+# CRLF-committed DESIGN.md inflated a two-line change to a 2392-line diff on
+# every commit that touched it). Working copies follow this too; Windows tools
+# that write CRLF get renormalised at staging instead of re-flipping the blob.
+* text=auto eol=lf

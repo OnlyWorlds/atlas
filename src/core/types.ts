@@ -176,6 +176,8 @@ export interface WorldMeta {
   name: string;
   description?: string;
   version?: string;
+  /** Folder Format spec version the folder was written against (§4.2). Stamped at birth; see FOLDER_FORMAT_VERSION. */
+  format_version?: string;
   /** World cover image URL. Preserved on import/export round-trip (DESIGN_IMPORT.md). */
   image_url?: string;
   /**

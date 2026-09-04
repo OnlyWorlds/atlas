@@ -6,12 +6,16 @@
  * editor's next autosave would silently revert.
  */
 
+import type { TermLinkTarget, TermMatchOptions } from '../core/prose-autolink';
+
 export interface LiveEditorOps {
   narrativeId: string;
   /** Convert every autolink hint in the live doc. Returns count. */
   linkAll(): number;
   /** Replace every chip in the live doc with its label. Returns count. */
   unlinkAll(): number;
+  /** Chip every match of `term` to `target` in the live doc (S355). Returns count. */
+  linkTerm(term: string | readonly string[], target: TermLinkTarget, opts: TermMatchOptions): number;
 }
 
 let current: LiveEditorOps | null = null;

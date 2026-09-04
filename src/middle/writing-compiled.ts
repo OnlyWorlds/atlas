@@ -365,8 +365,11 @@ function renderInline(
     const el = elements.get(id);
     // `label` was captured from the already-escaped string — return as-is.
     if (!el && unresolved === 'text') return label;
-    const displayLabel = el?.name ?? label;
-    return `<span class="atlas-element-chip" data-id="${escapeAttr(id)}" data-type="${escapeAttr(type)}">${escapeText(displayLabel)}</span>`;
+    // THE LABEL LAW reaches the read-only view (Captain, S355: a link must
+    // NEVER be shown as the element's name). The writer's label is the text;
+    // the chip resolves by id. `label` is already escaped (captured from the
+    // escaped string), so it goes back as-is.
+    return `<span class="atlas-element-chip" data-id="${escapeAttr(id)}" data-type="${escapeAttr(type)}">${label}</span>`;
   });
 
   // Standard links: [text](url) — non-ow:// only (the above already consumed

@@ -38,6 +38,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'label it your way with supertype and subtype',
       'add your own fields in the Custom fields section',
       'place it on a map from the header pin button',
+      'see in the Web tab where it is mentioned but not linked, and link every mention with one click',
     ],
   },
   writing: {
@@ -47,6 +48,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'rename the tiers to fit your project',
       'type @ to mention an element and link it',
       'link every unlinked mention at once from the corner link icon; right-click a selection or a tree row for the same',
+      'find a word with Ctrl+F and link every match to one element; on a chapter or book this reaches every scene inside',
       'create a chapter or scene inside a row with its hover +',
       'split a long piece into siblings at the cursor',
     ],

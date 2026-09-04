@@ -136,18 +136,21 @@ describe('writing-compiled / renderProseFragment', () => {
     expect(html).toContain('<hr>');
   });
 
-  it('converts ow:// links to element chips, resolving display label from elements map', () => {
+  it('converts ow:// links to element chips and KEEPS THE WRITER\'S LABEL (the label law, S355)', () => {
     const map = new Map<string, Element>();
     map.set('char-1', {
       id: 'char-1', type: 'character', name: 'Drizzle',
       local_updated_at: '2026-01-01T00:00:00Z',
     } as Element);
     const html = renderProseFragment('hello [annoying guy](ow://character/char-1) end', map).outerHTML;
-    // The chip uses the canonical name from the elements map, not the markdown label.
+    // Captain, S355: a link must NEVER be shown as the element's name. The
+    // rendering used to print "Drizzle" here, so a book compiled differently
+    // from the scene it contained.
     expect(html).toContain('class="atlas-element-chip"');
     expect(html).toContain('data-id="char-1"');
     expect(html).toContain('data-type="character"');
-    expect(html).toContain('>Drizzle<');
+    expect(html).toContain('>annoying guy<');
+    expect(html).not.toContain('Drizzle');
   });
 
   it('renders standard links as anchor tags', () => {

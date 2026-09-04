@@ -98,6 +98,15 @@ export const TOMBSTONES_FILE = 'tombstones.json';
 export const CHARTS_FILE = 'charts.json';
 export const LOCK_FILE = 'lock';
 export const WORLD_META_FILE = 'world.json';
+/**
+ * The Folder Format spec version a folder atlas CREATES is written against
+ * (`world.json.format_version`; spec §4.2, minted v0.3.3, moves whenever the
+ * spec's version moves). Stamped ONCE, at a folder's birth, by the store's
+ * meta writer; never added to a folder atlas merely opened or edited (a
+ * reader must not rewrite keys as a side effect, and an edit is not a
+ * capture). Absence means pre-0.3.3 or unknown, which every reader tolerates.
+ */
+export const FOLDER_FORMAT_VERSION = '0.3.6';
 export const ELEMENTS_DIR = 'elements' as const;
 export const SPATIAL_DIR = 'spatial' as const;
 export const MEDIA_DIR = 'media';

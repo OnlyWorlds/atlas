@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { defaultRegistry } from '../../src/core/types';
 import { setAtlasRoot, clearAtlasRoot } from '../../src/registry/registry';
-import { slugify } from '../../src/setup/atlas-root-flow';
+import { slugify, linkedWorldMeta } from '../../src/setup/atlas-root-flow';
 
 describe('setAtlasRoot / clearAtlasRoot', () => {
   it('records the atlas root with handle_key, folder_name, set_at', () => {
@@ -54,5 +54,23 @@ describe('slugify', () => {
   it('strips leading and trailing hyphens', () => {
     expect(slugify('--hello--')).toBe('hello');
     expect(slugify(' / world / ')).toBe('world');
+  });
+});
+
+describe('linkedWorldMeta (folder-format §4.1, ruled 2026-09-04)', () => {
+  it('a linked folder carries the SERVER world id as `id`, equal to api.world_id', () => {
+    const meta = linkedWorldMeta({
+      serverWorldId: 'srv-0001', displayName: 'My copy', apiKey: 'ow_w_x', serverWorldName: 'Sikelia',
+    });
+    expect(meta.id).toBe('srv-0001');
+    expect(meta.api?.world_id).toBe(meta.id);
+    expect(meta.name).toBe('My copy');
+    expect(meta.api?.world_name).toBe('Sikelia');
+    expect(meta.api?.read_only).toBeUndefined();
+  });
+
+  it('mirrors view-only into the api block and omits an absent server name', () => {
+    const meta = linkedWorldMeta({ serverWorldId: 's', displayName: 'n', apiKey: 'ow_r_x', readOnly: true });
+    expect(meta.api).toEqual({ world_id: 's', api_key: 'ow_r_x', read_only: true });
   });
 });

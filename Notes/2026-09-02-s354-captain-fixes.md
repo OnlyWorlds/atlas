@@ -1,6 +1,6 @@
 # S354: Captain's pile of atlas fixes, and what Sikelia found on the way
 
-**2026-09-02 19:50** · the report Captain asked for: "scope it all out, dive in, heat up, then report back with all your great refinements and questions"
+**2026-09-02 19:50, updated 20:10** · the report Captain asked for: "scope it all out, dive in, heat up, then report back with all your great refinements and questions"
 
 Every item below was reproduced first (own eyes, Playwright on the live dev server, Skeld's real Sikelia folder mirrored into the browser's OPFS and opened through the real open-folder path), then fixed, then re-inspected. Screenshots: `Notes/ui-snapshots/2026-09-02-s354/`.
 

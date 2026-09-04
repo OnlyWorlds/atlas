@@ -16,6 +16,7 @@ import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
+import { findUnlinkedMentions, createdToastText } from '../core/unlinked-mentions';
 import { getActiveStore } from '../core/active-store';
 import { completeWaypoint } from '../core/waypoints';
 import { CONTENT_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
@@ -449,7 +450,10 @@ export class ElementCreateModal extends BaseModal {
         // Charts-context callers toast their own, more specific confirmation
         // ("Created X at 60" + peek) — a second generic toast here doubles it.
         if (!this.opts.temporalContext && !this.opts.suppressToast) {
-          this.toasts.success(`Created ${this.selected}: ${el.name}`);
+          this.toasts.success(createdToastText(
+            this.selected, el.name,
+            findUnlinkedMentions(el, getState().data.elements),
+          ));
         }
         this.hide();
         this.opts.onCreated?.(el.id, this.selected);

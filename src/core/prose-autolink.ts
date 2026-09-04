@@ -20,7 +20,7 @@
 import type { Element } from './types';
 import { createOwLinkScanner } from './ow-links';
 
-const MIN_NAME_CHARS = 3;
+export const MIN_NAME_CHARS = 3;
 /** Cap alternation size to keep regex compile fast. */
 const MAX_KEYS_IN_INDEX = 2000;
 
@@ -134,7 +134,9 @@ export function promotionLabel(matched: string, cand: AutolinkCandidate): string
  */
 export function isValidChipLabel(label: unknown, surface: { name: string; aliases: string[] }): boolean {
   if (typeof label !== 'string' || label.length === 0) return false;
-  const folded = label.toLowerCase();
+  // Trimmed on BOTH sides of the comparison (S355): a label carrying stray
+  // whitespace must not read as "stale" and get rewritten to the name.
+  const folded = label.trim().toLowerCase();
   if (folded === surface.name.trim().toLowerCase()) return true;
   return surface.aliases.some(a => typeof a === 'string' && a.trim().toLowerCase() === folded);
 }
@@ -339,4 +341,178 @@ export function unlinkRichtext(doc: unknown): { doc: unknown; unlinked: number }
   };
   transform(root);
   return { doc: root, unlinked: n };
+}
+
+// ---------------------------------------------------------------------------
+// Term linking (S355) — every match of ONE chosen word → ONE chosen element
+// ---------------------------------------------------------------------------
+//
+// The find bar's "Link to element" verb. Unlike the autolink transforms above
+// this is NOT first-mention: the writer typed the word and picked the target,
+// so every occurrence links (a Discord request, 2026-09-03: "search narrative
+// text, kinda like a ctrl f, and link all of them to a specific element").
+// The automatic link-all stays sparse; the deliberate gesture goes dense.
+//
+// Matching mirrors the find bar exactly (substring by default, optional
+// case-sensitive and whole-word) so what the bar highlights is what links.
+// Text already inside a link or chip is never touched. The label is the
+// writer's matched text verbatim (THE LABEL LAW, convention #49b).
+
+export interface TermMatchOptions {
+  caseSensitive?: boolean;
+  wholeWord?: boolean;
+}
+
+export interface TermLinkTarget {
+  id: string;
+  type: string;
+}
+
+/**
+ * Shrink a match to its non-whitespace core (S355, Captain: a trailing space
+ * in the search term was becoming part of the chip label). The surrounding
+ * whitespace stays prose; an all-whitespace match links nothing.
+ */
+export function trimMatchSpan(text: string, from: number, to: number): [number, number] | null {
+  let a = from;
+  let b = to;
+  while (a < b && /\s/.test(text[a])) a++;
+  while (b > a && /\s/.test(text[b - 1])) b--;
+  return a < b ? [a, b] : null;
+}
+
+/**
+ * Same scanner the find plugin builds — one shape, two homes kept in step by
+ * tests. Accepts several terms (an element's name ∪ aliases): longest first,
+ * so "Orc Chief" wins over "orc" where both could match.
+ */
+export function buildTermScanner(term: string | readonly string[], opts: TermMatchOptions = {}): RegExp | null {
+  const terms = (typeof term === 'string' ? [term] : [...term]).filter(t => t.length > 0);
+  if (terms.length === 0) return null;
+  terms.sort((a, b) => b.length - a.length);
+  const escaped = terms.map(escapeRegexLiteral).join('|');
+  const pattern = opts.wholeWord ? `\\b(?:${escaped})\\b` : `(?:${escaped})`;
+  try {
+    return new RegExp(pattern, opts.caseSensitive ? 'g' : 'gi');
+  } catch {
+    return null;
+  }
+}
+
+export interface TermLinkMarkdownResult {
+  story: string;
+  linked: number;
+}
+
+/**
+ * Every unprotected, whitespace-trimmed match of `term` in a markdown story,
+ * as [from, to) offsets. Existing links are protected. The one span finder
+ * behind {@link linkTermMarkdown} and the unlinked-mentions count, so the
+ * number the pane shows is the number the link writes.
+ */
+export function findTermSpansMarkdown(
+  story: string,
+  term: string | readonly string[],
+  opts: TermMatchOptions = {},
+): Array<[number, number]> {
+  const scanner = buildTermScanner(term, opts);
+  if (!story || !scanner) return [];
+
+  const protectedSpans: Array<[number, number]> = [];
+  const linkRe = /\[[^\]]*\]\([^)]*\)/g;
+  let lm: RegExpExecArray | null;
+  while ((lm = linkRe.exec(story)) !== null) {
+    protectedSpans.push([lm.index, lm.index + lm[0].length]);
+  }
+  const isProtected = (a: number, b: number): boolean =>
+    protectedSpans.some(([s, e]) => a < e && b > s);
+
+  const spans: Array<[number, number]> = [];
+  let m: RegExpExecArray | null;
+  while ((m = scanner.exec(story)) !== null) {
+    if (m[0].length === 0) { scanner.lastIndex++; continue; }
+    const span = trimMatchSpan(story, m.index, m.index + m[0].length);
+    if (!span || isProtected(span[0], span[1])) continue;
+    spans.push(span);
+  }
+  return spans;
+}
+
+/** Chip EVERY unprotected match of `term` in a markdown story to `target`. */
+export function linkTermMarkdown(
+  story: string,
+  term: string | readonly string[],
+  target: TermLinkTarget,
+  opts: TermMatchOptions = {},
+): TermLinkMarkdownResult {
+  const spans = findTermSpansMarkdown(story, term, opts);
+  if (spans.length === 0) return { story, linked: 0 };
+
+  let out = story;
+  for (let i = spans.length - 1; i >= 0; i--) {
+    const [from, to] = spans[i];
+    out = out.slice(0, from)
+      + `[${story.slice(from, to)}](ow://${target.type}/${target.id})`
+      + out.slice(to);
+  }
+  return { story: out, linked: spans.length };
+}
+
+export interface TermLinkRichtextResult {
+  doc: unknown;
+  linked: number;
+}
+
+/**
+ * The sidecar half of {@link linkTermMarkdown}: every match inside a text
+ * node becomes an elementChip; chips already in the doc are atoms and are
+ * never entered. Returns a new doc; the input is never mutated.
+ */
+export function linkTermRichtext(
+  doc: unknown,
+  term: string | readonly string[],
+  target: TermLinkTarget,
+  opts: TermMatchOptions = {},
+): TermLinkRichtextResult {
+  const scanner = buildTermScanner(term, opts);
+  if (!doc || typeof doc !== 'object' || !scanner) return { doc, linked: 0 };
+  const root = structuredClone(doc) as RtNode;
+  let linked = 0;
+
+  const splitOne = (node: RtNode): RtNode[] => {
+    const text = node.text!;
+    const re = new RegExp(scanner.source, scanner.flags);
+    const parts: RtNode[] = [];
+    let cursor = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      if (m[0].length === 0) { re.lastIndex++; continue; }
+      const span = trimMatchSpan(text, m.index, m.index + m[0].length);
+      if (!span) continue;
+      const [from, to] = span;
+      if (from > cursor) parts.push({ ...node, text: text.slice(cursor, from) });
+      parts.push({ type: 'elementChip', attrs: { id: target.id, type: target.type, label: text.slice(from, to) } });
+      linked++;
+      cursor = to;
+    }
+    if (parts.length === 0) return [node];
+    if (cursor < text.length) parts.push({ ...node, text: text.slice(cursor) });
+    return parts;
+  };
+
+  const transform = (n: RtNode): void => {
+    if (!Array.isArray(n.content)) return;
+    const next: RtNode[] = [];
+    for (const child of n.content) {
+      if (child.type === 'text' && typeof child.text === 'string' && child.text.length > 0) {
+        next.push(...splitOne(child));
+      } else {
+        transform(child);
+        next.push(child);
+      }
+    }
+    n.content = next;
+  };
+  transform(root);
+  return { doc: root, linked };
 }

@@ -18,11 +18,27 @@ export interface FindBarOpts {
   search: SearchController;
   /** Called when the bar requests close (Esc or × click). */
   onClose: () => void;
+  /**
+   * "Link to element…" (S355): the workspace opens the picker and links every
+   * match. Resolves when the doc has settled so the bar can recount.
+   */
+  onLinkMatches?: () => Promise<void>;
+}
+
+export interface FindBarOpenOptions {
+  /**
+   * The surface behind the bar cannot be edited in place (the compiled view).
+   * Replace is hidden whatever mode was asked for; linking still works
+   * because it writes the source narratives, not the rendering.
+   */
+  readOnly?: boolean;
+  /** Seed the find box (the editor's selection, by convention). Whitespace-only is ignored. */
+  prefill?: string;
 }
 
 export interface FindBarHandle {
   /** Show the bar in find or replace mode. Focuses the find input. */
-  open(mode: FindBarMode): void;
+  open(mode: FindBarMode, opts?: FindBarOpenOptions): void;
   /** Hide the bar and clear the search highlight. */
   close(): void;
   /** True iff the bar is currently visible. */
@@ -69,6 +85,13 @@ export function createFindBar(container: HTMLElement, opts: FindBarOpts): FindBa
         aria-pressed="false"
         title="Whole word"
       >ab|</button>
+      <button
+        type="button"
+        class="atlas-btn-ghost atlas-find-bar-link"
+        data-role="link-matches"
+        title="Turn every match into a link to an element you pick"
+        disabled
+      >Link to element…</button>
       <button type="button" class="atlas-icon-btn-sm" data-role="close" title="Close (Esc)">
         <span class="material-symbols-outlined">close</span>
       </button>
@@ -92,6 +115,7 @@ export function createFindBar(container: HTMLElement, opts: FindBarOpts): FindBa
   const countSpan = bar.querySelector<HTMLElement>('[data-role="count"]')!;
   const caseToggle = bar.querySelector<HTMLButtonElement>('[data-role="case-toggle"]')!;
   const wordToggle = bar.querySelector<HTMLButtonElement>('[data-role="word-toggle"]')!;
+  const linkBtn = bar.querySelector<HTMLButtonElement>('[data-role="link-matches"]')!;
 
   let caseSensitive = false;
   let wholeWord = false;
@@ -104,6 +128,7 @@ export function createFindBar(container: HTMLElement, opts: FindBarOpts): FindBa
     } else {
       countSpan.textContent = `${info.currentIndex} of ${info.total}`;
     }
+    linkBtn.disabled = info.total === 0 || !opts.onLinkMatches;
   }
 
   function applyQuery(resetIndex = true): void {
@@ -148,6 +173,15 @@ export function createFindBar(container: HTMLElement, opts: FindBarOpts): FindBa
     refreshCount();
   });
   bar.querySelector<HTMLElement>('[data-role="close"]')!.addEventListener('click', doClose);
+  linkBtn.addEventListener('click', () => {
+    if (linkBtn.disabled || !opts.onLinkMatches) return;
+    linkBtn.disabled = true;
+    void opts.onLinkMatches().finally(() => {
+      // Linked text is chip label now, not text, so the count drops on its
+      // own; the recount also re-enables the button when matches remain.
+      applyQuery(true);
+    });
+  });
   bar.querySelector<HTMLElement>('[data-role="replace-one"]')!.addEventListener('click', () => {
     search.replaceCurrent(replaceInput.value);
     refreshCount();
@@ -170,14 +204,20 @@ export function createFindBar(container: HTMLElement, opts: FindBarOpts): FindBa
     applyQuery(true);
   });
 
-  function doOpen(mode: FindBarMode): void {
-    bar.dataset.mode = mode;
+  function doOpen(mode: FindBarMode, openOpts: FindBarOpenOptions = {}): void {
+    bar.dataset.mode = openOpts.readOnly ? 'find' : mode;
+    bar.dataset.readonly = openOpts.readOnly ? 'true' : 'false';
     bar.dataset.state = 'shown';
     open = true;
-    // Pre-fill is empty by default; let user start fresh each open.
-    // If they want to re-search the last query, they can type it again or
-    // we could persist — current design stays simple.
-    refreshCount();
+    // A selection seeds the box (S355, the editor convention); otherwise the
+    // last query stays for a quick re-search.
+    const seed = (openOpts.prefill ?? '').trim();
+    if (seed) {
+      findInput.value = seed;
+      applyQuery(true);
+    } else {
+      refreshCount();
+    }
     // Focus + select existing text for fast overtype.
     findInput.focus();
     findInput.select();

@@ -8269,6 +8269,21 @@ a.atlas-writing-workspace-crumb-seg:hover {
   background: rgba(var(--atlas-accent-rgb), 0.4);
   outline: 1px solid rgba(var(--atlas-accent-rgb), 0.7);
 }
+/* The compiled view marks matches in the rendered DOM (S355, no editor
+   behind it). Same look as the editor's decorations; <mark> reset so the
+   browser's yellow never shows. */
+.atlas-writing-compiled mark.atlas-search-match {
+  background: rgba(var(--atlas-accent-rgb), 0.15);
+  color: inherit;
+  border-radius: 2px;
+}
+.atlas-writing-compiled mark.atlas-search-match.is-current {
+  background: rgba(var(--atlas-accent-rgb), 0.4);
+  outline: 1px solid rgba(var(--atlas-accent-rgb), 0.7);
+}
+.atlas-writing-workspace-prose:focus {
+  outline: none;
+}
 
 /* Tiny right-click context menu for the prose surface — single-item menu
    that surfaces inline element creation from the current text selection.
@@ -8380,7 +8395,9 @@ a.atlas-writing-workspace-crumb-seg:hover {
 /* Find/replace bar — anchored to the top-right of the workspace. */
 .atlas-find-bar {
   position: absolute;
-  top: 44px; /* sits below the 36px header + a hair of breathing room */
+  /* Below the 36px header AND the 32px crumb row (S355: it used to float
+     over the crumb's date pill), plus a hair of breathing room. */
+  top: 76px;
   right: 12px;
   z-index: 50;
   background: rgba(var(--atlas-scrim-rgb), 0.88);
@@ -8399,6 +8416,15 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 .atlas-find-bar[data-mode='find'] .atlas-find-bar-replace-row {
   display: none;
+}
+.atlas-find-bar-link {
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+.atlas-find-bar-link:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .atlas-find-bar-row {
   display: flex;
@@ -13214,6 +13240,29 @@ a.atlas-share-map-pin { cursor: pointer; }
 }
 .atlas-context-preview-backlinks a:hover {
   text-decoration: underline;
+}
+
+/* Unlinked mentions (S355) — same voice as the backlinks line, plus the one
+   action that turns the count into links. */
+.atlas-context-preview-mentions {
+  font-size: 11.5px;
+  color: var(--atlas-text-soft);
+  line-height: 1.55;
+}
+.atlas-context-preview-mentions-label {
+  color: var(--atlas-text-muted);
+}
+.atlas-context-preview-mentions a {
+  color: var(--atlas-cyan);
+  text-decoration: none;
+}
+.atlas-context-preview-mentions a:hover {
+  text-decoration: underline;
+}
+.atlas-context-preview-mentions-link {
+  font-size: 11px;
+  padding: 1px 7px;
+  vertical-align: baseline;
 }
 
 .atlas-context-preview-actions {

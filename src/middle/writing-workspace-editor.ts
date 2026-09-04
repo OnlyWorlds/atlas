@@ -24,6 +24,7 @@ import {
   stepSearch,
   clearSearch,
   getSearchState,
+  findAllMatches,
   type SearchSetOptions,
 } from './writing-workspace-search';
 import {
@@ -33,7 +34,7 @@ import {
   type AutolinkIndex,
 } from './writing-workspace-autolink';
 import type { Element } from '../core/types';
-import { isValidChipLabel } from '../core/prose-autolink';
+import { isValidChipLabel, trimMatchSpan } from '../core/prose-autolink';
 import { completeWaypoint } from '../core/waypoints';
 import type { JSONContent } from '@tiptap/core';
 
@@ -93,6 +94,12 @@ export interface SearchController {
   replaceCurrent(text: string): boolean;
   /** Replace every match with `text`. Returns the number of replacements. */
   replaceAll(text: string): number;
+  /**
+   * Turn EVERY current match into a chip to `target` in one undoable
+   * transaction (S355, the find bar's "Link to element"). Labels are the
+   * matched text verbatim (convention #49b). Returns the count.
+   */
+  linkAllMatches(target: { id: string; type: string }): number;
   /** Drop the highlight + clear plugin state. */
   clear(): void;
   /** Current snapshot of match counts for UI display. */
@@ -132,6 +139,39 @@ export interface WorkspaceEditorHandle {
  * Optional initial autolink seed. Workspace caller passes the world's elements
  * so the editor can decorate already-present matches on mount.
  */
+/**
+ * Chip every match of `term` to `target` in a live editor, independent of
+ * the find bar's state (S355: the tree-level term link routes the OPEN
+ * narrative here so the write is a real transaction, undoable and
+ * autosaved, rather than a disk write the next autosave would revert).
+ */
+export function linkTermInEditor(
+  editor: Editor,
+  term: string | readonly string[],
+  target: { id: string; type: string },
+  opts: { caseSensitive?: boolean; wholeWord?: boolean },
+): number {
+  const chipType = editor.state.schema.nodes.elementChip;
+  if (!chipType) return 0;
+  const matches = findAllMatches(editor.state.doc, term, Boolean(opts.caseSensitive), Boolean(opts.wholeWord));
+  if (matches.length === 0) return 0;
+  const ordered = [...matches].sort((a, b) => b.from - a.from);
+  const tr = editor.state.tr;
+  let n = 0;
+  for (const m of ordered) {
+    const raw = editor.state.doc.textBetween(m.from, m.to, ' ', ' ');
+    const span = trimMatchSpan(raw, 0, raw.length);
+    if (!span) continue;
+    const from = m.from + span[0];
+    const to = m.from + span[1];
+    const label = raw.slice(span[0], span[1]);
+    tr.replaceWith(from, to, chipType.create({ id: target.id, type: target.type, label }));
+    n++;
+  }
+  if (n > 0) editor.view.dispatch(tr);
+  return n;
+}
+
 export interface AutolinkSeed {
   elements: Element[];
 }
@@ -310,6 +350,29 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
       }
       editor.view.dispatch(tr);
       return ordered.length;
+    },
+    linkAllMatches(target) {
+      const s = getSearchState(editor.state);
+      if (!s || s.matches.length === 0) return 0;
+      const chipType = editor.state.schema.nodes.elementChip;
+      if (!chipType) return 0;
+      // End -> start so earlier offsets stay valid; labels read from the
+      // pre-transaction doc, which is what the writer saw highlighted.
+      const ordered = [...s.matches].sort((a, b) => b.from - a.from);
+      const tr = editor.state.tr;
+      let n = 0;
+      for (const m of ordered) {
+        const raw = editor.state.doc.textBetween(m.from, m.to, ' ', ' ');
+        const span = trimMatchSpan(raw, 0, raw.length);
+        if (!span) continue;
+        const from = m.from + span[0];
+        const to = m.from + span[1];
+        const label = raw.slice(span[0], span[1]);
+        tr.replaceWith(from, to, chipType.create({ id: target.id, type: target.type, label }));
+        n++;
+      }
+      if (n > 0) editor.view.dispatch(tr);
+      return n;
     },
     clear() {
       clearSearch(editor.view);

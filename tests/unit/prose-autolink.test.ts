@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildAutolinkIndex, autolinkMarkdown, unlinkMarkdown,
   autolinkRichtext, unlinkRichtext, isValidChipLabel,
+  linkTermMarkdown, linkTermRichtext, buildTermScanner,
 } from '../../src/core/prose-autolink';
 import type { Element } from '../../src/core/types';
 
@@ -223,6 +224,11 @@ describe('autolinkRichtext', () => {
 });
 
 describe('isValidChipLabel (the chip-label sync predicate)', () => {
+  it('ignores stray whitespace on the label (S355: a padded label was being "corrected" to the name)', () => {
+    expect(isValidChipLabel('orc ', { name: 'Orc Chief', aliases: ['orc'] })).toBe(true);
+    expect(isValidChipLabel(' Orc Chief', { name: 'Orc Chief', aliases: [] })).toBe(true);
+  });
+
   // The editors' rename sync rewrites any label that fails this check. It
   // MUST fold case, or one tick after a promotion it would quietly undo the
   // writer's-text rule the tests above lock in (the S309 pairing: promotion
@@ -270,5 +276,120 @@ describe('unlinkRichtext', () => {
       { type: 'text', text: ' now.' },
     ]);
     expect(r.unlinked).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Term linking (S355): the find bar's "Link to element" — every match, one
+// chosen target, the writer's text as label, links and chips never entered.
+// ---------------------------------------------------------------------------
+
+describe('linkTermMarkdown', () => {
+  const target = { id: 'c2', type: 'character' };
+
+  it('links EVERY match, not just the first, keeping the matched text as label', () => {
+    const r = linkTermMarkdown('the orc met the Orc and another orc left', 'orc', target);
+    expect(r.linked).toBe(3);
+    expect(r.story).toBe(
+      'the [orc](ow://character/c2) met the [Orc](ow://character/c2) and another [orc](ow://character/c2) left',
+    );
+  });
+
+  it('respects the case-sensitive and whole-word flags exactly as the find bar does', () => {
+    const cs = linkTermMarkdown('orc Orc orcs', 'orc', target, { caseSensitive: true });
+    expect(cs.linked).toBe(2); // "orc" and the prefix of "orcs"; "Orc" skipped
+    const ww = linkTermMarkdown('orc Orc orcs', 'orc', target, { wholeWord: true });
+    expect(ww.linked).toBe(2); // "orc" and "Orc"; "orcs" skipped
+    const both = linkTermMarkdown('orc Orc orcs', 'orc', target, { caseSensitive: true, wholeWord: true });
+    expect(both.linked).toBe(1);
+    expect(both.story).toBe('[orc](ow://character/c2) Orc orcs');
+  });
+
+  it('never enters an existing link, ow:// or plain', () => {
+    const story = 'orc [orc](ow://character/c1) and [an orc](https://x.y) plus orc';
+    const r = linkTermMarkdown(story, 'orc', target);
+    expect(r.linked).toBe(2);
+    expect(r.story).toBe(
+      '[orc](ow://character/c2) [orc](ow://character/c1) and [an orc](https://x.y) plus [orc](ow://character/c2)',
+    );
+  });
+
+  it('is a no-op for an empty term, an empty story, or no matches', () => {
+    expect(linkTermMarkdown('', 'orc', target)).toEqual({ story: '', linked: 0 });
+    expect(linkTermMarkdown('no match here', '', target)).toEqual({ story: 'no match here', linked: 0 });
+    expect(linkTermMarkdown('no match here', 'orc', target)).toEqual({ story: 'no match here', linked: 0 });
+  });
+
+  it('treats the term as a literal, not a regex', () => {
+    const r = linkTermMarkdown('a.c abc a.c', 'a.c', target);
+    expect(r.linked).toBe(2);
+  });
+
+  it('never lets whitespace into a label: a padded term links its core and leaves the spaces as prose', () => {
+    // Captain, S355: "orc " typed into the find box was becoming the chip.
+    const r = linkTermMarkdown('an orc came; an orc.', 'orc ', target);
+    expect(r.linked).toBe(1); // only "orc " (with the trailing space) matches; "orc." does not
+    expect(r.story).toBe('an [orc](ow://character/c2) came; an orc.');
+    const ws = linkTermMarkdown('a  b', ' ', target);
+    expect(ws.linked).toBe(0);
+    expect(ws.story).toBe('a  b');
+  });
+});
+
+describe('linkTermRichtext', () => {
+  const target = { id: 'c2', type: 'character' };
+  const doc = (content: unknown[]) => ({ type: 'doc', content: [{ type: 'paragraph', content }] });
+
+  it('splits text nodes around every match and never enters a chip', () => {
+    const input = doc([
+      { type: 'text', text: 'the orc met ' },
+      { type: 'elementChip', attrs: { id: 'c1', type: 'character', label: 'orc' } },
+      { type: 'text', text: ' and an orc left', marks: [{ type: 'bold' }] },
+    ]);
+    const r = linkTermRichtext(input, 'orc', target);
+    expect(r.linked).toBe(2);
+    const para = (r.doc as any).content[0].content;
+    expect(para).toEqual([
+      { type: 'text', text: 'the ' },
+      { type: 'elementChip', attrs: { id: 'c2', type: 'character', label: 'orc' } },
+      { type: 'text', text: ' met ' },
+      { type: 'elementChip', attrs: { id: 'c1', type: 'character', label: 'orc' } },
+      { type: 'text', text: ' and an ', marks: [{ type: 'bold' }] },
+      { type: 'elementChip', attrs: { id: 'c2', type: 'character', label: 'orc' } },
+      { type: 'text', text: ' left', marks: [{ type: 'bold' }] },
+    ]);
+    // Input untouched.
+    expect((input as any).content[0].content).toHaveLength(3);
+  });
+
+  it('trims whitespace off each match the same way the markdown half does', () => {
+    const r = linkTermRichtext(doc([{ type: 'text', text: 'an orc came; an orc.' }]), 'orc ', target);
+    expect(r.linked).toBe(1);
+    expect((r.doc as any).content[0].content).toEqual([
+      { type: 'text', text: 'an ' },
+      { type: 'elementChip', attrs: { id: 'c2', type: 'character', label: 'orc' } },
+      { type: 'text', text: ' came; an orc.' },
+    ]);
+  });
+
+  it('agrees with the markdown half on the count under every flag combination', () => {
+    const text = 'Orc orc orcs ORC';
+    for (const caseSensitive of [false, true]) {
+      for (const wholeWord of [false, true]) {
+        const md = linkTermMarkdown(text, 'orc', target, { caseSensitive, wholeWord });
+        const rt = linkTermRichtext(doc([{ type: 'text', text }]), 'orc', target, { caseSensitive, wholeWord });
+        expect(rt.linked).toBe(md.linked);
+      }
+    }
+  });
+});
+
+describe('buildTermScanner', () => {
+  it('is the one scanner shape: literal, optional word bounds, optional case', () => {
+    expect(buildTermScanner('')).toBeNull();
+    expect(buildTermScanner('a.b')!.source).toBe('(?:a\\.b)');
+    expect(buildTermScanner('ab', { wholeWord: true })!.source).toBe('\\b(?:ab)\\b');
+    expect(buildTermScanner('ab')!.flags).toBe('gi');
+    expect(buildTermScanner('ab', { caseSensitive: true })!.flags).toBe('g');
   });
 });

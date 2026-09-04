@@ -1424,3 +1424,211 @@ test('switching narratives saves the old one without polluting the new one', asy
   await expect.poll(async () => (await stories()).a, { timeout: 15000 }).toContain('alpha canary');
   expect((await stories()).b).toBe('');
 });
+
+/**
+ * S355 — the find bar's "Link to element" (a Discord request: search the
+ * text for a word and link every one of them to a chosen element). Unlike
+ * link-all this is NOT first-mention: the writer named the word and picked
+ * the target, so every match links, labels verbatim, in one undoable step.
+ */
+test('find bar: "Link to element" links every match in a scene and records the alias', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-find-link-root');
+  await createWorld(page, 'find link world');
+  const chief = await createElement(page, 'character', { name: 'Orc Chief' });
+  const id = await createElement(page, 'narrative', {
+    name: 'link scene',
+    supertype: 'Book',
+    story: 'the orc met the Orc and another orc joined them',
+  });
+  await gotoWriting(page, id);
+  await waitForEditor(page);
+
+  const prose = page.locator('.atlas-writing-workspace-prose .ProseMirror');
+  await prose.click();
+  await page.keyboard.press('Control+f');
+  const bar = page.locator('.atlas-find-bar');
+  await expect(bar).toHaveAttribute('data-state', 'shown');
+  const linkBtn = bar.locator('[data-role="link-matches"]');
+  await expect(linkBtn).toBeDisabled();
+
+  await page.locator('[data-role="find-input"]').fill('orc');
+  await expect(page.locator('[data-role="count"]')).toContainText('1 of 3');
+  await expect(linkBtn).toBeEnabled();
+  await linkBtn.click();
+
+  await expect(page.locator('.atlas-picker-panel')).toBeVisible();
+  await page.locator('.atlas-picker-row', { hasText: 'Orc Chief' }).click();
+
+  // Three chips, each keeping the writer's own casing (THE LABEL LAW).
+  const chips = prose.locator('.atlas-element-chip');
+  await expect(chips).toHaveCount(3);
+  await expect(chips.nth(0)).toHaveText('orc');
+  await expect(chips.nth(1)).toHaveText('Orc');
+  await expect(chips.nth(2)).toHaveText('orc');
+  await expect(prose).toContainText('the orc met the Orc and another orc joined them');
+  // Linked text is chip label now, so the query finds nothing left.
+  await expect(page.locator('[data-role="count"]')).toContainText(/No matches|0 of 0/);
+  await expect(page.locator('.ow-toast', { hasText: 'Linked 3 mentions to Orc Chief' })).toBeVisible();
+
+  // On disk: three ow:// links to the chief, and "orc" learned as an alias.
+  await expect.poll(async () => {
+    const n = await getNarrative(page, id);
+    return (n?.story.match(/\]\(ow:\/\/character\//g) ?? []).length;
+  }, { timeout: 5000 }).toBe(3);
+  const narr = await getNarrative(page, id);
+  expect(narr.story).toBe(
+    `the [orc](ow://character/${chief}) met the [Orc](ow://character/${chief}) and another [orc](ow://character/${chief}) joined them`,
+  );
+  const chiefEl = await getNarrative(page, chief);
+  expect(chiefEl.atlas_aliases).toEqual(['orc']);
+
+  // One transaction: Ctrl+Z restores the plain text.
+  await page.locator('[data-role="find-input"]').press('Escape');
+  await prose.click();
+  await page.keyboard.press('Control+z');
+  await expect(chips).toHaveCount(0);
+  await expect(prose).toContainText('the orc met the Orc and another orc joined them');
+});
+
+test('compiled view: find searches every scene and "Link to element" writes them all', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-compiled-find-root');
+  await createWorld(page, 'compiled find world');
+  const chief = await createElement(page, 'character', { name: 'Orc Chief' });
+  const book = await createElement(page, 'narrative', {
+    name: 'The Orc Book', supertype: 'Book', story: 'An orc opens the book.',
+  });
+  const sceneA = await createElement(page, 'narrative', {
+    name: 'Scene A', supertype: 'Scene', parent_narrative: book,
+    story: 'The orc marched. Nobody saw the orc leave.',
+  });
+  const sceneB = await createElement(page, 'narrative', {
+    name: 'Scene B', supertype: 'Scene', parent_narrative: book,
+    story: `No orcs here, only an [orc](ow://character/${chief}) already linked.`,
+  });
+  await markWritingInitialized(page);
+  await gotoWriting(page, book);
+
+  const compiled = page.locator('.atlas-writing-compiled');
+  await expect(compiled).toBeVisible();
+  await compiled.click();
+
+  // Ctrl+H on a rendering opens FIND: there is nothing to replace in place.
+  await page.keyboard.press('Control+h');
+  const bar = page.locator('.atlas-find-bar');
+  await expect(bar).toHaveAttribute('data-state', 'shown');
+  await expect(bar).toHaveAttribute('data-mode', 'find');
+  await expect(bar).toHaveAttribute('data-readonly', 'true');
+  await expect(bar.locator('[data-role="replace-row"]')).toBeHidden();
+
+  // Whole-word "orc": book 1 + scene A 2 + scene B 0 (the "orcs" and the
+  // existing chip are both skipped) = 3, highlighted across sections.
+  await page.locator('[data-role="find-input"]').fill('orc');
+  await page.locator('[data-role="word-toggle"]').click();
+  await expect(page.locator('[data-role="count"]')).toContainText('1 of 3');
+  await expect(compiled.locator('mark.atlas-search-match')).toHaveCount(3);
+  await expect(compiled.locator('mark.atlas-search-match.is-current')).toHaveCount(1);
+  // Document order: "1 of 3" is the book's own line, not the last scene's.
+  await expect(compiled.locator('mark.atlas-search-match').first()).toHaveClass(/is-current/);
+  await page.locator('[data-role="find-input"]').press('Enter');
+  await expect(page.locator('[data-role="count"]')).toContainText('2 of 3');
+  await expect(compiled.locator('mark.atlas-search-match').nth(1)).toHaveClass(/is-current/);
+
+  await bar.locator('[data-role="link-matches"]').click();
+  await expect(page.locator('.atlas-picker-panel')).toBeVisible();
+  await page.locator('.atlas-picker-row', { hasText: 'Orc Chief' }).click();
+
+  await expect(page.locator('.ow-toast', { hasText: 'Linked 3 mentions to Orc Chief across 2 narratives' })).toBeVisible();
+  // The rendering re-drew from the written files: four chips now (three new
+  // plus scene B's existing one), no matches left. Every chip shows the
+  // writer's word, never the element's name (the label law, Captain S355).
+  await expect(compiled.locator('.atlas-element-chip')).toHaveCount(4);
+  await expect(compiled.locator('.atlas-element-chip')).toHaveText(['orc', 'orc', 'orc', 'orc']);
+  await expect(compiled).not.toContainText('Orc Chief');
+  await expect(page.locator('[data-role="count"]')).toContainText(/No matches|0 of 0/);
+
+  const bookEl = await getNarrative(page, book);
+  expect(bookEl.story).toBe(`An [orc](ow://character/${chief}) opens the book.`);
+  const a = await getNarrative(page, sceneA);
+  expect(a.story).toBe(`The [orc](ow://character/${chief}) marched. Nobody saw the [orc](ow://character/${chief}) leave.`);
+  const b = await getNarrative(page, sceneB);
+  expect(b.story).toBe(`No orcs here, only an [orc](ow://character/${chief}) already linked.`);
+  // Linking derives the relation field on each changed narrative (conv. #50).
+  expect(a.characters).toContain(chief);
+  const chiefEl = await getNarrative(page, chief);
+  expect(chiefEl.atlas_aliases).toEqual(['orc']);
+});
+
+test('find bar: Ctrl+F and Ctrl+H seed the box from the selection, and a padded term never links its spaces', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-find-prefill-root');
+  await createWorld(page, 'find prefill world');
+  const chief = await createElement(page, 'character', { name: 'Orc Chief' });
+  const id = await createElement(page, 'narrative', {
+    name: 'prefill scene', supertype: 'Book', story: 'the orc met an orc.',
+  });
+  await gotoWriting(page, id);
+  await waitForEditor(page);
+  const prose = page.locator('.atlas-writing-workspace-prose .ProseMirror');
+
+  // Select the whole line (End, Shift+Home), then Ctrl+F: the box is seeded.
+  await prose.click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Shift+Home');
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('the orc met an orc.');
+  await page.keyboard.press('Control+f');
+  const find = page.locator('[data-role="find-input"]');
+  await expect(find).toHaveValue('the orc met an orc.');
+  await expect(page.locator('[data-role="count"]')).toContainText('1 of 1');
+
+  // Now search a padded form on purpose: "orc " matches once ("orc." does
+  // not), and the chip must be "orc", the space staying prose.
+  await find.fill('orc ');
+  await expect(page.locator('[data-role="count"]')).toContainText('1 of 1');
+  await page.locator('[data-role="link-matches"]').click();
+  await page.locator('.atlas-picker-row', { hasText: 'Orc Chief' }).click();
+  const chips = prose.locator('.atlas-element-chip');
+  await expect(chips).toHaveCount(1);
+  await expect(chips.first()).toHaveText('orc');
+  await expect(prose).toHaveText('the orc met an orc.');
+
+  // The label survives the chip-label sync tick (alias recorded first).
+  await expect.poll(async () => (await getNarrative(page, chief))?.atlas_aliases ?? []).toEqual(['orc']);
+  await page.waitForTimeout(1500);
+  await expect(chips.first()).toHaveText('orc');
+  const narr = await getNarrative(page, id);
+  expect(narr.story).toBe(`the [orc](ow://character/${chief}) met an orc.`);
+
+  // Ctrl+H with a selection seeds the box too.
+  await find.press('Escape');
+  await prose.click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Shift+Home');
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? '')).toContain('met an orc.');
+  await page.keyboard.press('Control+h');
+  await expect(page.locator('.atlas-find-bar')).toHaveAttribute('data-mode', 'replace');
+  await expect(find).toHaveValue(/met an orc\.$/);
+});
+
+test('find bar: Ctrl+F still opens after switching scenes inside the room', async ({ page }) => {
+  // mountForNarrative wipes root.innerHTML; a find bar built for the first
+  // scene was left detached, so the shortcut opened an invisible bar.
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-find-switch-root');
+  await createWorld(page, 'find switch world');
+  const one = await createElement(page, 'narrative', { name: 'one', supertype: 'Book', story: 'alpha' });
+  const two = await createElement(page, 'narrative', { name: 'two', supertype: 'Book', story: 'beta' });
+  await gotoWriting(page, one);
+  await waitForEditor(page);
+  await page.keyboard.press('Control+f');
+  await expect(page.locator('.atlas-find-bar')).toBeVisible();
+  await page.locator('[data-role="find-input"]').press('Escape');
+
+  await gotoWriting(page, two);
+  await waitForEditor(page);
+  await page.keyboard.press('Control+f');
+  await expect(page.locator('.atlas-find-bar')).toBeVisible();
+  await page.locator('[data-role="find-input"]').fill('beta');
+  await expect(page.locator('[data-role="count"]')).toContainText('1 of 1');
+});

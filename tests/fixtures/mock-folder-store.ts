@@ -9,7 +9,7 @@
 import type { FolderStore, ListElementsOptions } from '../../src/store/folder-store';
 import { newId, nowIso } from '../../src/store/folder-store';
 import { PerIdWriteChain } from '../../src/store/write-chain';
-import { ATLAS_LOCAL_ONLY_FIELDS, ATLAS_WIRE_EXTENSION_FIELDS } from '../../src/core/constants';
+import { ATLAS_LOCAL_ONLY_FIELDS, ATLAS_WIRE_EXTENSION_FIELDS, FOLDER_FORMAT_VERSION } from '../../src/core/constants';
 import { findDuplicatePin, DuplicatePinError } from '../../src/core/pin-uniqueness';
 import type {
   Element,
@@ -71,9 +71,17 @@ export class MockFolderStore implements FolderStore {
     return { ...this.meta };
   }
 
+  private metaBorn = false;
+
   async writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta> {
     if (!opts?.fromSync) this.assertWritable();
-    this.meta = { ...this.meta, ...patch };
+    // Mirrors FsFolderStore's birth stamp (folder-format §4.2, S355): the
+    // first write to a store that has no meta yet records the spec version.
+    const stamp = !this.metaBorn && patch.format_version === undefined
+      ? { format_version: FOLDER_FORMAT_VERSION }
+      : {};
+    this.metaBorn = true;
+    this.meta = { ...this.meta, ...stamp, ...patch };
     return { ...this.meta };
   }
 

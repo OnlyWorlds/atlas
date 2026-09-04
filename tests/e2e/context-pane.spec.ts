@@ -609,3 +609,65 @@ test('the right-pane tab bar never becomes a vertical scroll container', async (
   expect(measured.forced.vRoom).toBe(0);
   expect(measured.forced.barWidthLostToScrollbar).toBe(0);
 });
+
+/**
+ * S355 — unlinked mentions in the element preview (a Discord ask: "if I make
+ * a new element, is there a way to search for matching words and link those
+ * all at once"). The preview line is the standing home; "Link all" writes
+ * every listed narrative on disk and the card rebuilds.
+ */
+test('element preview lists unlinked mentions and "Link all" links them across narratives', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'ctx-mentions-root');
+  await createWorld(page, 'mentions world');
+  const chief = await createElement(page, 'character', { name: 'Orc Chief', atlas_aliases: ['orc'] });
+  const a = await createElement(page, 'narrative', {
+    name: 'Scene A', supertype: 'Scene', story: 'The orc marched. The Orc Chief watched the orcs.',
+  });
+  const b = await createElement(page, 'narrative', {
+    name: 'Scene B', supertype: 'Scene', story: `An [orc](ow://character/${chief}) already linked, and an orc not.`,
+  });
+  await createElement(page, 'narrative', { name: 'Scene C', supertype: 'Scene', story: 'Nothing here.' });
+
+  await gotoElement(page, chief);
+  await openContextTab(page);
+  const preview = page.locator('.atlas-context-pane .atlas-context-preview');
+  await expect(preview.locator('.atlas-context-preview-name')).toHaveText('Orc Chief');
+
+  const line = preview.locator('.atlas-context-preview-mentions');
+  await expect(line).toBeVisible();
+  await expect(line).toContainText('Mentioned, unlinked (3 in 2 scenes):');
+  await expect(line).toContainText('Scene A (2)');
+  await expect(line).toContainText('Scene B');
+  await expect(line).not.toContainText('Scene C');
+
+  await line.locator('[data-action="link-mentions"]').click();
+  await expect(page.locator('.ow-toast', { hasText: 'Linked 3 mentions of Orc Chief across 2 scenes' })).toBeVisible();
+
+  // The card rebuilt: the line is gone, the backlinks line now names both scenes.
+  await expect(preview.locator('.atlas-context-preview-mentions')).toHaveCount(0);
+  await expect(preview.locator('.atlas-context-preview-backlinks')).toContainText('Linked from (2):');
+
+  const storyA = await page.evaluate((id) =>
+    (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.story, a);
+  expect(storyA).toBe(`The [orc](ow://character/${chief}) marched. The [Orc Chief](ow://character/${chief}) watched the orcs.`);
+  const storyB = await page.evaluate((id) =>
+    (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === id)?.story, b);
+  expect(storyB).toBe(`An [orc](ow://character/${chief}) already linked, and an [orc](ow://character/${chief}) not.`);
+});
+
+test('the create modal nudges when the new name already sits in prose', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'ctx-create-nudge-root');
+  await createWorld(page, 'nudge world');
+  await createElement(page, 'narrative', { name: 'Scene A', supertype: 'Scene', story: 'Vera stood. Vera sat.' });
+  await createElement(page, 'narrative', { name: 'Scene B', supertype: 'Scene', story: 'Vera left.' });
+
+  await page.click('[data-action="create-element"]');
+  const modal = page.locator('[data-modal="create-element"]');
+  await expect(modal).toBeVisible();
+  await modal.locator('.atlas-create-type-btn[data-type="character"]').click();
+  await modal.locator('input[name="element-name"]').fill('Vera');
+  await modal.locator('[data-action="create"]').click();
+  await expect(page.locator('.ow-toast', { hasText: 'Created character: Vera · appears in 2 narratives, unlinked' })).toBeVisible();
+});

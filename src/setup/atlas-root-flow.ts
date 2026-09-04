@@ -40,7 +40,7 @@ import { buildV2Adapter } from '../sync/make-online';
 import { initialDownloadAll, type InitialDownloadProgress } from '../sync/initial-download';
 import { applyImportPlan, type ApplyProgress, type ApplyResult } from '../import/apply-import-plan';
 import type { ImportPlan } from '../import/types';
-import type { WorldRegistryEntry, PerElementFailure } from '../core/types';
+import type { WorldRegistryEntry, PerElementFailure, WorldMeta } from '../core/types';
 
 /**
  * Prompt the user to pick the atlas root folder. On success: resolve the
@@ -743,6 +743,33 @@ export interface LinkExistingApiWorldResult {
   failures: PerElementFailure[];
 }
 
+/**
+ * The world.json a freshly linked folder is born with. Pure, so the one
+ * invariant the spec rules (§4.1: `id` MUST equal `api.world_id`) is a unit
+ * test rather than a reading of the flow above it.
+ */
+export function linkedWorldMeta(opts: {
+  serverWorldId: string;
+  displayName: string;
+  apiKey: string;
+  serverWorldName?: string | null;
+  readOnly?: boolean;
+}): Partial<WorldMeta> {
+  return {
+    id: opts.serverWorldId,
+    name: opts.displayName,
+    // Cache the server-side name so settings can show api-vs-local
+    // divergence without a network fetch on reload.
+    api: {
+      world_id: opts.serverWorldId,
+      api_key: opts.apiKey,
+      ...(opts.serverWorldName ? { world_name: opts.serverWorldName } : {}),
+      // Mirrored so root discovery restores view-only status (S264).
+      ...(opts.readOnly ? { read_only: true } : {}),
+    },
+  };
+}
+
 export async function linkExistingApiWorldInRoot(
   opts: LinkExistingApiWorldOpts
 ): Promise<LinkExistingApiWorldResult> {
@@ -849,28 +876,30 @@ export async function linkExistingApiWorldInRoot(
   // Create the subfolder under the root.
   const worldHandle = await rootHandle.getDirectoryHandle(subName, { create: true });
 
-  // Local-side uuid for the registry/folder identity. Distinct from serverWorldId.
-  const localWorldUuid = newId();
-  const handleKey = `world-${localWorldUuid}`;
+  // A LINKED FOLDER CARRIES THE SERVER ID AS `id` (folder-format §4.1, ruled
+  // 2026-09-04 v0.3.6 on the first two-producers comparison): this folder is
+  // not a snapshot of the world, it IS the world on disk, so there is nothing
+  // for a second id to name. Folders linked before the ruling keep their
+  // minted id (an id, once minted, is never re-derived); readers prefer
+  // `api.world_id` when present and fall back to `id`, so both shapes open.
+  const localWorldUuid = serverWorldId;
+  // The vault key follows the `world-<meta.id>` convention (DESIGN.md, open
+  // folder dedupe). Linking the same world twice would collide on it and
+  // orphan the first folder's handle, so a taken key gets a suffix.
+  let handleKey = `world-${localWorldUuid}`;
+  for (let n = 2; await loadHandle(handleKey); n++) {
+    handleKey = `world-${localWorldUuid}-${n}`;
+    if (n > 20) throw new Error('Could not find a free handle key for this world');
+  }
   await storeHandle(handleKey, worldHandle);
 
   // Open FolderStore + write meta with api credentials so reload-after-restart
   // can rebuild the engine from registry+world.json alone.
   const store = new FsFolderStore();
   await store.open(worldHandle);
-  await store.writeWorldMeta({
-    id: localWorldUuid,
-    name: displayName,
-    // Cache the server-side name so settings can show api-vs-local
-    // divergence without a network fetch on reload.
-    api: {
-      world_id: serverWorldId,
-      api_key: apiKey,
-      ...(world.name ? { world_name: world.name } : {}),
-      // Mirrored so root discovery restores view-only status (S264).
-      ...(readOnly ? { read_only: true } : {}),
-    },
-  });
+  await store.writeWorldMeta(linkedWorldMeta({
+    serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly,
+  }));
 
   // Initial download — all elements of all types stamped with
   // `server_updated_at`, fetched over the v2 dialect.
