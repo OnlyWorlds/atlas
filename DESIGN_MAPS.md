@@ -625,16 +625,20 @@ Schema:
 ```ts
 interface MapViewPrefs {
   pin_style:         'icon' | 'round-icon' | 'pin-shape';   // default: 'icon'
-  pin_labels:        'always' | 'hover' | 'threshold' | 'never';  // default: 'always' (S299)
+  pin_labels:        'auto' | 'always' | 'hover' | 'threshold' | 'never';  // default: 'auto' (S356; was 'always' S299)
   pin_label_threshold: number;                              // default: 6 (used iff pin_labels === 'threshold')
   pin_tint:          'type-color' | 'accent' | 'muted';     // default: 'type-color'
   show_grid:         boolean;                               // default: false
   grid_spacing:      50 | 100 | 200;                        // default: 100
   lock_pin_drag:     boolean;                               // default: false
   zone_fill_opacity: number;                                // default: 0.4
-  zone_labels:       'always' | 'hover' | 'never';          // default: 'always'
+  zone_labels:       'auto' | 'always' | 'hover' | 'never'; // default: 'auto' (S356)
 }
 ```
+
+**`'auto'` = the density layer (S356, `tabs/right/map-label-density.ts`).** Born on Sikelia (196 pins, 319 zones, one canvas): every label that has room is shown, and a label that would overprint a higher-ranked one drops. Rank: the selected element, then pins by world degree (incoming links + log of description length, the charts room's weight), then polygon zones, then line zones, bigger screen extent first. A pin label tries below, right, left, above its icon before dropping; it never covers another pin's icon, except that the top tenth of pins by weight (the anchors) may as a last resort sit over a LIGHTER icon (Syrakousai ringed by its harbour towns had no clean slot). Re-run on every settled pan/zoom and after every pin/zone sync; boxes are computed from projected anchors + canvas-measured text (one calibration rect read per pass, zero forced layouts after), so a pass costs single-digit ms. Culling is a class (`atlas-label-culled`), never `display`, so it cannot fight the mode toggle or the hover fade. On a sparse map `'auto'` renders exactly as `'always'`.
+
+**The icon-scale rule (same module, unconditional):** a pin icon is never wider than ~70% of the median gap between this map's pins at the current zoom (`pinScaleForSpacing`, floor 0.4). Sparse maps measure a gap wider than the icon and keep scale 1, so nothing existing changed; Sikelia's pins are 17px at fit and 32px one zoom in. Re-scaling patches the rendered `<img>` in place (no `setIcon`, which would replace 196 elements a zoom).
 
 `getEffectiveMapPrefs(mapId)` merges atlas-global defaults with the per-map partial override. UI reads only the effective object.
 
@@ -651,7 +655,7 @@ Layout:
 │  ( ) icon  ( ) round + icon  ( ) pin shape   │
 │                                              │
 │  Pin labels                                  │
-│  ( ) always  ( ) hover  (•) ≤ [6] visible  ( ) never │
+│  (•) fit  ( ) always  ( ) hover  ( ) ≤ [6] visible  ( ) never │
 │                                              │
 │  Pin tint                                    │
 │  (•) type color  ( ) accent  ( ) muted       │
@@ -666,7 +670,7 @@ Layout:
 │  Zone fill opacity   ━━━●━━━━━━━━━━  40%     │
 │                                              │
 │  Zone labels                                 │
-│  ( ) always  (•) hover  ( ) never            │
+│  (•) fit  ( ) always  ( ) hover  ( ) never   │
 │                                              │
 ├──────────────────────────────────────────────┤
 │  [ Save current as default for new maps ]    │

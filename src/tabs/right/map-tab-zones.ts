@@ -21,6 +21,7 @@ import {
   getZoneShape,
 } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
+import { refreshLabelDensity } from './map-label-density';
 import type { Zone } from '../../core/types';
 import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
@@ -51,6 +52,8 @@ export function syncZones(entry: MapTabCacheEntry): void {
     //   - 'always' → labelText = zone.name, hover-only = false (always shown)
     //   - 'hover'  → labelText = zone.name, hover-only = true  (fade on hover)
     //   - 'never'  → labelText = undefined (no marker built)
+    //   - 'auto'   → labelText = zone.name, hover-only = false; the density
+    //                pass right after culls collisions by class (S356)
     const labelMode = prefs.zone_labels;
     const labelText = labelMode === 'never' ? undefined : zone.name;
     const labelHoverOnly = labelMode === 'hover';
@@ -86,6 +89,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
   }
 
   renderChipStrip(entry, onThisMap, selectedId);
+  refreshLabelDensity(entry);
 }
 
 function zoneEffectiveOpacity(zone: Zone, mapDefault: number): number {
@@ -97,7 +101,7 @@ function zoneEffectiveOpacity(zone: Zone, mapDefault: number): number {
 // computeLabelText replaced inline (session 219) — label policy now sets both
 // labelText AND labelHoverOnly on the ZoneShape so ZoneOverlay can wire fade
 // behavior. Kept the export-shape pattern for any external callers.
-export function computeLabelText(zone: Zone, mode: 'always' | 'hover' | 'never'): string | undefined {
+export function computeLabelText(zone: Zone, mode: 'auto' | 'always' | 'hover' | 'never'): string | undefined {
   return mode === 'never' ? undefined : zone.name;
 }
 

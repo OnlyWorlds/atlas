@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.5',
+    date: '2026-09-11',
+    theme: 'a map with two hundred places on it is still a map',
+    entries: [
+      {
+        id: 'map-labels-fit',
+        title: 'Map labels show every name that has room, and pins make room for each other',
+        body: 'A map with hundreds of pins and zones used to draw every label on top of every other. Labels now claim their space in order of how much the world points at them: the names that fit are shown, a name that has no room below its pin tries beside or above it, and the rest appear as you zoom in. Pins on a crowded map shrink so they stop covering each other and grow back as you zoom. The old "always" mode is one click away in the map settings.',
+        tags: ['maps'],
+      },
+      {
+        id: 'zone-lines-from-other-tools',
+        title: 'Rivers and roads written by other tools draw as lines',
+        body: 'A zone whose shape was written as "Line" by another OnlyWorlds tool drew as a filled polygon, because atlas only recognised the lowercase spelling it wrote itself. Any spelling of line is a line now.',
+        tags: ['maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.4',
     date: '2026-09-04',
     theme: 'find a word, link every one of them',

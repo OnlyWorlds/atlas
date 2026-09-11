@@ -163,7 +163,9 @@ OW Zone schema does NOT carry a "polygon vs line" field directly. Pre-ZD6 conven
 
 > **SUPERSEDED BY v2 (keel), corrected 2026-07-26.** The two paragraphs above describe the **v1** dialect and are kept as history. Under v2 the extension list is SPLIT (`src/core/constants.ts`): `ATLAS_LOCAL_ONLY_FIELDS` are still stripped on write, but **`ATLAS_WIRE_EXTENSION_FIELDS` — `atlas_color`, `atlas_opacity`, `atlas_label_visible`, `atlas_shape` — now RIDE THE WIRE** via keel's extension passthrough, so zone visuals sync across devices and other tools CAN read the shape. Reading the v1 rule as current would build the opposite behaviour, which is why this note exists rather than a quiet edit.
 
-Reads go through `getZoneShape(zone)` (in `tabs/right/zone-derived.ts`) which checks `atlas_shape` first and falls back to legacy `supertype === 'polygon'|'line'` for zones created before ZD6. Default for ambiguous: `'polygon'`. **Never read `zone.supertype` directly to decide rendering** — go through the helper.
+Reads go through `getZoneShape(zone)` (in `tabs/right/zone-derived.ts`) which checks `atlas_shape` first and falls back to legacy `supertype` = line/polygon **in any casing** for zones created before ZD6 or by another tool. Default for ambiguous: `'polygon'`. **Never read `zone.supertype` directly to decide rendering** — go through the helper.
+
+> **S356, the other writers.** Only atlas writes `atlas_shape`. zoner writes `supertype: "line"`; Skeld's Sikelia writer wrote `supertype: "Line"` (318 rivers and routes), and atlas's case-sensitive fallback drew every one as a filled polygon. The fallback is case-folded now. The cross-tool truth stands as written above: a zone from any other tool has nothing but `supertype` to say what it is, and a canonical schema field is still the proper fix (Council motion, deferred S221). Reported to Skeld with the recommendation that writers also stamp `atlas_shape` (it rides the v2 wire) until the schema has a field.
 
 Polygons: ≥3 markers, last connects to first (visually closed).
 Lines: ≥2 markers, open path.

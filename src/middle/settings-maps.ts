@@ -117,7 +117,7 @@ function renderDefaultsSection(): string {
       </div>
       <div class="atlas-settings-row">
         <label class="atlas-settings-label">Pin labels</label>
-        ${sel('pin_labels', [['always', 'Always'], ['hover', 'On hover'], ['threshold', 'When few pins visible'], ['never', 'Never']], d.pin_labels)}
+        ${sel('pin_labels', [['auto', 'Fit (every label that has room)'], ['always', 'Always'], ['hover', 'On hover'], ['threshold', 'When few pins visible'], ['never', 'Never']], d.pin_labels)}
       </div>
       <div class="atlas-settings-row" data-map-default-row="pin_label_threshold" ${d.pin_labels === 'threshold' ? '' : 'hidden'}>
         <label class="atlas-settings-label">Label threshold (pins)</label>
@@ -129,7 +129,7 @@ function renderDefaultsSection(): string {
       </div>
       <div class="atlas-settings-row">
         <label class="atlas-settings-label">Zone labels</label>
-        ${sel('zone_labels', [['always', 'Always'], ['hover', 'On hover'], ['never', 'Never']], d.zone_labels)}
+        ${sel('zone_labels', [['auto', 'Fit (every label that has room)'], ['always', 'Always'], ['hover', 'On hover'], ['never', 'Never']], d.zone_labels)}
       </div>
       <div class="atlas-settings-row">
         <label class="atlas-settings-label">Zone label position</label>

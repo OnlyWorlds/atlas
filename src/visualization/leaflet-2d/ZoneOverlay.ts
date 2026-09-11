@@ -276,6 +276,41 @@ export class ZoneOverlay {
     return Array.from(this.entries.keys());
   }
 
+  /** The label's DOM element (undefined when the zone has no label or the
+   *  marker is not on the map yet). The density layer culls by class on it. */
+  getLabelElement(id: string): HTMLElement | undefined {
+    return this.entries.get(id)?.labelMarker?.getElement() as HTMLElement | undefined;
+  }
+
+  getZoneMode(id: string): 'polygon' | 'line' | undefined {
+    return this.entries.get(id)?.shape.mode;
+  }
+
+  /** Where the label marker sits, in container pixels (undefined without a label). */
+  getLabelPoint(id: string): { x: number; y: number } | undefined {
+    const marker = this.entries.get(id)?.labelMarker;
+    if (!marker) return undefined;
+    const pt = this.map.latLngToContainerPoint(marker.getLatLng());
+    return { x: pt.x, y: pt.y };
+  }
+
+  /**
+   * How big the zone is ON SCREEN right now: the diagonal of its bounding
+   * box in container pixels. The density layer ranks zone labels by it
+   * (a river across the map keeps its name; a forty-pixel route drops).
+   * Zero for an entry without geometry.
+   */
+  getZoneScreenExtent(id: string): number {
+    const entry = this.entries.get(id);
+    if (!entry) return 0;
+    const layer = entry.visibleLayer as L.Path & { getBounds?: () => L.LatLngBounds };
+    const bounds = layer.getBounds?.();
+    if (!bounds || !bounds.isValid()) return 0;
+    const a = this.map.latLngToContainerPoint(bounds.getNorthWest());
+    const b = this.map.latLngToContainerPoint(bounds.getSouthEast());
+    return Math.hypot(b.x - a.x, b.y - a.y);
+  }
+
   /**
    * Fast live-update of a zone's polygon/polyline points without rebuilding
    * the underlying Leaflet primitive (ZD4 — live outline during edit-mode
@@ -511,11 +546,16 @@ export class ZoneOverlay {
     const color = entry.shape.color ?? DEFAULT_COLOR;
     const opacity = entry.shape.opacity ?? DEFAULT_OPACITY;
     const showShape = entry.visible && this.layerVisible;
-    const weight = entry.selected ? SELECTED_WEIGHT : UNSELECTED_WEIGHT;
+    // Hover reads like a light selection (Captain, S356: "hover would
+    // highlight the whole road, river, chora"): selected weight, full
+    // stroke opacity, a notch more fill, and the label revealed even when
+    // the density layer culled it.
+    const lit = entry.selected || entry.hovered;
+    const weight = lit ? SELECTED_WEIGHT : UNSELECTED_WEIGHT;
     const style: L.PathOptions = {
       color,
       weight,
-      opacity: showShape ? (entry.selected ? 1 : 0.9) : 0,
+      opacity: showShape ? (lit ? 1 : 0.9) : 0,
       // Editing state renders dashed outline (ZC6) so the user sees at a
       // glance "this zone's geometry is mutable right now." Same dash pattern
       // as the draft-mode preview for visual continuity (zone-drawing).
@@ -523,7 +563,7 @@ export class ZoneOverlay {
     };
     if (entry.shape.mode === 'polygon') {
       style.fillColor = color;
-      style.fillOpacity = showShape ? opacity : 0;
+      style.fillOpacity = showShape ? (entry.hovered && !entry.selected ? Math.min(1, opacity + 0.15) : opacity) : 0;
     }
     entry.visibleLayer.setStyle(style);
     if (entry.labelMarker) {
@@ -539,6 +579,7 @@ export class ZoneOverlay {
         else if (entry.shape.labelHoverOnly && !entry.hovered) opacity = '0';
         else opacity = '1';
         (labelEl as HTMLElement).style.opacity = opacity;
+        labelEl.classList.toggle('atlas-label-revealed', Boolean(entry.hovered && showShape));
       }
     }
     // Selected styling: drop-shadow glow on the SVG path + show vertex dots.
@@ -551,6 +592,7 @@ export class ZoneOverlay {
       } else {
         visibleEl.classList.remove('atlas-zone-selected');
       }
+      visibleEl.classList.toggle('atlas-zone-hovered', Boolean(entry.hovered && !entry.selected && showShape));
     }
     if (entry.selected && showShape) {
       this.showVertexDots(entry);

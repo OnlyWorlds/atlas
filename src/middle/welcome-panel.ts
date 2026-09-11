@@ -158,7 +158,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // already using. No UA sniffing needed; the sentence just has to be true.
       const folderNote = folderMode
         ? ''
-        : `<p class="atlas-landing-note">Keeping worlds as real files on your drive needs a desktop Chromium browser: Chrome, Edge or Brave. Here you can take the tour.</p>`;
+        : `<p class="atlas-landing-note">Atlas requires a desktop Chromium browser to keep worlds as real files on your drive: Chrome, Edge or Brave.</p>`;
       // The example-page door shows ONLY on a folder-mode browser after the
       // tour is done (Captain, S354: a non-Chromium splash offers the tour and
       // nothing else). The S323 reading, that a phone visitor after the tour
@@ -189,7 +189,6 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             <div class="atlas-landing-actions">
               <span class="atlas-landing-choice">
                 <button class="${tourBtnClass} atlas-landing-btn" data-action="start-tour">${tourDone ? 'replay the tour' : 'take the tour'}</button>
-                <span class="atlas-landing-choice-note">one sentence becomes a small linked world</span>
               </span>
               ${folderDoor}
               ${exampleDoor}

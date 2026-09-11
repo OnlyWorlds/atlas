@@ -64,6 +64,14 @@ export interface MapTabCacheEntry {
    * zone (computed via listZonesOnMap). Click selects, right-click context.
    */
   zoneStrip: HTMLDivElement;
+  /**
+   * Median nearest-neighbour gap between this map's visible pins, in
+   * STORAGE units (S356, the density layer). Set by syncPins; read by
+   * applyPinScale on every zoomend. Infinity when fewer than two pins.
+   */
+  pinSpacing?: number;
+  /** The icon scale last applied to every pin (rounded); skip when unchanged. */
+  pinScale?: number;
 }
 
 export const mapTabCache = new Map<string, MapTabCacheEntry>();

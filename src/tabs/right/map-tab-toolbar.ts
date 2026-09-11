@@ -91,16 +91,18 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
   // (Captain, 2026-07-19 — the canvas had no route to the map's own editor).
   const editMapBtn = makeButton('map', 'Open this map element', 'open-map-element');
 
+  // Order (Captain, S356): the LOOKING controls first (settings, show/hide,
+  // fit), the MAKING controls last, so the left set reads settings | view |
+  // create. The dividers stay; they read well.
   root.append(
     settingsBtn,
     divider(),
-    drawPolygonBtn,
-    drawLineBtn,
-    divider(),
     toggleZonesBtn,
     togglePinsBtn,
-    divider(),
     fitToImageBtn,
+    divider(),
+    drawPolygonBtn,
+    drawLineBtn,
     spacer,
     zonesDropdownBtn,
     editMapBtn,

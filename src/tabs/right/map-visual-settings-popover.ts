@@ -200,6 +200,7 @@ function template(prefs: MapViewPrefs, hasOverride: boolean): string {
       <section class="atlas-popover-section">
         <label class="atlas-popover-section-label">Pin labels</label>
         <div class="atlas-popover-radio-row" data-field="pin_labels">
+          ${radio('pin_labels', 'auto',      'Fit',           prefs.pin_labels)}
           ${radio('pin_labels', 'always',    'Always',        prefs.pin_labels)}
           ${radio('pin_labels', 'hover',     'On hover',      prefs.pin_labels)}
           ${radio('pin_labels', 'threshold', `≤ N visible`,   prefs.pin_labels)}
@@ -254,6 +255,7 @@ function template(prefs: MapViewPrefs, hasOverride: boolean): string {
 
         <label class="atlas-popover-section-label">Zone labels</label>
         <div class="atlas-popover-radio-row" data-field="zone_labels">
+          ${radio('zone_labels', 'auto',   'Fit',        prefs.zone_labels)}
           ${radio('zone_labels', 'always', 'Always',     prefs.zone_labels)}
           ${radio('zone_labels', 'hover',  'On hover',   prefs.zone_labels)}
           ${radio('zone_labels', 'never',  'Never',      prefs.zone_labels)}

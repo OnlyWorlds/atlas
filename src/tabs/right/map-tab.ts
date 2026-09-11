@@ -28,7 +28,8 @@ import { ToastManager } from '../../ui/toast-manager';
 import { IMAGELESS_MAP_SIZE } from '../../ui/image-dims';
 import { navigate, elementHash } from '../../core/router';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
-import { syncPins, refreshActiveMapPins } from './map-tab-pins';
+import { syncPins, refreshActiveMapPins, applyPinScale } from './map-tab-pins';
+import { refreshLabelDensity } from './map-label-density';
 import { enablePinDrag } from './map-tab-pin-drag';
 import { applyMapBackground, refreshCachedBackgrounds } from './map-tab-backgrounds';
 import { buildCanvasToolbar, wireCanvasToolbar } from './map-tab-toolbar';
@@ -226,6 +227,11 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
           saveCameraState(mapId, { center: [center.lat, center.lng], zoom });
         });
       });
+      // The density layer (S356): icons re-scale to the gap between them at
+      // the new zoom, then labels re-contest their space. moveend follows
+      // zoomend, so one settled gesture runs the label pass once.
+      lMapForRestore.on('zoomend', () => applyPinScale(entry));
+      lMapForRestore.on('moveend', () => refreshLabelDensity(entry));
     }
 
     // Mount the zone overlay (polygon/polyline rendering). Construct after

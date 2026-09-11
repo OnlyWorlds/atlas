@@ -537,11 +537,35 @@ export class Leaflet2DManager {
       const iconSize = (updates.scale || pin.data.scale || 1) * this.config.defaultIconSize;
       const anchorChoice = updates.anchor ?? pin.data.anchor ?? 'center';
       const iconAnchorXY = computeIconAnchor(iconSize, anchorChoice);
-      pin.marker.setIcon(L.icon({
+      const nextIcon = L.icon({
         iconUrl,
         iconSize: [iconSize, iconSize],
         iconAnchor: iconAnchorXY
-      }));
+      });
+      const iconEl = pin.marker.getElement() as HTMLImageElement | undefined;
+      if (iconEl && updates.icon === undefined && updates.anchor === undefined && updates.scale !== undefined) {
+        // A pure re-scale (the density layer, on every zoom step of a dense
+        // map) patches the rendered <img> in place: setIcon would replace
+        // 196 elements a zoom, and Leaflet's icon is nothing but these four
+        // styles. The marker's option is updated too, so a later re-add or
+        // setIcon starts from the right size.
+        pin.marker.options.icon = nextIcon;
+        iconEl.style.width = `${iconSize}px`;
+        iconEl.style.height = `${iconSize}px`;
+        iconEl.style.marginLeft = `${-iconAnchorXY[0]}px`;
+        iconEl.style.marginTop = `${-iconAnchorXY[1]}px`;
+      } else {
+        pin.marker.setIcon(nextIcon);
+      }
+      // The label hangs off the icon's bottom edge by a pixel gap, and that
+      // edge just moved. Leaflet expresses a divIcon's anchor as a margin on
+      // the element, so adjust the margin in place rather than rebuilding
+      // the icon (a rebuild replaces the element and drops whatever classes
+      // the density layer put on it). Mirrors the anchor math in addPin.
+      if (updates.scale !== undefined && pin.label) {
+        const labelEl = pin.label.getElement();
+        if (labelEl) labelEl.style.marginTop = `${iconSize / 2 + this.config.defaultLabelOffset}px`;
+      }
     }
 
     // Update label if changed
@@ -905,6 +929,16 @@ export class Leaflet2DManager {
   setZoom(zoom: number): void {
     if (!this.map || this.config.fixedZoom) return;
     this.map.setZoom(zoom);
+  }
+
+  /** The icon size at scale 1, as configured. */
+  getDefaultIconSize(): number {
+    return this.config.defaultIconSize;
+  }
+
+  /** The pixel gap between a pin's bottom edge and its label, as configured. */
+  getDefaultLabelOffset(): number {
+    return this.config.defaultLabelOffset;
   }
 
   /**

@@ -5876,6 +5876,19 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   transform: translate(-50%, 6px);
 }
 
+/* The density layer (S356, map-label-density.ts): a pin or zone label that
+   lost its spot to a higher-ranked neighbour at this zoom. A class, not
+   inline display, so it cannot fight the mode toggle (display) or the hover
+   fade (opacity) that other owners write on the same element. */
+.atlas-map-pane .atlas-label-culled {
+  display: none !important;
+}
+
+/* A hovered zone's label comes back even when culled (later rule wins). */
+.atlas-map-pane .atlas-zone-label.atlas-label-revealed {
+  display: block !important;
+}
+
 /* ============================================================
    Map visual settings popover (DESIGN_MAPS.md §11, V1)
 
@@ -6740,6 +6753,12 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
    Vertex dots are rendered separately as L.circleMarkers in ZoneOverlay. */
 svg .atlas-zone-selected {
   filter: drop-shadow(0 0 4px rgba(var(--atlas-accent-rgb), 0.85));
+}
+
+/* Hovered zone (S356): the whole road, river or chora lights up before the
+   click, a lighter glow than selection. Weight and fill ride applyStyle. */
+svg .atlas-zone-hovered {
+  filter: drop-shadow(0 0 3px rgba(var(--atlas-accent-rgb), 0.6));
 }
 
 /* ============================================================

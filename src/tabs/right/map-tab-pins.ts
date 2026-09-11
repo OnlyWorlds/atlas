@@ -17,6 +17,7 @@ import { enablePinDrag } from './map-tab-pin-drag';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import type { PinLabels } from '../../core/map-view-prefs';
+import { medianNearestNeighbour, pinScaleForSpacing, refreshLabelDensity } from './map-label-density';
 
 export function syncPins(entry: MapTabCacheEntry): void {
   const elements = getState().data.elements;
@@ -86,14 +87,42 @@ export function syncPins(entry: MapTabCacheEntry): void {
     }
   }
 
+  // The icon-scale rule (S356): median nearest-neighbour gap of THIS pin
+  // set in storage units, computed once per sync; applyPinScale turns it
+  // into a per-zoom scale. Sparse maps measure a gap wider than the icon
+  // and keep scale 1 — the rule only ever shrinks.
+  entry.pinSpacing = medianNearestNeighbour(minePins.map(p => ({ x: p.x, y: p.y })));
+  applyPinScale(entry);
+
   // Apply label visibility AFTER the pin set is reconciled so we count the
   // post-sync set (relevant for threshold mode).
   applyLabelVisibility(entry, prefs.pin_labels, prefs.pin_label_threshold, minePins.length);
+  refreshLabelDensity(entry);
+}
+
+/**
+ * Re-skin every pin to the scale the current zoom warrants. Runs after each
+ * sync and on zoomend (map-tab wires it). A no-op unless the rounded scale
+ * changed, so panning never touches a marker.
+ */
+export function applyPinScale(entry: MapTabCacheEntry): void {
+  const lMap = entry.manager.getMap();
+  if (!lMap) return;
+  const spacing = entry.pinSpacing ?? Infinity;
+  // CRS.Simple: one storage unit is 2^zoom screen pixels.
+  const spacingPx = spacing * Math.pow(2, lMap.getZoom());
+  const scale = pinScaleForSpacing(spacingPx, entry.manager.getDefaultIconSize());
+  if (entry.pinScale === scale) return;
+  entry.pinScale = scale;
+  for (const p of entry.manager.getAllPins()) {
+    entry.manager.updatePin(p.id, { scale });
+  }
 }
 
 /**
  * Toggle per-pin label visibility per the active prefs mode.
  *
+ *  - 'auto':      every label visible here, then collision-culled (S356).
  *  - 'always':    every label visible (Leaflet default).
  *  - 'hover':     all permanent labels hidden — atlas's custom .atlas-pin-tooltip
  *                 already covers hover-time naming, so this collapses to "off"
@@ -112,7 +141,9 @@ function applyLabelVisibility(
   visiblePinCount: number,
 ): void {
   let show: boolean;
-  if (mode === 'always') show = true;
+  // 'auto' shows everything here; the density pass that runs right after
+  // culls the collisions by class (map-label-density.ts).
+  if (mode === 'always' || mode === 'auto') show = true;
   else if (mode === 'never') show = false;
   else if (mode === 'hover') show = false; // hover handled by custom tooltip
   else if (mode === 'threshold') show = visiblePinCount <= threshold;

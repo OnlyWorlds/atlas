@@ -13,6 +13,7 @@ import {
   zoneGeometry,
   isOrphanZone,
   partitionZonesAndMarkers,
+  getZoneShape,
 } from '../../src/tabs/right/zone-derived';
 import type { Zone, Marker, Element } from '../../src/core/types';
 
@@ -172,5 +173,28 @@ describe('partitionZonesAndMarkers', () => {
     const { zones, markers } = partitionZonesAndMarkers(elements);
     expect(zones.map(z => z.id)).toEqual(['z1', 'z2']);
     expect(markers.map(m => m.id)).toEqual(['m1', 'm2']);
+  });
+});
+
+describe('getZoneShape', () => {
+  it('reads atlas_shape first', () => {
+    expect(getZoneShape(zone('z', 'z', { atlas_shape: 'line', supertype: 'Polygon' } as Partial<Zone>))).toBe('line');
+    expect(getZoneShape(zone('z', 'z', { atlas_shape: 'polygon', supertype: 'Line' } as Partial<Zone>))).toBe('polygon');
+  });
+
+  // Only atlas writes atlas_shape. Every other writer puts the shape in
+  // supertype under its own casing (zoner: `line`; Skeld's Sikelia writer:
+  // `Line`), and a zone from any of them has nothing else to say what it is.
+  it('falls back to supertype in any casing', () => {
+    expect(getZoneShape(zone('z', 'z', { supertype: 'line' }))).toBe('line');
+    expect(getZoneShape(zone('z', 'z', { supertype: 'Line' }))).toBe('line');
+    expect(getZoneShape(zone('z', 'z', { supertype: 'LINE ' }))).toBe('line');
+    expect(getZoneShape(zone('z', 'z', { supertype: 'Polygon' }))).toBe('polygon');
+  });
+
+  it('defaults to polygon for anything else', () => {
+    expect(getZoneShape(zone('z', 'z', { supertype: 'River' }))).toBe('polygon');
+    expect(getZoneShape(zone('z', 'z', { supertype: '' }))).toBe('polygon');
+    expect(getZoneShape(undefined)).toBe('polygon');
   });
 });

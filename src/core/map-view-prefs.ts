@@ -15,9 +15,9 @@
 import { MAP_VIEW_PREFS_DEFAULTS_KEY, MAP_VIEW_PREFS_BY_MAP_KEY } from './constants';
 
 export type PinStyle = 'icon' | 'round-icon' | 'pin-shape';
-export type PinLabels = 'always' | 'hover' | 'threshold' | 'never';
+export type PinLabels = 'auto' | 'always' | 'hover' | 'threshold' | 'never';
 export type PinTint = 'type-color' | 'accent' | 'muted';
-export type ZoneLabels = 'always' | 'hover' | 'never';
+export type ZoneLabels = 'auto' | 'always' | 'hover' | 'never';
 export type ZoneLabelPosition = 'center' | 'below';
 /**
  * Grid spacing in storage-coord pixels. Common presets are 50/100/200 (shown
@@ -45,21 +45,25 @@ export interface MapViewPrefs {
  */
 export const FACTORY_DEFAULTS: MapViewPrefs = {
   pin_style: 'icon',
-  // 'always' out of the box (S299, Captain) — pins are discoverable at a
-  // glance without a hover; matches zone_labels. Per-map ⚙ / settings can
-  // dial it back to 'hover'/'threshold' on a dense map. Existing saved user
-  // defaults are untouched (this is only the factory floor).
-  pin_labels: 'always',
+  // 'auto' out of the box (S356): every label that fits is shown, and a
+  // label that would overprint a higher-ranked one drops — on a sparse map
+  // this IS 'always' (S299, Captain: pins discoverable at a glance), on
+  // Sikelia's 196 pins it is the difference between a map and a wall
+  // (`map-label-density.ts`). Existing saved user defaults are untouched
+  // (this is only the factory floor).
+  pin_labels: 'auto',
   pin_label_threshold: 6,
   pin_tint: 'type-color',
   show_grid: false,
   grid_spacing: 100,
   lock_pin_drag: false,
   zone_fill_opacity: 0.4,
+  // 'auto' (S356) = every label that fits, collision-pruned, pins ranked
+  // ahead of polygons ahead of lines and bigger zones ahead of smaller.
   // 'always' = labels always visible. 'hover' (wired session 219 via
   // ZoneOverlay) = labels fade in only when the zone is hovered. 'never' =
-  // never shown. Default 'always' so users see them out of the box.
-  zone_labels: 'always',
+  // never shown.
+  zone_labels: 'auto',
   // 'below' (default, Captain S313) = the label hangs off the zone's bottom
   // edge, so it never sits on the fill/markers and gets blocked. 'center' =
   // the old centroid placement.

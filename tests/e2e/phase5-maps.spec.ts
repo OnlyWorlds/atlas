@@ -455,3 +455,63 @@ test('deleting a map closes its right-pane tab (S306)', async ({ page }) => {
   // ...and we land on the map index, not an arbitrary neighbour.
   await expect(page.locator('.atlas-tab[data-tab-kind="map-index"]')).toHaveClass(/active/);
 });
+
+test('the density layer (S356): a 40-pin cluster keeps its icons apart and its labels from overprinting; "always" shows every label', async ({ page }) => {
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', 'Dense Canvas');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Dense Canvas' })).toBeVisible();
+
+  // Forty locations pinned in a 400x400 patch of a 2000x2000 canvas, plus a
+  // Line zone written the way another tool writes it (supertype, capitalised).
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const st = api.getState();
+    const map = st.data.elements.find((e: any) => e.type === 'map' && e.name === 'Dense Canvas');
+    for (let i = 0; i < 40; i++) {
+      const loc = await store.createElement('location', { name: `Town ${i}` });
+      await store.createPin({ map_id: map.id, element_id: loc.id, x: 800 + (i % 8) * 50, y: 800 + Math.floor(i / 8) * 50 });
+    }
+    const zone = await store.createZone({ name: 'the Long River', supertype: 'Line', subtype: 'River' });
+    await store.createMarker({ map_id: map.id, zone_id: zone.id, x: 100, y: 100, order: 1 });
+    await store.createMarker({ map_id: map.id, zone_id: zone.id, x: 1900, y: 1900, order: 2 });
+    api.patchData(await store.listElements());
+  });
+  const container = page.locator('.atlas-map-tab-wrapper .leaflet-container').first();
+  await expect(container.locator('.leaflet-marker-icon.leaflet-interactive')).toHaveCount(40);
+  await expect(container.locator('.leaflet-2d-pin-label')).toHaveCount(40);
+
+  // A capitalised legacy supertype renders as a LINE: an open path with no fill.
+  const linePaths = await container.locator('svg path[fill="none"]').count();
+  expect(linePaths).toBeGreaterThanOrEqual(1);
+
+  const measure = async () => container.evaluate((c) => {
+    const ov = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    const labels = Array.from(c.querySelectorAll('.leaflet-2d-pin-label:not(.atlas-label-culled) .pin-label-text'))
+      .map(e => e.getBoundingClientRect()).filter(r => r.width > 0);
+    let overlaps = 0;
+    for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++) if (ov(labels[i], labels[j])) overlaps++;
+    const icon = c.querySelector('.leaflet-marker-icon.leaflet-interactive') as HTMLElement;
+    return { visibleLabels: labels.length, overlaps, iconPx: icon.getBoundingClientRect().width };
+  });
+
+  // 'auto' (the factory default): the 50-unit gap at the mounted zoom is
+  // narrower than a 32px icon, so icons shrink, and only the labels that
+  // have room stay. What stays never overprints — measured on rendered ink.
+  const auto = await measure();
+  expect(auto.iconPx).toBeLessThan(32);
+  expect(auto.visibleLabels).toBeGreaterThan(0);
+  expect(auto.visibleLabels).toBeLessThan(40);
+  expect(auto.overlaps).toBe(0);
+
+  // 'always' restores every label without a remount (the popover path).
+  await page.evaluate(() => {
+    localStorage.setItem('atlas_map_view_defaults', JSON.stringify({ pin_labels: 'always', zone_labels: 'always' }));
+  });
+  await page.click('[data-action="map-visual-settings"]');
+  await page.click('.atlas-popover-radio-row[data-field="pin_labels"] label:has(input[value="always"])');
+  await expect.poll(async () => (await measure()).visibleLabels).toBe(40);
+  await page.click('.atlas-popover-radio-row[data-field="pin_labels"] label:has(input[value="auto"])');
+  await expect.poll(async () => (await measure()).visibleLabels).toBeLessThan(40);
+});

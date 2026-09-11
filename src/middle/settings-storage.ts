@@ -95,9 +95,8 @@ function renderStorageDeviceSection(): string {
              <div class="atlas-settings-actions">
                <button class="atlas-btn-primary" data-action="change-atlas-root">Set up OnlyWorlds folder</button>
              </div>`
-            : `<p>Not set up yet. This browser cannot open local folders, which needs a desktop
-               Chromium browser: Chrome, Edge or Brave. Here you can take the tour and read an
-               example page.</p>`}
+            : `<p>Not set up yet. Atlas requires a desktop Chromium browser to open local folders:
+               Chrome, Edge or Brave.</p>`}
     </section>
   `;
 }
