@@ -38,6 +38,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'label it your way with supertype and subtype',
       'add your own fields in the Custom fields section',
       'place it on a map from the header pin button',
+      'right-click a type in the sidebar strip to keep it out of the full list (pins and markers start that way)',
       'see in the Web tab where it is mentioned but not linked, and link every mention with one click',
     ],
   },
@@ -120,6 +121,8 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'draw a zone with the polygon or line tool, then double-click it to reshape it by its handles',
       'nest maps under a parent map or a location, and switch between them from the map list',
       'tune what a map shows from its settings: pin style and labels, zone opacity, the grid',
+      'colour zones by kind from the zones button: a swatch, an eye and a tune button per kind, saved with the world',
+      'hover a zone to see all of it; on a crowded map the labels that fit are shown and the rest appear as you zoom in',
     ],
   },
 };
