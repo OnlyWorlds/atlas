@@ -18,7 +18,7 @@ import {
   getZoneShape,
 } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
-import { refreshLabelDensity } from './map-label-density';
+import { scheduleLabelDensity } from './map-label-density';
 import { resolveStyle, groupByKind } from '../../core/world-styles';
 import { renderZonePanel, wireZonePanel } from './map-zone-panel';
 import type { Zone } from '../../core/types';
@@ -102,7 +102,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
   }
 
   renderZonePanel(entry, onThisMap, selectedId);
-  refreshLabelDensity(entry);
+  scheduleLabelDensity(entry);
 }
 
 function zoneEffectiveOpacity(zone: Zone, mapDefault: number): number {

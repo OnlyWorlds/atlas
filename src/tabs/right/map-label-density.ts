@@ -299,6 +299,24 @@ function inkBox(m: LabelMetrics, anchor: { x: number; y: number }, text: string)
 const PIN_LABEL_HALF_WIDTH = 75;
 
 /**
+ * Run the pass after the NEXT paint, once per burst. A pass run inside
+ * Leaflet's moveend reads rects on a tree Leaflet has just dirtied (a
+ * thousand transforms), which forces a full layout right there (48ms on
+ * Sikelia, the profile's biggest JS-attributed cost) and then dirties it
+ * again with its own writes for the frame to lay out a second time. Run
+ * after the frame's own layout and the reads are free.
+ */
+const scheduled = new WeakSet<MapTabCacheEntry>();
+export function scheduleLabelDensity(entry: MapTabCacheEntry): void {
+  if (scheduled.has(entry)) return;
+  scheduled.add(entry);
+  requestAnimationFrame(() => setTimeout(() => {
+    scheduled.delete(entry);
+    refreshLabelDensity(entry);
+  }, 0));
+}
+
+/**
  * The DOM pass. Idempotent; safe to call before the map has a size (it
  * returns). When neither labels pref is 'auto' it un-culls everything and
  * returns, so switching the pref back to 'always' in the popover restores

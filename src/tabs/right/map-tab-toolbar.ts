@@ -228,6 +228,8 @@ function wireZonesDropdown(btn: HTMLButtonElement, panel: HTMLElement): void {
   const open = (): void => {
     panel.classList.add('is-open');
     btn.classList.add('is-open');
+    // The panel skips rebuilds while closed (S356); tell it to catch up.
+    panel.dispatchEvent(new CustomEvent('atlas:zone-panel-open'));
     outsideListener = (e: MouseEvent) => {
       const t = e.target as Node;
       if (panel.contains(t) || btn.contains(t)) return;

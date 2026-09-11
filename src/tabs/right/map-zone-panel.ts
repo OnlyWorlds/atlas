@@ -33,6 +33,7 @@ import {
 import { saveWorldStyleRules } from '../../core/world-styles-state';
 import { openColourPopover } from '../../ui/colour-popover';
 import { panMapTabTo } from './map-tab';
+import { refreshActiveMapZones } from './map-tab-zones';
 import { markersForZoneOnMap } from './zone-derived';
 import { partitionZonesAndMarkers } from './zone-derived';
 
@@ -45,12 +46,14 @@ export interface ZonePanelState {
   tuning: string | null;
   /** The user has collapsed/opened at least once: stop auto-opening. */
   touched: boolean;
+  /** A sync happened while the panel was closed; render on open. */
+  stale: boolean;
 }
 
 const panelState = new WeakMap<MapTabCacheEntry, ZonePanelState>();
 function stateFor(entry: MapTabCacheEntry): ZonePanelState {
   let s = panelState.get(entry);
-  if (!s) { s = { openKinds: new Set(), search: '', tuning: null, touched: false }; panelState.set(entry, s); }
+  if (!s) { s = { openKinds: new Set(), search: '', tuning: null, touched: false, stale: true }; panelState.set(entry, s); }
   return s;
 }
 
@@ -82,6 +85,10 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   strip.style.display = '';
 
   const ps = stateFor(entry);
+  // A closed panel is not rebuilt (syncZones runs on every elements tick;
+  // 300 rows of innerHTML for nobody). It renders on open instead.
+  if (!strip.classList.contains('is-open')) { ps.stale = true; return; }
+  ps.stale = false;
   const rules = getState().styles.rules;
   const kinds = groupByKind(zones);
   const q = ps.search.trim().toLowerCase();
@@ -245,8 +252,8 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     if (kindKey && target.closest('[data-action="toggle-kind-visible"]')) {
       if (entry.hiddenZoneKinds.has(kindKey)) entry.hiddenZoneKinds.delete(kindKey);
       else entry.hiddenZoneKinds.add(kindKey);
-      // A state tick re-syncs the overlay AND rebuilds this panel.
-      patchSlice('ui', { ...getState().ui });
+      // Re-sync the overlay directly (it rebuilds this panel too).
+      refreshActiveMapZones();
       return;
     }
     if (kindKey && target.closest('[data-action="tune"]')) {
@@ -341,6 +348,11 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     e.preventDefault();
     const zoneId = chip.getAttribute('data-zone-id');
     if (zoneId) handlers.onContext(zoneId, e.clientX, e.clientY);
+  });
+
+  // The toolbar announces the open; render then if a sync was skipped.
+  strip.addEventListener('atlas:zone-panel-open', () => {
+    if (stateFor(entry).stale) rerender();
   });
 
   strip.addEventListener('keydown', (e) => {

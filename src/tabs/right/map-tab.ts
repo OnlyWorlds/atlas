@@ -29,7 +29,7 @@ import { IMAGELESS_MAP_SIZE } from '../../ui/image-dims';
 import { navigate, elementHash } from '../../core/router';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { syncPins, refreshActiveMapPins, applyPinScale } from './map-tab-pins';
-import { refreshLabelDensity } from './map-label-density';
+import { scheduleLabelDensity } from './map-label-density';
 import { enablePinDrag } from './map-tab-pin-drag';
 import { applyMapBackground, refreshCachedBackgrounds } from './map-tab-backgrounds';
 import { buildCanvasToolbar, wireCanvasToolbar } from './map-tab-toolbar';
@@ -232,7 +232,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
       // the new zoom, then labels re-contest their space. moveend follows
       // zoomend, so one settled gesture runs the label pass once.
       lMapForRestore.on('zoomend', () => applyPinScale(entry));
-      lMapForRestore.on('moveend', () => refreshLabelDensity(entry));
+      lMapForRestore.on('moveend', () => scheduleLabelDensity(entry));
     }
 
     // Mount the zone overlay (polygon/polyline rendering). Construct after
@@ -412,21 +412,19 @@ onPinVisualsReady(() => {
 let lastElementsRef: unknown = null;
 let lastSelectedRef: unknown = null;
 let lastStylesRef: unknown = null;
-let lastUiRef: unknown = null;
 subscribe(() => {
   const state = getState();
   const elements = state.data.elements;
   const selected = state.ui.selectedElementId;
-  // World styles (S356) restyle every zone; a ui tick carries the zone
-  // panel's hide-a-kind toggle (it has no slice of its own).
+  // World styles (S356) restyle every zone. (The zone panel's hide-a-kind
+  // toggle calls refreshActiveMapZones itself; keying on the ui slice here
+  // would re-sync 300 zones on every search keystroke.)
   const styles = state.styles;
-  const ui = state.ui;
-  if (elements === lastElementsRef && selected === lastSelectedRef && styles === lastStylesRef && ui === lastUiRef) return;
+  if (elements === lastElementsRef && selected === lastSelectedRef && styles === lastStylesRef) return;
   const zonesOnly = elements === lastElementsRef && selected === lastSelectedRef;
   lastElementsRef = elements;
   lastSelectedRef = selected;
   lastStylesRef = styles;
-  lastUiRef = ui;
   if (zonesOnly) { refreshActiveMapZones(); return; }
   refreshActiveMapPins();
   // Dims drifted under a BACKGROUND tab (image attached / dims corrected

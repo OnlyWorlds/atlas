@@ -17,7 +17,7 @@ import { enablePinDrag } from './map-tab-pin-drag';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import type { PinLabels } from '../../core/map-view-prefs';
-import { medianNearestNeighbour, pinScaleForSpacing, refreshLabelDensity } from './map-label-density';
+import { medianNearestNeighbour, pinScaleForSpacing, scheduleLabelDensity } from './map-label-density';
 
 export function syncPins(entry: MapTabCacheEntry): void {
   const elements = getState().data.elements;
@@ -97,7 +97,7 @@ export function syncPins(entry: MapTabCacheEntry): void {
   // Apply label visibility AFTER the pin set is reconciled so we count the
   // post-sync set (relevant for threshold mode).
   applyLabelVisibility(entry, prefs.pin_labels, prefs.pin_label_threshold, minePins.length);
-  refreshLabelDensity(entry);
+  scheduleLabelDensity(entry);
 }
 
 /**
