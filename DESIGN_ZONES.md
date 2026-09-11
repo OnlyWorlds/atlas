@@ -383,7 +383,9 @@ When the selected element is a Marker (rare — atlas excludes pin/marker/zone f
 - Standard schema editor.
 - Plus: "Go to zone" button → selectedElementId = marker.zone_id.
 
-### 4.5 Zone chip strip → toolbar dropdown (ZC9, session 217)
+### 4.5 Zone chip strip → toolbar dropdown (ZC9, session 217) → the zone panel (S356)
+
+> **S356: the fold-out is the zone panel** (`tabs/right/map-zone-panel.ts`; the button and the container's look are unchanged on purpose). Kinds (world-styles `groupByKind`: one row per distinct supertype/subtype pair, "Line · River") are collapsible groups; a kind row carries the rule's **swatch** (a native colour input under a dot; change = a world style rule, §5b), an **eye** (hide the kind on this map, session-only via `entry.hiddenZoneKinds`, like `hiddenPinTypes`), the count, a **tune** button (fill opacity, line weight, stroke solid/dashed/dotted, "label first", write-into-zones, clear) and the caret to its zones. A zone row is the chip below: hover lights the zone on the map (`ZoneOverlay.setZoneHovered`), click selects + navigates + pans, right-click opens the context menu. A search box filters zones by name and opens matching kinds. One kind (a small hand-drawn world) opens itself, so the panel still reads as the flat list it was. Open/closed, search and the tune target live per map tab and survive the per-sync rebuild. The rest of this section describes the chip a row still is.
 
 The bottom-of-canvas chip strip from sessions 213-216 was replaced in session 217 (ZC9) with a right-anchored dropdown on the canvas toolbar. The chip rendering is the same; only the container changed.
 
@@ -405,6 +407,8 @@ Filter: only zones returned by `listZonesOnMap(activeMapId, markers, zones)`. Re
 
 ## 5. Atlas-extension visual fields
 
+> **Corrected S356**: under v2 these three fields are in `ATLAS_WIRE_EXTENSION_FIELDS` and RIDE THE WIRE (the section header in the zone page said "Local only" from the v1 era until S356; it says "Synced" now). The paragraph below is the v1 description, kept as history.
+
 Zones support three atlas-extension fields, stored on disk in the element JSON but stripped from API push by the adapter (must be added to `ATLAS_LOCAL_EXTENSION_FIELDS` in `core/constants.ts`):
 
 | Field | Type | Default | Meaning |
@@ -415,7 +419,26 @@ Zones support three atlas-extension fields, stored on disk in the element JSON b
 
 These are stored on the Zone element itself (single source of truth per zone), folder-only. Multiple atlas instances accessing the same api-linked world each maintain their own per-zone visuals — like image_media_id today.
 
-Map-wide defaults (DESIGN_MAPS.md §11 visual settings popover): `zone_fill_opacity`, `zone_labels` ('always'|'hover'|'never'), **`zone_label_position` ('below'|'center', default 'below' — S313)**. A zone's `atlas_opacity` overrides the map default; if unset, map default applies. Same pattern as pin label threshold. `zone_label_position` 'below' anchors the label at the zone's bottom-centre (bounding-box max-y) so it hangs off the shape instead of sitting on the fill/markers (`ZoneOverlay.labelAnchorFor`/`bottomCenter`); it's a view pref only (never on the element).
+Map-wide defaults (DESIGN_MAPS.md §11 visual settings popover): `zone_fill_opacity`, `zone_labels` ('auto'|'always'|'hover'|'never'), **`zone_label_position` ('below'|'center', default 'below' — S313)**. A zone's `atlas_opacity` overrides the map default; if unset, map default applies. Same pattern as pin label threshold. `zone_label_position` 'below' anchors the label at the zone's bottom-centre (bounding-box max-y) so it hangs off the shape instead of sitting on the fill/markers (`ZoneOverlay.labelAnchorFor`/`bottomCenter`); it's a view pref only (never on the element).
+
+### 5b. World styles: rules per kind (S356)
+
+Born on Sikelia: 113 rivers, 192 routes and 14 chorai in one cyan, no legend. **A world style rule attaches a visual to a KIND** (a `(type, supertype, subtype)` taxonomy value) and the world carries it: `.atlas/styles.json` (`core/world-styles.ts`, `FolderStore.readStyles/writeStyles`, `state.styles`, loaded at world activation after the elements). Tool-private per the Folder Format ruling on `.<tool>/`, beside charts/tombstones/sync-state; travels with the folder and its git. Not localStorage (it is the world's, not the browser's), not per map.
+
+```json
+{ "version": 1, "rules": [
+  { "type": "zone", "supertype": "Line", "subtype": "River", "color": "#3b82f6", "weight": 3, "label_priority": true },
+  { "type": "zone", "supertype": "Line", "subtype": "Route", "color": "#a3a3a3", "weight": 1, "dash": "dashed" },
+  { "type": "zone", "supertype": "Polygon", "subtype": "Chora", "color": "#f59e0b", "fill_opacity": 0.25 }
+] }
+```
+
+- **Keys**: a rule names a `supertype`, a `subtype`, or both (then both must match). Taxonomy is user text: matched trimmed and case-insensitively. A rule with neither is never stored.
+- **Resolution per field**: the zone's own `atlas_color`/`atlas_opacity` > the subtype rule > the supertype rule > the map default. `resolveStyle(rules, el)` is the one reader; `syncZones` feeds the result into `ZoneShape` (`color`, `opacity`, `weight`, `dash`), and `ZoneOverlay.applyStyle` draws it (selected/hovered add one to the rest weight; edit mode's dash wins over the kind's).
+- **Fields**: `color` (stroke + fill; also the taxonomy swatch for ANY type), `fill_opacity`, `weight`, `dash` ('solid'|'dashed'|'dotted'), `label_priority` (the density layer ranks these kinds' labels with the pins instead of after every pin, DESIGN_MAPS §11).
+- **Where it shows beyond the map**: the taxonomy value lights up wherever `reservedValueHint` marks atlas's own reserved values: a swatch beside the field label in element detail (`styleValueHint`) and on sidebar rows (`styleRowHint`). The zone page's visuals section shows the inherited colour in the picker and says where it came from ("Colour from the world style for Line · River"), with "Use the kind's colour" to clear an own override (`atlas_color: null`).
+- **Write into zones**: the tune form's button materialises the kind's colour into every member's `atlas_color`, for tools that read the wire and know nothing of `styles.json`.
+- **Not in the rule**: label position, hover mode, the map's own defaults (those stay per-map view prefs, §11).
 
 ---
 

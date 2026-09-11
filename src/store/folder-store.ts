@@ -25,6 +25,7 @@ import type {
   Tombstone,
 } from '../core/types';
 import type { ChartConfig } from '../visualization/timeline/types';
+import type { WorldStyles } from '../core/world-styles';
 
 /**
  * Options for listElements. `onProgress(done, total)` fires per file during a
@@ -199,6 +200,13 @@ export interface FolderStore {
   readCharts(): Promise<ChartConfig[]>;
   /** Overwrite the saved chart list (whole-list write, mirrors writeSyncState). */
   writeCharts(charts: ChartConfig[]): Promise<void>;
+
+  // ---- World styles (`.atlas/styles.json`; core/world-styles.ts, S356) ----
+
+  /** Read the world's style rules. Empty (not an error) when the file is absent or malformed. */
+  readStyles(): Promise<WorldStyles>;
+  /** Overwrite the world's style rules (whole-object write, like charts). */
+  writeStyles(styles: WorldStyles): Promise<void>;
 
   /**
    * Direct write of `server_updated_at` (used by SyncEngine after a successful

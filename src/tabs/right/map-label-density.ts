@@ -33,6 +33,7 @@ import { getState } from '../../core/state';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import type { Element } from '../../core/types';
 import { buildReverseIndex } from './context-pane-graph';
+import { resolveStyle } from '../../core/world-styles';
 import type { MapTabCacheEntry } from './map-tab-cache';
 
 export const LABEL_CULLED_CLASS = 'atlas-label-culled';
@@ -424,12 +425,19 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
     }
   }
   if (zonesAuto && zoneMetrics && entry.zoneOverlay) {
+    const rules = state.styles.rules;
     for (const { id, el, anchor } of zoneLabelEls) {
+      // A hidden zone's label is already at opacity 0; it must not claim space.
+      if (!entry.zoneOverlay.isZoneVisible(id)) continue;
       const extent = entry.zoneOverlay.getZoneScreenExtent(id);
       const line = entry.zoneOverlay.getZoneMode(id) === 'line';
       const selected = selectedId === id;
+      // A kind with label_priority (world styles) competes in the pin tier:
+      // the big rivers keep their names at fit zoom.
+      const zone = byId.get(id);
+      const prioritised = zone ? Boolean(resolveStyle(rules, zone).label_priority) : false;
       const key = `zone:${id}`;
-      cands.push({ id: key, pri: selected ? 0 : line ? 3 : 2, weight: extent, boxes: [inkBox(zoneMetrics, anchor, el.textContent ?? '')] });
+      cands.push({ id: key, pri: selected ? 0 : prioritised ? 1 : line ? 3 : 2, weight: extent, boxes: [inkBox(zoneMetrics, anchor, el.textContent ?? '')] });
       zoneById.set(key, el);
     }
   }

@@ -67,6 +67,10 @@ export interface ZoneShape {
    * keeps the old behaviour.
    */
   labelBelow?: boolean;
+  /** Stroke width at rest (world style rule, S356); selected/hovered add one. */
+  weight?: number;
+  /** Stroke pattern (world style rule, S356); edit mode's dash overrides. */
+  dash?: 'solid' | 'dashed' | 'dotted';
 }
 
 interface ZoneEntry {
@@ -259,6 +263,19 @@ export class ZoneOverlay {
 
   isLayerVisible(): boolean {
     return this.layerVisible;
+  }
+
+  isZoneVisible(id: string): boolean {
+    const entry = this.entries.get(id);
+    return Boolean(entry && entry.visible && this.layerVisible);
+  }
+
+  /** Programmatic hover (the zone panel's rows light the map the way the cursor does). */
+  setZoneHovered(id: string, hovered: boolean): void {
+    const entry = this.entries.get(id);
+    if (!entry || entry.hovered === hovered) return;
+    entry.hovered = hovered;
+    this.applyStyle(entry);
   }
 
   /** Number of zones currently rendered. */
@@ -551,7 +568,8 @@ export class ZoneOverlay {
     // stroke opacity, a notch more fill, and the label revealed even when
     // the density layer culled it.
     const lit = entry.selected || entry.hovered;
-    const weight = lit ? SELECTED_WEIGHT : UNSELECTED_WEIGHT;
+    const restWeight = entry.shape.weight ?? UNSELECTED_WEIGHT;
+    const weight = lit ? restWeight + (SELECTED_WEIGHT - UNSELECTED_WEIGHT) : restWeight;
     const style: L.PathOptions = {
       color,
       weight,
@@ -559,7 +577,11 @@ export class ZoneOverlay {
       // Editing state renders dashed outline (ZC6) so the user sees at a
       // glance "this zone's geometry is mutable right now." Same dash pattern
       // as the draft-mode preview for visual continuity (zone-drawing).
-      dashArray: entry.editing ? '5, 5' : undefined,
+      // Otherwise the kind's own pattern (routes dashed, rivers solid).
+      dashArray: entry.editing ? '5, 5'
+        : entry.shape.dash === 'dashed' ? '8, 6'
+        : entry.shape.dash === 'dotted' ? '2, 5'
+        : undefined,
     };
     if (entry.shape.mode === 'polygon') {
       style.fillColor = color;
@@ -580,6 +602,10 @@ export class ZoneOverlay {
         else opacity = '1';
         (labelEl as HTMLElement).style.opacity = opacity;
         labelEl.classList.toggle('atlas-label-revealed', Boolean(entry.hovered && showShape));
+        // The chip's hairline takes the zone's colour (S356): with kinds
+        // coloured, a river's name reads as a river's name.
+        const span = labelEl.querySelector('span') as HTMLElement | null;
+        if (span) span.style.borderColor = color;
       }
     }
     // Selected styling: drop-shadow glow on the SVG path + show vertex dots.

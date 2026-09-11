@@ -24,6 +24,7 @@ import type {
   Tombstone,
 } from '../../src/core/types';
 import type { ChartConfig } from '../../src/visualization/timeline/types';
+import { EMPTY_STYLES, type WorldStyles } from '../../src/core/world-styles';
 
 const defaultMeta: WorldMeta = { id: 'mock-world', name: 'mock world' };
 const defaultSyncState: SyncState = {
@@ -40,6 +41,7 @@ export class MockFolderStore implements FolderStore {
   private tombstones: Tombstone[] = [];
   private syncState: SyncState = { ...defaultSyncState };
   private charts: ChartConfig[] = [];
+  private styles: WorldStyles = { ...EMPTY_STYLES, rules: [] };
   private mediaItems = new Map<string, MediaItem>();
   private mediaBlobs = new Map<string, Blob>();
   /** Per-id serialization for update/delete — mirrors FsFolderStore (convention #79). */
@@ -384,6 +386,15 @@ export class MockFolderStore implements FolderStore {
   async writeCharts(charts: ChartConfig[]): Promise<void> {
     this.assertWritable();
     this.charts = charts.map(c => ({ ...c }));
+  }
+
+  async readStyles(): Promise<WorldStyles> {
+    return { version: this.styles.version, rules: this.styles.rules.map(r => ({ ...r })) };
+  }
+
+  async writeStyles(styles: WorldStyles): Promise<void> {
+    this.assertWritable();
+    this.styles = { version: styles.version, rules: styles.rules.map(r => ({ ...r })) };
   }
 
   async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string): Promise<void> {

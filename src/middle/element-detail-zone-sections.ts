@@ -26,6 +26,10 @@ import { decideDeleteConfirm } from '../core/delete-confirm';
 import { getEditorSettings } from '../registry/registry';
 import { getWritingLabels } from './writing-helpers';
 import { navigate, elementsHash } from '../core/router';
+import { resolveStyle, kindLabel } from '../core/world-styles';
+
+/** Point tables longer than this fold behind their map row. */
+const MARKERS_FOLD_ABOVE = 8;
 
 export function buildZoneSections(zone: Zone, toasts: ToastManager): HTMLElement[] {
   return [
@@ -40,9 +44,12 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
 
   const header = document.createElement('div');
   header.className = 'atlas-detail-section-header';
+  // These three fields ride the v2 wire as extension fields (they are in
+  // ATLAS_WIRE_EXTENSION_FIELDS); this header said "Local only" from the v1
+  // era until S356.
   header.innerHTML = `
     <span class="atlas-detail-section-title">Zone visuals</span>
-    <span class="atlas-detail-section-hint" title="These fields are stored locally and are NOT synced to the OnlyWorlds API.">Local only</span>
+    <span class="atlas-detail-section-hint" title="atlas_color, atlas_opacity and atlas_label_visible are atlas extension fields; they sync with the world.">Synced</span>
   `;
   section.appendChild(header);
 
@@ -50,9 +57,22 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
   body.className = 'atlas-detail-section-body';
   section.appendChild(body);
 
-  const currentColor = (zone as { atlas_color?: string }).atlas_color ?? '#22d3ee';
-  const currentOpacity = (zone as { atlas_opacity?: number }).atlas_opacity ?? 0.4;
+  // World styles (S356): what this zone inherits from its kind's rule when
+  // it has no colour of its own, so the picker shows the colour that is
+  // actually drawn and the line under it says where it came from.
+  const rule = resolveStyle(getState().styles.rules, zone);
+  const ownColor = (zone as { atlas_color?: string }).atlas_color;
+  const currentColor = ownColor ?? rule.color ?? '#22d3ee';
+  const currentOpacity = (zone as { atlas_opacity?: number }).atlas_opacity ?? rule.fill_opacity ?? 0.4;
   const currentLabelVisible = !!(zone as { atlas_label_visible?: boolean }).atlas_label_visible;
+  const kind = kindLabel({ supertype: typeof zone.supertype === 'string' ? zone.supertype : '', subtype: typeof zone.subtype === 'string' ? zone.subtype : '' });
+  const inheritLine = ownColor
+    ? (rule.color
+        ? `This zone has its own colour. <button type="button" class="atlas-btn-link" data-action="use-kind-colour">Use the ${escapeText(kind)} colour (${escapeText(rule.color)})</button>`
+        : 'This zone has its own colour.')
+    : (rule.color
+        ? `Colour from the world style for ${escapeText(kind)}. Pick one here to override it for this zone only.`
+        : 'No world style for this kind yet; set one from the zones panel on the map.');
 
   body.innerHTML = `
     <div class="atlas-zone-visuals-row">
@@ -60,6 +80,7 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
       <input type="color" class="atlas-zone-visuals-color" value="${currentColor}" data-field="atlas_color" />
       <input type="text" class="atlas-zone-visuals-color-text" value="${currentColor}" data-field="atlas_color_text" maxlength="7" />
     </div>
+    <div class="atlas-zone-visuals-inherit">${inheritLine}</div>
     <div class="atlas-zone-visuals-row">
       <label class="atlas-zone-visuals-label">Opacity</label>
       <input type="range" min="0" max="100" value="${Math.round(currentOpacity * 100)}" class="atlas-zone-visuals-opacity" data-field="atlas_opacity" />
@@ -123,6 +144,11 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
   const labelChk = body.querySelector<HTMLInputElement>('input[data-field="atlas_label_visible"]')!;
   labelChk.addEventListener('change', async () => {
     await persist({ atlas_label_visible: labelChk.checked });
+  });
+
+  body.querySelector<HTMLButtonElement>('[data-action="use-kind-colour"]')?.addEventListener('click', async () => {
+    // Clearing the own colour: null is the wire's "unset" (convention #21).
+    await persist({ atlas_color: null } as unknown as Partial<Zone>);
   });
 
   return section;
@@ -262,14 +288,26 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
     const map = elements.find((e): e is WorldMap => e.type === 'map' && e.id === mapId);
     const mapName = map?.name ?? '(unknown map)';
 
-    const groupHeader = document.createElement('div');
+    // The point table is for editing points, which is rare next to reading
+    // the page; a long one used to be most of a zone's page (Sikelia's
+    // roads: 44 rows). Past a handful it folds behind the map row, which
+    // keeps the count and gains a pan-to-zone (S356).
+    const folded = list.length > MARKERS_FOLD_ABOVE;
+    const details = document.createElement('details');
+    details.className = 'atlas-zone-markers-group';
+    details.open = !folded;
+    const groupHeader = document.createElement('summary');
     groupHeader.className = 'atlas-zone-markers-group-header';
     groupHeader.innerHTML = `
       <span class="material-symbols-outlined">map</span>
       <span>${escapeText(mapName)}</span>
-      <span class="atlas-zone-markers-group-count">${list.length}</span>
+      <span class="atlas-zone-markers-group-count">${list.length} point${list.length === 1 ? '' : 's'}</span>
+      <button type="button" class="atlas-zone-markers-pan atlas-zone-markers-pan-zone" data-action="pan-zone" data-map-id="${escapeText(mapId)}" title="Pan the map to this zone">
+        <span class="material-symbols-outlined">my_location</span>
+      </button>
     `;
-    body.appendChild(groupHeader);
+    details.appendChild(groupHeader);
+    body.appendChild(details);
 
     const ul = document.createElement('ul');
     ul.className = 'atlas-zone-markers-list';
@@ -282,7 +320,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
         <span class="atlas-zone-markers-order">${(m.order ?? 0) + 1}</span>
         <span class="atlas-zone-markers-coords">(${m.x}, ${m.y})</span>
         <button type="button" class="atlas-zone-markers-pan" data-action="pan" title="Pan to marker">
-          <span class="material-symbols-outlined">crosshair</span>
+          <span class="material-symbols-outlined">my_location</span>
         </button>
         <button type="button" class="atlas-zone-markers-del" data-action="delete" title="Delete marker">
           <span class="material-symbols-outlined">delete</span>
@@ -291,12 +329,23 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
       ul.appendChild(li);
     }
 
-    body.appendChild(ul);
+    details.appendChild(ul);
   }
 
   // Delegate clicks for the whole section body.
   body.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
+    const panZone = target.closest<HTMLElement>('[data-action="pan-zone"]');
+    if (panZone) {
+      e.preventDefault(); // a button inside <summary> must not toggle the fold
+      const mapId = panZone.getAttribute('data-map-id') ?? '';
+      const map = elements.find((el): el is WorldMap => el.type === 'map' && el.id === mapId);
+      const list = markers.filter(m => m.map_id === mapId);
+      if (!map || list.length === 0) return;
+      openMapTab(map);
+      panMapTabTo(map.id, list.reduce((s, m) => s + m.x, 0) / list.length, list.reduce((s, m) => s + m.y, 0) / list.length);
+      return;
+    }
     const row = target.closest<HTMLElement>('.atlas-zone-markers-row');
     if (!row) return;
     const markerId = row.getAttribute('data-marker-id');

@@ -134,6 +134,8 @@ User picks a root folder once per world (persisted via `FileSystemDirectoryHandl
     .atlas/                          ← atlas internal state
       sync-state.json                ← last_synced_at per element, conflict log
       tombstones.json                ← deletion log (id, type, deleted_at)
+      charts.json                    ← saved chart configs (DESIGN_CHARTS)
+      styles.json                    ← WORLD STYLES: how the world draws its kinds (DESIGN_ZONES §5b, S356)
       lock                           ← presence indicates a writer is active
     elements/                        ← ALL 22 element types, one subfolder each
       character/
@@ -288,7 +290,7 @@ This sandboxes atlas data in a known subfolder when the user picks a busy folder
     .atlas-root                   ← marker file with {version, created_at}
     my-first-world-7a3f0c12/      ← per-world subfolder (the actual world)
       world.json
-      .atlas/{lock, sync-state.json, tombstones.json}
+      .atlas/{lock, sync-state.json, tombstones.json, charts.json, styles.json}
       elements/<type>/<id>.json
       elements/<type>/<id>.json     ← all 22 types; spatial/ only in ≤v1.0 folders
       media/<element-id>/<folder>/<filename>

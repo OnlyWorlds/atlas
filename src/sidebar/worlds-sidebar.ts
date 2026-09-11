@@ -42,6 +42,7 @@ import { rightTabHashFor } from './sidebar';
 const TOUR_CREATE_SEEN_KEY = 'atlas_tour_create_seen';
 
 import { isTourFlagActive } from '../tour/tour-flag';
+import { loadWorldStyles, resetWorldStyles } from '../core/world-styles-state';
 
 /**
  * Guided tour running. The tour OWNS the sidebar while it runs, whether or
@@ -645,6 +646,7 @@ async function doActivateWorld(
     // loading:true — the cache is about to be primed async; empty ≠ loading
     // (the misleading empty-home flash, 2026-07-10).
     patchSlice('data', { elements: [], loading: true, loadingProgress: null });
+    resetWorldStyles();
     // knowledgeLens + castAssign cleared too — both reference the OLD world.
     patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, castAssign: null });
     const currentRoute = parseHash(window.location.hash);
@@ -831,6 +833,8 @@ async function doActivateWorld(
       },
     });
     if (stillActive()) patchSlice('data', { elements, loading: false, loadingProgress: null });
+    // The world's style rules ride in after the elements (the map reads both).
+    await loadWorldStyles(store);
   } catch (err) {
     console.warn('[worlds-sidebar] failed to prime elements:', err);
     if (stillActive()) patchSlice('data', { elements: [], loading: false, loadingProgress: null });

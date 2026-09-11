@@ -72,6 +72,11 @@ export interface MapTabCacheEntry {
   pinSpacing?: number;
   /** The icon scale last applied to every pin (rounded); skip when unchanged. */
   pinScale?: number;
+  /**
+   * Kinds (world-styles `groupByKind` keys) whose zones are hidden on this
+   * map from the zone panel's eye. Session-only, like `hiddenPinTypes`.
+   */
+  hiddenZoneKinds: Set<string>;
 }
 
 export const mapTabCache = new Map<string, MapTabCacheEntry>();

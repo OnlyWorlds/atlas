@@ -67,6 +67,24 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['maps'],
       },
       {
+        id: 'zone-panel-and-world-styles',
+        title: 'Colour zones by kind: rivers blue, roads dashed, one click each, saved with the world',
+        body: 'The zones button on a map now opens a panel that groups zones by kind (a supertype and subtype pair, like Line and River). Each kind has a colour swatch, an eye to hide it on this map, and a tune button for fill, line weight, dashed or dotted strokes, and "label first" so its names stay on at any zoom. Rows open to the zones, and hovering a row lights that zone on the map. A search box finds a zone by name. The rules live in .atlas/styles.json inside the world folder, so they travel with it. The colour of a kind also shows as a small swatch beside the type on element pages and in the sidebar.',
+        tags: ['maps'],
+      },
+      {
+        id: 'zone-hover-highlight',
+        title: 'Hovering a zone lights the whole road, river or region',
+        body: 'You no longer have to click to see where a zone runs. The outline brightens and thickens under the cursor and its name shows even when the map is too crowded to label it.',
+        tags: ['maps'],
+      },
+      {
+        id: 'zone-page-inherits',
+        title: 'The zone page says where its colour comes from, and long point lists fold away',
+        body: 'The visuals section shows the colour the map actually draws and names the kind rule it inherits, with one click to go back to it after an override. Point lists longer than eight fold behind the map row, which gained a pan-to-zone button. The section also stopped claiming those fields were local only; they sync with the world.',
+        tags: ['maps', 'fix'],
+      },
+      {
         id: 'zone-lines-from-other-tools',
         title: 'Rivers and roads written by other tools draw as lines',
         body: 'A zone whose shape was written as "Line" by another OnlyWorlds tool drew as a filled polygon, because atlas only recognised the lowercase spelling it wrote itself. Any spelling of line is a line now.',

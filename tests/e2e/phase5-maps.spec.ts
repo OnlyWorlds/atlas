@@ -515,3 +515,84 @@ test('the density layer (S356): a 40-pin cluster keeps its icons apart and its l
   await page.click('.atlas-popover-radio-row[data-field="pin_labels"] label:has(input[value="auto"])');
   await expect.poll(async () => (await measure()).visibleLabels).toBeLessThan(40);
 });
+
+test('the zone panel (S356): kinds group, a kind colour is a world style that survives reload, the eye hides a kind, the zone page says what it inherits', async ({ page }) => {
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', 'Kinds Canvas');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Kinds Canvas' })).toBeVisible();
+
+  // Two rivers, one route (Line zones as another tool writes them) and a chora polygon.
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const st = api.getState();
+    const map = st.data.elements.find((e: any) => e.type === 'map' && e.name === 'Kinds Canvas');
+    const line = async (name: string, subtype: string, y: number) => {
+      const z = await store.createZone({ name, supertype: 'Line', subtype });
+      await store.createMarker({ map_id: map.id, zone_id: z.id, x: 100, y, order: 1 });
+      await store.createMarker({ map_id: map.id, zone_id: z.id, x: 1900, y: y + 50, order: 2 });
+      return z.id as string;
+    };
+    await line('the Anapos', 'River', 300);
+    await line('the Hyblaios', 'River', 700);
+    await line('Syracuse road', 'Route', 1100);
+    const chora = await store.createZone({ name: 'Chora of Gela', supertype: 'Polygon', subtype: 'Chora' });
+    for (const [i, [x, y]] of [[400, 1400], [800, 1400], [800, 1800], [400, 1800]].entries()) {
+      await store.createMarker({ map_id: map.id, zone_id: chora.id, x, y, order: i + 1 });
+    }
+    api.patchData(await store.listElements());
+  });
+  const container = page.locator('.atlas-map-tab-wrapper .leaflet-container').first();
+  await expect(container.locator('svg path[fill="none"]')).toHaveCount(6); // 3 lines × (visible + hit)
+
+  // The fold-out groups by kind, closed, with counts.
+  await page.click('[data-action="zones-dropdown"]');
+  const panel = page.locator('[data-role="zones-dropdown-panel"]');
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('.atlas-zone-kind-name')).toHaveText(['Line · River', 'Line · Route', 'Polygon · Chora']);
+  await expect(panel.locator('.atlas-zone-chip:visible')).toHaveCount(0);
+
+  // Pick a colour for rivers: both river strokes turn blue, the route does not,
+  // and the rule is on disk under .atlas/styles.json.
+  const riverKind = panel.locator('.atlas-zone-kind', { hasText: 'Line · River' });
+  await riverKind.locator('input[data-action="kind-color"]').evaluate((input: HTMLInputElement) => {
+    input.value = '#3b82f6';
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(container.locator('svg path[stroke="#3b82f6"]')).toHaveCount(2);
+  // State lands first and the disk write follows: poll the file, never
+  // read it on the DOM's sync point (the S323 law, again).
+  await expect.poll(async () => page.evaluate(async () => (await (window as any).__atlasTestApi.getActiveStore().readStyles()).rules))
+    .toEqual([{ type: 'zone', supertype: 'Line', subtype: 'River', color: '#3b82f6' }]);
+
+  // Open the kind: its rows; hovering a row lights that zone on the map.
+  await riverKind.locator('[data-action="toggle-kind"]').click();
+  await expect(riverKind.locator('.atlas-zone-chip:visible')).toHaveCount(2);
+  await riverKind.locator('.atlas-zone-chip', { hasText: 'the Anapos' }).hover();
+  await expect(container.locator('svg .atlas-zone-hovered')).toHaveCount(1);
+
+  // The eye hides every route on this map (stroke opacity 0), and the panel still lists it.
+  const routeKind = panel.locator('.atlas-zone-kind', { hasText: 'Line · Route' });
+  await routeKind.locator('[data-action="toggle-kind-visible"]').click();
+  await expect(container.locator('svg path[stroke-opacity="0"][stroke-width="2"]')).toHaveCount(1);
+  await expect(routeKind).toHaveClass(/is-hidden/);
+
+  // Search narrows to matching zones and opens their kinds.
+  await page.fill('[data-role="zone-search"]', 'hybl');
+  await expect(panel.locator('.atlas-zone-chip:visible .atlas-zone-chip-name')).toHaveText(['the Hyblaios']);
+
+  // Reload: the rule comes back from the folder; the hide (session-only) does not.
+  await page.reload();
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+  await expect.poll(async () => page.evaluate(() => (window as any).__atlasTestApi.getState().styles.rules.length), { timeout: 15_000 }).toBe(1);
+
+  // The zone page says where its colour comes from, and the taxonomy swatch lights the subtype.
+  const anaposId = await page.evaluate(() => (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.name === 'the Anapos').id);
+  const wid = await page.evaluate(() => (window as any).__atlasTestApi.getState().active.worldId);
+  await page.evaluate(({ wid, id }) => { window.location.hash = `#/w/${wid}/element/${id}`; }, { wid, id: anaposId });
+  await expect(page.locator('.atlas-zone-visuals-inherit')).toContainText('Colour from the world style for Line · River');
+  await expect(page.locator('.atlas-zone-visuals-color')).toHaveValue('#3b82f6');
+  await expect(page.locator('.atlas-field-style-swatch')).toHaveCount(1);
+  await expect(page.locator('.atlas-zone-visuals-section .atlas-detail-section-hint')).toHaveText('Synced');
+});

@@ -13,6 +13,7 @@
  * `data.elements` with a new array reference after every mutation.
  */
 
+import { WORLD_STYLES_VERSION, type WorldStyles } from './world-styles';
 import type { WorldsRegistry, WorldMeta, Element, ElementType, SyncEngineState, RightTabRef, AccountWorldRow } from './types';
 import { defaultRegistry } from './types';
 
@@ -178,6 +179,12 @@ export interface AccountWorldsState {
 
 export interface AppState {
   registry: WorldsRegistry;
+  /**
+   * The active world's style rules (`.atlas/styles.json`, core/world-styles).
+   * Its own slice, not part of `data`: every elements refresh replaces the
+   * data slice whole, and the rules must outlive that.
+   */
+  styles: WorldStyles;
   atlasRoot: AtlasRootRef | null;
   atlasRootRecoverable: AtlasRootRecoverableRef | null;
   active: ActiveWorldRef | null;
@@ -193,6 +200,7 @@ export interface AppState {
 const listeners = new Set<() => void>();
 let state: AppState = {
   registry: defaultRegistry(),
+  styles: { version: WORLD_STYLES_VERSION, rules: [] },
   atlasRoot: null,
   atlasRootRecoverable: null,
   active: null,

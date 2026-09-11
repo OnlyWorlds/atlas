@@ -16,6 +16,7 @@ import { CONTENT_ELEMENT_TYPES, type ElementType, type Element } from '../core/t
 import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import { lensKnownSet } from '../core/knowledge';
 import { reservedRowHint } from '../core/taxonomy';
+import { styleRowHint } from '../core/world-styles';
 import { ToastManager } from '../ui/toast-manager';
 import { openCreateDoor } from '../ui/create-element-door';
 import { isQuietRef, isTourFlagActive } from '../tour/tour-flag';
@@ -728,6 +729,11 @@ function renderElementRow(
   const reservedBadge = reserved
     ? `<span class="material-symbols-outlined atlas-row-reserved" title="${escapeAttr(reserved)}">auto_awesome</span>`
     : '';
+  // World-style swatch (S356): the kind's colour, when a rule names it.
+  const styled = styleRowHint(getState().styles.rules, el);
+  const styleBadge = styled
+    ? `<span class="atlas-row-style-swatch" style="background:${escapeAttr(styled.color)}" title="${escapeAttr(styled.title)}"></span>`
+    : '';
   // Chronicle sparkle (2026-07-19): elements recorded from play (tangle
   // battle Events, tropaion Objects, chronicle Narratives — supertype
   // 'Chronicle' by the registered convention) carry a quiet mark.
@@ -742,6 +748,7 @@ function renderElementRow(
       ${onMapBadge}
       ${chronicleBadge}
       ${reservedBadge}
+      ${styleBadge}
       <span class="atlas-row-meta">${escapeText(el.type)}</span>
     </div>
   `;

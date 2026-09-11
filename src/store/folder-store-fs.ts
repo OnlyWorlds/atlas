@@ -31,6 +31,7 @@ import {
   ATLAS_LOCAL_ONLY_FIELDS,
   ATLAS_WIRE_EXTENSION_FIELDS,
   CHARTS_FILE,
+  STYLES_FILE,
   ELEMENTS_DIR,
   LOCK_FILE,
   LOCK_HEARTBEAT_MS,
@@ -44,6 +45,7 @@ import {
   FOLDER_FORMAT_VERSION,
 } from '../core/constants';
 import type { LayoutDir } from '../core/constants';
+import { parseWorldStyles, type WorldStyles } from '../core/world-styles';
 import { ALL_ELEMENT_TYPES, CONTENT_ELEMENT_TYPES, SPATIAL_ELEMENT_TYPES } from '../core/types';
 import { findDuplicatePin, DuplicatePinError } from '../core/pin-uniqueness';
 import type {
@@ -1435,6 +1437,17 @@ export class FsFolderStore implements FolderStore {
     this.assertWritable();
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
     await writeJsonAtomic(atlasDir, CHARTS_FILE, { charts });
+  }
+
+  async readStyles(): Promise<WorldStyles> {
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    return parseWorldStyles(await readJson<unknown>(atlasDir, STYLES_FILE));
+  }
+
+  async writeStyles(styles: WorldStyles): Promise<void> {
+    this.assertWritable();
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    await writeJsonAtomic(atlasDir, STYLES_FILE, styles);
   }
 
   async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string): Promise<void> {

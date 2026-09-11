@@ -10,10 +10,7 @@
  */
 
 import { getState, patchSlice } from '../../core/state';
-import { navigate, elementHash } from '../../core/router';
-import { ELEMENT_LABELS } from '../../core/constants';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
-import { escapeText } from '../../core/dom-utils';
 import {
   listZonesOnMap,
   markersForZoneOnMap,
@@ -22,6 +19,8 @@ import {
 } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { refreshLabelDensity } from './map-label-density';
+import { resolveStyle, groupByKind } from '../../core/world-styles';
+import { renderZonePanel, wireZonePanel } from './map-zone-panel';
 import type { Zone } from '../../core/types';
 import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
@@ -39,6 +38,14 @@ export function syncZones(entry: MapTabCacheEntry): void {
 
   const present = new Set<string>();
   const prefs = getEffectiveMapPrefs(entry.mapId);
+  const rules = state.styles.rules;
+  // Kind → hidden, from the zone panel's eyes (session-only, per map).
+  const hiddenIds = new Set<string>();
+  if (entry.hiddenZoneKinds.size > 0) {
+    for (const kind of groupByKind(onThisMap)) {
+      if (entry.hiddenZoneKinds.has(kind.key)) for (const z of kind.members) hiddenIds.add(z.id);
+    }
+  }
 
   for (const zone of onThisMap) {
     present.add(zone.id);
@@ -47,7 +54,10 @@ export function syncZones(entry: MapTabCacheEntry): void {
       y: m.y,
     }));
     const mode = getZoneShape(zone);
-    const opacity = zoneEffectiveOpacity(zone, prefs.zone_fill_opacity);
+    // World style rules (S356): the zone's own atlas_* field wins, then the
+    // kind's rule, then the map default.
+    const style = resolveStyle(rules, zone);
+    const opacity = zoneEffectiveOpacity(zone, style.fill_opacity ?? prefs.zone_fill_opacity);
     // Label policy:
     //   - 'always' → labelText = zone.name, hover-only = false (always shown)
     //   - 'hover'  → labelText = zone.name, hover-only = true  (fade on hover)
@@ -62,12 +72,15 @@ export function syncZones(entry: MapTabCacheEntry): void {
       id: zone.id,
       mode,
       points,
-      color: (zone as { atlas_color?: string }).atlas_color,
+      color: (zone as { atlas_color?: string }).atlas_color ?? style.color,
       opacity,
       labelText,
       labelHoverOnly,
       labelBelow: prefs.zone_label_position === 'below',
+      weight: style.weight,
+      dash: style.dash,
     });
+    entry.zoneOverlay.setZoneVisible(zone.id, !hiddenIds.has(zone.id));
   }
 
   // Remove overlay entries that are no longer on this map. Iterate the
@@ -88,7 +101,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
     entry.zoneOverlay.setZoneSelected(zone.id, zone.id === selectedId);
   }
 
-  renderChipStrip(entry, onThisMap, selectedId);
+  renderZonePanel(entry, onThisMap, selectedId);
   refreshLabelDensity(entry);
 }
 
@@ -106,112 +119,35 @@ export function computeLabelText(zone: Zone, mode: 'auto' | 'always' | 'hover' |
 }
 
 /**
- * Render the zones dropdown panel + sync the toolbar dropdown button (ZC9
- * replaces the bottom-of-canvas chip strip from DESIGN_MAPS.md §13).
- *
- * - When zones.length === 0: hide both the toolbar button AND the panel.
- * - Otherwise: show the button with a count badge; render chip-styled rows
- *   into the panel. Panel opens/closes via the button (wireZonesDropdown).
+ * Bind the zone panel's handlers once per map tab (mountMapTab). The panel
+ * itself lives in map-zone-panel.ts; this module supplies the store-touching
+ * verbs (delete, rename via context menu, write a kind's colour into zones).
  */
-function renderChipStrip(entry: MapTabCacheEntry, zones: Zone[], selectedId?: string | null): void {
-  const strip = entry.zoneStrip;
-  strip.innerHTML = '';
-
-  // Update the toolbar dropdown button (count + visibility). The button lives
-  // in entry.toolbar — query for it by its data-action attribute so this
-  // helper is independent of CanvasToolbarRefs.
-  const btn = entry.toolbar.querySelector<HTMLButtonElement>('[data-action="zones-dropdown"]');
-  const countEl = btn?.querySelector<HTMLElement>('[data-role="zones-count"]');
-
-  if (zones.length === 0) {
-    strip.style.display = 'none';
-    strip.classList.remove('is-open');
-    if (btn) {
-      btn.style.display = 'none';
-      btn.classList.remove('is-open');
-    }
-    return;
-  }
-
-  if (btn) {
-    btn.style.display = '';
-    if (countEl) countEl.textContent = String(zones.length);
-  }
-  // Panel itself stays display: '' so the .is-open class controls visibility
-  // (driven by wireZonesDropdown). Keep it laid out so opening doesn't lag.
-  strip.style.display = '';
-
-  for (const z of zones) {
-    const chip = document.createElement('div');
-    chip.className = 'atlas-zone-chip';
-    if (z.id === selectedId) chip.classList.add('is-selected');
-    chip.setAttribute('data-zone-id', z.id);
-    chip.setAttribute('title', `${ELEMENT_LABELS.zone.singular}: ${z.name}`);
-
-    const shapeIcon = getZoneShape(z) === 'line' ? 'show_chart' : 'hexagon';
-    const color = (z as { atlas_color?: string }).atlas_color ?? '#22d3ee';
-
-    chip.innerHTML = `
-      <span class="material-symbols-outlined atlas-zone-chip-shape">${shapeIcon}</span>
-      <span class="atlas-zone-chip-dot" style="background:${color}"></span>
-      <span class="atlas-zone-chip-name">${escapeText(z.name)}</span>
-      <button type="button" class="atlas-zone-chip-x" data-action="delete" title="Delete zone">
-        <span class="material-symbols-outlined">delete</span>
-      </button>
-    `;
-    strip.appendChild(chip);
-  }
+export function wireChipStrip(entry: MapTabCacheEntry, toasts: ToastManager): void {
+  wireZonePanel(entry, {
+    onDelete: (zoneId) => { void deleteZoneFromChip(zoneId, toasts); },
+    onContext: (zoneId, x, y) => showChipContextMenu(zoneId, x, y, toasts),
+    onApplyToZones: (zones, color) => { void applyColorToZones(zones, color, toasts); },
+  });
 }
 
 /**
- * Bind handlers on the chip strip. Called once when the strip is mounted in
- * mountMapTab. Uses event delegation so individual chips don't need
- * per-render listener cleanup.
+ * Materialise a kind's rule colour into each zone's own `atlas_color`, so a
+ * tool that reads the wire (the field rides v2) sees the colour without
+ * knowing about `.atlas/styles.json`. Each write goes through the store's
+ * per-id chain; one refresh at the end.
  */
-export function wireChipStrip(entry: MapTabCacheEntry, toasts: ToastManager): void {
-  const strip = entry.zoneStrip;
-
-  strip.addEventListener('click', async (e) => {
-    const target = e.target as HTMLElement;
-    const chip = target.closest<HTMLElement>('.atlas-zone-chip');
-    if (!chip) return;
-    // Defensive: stop bubbling so the click can't reach any ancestor handler
-    // that might mis-interpret it (e.g. a sibling filter strip that shares a
-    // delegated parent in a future layout). Chip selection should be a
-    // contained gesture.
-    e.stopPropagation();
-    const zoneId = chip.getAttribute('data-zone-id');
-    if (!zoneId) return;
-
-    // Delete affordance.
-    if (target.closest('[data-action="delete"]')) {
-      await deleteZoneFromChip(zoneId, toasts);
-      return;
-    }
-
-    // Plain click → select zone AND navigate to element-detail route so the
-    // middle pane reflects the selection (parity with canvas zone-click flow).
-    // sidebarMode is intentionally left alone: navigation to /element/<id>
-    // triggers sidebar.syncModeFromRoute which already flips to elements mode
-    // when the route is content-y. Setting it here too creates a double-patch.
-    const worldId = getState().active?.worldId;
-    if (worldId) {
-      patchSlice('ui', { ...getState().ui, selectedElementId: zoneId });
-      navigate(elementHash(worldId, zoneId));
-    } else {
-      patchSlice('ui', { ...getState().ui, selectedElementId: zoneId });
-    }
-  });
-
-  strip.addEventListener('contextmenu', (e) => {
-    const target = e.target as HTMLElement;
-    const chip = target.closest<HTMLElement>('.atlas-zone-chip');
-    if (!chip) return;
-    e.preventDefault();
-    const zoneId = chip.getAttribute('data-zone-id');
-    if (!zoneId) return;
-    showChipContextMenu(zoneId, e.clientX, e.clientY, toasts);
-  });
+async function applyColorToZones(zones: Zone[], color: string, toasts: ToastManager): Promise<void> {
+  const store = getActiveStore();
+  if (!store || zones.length === 0) return;
+  try {
+    for (const z of zones) await store.updateZone(z.id, { atlas_color: color } as Partial<Zone>);
+    await refreshElementsAfterWrite(store);
+    toasts.success(`Colour written into ${zones.length} zone${zones.length === 1 ? '' : 's'}`);
+  } catch (err) {
+    console.error('[zone-panel] apply colour failed:', err);
+    toasts.error('Could not write the colour into every zone');
+  }
 }
 
 async function deleteZoneFromChip(zoneId: string, toasts: ToastManager): Promise<void> {

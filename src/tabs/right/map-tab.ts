@@ -168,6 +168,7 @@ export function mountMapTab(target: HTMLElement, mapId: string, toasts: ToastMan
     trashZone,
     chipStrip,
     hiddenPinTypes: new Set(),
+    hiddenZoneKinds: new Set(),
     lastBg: '',
     zoneOverlay: null,
     zoneStrip,
@@ -410,13 +411,23 @@ onPinVisualsReady(() => {
 // short-circuit when data.elements hasn't changed.
 let lastElementsRef: unknown = null;
 let lastSelectedRef: unknown = null;
+let lastStylesRef: unknown = null;
+let lastUiRef: unknown = null;
 subscribe(() => {
   const state = getState();
   const elements = state.data.elements;
   const selected = state.ui.selectedElementId;
-  if (elements === lastElementsRef && selected === lastSelectedRef) return;
+  // World styles (S356) restyle every zone; a ui tick carries the zone
+  // panel's hide-a-kind toggle (it has no slice of its own).
+  const styles = state.styles;
+  const ui = state.ui;
+  if (elements === lastElementsRef && selected === lastSelectedRef && styles === lastStylesRef && ui === lastUiRef) return;
+  const zonesOnly = elements === lastElementsRef && selected === lastSelectedRef;
   lastElementsRef = elements;
   lastSelectedRef = selected;
+  lastStylesRef = styles;
+  lastUiRef = ui;
+  if (zonesOnly) { refreshActiveMapZones(); return; }
   refreshActiveMapPins();
   // Dims drifted under a BACKGROUND tab (image attached / dims corrected
   // while the tab wasn't active): evict its cache so the next activation

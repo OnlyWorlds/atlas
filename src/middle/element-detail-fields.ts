@@ -38,6 +38,7 @@ import { readImageDimsFromUrl, smallMapImageHint, IMAGELESS_MAP_SIZE } from '../
 import { countSpatialOnMap, spatialPhrase, rescaleSketchOntoImage } from './map-attach-scale';
 import { getEditorSettings } from '../registry/registry';
 import { suggestionsForField, reservedValueHint } from '../core/taxonomy';
+import { styleValueHint } from '../core/world-styles';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */
 const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
@@ -162,6 +163,19 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
     mark.textContent = 'auto_awesome';
     mark.title = reserved;
     label.appendChild(mark);
+  }
+  // World-style awareness (S356): the same quiet mark, as a swatch, when a
+  // taxonomy value carries a colour in `.atlas/styles.json` (the kinds the
+  // zone panel coloured light up here too, and for any type a rule names).
+  if (meta.name === 'supertype' || meta.name === 'subtype') {
+    const styled = styleValueHint(getState().styles.rules, el, meta.name);
+    if (styled) {
+      const dot = document.createElement('span');
+      dot.className = 'atlas-field-style-swatch';
+      dot.style.background = styled.color;
+      dot.title = styled.title;
+      label.appendChild(dot);
+    }
   }
   // Clicking the label triggers the same edit affordance as clicking the
   // value — opens the popover for text/number, opens the picker for links.
