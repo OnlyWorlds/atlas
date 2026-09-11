@@ -67,6 +67,18 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['maps'],
       },
       {
+        id: 'sidebar-muted-types',
+        title: 'Right-click a type in the sidebar to keep it out of the full list',
+        body: 'A world with thousands of pins and markers should still read as its places. Pins and markers now sit in the last two filter slots, greyed: they stay out of the list when you show everything and appear when you click their filter. Right-click any type to mute or unmute it; the choice is remembered per world.',
+        tags: ['sidebar'],
+      },
+      {
+        id: 'colour-picker-and-toolbar',
+        title: 'A colour picker that belongs, and fit-to-image beside the map door',
+        body: 'Picking a colour for a kind of zone opens a small atlas panel with presets, a hex field and an Apply button instead of the browser dialog, which committed every drag and drew a stray white box. On the map toolbar the fit-to-image button moved to the right, next to the map element button, with the view toggles and the draw tools on the left.',
+        tags: ['maps'],
+      },
+      {
         id: 'zone-panel-and-world-styles',
         title: 'Colour zones by kind: rivers blue, roads dashed, one click each, saved with the world',
         body: 'The zones button on a map now opens a panel that groups zones by kind (a supertype and subtype pair, like Line and River). Each kind has a colour swatch, an eye to hide it on this map, and a tune button for fill, line weight, dashed or dotted strokes, and "label first" so its names stay on at any zoom. Rows open to the zones, and hovering a row lights that zone on the map. A search box finds a zone by name. The rules live in .atlas/styles.json inside the world folder, so they travel with it. The colour of a kind also shows as a small swatch beside the type on element pages and in the sidebar.',

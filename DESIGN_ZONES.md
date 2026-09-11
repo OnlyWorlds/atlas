@@ -433,6 +433,7 @@ Born on Sikelia: 113 rivers, 192 routes and 14 chorai in one cyan, no legend. **
 ] }
 ```
 
+- **The swatch's picker** is atlas's own (`ui/colour-popover.ts`, S356): fourteen presets that commit on click, a hex field that commits on Apply/Enter, Cancel/Escape/outside-click dismiss. Not the native `<input type=color>` dialog, which commits on every drag, cannot be styled, and painted a stray white box under the swatch. The zone page's per-zone colour keeps the native input (an override for one zone is a different gesture).
 - **Keys**: a rule names a `supertype`, a `subtype`, or both (then both must match). Taxonomy is user text: matched trimmed and case-insensitively. A rule with neither is never stored.
 - **Resolution per field**: the zone's own `atlas_color`/`atlas_opacity` > the subtype rule > the supertype rule > the map default. `resolveStyle(rules, el)` is the one reader; `syncZones` feeds the result into `ZoneShape` (`color`, `opacity`, `weight`, `dash`), and `ZoneOverlay.applyStyle` draws it (selected/hovered add one to the rest weight; edit mode's dash wins over the kind's).
 - **Fields**: `color` (stroke + fill; also the taxonomy swatch for ANY type), `fill_opacity`, `weight`, `dash` ('solid'|'dashed'|'dotted'), `label_priority` (the density layer ranks these kinds' labels with the pins instead of after every pin, DESIGN_MAPS §11).

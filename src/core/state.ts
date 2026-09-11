@@ -13,6 +13,7 @@
  * `data.elements` with a new array reference after every mutation.
  */
 
+import { DEFAULT_MUTED_TYPES } from './type-mutes';
 import { WORLD_STYLES_VERSION, type WorldStyles } from './world-styles';
 import type { WorldsRegistry, WorldMeta, Element, ElementType, SyncEngineState, RightTabRef, AccountWorldRow } from './types';
 import { defaultRegistry } from './types';
@@ -118,6 +119,11 @@ export interface UiState {
   selectedElementId: string | null;
   /** Filter chips: empty = no filter (show all), populated = restrict to these. */
   elementFilters: Set<ElementType>;
+  /**
+   * Muted types (S356, core/type-mutes.ts): hidden when showing all, shown
+   * when filtered to explicitly. Per world; pins + markers by default.
+   */
+  mutedTypes: Set<ElementType>;
   search: string;
   /** Right-pane tabs (always begins with implicit map-index; additional are maps). */
   rightTabs: RightTabRef[];
@@ -210,6 +216,7 @@ let state: AppState = {
     sidebarMode: 'worlds',
     selectedElementId: null,
     elementFilters: new Set(),
+    mutedTypes: new Set(DEFAULT_MUTED_TYPES),
     search: '',
     rightTabs: [{ kind: 'map-index' }],
     rightActiveIndex: 0,

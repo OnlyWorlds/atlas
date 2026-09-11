@@ -31,6 +31,7 @@ import {
   type StyleRule, type Kind, type LineDash,
 } from '../../core/world-styles';
 import { saveWorldStyleRules } from '../../core/world-styles-state';
+import { openColourPopover } from '../../ui/colour-popover';
 import { panMapTabTo } from './map-tab';
 import { markersForZoneOnMap } from './zone-derived';
 import { partitionZonesAndMarkers } from './zone-derived';
@@ -120,10 +121,9 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
         <div class="atlas-zone-kind-row" data-action="toggle-kind">
           <span class="material-symbols-outlined atlas-zone-kind-caret" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span>
           ${hasKind
-            ? `<label class="atlas-zone-kind-swatch" title="Colour for every ${escapeAttr(kindLabel(kind))} zone (a world style, saved with the folder)" data-action="swatch">
+            ? `<button type="button" class="atlas-zone-kind-swatch" title="Colour for every ${escapeAttr(kindLabel(kind))} zone (a world style, saved with the folder)" data-action="swatch" data-color="${escapeAttr(color)}" aria-label="Colour for ${escapeAttr(kindLabel(kind))}">
                  <span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span>
-                 <input type="color" value="${escapeAttr(color)}" data-action="kind-color" aria-label="Colour for ${escapeAttr(kindLabel(kind))}" />
-               </label>`
+               </button>`
             : `<span class="atlas-zone-kind-swatch is-inert"><span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span></span>`}
           <span class="atlas-zone-kind-name">${escapeText(kindLabel(kind))}</span>
           <span class="atlas-zone-kind-count">${matching.length}${q ? ` of ${members.length}` : ''}</span>
@@ -229,7 +229,17 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     const kindEl = target.closest<HTMLElement>('.atlas-zone-kind');
     const kindKey = kindEl?.getAttribute('data-kind-key') ?? null;
 
-    if (target.closest('[data-action="swatch"]')) return; // the native picker opens itself
+    const swatch = target.closest<HTMLElement>('[data-action="swatch"]');
+    if (swatch && kindKey) {
+      const kind = kindOf(kindKey);
+      if (!kind) return;
+      openColourPopover({
+        anchor: swatch,
+        current: swatch.getAttribute('data-color') ?? DEFAULT_ZONE_COLOR,
+        onApply: (hex) => writeRule(kind, { color: hex }),
+      });
+      return;
+    }
     if (target.closest('[data-role="tune"]') && !target.closest('button')) return;
 
     if (kindKey && target.closest('[data-action="toggle-kind-visible"]')) {
@@ -292,11 +302,7 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     const kindKey = target.closest<HTMLElement>('.atlas-zone-kind')?.getAttribute('data-kind-key');
     const kind = kindKey ? kindOf(kindKey) : undefined;
     if (!kind) return;
-    if (action === 'kind-color') {
-      // Live preview while the picker drags: paint the dot; the rule lands on change.
-      const dot = target.parentElement?.querySelector<HTMLElement>('.atlas-zone-kind-swatch-dot');
-      if (dot) dot.style.background = target.value;
-    } else if (action === 'tune-fill') {
+    if (action === 'tune-fill') {
       const val = target.parentElement?.querySelector<HTMLElement>('[data-role="fill-val"]');
       if (val) val.textContent = `${target.value}%`;
     }
@@ -308,8 +314,7 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     const kindKey = target.closest<HTMLElement>('.atlas-zone-kind')?.getAttribute('data-kind-key');
     const kind = kindKey ? kindOf(kindKey) : undefined;
     if (!kind || !action) return;
-    if (action === 'kind-color') writeRule(kind, { color: target.value });
-    else if (action === 'tune-fill') writeRule(kind, { fill_opacity: Number(target.value) / 100 });
+    if (action === 'tune-fill') writeRule(kind, { fill_opacity: Number(target.value) / 100 });
     else if (action === 'tune-weight') writeRule(kind, { weight: Number(target.value) });
     else if (action === 'tune-dash') writeRule(kind, { dash: target.value as LineDash });
     else if (action === 'tune-priority') writeRule(kind, { label_priority: (target as HTMLInputElement).checked || undefined });

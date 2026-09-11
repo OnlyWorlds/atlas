@@ -704,6 +704,9 @@ When `lock_pin_drag === true`, the pin marker creation in `map-tab-pin-drag.ts` 
 
 ## 12. Canvas toolbar (always visible above the leaflet canvas)
 
+> **Order as shipped (S356, Captain):** left set = settings | show zones · show pins | draw polygon · draw line (looking before making, dividers kept); right set = zones fold-out (the zone panel, DESIGN_ZONES §4.5) · fit-to-image (a view-state control, so it lives right) · open-map-element.
+
+
 A thin row (~36px tall) docked at the top of each map tab's body, above the leaflet container. Map index tab (the pinned first tab) does NOT get a toolbar.
 
 ```

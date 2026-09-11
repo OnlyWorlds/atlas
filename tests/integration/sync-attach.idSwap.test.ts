@@ -34,6 +34,7 @@ beforeEach(() => {
     sidebarMode: 'elements',
     selectedElementId: null,
     elementFilters: new Set(),
+    mutedTypes: new Set(),
     search: '',
     rightTabs: [{ kind: 'map-index' }],
     rightActiveIndex: 0,

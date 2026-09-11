@@ -94,17 +94,20 @@ export function buildCanvasToolbar(): CanvasToolbarRefs {
   // Order (Captain, S356): the LOOKING controls first (settings, show/hide,
   // fit), the MAKING controls last, so the left set reads settings | view |
   // create. The dividers stay; they read well.
+  // Order (Captain, S356, twice): the left set is settings | show/hide |
+  // create; fit-to-image is a VIEW-state control and sits on the right,
+  // just left of the map element's own door. The dividers stay.
   root.append(
     settingsBtn,
     divider(),
     toggleZonesBtn,
     togglePinsBtn,
-    fitToImageBtn,
     divider(),
     drawPolygonBtn,
     drawLineBtn,
     spacer,
     zonesDropdownBtn,
+    fitToImageBtn,
     editMapBtn,
   );
 
@@ -228,6 +231,9 @@ function wireZonesDropdown(btn: HTMLButtonElement, panel: HTMLElement): void {
     outsideListener = (e: MouseEvent) => {
       const t = e.target as Node;
       if (panel.contains(t) || btn.contains(t)) return;
+      // The colour popover floats outside the panel; a click in it is still
+      // "in the panel" (S356).
+      if ((t as Element).closest?.('.atlas-colour-popover')) return;
       close();
     };
     escListener = (e: KeyboardEvent) => {

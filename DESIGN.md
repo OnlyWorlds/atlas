@@ -732,6 +732,8 @@ interface UiState {
   sidebarMode: 'worlds' | 'elements';
   selectedElementId: string | null;
   elementFilters: Set<ElementType>;      // empty = show all
+  mutedTypes: Set<ElementType>;          // S356: out of "show all", in when filtered to; per world (core/type-mutes.ts);
+                                         // pin + marker by default and always the strip's last two; right-click toggles
   search: string;
   rightTabs: RightTabRef[];              // [context, map-index, ...maps]
   rightActiveIndex: number;

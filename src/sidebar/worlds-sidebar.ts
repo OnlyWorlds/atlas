@@ -43,6 +43,7 @@ const TOUR_CREATE_SEEN_KEY = 'atlas_tour_create_seen';
 
 import { isTourFlagActive } from '../tour/tour-flag';
 import { loadWorldStyles, resetWorldStyles } from '../core/world-styles-state';
+import { loadMutedTypes } from '../core/type-mutes';
 
 /**
  * Guided tour running. The tour OWNS the sidebar while it runs, whether or
@@ -648,7 +649,8 @@ async function doActivateWorld(
     patchSlice('data', { elements: [], loading: true, loadingProgress: null });
     resetWorldStyles();
     // knowledgeLens + castAssign cleared too — both reference the OLD world.
-    patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, castAssign: null });
+    // Muted types are per world (S356).
+    patchSlice('ui', { ...getState().ui, selectedElementId: null, knowledgeLens: null, castAssign: null, mutedTypes: loadMutedTypes(worldId) });
     const currentRoute = parseHash(window.location.hash);
     if (currentRoute.worldId !== worldId) {
       // Room-stable world switch (S256, Captain: "less jumpy"): world-agnostic

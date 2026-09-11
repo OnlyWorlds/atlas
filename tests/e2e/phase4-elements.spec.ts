@@ -289,3 +289,49 @@ test('switching worlds resets the elements view to the new world', async ({ page
   // creating instead (S255v3).
   await expect(page.locator('[data-role="elements-search"]')).toHaveAttribute('placeholder', 'Create an element...');
 });
+
+test('muted types (S356): pins and markers close the strip greyed, stay out of "show all", list when filtered to, right-click toggles and persists per world', async ({ page }) => {
+  await setupWorldA(page);
+  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
+
+  // A place, a map, a pin on it, and a zone with two markers.
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const loc = await store.createElement('location', { name: 'Syracuse' });
+    const map = await store.createElement('map', { name: 'Sicily', width: 2000, height: 2000 });
+    await store.createPin({ map_id: map.id, element_id: loc.id, x: 100, y: 100 });
+    const zone = await store.createZone({ name: 'the Anapos', supertype: 'Line', subtype: 'River' });
+    await store.createMarker({ map_id: map.id, zone_id: zone.id, x: 100, y: 100, order: 1 });
+    await store.createMarker({ map_id: map.id, zone_id: zone.id, x: 900, y: 900, order: 2 });
+    api.patchData(await store.listElements());
+  });
+
+  const strip = page.locator('.atlas-filter-strip');
+  const types = await strip.locator('.atlas-filter-btn').evaluateAll(btns => btns.map(b => b.getAttribute('data-filter-type')));
+  expect(types.slice(-2)).toEqual(['pin', 'marker']);
+  await expect(strip.locator('.atlas-filter-btn.muted')).toHaveCount(2);
+
+  // Showing all: the place, the map and the zone; no pin, no marker.
+  const rowTypes = () => page.locator('.atlas-row[data-element-id]').evaluateAll(rows => rows.map(r => r.getAttribute('data-element-type')).sort());
+  expect(await rowTypes()).toEqual(['location', 'map', 'zone']);
+
+  // Filter TO markers: they list.
+  await strip.locator('[data-filter-type="marker"]').click();
+  expect(await rowTypes()).toEqual(['marker', 'marker']);
+  await strip.locator('[data-filter-type="marker"]').click();
+
+  // Right-click unmutes markers: they join "show all"; the choice is saved for this world.
+  await strip.locator('[data-filter-type="marker"]').click({ button: 'right' });
+  await expect(strip.locator('.atlas-filter-btn.muted')).toHaveCount(1);
+  expect(await rowTypes()).toEqual(['location', 'map', 'marker', 'marker', 'zone']);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('atlas_muted_types') ?? '{}'));
+  expect(Object.values(saved)[0]).toEqual(['pin']);
+
+  // Right-click a content type mutes it (and drops it from an active filter).
+  await strip.locator('[data-filter-type="location"]').click();
+  await strip.locator('[data-filter-type="location"]').click({ button: 'right' });
+  await expect(strip.locator('[data-filter-type="location"]')).toHaveClass(/muted/);
+  await expect(strip.locator('[data-filter-type="location"]')).not.toHaveClass(/active/);
+  expect(await rowTypes()).toEqual(['map', 'marker', 'marker', 'zone']);
+});

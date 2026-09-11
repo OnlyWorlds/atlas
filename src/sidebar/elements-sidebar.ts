@@ -20,8 +20,7 @@ import { styleRowHint } from '../core/world-styles';
 import { ToastManager } from '../ui/toast-manager';
 import { openCreateDoor } from '../ui/create-element-door';
 import { isQuietRef, isTourFlagActive } from '../tour/tour-flag';
-import { getCurrentSyncEngine, pullNowAndRefresh } from '../sync/sync-attach';
-import { surfaceSyncUnavailable } from '../ui/sync-toasts';
+import { MUTED_TAIL_TYPES, saveMutedTypes } from '../core/type-mutes';
 import { escapeText, escapeAttr, installRowKeydownActivation } from '../core/dom-utils';
 import { elementMatchesQuery } from '../core/element-search';
 import { roomOf } from '../core/element-room';
@@ -29,13 +28,14 @@ import { panMapTabTo } from '../tabs/right/map-tab';
 import { locateTargetFor } from './pin-locate';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
-const FILTER_TYPES_WITH_MAP: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone'];
+// Pins and markers close the strip (S356): browsable when asked for, muted
+// by default (core/type-mutes.ts), always the last two slots.
+const FILTER_TYPES_WITH_MAP: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone', ...MUTED_TAIL_TYPES];
 
 /**
  * Single-flight lock for the right-click filter-chip refresh. Prevents
  * spam-clicks from stacking pulls and overlapping toasts (W4).
  */
-let refreshInFlight = false;
 
 /**
  * Element ids currently flashing in the sidebar (P3 / W5). A module-level
@@ -390,6 +390,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const state = getState();
     const elements = state.data.elements;
     const filters = state.ui.elementFilters;
+    const muted = state.ui.mutedTypes;
     const countByType = new Map<ElementType, number>();
     for (const el of elements) countByType.set(el.type, (countByType.get(el.type) ?? 0) + 1);
 
@@ -401,11 +402,14 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     FILTER_TYPES_WITH_MAP.forEach(type => {
       if (touring && !(countByType.get(type) ?? 0)) return;
       const btn = document.createElement('button');
-      btn.className = 'atlas-filter-btn' + (filters.has(type) ? ' active' : '');
+      const isMuted = muted.has(type) && !filters.has(type);
+      btn.className = 'atlas-filter-btn' + (filters.has(type) ? ' active' : '') + (isMuted ? ' muted' : '');
       // Instant CSS tooltip (S264, Captain: the category label should appear
       // the moment you hover) — data-tip drives a ::after pseudo; no native
       // title (its OS delay is the complaint, and doubling would ghost).
-      btn.dataset.tip = ELEMENT_LABELS[type].plural;
+      btn.dataset.tip = isMuted
+        ? `${ELEMENT_LABELS[type].plural} (hidden when showing all; right-click to show)`
+        : ELEMENT_LABELS[type].plural;
       // ...and the SAME text as the accessible name. `data-tip` is invisible to
       // assistive tech, so with the icon ligature correctly hidden (S308) these
       // buttons would otherwise have no accessible name at all — my own
@@ -434,46 +438,21 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
         patchSlice('ui', { ...getState().ui, elementFilters: next });
       });
 
-      // Right-click → "refresh from API" surfaced as a per-type intent.
-      // Today the engine's pull is global (no per-type variant); we fire a
-      // full pull and toast feedback in the chip's type so the user sees the
-      // result for their intent. Cheap on small worlds; users who right-click
-      // are signaling "I want fresh" anyway.
-      //
-      // W4: lock to one in-flight refresh at a time. Without the lock, spam-
-      // right-clicking the same chip stacks pulls and overlapping toasts.
+      // Right-click → MUTE (S356): the type drops out of "show all" and
+      // greys, one right-click brings it back. This replaced the per-type
+      // "refresh from API" intent (a global pull dressed as a type action;
+      // the sync pill's pull-now is the honest home for it). Muting a type
+      // that was explicitly filtered on also drops that filter.
       btn.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        const engine = getCurrentSyncEngine();
-        if (!engine) {
-          surfaceSyncUnavailable(toasts);
-          return;
-        }
-        if (refreshInFlight) {
-          toasts.info('Refresh already in progress…');
-          return;
-        }
-        refreshInFlight = true;
-        const label = ELEMENT_LABELS[type].plural;
-        void pullNowAndRefresh()
-          .then((result) => {
-            if (!result) return;
-            // Count what changed for THIS type by sampling the cache before
-            // and after. The engine's result doesn't break counts down per
-            // type, so we approximate via a re-list comparison.
-            const totalPulled = result.pulled.creates + result.pulled.updates;
-            if (totalPulled > 0) {
-              toasts.success(`Refreshed (${totalPulled} change${totalPulled === 1 ? '' : 's'} pulled; ${label} may be among them)`);
-            } else {
-              toasts.info(`${label} are up to date`);
-            }
-          })
-          .catch((err) => {
-            toasts.error(err instanceof Error ? err.message : String(err));
-          })
-          .finally(() => {
-            refreshInFlight = false;
-          });
+        const ui = getState().ui;
+        const nextMuted = new Set(ui.mutedTypes);
+        const nextFilters = new Set(ui.elementFilters);
+        if (nextMuted.has(type)) nextMuted.delete(type);
+        else { nextMuted.add(type); nextFilters.delete(type); }
+        const worldId = getState().active?.worldId;
+        if (worldId) saveMutedTypes(worldId, nextMuted);
+        patchSlice('ui', { ...ui, mutedTypes: nextMuted, elementFilters: nextFilters });
       });
 
       strip.appendChild(btn);
@@ -543,14 +522,14 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       if (icon) icon.textContent = isProt ? 'person_pin' : 'home_pin';
     }
 
-    // Pins + markers are truly map artifacts — created from map interactions,
-    // accessible via their owning map's element. Zones, despite being spatial,
-    // are first-class elements with their own identity (name, description,
-    // vertices) and warrant top-level browsing. The filter-strip already
-    // included 'zone'; excluding zones from the row list was a leftover
-    // legacy convention from when zones lacked their own UI.
+    // Pins + markers are map artifacts, created from map interactions and
+    // reached through their map; they used to be excluded from this list
+    // outright. Since S356 they are MUTED by default instead (hidden when
+    // showing all, listed when filtered to), and any type can be muted the
+    // same way: a world with 3,143 markers wants to read as 257 places.
+    const muted = state.ui.mutedTypes;
     const filtered = elements
-      .filter(el => el.type !== 'pin' && el.type !== 'marker')
+      .filter(el => filters.size > 0 || !muted.has(el.type))
       // Tour-quiet machinery (the calendar construct) stays out of the list
       // while touring — an element appearing unannounced in the sidebar is
       // exactly the confusion the progressive build-up prevents (S316).

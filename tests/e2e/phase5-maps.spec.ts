@@ -556,10 +556,16 @@ test('the zone panel (S356): kinds group, a kind colour is a world style that su
   // Pick a colour for rivers: both river strokes turn blue, the route does not,
   // and the rule is on disk under .atlas/styles.json.
   const riverKind = panel.locator('.atlas-zone-kind', { hasText: 'Line · River' });
-  await riverKind.locator('input[data-action="kind-color"]').evaluate((input: HTMLInputElement) => {
-    input.value = '#3b82f6';
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  // The swatch opens atlas's own picker (not the native dialog): a preset
+  // commits on click; the hex field commits on Apply. Use the hex path so
+  // the exact value is under test, and the panel must stay open through it.
+  await riverKind.locator('[data-action="swatch"]').click();
+  const picker = page.locator('.atlas-colour-popover');
+  await expect(picker).toBeVisible();
+  await picker.locator('.atlas-colour-hex').fill('#3b82f6');
+  await picker.locator('[data-action="apply"]').click();
+  await expect(picker).toHaveCount(0);
+  await expect(panel).toBeVisible();
   await expect(container.locator('svg path[stroke="#3b82f6"]')).toHaveCount(2);
   // State lands first and the disk write follows: poll the file, never
   // read it on the DOM's sync point (the S323 law, again).
