@@ -22,7 +22,7 @@
 import { getState, patchSlice } from '../../core/state';
 import { navigate, elementHash } from '../../core/router';
 import { ELEMENT_LABELS } from '../../core/constants';
-import { escapeText, escapeAttr } from '../../core/dom-utils';
+import { escapeText, escapeAttr, hexColourOr } from '../../core/dom-utils';
 import { getZoneShape } from './zone-derived';
 import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import type { Zone } from '../../core/types';
@@ -155,7 +155,8 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
 function renderChip(z: Zone, selectedId: string | null | undefined, rules: readonly StyleRule[]): string {
   const shapeIcon = getZoneShape(z) === 'line' ? 'show_chart' : 'hexagon';
   const own = (z as { atlas_color?: string }).atlas_color;
-  const color = own ?? resolveStyle(rules, z).color ?? DEFAULT_ZONE_COLOR;
+  // A zone's own colour is from its file: hex only into style="" (S360).
+  const color = hexColourOr(own, resolveStyle(rules, z).color ?? DEFAULT_ZONE_COLOR);
   return `
     <div class="atlas-zone-chip ${z.id === selectedId ? 'is-selected' : ''}" data-zone-id="${escapeAttr(z.id)}" title="${escapeAttr(`${ELEMENT_LABELS.zone.singular}: ${z.name}`)}">
       <span class="material-symbols-outlined atlas-zone-chip-shape">${shapeIcon}</span>

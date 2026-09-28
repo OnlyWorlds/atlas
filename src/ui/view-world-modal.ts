@@ -89,6 +89,8 @@ export class ViewWorldModal extends BaseModal {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Downloading…';
       cancelBtn.hidden = true;
+      // No outside-click or Escape close while the world downloads (S360).
+      this.dismissLocked = true;
 
       const renderProgress = (p: InitialDownloadProgress) => {
         if (p.phase === 'list') {
@@ -123,6 +125,7 @@ export class ViewWorldModal extends BaseModal {
         submitBtn.disabled = false;
         submitBtn.textContent = 'View';
         cancelBtn.hidden = false;
+        this.dismissLocked = false;
       }
     });
 

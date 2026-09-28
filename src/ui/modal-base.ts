@@ -49,8 +49,26 @@ export interface ModalShellOpts {
     dataModal?: string;
 }
 
+/** Open BaseModals, oldest first: Escape belongs to the last one only. */
+const openModals: BaseModal[] = [];
+
 export class BaseModal {
     protected modal: HTMLElement | null = null;
+
+    /**
+     * While true, an outside click and Escape do NOT close the modal (S360,
+     * Captain: a link that downloads for minutes closed on a stray click and
+     * looked cancelled). Set it for the duration of long work; the modal's own
+     * buttons are then the only way out, and they say what they do.
+     */
+    protected dismissLocked = false;
+
+    private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
+
+    /** True when this is the most recently opened modal still on screen. */
+    protected isTopmost(): boolean {
+        return openModals[openModals.length - 1] === this;
+    }
 
     /**
      * Build the standard modal chrome. Returns the overlay (root, append to
@@ -97,12 +115,23 @@ export class BaseModal {
             // Force reflow for CSS transition.
             this.modal.offsetHeight;
             this.modal.classList.add('visible');
+            if (!openModals.includes(this)) openModals.push(this);
             this.attachBaseEventListeners();
         }
     }
 
     /** Hide and detach the modal. Idempotent. */
     protected hide(): void {
+        // The Escape listener goes with the modal, however it closed (S360: it
+        // used to be removed only when Escape itself closed the modal, so every
+        // button-closed modal left one behind on document).
+        if (this.escapeHandler) {
+            document.removeEventListener('keydown', this.escapeHandler);
+            this.escapeHandler = null;
+        }
+        this.dismissLocked = false;
+        const at = openModals.indexOf(this);
+        if (at >= 0) openModals.splice(at, 1);
         if (this.modal) {
             this.modal.classList.remove('visible');
             if (this.modal.parentNode) {
@@ -126,16 +155,18 @@ export class BaseModal {
             pressedOnOverlay = e.target === this.modal;
         });
         this.modal?.addEventListener('pointerup', (e) => {
-            if (pressedOnOverlay && e.target === this.modal) this.hide();
+            if (pressedOnOverlay && e.target === this.modal && !this.dismissLocked) this.hide();
             pressedOnOverlay = false;
         });
 
-        const escapeHandler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                this.hide();
-                document.removeEventListener('keydown', escapeHandler);
-            }
+        if (this.escapeHandler) document.removeEventListener('keydown', this.escapeHandler);
+        this.escapeHandler = (e: KeyboardEvent) => {
+            // Only the TOPMOST modal answers (S360: a picker opened over the
+            // map-create modal closed both, losing the half-filled form).
+            if (e.key !== 'Escape' || this.dismissLocked) return;
+            if (openModals[openModals.length - 1] !== this) return;
+            this.hide();
         };
-        document.addEventListener('keydown', escapeHandler);
+        document.addEventListener('keydown', this.escapeHandler);
     }
 }

@@ -1632,3 +1632,53 @@ test('find bar: Ctrl+F still opens after switching scenes inside the room', asyn
   await page.locator('[data-role="find-input"]').fill('beta');
   await expect(page.locator('[data-role="count"]')).toContainText('1 of 1');
 });
+
+/**
+ * S360 F1: switching WORLDS while a prose save is pending. The switch used to
+ * empty the element cache before anything flushed, the workspace found its
+ * narrative gone, and the text was dropped (no undo). Every world-leaving flow
+ * now awaits the rooms' leave-flush first.
+ */
+test('prose typed just before switching to another WORLD still reaches disk', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'wrk-worldswitch-root');
+  await createWorld(page, 'other world');
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
+  await createWorld(page, 'home world');
+
+  const id = await createElement(page, 'narrative', {
+    name: 'Switch Chapter',
+    supertype: 'Book',
+    story: 'first line.',
+  });
+  await markWritingInitialized(page);
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const reg = JSON.parse(JSON.stringify(api.getState().registry));
+    reg.sync_debounce_ms = 8000;
+    api.patchSlice('registry', reg);
+  });
+
+  await gotoWriting(page, id);
+  await waitForEditor(page);
+  const prose = page.locator('.atlas-writing-workspace-prose .ProseMirror');
+  await prose.click();
+  await page.keyboard.press('End');
+  await prose.pressSequentially(' world-switch canary');
+
+  // Leave for the other world while the 8 s save is still pending.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
+  await page.locator('.atlas-row[data-world-id]', { hasText: 'other world' }).click();
+  await expect(page.locator('[data-action="mode-elements"] .atlas-mode-btn-label')).toContainText('other world');
+
+  // Come back and read the narrative from disk.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
+  await page.locator('.atlas-row[data-world-id]', { hasText: 'home world' }).click();
+  await expect(page.locator('[data-action="mode-elements"] .atlas-mode-btn-label')).toContainText('home world');
+  await expect.poll(async () => await page.evaluate(async (nid) => {
+    const store = (window as any).__atlasTestApi.getActiveStore();
+    if (!store) return '';
+    const el = (await store.listElements()).find((e: any) => e.id === nid);
+    return (el?.story as string) ?? '';
+  }, id), { timeout: 15000 }).toContain('world-switch canary');
+});

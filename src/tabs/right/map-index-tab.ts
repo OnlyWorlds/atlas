@@ -173,7 +173,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
     if (!source || !target) return;
 
     // Same-sibling-group check via `data-parent-id` (rendered-tree parent).
-    const sourceRow = root.querySelector<HTMLElement>(`.atlas-map-tree-row[data-map-id="${sourceId}"]`);
+    const sourceRow = root.querySelector<HTMLElement>(`.atlas-map-tree-row[data-map-id="${CSS.escape(sourceId)}"]`);
     const sourceParentId = sourceRow?.getAttribute('data-parent-id') ?? '';
     const targetParentId = row.getAttribute('data-parent-id') ?? '';
     if (sourceParentId !== targetParentId) {

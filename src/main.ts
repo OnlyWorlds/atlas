@@ -18,6 +18,8 @@ import { registerServiceWorker } from './core/offline';
 import { hasFolderMode, hasOpfsMode } from './core/capabilities';
 import { installPlacementHintWatcher } from './tabs/right/map-placement-hint';
 import { installIconA11y } from './ui/icon-a11y';
+import { installDocumentTitle } from './ui/document-title';
+import { installTruncationTitles } from './ui/truncation-title';
 import { applyTheme } from './core/theme';
 
 function renderUnsupportedPage(root: HTMLElement): void {
@@ -76,6 +78,9 @@ function boot(): void {
   // no shared icon helper to fix at — so the boundary is one observer. See
   // ui/icon-a11y.ts for the demolition plan.
   installIconA11y();
+  // The tab title follows the route; clipped names show whole on hover (S360).
+  installDocumentTitle();
+  installTruncationTitles();
 }
 
 if (document.readyState === 'loading') {

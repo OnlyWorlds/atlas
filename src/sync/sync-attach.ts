@@ -25,6 +25,7 @@ import type { FolderStore } from '../store/folder-store';
 import { rewriteChartScopeIds } from '../visualization/timeline/charts-store';
 import type { Element, WorldRegistryEntry, SyncEngineState, ElementType } from '../core/types';
 import { setWorldFavoriteElement, saveRegistry } from '../registry/registry';
+import { failureToastOnce, classifyFailure } from './sync-failure-copy';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
@@ -199,10 +200,8 @@ async function flushPendingOnAttach(
       // shown. Auth failures get their own dedicated toast via emitRoundToasts
       // below (pill also goes red); skip the generic warning in that case.
       if (!result.auth_blocked) {
-        const failed = result.failures.length;
-        toastManager.error(
-          `Couldn't sync ${failed} pending change${failed === 1 ? '' : 's'}. Check console or test connection in settings`
-        );
+        const text = failureToastOnce(result.failures);
+        if (text) toastManager.error(text);
       }
     }
   } catch (err) {
@@ -457,11 +456,15 @@ function emitConflictToasts(
     result.pushed.creates + result.pushed.updates + result.pushed.deletes +
     result.pulled.creates + result.pulled.updates +
     (result.meta_pushed?.length ?? 0) + (result.meta_pulled?.length ?? 0);
-  if (result.failures.length > 0 && synced === 0) {
-    const n = result.failures.length;
-    toastManager.error(
-      `Couldn't sync ${n} change${n === 1 ? '' : 's'}. Check console or test connection in settings`
-    );
+  // S360: say WHY, and say it once per distinct set. A persistent failure (an
+  // id owned by another world, an oversized element) used to be silent when
+  // anything else synced, and when nothing did, the advice was "test
+  // connection", which passes.
+  if (result.failures.length > 0) {
+    const text = synced === 0
+      ? failureToastOnce(result.failures)
+      : failureToastOnce(result.failures.filter(f => classifyFailure(f) !== 'other'));
+    if (text) toastManager.error(text);
     // Fall through — there might be conflicts to surface too.
   }
 

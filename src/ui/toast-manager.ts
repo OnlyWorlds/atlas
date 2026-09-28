@@ -61,7 +61,8 @@ export class ToastManager {
   }
 
   error(message: string, duration?: number): void {
-    this.show(message, 'error', duration);
+    // Errors stay twice as long (S360): they are the ones that need reading.
+    this.show(message, 'error', duration ?? 8000);
   }
 
   info(message: string, duration?: number): void {
@@ -77,6 +78,8 @@ export class ToastManager {
     const toastEl = document.createElement('div');
     toastEl.id = toast.id;
     toastEl.className = `ow-toast ow-toast-${toast.type}`;
+    // Screen readers hear toasts (S360): errors interrupt, the rest wait.
+    toastEl.setAttribute('role', toast.type === 'error' ? 'alert' : 'status');
 
     const icon = this.getIcon(toast.type);
     toastEl.innerHTML = `

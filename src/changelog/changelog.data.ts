@@ -56,6 +56,67 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.7',
+    date: '2026-09-28',
+    theme: 'a world from anywhere is safe to open',
+    entries: [
+      {
+        id: 'untrusted-folders-safe',
+        title: 'Opening a world folder from someone else can no longer run code in Atlas',
+        body: 'Names, colours and map points from a world file are now always shown as plain text and plain values, and Atlas refuses to run any script that did not come from Atlas itself. This matters because Atlas keeps your OnlyWorlds keys, and worlds now arrive from public repositories, converters and AI assistants.',
+        tags: ['folders', 'fix'],
+      },
+      {
+        id: 'link-stop-or-cancel',
+        title: 'A world that is still downloading can be stopped, kept or cancelled',
+        body: 'Linking a large world from OnlyWorlds now shows two buttons while it downloads: stop and keep what has arrived (Refresh from API brings the rest later), or cancel and remove the new folder. A stray click outside the window or the Escape key no longer closes it halfway, and the same holds while a world uploads.',
+        tags: ['sync'],
+      },
+      {
+        id: 'edit-during-sync-kept',
+        title: 'An edit made while Atlas is uploading is no longer lost',
+        body: 'If you changed an element in the second or so while its previous change was being sent to OnlyWorlds, Atlas could mark it as synced and never send the newer text. It now notices and sends it on the next round.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'world-switch-saves-prose',
+        title: 'Switching worlds saves the text you just typed',
+        body: 'Text typed in the writing, knowledge or pages room in the moment before switching to another world could be dropped. Atlas now saves it before it leaves the world.',
+        tags: ['writing', 'fix'],
+      },
+      {
+        id: 'foreign-files-kept',
+        title: 'Files from other tools are read more generously and never discarded',
+        body: 'A name written as a number, map points written as text, a link written as a single id instead of a list, and a pin with no position no longer break the element list or the map. A second file that shares an element id with another is moved to .atlas/quarantine instead of being deleted, and a world file Atlas cannot read (for example after a git merge conflict) is left alone rather than overwritten.',
+        tags: ['folders', 'fix'],
+      },
+      {
+        id: 'sync-errors-say-why',
+        title: 'Sync errors say what went wrong',
+        body: 'When elements cannot upload, Atlas now names the reason, such as ids that already belong to another OnlyWorlds world or custom fields larger than OnlyWorlds accepts, instead of suggesting a connection test.',
+        tags: ['sync'],
+      },
+      {
+        id: 'update-offer-not-reload',
+        title: 'A new version of Atlas asks before it reloads',
+        body: 'After an update, Atlas used to reload itself under you the first time you opened it. It now shows a small note with a Reload button and waits.',
+        tags: ['layout', 'fix'],
+      },
+      {
+        id: 'craft-pass-1',
+        title: 'Small things that make Atlas nicer to use',
+        body: 'The browser tab names the world and the element you are on. Double-clicking a button or row no longer highlights its text, and copying text never picks up icon names. Keyboard focus shows a clear ring, buttons that only appear on hover also appear when you tab to them, a disabled button looks disabled, error messages stay longer and are read out by screen readers, and a name cut short by its column shows in full when you rest the pointer on it.',
+        tags: ['layout'],
+      },
+      {
+        id: 'compiled-link-ampersand',
+        title: 'Links with more than one query value work in the compiled view',
+        body: 'A web link like example.com/?a=1&b=2 in your prose opened a broken address from the compiled view and from published pages. It opens the right one now.',
+        tags: ['writing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.6',
     date: '2026-09-28',
     theme: 'your folder, shared with other tools',

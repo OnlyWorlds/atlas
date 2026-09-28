@@ -15,7 +15,7 @@ import { statefulV2Handlers } from '../msw-handlers';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
 import { OwV2ClientAdapter } from '../../src/sync/ow-v2-client-adapter';
-import { initialDownloadAll, type InitialDownloadProgress } from '../../src/sync/initial-download';
+import { initialDownloadAll, DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../../src/sync/initial-download';
 
 const TEST_BASE = 'https://test-ow.local/api/v2';
 
@@ -131,5 +131,50 @@ describe('initial-download', () => {
     const all = await folder.listElements();
     const types = new Set(all.map(e => e.type));
     expect(types).toEqual(new Set(['character', 'location', 'species', 'map']));
+  });
+});
+
+describe('initial-download: the user stops it (S360)', () => {
+  async function seedFive(adapter: OwV2ClientAdapter) {
+    for (const [id, name] of [['c1', 'Alice'], ['c2', 'Bob'], ['c3', 'Carol'], ['c4', 'Dan'], ['c5', 'Eve']]) {
+      await adapter.createElement('character', { id, name });
+    }
+  }
+
+  it('finish keeps what arrived and says it stopped early', async () => {
+    const adapter = makeAdapter();
+    await seedFive(adapter);
+    let stop: DownloadStop = null;
+    const result = await initialDownloadAll(folder, adapter, (p) => {
+      if (p.phase === 'write' && p.done === 2) stop = 'finish';
+    }, () => stop);
+    expect(result.totalDownloaded).toBe(2);
+    expect(result.stoppedEarly).toEqual({ total: 5 });
+    expect(await folder.listElements()).toHaveLength(2);
+  });
+
+  it('cancel throws the cancel error mid-write', async () => {
+    const adapter = makeAdapter();
+    await seedFive(adapter);
+    let stop: DownloadStop = null;
+    await expect(initialDownloadAll(folder, adapter, (p) => {
+      if (p.phase === 'write' && p.done === 1) stop = 'cancel';
+    }, () => stop)).rejects.toBeInstanceOf(DownloadCancelledError);
+  });
+
+  it('cancel during listing throws before anything is written', async () => {
+    const adapter = makeAdapter();
+    await seedFive(adapter);
+    await expect(initialDownloadAll(folder, adapter, undefined, () => 'cancel'))
+      .rejects.toBeInstanceOf(DownloadCancelledError);
+    expect(await folder.listElements()).toHaveLength(0);
+  });
+
+  it('never stopping is the old behaviour, with no stoppedEarly flag', async () => {
+    const adapter = makeAdapter();
+    await seedFive(adapter);
+    const result = await initialDownloadAll(folder, adapter, undefined, () => null);
+    expect(result.totalDownloaded).toBe(5);
+    expect(result.stoppedEarly).toBeUndefined();
   });
 });

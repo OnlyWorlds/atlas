@@ -78,7 +78,9 @@ class ElementPickerModal extends BaseModal {
     });
     // Override the BaseModal close path so we resolve null on cancel.
     const onEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      // Only the topmost modal takes Escape (S360: the location picker's
+      // Escape also closed the map-create modal underneath it).
+      if (e.key === 'Escape' && this.isTopmost()) {
         e.stopPropagation();
         e.preventDefault();
         this.cancel();

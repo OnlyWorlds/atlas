@@ -44,6 +44,7 @@ const TOUR_CREATE_SEEN_KEY = 'atlas_tour_create_seen';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { loadWorldStyles, resetWorldStyles } from '../core/world-styles-state';
 import { loadMutedTypes } from '../core/type-mutes';
+import { flushBeforeLeavingWorld } from '../core/leave-flush';
 
 /**
  * Guided tour running. The tour OWNS the sidebar while it runs, whether or
@@ -639,6 +640,10 @@ async function doActivateWorld(
   // preserveSelection=true (boot path with a deep URL) skips this: the URL
   // already names the world, we don't want to wipe selection that the URL is
   // about to re-establish.
+  // Save what the open rooms still hold for the world being left BEFORE the
+  // element cache is emptied below (S360 F1: a room whose element vanished
+  // dropped its debounced prose). A no-op when nothing is pending.
+  if (!preserveSelection) await flushBeforeLeavingWorld();
   const priorHash = window.location.hash;
   // Tabs are GLOBAL across world switches by design (DESIGN_MAPS.md §5 revised
   // session 209). Tabs whose mapId isn't in the active world's elements get

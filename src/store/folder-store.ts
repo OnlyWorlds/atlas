@@ -210,9 +210,12 @@ export interface FolderStore {
 
   /**
    * Direct write of `server_updated_at` (used by SyncEngine after a successful
-   * push or pull). Does NOT change `local_updated_at`.
+   * push or pull). Does NOT change `local_updated_at`, EXCEPT when
+   * `sentLocalUpdatedAt` (the stamp the pushed body carried) no longer matches
+   * the file: the element was edited while the push was in flight, and it is
+   * kept dirty so the edit goes out next round (S360 H1, `store/sync-stamp.ts`).
    */
-  stampServerUpdatedAt(id: string, type: ElementType, server_updated_at: string): Promise<void>;
+  stampServerUpdatedAt(id: string, type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string): Promise<void>;
 
   /**
    * Clear `server_updated_at` on a local element. Used when resolving a

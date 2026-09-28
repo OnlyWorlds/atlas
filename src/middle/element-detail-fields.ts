@@ -398,7 +398,10 @@ function openCreateForLink(el: Element, meta: FieldMeta, existingIds: string[]):
 function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
   const row = document.createElement('div');
   row.className = 'atlas-link-row';
-  const raw = (el as Record<string, unknown>)[meta.name];
+  // A single link another tool wrote as `{id, name}` (or a one-item list)
+  // reads as its id, not "[object Object]" (S360).
+  const rawValue = (el as Record<string, unknown>)[meta.name];
+  const raw = typeof rawValue === 'string' ? rawValue : (linkIdsOf(rawValue)[0] ?? null);
   const candidates = candidateCountFor(el, meta.target);
   const offerCreate = !raw && candidates === 0 && !!meta.target && LINK_CREATABLE.has(meta.target);
 
@@ -422,7 +425,7 @@ function renderSingleLink(meta: FieldMeta, el: Element): HTMLElement {
   // a notch ("there's something to connect"); none exist → the click CREATES.
   if (!raw && candidates != null && candidates > 0) pickBtn.classList.add('atlas-link-pick-ready');
   pickBtn.title = raw ? 'Change link'
-    : offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? meta.target}s yet: create one`
+    : offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? `${meta.target}s`} yet: create one`
     : `Pick a ${meta.target ?? 'link'}`;
   // ALWAYS show the type-specific icon so users see at a glance what kind of
   // element this field links to — even before any link exists. Empty state
@@ -462,7 +465,12 @@ function renderMultiLink(meta: FieldMeta, el: Element): HTMLElement {
   wrap.className = 'atlas-link-row';
 
   const raw = (el as Record<string, unknown>)[meta.name];
-  const ids: string[] = Array.isArray(raw) ? raw.map(String) : [];
+  // Read the link list the way other writers store it (S360): a bare id string
+  // or expanded `{id, name}` objects used to render empty or as
+  // "[object Object]", and the next add/remove persisted THAT over the real
+  // links. Normalised to ids here, so an edit writes the schema's shape with
+  // every existing link kept.
+  const ids: string[] = linkIdsOf(raw);
   const candidates = candidateCountFor(el, meta.target);
   // Every candidate already linked still means "nothing left to pick" — but
   // only the fully-empty zero-candidate field reads as the create affordance.
@@ -481,7 +489,7 @@ function renderMultiLink(meta: FieldMeta, el: Element): HTMLElement {
   addBtn.className = 'atlas-icon-btn-sm atlas-link-pick';
   if (ids.length === 0) addBtn.classList.add('atlas-link-pick-empty');
   if (ids.length === 0 && candidates != null && candidates > 0) addBtn.classList.add('atlas-link-pick-ready');
-  addBtn.title = offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? meta.target}s yet: create one`
+  addBtn.title = offerCreate ? `No ${ELEMENT_LABELS[meta.target!]?.plural ?? `${meta.target}s`} yet: create one`
     : ids.length === 0 ? `Pick a ${meta.target ?? 'link'}` : `Add another ${meta.target ?? 'link'}`;
   // Always show the type-specific icon so users see WHICH category this
   // multi-link field targets at a glance. `margin-left: auto` keeps the
@@ -709,3 +717,15 @@ function pickIconFor(target: ElementType | undefined): string {
 // D9b taxonomy helpers moved to core/taxonomy.ts (the sidebar consumes them
 // too — a UI-domain-neutral home). Re-exported so tests + callers keep working.
 export { suggestionsForField, reservedValueHint } from '../core/taxonomy';
+
+/** A multi-link value as ids: string arrays, `{id}` objects and a lone id string all read (S360). */
+export function linkIdsOf(raw: unknown): string[] {
+  if (typeof raw === 'string') return raw ? [raw] : [];
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const v of raw) {
+    if (typeof v === 'string' && v) out.push(v);
+    else if (v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string') out.push((v as { id: string }).id);
+  }
+  return out;
+}

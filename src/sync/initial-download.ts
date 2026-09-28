@@ -38,12 +38,34 @@ export interface InitialDownloadProgress {
 export interface InitialDownloadResult {
   totalDownloaded: number;
   failures: PerElementFailure[];
+  /**
+   * Set when the user stopped early and kept what had arrived (S360). The
+   * folder is a valid, partial world; the first pull (a cold /changes replay
+   * from the epoch) brings the rest.
+   */
+  stoppedEarly?: { total: number };
+}
+
+/**
+ * The user's answer mid-download (S360): `finish` keeps what has arrived and
+ * registers the world; `cancel` abandons the link (the caller removes the
+ * folder it created). Polled between elements and between type listings.
+ */
+export type DownloadStop = 'finish' | 'cancel' | null;
+
+/** Thrown when the user cancels the download; nothing downloaded is kept. */
+export class DownloadCancelledError extends Error {
+  constructor() {
+    super('Link cancelled');
+    this.name = 'DownloadCancelledError';
+  }
 }
 
 export async function initialDownloadAll(
   folder: FolderStore,
   adapter: OwApiClient,
-  onProgress?: (p: InitialDownloadProgress) => void
+  onProgress?: (p: InitialDownloadProgress) => void,
+  shouldStop: () => DownloadStop = () => null,
 ): Promise<InitialDownloadResult> {
   // ---- List phase: gather all records per type so we know the total ----
   // Type walks run concurrently in a bounded pool (speed bout 2026-07-19):
@@ -59,6 +81,9 @@ export async function initialDownloadAll(
   let nextType = 0;
   const listWorker = async () => {
     while (nextType < ALL_ELEMENT_TYPES.length) {
+      // A stop during listing ends the listing; `finish` still writes every
+      // type already listed below.
+      if (shouldStop()) return;
       const type = ALL_ELEMENT_TYPES[nextType++];
       onProgress?.({ done: 0, total: 0, currentType: type, phase: 'list' });
       const records = await adapter.listElements(type);
@@ -67,6 +92,7 @@ export async function initialDownloadAll(
     }
   };
   await Promise.all(Array.from({ length: LIST_CONCURRENCY }, listWorker));
+  if (shouldStop() === 'cancel') throw new DownloadCancelledError();
   // Restore the canonical type order for the write phase (Map iteration
   // order follows insertion, which is now completion order).
   const orderedTypes = ALL_ELEMENT_TYPES.filter(t => recordsByType.has(t));
@@ -75,9 +101,13 @@ export async function initialDownloadAll(
   let done = 0;
   const failures: PerElementFailure[] = [];
 
-  for (const type of orderedTypes) {
+  let stoppedEarly = nextType < ALL_ELEMENT_TYPES.length;
+  outer: for (const type of orderedTypes) {
     const records = recordsByType.get(type)!;
     for (const record of records) {
+      const stop = shouldStop();
+      if (stop === 'cancel') throw new DownloadCancelledError();
+      if (stop === 'finish') { stoppedEarly = true; break outer; }
       try {
         // `applyServerRecord` stamps both local + server timestamps to the
         // server's `updated_at` so the engine considers this element "synced"
@@ -98,5 +128,9 @@ export async function initialDownloadAll(
     }
   }
 
-  return { totalDownloaded: done - failures.length, failures };
+  return {
+    totalDownloaded: done - failures.length,
+    failures,
+    ...(stoppedEarly ? { stoppedEarly: { total } } : {}),
+  };
 }

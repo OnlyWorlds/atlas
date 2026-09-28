@@ -369,7 +369,7 @@ function renderInline(
     // NEVER be shown as the element's name). The writer's label is the text;
     // the chip resolves by id. `label` is already escaped (captured from the
     // escaped string), so it goes back as-is.
-    return `<span class="atlas-element-chip" data-id="${escapeAttr(id)}" data-type="${escapeAttr(type)}">${label}</span>`;
+    return `<span class="atlas-element-chip" data-id="${id}" data-type="${type}">${label}</span>`;
   });
 
   // Standard links: [text](url) — non-ow:// only (the above already consumed
@@ -379,7 +379,10 @@ function renderInline(
   // plain text (`text` was captured from the already-escaped string).
   s = s.replace(/\[([^\]]+?)\]\(([^)\s]+?)\)/g, (_, text, url) => {
     if (!SAFE_LINK_HREF_RE.test(url)) return text;
-    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+    // `url` was captured from the already-escaped string (escapeText covers
+    // quotes since S360), so it is attribute-safe as-is; escaping it again
+    // turned `?a=1&b=2` into `&amp;amp;` and broke the link.
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
   });
 
   // Inline code (backticks) — done before bold/italic so backticks don't
@@ -402,6 +405,3 @@ function renderInline(
 /** Renderable link schemes — anything else renders as plain text. */
 const SAFE_LINK_HREF_RE = /^(https?:\/\/|mailto:|#)/i;
 
-function escapeAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-}

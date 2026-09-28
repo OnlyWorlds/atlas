@@ -45,6 +45,7 @@ import { collectNarrativeDescendants } from '../core/narrative-delete';
 import { pickElement } from '../ui/element-picker-modal';
 import { WRITING_FOCUS_TOGGLE_EVENT } from '../core/hotkeys';
 import type { JSONContent } from '@tiptap/core';
+import { onLeaveWorld } from '../core/leave-flush';
 
 /**
  * Public reset (was used to clear per-narrative disclosure state). Disclosures
@@ -436,7 +437,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
    * lands. Best effort — there is no fully-synchronous file-system write API
    * in the browser, so any guarantee weaker than "we tried" is a lie.
    */
-  function onPageHide(): void {
+  function onPageHide(): Promise<void> {
     // Capture latest editor state if onUpdate hasn't fired yet for the most
     // recent transaction (defensive — onUpdate is synchronous from TipTap's
     // dispatchTransaction, so this is rarely a no-op, but cheap insurance).
@@ -451,9 +452,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         };
       }
     }
-    void flushPendingSave();
+    return flushPendingSave();
   }
   window.addEventListener('pagehide', onPageHide);
+  // Same flush before a world switch empties the elements this save needs (S360).
+  const unLeaveWorld = onLeaveWorld(onPageHide);
 
   /**
    * Silent relation-only save. Used by the mount-time self-heal pass to bring
@@ -894,6 +897,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     }
     void flushPendingSave();
     window.removeEventListener('pagehide', onPageHide);
+    unLeaveWorld();
     unsubState();
     unsubHash();
     root.removeEventListener('keydown', onWorkspaceHotkey);

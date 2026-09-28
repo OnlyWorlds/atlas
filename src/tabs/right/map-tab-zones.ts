@@ -49,10 +49,11 @@ export function syncZones(entry: MapTabCacheEntry): void {
 
   for (const zone of onThisMap) {
     present.add(zone.id);
-    const points = markersForZoneOnMap(zone.id, entry.mapId, markers).map(m => ({
-      x: m.x,
-      y: m.y,
-    }));
+    // Points without finite coordinates are skipped, not drawn (S360: one bad
+    // marker threw inside Leaflet and the rest of the map's zones vanished).
+    const points = markersForZoneOnMap(zone.id, entry.mapId, markers)
+      .filter(m => Number.isFinite(m.x) && Number.isFinite(m.y))
+      .map(m => ({ x: m.x, y: m.y }));
     const mode = getZoneShape(zone);
     // World style rules (S356): the zone's own atlas_* field wins, then the
     // kind's rule, then the map default.

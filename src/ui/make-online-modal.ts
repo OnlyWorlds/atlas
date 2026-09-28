@@ -37,6 +37,7 @@ import {
   type MergeProgress,
 } from '../sync/make-online';
 import { escapeAttr } from '../core/dom-utils';
+import { describeFailures } from '../sync/sync-failure-copy';
 
 type Route = 'create' | 'link';
 
@@ -249,6 +250,9 @@ export class MakeOnlineModal extends BaseModal {
     form.closest<HTMLElement>('[data-modal]')
       ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
       .forEach((b) => (b.hidden = true));
+    // No outside-click or Escape close while the upload runs: closing looked
+    // like a cancel and was not, the work carried on unseen (S360).
+    this.dismissLocked = true;
 
     try {
       // 1. Create new api world (server-side).
@@ -328,7 +332,9 @@ export class MakeOnlineModal extends BaseModal {
       // 8. Toast + close.
       const failures = pushResult.failures.length;
       if (failures > 0) {
-        this.toasts.error(`${name} is online, but ${failures} element${failures === 1 ? '' : 's'} failed (will retry on next sync)`);
+        // Say why (S360): "will retry" was false for the commonest cause, an
+        // id another world already holds, which fails every retry.
+        this.toasts.error(`${name} is online. ${describeFailures(pushResult.failures)}`);
       } else {
         const uploaded = pushResult.pushed.creates + pushResult.pushed.updates;
         this.toasts.success(`${name} is online · ${uploaded} element${uploaded === 1 ? '' : 's'} uploaded`);
@@ -347,6 +353,7 @@ export class MakeOnlineModal extends BaseModal {
       form.closest<HTMLElement>('[data-modal]')
         ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
         .forEach((b) => (b.hidden = false));
+      this.dismissLocked = false;
     }
   }
 
@@ -386,6 +393,9 @@ export class MakeOnlineModal extends BaseModal {
     form.closest<HTMLElement>('[data-modal]')
       ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
       .forEach((b) => (b.hidden = true));
+    // No outside-click or Escape close while the upload runs: closing looked
+    // like a cancel and was not, the work carried on unseen (S360).
+    this.dismissLocked = true;
 
     try {
       // 1. Validate via v2 GET /world.
@@ -486,6 +496,7 @@ export class MakeOnlineModal extends BaseModal {
       form.closest<HTMLElement>('[data-modal]')
         ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
         .forEach((b) => (b.hidden = false));
+      this.dismissLocked = false;
     }
   }
 }

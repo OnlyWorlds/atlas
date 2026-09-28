@@ -94,6 +94,7 @@ interface LayoutScan {
   unreadableLc: Set<string>;
 }
 import { PerIdWriteChain } from './write-chain';
+import { stampedBody } from './sync-stamp';
 import {
   elementDirSegmentsIn,
   elementFilename,
@@ -103,6 +104,7 @@ import {
   isNotFound,
   listFiles,
   readJson,
+  readJsonStrict,
   removeFile,
   sameFsName,
   tryGetDir,
@@ -659,6 +661,7 @@ export class FsFolderStore implements FolderStore {
       if (typeof body.type !== 'string' || !body.type) {
         body.type = type;
       }
+      coerceForeignShapes(body);
       // LINK SPELLING (S354, §5): a pin written by the format carries `map`;
       // atlas keys on `map_id`. Normalise in memory and remember which
       // spelling the FILE used, so a write goes back the way it came.
@@ -677,10 +680,21 @@ export class FsFolderStore implements FolderStore {
         : (a.body.local_updated_at ?? '') > (b.body.local_updated_at ?? '') ? -1 : 0);
       const [survivor, ...losers] = recs;
       for (const loser of losers) {
-        await removeFile(dir, loser.filename).catch(() => {});
+        // A rename-crash twin carries the same content, and is safe to drop.
+        // A file that merely SHARES the id (someone copied `aldric.json` to
+        // `aldric-variant.json` and edited it) is somebody's work: it moves
+        // to `.atlas/quarantine/<type>/` instead of being deleted (S360; it
+        // used to be unlinked on open, with only a console line).
+        if (sameContentIgnoringStamps(loser.body, survivor.body)) {
+          await removeFile(dir, loser.filename).catch(() => {});
+        } else {
+          await this.quarantineFile(dir, loser.filename, loser.body, type).catch((err) => {
+            console.warn(`[fs-folder-store] could not quarantine ${loser.filename}; left in place`, err);
+          });
+        }
       }
       if (losers.length > 0) {
-        console.warn(`[fs-folder-store] dedupe(${type}@${layout}): kept ${survivor.filename}, removed ${losers.map(l => l.filename).join(', ')}`);
+        console.warn(`[fs-folder-store] dedupe(${type}@${layout}): kept ${survivor.filename}, set aside ${losers.map(l => l.filename).join(', ')}`);
       }
       survivors.set(id, survivor);
     }
@@ -807,6 +821,7 @@ export class FsFolderStore implements FolderStore {
    * write of this element does not silently change its dialect.
    */
   private adoptDiskBody(id: string, elem: Element): void {
+    coerceForeignShapes(elem); // every disk read path passes here (S360)
     const spelling = normalizeDiskLinks(elem);
     const entry = this.fileIndex.get(id);
     if (spelling && entry && entry.spelling !== spelling) this.fileIndex.set(id, { ...entry, spelling });
@@ -888,7 +903,10 @@ export class FsFolderStore implements FolderStore {
     // write happen atomically relative to every other meta writer, so a
     // background pull-apply can never erase a concurrent user edit.
     return this.runWorldMetaOp(async () => {
-      const born = (await this.readWorldMetaFile()) === null;
+      // Strict: a world.json that exists but will not parse must stop this
+      // write, or the merge below starts from nothing and the world loses its
+      // id (S360: a git conflict in world.json was one save from that).
+      const born = (await readJsonStrict<WorldMeta>(this.requireRoot(), WORLD_META_FILE)) === null;
       const current = await this.readWorldMeta();
       // THE BIRTH STAMP (folder-format §4.2, S355): a folder atlas creates
       // records the spec version it was written against. Only when no
@@ -1456,7 +1474,10 @@ export class FsFolderStore implements FolderStore {
 
   async updateSyncState(mutate: (current: SyncState) => Partial<SyncState>): Promise<SyncState> {
     return this.runSyncStateOp(async () => {
-      const current = await this.readSyncState();
+      // Strict on the write path (S360): merging into a corrupt file's null
+      // would reset the cursor, conflicts and pending server deletes.
+      const atlasDirR = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+      const current = (await readJsonStrict<SyncState>(atlasDirR, SYNC_STATE_FILE)) ?? { ...DEFAULT_SYNC_STATE };
       const next: SyncState = { ...current, ...mutate(current) };
       const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
       await writeJsonAtomic(atlasDir, SYNC_STATE_FILE, next);
@@ -1473,6 +1494,9 @@ export class FsFolderStore implements FolderStore {
   async writeCharts(charts: ChartConfig[]): Promise<void> {
     this.assertWritable();
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    // The caller's list came from a tolerant read; a corrupt file read as
+    // "no charts" must not be replaced by it (S360).
+    await readJsonStrict(atlasDir, CHARTS_FILE);
     await writeJsonAtomic(atlasDir, CHARTS_FILE, { charts });
   }
 
@@ -1484,17 +1508,35 @@ export class FsFolderStore implements FolderStore {
   async writeStyles(styles: WorldStyles): Promise<void> {
     this.assertWritable();
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    // Same guard as writeCharts: never replace a file we could not read (S360).
+    await readJsonStrict(atlasDir, STYLES_FILE);
     await writeJsonAtomic(atlasDir, STYLES_FILE, styles);
   }
 
-  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string): Promise<void> {
+  /**
+   * Move a file out of the element folders into `.atlas/quarantine/<type>/`,
+   * keeping its name (numbered if taken). The body is re-serialised, not
+   * byte-copied: the content is what matters and the original was valid JSON.
+   */
+  private async quarantineFile(dir: FileSystemDirectoryHandle, filename: string, body: Element, type: ElementType): Promise<void> {
+    if (!this.root) return;
+    const qdir = await getDir(this.root, [ATLAS_INTERNAL_DIR, 'quarantine', type]);
+    let name = filename;
+    for (let n = 2; await qdir.getFileHandle(name).then(() => true, () => false); n++) {
+      name = filename.replace(/\.json$/i, '') + `-${n}.json`;
+    }
+    await writeJsonAtomic(qdir, name, body);
+    await removeFile(dir, filename);
+  }
+
+  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string): Promise<void> {
     // Serialize with update/delete on the same id (#79). The SyncEngine calls
     // this after a push; without the chain a concurrent local edit could land
     // between this read and write, and the stamp would revert it to a stale body.
     return this.writeChain.run(id, async () => {
       const existing = await this.readForWrite(id);
       if (!existing) return;
-      const next: Element = { ...existing, server_updated_at };
+      const next = stampedBody(existing, server_updated_at, sentLocalUpdatedAt);
       const entry = this.indexEntry(id);
       const filename = entry?.filename ?? elementFilename(id, existing.name);
       const dir = await this.dirForElement(id, existing.type);
@@ -1639,7 +1681,9 @@ export class FsFolderStore implements FolderStore {
 
   private async readTombstoneList(): Promise<Tombstone[]> {
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
-    const payload = await readJson<{ deletions: Tombstone[] }>(atlasDir, TOMBSTONES_FILE);
+    // Strict (S360): every append/clear writes this list back whole, so a
+    // corrupt file read as empty would silently drop every pending delete.
+    const payload = await readJsonStrict<{ deletions: Tombstone[] }>(atlasDir, TOMBSTONES_FILE);
     return payload?.deletions ?? [];
   }
 
@@ -1698,5 +1742,39 @@ function getOrCreateTabId(): string {
   } catch {
     // No sessionStorage (e.g. private mode under strict settings). Best-effort: fresh id.
     return newId();
+  }
+}
+
+/** Two bodies are the same element state when they differ only in the sync stamps (a rename-crash twin). */
+function sameContentIgnoringStamps(a: Element, b: Element): boolean {
+  const canon = (e: Element): string => {
+    const { local_updated_at: _l, server_updated_at: _s, ...rest } = e as Element & Record<string, unknown>;
+    // Top-level keys sorted; nested values stringified whole. (A replacer
+    // ARRAY would also filter nested keys and call differing bodies equal.)
+    return JSON.stringify(Object.keys(rest).sort().map(k => [k, (rest as Record<string, unknown>)[k]]));
+  };
+  return canon(a) === canon(b);
+}
+
+/**
+ * SHAPE FALLBACK (S360), the sibling of the type fallback above: a foreign
+ * writer can put a number where the schema says string, or a numeric string
+ * where it says number. Coerce the few fields atlas's own code assumes, in
+ * memory, so one converter's `"name": 1453` does not blank the element list
+ * and search (every sort and filter calls string methods on `name`), and a
+ * `"x": "120"` pin still lands on its map. Written back as the schema's type
+ * only if atlas later saves the element.
+ */
+function coerceForeignShapes(body: Element): void {
+  const rec = body as unknown as Record<string, unknown>;
+  const name: unknown = rec.name;
+  if (name !== undefined && name !== null && typeof name !== 'string') {
+    rec.name = typeof name === 'number' || typeof name === 'boolean' ? String(name)
+      : Array.isArray(name) ? name.filter((v: unknown) => typeof v === 'string').join(', ')
+      : '';
+  }
+  for (const k of ['x', 'y', 'z', 'order'] as const) {
+    const v = rec[k];
+    if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) rec[k] = Number(v);
   }
 }

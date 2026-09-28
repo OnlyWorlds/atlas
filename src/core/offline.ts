@@ -23,12 +23,13 @@ export function registerServiceWorker(): void {
   // wired (e.g. tests, raw vitest runs that don't transform main.ts).
   void import(/* @vite-ignore */ 'virtual:pwa-register')
     .then((mod) => {
-      const register = (mod as { registerSW?: (opts?: unknown) => unknown }).registerSW;
+      const register = (mod as { registerSW?: (opts?: unknown) => (reload?: boolean) => Promise<void> }).registerSW;
       if (typeof register === 'function') {
-        register({
-          // Skip auto-prompting for SW updates — a hard reload always
-          // updates atlas because the new bundle has new asset hashes.
+        const updateSW = register({
           immediate: true,
+          // A new deploy is ready (registerType 'prompt', S360). Offer it;
+          // never reload under the user.
+          onNeedRefresh: () => showUpdateBanner(() => { void updateSW(true); }),
         });
       }
     })
@@ -36,4 +37,26 @@ export function registerServiceWorker(): void {
       // Non-fatal: app still runs without offline support.
       console.warn('[atlas:offline] service worker registration skipped:', err);
     });
+}
+
+/** The "new version" offer: one quiet banner, Reload or dismiss. Never automatic. */
+function showUpdateBanner(onReload: () => void): void {
+  if (document.querySelector('.atlas-update-banner')) return;
+  const bar = document.createElement('div');
+  bar.className = 'atlas-update-banner';
+  bar.setAttribute('role', 'status');
+  const text = document.createElement('span');
+  text.textContent = 'A new version of Atlas is ready.';
+  const reload = document.createElement('button');
+  reload.type = 'button';
+  reload.className = 'atlas-btn-primary';
+  reload.textContent = 'Reload';
+  reload.addEventListener('click', onReload);
+  const later = document.createElement('button');
+  later.type = 'button';
+  later.className = 'atlas-btn-ghost';
+  later.textContent = 'Later';
+  later.addEventListener('click', () => bar.remove());
+  bar.append(text, reload, later);
+  document.body.appendChild(bar);
 }

@@ -22,6 +22,7 @@
  */
 
 import type { Element, ElementType } from './types';
+import { isHexColour } from './dom-utils';
 
 export const WORLD_STYLES_VERSION = 1;
 
@@ -196,8 +197,20 @@ export function parseWorldStyles(raw: unknown): WorldStyles {
   const out: StyleRule[] = [];
   for (const r of rules) {
     if (!r || typeof r !== 'object' || typeof (r as StyleRule).type !== 'string') continue;
-    const rule = r as StyleRule;
+    const src = r as Record<string, unknown>;
+    const rule: StyleRule = { type: src.type as ElementType };
+    if (typeof src.supertype === 'string') rule.supertype = src.supertype;
+    if (typeof src.subtype === 'string') rule.subtype = src.subtype;
     if (!normKey(rule.supertype) && !normKey(rule.subtype)) continue;
+    // styles.json travels with the folder, so every visual is untrusted: a
+    // colour reaches `style="background:…"` and `value="…"` (S360: a CSS
+    // declaration list or a quote there was UI redress or a script breakout).
+    // Keep only the shapes atlas writes; drop the rest, keep the rule.
+    if (isHexColour(src.color)) rule.color = src.color;
+    if (typeof src.fill_opacity === 'number' && Number.isFinite(src.fill_opacity)) rule.fill_opacity = Math.min(1, Math.max(0, src.fill_opacity));
+    if (typeof src.weight === 'number' && Number.isFinite(src.weight)) rule.weight = Math.min(20, Math.max(0, src.weight));
+    if (src.dash === 'solid' || src.dash === 'dashed' || src.dash === 'dotted') rule.dash = src.dash;
+    if (typeof src.label_priority === 'boolean') rule.label_priority = src.label_priority;
     out.push(rule);
   }
   return { version: WORLD_STYLES_VERSION, rules: out };

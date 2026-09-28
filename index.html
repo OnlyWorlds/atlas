@@ -28,15 +28,12 @@
        Material Symbols icons are imported via main.ts from the bundled
        material-symbols npm package, no Google Fonts CDN dependency. -->
   <link rel="stylesheet" href="/src/styles/atlas.css" />
-  <script>
-    /* Pre-paint theme stamp (S315): reads the same key src/core/theme.ts owns.
-       Must run before first paint or light-mode users get a black flash. */
-    try {
-      if (localStorage.getItem('atlas_theme') === 'light') {
-        document.documentElement.setAttribute('data-theme', 'light');
-      }
-    } catch (e) { /* private mode: dark default */ }
-  </script>
+  <!-- S360: a world folder is untrusted input and this origin holds the
+       linked worlds' API keys, the PIN and the account token. No script
+       runs unless it is a file served from this origin, so an injected
+       onerror= or script tag is inert even if an escape is ever missed. -->
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self'; object-src 'none'; base-uri 'self'" />
+  <script src="./theme-stamp.js"></script>
   <style>
     /* Browser default body margin = 8px; without this reset the shell overflows
        and leaves a thin border of body background visible on right/bottom. */
@@ -78,7 +75,7 @@
 </head>
 <body>
   <div id="app"></div>
-  <div id="toast-container"></div>
+  <div id="toast-container" role="status" aria-live="polite"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

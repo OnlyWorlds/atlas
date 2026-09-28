@@ -419,10 +419,17 @@ export class Leaflet2DManager {
       // iconAnchor Y = negative pushes icon DOWN from latlng. Distance = pin half + gap.
       const pinHalf = iconSize / 2;
       const labelAnchorY = -(pinHalf + this.config.defaultLabelOffset);
+      // The label is an element NAME from a world file, which anyone can write:
+      // it goes in as text, never as HTML (S360; this interpolated it raw, so a
+      // name like `<img onerror=…>` ran script the moment its map opened).
+      // updatePin already writes it via textContent.
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'pin-label-text';
+      labelSpan.textContent = String(labelText ?? '');
       label = L.marker(latlng, {
         icon: L.divIcon({
           className: 'leaflet-2d-pin-label',
-          html: `<span class="pin-label-text">${labelText}</span>`,
+          html: labelSpan,
           iconSize: [150, 24],
           iconAnchor: [75, labelAnchorY]
         }),

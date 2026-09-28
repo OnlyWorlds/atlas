@@ -39,6 +39,7 @@ import { markersForZoneOnMap, partitionZonesAndMarkers, getZoneShape } from './z
 import { computeInsertion, commitVertexPosition } from './zone-edit-kernels';
 import type { Marker, Zone } from '../../core/types';
 import type { ToastManager } from '../../ui/toast-manager';
+import { finiteOr } from '../../core/dom-utils';
 
 interface MarkerSnapshot {
   id: string;
@@ -473,7 +474,9 @@ function collectLivePointsFromHandles(canvasHeight: number): Point[] {
 function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   const latlng = storageToLeaflet({ x: marker.x, y: marker.y }, canvasHeight);
   // 1-indexed display; matches zoner muscle memory ("marker 1, 2, 3...").
-  const displayOrder = (marker.order ?? 0) + 1;
+  // `order` comes from a world file: a string here was concatenated into the
+  // handle's HTML below (S360). Numbers only.
+  const displayOrder = finiteOr(marker.order, 0) + 1;
   // Tooltip via native title — surfaces the two affordances (drag-to-move /
   // drag-to-trash / right-click-delete) on hover. No layout cost, no
   // dependency on a popover lib.

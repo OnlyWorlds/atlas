@@ -51,6 +51,10 @@ function isHex(v: string): boolean {
 export function openColourPopover(opts: ColourPopoverOpts): void {
   closeColourPopover();
   const { anchor } = opts;
+  // `current` can arrive from styles.json via a decoded data-color attribute,
+  // and it is interpolated into style and value below: hex or the default
+  // (S360). The opts object is rebound so the handlers see the same value.
+  opts = { ...opts, current: isHex(opts.current) ? opts.current : '#22d3ee' };
   const pop = document.createElement('div');
   pop.className = 'atlas-colour-popover';
   pop.setAttribute('role', 'dialog');

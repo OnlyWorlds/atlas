@@ -37,10 +37,11 @@ import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-ut
 import { getActiveStore, setActiveStore } from '../core/active-store';
 import { attachSyncEngine, refreshElementsAfterWrite } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
-import { initialDownloadAll, type InitialDownloadProgress } from '../sync/initial-download';
+import { initialDownloadAll, DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
 import { applyImportPlan, type ApplyProgress, type ApplyResult } from '../import/apply-import-plan';
 import type { ImportPlan } from '../import/types';
 import type { WorldRegistryEntry, PerElementFailure, WorldMeta } from '../core/types';
+import { flushBeforeLeavingWorld } from '../core/leave-flush';
 
 /**
  * Prompt the user to pick the atlas root folder. On success: resolve the
@@ -574,7 +575,9 @@ export async function scaffoldWorldInRoot(
     rootLabel = reg.atlas_root.folder_name;
   }
 
-  // Close any prior active store before we open a new one.
+  // Save what the open rooms still hold for the prior world (S360 F1), then
+  // close its store before we open a new one.
+  await flushBeforeLeavingWorld();
   const prior = getActiveStore();
   if (prior) await prior.close().catch(() => {});
   setActiveStore(null);
@@ -735,12 +738,19 @@ export interface LinkExistingApiWorldOpts {
    * and the engine attaches pull-only.
    */
   readOnly?: boolean;
+  /**
+   * Polled during the download (S360): `finish` stops and keeps what arrived,
+   * `cancel` abandons the link and removes the folder this call created.
+   */
+  shouldStop?: () => DownloadStop;
 }
 
 export interface LinkExistingApiWorldResult {
   entry: WorldRegistryEntry;
   downloaded: number;
   failures: PerElementFailure[];
+  /** The user stopped early; `total` is how many the server had (as far as listed). */
+  stoppedEarly?: { total: number };
 }
 
 /**
@@ -852,7 +862,9 @@ export async function linkExistingApiWorldInRoot(
     throw new Error('Write permission for the OnlyWorlds folder was denied');
   }
 
-  // Close any prior active store before we open a new one.
+  // Save what the open rooms still hold for the prior world (S360 F1), then
+  // close its store before we open a new one.
+  await flushBeforeLeavingWorld();
   const prior = getActiveStore();
   if (prior) await prior.close().catch(() => {});
   setActiveStore(null);
@@ -904,7 +916,22 @@ export async function linkExistingApiWorldInRoot(
   // Initial download — all elements of all types stamped with
   // `server_updated_at`, fetched over the v2 dialect.
   const adapter = buildV2Adapter(apiKey, apiPin);
-  const downloadResult = await initialDownloadAll(store, adapter, opts.onProgress);
+  let downloadResult;
+  try {
+    downloadResult = await initialDownloadAll(store, adapter, opts.onProgress, opts.shouldStop);
+  } catch (err) {
+    if (err instanceof DownloadCancelledError) {
+      // Cancel = nothing kept. The folder and its vault handle were created by
+      // THIS call a moment ago (the collision guard above never reuses an
+      // existing folder), so removing them touches nothing the user owned.
+      await store.close().catch(() => {});
+      await rootHandle.removeEntry(subName, { recursive: true }).catch((e) => {
+        console.warn('[link-api] could not remove the cancelled folder:', e);
+      });
+      await deleteHandle(handleKey).catch(() => {});
+    }
+    throw err;
+  }
 
   // Register the world in registry. Persist PIN globally if not set yet
   // (never from a view-only link — there is no PIN to persist).
@@ -946,6 +973,7 @@ export async function linkExistingApiWorldInRoot(
     entry,
     downloaded: downloadResult.totalDownloaded,
     failures: downloadResult.failures,
+    ...(downloadResult.stoppedEarly ? { stoppedEarly: downloadResult.stoppedEarly } : {}),
   };
 }
 

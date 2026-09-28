@@ -28,7 +28,11 @@ export function syncPins(entry: MapTabCacheEntry): void {
   // pins whose element_type is in hiddenPinTypes are treated as removed —
   // syncPins removes their markers from the manager. Toggling a chip on the
   // strip is a syncPins re-call, so add/remove flips naturally.
-  const minePins = allMinePins.filter(p => !entry.hiddenPinTypes.has(p.element_type ?? ''));
+  // A pin without finite x/y is schema-legal (only `name` is required) but
+  // cannot be drawn; Leaflet throws on it and every later pin went missing
+  // (S360). Skip it here, as pin-locate and the share payload already do.
+  const minePins = allMinePins.filter(p =>
+    !entry.hiddenPinTypes.has(p.element_type ?? '') && Number.isFinite(p.x) && Number.isFinite(p.y));
   const mineIds = new Set(minePins.map(p => p.id));
 
   // Refresh the chip strip on every sync — type set may have changed if a

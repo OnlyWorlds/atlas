@@ -822,3 +822,37 @@ test('a field edited in the file by another tool survives an atlas update to a d
   expect(result.returnedDescription).toBe('edited outside atlas');
   expect(result.listedDescription).toBe('edited outside atlas');
 });
+
+test('a corrupt world.json or styles.json is never overwritten by a save (S360)', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const root = await api.opfsRoot({ clear: true });
+    const s1 = new api.FsFolderStore({ tabId: 't1', disableHeartbeat: true });
+    await s1.open(root);
+    await s1.writeWorldMeta({ id: 'w-1', name: 'Conflicted' });
+    await s1.close();
+
+    const CONFLICT = '<<<<<<< HEAD\n{"id":"w-1","name":"Conflicted"}\n=======\n{"id":"w-1","name":"Theirs"}\n>>>>>>> branch\n';
+    const put = async (dir: any, name: string, text: string) => {
+      const w = await (await dir.getFileHandle(name, { create: true })).createWritable();
+      await w.write(text); await w.close();
+    };
+    const read = async (dir: any, name: string) => (await (await dir.getFileHandle(name)).getFile()).text();
+    await put(root, 'world.json', CONFLICT);
+    const atlasDir = await root.getDirectoryHandle('.atlas', { create: true });
+    await put(atlasDir, 'styles.json', CONFLICT);
+
+    const s2 = new api.FsFolderStore({ tabId: 't2', disableHeartbeat: true });
+    await s2.open(root);
+    let metaError = '';
+    try { await s2.writeWorldMeta({ description: 'edit' }); } catch (e: any) { metaError = e?.name ?? String(e); }
+    let stylesError = '';
+    try { await s2.writeStyles({ version: 1, rules: [] }); } catch (e: any) { stylesError = e?.name ?? String(e); }
+    await s2.close();
+    return { metaError, stylesError, world: await read(root, 'world.json'), styles: await read(atlasDir, 'styles.json'), same: CONFLICT };
+  });
+  expect(result.metaError).toBe('CorruptFileError');
+  expect(result.stylesError).toBe('CorruptFileError');
+  expect(result.world).toBe(result.same);
+  expect(result.styles).toBe(result.same);
+});

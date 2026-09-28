@@ -25,6 +25,7 @@ import type {
 } from '../../src/core/types';
 import type { ChartConfig } from '../../src/visualization/timeline/types';
 import { EMPTY_STYLES, type WorldStyles } from '../../src/core/world-styles';
+import { stampedBody } from '../../src/store/sync-stamp';
 
 const defaultMeta: WorldMeta = { id: 'mock-world', name: 'mock world' };
 const defaultSyncState: SyncState = {
@@ -397,10 +398,10 @@ export class MockFolderStore implements FolderStore {
     this.styles = { version: styles.version, rules: styles.rules.map(r => ({ ...r })) };
   }
 
-  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string): Promise<void> {
+  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string): Promise<void> {
     const existing = this.elements.get(id);
     if (!existing) return;
-    this.elements.set(id, { ...existing, server_updated_at });
+    this.elements.set(id, stampedBody(existing, server_updated_at, sentLocalUpdatedAt));
   }
 
   async clearServerBaseline(id: string): Promise<void> {

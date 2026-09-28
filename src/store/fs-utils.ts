@@ -307,6 +307,41 @@ export async function readJson<T = unknown>(
   }
 }
 
+/** A file exists but will not parse: never treat it as absent and write over it. */
+export class CorruptFileError extends Error {
+  constructor(public readonly fileName: string, cause: unknown) {
+    super(`${fileName} exists but cannot be read (${cause instanceof Error ? cause.message : String(cause)}). Atlas will not overwrite it; fix or remove the file (a git merge conflict leaves markers like <<<<<<<).`);
+    this.name = 'CorruptFileError';
+  }
+}
+
+/**
+ * `readJson` for READ-MERGE-WRITE paths (S360): null when the file is missing
+ * or empty, but a file that exists and will not parse THROWS. `readJson`
+ * returns null for both, and a save that merged into that null wrote over the
+ * damaged file (a git-conflicted world.json lost its id; tombstones and world
+ * styles were replaced wholesale).
+ */
+export async function readJsonStrict<T = unknown>(
+  dir: FileSystemDirectoryHandle,
+  name: string
+): Promise<T | null> {
+  let fileHandle: FileSystemFileHandle;
+  try {
+    fileHandle = await dir.getFileHandle(name);
+  } catch (err) {
+    if (isNotFound(err)) return null;
+    throw err;
+  }
+  const text = await (await fileHandle.getFile()).text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch (err) {
+    throw new CorruptFileError(name, err);
+  }
+}
+
 /**
  * Remove a file. Returns true if removed, false if not present.
  */

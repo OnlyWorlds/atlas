@@ -18,6 +18,7 @@ import { navigate } from '../core/router';
 import { getState } from '../core/state';
 import { hasFolderMode } from '../core/capabilities';
 import type { PagePayload, PayloadElementEntry } from '../core/share-payload';
+import { escapeText } from '../core/dom-utils';
 
 interface DemoData {
   payload: PagePayload;
@@ -179,7 +180,9 @@ async function mountDemoMap(
       fillColor: '#0e7490',
       fillOpacity: 0.75,
     }).addTo(map);
-    marker.bindTooltip(pin.name, { direction: 'top', offset: [0, -6] });
+    // Leaflet reads a string tooltip as HTML: escape even this bundled name,
+    // so the pattern is safe if it is ever copied onto live data (S360).
+    marker.bindTooltip(escapeText(pin.name), { direction: 'top', offset: [0, -6] });
     // Close the hover tooltip before the modal opens — it otherwise lingers
     // under the dimmed backdrop like debris (S255 fresh-eyes pass).
     if (entry) marker.on('click', () => { marker.closeTooltip(); openEntry(entry); });

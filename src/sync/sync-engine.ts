@@ -550,7 +550,7 @@ export class SyncEngine {
         const response = local.server_updated_at
           ? await this.client.updateElement(local.type, id, body)
           : await this.client.createElement(local.type, body);
-        await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at);
+        await this.folder.stampServerUpdatedAt(id, local.type, response.updated_at, local.local_updated_at);
         console.info(`[atlas:sync] resolveConflict overwrite-mine: stamped baseline ${response.updated_at}`);
       } catch (err) {
         if (local.server_updated_at && isNotFoundError(err)) {
@@ -1260,6 +1260,8 @@ export class SyncEngine {
     // Re-fetch each candidate from disk (freshness) + pin element_type
     // self-heal, mirroring the per-element loop's pre-send discipline.
     const items: BulkItem[] = [];
+    /** The `local_updated_at` each sent body carried (S360 H1: an edit during the request stays dirty). */
+    const sentStamps = new Map<string, string>();
     for (const elem of candidates) {
       let current = await this.folder.getElement(elem.id);
       if (!current) { onItemDone(); continue; }
@@ -1277,6 +1279,7 @@ export class SyncEngine {
         }
       }
       items.push({ type: current.type, element: stripSyncFields(current) });
+      sentStamps.set(current.id, current.local_updated_at);
     }
     if (items.length === 0 || this.stopped) return { created: 0, authBlocked: false };
 
@@ -1318,14 +1321,15 @@ export class SyncEngine {
         if (this.stopped) break;
         const echo = result.items[i]?.updatedAt;
         if (typeof echo === 'string' && echo) {
-          await this.folder.stampServerUpdatedAt(items[i].element.id as string, items[i].type, echo);
+          const sentId = items[i].element.id as string;
+          await this.folder.stampServerUpdatedAt(sentId, items[i].type, echo, sentStamps.get(sentId));
           stamped++;
         } else {
           needBackfill.push(items[i]);
         }
       }
       if (needBackfill.length > 0 && !this.stopped) {
-        stamped += await this.backfillBulkTimestamps(needBackfill, failures);
+        stamped += await this.backfillBulkTimestamps(needBackfill, failures, sentStamps);
       }
       for (const _ of items) onItemDone();
       return { created: stamped, authBlocked: false };
@@ -1413,7 +1417,8 @@ export class SyncEngine {
    */
   private async backfillBulkTimestamps(
     items: BulkItem[],
-    failures: PerElementFailure[]
+    failures: PerElementFailure[],
+    sentStamps: ReadonlyMap<string, string> = new Map(),
   ): Promise<number> {
     let stamped = 0;
     if (items.length <= 20) {
@@ -1423,7 +1428,7 @@ export class SyncEngine {
         try {
           const remote = await this.client.getElement(it.type, id);
           if (!remote) throw new Error('created element missing on read-back');
-          await this.folder.stampServerUpdatedAt(id, it.type, remote.updated_at);
+          await this.folder.stampServerUpdatedAt(id, it.type, remote.updated_at, sentStamps.get(id));
           stamped++;
         } catch (err) {
           failures.push({
@@ -1452,7 +1457,7 @@ export class SyncEngine {
         const id = it.element.id as string;
         const ts = remoteById.get(id);
         if (ts) {
-          await this.folder.stampServerUpdatedAt(id, type, ts);
+          await this.folder.stampServerUpdatedAt(id, type, ts, sentStamps.get(id));
           stamped++;
         } else {
           failures.push({
@@ -1581,7 +1586,7 @@ export class SyncEngine {
             });
             continue;
           }
-          await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at);
+          await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at);
           creates++;
         } else {
           // UPDATE path: re-fetch element from folder in case an in-loop
@@ -1645,7 +1650,10 @@ export class SyncEngine {
           if (!skipPush) {
             const body = stripSyncFields(current);
             const response = await this.client.updateElement(current.type, current.id, body);
-            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at);
+            // The body sent carried `current.local_updated_at`; an edit that
+            // landed while this request was in flight keeps the element dirty
+            // (S360 H1: it used to be stamped clean and never uploaded).
+            await this.folder.stampServerUpdatedAt(current.id, current.type, response.updated_at, current.local_updated_at);
             updates++;
           }
         }

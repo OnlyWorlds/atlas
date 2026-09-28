@@ -52,6 +52,7 @@ import type { JSONContent } from '@tiptap/core';
 import type { ShareEditorHandle } from './share-editor';
 import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 import { makeDrillInPrefix } from '../ui/drill-in';
+import { onLeaveWorld } from '../core/leave-flush';
 
 export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -333,18 +334,19 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     teardownEditSession();
   }
 
-  const onPageHide = (): void => {
+  const onPageHide = (): Promise<unknown> | undefined => {
     // Flush an in-flight edit (prose or heading) on tab close/reload — same
     // idiom as the knowledge room. The mountedView IS the pageId in detail view.
     if (!mountedView || mountedView === 'list') return;
     if (proseMount && proseForBlockId) {
       pendingProseSnap = { markdown: proseMount.getMarkdown(), json: proseMount.getJson() };
-      void flushProseSave(mountedView);
-    } else {
-      void captureHeadingEdit(mountedView); // best-effort, same as prose
+      return flushProseSave(mountedView);
     }
+    return captureHeadingEdit(mountedView) ?? undefined; // best-effort, same as prose
   };
   window.addEventListener('pagehide', onPageHide);
+  // Same flush before a world switch empties the page this save needs (S360).
+  const unLeaveWorld = onLeaveWorld(onPageHide);
 
   // ---- structural block ops -----------------------------------------------------
 
@@ -2249,6 +2251,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   return () => {
     flushAndTeardown(mountedView);
     window.removeEventListener('pagehide', onPageHide);
+    unLeaveWorld();
     window.removeEventListener('atlas:charts-changed', onChartsChanged);
     unsubState();
     unsubHash();

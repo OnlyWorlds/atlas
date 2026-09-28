@@ -23,7 +23,11 @@ export default defineConfig({
   },
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' (S360): 'autoUpdate' reloaded the page under a returning
+      // visitor the moment a new deploy's worker took over (they saw the old
+      // app, then a reload mid-click). Now the new version waits and offers
+      // itself (core/offline.ts); closing every Atlas tab also picks it up.
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'favicon.png', 'owlogo.png'],
       manifest: {
         name: 'Atlas — OnlyWorlds',

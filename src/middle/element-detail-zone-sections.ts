@@ -21,7 +21,7 @@ import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
 import { enterEditMode, isEditing, getEditingZoneId, doneEdit, cancelEdit } from '../tabs/right/zone-edit-mode';
 import type { ToastManager } from '../ui/toast-manager';
-import { escapeText } from '../core/dom-utils';
+import { escapeText, hexColourOr, finiteOr } from '../core/dom-utils';
 import { decideDeleteConfirm } from '../core/delete-confirm';
 import { getEditorSettings } from '../registry/registry';
 import { getWritingLabels } from './writing-helpers';
@@ -62,7 +62,11 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
   // actually drawn and the line under it says where it came from.
   const rule = resolveStyle(getState().styles.rules, zone);
   const ownColor = (zone as { atlas_color?: string }).atlas_color;
-  const currentColor = ownColor ?? rule.color ?? '#22d3ee';
+  // Hex only into the inputs below: the value comes from a world file (or
+  // styles.json) and is interpolated into `value="…"` (S360: a quote in it
+  // was a script breakout). A non-hex colour another tool wrote still draws on
+  // the map; the picker just starts from the default.
+  const currentColor = hexColourOr(ownColor, hexColourOr(rule.color, '#22d3ee'));
   const currentOpacity = (zone as { atlas_opacity?: number }).atlas_opacity ?? rule.fill_opacity ?? 0.4;
   const currentLabelVisible = !!(zone as { atlas_label_visible?: boolean }).atlas_label_visible;
   const kind = kindLabel({ supertype: typeof zone.supertype === 'string' ? zone.supertype : '', subtype: typeof zone.subtype === 'string' ? zone.subtype : '' });
@@ -317,8 +321,8 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
       li.className = 'atlas-zone-markers-row';
       li.setAttribute('data-marker-id', m.id);
       li.innerHTML = `
-        <span class="atlas-zone-markers-order">${(m.order ?? 0) + 1}</span>
-        <span class="atlas-zone-markers-coords">(${m.x}, ${m.y})</span>
+        <span class="atlas-zone-markers-order">${finiteOr(m.order, 0) + 1}</span>
+        <span class="atlas-zone-markers-coords">(${escapeText(m.x)}, ${escapeText(m.y)})</span>
         <button type="button" class="atlas-zone-markers-pan" data-action="pan" title="Pan to marker">
           <span class="material-symbols-outlined">my_location</span>
         </button>

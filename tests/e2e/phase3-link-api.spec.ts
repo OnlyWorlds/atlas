@@ -103,3 +103,93 @@ test('link modal submit with empty fields shows inline error', async ({ page }) 
   await page.click('[data-modal="link-world"] [data-action="link"]');
   await expect(page.locator('[data-modal="link-world"] [data-role="error"]')).toBeVisible();
 });
+
+// ---------------------------------------------------------------------------
+// S360 (Captain): a long link needs a way out that says what it does, and a
+// stray click must not close it. The keel wire is mocked with page.route: one
+// big character list, everything else empty.
+// ---------------------------------------------------------------------------
+
+const V2 = 'https://www.onlyworlds.com/api/v2';
+const WORLD_ID = '11111111-2222-4333-8444-555555555555';
+
+async function mockKeel(page: Page, characters: number) {
+  const now = '2026-09-28T12:00:00.000Z';
+  const chars = Array.from({ length: characters }, (_, i) => ({
+    id: `c0000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+    type: 'character', name: `Character ${i}`, updated_at: now, created_at: now,
+  }));
+  await page.route(`${V2}/**`, async (route) => {
+    const url = new URL(route.request().url());
+    const path = url.pathname.replace('/api/v2', '');
+    if (path === '/world' || path === '/world/') {
+      return route.fulfill({ json: { id: WORLD_ID, name: 'Big World', updated_at: now } });
+    }
+    const type = path.split('/').filter(Boolean)[0];
+    const data = type === 'character' ? chars : [];
+    return route.fulfill({ json: { data, has_more: false, next_cursor: null } });
+  });
+}
+
+async function openLinkAndSubmit(page: Page) {
+  await page.click('[data-action="link-api"]');
+  await page.fill('input[name="api-key"]', 'ow_w_testkey');
+  await page.fill('input[name="api-pin"]', '1234');
+  await page.click('[data-modal="link-world"] [data-action="link"]');
+}
+
+async function worldFolders(page: Page): Promise<string[]> {
+  return page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory();
+    const sub = await root.getDirectoryHandle('link-api-root');
+    const names: string[] = [];
+    // @ts-expect-error values() is FS Access API
+    for await (const e of sub.values()) {
+      if (e.kind !== 'directory') continue;
+      // @ts-expect-error values() is FS Access API
+      for await (const w of e.values()) if (w.kind === 'directory') names.push(`${e.name}/${w.name}`);
+    }
+    return names;
+  });
+}
+
+test('a running link ignores outside clicks and Escape, and Stop keeps what has downloaded', async ({ page }) => {
+  await setupAtlasRoot(page);
+  await mockKeel(page, 1500);
+  await openLinkAndSubmit(page);
+  const modal = page.locator('[data-modal="link-world"]');
+  await expect(modal.locator('[data-action="finish-early"]')).toBeVisible();
+  await expect(modal.locator('[data-role="progress"]')).toContainText('Downloading');
+
+  // A stray click on the backdrop and an Escape do nothing while it runs.
+  await page.mouse.click(5, 5);
+  await page.keyboard.press('Escape');
+  await expect(modal).toBeVisible();
+
+  await modal.locator('[data-action="finish-early"]').click();
+  await expect(modal).toHaveCount(0);
+  await expect(page.locator('.ow-toast', { hasText: 'of 1500 elements' })).toBeVisible();
+  const state = await page.evaluate(() => {
+    const st = (window as any).__atlasTestApi.getState();
+    const w = st.registry.worlds.find((x: any) => x.api?.world_id === '11111111-2222-4333-8444-555555555555');
+    return { linked: w?.state, count: st.data.elements.length };
+  });
+  expect(state.linked).toBe('api-linked');
+  expect(state.count).toBeGreaterThan(0);
+  expect(state.count).toBeLessThan(1500);
+});
+
+test('Cancel link removes the new folder and registers nothing', async ({ page }) => {
+  await setupAtlasRoot(page);
+  await mockKeel(page, 1500);
+  const before = await worldFolders(page);
+  await openLinkAndSubmit(page);
+  const modal = page.locator('[data-modal="link-world"]');
+  await expect(modal.locator('[data-role="progress"]')).toContainText('Downloading');
+  await modal.locator('[data-action="cancel-link"]').click();
+  await expect(modal).toHaveCount(0);
+  await expect(page.locator('.ow-toast', { hasText: 'Link cancelled' })).toBeVisible();
+  expect(await worldFolders(page)).toEqual(before);
+  const linked = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length);
+  expect(linked).toBe(0);
+});

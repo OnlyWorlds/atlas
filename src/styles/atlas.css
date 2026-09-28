@@ -15673,3 +15673,92 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
   flex: 1 0 100%;
   order: -1;
 }
+
+/* ============================================================================
+   FRONTEND CRAFT, THE SYSTEMIC HALF (S360; lane A of the sweep,
+   Forge/Notes/2026-09-28-s360-sweep/lane-a-frontend-craft.md A2-A7).
+   Each rule closes a CLASS; local rules keep winning where they exist.
+   ========================================================================== */
+
+/* A2: icon glyphs are ligature WORDS; never select or copy them
+   ("Aragorn close Legolas close"). The CSS twin of icon-a11y's aria-hidden. */
+.material-symbols-outlined, .material-symbols-rounded, .material-symbols-sharp {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* A3: chrome does not flash a text selection on double-click (a double-click
+   on a sidebar row is a natural "open it"). Content stays selectable: field
+   values, descriptions, prose, headings. Inputs stay editable. */
+.atlas-shell :is(button, [role="button"], [role="tab"], .atlas-field-label, .atlas-tab-bar,
+                 .atlas-middle-room-nav, .atlas-sidebar-footer),
+.atlas-modal-overlay :is(button, [role="button"], [role="tab"], .atlas-modal-title) {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* A4: one brand focus ring for keyboard focus. :where() = zero specificity,
+   so every existing local focus style still wins. */
+:where(button, [role="button"], [role="tab"], [tabindex], a, summary):focus-visible {
+  outline: 2px solid var(--atlas-cyan);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+:where(.atlas-list, .atlas-picker-list, .atlas-cmdk-list) :where([role="button"], button):focus-visible {
+  outline-offset: -2px;
+}
+
+/* A5: an action revealed on hover is also revealed when focus is inside its
+   row (keyboard users could land on an invisible button), and shown quietly
+   on touch screens, which cannot hover at all. */
+.atlas-row:focus-within .atlas-inline-actions,
+.atlas-row:focus-within .sync-action-btn,
+.atlas-field:focus-within .atlas-field-remove,
+.atlas-media-tile:focus-within .atlas-media-delete,
+.atlas-zone-chip:focus-within .atlas-zone-chip-x,
+.atlas-element-image-wrap:focus-within .atlas-element-image-hide {
+  opacity: 1;
+}
+@media (hover: none) {
+  .atlas-row .atlas-inline-actions,
+  .atlas-row .sync-action-btn,
+  .atlas-field .atlas-field-remove,
+  .atlas-media-tile .atlas-media-delete,
+  .atlas-zone-chip .atlas-zone-chip-x,
+  .atlas-element-image-wrap .atlas-element-image-hide {
+    opacity: 0.7;
+  }
+}
+
+/* A6: a disabled primary button looks disabled (the first-run "Create" was
+   live-looking and silently did nothing until a folder was picked). */
+.atlas-btn-primary:disabled,
+.atlas-icon-btn-sm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* A7: every native checkbox, radio and range takes the brand colour, and
+   flips with the theme (--atlas-cyan is redefined in the light block). */
+:root {
+  accent-color: var(--atlas-cyan);
+}
+
+/* The new-version offer (S360, core/offline.ts): bottom-left, clear of the
+   toasts at bottom-right. App chrome, so it follows the theme. */
+.atlas-update-banner {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 8px;
+  background: rgba(var(--atlas-scrim-rgb), 0.92);
+  border: 1px solid rgba(var(--atlas-ink-rgb), 0.12);
+  color: var(--atlas-text);
+  font-size: 13px;
+  backdrop-filter: blur(10px);
+}

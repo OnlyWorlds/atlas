@@ -48,6 +48,7 @@ import type { KnowledgeEditorHandle } from './knowledge-editor';
 import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 import { makeRoomTabs } from '../ui/room-tabs';
 import { makeDrillInPrefix } from '../ui/drill-in';
+import { onLeaveWorld } from '../core/leave-flush';
 
 /** Sentinel knowledgeId for the unsaved draft editor (`/knowledge/new`). */
 const NEW = 'new';
@@ -318,16 +319,18 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     editorMountToken++;
   }
 
-  const onPageHide = (): void => {
+  const onPageHide = (): Promise<void> => {
     if (editorMount && editorForId && editorForId !== NEW && !pendingSnapshot) {
       const markdown = editorMount.getMarkdown();
       if (lastSavedMarkdown !== null && markdown !== lastSavedMarkdown) {
         pendingSnapshot = { markdown, json: editorMount.getJson() };
       }
     }
-    void flushPendingSave();
+    return flushPendingSave();
   };
   window.addEventListener('pagehide', onPageHide);
+  // Same flush before a world switch empties the elements this save needs (S360).
+  const unLeaveWorld = onLeaveWorld(onPageHide);
 
   async function createFromDraft(): Promise<void> {
     const worldId = wid();
@@ -1358,6 +1361,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   return () => {
     destroyEditorSession();
     window.removeEventListener('pagehide', onPageHide);
+    unLeaveWorld();
     unsubState();
     unsubHash();
   };

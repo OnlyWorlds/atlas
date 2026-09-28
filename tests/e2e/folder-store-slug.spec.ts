@@ -199,6 +199,41 @@ test('duplicate files for same id are deduped on next open (rename-crash recover
   expect(result.survivorName).toBe('New');
 });
 
+test('a hand-made variant sharing an id is set aside in .atlas/quarantine, never deleted (S360)', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const s1 = new api.FsFolderStore({ tabId: 'tab-1', disableHeartbeat: true });
+    await s1.open(root);
+    const created = await s1.createElement('character', { id: 'char-v', name: 'Aldric', description: 'the original' });
+    await s1.close();
+    // Someone copies the file by hand and edits the copy (an older stamp, so
+    // it loses the newest-wins vote).
+    const charDir = await (root as any).getDirectoryHandle('elements').then((d: any) => d.getDirectoryHandle('character'));
+    const variant = { ...created, description: 'my alternative take', local_updated_at: '2000-01-01T00:00:00.000Z' };
+    const fh = await charDir.getFileHandle('aldric-variant.json', { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify(variant));
+    await w.close();
+
+    const s2 = new api.FsFolderStore({ tabId: 'tab-2', disableHeartbeat: true });
+    await s2.open(root);
+    await s2.listElements('character');
+    await s2.close();
+
+    const q = await (root as any).getDirectoryHandle('.atlas')
+      .then((d: any) => d.getDirectoryHandle('quarantine'))
+      .then((d: any) => d.getDirectoryHandle('character'));
+    const kept = JSON.parse(await (await (await q.getFileHandle('aldric-variant.json')).getFile()).text());
+    const inPlace: string[] = [];
+    // @ts-ignore
+    for await (const e of (charDir as any).values()) if (e.kind === 'file') inPlace.push(e.name);
+    return { keptDescription: kept.description, inPlace: inPlace.sort() };
+  });
+  expect(result.keptDescription).toBe('my alternative take');
+  expect(result.inPlace).toEqual(['aldric--char-v.json']);
+});
+
 test('legacy full-uuid file tidies to canonical on open; second open is a no-op', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const api = window.__atlasTestApi;

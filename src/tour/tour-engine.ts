@@ -35,6 +35,7 @@ import { detachSyncEngine } from '../sync/sync-attach';
 import type { Element, ElementType } from '../core/types';
 import { isQuietRef, TOUR_MAP_REF, TOUR_PIN_REF, TOUR_STEPS, type TourStep } from './tour-data';
 import { mergeHealArray } from './tour-heal';
+import { flushBeforeLeavingWorld } from '../core/leave-flush';
 
 const TOUR_STATE_KEY = 'atlas_tour_v1';
 const TOUR_DONE_KEY = 'atlas_tour_done_v1';
@@ -876,6 +877,8 @@ async function mintNextCreateNow(): Promise<boolean> {
  * replayer carried in.
  */
 async function clearStageForTour(): Promise<void> {
+  // The world the tour replaces may have a room save pending (S360 F1).
+  await flushBeforeLeavingWorld();
   const store = getActiveStore();
   if (getState().active && store) {
     await store.close().catch(() => {});
