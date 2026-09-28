@@ -56,6 +56,49 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.8',
+    date: '2026-09-28',
+    theme: 'north is up',
+    entries: [
+      {
+        id: 'maps-north-up',
+        title: 'Maps read positions the way every other OnlyWorlds tool writes them',
+        body: 'Pin and zone positions now count from the bottom-left corner of the map, as the OnlyWorlds standard says, so worlds made by other tools and converters show the right way up. A map you placed in an earlier Atlas may now show upside down: open the gear on that map and press Flip pins and zones. Press it again to undo.',
+        tags: ['maps', 'fix'],
+      },
+      {
+        id: 'cancel-link-keeps-world',
+        title: 'Cancelling a link leaves you in the world you were in',
+        body: 'After cancelling a world that was still downloading, Atlas kept showing your previous world but could no longer save it: text typed in the writing room was lost and edits said there was no active world. The world you were in now stays open and working, whether the link finishes, stops or fails.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'damaged-files-stop-sync',
+        title: 'A damaged world file can no longer blank your world settings online',
+        body: 'If world.json could not be read, for example after a git merge conflict, the next sync could send empty world settings to OnlyWorlds. Sync now stops and names the file to fix. A damaged element file or sync file is treated the same way: Atlas leaves it untouched and tells you which one it is.',
+        tags: ['sync', 'folders', 'fix'],
+      },
+      {
+        id: 'lost-response-edit-kept',
+        title: 'An edit is no longer lost when a connection drops during a first upload',
+        body: 'If an element was edited while it was first being sent to OnlyWorlds and the reply never arrived, Atlas could treat the older copy on the server as current. It now compares the two and sends your newer text.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'pin-prompt-plain-text',
+        title: 'The PIN prompt shows world names as plain text',
+        body: 'A world name from your OnlyWorlds account is always shown as text in the prompt that asks for your PIN, so an oddly named world cannot change where the PIN is sent.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'reload-saves-first',
+        title: 'Reloading for a new version saves what you were typing',
+        body: 'Pressing Reload on the new version note now saves text that was still waiting to be written in the writing, knowledge or pages room before the page reloads.',
+        tags: ['writing', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.7',
     date: '2026-09-28',
     theme: 'a world from anywhere is safe to open',

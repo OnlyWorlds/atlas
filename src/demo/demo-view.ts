@@ -172,8 +172,9 @@ async function mountDemoMap(
 
   for (const pin of data.map.pins) {
     const entry = data.payload.elements[pin.ref];
-    // Storage is top-left origin; Leaflet CRS.Simple is bottom-left.
-    const marker = L.circleMarker([H - pin.y, pin.x], {
+    // Bottom-left, like the schema and Leaflet CRS.Simple (S361: the bundled
+    // pins were flipped to the standard with this line).
+    const marker = L.circleMarker([pin.y, pin.x], {
       radius: 5,
       color: '#22d3ee',
       weight: 1.5,

@@ -20,6 +20,7 @@
  */
 
 import { getState } from '../core/state';
+import { escapeText } from '../core/dom-utils';
 import { mountWorkspaceEditor, type WorkspaceEditorHandle } from './writing-workspace-editor';
 import { buildMentionItems } from './writing-workspace-mention-items';
 import { createChipPreview, type ChipPreviewController } from './writing-workspace-chip-preview';
@@ -175,7 +176,7 @@ export function mountShareEditor(opts: ShareEditorOptions): ShareEditorHandle {
       items.push(`
         <button type="button" class="atlas-prose-context-menu-item" data-role="unlink-chip">
           <span class="material-symbols-outlined">link_off</span>
-          <span>Unlink ${escapeMenuText(chipHit.label || 'chip')}</span>
+          <span>Unlink ${escapeText(chipHit.label || 'chip')}</span>
         </button>
       `);
     }
@@ -274,10 +275,3 @@ function syncLabels(handle: WorkspaceEditorHandle, elements: Element[]): void {
   handle.syncChipLabels((id) => byId.get(id) ?? null);
 }
 
-function escapeMenuText(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}

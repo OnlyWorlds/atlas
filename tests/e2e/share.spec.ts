@@ -495,7 +495,9 @@ test('map block: a pin moved elsewhere re-renders on the open page (no re-add ne
   }, ids);
 
   await expect(page.locator('.atlas-share-map-pin')).toHaveAttribute('style', /left: 75%/);
-  await expect(page.locator('.atlas-share-map-pin')).toHaveAttribute('style', /top: 75%/);
+  // y 600 of 800 is stored from the BOTTOM (the schema's origin, S361), so it
+  // draws a quarter of the way down: the one conversion is at the freeze.
+  await expect(page.locator('.atlas-share-map-pin')).toHaveAttribute('style', /top: 25%/);
 });
 
 async function readPayloadMapZones(page: Page) {

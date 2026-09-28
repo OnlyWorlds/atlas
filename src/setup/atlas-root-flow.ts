@@ -533,6 +533,23 @@ export async function readoptOrphanWorldHandles(): Promise<number> {
  * writes world.json, registers, and activates. Shared by createWorldInRoot
  * (empty world) and createWorldFromImportedData (populated from an import).
  */
+/**
+ * Leave the active world: save what its open rooms still hold (S360 F1), close
+ * its store, clear the slot. Every flow that swaps in a NEW world calls this at
+ * its COMMIT point, right before the registry flip, never before its own
+ * fallible work (download, import apply, meta writes). S361: the link flow
+ * used to release first, so a cancelled or failed link left the UI showing
+ * the prior world with no store behind it (prose dropped silently, "No active
+ * store" on every edit, and the sidebar click short-circuited as already
+ * active). Until the commit point the prior world stays fully usable.
+ */
+export async function releasePriorWorld(): Promise<void> {
+  await flushBeforeLeavingWorld();
+  const prior = getActiveStore();
+  if (prior) await prior.close().catch(() => {});
+  setActiveStore(null);
+}
+
 export async function scaffoldWorldInRoot(
   name: string,
   // Sample-world path (Bout DEMO): scaffold under an explicit parent handle
@@ -575,12 +592,8 @@ export async function scaffoldWorldInRoot(
     rootLabel = reg.atlas_root.folder_name;
   }
 
-  // Save what the open rooms still hold for the prior world (S360 F1), then
-  // close its store before we open a new one.
-  await flushBeforeLeavingWorld();
-  const prior = getActiveStore();
-  if (prior) await prior.close().catch(() => {});
-  setActiveStore(null);
+  // The prior world stays open here: the caller releases it at its commit
+  // point (`releasePriorWorld`), after its own fallible writes (S361).
 
   const trimmed = name.trim() || 'Untitled world';
   const worldUuid = adoptId ?? newId();
@@ -605,6 +618,7 @@ export async function createWorldInRoot(name: string): Promise<{ entry: WorldReg
   await store.writeWorldMeta({ id: worldUuid, name: trimmed });
 
   // Register + activate.
+  await releasePriorWorld();
   const { next, entry } = createLocalWorld(getState().registry, {
     name: trimmed,
     folderName: subName,
@@ -664,6 +678,7 @@ export async function createWorldFromImportedData(
   // Apply the elements BEFORE the world goes active.
   const applied = await applyImportPlan(store, plan, { onProgress: opts.onProgress });
 
+  await releasePriorWorld();
   const { next, entry } = createLocalWorld(getState().registry, {
     name,
     folderName: subName,
@@ -862,12 +877,9 @@ export async function linkExistingApiWorldInRoot(
     throw new Error('Write permission for the OnlyWorlds folder was denied');
   }
 
-  // Save what the open rooms still hold for the prior world (S360 F1), then
-  // close its store before we open a new one.
-  await flushBeforeLeavingWorld();
-  const prior = getActiveStore();
-  if (prior) await prior.close().catch(() => {});
-  setActiveStore(null);
+  // The prior world stays open and usable through the download; it is
+  // released at the commit point below (S361: releasing it here stranded the
+  // user on Cancel link or any download error).
 
   const slug = slugify(displayName);
   let subName = `${slug}-${serverWorldId.slice(0, 8)}`;
@@ -932,6 +944,9 @@ export async function linkExistingApiWorldInRoot(
     }
     throw err;
   }
+
+  // The commit point: the download succeeded, so leave the prior world now.
+  await releasePriorWorld();
 
   // Register the world in registry. Persist PIN globally if not set yet
   // (never from a view-only link — there is no PIN to persist).

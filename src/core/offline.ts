@@ -13,6 +13,8 @@
  * from main.ts.
  */
 
+import { flushBeforeLeavingWorld } from './leave-flush';
+
 export function registerServiceWorker(): void {
   // Dev-mode: vite-plugin-pwa is configured to not emit a SW unless
   // `devOptions.enabled` is true. Guard so dev reloads aren't slowed by SW
@@ -29,7 +31,12 @@ export function registerServiceWorker(): void {
           immediate: true,
           // A new deploy is ready (registerType 'prompt', S360). Offer it;
           // never reload under the user.
-          onNeedRefresh: () => showUpdateBanner(() => { void updateSW(true); }),
+          // Reload saves the rooms' pending text first (S361, gate F9: the
+          // reload discarded a debounced scene save; pagehide is only a
+          // best-effort net for async writes).
+          onNeedRefresh: () => showUpdateBanner(() => {
+            void flushBeforeLeavingWorld().finally(() => { void updateSW(true); });
+          }),
         });
       }
     })

@@ -11,7 +11,7 @@
 import { getState, patchSlice } from '../core/state';
 import { setActiveStore } from '../core/active-store';
 import { createLocalWorld, setActiveWorld, saveRegistry } from '../registry/registry';
-import { scaffoldWorldInRoot } from '../setup/atlas-root-flow';
+import { scaffoldWorldInRoot, releasePriorWorld } from '../setup/atlas-root-flow';
 import { attachSyncEngine } from '../sync/sync-attach';
 import type { WorldRegistryEntry } from '../core/types';
 import { TOUR_FOLDER } from './tour-engine';
@@ -49,6 +49,9 @@ export async function scaffoldTourWorld(): Promise<{ entry: WorldRegistryEntry }
   // world.json is unreadable, which would silently install a mirror WORSE than
   // the hand-built one it replaced (close gate, LOW).
 
+  // The commit point (S361). `clearStageForTour` has usually released the
+  // prior world already; this keeps every world-swapping flow on one rule.
+  await releasePriorWorld();
   const { next, entry } = createLocalWorld(getState().registry, {
     name: w.name,
     folderName: subName,

@@ -145,29 +145,22 @@ class MapCreateModal extends BaseModal {
       const len = input.value.length;
       input.setSelectionRange(len, len);
     });
-    const onEsc = (e: KeyboardEvent) => {
-      // Only the topmost modal takes Escape (S360: the location picker's
-      // Escape also closed the map-create modal underneath it).
-      if (e.key === 'Escape' && this.isTopmost()) {
-        this.cancel();
-        document.removeEventListener('keydown', onEsc);
-      }
-    };
-    document.addEventListener('keydown', onEsc);
-    this.modal?.addEventListener('click', (e) => {
-      if (e.target === this.modal) {
-        this.cancel();
-        document.removeEventListener('keydown', onEsc);
-      }
-    });
+    // Escape and the full outside click are BaseModal's; `hide` below
+    // settles the promise however the modal closed (S361, gate F4).
   }
 
   private cancel(): void {
+    this.hide();
+  }
+
+  /** Every close path settles `createMapDialog()` (S361, gate F4: Escape and
+   *  the overlay click both left it pending; the pin-prompt idiom). */
+  protected override hide(): void {
+    super.hide();
     if (!this.resolved) {
       this.resolved = true;
       this.onDone(null);
     }
-    this.hide();
   }
 
   private buildModal(): HTMLElement {

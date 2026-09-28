@@ -32,7 +32,7 @@
        linked worlds' API keys, the PIN and the account token. No script
        runs unless it is a file served from this origin, so an injected
        onerror= or script tag is inert even if an escape is ever missed. -->
-  <meta http-equiv="Content-Security-Policy" content="script-src 'self'; object-src 'none'; base-uri 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <script src="./theme-stamp.js"></script>
   <style>
     /* Browser default body margin = 8px; without this reset the shell overflows

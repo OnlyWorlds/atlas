@@ -32,6 +32,10 @@ import {
 import type { MapTabCacheEntry } from './map-tab-cache';
 import { syncPins } from './map-tab-pins';
 import { syncZones } from './map-tab-zones';
+import { getActiveStore } from '../../core/active-store';
+import { refreshElementsAfterWrite } from '../../sync/sync-attach';
+import { flipMapVertically } from '../../core/map-flip';
+import { toastManager } from '../../ui/toast-manager';
 
 interface OpenPopover {
   wrapper: HTMLDivElement;
@@ -267,6 +271,12 @@ function template(prefs: MapViewPrefs, hasOverride: boolean): string {
           ${radio('zone_label_position', 'center', 'Centered', prefs.zone_label_position)}
         </div>
       </section>
+
+      <section class="atlas-popover-section">
+        <div class="atlas-popover-section-divider">Upside down?</div>
+        <button type="button" class="atlas-btn-ghost" data-action="flip-map">Flip pins and zones</button>
+        <p class="atlas-popover-hint">Maps placed in Atlas before 1.8 can show upside down. This mirrors every pin and zone point on this map top to bottom. Press it again to undo.</p>
+      </section>
     </div>
 
     <div class="atlas-popover-footer">
@@ -378,6 +388,30 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
     resetMapOverride(mapId);
     applyLivePrefs(entry, getEffectiveMapPrefs(mapId));
     rerender();
+  });
+
+  // The flip (S361): a user action for a map placed in older Atlas, never a
+  // migration. Writes the elements; its own inverse.
+  const flipBtn = wrapper.querySelector<HTMLButtonElement>('[data-action="flip-map"]');
+  flipBtn?.addEventListener('click', async () => {
+    const store = getActiveStore();
+    if (!store) return;
+    flipBtn.disabled = true;
+    try {
+      const { pins, points } = await flipMapVertically(store, mapId);
+      await refreshElementsAfterWrite(store); // re-renders the map, requests the push
+      const parts = [
+        pins ? `${pins} pin${pins === 1 ? '' : 's'}` : '',
+        points ? `${points} zone point${points === 1 ? '' : 's'}` : '',
+      ].filter(Boolean);
+      toastManager.success(parts.length === 0
+        ? 'Nothing to flip on this map'
+        : `Flipped ${parts.join(' and ')}. Press again to undo`);
+    } catch (err) {
+      toastManager.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      flipBtn.disabled = false;
+    }
   });
 
   // Quiet helpers (avoid unused warnings)

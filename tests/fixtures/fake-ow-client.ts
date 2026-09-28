@@ -201,6 +201,12 @@ export class FakeOwApiClient implements OwApiClient {
     // Real OW behavior: ignore client-sent id when assignServerIds=true.
     const id = this.assignServerIds ? cryptoRandomId() : (wireBody.id as string) ?? cryptoRandomId();
     this.throwIfInjected('create', id);
+    // Mirror keel (convention #20, S361): a POST for an id the world already
+    // holds is 409 `id_conflict`, never a silent overwrite. The engine's
+    // adopt path (gate F3) is only testable against a fake that says so.
+    if (!this.assignServerIds && this.bucket(type).has(id)) {
+      throw new Error(`API Error 409: id_conflict: ${type} ${id} already exists`);
+    }
     const record: ServerRecord = { ...wireBody, id, type, updated_at: this.clock() };
     this.bucket(type).set(id, record);
     this.appendUpsert(record);

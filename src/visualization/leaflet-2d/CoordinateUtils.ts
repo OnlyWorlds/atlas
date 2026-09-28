@@ -3,10 +3,20 @@
  *
  * Conversion between Leaflet coordinates and storage coordinates.
  *
- * Leaflet CRS.Simple uses bottom-left origin (Y increases upward)
- * Storage/API uses top-left origin (Y increases downward)
+ * THE ORIGIN IS BOTTOM-LEFT (S361). The OnlyWorlds schema says pin and marker
+ * x/y run "from bottom left of the map" (`keel/schema/pin.yaml`); the folder
+ * format, the toolkit, azgaar-converter, Sikelia and Windrose all agree.
+ * Leaflet CRS.Simple is bottom-left too, and the image spans lat 0 (its
+ * bottom edge) to its height, so a stored point IS a Leaflet point:
+ * `lat = y`, `lng = x`. No height enters the conversion.
  *
- * Aligned with OnlyWorlds map tool: onlyworlds.com/maptool
+ * Until S361 this file said "Storage/API uses top-left origin", citing the
+ * old ow.com map tool, and flipped `lat = height - y` both ways: every
+ * standard world drew mirrored north-south in Atlas (Captain's Sikelia
+ * screenshot), and the flip needed a height that could be stale. Ruled
+ * 2026-09-28: Atlas conforms, no migration; a map placed in older Atlas can
+ * be mirrored once from its settings. `canvasHeight` stays in the signatures
+ * only so the 38 call sites did not have to change.
  */
 
 import L from 'leaflet';
@@ -17,13 +27,13 @@ import type { StoragePoint } from './types';
  * Used when: user clicks on canvas, saving marker positions
  *
  * @param latlng - Leaflet LatLng position
- * @param canvasHeight - Height of the canvas in pixels
- * @returns Storage coordinates (top-left origin)
+ * @param _canvasHeight - unused since S361 (bottom-left needs no height)
+ * @returns Storage coordinates (bottom-left origin, the schema's)
  */
-export function leafletToStorage(latlng: L.LatLng, canvasHeight: number): StoragePoint {
+export function leafletToStorage(latlng: L.LatLng, _canvasHeight?: number): StoragePoint {
   return {
     x: Math.round(latlng.lng),
-    y: Math.round(canvasHeight - latlng.lat)
+    y: Math.round(latlng.lat)
   };
 }
 
@@ -31,15 +41,12 @@ export function leafletToStorage(latlng: L.LatLng, canvasHeight: number): Storag
  * Convert storage coordinates to Leaflet LatLng
  * Used when: loading markers from storage, rendering on canvas
  *
- * @param point - Storage coordinates (top-left origin)
- * @param canvasHeight - Height of the canvas in pixels
+ * @param point - Storage coordinates (bottom-left origin, the schema's)
+ * @param _canvasHeight - unused since S361 (bottom-left needs no height)
  * @returns Leaflet LatLng position
  */
-export function storageToLeaflet(point: StoragePoint, canvasHeight: number): L.LatLng {
-  return L.latLng(
-    canvasHeight - point.y,
-    point.x
-  );
+export function storageToLeaflet(point: StoragePoint, _canvasHeight?: number): L.LatLng {
+  return L.latLng(point.y, point.x);
 }
 
 /**

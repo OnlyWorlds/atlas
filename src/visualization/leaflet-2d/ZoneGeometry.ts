@@ -2,8 +2,9 @@
  * Pure geometry helpers for zones.
  *
  * Ported from zoner's ZoneCanvas.ts (audit: 2026-05-16). These functions
- * operate on storage-space coordinates (top-left origin, x grows right,
- * y grows down) — the same coord space as Marker.x / Marker.y.
+ * operate on storage-space coordinates (bottom-left origin since S361, x
+ * grows right, y grows up) — the same coord space as Marker.x / Marker.y.
+ * Every helper here is reflection-invariant, so the flip changed none of them.
  *
  * No Leaflet dependency. Pure functions only. Drives the canvas overlay
  * (rendering + selection + insertion) and the zone-derived helpers.

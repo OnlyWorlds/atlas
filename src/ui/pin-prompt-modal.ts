@@ -24,7 +24,7 @@ export class PinPromptModal extends BaseModal {
       });
       body.innerHTML = `
         <form data-form="pin-prompt">
-          <p class="atlas-modal-hint">${context}</p>
+          <p class="atlas-modal-hint" data-role="context"></p>
           <label class="atlas-modal-field">
             <span>PIN</span>
             <input class="atlas-input" type="password" name="pin"
@@ -38,6 +38,11 @@ export class PinPromptModal extends BaseModal {
           </div>
         </form>
       `;
+      // TEXT, never markup (S361, gate F5): `context` carries a world name from
+      // the account API, and this is the one modal that collects the PIN. A
+      // name holding a <form action> would re-parent the PIN input off-origin;
+      // the CSP has no form-action to stop it.
+      body.querySelector<HTMLElement>('[data-role="context"]')!.textContent = context;
       const form = body.querySelector<HTMLFormElement>('form')!;
       const input = body.querySelector<HTMLInputElement>('input[name="pin"]')!;
       const errorEl = body.querySelector<HTMLElement>('[data-role="error"]')!;

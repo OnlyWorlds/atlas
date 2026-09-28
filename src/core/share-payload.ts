@@ -76,8 +76,9 @@ export interface PayloadCircleBlock {
 
 /**
  * The payload form of a map block — frozen at build: the image URL + the
- * chosen pins as %-positioned identity tokens (top-left origin; pin storage
- * coords are image pixels, normalized via the map's width/height). `ref` is
+ * chosen pins as %-positioned identity tokens (top-left CSS origin; pin
+ * storage coords are bottom-left image pixels, converted once in
+ * `freezeMapBlock` via the map's width/height). `ref` is
  * present only when the pinned element is itself included (the standard
  * disclosure rule — hover shows identity, click-through needs a card).
  */
@@ -379,10 +380,14 @@ export function projectElementEntry(
 }
 
 /**
- * Freeze a map block: image URL + chosen pins normalized to percentages
- * (top-left origin — pin storage coords ARE top-left image pixels; the map's
- * width/height fields hold the image dimensions, auto-detected by atlas when
- * image_url is set). Returns null — block drops from the wire — when the map
+ * Freeze a map block: image URL + chosen pins normalized to percentages.
+ * THE ONE ORIGIN CONVERSION on the publish path (S361): storage is the
+ * schema's BOTTOM-left, the payload's `yPct` is a TOP-left CSS percentage by
+ * contract (SHARING_CONTRACT.md §5), so `yPct = (height - y) / height`. The
+ * renderers (atlas preview, tools/show) apply `yPct` as `top:` and never
+ * convert, which is why pages published before S361 still draw right. The
+ * map's width/height fields hold the image dimensions, auto-detected by atlas
+ * when image_url is set. Returns null — block drops from the wire — when the map
  * is missing, has no published image (D3: image_url only, local media never
  * leaves the folder), or has no usable dimensions. Pins drop individually
  * when their pin/element is gone (disclose nothing) or out of bounds.
@@ -414,7 +419,7 @@ export function freezeMapBlock(
     if (!target) continue; // pin without a live element discloses nothing
     const token: PayloadMapBlock['pins'][number] = {
       xPct: Math.round(Math.min(100, Math.max(0, (x / width) * 100)) * 100) / 100,
-      yPct: Math.round(Math.min(100, Math.max(0, (y / height) * 100)) * 100) / 100,
+      yPct: Math.round(Math.min(100, Math.max(0, ((height - y) / height) * 100)) * 100) / 100,
       name: target.name || '(unnamed)',
       type: target.type,
     };
@@ -454,7 +459,7 @@ export function freezeMapBlock(
         .sort((a, b) => ((a.order as number | undefined) ?? 0) - ((b.order as number | undefined) ?? 0))
         .map(m => ({
           xPct: Math.round(Math.min(100, Math.max(0, ((m.x as number) / width) * 100)) * 100) / 100,
-          yPct: Math.round(Math.min(100, Math.max(0, ((m.y as number) / height) * 100)) * 100) / 100,
+          yPct: Math.round(Math.min(100, Math.max(0, ((height - (m.y as number)) / height) * 100)) * 100) / 100,
         }));
       const shape = getZoneShape(zone as Parameters<typeof getZoneShape>[0]);
       if (points.length < (shape === 'line' ? 2 : 3)) continue; // degenerate geometry drops

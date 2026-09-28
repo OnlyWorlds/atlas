@@ -59,7 +59,14 @@ export interface FolderStore {
 
   // ---- World metadata ----
 
-  readWorldMeta(): Promise<WorldMeta>;
+  /**
+   * Tolerant by default: a world.json that will not parse reads as the empty
+   * default, so a damaged world still OPENS. `strict` throws `CorruptFileError`
+   * instead; every read whose result is diffed or sent to the server uses it
+   * (S361: the sync meta step read the empty default as "every field cleared"
+   * and PATCHed blanks over the server's world meta).
+   */
+  readWorldMeta(opts?: { strict?: boolean }): Promise<WorldMeta>;
   /** `fromSync` bypasses the view-only guard — the engine's pull-apply channel. */
   writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta>;
 
@@ -214,8 +221,9 @@ export interface FolderStore {
    * `sentLocalUpdatedAt` (the stamp the pushed body carried) no longer matches
    * the file: the element was edited while the push was in flight, and it is
    * kept dirty so the edit goes out next round (S360 H1, `store/sync-stamp.ts`).
+   * `null` = the server is known to hold different content: keep it dirty.
    */
-  stampServerUpdatedAt(id: string, type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string): Promise<void>;
+  stampServerUpdatedAt(id: string, type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null): Promise<void>;
 
   /**
    * Clear `server_updated_at` on a local element. Used when resolving a

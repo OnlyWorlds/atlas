@@ -17,6 +17,7 @@
  */
 
 import { getState } from '../core/state';
+import { escapeText } from '../core/dom-utils';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
@@ -191,7 +192,7 @@ export function createProseContextMenu(deps: {
       items.push(`
         <button type="button" class="atlas-prose-context-menu-item" data-role="unlink-chip">
           <span class="material-symbols-outlined">link_off</span>
-          <span>Unlink ${escapeMenuText(chipHit.label || 'chip')}</span>
+          <span>Unlink ${escapeText(chipHit.label || 'chip')}</span>
         </button>
       `);
     }
@@ -199,7 +200,7 @@ export function createProseContextMenu(deps: {
       items.push(`
         <button type="button" class="atlas-prose-context-menu-item" data-role="link-autolink">
           <span class="material-symbols-outlined">link</span>
-          <span>Link to ${escapeMenuText(autolinkHit.name)}</span>
+          <span>Link to ${escapeText(autolinkHit.name)}</span>
         </button>
       `);
     }
@@ -313,14 +314,6 @@ export function createProseContextMenu(deps: {
   };
 
   /** Cheap HTML escape for menu labels — chip names can contain &<>". */
-  function escapeMenuText(s: string): string {
-    return s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
   /**
    * Right-click "Unlink" handler. Replaces the chip with its label text
    * (preserves visible reading). Then scans the rest of the prose for any

@@ -25,7 +25,8 @@
   "Steinway parent_object = Ebony Spaceship, location cleared (Captain, live): objects nest like the balcony does",
   "DATES RE-DERIVED from the source (S312): title grant_date 1 + both events at 12 = the Consul's SOURCED eleven-year tenure (L327 + L3823, two witnesses); events share one date (Captain's S305 ruling -- he plays WHILE they surge). Deep time via the L1130 epoch (AD 2732 = 589 P.C. -> P.C. 0 ~ AD 2143): Rachmaninov born AD 1873 -> -270, Prelude composed AD 1892 -> -251. time_range_min -300. The Earth<->PC conversion IS asserted now (one line in the book reconciles four calendars); the S305 no-conversion ruling was made before L1130 was found and Captain ordered the source update",
   "Captain's live 'new book' / 'new page' narratives are test artifacts: left live, excluded from the bundle",
-  "S318 re-verify vs live (2026-07-24): map renamed 'Unnamed planet' -> 'Map of Unnamed planet' (Captain's live edit, adopted; TOUR_MAP_REF + specs follow). Everything else identical modulo the disk dialect (map_id/zone_id) and the documented editorial layer (link weave, reputation, no time_current -- live's time_range_current=0 deliberately NOT adopted, the set-now beat needs an unset clock). Captain's live test narratives ('new book'/'new page') stay excluded."
+  "S318 re-verify vs live (2026-07-24): map renamed 'Unnamed planet' -> 'Map of Unnamed planet' (Captain's live edit, adopted; TOUR_MAP_REF + specs follow). Everything else identical modulo the disk dialect (map_id/zone_id) and the documented editorial layer (link weave, reputation, no time_current -- live's time_range_current=0 deliberately NOT adopted, the set-now beat needs an unset clock). Captain's live test narratives ('new book'/'new page') stay excluded.",
+  "S361 (2026-09-28): pin + 6 swamps markers FLIPPED to the schema's bottom-left origin (y' = 1492 - y: pin 810->682; markers 689/731/802/838/810/757 -> 803/761/690/654/682/735). Atlas stored y top-down until S361 and Captain placed these in atlas on 07-23, so the bundle was y-down. The LIVE demo world (key 0000000000) still holds the old y-down numbers: a re-bake must flip them again, or the live world must be flipped first."
  ],
  "world": {
   "name": "Hyperion",
@@ -344,7 +345,7 @@
    "id": "5bc8c9dc-47ae-4874-aadc-e395df789513",
    "name": "The Consul’s balcony seat",
    "x": 404,
-   "y": 810,
+   "y": 682,
    "element_type": "character",
    "element_id": "068e2ddb-83c6-71a7-8000-a45b8b711e25",
    "map_id": "2d277ba6-22e4-440b-9ef3-7f28153cd291"
@@ -364,7 +365,7 @@
    "id": "585ecc34-124b-4e11-8b2b-dd60f42a6e15",
    "name": "Swamps - Point 0",
    "x": 495,
-   "y": 689,
+   "y": 803,
    "map_id": "2d277ba6-22e4-440b-9ef3-7f28153cd291",
    "zone_id": "7fe67de4-de36-41eb-be50-3198d138f887",
    "order": 0
@@ -374,7 +375,7 @@
    "id": "2226926d-8bf8-4877-ae02-94693f8fe28c",
    "name": "Swamps - Point 1",
    "x": 585,
-   "y": 731,
+   "y": 761,
    "map_id": "2d277ba6-22e4-440b-9ef3-7f28153cd291",
    "zone_id": "7fe67de4-de36-41eb-be50-3198d138f887",
    "order": 1
@@ -384,7 +385,7 @@
    "id": "e7bb034c-4c57-410c-ad4b-7aba811d2c15",
    "name": "Swamps - Point 2",
    "x": 515,
-   "y": 802,
+   "y": 690,
    "map_id": "2d277ba6-22e4-440b-9ef3-7f28153cd291",
    "zone_id": "7fe67de4-de36-41eb-be50-3198d138f887",
    "order": 2
@@ -394,7 +395,7 @@
    "id": "0f591e91-670e-42eb-8aa1-cec6ea668c31",
    "name": "Swamps - Point 3",
    "x": 411,
-   "y": 838,
+   "y": 654,
    "map_id": "2d277ba6-22e4-440b-9ef3-7f28153cd291",
    "zone_id": "7fe67de4-de36-41eb-be50-3198d138f887",
    "order": 3
@@ -404,7 +405,7 @@
    "id": "cf80269b-8efc-4013-a2db-47b84e843a51",
    "name": "Swamps - Point 4",
    "x": 321,
-   "y": 810,
+   "y": 682,
    "map_id": "2d277ba6-22e4-440b-9ef3-7f28153cd291",
    "zone_id": "7fe67de4-de36-41eb-be50-3198d138f887",
    "order": 4
@@ -414,7 +415,7 @@
    "id": "bc87d8d3-283a-4ec9-8e30-bf0148b3cfa2",
    "name": "Swamps - Point 5",
    "x": 387,
-   "y": 757,
+   "y": 735,
    "map_id": "2d277ba6-22e4-440b-9ef3-7f28153cd291",
    "zone_id": "7fe67de4-de36-41eb-be50-3198d138f887",
    "order": 5

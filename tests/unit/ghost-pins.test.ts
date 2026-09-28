@@ -162,21 +162,21 @@ describe('computeGhostPositions — geometry', () => {
   it('places single ghost above source (12 o\'clock)', () => {
     const [p] = computeGhostPositions(100, 100, 1, 50);
     expect(p.x).toBeCloseTo(100, 5);
-    expect(p.y).toBeCloseTo(50, 5);   // Y - radius (up in storage coords is also negative-Y here)
+    expect(p.y).toBeCloseTo(150, 5);  // Y + radius: storage y grows UP (bottom-left, S361)
   });
 
   it('places N ghosts at evenly-spaced angles', () => {
     const positions = computeGhostPositions(100, 100, 4, 50);
     expect(positions).toHaveLength(4);
-    // i=0: top (x=100, y=50)
+    // i=0: top of screen (x=100, y=150; storage y grows up)
     expect(positions[0].x).toBeCloseTo(100, 5);
-    expect(positions[0].y).toBeCloseTo(50, 5);
+    expect(positions[0].y).toBeCloseTo(150, 5);
     // i=1: right (x=150, y=100)
     expect(positions[1].x).toBeCloseTo(150, 5);
     expect(positions[1].y).toBeCloseTo(100, 5);
-    // i=2: bottom (x=100, y=150)
+    // i=2: bottom of screen (x=100, y=50)
     expect(positions[2].x).toBeCloseTo(100, 5);
-    expect(positions[2].y).toBeCloseTo(150, 5);
+    expect(positions[2].y).toBeCloseTo(50, 5);
     // i=3: left (x=50, y=100)
     expect(positions[3].x).toBeCloseTo(50, 5);
     expect(positions[3].y).toBeCloseTo(100, 5);
@@ -184,9 +184,9 @@ describe('computeGhostPositions — geometry', () => {
 
   it('uses the default radius constant when not specified', () => {
     const [p] = computeGhostPositions(0, 0, 1);
-    // First ghost at top → x = 0, y = -GHOST_RADIUS_PX
+    // First ghost at top → x = 0, y = +GHOST_RADIUS_PX (storage y grows up)
     expect(p.x).toBeCloseTo(0, 5);
-    expect(p.y).toBeCloseTo(-GHOST_RADIUS_PX, 5);
+    expect(p.y).toBeCloseTo(GHOST_RADIUS_PX, 5);
   });
 
   it('GHOST_RADIUS_PX is tuned to the close-around target (≤50)', () => {

@@ -823,6 +823,47 @@ test('a field edited in the file by another tool survives an atlas update to a d
   expect(result.listedDescription).toBe('edited outside atlas');
 });
 
+test('an element file that will not parse is never overwritten by an atlas save (S361)', async ({ page }) => {
+  // Gate F6: `readForWrite` fell back to the CACHED body when the file would
+  // not parse, and the write then replaced a git-conflicted element file with
+  // atlas's copy, losing both sides of the conflict.
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot({ clear: true });
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    const el = await store.createElement('character', { name: 'Brisa', description: 'ours' });
+    await store.listElements();
+    const dir = await (await root.getDirectoryHandle('elements')).getDirectoryHandle('character');
+    let filename = '';
+    for await (const entry of (dir as any).values()) {
+      if (entry.kind === 'file' && entry.name.startsWith('brisa--')) filename = entry.name;
+    }
+    const CONFLICT = [
+      '<<<<<<< HEAD',
+      `{"id":"${el.id}","name":"Brisa","description":"ours"}`,
+      '=======',
+      `{"id":"${el.id}","name":"Brisa","description":"theirs"}`,
+      '>>>>>>> branch',
+      '',
+    ].join('\n');
+    const ws = await (await dir.getFileHandle(filename)).createWritable();
+    await ws.write(CONFLICT);
+    await ws.close();
+    let error = '';
+    try {
+      await store.updateElement(el.id, { motivations: 'written by atlas' });
+    } catch (err) {
+      error = (err as Error).name;
+    }
+    await store.close();
+    const raw = await (await (await dir.getFileHandle(filename)).getFile()).text();
+    return { error, untouched: raw === CONFLICT };
+  });
+  expect(result.error).toBe('CorruptFileError');
+  expect(result.untouched).toBe(true);
+});
+
 test('a corrupt world.json or styles.json is never overwritten by a save (S360)', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const api = (window as any).__atlasTestApi;

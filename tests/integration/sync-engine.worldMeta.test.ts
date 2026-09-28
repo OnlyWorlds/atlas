@@ -259,3 +259,30 @@ describe('stopped latch (gate R6 — unlink must not be resurrected)', () => {
     expect((await folder.readWorldMeta()).description ?? '').toBe('');
   });
 });
+
+describe('a world.json that will not parse (S361, gate F2)', () => {
+  async function establishedBaseline(): Promise<SyncEngine> {
+    client.__server_mutate_world_meta({ description: 'server desc', time_basic_unit: 'Year', time_current: 42 });
+    const engine = makeEngine();
+    await engine.syncNow(); // seed round: baseline adopted
+    expect((await folder.readSyncState()).meta_baseline).toBeTruthy();
+    folder.worldMetaCorrupt = true; // e.g. git conflict markers after a pull
+    return engine;
+  }
+
+  it('a sync round skips meta with a failure and never PATCHes blanks', async () => {
+    const engine = await establishedBaseline();
+    const result = await engine.syncNow();
+    expect(patchBodies()).toEqual([]);
+    expect(result.failures.some(f => f.type === 'world' && /world\.json/.test(f.message))).toBe(true);
+    const server = await client.getWorldMeta();
+    expect(server.description).toBe('server desc');
+    expect(server.time_current).toBe(42);
+  });
+
+  it('a push round (the precheck path) never PATCHes blanks either', async () => {
+    const engine = await establishedBaseline();
+    await engine.pushOnce();
+    expect(patchBodies()).toEqual([]);
+  });
+});

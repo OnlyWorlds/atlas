@@ -76,32 +76,28 @@ class ElementPickerModal extends BaseModal {
       const search = this.modal?.querySelector<HTMLInputElement>('input[data-role="picker-search"]');
       search?.focus();
     });
-    // Override the BaseModal close path so we resolve null on cancel.
-    const onEsc = (e: KeyboardEvent) => {
-      // Only the topmost modal takes Escape (S360: the location picker's
-      // Escape also closed the map-create modal underneath it).
-      if (e.key === 'Escape' && this.isTopmost()) {
-        e.stopPropagation();
-        e.preventDefault();
-        this.cancel();
-        document.removeEventListener('keydown', onEsc);
-      }
-    };
-    document.addEventListener('keydown', onEsc);
-    this.modal?.addEventListener('click', (e) => {
-      if (e.target === this.modal) {
-        this.cancel();
-        document.removeEventListener('keydown', onEsc);
-      }
-    });
+    // Escape and the full outside click are BaseModal's (topmost-only, S360;
+    // press-and-release, S318); `hide` below settles the promise however the
+    // modal closed.
   }
 
   private cancel(): void {
+    this.hide();
+  }
+
+  /**
+   * Every close path settles the promise (S361, gate F4). The picker used to
+   * run its own Escape listener AFTER BaseModal's: the base hid the picker
+   * first, the picker's `isTopmost()` check then failed, and `pickElement()`
+   * never resolved. Its own overlay `click` had the same hole behind the
+   * base's pointerup close. Resolving here is the pin-prompt idiom.
+   */
+  protected override hide(): void {
+    super.hide();
     if (!this.resolved) {
       this.resolved = true;
       this.onPick(null);
     }
-    this.hide();
   }
 
   private buildModal(): HTMLElement {

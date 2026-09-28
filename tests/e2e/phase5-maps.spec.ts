@@ -602,3 +602,66 @@ test('the zone panel (S356): kinds group, a kind colour is a world style that su
   await expect(page.locator('.atlas-field-style-swatch')).toHaveCount(1);
   await expect(page.locator('.atlas-zone-visuals-section .atlas-detail-section-hint')).toHaveText('Synced');
 });
+
+test('north is up: a pin by the schema\'s bottom-left numbers draws where the standard says, and a click stores bottom-left y (S361)', async ({ page }) => {
+  // pin.yaml: "x/y coordinate, from bottom left of the map". Atlas stored y
+  // top-down until S361, so every standard world (Sikelia) drew mirrored.
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', 'Compass Canvas');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Compass Canvas' })).toBeVisible();
+
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = api.getState().data.elements.find((e: any) => e.type === 'map' && e.name === 'Compass Canvas');
+    for (const [name, y] of [['Northreach', 1600], ['Midfield', 1000], ['Southmoor', 400]] as const) {
+      const loc = await store.createElement('location', { name });
+      // x spread so the density layer never has to cull a label.
+      await store.createPin({ map_id: map.id, element_id: loc.id, x: name === 'Midfield' ? 1400 : 600, y });
+    }
+    api.patchData(await store.listElements());
+  });
+  const container = page.locator('.atlas-map-tab-wrapper .leaflet-container').first();
+  await expect(container.locator('.leaflet-2d-pin-label')).toHaveCount(3);
+
+  // READ. Each label hangs the same fixed offset below its anchor, so
+  // differences between labels are differences between anchors.
+  const tops = await container.evaluate((c) => {
+    const top = (name: string) => {
+      const label = Array.from(c.querySelectorAll('.leaflet-2d-pin-label'))
+        .find(l => l.textContent?.includes(name)) as HTMLElement | undefined;
+      const r = label?.getBoundingClientRect();
+      return r ? { top: r.top, left: r.left, width: r.width } : null;
+    };
+    return { north: top('Northreach'), mid: top('Midfield'), south: top('Southmoor') };
+  });
+  expect({ n: !!tops.north, m: !!tops.mid, s: !!tops.south }).toEqual({ n: true, m: true, s: true });
+  // North is up (the old top-down storage drew it at the bottom)...
+  expect(tops.north!.top).toBeLessThan(tops.south!.top);
+  // ...and y 1000 sits halfway between y 1600 and y 400.
+  const midFrac = (tops.mid!.top - tops.north!.top) / (tops.south!.top - tops.north!.top);
+  expect(midFrac).toBeGreaterThan(0.4);
+  expect(midFrac).toBeLessThan(0.6);
+
+  // WRITE: a click just above the north label, off to its side, stores a y
+  // north of centre (the old conversion stored the mirror, south of 1000).
+  await page.click('.atlas-mode-btn[data-action="mode-elements"]');
+  await page.click('[data-action="create-element"]');
+  await page.fill('input[name="element-name"]', 'Clicked Place');
+  await page.click('[data-modal="create-element"] [data-action="create"]');
+  await page.locator('[data-action="pin-element"]').click();
+  await expect(page.locator('.atlas-map-placement-hint')).toBeVisible();
+  const cBox = (await container.boundingBox())!;
+  const n = tops.north!;
+  await container.click({ position: { x: n.left - cBox.x + n.width + 40, y: n.top - cBox.y - 6 } });
+  await expect(page.locator('.ow-toast', { hasText: 'Pin placed' })).toBeVisible();
+  const placed = await page.evaluate(() => {
+    const st = (window as any).__atlasTestApi.getState();
+    const el = st.data.elements.find((e: any) => e.name === 'Clicked Place');
+    const p = st.data.elements.find((e: any) => e.type === 'pin' && e.element_id === el?.id);
+    return p ? p.y : null;
+  });
+  expect(placed).not.toBeNull();
+  expect(placed as number).toBeGreaterThan(1300);
+});

@@ -22,6 +22,8 @@ import {
 import {
   ALL_ELEMENT_TYPES,
 } from '../core/types';
+import { ATLAS_LOCAL_ONLY_FIELDS } from '../core/constants';
+import { CorruptFileError } from '../store/fs-utils';
 import type {
   Conflict,
   Element,
@@ -350,6 +352,24 @@ export class SyncEngine {
    * `sync-attach.attachSyncEngine`). The new engine starts at idle. The user
    * can also unlink the world from settings → World tab.
    */
+  /**
+   * A round threw. The pill must not stay on "Saving..." (S308), so it goes
+   * back to idle, EXCEPT for a sync file that exists and will not parse
+   * (S361, gate F14): then the engine pauses and the pill turns red with the
+   * file's own message ("fix or remove the file"). Before, a corrupt
+   * sync-state.json replayed the whole world every round, failed at the
+   * persist, and said nothing anywhere.
+   */
+  private settleThrownRound(err: unknown): void {
+    if (err instanceof CorruptFileError) {
+      this.paused = true;
+      this.pauseReason = 'manual';
+      this.setState({ kind: 'error', message: err.message, recoverable: true });
+      return;
+    }
+    this.setState({ kind: 'idle', last_sync_at: null });
+  }
+
   private setAuthError(): void {
     this.paused = true;
     this.pauseReason = 'manual';
@@ -623,12 +643,33 @@ export class SyncEngine {
    * locally. Either way the field's baseline advances and it leaves
    * meta_conflicts.
    */
+  /**
+   * A CREATE came back "id already on the server" (a lost response, a
+   * backfill miss): adopt the server's copy as the baseline. S361 (gate F3):
+   * adopting used to stamp clean unconditionally, so an edit made while the
+   * lost create was in flight read as synced (its `local_updated_at` sorts
+   * below the server's commit) and never uploaded. Now the bodies are
+   * compared: when the local content differs from what the server holds, the
+   * element stays dirty and goes out as an UPDATE next round. The comparison
+   * errs toward "differs" (one redundant UPDATE), never toward "same" (a lost
+   * edit).
+   */
+  private async adoptServerCopy(local: Element, remote: { updated_at: string } & Record<string, unknown>): Promise<void> {
+    const ignore = new Set<string>(['created_at', 'change_seq', 'world', ...ATLAS_LOCAL_ONLY_FIELDS]);
+    const differs = diffFieldNames(local, remote)
+      .some(k => !ignore.has(k));
+    await this.folder.stampServerUpdatedAt(
+      local.id, local.type as ElementType, remote.updated_at,
+      differs ? null : (local.local_updated_at as string | undefined),
+    );
+  }
+
   async resolveMetaConflict(field: string, choice: 'mine' | 'theirs'): Promise<void> {
     const kind = META_SYNC_FIELDS[field];
     if (!kind) throw new Error(`resolveMetaConflict: unknown meta field '${field}'`);
     let baselineValue: unknown;
     if (choice === 'mine') {
-      const local = await this.folder.readWorldMeta();
+      const local = await this.folder.readWorldMeta({ strict: true });
       const resp = await this.client.patchWorldMeta(
         encodeMetaFieldsForPush({ [field]: (local as unknown as Record<string, unknown>)[field] }),
       );
@@ -684,7 +725,7 @@ export class SyncEngine {
     try {
       return await this.executeMetaStep(opts);
     } catch (err) {
-      this.setState({ kind: 'idle', last_sync_at: null });
+      this.settleThrownRound(err);
       throw err;
     }
   }
@@ -710,7 +751,7 @@ export class SyncEngine {
         const syncState = await this.folder.readSyncState();
         const baseline = syncState.meta_baseline ?? null;
         if (baseline) {
-          const local = await this.folder.readWorldMeta() as unknown as Record<string, unknown>;
+          const local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
           const dirty = META_SYNC_FIELD_NAMES.some(
             f => !metaEquals(META_SYNC_FIELDS[f], local[f], baseline[f])
           );
@@ -744,7 +785,17 @@ export class SyncEngine {
     if (this.stopped) return empty;
 
     const serverRec = server as unknown as Record<string, unknown>;
-    const local = await this.folder.readWorldMeta() as unknown as Record<string, unknown>;
+    // STRICT (S361, gate F2): a world.json that will not parse must stop the
+    // meta step. The tolerant read returns an empty default, which the diff
+    // below reads as "every field cleared locally" and PATCHes blank over the
+    // server's world meta, then carries the blanks to every other device.
+    let local: Record<string, unknown>;
+    try {
+      local = await this.folder.readWorldMeta({ strict: true }) as unknown as Record<string, unknown>;
+    } catch (err) {
+      console.warn('[atlas:sync] meta step: world.json unreadable — skipping meta this round', err);
+      return { ...empty, failures: [metaFailure('read', err)] };
+    }
     const syncState = await this.folder.readSyncState();
     const baseline = syncState.meta_baseline ?? null;
 
@@ -964,7 +1015,7 @@ export class SyncEngine {
       // every single user edit takes (element save -> requestPushIfLinked).
       // Hardening applied to one side of a symmetric surface is a defect class,
       // not a fix.
-      this.setState({ kind: 'idle', last_sync_at: null });
+      this.settleThrownRound(err);
       throw err;
     }
     // Only persist under pause-and-review. Under local-wins, conflicts are
@@ -1012,7 +1063,7 @@ export class SyncEngine {
       // Non-auth pull failures (network, 5xx) propagate to caller for toast
       // surfacing — but we MUST restore idle state first or the pill stays
       // stuck at 'fetching...' forever.
-      this.setState({ kind: 'idle', last_sync_at: null });
+      this.settleThrownRound(err);
       throw err;
     }
     if (pullResult.auth_blocked) {
@@ -1078,7 +1129,7 @@ export class SyncEngine {
     try {
       pullResult = await this.pullPhase(handledIds);
     } catch (err) {
-      this.setState({ kind: 'idle', last_sync_at: null });
+      this.settleThrownRound(err);
       throw err;
     }
     const result: SyncResult = {
@@ -1356,8 +1407,9 @@ export class SyncEngine {
       if (errObj.code === 'id_conflict') {
         const id = item.element.id as string;
         const remote = await this.client.getElement(item.type, id).catch(() => null);
-        if (remote) {
-          await this.folder.stampServerUpdatedAt(id, item.type, remote.updated_at);
+        const local = candidates.find(c => c.id === id);
+        if (remote && local) {
+          await this.adoptServerCopy(local, remote);
           console.info('[atlas:sync] bulk item id_conflict — element already on server; baseline adopted', {
             id, type: item.type,
           });
@@ -1722,7 +1774,7 @@ export class SyncEngine {
         else if (isCreate && isIdConflictError(err)) {
           const remote = await this.client.getElement(elem.type, elem.id);
           if (remote) {
-            await this.folder.stampServerUpdatedAt(elem.id, elem.type, remote.updated_at);
+            await this.adoptServerCopy(elem, remote);
             console.info('[atlas:sync] CREATE 409 id_conflict — element already on server; baseline adopted', {
               id: elem.id, type: elem.type,
             });

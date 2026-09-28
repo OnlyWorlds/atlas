@@ -26,6 +26,7 @@ import type {
 import type { ChartConfig } from '../../src/visualization/timeline/types';
 import { EMPTY_STYLES, type WorldStyles } from '../../src/core/world-styles';
 import { stampedBody } from '../../src/store/sync-stamp';
+import { CorruptFileError } from '../../src/store/fs-utils';
 
 const defaultMeta: WorldMeta = { id: 'mock-world', name: 'mock world' };
 const defaultSyncState: SyncState = {
@@ -70,7 +71,16 @@ export class MockFolderStore implements FolderStore {
 
   // ---- World metadata ----
 
-  async readWorldMeta(): Promise<WorldMeta> {
+  /** Test hook: world.json exists but will not parse (a git conflict). Mirrors
+   *  FsFolderStore: the tolerant read returns the empty default, a strict read
+   *  and every write throw `CorruptFileError`. */
+  worldMetaCorrupt = false;
+
+  async readWorldMeta(opts?: { strict?: boolean }): Promise<WorldMeta> {
+    if (this.worldMetaCorrupt) {
+      if (opts?.strict) throw new CorruptFileError('world.json', new SyntaxError('Unexpected token <'));
+      return { id: '', name: '' };
+    }
     return { ...this.meta };
   }
 
@@ -78,6 +88,7 @@ export class MockFolderStore implements FolderStore {
 
   async writeWorldMeta(patch: Partial<WorldMeta>, opts?: { fromSync?: boolean }): Promise<WorldMeta> {
     if (!opts?.fromSync) this.assertWritable();
+    if (this.worldMetaCorrupt) throw new CorruptFileError('world.json', new SyntaxError('Unexpected token <'));
     // Mirrors FsFolderStore's birth stamp (folder-format §4.2, S355): the
     // first write to a store that has no meta yet records the spec version.
     const stamp = !this.metaBorn && patch.format_version === undefined
@@ -367,7 +378,12 @@ export class MockFolderStore implements FolderStore {
     return { ...this.syncState };
   }
 
+  /** Test hook: sync-state.json exists but will not parse. Mirrors
+   *  FsFolderStore: the tolerant read returns defaults, writes throw. */
+  syncStateCorrupt = false;
+
   async writeSyncState(patch: Partial<SyncState>): Promise<SyncState> {
+    if (this.syncStateCorrupt) throw new CorruptFileError('sync-state.json', new SyntaxError('Unexpected token <'));
     this.syncState = { ...this.syncState, ...patch };
     return { ...this.syncState };
   }
@@ -376,6 +392,7 @@ export class MockFolderStore implements FolderStore {
     // In-memory ops complete within one turn, so this is atomic by
     // construction — but the mutator still receives the CURRENT state, so
     // read-modify-write semantics match FsFolderStore's chained impl.
+    if (this.syncStateCorrupt) throw new CorruptFileError('sync-state.json', new SyntaxError('Unexpected token <'));
     this.syncState = { ...this.syncState, ...mutate({ ...this.syncState }) };
     return { ...this.syncState };
   }
@@ -398,7 +415,7 @@ export class MockFolderStore implements FolderStore {
     this.styles = { version: styles.version, rules: styles.rules.map(r => ({ ...r })) };
   }
 
-  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string): Promise<void> {
+  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null): Promise<void> {
     const existing = this.elements.get(id);
     if (!existing) return;
     this.elements.set(id, stampedBody(existing, server_updated_at, sentLocalUpdatedAt));

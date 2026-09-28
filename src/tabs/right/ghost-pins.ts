@@ -134,9 +134,9 @@ export function computeGhostPositions(
     const angle = (Math.PI * 2 * i) / count - Math.PI / 2;
     out.push({
       x: sourceX + radius * Math.cos(angle),
-      // Note: storage Y grows DOWN. Adding radius * sin moves down for
-      // positive angles. That's fine — the circle still wraps correctly.
-      y: sourceY + radius * Math.sin(angle),
+      // Storage Y grows UP (bottom-left, S361), so SUBTRACTING the sin term
+      // keeps the first ghost at 12 o'clock on screen and the walk clockwise.
+      y: sourceY - radius * Math.sin(angle),
     });
   }
   return out;

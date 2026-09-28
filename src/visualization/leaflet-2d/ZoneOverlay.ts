@@ -11,8 +11,8 @@
  * accompanies the visible 2px line so click target is comfortable. Polygons
  * use Leaflet's native fill click — no hit-overlay needed.
  *
- * Coords on input are storage-space (top-left origin, y grows down) — the
- * same coord space as Marker.x / Marker.y. Conversion to Leaflet LatLng
+ * Coords on input are storage-space (bottom-left origin, y grows UP, the
+ * schema's; S361) — the same coord space as Marker.x / Marker.y. Conversion to Leaflet LatLng
  * happens inside the overlay.
  */
 
@@ -662,18 +662,18 @@ function labelAnchorFor(shape: ZoneShape): Point {
   return centroid(shape.points);
 }
 
-/** Bottom-centre of the points' bounding box. Screen-bottom = MAX storage-y
- *  (storageToLeaflet flips: lat = canvasHeight - y), so the label hangs off the
+/** Bottom-centre of the points' bounding box. Screen-bottom = MIN storage-y
+ *  (storage is bottom-left since S361: lat = y), so the label hangs off the
  *  zone's lowest edge, horizontally centred. */
-function bottomCenter(points: Point[]): Point {
+export function bottomCenter(points: Point[]): Point {
   if (points.length === 0) return { x: 0, y: 0 };
-  let minX = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity;
   for (const p of points) {
     if (p.x < minX) minX = p.x;
     if (p.x > maxX) maxX = p.x;
-    if (p.y > maxY) maxY = p.y;
+    if (p.y < minY) minY = p.y;
   }
-  return { x: (minX + maxX) / 2, y: maxY };
+  return { x: (minX + maxX) / 2, y: minY };
 }
 
 function pointsEqual(a: Point[], b: Point[]): boolean {

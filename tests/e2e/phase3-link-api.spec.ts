@@ -179,6 +179,41 @@ test('a running link ignores outside clicks and Escape, and Stop keeps what has 
   expect(state.count).toBeLessThan(1500);
 });
 
+test('Cancel link leaves the world you were in open and writable', async ({ page }) => {
+  // S361 (gate F1): the link flow used to close the prior world's store
+  // BEFORE downloading, so Cancel left the UI on world A with no store behind
+  // it: prose dropped silently, edits toasted "No active store".
+  await setupAtlasRoot(page);
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'Home World');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  const { worldId, charId } = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const ch = await api.getActiveStore().createElement('character', { name: 'Keeper' });
+    api.patchData(await api.getActiveStore().listElements());
+    return { worldId: api.getState().active.worldId, charId: ch.id };
+  });
+
+  await mockKeel(page, 1500);
+  await page.getByRole('button', { name: 'Worlds', exact: true }).click();
+  await openLinkAndSubmit(page);
+  const modal = page.locator('[data-modal="link-world"]');
+  await expect(modal.locator('[data-role="progress"]')).toContainText('Downloading');
+  await modal.locator('[data-action="cancel-link"]').click();
+  await expect(modal).toHaveCount(0);
+
+  const after = await page.evaluate(async (id) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    if (!store) return { store: false };
+    await store.updateElement(id, { description: 'still here' });
+    const back = await store.getElement(id);
+    return { store: true, active: api.getState().active?.worldId, description: back?.description };
+  }, charId);
+  expect(after).toEqual({ store: true, active: worldId, description: 'still here' });
+});
+
 test('Cancel link removes the new folder and registers nothing', async ({ page }) => {
   await setupAtlasRoot(page);
   await mockKeel(page, 1500);

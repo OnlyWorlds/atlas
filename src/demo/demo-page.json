@@ -1911,1177 +1911,1177 @@
   "pins": [
    {
     "x": 6530,
-    "y": 976,
+    "y": 4224,
     "name": "Abakainon",
     "ref": "12b1fd1c-d64b-5575-b5b3-fb249a42740e"
    },
    {
     "x": 6865,
-    "y": 4417,
+    "y": 783,
     "name": "Abolla",
     "ref": "8ad23f98-f465-5c3e-94a1-d0a8e8e53b85"
    },
    {
     "x": 1978,
-    "y": 2517,
+    "y": 2683,
     "name": "Adrane",
     "ref": "853c0284-4cba-5d85-9a83-a0d347cf040d"
    },
    {
     "x": 6136,
-    "y": 2222,
+    "y": 2978,
     "name": "Adranos",
     "ref": "a3abb5c6-0651-5867-a4fe-a601712962b4"
    },
    {
     "x": 6750,
-    "y": 4121,
+    "y": 1079,
     "name": "Adryx",
     "ref": "f0a83770-24cd-51da-a698-90e05261bb06"
    },
    {
     "x": 1214,
-    "y": 1788,
+    "y": 3412,
     "name": "Aegesta",
     "ref": "6d6a6143-ca35-5c5d-a940-63aadf006c99"
    },
    {
     "x": 1406,
-    "y": 1381,
+    "y": 3819,
     "name": "Aegeston Emporion",
     "ref": "6c25757f-b18b-55ca-80e6-4c995319e885"
    },
    {
     "x": 1548,
-    "y": 1651,
+    "y": 3549,
     "name": "Aereo",
     "ref": "98bac999-2c3b-52d1-9a73-d5ac0a68aa89"
    },
    {
     "x": 5656,
-    "y": 641,
+    "y": 4559,
     "name": "Agathyrnon",
     "ref": "a55e7d55-e138-541b-9d36-c36e7b60596c"
    },
    {
     "x": 5735,
-    "y": 4493,
+    "y": 707,
     "name": "Agera",
     "ref": "d24e03c1-0396-58c6-82b3-4e563224b4ac"
    },
    {
     "x": 7015,
-    "y": 1115,
+    "y": 4085,
     "name": "Agrilla",
     "ref": "201379b2-9745-5159-94e4-3039a5dcb42b"
    },
    {
     "x": 5243,
-    "y": 2236,
+    "y": 2964,
     "name": "Agyrion",
     "ref": "06601828-44ed-5a6d-97ef-ee3187226fa3"
    },
    {
     "x": 2993,
-    "y": 3588,
+    "y": 1612,
     "name": "Akragas",
     "ref": "d9cb7ceb-b402-5c2c-81ea-404e275739d6"
    },
    {
     "x": 6336,
-    "y": 4145,
+    "y": 1055,
     "name": "Akrai",
     "ref": "291493ed-801f-5b43-b3da-6bfd80128aff"
    },
    {
     "x": 5843,
-    "y": 4200,
+    "y": 1000,
     "name": "Akrillai",
     "ref": "3d6b9e7e-3615-5703-8370-f916a5e66886"
    },
    {
     "x": 4346,
-    "y": 2625,
+    "y": 2575,
     "name": "Alagene",
     "ref": "970395a4-8f6a-5d4c-a47a-8fc162101297"
    },
    {
     "x": 5868,
-    "y": 1560,
+    "y": 3640,
     "name": "Allisse",
     "ref": "1508279f-cbe1-564e-a090-a6b2aac1b99d"
    },
    {
     "x": 5571,
-    "y": 2292,
+    "y": 2908,
     "name": "Amaselos",
     "ref": "0f7cabf5-c733-52c9-ac12-13c9d5b05b56"
    },
    {
     "x": 3741,
-    "y": 1818,
+    "y": 3382,
     "name": "Ambikos",
     "ref": "5a6981c0-82d4-5386-9f92-4f2a32addfee"
    },
    {
     "x": 1042,
-    "y": 1290,
+    "y": 3910,
     "name": "Ancyrai",
     "ref": "fb0e2f86-532e-5e65-a46a-769851af757c"
    },
    {
     "x": 5304,
-    "y": 1229,
+    "y": 3971,
     "name": "Apollonia",
     "ref": "4c84774b-4659-5b36-96fb-d482390c3662"
    },
    {
     "x": 4738,
-    "y": 3764,
+    "y": 1436,
     "name": "Ariaiton",
     "ref": "eb8ec8c8-e7ed-5d6f-8866-b6a1079f7eb7"
    },
    {
     "x": 7103,
-    "y": 887,
+    "y": 4313,
     "name": "Artemision",
     "ref": "9c81cac4-babb-5259-91e0-8fa5244e6c9e"
    },
    {
     "x": 4791,
-    "y": 2134,
+    "y": 3066,
     "name": "Artesine",
     "ref": "8b081a90-003c-51cf-954b-eea178b3c470"
    },
    {
     "x": 5121,
-    "y": 2315,
+    "y": 2885,
     "name": "Assoros",
     "ref": "89ab0a3c-d4e0-522f-bf0d-c17b1fc8fed4"
    },
    {
     "x": 3855,
-    "y": 2665,
+    "y": 2535,
     "name": "Babalon",
     "ref": "95af74f5-2e83-5866-b52f-99899b2e6c87"
    },
    {
     "x": 4604,
-    "y": 3300,
+    "y": 1900,
     "name": "Bakra",
     "ref": "44a21f06-f022-5bae-b1e7-88182e7bbc90"
    },
    {
     "x": 2937,
-    "y": 1615,
+    "y": 3585,
     "name": "Balekena",
     "ref": "ee7bad1c-7d30-54d7-9fb6-520069217750"
    },
    {
     "x": 5467,
-    "y": 3531,
+    "y": 1669,
     "name": "Balkonon",
     "ref": "710d0293-e05b-5834-81d6-bedb0c92f367"
    },
    {
     "x": 5445,
-    "y": 4143,
+    "y": 1057,
     "name": "Bidis",
     "ref": "2e7a6cbc-7c3f-53a7-a01f-818e89d60f80"
    },
    {
     "x": 3420,
-    "y": 1514,
+    "y": 3686,
     "name": "Boukara",
     "ref": "851dc09c-3ad4-5b1a-a76c-66bb352d0288"
    },
    {
     "x": 6233,
-    "y": 3137,
+    "y": 2063,
     "name": "Brikinniai",
     "ref": "50d38e4e-3c17-510a-a3b9-7cd5c923adfe"
    },
    {
     "x": 6171,
-    "y": 5068,
+    "y": 132,
     "name": "Chersonos",
     "ref": "23b9d57e-2b03-5091-88bc-44bb29b44a51"
    },
    {
     "x": 6179,
-    "y": 1429,
+    "y": 3771,
     "name": "Demena",
     "ref": "08b48545-b347-52db-8994-6d7dc8bfe229"
    },
    {
     "x": 4520,
-    "y": 3222,
+    "y": 1978,
     "name": "Digenos",
     "ref": "8371806a-da6c-51b0-a568-b09659e86df4"
    },
    {
     "x": 592,
-    "y": 1427,
+    "y": 3773,
     "name": "Drepanon",
     "ref": "58ad9af3-d32c-56bb-8431-e9074a2d2ccc"
    },
    {
     "x": 5631,
-    "y": 3656,
+    "y": 1544,
     "name": "Echetla",
     "ref": "0a99546b-26df-5a2b-a686-7d91b654b0f1"
    },
    {
     "x": 6660,
-    "y": 5042,
+    "y": 158,
     "name": "Edissa",
     "ref": "db24c523-b253-5084-8ec1-57fa56d44b4b"
    },
    {
     "x": 3246,
-    "y": 2633,
+    "y": 2567,
     "name": "Egenimos",
     "ref": "72bd18ba-2916-520d-a953-a79cc0c1f093"
    },
    {
     "x": 3870,
-    "y": 3986,
+    "y": 1214,
     "name": "Eknomos",
     "ref": "5e3bc616-30a8-53f2-a80a-60411098d1c6"
    },
    {
     "x": 927,
-    "y": 1563,
+    "y": 3637,
     "name": "Elima",
     "ref": "0ff0990f-a3aa-51b0-b285-8197404c6c2c"
    },
    {
     "x": 5515,
-    "y": 1728,
+    "y": 3472,
     "name": "Engyon",
     "ref": "f8ec22dc-b040-569a-a5d0-5420e19101e7"
    },
    {
     "x": 4715,
-    "y": 2591,
+    "y": 2609,
     "name": "Enna",
     "ref": "555acba6-31ff-58bd-a7b2-5b011cbe0794"
    },
    {
     "x": 1907,
-    "y": 2263,
+    "y": 2937,
     "name": "Entella",
     "ref": "451df48d-aa85-52f5-8a3a-57c39effa5e9"
    },
    {
     "x": 6587,
-    "y": 2440,
+    "y": 2760,
     "name": "Ergetion",
     "ref": "2d51716e-c48c-5acc-b089-944e85453b73"
    },
    {
     "x": 4182,
-    "y": 2665,
+    "y": 2535,
     "name": "Erkenia",
     "ref": "f62b609f-833c-508b-8998-2ac75e1c22a1"
    },
    {
     "x": 5747,
-    "y": 3197,
+    "y": 2003,
     "name": "Eryke",
     "ref": "9feaffd8-91c2-53ac-b8a3-9c83fb7ae657"
    },
    {
     "x": 629,
-    "y": 1472,
+    "y": 3728,
     "name": "Eryx",
     "ref": "8eb41efc-3ae6-5ec4-9b4f-ba9defac1f22"
    },
    {
     "x": 5872,
-    "y": 3823,
+    "y": 1377,
     "name": "Euboia",
     "ref": "a3ddaeb5-b767-5db8-8c8c-348a42c08d45"
    },
    {
     "x": 6568,
-    "y": 4553,
+    "y": 647,
     "name": "Fiinoka",
     "ref": "b442ca4e-78bf-5646-8763-9081cc06c48c"
    },
    {
     "x": 4580,
-    "y": 4026,
+    "y": 1174,
     "name": "Gela",
     "ref": "b07f8d44-52e8-5128-9f66-75f9c0ba3947"
    },
    {
     "x": 4310,
-    "y": 3064,
+    "y": 2136,
     "name": "Gibol Gabol",
     "ref": "88d4351c-8c73-5774-a863-21a43c91aa93"
    },
    {
     "x": 2715,
-    "y": 3169,
+    "y": 2031,
     "name": "Gidinon",
     "ref": "8dfed504-64e5-5e4c-b806-82909464266a"
    },
    {
     "x": 6133,
-    "y": 696,
+    "y": 4504,
     "name": "Goraion",
     "ref": "5c4279ff-3fd9-5c6f-87c7-5171a976e38b"
    },
    {
     "x": 2453,
-    "y": 2325,
+    "y": 2875,
     "name": "Grannai",
     "ref": "a56075ed-a10c-5d31-bb13-c467cd641495"
    },
    {
     "x": 5007,
-    "y": 2883,
+    "y": 2317,
     "name": "Halfason",
     "ref": "ed92b347-dad9-569e-abbe-168ebdba59f5"
    },
    {
     "x": 1162,
-    "y": 2144,
+    "y": 3056,
     "name": "Halikyai",
     "ref": "27024eab-ad87-5a99-8e44-1ad8ee1da5d4"
    },
    {
     "x": 5620,
-    "y": 1056,
+    "y": 4144,
     "name": "Halontion",
     "ref": "e07aef25-6009-5862-991b-566177140d17"
    },
    {
     "x": 4744,
-    "y": 1433,
+    "y": 3767,
     "name": "Hamiit",
     "ref": "ac69b364-f0f7-53eb-a9f3-16c9798a52e5"
    },
    {
     "x": 3457,
-    "y": 2124,
+    "y": 3076,
     "name": "Helketion",
     "ref": "27220b1d-35cd-5fa3-a73a-b789245f5616"
    },
    {
     "x": 6873,
-    "y": 4701,
+    "y": 499,
     "name": "Heloros",
     "ref": "3df3b211-feb4-567e-ba88-076534697ea8"
    },
    {
     "x": 4803,
-    "y": 2954,
+    "y": 2246,
     "name": "Herbessos",
     "ref": "07a4a069-b0af-527a-9013-ef37e2b79860"
    },
    {
     "x": 4384,
-    "y": 1909,
+    "y": 3291,
     "name": "Herbita",
     "ref": "01b6a9cb-64a3-5a28-a13d-87cfcc9b7746"
    },
    {
     "x": 4542,
-    "y": 1293,
+    "y": 3907,
     "name": "Hesas",
     "ref": "70ec1dc1-39e7-56d8-adb5-bdfef2ccc5b1"
    },
    {
     "x": 3541,
-    "y": 1423,
+    "y": 3777,
     "name": "Himera",
     "ref": "77e56abb-b608-5b61-aee7-84a14237b91e"
    },
    {
     "x": 2690,
-    "y": 2400,
+    "y": 2800,
     "name": "Hippana",
     "ref": "d9e4620e-93d8-5f93-a082-b57029f6dc89"
    },
    {
     "x": 6311,
-    "y": 2564,
+    "y": 2636,
     "name": "Hybla Geleatis",
     "ref": "0b6343d8-10b1-5d25-bd08-9b5a3adfcf4a"
    },
    {
     "x": 5970,
-    "y": 4572,
+    "y": 628,
     "name": "Hybla Heraia",
     "ref": "cfbc2bab-7e13-59eb-89e4-4371499b5727"
    },
    {
     "x": 1995,
-    "y": 961,
+    "y": 4239,
     "name": "Hykarra",
     "ref": "2d5f57cb-9e77-5a86-87fb-30bc32c6c9d7"
    },
    {
     "x": 1995,
-    "y": 1553,
+    "y": 3647,
     "name": "Iaitas",
     "ref": "ec0ce03c-ecc9-525e-95fa-a767e290c686"
    },
    {
     "x": 6881,
-    "y": 4909,
+    "y": 291,
     "name": "Ichana",
     "ref": "5ae841f1-633c-5ae8-af03-2a901f701fff"
    },
    {
     "x": 4989,
-    "y": 1663,
+    "y": 3537,
     "name": "Imachara",
     "ref": "b143a80c-1735-5fcf-90bd-09ec860954ee"
    },
    {
     "x": 6070,
-    "y": 2643,
+    "y": 2557,
     "name": "Inessa",
     "ref": "cf5aef73-2420-59d2-aaac-8a18776e96b0"
    },
    {
     "x": 1331,
-    "y": 1517,
+    "y": 3683,
     "name": "Inikon",
     "ref": "0cd5532b-c1bf-5649-9556-52d930686736"
    },
    {
     "x": 6352,
-    "y": 4760,
+    "y": 440,
     "name": "Ispika",
     "ref": "c9c0c53f-291e-54c6-ac2d-c420ca97e74c"
    },
    {
     "x": 3987,
-    "y": 3607,
+    "y": 1593,
     "name": "Kakyron",
     "ref": "c285fc27-ea1b-51d6-b3e0-b9ac1f5c4445"
    },
    {
     "x": 4983,
-    "y": 1171,
+    "y": 4029,
     "name": "Kalakte",
     "ref": "2a76ac6c-ada1-5a4d-be36-b882b74b78b0"
    },
    {
     "x": 4182,
-    "y": 2500,
+    "y": 2700,
     "name": "Kaligenos",
     "ref": "864d05fa-d50c-579f-bbaa-ae457db14110"
    },
    {
     "x": 3195,
-    "y": 3507,
+    "y": 1693,
     "name": "Kalkarak",
     "ref": "2d6593c4-09d2-5428-b546-52eddaf9e0bb"
    },
    {
     "x": 6915,
-    "y": 2008,
+    "y": 3192,
     "name": "Kallipolis",
     "ref": "bff4d1fb-1495-5112-9361-73ab0ddf2b0d"
    },
    {
     "x": 1587,
-    "y": 1470,
+    "y": 3730,
     "name": "Kaloba",
     "ref": "11dc78a6-f975-5182-884c-819bc85f880c"
    },
    {
     "x": 4267,
-    "y": 2906,
+    "y": 2294,
     "name": "Kaltigene",
     "ref": "374bd071-5711-5d21-b9e2-39cb969f8b1e"
    },
    {
     "x": 5341,
-    "y": 4699,
+    "y": 501,
     "name": "Kamarina",
     "ref": "72055884-9a16-55c4-9a65-87b91f06c4e3"
    },
    {
     "x": 5028,
-    "y": 3853,
+    "y": 1347,
     "name": "Kamerai",
     "ref": "e6ae7292-1db0-5a70-a624-38d50b3f792d"
    },
    {
     "x": 2956,
-    "y": 3083,
+    "y": 2117,
     "name": "Kamikos",
     "ref": "131df24c-6877-5578-8387-13d88d0aea8b"
    },
    {
     "x": 1766,
-    "y": 1827,
+    "y": 3373,
     "name": "Kamporale",
     "ref": "022994e5-6abc-5770-bfae-0f2d50bf8599"
    },
    {
     "x": 4555,
-    "y": 2869,
+    "y": 2331,
     "name": "Kapod",
     "ref": "989f1fdc-1dcb-55a0-b05b-69ef8aa8e6ec"
    },
    {
     "x": 2478,
-    "y": 3140,
+    "y": 2060,
     "name": "Kaprianon",
     "ref": "ecc7015b-09d9-5c48-87bc-d5210e6c9c99"
    },
    {
     "x": 5189,
-    "y": 1538,
+    "y": 3662,
     "name": "Kapution",
     "ref": "588be673-8383-56fc-845d-9241f8694434"
    },
    {
     "x": 2697,
-    "y": 1666,
+    "y": 3534,
     "name": "Karastele",
     "ref": "14bf6fbf-3038-5e03-adf2-73047e1ea74a"
    },
    {
     "x": 6107,
-    "y": 2519,
+    "y": 2681,
     "name": "Karole",
     "ref": "876b5683-d07f-5d6d-8edb-a82e70ce2c50"
    },
    {
     "x": 5586,
-    "y": 3384,
+    "y": 1816,
     "name": "Kasasi",
     "ref": "d25f80fb-1cc7-59d0-91d4-2083236f45a6"
    },
    {
     "x": 5271,
-    "y": 3789,
+    "y": 1411,
     "name": "Kasgeraton",
     "ref": "61025336-04df-540f-bc46-023028e9b1eb"
    },
    {
     "x": 6941,
-    "y": 4309,
+    "y": 891,
     "name": "Kasibe",
     "ref": "9f27db68-7293-590c-bd3b-71ee24ee6bba"
    },
    {
     "x": 6184,
-    "y": 4064,
+    "y": 1136,
     "name": "Kasmenai",
     "ref": "290f68ae-1056-5afc-818c-3625fb4e0f74"
    },
    {
     "x": 6716,
-    "y": 2735,
+    "y": 2465,
     "name": "Katane",
     "ref": "c96c07c4-efb7-5cfc-8450-44d253631779"
    },
    {
     "x": 2340,
-    "y": 1275,
+    "y": 3925,
     "name": "Kataria",
     "ref": "03df1f5d-19cd-52c9-aa51-86f74acb0fc6"
    },
    {
     "x": 6821,
-    "y": 3348,
+    "y": 1852,
     "name": "Katulle",
     "ref": "2c120891-080c-58d9-906e-999792f06a3e"
    },
    {
     "x": 5465,
-    "y": 4882,
+    "y": 318,
     "name": "Kaukanai",
     "ref": "110c4738-2718-5640-9758-03e84f9b0bc2"
    },
    {
     "x": 2496,
-    "y": 2066,
+    "y": 3134,
     "name": "Kausos",
     "ref": "df80d87c-617f-5e16-95db-30d0fe7ed40f"
    },
    {
     "x": 5819,
-    "y": 2385,
+    "y": 2815,
     "name": "Kentoripa",
     "ref": "034fc1ae-c4a7-50e2-903c-2063eda157cf"
    },
    {
     "x": 4142,
-    "y": 1242,
+    "y": 3958,
     "name": "Kephaloidion",
     "ref": "f1f4f07a-6703-5171-953d-76a6908387a0"
    },
    {
     "x": 4019,
-    "y": 2583,
+    "y": 2617,
     "name": "Kibone",
     "ref": "54572d71-dd43-5e31-b056-b627c938d389"
    },
    {
     "x": 4743,
-    "y": 1299,
+    "y": 3901,
     "name": "Kilon",
     "ref": "f2803095-c6b6-502e-a584-134c3c7a2093"
    },
    {
     "x": 2977,
-    "y": 1789,
+    "y": 3411,
     "name": "Kimena",
     "ref": "ccc8f93c-32d3-52fc-ba83-cb87f30ec400"
    },
    {
     "x": 2812,
-    "y": 2311,
+    "y": 2889,
     "name": "Kolibra",
     "ref": "53eed2c2-9f79-57e8-b6d5-8febacee6db1"
    },
    {
     "x": 3782,
-    "y": 1465,
+    "y": 3735,
     "name": "Kolle Kalos",
     "ref": "e71ec4ae-04ca-5f13-bae7-3f75f1cd5cd8"
    },
    {
     "x": 6692,
-    "y": 1431,
+    "y": 3769,
     "name": "Koor",
     "ref": "24401ad7-3c22-5a0b-9166-38f36d3f9cd1"
    },
    {
     "x": 3648,
-    "y": 3383,
+    "y": 1817,
     "name": "Koskon",
     "ref": "b825453e-78b9-5c24-b5b5-9a02e4aa4e97"
    },
    {
     "x": 3010,
-    "y": 2431,
+    "y": 2769,
     "name": "Krastos",
     "ref": "b18c1983-9170-54eb-a71c-5059cbfa0e89"
    },
    {
     "x": 2615,
-    "y": 1178,
+    "y": 4022,
     "name": "Kronia",
     "ref": "a37c2bae-7026-50a5-8bc1-f1c86def9ca7"
    },
    {
     "x": 4941,
-    "y": 3657,
+    "y": 1543,
     "name": "Lavenka",
     "ref": "5e757a76-1ec0-5e61-b9e0-0298454cf363"
    },
    {
     "x": 5869,
-    "y": 2924,
+    "y": 2276,
     "name": "Leona",
     "ref": "02663282-1884-5b80-ae28-8b08a0123226"
    },
    {
     "x": 6543,
-    "y": 3423,
+    "y": 1777,
     "name": "Leontinoi",
     "ref": "9c7dfa1a-c650-5a02-966c-d4606e9251e3"
    },
    {
     "x": 6224,
-    "y": -259,
+    "y": 5459,
     "name": "Lipara",
     "ref": "059fa351-4b49-558c-b9ec-38c97795d32a"
    },
    {
     "x": 6694,
-    "y": 839,
+    "y": 4361,
     "name": "Longane",
     "ref": "d1f75c66-bdf3-562e-b451-4a10d52c318c"
    },
    {
     "x": 3094,
-    "y": 2175,
+    "y": 3025,
     "name": "Madara",
     "ref": "0a46fb8d-b9e9-53bd-ab5b-f50f4de376ba"
    },
    {
     "x": 2537,
-    "y": 1538,
+    "y": 3662,
     "name": "Makella",
     "ref": "42a4b6f7-baa1-5140-9b69-fe293410e2d1"
    },
    {
     "x": 4979,
-    "y": 3543,
+    "y": 1657,
     "name": "Maktorion",
     "ref": "cbf810f9-e665-5770-8ecb-a223c4e58464"
    },
    {
     "x": 4062,
-    "y": 1465,
+    "y": 3735,
     "name": "Manikos",
     "ref": "91985329-61b3-52e4-82ba-9f75733f7033"
    },
    {
     "x": 4116,
-    "y": 3757,
+    "y": 1443,
     "name": "Markesa",
     "ref": "eb309690-a130-50b6-ada9-2dc368a93eb8"
    },
    {
     "x": 5350,
-    "y": 3717,
+    "y": 1483,
     "name": "Maroi",
     "ref": "371c4cd7-bdd0-537e-b491-3ad7d224971e"
    },
    {
     "x": 5744,
-    "y": 4924,
+    "y": 276,
     "name": "Mastrome",
     "ref": "46487d2c-9602-5293-8c9a-1d73d5b269a6"
    },
    {
     "x": 658,
-    "y": 2660,
+    "y": 2540,
     "name": "Mazara",
     "ref": "9e5178d2-dd87-5724-92e8-f3e2750594d0"
    },
    {
     "x": 6997,
-    "y": 3667,
+    "y": 1533,
     "name": "Megara",
     "ref": "aac6fcd7-9a36-5f3d-825a-75c897b3ce46"
    },
    {
     "x": 5829,
-    "y": 3552,
+    "y": 1648,
     "name": "Menai",
     "ref": "02bb324f-5b2d-5e09-9d37-a2e8217c65ec"
    },
    {
     "x": 4873,
-    "y": 4151,
+    "y": 1049,
     "name": "Mentuse",
     "ref": "439df1e4-30b6-57ed-bafa-c7aac588e6bc"
    },
    {
     "x": 2123,
-    "y": 3161,
+    "y": 2039,
     "name": "Merkane",
     "ref": "364ff1a9-c111-582e-a47f-c74b9d2836bf"
    },
    {
     "x": 2358,
-    "y": 3341,
+    "y": 1859,
     "name": "Minoa",
     "ref": "2a023e7c-c8ef-5a7a-8462-015f62d563fd"
    },
    {
     "x": 2033,
-    "y": 1144,
+    "y": 4056,
     "name": "Montope",
     "ref": "8c725ead-4497-53d7-8dd0-4c71f7719ab1"
    },
    {
     "x": 1952,
-    "y": 1999,
+    "y": 3201,
     "name": "Morankusa",
     "ref": "5319303d-29ef-5ef9-8758-135b26fb3ce9"
    },
    {
     "x": 5257,
-    "y": 3131,
+    "y": 2069,
     "name": "Morgantina",
     "ref": "b3426a87-93af-5403-a400-ae7461907aef"
    },
    {
     "x": 427,
-    "y": 2010,
+    "y": 3190,
     "name": "Motya",
     "ref": "569933a5-488b-56ab-8adf-85f8cd8d4de4"
    },
    {
     "x": 6089,
-    "y": 4718,
+    "y": 482,
     "name": "Motyka",
     "ref": "054aa593-a47b-5878-a2f8-daf291eb1abe"
    },
    {
     "x": 3895,
-    "y": 2987,
+    "y": 2213,
     "name": "Motyon",
     "ref": "bbe49809-2f4e-5a17-9110-4b41ee8b0d96"
    },
    {
     "x": 4141,
-    "y": 2375,
+    "y": 2825,
     "name": "Murene",
     "ref": "cc9887cf-3172-58fa-a06c-9a313892ae8e"
    },
    {
     "x": 6912,
-    "y": 373,
+    "y": 4827,
     "name": "Mylai",
     "ref": "2dac277e-c396-5636-80cb-fb44073e2f71"
    },
    {
     "x": 4142,
-    "y": 2786,
+    "y": 2414,
     "name": "Myttistratos",
     "ref": "d255ea79-51ab-5ee4-a166-a51ff6eb468e"
    },
    {
     "x": 1595,
-    "y": 2445,
+    "y": 2755,
     "name": "Nakone",
     "ref": "c5b1898e-da9b-5771-a2f8-c84d6e97cdcd"
    },
    {
     "x": 4770,
-    "y": 3343,
+    "y": 1857,
     "name": "Naone",
     "ref": "8d55a681-c5e2-54bd-bda0-e875073d9068"
    },
    {
     "x": 7288,
-    "y": 327,
+    "y": 4873,
     "name": "Naulochos",
     "ref": "df685ad0-bd1a-5772-bb8e-c0805fa0000f"
    },
    {
     "x": 7135,
-    "y": 1521,
+    "y": 3679,
     "name": "Naxos",
     "ref": "1d4707d1-5620-57cf-b49f-4c40a45fda0d"
    },
    {
     "x": 6602,
-    "y": 4446,
+    "y": 754,
     "name": "Neaition",
     "ref": "63f8b7f2-7a09-5ffd-aa5d-cd84902358d1"
    },
    {
     "x": 5114,
-    "y": 1887,
+    "y": 3313,
     "name": "Nikos",
     "ref": "c8e6dee9-d623-5d01-b302-ed29015d003c"
    },
    {
     "x": 2419,
-    "y": 1895,
+    "y": 3305,
     "name": "Nilaios",
     "ref": "7a01e6ee-c7df-52a0-93d7-b3967edba172"
    },
    {
     "x": 5662,
-    "y": 2753,
+    "y": 2447,
     "name": "Noai",
     "ref": "6637a305-cd55-563b-bfdc-9334f0092968"
    },
    {
     "x": 4492,
-    "y": 3796,
+    "y": 1404,
     "name": "Omphake",
     "ref": "5253b60c-c201-5810-8241-8d23ed8b7210"
    },
    {
     "x": 6964,
-    "y": 5081,
+    "y": 119,
     "name": "Pachynos",
     "ref": "d57056da-88b5-5e0e-96dd-73ff73eb80c6"
    },
    {
     "x": 5989,
-    "y": 3366,
+    "y": 1834,
     "name": "Palike",
     "ref": "545ff929-c851-5816-a758-65ca122873a2"
    },
    {
     "x": 2457,
-    "y": 999,
+    "y": 4201,
     "name": "Panormos",
     "ref": "beeef3a8-ba28-5ab5-9c91-fe4d7b5ac11d"
    },
    {
     "x": 6641,
-    "y": 3853,
+    "y": 1347,
     "name": "Pantalika",
     "ref": "889abf46-9695-55c1-8f98-dad82f9858db"
    },
    {
     "x": 3612,
-    "y": 2544,
+    "y": 2656,
     "name": "Parkenon",
     "ref": "3d78511e-ecea-591c-b52e-0ecdd4282a60"
    },
    {
     "x": 2735,
-    "y": 1265,
+    "y": 3935,
     "name": "Paropos",
     "ref": "789f3f5d-9c2a-5e5d-a7bf-c8c472942e2c"
    },
    {
     "x": 1681,
-    "y": 2183,
+    "y": 3017,
     "name": "Pergane",
     "ref": "7a9c9895-b794-58ea-8152-b56332ebcf0a"
    },
    {
     "x": 4799,
-    "y": 2715,
+    "y": 2485,
     "name": "Pergusa",
     "ref": "56aefe6b-b0b5-5fc8-b01c-3ca622c59fee"
    },
    {
     "x": 1400,
-    "y": 2577,
+    "y": 2623,
     "name": "Petrosa",
     "ref": "a80a7a9e-3dbc-5686-a23f-6c3e970b8030"
    },
    {
     "x": 4246,
-    "y": 3945,
+    "y": 1255,
     "name": "Phalarion",
     "ref": "5f96f796-b36f-5a52-8faa-8633be4fcd5d"
    },
    {
     "x": 7259,
-    "y": 1252,
+    "y": 3948,
     "name": "Phoinix",
     "ref": "dd2307f6-4bc8-5915-af14-b7bc1ee6f541"
    },
    {
     "x": 6048,
-    "y": 2047,
+    "y": 3153,
     "name": "Piakos",
     "ref": "ccef4fde-54d4-557c-9bc5-8ad543c827e7"
    },
    {
     "x": 3097,
-    "y": 1873,
+    "y": 3327,
     "name": "Pikone",
     "ref": "daf33a69-4c64-5637-b5cb-a0ff2699ed61"
    },
    {
     "x": 3487,
-    "y": 3806,
+    "y": 1394,
     "name": "Pipana",
     "ref": "7e2582ce-77dd-5997-a2eb-45d0863c2c1d"
    },
    {
     "x": 2380,
-    "y": 1543,
+    "y": 3657,
     "name": "Pirama",
     "ref": "a5815ce8-85d6-5751-9b37-6e424c7cd864"
    },
    {
     "x": 7335,
-    "y": 4166,
+    "y": 1034,
     "name": "Plemmyrion",
     "ref": "9395c6fe-a889-5a8a-98cd-a75dad635f9c"
    },
    {
     "x": 1132,
-    "y": 2012,
+    "y": 3188,
     "name": "Pollike",
     "ref": "db81f308-bccd-5053-a1ae-69e86bb9dc90"
    },
    {
     "x": 3567,
-    "y": 2831,
+    "y": 2369,
     "name": "Rakine",
     "ref": "f711bec8-bac9-5b14-9894-c5dcb589eb10"
    },
    {
     "x": 3905,
-    "y": 3722,
+    "y": 1478,
     "name": "Ravanusa",
     "ref": "27c2f185-2854-52b3-98c7-c523646467bc"
    },
    {
     "x": 7907,
-    "y": 612,
+    "y": 4588,
     "name": "Rhegion",
     "ref": "0a77d35e-85f7-59e9-a451-56be33bf4005"
    },
    {
     "x": 1930,
-    "y": 2892,
+    "y": 2308,
     "name": "Rokka",
     "ref": "f8719e58-0fc4-50bc-bbc9-c09036d78b62"
    },
    {
     "x": 7281,
-    "y": 563,
+    "y": 4637,
     "name": "Romnos",
     "ref": "17aa284c-1ea8-5f77-bbef-36cd844c0249"
    },
    {
     "x": 2516,
-    "y": 3294,
+    "y": 1906,
     "name": "Rotonde",
     "ref": "4c20deb5-3ca4-58f0-9947-f40a93ed2d55"
    },
    {
     "x": 4432,
-    "y": 2947,
+    "y": 2253,
     "name": "Sabukina",
     "ref": "36688718-0e26-5605-a340-3293e79ce59a"
    },
    {
     "x": 3178,
-    "y": 1431,
+    "y": 3769,
     "name": "Saneka",
     "ref": "0efc48b7-6bc8-50ba-ba9c-de35b266a943"
    },
    {
     "x": 2337,
-    "y": 2202,
+    "y": 2998,
     "name": "Schera",
     "ref": "a7f055c1-8fe9-51e4-8f6f-e43b726c289c"
    },
    {
     "x": 6773,
-    "y": 3506,
+    "y": 1694,
     "name": "Selefe",
     "ref": "331aec1f-adb7-576e-b727-fac09b2a7cbe"
    },
    {
     "x": 1236,
-    "y": 2914,
+    "y": 2286,
     "name": "Selinous",
     "ref": "041e281d-e7cf-5eb0-8fa6-3861f453c50f"
    },
    {
     "x": 3660,
-    "y": 1906,
+    "y": 3294,
     "name": "Skiara",
     "ref": "837960f1-afec-5698-b104-9cb2943dd533"
    },
    {
     "x": 5977,
-    "y": 4858,
+    "y": 342,
     "name": "Skikli",
     "ref": "24f0f56b-56c2-544c-b7f5-f2cb48d4aad1"
    },
    {
     "x": 5528,
-    "y": 4223,
+    "y": 977,
     "name": "Skornake",
     "ref": "6f59d7e5-8ba8-5e85-89fb-d9f4fef1ca8f"
    },
    {
     "x": 5461,
-    "y": 1098,
+    "y": 4102,
     "name": "Skurke",
     "ref": "c1e2980f-f67d-52e5-8ad6-3b04a9062db1"
    },
    {
     "x": 2773,
-    "y": 992,
+    "y": 4208,
     "name": "Solous",
     "ref": "a1d0e381-4efc-5e19-8be7-4aaa492a9fe0"
    },
    {
     "x": 2456,
-    "y": 2111,
+    "y": 3089,
     "name": "Spolion",
     "ref": "5915a1ec-6a23-59a5-8bf0-6b92019a8a18"
    },
    {
     "x": 6378,
-    "y": 3653,
+    "y": 1547,
     "name": "Styella",
     "ref": "9586cb05-b199-52cb-9e98-f72a8ff5d9c2"
    },
    {
     "x": 6594,
-    "y": 3104,
+    "y": 2096,
     "name": "Symaithos",
     "ref": "a5589d2a-eb82-53ae-8594-12c50f372ea3"
    },
    {
     "x": 7298,
-    "y": 4016,
+    "y": 1184,
     "name": "Syrakousai",
     "ref": "29c92b41-6372-56ca-a6e7-311a740a9ea7"
    },
    {
     "x": 4998,
-    "y": 2268,
+    "y": 2932,
     "name": "Tavake",
     "ref": "b82d5ec4-9763-585e-96cb-2006c88d897d"
    },
    {
     "x": 7108,
-    "y": 3785,
+    "y": 1415,
     "name": "Thapsos",
     "ref": "cb35c8f7-07d4-5335-84ad-7ee40e991760"
    },
    {
     "x": 4807,
-    "y": 3189,
+    "y": 2011,
     "name": "Tigra",
     "ref": "60dcaff0-debe-5d9a-b14a-3a1053cd2357"
    },
    {
     "x": 6374,
-    "y": 1340,
+    "y": 3860,
     "name": "Tirakii",
     "ref": "e571806b-9bd5-5aa5-b519-b8c52e11db06"
    },
    {
     "x": 3074,
-    "y": 3277,
+    "y": 1923,
     "name": "Tirnon",
     "ref": "66eff82c-7e93-510d-8565-d2eae7f4b696"
    },
    {
     "x": 6577,
-    "y": 1566,
+    "y": 3634,
     "name": "Tissa",
     "ref": "d8da4cbe-a3e9-59ce-88e9-326791f841f1"
    },
    {
     "x": 2128,
-    "y": 2841,
+    "y": 2359,
     "name": "Triokala",
     "ref": "729308f6-6dc7-5a8f-a294-2af2e3075e53"
    },
    {
     "x": 6972,
-    "y": 3430,
+    "y": 1770,
     "name": "Trotilon",
     "ref": "f383f1f7-10d4-5e5e-b502-a34cb0d94642"
    },
    {
     "x": 4223,
-    "y": 2079,
+    "y": 3121,
     "name": "Tyrrhene",
     "ref": "0ef38751-c009-58a2-ba29-a412c52d2d95"
    },
    {
     "x": 6907,
-    "y": 2526,
+    "y": 2674,
     "name": "Xiphonia",
     "ref": "ae6083a2-d312-55fd-b1c0-5e927cbf95b4"
    },
    {
     "x": 5914,
-    "y": 3977,
+    "y": 1223,
     "name": "Xuthia",
     "ref": "585ac9c4-38a4-5103-a843-95eaac4010fe"
    },
    {
     "x": 7704,
-    "y": 424,
+    "y": 4776,
     "name": "Zankle",
     "ref": "082602ab-3c02-5f21-aead-0b3991874900"
    }

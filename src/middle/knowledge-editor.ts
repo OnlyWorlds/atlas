@@ -24,6 +24,7 @@
  */
 
 import { getState } from '../core/state';
+import { escapeText } from '../core/dom-utils';
 import { aboutFieldFor } from '../core/knowledge';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { getActiveStore } from '../core/active-store';
@@ -252,7 +253,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
       items.push(`
         <button type="button" class="atlas-prose-context-menu-item" data-role="unlink-chip">
           <span class="material-symbols-outlined">link_off</span>
-          <span>Unlink ${escapeMenuText(chipHit.label || 'chip')}</span>
+          <span>Unlink ${escapeText(chipHit.label || 'chip')}</span>
         </button>
       `);
     }
@@ -260,7 +261,7 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
       items.push(`
         <button type="button" class="atlas-prose-context-menu-item" data-role="link-autolink">
           <span class="material-symbols-outlined">link</span>
-          <span>Link to ${escapeMenuText(autolinkHit.name)}</span>
+          <span>Link to ${escapeText(autolinkHit.name)}</span>
         </button>
       `);
     }
@@ -367,10 +368,3 @@ function applySpellcheck(handle: WorkspaceEditorHandle): void {
   handle.editor.view.dom.setAttribute('spellcheck', enabled ? 'true' : 'false');
 }
 
-function escapeMenuText(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}

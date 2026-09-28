@@ -105,6 +105,7 @@ import {
   listFiles,
   readJson,
   readJsonStrict,
+  CorruptFileError,
   removeFile,
   sameFsName,
   tryGetDir,
@@ -870,8 +871,10 @@ export class FsFolderStore implements FolderStore {
 
   // ---- World meta ----
 
-  async readWorldMeta(): Promise<WorldMeta> {
-    const meta = await this.readWorldMetaFile();
+  async readWorldMeta(opts?: { strict?: boolean }): Promise<WorldMeta> {
+    const meta = opts?.strict
+      ? await readJsonStrict<WorldMeta>(this.requireRoot(), WORLD_META_FILE)
+      : await this.readWorldMetaFile();
     if (!meta) return { ...DEFAULT_META };
     // THE NOW, UNDER EITHER SPELLING (folder-format v0.3.5, 2026-07-28).
     //
@@ -1036,14 +1039,18 @@ export class FsFolderStore implements FolderStore {
     if (!entry) return cached;
     try {
       const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(entry.layout, entry.type));
-      const disk = dir ? await readJson<Element>(dir, entry.filename) : null;
+      // STRICT (S361, gate F6): a file that exists and will not parse (git
+      // conflict markers) must stop the write. Falling back to the cache here
+      // wrote atlas's copy over it, the one damaged-file case S360 left open.
+      const disk = dir ? await readJsonStrict<Element>(dir, entry.filename) : null;
       if (!disk || disk.id !== id) return cached;
       // Same fill as the scan: a foreign writer may omit `type`.
       if (typeof disk.type !== 'string' || !disk.type) disk.type = entry.type;
       this.adoptDiskBody(id, disk);
       this.bodyCache.set(id, disk);
       return structuredClone(disk);
-    } catch {
+    } catch (err) {
+      if (err instanceof CorruptFileError) throw err;
       return cached;
     }
   }
@@ -1529,7 +1536,7 @@ export class FsFolderStore implements FolderStore {
     await removeFile(dir, filename);
   }
 
-  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string): Promise<void> {
+  async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null): Promise<void> {
     // Serialize with update/delete on the same id (#79). The SyncEngine calls
     // this after a push; without the chain a concurrent local edit could land
     // between this read and write, and the stamp would revert it to a stale body.

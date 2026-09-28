@@ -6052,6 +6052,14 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   letter-spacing: 0.04em;
 }
 
+/* A one-line explanation under a popover action (S361: the map flip). */
+.atlas-popover-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(var(--atlas-ink-rgb), 0.55);
+}
+
 .atlas-popover-section-divider {
   /* Softened (Freek, S300): the dashed cyan rule + cyan caps text shouted;
      a solid hairline + quiet label matches the section-label voice. */
@@ -11127,13 +11135,20 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
 }
 
 .atlas-grounded-next .atlas-grounded-next-glyph .atlas-add-glyph-plus {
-  font-size: 10px;
+  /* !important beats the sidebar's `.atlas-add-glyph-*` sizes; margin 0 beats
+     `.atlas-welcome .material-symbols-outlined`'s 16px, which made this inline
+     box 34px tall and broke the paragraph's first line (S361 own eyes). */
+  font-size: 10px !important;
   line-height: 1;
+  margin: 0 -1px 0 0;
+  color: inherit;
 }
 
 .atlas-grounded-next .atlas-grounded-next-glyph .atlas-add-glyph-main {
-  font-size: 15px;
+  font-size: 15px !important;
   line-height: 1;
+  margin: 0;
+  color: inherit;
 }
 
 .atlas-share-map-zone-label {

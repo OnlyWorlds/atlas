@@ -311,9 +311,11 @@ describe('buildPagePayload', () => {
     expect(frozen.title).toBe('barovia');
     expect(frozen.image_url).toBe('https://img.example/map.png');
     expect(frozen.showLabels).toBeUndefined(); // absent = labels on
-    // 250/1000 = 25%, 125/500 = 25%; pinned elements are included → ref.
-    expect(frozen.pins[0]).toEqual({ xPct: 25, yPct: 25, name: 'Ireena', type: 'character', ref: IREENA });
-    expect(frozen.pins[1]).toEqual({ xPct: 90, yPct: 90, name: 'Vallaki', type: 'location', ref: VALLAKI });
+    // x: 250/1000 = 25%. y is stored BOTTOM-left (the schema's, S361) and the
+    // payload's yPct is a TOP-left CSS %: (500-125)/500 = 75%, (500-450)/500 =
+    // 10%. Pinned elements are included → ref.
+    expect(frozen.pins[0]).toEqual({ xPct: 25, yPct: 75, name: 'Ireena', type: 'character', ref: IREENA });
+    expect(frozen.pins[1]).toEqual({ xPct: 90, yPct: 10, name: 'Vallaki', type: 'location', ref: VALLAKI });
     // B6 (2026-07-03): pinned elements join `elements` as IDENTITY +
     // description (+ image) ONLY — a DM's other fields never leak from a
     // shared map without the per-pin full-profile opt-in.
