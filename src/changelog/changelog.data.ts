@@ -109,6 +109,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['sync', 'fix'],
       },
       {
+        id: 'scrollbars-and-motion',
+        title: 'One quiet scrollbar everywhere, and less motion when you ask for it',
+        body: 'Windows, the search palette and popovers now use the same thin scrollbar as the rest of Atlas, in both themes. If your system is set to reduce motion, the pulsing hints and sync dots hold still and transitions are instant.',
+        tags: ['layout'],
+      },
+      {
         id: 'reload-saves-first',
         title: 'Reloading for a new version saves what you were typing',
         body: 'Pressing Reload on the new version note now saves text that was still waiting to be written in the writing, knowledge or pages room before the page reloads.',

@@ -1,6 +1,6 @@
 {
-  "fixture_version": "1.2.0",
-  "spec_version": "0.3.5",
+  "fixture_version": "1.2.1",
+  "spec_version": "0.3.6",
   "created": "2026-07-28",
   "fixture_history": [
     {
@@ -26,6 +26,14 @@
       "elements": 9,
       "legacy_elements": 1,
       "change": "ADDITIVE: on-the-map, a pin whose map link uses the format's BARE spelling (`map`, not atlas's `map_id`). The first folder another tool wrote with pins on it opened in atlas with every pin missing and the map index reading 0: atlas keyed on its own suffixed name and never looked under the spec's. A reader must resolve the link under the spec spelling; a writer must not rewrite the key as a side effect of opening the folder."
+    },
+    {
+      "version": "1.2.1",
+      "date": "2026-09-28",
+      "spec_version": "0.3.6",
+      "elements": 9,
+      "legacy_elements": 1,
+      "change": "NO ELEMENT CHANGE: re-verified against spec 0.3.6, whose rulings (a linked folder carries the server world id, .gitignore guidance, snapshot_counts scoped to snapshots) bind writers and snapshots, not this reader answer key. The spec_version above moved so a reader does not report conformance against a superseded spec. Note for readers drawing maps: 0.3.6 section 5 states the bottom-left map origin out loud; this fixture asserts no positions."
     }
   ],
   "world": {

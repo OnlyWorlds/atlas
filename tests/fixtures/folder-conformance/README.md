@@ -5,8 +5,8 @@ imperfect, that any implementation claiming to READ the OnlyWorlds Folder
 Format can run against. It answers "does your reader handle X?" with a failing
 test instead of a question asked of a person.
 
-**Created**: 2026-07-28 (Temper, Forge) · fixture **v1.2.0** · built to
-folder-format spec **v0.3.5** · proposed by Kael (Assembly), adopted by every
+**Created**: 2026-07-28 (Temper, Forge) · fixture **v1.2.1** · built to
+folder-format spec **v0.3.6** · proposed by Kael (Assembly), adopted by every
 pass of Skeld's review round. **Report the fixture version you ran** —
 `expected.json`'s `fixture_history` says what each one contained, and 1.0.0
 shipped two different answer keys under one string before that array existed.

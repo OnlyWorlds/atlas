@@ -492,7 +492,7 @@ Updated through session 257. Listed by surface — none are cutover blockers.
 - **list items missing `updated_at`** are skipped-and-marked-incomplete (defensive, mirrors the /changes hardening); whether keel's list serializer can ever omit it is an open Skeld question.
 
 ### Sync engine internals
-- **Concurrent-edit race on autosave**: applying server response post-push would catch normalization but risks overwriting user's mid-push edit. Today we stamp-only (eventually consistent via next pull).
+- ~~**Concurrent-edit race on autosave**~~ CLOSED: an edit landing while its push is in flight stays dirty (S360 H1, `store/sync-stamp.ts`, convention 96); a create adopted after a lost response compares content and stays dirty when it differs (S361, `adoptServerCopy`). Pull-apply rides the per-id chain with its race check inside the slot (S361, `applyServerRecordIfUnchanged`). Push still stamps only, never applies the response body (by design).
 - **`pushPhase` UPDATE doesn't apply server response back to local**: refuted-by-design from session-205 pressure-test (push asserts local is correct). Revisit only if OW server starts normalizing fields server-side.
 - **`resolveConflict` CREATE path id-swap**: corner case — resolve-conflict on never-synced element doesn't swap if server returns a different id. Not tripped in practice.
 - **`rewriteIdReferences` bumps `local_updated_at`**: causes harmless re-push on next sync after id-swap. Add a "rewrite without bumping" mode if the trailing-push cost ever shows up in profiling.
@@ -680,8 +680,10 @@ elements; cold open 18.5s → ~3s). Load-bearing rules:
   mutate cache internals; write sinks store clones (`cacheSet`).
 - Sound because of the one-writer lock: nothing writes element bodies
   behind the store's back (gate-verified, zero out-of-store writers).
-  External-editor edits mid-session were never supported; they land on the
-  next open, as before.
+  External-editor edits mid-session are not SHOWN until the next open, but
+  since S359 they SURVIVE atlas's writes: every write merges into the file as
+  it is on disk (`readForWrite`, DESIGN convention 92), and since S361 a file
+  that will not parse is never written over (`CorruptFileError`).
 - **Index builds run concurrently** (64-way file reads from handles
   collected in one enumeration; types in parallel) with an in-flight
   promise guard per type. A closed store's in-flight build BAILS (zombie

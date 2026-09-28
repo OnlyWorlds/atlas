@@ -4201,24 +4201,19 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 /* ============================================================
-   Scrollbars (subtle)
+   Scrollbars (subtle): ONE mechanism everywhere (S361, lane a A8).
+   The old `.atlas-shell *::-webkit-scrollbar` block never reached modals,
+   the command palette or body-mounted popovers (native fat bars), and from
+   Chromium 121 any element with the standard `scrollbar-width` ignores the
+   webkit pseudo-elements, which made a third look. The standard pair is
+   inherited and flips with the theme through the ink token.
    ============================================================ */
-.atlas-shell *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+:root {
+  scrollbar-color: rgba(var(--atlas-ink-rgb), 0.16) transparent;
 }
 
-.atlas-shell *::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.atlas-shell *::-webkit-scrollbar-thumb {
-  background: rgba(var(--atlas-ink-rgb), 0.08);
-  border-radius: 4px;
-}
-
-.atlas-shell *::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--atlas-ink-rgb), 0.16);
+* {
+  scrollbar-width: thin;
 }
 
 /* ============================================================
@@ -15776,4 +15771,22 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
   color: var(--atlas-text);
   font-size: 13px;
   backdrop-filter: blur(10px);
+}
+
+/* Reduced motion (S361, lane a A9): transitions go instant and the INFINITE
+   pulses stop. Targeted on purpose: a blanket animation kill would freeze
+   the loading spinner into a static arc, which reads as broken. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  body.atlas-tour-pinstep [data-action="pin-element"],
+  body.atlas-tour-createstep [data-action="create-element"],
+  body.atlas-tour-nowstep [data-action="set-now"],
+  .atlas-tour-target,
+  .atlas-element-sync-dot[data-state="dirty"],
+  .atlas-sync-pill[data-state="saving"] .atlas-sync-pill-dot {
+    animation: none !important;
+  }
 }
