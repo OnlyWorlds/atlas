@@ -51,6 +51,7 @@ export interface ModalShellOpts {
 
 /** Open BaseModals, oldest first: Escape belongs to the last one only. */
 const openModals: BaseModal[] = [];
+let modalTitleSeq = 0;
 
 export class BaseModal {
     protected modal: HTMLElement | null = null;
@@ -64,6 +65,7 @@ export class BaseModal {
     protected dismissLocked = false;
 
     private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
+    private returnFocusTo: HTMLElement | null = null;
 
     /** True when this is the most recently opened modal still on screen. */
     protected isTopmost(): boolean {
@@ -89,11 +91,17 @@ export class BaseModal {
         panel.className =
             'atlas-modal-panel' + (opts.panelClass ? ` ${opts.panelClass}` : '');
         if (opts.dataModal) panel.setAttribute('data-modal', opts.dataModal);
+        // A real dialog to assistive tech (S361, lane a A1): role, modality,
+        // and its title as the accessible name when it has one.
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'true');
 
         if (opts.title !== undefined) {
             const title = document.createElement('div');
             title.className = 'atlas-modal-title';
             title.textContent = opts.title;
+            title.id = `atlas-modal-title-${++modalTitleSeq}`;
+            panel.setAttribute('aria-labelledby', title.id);
             panel.appendChild(title);
         }
 
@@ -111,6 +119,9 @@ export class BaseModal {
      */
     protected show(): void {
         if (this.modal) {
+            // Focus goes back where it was when the modal closes (S361).
+            const active = document.activeElement;
+            this.returnFocusTo = active instanceof HTMLElement && active !== document.body ? active : null;
             document.body.appendChild(this.modal);
             // Force reflow for CSS transition.
             this.modal.offsetHeight;
@@ -133,11 +144,17 @@ export class BaseModal {
         const at = openModals.indexOf(this);
         if (at >= 0) openModals.splice(at, 1);
         if (this.modal) {
+            const hadFocus = this.modal.contains(document.activeElement);
             this.modal.classList.remove('visible');
             if (this.modal.parentNode) {
                 this.modal.parentNode.removeChild(this.modal);
             }
             this.modal = null;
+            // Only when focus was inside the modal: never steal it from
+            // something the user moved to meanwhile.
+            const back = this.returnFocusTo;
+            this.returnFocusTo = null;
+            if (hadFocus && back && back.isConnected) back.focus({ preventScroll: true });
         }
     }
 

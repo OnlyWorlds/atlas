@@ -115,6 +115,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['layout'],
       },
       {
+        id: 'dialogs-keyboard',
+        title: 'Windows behave better from the keyboard',
+        body: 'Every window is announced to screen readers as a dialog with its title, and closing one puts the keyboard focus back where it was. In the small field editor, pressing Enter while Cancel is selected now cancels instead of saving.',
+        tags: ['layout', 'fix'],
+      },
+      {
         id: 'reload-saves-first',
         title: 'Reloading for a new version saves what you were typing',
         body: 'Pressing Reload on the new version note now saves text that was still waiting to be written in the writing, knowledge or pages room before the page reloads.',
