@@ -121,6 +121,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['layout', 'fix'],
       },
       {
+        id: 'show-folder',
+        title: 'Settings can show you the world folder',
+        body: 'Settings, World now has a Show folder button. A web page cannot open your file explorer, so it opens the folder picker inside the world folder, where you can see its files. Close it when you are done.',
+        tags: ['folders'],
+      },
+      {
         id: 'reload-saves-first',
         title: 'Reloading for a new version saves what you were typing',
         body: 'Pressing Reload on the new version note now saves text that was still waiting to be written in the writing, knowledge or pages room before the page reloads.',

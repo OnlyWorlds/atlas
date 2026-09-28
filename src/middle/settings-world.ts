@@ -14,7 +14,7 @@ import {
   setApiWorldName,
   setWorldPaused,
 } from '../registry/registry';
-import { deleteHandle } from '../store/handle-vault';
+import { deleteHandle, loadHandle } from '../store/handle-vault';
 import { getActiveStore, setActiveStore, evictParkedStore } from '../core/active-store';
 import { deleteWorldFolderUnderRoot } from '../setup/atlas-root-flow';
 import { MakeOnlineModal } from '../ui/make-online-modal';
@@ -63,7 +63,9 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       </label>
       <dl class="atlas-settings-meta">
         <dt>State</dt><dd>${stateLabel}</dd>
-        <dt>Folder</dt><dd><code>${escapeText(world.folder.folder_name)}</code></dd>
+        <dt>Folder</dt><dd><code>${escapeText(world.folder.last_path_hint ?? world.folder.folder_name)}</code>
+          <button class="atlas-btn-ghost" data-action="show-folder"
+            title="A web page cannot open your file explorer, so this opens the folder picker inside this world's folder. Close it when you have looked.">Show folder</button></dd>
         <dt>ID</dt><dd><code>${escapeText(world.id)}</code></dd>
         ${world.state === 'api-linked' && world.api
           ? `<dt>API world ID</dt><dd><code>${escapeText(world.api.world_id)}</code></dd>`
@@ -89,6 +91,20 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
 }
 
 export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): void {
+  // "Open the folder in Explorer" (Captain, S360): a web page cannot open an
+  // OS folder or learn its full path. The nearest real thing is the system
+  // folder picker opened INSIDE the world folder; whatever the user picks is
+  // ignored (S361).
+  document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="show-folder"]')
+    ?.addEventListener('click', async () => {
+      const handle = await loadHandle(world.folder.handle_key).catch(() => undefined);
+      const picker = (window as unknown as { showDirectoryPicker?: (o: unknown) => Promise<unknown> }).showDirectoryPicker;
+      if (!handle || !picker) { toasts.info('This browser cannot show the folder. Its name is shown beside the button'); return; }
+      try {
+        await picker({ startIn: handle, id: 'atlas-show-folder' });
+      } catch { /* closed: nothing to do */ }
+    });
+
   const nameInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="world-name"]');
   nameInput?.addEventListener('change', () => {
     const v = nameInput.value.trim();
