@@ -127,6 +127,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['folders'],
       },
       {
+        id: 'tour-world-stays-local',
+        title: 'The tour world says why it stays offline',
+        body: 'The world the guided tour builds is a sandbox that is removed when the tour ends, so it can no longer be taken online, where it could only fail to upload and then disappear. Settings says so plainly. Create your own world to take it online.',
+        tags: ['sync', 'fix'],
+      },
+      {
         id: 'reload-saves-first',
         title: 'Reloading for a new version saves what you were typing',
         body: 'Pressing Reload on the new version note now saves text that was still waiting to be written in the writing, knowledge or pages room before the page reloads.',

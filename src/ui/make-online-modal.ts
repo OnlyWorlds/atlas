@@ -61,6 +61,14 @@ export class MakeOnlineModal extends BaseModal {
       this.toasts.info('World is already online');
       return;
     }
+    // The tour world is a sandbox (S361, re-key gate lens 3): exiting the tour
+    // deletes it, folder and all, and its ids are the live demo world's, so
+    // keel refuses every element anyway. Taking it online could only end in a
+    // world that uploads nothing and vanishes when the tour closes.
+    if (entry?.demo === true) {
+      this.toasts.info('The tour world is a sandbox and is removed when the tour ends. Create your own world to take it online.');
+      return;
+    }
     if (!getActiveStore()) {
       this.toasts.error('Active store not open');
       return;

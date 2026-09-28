@@ -45,7 +45,9 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         <button class="atlas-btn-ghost" data-action="test-connection">Test connection</button>
         <button class="atlas-btn-ghost" data-action="unlink-from-api">Unlink from API</button>
       </div>`
-    : `<div class="atlas-settings-actions">
+    : world.demo === true
+      ? `<p class="atlas-settings-hint">The tour world is a sandbox and is removed when the tour ends, so it cannot go online. Create your own world for that.</p>`
+      : `<div class="atlas-settings-actions">
         <button class="atlas-btn-primary" data-action="make-online">Make online</button>
       </div>`;
   return `
