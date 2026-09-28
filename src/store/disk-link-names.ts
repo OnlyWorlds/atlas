@@ -12,8 +12,9 @@
  * follow: READ BOTH, WRITE BACK WHATEVER THE FILE ALREADY USED. In memory
  * there is one spelling (atlas's), so nothing above the store changes. On
  * disk each file keeps the spelling it arrived with, so opening a foreign
- * folder never rewrites its keys as a side effect, and a folder atlas made
- * keeps reading in every atlas that ever shipped.
+ * folder never rewrites its keys as a side effect. A NEW file follows its
+ * folder: bare unless the folder already speaks atlas's suffix (S359, born
+ * bare; an atlas older than 1.3 reads a bare pin as mapless).
  *
  * The rename table is DERIVED from `relationFieldsFor`, the one authority for
  * where disk and schema names differ. It is also why this module exists at

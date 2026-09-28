@@ -686,3 +686,139 @@ test('a foreign capture serves its content AND spatial elements in one list', as
   expect(result.count).toBe(3);
   expect(result.types).toEqual(['character', 'map', 'zone']);
 });
+
+/**
+ * ── BORN BARE (S359, Skeld's ruling 2026-09-28) ──────────────────────────
+ *
+ * A folder atlas creates writes pin/marker links under the format's bare
+ * names (`map`, `zone`), the spelling every other implementation reads. In
+ * memory they stay `map_id`/`zone_id` (atlas's one spelling above the store).
+ * A folder that already carries the suffixed spelling keeps it (the sticky
+ * half is guarded in folder-conformance.spec.ts and below).
+ */
+test('a new folder is born bare: pins and markers write map and zone, not map_id and zone_id', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    const map = await store.createElement('map', { name: 'Chart' });
+    const char = await store.createElement('character', { name: 'Pinned' });
+    const zone = await store.createElement('zone', { name: 'Reach' });
+    const pin = await store.createElement('pin', { name: 'p', map_id: map.id, element_id: char.id, element_type: 'character', x: 1, y: 2 });
+    const marker = await store.createElement('marker', { name: 'm', map_id: map.id, zone_id: zone.id, x: 3, y: 4, order: 0 });
+    const inMemory = await store.getElement(pin.id);
+    await store.close();
+    const readOne = async (type: string) => {
+      const dir = await (await root.getDirectoryHandle('elements')).getDirectoryHandle(type);
+      for await (const entry of (dir as any).values()) {
+        if (entry.kind === 'file') return JSON.parse(await (await (await dir.getFileHandle(entry.name)).getFile()).text());
+      }
+      return null;
+    };
+    const pinRaw = await readOne('pin');
+    const markerRaw = await readOne('marker');
+    return {
+      mapId: map.id, zoneId: zone.id, charId: char.id,
+      pinMap: pinRaw?.map ?? null, pinHasSuffix: pinRaw ? 'map_id' in pinRaw : null,
+      pinElement: pinRaw?.element_id ?? null,
+      markerMap: markerRaw?.map ?? null, markerZone: markerRaw?.zone ?? null,
+      markerHasSuffix: markerRaw ? ('map_id' in markerRaw || 'zone_id' in markerRaw) : null,
+      memoryMap: inMemory?.map_id ?? null,
+      memoryHasBare: inMemory ? 'map' in inMemory : null,
+      markerId: marker.id,
+    };
+  });
+  expect(result.pinMap).toBe(result.mapId);
+  expect(result.pinHasSuffix).toBe(false);
+  // `element_id` IS the schema's name for a pin's target: never renamed.
+  expect(result.pinElement).toBe(result.charId);
+  expect(result.markerMap).toBe(result.mapId);
+  expect(result.markerZone).toBe(result.zoneId);
+  expect(result.markerHasSuffix).toBe(false);
+  expect(result.memoryMap).toBe(result.mapId);
+  expect(result.memoryHasBare).toBe(false);
+});
+
+test('a folder whose pins already use map_id keeps that spelling for a new pin', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const writeJson = async (dir: FileSystemDirectoryHandle, name: string, obj: unknown) => {
+      const fh = await dir.getFileHandle(name, { create: true });
+      const ws = await fh.createWritable();
+      await ws.write(JSON.stringify(obj, null, 2) + '\n');
+      await ws.close();
+    };
+    const elements = await root.getDirectoryHandle('elements', { create: true });
+    const maps = await elements.getDirectoryHandle('map', { create: true });
+    const pins = await elements.getDirectoryHandle('pin', { create: true });
+    const mapId = 'cccccccc-1111-4111-8111-cccccccccccc';
+    await writeJson(maps, 'old-map--cccccccc.json', { id: mapId, name: 'Old map' });
+    await writeJson(pins, 'old-pin--dddddddd.json', { id: 'dddddddd-1111-4111-8111-dddddddddddd', name: 'Old pin', map_id: mapId, x: 0, y: 0 });
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    await store.listElements();
+    const created = await store.createElement('pin', { name: 'Newer', map_id: mapId, x: 5, y: 5 });
+    await store.close();
+    let raw: Record<string, unknown> | null = null;
+    for await (const entry of (pins as any).values()) {
+      if (entry.kind === 'file' && entry.name.startsWith('newer--')) {
+        raw = JSON.parse(await (await (await pins.getFileHandle(entry.name)).getFile()).text());
+      }
+    }
+    return { createdId: created.id, rawMapId: raw?.map_id ?? null, rawHasBare: raw ? 'map' in raw : null };
+  });
+  expect(result.rawMapId).toBe('cccccccc-1111-4111-8111-cccccccccccc');
+  expect(result.rawHasBare).toBe(false);
+});
+
+/**
+ * ── AN OUTSIDE EDIT SURVIVES ATLAS'S NEXT WRITE (S359) ────────────────────
+ *
+ * Atlas caches every body at open and does not watch the folder. Before
+ * S359 an update merged its patch into the CACHED body, so a field another
+ * tool (an AI following the toolkit's writer rules, a text editor) changed
+ * in the file was overwritten the next time atlas wrote that element. The
+ * write paths now merge into the body as it is on disk (`readForWrite`).
+ */
+test('a field edited in the file by another tool survives an atlas update to a different field', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot();
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    const el = await store.createElement('character', { name: 'Aldric', description: 'as atlas wrote it' });
+    await store.listElements(); // the cache now holds the body
+    // Another tool rewrites the file in place, bypassing the store.
+    const dir = await (await root.getDirectoryHandle('elements')).getDirectoryHandle('character');
+    let filename = '';
+    for await (const entry of (dir as any).values()) {
+      if (entry.kind === 'file' && entry.name.startsWith('aldric--')) filename = entry.name;
+    }
+    const fh = await dir.getFileHandle(filename);
+    const body = JSON.parse(await (await fh.getFile()).text());
+    body.description = 'edited outside atlas';
+    body.x_other_tool = { note: 'kept' };
+    const ws = await fh.createWritable();
+    await ws.write(JSON.stringify(body, null, 2) + '\n');
+    await ws.close();
+    // Atlas edits a DIFFERENT field of the same element.
+    const returned = await store.updateElement(el.id, { motivations: 'written by atlas' });
+    // What the UI re-lists after a save (element-detail-fields re-reads the list).
+    const listed = (await store.listElements('character')).find((e: any) => e.id === el.id);
+    await store.close();
+    const raw = JSON.parse(await (await (await dir.getFileHandle(filename)).getFile()).text());
+    return {
+      rawDescription: raw.description, rawMotivations: raw.motivations, rawExtension: raw.x_other_tool?.note ?? null,
+      returnedDescription: returned.description,
+      listedDescription: listed?.description ?? null,
+    };
+  });
+  expect(result.rawMotivations).toBe('written by atlas');
+  expect(result.rawDescription).toBe('edited outside atlas');
+  expect(result.rawExtension).toBe('kept');
+  // The returned body (what the UI adopts) carries the outside edit too.
+  expect(result.returnedDescription).toBe('edited outside atlas');
+  expect(result.listedDescription).toBe('edited outside atlas');
+});

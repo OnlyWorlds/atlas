@@ -529,10 +529,14 @@ export class FsFolderStore implements FolderStore {
     // destroying half of it. Newest `local_updated_at` is served, ties go to
     // `elements/`, and the shadowed copy is named in a warning so the state
     // is discoverable rather than mysterious.
-    // New-file spelling for this type (S354): bare only when every file that
-    // DECLARES a spelling is bare. Files that declare none (a mapless pin)
-    // cast no vote and take this default. Recomputed per index build so a
-    // folder that changes hands re-detects on next open.
+    // New-file spelling for this type (S354, BORN BARE since S359): a new
+    // file takes the format's bare `map`/`zone` unless some file of this
+    // type already declares atlas's suffixed spelling, in which case the
+    // folder keeps its dialect (sticky, like layouts and filenames). So a
+    // fresh folder is born bare (Skeld's ruling 2026-09-28: pre-1.3 atlas,
+    // which cannot read a bare pin's map, is the only cost). Files that
+    // declare no spelling (a mapless pin) cast no vote. Recomputed per index
+    // build so a folder that changes hands re-detects on next open.
     let bare = 0;
     let total = 0;
     for (const { scan } of perLayout) {
@@ -542,7 +546,7 @@ export class FsFolderStore implements FolderStore {
         if (rec.spelling === 'bare') bare++;
       }
     }
-    if (total > 0 && bare === total) this.bareSpellingTypes.add(type);
+    if (bare === total) this.bareSpellingTypes.add(type);
     else this.bareSpellingTypes.delete(type);
 
     for (const { layout, scan } of perLayout) {
@@ -993,6 +997,39 @@ export class FsFolderStore implements FolderStore {
     return structuredClone(elem);
   }
 
+  /**
+   * THE READ BEFORE A READ-MODIFY-WRITE (S359): the element as it is ON
+   * DISK now, not as it was cached. Every chained write path (update,
+   * updateWith, the sync stamps) merges into this, so a field another tool
+   * edited in the file while atlas held the world survives atlas's next
+   * write to that element instead of being overwritten by the cached body.
+   * Found reviewing the toolkit's in-place editing rules: the cache is
+   * filled at open and atlas does not watch the folder, so before this every
+   * atlas edit wrote its stale copy over an outside edit to the same
+   * element. One file read per write; a file that vanished or will not parse
+   * falls back to the cache (the pre-S359 behaviour), never to a failure.
+   * Seeing outside edits WITHOUT an atlas write (lists, the open element) is
+   * a separate question: the reopen/revive bout.
+   */
+  private async readForWrite(id: string): Promise<Element | null> {
+    const cached = await this.getElement(id); // warms the index; the fallback
+    if (!cached) return null;
+    const entry = this.indexEntry(id);
+    if (!entry) return cached;
+    try {
+      const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(entry.layout, entry.type));
+      const disk = dir ? await readJson<Element>(dir, entry.filename) : null;
+      if (!disk || disk.id !== id) return cached;
+      // Same fill as the scan: a foreign writer may omit `type`.
+      if (typeof disk.type !== 'string' || !disk.type) disk.type = entry.type;
+      this.adoptDiskBody(id, disk);
+      this.bodyCache.set(id, disk);
+      return structuredClone(disk);
+    } catch {
+      return cached;
+    }
+  }
+
   async createElement(type: ElementType, data: Partial<Element>): Promise<Element> {
     this.assertWritable();
     const id = (data.id as string) ?? newId();
@@ -1047,7 +1084,7 @@ export class FsFolderStore implements FolderStore {
     // Same chain as updateElement; the read happens INSIDE the lock so the
     // mutate callback always sees the latest committed state (no TOCTOU).
     return this.writeChain.run(id, async () => {
-      const existing = await this.getElement(id);
+      const existing = await this.readForWrite(id);
       if (!existing) return null;
       const patch = mutate(existing);
       if (patch === null || Object.keys(patch).length === 0) return existing;
@@ -1056,7 +1093,7 @@ export class FsFolderStore implements FolderStore {
   }
 
   private async updateElementUnchained(id: string, patch: Partial<Element>): Promise<Element> {
-    const existing = await this.getElement(id);
+    const existing = await this.readForWrite(id);
     if (!existing) throw new Error(`element ${id} not found`);
     return this.applyPatchUnchained(existing, patch);
   }
@@ -1455,7 +1492,7 @@ export class FsFolderStore implements FolderStore {
     // this after a push; without the chain a concurrent local edit could land
     // between this read and write, and the stamp would revert it to a stale body.
     return this.writeChain.run(id, async () => {
-      const existing = await this.getElement(id);
+      const existing = await this.readForWrite(id);
       if (!existing) return;
       const next: Element = { ...existing, server_updated_at };
       const entry = this.indexEntry(id);
@@ -1468,7 +1505,7 @@ export class FsFolderStore implements FolderStore {
 
   async clearServerBaseline(id: string): Promise<void> {
     return this.writeChain.run(id, async () => {
-      const existing = await this.getElement(id);
+      const existing = await this.readForWrite(id);
       if (!existing) return;
       const { server_updated_at: _drop, ...rest } = existing;
       const entry = this.indexEntry(id);

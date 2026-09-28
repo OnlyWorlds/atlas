@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.6',
+    date: '2026-09-28',
+    theme: 'your folder, shared with other tools',
+    entries: [
+      {
+        id: 'outside-edits-kept',
+        title: 'Edits another tool makes to a world file are kept when Atlas saves',
+        body: 'If a text editor, a script or an AI assistant changes an element file while Atlas has the world open, Atlas now saves its own change on top of what is on disk instead of over it. Atlas still shows the outside change only after you reopen the world, so close the Atlas tab before editing files by hand.',
+        tags: ['folders'],
+      },
+      {
+        id: 'born-bare-links',
+        title: 'New worlds write map links the way every other tool reads them',
+        body: 'Pins and markers in a new world store their map and zone under the standard names, so other OnlyWorlds tools read them without a translation step. Worlds that already use the older spelling keep it.',
+        tags: ['folders'],
+      },
+    ],
+  },
+  {
     version: '1.5',
     date: '2026-09-11',
     theme: 'a map with two hundred places on it is still a map',
