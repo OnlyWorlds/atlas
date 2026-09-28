@@ -427,7 +427,10 @@ with 6 named markers, his pin; the old map/zone/9-markers are gone, and the
 LIVE world was aligned back — curly names, aliases, dates, book/chapter/
 calendar pushed, orphan zone deleted). ⚠ `TOUR_MEDIA_URLS` in tour-engine must
 name every `x_tour_media` asset or the attach silently skips (S312's e2e
-catch). Offline; images ship as webp and attach as LOCAL media at reveal. `_bake_notes` lists every editorial
+catch). ⚠ **Map y is BOTTOM-left since S361 (atlas 1.8)**: the bundle's pin and six swamp markers were flipped
+(`y' = 1492 - y`) with the converter, but the LIVE demo world still holds the old y-down numbers, so a
+re-bake must flip them again (or the live world is flipped first; Skeld told). No test catches a wrong
+choice (swamp containment is reflection-invariant): look at the map step. Offline; images ship as webp and attach as LOCAL media at reveal. `_bake_notes` lists every editorial
 deviation: zone-twin merge, the SHARED event date (both at 7, S305), the link
 weave, pin rename, book+chapter mint, atlas_aliases for the sentence's surface
 forms, Rachmaninov's 1873 Earth birth_date removed (it stretched the chart axis),

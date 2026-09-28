@@ -2,7 +2,7 @@
 
 Folder-first OnlyWorlds world browser and editor with optional API sync.
 
-**Status**: **v1.0 LAUNCHED** 2026-07-24 at [atlas.onlyworlds.com](https://atlas.onlyworlds.com) (rebuild ran 2026-05-12 to 2026-07; public changelog at `/changelog.html`, drops 1.1 to 1.7 since; the newest is always the top of that page). Post-launch work: interop with other OnlyWorlds writers (the union read, both disk link spellings, the keel export envelope) and the migration bout (`Notes/2026-09-02-migration-hops.md`). See `DESIGN.md` for architecture, `PROGRESS.md` for operational state, `CHANGELOG.md` for releases.
+**Status**: **v1.0 LAUNCHED** 2026-07-24 at [atlas.onlyworlds.com](https://atlas.onlyworlds.com) (rebuild ran 2026-05-12 to 2026-07; public changelog at `/changelog.html`, drops 1.1 to 1.8 since; the newest is always the top of that page). Post-launch work: interop with other OnlyWorlds writers (the union read, both disk link spellings, the keel export envelope) and the migration bout (`Notes/2026-09-02-migration-hops.md`). See `DESIGN.md` for architecture, `PROGRESS.md` for operational state, `CHANGELOG.md` for releases.
 **Legacy**: Previous IDB-cached design lives at `tools/atlas-deprecated/` — UI/UX reference only. See its `DEPRECATED.md` for what to port vs drop.
 
 ## Run
