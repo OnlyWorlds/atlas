@@ -85,6 +85,24 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['sync', 'fix'],
       },
       {
+        id: 'busy-server-waits',
+        title: 'A busy or unreachable OnlyWorlds no longer ties up sync',
+        body: 'When OnlyWorlds is busy, limiting requests or out of reach, Atlas now stops after the first try instead of waiting out every pending change in turn, says so in one line, and tries again on its own a little later. Your changes stay saved in the folder the whole time.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'merge-keeps-atlas-fields',
+        title: 'Linking a local world to an existing one keeps your writing and pages',
+        body: 'When a local element matched one already online by name, linking the two kept the online copy but dropped what only Atlas stores: the formatted text of your writing, page layouts and their publish link, aliases and a map\'s local image. Those now carry over.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'one-refused-not-all',
+        title: 'One element OnlyWorlds refuses no longer holds back the rest',
+        body: 'If OnlyWorlds refused one new element in an upload, other new elements that linked to it could make the whole upload fail again every time. Those are now held back on their own and everything else goes through. Pulled changes also can no longer overwrite an edit you make at the same moment.',
+        tags: ['sync', 'fix'],
+      },
+      {
         id: 'pin-prompt-plain-text',
         title: 'The PIN prompt shows world names as plain text',
         body: 'A world name from your OnlyWorlds account is always shown as text in the prompt that asks for your PIN, so an oddly named world cannot change where the PIN is sent.',

@@ -448,9 +448,30 @@ export class MockFolderStore implements FolderStore {
     this.meta = metaRest as WorldMeta;
   }
 
+  // Parity with FsFolderStore (S361): pull-apply rides the per-id chain, and
+  // the guarded variant checks the local stamp inside the same slot.
   async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');
+    return this.writeChain.run(id, () => this.applyServerRecordUnchained(type, record, server_updated_at));
+  }
+
+  async applyServerRecordIfUnchanged(
+    type: ElementType, record: Record<string, unknown>, server_updated_at: string,
+    expectedLocalUpdatedAt: string | null,
+  ): Promise<boolean> {
+    const id = record.id as string;
+    if (!id) throw new Error('applyServerRecord: record missing id');
+    return this.writeChain.run(id, async () => {
+      const current = await this.getElement(id);
+      if ((current?.local_updated_at ?? null) !== expectedLocalUpdatedAt) return false;
+      await this.applyServerRecordUnchained(type, record, server_updated_at);
+      return true;
+    });
+  }
+
+  private async applyServerRecordUnchained(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
+    const id = record.id as string;
     const failure = this.applyFailures.get(id);
     if (failure) {
       this.applyFailures.delete(id); // one-shot

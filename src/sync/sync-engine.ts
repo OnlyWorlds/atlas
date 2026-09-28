@@ -360,6 +360,20 @@ export class SyncEngine {
    * sync-state.json replayed the whole world every round, failed at the
    * persist, and said nothing anywhere.
    */
+  private transientRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** One retry after a busy/unreachable round, never a loop: the timer is
+   *  single, and a round that fails again schedules the next one itself. */
+  private scheduleTransientRetry(ms: number | undefined): void {
+    if (this.transientRetryTimer) clearTimeout(this.transientRetryTimer);
+    const delay = Math.min(Math.max(ms ?? TRANSIENT_RETRY_DEFAULT_MS, 1000), 15 * 60_000);
+    this.transientRetryTimer = setTimeout(() => {
+      this.transientRetryTimer = null;
+      if (this.stopped || this.paused) return;
+      void this.pushOnce().catch(err => console.warn('[atlas:sync] transient retry failed:', err));
+    }, delay);
+  }
+
   private settleThrownRound(err: unknown): void {
     if (err instanceof CorruptFileError) {
       this.paused = true;
@@ -528,6 +542,10 @@ export class SyncEngine {
     if (this.debouncePushTimer) {
       clearTimeout(this.debouncePushTimer);
       this.debouncePushTimer = null;
+    }
+    if (this.transientRetryTimer) {
+      clearTimeout(this.transientRetryTimer);
+      this.transientRetryTimer = null;
     }
     this.setPendingPush(null);
     this.paused = true;
@@ -1029,6 +1047,7 @@ export class SyncEngine {
     } else {
       this.setState({ kind: 'idle', last_sync_at: nowIso() });
     }
+    if (pushResult.transient_blocked) this.scheduleTransientRetry(pushResult.retry_after_ms);
     const result: SyncResult = {
       pushed: pushResult.pushed,
       pulled: zero(),
@@ -1036,6 +1055,9 @@ export class SyncEngine {
       failures: [...meta.failures, ...pushResult.failures],
       auth_blocked: pushResult.auth_blocked,
       auth_reason: pushResult.auth_blocked ? this.lastAuthReason ?? undefined : undefined,
+      transient_blocked: pushResult.transient_blocked,
+      transient_reason: pushResult.transient_reason,
+      retry_after_ms: pushResult.retry_after_ms,
       meta_pushed: meta.meta_pushed.length ? meta.meta_pushed : undefined,
       meta_pulled: meta.meta_pulled.length ? meta.meta_pulled : undefined,
     };
@@ -1119,6 +1141,23 @@ export class SyncEngine {
         failures: pushResult.failures,
         auth_blocked: true,
         auth_reason: this.lastAuthReason ?? undefined,
+      };
+      this.onSyncResult('sync', result);
+      return result;
+    }
+    // A busy or unreachable server ends the round here too: the pull would
+    // meet the same wait. Retry once later (S361, lane b M4).
+    if (pushResult.transient_blocked) {
+      this.setState({ kind: 'idle', last_sync_at: null });
+      this.scheduleTransientRetry(pushResult.retry_after_ms);
+      const result: SyncResult = {
+        pushed: pushResult.pushed,
+        pulled: zero(),
+        conflicts: pushResult.conflicts,
+        failures: [...meta.failures, ...pushResult.failures],
+        transient_blocked: true,
+        transient_reason: pushResult.transient_reason,
+        retry_after_ms: pushResult.retry_after_ms,
       };
       this.onSyncResult('sync', result);
       return result;
@@ -1307,7 +1346,7 @@ export class SyncEngine {
     serverDeletesDetected: import('../core/types').ServerDeleteRecord[],
     onItemDone: () => void,
     isRetry = false
-  ): Promise<{ created: number; authBlocked: boolean }> {
+  ): Promise<{ created: number; authBlocked: boolean; transient?: unknown }> {
     // Re-fetch each candidate from disk (freshness) + pin element_type
     // self-heal, mirroring the per-element loop's pre-send discipline.
     const items: BulkItem[] = [];
@@ -1359,7 +1398,7 @@ export class SyncEngine {
       } else {
         console.warn('[atlas:sync] bulk CREATE request failed', { message });
       }
-      return { created: 0, authBlocked: auth };
+      return { created: 0, authBlocked: auth, transient: !auth && isTransientError(err) ? err : null };
     }
 
     if (!result.errors) {
@@ -1455,8 +1494,25 @@ export class SyncEngine {
       return { created: 0, authBlocked: false };
     }
 
-    console.info(`[atlas:sync] bulk CREATE retrying ${survivors.length} survivor(s) after atomic rollback`);
-    return this.bulkCreatePhase(survivors, failures, serverDeletesDetected, onItemDone, /* isRetry */ true);
+    // A survivor that links to a refused element (directly or through another
+    // survivor that does) fails the atomic retry too, and used to take every
+    // independent survivor down with it, every round (S360 work order, bout
+    // 2 item 5). Hold those back as failures; the rest go through.
+    const refused = new Set<string>();
+    result.items.forEach((it, i) => { if (it.status >= 400) refused.add(items[i].element.id as string); });
+    const { ready, blocked } = splitByRefusedLinks(survivors, refused);
+    for (const s of blocked) {
+      failures.push({
+        element_id: s.id,
+        type: s.type,
+        operation: 'create',
+        message: 'waits for an element OnlyWorlds refused in the same upload',
+      });
+      onItemDone();
+    }
+    if (ready.length === 0) return { created: 0, authBlocked: false };
+    console.info(`[atlas:sync] bulk CREATE retrying ${ready.length} survivor(s) after atomic rollback (${blocked.length} held back)`);
+    return this.bulkCreatePhase(ready, failures, serverDeletesDetected, onItemDone, /* isRetry */ true);
   }
 
   /**
@@ -1566,6 +1622,10 @@ export class SyncEngine {
      * per-element failure toasts. Caller transitions engine to `error` state.
      */
     let authBlocked = false;
+    /** The first 429/503/network error (S361, lane b M4): ends the round
+     *  without pausing, so a busy server costs one request, not one per
+     *  pending element. */
+    let transient: unknown = null;
 
     if (useBulk) {
       const bulk = await this.bulkCreatePhase(allCreates, failures, serverDeletesDetected, () => {
@@ -1574,6 +1634,7 @@ export class SyncEngine {
       });
       creates += bulk.created;
       if (bulk.authBlocked) authBlocked = true;
+      if (bulk.transient) transient = bulk.transient;
     }
 
     for (const elem of changed) {
@@ -1581,7 +1642,7 @@ export class SyncEngine {
       // a stampServerUpdatedAt landing after resetSyncBaseline would
       // resurrect a baseline the unlink just cleared (close-gate finding:
       // the G-C latch was pull-only).
-      if (authBlocked || this.stopped) break;
+      if (authBlocked || transient || this.stopped) break;
       const isCreate = !elem.server_updated_at;
       try {
         if (isCreate) {
@@ -1728,6 +1789,18 @@ export class SyncEngine {
             id: elem.id, type: elem.type, message: err instanceof Error ? err.message : String(err),
           });
         }
+        else if (isTransientError(err)) {
+          transient = err;
+          failures.push({
+            element_id: elem.id,
+            type: elem.type,
+            operation: isCreate ? 'create' : 'update',
+            message: err instanceof Error ? err.message : String(err),
+          });
+          console.warn('[atlas:sync] push hit a busy or unreachable server — ending the round', {
+            id: elem.id, type: elem.type, message: err instanceof Error ? err.message : String(err),
+          });
+        }
         // 404 on a non-CREATE means the server lost the element between our
         // pre-GET (which succeeded) and our PATCH. Race or out-of-band delete.
         // Route to server_deletes — same UX as the inline detection above.
@@ -1772,7 +1845,20 @@ export class SyncEngine {
         // Adopt the server's timestamp as baseline instead of failing forever;
         // any pending local divergence flows as UPDATE next round.
         else if (isCreate && isIdConflictError(err)) {
-          const remote = await this.client.getElement(elem.type, elem.id);
+          // The read-back is guarded (S361, lane b L2): a network error, 503
+          // or 401 here used to escape the loop, skipping the rest of the
+          // round, the tombstones and the server_deletes persist. Auth bails the
+          // round as the loop does; anything else is a per-element failure.
+          let remote: Awaited<ReturnType<OwApiClient["getElement"]>> = null;
+          try {
+            remote = await this.client.getElement(elem.type, elem.id);
+          } catch (readErr) {
+            if (isAuthError(readErr)) {
+              authBlocked = true; // the loop's top check ends the round
+              this.noteAuthBail(readErr);
+            }
+            remote = null;
+          }
           if (remote) {
             await this.adoptServerCopy(elem, remote);
             console.info('[atlas:sync] CREATE 409 id_conflict — element already on server; baseline adopted', {
@@ -1803,7 +1889,7 @@ export class SyncEngine {
     }
 
     for (const tomb of tombstones) {
-      if (authBlocked || this.stopped) break;
+      if (authBlocked || transient || this.stopped) break;
       try {
         await this.client.deleteElement(tomb.type, tomb.id);
         await this.folder.clearTombstone(tomb.id);
@@ -1821,6 +1907,15 @@ export class SyncEngine {
           });
           console.warn('[atlas:sync] push (tombstone) hit auth error — bailing round', {
             id: tomb.id, type: tomb.type,
+          });
+        }
+        else if (isTransientError(err)) {
+          transient = err;
+          failures.push({
+            element_id: tomb.id,
+            type: tomb.type,
+            operation: 'delete',
+            message: err instanceof Error ? err.message : String(err),
           });
         }
         // 404 means "server doesn't have it" — that IS the desired post-
@@ -1875,6 +1970,7 @@ export class SyncEngine {
       conflicts,
       failures,
       auth_blocked: authBlocked || undefined,
+      ...(transient ? transientFields(transient) : {}),
     };
   }
 
@@ -2058,14 +2154,15 @@ export class SyncEngine {
               });
               continue; // preserve the user's local change
             }
-            // M3 race guard: bail if the user edited during this round.
-            const fresh = await this.folder.getElement(op.id);
-            if (fresh && fresh.local_updated_at !== local.local_updated_at) {
+            // M3 race guard, INSIDE the per-id chain (S361): the check and
+            // the write are one slot, so a save cannot land between them.
+            if (this.stopped) break;
+            const applied = await this.folder.applyServerRecordIfUnchanged(
+              op.type, remoteBody, serverStamp, local.local_updated_at ?? null);
+            if (!applied) {
               console.info(`[atlas:sync] changes skip ${op.type}/${op.id} — local edited during round`);
               continue;
             }
-            if (this.stopped) break;
-            await this.folder.applyServerRecord(op.type, remoteBody, serverStamp);
             updates++;
             pulledIds.push(op.id);
           } else {
@@ -2248,12 +2345,13 @@ export class SyncEngine {
         // the in-flight edit and the user's keystroke would silently vanish.
         // Re-read and bail if local has moved; the next pull (or autosave-
         // triggered push) reconciles cleanly.
-        const fresh = await this.folder.getElement(remote.id);
-        if (fresh && fresh.local_updated_at !== local.local_updated_at) {
+        // The re-check now happens INSIDE the per-id chain (S361, lane b M1).
+        const applied = await this.folder.applyServerRecordIfUnchanged(
+          type, remoteBody, remote.updated_at, local.local_updated_at ?? null);
+        if (!applied) {
           console.info(`[atlas:sync] pull skip ${type}/${remote.id} — local edited during round, deferring to next sync`);
           continue;
         }
-        await this.folder.applyServerRecord(type, remoteBody, remote.updated_at);
         updates++;
         pulledIds.push(remote.id);
         console.info(`[atlas:sync] pull update ${type}/${remote.id}`, {
@@ -2539,9 +2637,68 @@ export function parseInvalidLinkError(
  * baseline and the element self-heals (pending local edits flow as UPDATE on
  * the following round).
  */
+/**
+ * Split bulk survivors into those that can be retried and those that link,
+ * directly or through another held-back survivor, to an id the server refused.
+ * Link detection scans top-level string and string-array values, the shape
+ * every atlas link field takes. Pure.
+ */
+export function splitByRefusedLinks(
+  survivors: Element[],
+  refusedIds: ReadonlySet<string>,
+): { ready: Element[]; blocked: Element[] } {
+  const bad = new Set(refusedIds);
+  const blocked = new Set<string>();
+  const refersToBad = (el: Element): boolean => Object.entries(el).some(([k, v]) =>
+    k !== 'id' && (typeof v === 'string' ? bad.has(v) : Array.isArray(v) && v.some(x => typeof x === 'string' && bad.has(x))));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const s of survivors) {
+      if (blocked.has(s.id) || !refersToBad(s)) continue;
+      blocked.add(s.id);
+      bad.add(s.id);
+      changed = true;
+    }
+  }
+  return {
+    ready: survivors.filter(s => !blocked.has(s.id)),
+    blocked: survivors.filter(s => blocked.has(s.id)),
+  };
+}
+
+const TRANSIENT_RETRY_DEFAULT_MS = 30_000;
+
+/**
+ * A server that is busy (503 `server_busy`), rate limiting (429, e.g. a PIN
+ * lockout after ten wrong tries) or unreachable (fetch's network TypeError).
+ * Not an auth failure: nothing is wrong with the key, and nothing pauses.
+ */
+export function isTransientError(err: unknown): boolean {
+  const t = typedError(err);
+  if (t) return t.status === 429 || t.status === 503 || t.code === 'server_busy' || t.code === 'rate_limited';
+  if (err instanceof TypeError && /fetch|network/i.test(err.message)) return true;
+  if (!(err instanceof Error)) return false;
+  return /api error (429|503)/i.test(err.message);
+}
+
+function transientFields(err: unknown): Pick<SyncResult, 'transient_blocked' | 'transient_reason' | 'retry_after_ms'> {
+  const t = typedError(err);
+  const retry = (err as { retryAfterMs?: unknown }).retryAfterMs;
+  const reason: SyncResult['transient_reason'] = !t ? 'offline'
+    : (t.status === 429 || t.code === 'rate_limited') ? 'rate_limited' : 'busy';
+  return {
+    transient_blocked: true,
+    transient_reason: reason,
+    retry_after_ms: typeof retry === 'number' ? retry : TRANSIENT_RETRY_DEFAULT_MS,
+  };
+}
+
 export function isIdConflictError(err: unknown): boolean {
   const t = typedError(err);
-  if (t) return t.status === 409 || t.code === 'id_conflict';
+  // The CODE, not the status (S361, lane b L5): keel's idempotency_error is
+  // a 409 too.
+  if (t) return t.code === 'id_conflict';
   if (!(err instanceof Error)) return false;
   return /api error 409/i.test(err.message) || /id_conflict/i.test(err.message);
 }

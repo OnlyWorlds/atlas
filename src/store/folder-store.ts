@@ -241,6 +241,13 @@ export interface FolderStore {
    * server-newer than the folder version (no local change to preserve).
    */
   applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element>;
+  /** Pull-apply guarded INSIDE the per-id chain: writes only if the element's
+   *  `local_updated_at` still equals `expectedLocalUpdatedAt` (null = absent).
+   *  Returns false when a local edit landed first (S361, lane b M1). */
+  applyServerRecordIfUnchanged(
+    type: ElementType, record: Record<string, unknown>, server_updated_at: string,
+    expectedLocalUpdatedAt: string | null,
+  ): Promise<boolean>;
 
   /**
    * Sever every link this folder has to a remote api world. Used by the

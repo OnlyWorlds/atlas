@@ -823,6 +823,36 @@ test('a field edited in the file by another tool survives an atlas update to a d
   expect(result.listedDescription).toBe('edited outside atlas');
 });
 
+test('unlinking keeps a field another tool edited in the file (S361)', async ({ page }) => {
+  // Lane b L1: resetSyncBaseline rewrote every synced file from the CACHE,
+  // reverting outside edits made since atlas last wrote each element.
+  const result = await page.evaluate(async () => {
+    const api = window.__atlasTestApi;
+    const root = await api.opfsRoot({ clear: true });
+    const store = new api.FsFolderStore({ tabId: 'test-tab', disableHeartbeat: true });
+    await store.open(root);
+    const el = await store.createElement('character', { name: 'Calder', description: 'as atlas wrote it' });
+    await store.stampServerUpdatedAt(el.id, 'character', '2026-01-01T00:00:00.000Z');
+    await store.listElements();
+    const dir = await (await root.getDirectoryHandle('elements')).getDirectoryHandle('character');
+    let filename = '';
+    for await (const entry of (dir as any).values()) {
+      if (entry.kind === 'file' && entry.name.startsWith('calder--')) filename = entry.name;
+    }
+    const fh = await dir.getFileHandle(filename);
+    const body = JSON.parse(await (await fh.getFile()).text());
+    body.description = 'edited outside atlas';
+    const ws = await fh.createWritable();
+    await ws.write(JSON.stringify(body, null, 2));
+    await ws.close();
+    await store.resetSyncBaseline();
+    await store.close();
+    const raw = JSON.parse(await (await (await dir.getFileHandle(filename)).getFile()).text());
+    return { description: raw.description, baseline: raw.server_updated_at ?? null };
+  });
+  expect(result).toEqual({ description: 'edited outside atlas', baseline: null });
+});
+
 test('an element file that will not parse is never overwritten by an atlas save (S361)', async ({ page }) => {
   // Gate F6: `readForWrite` fell back to the CACHED body when the file would
   // not parse, and the write then replaced a git-conflicted element file with

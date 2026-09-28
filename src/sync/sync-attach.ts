@@ -199,7 +199,7 @@ async function flushPendingOnAttach(
       // world (deleted server-side / bad PIN), failures collected but never
       // shown. Auth failures get their own dedicated toast via emitRoundToasts
       // below (pill also goes red); skip the generic warning in that case.
-      if (!result.auth_blocked) {
+      if (!result.auth_blocked && !result.transient_blocked) {
         const text = failureToastOnce(result.failures);
         if (text) toastManager.error(text);
       }
@@ -438,6 +438,21 @@ function emitConflictToasts(
   // pill carries the persistent signal; this toast is the moment-it-happened
   // notification. Skip if the round had successes (mixed-blocked is rare and
   // the engine still went to error — keep the surfacing single).
+  // Busy, rate limited or offline (S361, lane b M4): one plain sentence with
+  // the wait, instead of a wall of per-element failures.
+  if (result.transient_blocked) {
+    const secs = Math.max(1, Math.round((result.retry_after_ms ?? 30_000) / 1000));
+    const when = secs >= 90 ? `${Math.round(secs / 60)} minutes` : `${secs} seconds`;
+    toastManager.info(
+      result.transient_reason === 'rate_limited'
+        ? `OnlyWorlds is limiting requests, which happens after too many wrong PIN tries. Atlas will try again in ${when}.`
+        : result.transient_reason === 'offline'
+          ? `OnlyWorlds could not be reached. Your changes are saved in the folder, and Atlas will try again in ${when}.`
+          : `OnlyWorlds is busy. Your changes are saved in the folder, and Atlas will try again in ${when}.`
+    );
+    return;
+  }
+
   if (result.auth_blocked) {
     // Revoked minted key ≠ wrong PIN (gate R4): the PIN advice would send the
     // user to the wrong fix. Re-opening from the sidebar mints a fresh key.

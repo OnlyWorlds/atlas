@@ -53,8 +53,10 @@ export class OwV2Error extends Error {
   readonly code: string;
   readonly errorType: string;
   readonly param: string | null;
+  /** Parsed `Retry-After` (seconds or an HTTP date), in ms; null when absent. */
+  readonly retryAfterMs: number | null;
 
-  constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null } | null, rawBody: string) {
+  constructor(status: number, envelope: { type?: string; code?: string; message?: string; param?: string | null } | null, rawBody: string, retryAfter: string | null = null) {
     const serverMsg = envelope?.message ?? (rawBody || 'request failed');
     super(`API Error ${status}: ${serverMsg}`);
     this.name = 'OwV2Error';
@@ -62,7 +64,16 @@ export class OwV2Error extends Error {
     this.code = envelope?.code ?? 'unknown';
     this.errorType = envelope?.type ?? 'unknown';
     this.param = envelope?.param ?? null;
+    this.retryAfterMs = parseRetryAfter(retryAfter);
   }
+}
+
+function parseRetryAfter(value: string | null): number | null {
+  if (!value) return null;
+  const secs = Number(value);
+  if (Number.isFinite(secs) && secs >= 0) return secs * 1000;
+  const at = Date.parse(value);
+  return Number.isFinite(at) ? Math.max(0, at - Date.now()) : null;
 }
 
 /** Duck-typed check usable on errors that crossed a module boundary. */
@@ -245,7 +256,7 @@ export class OwV2ClientAdapter implements OwApiClient {
         const parsed = JSON.parse(text) as { error?: typeof envelope };
         envelope = parsed?.error ?? null;
       } catch { /* non-JSON error body — envelope stays null */ }
-      throw new OwV2Error(response.status, envelope, text.slice(0, 300));
+      throw new OwV2Error(response.status, envelope, text.slice(0, 300), response.headers.get('Retry-After'));
     }
     if (!text) return undefined;
     try {

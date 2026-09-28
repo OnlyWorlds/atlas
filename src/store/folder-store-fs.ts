@@ -1570,16 +1570,14 @@ export class FsFolderStore implements FolderStore {
     //    Touching only files that ACTUALLY had a baseline keeps churn minimal
     //    on never-synced folders. Iteration is sequential — atomic writes per
     //    file matter more than parallelism here.
+    //    Each clear rides the per-id chain and merges into the file AS IT IS
+    //    ON DISK (S361, lane b L1: rewriting from the cache reverted outside
+    //    edits and raced a save landing during the unlink).
     const all = await this.listElements();
     let cleared = 0;
     for (const elem of all) {
       if (!elem.server_updated_at) continue;
-      const { server_updated_at: _drop, ...rest } = elem;
-      const entry = this.indexEntry(elem.id);
-      const filename = entry?.filename ?? elementFilename(elem.id, elem.name);
-      const dir = await this.dirForElement(elem.id, elem.type);
-      await this.writeElementFile(dir, filename, rest as Element);
-      this.cacheSet(rest as Element);
+      await this.clearServerBaseline(elem.id);
       cleared++;
     }
     // 2. Drop every tombstone — they target ids on the now-defunct api world.
@@ -1594,7 +1592,9 @@ export class FsFolderStore implements FolderStore {
     //    it rewrites the same file writeWorldMeta serializes (gate R4).
     let hadApi = false;
     await this.runWorldMetaOp(async () => {
-      const meta = await this.readWorldMeta();
+      // Strict (S361): a world.json that will not parse must not be replaced
+      // by the empty default minus its api block.
+      const meta = await this.readWorldMeta({ strict: true });
       hadApi = !!meta.api;
       const { api: _dropApi, ...metaRest } = meta;
       await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, metaRest as WorldMeta);
@@ -1605,9 +1605,39 @@ export class FsFolderStore implements FolderStore {
     });
   }
 
+  /**
+   * Pull-apply rides the per-id write chain (S361, lane b M1): it used to be
+   * the one element write outside it, so a user save landing between the
+   * engine's race check and this write was overwritten and read as synced.
+   */
   async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');
+    return this.writeChain.run(id, () => this.applyServerRecordUnchained(type, record, server_updated_at));
+  }
+
+  /**
+   * Apply only if the element's `local_updated_at` still equals the one the
+   * caller decided on (null = the element did not exist). The check and the
+   * write happen inside ONE chain slot, so an edit can no longer land between
+   * them. Returns false when the element moved (the next round reconciles).
+   */
+  async applyServerRecordIfUnchanged(
+    type: ElementType, record: Record<string, unknown>, server_updated_at: string,
+    expectedLocalUpdatedAt: string | null,
+  ): Promise<boolean> {
+    const id = record.id as string;
+    if (!id) throw new Error('applyServerRecord: record missing id');
+    return this.writeChain.run(id, async () => {
+      const current = await this.getElement(id);
+      if ((current?.local_updated_at ?? null) !== expectedLocalUpdatedAt) return false;
+      await this.applyServerRecordUnchained(type, record, server_updated_at);
+      return true;
+    });
+  }
+
+  private async applyServerRecordUnchained(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
+    const id = record.id as string;
 
     // Preserve atlas-extension fields from the existing local file per the
     // split policy (gate 10.3, v2 port):

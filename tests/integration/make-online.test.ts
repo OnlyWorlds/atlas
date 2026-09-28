@@ -604,3 +604,43 @@ describe('mergeLocalIntoApi onIdSwap callback', () => {
     expect(result.failures).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// S361 (the id census): a name-matched swap wrote the SERVER's record at the
+// SERVER's id, where no local file existed, so every atlas-only field was
+// dropped with the old file: the writing's rich text, page blocks and the
+// publish record, aliases, the map image binding.
+// ---------------------------------------------------------------------------
+
+describe('mergeLocalIntoApi matched swap keeps atlas-only fields', () => {
+  const LOCAL_ONLY = {
+    atlas_richtext_json: { type: 'doc', content: [] },
+    atlas_aliases: ['the Lady'],
+    image_media_id: 'media-1',
+  };
+
+  it('policy b: every atlas-only field lands at the server id', async () => {
+    const adapter = makeAdapter();
+    await adapter.createElement('narrative', { id: 's-n', name: 'Chapter One' });
+    await folder.createElement('narrative', { name: 'Chapter One', ...LOCAL_ONLY } as never);
+
+    const result = await mergeLocalIntoApi(folder, adapter, 'b');
+    expect(result.failures).toEqual([]);
+    const at = await folder.getElement('s-n') as unknown as Record<string, unknown>;
+    expect(at.atlas_richtext_json).toEqual(LOCAL_ONLY.atlas_richtext_json);
+    expect(at.atlas_aliases).toEqual(LOCAL_ONLY.atlas_aliases);
+    expect(at.image_media_id).toBe('media-1');
+  });
+
+  it('policy c: the server prose wins, atlas bindings survive', async () => {
+    const adapter = makeAdapter();
+    await adapter.createElement('narrative', { id: 's-n', name: 'Chapter One' });
+    await folder.createElement('narrative', { name: 'Chapter One', ...LOCAL_ONLY } as never);
+
+    await mergeLocalIntoApi(folder, adapter, 'c');
+    const at = await folder.getElement('s-n') as unknown as Record<string, unknown>;
+    expect(at.atlas_richtext_json).toBeUndefined();
+    expect(at.atlas_aliases).toEqual(LOCAL_ONLY.atlas_aliases);
+    expect(at.image_media_id).toBe('media-1');
+  });
+});

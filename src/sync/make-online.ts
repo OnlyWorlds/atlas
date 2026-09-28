@@ -21,6 +21,24 @@ import { getState } from '../core/state';
 import { devWorldapiBase, devV2Base } from './dev-api-base';
 import type { FolderStore } from '../store/folder-store';
 import { ALL_ELEMENT_TYPES } from '../core/types';
+import { ATLAS_LOCAL_ONLY_FIELDS } from '../core/constants';
+
+/**
+ * The atlas-only fields of a local body (S361, the id census): a matched swap
+ * writes the SERVER's record at the SERVER's id, where no local file exists
+ * yet, so the store's usual preserve-from-existing never fires and the
+ * writing's rich text, page blocks, the publish record, aliases and the map
+ * image binding were silently dropped with the old file. `except` names
+ * fields a policy deliberately gives up (policy c keeps the server's prose).
+ */
+function localOnlyFieldsOf(el: Record<string, unknown>, except: ReadonlySet<string> = new Set()): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const f of ATLAS_LOCAL_ONLY_FIELDS) {
+    if (except.has(f)) continue;
+    if (el[f] !== undefined) out[f] = el[f];
+  }
+  return out;
+}
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
 
@@ -433,14 +451,20 @@ export async function mergeLocalIntoApi(
           // fields server kept untouched. Without this, the merged local would
           // be missing every field local didn't explicitly set.
           const { updated_at: _ts, ...fullBody } = response;
-          await folder.applyServerRecord(type, fullBody, response.updated_at);
+          await folder.applyServerRecord(type, { ...fullBody, ...localOnlyFieldsOf(current) }, response.updated_at);
           // Remove the old local file silently — never had a server counterpart.
           await folder.deleteElement(local.id, { silent: true });
           updates++;
         } else {
           // Policy c: pull server's full content into local at server.id.
           const { updated_at, ...serverBody } = dec.server;
-          await folder.applyServerRecord(type, serverBody, updated_at);
+          // Policy c gives up the local CONTENT (the server's prose wins, so
+          // the local rich-text copy goes too), never atlas's own bindings.
+          await folder.applyServerRecord(
+            type,
+            { ...serverBody, ...localOnlyFieldsOf(current, new Set(['atlas_richtext_json'])) },
+            updated_at,
+          );
           // Remove the old local file silently.
           await folder.deleteElement(local.id, { silent: true });
           skipped++;

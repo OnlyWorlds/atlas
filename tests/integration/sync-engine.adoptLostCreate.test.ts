@@ -67,4 +67,19 @@ describe('adopting a create that is already on the server', () => {
     expect(updates).toHaveLength(0);
     expect((await client.getElement('character', el.id))!.description).toBe('one');
   });
+
+  it('a read-back that fails on the network is one failure, not the end of the round (lane b L2)', async () => {
+    const a = await folder.createElement('character', { name: 'Rhea' });
+    loseFirstCreateResponse();
+    await engine.syncNow(); // A committed, response lost
+    await folder.createElement('character', { name: 'Ione' }); // B, never pushed
+    const realGet = client.getElement.bind(client);
+    client.getElement = async (type, id) => {
+      if (id === a.id) throw new TypeError('Failed to fetch');
+      return realGet(type, id);
+    };
+    const result = await engine.syncNow(); // A: 409 + failed read-back; B must still go out
+    expect(result.failures.some(f => f.element_id === a.id)).toBe(true);
+    expect(client.__server_count('character')).toBe(2);
+  });
 });

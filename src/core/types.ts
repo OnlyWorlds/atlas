@@ -336,6 +336,15 @@ export interface SyncResult {
    */
   auth_reason?: 'key_revoked' | 'read_only_key';
   /**
+   * The round stopped early because OnlyWorlds was busy (503 server_busy),
+   * rate limited (429, e.g. a PIN lockout) or unreachable (S361, lane b M4).
+   * Nothing is paused and no baseline moved; the engine retries once after
+   * `retry_after_ms`. `transient_reason` picks the words the user sees.
+   */
+  transient_blocked?: boolean;
+  transient_reason?: 'busy' | 'rate_limited' | 'offline';
+  retry_after_ms?: number;
+  /**
    * World-meta fields (disk names) the meta step PUSHED to / PULLED from
    * `PATCH|GET /world` this round (world-meta sync, S262). Lets the UI
    * surface meta-only rounds honestly — pushed/pulled above count elements

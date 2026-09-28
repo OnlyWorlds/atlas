@@ -151,6 +151,23 @@ describe('SyncEngine /bulk push path', () => {
     expect(client.__server_get('character', bad.id)).toBeUndefined();
   });
 
+  it('a survivor that links to a refused element is held back, so the independent ones still land (S361)', async () => {
+    // One refused element used to take every independent survivor down with
+    // it: its dependents made the atomic retry fail, every round.
+    const good = await folder.createElement('character', { name: 'Good' });
+    const bad = await folder.createElement('location', { name: 'Refused' });
+    const child = await folder.createElement('character', { name: 'Child', birthplace: bad.id });
+    client.__inject_bulk_item_failure(bad.id, { code: 'invalid', message: 'refused for the test', param: null } as never);
+
+    const result = await engine.pushOnce();
+
+    expect(client.__server_get('character', good.id)).toBeDefined();
+    expect(client.__server_get('character', child.id)).toBeUndefined();
+    const held = result.failures.find(f => f.element_id === child.id);
+    expect(held?.message).toMatch(/waits for an element OnlyWorlds refused/);
+    expect(result.failures.some(f => f.element_id === bad.id)).toBe(true);
+  });
+
   it('routes a bulk dangling-link peer (deleted server-side) to server_deletes review', async () => {
     // Zone + map synced first, so their baselines hold.
     const zone = await folder.createElement('zone', { name: 'Vanished zone' });
