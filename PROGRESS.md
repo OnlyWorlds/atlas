@@ -4,7 +4,7 @@ Operational state. Architecture in **DESIGN.md**; per-room design in `DESIGN_{MA
 
 ---
 
-## CURRENT STATE (2026-09-28 — SESSION 359: **THE FOLDER AS A SHARED SURFACE, THE FLOOR** — a toolkit review for Skeld found that atlas loses or ignores edits whenever another tool writes the folder; two fixes shipped, the real bout designed and measured; gates: typecheck 0 + **1648 vitest** + **308 e2e (count = `--list` = 308, PLAYWRIGHT_EXIT=0, zero flaky)** + build clean; UNCOMMITTED, 5 files + 2 probe scripts)
+## CURRENT STATE (2026-09-28 — SESSION 359: **THE FOLDER AS A SHARED SURFACE, THE FLOOR** — a toolkit review for Skeld found that atlas loses or ignores edits whenever another tool writes the folder; two fixes shipped, the real bout designed and measured; gates: typecheck 0 + **1648 vitest** + **308 e2e (count = `--list` = 308, PLAYWRIGHT_EXIT=0, zero flaky)** + build clean; PUSHED `8bbd2f5`, Boss briefed for the 1.6 redeploy)
 
 **Where it came from**: Captain asked for a fine-grain review of the OnlyWorlds toolkit (`Forge/Notes/2026-09-28-toolkit-review.md`). Answering Skeld's three atlas questions from source (not the capability card) turned up: a git branch switch under a linked folder is invisible to atlas; "close atlas" must mean close the TAB (a parked world keeps its cache and a 1970 lock heartbeat); and **an in-place edit to a linked folder never syncs** (push is decided by the in-file stamps). Skeld put all of it into toolkit 4.0 and ruled born-bare. Reply: `.temper/messages/inbox/from-skeld-2026-09-28-born-bare-and-an-atlas-bout.md`.
 
