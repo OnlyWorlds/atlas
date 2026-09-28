@@ -26,6 +26,7 @@ import type {
 import type { ChartConfig } from '../../src/visualization/timeline/types';
 import { EMPTY_STYLES, type WorldStyles } from '../../src/core/world-styles';
 import { stampedBody } from '../../src/store/sync-stamp';
+import { scrubReferrers } from '../../src/store/scrub-links';
 import { CorruptFileError } from '../../src/store/fs-utils';
 
 const defaultMeta: WorldMeta = { id: 'mock-world', name: 'mock world' };
@@ -237,6 +238,14 @@ export class MockFolderStore implements FolderStore {
 
   async deleteElement(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
     if (!opts.silent) this.assertWritable();
+    const result = await this.deleteElementInChain(id, opts);
+    // Mirrors FsFolderStore: a UI delete removes the dead ids from every
+    // referrer's links, as keel does (S362, `store/scrub-links.ts`).
+    if (!opts.silent) await scrubReferrers(this, new Set(result.tombstones.map(t => t.id)));
+    return result;
+  }
+
+  private deleteElementInChain(id: string, opts: { cascade?: boolean; silent?: boolean }): Promise<{ tombstones: Tombstone[] }> {
     // Same chain as updateElement — an in-flight update lands before the
     // element disappears (mirrors FsFolderStore, convention #79).
     return this.writeChain.run(id, async () => {

@@ -98,6 +98,8 @@ export function reconcile(
         // uuid collision between unrelated elements must not clobber (#83 guard).
         const ex = existingById.get(rawId)!;
         if (!ex.name || normName(ex.name) === normName(name)) matched = ex;
+        // Within the world's own export an id IS the element, renamed or not.
+        else if (opts.sameWorld && ex.type === type) matched = ex;
       }
       if (!matched && matchByName && name.trim()) {
         // Empty names never name-match (two unnamed pins are not "the same").

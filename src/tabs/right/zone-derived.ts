@@ -115,3 +115,27 @@ export function partitionZonesAndMarkers(elements: Element[]): {
   }
   return { zones, markers };
 }
+
+/**
+ * Zones drawn AS their linked zones (S362): a zone with no marker on this map
+ * whose `linked_zones` reach zones that are on it. Sikelia models each of its
+ * 13 historical roads this way (a markerless Road zone linking its Route
+ * segments), and before this they were invisible in atlas: not drawn, since
+ * they have no geometry, and not listed, since the panel listed only zones
+ * with markers. Returns each with the ids of its parts on this map, in the
+ * order the link field names them.
+ */
+export function listLinkedZonesOnMap(onMap: readonly Zone[], allZones: readonly Zone[]): Array<{ zone: Zone; parts: string[] }> {
+  const here = new Set(onMap.map(z => z.id));
+  const out: Array<{ zone: Zone; parts: string[] }> = [];
+  for (const z of allZones) {
+    if (here.has(z.id)) continue;
+    const raw = (z as { linked_zones?: unknown }).linked_zones;
+    const ids = typeof raw === 'string' ? [raw] : Array.isArray(raw)
+      ? raw.map(v => (typeof v === 'string' ? v : (v && typeof v === 'object' ? (v as { id?: unknown }).id : null)))
+      : [];
+    const parts = ids.filter((id): id is string => typeof id === 'string' && here.has(id));
+    if (parts.length > 0) out.push({ zone: z, parts });
+  }
+  return out;
+}

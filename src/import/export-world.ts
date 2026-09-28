@@ -10,7 +10,8 @@
  *   here would lose user data on every export→import cycle (D9 enablement).
  * - Converts spatial disk shape back to bare names (map_id → map, zone_id → zone)
  *   so pin/marker round-trip through ow.com's `/store/` and atlas's own import.
- * - Drops the world id (ow.com keeps none); includes api_key only on request.
+ * - Keeps the world id (the envelope, S354); includes api_key only on request, and
+ *   the export room never requests it (S362).
  */
 
 import { ALL_ELEMENT_TYPES, type ElementType } from '../core/types';

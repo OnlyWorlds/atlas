@@ -603,6 +603,60 @@ test('the zone panel (S356): kinds group, a kind colour is a world style that su
   await expect(page.locator('.atlas-zone-visuals-section .atlas-detail-section-hint')).toHaveText('Synced');
 });
 
+test('the zone panel by role (S362): rivers split by rank, a role colour paints only its role, a road drawn as its segments is listed and lights them', async ({ page }) => {
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', 'Roles Canvas');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Roles Canvas' })).toBeVisible();
+
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = api.getState().data.elements.find((e: any) => e.type === 'map' && e.name === 'Roles Canvas');
+    const line = async (name: string, subtype: string, role: string, y: number) => {
+      const z = await store.createZone({ name, supertype: 'Line', subtype, role });
+      await store.createMarker({ map_id: map.id, zone_id: z.id, x: 100, y, order: 1 });
+      await store.createMarker({ map_id: map.id, zone_id: z.id, x: 1900, y: y + 50, order: 2 });
+      return z.id as string;
+    };
+    await line('the Anapos', 'River', 'major river', 300);
+    await line('the Kakyparis', 'River', 'major river', 500);
+    await line('a brook', 'River', 'minor stream', 700);
+    const s1 = await line('coast road, north', 'Route', 'East Coastal Road', 1100);
+    const s2 = await line('coast road, south', 'Route', 'East Coastal Road', 1300);
+    // The road itself: no markers, its segments linked (Sikelia's shape).
+    await store.createZone({ name: 'East Coastal Road', supertype: 'Line', subtype: 'Road', linked_zones: [s1, s2] });
+    api.patchData(await store.listElements());
+  });
+  const container = page.locator('.atlas-map-tab-wrapper .leaflet-container').first();
+  await expect(container.locator('svg path[fill="none"]')).toHaveCount(10); // 5 lines x (visible + hit); the road draws nothing
+
+  await page.click('[data-action="zones-dropdown"]');
+  const panel = page.locator('[data-role="zones-dropdown-panel"]');
+  await expect(panel.locator('.atlas-zone-kind-name')).toHaveText([
+    'Line · River · major river', 'Line · River · minor stream', 'Line · Road', 'Line · Route · East Coastal Road',
+  ]);
+
+  // A role colour paints the two major rivers and not the brook; the rule on disk names the role.
+  const major = panel.locator('.atlas-zone-kind', { hasText: 'major river' });
+  await major.locator('[data-action="swatch"]').click();
+  const picker = page.locator('.atlas-colour-popover');
+  await picker.locator('.atlas-colour-hex').fill('#1d4ed8');
+  await picker.locator('[data-action="apply"]').click();
+  await expect(container.locator('svg path[stroke="#1d4ed8"]')).toHaveCount(2);
+  await expect.poll(async () => page.evaluate(async () => (await (window as any).__atlasTestApi.getActiveStore().readStyles()).rules))
+    .toEqual([{ type: 'zone', supertype: 'Line', subtype: 'River', role: 'major river', color: '#1d4ed8' }]);
+
+  // The road: listed with its parts, no colour/tune/eye, and hovering it lights both segments.
+  const road = panel.locator('.atlas-zone-kind', { hasText: 'Line · Road' });
+  await expect(road.locator('[data-action="swatch"], [data-action="tune"], [data-action="toggle-kind-visible"]')).toHaveCount(0);
+  await road.locator('[data-action="toggle-kind"]').click();
+  const chip = road.locator('.atlas-zone-chip.is-linked');
+  await expect(chip).toContainText('2 parts');
+  await chip.hover();
+  await expect(container.locator('svg .atlas-zone-hovered')).toHaveCount(2);
+});
+
 test('north is up: a pin by the schema\'s bottom-left numbers draws where the standard says, and a click stores bottom-left y (S361)', async ({ page }) => {
   // pin.yaml: "x/y coordinate, from bottom left of the map". Atlas stored y
   // top-down until S361, so every standard world (Sikelia) drew mirrored.

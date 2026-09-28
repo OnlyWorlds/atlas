@@ -10,7 +10,12 @@
  * folder and its git.
  *
  * Resolution, most specific wins per field:
- *   element's own atlas_* field  >  subtype rule  >  supertype rule
+ *   element's own atlas_* field  >  role rule  >  subtype rule  >  supertype rule
+ * A role rule (S362) names a zone's `role` (the schema's "operational
+ * function or intent"): Sikelia's rivers are one subtype in three roles
+ * (major river, river, minor stream) and its route segments carry the name
+ * of the road they belong to. It also names the supertype/subtype it was
+ * made under, and all of them must match.
  * A subtype rule is one that names a subtype (it may also name the
  * supertype, and then both must match); a supertype rule names only the
  * supertype. Taxonomy values are user text, so matching is trimmed and
@@ -34,6 +39,8 @@ export interface StyleRule {
   supertype?: string;
   /** Matched trimmed + case-insensitively; absent = the supertype-level rule. */
   subtype?: string;
+  /** Zones: the `role` value, matched like the taxonomy; absent = any role (S362). */
+  role?: string;
   /** Hex colour, e.g. "#3b82f6". Zones: stroke + fill. Every type: the taxonomy swatch. */
   color?: string;
   /** Zones: polygon fill opacity, 0..1. */
@@ -61,7 +68,7 @@ export interface ResolvedStyle {
   dash?: LineDash;
   label_priority?: boolean;
   /** Which rule supplied the colour (for the "inherits from" line). */
-  source?: 'subtype' | 'supertype';
+  source?: 'role' | 'subtype' | 'supertype';
 }
 
 export function normKey(v: unknown): string {
@@ -69,18 +76,26 @@ export function normKey(v: unknown): string {
 }
 
 /** Identity of a rule: type + its taxonomy keys, normalised. */
-export function ruleKey(r: Pick<StyleRule, 'type' | 'supertype' | 'subtype'>): string {
-  return `${r.type}␟${normKey(r.supertype)}␟${normKey(r.subtype)}`;
+export function ruleKey(r: Pick<StyleRule, 'type' | 'supertype' | 'subtype' | 'role'>): string {
+  const base = `${r.type}␟${normKey(r.supertype)}␟${normKey(r.subtype)}`;
+  // Keys without a role are unchanged, so kinds hidden or tuned before S362 keep their key.
+  return normKey(r.role) ? `${base}␟${normKey(r.role)}` : base;
 }
 
-function matches(rule: StyleRule, el: { type: string; supertype?: unknown; subtype?: unknown }): boolean {
+type Styled = { type: string; supertype?: unknown; subtype?: unknown; role?: unknown };
+
+function matches(rule: StyleRule, el: Styled): boolean {
   if (rule.type !== el.type) return false;
   const rs = normKey(rule.supertype);
   const rb = normKey(rule.subtype);
+  const rr = normKey(rule.role);
   if (rs && rs !== normKey(el.supertype)) return false;
   if (rb && rb !== normKey(el.subtype)) return false;
-  return Boolean(rs || rb);
+  if (rr && rr !== normKey(el.role)) return false;
+  return Boolean(rs || rb || rr);
 }
+
+const isRoleRule = (r: StyleRule): boolean => Boolean(normKey(r.role));
 
 const VISUAL_FIELDS = ['color', 'fill_opacity', 'weight', 'dash', 'label_priority'] as const;
 
@@ -89,17 +104,18 @@ const VISUAL_FIELDS = ['color', 'fill_opacity', 'weight', 'dash', 'label_priorit
  * subtype-level rule over it, field by field. An element with no taxonomy
  * resolves to nothing.
  */
-export function resolveStyle(rules: readonly StyleRule[], el: { type: string; supertype?: unknown; subtype?: unknown }): ResolvedStyle {
+export function resolveStyle(rules: readonly StyleRule[], el: Styled): ResolvedStyle {
   const out: ResolvedStyle = {};
-  const superRule = rules.find(r => !normKey(r.subtype) && matches(r, el));
-  const subRule = rules.find(r => normKey(r.subtype) && matches(r, el));
-  for (const rule of [superRule, subRule]) {
+  const superRule = rules.find(r => !isRoleRule(r) && !normKey(r.subtype) && matches(r, el));
+  const subRule = rules.find(r => !isRoleRule(r) && normKey(r.subtype) && matches(r, el));
+  const roleRule = rules.find(r => isRoleRule(r) && matches(r, el));
+  for (const rule of [superRule, subRule, roleRule]) {
     if (!rule) continue;
     for (const f of VISUAL_FIELDS) {
       const v = rule[f];
       if (v !== undefined && v !== null && v !== '') (out as Record<string, unknown>)[f] = v;
     }
-    if (rule.color) out.source = rule === subRule ? 'subtype' : 'supertype';
+    if (rule.color) out.source = rule === roleRule ? 'role' : rule === subRule ? 'subtype' : 'supertype';
   }
   return out;
 }
@@ -109,6 +125,7 @@ export function upsertRule(rules: readonly StyleRule[], rule: StyleRule): StyleR
   const cleaned: StyleRule = { type: rule.type };
   if (normKey(rule.supertype)) cleaned.supertype = rule.supertype!.trim();
   if (normKey(rule.subtype)) cleaned.subtype = rule.subtype!.trim();
+  if (normKey(rule.role)) cleaned.role = rule.role!.trim();
   for (const f of VISUAL_FIELDS) {
     const v = rule[f];
     if (v !== undefined && v !== null && v !== '') (cleaned as unknown as Record<string, unknown>)[f] = v;
@@ -123,7 +140,7 @@ export function removeRule(rules: readonly StyleRule[], key: string): StyleRule[
   return rules.filter(r => ruleKey(r) !== key);
 }
 
-export function findRule(rules: readonly StyleRule[], probe: Pick<StyleRule, 'type' | 'supertype' | 'subtype'>): StyleRule | undefined {
+export function findRule(rules: readonly StyleRule[], probe: Pick<StyleRule, 'type' | 'supertype' | 'subtype' | 'role'>): StyleRule | undefined {
   const key = ruleKey(probe);
   return rules.find(r => ruleKey(r) === key);
 }
@@ -138,33 +155,65 @@ export interface Kind<T> {
   key: string;
   supertype: string;
   subtype: string;
+  /** Set when the kind was split by role (`groupByKind(.., { byRole: true })`). */
+  role?: string;
   members: T[];
 }
 
-export function groupByKind<T extends { type: ElementType; supertype?: unknown; subtype?: unknown }>(elements: readonly T[]): Kind<T>[] {
+const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+/**
+ * `byRole` (zones, S362): a (supertype, subtype) group whose members SHARE
+ * roles splits into one kind per role, so "River" becomes major river / river
+ * / minor stream and a road's segments group under the road's name. A group
+ * where every role is distinct (14 chorai, each "the territory of X") stays
+ * whole: a row per zone would be a list, not a kind. Members with no role
+ * keep the unsplit key, so a kind hidden or tuned before S362 is the same kind.
+ */
+export function groupByKind<T extends { type: ElementType; supertype?: unknown; subtype?: unknown; role?: unknown }>(
+  elements: readonly T[],
+  opts: { byRole?: boolean } = {},
+): Kind<T>[] {
   const kinds = new Map<string, Kind<T>>();
   for (const el of elements) {
-    const s = typeof el.supertype === 'string' ? el.supertype.trim() : '';
-    const b = typeof el.subtype === 'string' ? el.subtype.trim() : '';
+    const s = text(el.supertype);
+    const b = text(el.subtype);
     const key = `${normKey(s)}␟${normKey(b)}`;
     let k = kinds.get(key);
     if (!k) { k = { key, supertype: s, subtype: b, members: [] }; kinds.set(key, k); }
     k.members.push(el);
   }
-  const out = [...kinds.values()];
+  let out = [...kinds.values()];
+  if (opts.byRole) {
+    out = out.flatMap(k => {
+      const roles = new Map<string, T[]>();
+      for (const el of k.members) {
+        const r = normKey(el.role);
+        const list = roles.get(r);
+        if (list) list.push(el); else roles.set(r, [el]);
+      }
+      const named = [...roles.keys()].filter(Boolean);
+      const withRole = k.members.filter(el => normKey(el.role)).length;
+      if (named.length === 0 || named.length === withRole) return [k];
+      return [...roles.entries()].map(([r, members]) => (r
+        ? { key: `${k.key}␟${r}`, supertype: k.supertype, subtype: k.subtype, role: text(members[0].role), members }
+        : { ...k, members }));
+    });
+  }
   out.sort((a, b) => {
     const ae = !a.supertype && !a.subtype;
     const be = !b.supertype && !b.subtype;
     if (ae !== be) return ae ? 1 : -1;
-    return (a.supertype + a.subtype).localeCompare(b.supertype + b.subtype);
+    return (a.supertype + a.subtype).localeCompare(b.supertype + b.subtype)
+      || (a.role ?? '').localeCompare(b.role ?? '');
   });
   return out;
 }
 
-/** The kind's display text: "River" · "Line · River" · "Line" · "(no kind)". */
-export function kindLabel(k: { supertype: string; subtype: string }): string {
-  if (k.supertype && k.subtype) return `${k.supertype} · ${k.subtype}`;
-  return k.supertype || k.subtype || '(no kind)';
+/** The kind's display text: "River" · "Line · River" · "Line · River · major river" · "(no kind)". */
+export function kindLabel(k: { supertype: string; subtype: string; role?: string }): string {
+  const base = k.supertype && k.subtype ? `${k.supertype} · ${k.subtype}` : (k.supertype || k.subtype || '(no kind)');
+  return k.role ? `${base} · ${k.role}` : base;
 }
 
 /**
@@ -178,8 +227,8 @@ export function styleValueHint(rules: readonly StyleRule[], el: Element, field: 
   if (typeof raw !== 'string' || !raw.trim()) return null;
   const value = raw.trim();
   const rule = field === 'subtype'
-    ? rules.find(r => normKey(r.subtype) && matches(r, el))
-    : rules.find(r => !normKey(r.subtype) && matches(r, el));
+    ? rules.find(r => !isRoleRule(r) && normKey(r.subtype) && matches(r, el))
+    : rules.find(r => !isRoleRule(r) && !normKey(r.subtype) && matches(r, el));
   if (!rule?.color) return null;
   return { color: rule.color, title: `"${value}" has a world style: ${rule.color}` };
 }
@@ -201,7 +250,8 @@ export function parseWorldStyles(raw: unknown): WorldStyles {
     const rule: StyleRule = { type: src.type as ElementType };
     if (typeof src.supertype === 'string') rule.supertype = src.supertype;
     if (typeof src.subtype === 'string') rule.subtype = src.subtype;
-    if (!normKey(rule.supertype) && !normKey(rule.subtype)) continue;
+    if (typeof src.role === 'string') rule.role = src.role;
+    if (!normKey(rule.supertype) && !normKey(rule.subtype) && !normKey(rule.role)) continue;
     // styles.json travels with the folder, so every visual is untrusted: a
     // colour reaches `style="background:…"` and `value="…"` (S360: a CSS
     // declaration list or a quote there was UI redress or a script breakout).

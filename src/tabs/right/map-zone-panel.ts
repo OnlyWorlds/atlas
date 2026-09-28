@@ -34,7 +34,7 @@ import { saveWorldStyleRules } from '../../core/world-styles-state';
 import { openColourPopover } from '../../ui/colour-popover';
 import { panMapTabTo } from './map-tab';
 import { refreshActiveMapZones } from './map-tab-zones';
-import { markersForZoneOnMap } from './zone-derived';
+import { markersForZoneOnMap, listLinkedZonesOnMap } from './zone-derived';
 import { partitionZonesAndMarkers } from './zone-derived';
 
 const DEFAULT_ZONE_COLOR = '#22d3ee';
@@ -57,10 +57,13 @@ function stateFor(entry: MapTabCacheEntry): ZonePanelState {
   return s;
 }
 
-/** The rule a kind row edits: the (type, supertype, subtype) of the kind itself. */
-function ruleProbe(kind: Kind<Zone>): Pick<StyleRule, 'type' | 'supertype' | 'subtype'> {
-  return { type: 'zone', supertype: kind.supertype || undefined, subtype: kind.subtype || undefined };
+/** The rule a kind row edits: the (type, supertype, subtype, role) of the kind itself. */
+function ruleProbe(kind: Kind<Zone>): Pick<StyleRule, 'type' | 'supertype' | 'subtype' | 'role'> {
+  return { type: 'zone', supertype: kind.supertype || undefined, subtype: kind.subtype || undefined, role: kind.role || undefined };
 }
+
+/** Zones split by shared role (S362): rivers by rank, route segments by their road. */
+const zoneKinds = (zones: readonly Zone[]): Kind<Zone>[] => groupByKind(zones, { byRole: true });
 
 /**
  * Render the panel for the zones on this map. `zones` is every zone on the
@@ -90,7 +93,11 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   if (!strip.classList.contains('is-open')) { ps.stale = true; return; }
   ps.stale = false;
   const rules = getState().styles.rules;
-  const kinds = groupByKind(zones);
+  // Zones drawn as their linked zones (a road as its segments, S362) join the
+  // panel beside the zones they link: listed, lit on hover, never drawn.
+  const linked = listLinkedZonesOnMap(zones, partitionZonesAndMarkers(getState().data.elements).zones);
+  const partsOf = new Map(linked.map(l => [l.zone.id, l.parts]));
+  const kinds = zoneKinds([...zones, ...linked.map(l => l.zone)]);
   const q = ps.search.trim().toLowerCase();
   // One kind (a small hand-drawn world) opens itself: the panel reads as the
   // flat list it was. Many kinds start closed; the selected zone's kind opens.
@@ -119,9 +126,12 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
     const open = q ? true : ps.openKinds.has(kind.key);
     const hidden = entry.hiddenZoneKinds.has(kind.key);
     const rule = findRule(rules, ruleProbe(kind));
-    const resolved = resolveStyle(rules, { type: 'zone', supertype: kind.supertype, subtype: kind.subtype });
+    const resolved = resolveStyle(rules, { type: 'zone', supertype: kind.supertype, subtype: kind.subtype, role: kind.role });
     const color = rule?.color ?? resolved.color ?? DEFAULT_ZONE_COLOR;
-    const hasKind = Boolean(kind.supertype || kind.subtype);
+    // A kind made only of linked zones has nothing on the map to colour,
+    // tune or hide: its row lists them and stops there.
+    const linkedOnly = kind.members.every(z => partsOf.has(z.id));
+    const hasKind = Boolean(kind.supertype || kind.subtype || kind.role) && !linkedOnly;
     const tuning = ps.tuning === kind.key;
     parts.push(`
       <div class="atlas-zone-kind ${open ? 'is-open' : ''} ${hidden ? 'is-hidden' : ''}" data-kind-key="${escapeAttr(kind.key)}">
@@ -135,11 +145,11 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
           <span class="atlas-zone-kind-name">${escapeText(kindLabel(kind))}</span>
           <span class="atlas-zone-kind-count">${matching.length}${q ? ` of ${members.length}` : ''}</span>
           ${hasKind ? `<button type="button" class="atlas-zone-kind-btn ${tuning ? 'is-active' : ''}" data-action="tune" title="Fill, line and label for this kind"><span class="material-symbols-outlined">tune</span></button>` : ''}
-          <button type="button" class="atlas-zone-kind-btn atlas-zone-kind-eye" data-action="toggle-kind-visible" title="${hidden ? 'Show' : 'Hide'} these zones on this map"><span class="material-symbols-outlined">${hidden ? 'visibility_off' : 'visibility'}</span></button>
+          ${linkedOnly ? '' : `<button type="button" class="atlas-zone-kind-btn atlas-zone-kind-eye" data-action="toggle-kind-visible" title="${hidden ? 'Show' : 'Hide'} these zones on this map"><span class="material-symbols-outlined">${hidden ? 'visibility_off' : 'visibility'}</span></button>`}
         </div>
         ${tuning && hasKind ? renderTune(kind, rule, resolved) : ''}
         <div class="atlas-zone-kind-members" ${open ? '' : 'hidden'}>
-          ${matching.map(z => renderChip(z, selectedId, rules)).join('')}
+          ${matching.map(z => renderChip(z, selectedId, rules, partsOf.get(z.id))).join('')}
         </div>
       </div>`);
   }
@@ -152,16 +162,20 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
   }
 }
 
-function renderChip(z: Zone, selectedId: string | null | undefined, rules: readonly StyleRule[]): string {
-  const shapeIcon = getZoneShape(z) === 'line' ? 'show_chart' : 'hexagon';
+function renderChip(z: Zone, selectedId: string | null | undefined, rules: readonly StyleRule[], parts?: string[]): string {
+  const shapeIcon = parts ? 'route' : getZoneShape(z) === 'line' ? 'show_chart' : 'hexagon';
   const own = (z as { atlas_color?: string }).atlas_color;
   // A zone's own colour is from its file: hex only into style="" (S360).
   const color = hexColourOr(own, resolveStyle(rules, z).color ?? DEFAULT_ZONE_COLOR);
+  const title = parts
+    ? `${z.name}: drawn as the ${parts.length} zones it links to`
+    : `${ELEMENT_LABELS.zone.singular}: ${z.name}`;
   return `
-    <div class="atlas-zone-chip ${z.id === selectedId ? 'is-selected' : ''}" data-zone-id="${escapeAttr(z.id)}" title="${escapeAttr(`${ELEMENT_LABELS.zone.singular}: ${z.name}`)}">
+    <div class="atlas-zone-chip ${z.id === selectedId ? 'is-selected' : ''} ${parts ? 'is-linked' : ''}" data-zone-id="${escapeAttr(z.id)}"${parts ? ` data-parts="${escapeAttr(parts.join(' '))}"` : ''} title="${escapeAttr(title)}">
       <span class="material-symbols-outlined atlas-zone-chip-shape">${shapeIcon}</span>
       <span class="atlas-zone-chip-dot ${own ? 'is-own' : ''}" style="background:${escapeAttr(color)}" title="${own ? 'This zone has its own colour' : ''}"></span>
-      <span class="atlas-zone-chip-name">${escapeText(z.name || '(unnamed)')}</span>
+      <span class="atlas-zone-chip-name">${escapeText(z.name || '(unnamed)')}</span>${parts ? `
+      <span class="atlas-zone-chip-parts">${parts.length} ${parts.length === 1 ? 'part' : 'parts'}</span>` : ''}
       <button type="button" class="atlas-zone-chip-x" data-action="delete" title="Delete zone">
         <span class="material-symbols-outlined">delete</span>
       </button>
@@ -220,7 +234,7 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     for (const m of markers) if (m.map_id === entry.mapId && m.zone_id) ids.add(m.zone_id);
     return zones.filter(z => ids.has(z.id));
   };
-  const kindOf = (key: string): Kind<Zone> | undefined => groupByKind(zonesOnMap()).find(k => k.key === key);
+  const kindOf = (key: string): Kind<Zone> | undefined => zoneKinds(zonesOnMap()).find(k => k.key === key);
   const rerender = (): void => {
     renderZonePanel(entry, zonesOnMap(), getState().ui.selectedElementId);
   };
@@ -271,7 +285,7 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     if (kindKey && target.closest('[data-action="apply-to-zones"]')) {
       const kind = kindOf(kindKey);
       if (!kind) return;
-      const color = resolveStyle(getState().styles.rules, { type: 'zone', supertype: kind.supertype, subtype: kind.subtype }).color;
+      const color = resolveStyle(getState().styles.rules, { type: 'zone', supertype: kind.supertype, subtype: kind.subtype, role: kind.role }).color;
       if (color) handlers.onApplyToZones(kind.members, color);
       return;
     }
@@ -291,7 +305,8 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     const worldId = getState().active?.worldId;
     patchSlice('ui', { ...getState().ui, selectedElementId: zoneId });
     if (worldId) navigate(elementHash(worldId, zoneId));
-    const pts = markersForZoneOnMap(zoneId, entry.mapId, partitionZonesAndMarkers(getState().data.elements).markers);
+    const { markers } = partitionZonesAndMarkers(getState().data.elements);
+    const pts = partIdsOf(chip, zoneId).flatMap(id => markersForZoneOnMap(id, entry.mapId, markers));
     if (pts.length > 0) {
       const cx = pts.reduce((s, m) => s + m.x, 0) / pts.length;
       const cy = pts.reduce((s, m) => s + m.y, 0) / pts.length;
@@ -328,18 +343,25 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
     else if (action === 'tune-priority') writeRule(kind, { label_priority: (target as HTMLInputElement).checked || undefined });
   });
 
-  // Hover a row → light the zone on the map, exactly as the cursor would.
+  // Hover a row → light the zone on the map, exactly as the cursor would. A
+  // zone drawn as its linked zones lights every part (a road, whole).
   let hoveredId: string | null = null;
+  let litIds: string[] = [];
   const unhover = (): void => {
-    if (hoveredId) entry.zoneOverlay?.setZoneHovered(hoveredId, false);
+    for (const id of litIds) entry.zoneOverlay?.setZoneHovered(id, false);
     hoveredId = null;
+    litIds = [];
   };
   strip.addEventListener('mouseover', (e) => {
     const chip = (e.target as HTMLElement).closest<HTMLElement>('.atlas-zone-chip');
     const id = chip?.getAttribute('data-zone-id') ?? null;
     if (id === hoveredId) return;
     unhover();
-    if (id) { hoveredId = id; entry.zoneOverlay?.setZoneHovered(id, true); }
+    if (id && chip) {
+      hoveredId = id;
+      litIds = partIdsOf(chip, id);
+      for (const part of litIds) entry.zoneOverlay?.setZoneHovered(part, true);
+    }
   });
   strip.addEventListener('mouseleave', unhover);
 
@@ -363,6 +385,12 @@ export function wireZonePanel(entry: MapTabCacheEntry, handlers: {
       e.stopPropagation();
     }
   });
+}
+
+/** The zones a chip stands for on the map: its linked parts, or itself. */
+function partIdsOf(chip: HTMLElement, zoneId: string): string[] {
+  const parts = chip.getAttribute('data-parts');
+  return parts ? parts.split(' ').filter(Boolean) : [zoneId];
 }
 
 /** Test seam: the panel state for a mounted map. */

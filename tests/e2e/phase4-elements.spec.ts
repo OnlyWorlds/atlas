@@ -335,3 +335,55 @@ test('muted types (S356): pins and markers close the strip greyed, stay out of "
   await expect(strip.locator('[data-filter-type="location"]')).not.toHaveClass(/active/);
   expect(await rowTypes()).toEqual(['map', 'marker', 'marker', 'zone']);
 });
+
+/** Setup shortcut through the active FolderStore (the real FsFolderStore on OPFS). */
+async function storeCreate(page: Page, type: string, data: Record<string, unknown>): Promise<string> {
+  return await page.evaluate(async ({ type, data }) => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const created = await store.createElement(type, data);
+    api.patchData(await store.listElements());
+    return created.id;
+  }, { type, data });
+}
+
+async function storeField(page: Page, id: string, field: string): Promise<unknown> {
+  return await page.evaluate(async ({ id, field }) => {
+    const el = await (window as any).__atlasTestApi.getActiveStore().getElement(id);
+    return el?.[field];
+  }, { id, field });
+}
+
+test('deleting an element removes it from every link that named it (S362, keel parity)', async ({ page }) => {
+  await setupWorldA(page);
+  const castle = await storeCreate(page, 'location', { name: 'Castle' });
+  const strahd = await storeCreate(page, 'character', { name: 'Strahd', location: castle });
+  const feast = await storeCreate(page, 'event', { name: 'Feast', locations: [castle] });
+
+  await page.evaluate((id) => { window.location.hash = `#/w/${(window as any).__atlasTestApi.getState().active.worldId}/element/${id}`; }, castle);
+  await expect(page.locator('.atlas-middle-header h2')).toContainText('Castle');
+  page.on('dialog', d => d.accept());
+  await page.click('[data-action="delete-element"]');
+  await expect(page.locator('.atlas-row[data-element-id]', { hasText: 'Castle' })).toHaveCount(0);
+
+  await expect.poll(() => storeField(page, strahd, 'location')).toBeNull();
+  expect(await storeField(page, feast, 'locations')).toEqual([]);
+});
+
+test('Settings → World offers to remove links to elements that are gone (local world)', async ({ page }) => {
+  await setupWorldA(page);
+  const kept = await storeCreate(page, 'location', { name: 'Village' });
+  // A link left behind by a delete from before the scrub, or a partial import.
+  const strahd = await storeCreate(page, 'character', { name: 'Strahd', location: '0199aaaa-0000-7000-8000-00000000dead', species: [] });
+  const ireena = await storeCreate(page, 'character', { name: 'Ireena', location: kept });
+
+  await page.evaluate(() => { const api = (window as any).__atlasTestApi; window.location.hash = `#/w/${api.getState().active.worldId}/settings/world`; });
+  const box = page.locator('.atlas-settings [data-role="dangling-links"]');
+  await expect(box).toBeVisible();
+  await expect(box).toContainText('1 element links to something no longer in this world');
+  await box.locator('[data-action="remove-dangling-links"]').click();
+  await expect(box).toBeHidden();
+
+  expect(await storeField(page, strahd, 'location')).toBeNull();
+  expect(await storeField(page, ireena, 'location')).toBe(kept);
+});

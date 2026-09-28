@@ -56,6 +56,55 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.9',
+    date: '2026-09-28',
+    theme: 'deletes that tidy up',
+    entries: [
+      {
+        id: 'delete-removes-links',
+        title: 'Deleting an element removes it from everything that linked to it',
+        body: 'A deleted location used to stay in its characters\' location field as a bare id, and when the world went online OnlyWorlds refused those characters, so they never uploaded. Atlas now removes the link, the same way onlyworlds.com does.',
+        tags: ['folders', 'fix'],
+      },
+      {
+        id: 'remove-broken-links',
+        title: 'A local world can remove links to elements that are gone',
+        body: 'Settings, then your world, shows how many elements still link to something deleted earlier or left out of an import, with one button to remove those links before the world goes online.',
+        tags: ['folders'],
+      },
+      {
+        id: 'export-without-key',
+        title: 'Exports no longer carry your API key',
+        body: 'The export offered to include the world\'s API key and had it ticked by default, for both the file and Copy JSON. Anyone holding that file could read the whole world. The key is never exported now; to connect a world, use Make online.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'import-keeps-renamed',
+        title: 'Merging your own export back in no longer duplicates renamed elements',
+        body: 'An element renamed since the export came back as a second copy, and new links in the file pointed at the copy. When the file is this world\'s own export, Atlas now treats the same id as the same element whatever its name.',
+        tags: ['folders', 'fix'],
+      },
+      {
+        id: 'zone-styles-by-role',
+        title: 'Zone styles can follow a zone\'s role',
+        body: 'The zones panel now splits a kind by role when its zones share roles, so rivers can be major rivers, rivers and streams, each with its own colour and line. Road segments that carry their road\'s name group under it.',
+        tags: ['maps'],
+      },
+      {
+        id: 'linked-zones-listed',
+        title: 'A zone made of other zones shows up in the zones panel',
+        body: 'Some worlds describe a road as one zone that links its segments and has no outline of its own. Atlas used to leave these out entirely. The zones panel now lists them with the number of parts, and hovering one lights every part on the map.',
+        tags: ['maps'],
+      },
+      {
+        id: 'big-world-list-speed',
+        title: 'Big worlds stay responsive while you click around',
+        body: 'The element list and the home page used to redraw completely on every small change, which on a world of twelve thousand elements cost a noticeable pause on each click. They now redraw only when something they show has changed.',
+        tags: ['layout', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.8',
     date: '2026-09-28',
     theme: 'north is up',

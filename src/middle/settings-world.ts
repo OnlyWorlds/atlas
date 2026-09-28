@@ -25,11 +25,13 @@ import {
   detachSyncEngine,
   getCurrentSyncEngine,
   pullNowAndRefresh,
+  refreshElementsAfterWrite,
   requestPushIfLinked,
 } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
 import type { WorldRegistryEntry } from '../core/types';
 import { escapeText, escapeAttr } from '../core/dom-utils';
+import { findDanglingLinks, scrubReferrers } from '../store/scrub-links';
 
 export function renderWorldTab(world: WorldRegistryEntry): string {
   const stateLabel = world.state === 'api-linked' ? 'api-linked' : 'local-only';
@@ -47,7 +49,11 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       </div>`
     : world.demo === true
       ? `<p class="atlas-settings-hint">The tour world is a sandbox and is removed when the tour ends, so it cannot go online. Create your own world for that.</p>`
-      : `<div class="atlas-settings-actions">
+      : `<div class="atlas-settings-dangling" data-role="dangling-links" hidden>
+        <p class="atlas-settings-hint" data-role="dangling-text"></p>
+        <button class="atlas-btn-ghost" data-action="remove-dangling-links">Remove those links</button>
+      </div>
+      <div class="atlas-settings-actions">
         <button class="atlas-btn-primary" data-action="make-online">Make online</button>
       </div>`;
   return `
@@ -106,6 +112,8 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
         await picker({ startIn: handle, id: 'atlas-show-folder' });
       } catch { /* closed: nothing to do */ }
     });
+
+  wireDanglingLinks(toasts);
 
   const nameInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="world-name"]');
   nameInput?.addEventListener('change', () => {
@@ -349,6 +357,44 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       const msg = err instanceof Error ? err.message : String(err);
       toasts.error(`Delete failed: ${msg}`);
       deletePermBtn.disabled = false;
+    }
+  });
+}
+
+/**
+ * Links that point at elements no longer in this LOCAL world (S362): left by
+ * deletes from before Atlas removed links on delete, or by importing part of
+ * an export. keel refuses an element whose link names nothing, so these
+ * elements would never upload. Offered only on a local world, where absent
+ * means gone; in a linked world an absent id can simply not be downloaded yet.
+ */
+function wireDanglingLinks(toasts: ToastManager): void {
+  const box = document.querySelector<HTMLElement>('.atlas-settings [data-role="dangling-links"]');
+  const text = box?.querySelector<HTMLElement>('[data-role="dangling-text"]');
+  const btn = box?.querySelector<HTMLButtonElement>('[data-action="remove-dangling-links"]');
+  if (!box || !text || !btn) return;
+  const show = (): void => {
+    const dangling = findDanglingLinks(getState().data.elements);
+    const elements = new Set(dangling.map(d => d.elementId)).size;
+    box.hidden = dangling.length === 0;
+    text.textContent = `${elements} ${elements === 1 ? 'element links' : 'elements link'} to something no longer in this world. OnlyWorlds refuses those elements when the world goes online.`;
+  };
+  show();
+  btn.addEventListener('click', async () => {
+    const store = getActiveStore();
+    if (!store) { toasts.error('No active world'); return; }
+    const missing = new Set(findDanglingLinks(getState().data.elements).map(d => d.missingId));
+    btn.disabled = true;
+    try {
+      const changed = await scrubReferrers(store, missing);
+      await refreshElementsAfterWrite(store);
+      toasts.success(`Removed the broken links from ${changed.length} ${changed.length === 1 ? 'element' : 'elements'}`);
+    } catch (err) {
+      console.error('[settings] remove dangling links failed:', err);
+      toasts.error('Could not remove the links');
+    } finally {
+      btn.disabled = false;
+      show();
     }
   });
 }

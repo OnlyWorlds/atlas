@@ -92,8 +92,19 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     }).catch(() => { savedCharts = []; });
   }
 
+  // Home rebuilds only when something it draws from moved (S362): it used to
+  // rebuild the cover, cast, chart strip, desk and loose threads on every
+  // state notify, ~80 ms a time at Sikelia's size, for sync ticks, toasts and
+  // clicks in other panes. A new input the home reads must join this list.
+  let lastInputs: unknown[] | null = null;
+
   function render(): void {
-    const active = getState().active;
+    const s = getState();
+    const inputs = [s.active, s.data.elements, s.data.loading, s.data.loadingProgress?.done, s.registry,
+      s.ui.castAssign?.kind, savedCharts, isTourFlagActive()];
+    if (lastInputs && inputs.every((v, i) => v === lastInputs![i])) return;
+    lastInputs = inputs;
+    const active = s.active;
     if (!active) {
       root.innerHTML = '<div class="atlas-pane-empty">No active world.</div>';
       return;

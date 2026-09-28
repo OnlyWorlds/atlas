@@ -425,3 +425,27 @@ describe('unnamed pins/markers round-trip (session 248)', () => {
     expect(plan.creates).toHaveLength(1);
   });
 });
+
+describe('reconcile — a renamed element in the world\'s own export (S362)', () => {
+  const EVT = '068e5012-d77c-799d-8000-0000000000e5';
+  const payload = () => parsePayload({
+    World: { name: 'W' },
+    Character: [{ id: U.kid, name: 'Strahd von Zarovich' }],
+    Event: [{ id: EVT, name: 'The Feast', characters: [U.kid] }],
+  });
+  const existing = [existingEl({ id: U.kid, type: 'character', name: 'Strahd' })];
+
+  it('same world: the id match wins over the rename, and new links keep the original', () => {
+    for (const onConflict of ['skip', 'overwrite'] as const) {
+      const plan = reconcile(payload(), existing, { onConflict, sameWorld: true, genId: genIdFactory() });
+      expect(plan.creates.map(c => c.type)).toEqual(['event']);
+      const feast = plan.creates[0].data as { characters?: string[] };
+      expect(feast.characters).toEqual([U.kid]);
+    }
+  });
+
+  it('a foreign file keeps the collision guard: same id, different name is a different element', () => {
+    const plan = reconcile(payload(), existing, { onConflict: 'skip', genId: genIdFactory() });
+    expect(plan.creates.map(c => c.type).sort()).toEqual(['character', 'event']);
+  });
+});

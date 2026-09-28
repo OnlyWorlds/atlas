@@ -15790,3 +15790,9 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
     animation: none !important;
   }
 }
+
+/* S362: the dangling-links repair row in Settings → World sits above Make online. */
+.atlas-settings-dangling { margin: 4px 0 14px; }
+.atlas-settings-dangling .atlas-settings-hint { margin-bottom: 8px; }
+/* S362: a zone drawn as its linked zones (a road as its segments) says how many parts it lights. */
+.atlas-zone-chip-parts { margin-left: auto; padding-left: 8px; font-size: 11px; color: var(--atlas-text-muted); white-space: nowrap; }

@@ -57,6 +57,13 @@ export interface ReconcileOptions {
   mergeMultiLinks?: boolean;
   /** UUID generator for inserts without a valid id. Default crypto.randomUUID. Inject for deterministic tests. */
   genId?: () => string;
+  /**
+   * The payload is THIS world's own export (its world id matched the target,
+   * S362). Then an id match is the same element even when the names differ:
+   * the realistic cause of same id + different name is a rename on one side,
+   * and the name guard used to turn every rename into a duplicate.
+   */
+  sameWorld?: boolean;
 }
 
 export interface DroppedLink {

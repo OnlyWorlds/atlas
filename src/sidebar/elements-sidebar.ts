@@ -459,10 +459,23 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     });
   }
 
+  // THE LIST MEMO (S362). `render` runs on EVERY state notify and every hash
+  // change, and the list is one innerHTML over every unmuted element: on
+  // Sikelia (12,306 elements) that is 7,752 rows, 3 MB of markup and ~180 ms
+  // of layout in Chromium, paid for sync ticks, toasts and each half of a row
+  // click. The rows depend only on the inputs below; when none moved, the
+  // list is left alone, and when only the selection moved, two classes move.
+  // Anything new a row reads must join `listInputs` or it will not repaint.
+  let lastList: Record<string, unknown> | null = null;
+  let lastSelectedId: string | null = null;
+  const sameInputs = (a: Record<string, unknown>, b: Record<string, unknown>): boolean =>
+    Object.keys(a).every(k => a[k] === b[k]);
+
   function render(): void {
     const state = getState();
 
     if (!state.active) {
+      lastList = null;
       strip.innerHTML = '';
       subFilterRow.hidden = true;
       subFilterType = null; superFilter = null; subtypeFilter = null;
@@ -528,6 +541,36 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     // showing all, listed when filtered to), and any type can be muted the
     // same way: a world with 3,143 markers wants to read as 257 places.
     const muted = state.ui.mutedTypes;
+    const activeMapId = (() => {
+      const active = state.ui.rightTabs[state.ui.rightActiveIndex];
+      return active && active.kind === 'map' ? active.mapId : null;
+    })();
+    const listInputs: Record<string, unknown> = {
+      elements,
+      rules: state.styles.rules,
+      filters: [...filters].sort().join(','),
+      muted: [...muted].sort().join(','),
+      query,
+      superFilter,
+      subtypeFilter,
+      lens: lens?.knowerId ?? null,
+      activeMapId,
+      flashing: [...flashingIds.keys()].join(','),
+      tourFresh: isTourFlagActive() ? [...tourFreshIds].join(',') : '',
+      loading: state.data.loading,
+      progress: state.data.loadingProgress?.done ?? null,
+    };
+    if (lastList && sameInputs(listInputs, lastList)) {
+      if (selectedId !== lastSelectedId) {
+        listEl.querySelector('.atlas-row.selected')?.classList.remove('selected');
+        if (selectedId) listEl.querySelector(`.atlas-row[data-element-id="${CSS.escape(selectedId)}"]`)?.classList.add('selected');
+        lastSelectedId = selectedId;
+      }
+      return;
+    }
+    lastList = listInputs;
+    lastSelectedId = selectedId;
+
     const filtered = elements
       .filter(el => filters.size > 0 || !muted.has(el.type))
       // Tour-quiet machinery (the calendar construct) stays out of the list
@@ -580,11 +623,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     //   - a pin on the active map references this element → presence
     //   - this element is a zone with a marker on the active map → presence
     // Renders as a small map icon left of the row's category label,
-    // signalling "this element is placed on the open map."
-    const activeMapId = (() => {
-      const active = state.ui.rightTabs[state.ui.rightActiveIndex];
-      return active && active.kind === 'map' ? active.mapId : null;
-    })();
+    // signalling "this element is placed on the open map." (`activeMapId`
+    // is resolved above, with the list memo's inputs.)
     const elementsOnActiveMap = new Set<string>();
     if (activeMapId) {
       for (const e of elements) {

@@ -69,7 +69,9 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
   const currentColor = hexColourOr(ownColor, hexColourOr(rule.color, '#22d3ee'));
   const currentOpacity = (zone as { atlas_opacity?: number }).atlas_opacity ?? rule.fill_opacity ?? 0.4;
   const currentLabelVisible = !!(zone as { atlas_label_visible?: boolean }).atlas_label_visible;
-  const kind = kindLabel({ supertype: typeof zone.supertype === 'string' ? zone.supertype : '', subtype: typeof zone.subtype === 'string' ? zone.subtype : '' });
+  // A role rule (S362) names the role too: "Line · River · major river".
+  const role = rule.source === 'role' && typeof (zone as { role?: unknown }).role === 'string' ? ((zone as { role?: string }).role ?? '').trim() : '';
+  const kind = kindLabel({ supertype: typeof zone.supertype === 'string' ? zone.supertype : '', subtype: typeof zone.subtype === 'string' ? zone.subtype : '', role: role || undefined });
   const inheritLine = ownColor
     ? (rule.color
         ? `This zone has its own colour. <button type="button" class="atlas-btn-link" data-action="use-kind-colour">Use the ${escapeText(kind)} colour (${escapeText(rule.color)})</button>`

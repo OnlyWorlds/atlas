@@ -95,6 +95,7 @@ interface LayoutScan {
 }
 import { PerIdWriteChain } from './write-chain';
 import { stampedBody } from './sync-stamp';
+import { scrubReferrers } from './scrub-links';
 import {
   elementDirSegmentsIn,
   elementFilename,
@@ -1238,7 +1239,14 @@ export class FsFolderStore implements FolderStore {
     if (!opts.silent) this.assertWritable();
     // Same chain as updateElement: an in-flight update to this id lands (or
     // fails) before the file disappears — no "element not found" tail errors.
-    return this.writeChain.run(id, () => this.deleteElementUnchained(id, opts));
+    const result = await this.writeChain.run(id, () => this.deleteElementUnchained(id, opts));
+    // Links to what just died are removed from every other element, as keel
+    // does (S362, `store/scrub-links.ts`). Outside the target's slot: each
+    // referrer goes through its own chain. Silent deletes are the engine's
+    // and Route 2's channel (the server already scrubbed, or the id is being
+    // swapped), so they never scrub.
+    if (!opts.silent) await scrubReferrers(this, new Set(result.tombstones.map(t => t.id)));
+    return result;
   }
 
   private async deleteElementUnchained(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {

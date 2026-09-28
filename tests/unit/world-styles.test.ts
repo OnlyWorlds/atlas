@@ -87,3 +87,47 @@ describe('parseWorldStyles', () => {
     expect(parseWorldStyles({ rules: [{ color: '#fff' }, { type: 'zone' }, { type: 'zone', supertype: 'X', color: '#000' }] }).rules).toHaveLength(1);
   });
 });
+
+describe('role rules and role kinds (S362)', () => {
+  const ROLE_RULES: StyleRule[] = [
+    ...RULES,
+    { type: 'zone', supertype: 'Line', subtype: 'River', role: 'major river', weight: 5, color: '#1d4ed8' },
+  ];
+
+  it('a role rule wins over the subtype rule, field by field, only for its role', () => {
+    const major = resolveStyle(ROLE_RULES, zone('Line', 'River', { role: 'Major River ' }));
+    expect(major).toMatchObject({ color: '#1d4ed8', weight: 5, source: 'role' });
+    const minor = resolveStyle(ROLE_RULES, zone('Line', 'River', { role: 'minor stream' }));
+    expect(minor).toMatchObject({ color: '#3b82f6', weight: 3, source: 'subtype' });
+  });
+
+  it('role rules have their own key and never answer for the plain kind', () => {
+    const plain = { type: 'zone' as const, supertype: 'Line', subtype: 'River' };
+    expect(ruleKey({ ...plain, role: 'major river' })).not.toBe(ruleKey(plain));
+    expect(findRule(ROLE_RULES, plain)?.color).toBe('#3b82f6');
+    expect(styleRowHint(ROLE_RULES, zone('Line', 'River', { role: 'major river' }))?.color).toBe('#3b82f6');
+  });
+
+  it('upsert and parse keep the role; a role-only rule survives parsing', () => {
+    const next = upsertRule([], { type: 'zone', supertype: 'Line', subtype: 'River', role: ' river ', color: '#00ff00' });
+    expect(next[0].role).toBe('river');
+    expect(parseWorldStyles({ rules: [{ type: 'zone', role: 'road', color: '#222222' }] }).rules).toEqual([{ type: 'zone', role: 'road', color: '#222222' }]);
+  });
+
+  it('byRole splits a kind whose members share roles, and keeps a kind of distinct roles whole', () => {
+    const rivers = [
+      zone('Line', 'River', { id: 'a', role: 'major river' }), zone('Line', 'River', { id: 'b', role: 'major river' }),
+      zone('Line', 'River', { id: 'c', role: 'minor stream' }), zone('Line', 'River', { id: 'd' }),
+    ];
+    const chorai = [zone('Polygon', 'Chora', { id: 'e', role: 'the territory of Gela' }), zone('Polygon', 'Chora', { id: 'f', role: 'the territory of Enna' })];
+    const kinds = groupByKind([...rivers, ...chorai], { byRole: true });
+    expect(kinds.map(k => kindLabel(k))).toEqual([
+      'Line · River', 'Line · River · major river', 'Line · River · minor stream', 'Polygon · Chora',
+    ]);
+    // the no-role members keep the pre-S362 key (a kind hidden before stays hidden)
+    expect(kinds[0].key).toBe(groupByKind(rivers)[0].key);
+    expect(kinds[0].members.map(z => z.id)).toEqual(['d']);
+    // without byRole nothing changes
+    expect(groupByKind([...rivers, ...chorai]).length).toBe(2);
+  });
+});

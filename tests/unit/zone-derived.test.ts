@@ -14,6 +14,7 @@ import {
   isOrphanZone,
   partitionZonesAndMarkers,
   getZoneShape,
+  listLinkedZonesOnMap,
 } from '../../src/tabs/right/zone-derived';
 import type { Zone, Marker, Element } from '../../src/core/types';
 
@@ -196,5 +197,20 @@ describe('getZoneShape', () => {
     expect(getZoneShape(zone('z', 'z', { supertype: 'River' }))).toBe('polygon');
     expect(getZoneShape(zone('z', 'z', { supertype: '' }))).toBe('polygon');
     expect(getZoneShape(undefined)).toBe('polygon');
+  });
+});
+
+describe('listLinkedZonesOnMap (S362: a road drawn as its segments)', () => {
+  it('lists a zone off the map whose linked zones are on it, with the parts that are', () => {
+    const seg1 = zone('s1'); const seg2 = zone('s2'); const elsewhere = zone('far');
+    const road = zone('road', 'East Coastal Road', { linked_zones: ['s1', { id: 's2' }, 'far', 'missing'] } as Partial<Zone>);
+    const lonely = zone('lonely', 'Unlinked', { linked_zones: ['far'] } as Partial<Zone>);
+    const out = listLinkedZonesOnMap([seg1, seg2], [seg1, seg2, elsewhere, road, lonely]);
+    expect(out.map(o => [o.zone.id, o.parts])).toEqual([['road', ['s1', 's2']]]);
+  });
+
+  it('never lists a zone that is itself on the map', () => {
+    const a = zone('a', 'a', { linked_zones: ['b'] } as Partial<Zone>); const b = zone('b');
+    expect(listLinkedZonesOnMap([a, b], [a, b])).toEqual([]);
   });
 });

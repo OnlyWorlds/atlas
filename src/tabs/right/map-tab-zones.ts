@@ -42,7 +42,7 @@ export function syncZones(entry: MapTabCacheEntry): void {
   // Kind → hidden, from the zone panel's eyes (session-only, per map).
   const hiddenIds = new Set<string>();
   if (entry.hiddenZoneKinds.size > 0) {
-    for (const kind of groupByKind(onThisMap)) {
+    for (const kind of groupByKind(onThisMap, { byRole: true })) {
       if (entry.hiddenZoneKinds.has(kind.key)) for (const z of kind.members) hiddenIds.add(z.id);
     }
   }

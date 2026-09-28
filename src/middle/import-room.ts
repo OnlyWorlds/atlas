@@ -137,7 +137,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   root.innerHTML = `
     <header class="atlas-room-header">
       <h1>Data</h1>
-      <p class="atlas-room-subtitle">Export your world as a complete file, or bring in OnlyWorlds-formatted data.</p>
+      <p class="atlas-room-subtitle">Export your world as an OnlyWorlds file, or bring in OnlyWorlds-formatted data.</p>
     </header>
     <div class="atlas-room-tabs" role="tablist">
       <button type="button" class="atlas-room-tab is-active" data-tab="in" role="tab">
@@ -349,7 +349,8 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
   function buildPlan(): ImportPlan {
     const existing = mode === 'merge' ? activeElements() : [];
-    const plan = reconcile(parsed!, existing, { onConflict: conflict, matchByName: true });
+    const sameWorld = mode === 'merge' && !!activeWorld() && idMatchWorld()?.id === activeWorld()!.worldId;
+    const plan = reconcile(parsed!, existing, { onConflict: conflict, matchByName: true, sameWorld });
     if (mode === 'new') {
       // The editable world name wins over the file's.
       plan.worldMeta = { ...(plan.worldMeta ?? {}), name: worldName.trim() || 'Imported world' };
@@ -583,8 +584,11 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   // Take out (export)
   // ---------------------------------------------------------------------------
 
-  let includeCreds = true;
-
+  // No API key in an export (S362). The box that offered it was on by default
+  // and said the key was "needed to re-upload to onlyworlds.com": keel's import
+  // never reads it and atlas's import drops it, while a prefixed write key reads
+  // a private world with no PIN, so a shared file or a pasted "Copy JSON" was a
+  // read pass for the whole world. Linking goes through Make Online.
   function renderExport(): void {
     const aw = activeWorld();
     const store = getActiveStore();
@@ -596,7 +600,6 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const counts = new Map<ElementType, number>();
     for (const e of activeElements()) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
     const populated = ALL_ELEMENT_TYPES.filter(t => (counts.get(t) ?? 0) > 0);
-    const isApiLinked = !!aw.meta?.id && getState().registry.worlds.find(w => w.id === aw.worldId)?.state === 'api-linked';
 
     if (populated.length === 0) {
       exportMount.innerHTML = `<p class="atlas-room-hint">This world has no elements yet; nothing to export.</p>`;
@@ -616,6 +619,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
     exportMount.innerHTML = `
       <p class="atlas-share-section-hint">Download <b>${escapeText(aw.meta?.name ?? 'this world')}</b> as an onlyworlds.com world export, the same file the site downloads. Untick types to export a subset.</p>
+      <p class="atlas-share-section-hint">The file holds the world's elements. Pages, aliases, saved charts, writing formatting and images kept in the folder stay in your world folder, which is the full copy of your world.</p>
       <div class="atlas-import-typelist">
         <label class="atlas-import-type-all">
           <input type="checkbox" data-role="all" checked />
@@ -631,20 +635,12 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
           </div>
         </div>
       </div>
-      ${isApiLinked ? `
-        <label class="atlas-import-check">
-          <input type="checkbox" data-role="creds" ${includeCreds ? 'checked' : ''}/>
-          <span>Include API key (needed to re-upload to onlyworlds.com)</span>
-        </label>
-      ` : ''}
       <div class="atlas-import-export-actions">
         <button type="button" class="atlas-btn-primary" data-action="export">Save to file</button>
         <button type="button" class="atlas-btn-ghost" data-action="copy-json">Copy JSON</button>
       </div>
     `;
 
-    const credsBox = exportMount.querySelector<HTMLInputElement>('[data-role="creds"]');
-    credsBox?.addEventListener('change', () => { includeCreds = credsBox.checked; });
     const allBox = exportMount.querySelector<HTMLInputElement>('[data-role="all"]')!;
     const exportBtn = exportMount.querySelector<HTMLButtonElement>('[data-action="export"]')!;
     const copyJsonBtn = exportMount.querySelector<HTMLButtonElement>('[data-action="copy-json"]')!;
@@ -680,8 +676,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const all = exportMount.querySelectorAll('.atlas-import-type-row input').length;
     try {
       const data = await buildWorldExport(store, {
-        includeCredentials: includeCreds,
-        types: checked.length === all ? undefined : new Set(checked),
+                types: checked.length === all ? undefined : new Set(checked),
       });
       const slug = (aw.meta?.name ?? 'world').replace(/[^a-z0-9]+/gi, '_').toLowerCase().replace(/^_+|_+$/g, '') || 'world';
       const date = new Date().toISOString().slice(0, 10);
@@ -704,8 +699,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const all = exportMount.querySelectorAll('.atlas-import-type-row input').length;
     try {
       const data = await buildWorldExport(store, {
-        includeCredentials: includeCreds,
-        types: checked.length === all ? undefined : new Set(checked),
+                types: checked.length === all ? undefined : new Set(checked),
       });
       await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
       const n = checked.reduce((sum, t) => sum + (activeElements().filter(e => e.type === t).length), 0);
