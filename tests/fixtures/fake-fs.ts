@@ -11,16 +11,35 @@
  */
 function err(name: string, msg: string): Error { const e = new Error(msg); e.name = name; return e; }
 
+/**
+ * `lastModified` (S364, the live folder): a monotonic counter, bumped on every
+ * commit and every `put`, as Chromium bumps it on every `close()` even for
+ * identical bytes. Monotonic rather than a clock so two writes in the same
+ * millisecond still differ, which is what the real thing measured (0 of 200).
+ */
+let fakeClock = 1_700_000_000_000;
+const tick = (): number => ++fakeClock;
+
+/** Content reads across every fake file (`text()` calls): a cost probe for passes that should only stat. */
+let contentReads = 0;
+export const fakeContentReads = (): number => contentReads;
+
 export class FakeBlob {
-  constructor(public readonly data: string, public readonly type = '') {}
+  constructor(public readonly data: string, public readonly type = '', public readonly lastModified = 0) {}
   get size() { return this.data.length; }
-  async text() { return this.data; }
+  async text() { contentReads++; return this.data; }
 }
 
 export class FakeFileHandle {
   readonly kind = 'file';
+  lastModified = tick();
+  /** Set by `removeEntry`: a removed file's handle throws on read, as Chromium's does (S364 gate). */
+  removed = false;
   constructor(public name: string, public data: string = '') {}
-  async getFile() { return new FakeBlob(this.data); }
+  async getFile() {
+    if (this.removed) throw err('NotFoundError', `file ${this.name} was removed`);
+    return new FakeBlob(this.data, '', this.lastModified);
+  }
   async createWritable(opts: { keepExistingData?: boolean } = {}) {
     let buf = opts.keepExistingData ? this.data : '';
     return {
@@ -31,7 +50,7 @@ export class FakeFileHandle {
         else if (v && typeof (v as { text?: unknown }).text === 'function') buf += await (v as Blob).text();
         else buf += String(v);
       },
-      close: async () => { this.data = buf; },
+      close: async () => { this.data = buf; this.lastModified = tick(); },
     };
   }
 }
@@ -57,6 +76,11 @@ export class FakeDirHandle {
     if (!c) throw err('NotFoundError', `entry ${name} not found`);
     if (c.kind === 'directory' && (c as FakeDirHandle).children.size > 0 && !opts.recursive) throw err('InvalidModificationError', 'not empty');
     this.children.delete(name);
+    const detach = (h: FakeDirHandle | FakeFileHandle): void => {
+      if (h.kind === 'file') (h as FakeFileHandle).removed = true;
+      else for (const ch of (h as FakeDirHandle).children.values()) detach(ch);
+    };
+    detach(c);
   }
   async *values() { for (const v of [...this.children.values()]) yield v; }
   async *entries() { for (const [k, v] of [...this.children.entries()]) yield [k, v] as const; }
@@ -72,6 +96,13 @@ export class FakeDirHandle {
       d = c;
     }
     d.children.set(segs[segs.length - 1], new FakeFileHandle(segs[segs.length - 1], data));
+  }
+  /** Bump a file's `lastModified` without changing its bytes (a `touch`). */
+  touch(path: string): void {
+    let cur: FakeDirHandle | FakeFileHandle | undefined = this;
+    for (const s of path.split('/')) cur = cur && cur.kind === 'directory' ? (cur as FakeDirHandle).children.get(s) : undefined;
+    if (!cur || cur.kind !== 'file') throw err('NotFoundError', `file ${path} not found`);
+    (cur as FakeFileHandle).lastModified = tick();
   }
   get(path: string): string | null {
     let cur: FakeDirHandle | FakeFileHandle | undefined = this;

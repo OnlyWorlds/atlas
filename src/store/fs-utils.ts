@@ -204,16 +204,26 @@ export async function tryGetDir(
 
 // ---- File ops ----
 
+/** A file's stat as Atlas last saw it: what the live folder compares (S364). */
+export interface FileStamp {
+  lastModified: number;
+  size: number;
+}
+
 /**
  * Atomic-ish write: encode JSON, write to `<name>.tmp`, then move to `<name>`.
  * Removes the tmp after success. On crash mid-write, the tmp file is the
  * breadcrumb; the next read can ignore it and use the prior `<name>`.
+ *
+ * Returns the final file's stamp, read from the verify pass it already does:
+ * a later stat of an untouched file equals it (measured, Chromium OPFS), so
+ * the live folder can tell Atlas's own writes from anyone else's for free.
  */
 export async function writeJsonAtomic(
   dir: FileSystemDirectoryHandle,
   name: string,
   value: unknown
-): Promise<void> {
+): Promise<FileStamp> {
   const tmpName = `${name}${TMP_SUFFIX}`;
   // Trailing newline (S354, the git hop of the migration bout): every other
   // writer of the format ends a file with one, and git shows "no newline at
@@ -263,7 +273,8 @@ export async function writeJsonAtomic(
   // where close() reports success but the on-disk content didn't actually
   // change. If this fires, we throw rather than letting the caller believe
   // the write succeeded.
-  const finalVerify = await (await finalHandle.getFile()).text();
+  const finalFile = await finalHandle.getFile();
+  const finalVerify = await finalFile.text();
   if (finalVerify !== json) {
     console.warn(`[fs-utils] writeJsonAtomic final read-back diverges from intent`, {
       name,
@@ -279,6 +290,7 @@ export async function writeJsonAtomic(
   }
 
   await dir.removeEntry(tmpName).catch(() => {});
+  return { lastModified: finalFile.lastModified, size: finalFile.size };
 }
 
 /**

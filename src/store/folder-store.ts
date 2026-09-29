@@ -214,6 +214,14 @@ export interface FolderStore {
   readStyles(): Promise<WorldStyles>;
   /** Overwrite the world's style rules (whole-object write, like charts). */
   writeStyles(styles: WorldStyles): Promise<void>;
+  /**
+   * `.atlas/world-prefs.json` (S364): the world's notes, cast, calendar lens
+   * and writing labels, so a copied folder carries them. `null` = no file.
+   * Strict: a file that will not parse throws `CorruptFileError` (never
+   * replaced by a seed).
+   */
+  readWorldPrefs(): Promise<Record<string, unknown> | null>;
+  writeWorldPrefs(prefs: Record<string, unknown>): Promise<void>;
 
   /**
    * Direct write of `server_updated_at` (used by SyncEngine after a successful
@@ -308,6 +316,33 @@ export interface FolderStore {
    *  one copy is served, the other left untouched. Re-keying it would leave the
    *  shadow behind to come back as a twin (S363 gate lens A F3). */
   hasShadowCopy(id: string): boolean;
+  /**
+   * THE LIVE FOLDER (S364): find element files another tool changed, created
+   * or deleted since Atlas last read or wrote them, and serve the disk's
+   * version from now on. In memory only: it writes no file and no tombstone,
+   * and never invents a sync stamp. Refuses while a re-key journal exists.
+   * Single-flight: a call during a run waits for one more run after it.
+   * `full` confirms every served file by content ("Reload from disk"): the
+   * stat pass misses an overwrite that kept its mtime and size.
+   */
+  rescanDisk(opts?: { full?: boolean }): Promise<RescanResult>;
+}
+
+/** One element file that changed on disk behind Atlas's back (S364). */
+export interface DiskChange {
+  id: string;
+  type: ElementType;
+  kind: 'changed' | 'created' | 'deleted' | 'unreadable';
+  /** The body Atlas served before (changed, deleted). */
+  before?: Element;
+  /** Unreadable files: the file name (the id may be unknowable). */
+  filename?: string;
+}
+
+export interface RescanResult {
+  changes: DiskChange[];
+  /** Why nothing was scanned: the store closed, or a re-key is unfinished. */
+  skipped?: 'closed' | 'rekey';
 }
 
 /**

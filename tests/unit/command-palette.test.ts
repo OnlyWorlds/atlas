@@ -112,3 +112,12 @@ describe('searchPalette ranking', () => {
     });
   });
 });
+
+describe('searchPalette: commands (S364)', () => {
+  it('finds "reload from disk" by its name and its aliases, and not by a stray letter pair', () => {
+    for (const q of ['reload', 'rel', 'rescan', 'refresh from', 'files', 'from disk']) {
+      expect(searchPalette(q, []).some(r => r.kind === 'action' && r.id === 'reload-disk'), q).toBe(true);
+    }
+    expect(searchPalette('di', []).some(r => r.kind === 'action')).toBe(false);
+  });
+});

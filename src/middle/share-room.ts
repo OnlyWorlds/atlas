@@ -48,6 +48,7 @@ import { humanizeFieldName } from './element-detail-fields';
 import { pickElement } from '../ui/element-picker-modal';
 import type { Element } from '../core/types';
 import { ToastManager } from '../ui/toast-manager';
+import { diskChangeFor } from '../core/live-folder';
 import type { JSONContent } from '@tiptap/core';
 import type { ShareEditorHandle } from './share-editor';
 import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
@@ -89,7 +90,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // Chart blocks freeze from pageCharts — force a block rebuild once warm so a
     // page opened directly (URL) with a chart block doesn't stay "chart not
     // found". renderBlocks bypasses render()'s same-elements skip-optimization.
-    if (mountedView && mountedView !== 'list') renderBlocks(mountedView);
+    // Never under an open prose block (S364 lane A5): renderBlocks wipes the
+    // host and remounts the editor from the in-memory block, which does not
+    // hold the pending snapshot yet. Closing the editor re-renders the blocks.
+    if (mountedView && mountedView !== 'list' && !editingBlockId) renderBlocks(mountedView);
   }
 
   // ---- writes ---------------------------------------------------------------
@@ -232,6 +236,12 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   let pendingProseTimer: number | null = null;
   let pendingProseSnap: { markdown: string; json: JSONContent } | null = null;
   let proseForBlockId: string | null = null;
+  /**
+   * The open text block's markdown as the EDITOR serialised it at mount, then
+   * after each landed save (S364 gate, lens B B2): the leave-flush, now run
+   * before every live-folder pass, writes only when the block really changed.
+   */
+  let proseBaseline: string | null = null;
 
   /** Debounce window matches inline field edits (registry pref, default 1s). */
   function getSaveDebounceMs(): number {
@@ -265,7 +275,8 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         ? { ...b, markdown: snap.markdown, richtextJson: snap.json }
         : b,
     );
-    await saveBlocks(pageId, blocks);
+    const saved = await saveBlocks(pageId, blocks);
+    if (saved && proseForBlockId === blockId) proseBaseline = snap.markdown;
   }
 
   /**
@@ -273,7 +284,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
    * into the block stack. Returns the save promise, or null when no heading
    * edit is open. No teardown — callers decide.
    */
-  function captureHeadingEdit(pageId: string): Promise<unknown> | null {
+  function captureHeadingEdit(pageId: string, opts: { onlyIfChanged?: boolean } = {}): Promise<unknown> | null {
     if (!editingBlockId) return null;
     const headingInput = blocksHost?.querySelector<HTMLInputElement>('.atlas-share-heading-input');
     if (!headingInput) return null;
@@ -282,6 +293,10 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const text = headingInput.value.trim();
     const page = elOf(pageId);
     if (!page) return null;
+    if (opts.onlyIfChanged) {
+      const current = blocksOf(page).find(b => b.id === blockId);
+      if (current && current.kind === 'heading' && current.text === (text || 'heading') && current.level === level) return null;
+    }
     const blocks = blocksOf(page).map(b =>
       b.id === blockId && b.kind === 'heading' ? { ...b, text: text || 'heading', level: level as 1 | 2 } : b,
     );
@@ -311,6 +326,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     proseMount?.destroy();
     proseMount = null;
     proseForBlockId = null;
+    proseBaseline = null;
     editingBlockId = null;
     proseMountToken++;
   }
@@ -339,14 +355,29 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     // idiom as the knowledge room. The mountedView IS the pageId in detail view.
     if (!mountedView || mountedView === 'list') return;
     if (proseMount && proseForBlockId) {
-      pendingProseSnap = { markdown: proseMount.getMarkdown(), json: proseMount.getJson() };
+      // Only what changed (S364 gate, lens B B2): an open, untouched block
+      // used to rewrite the page on every flush.
+      const markdown = proseMount.getMarkdown();
+      if (!pendingProseSnap && markdown === proseBaseline) return;
+      if (!pendingProseSnap) pendingProseSnap = { markdown, json: proseMount.getJson() };
       return flushProseSave(mountedView);
     }
-    return captureHeadingEdit(mountedView) ?? undefined; // best-effort, same as prose
+    return captureHeadingEdit(mountedView, { onlyIfChanged: true }) ?? undefined; // best-effort, same as prose
   };
   window.addEventListener('pagehide', onPageHide);
   // Same flush before a world switch empties the page this save needs (S360).
   const unLeaveWorld = onLeaveWorld(onPageHide);
+
+  // THE LIVE FOLDER (S364): an element swap already rebuilds the open page's
+  // blocks from the new body, except under an open block (refreshDetailData's
+  // editingBlockId guard). That one case says so: closing the block saves the
+  // page's blocks as this room holds them.
+  function onDiskChanges(ev: Event): void {
+    const pageId = mountedView && mountedView !== 'list' ? mountedView : null;
+    if (!pageId || !editingBlockId || !diskChangeFor(ev, pageId)) return;
+    toasts.info('This page also changed on disk. The block you are editing keeps your version.');
+  }
+  document.addEventListener('atlas:disk-changes', onDiskChanges);
 
   // ---- structural block ops -----------------------------------------------------
 
@@ -596,6 +627,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         toasts,
         onSnapshot: (snap) => scheduleProseSave(pageId, snap),
       });
+      proseBaseline = proseMount.getMarkdown();
       proseMount.focus();
     }).catch(err => {
       console.error('[share-room] editor chunk failed to load', err);
@@ -2251,6 +2283,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   return () => {
     flushAndTeardown(mountedView);
     window.removeEventListener('pagehide', onPageHide);
+    document.removeEventListener('atlas:disk-changes', onDiskChanges);
     unLeaveWorld();
     window.removeEventListener('atlas:charts-changed', onChartsChanged);
     unsubState();

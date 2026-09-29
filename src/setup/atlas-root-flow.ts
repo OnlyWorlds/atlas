@@ -628,8 +628,10 @@ export async function createWorldInRoot(name: string): Promise<{ entry: WorldReg
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);
   patchSlice('registry', activated);
-  patchSlice('active', { worldId: entry.id, meta: { id: worldUuid, name: trimmed }, opened: true });
+  // The store first (S364 gate lens C C9): a room mounts on the `active` patch
+  // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
+  patchSlice('active', { worldId: entry.id, meta: { id: worldUuid, name: trimmed }, opened: true });
   // Fresh world: no elements yet. Reset cache + selection for the new active world.
   patchSlice('data', { elements: [] });
   patchSlice('ui', { ...getState().ui, selectedElementId: null });
@@ -689,8 +691,10 @@ export async function createWorldFromImportedData(
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);
   patchSlice('registry', activated);
-  patchSlice('active', { worldId: entry.id, meta: { id: worldUuid, name }, opened: true });
+  // The store first (S364 gate lens C C9): a room mounts on the `active` patch
+  // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
+  patchSlice('active', { worldId: entry.id, meta: { id: worldUuid, name }, opened: true });
   const elements = await store.listElements();
   patchSlice('data', { elements });
   patchSlice('ui', { ...getState().ui, selectedElementId: null });
@@ -965,11 +969,13 @@ export async function linkExistingApiWorldInRoot(
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);
   patchSlice('registry', activated);
-  patchSlice('active', { worldId: entry.id, meta: { id: localWorldUuid, name: displayName }, opened: true });
   // Arm the view-only guard AFTER the setup writes above (they are this
   // flow's own, legitimate writes) and BEFORE the store reaches the UI.
   if (readOnly) store.setViewOnly(true);
+  // The store first (S364 gate lens C C9): a room mounts on the `active` patch
+  // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
+  patchSlice('active', { worldId: entry.id, meta: { id: localWorldUuid, name: displayName }, opened: true });
 
   // Prime the elements cache from the newly-downloaded folder.
   try {

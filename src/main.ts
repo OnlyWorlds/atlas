@@ -183,5 +183,10 @@ if (import.meta.env.DEV) {
     /** Generic slice patch — tests that write world meta directly to the store
      *  mirror it here (the room reads the slice, not the disk). */
     patchSlice: (slice: string, value: unknown) => _patchSlice(slice as never, value as never),
+    /** The live folder (S364): one pass now, no throttle; resolves with the changes it applied. */
+    async rescanNow(): Promise<unknown> {
+      const { rescanNow } = await import('./core/live-folder');
+      return rescanNow({ force: true });
+    },
   };
 }

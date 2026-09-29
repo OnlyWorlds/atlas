@@ -15,6 +15,7 @@
  * we log + skip engine creation; the UI surfaces this via the pill state.
  */
 
+import { adoptPersistedDiskHold } from '../core/live-folder';
 import { OwV2ClientAdapter } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
@@ -98,6 +99,10 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
 
   currentEngine = engine;
   currentWorldId = entry.id;
+  // A batch of outside edits that was waiting for the user's answer when the
+  // world was left (or the page reloaded) keeps waiting (S364 gate lens B B3):
+  // the hold goes on BEFORE the flush-on-attach below, which would push it.
+  if (!readOnly) adoptPersistedDiskHold(entry.id, engine);
   currentFolder = folder;
 
   console.info('[atlas:sync] engine attached', {

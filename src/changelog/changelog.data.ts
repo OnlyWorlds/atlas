@@ -56,6 +56,67 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.11',
+    date: '2026-09-29',
+    theme: 'what you wrote stays yours',
+    entries: [
+      {
+        id: 'live-folder',
+        title: 'Keep Atlas open while another tool writes your world',
+        body: 'When an AI assistant, a text editor or git changes the element files in your world folder, Atlas picks up the changes when you come back to its window: the elements update, the list marks what changed, and an open scene or knowledge entry reloads. Reload from disk in Ctrl+K checks every file. If you are typing in the same scene at that moment, your text is kept and Atlas says so. A file removed by another program leaves the list, and the list says so; it is never deleted from your OnlyWorlds account.',
+        tags: ['folders'],
+      },
+      {
+        id: 'outside-edits-online',
+        title: 'Outside edits on an online world upload when they say they are new',
+        body: 'An edit that sets a new local_updated_at, as the OnlyWorlds toolkit tells tools to, uploads like your own edits, and a sync no longer writes over it. An edit without one is marked "not synced". When more than 50 elements change at once, sync waits until you choose to upload them or stay offline.',
+        tags: ['sync', 'folders'],
+      },
+      {
+        id: 'pull-stops-at-broken-file',
+        title: 'A sync stops at a file it cannot read instead of writing over it',
+        body: 'If an element file will not open (for example git conflict markers), a sync that would update it now pauses and names the file, as uploads already did. Fix or remove the file and sync carries on.',
+        tags: ['sync', 'safety'],
+      },
+      {
+        id: 'notes-in-the-folder',
+        title: 'World notes, your cast and writing labels now live in the world folder',
+        body: 'They were kept only in this browser, so copying the folder, opening it on another computer or clearing site data lost them. They are now written to the folder too, and a folder opened elsewhere brings them along.',
+        tags: ['folders'],
+      },
+      {
+        id: 'charts-stay-with-their-world',
+        title: 'Switching worlds in Charts no longer replaces the other world\'s charts',
+        body: 'With Charts open, clicking another world kept showing the first world\'s saved charts, and saving one there replaced that world\'s charts with them. Each world now shows and keeps its own. Published pages in the second world no longer lose their chart blocks either.',
+        tags: ['charts', 'fix'],
+      },
+      {
+        id: 'deleted-stays-deleted',
+        title: 'A deleted element stays out of the scenes that mentioned it',
+        body: 'Opening a scene that mentioned a deleted character put the character back in the scene\'s links, so the scene would not upload. The mention stays in your text; the link does not come back.',
+        tags: ['writing', 'fix'],
+      },
+      {
+        id: 'rename-not-cut-short',
+        title: 'Renaming no longer saves half a name',
+        body: 'A sync or an autosave landing while you typed a new name could save what you had so far and drop the rest. The name now saves when you finish.',
+        tags: ['fix'],
+      },
+      {
+        id: 'knowledge-retries-save',
+        title: 'Knowledge text that failed to save is saved when you leave the entry',
+        body: 'After a failed save, leaving the entry used to drop the text on screen. Atlas now tries again on the way out.',
+        tags: ['knowledge', 'fix'],
+      },
+      {
+        id: 'page-text-keeps-focus',
+        title: 'A page\'s text block keeps your typing when charts refresh',
+        body: 'A chart refresh could rebuild the page under an open text block and lose the last second of typing.',
+        tags: ['pages', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.10',
     date: '2026-09-29',
     theme: 'new ids for copied worlds',

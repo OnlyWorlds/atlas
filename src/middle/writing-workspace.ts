@@ -23,12 +23,13 @@ import type { Element } from '../core/types';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
-import { renderHeader } from './element-detail-header';
+import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
+import { renderHeader, isEditingIn } from './element-detail-header';
 import { mountWorkspaceEditor, linkTermInEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
 import { createFindBar, type FindBarHandle } from './writing-workspace-find-bar';
 import { compiledWordCount, mountCompiledView, narrativeHasChildren } from './writing-compiled';
 import { handleAddToCast, type AddToCastDetail } from './writing-workspace-add-to-cast';
-import { computeRelationPatch } from './writing-workspace-derive';
+import { computeRelationPatch, linkTargetsIn } from './writing-workspace-derive';
 import { createChipPreview, type ChipPreviewController } from './writing-workspace-chip-preview';
 import { pushRecent } from './writing-workspace-recents';
 import { buildMentionItems } from './writing-workspace-mention-items';
@@ -459,6 +460,36 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
   const unLeaveWorld = onLeaveWorld(onPageHide);
 
   /**
+   * THE LIVE FOLDER (S364): another tool changed the open scene on disk.
+   * The pass flushed this room first, so a clean editor has nothing unsaved:
+   * remount it from the new body (the sidecar rule decides which text).
+   * Typing that landed during the pass wins, and the room says so; its save
+   * merges into the disk body (readForWrite), replacing only the story.
+   */
+  function onDiskChanges(ev: Event): void {
+    const change = diskChangeFor(ev, mountedForId);
+    if (!change || !editorHandle || mountedForId === null) return;
+    const dirty = pendingSnapshot !== null
+      || (lastSavedMarkdown !== null && editorHandle.getMarkdown() !== lastSavedMarkdown);
+    if (dirty) {
+      toastManager.info('This scene also changed on disk. Your version is kept.');
+      return;
+    }
+    const el = getState().data.elements.find(e => e.id === mountedForId);
+    if (!el) return;
+    // Keep the reader's place (S364 gate lens B B14): a writer coming back to
+    // the window with the caret in the scene keeps focus there (never on the
+    // page body, where single keys are hotkeys) and keeps the scroll.
+    const hadFocus = root.contains(document.activeElement);
+    const scrollTop = root.querySelector<HTMLElement>('.atlas-writing-workspace-body')?.scrollTop ?? 0;
+    mountForNarrative(el, { preferStory: storyChangedAlone(change.before, el, 'atlas_richtext_json') });
+    const body = root.querySelector<HTMLElement>('.atlas-writing-workspace-body');
+    if (body) body.scrollTop = scrollTop;
+    if (hadFocus) editorHandle?.editor.commands.focus('end');
+  }
+  document.addEventListener('atlas:disk-changes', onDiskChanges);
+
+  /**
    * Silent relation-only save. Used by the mount-time self-heal pass to bring
    * stale narrative.<relation> fields current with prose mentions, without
    * touching `story` or `atlas_richtext_json` (those are still the user's
@@ -504,7 +535,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // already belong to a different narrative by now).
     if (snap.baseline !== null && snap.markdown === snap.baseline) return;
 
-    const relationPatch = computeRelationPatch(el, snap.markdown);
+    const relationPatch = computeRelationPatch(el, snap.markdown, linkTargetsIn(getState().data.elements));
     const patch: Partial<Element> = {
       story: snap.markdown,
       atlas_richtext_json: snap.json,
@@ -592,7 +623,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     }
   }
 
-  function mountForNarrative(el: Element): void {
+  function mountForNarrative(el: Element, opts: { preferStory?: boolean } = {}): void {
     teardownEditor();
     root.innerHTML = '';
     mountedForId = el.id;
@@ -605,7 +636,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     // narrative whose relations drifted from the prose. No-op when relations
     // already match. Deferred to a microtask so the editor mounts first.
     if (typeof el.story === 'string' && el.story.length > 0) {
-      const initialPatch = computeRelationPatch(el, el.story);
+      const initialPatch = computeRelationPatch(el, el.story, linkTargetsIn(getState().data.elements));
       if (Object.keys(initialPatch).length > 0) {
         queueMicrotask(() => {
           void selfHealRelations(el.id, initialPatch);
@@ -652,7 +683,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       proseHost.tabIndex = -1;
     } else {
       compiledCountFor = null;
-      const initialJson = parseRichtextJson(el.atlas_richtext_json);
+      // A reload after an outside `story` edit skips the stale rich-text copy (S364).
+      const initialJson = opts.preferStory ? null : parseRichtextJson(el.atlas_richtext_json);
       const initialMarkdown = typeof el.story === 'string' ? el.story : '';
 
       editorHandle = mountWorkspaceEditor({
@@ -685,6 +717,12 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
           if (worldId) pushRecent(worldId, id);
         },
       });
+      // The "unsaved?" baseline is the EDITOR's serialisation of what it
+      // loaded, not the raw `story` (S364 gate, lens B B1 / lens C C2): TipTap
+      // re-serialises (a trailing newline, `*` bullets), so an untouched scene
+      // read as dirty and every flush, now run before each live-folder pass,
+      // wrote Atlas's stale text over the outside edit it was about to show.
+      lastSavedMarkdown = editorHandle.getMarkdown();
 
       // Sync chip labels to current element names immediately on mount —
       // covers the case where atlas_richtext_json was stored when elements
@@ -764,9 +802,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
 
     // Replace header (cheap — the renderHeader function is the same one
     // element-detail uses; works fine to re-render on every state change).
+    // Never under a focused rename (S364 lane A3): the replace would blur and
+    // commit the half-typed name. The rename's commit swaps the elements
+    // array, which brings this refresh back with the new name.
     const oldHeader = root.querySelector<HTMLElement>('.atlas-middle-header');
-    const newHeader = renderHeader(el);
-    if (oldHeader) oldHeader.replaceWith(newHeader);
+    if (oldHeader && !isEditingIn(oldHeader)) oldHeader.replaceWith(renderHeader(el));
 
     // Replace sticky bar (breadcrumb + date + action icons).
     const oldCrumb = root.querySelector<HTMLElement>(':scope > .atlas-writing-workspace-crumb');
@@ -898,6 +938,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     void flushPendingSave();
     window.removeEventListener('pagehide', onPageHide);
     unLeaveWorld();
+    document.removeEventListener('atlas:disk-changes', onDiskChanges);
     unsubState();
     unsubHash();
     root.removeEventListener('keydown', onWorkspaceHotkey);

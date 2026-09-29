@@ -6,7 +6,7 @@
  * `server_updated_at` mirror what the real one will do.
  */
 
-import type { FolderStore, ListElementsOptions, RekeyJournal } from '../../src/store/folder-store';
+import type { FolderStore, ListElementsOptions, RekeyJournal, RescanResult } from '../../src/store/folder-store';
 import { journalIds, RekeyPendingError } from '../../src/store/folder-store';
 import { newId, nowIso } from '../../src/store/folder-store';
 import { PerIdWriteChain } from '../../src/store/write-chain';
@@ -466,6 +466,11 @@ export class MockFolderStore implements FolderStore {
     return this.shadowIds.has(id);
   }
 
+  /** One map, no cache separate from "disk": nothing can change behind it. The real store's kernel runs on fake-fs. */
+  async rescanDisk(_opts?: { full?: boolean }): Promise<RescanResult> {
+    return { changes: [] };
+  }
+
   // ---- Sync-relevant reads ----
 
   async listLocallyChangedSince(baseline: string | null): Promise<Element[]> {
@@ -526,6 +531,19 @@ export class MockFolderStore implements FolderStore {
   async writeStyles(styles: WorldStyles): Promise<void> {
     this.assertWritable();
     this.styles = { version: styles.version, rules: styles.rules.map(r => ({ ...r })) };
+  }
+
+  /** `.atlas/world-prefs.json`; `worldPrefsCorrupt` makes a read throw like the real store. */
+  worldPrefs: Record<string, unknown> | null = null;
+  worldPrefsCorrupt = false;
+  async readWorldPrefs(): Promise<Record<string, unknown> | null> {
+    if (this.worldPrefsCorrupt) throw new CorruptFileError('world-prefs.json', new SyntaxError('Unexpected token <'));
+    return this.worldPrefs ? structuredClone(this.worldPrefs) : null;
+  }
+  async writeWorldPrefs(prefs: Record<string, unknown>): Promise<void> {
+    this.assertWritable();
+    if (this.worldPrefsCorrupt) throw new CorruptFileError('world-prefs.json', new SyntaxError('Unexpected token <'));
+    this.worldPrefs = structuredClone(prefs);
   }
 
   async stampServerUpdatedAt(id: string, _type: ElementType, server_updated_at: string, sentLocalUpdatedAt?: string | null): Promise<void> {

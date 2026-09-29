@@ -727,6 +727,27 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     return effectiveScope(allNodes, route);
   }
 
+  /**
+   * Every chart write is a read-modify-write of the file as it is on disk,
+   * serialized within the room. The in-memory list is a display copy: writing
+   * it back whole let a stale copy (another world's, before S364; another
+   * tab's, still) replace the file's charts.
+   */
+  let chartWrites: Promise<unknown> = Promise.resolve();
+  function mutateCharts(
+    store: NonNullable<ReturnType<typeof getActiveStore>>,
+    fn: (charts: ChartConfig[]) => ChartConfig[],
+  ): Promise<void> {
+    const run = chartWrites.then(async () => {
+      const onDisk = await store.readCharts();
+      const next = fn(onDisk);
+      if (next !== onDisk) await store.writeCharts(next);
+      savedCharts = next;
+    });
+    chartWrites = run.catch(() => {});
+    return run;
+  }
+
   /** Save the current view as a named chart in `.atlas/charts.json`. */
   async function saveCurrentChart(): Promise<void> {
     const store = getActiveStore();
@@ -746,8 +767,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       // it was saved under. Absent = bare numbers.
       ...(lens ? { calendarId: lens.id } : {}),
     };
-    savedCharts = upsertChart(savedCharts, chart);
-    await store.writeCharts(savedCharts);
+    await mutateCharts(store, charts => upsertChart(charts, chart));
     render(); // full render — the rail heading names the (now-active) chart
     toasts.success(`saved "${chart.name}"`);
   }
@@ -794,9 +814,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // the zone chip both ask first. There is no undo anywhere in atlas, so the
     // confirm IS the safety. Same `window.confirm` shape as those two.
     if (!window.confirm(`Delete chart "${chart.name ?? 'untitled'}"?`)) return;
-    savedCharts = removeChart(savedCharts, chart.id);
     const store = getActiveStore();
-    if (store) await store.writeCharts(savedCharts);
+    if (store) await mutateCharts(store, charts => removeChart(charts, chart.id));
+    else savedCharts = removeChart(savedCharts, chart.id);
     // Deleting the APPLIED chart must release its lens — a stale
     // appliedSelection kept scoping the room invisibly (chips unlit), so
     // e.g. drag-to-date toasted "not in this view" against a ghost member
@@ -830,12 +850,8 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       done = true;
       suppressGallery = false;
       if (save) {
-        const next = renameChart(savedCharts, chart.id, input.value);
-        if (next !== savedCharts) {
-          savedCharts = next;
-          const store = getActiveStore();
-          if (store) await store.writeCharts(savedCharts);
-        }
+        const store = getActiveStore();
+        if (store) await mutateCharts(store, charts => renameChart(charts, chart.id, input.value));
       }
       render(); // full render — the rail's chart-name label tracks renames too
     };

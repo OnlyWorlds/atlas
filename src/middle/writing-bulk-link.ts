@@ -21,7 +21,7 @@ import {
   linkTermMarkdown, linkTermRichtext,
   type TermLinkTarget, type TermMatchOptions,
 } from '../core/prose-autolink';
-import { computeRelationPatch } from './writing-workspace-derive';
+import { computeRelationPatch, linkTargetsIn } from './writing-workspace-derive';
 import { getLiveEditorOps } from './writing-live-editor-ops';
 import type { Element } from '../core/types';
 
@@ -39,6 +39,7 @@ export async function bulkLinkNarratives(
   const folder = getActiveStore();
   if (!folder) return { changed: 0, count: 0 };
   const index = mode === 'link' ? buildAutolinkIndex(getState().data.elements) : null;
+  const exists = linkTargetsIn(getState().data.elements); // once per run, not per narrative
   const live = getLiveEditorOps();
 
   let changed = 0;
@@ -64,7 +65,7 @@ export async function bulkLinkNarratives(
       const patch: Partial<Element> = {
         story: md.story,
         ...(sidecar ? { atlas_richtext_json: rt.doc } : {}),
-        ...computeRelationPatch(el, md.story),
+        ...computeRelationPatch(el, md.story, exists),
       };
       await folder.updateElement(id, patch);
       changed++; count += n; wroteDisk = true;
@@ -105,6 +106,7 @@ export async function bulkLinkTerm(
   const folder = getActiveStore();
   if (!folder) return { changed: 0, count: 0 };
   const live = getLiveEditorOps();
+  const exists = linkTargetsIn(getState().data.elements); // once per run, not per narrative
 
   let changed = 0;
   let count = 0;
@@ -128,7 +130,7 @@ export async function bulkLinkTerm(
     const patch: Partial<Element> = {
       story: md.story,
       ...(sidecar ? { atlas_richtext_json: rt.doc } : {}),
-      ...computeRelationPatch(el, md.story),
+      ...computeRelationPatch(el, md.story, exists),
     };
     await folder.updateElement(id, patch);
     changed++; count += n; wroteDisk = true;

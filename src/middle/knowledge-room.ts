@@ -36,7 +36,8 @@ import {
   ABOUT_FIELDS, aboutFieldFor, isKnowerType, listKnowers, knowledgeHeldBy, elementsKnownAboutBy,
   circleMembers,
 } from '../core/knowledge';
-import { computeRelationPatch, extractProseLinks } from './writing-workspace-derive';
+import { computeRelationPatch, extractProseLinks, linkTargetsIn } from './writing-workspace-derive';
+import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderProseFragment } from './writing-compiled';
 import { ELEMENT_ICONS, ELEMENT_LABELS, KNOWLEDGE_DRAFT_STASH_PREFIX } from '../core/constants';
 import { pickElement } from '../ui/element-picker-modal';
@@ -46,6 +47,7 @@ import { ToastManager } from '../ui/toast-manager';
 import type { JSONContent } from '@tiptap/core';
 import type { KnowledgeEditorHandle } from './knowledge-editor';
 import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
+import { isEditingIn } from './element-detail-header';
 import { makeRoomTabs } from '../ui/room-tabs';
 import { makeDrillInPrefix } from '../ui/drill-in';
 import { onLeaveWorld } from '../core/leave-flush';
@@ -218,16 +220,19 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
 
   // ---- writes ---------------------------------------------------------------
 
-  async function patchEntry(id: string, patch: Record<string, unknown>): Promise<void> {
+  /** True when the write landed (the prose save advances its baseline on it). */
+  async function patchEntry(id: string, patch: Record<string, unknown>): Promise<boolean> {
     const folder = getActiveStore();
-    if (!folder) return;
+    if (!folder) return false;
     try {
       await folder.updateElement(id, patch as Partial<Element>);
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
+      return true;
     } catch (err) {
       console.error('[knowledge-room] update failed', err);
       toasts.error('Could not update knowledge entry');
+      return false;
     }
   }
 
@@ -291,6 +296,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       if (!window.confirm(`Delete "${el?.name || 'this knowledge entry'}"?${extra}`)) return;
     }
     cancelPendingSave();
+    // The teardown capture (A4) must not write the text back to the entry being
+    // deleted (S364 gate, lens C C1): no baseline, nothing to capture.
+    lastSavedMarkdown = null;
     navigate(knowledgeHash(worldId));
     try {
       await folder.deleteElement(id);
@@ -314,22 +322,44 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
     if (lastSavedMarkdown !== null && snap.markdown === lastSavedMarkdown) return;
     const el = elOf(entryId);
     if (!el) return;
-    const relationPatch = computeRelationPatch(el, snap.markdown) as Record<string, unknown>;
+    const relationPatch = computeRelationPatch(el, snap.markdown, linkTargetsIn(getState().data.elements)) as Record<string, unknown>;
     if ('collectives' in relationPatch) {
       delete relationPatch.collectives;
       maybeToastDroppedCollective();
     }
-    await patchEntry(entryId, {
+    const saved = await patchEntry(entryId, {
       story: snap.markdown,
       atlas_richtext_json: snap.json,
       ...relationPatch,
     });
-    lastSavedMarkdown = snap.markdown;
+    // Advance the baseline only for a write that LANDED, and only while this
+    // entry is still the one open (S364 lane A4): a failed save marked as
+    // saved made the leave/pagehide capture find nothing to retry, and a late
+    // write from a closed session set the next entry's baseline.
+    if (saved && editorForId === entryId) lastSavedMarkdown = snap.markdown;
+  }
+
+  /**
+   * Queue the editor's text when it differs from the last write that landed,
+   * so a save that FAILED (or never got its debounce) is retried on the way
+   * out. The writing room's unmount capture does the same (S364 lane A4).
+   * A vanished entry is safe: persistEditorSnapshot writes nothing for it;
+   * the in-room delete clears the baseline first, so nothing is captured for
+   * the entry being deleted (S364 gate lens C C1).
+   */
+  function captureUnsaved(): void {
+    if (editorMount && editorForId && editorForId !== NEW && !pendingSnapshot) {
+      const markdown = editorMount.getMarkdown();
+      if (lastSavedMarkdown !== null && markdown !== lastSavedMarkdown) {
+        pendingSnapshot = { markdown, json: editorMount.getJson() };
+      }
+    }
   }
 
   function destroyEditorSession(): void {
     // Flush is async; initiate before teardown (persistEditorSnapshot reads
     // its inputs before the first await, so the in-flight write completes).
+    captureUnsaved();
     void flushPendingSave();
     editorMount?.destroy();
     editorMount = null;
@@ -341,14 +371,43 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   }
 
   const onPageHide = (): Promise<void> => {
-    if (editorMount && editorForId && editorForId !== NEW && !pendingSnapshot) {
-      const markdown = editorMount.getMarkdown();
-      if (lastSavedMarkdown !== null && markdown !== lastSavedMarkdown) {
-        pendingSnapshot = { markdown, json: editorMount.getJson() };
-      }
-    }
+    captureUnsaved();
     return flushPendingSave();
   };
+
+  /**
+   * THE LIVE FOLDER (S364): another tool changed the open entry on disk. The
+   * pass flushed this room first; a clean editor rebuilds from the new body,
+   * typing that landed during the pass wins and the room says so.
+   */
+  let preferStoryFor: string | null = null;
+  function onDiskChanges(ev: Event): void {
+    const entryId = editorForId;
+    if (!entryId || entryId === NEW || !editorMount) return;
+    const change = diskChangeFor(ev, entryId);
+    if (!change) return;
+    const dirty = pendingSnapshot !== null
+      || (lastSavedMarkdown !== null && editorMount.getMarkdown() !== lastSavedMarkdown);
+    if (dirty) {
+      toasts.info('This entry also changed on disk. Your version is kept.');
+      return;
+    }
+    const el = elOf(entryId);
+    if (!el) return;
+    if (storyChangedAlone(change.before, el, 'atlas_richtext_json')) preferStoryFor = entryId;
+    destroyEditorSession();
+    mountedView = null;
+    render();
+  }
+  document.addEventListener('atlas:disk-changes', onDiskChanges);
+
+  let knowerRebuildDeferred = false;
+  const onRootFocusOut = (): void => {
+    if (!knowerRebuildDeferred) return;
+    knowerRebuildDeferred = false;
+    queueMicrotask(render);
+  };
+  root.addEventListener('focusout', onRootFocusOut);
   window.addEventListener('pagehide', onPageHide);
   // Same flush before a world switch empties the elements this save needs (S360).
   const unLeaveWorld = onLeaveWorld(onPageHide);
@@ -1241,8 +1300,12 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       ? (draft?.story ?? '')
       : (typeof (entryEl as Record<string, unknown> | undefined)?.story === 'string'
         ? (entryEl as Record<string, unknown>).story as string : '');
+    // A reload after an outside `story` edit skips the stale rich-text copy (S364).
+    const skipSidecar = !isDraft && preferStoryFor === forId;
+    preferStoryFor = null;
     const initialJson = isDraft
       ? (draft?.richtextJson ?? null)
+      : skipSidecar ? null
       : parseRichtextJson((entryEl as Record<string, unknown> | undefined)?.atlas_richtext_json);
 
     editorForId = forId;
@@ -1273,6 +1336,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
         }
       },
     });
+    // The baseline is the editor's own serialisation of what it loaded (S364
+    // gate, lens B B1 / lens C C2): an untouched entry must never write.
+    if (!isDraft) lastSavedMarkdown = editorMount.getMarkdown();
   }
 
   /** Same-view tick (saved editor): refresh chips + title + editor decorations; leave inputs alone. */
@@ -1329,7 +1395,11 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       if (tgt === 'list') {
         if (getState().data.elements !== lastBuiltElementsRef) rebuildPreservingScroll(buildHome);
       } else if (tgt.startsWith('knower:')) {
-        if (getState().data.elements !== lastBuiltElementsRef) rebuildPreservingScroll(() => buildKnower(knowerId!));
+        // Never under a focused rename of the knower (S364 gate, lens C C4):
+        // the rebuild blurs it and the blur commits half a name. Deferred to
+        // the focusout below.
+        if (getState().data.elements !== lastBuiltElementsRef && isEditingIn(root)) knowerRebuildDeferred = true;
+        else if (getState().data.elements !== lastBuiltElementsRef) rebuildPreservingScroll(() => buildKnower(knowerId!));
         else {
           // ui-only tick (e.g. lens cleared via the sidebar banner ×) — keep
           // the toggle's active class honest without a rebuild.
@@ -1382,6 +1452,8 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
   return () => {
     destroyEditorSession();
     window.removeEventListener('pagehide', onPageHide);
+    document.removeEventListener('atlas:disk-changes', onDiskChanges);
+    root.removeEventListener('focusout', onRootFocusOut);
     unLeaveWorld();
     unsubState();
     unsubHash();

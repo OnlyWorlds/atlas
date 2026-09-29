@@ -33,6 +33,7 @@ import {
   CHARTS_FILE,
   REKEY_JOURNAL_FILE,
   STYLES_FILE,
+  WORLD_PREFS_FILE,
   ELEMENTS_DIR,
   LOCK_FILE,
   LOCK_HEARTBEAT_MS,
@@ -61,7 +62,7 @@ import type {
   WorldMeta,
   Zone,
 } from '../core/types';
-import type { FolderStore, ListElementsOptions, RekeyJournal } from './folder-store';
+import type { FolderStore, ListElementsOptions, RekeyJournal, DiskChange, RescanResult } from './folder-store';
 import { journalIds, RekeyPendingError } from './folder-store';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { newId, nowIso } from './folder-store';
@@ -91,7 +92,7 @@ const INDEX_READ_CONCURRENCY = 64;
 interface LayoutScan {
   dir: FileSystemDirectoryHandle;
   /** id → the file that survived same-directory crash-twin dedupe. `spelling` null = the file declares none. */
-  survivors: Map<string, { filename: string; body: Element; spelling: LinkSpelling | null }>;
+  survivors: Map<string, { filename: string; body: Element; spelling: LinkSpelling | null; stamp: FileStamp }>;
   /** Lowercased names of files the scan could not read — never a tidy target. */
   unreadableLc: Set<string>;
 }
@@ -114,6 +115,7 @@ import {
   tryGetDir,
   validElementFilenames,
   writeJsonAtomic,
+  type FileStamp,
 } from './fs-utils';
 
 const DEFAULT_META: WorldMeta = { id: '', name: '' };
@@ -226,6 +228,32 @@ export class FsFolderStore implements FolderStore {
   private bodyCache: Map<string, Element> = new Map();
   /** Ids found in BOTH element layouts at index time: one copy served, the other untouched (S363: the re-key refuses them). */
   private shadowedIds = new Set<string>();
+  /**
+   * THE LIVE FOLDER (S364): each served element's file as Atlas last saw it,
+   * from the index read or from Atlas's own write (`writeJsonAtomic` returns
+   * the verified file's stamp). A stat that differs means someone else wrote
+   * the file. EQUALITY, never "newer than": clock skew cannot fool it.
+   * Keyed by id; the filename is part of the value, so a stamp only vouches
+   * for the file it was taken from. In memory only.
+   */
+  private fileStamps = new Map<string, { filename: string } & FileStamp>();
+  /**
+   * Files in the element folders that Atlas does not serve (a shadowed
+   * layout copy, a second file claiming a served id, an unreadable file):
+   * path → stamp, so the rescan reads each one once per change, not per pass.
+   */
+  private otherFileStamps = new Map<string, { stamp: string; id: string | null; type: ElementType }>();
+  /**
+   * Bodies adopted from disk OUTSIDE a pass (`readForWrite`: an Atlas write,
+   * or a pull that backed off from an outside edit), id -> the body served
+   * before. The cache already holds the new body, so no stat will show it
+   * again: the next pass reports these (S364 gate lens A F5).
+   */
+  private pendingAdoptions = new Map<string, Element>();
+  /** Single-flight rescans: the run in progress, and at most one queued after it. */
+  private rescanActive: Promise<RescanResult> | null = null;
+  private rescanQueued: Promise<RescanResult> | null = null;
+  private rescanQueuedFull = false;
   /** Ids named by an unfinished re-key journal, as last read or written: a UI delete of one is refused (lens A F6). */
   private rekeyPendingIds = new Set<string>();
   /** In-flight index builds, type → shared promise (concurrent-caller guard). */
@@ -326,6 +354,9 @@ export class FsFolderStore implements FolderStore {
     }
     this.root = null;
     this.fileIndex.clear();
+    this.fileStamps.clear();
+    this.otherFileStamps.clear();
+    this.pendingAdoptions.clear();
     this.bareSpellingTypes.clear();
     this.shadowedIds.clear();
     this.rekeyPendingIds.clear();
@@ -575,9 +606,15 @@ export class FsFolderStore implements FolderStore {
             `(${existing.layout}/${existing.filename} and ${layout}/${rec.filename}); ` +
             `serving the ${challengerWins ? layout : existing.layout} copy. Neither file was touched.`
           );
-          if (!challengerWins) continue;
+          if (!challengerWins) {
+            this.otherFileStamps.set(otherFileKey(type, layout, rec.filename), { stamp: stampKey(rec.stamp), id, type });
+            continue;
+          }
+          // The copy losing its seat stays on disk, unserved: the rescan must not read it as new.
+          this.otherFileStamps.set(otherFileKey(type, existing.layout, existing.filename), { stamp: stampKey(this.fileStamps.get(id)), id, type });
         }
         this.fileIndex.set(id, { type, layout, filename: rec.filename, spelling: rec.spelling ?? this.writeSpellingFor(type) });
+        this.fileStamps.set(id, { filename: rec.filename, ...rec.stamp });
         // The index pass owns these freshly-parsed bodies outright — cache
         // them without a clone (serve-side clones protect them from callers).
         this.bodyCache.set(id, rec.body);
@@ -616,8 +653,9 @@ export class FsFolderStore implements FolderStore {
       }
     }
     files.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-    type Rec = { filename: string; body: Element; spelling: LinkSpelling | null };
+    type Rec = { filename: string; body: Element; spelling: LinkSpelling | null; stamp: FileStamp };
     const bodies: Array<Element | null> = new Array(files.length);
+    const stamps: FileStamp[] = new Array(files.length);
     const spellings: Array<LinkSpelling | null> = new Array(files.length).fill(null);
     let cursor = 0;
     const readWorker = async () => {
@@ -625,6 +663,7 @@ export class FsFolderStore implements FolderStore {
         const i = cursor++;
         try {
           const file = await files[i].handle.getFile();
+          stamps[i] = { lastModified: file.lastModified, size: file.size };
           bodies[i] = JSON.parse(await file.text()) as Element;
         } catch {
           bodies[i] = null; // unreadable/corrupt — same null contract as readJson
@@ -646,6 +685,7 @@ export class FsFolderStore implements FolderStore {
       const body = bodies[i];
       if (!body || typeof body.id !== 'string' || !body.id) {
         unreadable.add(filename);
+        if (stamps[i]) this.otherFileStamps.set(otherFileKey(type, layout, filename), { stamp: stampKey(stamps[i]), id: null, type });
         console.warn(`[fs-folder-store] index(${type}@${layout}): skipping unreadable/id-less file ${filename}`);
         continue;
       }
@@ -678,8 +718,9 @@ export class FsFolderStore implements FolderStore {
       // spelling the FILE used, so a write goes back the way it came.
       spellings[i] = normalizeDiskLinks(body);
       const list = grouped.get(body.id);
-      if (list) list.push({ filename, body, spelling: spellings[i] });
-      else grouped.set(body.id, [{ filename, body, spelling: spellings[i] }]);
+      const rec = { filename, body, spelling: spellings[i], stamp: stamps[i] };
+      if (list) list.push(rec);
+      else grouped.set(body.id, [rec]);
     }
     // Dedupe crash-twins FIRST for every group (grouping is by body id, so a
     // same-named stranger can never be a "loser"), building the survivor set.
@@ -792,6 +833,372 @@ export class FsFolderStore implements FolderStore {
     }
   }
 
+  // ---- The live folder (S364) ----
+
+  rescanDisk(opts: { full?: boolean } = {}): Promise<RescanResult> {
+    if (!this.rescanActive) {
+      this.rescanActive = this.rescanOnce(!!opts.full).finally(() => { this.rescanActive = null; });
+      return this.rescanActive;
+    }
+    if (opts.full) this.rescanQueuedFull = true;
+    if (!this.rescanQueued) {
+      this.rescanQueued = this.rescanActive.catch(() => undefined).then(() => {
+        this.rescanQueued = null;
+        const full = this.rescanQueuedFull;
+        this.rescanQueuedFull = false;
+        return this.rescanDisk({ full });
+      });
+    }
+    return this.rescanQueued;
+  }
+
+  /**
+   * One pass. A STAT pass finds candidates (a served file whose stat differs
+   * from the stamp Atlas recorded, a served file gone, a file nobody serves);
+   * each candidate is then CONFIRMED inside its id's write chain, so a user
+   * save, a sync stamp, a pull-apply or a tidy rename on the same id runs
+   * wholly before or wholly after it, and a stamp that now matches (Atlas
+   * wrote meanwhile) drops the candidate. Everything a slot decides on is
+   * re-read INSIDE the slot (S364 gate lens A F1): a decision taken on the
+   * walk's snapshot raced Atlas's own renames. Only types already indexed are
+   * scanned: a type nobody has listed yet is read fresh when it is. One file
+   * that throws never sinks the pass (F6): its id is left for the next one.
+   *
+   * What it never does, by design: write a file, write a tombstone (a
+   * deletion outside Atlas is not a server DELETE), rename or quarantine a
+   * file another tool may be halfway through writing, or touch the sync
+   * stamps inside a body (the file's own stamps are served as they are).
+   */
+  private async rescanOnce(full: boolean): Promise<RescanResult> {
+    const root = this.root;
+    if (!root) return { changes: [], skipped: 'closed' };
+    // Mid re-key the disk holds old/new pairs on purpose; recovery owns it.
+    if (await this.hasRekeyJournal()) return { changes: [], skipped: 'rekey' };
+    await this.awaitTidies();
+
+    const changes: DiskChange[] = [];
+    const changedReported = new Set<string>();
+    const report = (c: DiskChange): void => {
+      if (c.kind === 'changed') {
+        if (changedReported.has(c.id)) return;
+        changedReported.add(c.id);
+      }
+      changes.push(c);
+    };
+    const alive = (): boolean => this.root === root;
+    const dirOf = (layout: LayoutDir, type: ElementType) => tryGetDir(root, elementDirSegmentsIn(layout, type));
+    /** The file's current stat, or null when it is not there. */
+    const statOf = async (layout: LayoutDir, type: ElementType, filename: string): Promise<{ handle: FileSystemFileHandle; stamp: FileStamp } | null> => {
+      try {
+        const dir = await dirOf(layout, type);
+        if (!dir) return null;
+        const handle = await dir.getFileHandle(filename);
+        const f = await handle.getFile();
+        return { handle, stamp: { lastModified: f.lastModified, size: f.size } };
+      } catch (err) {
+        if (isNotFound(err)) return null;
+        throw err;
+      }
+    };
+    /** Run one candidate's slot; a throw is logged and leaves the id for the next pass (F6). */
+    const slot = async (id: string, fn: () => Promise<void>): Promise<void> => {
+      try {
+        await this.writeChain.run(id, async () => { if (alive()) await fn(); });
+      } catch (err) {
+        console.warn(`[fs-folder-store] live folder: ${id} skipped this pass:`, err instanceof Error ? err.message : err);
+      }
+    };
+
+    // 0. Bodies adopted from disk OUTSIDE a pass (readForWrite, including a
+    //    pull that backed off from an outside edit): the cache already holds
+    //    them, so no stat will ever show them again (F5). Report them now.
+    for (const [id, before] of this.pendingAdoptions) {
+      const entry = this.fileIndex.get(id);
+      if (entry) report({ id, type: entry.type, kind: 'changed', before: structuredClone(before) });
+    }
+    this.pendingAdoptions.clear();
+
+    // 1. The stat pass: every *.json in every indexed (type, layout) dir.
+    type Seen = { type: ElementType; layout: LayoutDir; filename: string; handle: FileSystemFileHandle; stamp?: FileStamp };
+    const seen: Seen[] = [];
+    const scannedTypes = [...this.indexedTypes];
+    for (const type of scannedTypes) {
+      const layouts: LayoutDir[] = SPATIAL_TYPES.has(type) ? [ELEMENTS_DIR, SPATIAL_DIR] : [ELEMENTS_DIR];
+      for (const layout of layouts) {
+        const dir = await dirOf(layout, type);
+        if (!dir) continue;
+        for await (const entry of (dir as unknown as { values(): AsyncIterable<FileSystemHandle> }).values()) {
+          if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+            seen.push({ type, layout, filename: entry.name, handle: entry as FileSystemFileHandle });
+          }
+        }
+      }
+    }
+    let cursor = 0;
+    const statWorker = async (): Promise<void> => {
+      while (cursor < seen.length) {
+        const s = seen[cursor++];
+        try {
+          const f = await s.handle.getFile();
+          s.stamp = { lastModified: f.lastModified, size: f.size };
+        } catch { /* vanished between listing and stat: not seen */ }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(INDEX_READ_CONCURRENCY, seen.length) }, statWorker));
+    if (!alive()) return { changes: [], skipped: 'closed' };
+
+    // 2. Classify against the index.
+    const byPath = new Map<string, Seen>();
+    for (const s of seen) if (s.stamp) byPath.set(otherFileKey(s.type, s.layout, s.filename), s);
+    const servedPaths = new Set<string>();
+    let changedIds: string[] = [];
+    const goneIds = new Set<string>();
+    for (const [id, entry] of this.fileIndex) {
+      if (!this.indexedTypes.has(entry.type)) continue;
+      const key = otherFileKey(entry.type, entry.layout, entry.filename);
+      servedPaths.add(key);
+      const s = byPath.get(key);
+      if (!s) { goneIds.add(id); continue; }
+      // A served file already reported unreadable at this very stat (F10).
+      if (!full && this.otherFileStamps.get(key)?.stamp === stampKey(s.stamp)) continue;
+      const known = this.fileStamps.get(id);
+      // FULL ("Reload from disk"): every served file is confirmed by content,
+      // which also catches an overwrite that kept its mtime and size.
+      if (full || !known || known.filename !== entry.filename || stampKey(known) !== stampKey(s.stamp)) changedIds.push(id);
+    }
+    const strangers: Seen[] = [];
+    for (const [key, s] of byPath) {
+      if (servedPaths.has(key)) continue;
+      if (!full && this.otherFileStamps.get(key)?.stamp === stampKey(s.stamp)) continue; // known, unserved, unchanged
+      strangers.push(s);
+    }
+    // Paths remembered as unserved that are no longer there (F11).
+    const scanned = new Set<string>(scannedTypes);
+    for (const [key, rec] of this.otherFileStamps) {
+      if (scanned.has(rec.type) && !byPath.has(key)) this.otherFileStamps.delete(key);
+    }
+
+    // FULL: read the served files 64-way OUTSIDE the chain and enter a slot
+    // only for those that differ (a serial full pass cost seconds at 12k).
+    if (full && changedIds.length > 0) {
+      const differ: string[] = [];
+      let c = 0;
+      const readWorker = async (): Promise<void> => {
+        while (c < changedIds.length) {
+          const id = changedIds[c++];
+          const entry = this.fileIndex.get(id);
+          const cached = this.bodyCache.get(id);
+          const s = entry ? byPath.get(otherFileKey(entry.type, entry.layout, entry.filename)) : undefined;
+          if (!entry || !cached || !s) { differ.push(id); continue; }
+          let body: Awaited<ReturnType<typeof this.readForRescan>>;
+          try { body = await this.readForRescan(entry.type, s.handle); } catch { differ.push(id); continue; }
+          const known = this.fileStamps.get(id);
+          const sameStamp = !!known && known.filename === entry.filename && stampKey(known) === stampKey(s.stamp);
+          if (body && body !== 'gone' && body.elem.id === id && sameStamp && sameContentIgnoringStamps(cached, body.elem)) continue;
+          differ.push(id);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(INDEX_READ_CONCURRENCY, changedIds.length) }, readWorker));
+      if (!alive()) return { changes, skipped: 'closed' };
+      changedIds = differ;
+    }
+
+    /** Serve `filename` in (layout, type) as id's file: index, stamp, cache; report when the content moved. */
+    const rehome = (id: string, type: ElementType, layout: LayoutDir, filename: string, stamp: FileStamp, elem: Element, spelling: LinkSpelling | null): void => {
+      const entry = this.fileIndex.get(id);
+      const before = this.bodyCache.get(id);
+      this.fileIndex.set(id, { type, layout, filename, spelling: spelling ?? entry?.spelling ?? this.writeSpellingFor(type) });
+      this.fileStamps.set(id, { filename, ...stamp });
+      this.bodyCache.set(id, elem);
+      this.otherFileStamps.delete(otherFileKey(type, layout, filename));
+      if (!before || !sameContentIgnoringStamps(before, elem)) {
+        report({ id, type, kind: 'changed', ...(before ? { before: structuredClone(before) } : {}) });
+      }
+    };
+    /** Is id's served file still where the index says? */
+    const servedExists = async (id: string): Promise<boolean> => {
+      const entry = this.fileIndex.get(id);
+      return !!entry && (await statOf(entry.layout, entry.type, entry.filename)) !== null;
+    };
+
+    /**
+     * A file nobody serves: created outside, the served file renamed or moved
+     * between layouts, a second copy of a served id, or another type's id.
+     * Read once outside the chain to learn its id, then RE-READ inside the
+     * slot, and the served file's absence re-checked there too (F1).
+     */
+    const handleStranger = async (s: Pick<Seen, 'type' | 'layout' | 'filename' | 'handle'>): Promise<void> => {
+      const key = otherFileKey(s.type, s.layout, s.filename);
+      const first = await this.readForRescan(s.type, s.handle);
+      if (!alive() || first === 'gone') return; // gone before we could read it: nothing to say (F8)
+      if (!first) {
+        const now = await statOf(s.layout, s.type, s.filename).catch(() => null);
+        if (!now) return;
+        const prev = this.otherFileStamps.get(key);
+        this.otherFileStamps.set(key, { stamp: stampKey(now.stamp), id: null, type: s.type });
+        if (!prev || prev.stamp !== stampKey(now.stamp)) report({ id: '', type: s.type, kind: 'unreadable', filename: s.filename });
+        return;
+      }
+      const id = first.elem.id;
+      await slot(id, async () => {
+        const now = await statOf(s.layout, s.type, s.filename);
+        if (!now) return; // removed meanwhile (an Atlas rename's old file, an agent's temp)
+        const body = await this.readForRescan(s.type, now.handle);
+        if (!alive() || !body || body === 'gone' || body.elem.id !== id) return; // moved under us: the next pass decides
+        // Atlas's own new file, caught between its write and its index entry.
+        const own = this.fileStamps.get(id);
+        if (own && own.filename === s.filename && stampKey(own) === stampKey(now.stamp)) return;
+        const entry = this.fileIndex.get(id);
+        if (entry && entry.type === s.type) {
+          if (!(await servedExists(id))) {
+            // The served file moved: renamed (slug), or between elements/ and spatial/.
+            goneIds.delete(id);
+            if (!alive()) return;
+            rehome(id, s.type, s.layout, s.filename, now.stamp, body.elem, body.spelling);
+            return;
+          }
+          // A second copy of a served id (an agent copying, then editing).
+          // Serve what is served; never quarantine or rename live, under
+          // another tool's feet; remember the copy (its id too, F2) and mark
+          // the id shadowed so a re-key refuses it (F3).
+          this.otherFileStamps.set(key, { stamp: stampKey(now.stamp), id, type: s.type });
+          this.shadowedIds.add(id);
+          console.warn(`[fs-folder-store] live folder: ${s.layout}/${s.type}/${s.filename} claims id ${id}, already served from ${entry.layout}/${entry.filename}; left alone`);
+          return;
+        }
+        if (entry) {
+          this.otherFileStamps.set(key, { stamp: stampKey(now.stamp), id, type: s.type });
+          console.warn(`[fs-folder-store] live folder: ${s.layout}/${s.type}/${s.filename} claims id ${id}, which is a ${entry.type}; left alone`);
+          return;
+        }
+        if (!alive()) return;
+        this.fileIndex.set(id, { type: s.type, layout: s.layout, filename: s.filename, spelling: body.spelling ?? this.writeSpellingFor(s.type) });
+        this.fileStamps.set(id, { filename: s.filename, ...now.stamp });
+        this.bodyCache.set(id, body.elem);
+        this.otherFileStamps.delete(key);
+        report({ id, type: s.type, kind: 'created' });
+      });
+    };
+
+    // 3. Strangers, BEFORE deletions, so a rename is never reported as a delete.
+    for (const s of strangers) {
+      try { await handleStranger(s); } catch (err) {
+        console.warn(`[fs-folder-store] live folder: ${s.filename} skipped this pass:`, err instanceof Error ? err.message : err);
+      }
+      if (!alive()) return { changes, skipped: 'closed' };
+    }
+
+    // 4. Served files whose stat moved: confirm, then serve the disk's body.
+    const movedAway: Array<Pick<Seen, 'type' | 'layout' | 'filename' | 'handle'>> = [];
+    for (const id of changedIds) {
+      if (goneIds.has(id)) continue;
+      await slot(id, async () => {
+        const entry = this.fileIndex.get(id);
+        if (!entry) return; // deleted meanwhile
+        const now = await statOf(entry.layout, entry.type, entry.filename);
+        if (!now) { goneIds.add(id); return; }
+        const known = this.fileStamps.get(id);
+        if (!full && known && known.filename === entry.filename && stampKey(known) === stampKey(now.stamp)) return; // Atlas wrote it meanwhile
+        const body = await this.readForRescan(entry.type, now.handle);
+        if (!alive()) return;
+        if (body === 'gone') { goneIds.add(id); return; }
+        const key = otherFileKey(entry.type, entry.layout, entry.filename);
+        if (!body) {
+          // Half-written by a non-atomic writer, or conflict markers: keep
+          // serving the cached body, say so once per version of the file.
+          if (this.otherFileStamps.get(key)?.stamp !== stampKey(now.stamp)) {
+            this.otherFileStamps.set(key, { stamp: stampKey(now.stamp), id, type: entry.type });
+            report({ id, type: entry.type, kind: 'unreadable', filename: entry.filename });
+          }
+          return;
+        }
+        if (body.elem.id !== id) {
+          // Another element's file was moved onto this one's name (F4): this
+          // id has lost its file, and the file is a stranger for the other id.
+          goneIds.add(id);
+          movedAway.push({ type: entry.type, layout: entry.layout, filename: entry.filename, handle: now.handle });
+          return;
+        }
+        this.otherFileStamps.delete(key); // readable again
+        rehome(id, entry.type, entry.layout, entry.filename, now.stamp, body.elem, body.spelling ?? entry.spelling);
+      });
+    }
+    for (const s of movedAway) {
+      try { await handleStranger(s); } catch (err) {
+        console.warn(`[fs-folder-store] live folder: ${s.filename} skipped this pass:`, err instanceof Error ? err.message : err);
+      }
+    }
+
+    // 5. Served files that are gone. Before calling it a delete, look for a
+    //    copy of the same id we left unserved (an agent's copy-then-delete
+    //    move across two passes, a shadowed layout copy, F2): promote the one
+    //    the index rule would serve (newest local_updated_at, ties to elements/).
+    for (const id of goneIds) {
+      await slot(id, async () => {
+        const entry = this.fileIndex.get(id);
+        if (!entry) return;
+        // The file is back (or Atlas wrote it meanwhile), unless another
+        // element now owns that path (a file moved onto this one's name, F4).
+        const takenByOther = [...this.fileIndex].some(([other, e]) =>
+          other !== id && e.type === entry.type && e.layout === entry.layout && e.filename === entry.filename);
+        if (!takenByOther && (await servedExists(id))) return;
+        const copies: Array<{ layout: LayoutDir; filename: string; stamp: FileStamp; elem: Element; spelling: LinkSpelling | null }> = [];
+        for (const [key, rec] of this.otherFileStamps) {
+          if (rec.id !== id || rec.type !== entry.type) continue;
+          const [layout, , filename] = splitOtherFileKey(key);
+          const now = await statOf(layout, entry.type, filename);
+          if (!now) continue;
+          const body = await this.readForRescan(entry.type, now.handle);
+          if (body && body !== 'gone' && body.elem.id === id) copies.push({ layout, filename, stamp: now.stamp, elem: body.elem, spelling: body.spelling });
+        }
+        if (!alive()) return;
+        if (copies.length > 0) {
+          copies.sort((a, b) => {
+            const la = a.elem.local_updated_at ?? '', lb = b.elem.local_updated_at ?? '';
+            if (la !== lb) return la < lb ? 1 : -1;
+            return (a.layout === ELEMENTS_DIR ? 0 : 1) - (b.layout === ELEMENTS_DIR ? 0 : 1);
+          });
+          const [winner] = copies;
+          rehome(id, entry.type, winner.layout, winner.filename, winner.stamp, winner.elem, winner.spelling);
+          if (copies.length === 1) this.shadowedIds.delete(id);
+          return;
+        }
+        const before = this.bodyCache.get(id);
+        this.fileIndex.delete(id);
+        this.fileStamps.delete(id);
+        this.bodyCache.delete(id);
+        this.shadowedIds.delete(id);
+        report({ id, type: entry.type, kind: 'deleted', ...(before ? { before: structuredClone(before) } : {}) });
+      });
+    }
+    return { changes };
+  }
+
+  /**
+   * Read + normalise one file the way the index pass does. `'gone'` when the
+   * file is no longer there (never "unreadable", F8); null when it will not
+   * parse or has no id.
+   */
+  private async readForRescan(type: ElementType, handle: FileSystemFileHandle): Promise<{ elem: Element; spelling: LinkSpelling | null } | 'gone' | null> {
+    let text: string;
+    try {
+      text = await (await handle.getFile()).text();
+    } catch (err) {
+      if (isNotFound(err)) return 'gone';
+      throw err; // held open by another program: the slot retries next pass (F6)
+    }
+    try {
+      const elem = JSON.parse(text) as Element;
+      if (!elem || typeof elem.id !== 'string' || !elem.id) return null;
+      if (typeof elem.type !== 'string' || !elem.type) elem.type = type;
+      coerceForeignShapes(elem);
+      const spelling = normalizeDiskLinks(elem);
+      return { elem, spelling };
+    } catch {
+      return null;
+    }
+  }
+
   /** Cheap .json count for a not-yet-indexed type dir (progress totals). */
   private async countPendingFiles(type: ElementType): Promise<number> {
     if (this.indexedTypes.has(type)) return 0;
@@ -823,7 +1230,8 @@ export class FsFolderStore implements FolderStore {
    */
   private async writeElementFile(dir: FileSystemDirectoryHandle, filename: string, body: Element): Promise<void> {
     const spelling = this.fileIndex.get(body.id)?.spelling ?? this.writeSpellingFor(body.type);
-    await writeJsonAtomic(dir, filename, denormalizeDiskLinks(body, spelling));
+    const stamp = await writeJsonAtomic(dir, filename, denormalizeDiskLinks(body, spelling));
+    this.fileStamps.set(body.id, { filename, ...stamp });
   }
 
   /**
@@ -1057,6 +1465,12 @@ export class FsFolderStore implements FolderStore {
       // Same fill as the scan: a foreign writer may omit `type`.
       if (typeof disk.type !== 'string' || !disk.type) disk.type = entry.type;
       this.adoptDiskBody(id, disk);
+      // Someone else changed the file since Atlas last served it: the next
+      // live-folder pass says so, since no stat will show it now (F5).
+      const before = this.bodyCache.get(id);
+      if (before && !this.pendingAdoptions.has(id) && !sameContentIgnoringStamps(before, disk)) {
+        this.pendingAdoptions.set(id, structuredClone(before));
+      }
       this.bodyCache.set(id, disk);
       return structuredClone(disk);
     } catch (err) {
@@ -1094,13 +1508,17 @@ export class FsFolderStore implements FolderStore {
       local_updated_at: now,
     };
     await this.ensureIndexFor(type);
-    const layout = this.writeLayoutFor(type);
-    const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
-    const filename = this.resolveFilename(type, layout, id, elem.name);
-    await this.writeElementFile(dir, filename, elem);
-    this.setIndex(id, type, layout, filename);
-    this.cacheSet(elem);
-    return elem;
+    // In the id's chain (S364 gate lens A F7): a live-folder pass that finds
+    // the new file between its write and its index entry waits for both.
+    return this.writeChain.run(id, async () => {
+      const layout = this.writeLayoutFor(type);
+      const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
+      const filename = this.resolveFilename(type, layout, id, elem.name);
+      await this.writeElementFile(dir, filename, elem);
+      this.setIndex(id, type, layout, filename);
+      this.cacheSet(elem);
+      return elem;
+    });
   }
 
   async createElementVerbatim(
@@ -1134,7 +1552,8 @@ export class FsFolderStore implements FolderStore {
       const spelling = inherit ? from!.spelling : this.writeSpellingFor(type);
       const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
       const filename = this.resolveFilename(type, layout, id, elem.name);
-      await writeJsonAtomic(dir, filename, denormalizeDiskLinks(elem, spelling));
+      const stamp = await writeJsonAtomic(dir, filename, denormalizeDiskLinks(elem, spelling));
+      this.fileStamps.set(id, { filename, ...stamp });
       this.fileIndex.set(id, { type, layout, filename, spelling });
       this.cacheSet(elem);
       return { created: true, element: structuredClone(elem) };
@@ -1363,6 +1782,7 @@ export class FsFolderStore implements FolderStore {
     const filename = entry?.filename ?? elementFilename(elem.id, elem.name);
     await removeFile(dir, filename);
     this.fileIndex.delete(elem.id);
+    this.fileStamps.delete(elem.id);
     this.bodyCache.delete(elem.id);
   }
 
@@ -1672,6 +2092,20 @@ export class FsFolderStore implements FolderStore {
     await writeJsonAtomic(atlasDir, STYLES_FILE, styles);
   }
 
+  async readWorldPrefs(): Promise<Record<string, unknown> | null> {
+    const atlasDir = await tryGetDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    if (!atlasDir) return null;
+    const raw = await readJsonStrict<unknown>(atlasDir, WORLD_PREFS_FILE);
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+  }
+
+  async writeWorldPrefs(prefs: Record<string, unknown>): Promise<void> {
+    this.assertWritable();
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    await readJsonStrict(atlasDir, WORLD_PREFS_FILE); // never replace a file we could not read
+    await writeJsonAtomic(atlasDir, WORLD_PREFS_FILE, prefs);
+  }
+
   /**
    * Move a file out of the element folders into `.atlas/quarantine/<type>/`,
    * keeping its name (numbered if taken). The body is re-serialised, not
@@ -1781,7 +2215,13 @@ export class FsFolderStore implements FolderStore {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');
     return this.writeChain.run(id, async () => {
-      const current = await this.getElement(id);
+      // The file AS IT IS ON DISK (S364): an outside edit that followed the
+      // toolkit's rule (a fresh `local_updated_at`) moved the stamp the engine
+      // decided on, so the pull backs off instead of overwriting it, even
+      // when no live-folder pass has adopted the edit yet. `readForWrite`
+      // adopts the disk body into the cache; a file that will not parse
+      // throws CorruptFileError, which pauses the round with the file named.
+      const current = await this.readForWrite(id);
       if ((current?.local_updated_at ?? null) !== expectedLocalUpdatedAt) return false;
       await this.applyServerRecordUnchained(type, record, server_updated_at);
       return true;
@@ -1934,13 +2374,33 @@ function getOrCreateTabId(): string {
   }
 }
 
+/** The live folder's key for an element file Atlas does not serve (S364). */
+function otherFileKey(type: ElementType, layout: LayoutDir, filename: string): string {
+  return `${layout}|${type}|${filename}`;
+}
+
+/** The inverse of `otherFileKey`. */
+function splitOtherFileKey(key: string): [LayoutDir, ElementType, string] {
+  const a = key.indexOf('|');
+  const b = key.indexOf('|', a + 1);
+  return [key.slice(0, a) as LayoutDir, key.slice(a + 1, b) as ElementType, key.slice(b + 1)];
+}
+
+/** A stamp as one comparable string ('' when unknown, which never matches a real stat). */
+function stampKey(stamp: FileStamp | undefined): string {
+  return stamp ? `${stamp.lastModified}:${stamp.size}` : '';
+}
+
 /** Two bodies are the same element state when they differ only in the sync stamps (a rename-crash twin). */
 function sameContentIgnoringStamps(a: Element, b: Element): boolean {
   const canon = (e: Element): string => {
     const { local_updated_at: _l, server_updated_at: _s, ...rest } = e as Element & Record<string, unknown>;
     // Top-level keys sorted; nested values stringified whole. (A replacer
     // ARRAY would also filter nested keys and call differing bodies equal.)
-    return JSON.stringify(Object.keys(rest).sort().map(k => [k, (rest as Record<string, unknown>)[k]]));
+    // A key holding `undefined` is dropped, as JSON drops it on disk: a body
+    // Atlas wrote with one looked "changed" against its own file (S364 F9).
+    const keys = Object.keys(rest).filter(k => (rest as Record<string, unknown>)[k] !== undefined).sort();
+    return JSON.stringify(keys.map(k => [k, (rest as Record<string, unknown>)[k]]));
   };
   return canon(a) === canon(b);
 }

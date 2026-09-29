@@ -697,3 +697,27 @@ test('a dark page previews dark even while the app is in light mode', async ({ p
   // the light block defines --atlas-text as a flat literal.
   expect(inLight.fieldLum).toBeGreaterThan(150);
 });
+
+// S364 lane A5: a charts refresh (the id-swap / re-key signal, or the first
+// readCharts landing after a deep-linked page opens) rebuilt the block list
+// under an open text block, remounting its editor from the in-memory block,
+// which did not hold the pending text yet: typing jumped back and lost focus.
+test('an open text block survives a charts refresh', async ({ page }) => {
+  await setupWorld(page);
+  await openShare(page);
+  await page.click('button.atlas-share-new');
+  await page.click('.atlas-share-block-add-btn:has-text("text")');
+  const pm = page.locator('.atlas-share-prose-rich .ProseMirror');
+  await expect(pm).toBeVisible({ timeout: 10000 });
+  await pm.click();
+  await page.keyboard.type('The mists never lift');
+  // Mark the live editor node, then fire the refresh inside the save debounce.
+  await page.evaluate(() => {
+    (document.querySelector('.atlas-share-prose-rich .ProseMirror') as HTMLElement).dataset.probe = 'same-node';
+    window.dispatchEvent(new Event('atlas:charts-changed'));
+  });
+  await page.waitForTimeout(150); // let readCharts resolve and the refresh run
+  await expect(page.locator('.atlas-share-prose-rich .ProseMirror[data-probe="same-node"]')).toHaveCount(1);
+  await page.keyboard.type(', ever.');
+  await expect(pm).toContainText('The mists never lift, ever.');
+});

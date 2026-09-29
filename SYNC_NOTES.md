@@ -678,12 +678,15 @@ elements; cold open 18.5s → ~3s). Load-bearing rules:
   e2e (`folder-store-fs.spec.ts`) catches a missed sink by construction.
 - **The cache owns its entries and serves clones** — callers can never
   mutate cache internals; write sinks store clones (`cacheSet`).
-- Sound because of the one-writer lock: nothing writes element bodies
-  behind the store's back (gate-verified, zero out-of-store writers).
-  External-editor edits mid-session are not SHOWN until the next open, but
-  since S359 they SURVIVE atlas's writes: every write merges into the file as
-  it is on disk (`readForWrite`, DESIGN convention 92), and since S361 a file
-  that will not parse is never written over (`CorruptFileError`).
+- The one-writer lock keeps other ATLAS tabs out; other TOOLS write the
+  folder freely (an AI agent, a text editor, git), and the cache handles them
+  in three layers: since S359 their edits SURVIVE atlas's writes (every write
+  merges into the file as it is on disk, `readForWrite`, DESIGN conv. 92);
+  since S361 a file that will not parse is never written over
+  (`CorruptFileError`); since S364 they are SHOWN (the live folder,
+  `rescanDisk`, conv. 111: a stat pass against the stamps atlas recorded,
+  on focus, visibility, revive and Ctrl+K "reload from disk"), and a pull
+  checks the disk stamp before it overwrites (`applyServerRecordIfUnchanged`).
 - **Index builds run concurrently** (64-way file reads from handles
   collected in one enumeration; types in parallel) with an in-flight
   promise guard per type. A closed store's in-flight build BAILS (zombie

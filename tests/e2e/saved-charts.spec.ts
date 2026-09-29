@@ -168,3 +168,44 @@ test('declining the delete confirm KEEPS the chart (S306)', async ({ page }) => 
   await expect(page.locator('.atlas-saved-chart')).toHaveCount(1);
   expect(asked, 'deleting a saved chart must ask first').toBe(true);
 });
+
+// S364 lane A1: the Charts room read charts.json once per mount and stayed
+// mounted across a world switch (room-stable switch, S256), then wrote its
+// whole in-memory list to the NEW world: world B's charts were replaced by
+// world A's. The room now remounts per world and every chart write is a
+// read-modify-write of the file.
+test('switching worlds inside Charts shows and keeps each world\'s own charts', async ({ page }) => {
+  await setupWorld(page); // "chartworld", active
+  await createElement(page, 'event', { name: 'Siege', start_date: 10 });
+  await openCharts(page);
+  await page.click('[data-action="save-chart"]');
+  const chip = page.locator('.atlas-saved-chart');
+  await expect(chip).toHaveCount(1);
+  const aName = (await chip.locator('.atlas-saved-chart-name').textContent()) ?? '';
+
+  // A second world with its own chart, saved from its own Charts room.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'otherworld');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await createElement(page, 'event', { name: 'Flood', start_date: 5 });
+  await openCharts(page);
+  await expect(chip).toHaveCount(0);
+  await page.click('[data-action="save-chart"]');
+  await expect(chip).toHaveCount(1);
+  const bName = (await chip.locator('.atlas-saved-chart-name').textContent()) ?? '';
+  expect(bName).not.toBe(aName);
+
+  // Switch to chartworld while in Charts: the room follows, with A's list.
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
+  await page.click('.atlas-row[data-world-id]:has-text("chartworld")');
+  await expect(page.locator('.atlas-timeline-room h1')).toHaveText('Charts');
+  await expect(chip).toHaveCount(1);
+  await expect(chip.locator('.atlas-saved-chart-name')).toHaveText(aName);
+
+  // Back to otherworld: its own chart survived, and only it.
+  await page.click('.atlas-row[data-world-id]:has-text("otherworld")');
+  await expect(chip).toHaveCount(1);
+  await expect(chip.locator('.atlas-saved-chart-name')).toHaveText(bName);
+});

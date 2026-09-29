@@ -446,6 +446,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     }
     if (cur?.kind === 'paused') {
       toasts.info(cur.reason === 'network' ? 'Offline; pull skipped'
+        : cur.reason === 'held' && cur.held_for === 'disk' ? 'Files changed on disk are waiting for your answer in the element list.'
         : cur.reason === 'held' ? 'Ids are being updated in this world. Pull when that finishes.'
         : 'Sync paused. Flip stay-offline off to pull');
       return;
@@ -520,6 +521,9 @@ function mapEngineStateToPill(
         title: `Syncing (${engine.phase})${engine.progress ? ` ${engine.progress.done}/${engine.progress.total}` : ''}`,
       };
     case 'paused':
+      if (engine.reason === 'held' && engine.held_for === 'disk') {
+        return { dataState: 'pending', label: 'Waiting', title: 'Many files changed on disk. Upload them or stay offline, from the element list.' };
+      }
       if (engine.reason === 'held') {
         return { dataState: 'saving', label: 'Updating ids', title: 'Giving elements new ids. Sync resumes when it finishes. If it does not, Settings can finish it.' };
       }

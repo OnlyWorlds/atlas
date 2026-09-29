@@ -323,7 +323,7 @@ export type SyncEngineState =
   | { kind: 'idle'; last_sync_at: string | null }
   | { kind: 'syncing'; phase: 'pull' | 'push'; progress?: { done: number; total: number } }
   /** `held`: an exclusive local operation (the re-key, S363) owns the world; nothing syncs until it ends. */
-  | { kind: 'paused'; reason: 'manual' | 'network' | 'held'; pending_changes: number }
+  | { kind: 'paused'; reason: 'manual' | 'network' | 'held'; pending_changes: number; held_for?: 'rekey' | 'disk' }
   | { kind: 'error'; message: string; recoverable: boolean };
 
 export interface SyncResult {

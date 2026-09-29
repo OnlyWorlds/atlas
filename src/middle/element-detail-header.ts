@@ -172,6 +172,21 @@ export function renderHeader(el: Element): HTMLElement {
  * universally the primary identity field; making it edit-in-place removes a
  * click without disrupting the popover for everything else.
  */
+/**
+ * Is someone typing in a text control inside `root`? A render that replaces
+ * a focused input removes it, Chromium fires `blur` on the removal, and the
+ * blur COMMITS: a name saved half-typed (S364 lane A3, "Strahd von"), and
+ * the inline field editors the same way (S364 gate, lens C C3). Every surface
+ * that rebuilds on a background tick asks this first and defers the rebuild
+ * until focus leaves (the commit re-renders anyway). Same rule as
+ * editable-title's sync().
+ */
+export function isEditingIn(root: ParentNode): boolean {
+  const active = document.activeElement as HTMLElement | null;
+  if (!active || !root.contains(active)) return false;
+  return active.matches('input, textarea') || active.isContentEditable;
+}
+
 function startInlineNameEdit(host: HTMLElement, el: Element): void {
   if (host.querySelector('input')) return; // already editing
 

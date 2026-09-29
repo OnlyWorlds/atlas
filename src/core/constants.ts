@@ -100,6 +100,8 @@ export const CHARTS_FILE = 'charts.json';
 export const REKEY_JOURNAL_FILE = 'rekey-journal.json';
 /** World styles — how the world draws its kinds (core/world-styles.ts, S356). */
 export const STYLES_FILE = 'styles.json';
+/** What the world's user wrote about it that is not an element: notes, cast, calendar lens, writing labels (core/world-prefs.ts, S364). */
+export const WORLD_PREFS_FILE = 'world-prefs.json';
 export const LOCK_FILE = 'lock';
 export const WORLD_META_FILE = 'world.json';
 /**

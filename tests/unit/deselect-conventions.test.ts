@@ -21,6 +21,10 @@ import {
 } from '../../src/core/hotkeys';
 
 describe('Convention #32 — Esc deselect-to-home', () => {
+  // The binding reads the URL (writing/knowledge/share/import own their Esc),
+  // and jsdom's window outlives a test FILE here (vitest singleFork): start
+  // from a neutral route instead of whatever the previous file left.
+  beforeEach(() => { window.location.hash = '#/w/test-world/element/el-1'; });
   afterEach(() => {
     uninstallHotkeys();
     setHotkeyCallbacks({});

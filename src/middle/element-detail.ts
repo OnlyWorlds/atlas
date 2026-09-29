@@ -29,7 +29,7 @@ import { buildMapLocalImageRow } from './element-detail-map-image';
 import { renderReferencedBy } from './element-detail-refs';
 import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
-import { renderHeader } from './element-detail-header';
+import { renderHeader, isEditingIn } from './element-detail-header';
 import { renderElementImage } from '../ui/element-image';
 import { escapeText, relativeTime } from '../core/dom-utils';
 
@@ -87,7 +87,19 @@ export function mountElementDetail(target: HTMLElement): () => void {
     }
   }
 
+  // A background tick (a sync publish, a list refresh) during an inline rename or field edit
+  // is deferred, not dropped: it runs once focus leaves the input, after the
+  // blur has read the value it commits.
+  let renderDeferred = false;
+  const onFocusOut = (): void => {
+    if (!renderDeferred) return;
+    renderDeferred = false;
+    queueMicrotask(render);
+  };
+  target.addEventListener('focusout', onFocusOut);
+
   function render(): void {
+    if (isEditingIn(target)) { renderDeferred = true; return; }
     captureScrollBeforeRender();
     target.innerHTML = '';
     const state = getState();
@@ -274,7 +286,12 @@ export function mountElementDetail(target: HTMLElement): () => void {
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
   render();
-  return () => { unsubState(); unsubHash(); };
+  return () => {
+    unsubState();
+    unsubHash();
+    renderDeferred = false;
+    target.removeEventListener('focusout', onFocusOut);
+  };
 }
 
 

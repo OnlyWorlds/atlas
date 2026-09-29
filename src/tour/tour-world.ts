@@ -62,8 +62,10 @@ export async function scaffoldTourWorld(): Promise<{ entry: WorldRegistryEntry }
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);
   patchSlice('registry', activated);
-  patchSlice('active', { worldId: entry.id, meta, opened: true });
+  // The store first (S364 gate lens C C9): a room mounts on the `active` patch
+  // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
+  patchSlice('active', { worldId: entry.id, meta, opened: true });
   patchSlice('data', { elements: [] });
   patchSlice('ui', { ...getState().ui, selectedElementId: null });
   attachSyncEngine(entry, store);

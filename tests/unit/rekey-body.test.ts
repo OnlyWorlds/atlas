@@ -107,7 +107,7 @@ describe('rekeyBody: the TipTap sidecar', () => {
     const links = Object.values(extractProseLinks(md)).flat();
     expect(links).not.toContain(O);
     expect(links).not.toContain(O2);
-    expect(computeRelationPatch(after, md)).toEqual({});
+    expect(computeRelationPatch(after, md, () => true)).toEqual({});
     expect(Object.values(extractProseLinks(after.story as string)).flat()).toEqual([N, N2]);
   });
 });

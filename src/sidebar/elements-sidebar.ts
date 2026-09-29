@@ -26,6 +26,7 @@ import { elementMatchesQuery } from '../core/element-search';
 import { roomOf } from '../core/element-room';
 import { panMapTabTo } from '../tabs/right/map-tab';
 import { locateTargetFor } from './pin-locate';
+import { answerHeldBatch, dismissDiskNotice, getDiskNotice, notSyncedNow, onDiskNotice, setDiskShowOnly } from '../core/live-folder';
 
 /** Types shown in the filter strip — matches legacy: all 22 except pin/marker (placed via maps). */
 // Pins and markers close the strip (S356): browsable when asked for, muted
@@ -276,6 +277,61 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   assignBanner.appendChild(assignLabel);
   assignBanner.appendChild(assignOff);
   content.appendChild(assignBanner);
+
+  // ----- The live folder's notice (S364): what another tool changed on disk -----
+  // One line: "N changed on disk · show", plus what will not sync and what
+  // cannot be read; a second line when a big batch holds sync for an answer.
+  const diskBar = document.createElement('div');
+  diskBar.className = 'atlas-disk-notice';
+  diskBar.setAttribute('data-active', 'false');
+  diskBar.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-disk-action]');
+    if (!btn) return;
+    const action = btn.dataset.diskAction;
+    if (action === 'show') setDiskShowOnly(!getDiskNotice()?.showOnly);
+    else if (action === 'dismiss') dismissDiskNotice();
+    else if (action === 'upload') void answerHeldBatch(true);
+    else if (action === 'offline') void answerHeldBatch(false);
+  });
+  content.appendChild(diskBar);
+  let lastDiskBar = '';
+  function renderDiskBar(): void {
+    const n = getDiskNotice();
+    const active = !!n && (n.marked.size > 0 || n.unreadable.length > 0 || n.removed.length > 0 || !!n.held);
+    const parts: string[] = [];
+    if (n && n.marked.size > 0) {
+      parts.push(`<span class="atlas-disk-notice-count">${n.marked.size} changed on disk</span>`);
+      const notSynced = notSyncedNow(n, getState().data.elements);
+      if (notSynced > 0) {
+        parts.push(`<span class="atlas-disk-notice-warn" title="Changed outside Atlas without a new edit time, so they do not upload. Change them in Atlas to upload them.">${notSynced} not synced</span>`);
+      }
+      parts.push(`<button type="button" class="atlas-disk-notice-btn" data-disk-action="show">${n.showOnly ? 'show all' : 'show'}</button>`);
+    }
+    if (n && n.removed.length > 0) {
+      const linked = getState().registry.worlds.find(w => w.id === n.worldId)?.state === 'api-linked';
+      const tip = `Removed from the world folder by another program: ${n.removed.join(', ')}.`
+        + (linked ? ' They are gone from this folder only and stay on your OnlyWorlds account; a full refresh from the account brings them back.' : '');
+      parts.push(`<span class="atlas-disk-notice-warn" title="${escapeAttr(tip)}">${n.removed.length} removed on disk</span>`);
+    }
+    if (n && n.unreadable.length > 0) {
+      const tip = `These files would not open, so Atlas shows them as they were: ${n.unreadable.join(', ')}`;
+      parts.push(`<span class="atlas-disk-notice-warn" title="${escapeAttr(tip)}">${n.unreadable.length} cannot be read</span>`);
+    }
+    const held = n?.held
+      ? `<div class="atlas-disk-notice-held">Sync is waiting: ${n.held.count} elements changed on disk. `
+        + `<button type="button" class="atlas-disk-notice-btn" data-disk-action="upload">Upload them</button> `
+        + `<button type="button" class="atlas-disk-notice-btn" data-disk-action="offline">Stay offline</button></div>`
+      : '';
+    const html = !active ? '' : `<div class="atlas-disk-notice-line">`
+      + `<span class="material-symbols-outlined atlas-disk-notice-icon">folder_open</span>`
+      + parts.join('<span class="atlas-disk-notice-sep">·</span>')
+      + (parts.length > 0 ? `<button type="button" class="atlas-disk-notice-off" data-disk-action="dismiss" title="Mark all seen"><span class="material-symbols-outlined">close</span></button>` : '')
+      + `</div>${held}`;
+    if (html === lastDiskBar) return;
+    lastDiskBar = html;
+    diskBar.setAttribute('data-active', active ? 'true' : 'false');
+    diskBar.innerHTML = html;
+  }
 
   // ----- List body -----
   const listEl = document.createElement('div');
@@ -545,8 +601,14 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       const active = state.ui.rightTabs[state.ui.rightActiveIndex];
       return active && active.kind === 'map' ? active.mapId : null;
     })();
+    renderDiskBar();
+    const disk = getDiskNotice();
+    const diskMarked = disk?.marked ?? new Set<string>();
+    const diskOnly = !!disk?.showOnly && diskMarked.size > 0;
     const listInputs: Record<string, unknown> = {
       elements,
+      disk: [...diskMarked].join(','),
+      diskOnly,
       rules: state.styles.rules,
       filters: [...filters].sort().join(','),
       muted: [...muted].sort().join(','),
@@ -572,7 +634,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     lastSelectedId = selectedId;
 
     const filtered = elements
-      .filter(el => filters.size > 0 || !muted.has(el.type))
+      .filter(el => !diskOnly || diskMarked.has(el.id))
+      .filter(el => filters.size > 0 || !muted.has(el.type) || diskOnly)
       // Tour-quiet machinery (the calendar construct) stays out of the list
       // while touring — an element appearing unannounced in the sidebar is
       // exactly the confusion the progressive build-up prevents (S316).
@@ -652,6 +715,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
           flashingIds.has(el.id),
           knownSet ? !knownSet.has(el.id) : false,
           tourFreshIds.has(el.id) && isTourFlagActive(),
+          diskMarked.has(el.id),
         ),
       )
       .join('');
@@ -684,10 +748,12 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
 
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
+  const unsubDisk = onDiskNotice(render);
   render();
   return () => {
     unsubState();
     unsubHash();
+    unsubDisk();
     mountedRerenders.delete(render);
     document.removeEventListener('atlas:pulled-ids', handlePulledIds);
     document.removeEventListener('atlas:tour-fresh-ids', handleTourFresh);
@@ -717,12 +783,16 @@ function renderElementRow(
   flash: boolean,
   lensDimmed: boolean,
   tourFresh = false,
+  diskChanged = false,
 ): string {
   const icon = ELEMENT_ICONS[el.type] ?? 'category';
   const cls = ['atlas-row', selected ? 'selected' : '', lensDimmed ? 'atlas-row-lens-dim' : '']
     .filter(Boolean).join(' ');
   const flashAttr = (flash ? ' data-flash="true"' : '')
-    + (tourFresh ? ' data-tour-fresh="true"' : '');
+    + (tourFresh ? ' data-tour-fresh="true"' : '')
+    + (diskChanged ? ' data-disk-changed="true"' : '');
+  // The live folder's mark (S364): changed on disk, until opened or dismissed.
+  const diskDot = diskChanged ? '<span class="atlas-row-disk-dot" title="Changed on disk"></span>' : '';
   // hasMap is set only for Location rows that have at least one map anchored.
   // Renders a small cyan-tinted map glyph between the name and the type chip.
   const mapBadge = hasMap
@@ -763,6 +833,7 @@ function renderElementRow(
     <div class="${cls}" ${draggable} data-element-id="${escapeAttr(el.id)}" data-element-type="${escapeAttr(el.type)}"${flashAttr} role="button" tabindex="0">
       <span class="material-symbols-outlined">${icon}</span>
       <span class="atlas-row-main">${escapeText(el.name || '(unnamed)')}</span>
+      ${diskDot}
       ${mapBadge}
       ${onMapBadge}
       ${chronicleBadge}

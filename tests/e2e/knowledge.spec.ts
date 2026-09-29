@@ -505,3 +505,68 @@ test('two individual knowers promote to a circle (S265, the narrator single-link
     return s.data.elements.find((e: any) => e.name === 'Bram').id;
   }))].sort());
 });
+
+// S364 lane A4: a failed prose save was marked saved (the baseline advanced
+// regardless), and leaving the entry inside the room captured nothing, so the
+// text shown in the editor never reached disk. Now the baseline advances only
+// on a landed write and leaving the entry retries what did not land.
+test('saved entry: a prose save that fails is retried when you leave the entry', async ({ page }) => {
+  test.slow();
+  await setupWorld(page);
+  const entryId = await createElement(page, 'narrative', { name: 'ledger', subtype: 'knowledge', story: '' });
+  await openKnowledge(page);
+  await page.click('.atlas-knowledge-row:has-text("ledger")');
+  await waitForKnowledgeEditor(page);
+
+  // The next story write fails once (a quota error, a locked file).
+  await page.evaluate(() => {
+    const store = (window as any).__atlasTestApi.getActiveStore();
+    const real = store.updateElement.bind(store);
+    let failed = false;
+    store.updateElement = async (id: string, patch: any) => {
+      if (!failed && patch && 'story' in patch) { failed = true; throw new Error('disk said no'); }
+      return real(id, patch);
+    };
+  });
+  await page.locator('.atlas-knowledge-prose-rich .ProseMirror').click();
+  await page.keyboard.type('the tithe is overdue');
+  await expect(page.locator('.ow-toast', { hasText: 'Could not update knowledge entry' })).toBeVisible();
+
+  // Leave the entry without typing again: back to the list.
+  await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    window.location.hash = `#/w/${s.active.worldId}/knowledge`;
+  });
+  await expect(page.locator('.atlas-knowledge-row:has-text("ledger")')).toBeVisible();
+  await expect.poll(async () => (await getElement(page, entryId))?.story ?? '', { timeout: 5000 })
+    .toContain('the tithe is overdue');
+});
+
+// S364 gate, lens C C1: the teardown capture (A4) must not write the typed
+// text back to an entry being deleted.
+test('deleting an entry right after typing writes nothing to it', async ({ page }) => {
+  await setupWorld(page);
+  await createElement(page, 'narrative', { name: 'ledger', subtype: 'knowledge', story: 'hello' });
+  await page.evaluate(() => {
+    const api = (window as any).__atlasTestApi;
+    const reg = api.getState().registry;
+    api.patchSlice('registry', { ...reg, editor_settings: { ...(reg.editor_settings ?? {}), confirm_before_delete: false } });
+  });
+  await openKnowledge(page);
+  await page.click('.atlas-knowledge-row:has-text("ledger")');
+  await waitForKnowledgeEditor(page);
+  await page.evaluate(() => {
+    const store = (window as any).__atlasTestApi.getActiveStore();
+    const up = store.updateElement.bind(store);
+    (window as any).__updates = 0;
+    store.updateElement = async (id: string, patch: any) => { (window as any).__updates++; return up(id, patch); };
+  });
+  await page.locator('.atlas-knowledge-prose-rich .ProseMirror').click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' world');
+  await page.click('.atlas-knowledge-delete'); // inside the save debounce
+  await expect(page.locator('.atlas-knowledge-row:has-text("ledger")')).toHaveCount(0);
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => (window as any).__updates)).toBe(0);
+  await expect(page.locator('.ow-toast', { hasText: 'Could not update knowledge entry' })).toHaveCount(0);
+});

@@ -811,6 +811,13 @@ async function doActivateWorld(
   const meta = await store.readWorldMeta();
   // View-only worlds (S264): arm the store guard before the UI can reach it.
   store.setViewOnly(!!entry.api?.read_only);
+  // The world's notes, cast, calendar lens and writing labels, from its
+  // folder (S364). BEFORE re-key recovery: recovery remaps the registry's
+  // cast ids, and the prefs sync then writes the remapped ids back out.
+  {
+    const { loadWorldPrefs } = await import('../core/world-prefs');
+    await loadWorldPrefs(store, worldId);
+  }
   // An id update that did not finish (a crash, a closed tab) completes HERE,
   // on both the open and the revive path, before anything reads the world
   // (S363, re-key gate lens 1 F3/F6): otherwise the list would show old and
@@ -899,6 +906,11 @@ async function doActivateWorld(
   // Attach SyncEngine if this world is api-linked. Auto-detaches the previous
   // world's engine. For local-only worlds this is a no-op (returns null).
   attachSyncEngine(entry, store);
+
+  // A revived store trusted its caches: anything another tool wrote while the
+  // world sat parked shows after one pass (the live folder, S364). Background:
+  // never blocks the switch-back.
+  if (revived) void import('../core/live-folder').then(m => m.rescanNow({ force: true }));
 
   if (preserveSelection) {
     // Boot path: URL was already correct (deep route, possibly with /element/<id>).

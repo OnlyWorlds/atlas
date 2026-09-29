@@ -346,6 +346,8 @@ export class SyncEngine {
    * pause. Every round entry and push trigger reads `blocked`.
    */
   private holds = 0;
+  /** Why each standing hold was taken, oldest first: the pill names the newest. */
+  private holdReasons: Array<'rekey' | 'disk'> = [];
 
   private get blocked(): boolean {
     return this.paused || this.holds > 0;
@@ -364,8 +366,9 @@ export class SyncEngine {
    * it pushes only when no other hold or pause remains (a world the user set to
    * stay offline stays offline).
    */
-  async hold(_reason: 'rekey'): Promise<() => void> {
+  async hold(reason: 'rekey' | 'disk'): Promise<() => void> {
     this.holds++;
+    this.holdReasons.push(reason);
     if (this.debouncePushTimer) {
       clearTimeout(this.debouncePushTimer);
       this.debouncePushTimer = null;
@@ -379,13 +382,22 @@ export class SyncEngine {
     // What the world said before the hold: an auth or corrupt-file error keeps
     // its red pill and its message afterwards (lens B F2).
     const before = this.state;
-    this.setState({ kind: 'paused', reason: 'held', pending_changes: 0 });
+    // `held_for` is what the pill says (S364): a re-key and a big batch of
+    // outside edits waiting for the user's answer are different sentences.
+    this.setState({ kind: 'paused', reason: 'held', pending_changes: 0, held_for: reason });
     let released = false;
     return () => {
       if (released) return;
       released = true;
       this.holds--;
-      if (this.holds > 0 || this.stopped) return;
+      const at = this.holdReasons.indexOf(reason);
+      if (at >= 0) this.holdReasons.splice(at, 1);
+      if (this.stopped) return;
+      if (this.holds > 0) {
+        // Another hold still stands: the pill says ITS sentence (S364 gate lens B B13).
+        this.setState({ kind: 'paused', reason: 'held', pending_changes: 0, held_for: this.holdReasons[this.holdReasons.length - 1] });
+        return;
+      }
       if (this.paused) {
         if (before.kind === 'error') this.setState(before);
         else this.setState({ kind: 'paused', reason: this.pauseReason ?? 'manual', pending_changes: 0 });
@@ -421,7 +433,7 @@ export class SyncEngine {
 
   private async rekeyPending(): Promise<boolean> {
     if (!(await this.folder.hasRekeyJournal())) return false;
-    this.setState({ kind: 'paused', reason: 'held', pending_changes: 0 });
+    this.setState({ kind: 'paused', reason: 'held', pending_changes: 0, held_for: 'rekey' });
     return true;
   }
 

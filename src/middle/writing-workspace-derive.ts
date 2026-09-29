@@ -45,6 +45,21 @@ export function extractProseLinks(markdown: string): Record<string, string[]> {
   return flat;
 }
 
+/** Does a prose link point at an element that exists, with that type? */
+export type LinkTargetExists = (type: string, id: string) => boolean;
+
+/**
+ * The existence check every derive caller passes, built from the world's
+ * element list. A chip can outlive its element: a delete scrubs the link
+ * FIELDS (conv. 101) and deliberately leaves the prose alone, so the derive
+ * must not put the dead id back (S364: it did, at every scene open).
+ */
+export function linkTargetsIn(elements: readonly Element[]): LinkTargetExists {
+  const typeOf = new Map<string, string>();
+  for (const e of elements) typeOf.set(e.id, e.type);
+  return (type, id) => typeOf.get(id) === type;
+}
+
 /**
  * Given a Narrative element and a markdown snapshot, compute the patch needed
  * to update the multi-link relation fields. Returns ONLY the fields that
@@ -57,6 +72,7 @@ export function extractProseLinks(markdown: string): Record<string, string[]> {
 export function computeRelationPatch(
   narrative: Element,
   markdown: string,
+  exists: LinkTargetExists,
 ): Partial<Element> {
   const linksByType = extractProseLinks(markdown);
   const patch: Partial<Element> = {};
@@ -69,7 +85,9 @@ export function computeRelationPatch(
     // to `any` — TS still catches misuse downstream.
     const existing = (narrative as Record<string, unknown>)[field];
     const existingArr: string[] = Array.isArray(existing) ? existing.filter(x => typeof x === 'string') : [];
-    const merged = unionPreserveOrder(existingArr, ids);
+    // Only LIVE targets are derived; an entry already in the field stays
+    // (manual links are never removed here; the delete scrub owns that).
+    const merged = unionPreserveOrder(existingArr, ids.filter(id => exists(type, id)));
     if (!arraysEqual(existingArr, merged)) {
       (patch as Record<string, unknown>)[field] = merged;
     }

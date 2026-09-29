@@ -229,3 +229,36 @@ test('export downloads an ow.com-compatible JSON', async ({ page }) => {
   ]);
   expect(download.suggestedFilename()).toMatch(/^onlyworlds_.*\.json$/);
 });
+
+// S364 gate lens C C5: the Data room remounts per world since S364 (conv. 109),
+// and a loaded payload rides across a WORLD switch (load a file, then click
+// the world to merge it into), as the S256 room-stable switch intended.
+// Leaving for another room still drops it.
+test('a loaded payload survives switching worlds in the Data room, not leaving the room', async ({ page }) => {
+  await setupWorld(page, 'alpha');
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'beta');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await openImport(page);
+  await page.fill('[data-role="paste"]', JSON.stringify({ Character: [{ name: 'Toadvine' }] }));
+  await page.click('[data-action="load"]');
+  await expect(page.locator('.atlas-import-badge')).toBeVisible();
+  // The sync point is the NEW room: right after the click the old one is
+  // still on screen, badge and all (a first version of this test asserted
+  // there and passed with the carry removed).
+  await page.evaluate(() => { (document.querySelector('.atlas-import-room') as HTMLElement).dataset.probe = 'old'; });
+
+  await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
+  await page.click('.atlas-row[data-world-id]:has-text("alpha")');
+  await expect(page.locator('.atlas-import-room[data-probe="old"]')).toHaveCount(0);
+  await expect(page.locator('.atlas-import-room h1')).toHaveText('Data');
+  await expect(page.locator('.atlas-import-badge')).toBeVisible();
+  await expect(page.locator('[data-role="paste"]')).toHaveValue(/Toadvine/);
+
+  // Another room, then back: gone, as before.
+  await page.click('.atlas-room-nav-btn[data-room="home"]');
+  await openImport(page);
+  await expect(page.locator('.atlas-import-badge')).toHaveCount(0);
+});

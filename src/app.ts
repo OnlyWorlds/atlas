@@ -37,6 +37,8 @@ import { initAutoPullScheduler } from './sync/auto-pull-scheduler';
 import { installHotkeys, setHotkeyCallbacks } from './core/hotkeys';
 import { openCreateDoor } from './ui/create-element-door';
 import type { WorldMap } from './core/types';
+import { installLiveFolder } from './core/live-folder';
+import { installWorldPrefsSync } from './core/world-prefs';
 
 export interface AppHandle {
   shell: AppShell;
@@ -127,9 +129,15 @@ export function startApp(container: HTMLElement): AppHandle {
   // index 0 of the right pane. No auto-open; route-driven content.
   const unsubContextTab = installContextTabLifecycle();
 
+  // The live folder (S364): what another tool wrote shows when you come back.
+  const uninstallLiveFolder = installLiveFolder();
+  // The world's notes, cast, calendar lens and writing labels travel in its folder (S364).
+  const uninstallWorldPrefs = installWorldPrefsSync();
+
   // Middle pane — routed by hash mode + active world.
   let unmountMiddle: (() => void) | null = null;
   let currentMode: MiddleMode | null = null;
+  let mountedWorldId: string | null = null;
   let demoWasMounted = false;
 
   function renderMiddle(): void {
@@ -200,9 +208,17 @@ export function startApp(container: HTMLElement): AppHandle {
     const navActive = active == null || nextMode !== 'welcome';
     shell.middleRoomNav.setAttribute('data-active', navActive ? 'true' : 'false');
 
-    if (nextMode !== currentMode) {
+    // A room instance belongs to ONE world. The room-stable world switch
+    // (S256) keeps the room KIND, but rooms read world files once at mount
+    // (charts.json, pages) and write whole lists back, so an instance carried
+    // across a switch wrote world A's charts over world B's (S364). Remount on
+    // a world change too; activateWorld flushes pending saves before it gets
+    // here (flushBeforeLeavingWorld).
+    const nextWorldId = active?.worldId ?? null;
+    if (nextMode !== currentMode || nextWorldId !== mountedWorldId) {
       unmountMiddle?.();
       currentMode = nextMode;
+      mountedWorldId = nextWorldId;
       unmountMiddle = mountRoom(nextMode, shell.middleContent, toasts);
       patchSliceIfChanged('middleMode', nextMode);
     }
@@ -267,6 +283,8 @@ export function startApp(container: HTMLElement): AppHandle {
       unsubRoomNav();
       unsubRight();
       unsubContextTab();
+      uninstallLiveFolder();
+      uninstallWorldPrefs();
       unsubHash();
       unsubState();
       unmountMiddle?.();

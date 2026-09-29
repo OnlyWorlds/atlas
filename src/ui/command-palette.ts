@@ -31,7 +31,7 @@ const MAX_ELEMENT_RESULTS = 12;
 const MAX_ROOM_RESULTS = 3;
 
 export interface PaletteResult {
-  kind: 'element' | 'room';
+  kind: 'element' | 'room' | 'action';
   /** Element id, or the room's route segment ('' = home). */
   id: string;
   name: string;
@@ -51,6 +51,14 @@ export interface PaletteResult {
  * actually types. Before S308 this list keyed on the segment word, so the room
  * was branded "Data" everywhere else and searching "data" here found nothing.
  */
+/**
+ * Commands reachable by name (S364: the palette's first). `id` is what
+ * `activate` switches on.
+ */
+const ACTIONS: Array<{ label: string; id: string; icon: string; aliases?: string[] }> = [
+  { label: 'reload from disk', id: 'reload-disk', icon: 'folder_open', aliases: ['refresh from disk', 'rescan', 'files'] },
+];
+
 const ROOMS: Array<{ label: string; segment: string; icon: string; aliases?: string[] }> = [
   { label: 'home', segment: '', icon: 'home' },
   { label: 'writing', segment: 'writing', icon: 'edit_note' },
@@ -83,6 +91,15 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
     }
   }
 
+  for (const action of ACTIONS) {
+    const names = [action.label, ...(action.aliases ?? [])];
+    if (names.some(n => n.startsWith(q))) {
+      out.push({ kind: 'action', id: action.id, name: action.label, hint: 'command', score: 85 });
+    } else if (q.length >= 3 && names.some(n => n.includes(q))) {
+      out.push({ kind: 'action', id: action.id, name: action.label, hint: 'command', score: 50 });
+    }
+  }
+
   for (const el of elements) {
     // Pins/markers are map artifacts, not browse targets — the elements
     // sidebar excludes them, so the palette does too (see-all consistency).
@@ -106,8 +123,9 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
   out.sort((a, b) => (b.score - a.score) || (a.name ?? '').localeCompare(b.name ?? ''));
 
   const rooms = out.filter(r => r.kind === 'room').slice(0, MAX_ROOM_RESULTS);
+  const actions = out.filter(r => r.kind === 'action');
   const els = out.filter(r => r.kind === 'element').slice(0, MAX_ELEMENT_RESULTS);
-  return [...rooms, ...els].sort((a, b) => (b.score - a.score) || (a.name ?? '').localeCompare(b.name ?? ''));
+  return [...rooms, ...actions, ...els].sort((a, b) => (b.score - a.score) || (a.name ?? '').localeCompare(b.name ?? ''));
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +222,9 @@ class CommandPalette extends BaseModal {
       icon.className = 'material-symbols-outlined atlas-cmdk-icon';
       icon.textContent = r.kind === 'room'
         ? (ROOMS.find(rm => rm.segment === r.id)?.icon ?? 'door_open')
-        : (r.type ? ELEMENT_ICONS[r.type] : 'category');
+        : r.kind === 'action'
+          ? (ACTIONS.find(a => a.id === r.id)?.icon ?? 'bolt')
+          : (r.type ? ELEMENT_ICONS[r.type] : 'category');
       row.appendChild(icon);
 
       const main = document.createElement('span');
@@ -275,6 +295,10 @@ class CommandPalette extends BaseModal {
       navigate(r.id === '' ? homeHash(this.worldId) : `#/w/${this.worldId}/${r.id}`);
       return;
     }
+    if (r.kind === 'action') {
+      if (r.id === 'reload-disk') void reloadFromDisk();
+      return;
+    }
     // Route to the room the element actually LIVES in (S306). This used to be
     // a bare `navigate(elementHash(...))` for every non-room result, so Cmd+K
     // on a map, a page, a knowledge entry or a chapter landed in the generic
@@ -306,4 +330,25 @@ class CommandPalette extends BaseModal {
 export function openCommandPalette(): void {
   if (openInstance) return;
   new CommandPalette().open();
+}
+
+/**
+ * "Reload from disk" (S364): a FULL live-folder pass, every file confirmed by
+ * content. Says what it found, including nothing.
+ */
+async function reloadFromDisk(): Promise<void> {
+  const { rescanNow } = await import('../core/live-folder');
+  const { toastManager } = await import('./toast-manager');
+  const { changes, skipped } = await rescanNow({ force: true, full: true });
+  if (skipped) {
+    // Never "nothing changed" when it did not look (S364 gate lens B B10).
+    const why = skipped === 'rekey' ? 'ids are being updated' : skipped === 'busy' ? 'the world is busy (loading, the tour, or a map edit)' : 'no world is open';
+    toastManager.info(`Atlas could not check the folder just now: ${why}.`);
+    return;
+  }
+  const shown = changes.filter(c => c.kind !== 'unreadable').length;
+  const broken = changes.length - shown;
+  if (shown === 0 && broken === 0) toastManager.info('Nothing changed on disk.');
+  else if (broken === 0) toastManager.info(`${shown} ${shown === 1 ? 'element' : 'elements'} changed on disk.`);
+  else toastManager.info(`${shown} changed on disk, ${broken} could not be read.`);
 }

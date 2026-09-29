@@ -10410,6 +10410,61 @@ td.atlas-writing-setup-promote-count {
 .atlas-lens-banner-off:hover,
 .atlas-cast-assign-off:hover { color: var(--atlas-cyan); }
 
+/* The live folder (S364): what another tool changed on disk. Same shape as
+   the lens banner; its own class family (lens e2e locators are strict). */
+.atlas-disk-notice { display: none; margin: 0 8px 4px 8px; font-size: 11px; line-height: 1.3; }
+.atlas-disk-notice[data-active="true"] { display: block; }
+.atlas-disk-notice-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(var(--atlas-accent-rgb), 0.08);
+  color: var(--atlas-cyan);
+}
+.atlas-disk-notice-icon { font-size: 14px; flex: 0 0 auto; }
+.atlas-disk-notice-count { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atlas-disk-notice-sep { color: var(--atlas-text-muted); }
+.atlas-disk-notice-warn { color: var(--atlas-warn-soft); white-space: nowrap; cursor: help; }
+.atlas-disk-notice-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--atlas-cyan);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.atlas-disk-notice-off {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+  padding: 1px;
+  background: transparent;
+  border: none;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+}
+.atlas-disk-notice-off:hover { color: var(--atlas-cyan); }
+.atlas-disk-notice-off .material-symbols-outlined { font-size: 13px; }
+.atlas-disk-notice-held {
+  margin-top: 3px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: var(--atlas-warn-soft-tint);
+  color: var(--atlas-warn-soft);
+}
+.atlas-disk-notice-held .atlas-disk-notice-btn { color: var(--atlas-warn-soft); }
+.atlas-row-disk-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin: 0 4px;
+  border-radius: 50%;
+  background: var(--atlas-cyan);
+}
+
 .atlas-lens-banner-off .material-symbols-outlined,
 .atlas-cast-assign-off .material-symbols-outlined { font-size: 13px; }
 

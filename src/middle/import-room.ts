@@ -17,6 +17,7 @@ import { getActiveStore } from '../core/active-store';
 import { ELEMENT_ICONS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
 import { escapeText } from '../core/dom-utils';
 import { getState, subscribe } from '../core/state';
+import { parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { completeWaypoint } from '../core/waypoints';
 import { sectionsFor } from '../editor/field-schema';
@@ -127,6 +128,15 @@ export function buildConvertNotesPrompt(): string {
 function estimateTokens(s: string): number {
   return Math.round(s.length / 4);
 }
+
+/**
+ * A loaded payload carried across a WORLD switch (S364 gate lens C C5). Since
+ * S364 the room remounts per world (DESIGN conv. 109); "load a file, then
+ * click the world to merge it into" is the flow the S256 room-stable switch
+ * kept on purpose, so the payload rides across and the review re-renders for
+ * the new world. Leaving for another ROOM still drops it, as it always did.
+ */
+let carriedPayload: { text: string; sourceLabel: string; pasted: boolean } | null = null;
 
 export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () => void {
   target.innerHTML = '';
@@ -250,7 +260,9 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     clearBtn.hidden = false;
   }
 
+  let lastIngest: { text: string; sourceLabel: string; pasted: boolean } | null = null;
   function ingest(text: string, sourceLabel: string): void {
+    lastIngest = { text, sourceLabel, pasted: sourceLabel === 'The pasted text' };
     errorEl.hidden = true;
     let raw: unknown;
     try {
@@ -282,6 +294,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
   function clearLoaded(): void {
     parsed = null;
+    lastIngest = null;
     pasteEl.value = '';
     errorEl.hidden = true;
     reviewMount.innerHTML = '';
@@ -619,7 +632,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
     exportMount.innerHTML = `
       <p class="atlas-share-section-hint">Download <b>${escapeText(aw.meta?.name ?? 'this world')}</b> as an onlyworlds.com world export, the same file the site downloads. Untick types to export a subset.</p>
-      <p class="atlas-share-section-hint">The file holds the world's elements. Pages, aliases, saved charts, writing formatting and images kept in the folder stay in your world folder, which is the full copy of your world.</p>
+      <p class="atlas-share-section-hint">The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images kept in the folder stay in your world folder, which is the full copy of your world.</p>
       <div class="atlas-import-typelist">
         <label class="atlas-import-type-all">
           <input type="checkbox" data-role="all" checked />
@@ -760,7 +773,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       .catch(() => toasts.error('Could not copy to clipboard'));
   });
 
-  // ---- react to world switches (room persists across them) -------------------
+  // ---- react to element changes (a world switch remounts the room since S364, conv. 109; the payload is carried) ----
   let lastWorldId = activeWorld()?.worldId ?? null;
   let lastElementsRef: readonly Element[] | null = activeElements();
   const unsub = subscribe(() => {
@@ -778,7 +791,20 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
   renderExport();
 
-  return () => unsub();
+  if (carriedPayload) {
+    const c = carriedPayload;
+    carriedPayload = null;
+    if (c.pasted) { pasteEl.value = c.text; autoGrow(); }
+    ingest(c.text, c.sourceLabel);
+  }
+
+  return () => {
+    unsub();
+    // Still on the Data room's route = a world switch: carry the payload.
+    carriedPayload = parsed && lastIngest && !importing && parseHash(window.location.hash).mode === 'import'
+      ? lastIngest
+      : null;
+  };
 }
 
 function downloadJson(data: unknown, filename: string): void {
