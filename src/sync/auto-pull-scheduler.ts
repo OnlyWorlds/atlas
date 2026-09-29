@@ -180,8 +180,9 @@ export function initAutoPullScheduler(): void {
   if (typeof window !== 'undefined') {
     window.addEventListener('online', () => {
       const engine = getCurrentSyncEngine();
-      if (engine && getState().sync.activeSync?.kind === 'paused' &&
-          (getState().sync.activeSync as { reason?: string }).reason === 'network') {
+      // Ask the engine, not the pill: during a re-key the pill says "held"
+      // while the network pause sits underneath it (S363 gate lens B F1).
+      if (engine?.isNetworkPaused()) {
         // Came back online — resume engine. `resume()` now also fires
         // pushOnce internally so pending writes from the offline window
         // flush immediately (previously they sat on disk until the next
@@ -194,7 +195,7 @@ export function initAutoPullScheduler(): void {
     });
     window.addEventListener('offline', () => {
       const engine = getCurrentSyncEngine();
-      if (engine && getState().sync.activeSync?.kind !== 'paused') {
+      if (engine && !engine.isPaused()) {
         engine.pause('network');
       }
       reconcileScheduler();

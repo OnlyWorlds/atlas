@@ -437,6 +437,46 @@ export function toggleWritingTreeCollapsed(
 }
 
 /**
+ * The re-key (S363) moves ids; stored state follows. Remaps the element ids a
+ * world entry carries (favourites, calendar lens, writing-tree collapse, last
+ * writing narrative). Returns the SAME registry when nothing matched; the
+ * caller saves.
+ */
+export function rekeyRegistryEntry(
+  reg: WorldsRegistry,
+  worldId: string,
+  map: ReadonlyMap<string, string>,
+): WorldsRegistry {
+  const one = (v: string | null | undefined): string | null | undefined =>
+    typeof v === 'string' && map.has(v) ? map.get(v)! : v;
+  let changed = false;
+  const worlds = reg.worlds.map(w => {
+    if (w.id !== worldId) return w;
+    let next = w;
+    if (w.favorites) {
+      const p = one(w.favorites.protagonist_id);
+      const n = one(w.favorites.nexus_id);
+      if (p !== w.favorites.protagonist_id || n !== w.favorites.nexus_id) {
+        const favorites = { ...w.favorites };
+        if (p !== w.favorites.protagonist_id) favorites.protagonist_id = p as string | null;
+        if (n !== w.favorites.nexus_id) favorites.nexus_id = n as string | null;
+        next = { ...next, favorites };
+      }
+    }
+    const cal = one(w.active_calendar_id);
+    if (cal !== w.active_calendar_id) next = { ...next, active_calendar_id: cal };
+    if (Array.isArray(w.writing_tree_collapsed) && w.writing_tree_collapsed.some(id => map.has(id))) {
+      next = { ...next, writing_tree_collapsed: w.writing_tree_collapsed.map(id => map.get(id) ?? id) };
+    }
+    const last = one(w.last_writing_narrative_id);
+    if (last !== w.last_writing_narrative_id) next = { ...next, last_writing_narrative_id: last as string };
+    if (next !== w) changed = true;
+    return next;
+  });
+  return changed ? { ...reg, worlds } : reg;
+}
+
+/**
  * Set parent. Refuses cycles and self-parenting (returns reg unchanged).
  */
 export function setParent(

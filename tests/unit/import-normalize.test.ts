@@ -54,6 +54,13 @@ describe('normalizeRecord — keepUnknown (envelope §8c passthrough)', () => {
     expect(record.future_field).toBe('kept');
   });
 
+  it('strips created_by: a membership in the source world names nobody here', () => {
+    const { record } = normalizeRecord(
+      { name: 'A', created_by: 'b1c2d3e4-0000-4000-8000-000000000001' },
+      'character' as never, { keepUnknown: true });
+    expect(record.created_by).toBeUndefined();
+  });
+
   it('default path still drops and counts unknown fields (the pair)', () => {
     const { record, droppedUnknown } = normalizeRecord(
       { name: 'A', future_field: 'dropped' }, 'character' as never);

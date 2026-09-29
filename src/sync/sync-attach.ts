@@ -20,7 +20,7 @@ import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
 import { patchSlice, getState, setState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
-import { navigate, elementHash, knowledgeHash, knowledgeKnowerHash, shareHash, parseHash } from '../core/router';
+import { rekeyRouteHash } from './rekey-route';
 import type { FolderStore } from '../store/folder-store';
 import { rewriteChartScopeIds } from '../visualization/timeline/charts-store';
 import type { Element, WorldRegistryEntry, SyncEngineState, ElementType } from '../core/types';
@@ -82,6 +82,7 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
     folder,
     client: adapter,
     readOnly,
+    apiWorldId: entry.api.world_id,
     policy: reg.sync_default_policy ?? 'local-wins',
     onStateChange: (s) => publishSyncState(entry.id, s),
     onSyncResult: (phase, result) => emitConflictToasts(phase, result),
@@ -695,36 +696,12 @@ function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType 
     });
   }
 
-  // Update URL if it currently names the old id. Use replace-style navigate
-  // by leaving history untouched — back-button shouldn't take the user to a
-  // 404'd /element/<old-id>.
+  // The URL follows the id (S363: one rewriter for every room, `rekey-route.ts`).
+  // `replace`, not navigate: Back must not lead to an id that no longer exists.
   const worldId = current.active?.worldId;
   if (!worldId) return;
-  const route = parseHash(window.location.hash);
-  if (route.elementId === swap.old_id && route.worldId === worldId) {
-    if (route.mode === 'map' && route.mapId) {
-      // Preserve map context.
-      navigate(`#/w/${worldId}/map/${route.mapId}/element/${swap.new_id}`);
-    } else {
-      navigate(elementHash(worldId, swap.new_id));
-    }
-  }
-  // Knowledge room editor: `/knowledge/<old-id>` → `/knowledge/<new-id>`. Without
-  // this, an open knowledge entry on an api-linked world bounces back to the
-  // list when the push reassigns its id (DESIGN_KNOWLEDGE.md).
-  if (route.mode === 'knowledge' && route.knowledgeId === swap.old_id && route.worldId === worldId) {
-    navigate(knowledgeHash(worldId, swap.new_id));
-  }
-  // Known-view: `/knowledge/knower/<old-id>` → new id (knowers are characters /
-  // collectives — they id-swap like any element on first push).
-  if (route.mode === 'knowledge' && route.knowerId === swap.old_id && route.worldId === worldId) {
-    navigate(knowledgeKnowerHash(worldId, swap.new_id));
-  }
-  // Share room detail: `/share/<old-id>` → new id (pages are narratives —
-  // same class as the knowledge-entry migration above).
-  if (route.mode === 'share' && route.pageId === swap.old_id && route.worldId === worldId) {
-    navigate(shareHash(worldId, swap.new_id));
-  }
+  const next = rekeyRouteHash(window.location.hash, worldId, new Map([[swap.old_id, swap.new_id]]));
+  if (next) window.location.replace(next);
 }
 
 /**

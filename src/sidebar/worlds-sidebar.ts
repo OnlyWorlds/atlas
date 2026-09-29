@@ -811,6 +811,36 @@ async function doActivateWorld(
   const meta = await store.readWorldMeta();
   // View-only worlds (S264): arm the store guard before the UI can reach it.
   store.setViewOnly(!!entry.api?.read_only);
+  // An id update that did not finish (a crash, a closed tab) completes HERE,
+  // on both the open and the revive path, before anything reads the world
+  // (S363, re-key gate lens 1 F3/F6): otherwise the list would show old and
+  // new elements as twins. Until it completes the sync engine refuses every
+  // round (the journal gate), so a failure here costs sync, never data.
+  if (await store.hasRekeyJournal().catch(() => false)) {
+    try {
+      const { recoverRekey } = await import('../store/rekey');
+      const { rekeyPersistedState, isRekeyRunning } = await import('../sync/rekey-run');
+      const { rekeyRouteHash } = await import('../sync/rekey-route');
+      // A run still going (the user navigated back to this world under its
+      // modal) owns the folder; a second writer beside it is the one thing
+      // the journal cannot survive (S363 gate lens C F1).
+      const done = isRekeyRunning() ? null : await recoverRekey(store, { rekeyPersistedState });
+      if (done) {
+        const next = rekeyRouteHash(window.location.hash, worldId, done.map);
+        if (next) window.location.replace(next);
+        if (!silent && done.map.size > 0) toasts.info(`Finished giving ${done.map.size} ${done.map.size === 1 ? 'element a new id' : 'elements new ids'}.`);
+        // Files that would not open keep old ids; Settings offers "Update
+        // links" once they are repaired (gate lens A F5).
+        if (done.unrewritten.length > 0) {
+          const n = done.unrewritten.length;
+          toasts.error(`${n === 1 ? '1 element' : `${n} elements`} could not be updated because ${n === 1 ? 'its file' : 'their files'} would not open. Fix ${n === 1 ? 'it' : 'them'}, then use Update links in Settings.`, 10_000);
+        }
+      }
+    } catch (err) {
+      console.warn('[worlds-sidebar] re-key recovery failed:', err);
+      toasts.error(`An id update in ${entry.name} could not finish, so it is not syncing. Settings, under This world, can finish or discard it.`);
+    }
+  }
   setActiveStore(store);
 
   const nextRegistry = setActiveWorld(getState().registry, worldId);

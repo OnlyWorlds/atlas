@@ -182,6 +182,12 @@ function readPersistedSnapshot(worldId: string): PersistedSnapshot | null {
   return { worldId, ...entry };
 }
 
+/** A zone edit this world left open (replayed at activation). The re-key
+ *  (S363) refuses while one exists: the snapshot names zone and marker ids. */
+export function hasPendingZoneEdit(worldId: string): boolean {
+  return readPersistedSnapshot(worldId) !== null;
+}
+
 function clearPersistedSnapshot(worldId: string): void {
   const all = readSnapshotsByWorld();
   if (!(worldId in all)) return;

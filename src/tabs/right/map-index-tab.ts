@@ -69,7 +69,26 @@ function isNodeCollapsed(worldId: string, mapId: string): boolean {
   return all.get(worldId)?.has(mapId) ?? false;
 }
 
-function toggleNodeCollapsed(worldId: string, mapId: string): void {
+/**
+ * The re-key (S363) moves ids; stored state follows. Remaps a world's
+ * collapsed map ids in the in-memory shadow AND storage, so a later toggle
+ * cannot write the old ids back. Loading first makes memory the truth.
+ */
+export function remapCollapsedMapIds(worldId: string, map: ReadonlyMap<string, string>): void {
+  const set = loadCollapsed().get(worldId);
+  if (!set) return;
+  let changed = false;
+  for (const [oldId, newId] of map) {
+    if (!set.has(oldId)) continue;
+    set.delete(oldId);
+    set.add(newId);
+    changed = true;
+  }
+  if (changed) saveCollapsed();
+}
+
+// Exported for the re-key test (toggle after remap must keep the new ids).
+export function toggleNodeCollapsed(worldId: string, mapId: string): void {
   const all = loadCollapsed();
   let set = all.get(worldId);
   if (!set) {

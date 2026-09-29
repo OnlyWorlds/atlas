@@ -143,6 +143,23 @@ export function resetMapOverride(mapId: string): void {
 }
 
 /**
+ * The re-key (S363) moves ids; stored state follows. Moves each old map id's
+ * override to its new id. The record is not world-scoped (map ids are uuids),
+ * so `worldId` is kept for a uniform call shape and ignored.
+ */
+export function remapMapViewPrefs(_worldId: string, map: ReadonlyMap<string, string>): void {
+  const all = getAllMapOverrides();
+  let changed = false;
+  for (const [oldId, newId] of map) {
+    if (!(oldId in all) || oldId === newId) continue;
+    all[newId] = all[oldId];
+    delete all[oldId];
+    changed = true;
+  }
+  if (changed) writeJson(MAP_VIEW_PREFS_BY_MAP_KEY, all);
+}
+
+/**
  * Compute effective prefs for a map by merging factory defaults + atlas
  * global defaults + per-map override (in that order; later wins).
  */

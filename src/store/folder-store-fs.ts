@@ -31,6 +31,7 @@ import {
   ATLAS_LOCAL_ONLY_FIELDS,
   ATLAS_WIRE_EXTENSION_FIELDS,
   CHARTS_FILE,
+  REKEY_JOURNAL_FILE,
   STYLES_FILE,
   ELEMENTS_DIR,
   LOCK_FILE,
@@ -60,7 +61,8 @@ import type {
   WorldMeta,
   Zone,
 } from '../core/types';
-import type { FolderStore, ListElementsOptions } from './folder-store';
+import type { FolderStore, ListElementsOptions, RekeyJournal } from './folder-store';
+import { journalIds, RekeyPendingError } from './folder-store';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { newId, nowIso } from './folder-store';
 import { normalizeDiskLinks, denormalizeDiskLinks, type LinkSpelling } from './disk-link-names';
@@ -222,6 +224,10 @@ export class FsFolderStore implements FolderStore {
    * fresh-objects-per-read semantics. Cleared in close().
    */
   private bodyCache: Map<string, Element> = new Map();
+  /** Ids found in BOTH element layouts at index time: one copy served, the other untouched (S363: the re-key refuses them). */
+  private shadowedIds = new Set<string>();
+  /** Ids named by an unfinished re-key journal, as last read or written: a UI delete of one is refused (lens A F6). */
+  private rekeyPendingIds = new Set<string>();
   /** In-flight index builds, type → shared promise (concurrent-caller guard). */
   private indexBuilds: Map<ElementType, Promise<void>> = new Map();
   /** In-flight background tidy passes (awaitTidies drains them). */
@@ -321,6 +327,8 @@ export class FsFolderStore implements FolderStore {
     this.root = null;
     this.fileIndex.clear();
     this.bareSpellingTypes.clear();
+    this.shadowedIds.clear();
+    this.rekeyPendingIds.clear();
     this.indexedTypes.clear();
     this.bodyCache.clear();
     this.indexBuilds.clear();
@@ -557,6 +565,7 @@ export class FsFolderStore implements FolderStore {
       for (const [id, rec] of scan.survivors) {
         const existing = this.fileIndex.get(id);
         if (existing && existing.type === type) {
+          this.shadowedIds.add(id);
           const kept = this.bodyCache.get(id);
           const keptStamp = kept?.local_updated_at ?? '';
           const challengerStamp = rec.body.local_updated_at ?? '';
@@ -1094,6 +1103,44 @@ export class FsFolderStore implements FolderStore {
     return elem;
   }
 
+  async createElementVerbatim(
+    type: ElementType,
+    body: Element,
+    opts?: { bindingFrom?: string },
+  ): Promise<{ created: boolean; element: Element }> {
+    this.assertWritable();
+    const id = body.id;
+    await this.ensureIndexFor(type);
+    return this.writeChain.run(id, async () => {
+      // Recovery reruns this step: a present file is a complete one (atomic
+      // writes), so it is never rewritten and never loses a baseline it got.
+      const existing = await this.getElement(id);
+      if (existing) return { created: false, element: existing };
+      const now = this.clock();
+      const { server_updated_at: _drop, ...rest } = body;
+      const elem: Element = {
+        ...rest,
+        created_at: body.created_at ?? now,
+        id,
+        type,
+        name: body.name ?? '',
+        local_updated_at: now,
+      };
+      // The old element's binding: same directory layout, same link spelling,
+      // so a re-key in someone else's folder changes names, not dialect.
+      const from = opts?.bindingFrom ? this.fileIndex.get(opts.bindingFrom) : undefined;
+      const inherit = !!from && from.type === type;
+      const layout = inherit ? from!.layout : this.writeLayoutFor(type);
+      const spelling = inherit ? from!.spelling : this.writeSpellingFor(type);
+      const dir = await getDir(this.requireRoot(), elementDirSegmentsIn(layout, type));
+      const filename = this.resolveFilename(type, layout, id, elem.name);
+      await writeJsonAtomic(dir, filename, denormalizeDiskLinks(elem, spelling));
+      this.fileIndex.set(id, { type, layout, filename, spelling });
+      this.cacheSet(elem);
+      return { created: true, element: structuredClone(elem) };
+    });
+  }
+
   async updateElement(id: string, patch: Partial<Element>): Promise<Element> {
     this.assertWritable();
     // Per-id serialization (convention #79): two concurrent updates to the
@@ -1237,6 +1284,7 @@ export class FsFolderStore implements FolderStore {
     // Silent deletes are the ENGINE's channel (server-side deletes applying
     // locally) — they bypass the view-only guard; UI deletes never pass silent.
     if (!opts.silent) this.assertWritable();
+    if (!opts.silent && this.rekeyPendingIds.has(id)) throw new RekeyPendingError();
     // Same chain as updateElement: an in-flight update to this id lands (or
     // fails) before the file disappears — no "element not found" tail errors.
     const result = await this.writeChain.run(id, () => this.deleteElementUnchained(id, opts));
@@ -1304,9 +1352,14 @@ export class FsFolderStore implements FolderStore {
   }
 
   private async unlinkElement(elem: Element): Promise<void> {
-    const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(this.layoutOf(elem.id, elem.type), elem.type));
-    if (!dir) return;
     const entry = this.indexEntry(elem.id);
+    // The DIRECTORY the file was found in, never the type its body declares:
+    // a body saying "location" inside elements/character/ used to be "deleted"
+    // from elements/location/ (not found = success) and came back on the next
+    // open (S363 gate lens A F2).
+    const dirType = entry?.type ?? elem.type;
+    const dir = await tryGetDir(this.requireRoot(), elementDirSegmentsIn(this.layoutOf(elem.id, dirType), dirType));
+    if (!dir) return;
     const filename = entry?.filename ?? elementFilename(elem.id, elem.name);
     await removeFile(dir, filename);
     this.fileIndex.delete(elem.id);
@@ -1449,6 +1502,97 @@ export class FsFolderStore implements FolderStore {
         await removeFile(folderHandle, `${mediaId}.meta.json`);
         return;
       }
+    }
+  }
+
+  async copyMediaDir(fromElementId: string, toElementId: string): Promise<number> {
+    this.assertWritable();
+    const fromDir = await tryGetDir(this.requireRoot(), [MEDIA_DIR, fromElementId]);
+    if (!fromDir) return 0;
+    // EVERYTHING under media/<from>/, at any depth (S363 gate lens A F1): the
+    // old directory is removed whole afterwards, so a file this copy skips is
+    // a file deleted. Atlas writes media/<id>/<folder>/<file>, but a copied
+    // or imported folder may hold loose files or deeper folders.
+    const copyTree = async (src: FileSystemDirectoryHandle, destPath: string[]): Promise<number> => {
+      const dest = await getDir(this.requireRoot(), destPath);
+      const files: string[] = [];
+      const dirs: FileSystemDirectoryHandle[] = [];
+      // @ts-expect-error — values() is FS Access API, not in lib.dom
+      for await (const entry of src.values()) {
+        if (entry.kind === 'directory') dirs.push(entry as FileSystemDirectoryHandle);
+        else if (!entry.name.endsWith('.tmp')) files.push(entry.name);
+      }
+      let n = 0;
+      // Blobs before sidecars (lens 1 F5): `getMediaBlob` gives up on the
+      // first sidecar whose blob is missing, so a sidecar never lands first.
+      const sidecar = (name: string) => name.endsWith('.meta.json');
+      for (const name of [...files.filter(f => !sidecar(f)), ...files.filter(sidecar)]) {
+        const file = await (await src.getFileHandle(name)).getFile();
+        if (sidecar(name)) {
+          let item: MediaItem | null = null;
+          try { item = JSON.parse(await file.text()) as MediaItem; } catch { item = null; }
+          if (item && typeof item === 'object') {
+            await writeJsonAtomic(dest, name, { ...item, element_id: toElementId });
+            n++;
+            continue;
+          }
+          // A sidecar that will not parse is copied byte for byte, never dropped.
+        }
+        const writer = await (await dest.getFileHandle(name, { create: true })).createWritable();
+        await writer.write(file);
+        await writer.close();
+        n++;
+      }
+      for (const d of dirs) n += await copyTree(d, [...destPath, d.name]);
+      return n;
+    };
+    return copyTree(fromDir, [MEDIA_DIR, toElementId]);
+  }
+
+  hasShadowCopy(id: string): boolean {
+    return this.shadowedIds.has(id);
+  }
+
+  async removeMediaDir(elementId: string): Promise<void> {
+    this.assertWritable();
+    const mediaRoot = await tryGetDir(this.requireRoot(), [MEDIA_DIR]);
+    if (!mediaRoot) return;
+    try {
+      await mediaRoot.removeEntry(elementId, { recursive: true });
+    } catch (err) {
+      if (!isNotFound(err)) throw err;
+    }
+  }
+
+  async readRekeyJournal(): Promise<RekeyJournal | null> {
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    const journal = await readJsonStrict<RekeyJournal>(atlasDir, REKEY_JOURNAL_FILE);
+    this.rekeyPendingIds = journalIds(journal);
+    return journal;
+  }
+
+  async writeRekeyJournal(journal: RekeyJournal): Promise<void> {
+    this.assertWritable();
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    await writeJsonAtomic(atlasDir, REKEY_JOURNAL_FILE, journal);
+    this.rekeyPendingIds = journalIds(journal);
+  }
+
+  async clearRekeyJournal(): Promise<void> {
+    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    await removeFile(atlasDir, REKEY_JOURNAL_FILE);
+    this.rekeyPendingIds = new Set();
+  }
+
+  async hasRekeyJournal(): Promise<boolean> {
+    const atlasDir = await tryGetDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+    if (!atlasDir) return false;
+    try {
+      await atlasDir.getFileHandle(REKEY_JOURNAL_FILE);
+      return true;
+    } catch (err) {
+      if (isNotFound(err)) return false;
+      throw err;
     }
   }
 

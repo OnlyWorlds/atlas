@@ -6,7 +6,8 @@
  * `server_updated_at` mirror what the real one will do.
  */
 
-import type { FolderStore, ListElementsOptions } from '../../src/store/folder-store';
+import type { FolderStore, ListElementsOptions, RekeyJournal } from '../../src/store/folder-store';
+import { journalIds, RekeyPendingError } from '../../src/store/folder-store';
 import { newId, nowIso } from '../../src/store/folder-store';
 import { PerIdWriteChain } from '../../src/store/write-chain';
 import { ATLAS_LOCAL_ONLY_FIELDS, ATLAS_WIRE_EXTENSION_FIELDS, FOLDER_FORMAT_VERSION } from '../../src/core/constants';
@@ -45,8 +46,24 @@ export class MockFolderStore implements FolderStore {
   private syncState: SyncState = { ...defaultSyncState };
   private charts: ChartConfig[] = [];
   private styles: WorldStyles = { ...EMPTY_STYLES, rules: [] };
+  /**
+   * Media keyed by (element dir, media id), like the real folder
+   * (`media/<elementId>/...`): a re-key copies an element's media, so the same
+   * media id lives under two directories at once and must not overwrite
+   * (re-key gate, lens 1 F5). Lookups by media id scan NEWEST directory first,
+   * the adversarial order for anything that picks "the first match".
+   */
   private mediaItems = new Map<string, MediaItem>();
   private mediaBlobs = new Map<string, Blob>();
+  private static mediaKey(elementId: string, mediaId: string): string { return `${elementId}\u0000${mediaId}`; }
+  private mediaKeysById(mediaId: string): string[] {
+    return Array.from(this.mediaItems.keys()).reverse().filter(k => k.endsWith(`\u0000${mediaId}`));
+  }
+  /** Test hook: ids whose file "will not parse" on a chained read-modify-write. */
+  corruptIds = new Set<string>();
+  private rekeyJournal: RekeyJournal | null = null;
+  /** Test hook: the journal file exists but will not parse. */
+  rekeyJournalCorrupt = false;
   /** Per-id serialization for update/delete — mirrors FsFolderStore (convention #79). */
   private writeChain = new PerIdWriteChain();
 
@@ -145,6 +162,7 @@ export class MockFolderStore implements FolderStore {
     return this.writeChain.run(id, async () => {
       const existing = this.elements.get(id);
       if (!existing) return null;
+      if (this.corruptIds.has(id)) throw new CorruptFileError(`${id}.json`, new SyntaxError('Unexpected token <'));
       await Promise.resolve(); // mirror the real store's in-chain read gap
       // Deep-clone like the real store's getElement (structuredClone) — the
       // mutate callback must not be able to reach the mock's stored nested
@@ -238,6 +256,8 @@ export class MockFolderStore implements FolderStore {
 
   async deleteElement(id: string, opts: { cascade?: boolean; silent?: boolean } = {}): Promise<{ tombstones: Tombstone[] }> {
     if (!opts.silent) this.assertWritable();
+    // Mirrors FsFolderStore (S363 gate lens A F6).
+    if (!opts.silent && journalIds(this.rekeyJournal).has(id)) throw new RekeyPendingError();
     const result = await this.deleteElementInChain(id, opts);
     // Mirrors FsFolderStore: a UI delete removes the dead ids from every
     // referrer's links, as keel does (S362, `store/scrub-links.ts`).
@@ -343,23 +363,107 @@ export class MockFolderStore implements FolderStore {
       size_bytes: file.size,
       added_at: this.clock(),
     };
-    this.mediaItems.set(id, item);
-    this.mediaBlobs.set(id, file);
+    const key = MockFolderStore.mediaKey(elementId, id);
+    this.mediaItems.set(key, item);
+    this.mediaBlobs.set(key, file);
     return { ...item };
   }
 
   async listMedia(elementId: string): Promise<MediaItem[]> {
-    return Array.from(this.mediaItems.values()).filter(m => m.element_id === elementId);
+    const prefix = `${elementId}\u0000`;
+    return Array.from(this.mediaItems.entries())
+      .filter(([k]) => k.startsWith(prefix))
+      .map(([, m]) => ({ ...m }));
   }
 
   async getMediaBlob(mediaId: string): Promise<Blob | null> {
-    return this.mediaBlobs.get(mediaId) ?? null;
+    // Mirrors FsFolderStore: the first sidecar found wins, and a sidecar
+    // whose blob is missing answers null rather than scanning on.
+    const key = this.mediaKeysById(mediaId)[0];
+    return key ? this.mediaBlobs.get(key) ?? null : null;
   }
 
   async deleteMedia(mediaId: string): Promise<void> {
     this.assertWritable();
-    this.mediaItems.delete(mediaId);
-    this.mediaBlobs.delete(mediaId);
+    // Mirrors FsFolderStore: removes the FIRST match only.
+    const key = this.mediaKeysById(mediaId)[0];
+    if (!key) return;
+    this.mediaItems.delete(key);
+    this.mediaBlobs.delete(key);
+  }
+
+  async copyMediaDir(fromElementId: string, toElementId: string): Promise<number> {
+    this.assertWritable();
+    const prefix = `${fromElementId}\u0000`;
+    let copied = 0;
+    for (const [k, item] of Array.from(this.mediaItems.entries())) {
+      if (!k.startsWith(prefix)) continue;
+      const key = MockFolderStore.mediaKey(toElementId, item.id);
+      const blob = this.mediaBlobs.get(k);
+      if (blob) { this.mediaBlobs.set(key, blob); copied++; } // blob first
+      this.mediaItems.set(key, { ...item, element_id: toElementId });
+      copied++;
+    }
+    return copied;
+  }
+
+  async removeMediaDir(elementId: string): Promise<void> {
+    this.assertWritable();
+    const prefix = `${elementId}\u0000`;
+    for (const k of Array.from(this.mediaItems.keys())) {
+      if (k.startsWith(prefix)) { this.mediaItems.delete(k); this.mediaBlobs.delete(k); }
+    }
+    for (const k of Array.from(this.mediaBlobs.keys())) {
+      if (k.startsWith(prefix)) this.mediaBlobs.delete(k);
+    }
+  }
+
+  async createElementVerbatim(
+    type: ElementType,
+    body: Element,
+    _opts?: { bindingFrom?: string },
+  ): Promise<{ created: boolean; element: Element }> {
+    this.assertWritable();
+    return this.writeChain.run(body.id, async () => {
+      const existing = this.elements.get(body.id);
+      if (existing) return { created: false, element: structuredClone(existing) };
+      await Promise.resolve();
+      const now = this.clock();
+      const { server_updated_at: _drop, ...rest } = structuredClone(body);
+      const elem: Element = { ...rest, created_at: body.created_at ?? now, id: body.id, type, name: body.name ?? '', local_updated_at: now };
+      this.elements.set(body.id, elem);
+      return { created: true, element: structuredClone(elem) };
+    });
+  }
+
+  async readRekeyJournal(): Promise<RekeyJournal | null> {
+    if (this.rekeyJournalCorrupt) throw new CorruptFileError('rekey-journal.json', new SyntaxError('Unexpected token <'));
+    return this.rekeyJournal ? structuredClone(this.rekeyJournal) : null;
+  }
+
+  async writeRekeyJournal(journal: RekeyJournal): Promise<void> {
+    this.assertWritable();
+    this.rekeyJournal = structuredClone(journal);
+    this.rekeyJournalCorrupt = false;
+  }
+
+  async clearRekeyJournal(): Promise<void> {
+    this.rekeyJournal = null;
+    this.rekeyJournalCorrupt = false;
+    this.rekeyJournalEmpty = false;
+  }
+
+  async hasRekeyJournal(): Promise<boolean> {
+    return this.rekeyJournal !== null || this.rekeyJournalCorrupt || this.rekeyJournalEmpty;
+  }
+
+  /** Test hook: the journal file exists and is empty (a tab closed inside its first write). */
+  rekeyJournalEmpty = false;
+
+  /** Test hook: ids "found in both element layouts" (the mock has no directories). */
+  shadowIds = new Set<string>();
+  hasShadowCopy(id: string): boolean {
+    return this.shadowIds.has(id);
   }
 
   // ---- Sync-relevant reads ----

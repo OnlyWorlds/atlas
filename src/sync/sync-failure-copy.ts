@@ -17,7 +17,9 @@ export type FailureKind = 'foreign_id' | 'too_large' | 'other';
 
 export function classifyFailure(f: PerElementFailure): FailureKind {
   const m = f.message ?? '';
-  if (/already exists in another world|could not be read back|a copied world folder needs fresh ids/i.test(m)) return 'foreign_id';
+  // Evidence only (S363): a 409 whose read-back FAILED says nothing about
+  // which world holds the id, so its message no longer matches here.
+  if (/already exists in another world|a copied world folder needs fresh ids/i.test(m)) return 'foreign_id';
   if (/Extension fields may hold at most/i.test(m)) return 'too_large';
   return 'other';
 }
@@ -37,7 +39,7 @@ export function describeFailures(failures: readonly PerElementFailure[]): string
   const parts: string[] = [];
   const foreign = byKind.get('foreign_id');
   if (foreign) {
-    parts.push(`${plural(foreign.length, 'element', 'elements')} could not upload because ${foreign.length === 1 ? 'its id already belongs' : 'their ids already belong'} to another OnlyWorlds world. This happens with a copied or imported folder, or a world taken online a second time. They stay safe on your disk.`);
+    parts.push(`${plural(foreign.length, 'element', 'elements')} could not upload because ${foreign.length === 1 ? 'its id already belongs' : 'their ids already belong'} to another OnlyWorlds world. This happens with a copied or imported folder, or a world taken online a second time. ${foreign.length === 1 ? 'It stays safe on your disk, and Settings can give it a new id.' : 'They stay safe on your disk, and Settings can give them new ids.'}`);
   }
   const large = byKind.get('too_large');
   if (large) {

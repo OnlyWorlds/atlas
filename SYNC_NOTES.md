@@ -726,3 +726,14 @@ full step and pushes.
 ---
 
 *Authored mid-session 201 (2026-05-13) after Phase 3.5 mega smoke. If you're reading this in a future chat, this is what the sync engine wanted you to know.*
+
+## Foreign ids, the hold, and the re-key (S363, gated twice)
+
+keel preserves client ids and refuses a create whose id lives in another world. Before S363 atlas could only say so (the S360 toast); now it records the refusal and can give the element a new id. DESIGN conventions 105-108 hold the rules; the lessons that cost the most:
+
+- **"Foreign" needs evidence.** A single POST 409s for a same-world id too (a create that landed while its response was lost), so a 409 is foreign only when the read-back ANSWERED "not here". The old classifier also counted a failed read-back (503, 401), and a re-key of such an element would have duplicated it on the server. /bulk upserts same-world ids, so a bulk `id_conflict` is foreign as keel says.
+- **A foreign entry expires when the id is sent and not refused again**: the other world may have freed the id, and the create can land with its backfill failing (no baseline yet). Keeping it would have offered a re-key of an element already on this server.
+- **`pause()` is not a hold.** A round in flight checks `stopped`, never `paused`, and `resume()` is one shared flag. `hold()` waits for the round and is its own counter. The way OUT of a hold needed as much care as the way in: republish an auth error (not "Paused"), let the network pause be lifted while held (ask the engine, not the pill), and never publish idle under a hold.
+- **The journal gate is a round's first disk touch**, so its throw must settle like any round error or the pill sits on "Saving" for good.
+- **The mock cannot see directories.** The crash matrix passed on MockFolderStore while the real store deleted loose media, left a body-type/directory mismatch on disk, and ignored a cross-layout shadow copy. The composition gate ran the REAL FsFolderStore on an in-memory FS (`tests/fixtures/fake-fs.ts`) to find them; keep a real-store variant of any kernel test.
+- **Discard is an undo, not a forget.** Forgetting a journal left new elements naming new elements never written, and twins with nothing to say which to keep.

@@ -42,6 +42,10 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         <input type="checkbox" name="world-paused" ${paused ? 'checked' : ''} />
         <span>Stay offline (per-world)</span>
       </label>
+      <div class="atlas-settings-dangling" data-role="foreign-ids" ${lastForeignCount[world.id] ? '' : 'hidden'}>
+        <p class="atlas-settings-hint" data-role="foreign-text">${escapeText(foreignLine(lastForeignCount[world.id] ?? 0))}</p>
+        <button class="atlas-btn-ghost" data-action="give-new-ids">${lastForeignCount[world.id] === 1 ? 'Give it a new id' : 'Give them new ids'}</button>
+      </div>
       <div class="atlas-settings-actions">
         <button class="atlas-btn-ghost" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from API</button>
         <button class="atlas-btn-ghost" data-action="test-connection">Test connection</button>
@@ -90,6 +94,16 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
           : ''}
       </dl>
       ${apiActions}
+      <div class="atlas-settings-dangling" data-role="rekey-interrupted" hidden>
+        <p class="atlas-settings-hint">An id update in this world did not finish, so it is not syncing.</p>
+        <button class="atlas-btn-ghost" data-action="rekey-finish">Finish it</button>
+        <button class="atlas-btn-ghost" data-action="rekey-discard"
+          title="Undo the update: elements that already have their new ids keep them, the rest go back to their old ids, and every link follows.">Undo it</button>
+      </div>
+      <div class="atlas-settings-dangling" data-role="rekey-stale" hidden>
+        <p class="atlas-settings-hint" data-role="rekey-stale-text"></p>
+        <button class="atlas-btn-ghost" data-action="rekey-repair">Update links</button>
+      </div>
       <div class="atlas-settings-actions atlas-settings-actions-danger">
         <button class="atlas-btn-ghost" data-action="delete-world">Forget world (keep folder)</button>
         <button class="atlas-btn-ghost" data-action="delete-world-permanent" title="Remove from atlas AND delete the world folder on disk">Delete world + folder</button>
@@ -114,6 +128,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     });
 
   wireDanglingLinks(toasts);
+  void wireForeignIds(world, toasts);
 
   const nameInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="world-name"]');
   nameInput?.addEventListener('change', () => {
@@ -358,6 +373,111 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       toasts.error(`Delete failed: ${msg}`);
       deletePermBtn.disabled = false;
     }
+  });
+}
+
+/**
+ * Elements OnlyWorlds refused because their ids already live in another
+ * world (S363): a copied or imported folder, a world taken online twice. Only
+ * new ids fix that, so this is where they are offered; and an id update that
+ * did not finish is finished (or discarded) from here too.
+ */
+/** The last count seen per world: Settings re-renders on every state change,
+ *  and a row that starts hidden and appears after two awaits blinks each time
+ *  (gate lens C F4). The row renders from this, then refreshes. */
+const lastForeignCount: Record<string, number> = {};
+
+function foreignLine(n: number): string {
+  return n === 1
+    ? '1 element could not upload: its id belongs to another OnlyWorlds world.'
+    : `${n} elements could not upload: their ids belong to another OnlyWorlds world.`;
+}
+
+async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): Promise<void> {
+  const box = document.querySelector<HTMLElement>('.atlas-settings [data-role="foreign-ids"]');
+  const text = box?.querySelector<HTMLElement>('[data-role="foreign-text"]');
+  const btn = box?.querySelector<HTMLButtonElement>('[data-action="give-new-ids"]');
+  const stuck = document.querySelector<HTMLElement>('.atlas-settings [data-role="rekey-interrupted"]');
+  const stale = document.querySelector<HTMLElement>('.atlas-settings [data-role="rekey-stale"]');
+  const staleText = stale?.querySelector<HTMLElement>('[data-role="rekey-stale-text"]');
+  const store = getActiveStore();
+  // The interrupted and stale rows live outside the api-linked branch: a crash
+  // then an unlink must still leave a way to finish or undo (gate lens C F10).
+  if (!stuck || !stale || !staleText || !store) return;
+  const rk = await import('../sync/rekey-run');
+
+  let count = lastForeignCount[world.id] ?? 0;
+  const show = async (): Promise<void> => {
+    // A run in progress writes the journal: that is not "did not finish".
+    const interrupted = !rk.isRekeyRunning() && await store.hasRekeyJournal().catch(() => false);
+    stuck.hidden = !interrupted;
+    const staleN = interrupted ? 0 : await rk.staleLinkCount(store).catch(() => 0);
+    stale.hidden = staleN === 0;
+    staleText.textContent = staleN === 1
+      ? '1 element still links to an old id: its file could not be read when the ids changed.'
+      : `${staleN} elements still link to old ids: their files could not be read when the ids changed.`;
+    if (!box || !text || !btn) return;
+    count = interrupted ? 0 : (await rk.foreignIdsFor(store, world).catch(() => [])).length;
+    lastForeignCount[world.id] = count;
+    box.hidden = count === 0;
+    text.textContent = foreignLine(count);
+    btn.textContent = count === 1 ? 'Give it a new id' : 'Give them new ids';
+  };
+  await show();
+
+  btn?.addEventListener('click', async () => {
+    btn.disabled = true; // a second click during the chunk load stacked two modals (lens C F6)
+    try {
+      const { RekeyModal } = await import('../ui/rekey-modal');
+      await new RekeyModal(toasts, world, store, count).open();
+    } finally {
+      btn.disabled = false;
+      await show();
+    }
+  });
+  const refused = (err: unknown): string | null =>
+    err instanceof Error && err.name === 'RekeyRefusedError' ? err.message : null;
+  stuck.querySelector<HTMLButtonElement>('[data-action="rekey-finish"]')?.addEventListener('click', async () => {
+    try {
+      const done = await rk.finishInterruptedRekey(store, world.id);
+      const n = done?.map.size ?? 0;
+      toasts.success(n === 0 ? 'Nothing was left to finish.'
+        : n === 1 ? 'Finished giving 1 element a new id.' : `Finished giving ${n} elements new ids.`);
+    } catch (err) {
+      console.error('[settings] finishing the re-key failed:', err);
+      toasts.error(refused(err) ?? 'The id update still could not finish. Nothing was lost; the world stays offline until it does.');
+    }
+    await show();
+  });
+  stuck.querySelector<HTMLButtonElement>('[data-action="rekey-discard"]')?.addEventListener('click', async () => {
+    if (!window.confirm('Undo the unfinished id update? Elements that already have their new ids keep them; the rest go back to their old ids, and every link follows.')) return;
+    try {
+      const r = await rk.discardInterruptedRekey(store, world.id);
+      toasts.info(r && r.restored > 0
+        ? `${r.restored === 1 ? '1 element is' : `${r.restored} elements are`} back on ${r.restored === 1 ? 'its old id' : 'their old ids'}.`
+        : 'Id update undone.');
+    } catch (err) {
+      if (refused(err)) { toasts.error(refused(err)!); await show(); return; }
+      // The record itself will not parse: there is no map to undo with.
+      console.error('[settings] undoing the re-key failed:', err);
+      if (window.confirm('The record of this id update is damaged, so it cannot be undone or finished. Forget it and let the world sync again? Any element that exists twice (old and new) stays, and you can delete the one you do not want.')) {
+        await rk.discardInterruptedRekey(store, world.id, { forget: true });
+        await refreshElementsAfterWrite(store);
+        toasts.info('Id update forgotten');
+      }
+    }
+    await show();
+  });
+  stale.querySelector<HTMLButtonElement>('[data-action="rekey-repair"]')?.addEventListener('click', async () => {
+    try {
+      const fixed = await rk.repairStaleLinks(store);
+      requestPushIfLinked();
+      toasts.success(fixed.length === 1 ? 'Updated the links in 1 element.' : `Updated the links in ${fixed.length} elements.`);
+    } catch (err) {
+      console.error('[settings] updating stale links failed:', err);
+      toasts.error(refused(err) ?? 'Could not update the links');
+    }
+    await show();
   });
 }
 

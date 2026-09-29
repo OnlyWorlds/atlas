@@ -90,8 +90,11 @@ export function isOwV2Error(err: unknown): err is OwV2Error {
  * responses, so any disk file written from a server record before the
  * adaptV2Record drop below may still carry it; stripping here keeps those
  * legacy files pushable.
+ * `created_by` (keel membership phase 2, 2026-09-28) is the membership id that
+ * created the element, null for the owner. Read-only: kept on disk as received,
+ * never sent (keel ignores it on writes; atlas does not rely on that).
  */
-const SERVER_MANAGED_FIELDS = new Set(['type', 'world', 'created_at', 'updated_at', 'change_seq']);
+const SERVER_MANAGED_FIELDS = new Set(['type', 'world', 'created_at', 'updated_at', 'change_seq', 'created_by']);
 
 /** Sync metadata + local-only extensions — never on the wire. */
 const STRIP_FIELDS = new Set<string>([

@@ -37,7 +37,7 @@ import {
   type MergeProgress,
 } from '../sync/make-online';
 import { escapeAttr } from '../core/dom-utils';
-import { describeFailures } from '../sync/sync-failure-copy';
+import { describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
 
 type Route = 'create' | 'link';
 
@@ -300,6 +300,7 @@ export class MakeOnlineModal extends BaseModal {
       const engine = new SyncEngine({
         folder,
         client: adapter,
+        apiWorldId: world.id,
         // No onIdSwap: keel preserves client ids on CREATE (create-path
         // id-swap excised 2026-07-12). Route 2's MATCH-phase swaps still
         // propagate via MergeOpts.onIdSwap → applyIdSwapToUi below.
@@ -342,7 +343,10 @@ export class MakeOnlineModal extends BaseModal {
       if (failures > 0) {
         // Say why (S360): "will retry" was false for the commonest cause, an
         // id another world already holds, which fails every retry.
-        this.toasts.error(`${name} is online. ${describeFailures(pushResult.failures)}`);
+        // Registered as shown (re-key gate lens 2 F11): the flush-on-attach
+        // round re-sends the same failing set a moment later and must not
+        // repeat the paragraph.
+        this.toasts.error(`${name} is online. ${failureToastOnce(pushResult.failures) ?? describeFailures(pushResult.failures)}`);
       } else {
         const uploaded = pushResult.pushed.creates + pushResult.pushed.updates;
         this.toasts.success(`${name} is online · ${uploaded} element${uploaded === 1 ? '' : 's'} uploaded`);

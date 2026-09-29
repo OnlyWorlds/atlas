@@ -49,6 +49,7 @@ import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
 import { makeRoomTabs } from '../ui/room-tabs';
 import { makeDrillInPrefix } from '../ui/drill-in';
 import { onLeaveWorld } from '../core/leave-flush';
+import { rekeyOwLinks, rekeySidecar } from '../store/rekey-body';
 
 /** Sentinel knowledgeId for the unsaved draft editor (`/knowledge/new`). */
 const NEW = 'new';
@@ -117,6 +118,26 @@ function saveDraftStash(worldId: string, draft: Draft): void {
   } catch {
     /* ignore quota */
   }
+}
+
+/**
+ * The re-key (S363) moves ids; stored state follows. Id fields by equality,
+ * prose and rich text through the shared re-key helpers. Writes only on change.
+ */
+export function remapDraftStash(worldId: string, map: ReadonlyMap<string, string>): void {
+  const d = loadDraftStash(worldId);
+  if (!d) return;
+  const one = (id: string): string => map.get(id) ?? id;
+  const next: Draft = {
+    ...d,
+    story: rekeyOwLinks(d.story, map),
+    richtextJson: d.richtextJson ? (rekeySidecar(d.richtextJson, map) as JSONContent) : null,
+    narrator: d.narrator === null ? null : one(d.narrator),
+    collectives: d.collectives.map(one),
+    aboutIds: d.aboutIds.map(one),
+  };
+  if (JSON.stringify(next) === JSON.stringify(d)) return;
+  saveDraftStash(worldId, next);
 }
 
 function clearDraftStash(worldId: string): void {

@@ -36,6 +36,7 @@ import type { Element, ElementType } from '../core/types';
 import { isQuietRef, TOUR_MAP_REF, TOUR_PIN_REF, TOUR_STEPS, type TourStep } from './tour-data';
 import { mergeHealArray } from './tour-heal';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
+import { rekeyRouteHash } from '../sync/rekey-route';
 
 const TOUR_STATE_KEY = 'atlas_tour_v1';
 const TOUR_DONE_KEY = 'atlas_tour_done_v1';
@@ -90,6 +91,18 @@ function writeTourState(p: TourPersist | null): void {
     else localStorage.setItem(TOUR_STATE_KEY, JSON.stringify(p));
   } catch { /* private mode — tour just won't resume */ }
   emit();
+}
+
+/**
+ * The re-key (S363) moves ids; stored state follows. The saved return hash is
+ * a stored URL and may name a re-keyed element; null from the router = leave.
+ */
+export function remapTourReturnHash(worldId: string, map: ReadonlyMap<string, string>): void {
+  const p = readTourState();
+  if (!p || typeof p.returnHash !== 'string') return;
+  const next = rekeyRouteHash(p.returnHash, worldId, map);
+  if (next === null || next === p.returnHash) return;
+  writeTourState({ ...p, returnHash: next });
 }
 
 export function isTourActive(): boolean {

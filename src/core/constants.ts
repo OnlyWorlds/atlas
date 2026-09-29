@@ -96,6 +96,8 @@ export const SYNC_STATE_FILE = 'sync-state.json';
 export const TOMBSTONES_FILE = 'tombstones.json';
 /** Saved chart configs — atlas-local, travels with the folder (DESIGN_CHARTS.md). */
 export const CHARTS_FILE = 'charts.json';
+/** `.atlas/rekey-journal.json`: present only while a re-key is unfinished (`store/rekey.ts`, S363). */
+export const REKEY_JOURNAL_FILE = 'rekey-journal.json';
 /** World styles — how the world draws its kinds (core/world-styles.ts, S356). */
 export const STYLES_FILE = 'styles.json';
 export const LOCK_FILE = 'lock';

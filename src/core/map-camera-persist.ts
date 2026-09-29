@@ -92,6 +92,23 @@ export function getCameraState(mapId: string): CameraState | null {
 }
 
 /**
+ * The re-key (S363) moves ids; stored state follows. Moves each old map id's
+ * entry to its new id (the new id is brand new, so the old entry wins).
+ * The store is not world-scoped, so no world parameter. No-op when nothing matches.
+ */
+export function remapCameraStates(map: ReadonlyMap<string, string>): void {
+  const store = read();
+  let changed = false;
+  for (const [oldId, newId] of map) {
+    if (!(oldId in store) || oldId === newId) continue;
+    store[newId] = store[oldId];
+    delete store[oldId];
+    changed = true;
+  }
+  if (changed) write(store);
+}
+
+/**
  * Drop a map's saved camera state (e.g., when the map is deleted). Idempotent.
  */
 export function clearCameraState(mapId: string): void {

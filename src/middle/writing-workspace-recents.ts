@@ -27,6 +27,19 @@ export function getRecents(worldId: string): string[] {
   }
 }
 
+/** The re-key (S363) moves ids; stored state follows. Order kept, dupes dropped. */
+export function remapRecents(worldId: string, map: ReadonlyMap<string, string>): void {
+  if (!worldId) return;
+  try {
+    const current = getRecents(worldId);
+    if (!current.some(id => map.has(id))) return;
+    const next = [...new Set(current.map(id => map.get(id) ?? id))];
+    localStorage.setItem(storageKey(worldId), JSON.stringify(next));
+  } catch {
+    /* private mode / quota — silently ignore */
+  }
+}
+
 export function pushRecent(worldId: string, elementId: string): void {
   if (!worldId || !elementId) return;
   try {

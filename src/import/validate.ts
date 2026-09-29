@@ -24,7 +24,7 @@ const SPATIAL_SAFE = new Set(['x', 'y', 'z', 'order', 'element_type']);
 // world-export envelope — without it a 36-element import shows "36 things to
 // check", one per element (2026-07-23). Reconcile strips them all; the
 // validator's job is only to not cry wolf.
-const SERVER_STAMPS = new Set(['created_at', 'updated_at', 'change_seq']);
+const SERVER_STAMPS = new Set(['created_at', 'updated_at', 'change_seq', 'created_by']);
 const VALID_TYPE_LIST = ALL_ELEMENT_TYPES.map(t => cap(t)).join(', ');
 
 function cap(s: string): string {

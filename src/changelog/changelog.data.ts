@@ -56,6 +56,31 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.10',
+    date: '2026-09-29',
+    theme: 'new ids for copied worlds',
+    entries: [
+      {
+        id: 'give-new-ids',
+        title: 'Elements whose ids belong to another world can get new ones',
+        body: 'A copied or imported folder, or a world taken online a second time, carries ids that another OnlyWorlds world already holds, and those elements never uploaded. Settings, then your world, now offers to give them new ids: every link, mention and page block follows, and then they upload.',
+        tags: ['sync', 'folders'],
+      },
+      {
+        id: 'id-update-finishes',
+        title: 'An id update that was interrupted finishes when the world opens',
+        body: 'If the tab closes while elements are getting new ids, the world does not sync until the update is done, and the next time it opens Atlas finishes it before showing anything.',
+        tags: ['sync'],
+      },
+      {
+        id: 'make-online-keeps-page',
+        title: 'Make online keeps you on the page you had open',
+        body: 'When Make online matched a local element to one already online, an open timeline, writing or map page for it jumped to another page or showed nothing. It now follows the element, and Back no longer leads to its old address.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.9',
     date: '2026-09-28',
     theme: 'deletes that tidy up',

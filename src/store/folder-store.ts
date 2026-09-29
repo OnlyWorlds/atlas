@@ -274,6 +274,76 @@ export interface FolderStore {
    * api world empty when the user expects a fresh upload.
    */
   resetSyncBaseline(): Promise<void>;
+
+  // ---- Re-key (giving elements new ids, S363; `store/rekey.ts`) ----
+
+  /**
+   * Write `body` as a NEW element at `body.id`, verbatim: every field kept
+   * (local-only ones included), `created_at` kept, `server_updated_at`
+   * stripped, `local_updated_at` stamped now. No duplicate-pin guard: during a
+   * re-key the old and new pin coexist by design. Runs in the per-id write
+   * chain. `bindingFrom` names an existing element whose directory layout and
+   * link spelling the new file inherits. When `body.id` already exists nothing
+   * is written and `created: false` comes back with the element as it is.
+   */
+  createElementVerbatim(
+    type: ElementType,
+    body: Element,
+    opts?: { bindingFrom?: string },
+  ): Promise<{ created: boolean; element: Element }>;
+  /** Copy every file under `media/<from>/` to `media/<to>/`, each blob before
+   *  its sidecar; sidecars get `element_id: to`, media ids unchanged. Returns
+   *  the number of files copied. */
+  copyMediaDir(fromElementId: string, toElementId: string): Promise<number>;
+  /** Remove `media/<elementId>/` whole. No-op when absent. Never looks up a
+   *  media id (the same id lives under both dirs mid re-key). */
+  removeMediaDir(elementId: string): Promise<void>;
+  /** `.atlas/rekey-journal.json`. Strict: a file that will not parse throws `CorruptFileError`. */
+  readRekeyJournal(): Promise<RekeyJournal | null>;
+  writeRekeyJournal(journal: RekeyJournal): Promise<void>;
+  clearRekeyJournal(): Promise<void>;
+  /** Whether a journal file exists (parsed or not). The sync engine's gate. */
+  hasRekeyJournal(): Promise<boolean>;
+  /** The id lives in BOTH element layouts (`elements/` and legacy `spatial/`):
+   *  one copy is served, the other left untouched. Re-keying it would leave the
+   *  shadow behind to come back as a twin (S363 gate lens A F3). */
+  hasShadowCopy(id: string): boolean;
+}
+
+/**
+ * A non-silent delete of an id an unfinished re-key names (its old or new
+ * copy). Deleting either one would scrub the links that already moved to it
+ * (S363 gate lens A F6): finish or discard the id update first.
+ */
+export class RekeyPendingError extends Error {
+  constructor() {
+    super('Finish or discard the id update in Settings first.');
+    this.name = 'RekeyPendingError';
+  }
+}
+
+/** Every id a journal names, old and new. */
+export function journalIds(journal: RekeyJournal | null): Set<string> {
+  const out = new Set<string>();
+  if (!journal || !journal.map || typeof journal.map !== 'object') return out;
+  for (const [o, n] of Object.entries(journal.map)) { out.add(o); if (typeof n === 'string') out.add(n); }
+  return out;
+}
+
+/** An unfinished re-key, on disk until its last step (`store/rekey.ts`). */
+export interface RekeyJournal {
+  version: 1;
+  /** The atlas world id (registry), so recovery acts on the right world's browser state. */
+  world_id: string;
+  /** old id → new id. */
+  map: Record<string, string>;
+  /** old id → element type. */
+  types: Record<string, ElementType>;
+  /** old id → its `local_updated_at` when the run began: an edit since means re-copy before removing. */
+  stamps: Record<string, string>;
+  /** Referrers that could not be read (corrupt files) and still name old ids. */
+  unrewritten: string[];
+  started_at: string;
 }
 
 export function newId(): string {

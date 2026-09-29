@@ -5,7 +5,9 @@ import type { PerElementFailure } from '../../src/core/types';
 const f = (id: string, message: string): PerElementFailure => ({ element_id: id, type: 'character', operation: 'create', message });
 // keel's own texts (elements/service.py _upsert_once, serialize.py) and atlas's read-back text.
 const FOREIGN_BULK = 'An element with id x already exists in another world. give this element a new id (a copied world folder needs fresh ids).';
-const FOREIGN_POST = 'server reported id_conflict but the element could not be read back';
+const FOREIGN_POST = 'this id already exists in another world';
+// A 409 whose read-back FAILED proves nothing about which world holds the id (S363).
+const UNPROVEN_POST = 'id_conflict, and checking it failed: API Error 503: busy';
 const TOO_LARGE = 'Extension fields may hold at most 65536 bytes per element (got 70000). Store large data elsewhere and link to it.';
 
 beforeEach(() => __resetFailureToasts());
@@ -14,6 +16,8 @@ describe('sync failure copy (S360)', () => {
   it('classifies keel and atlas messages', () => {
     expect(classifyFailure(f('a', FOREIGN_BULK))).toBe('foreign_id');
     expect(classifyFailure(f('a', FOREIGN_POST))).toBe('foreign_id');
+    expect(classifyFailure(f('a', UNPROVEN_POST))).toBe('other');
+    expect(classifyFailure(f('a', 'server reported id_conflict but the element could not be read back'))).toBe('other');
     expect(classifyFailure(f('a', TOO_LARGE))).toBe('too_large');
     expect(classifyFailure(f('a', 'API Error 500: boom'))).toBe('other');
   });

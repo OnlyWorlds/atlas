@@ -267,6 +267,28 @@ export interface SyncState {
    * resolved via the conflict-review modal's world-settings rows (gate R9).
    */
   meta_conflicts?: string[];
+  /**
+   * Elements whose CREATE keel refused because the id already lives in
+   * another OnlyWorlds world (a copied or imported folder, a world taken
+   * online twice): the re-key's worklist (S363, `sync/foreign-ids.ts`).
+   * Recorded only on evidence (a /bulk `id_conflict`, or a single-create 409
+   * whose read-back returned nothing), merged at the end of each round, and
+   * scoped to the api world it was observed against. Readers intersect it
+   * with "still here, still never synced" at the moment of use.
+   */
+  foreign?: ForeignIds;
+  /**
+   * Every finished re-key's map, old id → new id (S363, gate lens A F5).
+   * Kept so a link inside a file that could not be read during the re-key (a
+   * git conflict) can still follow once the file is repaired
+   * (`repairRekeyedLinks`); without it the map died with the journal.
+   */
+  rekeyed?: Record<string, string>;
+}
+
+export interface ForeignIds {
+  api_world_id: string | null;
+  ids: Array<{ id: string; type: ElementType; first_seen: string }>;
 }
 
 export interface ServerDeleteRecord {
@@ -300,7 +322,8 @@ export interface Tombstone {
 export type SyncEngineState =
   | { kind: 'idle'; last_sync_at: string | null }
   | { kind: 'syncing'; phase: 'pull' | 'push'; progress?: { done: number; total: number } }
-  | { kind: 'paused'; reason: 'manual' | 'network'; pending_changes: number }
+  /** `held`: an exclusive local operation (the re-key, S363) owns the world; nothing syncs until it ends. */
+  | { kind: 'paused'; reason: 'manual' | 'network' | 'held'; pending_changes: number }
   | { kind: 'error'; message: string; recoverable: boolean };
 
 export interface SyncResult {

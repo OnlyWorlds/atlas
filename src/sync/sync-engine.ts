@@ -24,6 +24,7 @@ import {
 } from '../core/types';
 import { ATLAS_LOCAL_ONLY_FIELDS } from '../core/constants';
 import { CorruptFileError } from '../store/fs-utils';
+import { mergeForeignIds } from './foreign-ids';
 import type {
   Conflict,
   Element,
@@ -205,6 +206,11 @@ export interface SyncEngineOptions {
    * `requestPush` boundary, and the meta step is pull-apply only (no PATCH).
    */
   readOnly?: boolean;
+  /**
+   * The api world this engine pushes to. Scopes the recorded foreign ids
+   * (sync-state `foreign`): ids refused by one world say nothing about another.
+   */
+  apiWorldId?: string | null;
   /** Called when a conflict is detected. */
   onConflict?: (conflict: Conflict) => void;
   /** Called whenever engine state changes (for UI). */
@@ -233,6 +239,7 @@ export class SyncEngine {
   private policy: CanonicalPolicy;
   /** View-only engine (S264): pull-only, no push of any kind. */
   private readOnly = false;
+  private apiWorldId: string | null = null;
   private onConflict: (conflict: Conflict) => void;
   private onStateChange: (state: SyncEngineState) => void;
   private onPushProgress: (done: number, total: number) => void;
@@ -284,6 +291,7 @@ export class SyncEngine {
     this.folder = opts.folder;
     this.client = opts.client;
     this.readOnly = !!opts.readOnly;
+    this.apiWorldId = opts.apiWorldId ?? null;
     this.policy = normalizePolicy(opts.policy);
     this.onConflict = opts.onConflict ?? (() => {});
     this.onStateChange = opts.onStateChange ?? (() => {});
@@ -307,12 +315,121 @@ export class SyncEngine {
   pause(reason: 'manual' | 'network' = 'manual'): void {
     this.paused = true;
     this.pauseReason = reason;
+    // Under a hold the pill keeps saying what is happening; the release
+    // republishes this pause (S363 gate lens B F1).
+    if (this.holds > 0) return;
     this.setState({ kind: 'paused', reason, pending_changes: 0 });
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
+  /** Paused because the browser went offline: what the `online` listener lifts.
+   *  Read from the engine, never from the published state, which says `held`
+   *  during a re-key (S363 gate lens B F1: the network pause outlived the network). */
+  isNetworkPaused(): boolean {
+    return this.paused && this.pauseReason === 'network';
+  }
+
+  /** A round that ends during a hold leaves the state to the hold (lens B F6). */
+  private settleIdle(lastSyncAt: string | null): void {
+    if (lastSyncAt) this.lastSyncAt = lastSyncAt;
+    if (this.holds > 0) return;
+    this.setState({ kind: 'idle', last_sync_at: lastSyncAt });
+  }
+
+  /**
+   * Holds taken by an exclusive local operation (the re-key, S363). Separate
+   * from `paused` on purpose (re-key gate, lens 2 F1/F2): `resume()` cannot
+   * release a hold, and releasing one cannot clear a user, auth or corrupt
+   * pause. Every round entry and push trigger reads `blocked`.
+   */
+  private holds = 0;
+
+  private get blocked(): boolean {
+    return this.paused || this.holds > 0;
+  }
+
+  isHeld(): boolean {
+    return this.holds > 0;
+  }
+
+  /**
+   * Stop all sync for an exclusive local operation. Clears the debounce and
+   * retry timers, then waits until no round is in flight, so nothing reaches
+   * the server between this resolving and `release()`. `pause()` alone does
+   * neither: a running round checks `stopped`, never `paused`, and would keep
+   * creating and stamping (probed, gate P1a). The returned release works once;
+   * it pushes only when no other hold or pause remains (a world the user set to
+   * stay offline stays offline).
+   */
+  async hold(_reason: 'rekey'): Promise<() => void> {
+    this.holds++;
+    if (this.debouncePushTimer) {
+      clearTimeout(this.debouncePushTimer);
+      this.debouncePushTimer = null;
+    }
+    if (this.transientRetryTimer) {
+      clearTimeout(this.transientRetryTimer);
+      this.transientRetryTimer = null;
+    }
+    this.setPendingPush(null);
+    while (this.inFlight) await this.inFlight.catch(() => {});
+    // What the world said before the hold: an auth or corrupt-file error keeps
+    // its red pill and its message afterwards (lens B F2).
+    const before = this.state;
+    this.setState({ kind: 'paused', reason: 'held', pending_changes: 0 });
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.holds--;
+      if (this.holds > 0 || this.stopped) return;
+      if (this.paused) {
+        if (before.kind === 'error') this.setState(before);
+        else this.setState({ kind: 'paused', reason: this.pauseReason ?? 'manual', pending_changes: 0 });
+        return;
+      }
+      this.setState({ kind: 'idle', last_sync_at: this.lastSyncAt });
+      void this.pushOnce().catch(err => console.warn('[atlas:sync] push after hold failed:', err));
+    };
+  }
+
+  /** Resolving a conflict writes to the server directly; never during a hold. */
+  private async assertNotHeld(): Promise<void> {
+    if (this.holds > 0 || await this.folder.hasRekeyJournal()) {
+      throw new Error('Ids are being updated in this world. Try again when that finishes.');
+    }
+  }
+
+  /**
+   * A re-key journal on disk means an id update is unfinished (a crash, a
+   * failed run): no round may start until it completes, on any engine attached
+   * by any path (re-key gate, lens 2 R2).
+   */
+  /** The gate is the round's first disk touch: a throw must settle like any
+   *  other round error, never leave the pill on "Saving" (lens B F3). */
+  private async rekeyPendingGuarded(): Promise<boolean> {
+    try {
+      return await this.rekeyPending();
+    } catch (err) {
+      this.settleThrownRound(err);
+      throw err;
+    }
+  }
+
+  private async rekeyPending(): Promise<boolean> {
+    if (!(await this.folder.hasRekeyJournal())) return false;
+    this.setState({ kind: 'paused', reason: 'held', pending_changes: 0 });
+    return true;
   }
 
   resume(): void {
     this.paused = false;
     this.pauseReason = null;
+    // A hold outlives a resume: the holder's release does the push.
+    if (this.holds > 0) return;
     // Preserve last_sync_at from before pause — toggling stay-offline off
     // shouldn't erase the pill's "synced X min ago" tooltip. The push round
     // below (or a subsequent successful sync) will stamp a fresher value if
@@ -369,7 +486,7 @@ export class SyncEngine {
     const delay = Math.min(Math.max(ms ?? TRANSIENT_RETRY_DEFAULT_MS, 1000), 15 * 60_000);
     this.transientRetryTimer = setTimeout(() => {
       this.transientRetryTimer = null;
-      if (this.stopped || this.paused) return;
+      if (this.stopped || this.blocked) return;
       void this.pushOnce().catch(err => console.warn('[atlas:sync] transient retry failed:', err));
     }, delay);
   }
@@ -427,7 +544,7 @@ export class SyncEngine {
    */
   requestPush(): void {
     if (this.readOnly) return; // view-only world — nothing ever pushes (S264)
-    if (this.paused) {
+    if (this.blocked) {
       console.info('[atlas:sync] push requested but engine paused — skipping');
       return;
     }
@@ -442,7 +559,7 @@ export class SyncEngine {
       if (this.inFlight && this.inFlightKind === 'pull') {
         console.info('[atlas:sync] debounce fired during in-flight pull — re-arming push behind it');
         void this.inFlight.finally(() => {
-          if (!this.paused) this.requestPush();
+          if (!this.blocked) this.requestPush();
         });
         return;
       }
@@ -502,7 +619,7 @@ export class SyncEngine {
    * silently do nothing — chain the push behind the pull instead.
    */
   flushPendingPush(): Promise<SyncResult> | null {
-    if (this.paused) return null;
+    if (this.blocked) return null;
     if (!this.debouncePushTimer) return null;
     clearTimeout(this.debouncePushTimer);
     this.debouncePushTimer = null;
@@ -510,7 +627,7 @@ export class SyncEngine {
     if (this.inFlight && this.inFlightKind === 'pull') {
       console.info('[atlas:sync] flush-pending-push during in-flight pull — chaining push behind it');
       const chained = this.inFlight.then(() => {
-        if (this.paused) return emptyResult();
+        if (this.blocked) return emptyResult();
         return this.pushOnce();
       });
       return chained;
@@ -569,6 +686,7 @@ export class SyncEngine {
     id: string,
     action: 'overwrite-mine' | 'pull-theirs'
   ): Promise<void> {
+    await this.assertNotHeld();
     console.info(`[atlas:sync] resolveConflict ${action} ${id}`);
     const syncState = await this.folder.readSyncState();
     const conflict = syncState.conflicts.find(c => c.element_id === id);
@@ -673,7 +791,7 @@ export class SyncEngine {
    * edit).
    */
   private async adoptServerCopy(local: Element, remote: { updated_at: string } & Record<string, unknown>): Promise<void> {
-    const ignore = new Set<string>(['created_at', 'change_seq', 'world', ...ATLAS_LOCAL_ONLY_FIELDS]);
+    const ignore = new Set<string>(['created_at', 'created_by', 'change_seq', 'world', ...ATLAS_LOCAL_ONLY_FIELDS]);
     const differs = diffFieldNames(local, remote)
       .some(k => !ignore.has(k));
     await this.folder.stampServerUpdatedAt(
@@ -683,6 +801,7 @@ export class SyncEngine {
   }
 
   async resolveMetaConflict(field: string, choice: 'mine' | 'theirs'): Promise<void> {
+    await this.assertNotHeld();
     const kind = META_SYNC_FIELDS[field];
     if (!kind) throw new Error(`resolveMetaConflict: unknown meta field '${field}'`);
     let baselineValue: unknown;
@@ -755,7 +874,7 @@ export class SyncEngine {
     auth_blocked: boolean;
   }> {
     const empty = { meta_pushed: [], meta_pulled: [], failures: [], auth_blocked: false };
-    if (this.stopped || this.paused) return empty;
+    if (this.stopped || this.blocked) return empty;
 
     // PUSH-round precheck (speed bout 2026-07-19): a push round's meta duty
     // is carrying LOCAL meta edits out — that dirtiness is decidable from
@@ -931,6 +1050,7 @@ export class SyncEngine {
     id: string,
     action: 'delete-locally' | 'keep'
   ): Promise<void> {
+    await this.assertNotHeld();
     const syncState = await this.folder.readSyncState();
     const list = syncState.server_deletes ?? [];
     const target = list.find(d => d.id === id);
@@ -1006,8 +1126,9 @@ export class SyncEngine {
   }
 
   private async runPushOnly(): Promise<SyncResult> {
-    if (this.paused) return emptyResult();
+    if (this.blocked) return emptyResult();
     this.setState({ kind: 'syncing', phase: 'push' });
+    if (await this.rekeyPendingGuarded()) return emptyResult();
     // The meta step rides EVERY round (world-meta sync R2) — a setNow-triggered
     // debounce push is exactly the round that must carry the now to the server.
     // skipIfLocalClean: when local meta matches the baseline there is nothing
@@ -1045,7 +1166,7 @@ export class SyncEngine {
     if (pushResult.auth_blocked) {
       this.setAuthError();
     } else {
-      this.setState({ kind: 'idle', last_sync_at: nowIso() });
+      this.settleIdle(nowIso());
     }
     if (pushResult.transient_blocked) this.scheduleTransientRetry(pushResult.retry_after_ms);
     const result: SyncResult = {
@@ -1066,8 +1187,9 @@ export class SyncEngine {
   }
 
   private async runPullOnly(): Promise<SyncResult> {
-    if (this.paused) return emptyResult();
+    if (this.blocked) return emptyResult();
     this.setState({ kind: 'syncing', phase: 'pull' });
+    if (await this.rekeyPendingGuarded()) return emptyResult();
     const meta = await this.executeMetaStepGuarded();
     if (meta.auth_blocked) {
       this.setAuthError();
@@ -1091,7 +1213,7 @@ export class SyncEngine {
     if (pullResult.auth_blocked) {
       this.setAuthError();
     } else {
-      this.setState({ kind: 'idle', last_sync_at: nowIso() });
+      this.settleIdle(nowIso());
     }
     const result: SyncResult = {
       pushed: zero(),
@@ -1109,10 +1231,11 @@ export class SyncEngine {
   }
 
   private async runSync(): Promise<SyncResult> {
-    if (this.paused) {
+    if (this.blocked) {
       return emptyResult();
     }
     this.setState({ kind: 'syncing', phase: 'push' });
+    if (await this.rekeyPendingGuarded()) return emptyResult();
     const meta = await this.executeMetaStepGuarded();
     if (meta.auth_blocked) {
       this.setAuthError();
@@ -1148,7 +1271,7 @@ export class SyncEngine {
     // A busy or unreachable server ends the round here too: the pull would
     // meet the same wait. Retry once later (S361, lane b M4).
     if (pushResult.transient_blocked) {
-      this.setState({ kind: 'idle', last_sync_at: null });
+      this.settleIdle(null);
       this.scheduleTransientRetry(pushResult.retry_after_ms);
       const result: SyncResult = {
         pushed: pushResult.pushed,
@@ -1185,7 +1308,7 @@ export class SyncEngine {
     if (pullResult.auth_blocked) {
       this.setAuthError();
     } else {
-      this.setState({ kind: 'idle', last_sync_at: nowIso() });
+      this.settleIdle(nowIso());
     }
     this.onSyncResult('sync', result);
     return result;
@@ -1345,7 +1468,9 @@ export class SyncEngine {
     failures: PerElementFailure[],
     serverDeletesDetected: import('../core/types').ServerDeleteRecord[],
     onItemDone: () => void,
-    isRetry = false
+    isRetry = false,
+    foreign: Array<{ id: string; type: ElementType }> = [],
+    attempted: Set<string> = new Set(),
   ): Promise<{ created: number; authBlocked: boolean; transient?: unknown }> {
     // Re-fetch each candidate from disk (freshness) + pin element_type
     // self-heal, mirroring the per-element loop's pre-send discipline.
@@ -1374,6 +1499,7 @@ export class SyncEngine {
     if (items.length === 0 || this.stopped) return { created: 0, authBlocked: false };
 
     console.info(`[atlas:sync] bulk CREATE ${items.length} element(s)${isRetry ? ' (retry)' : ''}`);
+    for (const it of items) attempted.add(it.element.id as string);
     let result: BulkResult;
     try {
       result = await this.client.bulkCreate!(items, {
@@ -1455,6 +1581,9 @@ export class SyncEngine {
           onItemDone();
           continue;
         }
+        // /bulk upserts ids of THIS world, so an id_conflict nothing here
+        // could adopt belongs to another world (re-key gate, lens 2 F3).
+        foreign.push({ id, type: item.type });
       }
       const parsed = parseInvalidLinkItem(errObj);
       let routed = false;
@@ -1512,7 +1641,7 @@ export class SyncEngine {
     }
     if (ready.length === 0) return { created: 0, authBlocked: false };
     console.info(`[atlas:sync] bulk CREATE retrying ${ready.length} survivor(s) after atomic rollback (${blocked.length} held back)`);
-    return this.bulkCreatePhase(ready, failures, serverDeletesDetected, onItemDone, /* isRetry */ true);
+    return this.bulkCreatePhase(ready, failures, serverDeletesDetected, onItemDone, /* isRetry */ true, foreign, attempted);
   }
 
   /**
@@ -1626,16 +1755,30 @@ export class SyncEngine {
      *  without pausing, so a busy server costs one request, not one per
      *  pending element. */
     let transient: unknown = null;
+    /** Creates refused because their id lives in another world (sync-state `foreign`). */
+    const roundForeign: Array<{ id: string; type: ElementType }> = [];
+    /** Every create actually SENT this round: one that is not refused as foreign again leaves the list (lens B F4). */
+    const attemptedCreates = new Set<string>();
 
     if (useBulk) {
       const bulk = await this.bulkCreatePhase(allCreates, failures, serverDeletesDetected, () => {
         done++;
         this.onPushProgress(done, total);
-      });
+      }, false, roundForeign, attemptedCreates);
       creates += bulk.created;
       if (bulk.authBlocked) authBlocked = true;
       if (bulk.transient) transient = bulk.transient;
     }
+
+    /**
+     * Creates refused this round. An UPDATE whose links name one would be
+     * refused whole by keel (`invalid_link`), taking its other edits down
+     * with it; it waits instead (S363, re-key gate lens 2 F5: a re-keyed
+     * element refused on upload must not drag every referrer's PATCH along).
+     */
+    const refusedCreates = new Set<string>(
+      failures.filter(f => f.operation === 'create').map(f => f.element_id),
+    );
 
     for (const elem of changed) {
       // `stopped` (detach/unlink) aborts the push loop like the pull walk —
@@ -1644,6 +1787,18 @@ export class SyncEngine {
       // the G-C latch was pull-only).
       if (authBlocked || transient || this.stopped) break;
       const isCreate = !elem.server_updated_at;
+      const failuresBefore = failures.length;
+      if (!isCreate && refusedCreates.size > 0 && splitByRefusedLinks([elem], refusedCreates).blocked.length > 0) {
+        failures.push({
+          element_id: elem.id,
+          type: elem.type,
+          operation: 'update',
+          message: 'waits for an element OnlyWorlds refused in the same upload',
+        });
+        done++;
+        this.onPushProgress(done, total);
+        continue;
+      }
       try {
         if (isCreate) {
           // Never synced before → CREATE on server. The server may assign its
@@ -1681,6 +1836,7 @@ export class SyncEngine {
             }
           }
           const body = stripSyncFields(current);
+          attemptedCreates.add(current.id);
           const response = await this.client.createElement(current.type, body);
           if (response.id !== current.id) {
             // Contract-impossible under keel (client ids PRESERVED — probed
@@ -1850,24 +2006,36 @@ export class SyncEngine {
           // round, the tombstones and the server_deletes persist. Auth bails the
           // round as the loop does; anything else is a per-element failure.
           let remote: Awaited<ReturnType<OwApiClient["getElement"]>> = null;
+          let readErr: unknown = null;
           try {
             remote = await this.client.getElement(elem.type, elem.id);
-          } catch (readErr) {
-            if (isAuthError(readErr)) {
+          } catch (err) {
+            readErr = err;
+            if (isAuthError(err)) {
               authBlocked = true; // the loop's top check ends the round
-              this.noteAuthBail(readErr);
+              this.noteAuthBail(err);
             }
-            remote = null;
           }
           if (remote) {
             await this.adoptServerCopy(elem, remote);
             console.info('[atlas:sync] CREATE 409 id_conflict — element already on server; baseline adopted', {
               id: elem.id, type: elem.type,
             });
-          } else {
+          } else if (readErr === null) {
+            // A single POST 409s for a same-world id too, so only a read-back
+            // that ANSWERED "not here" proves the id belongs to another world.
+            roundForeign.push({ id: elem.id, type: elem.type });
             failures.push({
               element_id: elem.id, type: elem.type, operation: 'create',
-              message: 'server reported id_conflict but the element could not be read back',
+              message: 'this id already exists in another world',
+            });
+          } else {
+            // A read-back that failed proves nothing (S363, re-key gate lens 2
+            // F3: a 409 plus a 503 used to read as foreign and would have been
+            // offered a re-key, duplicating a same-world element).
+            failures.push({
+              element_id: elem.id, type: elem.type, operation: 'create',
+              message: `id_conflict, and checking it failed: ${readErr instanceof Error ? readErr.message : String(readErr)}`,
             });
           }
         } else {
@@ -1885,6 +2053,9 @@ export class SyncEngine {
       } finally {
         done++;
         this.onPushProgress(done, total);
+        if (isCreate && failures.slice(failuresBefore).some(f => f.element_id === elem.id)) {
+          refusedCreates.add(elem.id);
+        }
       }
     }
 
@@ -1956,12 +2127,21 @@ export class SyncEngine {
     // any real server-deletes via its first pull. SKIP likewise when stopped
     // (detach/unlink) — a post-reset write would resurrect cleared state.
     if (!authBlocked && !this.stopped) {
+      // Foreign ids (S363): the stored list, this round's evidence, and only
+      // what is STILL here and never synced (formula: sync/foreign-ids.ts).
+      const stillUnsynced = new Set(
+        (await this.folder.listLocallyChangedSince(null)).filter(e => !e.server_updated_at).map(e => e.id),
+      );
+      const roundNow = nowIso();
       await this.folder.updateSyncState(curr => {
-        if (serverDeletesDetected.length === 0) return { last_push_at: nowIso() };
+        const foreignNext = (curr.foreign || roundForeign.length > 0)
+          ? { foreign: mergeForeignIds(curr.foreign, this.apiWorldId, roundForeign, stillUnsynced, roundNow, attemptedCreates) }
+          : {};
+        if (serverDeletesDetected.length === 0) return { last_push_at: roundNow, ...foreignNext };
         const existing = curr.server_deletes ?? [];
         const existingIds = new Set(existing.map(d => d.id));
         const fresh = serverDeletesDetected.filter(d => !existingIds.has(d.id));
-        return { last_push_at: nowIso(), server_deletes: [...existing, ...fresh] };
+        return { last_push_at: roundNow, server_deletes: [...existing, ...fresh], ...foreignNext };
       });
     }
     return {
@@ -2483,7 +2663,9 @@ function stripServerOnlyFields(record: Record<string, unknown>): Record<string, 
  * ordering, and JSON.stringify is order-sensitive).
  */
 function diffFieldNames(local: Element, remote: Record<string, unknown>): string[] {
-  const SKIP = new Set(['id', 'type', 'local_updated_at', 'server_updated_at', 'updated_at']);
+  // created_by is server-authored and read-only: a local file that never saw a
+  // pull lacks it, which is not a difference anyone made.
+  const SKIP = new Set(['id', 'type', 'local_updated_at', 'server_updated_at', 'updated_at', 'created_by']);
   const keys = new Set<string>([...Object.keys(local), ...Object.keys(remote)]);
   const diff: string[] = [];
   for (const key of keys) {
@@ -2649,8 +2831,12 @@ export function splitByRefusedLinks(
 ): { ready: Element[]; blocked: Element[] } {
   const bad = new Set(refusedIds);
   const blocked = new Set<string>();
+  // Wire fields only (S363 gate lens B F5): a page's `atlas_page_refs` or a
+  // narrative's dismissed suggestions never reach keel, so an id there cannot
+  // get the element refused, and holding it back on that basis stopped the
+  // element's real edits from uploading for as long as the other stayed refused.
   const refersToBad = (el: Element): boolean => Object.entries(el).some(([k, v]) =>
-    k !== 'id' && (typeof v === 'string' ? bad.has(v) : Array.isArray(v) && v.some(x => typeof x === 'string' && bad.has(x))));
+    !NOT_ON_THE_WIRE.has(k) && (typeof v === 'string' ? bad.has(v) : Array.isArray(v) && v.some(x => typeof x === 'string' && bad.has(x))));
   let changed = true;
   while (changed) {
     changed = false;
@@ -2666,6 +2852,8 @@ export function splitByRefusedLinks(
     blocked: survivors.filter(s => blocked.has(s.id)),
   };
 }
+
+const NOT_ON_THE_WIRE = new Set<string>(['id', 'local_updated_at', 'server_updated_at', ...ATLAS_LOCAL_ONLY_FIELDS]);
 
 const TRANSIENT_RETRY_DEFAULT_MS = 30_000;
 

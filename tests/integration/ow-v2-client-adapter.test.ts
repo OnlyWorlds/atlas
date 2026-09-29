@@ -203,6 +203,22 @@ describe('OwV2ClientAdapter — change_seq is server bookkeeping (2026-07-19 reg
   });
 });
 
+describe('OwV2ClientAdapter — created_by is read-only (keel membership phase 2, 2026-09-28)', () => {
+  it('a pulled record keeps created_by as received', async () => {
+    const { adaptV2Record } = await import('../../src/sync/ow-v2-client-adapter');
+    const member = uuid();
+    const rec = adaptV2Record({ id: uuid(), name: 'Frodo', updated_at: clock.next(), created_by: member }, 'character');
+    expect(rec.created_by).toBe(member);
+  });
+
+  it('write bodies never carry it, on create or update', async () => {
+    const { toV2WireShape } = await import('../../src/sync/ow-v2-client-adapter');
+    const body = { id: uuid(), name: 'Frodo', created_by: uuid() };
+    expect('created_by' in toV2WireShape(body, 'character', 'create')).toBe(false);
+    expect('created_by' in toV2WireShape(body, 'character', 'update')).toBe(false);
+  });
+});
+
 describe('OwV2ClientAdapter — LIST cursor walk', () => {
   it('walks >2 pages to completion; incomplete set stays empty', async () => {
     const { handlers } = statefulV2Handlers({ baseUrl: TEST_BASE, clock: clock.next, pageSize: 3 });

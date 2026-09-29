@@ -123,6 +123,34 @@ export function dropPersistedTabsForWorld(worldId: string): void {
   }
 }
 
+/**
+ * The re-key (S363) moves ids; stored state follows. Rewrites the `mapId` of
+ * persisted map tabs of one world (a tab with no worldId is legacy and
+ * follows too; map ids are uuids). Raw read/write so nothing else in the
+ * snapshot is normalised. No-op when nothing matches.
+ */
+export function remapPersistedTabs(worldId: string, map: ReadonlyMap<string, string>): void {
+  try {
+    const raw = localStorage.getItem(RIGHT_TABS_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Partial<PersistedRightTabs> | null;
+    if (!parsed || !Array.isArray(parsed.tabs)) return;
+    let changed = false;
+    const tabs = parsed.tabs.map(t => {
+      if (!t || typeof t !== 'object' || t.kind !== 'map') return t;
+      if (t.worldId !== undefined && t.worldId !== worldId) return t;
+      const next = typeof t.mapId === 'string' ? map.get(t.mapId) : undefined;
+      if (next === undefined) return t;
+      changed = true;
+      return { ...t, mapId: next };
+    });
+    if (!changed) return;
+    localStorage.setItem(RIGHT_TABS_STORAGE_KEY, JSON.stringify({ ...parsed, tabs }));
+  } catch (err) {
+    console.warn('[right-tabs-persistence] remap failed:', err);
+  }
+}
+
 /** Save the snapshot to localStorage. Idempotent; safe to spam. */
 export function savePersistedRightTabs(tabs: readonly RightTabRef[], activeIndex: number): void {
   try {
