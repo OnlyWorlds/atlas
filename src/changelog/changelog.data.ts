@@ -56,6 +56,55 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.13',
+    date: '2026-09-29',
+    theme: 'nobody gets stuck',
+    entries: [
+      {
+        id: 'tour-in-narrow-windows',
+        title: 'The guided tour works in narrow windows',
+        body: 'Below about 1100 pixels wide, Atlas folds its side panels away, and the tour pointed at controls inside them and could not go on: on phones at the first step, on smaller laptop windows at the map. The tour now opens the panel each step needs, and the panel buttons stay on screen if you close one.',
+        tags: ['tour', 'layout', 'fix'],
+      },
+      {
+        id: 'pin-opens-the-map',
+        title: 'Placing a pin in a narrow window opens the map',
+        body: 'Clicking + pin while the map was folded away left the next click nowhere to go. The map now opens, ready for the click.',
+        tags: ['maps', 'layout', 'fix'],
+      },
+      {
+        id: 'narrow-no-world',
+        title: 'A narrow window with no world open shows the Worlds list',
+        body: 'With no world open, a narrow window showed an empty page that pointed at a list you could not see. It now opens the Worlds panel, and the panel button is there to bring it back.',
+        tags: ['layout', 'fix'],
+      },
+      {
+        id: 'private-window-says-why',
+        title: 'A private window says why the tour cannot run',
+        body: 'Firefox private windows do not allow the browser storage the tour keeps its world in. Atlas now says so on the first screen, instead of stopping at the tour\'s first step with a technical error.',
+        tags: ['tour', 'fix'],
+      },
+      {
+        id: 'reload-after-update',
+        title: 'A tab left open through an update picks up the new version cleanly',
+        body: 'After an update, a tab that was already open could fail to open rooms and editors. It now offers one Reload, and every reload after an update saves your unsaved text first, in every open tab.',
+        tags: ['safety', 'fix'],
+      },
+      {
+        id: 'quick-return-stays-quick',
+        title: 'Going back to a world you just left no longer reopens it from scratch',
+        body: 'Atlas keeps a world you leave ready for a quick return. Two saves of the same small file could collide and throw that away, so the world reopened slowly; each file now takes its saves one at a time.',
+        tags: ['performance', 'fix'],
+      },
+      {
+        id: 'make-online-own-failures',
+        title: 'Taking a world online no longer asks about its own failed uploads',
+        body: 'When some uploads failed while taking a world online, Atlas then asked whether to upload a batch of changes found on disk: the same elements. It now retries them and says which failed.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.12',
     date: '2026-09-29',
     theme: 'open what your AI made',

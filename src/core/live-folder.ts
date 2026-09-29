@@ -175,6 +175,19 @@ export async function answerHeldBatch(upload: boolean): Promise<void> {
   held.release(); // pushes on release unless the world is now paused
 }
 
+/**
+ * Drop a waiting big-batch question for this world without answering it
+ * (S366 gate A2). Taking a world online IS the answer: the link just tried to
+ * upload every element, so a question saved before it (a world held, then
+ * unlinked, then linked again) must not come back with its old count.
+ */
+export function forgetPersistedDiskHold(worldId: string): void {
+  if (!heldMap()[worldId]) return;
+  persistHeld(worldId, null);
+  const prev = notices.get(worldId);
+  if (prev?.held) setNotice({ ...prev, held: null });
+}
+
 /** True when a big-batch question is waiting for this world (persisted across reloads). */
 export function isDiskHoldPersisted(worldId: string): boolean {
   return !!heldMap()[worldId];

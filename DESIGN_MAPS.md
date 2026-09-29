@@ -435,7 +435,7 @@ Current behavior: right-click → opens element-create modal → new element + d
 
 ### 4.1 Pin coordinates anchor to the stored canvas dims (session 209, reshaped S300)
 
-**Origin (S361, atlas 1.8)**: `x`/`y` run from the map's BOTTOM-left, the schema's origin, and ARE Leaflet CRS.Simple `lng`/`lat` (`CoordinateUtils.ts`, no height in the conversion). Before 1.8 atlas stored y top-down; the map gear popover's "Flip pins and zones" mirrors one map once. DESIGN convention 97.
+**Origin (S361, atlas 1.8)**: `x`/`y` run from the map's BOTTOM-left, the schema's origin, and ARE Leaflet CRS.Simple `lng`/`lat` (`CoordinateUtils.ts`, no height in the conversion). Before 1.8 atlas stored y top-down; the map gear popover's "Flip pins and zones" mirrors one map once. DESIGN_LAWS convention 97.
 
 Pins anchor to the map's coordinate system, whose size is the stored `width`/`height`. The session-209 image gate ("pin placement refused without an image") existed to prevent the "pins-placed-on-default-2000-grid-then-canvas-shrinks-to-image" bug; since S300 that protection comes from **durable stored dims** instead of a refusal — every map carries `width`/`height` (decoded from its image, or the §4.2 imageless default), so the coordinate space never silently changes shape under the pins. The gate and its toasts are removed from all four sites (placement click, contextual right-click, sidebar drag-drop, zone drawing).
 

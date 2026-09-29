@@ -1,8 +1,8 @@
 # Atlas Sync — Architecture Notes
 
-Companion to `DESIGN.md`. This file captures **lessons + patterns** from building the sync layer — the WHY behind decisions, the bug categories we've hit, and what to watch for. Read this before touching sync code.
+Companion to `DESIGN_SYNC.md` (how the engine runs today). This file captures **lessons + patterns** from building the sync layer — the WHY behind decisions, the bug categories we've hit, and what to watch for. Read this before touching sync code.
 
-**⚑ DIALECT NOTE (v2 port, 2026-07-12)**: atlas element CRUD now speaks the keel **v2** dialect through `OwV2ClientAdapter` (thin fetch, no SDK). The frozen wire contract lives in `Forge/Notes/2026-07-12-v2-probed-facts.md`; the /changes pull design + its adversarial-gate resolutions in `Forge/Notes/2026-07-12-v2-changes-pull-design.md`. Sections below marked HISTORY (v1) describe the retired v1 dialect — kept because the failure PATTERNS they teach still apply.
+**⚑ DIALECT NOTE (v2 port, 2026-07-12)**: atlas element CRUD now speaks the keel **v2** dialect through `OwV2ClientAdapter` (thin fetch, no SDK). The frozen wire contract lives in `Forge/Notes/Archive/2026-07-12-v2-probed-facts.md`; the /changes pull design + its adversarial-gate resolutions in `Forge/Notes/Archive/2026-07-12-v2-changes-pull-design.md`. Sections below marked HISTORY (v1) describe the retired v1 dialect — kept because the failure PATTERNS they teach still apply.
 
 ---
 
@@ -30,11 +30,15 @@ HISTORY (pre-keel): the old Django server assigned its OWN UUID v7 on CREATE, ov
 
 ### Symptoms when not handled
 
+History (pre-keel), no longer the code path. keel keeps client ids, so this cannot happen on the engine path today.
+
 - Local file has Location at client-uuid-v4. Server has it at server-uuid-v7.
 - Next pull: server lists at v7. Local file at v4 has `server_updated_at` set but isn't in seenLocalIds. → **Server-delete detection fires falsely** ("vanished from server" modal).
 - Foreign keys in OTHER local elements still point at v4. Push of those elements 400s with "Invalid FK".
 
 ### The id-swap fix
+
+History (pre-keel), no longer the code path. The engine's create-path swap was excised 2026-07-12; Route 2's match-phase swaps are the only swaps left (DESIGN_SYNC "Make Online").
 
 Both `pushPhase` and `mergeLocalIntoApi`'s CREATE branch do this:
 
@@ -218,6 +222,8 @@ round retries. Same as pre-Bout-U behavior, scoped to the rare case.
 
 ### Combined with id-swap
 
+History (pre-keel), no longer the code path. The server no longer reassigns ids, and CREATE batches of two or more go through `/bulk`.
+
 The id-swap path (server enforces UUID v7, overrides client's v4) still
 fires. After Location's CREATE produces a server-assigned id,
 `rewriteIdReferences` updates Character's local file before Character's
@@ -248,7 +254,7 @@ When `pushPhase` or `pullPhase` sees a 401/403:
 3. **Surface via state.** Caller (runPushOnly / runPullOnly / runSync) checks `result.auth_blocked` and calls `setAuthError()` instead of transitioning to idle. `setAuthError` sets `paused=true` AND state to `{kind: 'error', message: 'authentication failed...', recoverable: true}`. The pill maps `error` to red display.
 4. **Bail pull when push auth-blocks.** `runSync` skips the pull phase if push hit auth — same dead key would 401 there too.
 5. **Surface via toast.** `sync-attach.emitConflictToasts` (despite the name) now checks `result.auth_blocked` first and fires the dedicated "sync paused: authentication failed..." error toast pointing to settings. The conflict-handling code stays below.
-6. **Surface flush-on-attach failures.** Previously logged to console only. Now toasts "couldn't sync N pending change(s)" when post-attach push has failures with no successes. Auth case gets the dedicated toast; generic failures get the generic message. (S365: the success toast reads "Uploaded N change(s) that were waiting in the folder", neutral about who made them; above 50 changed elements the flush holds and asks instead, DESIGN conv. 117.)
+6. **Surface flush-on-attach failures.** Previously logged to console only. Now toasts "couldn't sync N pending change(s)" when post-attach push has failures with no successes. Auth case gets the dedicated toast; generic failures get the generic message. (S365: the success toast reads "Uploaded N change(s) that were waiting in the folder", neutral about who made them; above 50 changed elements the flush holds and asks instead, DESIGN_LAWS conv. 117.)
 
 ### Detection
 
@@ -348,6 +354,8 @@ Useful sequences:
 
 ## Atlas-extension fields and the `applyServerRecord` overlay contract
 
+Superseded in part by the v2 split: only `ATLAS_LOCAL_ONLY_FIELDS` are preserved from the local file on pull; for `ATLAS_WIRE_EXTENSION_FIELDS` the server value wins. `ATLAS_FIELDS.md` is the register.
+
 (Added Bout V, session 202.)
 
 Some fields live ONLY on local element files — the OW server has no concept of them. Today: `image_media_id`. Future: anything else atlas adds. The canonical list is `ATLAS_LOCAL_EXTENSION_FIELDS` in `src/core/constants.ts`. Two contracts depend on it:
@@ -389,7 +397,7 @@ If two new locals reference each other (Bob, Carol with `Carol.friends = [bob.lo
 
 Fix: `applyIdSwapsToBody` rewrites in-memory bodies before each adapter call, using the current `idSwaps` Map. Belt-and-suspenders on top of the per-iteration re-fetch — covers CREATE and (defensively) matched UPDATE branches. Idempotent for bodies whose FKs are already current.
 
-**Why the engine's `pushPhase` doesn't need this**: it calls `rewriteIdReferences` INSIDE the iteration loop after each id-swap. The next iteration's `getElement` returns post-rewrite content. Merge's 5-phase ordering rewrites between phases instead, so the gap is unique to merge.
+**Why the engine's `pushPhase` doesn't need this** (History (pre-keel), no longer the code path; the engine no longer swaps ids at all): it called `rewriteIdReferences` INSIDE the iteration loop after each id-swap. The next iteration's `getElement` returns post-rewrite content. Merge's 5-phase ordering rewrites between phases instead, so the gap is unique to merge.
 
 ---
 
@@ -433,6 +441,8 @@ Same fix covers `resolveConflict('overwrite-mine')` — that path also does an U
 ---
 
 ## ID-swap propagates to UI state + URL (closed Bouts 9 + 9b)
+
+History (pre-keel), no longer the code path. The engine has no `onIdSwap` hook (`sync-attach.ts`); `handleIdSwap` survives for Route 2's match-phase swaps through `applyIdSwapToUi`, and the atomic-transition rule below still holds there.
 
 (Added Bout 9, session 204.)
 
@@ -488,14 +498,14 @@ Updated through session 257. Listed by surface — none are cutover blockers.
 
 ### v2 close-gate deferrals (2026-07-12, documented not fixed)
 - **skipIds on the /changes path is event-once**: an op for a push-conflicted id is skipped for the whole round and the cursor passes it; a genuinely newer third-party op for that id in the SAME round is never re-seen (the full-list pull re-derived it next round; the cursor path doesn't). Requires a 3-device same-round race; self-heals on any later edit to the element. Fix shape when it matters: scope the skip to ops at-or-below the conflict's seq, or drop skipIds on the changes path and rely on !serverChanged idempotence + conflict dedup.
-- **~7 flow suites still drive the v1 OwClientAdapter** (initial-download, knowledge-sync, zoneMarkerOrder, sharing-sync, make-online legacy, ow-client-adapter*): their integration confidence for the v2 production dialect is partial (the v2 adapter has its own direct suite + the bulkMerge/bulkPush/changesPull suites). Migrate them to statefulV2Handlers / the v2 fake in the SAME named cleanup bout that deletes the v1 adapter + excises id-swap.
+- History (pre-keel), no longer the code path. CLOSED 2026-07-12: the v1 adapter and its dedicated suites were deleted and the flow suites moved to the v2 fake. Was: **~7 flow suites still drive the v1 OwClientAdapter** (initial-download, knowledge-sync, zoneMarkerOrder, sharing-sync, make-online legacy, ow-client-adapter*): their integration confidence for the v2 production dialect is partial (the v2 adapter has its own direct suite + the bulkMerge/bulkPush/changesPull suites). Migrate them to statefulV2Handlers / the v2 fake in the SAME named cleanup bout that deletes the v1 adapter + excises id-swap.
 - **list items missing `updated_at`** are skipped-and-marked-incomplete (defensive, mirrors the /changes hardening); whether keel's list serializer can ever omit it is an open Skeld question.
 
 ### Sync engine internals
 - ~~**Concurrent-edit race on autosave**~~ CLOSED: an edit landing while its push is in flight stays dirty (S360 H1, `store/sync-stamp.ts`, convention 96); a create adopted after a lost response compares content and stays dirty when it differs (S361, `adoptServerCopy`). Pull-apply rides the per-id chain with its race check inside the slot (S361, `applyServerRecordIfUnchanged`). Push still stamps only, never applies the response body (by design).
 - **`pushPhase` UPDATE doesn't apply server response back to local**: refuted-by-design from session-205 pressure-test (push asserts local is correct). Revisit only if OW server starts normalizing fields server-side.
-- **`resolveConflict` CREATE path id-swap**: corner case — resolve-conflict on never-synced element doesn't swap if server returns a different id. Not tripped in practice.
-- **`rewriteIdReferences` bumps `local_updated_at`**: causes harmless re-push on next sync after id-swap. Add a "rewrite without bumping" mode if the trailing-push cost ever shows up in profiling.
+- History (pre-keel), no longer the code path. **`resolveConflict` CREATE path id-swap**: corner case — resolve-conflict on never-synced element doesn't swap if server returns a different id. Not tripped in practice.
+- **`rewriteIdReferences` bumps `local_updated_at`** (Route 2 only, `make-online.ts`; the engine no longer calls it): causes harmless re-push on next sync after id-swap. Add a "rewrite without bumping" mode if the trailing-push cost ever shows up in profiling.
 
 ### Reliability edges
 - **Cascade-delete loop crash leaves inconsistent state** (pressure-test Path 10): FS Access API has no transactions. Pre-collect tombstones into one write before unlinking files would harden. Worst case today: "confusing server-delete modal on next sync."
@@ -545,6 +555,8 @@ When a UI surface tries to run a sync action and `getCurrentSyncEngine()` return
 
 ### Atlas-local fields must be stripped on the wire (session 221 live bug)
 
+History (pre-keel), no longer the code path. The v1 `OwClientAdapter` is gone, and the zone visuals now SYNC; the v2 rule is `ATLAS_FIELDS.md`. The lesson (fakes must reject what the real server rejects) stands.
+
 Captain's bug: fresh world, drew zones, made online, push failed:
 ```
 POST /marker/ 500 (Internal Server Error)
@@ -563,7 +575,7 @@ Why tests didn't catch it: the fakes (FakeOwApiClient + MSW handlers) silently s
 
 When adding a new atlas-only field: append it to `ATLAS_LOCAL_EXTENSION_FIELDS`. Both ends (write-strip + pull-preserve) pick it up automatically. The fake guards (`rejectAtlasLocalFields` in `fake-ow-client.ts`, the ATLAS_LOCAL list in `msw-handlers.ts`) also need the field name added so regressions surface in tests.
 
-Verified by `tests/integration/ow-client-adapter.atlasLocal.test.ts` (4 tests).
+Was verified by the v1 adapter's atlasLocal suite, deleted with the adapter; the v2 split is locked by `tests/integration/ow-v2-client-adapter.test.ts` ("LOCAL_ONLY stripped from writes").
 
 ### Dangling-link routing (invalid_link → server-delete review) — v2 rewrite of the old FK routing
 
@@ -634,7 +646,7 @@ download + edit-block + a wire log with zero writes.
 
 ## World-meta sync — the meta step (S262, gated)
 
-`world.json`'s eight OW wire fields sync via `GET|PATCH /world` (full design + all ten gate resolutions: `Forge/Notes/2026-07-13-worldmeta-sync-design.md`; the shipped shape is summarized in DESIGN.md "World-meta sync"). Engine-side facts a future session needs:
+`world.json`'s eight OW wire fields sync via `GET|PATCH /world` (full design + all ten gate resolutions: `Forge/Notes/2026-07-13-worldmeta-sync-design.md`; the shipped shape is summarized in DESIGN_SYNC.md "World-meta sync"). Engine-side facts a future session needs:
 
 - **`executeMetaStep()` opens every round** (all three run paths — a setNow debounce push must carry the now). Consequence for tests: every engine round now emits ONE `getWorldMeta` call; call-log assertions filter it (`sync-engine.push.test.ts` writeCalls) and dead-creds rounds bail AT THE META READ, before any element attempt (authBlocked/bulkPush suites re-locked to that truth; the element-loop first-bail is still covered via a per-element injected 401).
 - **Baseline lives in sync-state** (`meta_baseline`, canonical snapshot; `meta_server_updated_at` informational; `meta_conflicts` under pause-and-review). Seed rule: absent baseline → adopt server + fill local-empties, NEVER PATCH that round.
@@ -683,7 +695,7 @@ elements; cold open 18.5s → ~3s). Load-bearing rules:
 - The one-writer lock keeps other ATLAS tabs out; other TOOLS write the
   folder freely (an AI agent, a text editor, git), and the cache handles them
   in three layers: since S359 their edits SURVIVE atlas's writes (every write
-  merges into the file as it is on disk, `readForWrite`, DESIGN conv. 92);
+  merges into the file as it is on disk, `readForWrite`, DESIGN_LAWS conv. 92);
   since S361 a file that will not parse is never written over
   (`CorruptFileError`); since S364 they are SHOWN (the live folder,
   `rescanDisk`, conv. 111: a stat pass against the stamps atlas recorded,
@@ -734,7 +746,7 @@ full step and pushes.
 
 ## Foreign ids, the hold, and the re-key (S363, gated twice)
 
-keel preserves client ids and refuses a create whose id lives in another world. Before S363 atlas could only say so (the S360 toast); now it records the refusal and can give the element a new id. DESIGN conventions 105-108 hold the rules; the lessons that cost the most:
+keel preserves client ids and refuses a create whose id lives in another world. Before S363 atlas could only say so (the S360 toast); now it records the refusal and can give the element a new id. DESIGN_LAWS conventions 105-108 hold the rules; the lessons that cost the most:
 
 - **"Foreign" needs evidence.** A single POST 409s for a same-world id too (a create that landed while its response was lost), so a 409 is foreign only when the read-back ANSWERED "not here". The old classifier also counted a failed read-back (503, 401), and a re-key of such an element would have duplicated it on the server. /bulk upserts same-world ids, so a bulk `id_conflict` is foreign as keel says.
 - **A foreign entry expires when the id is sent and not refused again**: the other world may have freed the id, and the create can land with its backfill failing (no baseline yet). Keeping it would have offered a re-key of an element already on this server.

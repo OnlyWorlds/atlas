@@ -26,6 +26,7 @@
 
 import { hasFolderMode } from '../core/capabilities';
 import { confirmExitTour } from './tour-exit-modal';
+import { showTourPane, tourPaneFor } from './tour-pane';
 import { ELEMENT_ICONS, ELEMENT_LABELS, ELEMENT_TYPE_COLORS } from '../core/constants';
 import { getState, subscribe } from '../core/state';
 import type { ElementType } from '../core/types';
@@ -91,6 +92,9 @@ function setDockCollapsed(v: boolean): void {
  *  reached this run; back-navigation keeps the pane. Reset on unmount. */
 let webSeen = false;
 
+/** The narrow-window pane last shown for a step (S366); applied only when it changes. Reset on unmount. */
+let lastPaneKey: string | null = null;
+
 export function ensureTourBar(container: HTMLElement): void {
   if (isTourActive() && !root) mount(container);
   else if (!isTourActive() && root) unmount();
@@ -145,6 +149,7 @@ function unmount(): void {
   root = null;
   dockCollapsed = false;
   webSeen = false;
+  lastPaneKey = null;
   document.body.classList.remove('atlas-touring', 'atlas-tour-prezone', 'atlas-tour-preweb',
     'atlas-tour-pinstep', 'atlas-tour-createstep', 'atlas-tour-nowstep', 'atlas-tour-finalstep',
     'atlas-tour-collapsed', 'atlas-tour-basefull');
@@ -411,6 +416,14 @@ function render(): void {
   // Field rows the step narrates glow subtly (Captain, S316) — injected as a
   // style tag so detail re-renders can never wipe the highlight.
   applyFieldHighlights(step);
+  // A narrow window shows the pane the step points at (S366): its drawers
+  // start closed, so step 1's icon and the map beats were out of reach.
+  const pane = tourPaneFor(step, handsOnDone, step.creates ? hasAll(step.creates)(view) : true);
+  const paneKey = `${idx}|${pane}`;
+  if (paneKey !== lastPaneKey) {
+    lastPaneKey = paneKey;
+    showTourPane(pane);
+  }
   // Re-assert the collapse state (the handlers toggle it directly; render
   // must agree with the flag after any state tick).
   document.body.classList.toggle('atlas-tour-collapsed', dockCollapsed);

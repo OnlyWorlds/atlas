@@ -15,7 +15,7 @@
  * we log + skip engine creation; the UI surfaces this via the pill state.
  */
 
-import { adoptPersistedDiskHold, holdBigBatchAtOpen, isDiskHoldPersisted, BIG_BATCH } from '../core/live-folder';
+import { adoptPersistedDiskHold, forgetPersistedDiskHold, holdBigBatchAtOpen, isDiskHoldPersisted, BIG_BATCH } from '../core/live-folder';
 import { OwV2ClientAdapter } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
@@ -53,7 +53,18 @@ let chartsMigrationChain: Promise<void> = Promise.resolve();
  *   - Default conflict policy comes from `registry.sync_default_policy` (or
  *     `local-wins` if not set).
  */
-export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore): SyncEngine | null {
+/**
+ * `justLinked` (S366): the attach Make Online itself performs. Its own failed
+ * uploads are unstamped elements, which the big-batch rule would otherwise
+ * report as "changed on disk" and hold for an answer, right after the user
+ * clicked Link (and the foreign-id record waits on that answer). The link IS
+ * the user's answer: flush unasked, report the failures.
+ */
+export function attachSyncEngine(
+  entry: WorldRegistryEntry,
+  folder: FolderStore,
+  opts: { justLinked?: boolean } = {},
+): SyncEngine | null {
   // Always detach the previous engine first — at most one active at a time.
   detachSyncEngine();
 
@@ -102,6 +113,8 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
   // A batch of outside edits that was waiting for the user's answer when the
   // world was left (or the page reloaded) keeps waiting (S364 gate lens B B3):
   // the hold goes on BEFORE the flush-on-attach below, which would push it.
+  // The link's own attach answers any question saved before it (gate A2).
+  if (opts.justLinked) forgetPersistedDiskHold(entry.id);
   if (!readOnly) adoptPersistedDiskHold(entry.id, engine);
   currentFolder = folder;
 
@@ -147,7 +160,7 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
       // state, and the local-first push asymmetry doesn't apply (no pushes).
       if (!readOnly) {
         try {
-          await flushPendingOnAttach(engine, folder, entry.name, entry.id);
+          await flushPendingOnAttach(engine, folder, entry.name, entry.id, !!opts.justLinked);
         } catch (err) {
           // flushPendingOnAttach swallows its own errors; outer catch is defense-
           // in-depth in case the helper is ever refactored to throw.
@@ -182,6 +195,7 @@ async function flushPendingOnAttach(
   folder: FolderStore,
   worldName: string,
   worldId: string,
+  justLinked = false,
 ): Promise<void> {
   try {
     const changed = await folder.listLocallyChangedSince(null);
@@ -191,7 +205,7 @@ async function flushPendingOnAttach(
     // A batch too big to upload unasked waits for the user, as it would with
     // the window open (S365, `holdBigBatchAtOpen`). A hold already persisted
     // was adopted before this ran and refuses the round by itself.
-    if (changed.length > BIG_BATCH && !isDiskHoldPersisted(worldId)) {
+    if (!justLinked && changed.length > BIG_BATCH && !isDiskHoldPersisted(worldId)) {
       holdBigBatchAtOpen(worldId, changed.length, engine);
       return;
     }

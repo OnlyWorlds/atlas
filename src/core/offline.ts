@@ -14,6 +14,7 @@
  */
 
 import { flushBeforeLeavingWorld } from './leave-flush';
+import { reloadAfterFlush, showReloadBanner } from './reload-offer';
 
 export function registerServiceWorker(): void {
   // Dev-mode: vite-plugin-pwa is configured to not emit a SW unless
@@ -34,9 +35,15 @@ export function registerServiceWorker(): void {
           // Reload saves the rooms' pending text first (S361, gate F9: the
           // reload discarded a debounced scene save; pagehide is only a
           // best-effort net for async writes).
-          onNeedRefresh: () => showUpdateBanner(() => {
+          onNeedRefresh: () => showReloadBanner('A new version of Atlas is ready.', true, () => {
             void flushBeforeLeavingWorld().finally(() => { void updateSW(true); });
           }),
+          // Once the new version takes control, EVERY open tab reloads, the
+          // ones that said "Later" included (the old page cannot keep
+          // running on the new version's files). The plugin's default is a
+          // bare `location.reload()`, which dropped the other tabs' pending
+          // text (S366, lane C B2): save first, then reload.
+          onNeedReload: () => { void reloadAfterFlush(); },
         });
       }
     })
@@ -44,26 +51,4 @@ export function registerServiceWorker(): void {
       // Non-fatal: app still runs without offline support.
       console.warn('[atlas:offline] service worker registration skipped:', err);
     });
-}
-
-/** The "new version" offer: one quiet banner, Reload or dismiss. Never automatic. */
-function showUpdateBanner(onReload: () => void): void {
-  if (document.querySelector('.atlas-update-banner')) return;
-  const bar = document.createElement('div');
-  bar.className = 'atlas-update-banner';
-  bar.setAttribute('role', 'status');
-  const text = document.createElement('span');
-  text.textContent = 'A new version of Atlas is ready.';
-  const reload = document.createElement('button');
-  reload.type = 'button';
-  reload.className = 'atlas-btn-primary';
-  reload.textContent = 'Reload';
-  reload.addEventListener('click', onReload);
-  const later = document.createElement('button');
-  later.type = 'button';
-  later.className = 'atlas-btn-ghost';
-  later.textContent = 'Later';
-  later.addEventListener('click', () => bar.remove());
-  bar.append(text, reload, later);
-  document.body.appendChild(bar);
 }

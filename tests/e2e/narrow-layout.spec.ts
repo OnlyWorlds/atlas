@@ -225,3 +225,29 @@ test.describe('narrow windows', () => {
     expect(geo.copy!.bottom).toBeLessThanOrEqual(geo.controls!.top + 1);
   });
 });
+
+// S366 (lane C B1): below 820px with no world open, the sidebar drawer held
+// the only thing to do and nothing opened it: the preview strip had no
+// toggle and the copy pointed at "the top left". Now the no-world screen
+// opens the drawer once, and the toggle is there for a user who closes it.
+test('at 760 with a home folder and no world open, the sidebar is in reach', async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 820 });
+  await freshBoot(page);
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const fsRoot = await navigator.storage.getDirectory();
+    api.setNextDirectory(await fsRoot.getDirectoryHandle('narrow-noworld', { create: true }));
+  });
+  await page.click('[data-action="setup-atlas"]');
+  const create = page.locator('.atlas-worlds-header [data-action="create-local"]');
+  const inReach = async () => {
+    const box = await create.boundingBox();
+    return !!box && box.x >= 0 && box.x + box.width <= 760;
+  };
+  await expect.poll(inReach).toBe(true);
+  // Closed by hand through the scrim, it comes back from the strip's toggle.
+  await page.locator('.atlas-drawer-scrim').click({ position: { x: 700, y: 300 } });
+  await expect.poll(inReach).toBe(false);
+  await page.locator('.atlas-room-nav-drawer-btn.is-sidebar').click();
+  await expect.poll(inReach).toBe(true);
+});

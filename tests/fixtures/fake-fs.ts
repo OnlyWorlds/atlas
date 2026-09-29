@@ -20,6 +20,16 @@ function err(name: string, msg: string): Error { const e = new Error(msg); e.nam
 let fakeClock = 1_700_000_000_000;
 const tick = (): number => ++fakeClock;
 
+/**
+ * Optional latency (S366): the real file system resolves each step after a
+ * variable delay, so two overlapping writes of one file interleave; this fake
+ * resolves in microtask order and they never do. A test that is about a race
+ * sets a jitter for its duration and clears it (`setFakeFsJitter(null)`).
+ */
+let jitter: (() => Promise<void>) | null = null;
+export function setFakeFsJitter(fn: (() => Promise<void>) | null): void { jitter = fn; }
+const settle = async (): Promise<void> => { if (jitter) await jitter(); };
+
 /** Content reads across every fake file (`text()` calls): a cost probe for passes that should only stat. */
 let contentReads = 0;
 export const fakeContentReads = (): number => contentReads;
@@ -37,20 +47,22 @@ export class FakeFileHandle {
   removed = false;
   constructor(public name: string, public data: string = '') {}
   async getFile() {
+    await settle();
     if (this.removed) throw err('NotFoundError', `file ${this.name} was removed`);
     return new FakeBlob(this.data, '', this.lastModified);
   }
   async createWritable(opts: { keepExistingData?: boolean } = {}) {
     let buf = opts.keepExistingData ? this.data : '';
     return {
-      truncate: async (n: number) => { buf = buf.slice(0, n); },
+      truncate: async (n: number) => { await settle(); buf = buf.slice(0, n); },
       write: async (v: unknown) => {
+        await settle();
         if (typeof v === 'string') buf += v;
         else if (v instanceof FakeBlob) buf += v.data;
         else if (v && typeof (v as { text?: unknown }).text === 'function') buf += await (v as Blob).text();
         else buf += String(v);
       },
-      close: async () => { this.data = buf; this.lastModified = tick(); },
+      close: async () => { await settle(); this.data = buf; this.lastModified = tick(); },
     };
   }
 }

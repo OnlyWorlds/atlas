@@ -175,9 +175,9 @@ export function isDemoKey(apiKey: string): boolean {
  *     the preserve-loop would clobber every pulled change with the stale
  *     local value.
  *
- * The v1 dialect rejects ALL extension fields (adapter mirrors v1's exact
- * strictness — Skeld 2026-07-12), so wire extensions are v2-only; the legacy
- * v1 adapter keeps stripping the combined list.
+ * The v1 dialect rejects ALL extension fields (Skeld 2026-07-12), so wire
+ * extensions are v2-only. The sync path is v2 only (`OwV2ClientAdapter`);
+ * the v1 adapter this line once described is gone.
  *
  * Add new atlas-only fields to LOCAL_ONLY; new synced extensions to WIRE.
  */

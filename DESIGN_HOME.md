@@ -2,7 +2,7 @@
 
 **Version**: 1.0 (2026-05-18)
 **Status**: ⚠️ **PARTIALLY SUPERSEDED (session 248, workplan D2)** — home is now the **cover-page × study-desk hybrid**: identity hero (+ cover image), quiet text-links, D2b cast slot (protagonist/home favorites), woven clickable stat line, Continue strip, tight room-routed Recent. The count-card grid, timeline-mini, and boxed quick actions below are GONE (timeline-mini may return post-charts-sitdown as a starred chart). Current truth: `src/middle/world-home.ts` header comment + PROGRESS.md session-248 entries. Sections below remain valid for identity click-edit + onboarding.
-**Related**: `DESIGN.md` (Rooms model), `DESIGN_WRITING.md`, `DESIGN_SHARING.md`
+**Related**: `DESIGN_SHELL.md` (Rooms model), `DESIGN_WRITING.md`, `DESIGN_SHARING.md`
 
 ---
 
@@ -50,7 +50,7 @@ The home that renders today is the **cover-page × study-desk hybrid** (bout H r
 
 On an empty (or tutorial-state) world the desk and stat line give way to the **home-tour CTA cards** (`buildTour`, S264) — the create pair, then the next wave / room CTAs. The tour renders nothing on a built-out (or dismissed) world, and never on a view-only world.
 
-The room nav strip is shared across all rooms (see `DESIGN.md` Rooms section). It's not "part of" home — home content begins below it.
+The room nav strip is shared across all rooms (see `DESIGN_SHELL.md` Rooms section). It's not "part of" home — home content begins below it.
 
 ---
 
@@ -85,7 +85,7 @@ One list (`buildDesk`), newest first. A **Continue strip** surfaces the last wri
 
 ## Superseded layout (historical)
 
-*The sections below describe the pre-D2 home (count-card grid, compact timeline-mini, boxed quick actions). They were removed at session 248 (workplan H2-H6); `src/visualization/timeline-bar.ts` was later deleted (see DESIGN_CHARTS.md). Kept for design history — not what renders today.*
+*The sections below describe the pre-D2 home (count-card grid, compact timeline-mini, boxed quick actions). They were removed at session 248 (workplan H2-H6); the timeline-bar module (src/visualization/timeline-bar.ts) was later deleted (see DESIGN_CHARTS.md). Kept for design history — not what renders today.*
 
 ### ~~1. Identity strip~~ (superseded — see "Identity (cover)" above)
 
@@ -104,7 +104,7 @@ Visual: horizontal row of compact `<icon><count>` tiles. Wraps if needed. Pin/ma
 
 ### ~~3. Compact timeline~~ (superseded — module deleted; see "Chart strip" above)
 
-Embedded `timeline-bar` component (was `src/visualization/timeline-bar.ts`, ported from `tools/little-element-viewer/src/timeline/` — **deleted**; the strip now runs the chart pipeline / `tableauScope`).
+Embedded `timeline-bar` component (was src/visualization/timeline-bar.ts, ported from `tools/little-element-viewer/src/timeline/` — **deleted**; the strip now runs the chart pipeline / `tableauScope`).
 
 Compact mode: ~100px tall. Multi-row dot binning across temporal elements. Click dot → element room. Click empty axis (or "expand" affordance) → full timeline room (`#/w/<id>/timeline`).
 
@@ -157,8 +157,8 @@ Subscribes to state changes via standard `subscribe()` and re-renders on data/ac
 
 ## Conventions added
 
-- **#31** (in DESIGN.md): Room nav strip mounts to `shell.middleRoomNav`, room content to `shell.middleContent`. Middle pane is a flex column.
-- **#32** (in DESIGN.md): Esc clears `selectedElementId` and navigates to home. Clicking the selected element row in sidebar toggles off (same effect).
+- **#31** (in DESIGN_LAWS.md): Room nav strip mounts to `shell.middleRoomNav`, room content to `shell.middleContent`. Middle pane is a flex column.
+- **#32** (in DESIGN_LAWS.md): Esc clears `selectedElementId` and navigates to home. Clicking the selected element row in sidebar toggles off (same effect).
 
 ---
 

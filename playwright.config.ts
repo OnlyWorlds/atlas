@@ -33,10 +33,30 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
+  // Firefox (S366): a TAGGED handful, not the suite. Firefox has no folder
+  // picker, so what it can do (the tour, later browser worlds) is small and
+  // specific; `@firefox` specs run there and not in Chromium. `@private` runs
+  // in Firefox with private browsing forced on, which is how a private
+  // window refuses browser storage (measured: getDirectory() SecurityError).
+  // The count rule is per project: `--list --project=<name>` equals its run.
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      grepInvert: /@firefox|@private/,
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+      grep: /@firefox/,
+    },
+    {
+      name: 'firefox-private',
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: { firefoxUserPrefs: { 'browser.privatebrowsing.autostart': true } },
+      },
+      grep: /@private/,
     },
   ],
   webServer: {

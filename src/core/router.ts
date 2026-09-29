@@ -1,12 +1,13 @@
 /**
  * Hash-based router (no server rewrites needed — Cloudflare Pages friendly).
  *
- * URL scheme (session 223+ rooms model — see DESIGN.md "Rooms"):
+ * URL scheme (the rooms model; the full table is DESIGN_SHELL "Routes").
+ * The sidebar mode is UI state, never a route (conv. 37): `/elements`
+ * survives only as a legacy alias that lands on home.
  *
- *   Sidebar-mode signals (independent of middle room):
  *     #/                                          → welcome, no world
- *     #/w/<id>                                    → home room, sidebar: worlds
- *     #/w/<id>/elements                           → home room, sidebar: elements
+ *     #/w/<id>                                    → home room
+ *     #/w/<id>/elements                           → home room (legacy alias)
  *
  *   Room routes (middle pane):
  *     #/w/<id>/element/<eid>                      → element room
@@ -17,13 +18,13 @@
  *     LEGACY (still parsed for back-compat, no longer emitted):
  *     #/w/<id>/writing/book/<bId>[/chapter/<cId>[/scene/<sId>]]
  *     #/w/<id>/timeline                           → full timeline room
- *     #/w/<id>/search?q=<query>                   → search room
+ *     #/w/<id>/search                             → home (the search room was deleted; Ctrl+K is search)
  *     #/w/<id>/share                              → share room (page list)
  *     #/w/<id>/share/<pageId>                     → share room, page detail
  *     LEGACY (still parsed, no longer emitted):
  *     #/w/<id>/publish[/<id>]                     → aliases to /share[/<id>]
  *     #/w/<id>/import                             → import room
- *     #/w/<id>/templates                          → templates room
+ *     #/w/<id>/templates                          → home (the templates room was deleted)
  *     #/w/<id>/settings[/<tab>]                   → settings room
  *
  *   Right-pane map composition (orthogonal — map lives in right pane):

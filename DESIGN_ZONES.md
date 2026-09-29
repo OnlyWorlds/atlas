@@ -527,7 +527,7 @@ Initial design assumption was that markers would need the same `prepareRelations
 
 **Defense encoded in fakes** (Convention #20): FakeOwApiClient and statefulOwHandlers reject any pin or marker write body containing `*_id_id` / `*_ids_ids` keys. If a future refactor accidentally routes a marker through prepareRelations-with-bare-names (which WOULD double-suffix), the regression fails its tests immediately.
 
-Verified by `tests/integration/ow-client-adapter.marker.test.ts`.
+Was verified by the v1 adapter's marker suite, deleted with that adapter in the 2026-07-12 v2 port (this section is v1 history: the sync path no longer uses `prepareRelations`). Today the marker rename is locked by `tests/integration/ow-v2-client-adapter.test.ts` ("marker map_id/zone_id land as bare map/zone").
 
 ### 8.2 Read-side unwrap
 

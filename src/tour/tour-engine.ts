@@ -938,6 +938,11 @@ export async function startTour(returnHash?: string): Promise<void> {
  * location so exit can return there.
  */
 export async function launchTour(): Promise<void> {
+  // Every door ends here (landing, Settings replay): a window that refuses
+  // browser storage says so in one plain line instead of stalling at the
+  // first create with a raw SecurityError (S366). Callers toast the message.
+  const { opfsUsable, NO_BROWSER_STORAGE_LINE } = await import('../core/capabilities');
+  if (!(await opfsUsable())) throw new Error(NO_BROWSER_STORAGE_LINE);
   const here = window.location.hash;
   // Launching from the tour's own world (shouldn't happen) or from nowhere →
   // return to the landing.
@@ -1085,6 +1090,44 @@ async function forgetTourMapUiState(worldId: string): Promise<void> {
   }
 }
 
+/**
+ * Is this browser-storage folder a tour world? Its world.json says
+ * `demo: true`, or it has none (the scaffold was interrupted before the first
+ * write). Anything else is somebody's world, whatever its name (S366).
+ */
+export async function isTourFolder(dir: FileSystemDirectoryHandle): Promise<boolean> {
+  let text: string;
+  try {
+    text = await (await (await dir.getFileHandle('world.json')).getFile()).text();
+  } catch (err) {
+    return (err as { name?: string })?.name === 'NotFoundError';
+  }
+  try {
+    return (JSON.parse(text) as { demo?: unknown })?.demo === true;
+  } catch {
+    return false; // unreadable: never delete what we cannot identify
+  }
+}
+
+/**
+ * Remove prior tour folders from browser storage. A tour folder is named
+ * `hyperion-tour-<uuid8>`, but so is a user's world called "Hyperion Tour"
+ * (the same scaffold names both), so the NAME only nominates: a folder goes
+ * only when `isTourFolder` says so. S366, the delete-by-name class S365's
+ * gate found in "Delete world + folder".
+ */
+export async function sweepTourFolders(opfs: FileSystemDirectoryHandle): Promise<string[]> {
+  const removed: string[] = [];
+  const entries = (opfs as unknown as { entries(): AsyncIterable<[string, FileSystemHandle]> }).entries();
+  for await (const [name, handle] of entries) {
+    if (!name.startsWith(TOUR_FOLDER) || handle.kind !== 'directory') continue;
+    if (await isTourFolder(handle as FileSystemDirectoryHandle)) {
+      await opfs.removeEntry(name, { recursive: true }).then(() => removed.push(name), () => {});
+    }
+  }
+  return removed;
+}
+
 /** Remove the tour world entirely (registry entry + handle + OPFS folder). */
 async function teardownPriorTourWorld(): Promise<void> {
   // Disarm any pending pin placement (gate MED scenario B, S299): a restart
@@ -1112,13 +1155,7 @@ async function teardownPriorTourWorld(): Promise<void> {
     await forgetTourMapUiState(entry.id);
   }
   try {
-    const opfs = await navigator.storage.getDirectory();
-    // Remove any prior tour folders (name is `hyperion-tour-<uuid8>`).
-    for await (const [name] of (opfs as unknown as AsyncIterable<[string, FileSystemHandle]>)) {
-      if (name.startsWith(TOUR_FOLDER)) {
-        await opfs.removeEntry(name, { recursive: true }).catch(() => {});
-      }
-    }
+    await sweepTourFolders(await navigator.storage.getDirectory());
   } catch { /* OPFS unavailable — nothing to clean */ }
   writeTourState(null);
 }

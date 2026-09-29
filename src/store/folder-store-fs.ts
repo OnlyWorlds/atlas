@@ -22,8 +22,11 @@
  * Writer lock: a single tab "owns" the folder at a time. Owner writes
  * `.atlas/lock = { tab_id, started_at, last_heartbeat }` and refreshes
  * `last_heartbeat` every LOCK_HEARTBEAT_MS. A peer opening the same folder
- * checks the lock: missing or older than LOCK_STALE_MS → take it. Otherwise →
- * open in read-only mode (writes throw).
+ * checks the lock: missing or older than LOCK_STALE_MS → take it. Otherwise
+ * `open()` throws `ELockHeld` and the caller offers a consented take-over
+ * (`forceTakeLock`); there is no read-only mode (an earlier line here said
+ * so; corrected S366, DESIGN_LAWS conv. 13). Every lock write runs on one
+ * chain (conv. 118).
  */
 
 import {
@@ -314,6 +317,23 @@ export class FsFolderStore implements FolderStore {
     this.worldMetaChain = next.then(() => undefined, () => undefined);
     return next;
   }
+  /**
+   * ONE WRITER PER FILE (S366). `writeJsonAtomic` stages through one fixed
+   * `<name>.tmp`, so two overlapping writes of the same file corrupt each
+   * other's staging (the first verify reads the second's bytes and removes
+   * the tmp; the second then fails). The lock had four writers (claim,
+   * heartbeat, park's staling, unpark) and park never waited for its own:
+   * a tab switch under load came back "not revived" (lane C: 21 of 320).
+   * Every lock read-modify-write runs here, in call order.
+   */
+  private lockChain: Promise<unknown> = Promise.resolve();
+  private runLockOp<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.lockChain.then(fn, fn);
+    this.lockChain = next.then(() => undefined, () => undefined);
+    return next;
+  }
+  /** The same rule for the other whole-file `.atlas/` writes (charts, styles, world prefs, the re-key journal), keyed by file name. */
+  private atlasFileChain = new PerIdWriteChain();
 
   constructor(opts: FsFolderStoreOptions = {}) {
     this.opts = opts;
@@ -328,7 +348,7 @@ export class FsFolderStore implements FolderStore {
     this.root = handle;
     await this.detectSpatialLayout();
     await this.ensureLayout();
-    await this.claimLock();
+    await this.runLockOp(() => this.claimLock());
     if (!this.opts.disableHeartbeat) {
       this.heartbeatTimer = setInterval(() => {
         this.refreshHeartbeat().catch(err => console.warn('[fs-folder-store] heartbeat:', err));
@@ -348,8 +368,10 @@ export class FsFolderStore implements FolderStore {
       // (stale-TTL takeover) — deleting unconditionally would destroy the
       // OTHER tab's live lock (parking bout, 2026-07-19).
       if (atlasDir) {
-        const lock = await readJson<LockPayload>(atlasDir, LOCK_FILE).catch(() => null);
-        if (lock && lock.tab_id === this.tabId) await removeFile(atlasDir, LOCK_FILE);
+        await this.runLockOp(async () => {
+          const lock = await readJson<LockPayload>(atlasDir, LOCK_FILE).catch(() => null);
+          if (lock && lock.tab_id === this.tabId) await removeFile(atlasDir, LOCK_FILE);
+        });
       }
     }
     this.root = null;
@@ -385,7 +407,9 @@ export class FsFolderStore implements FolderStore {
     // scary "open in another tab — take over?" prompt for worlds no tab is
     // using. Parked = takeable instantly; unpark still verifies tab_id, so
     // a takeover is detected and forces the cold reopen. Best-effort.
-    void (async () => {
+    // On the lock chain (S366): an unpark() right behind this waits for it,
+    // instead of writing the same file through the same tmp at once.
+    void this.runLockOp(async () => {
       try {
         if (!this.root) return;
         const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
@@ -394,7 +418,7 @@ export class FsFolderStore implements FolderStore {
           await writeJsonAtomic(atlasDir, LOCK_FILE, { ...lock, last_heartbeat: new Date(0).toISOString() });
         }
       } catch { /* parked lock staling is best-effort */ }
-    })();
+    });
   }
 
   /**
@@ -408,14 +432,19 @@ export class FsFolderStore implements FolderStore {
    */
   async unpark(): Promise<boolean> {
     if (!this.root) return false;
-    try {
-      const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
-      const lock = await readJson<LockPayload>(atlasDir, LOCK_FILE);
-      if (!lock || lock.tab_id !== this.tabId) return false;
-      await writeJsonAtomic(atlasDir, LOCK_FILE, { ...lock, last_heartbeat: this.clock() });
-    } catch {
-      return false;
-    }
+    const root = this.root;
+    const ours = await this.runLockOp(async () => {
+      try {
+        const atlasDir = await getDir(root, [ATLAS_INTERNAL_DIR]);
+        const lock = await readJson<LockPayload>(atlasDir, LOCK_FILE);
+        if (!lock || lock.tab_id !== this.tabId) return false;
+        await writeJsonAtomic(atlasDir, LOCK_FILE, { ...lock, last_heartbeat: this.clock() });
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (!ours) return false;
     if (!this.opts.disableHeartbeat && !this.heartbeatTimer) {
       this.heartbeatTimer = setInterval(() => {
         this.refreshHeartbeat().catch(err => console.warn('[fs-folder-store] heartbeat:', err));
@@ -492,16 +521,18 @@ export class FsFolderStore implements FolderStore {
     await writeJsonAtomic(atlasDir, LOCK_FILE, fresh);
   }
 
-  private async refreshHeartbeat(): Promise<void> {
-    if (!this.root) return;
-    const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
-    const existing = await readJson<LockPayload>(atlasDir, LOCK_FILE);
-    if (!existing || existing.tab_id !== this.tabId) {
-      // Lock was taken by another tab; stop heartbeating.
-      if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
-      return;
-    }
-    await writeJsonAtomic(atlasDir, LOCK_FILE, { ...existing, last_heartbeat: this.clock() });
+  private refreshHeartbeat(): Promise<void> {
+    return this.runLockOp(async () => {
+      if (!this.root) return;
+      const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
+      const existing = await readJson<LockPayload>(atlasDir, LOCK_FILE);
+      if (!existing || existing.tab_id !== this.tabId) {
+        // Lock was taken by another tab; stop heartbeating.
+        if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
+        return;
+      }
+      await writeJsonAtomic(atlasDir, LOCK_FILE, { ...existing, last_heartbeat: this.clock() });
+    });
   }
 
   private requireRoot(): FileSystemDirectoryHandle {
@@ -1994,13 +2025,13 @@ export class FsFolderStore implements FolderStore {
   async writeRekeyJournal(journal: RekeyJournal): Promise<void> {
     this.assertWritable();
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
-    await writeJsonAtomic(atlasDir, REKEY_JOURNAL_FILE, journal);
+    await this.atlasFileChain.run(REKEY_JOURNAL_FILE, () => writeJsonAtomic(atlasDir, REKEY_JOURNAL_FILE, journal));
     this.rekeyPendingIds = journalIds(journal);
   }
 
   async clearRekeyJournal(): Promise<void> {
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
-    await removeFile(atlasDir, REKEY_JOURNAL_FILE);
+    await this.atlasFileChain.run(REKEY_JOURNAL_FILE, () => removeFile(atlasDir, REKEY_JOURNAL_FILE));
     this.rekeyPendingIds = new Set();
   }
 
@@ -2073,10 +2104,12 @@ export class FsFolderStore implements FolderStore {
   async writeCharts(charts: ChartConfig[]): Promise<void> {
     this.assertWritable();
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
-    // The caller's list came from a tolerant read; a corrupt file read as
-    // "no charts" must not be replaced by it (S360).
-    await readJsonStrict(atlasDir, CHARTS_FILE);
-    await writeJsonAtomic(atlasDir, CHARTS_FILE, { charts });
+    await this.atlasFileChain.run(CHARTS_FILE, async () => {
+      // The caller's list came from a tolerant read; a corrupt file read as
+      // "no charts" must not be replaced by it (S360).
+      await readJsonStrict(atlasDir, CHARTS_FILE);
+      await writeJsonAtomic(atlasDir, CHARTS_FILE, { charts });
+    });
   }
 
   async readStyles(): Promise<WorldStyles> {
@@ -2087,9 +2120,11 @@ export class FsFolderStore implements FolderStore {
   async writeStyles(styles: WorldStyles): Promise<void> {
     this.assertWritable();
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
-    // Same guard as writeCharts: never replace a file we could not read (S360).
-    await readJsonStrict(atlasDir, STYLES_FILE);
-    await writeJsonAtomic(atlasDir, STYLES_FILE, styles);
+    await this.atlasFileChain.run(STYLES_FILE, async () => {
+      // Same guard as writeCharts: never replace a file we could not read (S360).
+      await readJsonStrict(atlasDir, STYLES_FILE);
+      await writeJsonAtomic(atlasDir, STYLES_FILE, styles);
+    });
   }
 
   async readWorldPrefs(): Promise<Record<string, unknown> | null> {
@@ -2102,8 +2137,10 @@ export class FsFolderStore implements FolderStore {
   async writeWorldPrefs(prefs: Record<string, unknown>): Promise<void> {
     this.assertWritable();
     const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
-    await readJsonStrict(atlasDir, WORLD_PREFS_FILE); // never replace a file we could not read
-    await writeJsonAtomic(atlasDir, WORLD_PREFS_FILE, prefs);
+    await this.atlasFileChain.run(WORLD_PREFS_FILE, async () => {
+      await readJsonStrict(atlasDir, WORLD_PREFS_FILE); // never replace a file we could not read
+      await writeJsonAtomic(atlasDir, WORLD_PREFS_FILE, prefs);
+    });
   }
 
   /**
@@ -2167,11 +2204,17 @@ export class FsFolderStore implements FolderStore {
       cleared++;
     }
     // 2. Drop every tombstone — they target ids on the now-defunct api world.
-    await this.writeTombstoneList([]);
+    //    On the tombstone chain (S366): a delete appending at this moment
+    //    must not race this write through the same tmp.
+    await this.runTombstoneOp(() => this.writeTombstoneList([]));
     // 3. Reset sync-state.json to the default empty-history shape. This also
     //    clears any persisted conflicts + server_deletes from the old world.
-    const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
-    await writeJsonAtomic(atlasDir, SYNC_STATE_FILE, { ...DEFAULT_SYNC_STATE });
+    //    On the sync-state chain (S366): a round recording state right now
+    //    otherwise overlaps this write (one tmp, two writers).
+    await this.runSyncStateOp(async () => {
+      const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+      await writeJsonAtomic(atlasDir, SYNC_STATE_FILE, { ...DEFAULT_SYNC_STATE });
+    });
     // 4. Strip the api block from world.json so a future reload-and-rescan
     //    (e.g., handle re-permission, fresh atlas root setup) doesn't try to
     //    auto-attach against dead credentials. Rides the world-meta chain —

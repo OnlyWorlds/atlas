@@ -703,7 +703,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       id: 'a',
       // NO UNCONDITIONAL GESTURE HERE (S307). This used to end "Pick one and
       // start building, or finish here" — but the folder picker button is
-      // gated on `hasFolderMode()`, and OPFS-only browsers (Safari 18.2+,
+      // gated on `hasFolderMode()`, and OPFS-only browsers (Safari 26+,
       // Firefox, which `main.ts` deliberately admits in tour-capable mode)
       // can complete all 17 steps and never see it. The code branched on the
       // capability; the sentence did not, so it instructed a control that was

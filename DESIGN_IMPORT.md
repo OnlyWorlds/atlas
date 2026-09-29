@@ -5,7 +5,7 @@
 UI (route segment stays `import`). The header below is the original pre-build
 design; treat PROGRESS.md as current for what actually shipped.
 **Owner**: Temper
-**Relationship**: companion to `DESIGN.md` (folder-first model, FolderStore, SyncEngine). Import is the last main data pillar. This doc is the stable reference for the import/export subsystem; operational state goes to `PROGRESS.md`.
+**Relationship**: companion to `DESIGN_FOLDER.md` (folder-first model, FolderStore) and `DESIGN_SYNC.md` (SyncEngine). Import is the last main data pillar. This doc is the stable reference for the import/export subsystem; operational state goes to `PROGRESS.md`.
 
 Grounded by the session-241 research sweep (6 read-only agents: atlas reconcile machinery · FolderStore surface · base-tool pipeline audit · validation/schema · test idioms · UI integration).
 

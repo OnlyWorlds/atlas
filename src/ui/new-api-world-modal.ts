@@ -143,7 +143,7 @@ export class NewApiWorldModal extends BaseModal {
             },
           });
           const updatedEntry = regAfter.worlds.find((w) => w.id === entry.id)!;
-          attachSyncEngine(updatedEntry, folder);
+          attachSyncEngine(updatedEntry, folder, { justLinked: true });
         }
 
         this.toasts.success(`${name} created online`);

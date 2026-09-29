@@ -94,6 +94,11 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
   function renderPreview(): void {
     strip.innerHTML = '';
     strip.classList.add('is-preview');
+    // The sidebar toggle belongs here too (S366): with no world open the
+    // worlds sidebar is the ONLY way in, and below 820px it is a drawer. The
+    // preview strip used to carry no toggle, so a narrow window with no world
+    // (the first visit, or after "set up a folder") had no way to reach it.
+    strip.appendChild(drawerToggle('sidebar', 'left_panel_open', 'Worlds and elements'));
     for (const room of ROOMS) {
       if (!PREVIEW_ROOM_IDS.has(room.id)) continue;
       const btn = document.createElement('button');

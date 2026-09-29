@@ -2283,7 +2283,7 @@ body.atlas-touring:not(.atlas-tour-cap-rightpane) .atlas-middle ~ .atlas-divider
    own capability (knowledge, pages, import, expander ride `allrooms`). */
 body.atlas-touring .atlas-room-nav-strip [data-room],
 body.atlas-touring .atlas-room-nav-expand,
-body.atlas-touring .atlas-room-nav-strip.is-preview {
+body.atlas-touring .atlas-room-nav-strip.is-preview .atlas-room-nav-preview-btn {
   display: none;
 }
 body.atlas-touring .atlas-room-nav-strip [data-room="home"] { display: inline-flex; }
@@ -15732,9 +15732,14 @@ body.atlas-narrow-sidebar.atlas-drawer-sidebar-open .atlas-sidebar {
 body.atlas-narrow .atlas-room-nav-drawer-btn.is-right { display: inline-flex; }
 body.atlas-narrow-sidebar .atlas-room-nav-drawer-btn.is-sidebar { display: inline-flex; }
 
-/* The tour owns the whole screen and drives its own navigation; a drawer
-   toggle during a tour step is a door out of the script. */
-body.atlas-touring .atlas-room-nav-drawer-btn { display: none !important; }
+/* During the tour a drawer toggle shows only once the tour has revealed its
+   pane (S366). They were hidden outright, as "a door out of the script", but
+   the tour then opened no drawer either, so in a narrow window step 1's icon
+   and the map beats sat in closed drawers with no way to reach them. The tour
+   now opens the pane each step points at (tour-pane.ts); the toggles are how
+   a user who closed it gets it back, the same reach a desktop user has. */
+body.atlas-touring:not(.atlas-tour-cap-shell) .atlas-room-nav-drawer-btn,
+body.atlas-touring:not(.atlas-tour-cap-rightpane) .atlas-room-nav-drawer-btn.is-right { display: none !important; }
 
 /* The toggles must never be the thing that scrolls out of reach — that would
    be this layer reintroducing its own bug. Measured at 390px: the strip

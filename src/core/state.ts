@@ -1,11 +1,11 @@
 /**
  * Minimal observable state store.
  *
- * Reads via `getState()`, writes via `patchSlice(key, partial)`. Subscribers
- * registered with `select()` re-fire only when the SELECTED value changes
- * (strict equality on the slice). This is the same idiom the legacy used —
- * its critical edge case is that patching a slice with the same content but
- * a new reference does NOT fire selectors that read a sub-property unchanged.
+ * Reads via `getState()`, writes via `patchSlice(key, partial)`. Every
+ * subscriber fires on every patch (there are no selectors; an earlier line
+ * here described a `select()` that never existed, corrected S366). A
+ * subscriber that must not repaint on unrelated patches memoises its own
+ * inputs (DESIGN_LAWS conv. 103).
  *
  * Force-rerender pattern (documented in DESIGN convention #2): to nudge a
  * subscriber that depends on a stable object, patch with a fresh reference
@@ -245,8 +245,8 @@ export function setState(next: AppState): void {
 }
 
 /**
- * Patch one top-level slice. Always allocates a new top-level state object
- * so identity comparisons in selectors work.
+ * Patch one top-level slice. Always allocates a new top-level state object,
+ * so a subscriber that memoises its inputs by reference sees the change.
  */
 export function patchSlice<K extends keyof AppState>(key: K, value: AppState[K]): void {
   state = { ...state, [key]: value };

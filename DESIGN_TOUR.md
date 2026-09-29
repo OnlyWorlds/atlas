@@ -14,7 +14,7 @@ reassigned one word per element (The=title, Hegemony=institution, Consul stays
 character), the consul step acknowledges its own create, the false "zone you
 traced" line corrected, the Consul alias list trimmed to ['Consul'], and the old
 `where-it-lives` + `online` steps MERGED into one `yours-to-keep` close --
-**17 steps**. The writing beat's copy now says CLICK a dotted word (hovering
+**17 steps** (16 since the S317 map and pin merge). The writing beat's copy now says CLICK a dotted word (hovering
 places no cursor, so Tab could never fire -- Captain hit this live) and points
 at the prose panel's link-all corner button rather than the tree's right-click
 menu). Prior: 3.0 (S306 — THE WRITING BEAT: Chapter 1 baked as plain prose and
@@ -63,7 +63,7 @@ at the 'online' step as the deeper schema story).
 - **The bare splash** (`body.atlas-preroot`): pre-setup, atlas shows NO shell
   chrome at all — the Atlas mark and the doors on black: take the tour, and on
   a folder-mode browser set up a folder and open a world folder (S365). The
-  splash shows while Atlas is not grounded (DESIGN conv. 114: no home folder
+  splash shows while Atlas is not grounded (DESIGN_LAWS conv. 114: no home folder
   AND no world of the user's own), no longer merely while it has no root. Settings stays live at the
   `#/settings` route. After a completed tour (`atlas_tour_done_v1`) the doors
   swap emphasis: folder primary, tour reads "Replay the tour".
@@ -178,7 +178,7 @@ throwaway world:
    placed pin IS the bundle pin. The drop path missed the bake until S318 —
    a dragged-in pin was nameless, the gate never opened, and +pin (hidden
    once the element is pinned) left no retry; revert-checked e2e locks it.
-4. **Set up your folder** (step 16, finale): the real `setupAtlasRoot`
+4. **Set up your folder** (the finale, `data-tour-step="16"`): the real `setupAtlasRoot`
    picker; success ends the tour. On OPFS-only browsers Finish is primary
    and no folder button renders. The finale ROUTES to `object:Ebony
    Spaceship` (Captain, S318): the closing view is the sentence's grandest
@@ -219,7 +219,7 @@ for the pane in front of the user, storage for the next boot). E2e-locked in
 `tour.spec.ts` with a precondition assert, so the test cannot pass by never
 having created the tab.
 
-## Acts (17 steps — S306c; `data-tour-step` = step number below)
+## Acts (16 steps since S317, when the map and pin steps merged; `data-tour-step` = step number below)
 
 The reorder (Captain's dump): the sentence gets its own opener, the maps act
 comes BEFORE the objects so the pin's "sat" (word 3) lights in reading order
@@ -231,18 +231,18 @@ already drawn).
 1. **Elements** (steps 2-4): create the world (opens the shell) · create the
    Consul · **Hegemony institution + title (merged)** — both reveal, the copy
    teaches the distinction, routes to the Hegemony.
-2. **Maps** (steps 5-8): the **Unnamed Planet** location (right pane appears —
+2. **Maps** (steps 5-7; the map, its zone and the pin are ONE hands-on step since S317): the **Unnamed Planet** location (right pane appears —
    S312: the unnamed-world resolution; the opening scene is NOT on Hyperion,
    hyperion.txt L307, so Captain rebuilt the spatial layer live and the bundle
    adopted it) · the map "Map of Unnamed planet" (bundled art; renamed live by Captain, adopted S318) **+ the Swamps zone
    drawn on it** (zone name is now `Swamps`, 6 markers) · the balcony-seat pin
    (HANDS-ON, **soft correction**: place anywhere, Next only over the swamps) ·
    the swamps' living things (2 creatures, species, Pack of Bellowing Saurians).
-3. **Objects & links** (steps 9-10): the scripted object run (spaceship,
+3. **Objects & links** (steps 8-9): the scripted object run (spaceship,
    balcony, Steinway — one + click each) · linking payoff (objects BEFORE
    linking so the Consul's page carries real chips; deeper: two-way links, Web,
    Knowledge).
-4. **Writing** (step 11): Chapter 1 = the sentence VERBATIM, baked as PLAIN
+4. **Writing** (step 10): Chapter 1 = the sentence VERBATIM, baked as PLAIN
    prose with NO chips (S306). **HANDS-ON** (`link-word`): autolink underlines
    the surface forms it can resolve and the user presses Tab to link one; Next
    appears at the first chip. Only SEVEN of the nine phrases are linkable here
@@ -250,7 +250,7 @@ already drawn).
    `deep-time`, three steps later; phase c says so instead of promising a fully
    linked sentence. Phase b points at the tree's right-click "Link mentions in
    this chapter" for the rest.
-5. **Time** (steps 12-14): the events, BOTH at the shared year **12** (he plays
+5. **Time** (steps 11-13): the events, BOTH at the shared year **12** (he plays
    while they surge) · the chart = the **now beat** (HANDS-ON `set-now`; the
    bundle ships no `time_current`, so the room's real button is pressable) ·
    deep time (Rachmaninov **-270** and his Prelude **-251** in the Old Earth
@@ -259,7 +259,7 @@ already drawn).
    the L1130 epoch (AD 2732 = 589 P.C. → P.C. 0 ≈ AD 2143 → 1873 = -270,
    1892 = -251). The old "no Earth↔PC conversion asserted" rule is RETIRED —
    the deep-time deeper states the derivation honestly.
-6. **Your world** (steps 15-17): the sweep · **yours-to-keep** (S306c MERGE of
+6. **Your world** (steps 14-16): the sweep · **yours-to-keep** (S306c MERGE of
    the old where-it-lives + online: the files story and the OnlyWorlds story, a
    sentence each, detail in the flyout; carries the Web tab's only introduction
    via `webTab`, so it is NOT named earlier) · finale.
@@ -455,7 +455,7 @@ path (which was silently broken until it did; fixed with
 ## Browser support
 
 `src/core/capabilities.ts`: `hasFolderMode()` (showDirectoryPicker) vs
-`hasOpfsMode()` (storage.getDirectory + createWritable — Safari 18.2+,
+`hasOpfsMode()` (storage.getDirectory + createWritable — Safari 26+,
 Firefox 111+). Boot admits folder-mode fully, OPFS-only in tour-capable mode
 (landing folder door becomes an honest line; finale drops the folder
 button), neither → the unsupported page (recommends Chrome/Brave, names the

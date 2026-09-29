@@ -15,6 +15,7 @@ import { startApp } from './app';
 import { getState as _getState, patchSlice as _patchSlice } from './core/state';
 import { getActiveStore as _getActiveStore } from './core/active-store';
 import { registerServiceWorker } from './core/offline';
+import { installStaleCodeRecovery } from './core/reload-offer';
 import { hasFolderMode, hasOpfsMode } from './core/capabilities';
 import { installPlacementHintWatcher } from './tabs/right/map-placement-hint';
 import { installIconA11y } from './ui/icon-a11y';
@@ -62,7 +63,7 @@ function boot(): void {
     return;
   }
   // Folder-mode browsers (Chromium) get the full app. OPFS-capable browsers
-  // (Safari 18.2+, Firefox 111+) boot in tour-capable mode — the guided tour
+  // (Safari 26+, Firefox 111+) boot in tour-capable mode — the guided tour
   // and browser-storage worlds work; folder pickers stay honestly gated in
   // the UI (welcome-panel folder CTA + directory-picker's clean error).
   if (!hasFolderMode() && !hasOpfsMode()) {
@@ -93,6 +94,8 @@ if (document.readyState === 'loading') {
 // emits a no-op SW in dev unless explicitly enabled). The SW precaches the
 // app shell so atlas works offline after first load.
 registerServiceWorker();
+// A tab from before a deploy asks for code files the deploy replaced (S366).
+installStaleCodeRecovery();
 
 // ---- Dev-only test harness ----
 //

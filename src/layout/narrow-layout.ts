@@ -160,8 +160,12 @@ export function installNarrowLayout(): void {
   });
 
   // A drawer is a view of the CURRENT room; navigating away should not leave
-  // it hanging over the new one.
+  // it hanging over the new one. Except during the tour, which owns the
+  // drawers (S366 gate B1): each step navigates and then opens the pane it
+  // points at (tour-pane.ts), and this close, landing a tick after the
+  // navigation, shut the drawer the step had just opened.
   window.addEventListener('hashchange', () => {
+    if (document.body.classList.contains('atlas-touring')) return;
     if (isDrawerOpen('right') || isDrawerOpen('sidebar')) closeDrawers();
   });
 }

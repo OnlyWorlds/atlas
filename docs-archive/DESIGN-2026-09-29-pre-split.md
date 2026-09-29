@@ -1,0 +1,1237 @@
+# Atlas — Design Document
+
+**Version**: 2.0 (2026-09-28) — folder-first rebuild · the union read + the conformance fixture (see "On-Disk Layout") · S360: untrusted world data, leave-flush, in-flight stamps (conventions 93-96) · S361 (atlas 1.8): bottom-left map origin, commit-point world release, chained pull-apply + strict reads, the transient bail (conventions 97-100) · S364 (atlas 1.11): a room per world, live-target derive, the live folder, world prefs in the folder (conventions 109-113) · S365 (atlas 1.12): the world doors and rootless grounding, the two-tab registry merge, the sidecar rule at open, the big-batch question at open (conventions 114-117)
+**Status**: **LAUNCHED (2026-07-24, atlas.onlyworlds.com).** The guided Hyperion tour is the onboarding (`DESIGN_TOUR.md`); the full share pipeline is live (import · publish · pin/zone disclosure · chart block · republish/revoke, verified on deployed atlas + show + production keel). This doc is the stable ARCHITECTURAL reference; **for current operational state, gates, and the live work queue always read `PROGRESS.md` (CURRENT STATE block) — that is the truth, this Status line is a pointer.** Post-launch work runs in sessions logged there (S296-297 tour · S298 Freek round · S299 tour resilience + placement feedback + per-zone share curation). Architecture sections below (folder-first store, sync engine, account mode, world-meta sync, calendars, the tour) are current; the historical build record lives in `docs-archive/PROGRESS-history.md`. Decision records: release `Forge/Notes/Archive/2026-07-03-atlas-release-plan.md`; the S298 tour queue `tools/atlas/Notes/2026-07-19-s298-freek-round-handover.md` (partly executed in S299 — see PROGRESS).
+**Predecessor**: `tools/atlas-deprecated/` (IDB-cached architecture, retained as UI/UX reference)
+
+---
+
+## Vision
+
+Atlas is the place where you see, explore, create, and edit any OnlyWorlds world — local or synced, alone or with collaborators.
+
+**OnlyWorlds is local-first**. Atlas honors that. Every world lives as real files on real disk. Synchronization with the OW API is an **opt-in capability**, not a storage mode. Users choose when and how to sync, and the data on their machine is always the source of truth.
+
+**Replaces** the legacy atlas at `tools/atlas-deprecated/` once at feature parity.
+**Targets** the same three audiences as the legacy: the DM prepper, the worldbuilder, the developer using OW as headless backend.
+
+---
+
+## Foundational Principle
+
+> **The folder is the world. The API is a sync target.**
+
+Every world has a folder on disk. Reads come from the folder. Writes go to the folder first. If api credentials are attached, a `SyncEngine` runs alongside, pushing local changes up and pulling remote changes down.
+
+This is the only architectural decision that matters. Everything else falls out of it.
+
+The legacy atlas had two parallel local-storage layers (filesystem for local-only worlds, IndexedDB for api-linked worlds). That split made "where does my data live?" depend on "am I synced?" — wrong dimensions. The rebuild collapses them: one storage layer, one mental model.
+
+### Local representation invariant
+
+**Every world Atlas knows about is fully represented in local files, regardless of origin.** No "partial-shadow-of-server" mode. Consequences for every flow:
+
+- Link existing api → initial download of every element BEFORE registry flips to api-linked.
+- Make Online Route 2 (merge into existing api) → bidirectional. Local pushes up AND server-only pulls down. After the merge, local folder contains every element on either side.
+- After a pull, server-side new elements are written to local; server-side deletes prompt user review (default: confirm before deleting locally).
+- Even on auto-pull (cadence-driven), the rule holds — pull always reconciles into local first.
+
+If a user goes offline indefinitely with an api-linked world, every element they had access to is still on disk and editable.
+
+### Sync orientation: local-first by default
+
+User intent is captured by what they DON'T have to opt into:
+
+- Autosave (debounced push) is on by default — they made an edit, they want it persisted.
+- Auto-pull is OFF by default — Atlas doesn't fetch unless asked. Pull on activate is a setting, periodic cadence is a setting, both default off.
+- The manual "Refresh from API" button is always available regardless of cadence settings.
+
+The asymmetry is deliberate: pushes reflect user intent (you typed → it saves). Pulls don't, unless the user opted in.
+
+---
+
+## World States
+
+Two states. The difference is **whether sync is wired**, not where data lives.
+
+| State | Folder | API credentials | SyncEngine attached |
+|---|---|---|---|
+| `local-only` | yes | no | no |
+| `api-linked` | yes | yes (api_key + global PIN) | yes |
+
+No `api-only` mode. Every world has a folder. The folder is the truth. If you want the world "online," you attach api credentials and the SyncEngine begins reconciling.
+
+**View-only worlds (S264)** are a FLAG on api-linked, not a third state: `api.read_only` (registry + world.json mirror, so root discovery restores it). Linked via the sidebar's `+eye` → ViewWorldModal with a READ key — no PIN anywhere (keel reads are keyless-PIN). The folder-first invariant holds (full local download, browsable offline); the difference is the double wall: the engine is pull-only (`readOnly` option — no push trigger survives, the meta step never PATCHes, pull-on-activate always runs) and the store blocks every UI mutation at the seam (`setViewOnly` → "This world is view-only"; the engine's own channels bypass). The sister-shares-with-her-DM flow. Details: SYNC_NOTES "Read-only engines".
+
+**Transitions**:
+- `local-only` → `api-linked`: **Make Online** flow (two routes, see Workflows).
+- `api-linked` → `local-only`: detach api credentials. Folder remains, sync stops. Reversible at any time without data loss. The server world id is remembered as `former_api_world_id` so the account-mode remote list knows the world is already here.
+
+**Open world folder (2026-07-19)**: the 5th worlds-sidebar action (`+folder_open`) registers ANY folder containing a `world.json` IN PLACE — no copy, no download (`openWorldFolder`, atlas-root-flow.ts). An `api` block in the meta registers it api-linked with sync intact; dedupe by the `world-<meta.id>` handle-key convention; a failed first open rolls the entry back. This is the external-worlds "advanced path" with UI, and the obsidian/Dropbox/other-machine carry-a-folder story.
+
+**Store parking (2026-07-19)**: switching worlds PARKS the prior FsFolderStore (LRU-3; caches kept, heartbeat stopped, on-disk lock retained but heartbeat-staled so other tabs can take over instantly). Switch-back revives in ~80ms iff the lock still carries our tab id (and runs one live-folder pass in the background, S364, conv. 111); a takeover forces a cold reopen, so a stale cache is never trusted. Details + residuals: SYNC_NOTES "Background tidy + parked locks".
+
+## Account mode (session 260 — design + gate record: `Forge/Notes/2026-07-13-account-mode-design.md`)
+
+Atlas can hold an OnlyWorlds **account token** (`ow_a_`, minted in the portal's Tokens UI, pasted in Settings → Account). The token is a key-minting authority, never a sync credential — sync always runs on per-world keys in `world.json`, exactly as above.
+
+- **Sign-in**: paste in Settings → Account → validated via `GET /api/v2/account` (profile; username cached for display). Registry stores `account_token` + `account_username` (same trust posture as the PIN). Forget drops both; opened worlds keep their own keys.
+- **"On OnlyWorlds" sidebar section** (`worlds-sidebar.renderRemote` + `src/sync/account-worlds.ts`): account worlds not represented locally (by live `api.world_id` OR remembered `former_api_world_id`) render as dimmed rows below the local list. Owned row click = the open flow: **preconditions first** (atlas root, PIN — prompted via `PinPromptModal` and saved if absent), THEN mint a WRITE key (`POST /account/worlds/{id}/keys` with `{name: "atlas · <platform>"}` — `deviceKeyName()`; live since 2026-07-13, so the portal keys table names each key's tool + machine), then the existing link pipeline (`linkExistingApiWorldInRoot` with `knownWorld` skipping re-validation) **on the activation chain**, then `navigate(home)` + the ecosystem waypoint. Collaborator rows route to the link-by-key path (minting is owner-only; server 404s). Offline-first law: the account fetch can only ever ADD a section; local rendering never waits on it.
+- **The activation chain** (`src/core/activation-chain.ts`): ONE serializer for everything that touches the shared active store — activations (supersedable) and link/download flows (never superseded). LinkWorldModal and the account open flow both ride it (gate R2; the modal raced the chain before).
+- **Create world v2**: `createApiWorld` (make-online.ts) branches — signed in → `POST /api/v2/account/worlds` with the PIN dance (omit `pin` first; a fresh account 422s param=pin → retry with the PIN, which becomes the account PIN); signed out → the v1 `create-world-external` fallback. The new-api-world modal hides the email field when signed in.
+- **Auth split** (keel, pinned 2026-07-13): account routes = `Authorization: Bearer ow_a_...`; world routes = `API-Key` (+ `API-Pin` on writes). No shared headers. A revoked world key surfaces a distinct sync toast (`SyncResult.auth_reason === 'key_revoked'`: "reopen from the sidebar", not "check your PIN").
+- **Folder-collision guard**: the link flow probes the deterministic subfolder name and falls to `-2`/`-3` suffixes rather than ever writing into an existing folder.
+- **Deferred**: watched worlds (`ow_r_`) · device-code sign-in.
+
+## World-meta sync (session 262 — design + gate record: `Forge/Notes/2026-07-13-worldmeta-sync-design.md`)
+
+The eight OW world fields in `world.json` (`description`, `image_url`, `time_basic_unit`, `time_format_names`, `time_format_equivalents`, `time_range_min`, `time_range_max`, `time_current`) sync via keel's `GET|PATCH /api/v2/world` — the now-line travels between devices. **`name` is deliberately NOT synced**: the local world name and the server world name are separate identities (`api.world_name` display mirror; rename-on-OnlyWorlds would be an explicit future action, never an autosync side effect).
+
+- **The meta step** (`SyncEngine.executeMetaStep`) runs once per round from all three run paths. ONE `GET /world` (meta never enters `/changes` — freshness is this read; `updated_at` is a skip-hint only, never load-bearing), then a per-field three-way diff against `meta_baseline` in sync-state.json: server-only changes apply to disk, local-only changes go out as ONE partial PATCH (only changed fields — a device moving the now never transmits `time_range_min`), contested fields follow the policy (local-wins pushes; pause-and-review skips both ways, persists `meta_conflicts`, and the conflict-review modal gains world-settings rows resolved via `resolveMetaConflict`).
+- **Absent baseline = seed round, never a PATCH**: adopt the server's values as baseline, fill locally-EMPTY fields from the server, push nothing (a blind first push would blank a link-existing world's real meta — the gate's 3-lens convergent blocker). Locally-set fields push on the next round. One uniform rule; no per-link-flow seeding.
+- **Canonical equality**: disk `undefined` ≡ wire empties (`''` text / `[]` list / `null` int) everywhere; the encoder emits typed empties, so a cleared now goes out as explicit `time_range_current: null` (omission means "no change" on a PATCH and the clear would resurrect). Kernel: `src/sync/world-meta-sync.ts` (pure, unit-locked; owns the one disk↔wire rename `time_current`⇄`time_range_current` table the adapter applies).
+- **Baseline advances PER-FIELD** (fields the PATCH sent + fields the pull applied, only), so concurrent server changes to untouched fields still surface next round. `resetSyncBaseline` clears it; stopped-latches guard both the pull-apply and the baseline persist (unlink is never resurrected).
+- `writeWorldMeta` is serialized store-wide (gate R4 — a background pull-apply can't erase a concurrent `setNow`). Pull-applied meta reaches `state.active.meta` via `refreshMetaCache` (sync-attach, idle transition) — the charts now-line moves without a reload. Meta-only rounds surface honestly (`SyncResult.meta_pushed/meta_pulled` → "Pulled world settings" toast; "Already up to date" accounts for meta).
+- Keel validates types, never lengths (overflow raw-500s at the DB): atlas guards `image_url` ≤1024 / `time_basic_unit` ≤128 as per-field failures before the wire. A read-only key's 403 `permission_error` auth-bails with its own reason (`read_only_key`) and honest copy — never "check your PIN".
+
+---
+
+## Calendars (2B arc, sessions 266-267 — binding contract: `Forge/Notes/2026-07-14-calendar-design-final.md`)
+
+The world owns the clock, calendars own the language. Every dated element stores a plain integer forever; a calendar is a LENS that names those integers ("12 Frostwane, Year 454 FT"). Full arithmetic contract (eras/leap/intercalary/weekday/format/parse rules) lives in the design note — 3-lens gated, Skeld-passed; this section holds the architecture.
+
+- **The world clock**: `time_basic_unit` (the step meaning — required, the GATE for calendar creation), `time_current` (the now), `time_range_min/max` (extent). All ride the meta sync above. The clock modal is the one required first step; the chip menu keeps it ABOVE "+ new calendar", which stays greyed until the clock is set (the order teaches the model — Captain's ruling).
+- **A calendar = a Construct** with supertype `calendar` (display convention only) carrying its machine config in the **`atlas_calendar`** wire-extension field. **Detection keys on FIELD PRESENCE, never the supertype** (users hand-mint arbitrary supertypes; a lore-only "Calendar" must never surface as a broken lens). The field is in `ATLAS_WIRE_EXTENSION_FIELDS`: rides the v2 wire, hidden from the generic custom-fields editor, edited only via the builder modal. Keel stores extension fields VERBATIM in a per-element `JSONField` (source-verified at keel@e64f270, S267) — nested objects round-trip; calendars sync/export/import with zero new machinery. `readCalendarValue` (calendar-lens.ts) is the ONE tolerant read (object or JSON string) every consumer shares.
+- **Kernels, all pure**: `core/calendar.ts` (config types, validation, format/parse, era/leap/intercalary/weekday arithmetic — O(config), Euclidean floor, total under malformed input) · `core/calendar-axis.ts` (boundary ticks with rung labels: era landmarks / round era-local years / month names / day mid-labels / festival glints, plus era bands + season segmentation) · `core/calendar-seed.ts` (the legacy-field mint parse).
+- **Lens model**: at most one active per room (registry `active_calendar_id`, mirrored to `.atlas/world-prefs.json` since S364, conv. 112, so it travels with the folder); saved charts carry `ChartConfig.calendarId` (rewritten by `rewriteChartScopeIds` on Route-2 id-swaps); every dangling/malformed ref degrades to bare numbers, never an error.
+- **The legacy-field seed**: `time_format_names`/`time_format_equivalents` are read ONCE to offer minting the first calendar, then CLEARED on the world (both `[]`; rides the meta sync). Offer gates: fields present ∧ no calendar exists ∧ writable ∧ (api-linked → `meta_baseline` established, else the S262 seed round would pull the clear back). A crash between mint and clear self-heals: the calendar's presence suppresses re-offering and the room retries the clear quietly.
+- **Publish bake**: chart blocks freeze `PayloadChartNode.label`/`endLabel` (lens-formatted text) + `PayloadChartBlock.axisTicks` at publish; `date` stays numeric forever. Additive — old payloads valid. The show viewer's re-lift landed 2026-07-14 (baked ticks + cast marks render; label/endLabel parsed and carried); Boss owes the redeploy.
+- **The document view (2C, S268)**: `ChartConfig.render: '2d' | 'scroll'` — the same chart as a scrolling document (center spine, era section seams, named gap seams, gold now seam, sticky lens-formatted readout). Kernel `visualization/timeline/scroll-layout.ts` + renderer `scroll-view.ts` behind the canvas view's handle surface. Publishes as the existing static block. Design: `Forge/Notes/2026-07-14-s268-scroll-design.md`.
+
+---
+
+## The Guided Tour (S296-297 — full design: `DESIGN_TOUR.md`)
+
+The onboarding: the opening sentence of *Hyperion* becomes a 36-element
+linked world while the workspace builds itself around the user (bare splash →
+one narrator panel → chrome appears per act → real-modal hands-on beats →
+exit tears everything down, no residue). Lives in `src/tour/`; the bundle in
+`src/demo/hyperion-world.json`. Two architectural exports beyond the tour
+itself: `core/capabilities.ts` (folder-mode vs OPFS-mode boot gating —
+Safari/Firefox run tour-capable) and `body.atlas-preroot` (the bare splash
+state: not grounded, conv. 114). DESIGN_TOUR.md v2.2 is the authoritative document.
+
+---
+
+## On-Disk Layout
+
+User picks a root folder once per world (persisted via `FileSystemDirectoryHandle` in IndexedDB; the only IDB use case in atlas). Atlas writes (wrapper folder is `onlyworlds-atlas/` — `atlas-worlds/` is the recognized legacy name):
+
+```
+<user-chosen-root>/onlyworlds-atlas/
+  <world-name>-<uuid-prefix>/
+    world.json                       ← metadata + api credentials (if linked); `format_version` stamped at birth (spec §4.2); a LINKED folder's `id` IS the server world id (spec §4.1, 2026-09-04; earlier links keep their minted id)
+    .atlas/                          ← atlas internal state
+      sync-state.json                ← last_synced_at per element, conflict log
+      tombstones.json                ← deletion log (id, type, deleted_at)
+      charts.json                    ← saved chart configs (DESIGN_CHARTS)
+      styles.json                    ← WORLD STYLES: how the world draws its kinds (DESIGN_ZONES §5b, S356)
+      lock                           ← presence indicates a writer is active
+    elements/                        ← ALL 22 element types, one subfolder each
+      character/
+        <name-slug>--<id-tail8>.json   ← e.g. aragorn--0d2a8c2b.json (unnamed: <full-id>.json)
+      location/
+        <name-slug>--<id-tail8>.json
+      map/ pin/ zone/ marker/        ← spatial types live here too (see below)
+      ... (22 types)
+    spatial/                         ← LEGACY ONLY (atlas ≤ v1.0). Read, never created.
+      map/ pin/ zone/ marker/
+    media/
+      <element-id>/
+        <folder-name>/
+          <original-filename>.<ext>
+          _meta.json
+```
+
+**Element file format**:
+
+```json
+{
+  "id": "<uuid-v7>",
+  "type": "character",
+  "name": "Alice",
+  "description": "...",
+  "species_ids": ["..."],
+  "local_updated_at": "2026-05-12T10:30:45.123Z",
+  "server_updated_at": "2026-05-12T10:25:00.000Z",
+  ...
+}
+```
+
+- `local_updated_at` is the source of truth for "this changed locally at time T." Stamped by FolderStore on every save.
+- `server_updated_at` is the last value the server confirmed. Used to detect server-side changes (server `updated_at > server_updated_at` means someone else edited).
+- For `local-only` worlds, `server_updated_at` is omitted.
+
+### Directory layout: THE UNION READ (settled 2026-07-28, spec v0.3)
+
+**`elements/<type>/` is the format for all 22 types.** `spatial/{map,pin,zone,marker}/`
+is a **named, dated legacy path**: atlas through v1.0 wrote the four spatial
+types there and no other implementation ever did. The split carried no
+semantics — it was the Leaflet subsystem's convenience leaking into the
+serialization.
+
+| Behaviour | Rule |
+|---|---|
+| read | **BOTH layouts, unioned** (`buildIndexFor` scans `elements/<type>/` then `spatial/<type>/` for spatial types). A world written either way opens whole |
+| write, new world | `elements/` for all 22. `spatial/` is never created |
+| write, legacy world | **sticky**: a folder that already holds spatial files under `spatial/` keeps receiving them there, so one world never straddles two directories. Detected once at open (`detectSpatialLayout`) by FILE presence, never by directory presence — an empty `spatial/map/` is litter from the old `ensureLayout`, not a layout |
+| existing element | rewritten **where it was found** (`fileIndex` records each element's `layout`). An edit never migrates a file between layouts |
+| same id in BOTH layouts | newest `local_updated_at` is served, ties go to `elements/`, a warning names both paths, and **neither file is touched**. Same-directory twins are a rename crash and get deduped; cross-directory twins are two tools writing legitimately, and resolving someone else's folder by deleting half of it is not atlas's call |
+| tidy | scheduled per (type, layout) — two directories are two occupancy spaces. A file shadowed by the merge is absent from the index and therefore never renamed |
+
+**Why it matters**: before this, a world written to spec opened in atlas
+showing every content element, a clean UI, and no maps, pins, zones or markers
+at all, with no warning anywhere. Guards: `tests/e2e/folder-store-fs.spec.ts`
+(both halves revert-checked) and the conformance fixture below.
+
+### The conformance fixture (2026-07-28)
+
+`tests/fixtures/folder-conformance/` is an **ecosystem artifact**: one tiny
+world folder plus a machine-readable `expected.json`, which any Folder Format
+reader can run against and report what it found. Its README states the
+contract (only `name` required · body type beats directory · id-less files
+skipped and left · unknown `x_*` round-trips · mapless pins are legal ·
+filenames are presentation). `tests/e2e/folder-conformance.spec.ts` is atlas
+answering it, so "shipped atlas reads the format" is a failing test rather
+than a claim in a document someone quotes six weeks later. Proposed by Kael,
+adopted by every pass of Skeld's review round; destined for a public sibling
+repo beside the spec, so it is built portable — plain files, nothing generated
+at read time.
+
+### File naming (Folder Format spec source — settled 2026-07-03)
+
+**The invariant**: the filename is PRESENTATION; the `id` INSIDE the file is identity. A consumer MUST load every `*.json` in a type folder and key on the internal id — never parse a filename for meaning. This makes every legacy and foreign filename automatically valid, and keeps both id-minting models legal (atlas server-uuids; magelet-style deterministic uuid5-from-slug — how ids are minted is the implementation's business).
+
+**Canonical form atlas writes**: `<name-slug>--<id-tail8>.json`
+
+| Rule | Detail |
+|------|--------|
+| slug | lowercase; NFKD diacritic-strip to ASCII (José → jose); non-alphanumeric runs → single `-`; trimmed; capped at 40 chars |
+| separator | `--` (unambiguous: slugs can never contain a double hyphen) |
+| id-tail | LAST 8 chars of the element id (guards: a tail that would contain `--` or start with `-` falls back to the hyphen-stripped tail — canonical uuids never hit this) |
+| unnamed element | bare `<full-id>.json`; renamed to slug form on the first SLUGGABLE naming |
+| named but unsluggable (all-non-ASCII/emoji name → empty slug) | same bare `<full-id>.json`; stays bare until renamed to a sluggable name |
+| rename | renaming the element renames the file (write-new, delete-old; the crash window heals via dedupe at next open) |
+| stability (sticky runtime writes) | a write keeps the file's current name whenever that name is any valid form for the element's name — case-insensitively. Filenames never change because a sibling appeared/vanished, and never churn on body-only edits (keeps git-versioned world folders quiet). The ONE sanctioned sibling-dependent rename: open-time tidy converges a full-id fallback back to the short form once its collision has cleared |
+| case-folding filesystems | equivalence is by LOWERCASE comparison everywhere (NTFS/APFS resolve case variants to the same physical entry — writing one and deleting the other would destroy the file; canonical forms are pure lowercase ASCII, so ASCII folding is the whole space). A case-variant of a target form is that target: written in place under its existing name, never renamed to its lowercase twin. (A case-variant of a NON-target form still converges normally — the write+remove pair is safe whenever the two names differ case-insensitively) |
+| tail collision (same slug + same tail, different ids, ~2^-32) | the later writer falls back to `<slug>--<full-id>.json`; at open-time tidy the LOWER full id keeps the short form (deterministic — two machines produce identical layouts from the same data) |
+| Windows reserved names | non-issue by construction: the always-present `--<tail>` means the base name is never exactly `con`/`prn`/`aux`/… |
+| index & dedupe | the store indexes by reading file BODIES; same-id twins resolve to the latest `local_updated_at`. A loser with IDENTICAL content (a rename crash) is unlinked; one with different content moves to `.atlas/quarantine/<type>/` (S360, convention 94). Grouping is by body id, so a same-named stranger can never be touched |
+| tidy | non-canonical filenames (legacy full-uuid tails, hand-renamed files) converge to canonical form in a BACKGROUND pass shortly after first index per type per open (deferred out of the open path 2026-07-19 — an inline tidy froze activation on foreign folders with thousands of non-canonical names); processed id-sorted with a FULL occupancy view (a target name held by ANY other survivor — case-insensitively — forces the full-id fallback; both taken → the file is left alone), each rename serialized against user edits via the per-id write chain. Unreadable/id-less files are skipped and never deleted or overwritten; a converged open is a no-op. CONSUMER RULE unchanged: filenames are presentation — a consumer must never require canonical names |
+
+Implementation: `src/store/fs-utils.ts` (`slugify`, `idTail`, `elementFilename`, `elementFilenameFullId`) + `FsFolderStore.ensureIndexFor`/`resolveFilename`. Contract tests: `tests/unit/fs-utils.slug.test.ts`, `tests/e2e/folder-store-slug.spec.ts`.
+
+**Tombstones format** (`tombstones.json`):
+
+```json
+{
+  "deletions": [
+    { "id": "<uuid>", "type": "character", "deleted_at": "2026-05-12T10:31:00Z" },
+    ...
+  ]
+}
+```
+
+Append-only during local deletes. SyncEngine pushes each entry to the API as a DELETE, then removes it from the log on success.
+
+**Sync state format** (`sync-state.json`):
+
+```json
+{
+  "last_pull_at": "2026-05-12T10:25:00Z",
+  "last_push_at": "2026-05-12T10:30:00Z",
+  "conflicts": [
+    {
+      "element_id": "<uuid>",
+      "type": "character",
+      "detected_at": "...",
+      "local_updated_at": "...",
+      "server_updated_at": "...",
+      "fields": ["description", "image_url"]
+    }
+  ],
+  "paused": false
+}
+```
+
+---
+
+## Atlas Root (creation-default container for worlds)
+
+A single user-chosen folder that holds atlas-managed worlds. Set up once per browser profile; the handle persists in IndexedDB under `ATLAS_ROOT_HANDLE_KEY`. New worlds default to becoming subfolders inside this root.
+
+**Critical**: the atlas root is a **creation convenience**, not a storage layer. Each world stores its own `FileSystemDirectoryHandle` in the vault under `world-<uuid>`. Existing worlds work independently of the root — changing the root doesn't move them; losing the root doesn't break them.
+
+**Wrap convention**: when the user picks a parent folder, atlas creates an `onlyworlds-atlas/` subfolder inside it for worlds, unless:
+- the picked folder itself has a `.atlas-root` marker → use it directly
+- the picked folder already contains an `onlyworlds-atlas/` (or legacy `atlas-worlds/`) with marker → use that subfolder
+
+This sandboxes atlas data in a known subfolder when the user picks a busy folder like Documents, while supporting power users who pick the wrapper directly.
+
+**World discovery on root setup**: after resolving the root, atlas scans its subfolders for any with a valid `world.json` and imports them into the registry (using `handle.isSameEntry()` to avoid duplicates). Critical when localStorage is wiped but the disk folder remains. Discovery reads each `world.json`'s `api` block — present → registered as api-linked (sync engine attaches normally on activation); absent → registered as local-only.
+
+**Orphan-handle recovery** (session 212): the atlas-root handle persists in IndexedDB under the fixed `ATLAS_ROOT_HANDLE_KEY`. When localStorage is cleared but IDB survives (the common "clear site data" partial-wipe), `hydrateAtlasRoot` detects the orphan and surfaces `state.atlasRootRecoverable`. UI shows a one-click `↻ Recover atlas folder` button (sidebar header + welcome panel) that ensures-writable + validates the `.atlas-root` marker + restores the registry entry + runs `discoverWorldsInRoot`. Post-recovery, deep URLs from before the wipe are reset to `#/` so the sidebar lands on Worlds mode without requiring an extra click.
+
+**Subfolder naming**: created worlds get `<slugified-name>-<uuid-prefix>` directories. Each world's `world.json` has the friendly name; the folder name is a backstage detail.
+
+```
+<user-picked-parent>/
+  onlyworlds-atlas/
+    .atlas-root                   ← marker file with {version, created_at}
+    my-first-world-7a3f0c12/      ← per-world subfolder (the actual world)
+      world.json
+      .atlas/{lock, sync-state.json, tombstones.json, charts.json, styles.json}
+      elements/<type>/<id>.json
+      elements/<type>/<id>.json     ← all 22 types; spatial/ only in ≤v1.0 folders
+      media/<element-id>/<folder>/<filename>
+    another-world-92b4ee01/
+      ...
+```
+
+The atlas root also supports **external worlds** (advanced path, no UI in v1): a world folder anywhere on disk, registered via its own handle, not living inside any atlas root. Existing local-only worlds created before the atlas-root concept work as external automatically.
+
+---
+
+## The FolderStore
+
+Single source of truth. Implements every read/write Atlas needs.
+
+**Illustrative, not exhaustive** — the authoritative interface is `src/store/folder-store.ts` (which has since grown `findDependents`, `readCharts`/`writeCharts`, `updateSyncState`, `applyServerRecord`, `stampServerUpdatedAt`, `clearServerBaseline`, `clearTombstone`, `resetSyncBaseline`, and more).
+
+```ts
+interface FolderStore {
+  // Lifecycle
+  open(handle: FileSystemDirectoryHandle): Promise<void>;
+  close(): Promise<void>;
+
+  // Elements
+  listElements(type?: ElementType): Promise<Element[]>;
+  getElement(id: string): Promise<Element | null>;
+  createElement(type: ElementType, data: Partial<Element>): Promise<Element>;
+  updateElement(id: string, patch: Partial<Element>): Promise<Element>;
+  // deletes cascade by default (W9) and report what they tombstoned
+  deleteElement(id: string, opts?: { cascade?: boolean }): Promise<{ tombstones: Tombstone[] }>;
+
+  // Spatial (maps, pins, zones, markers — same shape, specialized types)
+  listMaps(): Promise<WorldMap[]>;
+  createMap(data: Partial<WorldMap>): Promise<WorldMap>;
+  updateMap(id: string, patch: Partial<WorldMap>): Promise<WorldMap>;
+  deleteMap(id: string, opts?: { cascade?: boolean }): Promise<{ tombstones: Tombstone[] }>;
+  listPins(mapId?: string): Promise<Pin[]>;
+  // ... pins, zones, markers identical shape
+
+  // Media — files in folder, never sent to API
+  addMedia(elementId: string, file: File, folder: string): Promise<MediaItem>;
+  listMedia(elementId: string): Promise<MediaItem[]>;
+  getMediaBlob(mediaId: string): Promise<Blob>;
+  deleteMedia(mediaId: string): Promise<void>;
+
+  // World-level
+  readWorldMeta(): Promise<WorldMeta>;
+  writeWorldMeta(patch: Partial<WorldMeta>): Promise<void>;
+
+  // Sync-relevant reads (for SyncEngine)
+  listLocallyChangedSince(timestamp: string): Promise<Element[]>;
+  listTombstonesSince(timestamp: string): Promise<Tombstone[]>;
+  readSyncState(): Promise<SyncState>;
+  writeSyncState(patch: Partial<SyncState>): Promise<void>;
+}
+```
+
+**Save semantics**:
+- Every `createElement` / `updateElement` stamps `local_updated_at = now()` automatically.
+- `deleteElement` writes a tombstone and removes the file in one atomic step (acquire lock, write tombstone, unlink file, release lock).
+- `server_updated_at` is only stamped by the SyncEngine after a successful push or pull confirmation.
+
+---
+
+## The SyncEngine
+
+Attached only to `api-linked` worlds. Reads the folder, talks to the OW API.
+
+```ts
+interface SyncEngine {
+  // Lifecycle
+  start(): void;
+  stop(): void;
+  pause(): void;        // user-initiated "stay offline"
+  resume(): void;       // unpause; triggers immediate diff-and-sync
+
+  // Manual triggers (from UI)
+  pullNow(): Promise<SyncResult>;
+  pushNow(): Promise<SyncResult>;
+  syncNow(): Promise<SyncResult>;    // pull then push
+
+  // Status (observable)
+  getState(): SyncEngineState;
+  onStateChange(cb: (state: SyncEngineState) => void): Unsubscribe;
+  onConflict(cb: (conflict: Conflict) => void): Unsubscribe;
+}
+
+type SyncEngineState =
+  | { kind: 'idle'; lastSyncAt: string | null }
+  | { kind: 'syncing'; phase: 'pull' | 'push'; progress?: { done: number; total: number } }
+  | { kind: 'paused'; reason: 'manual' | 'network'; pendingChanges: number }
+  | { kind: 'error'; message: string; recoverable: boolean };
+
+interface SyncResult {
+  pushed: { creates: number; updates: number; deletes: number };
+  pulled: { creates: number; updates: number; deletes: number };
+  conflicts: Conflict[];
+}
+```
+
+### Sync algorithm
+
+**Push phase** (local → server):
+1. Read `last_pull_at` from sync state.
+2. Find all elements with `local_updated_at > server_updated_at` (or `server_updated_at` absent — meaning never synced).
+3. Read tombstones.
+4. For each push candidate:
+   - If element has no `server_updated_at` → CREATE on server (client-provided UUID preserved).
+   - Else → UPDATE on server. Before sending, optionally GET server state; if server `updated_at > server_updated_at` (stored), record a **conflict** instead of pushing (depending on policy).
+5. For each tombstone → DELETE on server. On success, remove from tombstone log.
+6. Stamp `server_updated_at = response.updated_at` on successfully synced elements.
+
+**Pull phase** (server → local):
+1. List server elements for each type bucket.
+2. For each server element:
+   - If not in folder → CREATE locally (download, write file with stamped `server_updated_at`).
+   - If server `updated_at > server_updated_at` AND `local_updated_at <= server_updated_at` → UPDATE locally (overwrite with server version).
+   - If both sides changed (`local_updated_at > server_updated_at` AND server `updated_at > server_updated_at`) → CONFLICT (don't overwrite locally; record in sync state).
+3. For server elements missing locally that have NO tombstone → they were created on the server while we were offline; pull them.
+4. For folder elements missing on server that have NO tombstone AND `server_updated_at` is present (meaning they were synced before) → server deleted them; route to `sync_state.server_deletes` and surface the server-delete review modal (per-row `keep + re-push` / `delete locally`). Default `sync_confirm_server_deletes` is on (confirm before deleting locally). Pagination-aware: detection is suppressed for types whose list was paginated, to avoid falsely flagging page-2+ elements (SYNC_NOTES).
+
+### Sync policies (Phase 3.5+, simplified to two)
+
+Global setting (per-world overrides deferred to 3.6+). Default: `local-wins`.
+
+| Policy | Push conflict | Pull conflict | UI surfacing |
+|---|---|---|---|
+| **`local-wins`** (default) | Push local anyway, server overwritten | Skip applying server change for that element; local stays | One-shot toast per sync round. **No badge, no modal, no sync-state entries persisted.** |
+| **`pause-and-review`** | Skip the push, conflict persisted | Skip applying server change, conflict persisted | ⚠ badge fires on sync pill. Click → modal with per-element `overwrite (mine wins)` / `pull (theirs wins)` actions. Closing without picking = "decide later"; badge persists. |
+
+Both policies apply symmetrically across push AND pull (same divergence, different direction). Legacy values (`drain-blind`, `pause-on-conflict`, `ask`) are migrated on load — see `registry.loadRegistry`.
+
+#### Why no `server-wins` policy
+
+Destructive auto-overwrite of local edits is too dangerous as an implicit default. Users who want server's version for a specific element invoke the explicit `pull (theirs wins)` action in the conflict modal (or the future per-element refresh button).
+
+#### When `pause-and-review` is the right choice
+
+When you're editing the world from multiple places (web app, multiple atlas instances, obsidian plugin) and need to know when changes diverge. The modal forces an explicit choice per conflict so nothing gets silently overwritten in either direction. Default for solo atlas users is `local-wins` since their edits should generally win.
+
+### Pause semantics
+
+- `pause()` sets `sync state.paused = true` (`reason: manual`). Engine stops attempting pushes/pulls. Local writes continue normally to the folder. Sync indicator shows `offline (paused) · N pending`.
+- `navigator.onLine === false` → engine self-pauses (`reason: network`). Same external behavior.
+- `resume()` clears paused flag and immediately calls `syncNow()`.
+
+### Push triggers
+
+- Manual: `pushNow()` button.
+- Auto-debounced: 5 seconds after the last local write, if not paused and online. Configurable later via `engine.setDebounceMs(ms)`.
+- On resume / online event.
+
+The auto-debounce is implemented in `SyncEngine.requestPush()`: schedules `pushOnce()` after the debounce window, resets on each call so bursts of edits coalesce. Wired into every folder-write site (element edit + delete + create, map create + delete, pin placement) via `requestPushIfLinked()` in `sync-attach.ts` — a no-op for local-only worlds. `SyncEngine.stop()` cancels any pending debounced push (called on engine detach).
+
+### Push resilience
+
+`pushPhase` is per-element error tolerant: 4xx, validation, transient network failures on a single element are recorded in `result.failures: PerElementFailure[]` and iteration continues. This matters most for `pushOnce()` invoked by Make-Online flows that upload dozens of elements at once — one bad element shouldn't abort the upload. Successful elements get `server_updated_at` stamped; failed ones retry on the next sync.
+
+### Pull triggers (3.5+)
+
+Pull is local-first opt-in. None of these fire unless the user enabled the corresponding setting.
+
+- **Manual** (always available): `pullNow()` via "Refresh from API" button on the sync pill / world settings.
+- **On world activate** (default OFF): if `registry.sync_pull_on_activate` is true, `pullNow()` runs after `attachSyncEngine` whenever an api-linked world activates.
+- **Periodic auto-pull** (default OFF — `registry.sync_cadence_ms = null`): scheduler polls every N ms; pauses on `visibilitychange:hidden`; only ever calls `pullNow()` on the currently-active engine.
+- **On `online` event**: when network returns AND the engine was network-auto-paused, a one-shot `syncNow()` flushes queued pushes + pulls.
+
+Push triggers are unchanged — autosave debounce is the only push trigger; user typed = user wants saved.
+
+---
+
+## UUIDs
+
+**Local creates use `crypto.randomUUID()` (v4) today; Captain ruled 2026-09-28 that tools we control should DEFAULT to v7 for element ids** (keel mints v7; v4 stays valid forever). The switch is queued in the S360 work order with its trap: `newId()` is shared with media, whose filename dedupe keys on the first 8 id characters, a timestamp in v7, so element ids get their own `newElementId()`. **keel PRESERVES client ids** (v1 and v2, probed live 2026-07-12): the id atlas mints locally is the id server-side, forever. Duplicate POST → 409 `id_conflict`; v2 `PUT /{type}/{id}` is create-or-replace upsert; any RFC-4122 UUID is first-class.
+
+Consequences:
+- The **create-path id-swap machinery is EXCISED** (cleanup bout, 2026-07-12): the engine no longer swaps on `response.id !== current.id` — a reassigning server is a v2 contract violation and produces a LOUD per-element failure (nothing stamped, element retried; regression in `sync-engine.createOrder.test.ts`). The engine's `onIdSwap` hook is deleted; `rewriteIdReferences` survives in Route 2 (`make-online.ts`), a flat rewrite that misses chips, `ow://` prose and page blocks until the Route 2 bout moves it onto the re-key kernel (S365 lane A). **Match-phase swaps in Route 2 (name+type match with DIFFERENT ids) remain real**: the merge machinery + `applyIdSwapToUi` → `handleIdSwap` (UI/URL/favorites migration) survive for exactly that path.
+- Locally (offline / local-only), client v4 ids work indefinitely and survive Make-Online unchanged.
+
+HISTORY: the pre-keel Django server assigned its own UUID v7 on CREATE, which is why the swap machinery exists (SYNC_NOTES "Server-assigned ids").
+
+**Implications for Make-Online Route 2** (link to existing api world): name+type matching is the primary match key (elements created independently on different machines have different UUIDs); ID matching catches re-uploads from the same machine cleanly.
+
+---
+
+## Workflows
+
+### W1 — Create local world
+
+1. User clicks "+ Create Local" in sidebar Worlds mode (or Welcome CTA).
+2. Modal asks for name; "Pick Folder" button opens the OS folder picker.
+3. Atlas writes `world.json`, empty `elements/<type>/` for all 22, `media/`, `.atlas/`. (No `spatial/` — see the union read.)
+4. Registry entry added with `state: 'local-only'`, folder handle stored in handle-vault.
+5. World activated. Middle shows the world home room (sidebar mode is independent — convention #37).
+
+### W2 — Link existing api world
+
+1. User clicks "+ Link API" (or Welcome CTA).
+2. Modal asks for: API key, PIN (pre-filled from registry if set), optional display name override. Then "Pick Folder" (where the world's local files will live).
+3. On submit:
+   - Validate by calling `client.worlds.get()` with the credentials.
+   - **Initial download**: fetch ALL elements/maps/pins/zones/markers from the API, write to folder with stamped `server_updated_at`.
+   - Progress UI: "Downloading 247 of 412 elements…"
+   - Register entry as `api-linked`, attach SyncEngine.
+4. Toast: "linked {name}". Sync indicator shows "synced".
+
+**Initial-download error handling**: partial downloads are valid (folder has what it has). User can resume by clicking "Refresh from API". The world is openable even if download is incomplete.
+
+### W3 — Make local online: Route 1 (create new api world)
+
+1. User opens local world. Sidebar Worlds mode → context menu on the world → "Make Online…" (or Settings → World → "Make Online").
+2. Modal:
+   - Display name (defaults to current world name)
+   - Email (pre-filled from Settings, editable)
+   - PIN (pre-filled from Settings, editable)
+   - Validation: must be online; folder must contain at least one element OR user confirms creating an empty api world.
+3. On submit:
+   - `POST /api/worldsync/create-world-external/` with `{name, email, pin}` → returns `{api_key}`.
+   - Push all local elements/maps/pins/zones/markers to the new api world using the SyncEngine push path (with `server_updated_at` stamped on success).
+   - Progress UI: "Uploading 47 of 412 elements…"
+   - Maps without `image_url` are pushed with empty url; UI shows warning indicator on those maps post-upload.
+   - On full success: update registry entry — `state: 'api-linked'`, attach api credentials, start SyncEngine.
+   - Folder data is untouched. Files stay where they are. The world is now api-linked but the local layer is the SAME folder.
+4. Toast: "{name} is online."
+
+**Error handling**: if push fails mid-upload, the api world has partial data. Registry entry stays `local-only` until user retries or proceeds with partial state. (No dedicated "finish upload" action — retry re-runs the flow; per-element push resilience means a partial upload converges on the next sync round.)
+
+### W4 — Make local online: Route 2 (link to existing api world)
+
+For users who already created an api world elsewhere (web app, obsidian plugin) and want to merge their local content into it. **Bidirectional**: local-only elements push up, server-only elements pull down, matched elements resolve per policy. End state: local folder contains every element on either side.
+
+1. Same context menu entry → "Link to Existing API World…"
+2. Modal:
+   - API key
+   - PIN
+   - **Merge policy** (radio) for the MATCHED elements (same name+type on both sides):
+     - **(b) Push, overwrite duplicates** (default): local content wins → UPDATE server. Local file's id is rewritten to the server's id (server-side id always wins).
+     - **(c) Skip duplicates**: server content kept → local file fully overwritten with server's record (adopts server's id and content). Local edits to matched elements are LOST under this policy — explicit warning in UI.
+
+   Full-overwrite ("wipe server, push local fresh") is intentionally NOT a v1 policy — too easy to nuke a collaborator's data. Users who genuinely want this delete the api world via the web app, then use Route 1 (Make Online → create new).
+3. On submit:
+   - Validate credentials, fetch server state for every type.
+   - Build diff (three buckets):
+     - **Local-only** (no server match) → CREATE on server.
+     - **Server-only** (no local match) → DOWNLOAD to local (via `applyServerRecord`).
+     - **Matched** (name+type match) → policy (b): UPDATE server with local + rewrite local id to server's id; policy (c): overwrite local file with server's full record.
+   - Apply diff with progress UI showing all three counts.
+   - On success: flip registry state, attach SyncEngine, stamp `server_updated_at` everywhere.
+4. Toast: "{name} linked. {n} pushed, {m} downloaded, {p} updated/skipped."
+
+**Id-swap on matched elements (policy b)**: when local id ≠ server id and they match by name+type, local file is re-saved with the server's id. Foreign-key references to the old local id (pins on this element, relations, etc.) MUST be rewritten in the same atomic operation. The folder-store provides a helper for this rewrite.
+
+### W5 — Edit element (online, autosave default)
+
+1. Click field value → popover opens.
+2. Edit → Save (Enter or button).
+3. FolderStore.updateElement stamps `local_updated_at` and writes the file.
+4. UI re-renders from folder state.
+5. SyncEngine's debounced push fires 5 seconds later → server gets the change → `server_updated_at` stamped.
+6. Sync indicator: synced → saving (pulse cyan) → synced.
+
+### W6 — Edit element (stay-offline or network-offline)
+
+Same flow as W5, except:
+- SyncEngine is paused (manual or network).
+- FolderStore writes still happen normally; the element file is updated, `local_updated_at` stamped.
+- Sync indicator shows: `offline (paused) · 1 pending` (count derived from elements with `local_updated_at > server_updated_at`).
+- No SDK calls attempted while paused.
+
+### W7 — Resume sync (manual toggle off, or network return)
+
+1. User flips "stay offline" toggle to off (or `online` event fires).
+2. SyncEngine `resume()` → state → `syncing`.
+3. Push phase runs: for each locally-changed element, push to server. Conflicts handled per policy (default `local-wins`: push overwrites server, one-shot toast).
+4. Pull phase runs: fetch updates from server since `last_pull_at`. Apply non-conflicting; conflicting handled per policy.
+5. Sync indicator returns to `synced` (or `error` if anything failed).
+
+### W8 — Conflict surfacing
+
+Two policies only (see "Sync policies" above; legacy `drain-blind`/`pause-on-conflict`/`ask` names are migrated on load). Symmetric across push and pull.
+
+Under **`local-wins`** (default):
+- Conflict detected (both sides changed since the baseline).
+- Local wins — push overwrites the server; pull skips applying the server change for that element.
+- One-shot toast per round; no badge, no modal, no persisted conflict (the divergence is already resolved). A pull-time conflict triggers an immediate follow-up push to converge (SYNC_NOTES).
+
+Under **`pause-and-review`**:
+- Nothing auto-resolves — push skips, pull skips, the conflict is persisted to `sync-state.json`.
+- ⚠ badge fires on the sync pill; clicking opens the conflict-review modal with per-element `overwrite (mine wins)` / `pull (theirs wins)` actions. Closing without choosing = decide later; the badge persists.
+
+### W9 — Delete element (cascade-aware)
+
+1. User clicks delete in element-detail header.
+2. UI calls `folder.findDependents(id)` for the preview count.
+3. Confirmation dialog: "Delete X? This will also remove {n} pins."
+4. `folder.deleteElement(id)` (cascade defaults true): tombstones are written for every dependent first, then for the primary element. Returns `{ tombstones }` so the UI can surface a toast count.
+5. **Cascade rules**:
+   - Content element delete → tombstones every pin whose `element_id` references it.
+   - Map delete → tombstones every pin / zone / marker on that map.
+   - Pin / zone / marker delete → no cascade.
+6. Cascade tombstones are appended BEFORE the primary so server DELETEs execute in dependency-safe order.
+7. If api-linked: SyncEngine pushes DELETEs on next sync.
+8. `opts.cascade: false` is an escape hatch for advanced flows (engine cleanups, repairs). UI flows must use the default.
+
+### W10 — Multi-machine, same world
+
+User opens the same world's folder on two machines (e.g., via Dropbox-synced folder, or two laptops with the same api credentials but separate folders).
+
+- **Same folder via Dropbox**: undefined behavior (file system race conditions). Lock file (`.atlas/lock`) detects concurrent access and warns the second tab. User accepts at their own risk. Document as "not officially supported."
+- **Separate folders, same api credentials**: each machine has its own FolderStore + SyncEngine. They reconcile through the api server. Standard distributed-edit semantics — last writer wins on conflicts unless policy is `pause-and-review`.
+
+### W11 — Snapshot / backup
+
+Native to the architecture: copy the folder. No export feature needed.
+
+### W12 — Portability
+
+Native: zip the folder, share it. Recipient picks "Open Local Folder" on their atlas, points it at the unzipped folder. Registry entry is theirs; the api credentials in `world.json` are also there (consider whether to strip them on copy — probably yes for shared zips; Phase 3.5 add a "Share copy without credentials" option).
+
+---
+
+## Maps Subsystem
+
+See **`DESIGN_MAPS.md`** for the full map subsystem design — domain model (parent_map, location, hierarchy as sibling-order), tree-build algorithm, UI surfaces, image source rules, test world fixtures, schema-update pile, and the bout sequence.
+
+**Image source rule** (supersedes prior text): `image_url` is canonical and wins display when set. `image_media_id` is the atlas-local fallback when no URL exists. Both can be stored simultaneously; UI badges indicate which is rendering. Push to API: `image_url` only.
+
+---
+
+## Media (always local, always in folder)
+
+Even for api-linked worlds, media lives ONLY in the folder. No upload to OW.
+
+- `media/<element-id>/<folder-name>/<filename>` — real files
+- `_meta.json` per item — original filename, type, added_at, etc.
+- Element's `image_url` field is separate from the media grid (it's the API's canonical primary image).
+- "Set local file as image_url" is a future feature requiring an upload-to-third-party (imgur, etc.) — Phase 3.5.
+
+---
+
+## UI — Three-Pane Shell + Room Model
+
+```
+┌─────────┬─────────────────────────────────┬─────────────────────────┐
+│ 19%     │ 51%                             │ 30%                     │
+│ SIDEBAR │ MIDDLE                          │ RIGHT                   │
+│         │ ┌─────────────────────────────┐ │                         │
+│ [Worlds │ │ 🏠 ✎ 🕓 ⌕ ⬆ ⬇ 🧩 ⚙       │ │ [Maps | <map tabs>]    │
+│  Elem]  │ │ ← room nav strip (~32px)   │ │                         │
+│         │ ├─────────────────────────────┤ │ leaflet canvas per map  │
+│ filter  │ │                             │ │ with lifecycle cache    │
+│ chips   │ │   <room content>            │ │                         │
+│ search  │ │                             │ │                         │
+│ list    │ │   home / element / writing  │ │                         │
+│         │ │   knowledge / charts /      │ │                         │
+│         │ │   share / import / settings │ │                         │
+│         │ │   (search+templates dormant)│ │                         │
+│ ⚙       │ │                             │ │                         │
+└─────────┴─└─────────────────────────────┘─┴─────────────────────────┘
+```
+
+**Sidebar (~19%)**: 2 modes (Worlds | Elements). Top toggle, footer gear → settings.
+
+**Middle (~51%)**: split into two stacked regions —
+- **Room nav strip** (~32px, top): persistent icon strip when a world is active. Click any icon → navigate to that room. Hidden on the welcome screen (no world).
+- **Room content** (flex 1, below): the active room renders here.
+
+**Right (~30%)**: tab bar (Map Index pinned + per-map tabs) + leaflet canvas.
+
+**Ratios** persisted to `localStorage.atlas_shell_ratios_v2`.
+
+---
+
+## Rooms
+
+A **room** is a top-level mode of the middle pane. The room nav strip is always visible when a world is active; clicking an icon navigates to that room.
+
+| Room | Route | Content | Status |
+|---|---|---|---|
+| `welcome` | `#/` | First-launch doors (tour, set up a folder, open a world folder, example page); the grounded and no-world-open states | shipped |
+| `home` | `#/w/<id>` | World home — identity, stats, charts preview, recent, quick actions. **Default landing for active worlds.** | shipped |
+| `element` | `#/w/<id>/element/<eid>` | Schema-driven element detail | shipped |
+| `writing` | `#/w/<id>/writing[/<narrativeId>]` | Book/chapter/scene/draft authorship (any tier; ancestry derived from `parent_narrative`). See `DESIGN_WRITING.md`. Legacy long-form URL still parsed. | shipped |
+| `knowledge` | `#/w/<id>/knowledge[/<entryId>\|/new\|/knower/<id>]` | Knowledge entries — who knows what. [Entries \| Knowers] tabs, draft editor (persists nothing until create), embedded TipTap prose w/ mentions, known-view per knower. See `DESIGN_KNOWLEDGE.md` | shipped (phase 1) |
+| `timeline` (the **Charts** room) | `#/w/<id>/timeline[/<id>]` | **Charts** — chart views of the world along chosen axes (time first): type-icon identity, degree-ranked anchor beats, density-fan layout, LOD, unified select=focus (focus in the URL, Back walks the chain). Route key stays `timeline`; room title + nav read "Charts". See `DESIGN_CHARTS.md`. | shipped |
+| `search` | ~~`#/w/<id>/search`~~ | **DELETED (256; nav-hidden since 240)** — legacy URLs land on home; interim search = elements-sidebar filter; replacement = Cmd+K palette (see "Search" above) |
+| `share` | `#/w/<id>/share[/<pageId>]` | **The Pages room** (renamed from "Share" S255 — label only; route key + code identifiers keep `share`) — list + block builder (heading/prose/element-card/circle/collection/map/chart) + themes + payload-true visitor preview + LIVE publish/republish/revoke (contract v0.3). Legacy `/publish` URLs alias here. Icon `wall_art`. See `DESIGN_SHARING.md` | shipped + live |
+| `import` | `#/w/<id>/import` | **Import & export room** — bring in (full-world/loose JSON → new world or merge, validation + fix-prompt) / take out (ow.com-shape export, by-type subset). See `DESIGN_IMPORT.md` | shipped (241) |
+| `templates` | ~~`#/w/<id>/templates`~~ | **DELETED (256; was a never-built stub)** — legacy URLs land on home |
+| `settings` | `#/w/<id>/settings[/<tab>]` | Account / storage / editing (atlas-wide) · world / writing / context (per-world) | shipped |
+| `demo` | `#/demo` | View-only example-page presentation (Sikelia; no world, no registry — entry: the Pages room's empty state) | shipped (254-255) |
+
+**Default route**: bare `#/w/<id>` resolves to `home` (was `timeline` pre-session-223). Welcome stays at root `#/` with no active world.
+
+**Room-stable world switch** (S256, generalizing the S253 settings-keeps-its-tab precedent): activating a different world keeps the current room KIND at its landing level — writing/knowledge/timeline/share/import follow to the new world; settings keeps its tab; element and map routes fall to home (their ids are world-bound). Implemented in `worlds-sidebar.activateWorld`. Since S364 the room INSTANCE remounts per world (conv. 109): the kind follows, instance state resets (the Charts room's mode and filters), except a Data room payload, which is carried across on purpose so a loaded file can be merged into the world you click.
+
+**Room nav strip** (`src/middle/room-nav.ts`) reads `state.active` + parsed route, highlights the active room icon. Hover → tooltip with sentence-case room name.
+
+**Element selection lives WITHIN the element room** — selecting an element navigates to `#/w/<id>/element/<eid>` (the element room). The element header appears BELOW the room nav strip with element-specific actions (delete, publish, pin, etc.).
+
+**Deselect convention**: **Esc** clears `selectedElementId` and navigates to home — when an element is selected, no modal/overlay is open, and the route is NOT `writing`/`knowledge` (those rooms own their keyboards; see convention #32 + #46). Click-row-toggle was considered and dropped (session 223) — Esc is the canonical deselect.
+
+**Room header model — the two-tier rule (convention #80, session 240).** Every middle-pane view opens with ONE of two header shapes, chosen by level:
+- **Room landing** (home, knowledge list, share list, timeline, settings, import, writing-with-no-narrative) → `.atlas-room-header`: a **22px white** `<h1>` + optional `.atlas-room-subtitle`, with the primary action in an `.atlas-room-actions` row below. Section headings within are **sentence-case** (match the share room), never uppercase.
+- **A single named entity** (element, knowledge entry, share page, knower, an open writing narrative) → the compact 36px `.atlas-middle-header` band: `back · kind icon · 15px click-to-edit title · actions`. The title IS the editable name — there is **no separate "Name" field**. Click-to-edit is the shared `makeEditableTitle` helper (`src/middle/editable-title.ts`), used by element-detail-header + knowledge-room + share-room.
+
+Rule of thumb: **big title = you're in a room; compact band = you're looking at one thing.** Titles are white; cyan is for accents/links, not headings.
+
+**Search** (240 → 256 → 258): the dedicated search ROOM was nav-hidden pre-release (240, weakest surface) and DELETED in 256 (`search.ts` + `templates-room.ts` removed; `/search` + `/templates` URLs parse to home). **The replacement SHIPPED in 258: the command palette** (`src/ui/command-palette.ts`, lazy chunk) — Ctrl/Cmd+K or `/` from any room, ranked tiers (name prefix > name substring > alias > supertype/subtype > description-with-snippet), room jumps by name (an element name-prefix outranks a room; rooms outrank weaker tiers), Enter/click navigates, "see all →" hands the query to the elements-sidebar filter. **One search language**: the sidebar filter and the palette share `core/element-search.ts` (name/alias/taxonomy/description) so see-all always shows a superset of the palette's capped 12 — a name-only sidebar filter would show "no matches" for a query the palette just matched. Pins/markers excluded from both (map artifacts, not browse targets). Bindings: `command-palette` + `command-palette-slash` in hotkeys.ts (replaced the old focus-search Ctrl+K). **Since S309** the room-nav strip carries a field-shaped search pill anchored right that opens the same palette — one search, two doors.
+
+Per-room design docs:
+- World Home: `DESIGN_HOME.md`
+- Writing: `DESIGN_WRITING.md`
+- Knowledge: `DESIGN_KNOWLEDGE.md`
+- Sharing: `DESIGN_SHARING.md` (supersedes `DESIGN_PUBLISHING.md`)
+- Maps (right pane): `DESIGN_MAPS.md`
+- Zones (right pane): `DESIGN_ZONES.md`
+
+---
+
+## State Shape
+
+`src/core/state.ts` is the source of truth — the shape below is a reference, kept high-level to avoid drift. `middleMode` is the room (rooms model, session 223+); navigational/world-specific prefs live on the registry or URL, app-level UI prefs in `ui-prefs.ts` (NOT in `UiState`).
+
+```ts
+interface AppState {
+  registry: WorldsRegistry;              // localStorage-persisted
+  atlasRoot: AtlasRootRef | null;        // creation-default root container
+  atlasRootRecoverable: AtlasRootRecoverableRef | null;  // orphan-handle recovery
+  active: ActiveWorldRef | null;         // currently-open world
+  middleMode: MiddleMode;                // active room (home/element/writing/timeline/settings/…)
+  data: DataState;                       // elements/maps/pins/zones/markers in memory
+  ui: UiState;                           // selection, filters, right tabs, transient flags
+  sync: SyncSummaryState;                // per-world sync engine summary for UI
+  busy: boolean;
+}
+
+interface UiState {
+  sidebarMode: 'worlds' | 'elements';
+  selectedElementId: string | null;
+  elementFilters: Set<ElementType>;      // empty = show all
+  mutedTypes: Set<ElementType>;          // S356: out of "show all", in when filtered to; per world (core/type-mutes.ts);
+                                         // pin + marker by default and always the strip's last two; right-click toggles
+  search: string;
+  rightTabs: RightTabRef[];              // [context, map-index, ...maps]
+  rightActiveIndex: number;
+  pinPlacement: { elementId: string } | null;
+  zoneEditing: { zoneId: string; mapId: string } | null;
+  sidebarWritingOverride: boolean;       // transient, in-session only
+}
+
+interface SyncSummaryState {
+  byWorld: Record<string, SyncEngineState>;
+  activeSync: SyncEngineState | null;       // convenience pointer to active world's engine
+}
+```
+
+The `state.sync` slice is populated by `attachSyncEngine(entry, folder)` (singleton in `src/sync/sync-attach.ts`). The helper:
+
+1. No-ops for `local-only` worlds (and detaches any prior engine).
+2. For `api-linked` worlds: constructs `OwV2ClientAdapter` from `entry.api.api_key` + `registry.pin` (thin fetch, keel v2 dialect — no SDK in the sync path), instantiates `SyncEngine`, wires `onStateChange → patchSlice('sync', ...)`.
+3. Detaches the previous world's engine on switch — at most one active at a time.
+4. Exposed: `getCurrentSyncEngine()` for autosave callers, `requestPushIfLinked()` as a fire-and-forget convenience.
+
+`attachSyncEngine` is called from:
+- `worlds-sidebar.activateWorld` — every world activation.
+- `atlas-root-flow.createWorldInRoot` — fresh local world (detaches prior engine).
+- `atlas-root-flow.linkExistingApiWorldInRoot` — after initial download.
+- `make-online-modal` — after registry transition to api-linked.
+
+UI prefs (`sidebarMode`, `defaultCreateType`) → `localStorage.atlas_ui_prefs` (see `core/ui-prefs.ts`).
+Navigation state (active world, selection, open maps, room) → URL hash.
+
+---
+
+## Routing (URL hash)
+
+Hash-based, no server rewrites needed (Cloudflare Pages friendly).
+
+**Sidebar mode routes** (worlds | elements):
+```
+#/                                          → no world (welcome)
+#/w/<worldId>/worlds                        → Worlds sidebar mode
+#/w/<worldId>/elements                      → Elements sidebar mode
+```
+
+**Room routes** (active room = mode of middle pane):
+```
+#/w/<worldId>                               → home room (DEFAULT for active world)
+#/w/<worldId>/element/<elementId>           → element room
+#/w/<worldId>/writing                       → writing room (no narrative selected)
+#/w/<worldId>/writing/<narrativeId>         → narrative selected (any tier; ancestry derived from parent_narrative)
+                                              (legacy long form /writing/book/<b>[/chapter/<c>[/scene/<s>]] still parses)
+#/w/<worldId>/knowledge                     → knowledge room ([Entries | Knowers] tabs)
+#/w/<worldId>/knowledge/new                 → knowledge draft editor (nothing persists until create)
+#/w/<worldId>/knowledge/<entryId>           → knowledge entry editor (embedded TipTap prose)
+#/w/<worldId>/knowledge/knower/<knowerId>   → known-view (the world as a character/circle knows it)
+#/w/<worldId>/timeline                      → full timeline room
+#/w/<worldId>/share                         → share room (page list)
+#/w/<worldId>/share/<pageId>                → share room, page builder
+                                              (legacy /publish[/<id>] still parses as an alias)
+#/w/<worldId>/import                        → import room
+#/w/<worldId>/settings                      → settings (default tab)
+#/w/<worldId>/settings/<tab>                → settings deep-link (onlyworlds/storage/elements/maps/world/writing/context; legacy keys alias, incl. editing→elements. 'context' is labeled "Web" in the UI)
+#/demo                                      → view-only example-page presentation (no world, no registry)
+```
+
+**Right-pane map composition** (orthogonal to room — maps live in the right pane, room lives in middle):
+```
+#/w/<worldId>/map/<mapId>                   → opens map tab in right pane; middle stays on home/last room
+#/w/<worldId>/map/<mapId>/element/<eid>     → map open + element selected (element room in middle)
+```
+
+**Deep-link helpers** in `core/router.ts`:
+- `homeHash(worldId)`
+- `elementHash(worldId, elementId)`
+- `elementsHash(worldId)` (sidebar mode)
+- `worldsHash(worldId)` (sidebar mode)
+- `writingHash(worldId, narrativeId?)`
+- `knowledgeHash(worldId, knowledgeId?)` / `knowledgeKnowerHash(worldId, knowerId)`
+- `timelineHash(worldId)`
+- `shareHash(worldId, pageId?)`
+- `importHash(worldId)`
+- `settingsHash(worldId, tab?)`
+- `mapHash(worldId, mapId)` / `mapElementHash(worldId, mapId, elementId)`
+
+---
+
+## Critical Conventions
+
+Inherited from legacy (hard-won; preserve in new code):
+
+1. **State is truth** — UI reads `getState()`, writes via `patchSlice()`, router mediates URL ↔ state. Every subscriber fires on every change (no selectors).
+2. **Force re-render idiom** — patch `data.elements` with a new reference; a subscriber that memoises its inputs (conv. 103) repaints only when a reference changes.
+3. **Shell pane non-mutation** — renderers must wrap content in a child div, never set `.atlas-middle` / `.atlas-right` cssText or className. Touching the shell pane wipes its `flex: 0 0 X%` and breaks the layout.
+4. **`min-width: 0` on flex children** — without it, wide content forces parent past flex-basis.
+5. **SDK-shape-agnostic relationships** — scan all array fields whose items have `id`; don't hardcode `_ids` suffix detection (SDK may rewrite field names).
+6. **Acronym-aware field labels** — `humanizeFieldName('image_url')` → `Image URL` via ACRONYMS set (URL, ID, API, UI, IP, HTML, HTTP, DNS, UUID, SDK, PIN, GPS).
+7. **ui-prefs vs URL state** — UX preferences in localStorage; navigation state in URL hash. Don't conflate.
+8. **Spatial disk↔wire rename lives in the adapter, schema-derived** — atlas stores pin/marker with `map_id`/`zone_id` on disk; the v2 wire uses bare `map`/`zone` (pin's `element_id`/`element_type` ARE the schema names). `OwV2ClientAdapter` derives the rename table from `FIELD_SCHEMA` via `relationFieldsFor` — never hardcode it. (HISTORY: this convention was born as the v1 "pin write SDK bypass" — `prepareRelations` would double-suffix `element_id` to `element_id_id`. The SDK no longer touches element CRUD.) **S354 (2026-09-02), the §5 half — the DISK reads both spellings and each file keeps its own.** The Folder Format writes the bare schema name on disk too (`map`, `zone`), and the first foreign folder with pins on it opened blank: five pins on disk, zero on the map, the map index reading 0. `store/disk-link-names.ts` (same `relationFieldsFor` authority) normalises every body read from disk to atlas's spelling and records the FILE's spelling in `fileIndex` (`spelling: 'atlas' | 'bare'`); every element write goes through `writeElementFile`, which writes the file back in the spelling it arrived with. A file declaring neither (a mapless pin) casts no vote. **BORN BARE since S359 (Skeld's ruling 2026-09-28)**: a NEW file takes `bare` unless some file of its type in the folder already declares atlas's suffix (`bareSpellingTypes`), so a folder atlas creates is written in the format's spelling and an old atlas folder keeps its dialect. The cost, accepted: an atlas older than 1.3 reads a bare pin as mapless. Same law as the union read and the world `now`: read both, never migrate a key as a side effect of opening, write back what was there. Fixture v1.2.0 carries the bare-spelled pin; the write-side e2e locks the stickiness.
+9. **CSS class + data-active for visibility** — never inline `display: none` toggled by JS. Use opacity transition on a class. Debug-hostile otherwise.
+10. **Pane scroll preservation** — module-level `Map<contentId, scrollTop>`; capture before re-render via data attribute; restore via queueMicrotask.
+
+**New for folder-first**:
+
+11. **FolderStore stamps `local_updated_at` on every write**. Callers never set this field. SyncEngine stamps `server_updated_at` on successful sync; FolderStore preserves it on round-trip.
+12. **Tombstones append before file unlink**. If the process dies mid-delete, the tombstone is durable; next sync still pushes the delete.
+13. **One writer at a time per folder**. Lock file (`.atlas/lock`) guards against multi-tab races. Format: `{ tab_id, started_at, last_heartbeat }`. The active tab refreshes `last_heartbeat` every 30s. A peer tab that finds a lock with `last_heartbeat` older than 90s treats it as stale and takes it (warning shown). Second writer with a fresh lock gets read-only mode with a warning.
+14. **Element files are the schema**. The `type` field on disk is authoritative. The adapter re-stamps `type` from the path on every server record (the v2 wire does return it, probed 2026-07-28, so this is a harmless same-value overwrite); a folder file WITHOUT `type` gets it from its directory at index time (the type fallback).
+15. **One engine, attached at world activation**. `attachSyncEngine` is a module-level singleton — at most one `SyncEngine` exists at a time. Switching worlds detaches the previous engine (`stop()` cancels pending debounced push, slice resets). Avoids cross-world push contamination.
+16. **Modal chrome lives in `BaseModal.buildModalShell`**. All modals (`create-world`, `element-create`, `element-picker`, `map-create`, `link-world`, `make-online`) share the same overlay+panel+title+body via `buildModalShell({title?, panelClass?, dataModal?})`. Title is optional (picker skips it for a custom title-row). Future modals MUST use this helper — never build overlay/panel from scratch.
+17. **Folder writes from the UI call `requestPushIfLinked()`**. After any successful `FolderStore.update/create/delete` from a UI handler, call `requestPushIfLinked()` so the autosave debounce fires. No-op for local-only worlds. Without this, edits to api-linked worlds wouldn't sync until the user manually triggered a push.
+18. **Element-detail scroll position is preserved across re-renders** via a module-level `Map<elementId, scrollTop>`. Captured before `target.innerHTML = ''`, restored via `queueMicrotask` after layout, live-tracked via passive scroll listener. Reset on world switch via `resetElementDetailScrollMemory()`. Without this, field edits/link toggles dump the user back to the top of the panel.
+
+19. **Pin writes require `element_type`** (server rule, surfaced by Bout V.5 smoke). Every code path that creates a pin MUST populate `element_type` from the referenced element. UI: map-tab placement looks it up from `state.data.elements`; the contextual-create flow receives `(id, type)` from `ElementCreateModal.onCreated`. Engine: `pushPhase` self-heals legacy pins missing this field by looking up the referenced element's type and writing back. Fakes (MSW + FakeOwApiClient) enforce the rule — any new code path forgetting it fails its tests immediately.
+
+20. **Encode real-server validation rules in fakes BEFORE fixing the caller**. When live OW returns a 4xx with a clear message that fakes didn't catch (Bout V.5's pin element_type rule was the canonical example), first add the rule to `statefulOwHandlers` AND `FakeOwApiClient`, then fix the caller. The fix lands with a regression test that locks the rule in, and future test code violating the rule fails immediately. This is how fakes get more faithful over time without contract-testing infrastructure.
+
+21. **Clear fields with `null` (relations / numbers) or `''` (text), never `undefined`.** `JSON.stringify` drops `undefined` keys at disk-write AND at wire serialization, so a PATCH body built around `undefined` omits the field — and real PATCH semantics treat a missing key as "no change to this field." The server then silently keeps the old value despite the user clicking × on a chip or blanking a popover. Verified by `tests/integration/sync-engine.fieldClear.test.ts`: the "trap" tests document what undefined does, the "contract" tests prove null/'' propagate. The fakes (`FakeOwApiClient`) also strip undefined to mirror JSON-wire behavior — same fakes-mirror-real discipline as #20. UI write sites that mean "clear" must pass the right sentinel: see `element-detail.ts` single-link `×` and `field-edit-popover.ts` empty-input handling.
+
+22. **Auth failure bails the round + transitions to `error` state.** When push or pull encounters 401/403 (PIN changed, api_key revoked, world deleted server-side — all surface the same way), the engine MUST: (a) stop iterating immediately, since every subsequent op would fail the same way against the dead key; (b) set `paused = true` so the autosave debounce no longer fires against the dead endpoint; (c) transition state to `{kind: 'error', message: 'authentication failed...', recoverable: true}` so the pill goes red. The `SyncResult.auth_blocked` flag tells `sync-attach` to emit a dedicated toast instead of the generic "couldn't sync N change(s)" message. Recovery is a fresh engine — changing PIN in settings calls `attachSyncEngine` which constructs a new `SyncEngine` instance (the error state doesn't bleed across instances). Without this convention, an auth-failed push round still set state to `idle`, the pill went "saving → synced," and the user thought everything was fine while changes silently failed (the "lying pill" class). Verified by `tests/integration/sync-engine.authBlocked.test.ts`.
+
+23. **CREATE batches go through `/bulk` — one atomic request, server-resolved order, cycles included.** `pushPhase` (and Route 2 merge) routes never-synced batches of ≥2 through `POST /bulk`: keel resolves in-batch FK order as a fixpoint, so cyclic reference webs (the Sikelia class — impossible for any per-element loop to converge) land in a single round-trip. Protocol: atomic + one retry of the survivors on partial failure + timestamp backfill (never client now()); see SYNC_NOTES "/bulk CREATE path". The Kahn topo-sort (`sortCreatesByDependencies`, schema-agnostic field scanning) survives ONLY as the fallback orderer for clients without `bulkCreate`. Verified by `tests/integration/sync-engine.bulkPush.test.ts` + `sync-engine.createOrder.test.ts` (fallback).
+
+24. **Unlink severs the sync history — `FolderStore.resetSyncBaseline()` is non-optional.** When the user unlinks from an api world, the folder is conceptually no longer associated with that api world. Every shred of sync metadata must be invalidated: every element's `server_updated_at`, every pending tombstone, the `sync-state.json` last_*_at + conflicts + server_deletes, and `world.json.api`. Without this, lingering baselines from the deleted api world make a subsequent Make-Online Route 1 treat every element as an UPDATE against the new world — pre-update GETs 404 → all routed to server_deletes → the new world appears online but empty. The settings unlink handler calls `resetSyncBaseline()` AFTER `detachSyncEngine()` (so no in-flight round mutates files mid-reset) and BEFORE the registry write (so the world flips to local-only with a clean folder). Verified by `tests/integration/folder-store.resetSyncBaseline.test.ts`. Note: `Forget World` is DIFFERENT — it removes the registry entry but doesn't touch the folder; reopening that folder later re-imports with its existing sync history intact.
+
+25. **Flush-on-attach runs BEFORE pull-on-activate.** Both paths fire from `attachSyncEngine` and both grab the engine's shared `inFlight` lock — without explicit sequencing they race, and the loser silently returns the winner's promise (in practice the pull always won, so flush's `pushOnce()` returned the pull's no-push result, no "synced N pending change(s)" toast fired, and stranded edits never reached the server until the next user write re-armed the autosave debounce). The async IIFE in `attachSyncEngine` awaits flush first, then pull. Order rationale: pending writes encode older user intent (typed in a prior session, lost the debounce to a reload) and should land server-side before pull-on-activate looks for newer remote changes. Flush is unconditional when pending exist; pull-on-activate is opt-in. Verified by `tests/integration/sync-attach.flushBeforePull.test.ts`.
+
+26. **Engine preserves `last_sync_at` across pause/resume.** `pause()` transitions to a `paused` state that doesn't carry the timestamp; without preservation, `resume()` would emit `{kind:'idle', last_sync_at: null}` and the pill's "synced X min ago" tooltip would briefly read "never synced" between resume and the post-resume push completing. The engine keeps a private `lastSyncAt` field updated by `setState` on every idle transition with a non-null timestamp; `resume()` reads it back so the brief idle window post-resume carries the prior value. A successful sync afterwards stamps a fresher value normally. Verified by `tests/integration/sync-engine.resumePreservesLastSyncAt.test.ts`.
+
+27. **Sidebar mode toggle label reads URL + registry, NOT `state.active`.** The right-tab label is the active world's name. `state.active` only fills in AFTER the slow FS work in `activateWorld` (handle resolve, permission re-grant, `store.open`, `listElements`); during that window the registry entry exists but `state.active` is still null or stale. Reading `state.active.meta.name` in the toggle would lag the UI ~500ms behind the click. Reading `registry.worlds.find(w => w.id === route.worldId).name` flips the label synchronously in the same frame as the click — the "instant-feel world switch" depends on it. The same principle applies to any UI whose visible identity should match the URL: source from registry+URL, not from store state that catches up async. `activateWorld` clears `data.elements` + `selectedElementId` and navigates synchronously BEFORE the FS work for the same reason; failure paths revert URL to the priorHash.
+
+    **Note (session 223 decoupling)**: the *active state* of the sidebar mode buttons reads from `state.ui.sidebarMode` (not URL). The toggle's *label* still comes from URL+registry. Two independent reads — that's intentional.
+
+31. **Middle pane is a flex column with room nav strip + content.** `app-shell.middle` is split into `shell.middleRoomNav` (~32px, top, fixed) and `shell.middleContent` (flex 1, bottom). Room nav strip mounts to `middleRoomNav`; every room component (welcome, home, element-detail, writing, timeline, search, publish, import, templates, settings) mounts to `middleContent`. The room nav strip is hidden (display:none via data-active="false") when no world is active — welcome owns the full middle pane during first launch. **Renderers must NEVER touch `shell.middle` directly** (would break the column flex) — always target `shell.middleContent`. This extends convention #3 (shell pane non-mutation) to the new sub-structure.
+
+32. **Esc clears element selection + navigates to home.** When an element is selected (`state.ui.selectedElementId` is set) and no modal/popover/inline-editor is open, pressing Esc clears the selection and navigates to `homeHash(worldId)`. This makes "exit element detail back to my world overview" a one-key operation and matches the room model's "element is a room you enter, home is the room you exit to." The Esc handler must check `!hasOpenModal()` AND no non-modal overlay (field-edit popover, visual settings popover, shortcuts popover) is active so it doesn't steal Esc from those handlers. **Click-row-toggle was considered + dropped (session 223 e2e fallout)** — re-clicking the selected row toggling off conflicts with common UX/test patterns where re-clicking a row is meant to refocus. Esc is the canonical deselect.
+
+33. **Writing tier labels live in `registry.worlds[i].writing_labels` (l1-l4)** and ARE the `supertype` storage value on each Narrative. Defaults `{l1: 'Book', l2: 'Chapter', l3: 'Scene', l4: 'Draft'}`. UI reads via `getWritingLabels(worldId)`. **No canonical/display split** — storage matches display 1:1. Renaming a label triggers `applyLabelRenameMigration` which rewrites every existing narrative's supertype so data + UI stay consistent. Convention #38 covers the membership filter; convention #39 covers the migration trigger.
+
+34. **Atlas writing has three structured tiers (l1/l2/l3) + one flexible (l4=Draft).** l1 forbids parent; l2 requires l1 parent; l3 requires l2 parent; l4 has no parent constraints (drafts can root, sit under any tier, or nest other drafts). The writing-room create flow enforces these; element-detail field edits don't (user can override at their discretion). External narratives nested below depth 3 are PROMOTED to Draft tier (`l4`) during initial setup.
+
+35. **SUPERSEDED (session 234).** Was: showcase_config `atlas_*` extensions — built on the dead write-tool-prototype publishing model. Sharing is redesigned in `DESIGN_SHARING.md` (pages + blocks + theme tokens; backend contract with Anchor pending). Number retained so cross-references stay stable.
+
+36. **SUPERSEDED (session 234).** Was: "showcases are immutable, republish creates new." The current snapshot-vs-live model (Pages = frozen snapshot, World Showcase = live, republish semantics) lives in `DESIGN_SHARING.md`.
+
+37. **Sidebar mode and room are independent dimensions** (session 223 decoupling). `state.ui.sidebarMode` is pure UI state, persisted to localStorage via `core/ui-prefs.ts`. Toggle clicks update state directly — no URL navigation. Room navigation (top-of-middle nav strip + room URLs) is orthogonal. Previously the URL's "elements" route forced sidebar to elements mode via `syncModeFromRoute`; that auto-coupling was removed because it caused inconsistent behavior across room transitions ("some top tabs open the worlds part, others open elements"). The two dimensions now move independently — user picks sidebar mode via the toggle, picks room via the top strip. `activateWorld` navigates to `worldHash(id)` (home), not `elementsHash(id)`, so sidebar mode is not perturbed on world switch. The `/elements` route still exists for backward compat (rare bookmarks, test code) — it resolves to middle=home with the Home icon highlighted in room nav.
+
+38. **A Narrative belongs to the writing tree iff `supertype` matches one of `registry.worlds[i].writing_labels` (l1-l4)** for the world. Detection via `isWritingNarrative(el, worldId)`; tier classification via `getTierForNarrative(el, worldId)` (returns `'l1'`/`'l2'`/`'l3'`/`'l4'`/`null`). Setting supertype to anything outside the four labels removes the narrative from the writing tree (still visible in elements list / search / timeline). Setting supertype to one of the four labels via element-detail effectively PROMOTES that narrative into the tree.
+
+39. **Label renames trigger immediate supertype migration on existing narratives.** When the user changes any of l1-l4 in Settings → Writing or the writing setup screen, `applyLabelRenameMigration(folder, elements, oldLabels, newLabels)` walks every narrative and rewrites supertype values that match an old label to the new value. Keeps storage and display 1:1 — no canonical/display split. Settings → Writing wires the migration into the per-input change event; the setup screen wires it into the Save handler. Both surface a toast with the migrated count.
+
+40. **Writing-room sidebar takeover** (session 224). When the route is `writing` and `state.ui.sidebarWritingOverride === false`, the sidebar body shows the writing tree (`mountWritingBody` in `src/sidebar/writing-sidebar.ts`) instead of worlds/elements. Clicking the worlds/world-name toggle while in writing sets `sidebarWritingOverride: true` — that escape sticks until the route leaves+re-enters writing OR the user clicks the writing icon in the room nav (which clears it). The two-band sidebar header mirrors the elements-sidebar layout EXACTLY (filter-strip slot becomes create row, search-row slot reused with tune in the `+` position). Middle pane in writing mode is single-column — just element-detail. Bands and tree are appended directly to `.atlas-sidebar-content` (no wrapping flex div) so the shell-level scrollbar gutter aligns between writing and elements sidebars.
+
+41. **`.atlas-middle-header` is locked at 36px.** Every height channel — `height`, `min-height`, `max-height`, `flex: 0 0 36px` — set with `!important`. Plus `overflow: hidden; flex-wrap: nowrap`. Plus defensive `.atlas-middle-header > * { max-height: 100%; flex-shrink: 0 }` so no descendant can grow the band. Tier badge + child-create buttons for writing-tree narratives live inside this header (no separate toolbar slot above element-detail). One stable band across all elements and rooms. (Iterated 64 → 48 → 46 → 36 across session 224's polish day; 36 is final.)
+
+42. **Optimistic close on `openFieldEditPopover` saves.** The overlay calls `cleanup()` BEFORE awaiting `opts.onSave`, then catches any rejection and surfaces it via toast. UI stays interactive during persistence (sidebar clicks, chevrons, navigation all responsive). Pattern: saves whose failure is rare and survivable should not block the UI. Convention #42 is the popover-level expression; same principle drives the "save registry first, then promote" ordering in `writing-setup.ts`.
+
+43. **Narrative deletes cascade through `parent_narrative` chains.** `FolderStore.findDependents` for `target.type === 'narrative'` BFS-walks the chain and collects: every descendant narrative + every pin referencing the target or any descendant. `deleteElement` tombstones all in dependency-safe order. Without this, deleting a book would orphan its chapters with a dangling FK and resurface them as loose roots in the writing tree. Cascade-by-default is the safer UX; the count appears in the confirm dialog. Implemented in both `folder-store-fs.ts` and `mock-folder-store.ts` (test fixture parity).
+
+44. **Last-edited narrative is restored from the writing icon.** `WorldRegistryEntry.last_writing_narrative_id?: string` is written every time the writing room's active narrative changes (deferred via `queueMicrotask` to avoid render thrash). Clicking the writing icon in the room nav reads this and navigates via `writingHashForNarrative(worldId, id, elements)` — the helper walks `parent_narrative` to build the full `/writing/book/<b>/chapter/<c>/scene/<s>` URL. Falls back to bare writing path when no memory or the narrative no longer exists. Combined with element-detail's module-level scroll memory (keyed by element id), returning to writing restores both selection and scroll position.
+
+45. **Selected-element chip on the room-nav strip** (session 226). The right edge of `.atlas-room-nav-strip` carries a persistent `.atlas-room-nav-selected` chip whenever `state.ui.selectedElementId` is set. Shape: `[icon] [truncated name] [×]`. Click body → `navigate(elementHash(worldId, selectedId))`. Click × → clear `selectedElementId`. The chip styling mirrors `.atlas-room-nav-btn` (transparent default chrome; cyan-tint pill when active) — `.active` is added iff `route.mode === 'element'`, so the chip lights up only when its own destination is the current room. Gives the always-something-highlighted invariant: when the user views an element, the chip is the highlighted room indicator (element isn't a room button itself). Name truncates at 22 chars. Icon + × scoped under `.atlas-room-nav-selected` for two-class specificity to outrank `.material-symbols-outlined` from the `material-symbols` package.
+
+46. **Writing room derives target element from URL, NOT from `state.ui.selectedElementId`.** `element-detail.ts:getSelectedElement` branches: when `route.mode === 'writing'`, it returns `route.sceneId ?? route.chapterId ?? route.bookId` (each is a narrative id by URL contract). Otherwise it falls back to `route.elementId ?? state.ui.selectedElementId`. Writing room's `mountEditor` MUST NOT patch `state.ui.selectedElementId` on narrative navigation — that would clobber the user's persisted global selection. The URL is the single source of truth for writing-room navigation; `state.ui.selectedElementId` is the global selection that persists across rooms (and feeds the convention #45 chip). Writing tree highlighting in the sidebar also reads URL, not `selectedElementId`. Without this decoupling, opening writing erases whatever element you had selected — the chip would mirror the active narrative instead of preserving the prior context. Implemented session 226 alongside convention #45 chip; previously writing.ts mirrored the URL into `selectedElementId` for element-detail's benefit, which leaked the writing selection across rooms.
+
+Related: convention #32 (Esc clears selection + nav home) is **gated to NOT fire when route is `writing`, `knowledge`, OR `share`** — those rooms own their keyboards (editing surfaces + URL-owned navigation); pulling the user out AND clearing their persisted global selection on one Esc keystroke surprised more than it helped. `hotkeys.ts:'deselect-to-home'` skips when the hash includes `/writing`, `/knowledge`, or `/share` (knowledge added session 235; share added session 237).
+
+47-57. **Writing conventions** — codified in `DESIGN_WRITING.md` (richtext storage, ow:// link scheme, atlas_aliases, UNION-on-save, workspace replacement gate, material-symbols scoping, autolink rules, sticky bar, ambient word count, add-to-cast unification, compiled view). See that doc for details. Numbering reserved for cross-doc consistency.
+
+58. **Context tab is permanent + route-driven** (session 231). The right-pane Context tab lives at index 0 of `state.ui.rightTabs` for every world, alongside Maps and per-map tabs. Its content is derived from the URL: writing route → narrative subject + Cast/Potentials lists; element route → element subject + preview card; any other route → empty state with helpful copy. The pane's content reacts to hash changes via `onHashChange`; in-pane click-to-recenter and graph-node selection stay pane-local (no URL change). Subject is NEVER stored on the RightTabRef — the tab is a stable shell, the URL is the focus source of truth. `context-tab-lifecycle.ts` enforces the at-index-0 invariant defensively.
+
+59. **Context pane prefs flow one direction**: registry → orchestrator → graph → toolbar (session 231). Toolbar callbacks ONLY persist via `patchWorldEntry`; never call graph methods directly. The orchestrator's `syncPrefsToGraph` watches state, diffs against last-applied prefs, and propagates changes to the graph + toolbar. Settings page edits land via the same path — same registry write, same propagation. Single source of truth (registry), single propagation channel, no duplicate-update races. Toolbar `onToggleType` / `onSetHop` / `onToggleLockLayout` callbacks fire `patchWorldEntry({...})` only — the subscriber takes it from there.
+
+60. **Diff-aware setter calls + ordering matter for graphs with sims** (session 231). When a setter has side effects beyond state mutation — `setHiddenTypes` calls `renderForCenter` which runs the physics sim — spurious "no-op" calls aren't no-ops. They wobble node positions by re-running the sim, breaking the lock-layout "no jumping" guarantee. `syncPrefsToGraph` compares each pref against `lastAppliedPrefs` and only calls the setter when the field actually changed. Setters with prerequisite flags (e.g. `setLockLayout` toggles the flag that subsequent `setHiddenTypes` reads to decide sim-vs-paint) MUST be called first in the propagation order.
+
+61. **Window-level capture phase for browser-default mouse buttons** (session 231). Mouse buttons 3 (back) and 4 (forward) trigger browser history navigation. To suppress: listen on `mousedown` AND `mouseup` AND `auxclick` at window level in capture phase (`{ capture: true }` or `addEventListener(t, fn, true)`). Bubble-phase listeners on a child element may run AFTER Chrome's gesture handler initiates `history.back()`. preventDefault on all three to maximize browser coverage. Scope the suppression with `host.contains(e.target)` — when cursor is outside the relevant pane, browser nav works normally. Trigger the in-pane action only on `mousedown` (avoid triple-firing).
+
+62. **Per-ring caps keep multi-hop graphs readable** (session 231). The context-pane graph supports hop depth 1-4. Ring 1 (direct cast) is uncapped; outer rings are score-and-capped: ring 2 = 12 (chapter 6 / book 4 under tier density), ring 3 = 8, ring 4 = 6. Each ring's candidates are scored by edges back to the PREVIOUS ring (mirrors the cast → adjacent scoring at ring 2). Without per-ring caps, hop=4 in a dense world produces 100+ nodes — unreadable in a small pane. Implementation in `context-pane-graph.ts:renderForCenter` ring-walk loop.
+
+63. **CSS-JS coupling needs a code-level reminder** (session 231). When CSS sets a variant size for a special node (e.g. `.atlas-context-graph-node.is-center { width: 44px }` overriding the default `36px`), the JS positioning code MUST use the matching diameter when computing the top-left offset for that node. Otherwise the variant sits off-center relative to other geometry (the center node sat 4px down-right of the edge crossings until fixed). Pattern: declare paired constants in the JS (`NODE_DIAMETER` + `CENTER_NODE_DIAMETER`) with a comment "MUST match CSS .is-center width/height"; provide a tiny `diameterFor(node)` helper used at every position-set site. Same principle: any time CSS and JS share a magic number, the JS side gets a constant with a comment pointing at the CSS rule.
+
+64. **Settings tabs are scope-grouped; `editor_settings` is the element-editor pref home** (session 232). `SETTINGS_TAB_GROUPS` (`router.ts`) splits the settings rail into ATLAS-wide (`general`, `onlyworlds`, `storage`, `elements`, `maps`) and per-world (`world`, `writing`, `context`) groups (current ids; `account`/`editing` and older ids alias via `LEGACY_SETTINGS_TABS`), each rendered with an icon + label header; per-world tabs disable when no world is active. `storage` merges the old atlas-folder + sync tabs (two sections within one tab); `editing` is the home for element-editor/detail display prefs stored in `registry.editor_settings` (`field_edit_mode`, `refs_group_by_field`, `confirm_before_delete`). When renaming or merging settings route keys, add old→new in `parseSettingsTab`'s `LEGACY_SETTINGS_TABS` so existing deep-links + the stored last-tab still resolve.
+
+65. **Settings tabs are per-tab `render*`/`wire*` module pairs; `settings-panel.ts` is a thin orchestrator** (session 233). Each tab lives in `src/middle/settings-<tab>.ts` (today `settings-general`, `-onlyworlds`, `-storage`, `-elements`, `-maps`, `-world`, `-writing`, `-context`; `settings-account.ts` is a superseded leftover), exporting a `renderXTab(...) → string` and `wireXTab(...)`. `settings-panel.ts` owns only the shell: nav rail, last-tab restore, and dispatch via `renderTab`/`wireTabHandlers` switches. Public surface (`mountSettingsPanel`) is unchanged, so `app.ts` doesn't care. Flat `settings-*.ts` files (not a subfolder) match the established split convention (`writing-workspace-*.ts`, `map-tab-*.ts`) and keep import depth identical. Add a new tab = new module + two switch arms + a `SETTINGS_TABS`/`SETTINGS_TAB_GROUPS` entry. Per-world settings handlers use `updateWorldEntry(reg, worldId, patch)` (registry.ts) for one-off field merges rather than hand-rolling `findIndex` + `worlds.map`.
+
+66. **`defaultCreateType` is a `ui-prefs` pref, not URL/registry state** (session 233). The element-create modal preselects `loadUiPrefs().defaultCreateType` when opened without an explicit `initialType` (sidebar +, home, hotkey, writing inline-create, map contextual). It's an app-level persistent pref (localStorage via `core/ui-prefs.ts`), set from Settings → Editing. The DESIGN sketch once placed it on `UiState`; ui-prefs is the correct home (same migration as `sidebarMode` in session 223 — app-level + persistent, neither navigational nor world-specific). The modal re-validates the preselected type against the effective (post-`excludeTypes`) set in `buildModal`, so an excluded default (e.g. 'map' in the map contextual flow) can't stick — it falls back to the first offered type. `ui-prefs` setters must load-merge-save (`{ ...loadUiPrefs(), <field>: v }`) so adding a field doesn't clobber siblings.
+
+67-72. **Knowledge conventions** — codified in `DESIGN_KNOWLEDGE.md` (knowledge entry = Narrative subtype, about vs held-by field split + the mention-derive `collectives` exclusion, knowing is computed, the text is the knowledge, fidelity = separate entries, Circle = a Collective acting as knower). Numbering reserved for cross-doc consistency, same as 47-57.
+
+73-78. **Sharing conventions** — codified in `DESIGN_SHARING.md` (page = Narrative subtype 'page' + the narrative-kind seam, blocks are truth / story is a derived mirror, the refs mirror for id-swap-safe card bindings, page prose never derives relations, per-room serialized page writes, `share-page-render.ts` stays store-free). Numbering reserved for cross-doc consistency.
+
+79. **Element writes serialize per-id at the FolderStore boundary** (session 238). `updateElement` and `deleteElement` queue through a `PerIdWriteChain` (`src/store/write-chain.ts`) in BOTH stores (FsFolderStore + MockFolderStore, fixture parity): same-id operations run strictly in submission order; different ids stay concurrent. Kills the lost-update class — two read-merge-writes interleave, the second call's read predates the first call's write, and the merge silently reverts its fields (found live by the share e2e, session 237; knowledge-room's `patchEntry` was still exposed) — for EVERY caller instead of per-room defenses. A delete queued behind an update waits for it, so late writes never throw "element not found". **What the chain can't fix**: a patch COMPUTED from a stale in-memory snapshot (e.g. a whole blocks array built before a prior write refreshed state) — callers doing read-compute-write over arrays still need await discipline (share-room's chain, convention #77, stays for exactly this). The mock's updateElement carries a deliberate microtask yield between read and merge so an unserialized regression manifests in vitest (convention #20: fakes encode real failure modes). Verified by `tests/unit/write-chain.test.ts`, `tests/integration/folder-store.serializedWrites.test.ts`, and a real-FS concurrent-update e2e in `folder-store-fs.spec.ts`.
+
+*(#80 = the two-tier room-header model, documented in the Rooms section. #81-85 = import conventions, in `DESIGN_IMPORT.md`.)*
+
+86. **Sync-state mutations go through `updateSyncState(mutate)`** (2026-07-03). Every patch COMPUTED FROM the current sync-state (conflict/server-delete list edits, dedupe-appends) uses `FolderStore.updateSyncState(mutate)` — the mutator receives the CURRENT state inside a store-global chain and returns a partial patch. Never split into `readSyncState()` + `writeSyncState()`: the audit found resolveConflict/pushPhase/pullPhase computing whole-array patches from snapshots taken BEFORE network I/O, so a concurrent round's entries got silently clobbered. `writeSyncState(patch)` remains for whole-field replacement and rides the same chain. Every engine read-modify-write site goes through the mutator (grep `updateSyncState(` in sync-engine.ts for the current set); regression suite `tests/integration/folder-store.syncStateChain.test.ts`.
+
+87. **Filenames: sticky runtime writes, converging open-time tidy, lowercase equivalence** (2026-07-03, gate-hardened). The full contract is the "File naming" table in On-Disk Layout (the Folder Format spec source). The load-bearing halves: (a) a RUNTIME write keeps the file's current name whenever it's any valid form for the element's name, compared via `sameFsName` (lowercase) — case-folding filesystems (NTFS/APFS) make a case-variant pair the SAME physical entry, so write-new + delete-old self-destructs; OPFS-based tests cannot see this. (b) The open-time tidy is the ONLY converger: id-sorted (deterministic layouts), FULL occupancy view computed before any write (an incremental view lets an early id overwrite a later sibling's live file — 3-lens-convergent gate finding), never touches unreadable files. Index is built from file BODIES; `parseIdFromFilename` is diagnostics, never identity.
+
+88. **Custom fields: `x_` is the user namespace, `null` is the delete tombstone** (2026-07-12, D9). User-defined fields live in the extension namespaces keel v2 round-trips (`x_`/`shadow_`; `atlas_` is machinery-reserved — the add flow rejects it). The element-detail "Custom fields" section (`element-detail-custom-fields.ts`) renders every `isCustomEditableField` key: the user types `mood`, disk gets `x_mood`, labels hide the prefix (`humanizeFieldName` strips all three namespaces — atlas editor, atlas payload renderer, AND show's copy; re-lift note applies), the row tooltip discloses the stored key. Name datalist derives from the world's populated `x_` keys (never tracked, D9b law). **Deleting a field persists `null` — never removes the key**: the push must carry an explicit clear or the server keeps the old value and the next pull resurrects the field; keel keeps null-valued extension keys forever (probed 2026-07-12), so `null` = deleted (row hidden, suggestions skip it) and `''` = live-but-empty (row shows). Value types are preserved on edit (number/boolean/string-array round-trip through the text editor via `persistFieldPatch`'s custom-field conversion). Disclosure: custom fields join the card field-picker like any populated field (`isCardSkipField` passes `x_`/`shadow_`, skips `atlas_`) — off until ticked on a full-variant card, by construction.
+
+89. **The narrow-window layer: below a breakpoint a side pane becomes a DRAWER, not a smaller column** (2026-07-26, S323). `src/layout/narrow-layout.ts` stamps `atlas-narrow` (≤1100px) and `atlas-narrow-sidebar` (≤820px) on `body`; CSS turns `.atlas-right` and then `.atlas-sidebar` into absolutely-positioned drawers over the middle pane, with a scrim, Escape and hashchange dismissal, and one drawer open at a time. **Why a drawer and not a shrink**: the panes carry hard pixel floors (180 + 280 + 240 + two dividers ≈ 706px) while `html`, `body` and `.atlas-shell` all hide overflow, so below the floor a pane did not get smaller, it left the screen with no scrollbar and no affordance. Three rules the next editor needs: (a) the `!important` on the narrow pane widths is load-bearing, because `app-shell.ts` writes pane widths as INLINE `flex` from the persisted ratios and inline beats stylesheet; (b) a drawer needs an OPAQUE floor (`--atlas-bg`) — as a column it sat on the app background and its translucent panel tint was enough; (c) the drawer toggles live in the room-nav strip and are `position: sticky` at its edges, because at 390px the strip overflows and parked the right toggle off-screen. Above 1100px NOTHING here applies. Width-aware coverage: `tests/e2e/narrow-layout.spec.ts` — the rest of the e2e suite runs at one viewport width and is structurally blind to this whole dimension.
+
+90. **Canvas chrome does not follow the theme; app chrome does** (2026-07-26, S323). Two token pairs, and picking the wrong one is a light-mode bug either way. App surfaces use `--atlas-ink-rgb` / `--atlas-scrim-rgb`, which FLIP under `[data-theme='light']`. Chrome that floats over the MAP or CHART canvas uses `--atlas-canvas-ink-rgb` / `--atlas-canvas-scrim-rgb`, which do NOT flip: a map's background is the user's own artwork and those canvases are deliberate dark islands. The bug class this closes is a foreground and a background answering to different authorities — pin labels paired a flipping scrim with a literal `#fff` and went white-on-white; the share pin modal paired a literal near-black with themed ink and went dark-on-dark. Related: a surface that paints its own dark floor under a possibly-light app must re-pin the WHOLE `--atlas-text*` family, not just the triplets (the light block defines them as flat literals) — see the shared dark-island rule in atlas.css. Guard: `tests/e2e/light-mode-contrast.spec.ts` measures composited contrast in both themes. **Census closed S354 (2026-09-02)**: zone labels, the placement banner and the pin tooltip's type/desc lines moved to the canvas pair (the S324 opener's item 1, half-applied for six weeks); the waypoint toast keeps a deliberate dark chip stated in canvas tokens; the charts island keeps its dark plot and wears a light-page FRAME (hairline + lift) rather than a repainted palette. Rule as ruled: anything floating over the user's artwork holds the dark chip in both themes.
+
+92. **Every write merges into the file as it is ON DISK, not as cached** (2026-09-28, S359). Atlas caches every body at open (since S364 the live folder re-reads what changed, conv. 111). Before S359 `updateElement`, `updateElementWith` and the two sync stamps merged into the CACHED body, so a field another tool changed in the file (an AI following the toolkit's writer rules, a text editor) was overwritten the next time atlas wrote that element. `FsFolderStore.readForWrite` re-reads the file inside the per-id chain (#79) and falls back to the cache only when the file vanished or will not parse. Scope: this keeps outside edits ALIVE. Making them VISIBLE is the live folder (S364, conv. 111). SYNC is still decided by the in-file stamps: an outside edit reaches the account only if it bumped `local_updated_at` or atlas writes that element afterwards; the rest is the manifest question in `Forge/Notes/2026-09-28-shared-surface-design.md` (sync manifest with content hashes, the outside-edit review prompt). Guard: `folder-store-fs.spec.ts` "a field edited in the file by another tool survives", revert-checked.
+
+93. **World data is untrusted input** (2026-09-28, S360). Folders arrive from public repos, converters and AI agents, and this origin holds every linked world's API key, the PIN and the account token. So: `escapeText` (`core/dom-utils.ts`) escapes `& < > " '` and is total, and is the one helper for text AND attribute interpolation (never a local copy that skips quotes); a value from a file never reaches Leaflet `html:`/`bindTooltip(string)` unescaped (build a node, set `textContent`); colours from files or `styles.json` pass `hexColourOr` before any `style=`/`value=`; numbers from files pass `finiteOr` before HTML. The CSP (`script-src 'self'`, meta in `index.html`) is the backstop, which is why the theme stamp is a file (`public/theme-stamp.js`) and not an inline script. Guard: `tests/e2e/hostile-world.spec.ts` (every case asserts the rendered text, not only the canary, so it still bites under the CSP).
+
+94. **Foreign shapes are read generously, damaged files are never written over** (S360). At every disk read (`coerceForeignShapes`: the index loop and `adoptDiskBody`) a non-string `name` and string `x`/`y`/`z`/`order` are coerced in memory; link fields read `{id}` objects and a lone id string (`linkIdsOf`); unplaceable pins/markers are skipped on the map. A second file claiming an element id is moved to `.atlas/quarantine/<type>/` unless its content matches the survivor (a rename-crash twin, still unlinked). Read-merge-write paths use `readJsonStrict`: a file that exists and will not parse throws `CorruptFileError` instead of reading as absent (world.json, sync-state, tombstones; charts and styles are checked before their whole-file writes).
+
+95. **Leaving a world flushes the rooms first** (S360). A room with a debounced save registers its pagehide flush with `core/leave-flush.ts` (`onLeaveWorld`); every flow that swaps the active world awaits `flushBeforeLeavingWorld()` BEFORE it clears state or closes the store. A new room with a debounced write must register, or its last keystrokes die on a world switch.
+
+96. **A sync stamp keeps an in-flight edit dirty** (S360). Push sites pass the `local_updated_at` the sent body carried to `stampServerUpdatedAt`; `store/sync-stamp.ts` lifts `local_updated_at` just past the new baseline when the file changed during the request. Any new push path must pass it. (The planned manifest must hash the body that was SENT, for the same reason.) A stamp of `null` means "the server holds different content": a create adopted after a lost response keeps the element dirty when the bodies differ (S361, `adoptServerCopy`).
+
+97. **Map coordinates are the schema's BOTTOM-left** (S361, atlas 1.8). Stored `x`/`y` are Leaflet CRS.Simple `lng`/`lat` (`CoordinateUtils.ts`, height-free). The publish path converts ONCE, in `share-payload.ts` `freezeMapBlock`, to the payload's top-left CSS `yPct` (contract); renderers never convert. Maps placed before 1.8 are mirrored until the user presses "Flip pins and zones" in the map gear popover (`core/map-flip.ts`). Guard: `phase5-maps.spec.ts` "north is up".
+
+98. **Swapping the active world releases the prior world at the COMMIT point** (S361). `releasePriorWorld()` (flush rooms, close the store, clear the slot) runs right before the registry flip in every world-swapping flow (create, import-as-new, link, tour), never before the flow's fallible work. Before, a cancelled or failed link left the UI on a world with no store.
+
+99. **Every element write is chained, including pull-apply** (S361). `applyServerRecord` runs in the per-id chain; the pull's race check is `applyServerRecordIfUnchanged(…, expectedLocalUpdatedAt)`, the check and the write in one slot. `resetSyncBaseline` clears per element through `clearServerBaseline`. Reads whose result is diffed or sent use `readWorldMeta({ strict: true })`; a `CorruptFileError` in a sync round pauses the engine with the file named (`settleThrownRound`).
+
+100. **A busy, rate-limited or unreachable server ends the push round after one request** (S361). `isTransientError` (429, 503 `server_busy`, fetch's network TypeError) sets the round's `transient_blocked`; nothing pauses, no baseline moves, one retry after `Retry-After` (`OwV2Error.retryAfterMs`, default 30 s), one plain toast. Auth stays its own bail.
+
+101. **A delete removes the dead ids from every link that named them** (S362, keel parity: `_scrub_cross_type`). `store/scrub-links.ts`: after a non-silent `deleteElement` (both stores), every other element's schema link fields drop the primary and cascaded ids (single link to `null`, multi link filtered), each referrer through its own write chain, so a synced referrer pushes the cleared link. Silent deletes (the engine's server deletes, Route 2's swap) never scrub. Pin `element_id` is the cascade's, not the scrub's; prose is user text. Links already dangling in a LOCAL world are offered for removal in Settings → World (`findDanglingLinks`); a linked world's absent id may just not be downloaded yet, so it is not offered there.
+102. **An export never carries the API key** (S362). The Data room never asks `buildWorldExport` for credentials (keel's and atlas's imports ignore a key in the file; a prefixed write key reads a private world with no PIN). Guard: `tests/unit/export-no-credentials.test.ts`. A merge-import of the world's OWN export (world id matched) treats an id match as the same element whatever its name (`ReconcileOptions.sameWorld`); foreign files keep the name guard.
+103. **Rooms that render on every notify gate on their inputs** (S362). The element list keeps a memo of what its rows read (`listInputs` in `elements-sidebar.ts`: elements, style rules, filters, muted, query, sub-filters, lens, active map, flashing, tour-fresh, loading) and returns early when none moved; a selection-only change moves two classes. The home room does the same (`lastInputs`). Anything new a row or the home reads must join its input list or it will not repaint. Measured on Sikelia (12.3k elements, jsdom): an unrelated notify 966 ms to 4 ms.
+104. **Zone styles have a role level, and a zone can be drawn as its linked zones** (S362, DESIGN_ZONES §4.5 + §5b). A style rule may name a zone `role`; `groupByKind(.., { byRole: true })` splits a kind whose members share roles. A zone with no markers on the map whose `linked_zones` reach zones on it is listed in the zone panel (`listLinkedZonesOnMap`) and lights its parts on hover; it draws nothing itself.
+105. **Giving elements new ids is the re-key kernel, journaled** (S363; contract `Forge/Notes/2026-09-28-s361-rekey-design.md` §7-§8, gates `Notes/2026-09-28-s361-sweep/gate-rekey-*` and `Notes/2026-09-29-s363-gate/`). `store/rekey.ts`: `.atlas/rekey-journal.json` first, then new elements from the old ones AS ON DISK with the whole map applied (`createElementVerbatim`: no pin guard, the old file's layout and link spelling), media copied whole, referrers rewritten in their own chains, charts, persisted browser state, then the old elements removed silently and the finished map kept in sync-state `rekeyed`. Every step idempotent; recovery is the same function, run in `activateWorld` before the elements prime on both the open and unpark paths. Discard is `rollbackRekey` (unfinished pairs go back, finished ones stay), never a forget, except for a journal that will not parse. While a journal exists: every sync round refuses, and a UI delete of an id it names throws `RekeyPendingError`. Ids with a copy in both element layouts are refused (`hasShadowCopy`). The only launcher is Settings (`sync/rekey-run.ts`, single-flight, app `inert` behind the locked modal): a room holding a mounted editor would write old ids back.
+106. **`rekeyBody` is the re-key's reference transform** (Route 2 still runs its own flat `rewriteIdReferences` until its bout) (`store/rekey-body.ts`). Top-level strings and string arrays by equality except identity, stamps and prose (schema text fields get only the `ow://` rule); `ow://` links in any string; the TipTap sidecar (object or JSON string): `elementChip` and `mention` `attrs.id`, `link` marks with an ow:// href; `atlas_page_blocks` walked RAW by kind (unknown kinds untouched, `fullPinIds` included). A new place atlas stores an element id must be taught here, or a re-key leaves it on the old id. Nested `x_*` objects from other tools are not walked (named limit).
+107. **The engine can be HELD** (`SyncEngine.hold()`, S363). A counter separate from `paused`: it clears the timers, waits for the round in flight, and nothing reaches the server until `release()`; `resume()` cannot release it and release cannot clear a user, auth, network or corrupt-file pause (their state is republished). The `online` listener asks `isNetworkPaused()`, never the pill. A round that ends during a hold leaves the state to the hold.
+108. **Foreign ids are recorded on evidence only** (`sync/foreign-ids.ts`, sync-state `foreign`, scoped to the api world). A /bulk `id_conflict` nothing could adopt, or a single-create 409 whose read-back ANSWERED "not here"; a failed read-back is an ordinary failure. Merged per round: this round's refusals plus carried entries still here, never synced, and not sent-and-accepted this round (a create that landed with its backfill failing leaves). Readers intersect with "present, never synced" at use. An UPDATE naming a create refused this round waits (`splitByRefusedLinks`, wire fields only).
+109. **A room instance belongs to one world** (S364). `app.ts` remounts the middle room when the active world changes, not only when the room kind does: rooms read world files once at mount and wrote whole lists back, so a Charts room carried across a switch wrote world A's charts over B's. The S256 room-stable switch keeps the room KIND. Chart writes are read-modify-write of the file (`mutateCharts`).
+110. **The prose derive links only live targets** (S364). `computeRelationPatch(narrative, markdown, exists)` takes a required `LinkTargetExists` (`linkTargetsIn(elements)`: id present AND of the chip's type). A chip outlives its element (conv. 101 scrubs link fields, never prose); without the check every scene open wrote the deleted id back. An entry already in the field stays: the scrub owns removal.
+111. **The live folder** (S364; grounding `Forge/Notes/2026-09-29-s364-orient/lane-c-live-folder.md`, composition gate `Forge/Notes/2026-09-29-s364-gate/`). Store: `rescanDisk({ full? })` compares each served file's `lastModified`+`size` for EQUALITY with the stamp Atlas recorded (`fileStamps`, from the index read and from `writeJsonAtomic`'s verified read-back at every write sink; `createElement` writes inside its chain slot), and confirms each candidate by content INSIDE its id's write chain, re-reading everything it decides on there (a decision on the walk's snapshot raced Atlas's own renames). Unserved files are handled before deletions and remembered with the id they carry (`otherFileStamps`), so a rename, a layout move or an agent's copy-then-delete is never reported as a delete (a remembered copy is promoted by the index rule), and a live second copy marks the id shadowed (the re-key refuses it). Bodies adopted from disk outside a pass (`readForWrite`, a backed-off pull) are reported by the next pass (`pendingAdoptions`). One file that throws never sinks a pass; a vanished file is silence, not "unreadable". It never writes a file, a tombstone or a stamp, and refuses under a re-key journal; `full` confirms every file by content, 64-way. App (`core/live-folder.ts`): window focus, the tab becoming visible, revive and Ctrl+K "reload from disk" run a pass after `flushBeforeLeavingWorld()` (the rooms flush only what really changed: their baselines are the EDITOR's serialisation, never the raw `story`); the pass in flight is keyed by store, and changes found for a world left mid-pass are carried to that store's next pass; a pass says why it skipped. Notices are per world (marks, "not synced" recomputed from live state, unreadable files, and elements removed on disk, named in the line's title: said, never silent, Captain S364). Rooms listen to `atlas:disk-changes` (a clean editor reloads keeping focus and scroll, with the story preferred when only `story` moved; typing in flight wins and says so). Linked worlds: an outside edit with a fresh `local_updated_at` uploads; one without is marked "not synced"; more than 50 that WOULD upload hold the engine (`hold('disk')`, reason shown in the pill) until the user uploads or stays offline, and the held question is persisted (`atlas_disk_held`) and re-held at attach BEFORE the flush-on-attach; view-only worlds never hold. A pull checks the DISK stamp (`applyServerRecordIfUnchanged` reads via `readForWrite`); a served file that will not parse therefore pauses the pull with the file named (conv. 99's posture, ruled S364). **S365**: a focus inside the 5 s throttle arms ONE trailing pass for when the window reopens (not while hidden; cleared on uninstall); the tour exemption asks whether the ACTIVE world is the tour world (`entry.demo`), never the per-origin tour flag; a standing big-batch question is recounted from what is waiting, never summed across paths (conv. 117).
+112. **The world's notes, cast, calendar lens and writing labels live in its folder** (S364, `core/world-prefs.ts`): `.atlas/world-prefs.json`, mirrored from the registry (every reader unchanged). At open, before re-key recovery, a three-way against the JSON this browser last wrote (its own localStorage key, `atlas_world_prefs_synced`, never the registry: recording it must not re-save the registry): no file seeds it; no base yet with a file present MERGES (the file's keys win, keys it lacks keep this browser's, two different notes are both kept) and writes the merge out; a file equal to the base means the registry wins; a file that differs from the base wins. A subscriber writes changes (debounced, flushed on leaving the world and on pagehide), and a world made active without an open is reconciled once per session; a write that fails (view-only, corrupt file) is retried only when the prefs change again. Read-both-write-new: the registry keeps its copy. **S365**: the same three-way runs at WRITE time while the world stays open (a pref this browser changed since the base is ours, any other the file's, two different new notes both kept, the file's first), and the base moves to the file as soon as it is folded in, so a failing write never merges it twice; the open-time merge is idempotent; the notes overlay follows the registry while it is not dirty and folds in what moved underneath it.
+113. **Nothing rebuilds under a focused text control** (S364, `isEditingIn(root)` in `element-detail-header.ts`). A background tick (a sync publish, a pull, another room's save) that replaces a focused input removes it; Chromium blurs a removed input and the blur COMMITS, so a name or a field saved half-typed and the rest of the typing landed on the page, where single keys are hotkeys. Every surface that rebuilds on a tick asks first and defers to the root's `focusout` (the element editor, the writing header, the knower page); `editable-title`'s `sync()` is the same rule.
+
+114. **The world doors; a world with no home folder** (S365, `setup/world-doors.ts`, `core/grounded.ts`; gate `Forge/Notes/2026-09-29-s365-gate/`). A picked world folder opens IN PLACE from every door: the landing's "open a world folder", every setup door whose pick turns out to be a world (landing, recover screen, Settings → Storage, the tour finale, the example page), the sidebar's open-folder icon, the "add a world" chooser, Ctrl+K. It opens with or without an atlas root. The root ("home folder") is asked for only by an action that makes a new world folder (create-local, new-api, link-api, view-api, an account world's open, Import as a new world): `ensureAtlasRoot(toasts, purpose)` shows one dialog (Cancel = a quiet false, never an error toast) and runs the picker inside its click; a world picked there opens and answers false. The File System Access API cannot give a picked folder's parent, so "use the folder it sits in" is not possible. "Set up?" is `isAtlasGrounded(state)` = a root OR any non-demo world, never `!!atlasRoot`; every first-launch surface asks it (the landing and `atlas-preroot`, the sidebar toggle, the elements pane's silence, the worlds header, the account-worlds list, the example page). The open-folder door recognises a folder that KEEPS worlds (`isAtlasRootFolder`, read-only): with no root it becomes the home folder and says so; with a root it is NEVER switched there (Settings → Storage "Change folder" is the deliberate route). A folder of world folders with no marker is named ("holds N worlds, pick one"). A user's pick is never the tour sandbox (`demo: false`). Discovery skips a world id already registered from another folder (its vault slot is someone else's). Delete world + folder refuses, BEFORE closing anything, unless the world's own handle resolves to `<root>/<folder_name>` (`whyWorldFolderNotDeletable`): by name alone it deleted a different world. One runner (`runAddWorldAction`) serves the icon row, the chooser and Ctrl+K, and is locked during the tour like the tour's sidebar. The icon row is Captain's (S219) and stays the default; `registry.worlds_add_icons === false` (Settings → General) hides it and "add a world" stays. Browser-storage worlds (the next design, `Forge/Notes/2026-09-29-s365-atlas-orient.md`) change only where "start a world" puts a world.
+
+115. **Two tabs, one registry** (S365, `registry/registry.ts`). Every tab holds the whole registry and every save used to write all of it, so one tab put back its old copy of a world another tab had changed (notes, a Make Online). `saveRegistry` merges against `tabBase`, this tab's view as it last loaded or saved: an entry or top-level field this tab did not change comes from storage as it is now; inside an entry this tab DID change, the same rule runs per field (opening a world stamps `last_opened_at`, and a whole-entry rule let the stale copy win); a world another tab added is kept, one it forgot stays forgotten; the same field changed in both tabs: the later save wins. A `storage` listener (`app.ts` → `adoptStoredRegistry`) folds other tabs' saves into memory and re-bases, so a tab does not go stale in the first place. Nothing stored merges against an empty registry (a save after "clear site data" does not resurrect worlds); an unreadable stored value is written over whole. `loadRegistry` re-bases and is BOOT-ONLY; a mid-session reader uses `getState().registry`. Tests: `tests/unit/registry-merge.test.ts`, `registry-two-tabs.test.ts` (`__setRegistryTabBaseForTests` plays the other tab; `tests/setup.ts` resets the base per test). Scope: localStorage has no compare-and-swap, so two saves in the same millisecond can still lose one field.
+
+116. **The sidecar rule at open: plain text wins** (S365, Captain; `middle/story-sidecar.ts`). A scene's text lives twice: `story` (markdown, what every tool and AI reads and writes) and `atlas_richtext_json` (Atlas's editor copy). Every Atlas write keeps `story === serializeDocToMarkdown(sidecar)`, so a disagreement means something outside Atlas edited `story`. At mount, `storyOutranksSidecar`: (1) exact `serialize(sidecar) === story`: the sidecar (no parse; 20 of 20 real sidecars in the Captain's worlds); (2) otherwise normalise `story` through the editor's own parse, chips and serializer and compare again, in ONE representation (another writer's `*` bullets or trailing newline are not new text); (3) still different: open `story`, and the next save writes a fresh sidecar (Atlas-only formatting is the documented cost). An empty or absent `story` never wins; a parse that throws keeps the sidecar. Scenes and SAVED knowledge entries opt in (`storyOutranksStaleSidecar`); drafts and page blocks do not (their markdown is Atlas's own). The room says so once per element per session (`story-notice.ts`). **Every writer of both halves must keep the invariant**: the bulk writers (`writing-bulk-link.ts`) pick the authoritative half (the sidecar while it still holds the scene, then derive `story` from it; `story` when it outranks, dropping the stale sidecar) instead of transforming both halves apart, which parted them on a first mention in italics (gate lens A H3); the rich-text autolink never splits text inside a web link. A new both-halves writer joins `tests/integration/bulk-link-halves.test.ts`. Keel returns `story` byte-exact (probed live S365: hard-break spaces, CRLF, NFD, tabs), so a pull cannot false-win. Closes DESIGN_WRITING's S260 ⚠ for the closed-Atlas case; the open case is conv. 111's reload.
+
+117. **The big-batch question at open** (S365, Captain's yes; `sync-attach.ts flushPendingOnAttach`, `live-folder.ts holdBigBatchAtOpen`). The flush-on-attach counts the locally changed elements; more than `BIG_BATCH` (50) with no question persisted: nothing uploads, the count persists (`atlas_disk_held`), the engine holds, and the notice asks Upload them / Stay offline, as for a batch seen with the window open (conv. 111). A persisted question was adopted before the flush and refuses its round. The count is what is WAITING (`listLocallyChangedSince`), recounted by any path that meets a standing question, never summed (the hold at open and the revive pass after it saw the same edits). Tombstones do not count. The toast after an unasked flush is neutral about who made the changes ("Uploaded N change(s) that were waiting in the folder").
+
+---
+
+## Context Pane (session 231 tool-global rewrite)
+
+The right-pane Context tab is a tool-global surface — graph + details, route-driven content. Replaces the writing-only ephemeral context tab introduced in session 229.
+
+### Tab structure
+
+| Index | Kind | Behavior |
+|---|---|---|
+| 0 | `context` (permanent) | Always present per world; never closed; toggled active by user |
+| 1 | `map-index` (permanent) | Maps overview |
+| 2..N | `map` (per opened map) | Each open map is its own closable tab |
+
+`context-tab-lifecycle.ts` ensures the invariant on boot + defensively on every state tick.
+
+### Content per route
+
+| Route | Subject | Details slot |
+|---|---|---|
+| `/writing/<narrativeId>` | the narrative | `context-pane-lists`: Cast + Potentials |
+| `/element/<elementId>` | the element | `context-pane-preview`: subject preview card (swaps to whichever node user clicks in graph) |
+| Anything else (home / timeline / settings / map / search) | none | Empty state with route-specific copy |
+
+The orchestrator's `resolveSubject(route, elements)` derives `{element, detailsMode}` from the URL. Subject-changes via URL trigger a full re-render (new graph mount); in-pane clicks (recenter, select) stay pane-local.
+
+### Graph capabilities
+
+- **Subject-centered force-directed layout** (synchronous sim → stable positions; ~290 LOC, no library)
+- **Neighbors = ALL outgoing links** — the Involves multi-links AND single-link fields (narrator, birthplace, protagonist, …) via a generic id-shaped scan, double-gated by element lookup; `parent_narrative` deliberately excluded (tree hierarchy ≠ graph material). Session 235 — single links were previously invisible.
+- **Backlinks, S354 (2026-09-02)**: ring 1 is the UNION of outgoing links and INCOMING ones (`buildReverseIndex`, the exact mirror of `collectDirectNeighbors`, built once per render). A node that only links TO the subject is `is-backlink`: muted ink-grey ring, settled BELOW the center by a hemisphere force in the sim (applied only when both halves exist), an arrowhead into the center's rim on its edge alone, and a "N link here" legend bottom-left. Uncapped like cast; the label budget governs density. Outer rings walk the web undirected. Any array of id-shaped strings is a link list (the eighteen-name multi-link list is a fast path, not the boundary). The web preview's "Linked from (N)" line reads the same all-fields scan the element page's Referenced-by section uses (`findIncomingReferences`).
+- **Click-to-recenter**: clicking a non-subject node re-runs sim with that node as center; pushes to breadcrumb stack
+- **Ctrl/Cmd+click**: navigates URL to that element → context pane re-renders with new subject
+- **Recent-centers breadcrumb** at top of graph: `[Home] › [Recent] › current` (clickable chips pop the stack)
+- **Mouse-back button** (over pane): pops breadcrumb; falls through to browser history when outside pane
+- **Free zoom + pan**: wheel zooms anchored at cursor, drag pans, double-click resets, fit-to-view button appears when transform is non-identity
+- **Hover-fade non-connected nodes**, **right-click node menu** (Open as element / Copy ID / Add to story in writing mode)
+- **Hop depth 1-4** with per-ring caps (Convention #62); tier-derived default (scene/draft = 2, chapter/book = 1)
+- **Type filter chips** at top of pane; persist per-world; chips persist even when their type is hidden
+- **Lock-layout mode**: when on, filter toggles hide via CSS without re-running sim (surviving nodes stay put)
+- **Edge type coloring** (opt-in): edges take the non-center node's element-type color at 0.45 alpha
+
+### Per-world registry fields
+
+- `context_filters_off?: ElementType[]`
+- `context_hop_depth?: 1 | 2 | 3 | 4` (absent = tier-derived)
+- `context_lock_layout?: boolean`
+- `context_edge_color?: boolean`
+
+Element-type palette (`ELEMENT_TYPE_COLORS` in `core/constants.ts`) shared with future cross-tool surfaces; sourced from the dcc-viewer / element-viewer-trial palette.
+
+### Module layout
+
+```
+src/tabs/right/
+├── context-tab.ts              # Orchestrator (route → subject, unified onSelect, syncPrefsToGraph)
+├── context-tab-lifecycle.ts    # Permanent-tab invariant
+├── context-pane-graph.ts       # Force-sim graph + breadcrumb + zoom/pan + right-click menu
+├── context-pane-toolbar.ts     # Type chips + lock + hop pill
+├── context-pane-lists.ts       # Writing-mode Cast + Potentials
+└── context-pane-preview.ts     # Element preview card (writing OR element mode)
+```
+
+---
+
+## Test Strategy
+
+**Run cadence** (Captain's call, session 235 — err sparse): per-edit = typecheck; per-bout = typecheck + full vitest (~3s) + only the AFFECTED e2e spec file(s); full Playwright suite ONCE at session close / pre-commit. The cost table + speedup experiments live in the `atlas-tool` skill ("Test Cadence").
+
+Four layers:
+
+### Unit (Vitest)
+Pure logic: diff computation, conflict detection, tombstone application, URL parsing, field schema resolution, sanitization. Fast, deterministic. Run on save in watch mode.
+
+### Integration (Vitest + MSW + mock FolderStore)
+End-to-end loops with mocked filesystem and mocked OW API. Test the SyncEngine's push/pull/diff/policy/pause behavior against MSW handlers and an in-memory FolderStore.
+
+Key targets:
+- Empty folder + empty server → no-op sync
+- Local-only changes → push only
+- Server-only changes → pull only
+- Both-sides changes (no overlap) → push + pull
+- Conflict (same element, both sides changed) → policy-dependent behavior
+- Tombstone push → server DELETE → tombstone cleared
+- Temp-disconnect mid-push → re-attempt on resume
+- Initial download for link-existing → full hydration
+
+### E2E (Playwright)
+Real browser, real File System Access API, real dev server, MSW intercepting API calls. Each critical user flow as a spec:
+
+- W1 create local
+- W2 link existing api
+- W3 make online route 1
+- W4 make online route 2 (per policy)
+- W5 edit online
+- W6 edit offline (paused)
+- W7 resume sync
+- W8 conflict surfacing
+- W9 delete cascade
+- W11 reopen world (handle re-permission flow)
+
+### Smoke (manual against real OW)
+Dedicated test world (Captain provided: `5474990854`). Periodic manual runs to verify:
+- create-world-external endpoint
+- create / update / delete round-trip
+- UUID preservation
+- Real conflict on concurrent edit (open web app + atlas, edit same element)
+- Real network failure recovery
+
+Smoke results recorded in a `tests/smoke-log.md` (date, what we ran, what we observed).
+
+---
+
+## File Layout
+
+The **live file map** (accurate per-module tree) lives in the `atlas-tool` skill's "Critical Code Locations" — it's the load-on-start reference and is kept current. High-level directory roles:
+
+```
+src/
+├── core/          # types, observable state, router, constants, ui-prefs, hotkeys, map-view/camera prefs, dom-utils, active-store
+├── store/         # FolderStore interface + FsFolderStore, fs-utils, handle-vault, idb (handle-vault only)
+├── sync/          # sync-engine, sync-attach (singleton), ow-client-adapter, make-online, auto-pull-scheduler
+├── registry/      # localStorage registry + per-world helpers
+├── layout/        # 3-pane app-shell
+├── sidebar/       # sidebar driver + worlds / elements / writing bodies
+├── middle/        # rooms: element-detail(+header/fields/refs), world-home, writing-workspace(+modules), knowledge-room(+editor), share-room(+editor/+page-render), timeline, settings-panel(+per-tab modules)
+├── tabs/right/    # map-index, map-tab(+concern modules), context-tab(+graph/toolbar/lists/preview), zone-drawing/edit, ghost-pins
+├── visualization/ # leaflet-2d (Leaflet2DManager, ZoneOverlay, ZoneGeometry) + timeline/ (chart pipeline)
+├── editor/        # field-schema (SDK adapter) + field-descriptions
+├── import/        # import & export room engine (parse, validate, reconcile, export shapes)
+├── demo/          # bundled sample world + the #/demo view-only presentation
+├── assets/        # self-hosted fonts (Open Sans variable woff2)
+├── ui/            # modals (create/picker/map-create/make-online/link/conflict/server-delete/zone-create), popovers, toast-manager, modal-base
+├── setup/         # atlas-root-flow
+├── styles/        # atlas.css (conventions #1-30 codified)
+├── app.ts         # orchestration   main.ts  # boot + Chromium gate
+tests/             # unit (vitest) · integration (vitest+MSW+mock store) · e2e (Playwright)
+```
+
+Root: `DESIGN.md` (+ per-room `DESIGN_*.md`), `PROGRESS.md` (operational log), `SYNC_NOTES.md` (sync lessons), `PORTED.md` (port log), `README.md`, build config (`vite`/`vitest`/`playwright`/`tsconfig`), `index.html`.
+
+---
+
+## Build History
+
+All phases (0 → 6 + 3.5) shipped by session 221; rooms model + writing system (223-228); context pane (229-231); maintenance splits (232-233); Knowledge phase 1 (234-236); Sharing S1-S7 + contract + LIVE backend + show viewer deployed (237-239); UI consistency + quick wins (240); **import & export** (241); **Charts** (timeline reframe, charts #1-#2, save/gallery/share-block, all gated; 242-245); **release-prep correctness** (filename contract conv #87, sync-state serialization conv #86, pin disclosure B6, edited-dot B1 — all gated; 246); **release design pass** (UI workplan D1-D12 all decided; 247, 2026-07-05→07). Cutover happened — atlas lives at `github.com/OnlyWorlds/atlas` (repo private for launch; D12); `tools/atlas-deprecated/` is retained as UI/UX reference only. See `docs-archive/PROGRESS-history.md` for session-by-session detail. Sync soft-edges live in `SYNC_NOTES.md`.
+
+### Release-prep decision layer (2026-07, pointers)
+
+The v1 launch shape was settled in two passes and lives OUTSIDE this doc (this doc stays architecture):
+- **`Forge/Notes/2026-07-03-atlas-release-plan.md`** — the Comms-session decision record (strategy, A/B/C batches, Captain's lane).
+- **`Forge/Notes/2026-07-05-atlas-ui-workplan.md`** — the full UI/UX design pass: D1 unification (Capitalized underline room-tabs + `‹ Room` drill-in prefix bands) · D2 home cover-page×study-desk hybrid (+ D2b protagonist/home favorites) · D3 context-pane rule ("graph of the focused thing + per-room details") · D4 knowledge WHO/WHAT/ABOUT · **D5 intent picker REMOVED for v1** (`atlas_page_intent` stays in the model, hidden) · D6 take-out list · D8 help layers + per-room `?` overlay · D9 custom fields = post-launch (D9b supertype/subtype program is v1) · D10 bundled sample world · D11 Settings→"OnlyWorlds" page + waypoints · D12 dev story (closed source for launch, open everything around it).
+- **`BUILD_BRIEF.md`** — the execution pickup for the build sessions.
+When these ship, fold the durable outcomes back into this doc's conventions (expect new conventions for: room-tab pattern, drill-in band, waypoint hooks, favorites registry fields).
+
+---
+
+## Tradeoffs Accepted
+
+- **Chromium-only forever**. File System Access API is Chromium. Worth it for local-first integrity. If Firefox/Safari ever ship FS Access, we get them automatically.
+- **Permission re-prompt every session**. FS API requires user gesture per session for write access. Mitigations: `navigator.storage.persist()` (some help), "open all" button in worlds list, eventual remember-this-session UX.
+- **Initial download for link-existing**. One-time wait when first linking a world. Show progress.
+- **Multi-tab same-world risk**. Lock file detects, warns; user accepts at their own risk.
+- **Folder location is user's responsibility**. If they move/rename the folder outside Atlas, the handle invalidates. UX: "Re-link folder" recovery action.
+
+---
+
+## Atlas-Specific Fields & Features
+
+Atlas extends OnlyWorlds with capabilities that don't (yet) live in the OW schema. This section catalogs them so we can take stock once the tool is mature — some may warrant council motions to migrate into core schema; others stay atlas-only forever (visual prefs, UI state).
+
+**Strip discipline**: all element-level atlas-only fields are listed in `ATLAS_LOCAL_EXTENSION_FIELDS` (in `core/constants.ts`). The adapter strips them on API push; `applyServerRecord` preserves them when overlaying server responses. Both fakes (FakeOwApiClient + MSW handler) reject them in write bodies to lock in the discipline (convention #20).
+
+### Element-level atlas-only fields (candidates for future schema discussion)
+
+| Field | On element types | Purpose | Council-motion candidate? |
+|---|---|---|---|
+| `image_media_id` | Any element with `image_url` | Local binding to atlas media folder for non-URL image sources | Maybe — if OW adds local-media support to schema |
+| `atlas_color` | Zone | Hex color override for zone fill | Probably not — visual pref |
+| `atlas_opacity` | Zone | 0..1 fill opacity | Probably not — visual pref |
+| `atlas_label_visible` | Zone | Whether zone label renders on map | Probably not — visual pref |
+| `atlas_shape` | Zone | `'polygon' \| 'line'` shape kind | **Yes** — fundamental zone geometry data |
+| `atlas_richtext_json` | Narrative | TipTap JSON for the richtext story body | Maybe — if OW adds richtext-on-story support |
+| `atlas_aliases` | Any element | `string[]` of name aliases for linking | **Yes** — broadly useful (writers want it; pickers want it; search wants it) |
+| `atlas_dismissed_suggestions` | Narrative | `string[]` of element ids dismissed from the context pane's Potentials list | Probably not — UI state |
+
+### Semantic reinterpretations (candidates for first-class schema)
+
+Beyond atlas-only *fields*, atlas also reinterprets canon fields in ways other OW tools can't see. These are tracked here as schema-requirement candidates — same pipeline as `atlas_shape`/`atlas_aliases`, but the motion would add new fields rather than promote an `atlas_*` one:
+
+| Reinterpretation | Where | Motion shape | Status |
+|---|---|---|---|
+| Narrative `narrator` + `collectives` read as **knowledge holders** when `subtype: "knowledge"` | `DESIGN_KNOWLEDGE.md` (conventions #67-72, "De-hiding path") | First-class `held_by_characters` / `held_by_collectives` on Narrative, then migrate off the reinterpretation | Logged 2026-06-07 (session 236). Draft the council motion once Knowledge proves out in real use. |
+
+### Sharing/page extensions (as built, session 237 — per DESIGN_SHARING.md)
+
+Stored on Narrative elements with `subtype: "page"`; all in `ATLAS_LOCAL_EXTENSION_FIELDS`:
+
+| Field | Purpose | Council-motion candidate? |
+|---|---|---|
+| `atlas_page_blocks` | The page's block stack (source of truth; heading/prose/element-card/circle) | No — composition is presentation config |
+| `atlas_page_refs` | Flat element-id mirror of the element-bearing block bindings (card elementIds + circle knowerIds; id-swap safety via `rewriteIdReferences`; `blocksOf()` heals nested ids) | No — internal mechanics |
+| `atlas_page_intent` | show / reference / publish | Probably not — sharing metadata |
+| `atlas_page_theme` | Reserved for the S3 theme tokens | Probably not — visual pref |
+| `atlas_page_pub` | Published-state mirror `{id, slug, published_at, updated_at, revoked, content_sig}` from the sharing backend (display cache; the API rows are truth; `content_sig` = hash at publish time driving the edited-since-publish dot, B1). Mirrors are per-folder — two atlas instances on copies of one world each keep their own (S2/V1b, 2026-07-05) | No — sharing metadata |
+
+The published artifact is a frozen snapshot in a new Django model — see `SHARING_CONTRACT.md` (drafted session 237, Anchor pending). The canonical `story` field on a page carries a derived plain-markdown compilation of the blocks (synced, readable by other tools, regenerated on every blocks save — never hand-edited).
+
+### World-level / per-world atlas-only state (atlas-only forever)
+
+Stored in atlas's localStorage `WorldRegistryEntry`, not in any element file. Since S364, `notes`, `favorites`, `active_calendar_id`, `writing_labels` and `writing_initialized` are ALSO written to `.atlas/world-prefs.json` (conv. 112); the registry stays the in-memory home:
+
+- `writing_labels` (l1-l4 tier label config)
+- `writing_initialized` (whether setup flow was completed)
+- `writing_tree_collapsed[]` (sidebar tree expand state)
+- `last_writing_narrative_id` (room-nav restore target)
+- `notes` (per-world freeform notes, accessible via overlay)
+- `showcases[]` (per-world published showcase registry)
+- `sync_debounce_ms` (autosave delay, per-world preference)
+- Various sync state (last_pull_at, last_push_at, pending baselines)
+
+### Per-tool / per-browser atlas-only state
+
+- `atlas_ui_prefs` — sidebarMode etc.
+- `atlas_shell_ratios_v2` — three-pane resize ratios
+- `atlas_right_tabs` — right-pane open tabs and active index
+- `atlas_map_view_defaults`, `atlas_map_view_prefs` — map visual prefs
+- `atlas_map_camera_state` — per-map camera (center + zoom)
+
+### Why track this
+
+Atlas is a primary OnlyWorlds tool, and the boundary between "atlas innovates" and "OnlyWorlds standardizes" should be a conscious decision, not an accident. Periodically we should:
+
+1. Review the `ATLAS_LOCAL_EXTENSION_FIELDS` list and ask: which of these would benefit other OW tools if they migrated into the OW schema?
+2. Draft council motions for the strong candidates (currently `atlas_shape` and `atlas_aliases`).
+3. After motion + amendment, plan a migration: stop stripping the field on push, ensure schema validation passes server-side, migrate existing local data into the canonical field name (drop the `atlas_` prefix if the council chose a different name).
+
+Atlas innovating is healthy. Atlas innovating *and* feeding learnings back to OnlyWorlds is the design intent.
+
+---
+
+## Open Questions
+
+1. **Multi-image API support** — deferred until OW schema supports it (current model has one `image_url`). When schema lands, design a media-grid → primary-image UX. Open implementation candidates (server-delete-on-pull UX, unlink confirmation, conflict log review, etc.) are tracked in `PROGRESS.md`. Per-world conflict policy override was explicitly dropped session 221.
+
+---
+
+## Reference
+
+- **Legacy reference**: `tools/atlas-deprecated/` (UI/UX only; architecture is fully replaced). See its `DEPRECATED.md` for the port list.
+- **OW SDK patterns**: `Knowledge/Technical/onlyworlds.md` (handles SDK quirks, relationship fields, schema reference).
+- **Create-world endpoint reference**: `Development/OnlyWorlds/obsidian-plugin/Commands/CreateWorldCommand.ts`.
+- **Field schema source**: SDK FIELD_SCHEMA + ELEMENT_SECTIONS.
+- **Test world for smoke**: `5474990854` (Captain's messworld).
+
+---
+
+**Doc cadence**: this DESIGN.md is the stable architectural reference. Operational state (what's done, what's next, rough edges) lives in `PROGRESS.md` once Phase 1 starts. Port decisions get logged in `PORTED.md`.

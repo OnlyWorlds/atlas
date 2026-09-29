@@ -8,8 +8,9 @@
  *   elements list lands in Phase 4).
  */
 
+import { isCodeLoadError } from '../core/reload-offer';
 import { getActiveStore } from '../core/active-store';
-import { hasFolderMode } from '../core/capabilities';
+import { hasFolderMode, opfsUsable, NO_BROWSER_STORAGE_LINE } from '../core/capabilities';
 import { escapeText } from '../core/dom-utils';
 import { navigate, timelineHash } from '../core/router';
 import { getState, subscribe } from '../core/state';
@@ -18,6 +19,15 @@ import { finishSetupDoor, pickAndOpenWorldFolder } from '../setup/world-doors';
 import { isAtlasGrounded } from '../core/grounded';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
+import { isNarrowSidebar, openDrawer } from '../layout/narrow-layout';
+
+/**
+ * Whether this no-world stretch already opened the sidebar drawer (S366).
+ * Below 820px the sidebar is a drawer, and with no world open it holds the
+ * only thing to do (every copy line here points at it), so the panel opens it
+ * ONCE on arriving; a user who closes it is not fought on the next render.
+ */
+let sidebarShownForNoWorld = false;
 
 export function mountWelcomePanel(target: HTMLElement): () => void {
   target.innerHTML = '';
@@ -34,6 +44,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     hoverCleanup = null;
     const state = getState();
     const { active, atlasRoot, atlasRootRecoverable } = state;
+    if (active) sidebarShownForNoWorld = false;
 
     // Pre-setup the splash is a BARE stage: no sidebar, no nav, no panes —
     // the same empty black the tour opens on, so starting the tour is
@@ -102,7 +113,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // tour needs NO folder (browser storage), so it leads; the folder CTA
     // carries honest context about where worlds live; about-link for depth.
     if (!grounded) {
-      // OPFS-only browsers (Safari 18.2+, Firefox: tour-capable boot) have no
+      // OPFS-only browsers (Safari 26+, Firefox: tour-capable boot) have no
       // folder picker — the folder door becomes an honest line instead of a
       // button that would fail on click. After a completed tour the emphasis
       // swaps: the folder is the primary door, the tour a replay.
@@ -183,6 +194,17 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       root.querySelector<HTMLButtonElement>('[data-action="see-example"]')
         ?.addEventListener('click', () => { window.location.hash = '#/demo'; });
       const tourBtn = root.querySelector<HTMLButtonElement>('[data-action="start-tour"]')!;
+      // Without a folder picker the tour is the only door, so a window that
+      // refuses browser storage (a Firefox private window) says why up front
+      // rather than on the click (S366).
+      if (!folderMode) {
+        void opfsUsable().then((ok) => {
+          if (ok || !tourBtn.isConnected) return;
+          tourBtn.closest('.atlas-landing-choice')?.remove();
+          const note = root.querySelector('.atlas-landing-note');
+          if (note) note.textContent = NO_BROWSER_STORAGE_LINE;
+        });
+      }
       tourBtn.addEventListener('click', async () => {
         tourBtn.disabled = true;
         // CAPTURE the rendered label rather than restating it (S310). Both
@@ -199,7 +221,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           const engine = await import('../tour/tour-engine');
           await engine.launchTour();
         } catch (err) {
-          toastManager.error(err instanceof Error ? err.message : String(err));
+          if (!isCodeLoadError(err)) toastManager.error(err instanceof Error ? err.message : String(err));
           tourBtn.disabled = false;
           tourBtn.textContent = tourLabel;
         }
@@ -237,6 +259,16 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // first setup — headline the ONE next step (Captain's smoke, S254: "not
     // super clear what the intent is here"); with worlds, it's just a picker.
     if (!active) {
+      // Not during the tour (it owns the drawers, and would use up the once),
+      // and one task later (gate B3): the navigation that brought this screen
+      // up (a tour exit, a finished setup) fires its hashchange after this
+      // render, and the drawer layer closes drawers on hashchange.
+      if (!sidebarShownForNoWorld && !isTourFlagActive() && isNarrowSidebar()) {
+        sidebarShownForNoWorld = true;
+        setTimeout(() => {
+          if (!getState().active && !isTourFlagActive() && isNarrowSidebar()) openDrawer('sidebar');
+        }, 0);
+      }
       const hasWorlds = state.registry.worlds.length > 0;
       if (!hasWorlds) {
         // Zero worlds = the grounding beat, minimal (S255v2, Captain's call):

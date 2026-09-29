@@ -1,8 +1,8 @@
 # Atlas — Writing Design
 
 **Version**: 3.3 (2026-09-04) — S355: find bar "Link to element" at both tiers, find in the compiled view, unlinked mentions in the element preview, the label law extended to read-only renders (conventions #49b, #49e). v3.2 (2026-05-24): context pane promoted to tool-global (session 231)
-**Status**: v1 + v1.5 + v2 batch all shipped (sessions 227-228). Session 229 added the writing-context pane in the right tab. Session 230 polished it (Featured/Planned, click-recenter, reading-mode redesign). Session 231 promoted the context pane to a tool-global Context tab — see `DESIGN.md` "Context Pane" section for the cross-route architecture. Writing-mode behavior in the context pane (Cast + Potentials + chip-click selection + Featured/Planned semantics) is unchanged.
-**Related**: `DESIGN.md` (Rooms model, atlas-specific fields, **Context Pane**), `DESIGN_HOME.md`, `DESIGN_SHARING.md`
+**Status**: v1 + v1.5 + v2 batch all shipped (sessions 227-228). Session 229 added the writing-context pane in the right tab. Session 230 polished it (Featured/Planned, click-recenter, reading-mode redesign). Session 231 promoted the context pane to a tool-global Context tab — see `DESIGN_SHELL.md` "The context pane" section for the cross-route architecture. Writing-mode behavior in the context pane (Cast + Potentials + chip-click selection + Featured/Planned semantics) is unchanged.
+**Related**: `DESIGN_SHELL.md` (Rooms model, **the context pane**), `ATLAS_FIELDS.md` (atlas-specific fields), `DESIGN_HOME.md`, `DESIGN_SHARING.md`
 
 ---
 
@@ -144,7 +144,7 @@ Two fields on every Narrative:
 - **`story`** (canonical OW text-long field) — markdown serialization of the document. Source of truth for OW interop. Other OW tools see this.
 - **`atlas_richtext_json`** (atlas-local extension field, added to `ATLAS_LOCAL_EXTENSION_FIELDS` in `core/constants.ts`) — full TipTap JSON document, preserves atlas-only formatting and custom node types. Stripped on API push; persists in folder storage.
 
-**On load**: atlas reads `atlas_richtext_json` if present, unless `story` holds text it does not (DESIGN conv. 116, S365: plain text wins); otherwise parses `story` markdown into a TipTap doc. The "no sidecar, only markdown" case is the migration path for narratives already in the world (AtlasMoppetopia, others).
+**On load**: atlas reads `atlas_richtext_json` if present, unless `story` holds text it does not (DESIGN_LAWS conv. 116, S365: plain text wins); otherwise parses `story` markdown into a TipTap doc. The "no sidecar, only markdown" case is the migration path for narratives already in the world (AtlasMoppetopia, others).
 
 **On save** (debounced via existing sync debounce window):
 1. TipTap doc → markdown serializer → write to `story` field.
@@ -152,7 +152,7 @@ Two fields on every Narrative:
 3. Auto-derive relation fields (see below).
 4. Single `folder.updateElement` call. Sync push fires via existing `requestPushIfLinked()` pipeline.
 
-**Coherence**: the two representations are atomically updated in the same write. **Out-of-band `story` edits (RECONCILED, S364 + S365)**: made while atlas is open, the live folder reloads the scene (DESIGN conv. 111); made while it was closed, the sidecar rule at open opens `story` (conv. 116). No fingerprint was needed: the comparison is `serialize(sidecar)` against `story`, then against the NORMALISED story, and every Atlas writer keeps the two halves equal (the bulk writers derive `story` from the sidecar). Atlas-only styling is the documented cost when `story` wins. (S260 found the shadowing; this paragraph used to say so.)
+**Coherence**: the two representations are atomically updated in the same write. **Out-of-band `story` edits (RECONCILED, S364 + S365)**: made while atlas is open, the live folder reloads the scene (DESIGN_LAWS conv. 111); made while it was closed, the sidecar rule at open opens `story` (conv. 116). No fingerprint was needed: the comparison is `serialize(sidecar)` against `story`, then against the NORMALISED story, and every Atlas writer keeps the two halves equal (the bulk writers derive `story` from the sidecar). Atlas-only styling is the documented cost when `story` wins. (S260 found the shadowing; this paragraph used to say so.)
 
 ### TipTap stack (the library decision)
 
@@ -272,7 +272,7 @@ The URL is the source of truth for which narrative is active (convention #46). W
 
 ### Shipped through session 231 (context pane: writing-only → tool-global)
 
-Big-picture context-pane work moved into `DESIGN.md` "Context Pane" — that's the authoritative architecture doc now. The writing-mode contributions to the pane (Cast + Potentials + Featured/Planned + chip-click selection + add-to-story button) stay specified here.
+Big-picture context-pane work moved into `DESIGN_SHELL.md` "The context pane" — that's the authoritative architecture doc now. The writing-mode contributions to the pane (Cast + Potentials + Featured/Planned + chip-click selection + add-to-story button) stay specified here.
 
 - ✅ **Context tab** — was writing-only ephemeral in session 229, now tool-global permanent (session 231). Writing route shows Cast + Potentials; element route shows element preview; other routes show empty state.
 - ✅ **Force-directed graph** with click-recenter, recent-centers breadcrumb, mouse-back intercept, right-click menu, free zoom/pan, fit-to-view button, hover-fade, hop-depth 1-4 with per-ring caps, element-type filter chips, lock-layout mode, optional element-type edge coloring (session 231).
@@ -318,7 +318,7 @@ Big-picture context-pane work moved into `DESIGN.md` "Context Pane" — that's t
 
 ## Deferred design questions (slim — most v2.1 questions are now answered in v3.0)
 
-1. **Aliases at OW schema level** — currently atlas-local via `atlas_aliases`. Whether/when to propose council motion to add to OW core schema. See DESIGN.md "Atlas-Specific Fields & Features" tracking section.
+1. **Aliases at OW schema level** — currently atlas-local via `atlas_aliases`. Whether/when to propose council motion to add to OW core schema. See `ATLAS_FIELDS.md` (the tracking register).
 2. **Per-narrative atlas-local notes** — separate field (`atlas_notes`?) or hook into the existing per-world notes overlay scoped by narrative?
 3. **Word count rollup** — current narrative only in v1. Chapter / book aggregate is v2.
 4. **Reading-mode pagination** — v1 ships scrolling reading mode; pagination is a v2 polish question.

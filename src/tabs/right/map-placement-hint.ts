@@ -14,6 +14,7 @@
  * applied by element-detail-header when armed) — this module owns the map side.
  */
 
+import { isNarrow, openDrawer } from '../../layout/narrow-layout';
 import { getState, patchSlice, subscribe } from '../../core/state';
 
 const BANNER_CLASS = 'atlas-map-placement-hint';
@@ -70,6 +71,9 @@ export function installPlacementHintWatcher(): void {
       document.body.classList.add('atlas-placing');
       const name = armedElementName();
       if (name) renderBanner(name);
+      // The next click belongs on the map, and below 1100px the map is in
+      // the right drawer (S366): open it, or the armed pin has nowhere to go.
+      if (isNarrow()) openDrawer('right');
     } else {
       document.body.classList.remove('atlas-placing');
       removeBanners();

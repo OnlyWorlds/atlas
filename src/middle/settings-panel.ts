@@ -18,6 +18,7 @@
  * Clicking a tab navigates — the URL is the source of truth so deep-linking works.
  */
 
+import { isCodeLoadError } from '../core/reload-offer';
 import { getState, subscribe } from '../core/state';
 import { ToastManager } from '../ui/toast-manager';
 import { navigate, parseHash, settingsHash, SETTINGS_TABS, SETTINGS_TAB_GROUPS, onHashChange, type SettingsTab } from '../core/router';
@@ -144,7 +145,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
         const engine = await import('../tour/tour-engine');
         await engine.launchTour();
       } catch (err) {
-        toasts.error(err instanceof Error ? err.message : String(err));
+        if (!isCodeLoadError(err)) toasts.error(err instanceof Error ? err.message : String(err));
         btn.disabled = false;
         btn.textContent = 'Replay the tour';
       }

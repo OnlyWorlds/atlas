@@ -3,19 +3,19 @@
  *
  * Two routes (selectable via tabs at the top):
  *
- *   - Route 1 — "create new":
- *       POST /worldsync/create-world-external/ → new api_key.
- *       Push every local element to the new world as CREATEs (via pushOnce
- *       on a transient engine). Stamps `server_updated_at` on each.
+ *   - Route 1, "create new": `createApiWorld` (`sync/make-online.ts`):
+ *       signed in, `POST /api/v2/account/worlds`; signed out, the legacy v1
+ *       `create-world-external`. Then every local element uploads through
+ *       `pushOnce` on a transient engine.
  *
- *   - Route 2 — "link existing":
- *       Validate creds via `client.worlds.get()`, then merge local into the
- *       existing api world per the chosen policy:
- *         (b) overwrite-on-match — local wins on duplicates, new locals push.
- *         (c) push-only-new — duplicates skipped, new locals push.
+ *   - Route 2, "link existing": validate with `getWorld()` on the v2
+ *       adapter, then `mergeLocalIntoApi` per the chosen policy for matched
+ *       elements: (b) push, local wins; (c) skip, the server's record
+ *       overwrites the local file. Server-only elements download.
  *
- * On success either way: registry transitions to api-linked, world.json
- * gets the api block, the long-running SyncEngine attaches.
+ * Either way: registry to api-linked, world.json gets the api block, and the
+ * long-running SyncEngine attaches with `justLinked` (S366: its own failed
+ * uploads are retried, never asked about). DESIGN_SYNC "Make Online".
  *
  * Trigger: settings panel "Make Online" button (only shown for local-only
  * active world).
@@ -336,7 +336,7 @@ export class MakeOnlineModal extends BaseModal {
 
       // 7. Attach the long-running SyncEngine for this world.
       const updatedEntry = reg.worlds.find((w) => w.id === active.worldId)!;
-      attachSyncEngine(updatedEntry, folder);
+      attachSyncEngine(updatedEntry, folder, { justLinked: true });
 
       // 8. Toast + close.
       const failures = pushResult.failures.length;
@@ -468,9 +468,15 @@ export class MakeOnlineModal extends BaseModal {
         demo: undefined,
       });
 
-      // 5. Attach SyncEngine for ongoing sync.
+      // 5. Attach SyncEngine for ongoing sync. The merge's failure set is
+      // registered as shown FIRST (S366 gate A3, as Route 1 does): the
+      // attach's flush retries the same set a moment later and must not
+      // toast the same paragraph a second time.
+      const failureDetail = mergeResult.failures.length > 0
+        ? (failureToastOnce(mergeResult.failures) ?? describeFailures(mergeResult.failures))
+        : null;
       const updatedEntry = reg.worlds.find((w) => w.id === active.worldId)!;
-      attachSyncEngine(updatedEntry, folder);
+      attachSyncEngine(updatedEntry, folder, { justLinked: true });
 
       // 5b. Refresh elements cache — bidirectional merge may have downloaded
       // server-only elements and swapped local ids, so the in-memory cache is
@@ -493,7 +499,7 @@ export class MakeOnlineModal extends BaseModal {
       if (failed) parts.push(`${failed} failed`);
       const summary = parts.length ? parts.join(', ') : 'Nothing to merge';
       const verb = failed > 0 ? this.toasts.error.bind(this.toasts) : this.toasts.success.bind(this.toasts);
-      verb(`Linked to ${world.name ?? 'world'} · ${summary}`);
+      verb(`Linked to ${world.name ?? 'world'} · ${summary}${failureDetail ? `. ${failureDetail}` : ''}`);
       completeWaypoint('ecosystem');
 
       this.hide();
