@@ -114,6 +114,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'A chart refresh could rebuild the page under an open text block and lose the last second of typing.',
         tags: ['pages', 'fix'],
       },
+      {
+        id: 'new-type-icons',
+        title: 'Institutions and map markers have new icons',
+        body: 'They now match the icons OnlyWorlds uses for these types.',
+        tags: ['layout'],
+      },
     ],
   },
   {
