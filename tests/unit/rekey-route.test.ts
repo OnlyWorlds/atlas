@@ -3,10 +3,8 @@
  * E18 map id kept, E19 timeline thrown to the element room, E20 writing left
  * on the old id, and a navigate that pushed Back onto a dead id).
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { rekeyRouteHash } from '../../src/sync/rekey-route';
-import { __test_handleIdSwap } from '../../src/sync/sync-attach';
-import { setState, getState } from '../../src/core/state';
 
 const W = 'w1';
 const map = new Map([['old', 'new'], ['m-old', 'm-new']]);
@@ -31,19 +29,5 @@ describe('rekeyRouteHash', () => {
     expect(r('#/w/w1/map/keep/element/other')).toBeNull();
     expect(r('#/w/w1/settings/world')).toBeNull();
     expect(r('#/w/w2/element/old')).toBeNull();
-  });
-});
-
-describe('Route 2 id swap: the URL follows, and Back never reaches the old id', () => {
-  beforeEach(() => {
-    setState({ ...getState(), active: { worldId: W } as never });
-  });
-
-  it('a timeline route stays in the timeline, replacing history', () => {
-    window.location.hash = '#/w/w1/timeline/old';
-    const before = window.history.length;
-    __test_handleIdSwap({ old_id: 'old', new_id: 'new', type: 'character' });
-    expect(window.location.hash).toBe('#/w/w1/timeline/new');
-    expect(window.history.length).toBe(before);
   });
 });

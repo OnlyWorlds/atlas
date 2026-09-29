@@ -13,6 +13,7 @@ import {
   renameWorld,
   setApiWorldName,
   setWorldPaused,
+  effectiveSyncPaused,
 } from '../registry/registry';
 import { deleteHandle, loadHandle } from '../store/handle-vault';
 import { getActiveStore, setActiveStore, evictParkedStore } from '../core/active-store';
@@ -24,6 +25,7 @@ import { navigate } from '../core/router';
 import {
   detachSyncEngine,
   getCurrentSyncEngine,
+  getCurrentSyncWorldId,
   pullNowAndRefresh,
   refreshElementsAfterWrite,
   requestPushIfLinked,
@@ -95,7 +97,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       </dl>
       ${apiActions}
       <div class="atlas-settings-dangling" data-role="rekey-interrupted" hidden>
-        <p class="atlas-settings-hint">An id update in this world did not finish, so it is not syncing.</p>
+        <p class="atlas-settings-hint" data-role="rekey-interrupted-text">An id update in this world did not finish, so it is not syncing.</p>
         <button class="atlas-btn-ghost" data-action="rekey-finish">Finish it</button>
         <button class="atlas-btn-ghost" data-action="rekey-discard"
           title="Undo the update: elements that already have their new ids keep them, the rest go back to their old ids, and every link follows.">Undo it</button>
@@ -170,12 +172,18 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     const next = setWorldPaused(getState().registry, world.id, pausedInput.checked);
     saveRegistry(next);
     patchSlice('registry', next);
-    const engine = getCurrentSyncEngine();
+    // The engine follows the EFFECTIVE pause: unticking this must not resume
+    // a world "Pause all sync" keeps offline (S367 critic C7, same predicate
+    // as the sidebar and Settings, Sync).
+    const stillPaused = effectiveSyncPaused(next.worlds.find(w => w.id === world.id), next);
+    const engine = getCurrentSyncWorldId() === world.id ? getCurrentSyncEngine() : null;
     if (engine) {
-      if (pausedInput.checked) engine.pause('manual');
+      if (stillPaused) engine.pause('manual');
       else engine.resume();
     }
-    toasts.info(pausedInput.checked ? 'This world set to offline' : 'Sync resumed for this world');
+    toasts.info(pausedInput.checked
+      ? 'This world set to offline'
+      : stillPaused ? 'This world will sync when Pause all sync is turned off' : 'Sync resumed for this world');
   });
 
   const refreshBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="refresh-from-api"]');
@@ -415,9 +423,23 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
   const rk = await import('../sync/rekey-run');
 
   let count = lastForeignCount[world.id] ?? 0;
+  let stuckIsMerge = false;
   const show = async (): Promise<void> => {
     // A run in progress writes the journal: that is not "did not finish".
     const interrupted = !rk.isRekeyRunning() && await store.hasRekeyJournal().catch(() => false);
+    if (interrupted) {
+      // A Route 2 link that stopped mid-way (S367): the world is local-only,
+      // so "not syncing" is not the news; what to do next is. The words are
+      // set BEFORE the row shows, so the re-key copy never flashes (gate B10).
+      const { rekeyJournalOrigin } = await import('../store/rekey');
+      stuckIsMerge = (await rekeyJournalOrigin(store)) === 'merge';
+      const line = stuck.querySelector<HTMLElement>('[data-role="rekey-interrupted-text"]');
+      if (line) {
+        line.textContent = stuckIsMerge
+          ? 'Linking this world to OnlyWorlds did not finish. Finish it, then run Make online again with the same key.'
+          : 'An id update in this world did not finish, so it is not syncing.';
+      }
+    }
     stuck.hidden = !interrupted;
     const staleN = interrupted ? 0 : await rk.staleLinkCount(store).catch(() => 0);
     stale.hidden = staleN === 0;
@@ -432,6 +454,15 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
     btn.textContent = count === 1 ? 'Give it a new id' : 'Give them new ids';
   };
   await show();
+  // An id move that ends (a Route 2 run behind the Make online modal, a
+  // re-key) re-reads the rows: the render that happened DURING the run saw
+  // the journal as "running", not "did not finish" (S367 gate B3). The
+  // listener retires itself once this tab's markup is gone.
+  const onSettled = (): void => {
+    if (!document.contains(stuck)) { window.removeEventListener(rk.ID_MOVE_SETTLED_EVENT, onSettled); return; }
+    void show();
+  };
+  window.addEventListener(rk.ID_MOVE_SETTLED_EVENT, onSettled);
 
   btn?.addEventListener('click', async () => {
     btn.disabled = true; // a second click during the chunk load stacked two modals (lens C F6)
@@ -450,10 +481,13 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
       const done = await rk.finishInterruptedRekey(store, world.id);
       const n = done?.map.size ?? 0;
       toasts.success(n === 0 ? 'Nothing was left to finish.'
+        : done?.origin === 'merge' ? `Finished matching ${n === 1 ? '1 element' : `${n} elements`} to OnlyWorlds. Run Make online again with the same key to link.`
         : n === 1 ? 'Finished giving 1 element a new id.' : `Finished giving ${n} elements new ids.`);
     } catch (err) {
       console.error('[settings] finishing the re-key failed:', err);
-      toasts.error(refused(err) ?? 'The id update still could not finish. Nothing was lost; the world stays offline until it does.');
+      toasts.error(refused(err) ?? (stuckIsMerge
+        ? 'Linking still could not finish. Nothing was lost; try Finish it again, or Undo it.'
+        : 'The id update still could not finish. Nothing was lost; the world stays offline until it does.'));
     }
     await show();
   });

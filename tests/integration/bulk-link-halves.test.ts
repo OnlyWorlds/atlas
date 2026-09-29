@@ -24,6 +24,12 @@ import { serializeDocToMarkdown } from '../../src/middle/writing-workspace-markd
 import { storyOutranksSidecar } from '../../src/middle/story-sidecar';
 import type { Element } from '../../src/core/types';
 import type { FsFolderStore } from '../../src/store/folder-store-fs';
+import { Editor } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import { Markdown } from '@tiptap/markdown';
+import { ElementChip } from '../../src/middle/writing-workspace-element-chip';
+import { convertLinkMarksToChips } from '../../src/middle/writing-workspace-load';
+import { startRekey } from '../../src/store/rekey';
 
 const p = (...content: JSONContent[]): JSONContent => ({ type: 'paragraph', content });
 const t = (text: string, marks?: JSONContent['marks']): JSONContent => ({ type: 'text', text, ...(marks ? { marks } : {}) });
@@ -100,4 +106,53 @@ describe('a story edited outside outranks the stale sidecar', () => {
     expect(story).toBe(`An agent wrote: [Gilgamesh](ow://character/${gil.id}) returned.`);
     expect(sidecar).toBeNull();
   });
+});
+
+/**
+ * The re-key kernel is a both-halves writer too (conv. 116; S366 lane B N5,
+ * probe b-rekey-halves). Route 2 on the kernel makes it a routine one, so
+ * each scene is built by the editor's own parse, re-keyed by the real kernel
+ * (`startRekey`), and must still satisfy `story === serialize(sidecar)`.
+ * A GUARD: green before the Route 2 rebuild and after it.
+ */
+describe('the re-key kernel keeps both halves', () => {
+  const O = '00000000-0000-4000-8000-0000000000a1';
+  const O2 = '00000000-0000-4000-8000-0000000000a2';
+  const N = '00000000-0000-4000-8000-0000000000b1';
+  const N2 = '00000000-0000-4000-8000-0000000000b2';
+
+  /** The sidecar the writing editor itself would hold for this markdown. */
+  function sidecarOf(markdown: string): JSONContent {
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: [StarterKit as never, Markdown, ElementChip as never],
+      content: markdown,
+      contentType: 'markdown',
+    });
+    try { return convertLinkMarksToChips(editor.getJSON()); } finally { editor.destroy(); }
+  }
+
+  const cases: Record<string, string> = {
+    plain: `Then [Ann](ow://character/${O}) went to [the hall](ow://location/${O2}).`,
+    italic: `*[Ann](ow://character/${O})* waited.`,
+    bold: `**[Ann](ow://character/${O})** and [Ann](ow://character/${O}) again.`,
+    list: `- [Ann](ow://character/${O})\n- [the hall](ow://location/${O2})`,
+    weblink: `See [the site](https://example.com) and [Ann](ow://character/${O}).`,
+    heading: `# [Ann](ow://character/${O})\n\nText.`,
+  };
+
+  for (const [name, md] of Object.entries(cases)) {
+    it(name, async () => {
+      await store.createElement('character', { id: O, name: 'Ann' } as Partial<Element>);
+      await store.createElement('location', { id: O2, name: 'the hall' } as Partial<Element>);
+      const id = await scene(sidecarOf(md));
+      const mints = [N, N2];
+      await startRekey(store, { worldId: 'w', ids: [O, O2], mintId: () => mints.shift()! });
+      const { story, sidecar } = await halves(id);
+      expect(story).toBe(serializeDocToMarkdown(sidecar!));
+      expect(story).not.toContain(O);
+      expect(story).toContain(`ow://character/${N}`);
+      expect(storyOutranksSidecar(sidecar, story)).toBe(false);
+    });
+  }
 });

@@ -18,6 +18,7 @@
  *   3  media        everything under media/O copied to media/N, blobs before sidecars
  *   4  referrers    every other element, pre-filtered in memory, rewritten in its own chain
  *   5  charts       .atlas/charts.json scopes
+ *   5b prefs        .atlas/world-prefs.json cast + calendar lens (S367)
  *   6p browser      persisted UI state (a caller hook), BEFORE O disappears
  *   6  remove O     silent (O never reached this server), then media/O; O leaves `foreign`
  *                   and joins `rekeyed` (the finished map, so links in files that could not
@@ -55,6 +56,8 @@ export interface RekeyResult {
   map: Map<string, string>;
   /** Referrers that could not be read and still name old ids. */
   unrewritten: string[];
+  /** What started the run (from its journal): 'merge' is Route 2, which still has to link afterwards. */
+  origin?: 'rekey' | 'merge';
 }
 
 export class RekeyRefusedError extends Error {
@@ -73,36 +76,69 @@ async function readFresh(store: FolderStore, id: string): Promise<Element | null
   return store.updateElementWith(id, () => null);
 }
 
+export interface StartRekeyOpts {
+  worldId: string;
+  /** Mint a fresh id for each (the Settings re-key of foreign elements). */
+  ids?: readonly string[];
+  /**
+   * Or move each old id onto a GIVEN new id (Route 2, S367: a local element
+   * onto the server element it matched by name). A new id must not exist
+   * locally; the caller's plan guarantees it and the kernel re-checks.
+   */
+  pairs?: ReadonlyMap<string, string>;
+  /**
+   * Route 2 only: accept an element with a server baseline. Route 2 runs on
+   * a LOCAL-ONLY world, where any `server_updated_at` is left from an
+   * unrelated or unfinished earlier link, and the new element is written
+   * without one anyway (`createElementVerbatim`).
+   */
+  allowStaleBaseline?: boolean;
+  origin?: 'rekey' | 'merge';
+  /** Test seam. */
+  mintId?: () => string;
+}
+
 /**
- * Start a re-key of `ids` (each never synced to this world's server). Refuses,
- * touching nothing, when a journal already exists (finish that one first), an
- * id is missing, has a server baseline or has a second copy in the other
- * element layout, or a minted id is taken. `mintId` is a test seam.
+ * Start a re-key of `ids` (each never synced to this world's server) or of
+ * `pairs`. Refuses, touching nothing, when a journal already exists (finish
+ * that one first), an id is missing, has a server baseline (unless allowed)
+ * or has a second copy in the other element layout, or a new id is taken.
+ * The journal check comes first even when there is nothing to move, so a
+ * caller with an empty plan still learns the world has an unfinished run.
  */
 export async function startRekey(
   store: FolderStore,
-  opts: { worldId: string; ids: readonly string[]; mintId?: () => string },
+  opts: StartRekeyOpts,
   hooks: RekeyHooks = {},
 ): Promise<RekeyResult> {
   if (await store.hasRekeyJournal()) {
     throw new RekeyRefusedError('An earlier id update in this world is unfinished. Finish it first.');
   }
   const mint = opts.mintId ?? newId;
+  const wanted: Array<[string, string | null]> = opts.pairs
+    ? [...opts.pairs]
+    : [...new Set(opts.ids ?? [])].map(id => [id, null]);
   const map: Record<string, string> = {};
   const types: Record<string, ElementType> = {};
   const stamps: Record<string, string> = {};
-  for (const id of new Set(opts.ids)) {
+  const taken = new Set<string>();
+  for (const [id, given] of wanted) {
     const el = await readFresh(store, id);
     if (!el) throw new RekeyRefusedError(`Element ${id} is not in this world.`);
     // v1 scope (contract §2, invariant 6): an element that ever reached this
     // server would need a server DELETE for its old id. Not this operation.
-    if (el.server_updated_at) throw new RekeyRefusedError(`${el.name || id} is already uploaded; it keeps its id.`);
+    if (el.server_updated_at && !opts.allowStaleBaseline) {
+      throw new RekeyRefusedError(`${el.name || id} is already uploaded; it keeps its id.`);
+    }
     // Its other copy would stay behind and come back as a twin (lens A F3).
     if (store.hasShadowCopy(id)) {
       throw new RekeyRefusedError(`${el.name || id} has two files, one under elements/ and one under spatial/. Remove the one you do not want, then try again.`);
     }
-    const n = mint();
-    if (await store.getElement(n)) throw new RekeyRefusedError('A new id was already taken. Try again.');
+    const n = given ?? mint();
+    if (n === id || taken.has(n) || await store.getElement(n)) {
+      throw new RekeyRefusedError(given ? `${el.name || id} cannot take the id ${n}: it is already in use.` : 'A new id was already taken. Try again.');
+    }
+    taken.add(n);
     map[id] = n;
     types[id] = el.type;
     stamps[id] = el.local_updated_at;
@@ -110,6 +146,7 @@ export async function startRekey(
   if (Object.keys(map).length === 0) return { map: new Map(), unrewritten: [] };
   const journal: RekeyJournal = {
     version: 1, world_id: opts.worldId, map, types, stamps, unrewritten: [], started_at: nowIso(),
+    ...(opts.origin && opts.origin !== 'rekey' ? { origin: opts.origin } : {}),
   };
   await store.writeRekeyJournal(journal);
   return runRekey(store, journal, hooks);
@@ -134,6 +171,48 @@ async function readJournal(store: FolderStore): Promise<RekeyJournal | null> {
     throw new Error('The id update record in this world is damaged, so it cannot be finished.');
   }
   return journal;
+}
+
+/**
+ * `.atlas/world-prefs.json`'s element ids through `map`: `favorites`
+ * (protagonist, nexus) and `active_calendar_id`. Idempotent. A file that
+ * will not parse is left alone (its own open reports it), never a reason to
+ * stop the re-key.
+ */
+async function remapWorldPrefsFile(store: FolderStore, map: ReadonlyMap<string, string>): Promise<void> {
+  if (map.size === 0) return;
+  let prefs: Record<string, unknown> | null;
+  try {
+    prefs = await store.readWorldPrefs();
+  } catch (err) {
+    if (err instanceof CorruptFileError) return;
+    throw err;
+  }
+  if (!prefs) return;
+  const sw = (v: unknown) => (typeof v === 'string' && map.has(v) ? map.get(v)! : v);
+  let changed = false;
+  const next: Record<string, unknown> = { ...prefs };
+  const cal = sw(prefs.active_calendar_id);
+  if (cal !== prefs.active_calendar_id) { next.active_calendar_id = cal; changed = true; }
+  const fav = prefs.favorites;
+  if (fav && typeof fav === 'object' && !Array.isArray(fav)) {
+    const f = fav as Record<string, unknown>;
+    const nf = { ...f, protagonist_id: sw(f.protagonist_id), nexus_id: sw(f.nexus_id) };
+    if (nf.protagonist_id !== f.protagonist_id || nf.nexus_id !== f.nexus_id) {
+      // Keep absent keys absent.
+      if (!('protagonist_id' in f)) delete nf.protagonist_id;
+      if (!('nexus_id' in f)) delete nf.nexus_id;
+      next.favorites = nf;
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  try {
+    await store.writeWorldPrefs(next);
+  } catch (err) {
+    if (err instanceof CorruptFileError) return;
+    throw err;
+  }
 }
 
 /** Finish an interrupted re-key from its journal; null when there is none. */
@@ -213,6 +292,12 @@ async function runRekey(store: FolderStore, journal: RekeyJournal, hooks: RekeyH
   }
   if (chartsChanged) await store.writeCharts(charts);
 
+  // 5b. The world prefs file (conv. 112) names elements too: the cast and the
+  // calendar lens. The registry follows in 6p and its subscriber would write
+  // the file in THIS browser, but a folder that travels (git, a shared drive)
+  // opens elsewhere with the file's ids winning, so the file moves here.
+  await remapWorldPrefsFile(store, map);
+
   // 6p. Browser state that names old ids moves while both ids still exist.
   await hooks.rekeyPersistedState?.(journal.world_id, map);
 
@@ -240,7 +325,7 @@ async function runRekey(store: FolderStore, journal: RekeyJournal, hooks: RekeyH
 
   // 8. Done: the engine may run again.
   await store.clearRekeyJournal();
-  return { map, unrewritten: [...unrewritten] };
+  return { map, unrewritten: [...unrewritten], origin: journal.origin ?? 'rekey' };
 }
 
 /**
@@ -283,6 +368,7 @@ export async function rollbackRekey(store: FolderStore, hooks: RekeyHooks = {}):
     if (r.changed) { charts = r.charts; chartsChanged = true; }
   }
   if (chartsChanged) await store.writeCharts(charts);
+  await remapWorldPrefsFile(store, back);
   await hooks.rekeyPersistedState?.(journal.world_id, back);
   for (const [n] of back) {
     await store.deleteElement(n, { silent: true, cascade: false });
@@ -296,6 +382,16 @@ export async function rollbackRekey(store: FolderStore, hooks: RekeyHooks = {}):
   }
   await store.clearRekeyJournal();
   return { restored: back.size, kept: finished.size };
+}
+
+/** What started the unfinished run on disk, if any ('rekey' for a journal from before S367). Never throws. */
+export async function rekeyJournalOrigin(store: FolderStore): Promise<'rekey' | 'merge' | null> {
+  try {
+    const j = await store.readRekeyJournal();
+    return j ? (j.origin ?? 'rekey') : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Elements whose links still name an id a finished re-key replaced (a file that could not be read at the time). */

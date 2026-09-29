@@ -14,12 +14,14 @@ import {
   isInTextInput,
   matchesBinding,
   formatCombo,
+  comboParts,
   SAVE_REQUEST_EVENT,
   dispatchSaveRequest,
 } from '../../src/core/hotkeys';
 
 function makeKey(opts: {
   key: string;
+  code?: string;
   ctrlKey?: boolean;
   metaKey?: boolean;
   shiftKey?: boolean;
@@ -28,6 +30,7 @@ function makeKey(opts: {
 }): KeyboardEvent {
   return new KeyboardEvent('keydown', {
     key: opts.key,
+    code: opts.code,
     ctrlKey: opts.ctrlKey,
     metaKey: opts.metaKey,
     shiftKey: opts.shiftKey,
@@ -74,6 +77,37 @@ describe('matchesBinding', () => {
     };
     expect(matchesBinding(makeKey({ key: '?' }), helpBinding)).toBe(true);
     expect(matchesBinding(makeKey({ key: '?', ctrlKey: true }), helpBinding)).toBe(false);
+  });
+});
+
+// S367 critic C12b: non-Latin layouts match modified letter bindings by e.code.
+describe('matchesBinding on a non-Latin layout (C12b)', () => {
+  const save: HotkeyBinding = {
+    id: 's', description: 's', scope: 'Editor', key: 's', modifier: 'mod', action: () => {},
+  };
+  const bare: HotkeyBinding = {
+    id: 'n', description: 'n', scope: 'Global', key: 'n', modifier: 'none', action: () => {},
+  };
+
+  it('Ctrl+S on a Cyrillic layout (key ы, code KeyS) matches', () => {
+    expect(matchesBinding(makeKey({ key: 'ы', code: 'KeyS', ctrlKey: true }), save)).toBe(true);
+  });
+
+  it('Ctrl with the wrong physical key does not match', () => {
+    expect(matchesBinding(makeKey({ key: 'ы', code: 'KeyD', ctrlKey: true }), save)).toBe(false);
+  });
+
+  it('a Latin key on another physical key (Dvorak) follows the typed char', () => {
+    expect(matchesBinding(makeKey({ key: 'o', code: 'KeyS', ctrlKey: true }), save)).toBe(false);
+  });
+
+  it('unmodified non-Latin key never triggers an unmodified letter binding', () => {
+    expect(matchesBinding(makeKey({ key: 'т', code: 'KeyN' }), bare)).toBe(false);
+  });
+
+  it('digit bindings match Digit codes with a modifier', () => {
+    const d: HotkeyBinding = { id: 'd', description: 'd', scope: 'Global', key: '1', modifier: 'mod', action: () => {} };
+    expect(matchesBinding(makeKey({ key: '&', code: 'Digit1', ctrlKey: true }), d)).toBe(true);
   });
 });
 
@@ -201,6 +235,22 @@ describe('formatCombo', () => {
       id: 't', description: 't', scope: 'Global', key: 'Escape', modifier: 'none', action: () => {},
     };
     expect(formatCombo(b)).toBe('Escape');
+  });
+});
+
+describe('comboParts (C12c)', () => {
+  it('splits a mod+shift binding into Ctrl, Shift, key on non-Mac', () => {
+    const b: HotkeyBinding = {
+      id: 't', description: 't', scope: 'Global', key: 'f', modifier: 'mod+shift', action: () => {},
+    };
+    expect(comboParts(b)).toEqual(['Ctrl', 'Shift', 'F']);
+  });
+
+  it('keeps Escape as one part', () => {
+    const b: HotkeyBinding = {
+      id: 't', description: 't', scope: 'Global', key: 'Escape', modifier: 'none', action: () => {},
+    };
+    expect(comboParts(b)).toEqual(['Escape']);
   });
 });
 

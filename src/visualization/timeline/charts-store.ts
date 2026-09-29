@@ -55,9 +55,9 @@ function sameIdSet(a: readonly string[], b: readonly string[]): boolean {
 }
 
 /**
- * Rewrite element ids inside saved chart SCOPES after an id-swap. Make-online
- * re-keys local v4 ids to server v7 ids; charts.json is atlas-local so it is
- * NOT covered by the element-file `rewriteIdReferences` pass — a focus/selection
+ * Rewrite element ids inside saved chart SCOPES when ids change (the re-key
+ * kernel's step 5: the Settings re-key and Route 2). charts.json is
+ * atlas-local, so the element-file pass does not reach it — a focus/selection
  * chart would silently point at a dead id. (types/all scopes carry no element
  * ids and are untouched.) Returns the (possibly new) list + whether anything
  * changed, so the caller can skip the write when nothing matched.

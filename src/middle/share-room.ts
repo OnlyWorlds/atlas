@@ -35,7 +35,7 @@ import {
   isPageNarrative, listPages, pageIntentOf, blocksOf, blockSummary,
   findUniquePageName, newBlockId, pageBlocksPatch, pagePubOf, pageContentSig,
   pageThemeOf, PAGE_THEME_ACCENTS, PAGE_THEME_FONTS, type PageTheme,
-  type PageBlock, type HeadingBlock, type ProseBlock, type ElementCardBlock,
+  type PageBlock, type HeadingBlock, type ProseBlock, type ElementCardBlock, type PagePubState,
 } from '../core/sharing';
 import { renderBlockView, renderPayloadPage, populatedCardFields, setBuilderCharts } from './share-page-render';
 import type { ChartConfig } from '../visualization/timeline/types';
@@ -61,6 +61,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   root.className = 'atlas-share-room';
   target.appendChild(root);
 
+  let disposed = false;                          // S367 critic C4: set on unmount
   let mountedView: string | null = null;        // 'list' | '<pageId>' | null
   // Whether the mounted view found its target — false = not-found interim;
   // same-view ticks retry a full build (resolves load/id-swap transients).
@@ -108,10 +109,18 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
 
   /** Resolves true when the write landed — publish uses this to avoid toasting
    *  success over a failed mirror write. The chain itself never rejects. */
-  function patchPage(id: string, patch: Record<string, unknown>): Promise<boolean> {
+  function patchPage(
+    id: string,
+    patch: Record<string, unknown>,
+    store?: ReturnType<typeof getActiveStore>,
+  ): Promise<boolean> {
     const step = writeChain.then(async () => {
-      const folder = getActiveStore();
+      // S367 critic C4: a caller that captured its store before an await
+      // writes through THAT store, and only while it is still the active one
+      // (a write-then-refresh into another world would clobber its elements).
+      const folder = store ?? getActiveStore();
       if (!folder) return false;
+      if (store && getActiveStore() !== store) return false;
       try {
         await folder.updateElement(id, patch as Partial<Element>);
         await refreshElementsAfterWrite(folder);
@@ -1826,6 +1835,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   async function reconcilePubMirrors(worldId: string): Promise<void> {
     const client = sharingClientForActiveWorld();
     if (!client) return;
+    // S367 critic C4: capture the world's store before the await; bail if the
+    // room unmounted or the world changed while the list call was out.
+    const store = getActiveStore();
+    if (!store) return;
+    const stale = () => disposed || wid() !== worldId || getActiveStore() !== store;
     let rows: SharedPageRow[];
     try {
       rows = await client.listForWorld(worldId);
@@ -1833,27 +1847,39 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       reconciledWorlds.delete(worldId); // retry on next room entry
       return;
     }
+    if (stale()) {
+      reconciledWorlds.delete(worldId);
+      return;
+    }
     const byId = new Map(rows.map(r => [r.id, r]));
     let healed = 0;
     for (const page of listPages(getState().data.elements)) {
+      if (stale()) return;
       const pub = pagePubOf(page);
       if (!pub) continue;
       const row = byId.get(pub.id);
       if (!row) {
         // Server no longer has the row — the page is publishable again.
-        if (await patchPage(page.id, { atlas_page_pub: null })) healed++;
+        if (await patchPage(page.id, { atlas_page_pub: null }, store)) healed++;
         continue;
       }
-      if (row.revoked !== pub.revoked || row.updated_at !== pub.updated_at || row.slug !== pub.slug) {
-        const ok = await patchPage(page.id, {
-          atlas_page_pub: {
-            id: row.id, slug: row.slug, published_at: row.published_at,
-            updated_at: row.updated_at, revoked: row.revoked,
-          },
-        });
+      // S367 critic C5: heal only on a field that means something. The
+      // publish mirror stamps LOCAL times (PublishResult has none), so a
+      // timestamp-only difference is the normal state after every publish.
+      // The mirror stores no title or intent, so revoked + slug are the set.
+      if (row.revoked !== pub.revoked || row.slug !== pub.slug) {
+        const next: PagePubState = {
+          id: row.id, slug: row.slug, published_at: row.published_at,
+          updated_at: row.updated_at, revoked: row.revoked,
+        };
+        // C5: carry the publish-time signature, or the "edited since
+        // publish" reminder switches off for good.
+        if (pub.content_sig) next.content_sig = pub.content_sig;
+        const ok = await patchPage(page.id, { atlas_page_pub: next }, store);
         if (ok) healed++;
       }
     }
+    if (stale()) return;
     if (healed > 0) {
       toasts.info(`Publish state refreshed from the server (${healed} page${healed === 1 ? '' : 's'})`);
     }
@@ -2281,6 +2307,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   const unsubState = subscribe(render);
   const unsubHash = onHashChange(render);
   return () => {
+    disposed = true;
     flushAndTeardown(mountedView);
     window.removeEventListener('pagehide', onPageHide);
     document.removeEventListener('atlas:disk-changes', onDiskChanges);

@@ -230,6 +230,56 @@ describe('buildPagePayload', () => {
     expect(JSON.stringify(p)).not.toContain(VALLAKI);
   });
 
+  it('S367 critic C6: card field text ships no ow:// link (full-card story and pinned description)', () => {
+    const SCENE = 'd1000000-0000-0000-0000-000000000001';
+    const elements: Element[] = [
+      ...world(),
+      { id: SCENE, type: 'narrative', name: 'Chapter 3',
+        story: `The courier met [Ireena](ow://character/${IREENA}) near ow://location/${VALLAKI}.`,
+        local_updated_at: 't' } as unknown as Element,
+    ];
+    // Ireena is carded too: even an included target's link goes (fields never chip).
+    const p = buildPagePayload(makePage([
+      { id: 'b1', kind: 'element-card', elementId: SCENE, variant: 'full', fields: ['story'] },
+      { id: 'b2', kind: 'element-card', elementId: IREENA, variant: 'compact', fields: [] },
+    ]), elements);
+    expect(p.elements[SCENE].fields.story).toBe('The courier met Ireena near Vallaki.');
+    expect(JSON.stringify(p)).not.toContain('ow://');
+    expect(JSON.stringify(p)).not.toContain(VALLAKI);
+
+    // A pinned element's default description goes through the same scrub.
+    const MAP = 'f1000000-0000-0000-0000-000000000001';
+    const PIN = 'f2000000-0000-0000-0000-000000000002';
+    const TOWN = 'f3000000-0000-0000-0000-000000000003';
+    const mapWorld: Element[] = [
+      ...world(),
+      { id: MAP, type: 'map', name: 'Realm', image_url: 'https://img.example/m.png', width: 100, height: 100 } as unknown as Element,
+      { id: TOWN, type: 'location', name: 'Dampworth', description: `Seat of [Ismark](ow://character/${ISMARK}).` } as unknown as Element,
+      { id: PIN, type: 'pin', name: 'p', map_id: MAP, element_id: TOWN, x: 10, y: 10 } as unknown as Element,
+    ];
+    const pm = buildPagePayload(makePage([{ id: 'b1', kind: 'map', mapId: MAP, pinIds: [PIN] }]), mapWorld);
+    expect(pm.elements[TOWN].fields.description).toBe('Seat of Ismark.');
+    expect(JSON.stringify(pm)).not.toContain(ISMARK);
+  });
+
+  it('S367 critic C12a: a circle block ships the knower id only when the knower is included', () => {
+    const CIRCLE = 'c1000000-0000-0000-0000-000000000001';
+    const elements: Element[] = [
+      ...world(),
+      { id: CIRCLE, type: 'collective', name: 'the party', subtype: 'circle',
+        characters: [], local_updated_at: 't' } as unknown as Element,
+    ];
+    const hidden = buildPagePayload(makePage([{ id: 'b1', kind: 'circle', knowerId: CIRCLE }]), elements);
+    expect((hidden.blocks[0] as PayloadCircleBlock).knowerId).toBe('');
+    expect(JSON.stringify(hidden)).not.toContain(CIRCLE);
+
+    const shown = buildPagePayload(makePage([
+      { id: 'b1', kind: 'circle', knowerId: CIRCLE },
+      { id: 'b2', kind: 'element-card', elementId: CIRCLE, variant: 'compact', fields: [] },
+    ]), elements);
+    expect((shown.blocks[0] as PayloadCircleBlock).knowerId).toBe(CIRCLE);
+  });
+
   it('image_url ships per showImage (default ON, compact renders it as avatar); all-cards opt-out drops it from the wire', () => {
     // Default: a lone compact card ships the image (rendered as a head avatar).
     const def = buildPagePayload(makePage([
@@ -286,7 +336,10 @@ describe('buildPagePayload', () => {
     const p = buildPagePayload(page, elements);
     expect((p.blocks[0] as { elementId: string }).elementId).toBe(IREENA);
     expect((p.blocks[1] as { elementIds: string[] }).elementIds).toEqual([ISMARK, VALLAKI]);
-    expect((p.blocks[2] as { knowerId: string }).knowerId).toBe(CIRCLE);
+    // The healed knower resolved (its name froze in); its id stays off the
+    // wire because the knower is not itself included (S367 critic C12a).
+    expect((p.blocks[2] as PayloadCircleBlock).title).toBe('the party');
+    expect((p.blocks[2] as PayloadCircleBlock).knowerId).toBe('');
   });
 
   it('map block freezes: %-coords, pinned elements IDENTITY + description by default (B6); no-image maps drop entirely', () => {

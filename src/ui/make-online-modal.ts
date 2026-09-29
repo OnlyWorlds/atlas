@@ -9,9 +9,10 @@
  *       `pushOnce` on a transient engine.
  *
  *   - Route 2, "link existing": validate with `getWorld()` on the v2
- *       adapter, then `mergeLocalIntoApi` per the chosen policy for matched
- *       elements: (b) push, local wins; (c) skip, the server's record
- *       overwrites the local file. Server-only elements download.
+ *       adapter, then the Route 2 runner (`sync/make-online-run.ts`):
+ *       name-matched locals take the server's ids through the re-key
+ *       kernel first, then (b) push, local wins; (c) the server's record
+ *       lands locally. Server-only elements download.
  *
  * Either way: registry to api-linked, world.json gets the api block, and the
  * long-running SyncEngine attaches with `justLinked` (S366: its own failed
@@ -27,11 +28,11 @@ import { getState, patchSlice } from '../core/state';
 import { attachApi, saveRegistry, setPin, setEmail, findLinkedWorld } from '../registry/registry';
 import { completeWaypoint } from '../core/waypoints';
 import { getActiveStore } from '../core/active-store';
-import { attachSyncEngine, detachSyncEngine, applyIdSwapToUi } from '../sync/sync-attach';
+import { attachSyncEngine, detachSyncEngine } from '../sync/sync-attach';
+import { runRoute2, ambiguousLine } from '../sync/make-online-run';
 import { SyncEngine } from '../sync/sync-engine';
 import {
   createApiWorld,
-  mergeLocalIntoApi,
   buildV2Adapter,
   type MergePolicy,
   type MergeProgress,
@@ -44,6 +45,18 @@ type Route = 'create' | 'link';
 export class MakeOnlineModal extends BaseModal {
   private toasts: ToastManager;
   private route: Route = 'create';
+  /**
+   * A route is running (S367 gate B5). The runner makes the app behind the
+   * modal inert, but the modal is outside it: without this the other tab's
+   * form could start a second route on the same folder mid-run.
+   */
+  private busy = false;
+
+  private setBusy(on: boolean): void {
+    this.busy = on;
+    document.querySelectorAll<HTMLButtonElement>('[data-modal="make-online"] [data-route-tab]')
+      .forEach((b) => { b.disabled = on; });
+  }
 
   constructor(toasts: ToastManager) {
     super();
@@ -171,9 +184,10 @@ export class MakeOnlineModal extends BaseModal {
       </div>
     `;
 
-    // Tab switching.
+    // Tab switching. Refused while a route runs (S367 gate B5).
     body.querySelectorAll<HTMLButtonElement>('[data-route-tab]').forEach((btn) => {
       btn.addEventListener('click', () => {
+        if (this.busy) return;
         const target = btn.getAttribute('data-route-tab') as Route;
         this.route = target;
         body.querySelectorAll<HTMLButtonElement>('[data-route-tab]').forEach((b) => {
@@ -195,6 +209,7 @@ export class MakeOnlineModal extends BaseModal {
     const createForm = body.querySelector<HTMLFormElement>('[data-form="create-route"]')!;
     createForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      if (this.busy) return;
       void this.handleCreate(createForm);
     });
 
@@ -202,6 +217,7 @@ export class MakeOnlineModal extends BaseModal {
     const linkForm = body.querySelector<HTMLFormElement>('[data-form="link-route"]')!;
     linkForm.addEventListener('submit', (e) => {
       e.preventDefault();
+      if (this.busy) return;
       void this.handleLink(linkForm);
     });
 
@@ -261,6 +277,7 @@ export class MakeOnlineModal extends BaseModal {
     // No outside-click or Escape close while the upload runs: closing looked
     // like a cancel and was not, the work carried on unseen (S360).
     this.dismissLocked = true;
+    this.setBusy(true);
 
     try {
       // 1. Create new api world (server-side).
@@ -302,8 +319,7 @@ export class MakeOnlineModal extends BaseModal {
         client: adapter,
         apiWorldId: world.id,
         // No onIdSwap: keel preserves client ids on CREATE (create-path
-        // id-swap excised 2026-07-12). Route 2's MATCH-phase swaps still
-        // propagate via MergeOpts.onIdSwap → applyIdSwapToUi below.
+        // id-swap excised 2026-07-12).
         onPushProgress: (done, total) => {
           pushDone = done;
           pushTotal = total;
@@ -366,6 +382,7 @@ export class MakeOnlineModal extends BaseModal {
         ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
         .forEach((b) => (b.hidden = false));
       this.dismissLocked = false;
+      this.setBusy(false);
     }
   }
 
@@ -408,6 +425,7 @@ export class MakeOnlineModal extends BaseModal {
     // No outside-click or Escape close while the upload runs: closing looked
     // like a cancel and was not, the work carried on unseen (S360).
     this.dismissLocked = true;
+    this.setBusy(true);
 
     try {
       // 1. Validate via v2 GET /world.
@@ -433,60 +451,64 @@ export class MakeOnlineModal extends BaseModal {
         throw new Error(`This API world is already linked to "${dupe0.name}" locally. Unlink it first or open it from the sidebar.`);
       }
 
-      // 2. Run the merge through the v2 adapter (worlds.get above stays the
-      //    v1 validation call — gate 10.7 split).
+      // 2. The merge, through the Route 2 runner (S367): the id-move lock, the
+      //    app inert, rooms flushed, local ids moved onto the server's with
+      //    the journaled kernel BEFORE any server call, the screen following
+      //    the disk, then the server phase. The link step runs inside the
+      //    runner's lock so no live-folder pass sees a half-linked world.
       const adapter = buildV2Adapter(apiKey, pin);
       detachSyncEngine();
       const folder = getActiveStore()!;
+      const worldId = active0.worldId;
       const renderProgress = (p: MergeProgress) => {
         progressBox.textContent = p.phase === 'list'
           ? 'Reading server elements…'
-          : `Merging ${p.done} of ${p.total} elements…`;
+          : p.phase === 'ids'
+            // The kernel's count is file writes, not elements (S367 gate B4).
+            ? `Moving links to the online ids: ${p.done} of ${p.total}…`
+            : `Merging ${p.done} of ${p.total} elements…`;
       };
-      const mergeResult = await mergeLocalIntoApi(folder, adapter, policy, {
+      let failureDetail: string | null = null;
+      const mergeResult = await runRoute2({
+        store: folder,
+        worldId,
+        adapter,
+        policy,
         matchByName,
         onProgress: renderProgress,
-        // Mirror Route 1: fire UI propagation on every id-swap that happens
-        // during the merge (match-phase + server-assigned-on-CREATE). Without
-        // this, a user viewing a local element whose id gets replaced sees
-        // "element <old-id> not found in this world" after the modal closes.
-        onIdSwap: applyIdSwapToUi,
+        link: async (result) => {
+          // The double-link check again (S367 gate B11): another tab may have
+          // linked a different local world to this api world during the merge.
+          const dupe = findLinkedWorld(getState().registry, world.id!, worldId);
+          if (dupe) {
+            throw new Error(`While linking, "${dupe.name}" was linked to this API world in another tab. Unlink one of them, then run Make online again.`);
+          }
+          // 3. Registry transition + persist creds (read now: the id move
+          //    rewrote this world's entry).
+          let reg = getState().registry;
+          if (!reg.pin) reg = setPin(reg, pin);
+          reg = attachApi(reg, worldId, { worldId: world.id!, apiKey, worldName: world.name });
+          saveRegistry(reg);
+          patchSlice('registry', reg);
+
+          // 4. Persist api credentials + cached server-side name to disk.
+          await folder.writeWorldMeta({
+            api: { world_id: world.id!, api_key: apiKey, ...(world.name ? { world_name: world.name } : {}) },
+            // Un-demo on make-online (see Route 1 note).
+            demo: undefined,
+          });
+
+          // 5. Attach SyncEngine for ongoing sync. The merge's failure set is
+          // registered as shown FIRST (S366 gate A3, as Route 1 does): the
+          // attach's flush retries the same set a moment later and must not
+          // toast the same paragraph a second time.
+          failureDetail = result.failures.length > 0
+            ? (failureToastOnce(result.failures) ?? describeFailures(result.failures))
+            : null;
+          const updatedEntry = reg.worlds.find((w) => w.id === worldId)!;
+          attachSyncEngine(updatedEntry, folder, { justLinked: true });
+        },
       });
-
-      // 3. Registry transition + persist creds.
-      const active = getState().active!;
-      let reg = getState().registry;
-      if (!reg.pin) reg = setPin(reg, pin);
-      reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey, worldName: world.name });
-      saveRegistry(reg);
-      patchSlice('registry', reg);
-
-      // 4. Persist api credentials + cached server-side name to disk.
-      await folder.writeWorldMeta({
-        api: { world_id: world.id, api_key: apiKey, ...(world.name ? { world_name: world.name } : {}) },
-        // Un-demo on make-online (see Route 1 note).
-        demo: undefined,
-      });
-
-      // 5. Attach SyncEngine for ongoing sync. The merge's failure set is
-      // registered as shown FIRST (S366 gate A3, as Route 1 does): the
-      // attach's flush retries the same set a moment later and must not
-      // toast the same paragraph a second time.
-      const failureDetail = mergeResult.failures.length > 0
-        ? (failureToastOnce(mergeResult.failures) ?? describeFailures(mergeResult.failures))
-        : null;
-      const updatedEntry = reg.worlds.find((w) => w.id === active.worldId)!;
-      attachSyncEngine(updatedEntry, folder, { justLinked: true });
-
-      // 5b. Refresh elements cache — bidirectional merge may have downloaded
-      // server-only elements and swapped local ids, so the in-memory cache is
-      // stale by now.
-      try {
-        const elements = await folder.listElements();
-        patchSlice('data', { elements });
-      } catch (err) {
-        console.warn('[make-online] refresh-after-merge failed:', err);
-      }
 
       // 6. Toast.
       const { creates, updates, skipped, downloaded, failures } = mergeResult;
@@ -499,11 +521,20 @@ export class MakeOnlineModal extends BaseModal {
       if (failed) parts.push(`${failed} failed`);
       const summary = parts.length ? parts.join(', ') : 'Nothing to merge';
       const verb = failed > 0 ? this.toasts.error.bind(this.toasts) : this.toasts.success.bind(this.toasts);
-      verb(`Linked to ${world.name ?? 'world'} · ${summary}${failureDetail ? `. ${failureDetail}` : ''}`);
+      const unmatched = ambiguousLine(mergeResult.ambiguous);
+      verb(`Linked to ${world.name || 'world'} · ${summary}${unmatched ? `. ${unmatched}` : ''}${failureDetail ? `. ${failureDetail}` : ''}`);
+      // Files the id move could not open keep their old links (S367 gate B2),
+      // said as the Settings re-key says it.
+      if (mergeResult.unrewritten.length > 0) {
+        const { unrewrittenMessage } = await import('./rekey-modal');
+        this.toasts.error(unrewrittenMessage(mergeResult.unrewritten), 10_000);
+      }
       completeWaypoint('ecosystem');
 
       this.hide();
     } catch (err) {
+      // A twice-stopped id move arrives already worded (the runner's
+      // LINK_STOPPED_LINE, S367 gate B3).
       const message = err instanceof Error ? err.message : String(err);
       errorBox.textContent = message;
       errorBox.hidden = false;
@@ -515,6 +546,7 @@ export class MakeOnlineModal extends BaseModal {
         ?.querySelectorAll<HTMLButtonElement>('[data-action="cancel"]')
         .forEach((b) => (b.hidden = false));
       this.dismissLocked = false;
+      this.setBusy(false);
     }
   }
 }

@@ -145,13 +145,30 @@ const CENTER_NODE_DIAMETER = 44;
 export type HopDepth = 1 | 2 | 3 | 4;
 
 /**
- * Per-ring cap. Ring 1 (cast) is uncapped; tighter caps for outer rings
- * keep dense worlds visually digestible. Tier-density may shrink ring 2
- * further (see RING2_CAP_CHAPTER / _BOOK).
+ * Per-ring cap. Tighter caps for outer rings keep dense worlds visually
+ * digestible. Tier-density may shrink ring 2 further (see RING2_CAP_CHAPTER /
+ * _BOOK). Ring 1 was uncapped until S367 (critic C3): a Map's backlinks are
+ * every pin and marker on it, and the sim is O(iters x n^2), so a Sikelia map
+ * stalled the tab. Ring 1 now keeps its RING_CAPS[1] most connected; the
+ * legend says how many were left out.
  */
-const RING_CAPS: Record<2 | 3 | 4, number> = { 2: 12, 3: 8, 4: 6 };
+const RING_CAPS: Record<1 | 2 | 3 | 4, number> = { 1: 60, 2: 12, 3: 8, 4: 6 };
 const RING2_CAP_CHAPTER = 6;
 const RING2_CAP_BOOK = 4;
+
+/**
+ * Layout memo (S367 critic C3). The context tab remounts the graph on every
+ * elements swap (each edit, each autosave), and the sim is deterministic in
+ * its inputs, so a node + edge set already laid out reuses its positions.
+ * Module-level so it survives the remount; a few entries cover recenters.
+ */
+const LAYOUT_MEMO_MAX = 8;
+const layoutMemo = new Map<string, Array<[number, number]>>();
+let simRuns = 0;
+/** Test seam: how many times the physics sim has actually run. */
+export function contextGraphSimRuns(): number { return simRuns; }
+/** Test seam: forget memoised layouts. */
+export function clearContextGraphLayoutMemo(): void { layoutMemo.clear(); }
 
 function diameterFor(n: { isCenter: boolean }): number {
   return n.isCenter ? CENTER_NODE_DIAMETER : NODE_DIAMETER;
@@ -377,9 +394,9 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     const byId = new Map<string, Element>();
     for (const e of elements) byId.set(e.id, e);
 
-    // Tier-aware ring-2 cap. Ring 1 (cast) is uncapped; ring 2 narrows on
-    // chapter/book narratives for visual clarity. Rings 3 and 4 use fixed
-    // global caps (RING_CAPS) regardless of tier.
+    // Tier-aware ring-2 cap. Ring 2 narrows on chapter/book narratives for
+    // visual clarity. Rings 1, 3 and 4 use fixed global caps (RING_CAPS)
+    // regardless of tier.
     let ring2Cap = RING_CAPS[2];
     let tierDefaultHop: HopDepth = 2;
     const worldId = state.active?.worldId ?? '';
@@ -402,16 +419,15 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // Ring 1 is the UNION of both directions (S354, Captain's ask): what the
     // subject links to (cast) plus everything that links to the subject
     // (backlinks). An element that is only ever pointed at, a regime named
-    // by ten titles and three houses, used to draw an empty web. Backlinks
-    // are uncapped, like cast; the label budget keeps a hub readable.
+    // by ten titles and three houses, used to draw an empty web.
     const reverse = buildReverseIndex(elements);
     const allCastIds = collectDirectNeighbors(centerEl).filter(id => byId.has(id));
     const castSet = new Set(allCastIds);
     const backlinkIds = Array.from(reverse.get(centerEl.id) ?? [])
       .filter(id => id !== centerEl.id && byId.has(id) && !castSet.has(id));
     const backlinkSet = new Set(backlinkIds);
-    const rings: string[][] = [[centerEl.id], [...allCastIds, ...backlinkIds]];
-    const inAnyRing = new Set<string>([centerEl.id, ...allCastIds, ...backlinkIds]);
+    const ring1All = [...allCastIds, ...backlinkIds];
+    const inAnyRing = new Set<string>([centerEl.id, ...ring1All]);
     // Outer rings walk the web undirected: a backlink's own links and
     // linkers are as much "one hop out" as a cast member's.
     const undirected = (id: string): string[] => {
@@ -420,6 +436,31 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       const inc = reverse.get(id);
       return inc ? [...out, ...inc] : out;
     };
+    const isHidden = (id: string): boolean => {
+      const t = byId.get(id)?.type;
+      return t ? currentHiddenTypes.has(t) : false;
+    };
+    // Ring 1 cap (S367 critic C3), applied AFTER the type filter so hiding
+    // the flood type (markers) lets the rest through. Scored like the outer
+    // rings: edges back into the center and the ring itself; the stable sort
+    // keeps cast ahead of backlinks on a tie. The left-out count feeds the
+    // legend; the left-out ids stay in inAnyRing so they never pose as ring 2.
+    const ring1Eligible = ring1All.filter(id => !isHidden(id));
+    let ring1 = ring1Eligible;
+    if (ring1Eligible.length > RING_CAPS[1]) {
+      const pool = new Set<string>([centerEl.id, ...ring1Eligible]);
+      const score = new Map<string, number>();
+      for (const id of ring1Eligible) {
+        let s = 0;
+        for (const adj of undirected(id)) if (pool.has(adj) && adj !== id) s++;
+        score.set(id, s);
+      }
+      ring1 = [...ring1Eligible]
+        .sort((a, b) => (score.get(b) ?? 0) - (score.get(a) ?? 0))
+        .slice(0, RING_CAPS[1]);
+    }
+    const ring1Omitted = ring1Eligible.length - ring1.length;
+    const rings: string[][] = [[centerEl.id], ring1];
 
     for (let depth = 2; depth <= effectiveHop; depth++) {
       const previousRing = rings[depth - 1];
@@ -444,18 +485,14 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // toolbar reads this to render type chips; chips persist for hidden
     // types so the user can re-enable them.
     presentTypes = new Set<ElementType>();
-    for (let r = 1; r < rings.length; r++) {
-      for (const id of rings[r]) {
+    for (const ids of [ring1All, ...rings.slice(2)]) {
+      for (const id of ids) {
         const t = byId.get(id)?.type;
         if (t) presentTypes.add(t);
       }
     }
 
     // Apply hidden-types filter to derive the visible-per-ring sets.
-    const isHidden = (id: string): boolean => {
-      const t = byId.get(id)?.type;
-      return t ? currentHiddenTypes.has(t) : false;
-    };
     const visibleRings: string[][] = rings.map((r, idx) =>
       idx === 0 ? r : r.filter(id => !isHidden(id))
     );
@@ -547,7 +584,21 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // halves of ring 1 exist; with backlinks alone it would crowd the whole
     // ring into the bottom of the canvas for no contrast.
     const biased = nodes.some(n => n.isCast) && nodes.some(n => n.isBacklink);
-    runSim(nodes, edges, idToNode, biased);
+    // Seeds follow from ring order and the cast/backlink split, and the sim
+    // has no randomness, so this key fixes the result (S367 critic C3).
+    const memoKey = `${biased ? 1 : 0}#`
+      + visibleRings.map((r, d) => r.map(id => (d === 1 && backlinkSet.has(id) ? '<' : '') + id).join(',')).join(';')
+      + '#' + edges.map(e => `${e.fromId}>${e.toId}${e.mutual ? '=' : ''}`).join(',');
+    const memo = layoutMemo.get(memoKey);
+    if (memo && memo.length === nodes.length) {
+      memo.forEach(([x, y], i) => { nodes[i].x = x; nodes[i].y = y; });
+    } else {
+      runSim(nodes, edges, idToNode, biased);
+      simRuns++;
+      layoutMemo.delete(memoKey);
+      layoutMemo.set(memoKey, nodes.map(n => [n.x, n.y]));
+      if (layoutMemo.size > LAYOUT_MEMO_MAX) layoutMemo.delete(layoutMemo.keys().next().value!);
+    }
 
     // Compute per-node neighbor sets for hover-fade.
     const neighborSets = new Map<string, Set<string>>();
@@ -564,14 +615,19 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // Legend for the muted half of the ring (S354): one quiet line, only
     // when backlinks are on the canvas, so a first-time reader has the key
     // without a settings trip. Pointer-events off; it is not a control.
+    // The same line carries the ring-1 cap's left-out count (S367 critic C3).
     const backlinkCount = nodes.filter(n => n.isBacklink).length;
-    if (backlinkCount > 0) {
+    if (backlinkCount > 0 || ring1Omitted > 0) {
       const legend = document.createElement('div');
       legend.className = 'atlas-context-graph-legend';
-      legend.setAttribute('aria-hidden', 'true');
-      legend.innerHTML =
-        `<span class="atlas-context-graph-legend-swatch"></span>` +
-        `<span>${backlinkCount} link${backlinkCount === 1 ? 's' : ''} here</span>`;
+      if (ring1Omitted === 0) legend.setAttribute('aria-hidden', 'true');
+      legend.innerHTML = (backlinkCount > 0
+        ? `<span class="atlas-context-graph-legend-swatch"></span>` +
+          `<span>${backlinkCount} link${backlinkCount === 1 ? 's' : ''} here</span>`
+        : '')
+        + (ring1Omitted > 0
+          ? `<span class="atlas-context-graph-legend-more">+${ring1Omitted} more not shown</span>`
+          : '');
       host.appendChild(legend);
     }
 

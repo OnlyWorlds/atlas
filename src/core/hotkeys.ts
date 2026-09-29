@@ -30,6 +30,8 @@
  * its content from the same table. Adding a binding is one edit, not three.
  */
 
+import { isZoneGestureActive } from './zone-gesture';
+
 export interface HotkeyBinding {
   /** Stable identifier for tests + the reference modal. */
   id: string;
@@ -58,16 +60,23 @@ export function isMac(): boolean {
   return /Mac|iPhone|iPad|iPod/.test(ua);
 }
 
-/** OS-appropriate display for a binding combo (Cmd+E on Mac, Ctrl+E otherwise). */
-export function formatCombo(b: HotkeyBinding): string {
+/**
+ * A binding's combo as separate parts (modifiers then key), OS-appropriate.
+ * The shortcuts overlay renders one chip per part (S367 critic C12c).
+ */
+export function comboParts(b: HotkeyBinding): string[] {
   const mod = isMac() ? '⌘' : 'Ctrl';
   const parts: string[] = [];
   if (b.modifier === 'mod' || b.modifier === 'mod+shift') parts.push(mod);
   if (b.modifier === 'shift' || b.modifier === 'mod+shift') parts.push('Shift');
   // Display the printable key in uppercase, multi-char keys (Escape, F, etc) as-is.
-  const k = b.key.length === 1 ? b.key.toUpperCase() : b.key;
-  parts.push(k);
-  return parts.join(isMac() ? '' : '+');
+  parts.push(b.key.length === 1 ? b.key.toUpperCase() : b.key);
+  return parts;
+}
+
+/** OS-appropriate display for a binding combo (Cmd+E on Mac, Ctrl+E otherwise). */
+export function formatCombo(b: HotkeyBinding): string {
+  return comboParts(b).join(isMac() ? '' : '+');
 }
 
 /**
@@ -75,8 +84,16 @@ export function formatCombo(b: HotkeyBinding): string {
  * Exported for unit tests; the dispatcher uses it internally.
  */
 export function matchesBinding(e: KeyboardEvent, b: HotkeyBinding): boolean {
-  if (e.key.toLowerCase() !== b.key.toLowerCase()) return false;
   const mod = b.modifier ?? 'none';
+  if (e.key.toLowerCase() !== b.key.toLowerCase()) {
+    // S367 critic C12b: on a non-Latin layout (Cyrillic, Greek) Ctrl+S reports
+    // key 'ы'. For modified single-letter/digit bindings fall back to the
+    // physical key (e.code). Unmodified bindings keep following the typed char.
+    const usesMod = mod === 'mod' || mod === 'mod+shift';
+    if (!usesMod || !/^[a-z0-9]$/i.test(b.key) || /^[A-Za-z]$/.test(e.key)) return false;
+    const want = /^[a-z]$/i.test(b.key) ? `Key${b.key.toUpperCase()}` : `Digit${b.key}`;
+    if (e.code !== want) return false;
+  }
   const isModDown = isMac() ? e.metaKey : e.ctrlKey;
   // Disallow the "other" platform's modifier if we required one.
   // (e.g. don't fire mod+E on Mac when Ctrl is held instead of Cmd — that
@@ -275,6 +292,12 @@ export function defaultBindings(): HotkeyBinding[] {
         // deselect-to-home) — same "each mode owns its Esc" rule as overlays.
         // The watcher stamps body.atlas-placing when ui.pinPlacement is set.
         if (typeof document !== 'undefined' && document.body.classList.contains('atlas-placing')) return false;
+        // Zone draw and zone reshape own Esc too (cancel the draft, revert the
+        // shape). Their keydown listeners sit on document beside this one, so
+        // stopPropagation cannot stand this down; read their DOM markers
+        // instead (the draft overlay, the edit-mode container class). Kept as
+        // DOM reads so core stays free of the Leaflet modules (S367 critic C9).
+        if (isZoneGestureActive()) return false;
         const hash = typeof window !== 'undefined' ? window.location.hash : '';
         // The Data room joined the list (S309): Esc navigating home there
         // destroyed an unsaved pasted import payload — no draft, no confirm.

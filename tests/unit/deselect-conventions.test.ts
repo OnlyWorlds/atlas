@@ -24,7 +24,13 @@ describe('Convention #32 — Esc deselect-to-home', () => {
   // The binding reads the URL (writing/knowledge/share/import own their Esc),
   // and jsdom's window outlives a test FILE here (vitest singleFork): start
   // from a neutral route instead of whatever the previous file left.
-  beforeEach(() => { window.location.hash = '#/w/test-world/element/el-1'; });
+  beforeEach(() => {
+    window.location.hash = '#/w/test-world/element/el-1';
+    // Same for the document: a modal, a zone marker or atlas-placing left by
+    // another file stands the binding down (S367).
+    document.body.innerHTML = '';
+    document.body.className = '';
+  });
   afterEach(() => {
     uninstallHotkeys();
     setHotkeyCallbacks({});

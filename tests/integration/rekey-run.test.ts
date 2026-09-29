@@ -62,9 +62,12 @@ describe('giveForeignElementsNewIds', () => {
   it('refuses the tour world, and a world whose zone edit is open, touching nothing', async () => {
     await expect(giveForeignElementsNewIds({ store, entry: { ...entry, demo: true } }))
       .rejects.toBeInstanceOf(RekeyRefusedError);
-    const cur = getState();
-    setState({ ...cur, ui: { ...cur.ui, zoneEditing: { zoneId: 'z', mapId: M } } });
+    // A zone reshape marks the page (S367: the ui.zoneEditing slice was never set).
+    const edit = document.createElement('div');
+    edit.className = 'atlas-zone-editing';
+    document.body.appendChild(edit);
     await expect(giveForeignElementsNewIds({ store, entry })).rejects.toThrow(/zone/);
+    edit.remove();
     expect(await store.getElement(O)).not.toBeNull();
   });
 

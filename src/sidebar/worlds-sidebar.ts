@@ -25,7 +25,7 @@ import {
   writingHash,
 } from '../core/router';
 import { getState, patchSlice, subscribe } from '../core/state';
-import { deleteWorldEntry, saveRegistry, setActiveWorld, setFavorite, setWorldPaused } from '../registry/registry';
+import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused } from '../registry/registry';
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
 import { deleteHandle, ensureWritable, loadHandle, queryWritable } from '../store/handle-vault';
 import { CreateWorldModal } from '../ui/create-world-modal';
@@ -300,15 +300,19 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       const next = setWorldPaused(reg, worldId, !entry.sync_paused);
       saveRegistry(next);
       patchSlice('registry', next);
-      // If this is the active world's engine, toggle its pause state immediately.
+      // Active world's engine follows the EFFECTIVE pause, so resuming here
+      // does not override Pause all (S367 critic C7).
+      const stillPaused = effectiveSyncPaused(next.worlds.find(w => w.id === worldId), next);
       if (worldId === getCurrentSyncWorldId()) {
         const engine = getCurrentSyncEngine();
         if (engine) {
-          if (!entry.sync_paused) engine.pause('manual');
+          if (stillPaused) engine.pause('manual');
           else engine.resume();
         }
       }
-      toasts.info(!entry.sync_paused ? 'Stayed offline' : 'Sync resumed');
+      toasts.info(!entry.sync_paused
+        ? 'Stayed offline'
+        : stillPaused ? 'This world is back online, but Pause all is still on' : 'Sync resumed');
       return;
     }
     const refreshBtn = target.closest<HTMLElement>('[data-role="refresh-world"]');
@@ -806,9 +810,20 @@ async function doActivateWorld(
       // the journal cannot survive (S363 gate lens C F1).
       const done = isRekeyRunning() ? null : await recoverRekey(store, { rekeyPersistedState });
       if (done) {
+        // The live folder's marks follow too (S367 gate B13; rekeyLiveUi does
+        // it for live runs, but this path never reaches rekeyLiveUi).
+        const { remapDiskNoticeIds } = await import('../core/live-folder');
+        remapDiskNoticeIds(worldId, done.map);
         const next = rekeyRouteHash(window.location.hash, worldId, done.map);
         if (next) window.location.replace(next);
-        if (!silent && done.map.size > 0) toasts.info(`Finished giving ${done.map.size} ${done.map.size === 1 ? 'element a new id' : 'elements new ids'}.`);
+        // A finished Route 2 journal speaks even on the silent boot path: the
+        // link itself is still not done, and nothing else would say so (S367
+        // gate B6: a reload mid-link reopens the world silently).
+        if ((!silent || done.origin === 'merge') && done.map.size > 0) {
+          toasts.info(done.origin === 'merge'
+            ? `Finished matching ${done.map.size} ${done.map.size === 1 ? 'element' : 'elements'} to OnlyWorlds. Linking did not finish: run Make online again with the same key.`
+            : `Finished giving ${done.map.size} ${done.map.size === 1 ? 'element a new id' : 'elements new ids'}.`);
+        }
         // Files that would not open keep old ids; Settings offers "Update
         // links" once they are repaired (gate lens A F5).
         if (done.unrewritten.length > 0) {
@@ -818,7 +833,10 @@ async function doActivateWorld(
       }
     } catch (err) {
       console.warn('[worlds-sidebar] re-key recovery failed:', err);
-      toasts.error(`An id update in ${entry.name} could not finish, so it is not syncing. Settings, under This world, can finish or discard it.`);
+      const { rekeyJournalOrigin } = await import('../store/rekey');
+      toasts.error((await rekeyJournalOrigin(store)) === 'merge'
+        ? `Linking ${entry.name} to OnlyWorlds did not finish. Settings, under This world, can finish or undo it; then run Make online again with the same key.`
+        : `An id update in ${entry.name} could not finish, so it is not syncing. Settings, under This world, can finish or discard it.`);
     }
   }
   setActiveStore(store);

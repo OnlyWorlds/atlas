@@ -70,6 +70,8 @@ interface Draft {
 export class CalendarBuilderModal extends BaseModal {
   private draft: Draft;
   private grain: string;
+  /** The config as stored, on edit (S367 critic K2): save patches it, never rebuilds it. */
+  private stored: CalendarConfig | null = null;
 
   constructor(private toasts: ToastManager, private opts: CalendarBuilderOpts) {
     super();
@@ -92,6 +94,7 @@ export class CalendarBuilderModal extends BaseModal {
     // load an EMPTY draft for a string-config calendar and save would blank it.
     const cfg = readCalendarValue((el as Record<string, unknown>)['atlas_calendar']);
     if (!cfg) return { ...empty, name: el.name };
+    this.stored = structuredClone(cfg);
     return {
       name: el.name,
       stepName: cfg.step_name ?? cfg.grain,
@@ -118,12 +121,22 @@ export class CalendarBuilderModal extends BaseModal {
     };
   }
 
-  /** The draft as a CalendarConfig (or the reason it isn't one yet). */
+  /**
+   * The draft as a CalendarConfig (or the reason it isn't one yet). On edit it
+   * starts from the STORED config and patches only the fields the form owns
+   * (S367 critic K2): sections the form does not render, a coarse
+   * `bundles.year`, unknown keys and the grain all survive a save.
+   */
   private buildConfig(): { config: CalendarConfig; errors: string[] } {
     const d = this.draft;
     const num = (s: string): number => Number(s.trim());
-    const config: CalendarConfig = { version: 1, grain: this.grain };
-    if (d.stepName.trim() && d.stepName.trim() !== this.grain) config.step_name = d.stepName.trim();
+    const config: CalendarConfig = this.stored ? structuredClone(this.stored) : { version: 1, grain: this.grain };
+    const grain = config.grain;
+    const stepName = d.stepName.trim();
+    const storedStepWord = this.stored ? (this.stored.step_name ?? this.stored.grain) : null;
+    if (stepName === storedStepWord) { /* untouched: keep as stored */ }
+    else if (stepName && stepName !== grain) config.step_name = stepName;
+    else delete config.step_name;
 
     const eras: CalendarEra[] = [];
     for (const e of d.eras) {
@@ -138,24 +151,30 @@ export class CalendarBuilderModal extends BaseModal {
       eras.push(era);
     }
     if (eras.length > 0) config.eras = eras;
+    else delete config.eras;
 
+    // Months, week and festival days are the form's only when it renders them;
+    // on a year-grain world they are hidden and the stored ones stay.
     if (!this.yearGrain()) {
+      const bundles: NonNullable<CalendarConfig['bundles']> = { ...config.bundles };
       const months = d.months.filter(m => m.name.trim() || m.length.trim());
       if (months.length > 0) {
-        config.bundles = {
-          months: {
-            names: months.map(m => m.name.trim()),
-            lengths: months.map(m => num(m.length)),
-          },
+        bundles.months = {
+          names: months.map(m => m.name.trim()),
+          lengths: months.map(m => num(m.length)),
         };
+        delete bundles.year; // months define the year length (the form says so)
+      } else {
+        delete bundles.months;
       }
       if (d.weekLength.trim()) {
         const names = d.weekNames.split(',').map(s => s.trim()).filter(Boolean);
-        config.bundles = {
-          ...config.bundles,
-          week: { length: num(d.weekLength), names, mode: d.weekMode },
-        };
+        bundles.week = { length: num(d.weekLength), names, mode: d.weekMode };
+      } else {
+        delete bundles.week;
       }
+      if (Object.keys(bundles).length > 0) config.bundles = bundles;
+      else delete config.bundles;
       const inter = d.intercalary.filter(ic => ic.name.trim());
       if (inter.length > 0) {
         config.intercalary = inter.map(ic => {
@@ -164,11 +183,17 @@ export class CalendarBuilderModal extends BaseModal {
           if (!ic.inWeek) entry.in_week = false;
           return entry;
         });
+      } else {
+        delete config.intercalary;
       }
     }
 
     if (d.format.trim()) config.format = d.format.trim();
-    if (d.formatIntercalary.trim()) config.format_intercalary = d.formatIntercalary.trim();
+    else delete config.format;
+    if (!this.yearGrain()) {
+      if (d.formatIntercalary.trim()) config.format_intercalary = d.formatIntercalary.trim();
+      else delete config.format_intercalary;
+    }
 
     const errors = validateCalendarConfig(config);
     if (!this.draft.name.trim()) errors.unshift('the calendar needs a name');
@@ -177,6 +202,30 @@ export class CalendarBuilderModal extends BaseModal {
 
   private yearGrain(): boolean {
     return this.grain.trim().toLowerCase() === 'year';
+  }
+
+  /** The step word the calendar was made with (stored grain on edit, world grain on create). */
+  private calendarGrain(): string {
+    return this.stored?.grain ?? this.grain;
+  }
+
+  /**
+   * Plain notes on what the form keeps but does not show (S367 critic K2): a
+   * grain that no longer matches the world clock, and a coarse year length.
+   */
+  private keptNotes(): string {
+    const s = this.stored;
+    if (!s) return '';
+    const notes: string[] = [];
+    if (s.grain.trim().toLowerCase() !== this.grain.trim().toLowerCase()) {
+      const hidden = this.yearGrain() && (s.bundles?.months || s.bundles?.week || (s.intercalary?.length ?? 0) > 0);
+      notes.push(`<p class="atlas-calbuilder-hint" data-role="grain-note">This calendar was made when one step was a ${escapeText(s.grain)}; the world clock now counts in ${escapeText(this.grain)}s. It keeps its original step.${hidden ? ' Its months, week and festival days are kept as they are but are not shown here.' : ''}</p>`);
+    }
+    const yearSteps = s.bundles?.year?.steps;
+    if (yearSteps != null && !s.bundles?.months) {
+      notes.push(`<p class="atlas-calbuilder-hint" data-role="year-note">A year here is ${escapeText(String(yearSteps))} ${escapeText(s.grain)}s long. That is kept as it is.${this.yearGrain() ? '' : ' Adding months replaces it, since the months then set the year.'}</p>`);
+    }
+    return notes.join('');
   }
 
   open(): void {
@@ -193,9 +242,10 @@ export class CalendarBuilderModal extends BaseModal {
           <input id="cb-name" data-field="name" type="text" class="atlas-modal-input"
                  placeholder="The Imperial Reckoning" value="${escapeText(this.draft.name)}" />
 
-          <label class="atlas-modal-label" for="cb-step">What one ${escapeText(this.grain)} is called here <span class="atlas-calbuilder-opt">optional</span></label>
+          <label class="atlas-modal-label" for="cb-step">What one ${escapeText(this.calendarGrain())} is called here <span class="atlas-calbuilder-opt">optional</span></label>
           <input id="cb-step" data-field="stepName" type="text" class="atlas-modal-input"
-                 placeholder="${escapeText(this.grain)}" value="${escapeText(this.draft.stepName)}" />
+                 placeholder="${escapeText(this.calendarGrain())}" value="${escapeText(this.draft.stepName)}" />
+          ${this.keptNotes()}
 
           <div class="atlas-calbuilder-section" data-section="eras">
             <div class="atlas-calbuilder-section-head">Eras <span class="atlas-calbuilder-opt">named stretches with their own counting</span></div>

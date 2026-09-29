@@ -469,3 +469,67 @@ describe('defensive read (wild configs fall back, never a broken axis)', () => {
     }
   });
 });
+
+// S367 critic K1: a hand-edited or foreign config with a bad step size used to
+// pass the reader and hang absoluteYear (tab freeze).
+describe('malformed step sizes (S367 critic K1)', () => {
+  const base = { version: 1, grain: 'day' };
+  it('the reader rejects non-positive, fractional or non-finite divisors and step sizes', () => {
+    const bad: unknown[] = [
+      { ...base, bundles: { months: { names: ['Frost', 'Thaw'], lengths: [-30, 10] } } },
+      { ...base, bundles: { months: { names: ['Frost'], lengths: [0] } } },
+      { ...base, bundles: { months: { names: ['Frost'], lengths: [2.5] } } },
+      { ...base, bundles: { months: { names: ['Frost'], lengths: ['30'] } } },
+      { ...base, bundles: { year: { steps: -5 } } },
+      { ...base, bundles: { year: { steps: 0 } } },
+      { ...base, bundles: { year: { steps: Infinity } } },
+      { ...base, bundles: { year: {} } },
+      { ...base, bundles: { week: { length: 0, names: [] } } },
+      { ...base, bundles: { week: { length: 3, names: 'abc' } } },
+      { ...base, bundles: { months: { names: ['a'], lengths: [30] } }, intercalary: [{ name: 'Leap', after_month: 1, every_years: 0 }] },
+      { ...base, bundles: { months: { names: ['a'], lengths: [30] } }, intercalary: [{ name: 'Leap', after_month: 1, every_years: -4 }] },
+    ];
+    for (const cfg of bad) expect(readCalendarConfig(cfg), JSON.stringify(cfg)).toBe(null);
+  });
+
+  /** A config whose `bundles` read throws after `limit` reads: a hang turns into a failure. */
+  function tripwire(bundles: CalendarConfig['bundles'], limit = 1_000_000): CalendarConfig {
+    let reads = 0;
+    return {
+      version: 1, grain: 'day',
+      get bundles() {
+        reads += 1;
+        if (reads > limit) throw new Error('runaway loop: absoluteYear never exits');
+        return bundles;
+      },
+    } as CalendarConfig;
+  }
+
+  it('absoluteYear and formatStep terminate on a config that slips the reader', () => {
+    const negMonth = tripwire({ months: { names: ['Frost', 'Thaw'], lengths: [-30, 10] } });
+    expect(Number.isFinite(absoluteYear(negMonth, 100))).toBe(true);
+    expect(typeof formatStep(tripwire({ months: { names: ['Frost', 'Thaw'], lengths: [-30, 10] } }), 100)).toBe('string');
+    const negYear = tripwire({ year: { steps: -5 } });
+    expect(Number.isFinite(absoluteYear(negYear, 100))).toBe(true);
+    expect(typeof formatStep(tripwire({ year: { steps: -5 } }), 100)).toBe('string');
+  });
+
+  it('the bound never bites a valid calendar far from zero (leap-aware seed)', () => {
+    for (const step of [0, 1, -1, 1e9, -1e9, 1e12, -1e12]) {
+      const y = absoluteYear(HARPTOS, step);
+      expect(yearStartStep(HARPTOS, y)).toBeLessThanOrEqual(step);
+      expect(yearStartStep(HARPTOS, y + 1)).toBeGreaterThan(step);
+    }
+    // One step per month, a festival every year: the old seed was off by half the step count.
+    const dense: CalendarConfig = {
+      version: 1, grain: 'day',
+      bundles: { months: { names: ['a'], lengths: [1] } },
+      intercalary: [{ name: 'F', after_month: 1, every_years: 1 }, { name: 'G', after_month: 0, every_years: 3 }],
+    };
+    for (const step of [0, 7, -7, 5_000_000, -5_000_000]) {
+      const y = absoluteYear(dense, step);
+      expect(yearStartStep(dense, y)).toBeLessThanOrEqual(step);
+      expect(yearStartStep(dense, y + 1)).toBeGreaterThan(step);
+    }
+  });
+});

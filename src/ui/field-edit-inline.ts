@@ -18,6 +18,8 @@
  * (which they already do via state patches).
  */
 
+import { toastManager } from './toast-manager';
+
 export interface FieldEditInlineOptions {
   /** The .atlas-field-value cell. Replaced in place. */
   anchor: HTMLElement;
@@ -91,18 +93,20 @@ export function openFieldEditInline(opts: FieldEditInlineOptions): void {
     editor.removeEventListener('blur', onBlur);
     let nextValue: unknown = editor.value;
     if (widget === 'number') {
-      // Empty → null (not undefined; see convention #21). Otherwise coerce.
-      if (nextValue === '') {
-        nextValue = null;
-      } else {
-        const n = Number(nextValue);
-        if (Number.isNaN(n)) {
-          // Bad input — restore and let user try again. No persistent edit.
-          restoreAnchor();
-          return;
-        }
-        nextValue = n;
+      // Bad text FIRST: type=number reports '' for text it cannot parse, which
+      // would read as a clear and write null; "1e999" parses to Infinity,
+      // which JSON writes as null. Restore the old value, write nothing
+      // (S367 critic C2).
+      const bad = editor instanceof HTMLInputElement && editor.validity.badInput;
+      const n = Number(nextValue);
+      if (bad || (nextValue !== '' && !Number.isFinite(n))) {
+        restoreAnchor();
+        toastManager.info('That is not a number. The old value is kept.');
+        onCancel?.();
+        return;
       }
+      // Empty → null (not undefined; see convention #21). Otherwise coerce.
+      nextValue = nextValue === '' ? null : n;
     }
     // Disable editor visually while saving so the user can't double-trigger.
     editor.setAttribute('disabled', 'true');

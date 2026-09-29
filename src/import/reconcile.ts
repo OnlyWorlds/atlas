@@ -19,11 +19,13 @@
  * Incoming-id remap: when an incoming record's uuid is discarded (it matched an
  * existing element by name, or collided with an unrelated existing id and got a
  * fresh one), uuid references to that discarded id from OTHER records are
- * rewritten to the final id — otherwise they'd dangle silently. This is the
- * pure-local analogue of sync's rewriteIdReferences.
+ * rewritten to the final id — otherwise they'd dangle silently. Relation fields
+ * go through resolveRelations; ow:// prose, sidecar and page blocks through
+ * remapProse (the re-key kernel's rekeyBody, S367 critic C8).
  */
 
 import { relationFieldsFor } from '../editor/field-schema';
+import { rekeyBody } from '../store/rekey-body';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type WorldMeta } from '../core/types';
 import { isUuid, keyNT, normName, normalizeRecord } from './normalize';
 import type { ImportPlan, ImportReport, ParseResult, RawRecord, ReconcileOptions } from './types';
@@ -159,7 +161,11 @@ export function reconcile(
       continue;
     }
 
-    const resolved = resolveRelations(inc, idByNameType, incomingIdRemap, typeById, report);
+    const resolved = remapProse(
+      inc.type,
+      resolveRelations(inc, idByNameType, incomingIdRemap, typeById, report),
+      incomingIdRemap,
+    );
 
     if (inc.action === 'insert') {
       plan.creates.push({ type: inc.type, data: { ...resolved, id: inc.finalId } });
@@ -252,6 +258,27 @@ function resolveRelations(
     else delete out.element_type;
   }
 
+  return out;
+}
+
+/**
+ * Apply the incoming-id remap to everything EXCEPT relation fields (already
+ * resolved above; a second pass could chain X to Y to W): ow:// links in
+ * prose, the TipTap sidecar, page blocks. The re-key kernel's transform, so
+ * import and re-key agree on what a reference is (S367 critic C8).
+ */
+function remapProse(type: ElementType, resolved: RawRecord, map: Map<string, string>): RawRecord {
+  if (map.size === 0) return resolved;
+  const rel = new Set<string>();
+  for (const r of relationFieldsFor(type)) { rel.add(r.schemaField); rel.add(r.diskField); }
+  const body: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(resolved)) if (!rel.has(k)) body[k] = v;
+  body.type = type;
+  const { body: next, changed } = rekeyBody(body as unknown as Element, map);
+  if (!changed) return resolved;
+  const out: RawRecord = { ...resolved };
+  const nextRec = next as unknown as Record<string, unknown>;
+  for (const k of Object.keys(body)) if (k !== 'type') out[k] = nextRec[k];
   return out;
 }
 

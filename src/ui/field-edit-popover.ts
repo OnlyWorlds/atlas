@@ -135,6 +135,16 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
     panel.appendChild(live);
   }
 
+  // Bad-number line: shown instead of saving when the typed text is not a
+  // number, so the old value stays put (S367 critic C2).
+  const errorLine = document.createElement('div');
+  // Its own class: `.atlas-edit-popover-live` is the resolution hint that
+  // callers (and specs) read.
+  errorLine.className = 'atlas-edit-popover-error';
+  errorLine.dataset.active = 'false';
+  panel.appendChild(errorLine);
+  input.addEventListener('input', () => { errorLine.dataset.active = 'false'; });
+
   // Footer (hint + actions)
   const footer = document.createElement('div');
   footer.className = 'atlas-edit-popover-footer';
@@ -189,15 +199,23 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
   async function save(): Promise<void> {
     let nextValue: any = input.value;
     if (opts.widget === 'number') {
+      // Bad text FIRST: a type=number input reports '' for text it cannot
+      // parse ("12,5", "1e"), which would read as a deliberate clear and
+      // write null (deleting a custom field). Too-big numbers ("1e999")
+      // parse to Infinity, which JSON writes as null. Keep the popover open
+      // and write nothing (S367 critic C2).
+      const bad = input instanceof HTMLInputElement && input.validity.badInput;
+      const n = Number(nextValue);
+      if (bad || (nextValue !== '' && !Number.isFinite(n))) {
+        errorLine.textContent = 'That is not a number. Fix it, or press Esc to keep the old value.';
+        errorLine.dataset.active = 'true';
+        input.focus();
+        return;
+      }
       // Empty number → `null` (not undefined). undefined gets dropped through
       // JSON.stringify → server keeps the old value. null survives the wire
       // and the server clears the field. See sync-engine.fieldClear.test.ts.
-      if (nextValue === '') nextValue = null;
-      else {
-        const n = Number(nextValue);
-        if (Number.isNaN(n)) return;
-        nextValue = n;
-      }
+      nextValue = nextValue === '' ? null : n;
     } else {
       // Empty text-short / text-long → keep as empty string. Server applies
       // the empty string as the field's new value. (Don't convert to

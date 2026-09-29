@@ -301,7 +301,7 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     expect(frodo?.species_ids).toEqual(['srv-hobbit', 'other-id-untouched']);
   });
 
-  it('new local CREATE that references a matched-swap element sends server id, not local id', async () => {
+  it('new local CREATE that references a name-matched element sends server id, not local id', async () => {
     // Captain's scenario: matched char has different ids local vs server.
     // Two new local chars reference the matched one via FK (friends field).
     // After merge, server should have those new chars with friends pointing
@@ -474,7 +474,7 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     // both end up on server as separate elements with different ids.
     const result = await mergeLocalIntoApi(folder, adapter, 'b', { matchByName: false });
 
-    expect(result.updates).toBe(0);  // no matched-swap or matched-same-id
+    expect(result.updates).toBe(0);  // no name match or same-id match
     expect(result.creates).toBe(2);  // local Alice + Bob both pushed as new
     expect(result.downloaded).toBe(1);  // srv-alice has no local match → pulled
 
@@ -498,112 +498,16 @@ describe('mergeLocalIntoApi (Route 2)', () => {
     const result = await mergeLocalIntoApi(folder, adapter, 'b');
 
     expect(result.creates).toBe(2);      // LocalCarol, LocalForest
-    expect(result.updates).toBe(1);      // matched-swap ServerAlice
+    expect(result.updates).toBe(1);      // name-matched ServerAlice
     expect(result.skipped).toBe(0);
     expect(result.downloaded).toBe(1);   // ServerShire (no local match)
     expect(result.failures).toEqual([]);
   });
 });
 
-// ---------------------------------------------------------------------------
-// MergeOpts.onIdSwap (UI propagation) — symmetric to SyncEngine.onIdSwap.
-//
-// Both routes through Make-Online must propagate id-swaps to the UI so the
-// user doesn't see "element <old-id> not found in this world" after the modal
-// closes. Route 1 plugs `applyIdSwapToUi` into the transient engine's
-// onIdSwap option; Route 2 plugs it into MergeOpts.onIdSwap. These tests pin
-// the contract at the merge layer.
-// ---------------------------------------------------------------------------
-
-describe('mergeLocalIntoApi onIdSwap callback', () => {
-  it('fires for a match-phase swap (local has Alice, server has Alice at different id)', async () => {
-    const adapter = makeAdapter();
-    await adapter.createElement('character', { id: 'srv-alice', name: 'Alice' });
-    const localAlice = await folder.createElement('character', { name: 'Alice' });
-
-    const swaps: Array<{ old_id: string; new_id: string; type: string }> = [];
-    const result = await mergeLocalIntoApi(folder, adapter, 'b', {
-      onIdSwap: (s) => swaps.push(s),
-    });
-
-    expect(result.updates).toBe(1);
-    expect(swaps).toHaveLength(1);
-    expect(swaps[0]).toEqual({
-      old_id: localAlice.id,
-      new_id: 'srv-alice',
-      type: 'character',
-    });
-  });
-
-  it('does NOT fire for a local-only CREATE under v2 (client ids preserved)', async () => {
-    // v2 preserves the client id on CREATE (no v7 reassignment), so a
-    // local-only create produces no id-swap and onIdSwap must stay silent —
-    // the inverse guard: if id reassignment were reintroduced, a spurious swap
-    // would fire here.
-    const adapter = makeAdapter();
-    await folder.createElement('character', { name: 'Bob' });
-
-    const swaps: Array<{ old_id: string; new_id: string; type: string }> = [];
-    const result = await mergeLocalIntoApi(folder, adapter, 'b', {
-      onIdSwap: (s) => swaps.push(s),
-    });
-
-    expect(result.creates).toBe(1);
-    expect(swaps).toHaveLength(0);
-  });
-
-  it('fires only for the match-swap when a merge mixes a match-swap and a local-only CREATE', async () => {
-    // Alice matches an existing server element by name (different id) → one
-    // match-phase swap. Dave is a local-only create → no swap under v2. Exactly
-    // one swap fires, for Alice.
-    const adapter = makeAdapter();
-    await adapter.createElement('character', { name: 'Alice' });
-
-    const localAlice = await folder.createElement('character', { name: 'Alice' });
-    await folder.createElement('character', { name: 'Dave' });
-
-    const swaps: Array<{ old_id: string; new_id: string; type: string }> = [];
-    await mergeLocalIntoApi(folder, adapter, 'b', {
-      onIdSwap: (s) => swaps.push(s),
-    });
-
-    expect(swaps).toHaveLength(1);
-    expect(swaps[0].old_id).toBe(localAlice.id);
-    expect(swaps[0].type).toBe('character');
-  });
-
-  it('no-op when the merge has no swaps at all (same-id + downloads only)', async () => {
-    const adapter = makeAdapter();
-    await adapter.createElement('character', { id: 'a', name: 'Alpha' });
-    await adapter.createElement('location', { id: 'b', name: 'Beta' });
-    // Local has same-id Alpha; nothing else.
-    await folder.createElement('character', { id: 'a', name: 'Alpha' });
-
-    const swaps: Array<{ old_id: string; new_id: string; type: string }> = [];
-    const result = await mergeLocalIntoApi(folder, adapter, 'b', {
-      onIdSwap: (s) => swaps.push(s),
-    });
-
-    expect(swaps).toHaveLength(0);
-    expect(result.downloaded).toBe(1); // Beta downloaded
-    expect(result.updates).toBe(1);    // Alpha updated (same-id path)
-  });
-
-  it('does not require onIdSwap (callback is optional)', async () => {
-    // The merge must still work end-to-end without a callback. Asserting this
-    // explicitly prevents future contributors from making the callback
-    // required by accident.
-    const adapter = makeAdapter();
-    await adapter.createElement('character', { id: 'srv-alice', name: 'Alice' });
-    await folder.createElement('character', { name: 'Alice' });
-    await folder.createElement('character', { name: 'Bob' });
-
-    const result = await mergeLocalIntoApi(folder, adapter, 'b');
-    expect(result.creates).toBe(1);
-    expect(result.updates).toBe(1);
-    expect(result.failures).toEqual([]);
-  });
-});
+// (S367) The MergeOpts.onIdSwap tests retired with the callback: Route 2 now
+// moves ids with the re-key kernel BEFORE any server call and the app follows
+// once, after (`rekeyLiveUi`). Covered by tests/integration/make-online.kernel.test.ts.
 
 // ---------------------------------------------------------------------------
 // S361 (the id census): a name-matched swap wrote the SERVER's record at the

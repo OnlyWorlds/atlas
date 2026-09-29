@@ -640,6 +640,18 @@ export function setSyncPauseAll(reg: WorldsRegistry, paused: boolean): WorldsReg
   return { ...reg, sync_pause_all: paused };
 }
 
+/**
+ * The one answer to "should this world's engine be paused by the user?":
+ * Pause all OR the world's own Stay offline. Every pause/resume handler and
+ * attach read this, so neither switch can undo the other (S367 critic C7).
+ */
+export function effectiveSyncPaused(
+  entry: Pick<WorldRegistryEntry, 'sync_paused'> | null | undefined,
+  reg: Pick<WorldsRegistry, 'sync_pause_all'>,
+): boolean {
+  return !!reg.sync_pause_all || !!entry?.sync_paused;
+}
+
 /** Per-world "stay offline" toggle. */
 export function setWorldPaused(
   reg: WorldsRegistry,

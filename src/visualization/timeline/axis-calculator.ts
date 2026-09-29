@@ -13,8 +13,12 @@ const PADDING_RIGHT = 16;
 const TIME_RANGE_PADDING = 0.02;
 /** Half-width of the window drawn around a zero-span range (see below). */
 const ZERO_SPAN_HALF_WINDOW = 50;
-const TICK_TARGETS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000];
+/** Nice-interval mantissas: the ladder is 1, 2, 5 x 10^k, unbounded above
+ *  (S367 critic K4: it used to stop at 2000, so wide spans drew a tick wall). */
+const TICK_MANTISSAS = [1, 2, 5];
 const IDEAL_TICK_PX = 100;
+/** Hard cap on ticks computed per redraw (the axis redraws on every mousemove). */
+export const MAX_AXIS_TICKS = 200;
 
 export function calculateTimeRange(nodes: TimelineNode[]): TimeRange {
   if (nodes.length === 0) return { min: 0, max: 100 };
@@ -61,26 +65,47 @@ export function calculateTimeRange(nodes: TimelineNode[]): TimeRange {
 export function calculateTicks(range: TimeRange, canvasWidth: number): number[] {
   const span = range.max - range.min;
   const usableWidth = Math.max(1, canvasWidth - PADDING_LEFT - PADDING_RIGHT);
+  if (!(span > 0) || !Number.isFinite(span)) return [];
   const pxPerUnit = usableWidth / span;
 
-  let bestInterval = TICK_TARGETS[TICK_TARGETS.length - 1];
+  // Pick the ladder rung whose spacing lands nearest IDEAL_TICK_PX: search the
+  // decades either side of the ideal raw interval (never below 1).
+  const ideal = IDEAL_TICK_PX / pxPerUnit;
+  const decade = Math.max(0, Math.floor(Math.log10(Math.max(1, ideal))));
+  let bestInterval = 1;
   let bestDiff = Infinity;
-
-  for (const target of TICK_TARGETS) {
-    const tickPx = target * pxPerUnit;
-    const diff = Math.abs(tickPx - IDEAL_TICK_PX);
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      bestInterval = target;
+  for (let k = Math.max(0, decade - 1); k <= decade + 1; k++) {
+    for (const m of TICK_MANTISSAS) {
+      const interval = m * Math.pow(10, k);
+      const diff = Math.abs(interval * pxPerUnit - IDEAL_TICK_PX);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestInterval = interval;
+      }
     }
   }
+  // Hard cap: step up the ladder rather than truncate, so ticks always
+  // spread across the whole visible range.
+  while (span / bestInterval > MAX_AXIS_TICKS) bestInterval = nextNiceInterval(bestInterval);
 
   const firstTick = Math.ceil(range.min / bestInterval) * bestInterval;
   const ticks: number[] = [];
-  for (let t = firstTick; t <= range.max; t += bestInterval) {
+  for (let i = 0; i <= MAX_AXIS_TICKS; i++) {
+    const t = firstTick + i * bestInterval;
+    if (t > range.max) break;
     ticks.push(t);
   }
   return ticks;
+}
+
+/** The next rung up the 1, 2, 5 x 10^k ladder. */
+function nextNiceInterval(interval: number): number {
+  const k = Math.floor(Math.log10(interval));
+  const base = Math.pow(10, k);
+  const m = Math.round(interval / base);
+  if (m < 2) return 2 * base;
+  if (m < 5) return 5 * base;
+  return 10 * base;
 }
 
 export function createDateToX(range: TimeRange, canvasWidth: number): (date: number) => number {

@@ -15154,6 +15154,9 @@ body.atlas-share-fullpreview > * {
   color: rgba(var(--atlas-accent-rgb), 0.7);
   font-variant-numeric: tabular-nums;
 }
+/* The bad-number line (S367 critic C2): shown instead of saving. */
+.atlas-edit-popover-error { margin-top: 5px; font-size: 11px; color: var(--atlas-warn); }
+.atlas-edit-popover-error[data-active="false"] { display: none; }
 
 /* World clock modal layout fix (Captain's screenshot 2026-07-14: the question
    and its input were crammed on one line, placeholder truncated). Labels are

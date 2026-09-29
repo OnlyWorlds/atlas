@@ -54,8 +54,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // og.png is the social card: crawlers fetch it, the app never does,
         // and a visitor should not pay 100 KB of precache for an image their
-        // browser will never request (S323).
-        globIgnores: ['**/og.png'],
+        // browser will never request (S323). assets/404.html (public/) makes
+        // Cloudflare Pages answer a missing /assets/* file with a 404 instead
+        // of the app page, so a tab from before a deploy fails its lazy chunk
+        // honestly (conv. 121, Boss's probe S366); nothing in the app loads it.
+        globIgnores: ['**/og.png', 'assets/404.html'],
         // The Material Symbols outlined font is ~4 MB (covers thousands of
         // icons). Subsetting to atlas's ~40 used icons would drop it to
         // ~50 KB — deferred optimization. For now, bump the precache size

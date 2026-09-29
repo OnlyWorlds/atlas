@@ -90,6 +90,17 @@ describe('the tour exemption is per world, not per origin', () => {
     const out = await rescanNow({ force: true, full: true });
     expect({ skipped: out.skipped, desc: desc(id) }).toEqual({ skipped: 'busy', desc: undefined });
   });
+
+  it('no pass runs under a zone reshape (S367: its old ui.zoneEditing check was dead)', async () => {
+    const { root, id } = await localWorld();
+    const edit = document.createElement('div');
+    edit.className = 'atlas-zone-editing';
+    document.body.appendChild(edit);
+    editOutside(root, id, { description: 'agent' });
+    const out = await rescanNow({ force: true, full: true });
+    edit.remove();
+    expect({ skipped: out.skipped, desc: desc(id) }).toEqual({ skipped: 'busy', desc: undefined });
+  });
 });
 
 describe('control: the same return after 6 s shows the edit', () => {

@@ -198,9 +198,13 @@ export function buildNarrativeIndex(elements: Element[], worldId: string): Narra
 /** Walk up `parent_narrative` from `id`, returning ancestor ids closest-first. */
 export function ancestorIds(idx: NarrativeIndex, id: string): string[] {
   const out: string[] = [];
+  // A parent cycle in world data would loop (and grow `out`) forever; stop at
+  // the first repeat (S367 critic C1).
+  const seen = new Set<string>([id]);
   const cur = idx.byId.get(id);
   let parentId = cur ? (cur.el as Element & { parent_narrative?: string }).parent_narrative : undefined;
-  while (parentId) {
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId);
     out.push(parentId);
     const parent = idx.byId.get(parentId);
     if (!parent) break;
@@ -218,8 +222,10 @@ export function findAncestry(idx: NarrativeIndex, id: string): { bookId?: string
   const node = idx.byId.get(id);
   if (!node) return {};
   const chain: NarrativeNode[] = [node];
+  const seen = new Set<string>([id]); // cycle guard, S367 critic C1
   let parentId = (node.el as Element & { parent_narrative?: string }).parent_narrative;
-  while (parentId) {
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId);
     const parent = idx.byId.get(parentId);
     if (!parent) break;
     chain.unshift(parent);

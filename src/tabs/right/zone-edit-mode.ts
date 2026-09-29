@@ -22,7 +22,9 @@
  *
  * Improvements over zoner:
  *   - Leaflet native dblclick suppression (no 200ms clickTimeout dance)
- *   - Explicit `ui.zoneEditing` state slice (not implicit via activeMarkers/editingZoneId pair)
+ *   - Module-level edit state per world, marked on the page by the container's
+ *     `atlas-zone-editing` class (`core/zone-gesture.ts` reads it; the
+ *     `ui.zoneEditing` slice this line once promised was never wired, S367)
  *   - 3-way diff cancel (vs zoner's points-array overwrite) since atlas stores
  *     markers as separate entities with stable ids.
  */

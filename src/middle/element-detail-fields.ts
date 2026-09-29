@@ -209,6 +209,21 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
   }
 
   const raw = (el as Record<string, unknown>)[meta.name];
+  // A structured (object or array) value in a scalar field, written by
+  // another tool or a hand edit: show it read-only. Seeding an editor with
+  // String(raw) would overwrite it with "[object Object]" on the next save
+  // (S367 critic C11; custom fields got the same guard at S360 gate A13).
+  if (raw !== null && typeof raw === 'object') {
+    const pre = document.createElement('pre');
+    pre.className = 'atlas-custom-structured-value atlas-field-structured';
+    let text: string;
+    try { text = JSON.stringify(raw, null, 2); } catch { text = String(raw); }
+    pre.textContent = text;
+    pre.title = 'Structured data written by another tool. Atlas shows it read-only so it cannot be damaged here.';
+    label.classList.remove('atlas-field-label-clickable');
+    wrap.appendChild(pre);
+    return wrap;
+  }
   const valueText = formatValue(raw);
   const isEmpty = !valueText;
   const valueEl = document.createElement('div');
@@ -565,6 +580,10 @@ async function persistFieldPatch(el: Element, fieldName: string, nextValue: unkn
     toastManager.error('No active store');
     return;
   }
+  // Never persist Infinity or NaN: JSON writes both as null, which clears the
+  // field (and deletes a custom one). The editors refuse them first; this is
+  // the backstop (S367 critic C2).
+  if (typeof nextValue === 'number' && !Number.isFinite(nextValue)) return;
   // atlas_aliases edit comes in as a CSV string from the popover; parse to
   // string[] before persisting so the on-disk shape matches the type contract.
   let valueToPersist: unknown = nextValue;

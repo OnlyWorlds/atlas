@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { computeBeeswarm, clampWindow, zoomWindow, rangeVsNow, extendRangeForOpenEnds, temporalMetaLine, focusInferredEnd, glyphDropDate } from '../../src/visualization/timeline/timeline-view';
+import { computeBeeswarm, clampWindow, zoomWindow, navBounds, rangeVsNow, extendRangeForOpenEnds, temporalMetaLine, focusInferredEnd, glyphDropDate } from '../../src/visualization/timeline/timeline-view';
 import { effectiveEndDate } from '../../src/visualization/timeline/temporal-fields';
 import type { TimelineNode } from '../../src/visualization/timeline/types';
 
@@ -278,6 +278,39 @@ describe('zoomWindow — resize around the cursor date (S3)', () => {
     let win = { start: 0, end: 20000 };
     for (let i = 0; i < 80; i++) win = zoomWindow(win, 0.5, 7600, bigBounds);
     expect(win.end - win.start).toBeCloseTo(24, 4);
+  });
+});
+
+describe('navBounds: the camera can reach a now outside history (S367 critic K7)', () => {
+  const universe = [node('a', 0), node('b', 100)];
+
+  it('a now at 1000 with history 0..100 is reachable by pan and by zoom-out', () => {
+    const bounds = navBounds({ universe, baseRange: null, now: 1000 })!;
+    const panned = clampWindow({ start: 950, end: 1050 }, bounds);
+    expect(panned.start).toBeLessThanOrEqual(1000);
+    expect(panned.end).toBeGreaterThanOrEqual(1000);
+    let win = { start: 0, end: 100 };
+    for (let i = 0; i < 50; i++) win = zoomWindow(win, 1.2, win.end, bounds);
+    expect(win.end).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('a now before every event widens the low edge', () => {
+    const bounds = navBounds({ universe, baseRange: null, now: -500 })!;
+    expect(bounds.min).toBeLessThanOrEqual(-500);
+    expect(clampWindow({ start: -550, end: -450 }, bounds).start).toBeLessThanOrEqual(-500);
+  });
+
+  it('no now (or a now inside history) leaves the bounds on recorded history', () => {
+    const plain = navBounds({ universe, baseRange: null, now: null })!;
+    expect(navBounds({ universe, baseRange: null, now: 50 })).toEqual(plain);
+    expect(plain.min).toBeLessThan(0);
+    expect(plain.max).toBeGreaterThan(100);
+    expect(plain.max).toBeLessThan(110);
+  });
+
+  it('falls back to the scoped fit when there is no universe, still taking in the now', () => {
+    expect(navBounds({ universe: [], baseRange: { min: 0, max: 100 }, now: 400 })).toEqual({ min: 0, max: 400 });
+    expect(navBounds({ universe: [], baseRange: null, now: 400 })).toBeNull();
   });
 });
 

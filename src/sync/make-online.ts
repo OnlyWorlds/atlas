@@ -5,11 +5,11 @@
  * (outside the worldapi prefix; not exposed by the SDK), then push all
  * local elements to the new api world as CREATEs.
  *
- * Route 2 (link existing api world): validate creds, list all server
- * elements, build a per-element diff against the local folder, apply
- * the diff per the chosen merge policy:
+ * Route 2 (link existing api world): list all server elements, plan the
+ * match (`plan-merge.ts`), move name-matched locals onto the server's ids
+ * with the journaled re-key kernel, then apply the plan per policy:
  *   - (b) overwrite-on-match: matched → UPDATE server with local; unmatched → CREATE.
- *   - (c) push-only-new: matched → skip + stamp local baseline; unmatched → CREATE.
+ *   - (c) keep-server: matched → the server's record lands locally; unmatched → CREATE.
  *
  * Both routes leave the folder state coherent (every locally-present
  * element has a `server_updated_at` baseline set on success).
@@ -21,24 +21,9 @@ import { getState } from '../core/state';
 import { devWorldapiBase, devV2Base } from './dev-api-base';
 import type { FolderStore } from '../store/folder-store';
 import { ALL_ELEMENT_TYPES } from '../core/types';
-import { ATLAS_LOCAL_ONLY_FIELDS } from '../core/constants';
+import { planMerge, type ServerRec } from './plan-merge';
+import { startRekey, type RekeyHooks } from '../store/rekey';
 
-/**
- * The atlas-only fields of a local body (S361, the id census): a matched swap
- * writes the SERVER's record at the SERVER's id, where no local file exists
- * yet, so the store's usual preserve-from-existing never fires and the
- * writing's rich text, page blocks, the publish record, aliases and the map
- * image binding were silently dropped with the old file. `except` names
- * fields a policy deliberately gives up (policy c keeps the server's prose).
- */
-function localOnlyFieldsOf(el: Record<string, unknown>, except: ReadonlySet<string> = new Set()): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const f of ATLAS_LOCAL_ONLY_FIELDS) {
-    if (except.has(f)) continue;
-    if (el[f] !== undefined) out[f] = el[f];
-  }
-  return out;
-}
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
 
@@ -168,7 +153,7 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
 }
 
 // ---------------------------------------------------------------------------
-// Route 2: merge diff against existing api world
+// Route 2: merge a local world into an existing api world
 // ---------------------------------------------------------------------------
 
 export type MergePolicy = 'b' | 'c';
@@ -176,7 +161,8 @@ export type MergePolicy = 'b' | 'c';
 export interface MergeProgress {
   done: number;
   total: number;
-  phase: 'list' | 'apply';
+  /** 'ids' = local elements moving onto the server's ids (the re-key kernel). */
+  phase: 'list' | 'ids' | 'apply';
 }
 
 export interface MergeResult {
@@ -189,55 +175,77 @@ export interface MergeResult {
   /** Server-only elements downloaded to local. Same for both policies. */
   downloaded: number;
   failures: PerElementFailure[];
+  /** Names left unmatched because two or more on one side share them (per type). */
+  ambiguous: Array<{ type: ElementType; name: string }>;
+  /** Local id → server id, the elements that took the server's id. */
+  rekeyed: Map<string, string>;
+  /** Elements whose file could not be read, so their links still name old ids. */
+  unrewritten: string[];
+  /** Server records not downloaded because a local element of another type has the id. */
+  idClashes: Array<{ id: string; localType: ElementType; serverType: ElementType }>;
 }
 
-/**
- * Bidirectional merge between a local folder and an existing api world.
- *
- * Three buckets after matching by id-or-name+type:
- *   - **Local-only**: no server counterpart → CREATE on server.
- *   - **Server-only**: no local counterpart → DOWNLOAD to local
- *     (enforces local-representation invariant).
- *   - **Matched**: name+type or id match → apply policy:
- *     - Policy (b) — overwrite duplicates: local content wins, server[server_id]
- *       gets UPDATEd with local body. If local.id ≠ server.id, local file is
- *       re-saved at server.id (id swap) and references are rewritten across
- *       all other local elements.
- *     - Policy (c) — skip duplicates: server content wins. Local file at
- *       server.id (overwrites prior local content). Local edits to matched
- *       elements are LOST. Same id-swap discipline as (b) when ids differ.
- *
- * Per-element write errors are non-fatal and recorded in `failures`.
- */
 export interface MergeOpts {
   /**
-   * Whether to treat same-name elements as duplicates. Default true (existing
-   * behavior). When false, only exact id matches count as duplicates — name
-   * collisions are pushed as fresh elements. Useful for worlds with
-   * intentional name collisions ("John the merchant" + "John the bandit").
+   * Whether same-name elements are the same element. Default true. When
+   * false only exact id matches count, and name collisions upload as their
+   * own elements ("John the merchant" + "John the bandit").
    */
   matchByName?: boolean;
   onProgress?: (p: MergeProgress) => void;
+  /** The atlas world id, for the re-key journal. Default: world.json's id. */
+  worldId?: string;
+  /** Step 6p of the re-key: browser state that names element ids (the app passes `rekeyPersistedState`). */
+  rekeyPersistedState?: RekeyHooks['rekeyPersistedState'];
   /**
-   * Fires whenever a local id is replaced by a server id during the merge.
-   * Two vectors produce swaps:
-   *
-   *   1. **Match phase** — a local element matches an api element by name+type
-   *      but has a different id. The server's id wins; the local file is
-   *      re-saved at the server's id later in the apply phase.
-   *   2. **CREATE phase** — server enforces UUID v7 and returns a fresh id
-   *      different from the client v4 we sent.
-   *
-   * UI callers wire this to migrate `state.ui.selectedElementId` + URL hash so
-   * the user doesn't see "element <old-id> not found in this world" after the
-   * modal closes. The Route 1 transient engine plugs into the same UI
-   * propagation via its `onIdSwap` option — keeping Route 1 and Route 2
-   * symmetric for the user. Without this callback the merge still works
-   * server-side; only the post-merge UI state is left stale.
+   * Right after the local ids moved, before any server call: the app's
+   * screen follows the disk here (`rekeyLiveUi`), so a later failure never
+   * leaves the UI on ids the folder no longer has.
    */
-  onIdSwap?: (swap: { old_id: string; new_id: string; type: ElementType }) => void;
+  onRekeyed?: (map: ReadonlyMap<string, string>) => void | Promise<void>;
 }
 
+/** Route 2 will not start: nothing was read or written. The message is for the user. */
+export class MergeRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MergeRefusedError';
+  }
+}
+
+/**
+ * Bidirectional merge between a local folder and an existing api world
+ * (Route 2, rebuilt S367 onto the re-key kernel). Three buckets after
+ * `planMerge` (per type: ids first, then unique names):
+ *   - **Local-only**: CREATE on the server.
+ *   - **Server-only**: DOWNLOAD into the folder.
+ *   - **Matched**: policy (b) the local content goes up (PATCH, then the
+ *     server's full response lands locally); policy (c) the server's record
+ *     lands locally and the local content, rich text included, is given up.
+ *     Atlas's own bindings (map image, aliases, page blocks) survive both.
+ *
+ * The order is the design (`Forge/Notes/2026-09-29-s365-orient/lane-a-route2.md`
+ * §3 Option A). A name match means a local element O IS server element N, so
+ * FIRST the journaled kernel moves O onto N locally (every link, prose link,
+ * chip, page block and media file), and only THEN does anything talk to the
+ * server, with every decision keyed by an id that will not change again. The
+ * old order re-derived "O is N" from disk and could not read a half-done
+ * swap: a crash between writing N and removing O put a duplicate on the
+ * server on the rerun. Now O and N coexist only inside the journal's window,
+ * and nothing matches against a world while a journal exists.
+ *
+ * Crash points: before the kernel, nothing is written. Inside it, the journal
+ * stays and the SERVER IS UNTOUCHED; the caller retries it as recovery, else
+ * the next open finishes it, and a rerun matches by id. In the server phase,
+ * a rerun matches everything by id (a created-but-unstamped element is in the
+ * server list), so nothing duplicates.
+ *
+ * Per-element server errors, and per-element disk errors while stamping,
+ * are non-fatal and recorded in `failures`. A kernel error throws with
+ * nothing sent; a listing or planning error throws before anything is
+ * written. The caller reloads the element list on any exit after the kernel
+ * (`make-online-run.ts`).
+ */
 export async function mergeLocalIntoApi(
   folder: FolderStore,
   adapter: OwApiClient,
@@ -250,27 +258,15 @@ export async function mergeLocalIntoApi(
     : (optsOrProgress ?? {});
   const matchByName = opts.matchByName ?? true;
   const onProgress = opts.onProgress;
-  const onIdSwap = opts.onIdSwap;
-  /**
-   * Map of every (localId → serverId) replacement that happens during the
-   * merge. Drives both the file-level `rewriteIdReferences` passes (so other
-   * local elements' FKs follow the swap) and the in-memory
-   * `applyIdSwapsToBody` (so CREATE bodies dispatched mid-phase carry
-   * up-to-date refs). Declared early so `recordIdSwap` can close over it.
-   */
-  const idSwaps = new Map<string, string>(); // oldLocalId → serverId
-  /**
-   * Record a swap into the rewrite map AND notify the caller (UI) so
-   * selectedElementId + URL hash migrate atomically. Centralizing this keeps
-   * every swap site honest — adding a future swap path elsewhere just calls
-   * `recordIdSwap` and the UI propagation comes for free.
-   */
-  const recordIdSwap = (oldId: string, newId: string, type: ElementType): void => {
-    idSwaps.set(oldId, newId);
-    if (onIdSwap) onIdSwap({ old_id: oldId, new_id: newId, type });
-  };
+
+  // 0. An unfinished id update owns this world until it is finished or
+  // discarded: matching against a half-moved world is how duplicates were made.
+  if (await folder.hasRekeyJournal()) {
+    throw new MergeRefusedError('An id update in this world did not finish. In Settings, under This world, use Finish it or Undo it, then link again.');
+  }
+
   // 1. List all server elements (one fetch per type).
-  const serverByType = new Map<ElementType, Array<{ id: string; updated_at: string } & Record<string, unknown>>>();
+  const serverByType = new Map<ElementType, ServerRec[]>();
   let serverTotalForList = 0;
   for (const type of ALL_ELEMENT_TYPES) {
     onProgress?.({ done: 0, total: serverTotalForList, phase: 'list' });
@@ -279,254 +275,123 @@ export async function mergeLocalIntoApi(
     serverTotalForList += records.length;
   }
 
-  // 2. List all local elements (single call, then group by type).
-  const allLocal = await folder.listElements();
-  const localByType = new Map<ElementType, Element[]>();
-  for (const e of allLocal) {
-    if (!localByType.has(e.type)) localByType.set(e.type, []);
-    localByType.get(e.type)!.push(e);
+  // 2. Plan. Nothing is written yet.
+  const plan = planMerge(await folder.listElements(), serverByType, { matchByName });
+
+  // 3. Local ids onto the server's ids, journaled. A throw here leaves the
+  // journal (the server has not been touched) and propagates.
+  let rekeyed = new Map<string, string>();
+  let unrewritten: string[] = [];
+  if (plan.pairs.size > 0) {
+    const worldId = opts.worldId ?? (await folder.readWorldMeta()).id;
+    const r = await startRekey(
+      folder,
+      { worldId, pairs: plan.pairs, allowStaleBaseline: true, origin: 'merge' },
+      {
+        onProgress: (done, total) => onProgress?.({ done, total, phase: 'ids' }),
+        rekeyPersistedState: opts.rekeyPersistedState,
+      },
+    );
+    rekeyed = r.map;
+    unrewritten = r.unrewritten;
+    if (rekeyed.size > 0) await opts.onRekeyed?.(rekeyed);
   }
 
-  // 3. Match phase — decide what each element does without touching anything yet.
-  type LocalDecision =
-    | { kind: 'create'; local: Element; type: ElementType }
-    | { kind: 'matched-same-id'; local: Element; server: ServerRec; type: ElementType }
-    | { kind: 'matched-swap'; local: Element; server: ServerRec; type: ElementType };
-  type DownloadDecision = { kind: 'download'; server: ServerRec; type: ElementType };
-
-  const localDecisions: LocalDecision[] = [];
-  const downloadDecisions: DownloadDecision[] = [];
-
-  for (const type of ALL_ELEMENT_TYPES) {
-    const serverList = serverByType.get(type) ?? [];
-    const locals = localByType.get(type) ?? [];
-
-    const matchedServerIds = new Set<string>();
-
-    for (const local of locals) {
-      const byId = serverList.find(r => r.id === local.id);
-      if (byId) {
-        matchedServerIds.add(byId.id);
-        localDecisions.push({ kind: 'matched-same-id', local, server: byId, type });
-        continue;
-      }
-      const byName = (matchByName && local.name)
-        ? serverList.find(r =>
-            !matchedServerIds.has(r.id) &&
-            typeof r.name === 'string' &&
-            r.name.trim().toLowerCase() === local.name.trim().toLowerCase()
-          )
-        : undefined;
-      if (byName) {
-        matchedServerIds.add(byName.id);
-        localDecisions.push({ kind: 'matched-swap', local, server: byName, type });
-        // Notify caller now (UI propagation happens immediately); the actual
-        // file/rewrite happens in the apply phase below. handleIdSwap is
-        // idempotent in the rare case the swap is later re-recorded.
-        recordIdSwap(local.id, byName.id, type);
-        continue;
-      }
-      localDecisions.push({ kind: 'create', local, type });
-    }
-
-    // Server-only — anything not matched.
-    for (const server of serverList) {
-      if (!matchedServerIds.has(server.id)) {
-        downloadDecisions.push({ kind: 'download', server, type });
-      }
-    }
+  // 4. The server phase. Every decision is same-id now: a renamed local
+  // carries the server's id.
+  //
+  // A file the kernel could not rewrite still names old ids; its cached body
+  // must not go up (S367 gate A6). It stays local, named in `unrewritten`.
+  const unreadable = new Set(unrewritten);
+  // A planned create carrying a stale baseline (a folder copied out of an api
+  // world, an unlink without reset) would, if its create failed, read as
+  // synced or as deleted on the server forever (gate A2). It never reached
+  // THIS server, so it is never-synced before anything is sent.
+  for (const c of plan.creates) {
+    if (c.local.server_updated_at && !unreadable.has(c.local.id)) await folder.clearServerBaseline(c.local.id);
   }
-
-  // 4. Apply phase.
-  const total = localDecisions.length + downloadDecisions.length;
+  // Ids an earlier, unfinished run of this route created (gate A3): on a
+  // rerun they meet their own upload as a same-id match.
+  const ownUploads = new Set((await folder.readSyncState()).route2_created ?? []);
+  type Matched = { id: string; server: ServerRec; type: ElementType };
+  const matched: Matched[] = [
+    ...plan.sameId.map(m => ({ id: m.local.id, server: m.server, type: m.type })),
+    ...plan.renamed.map(m => ({ id: m.server.id, server: m.server, type: m.type })),
+  ];
+  const creates = plan.creates.filter(c => !unreadable.has(c.local.id));
+  const total = plan.downloads.length + creates.length + matched.length;
   let done = 0;
-  let creates = 0;
-  let updates = 0;
-  let skipped = 0;
-  let downloaded = 0;
+  const tick = () => { done++; onProgress?.({ done, total, phase: 'apply' }); };
+  const counts = { creates: 0, updates: 0, skipped: 0, downloaded: 0 };
   const failures: PerElementFailure[] = [];
+  for (const c of plan.creates) {
+    if (unreadable.has(c.local.id)) {
+      failures.push({ element_id: c.local.id, type: c.type, operation: 'create', message: 'its file could not be read, so it was not uploaded' });
+    }
+  }
 
-  // 4a. Downloads first — guarantees server-only elements are present before
-  // any id-swap rewrite walks them.
-  for (const d of downloadDecisions) {
+  // 4a. Downloads first: a create or update may link to them.
+  for (const d of plan.downloads) {
     try {
       const { updated_at, ...body } = d.server;
       await folder.applyServerRecord(d.type, body, updated_at);
-      downloaded++;
+      counts.downloaded++;
     } catch (err) {
-      failures.push({
-        element_id: d.server.id,
-        type: d.type,
-        operation: 'create',
-        message: err instanceof Error ? err.message : String(err),
-      });
+      failures.push({ element_id: d.server.id, type: d.type, operation: 'create', message: errText(err) });
     } finally {
-      done++;
-      onProgress?.({ done, total, phase: 'apply' });
+      tick();
     }
   }
 
-  // 4b. Matched elements FIRST — populates idSwaps for any name+type matches
-  //     so subsequent CREATEs can reference the server's id, not the stale
-  //     local one. Without this ordering, a new local Character with
-  //     `friends: [matchedCharLocalId]` would send the local id to the
-  //     server's CREATE — server stores stale FK, local later rewrites only
-  //     its OWN file, server stays wrong.
-  const matchedDecisions = localDecisions.filter(d => d.kind !== 'create');
-  const createDecisions = localDecisions.filter(d => d.kind === 'create');
+  // 4b. Creates before matched updates: a matched element may link to a new one.
+  // Bodies are read from disk now, after the kernel rewrote their links.
+  // Read from DISK inside the element's chain (S367 gate A1): an outside
+  // write no live pass adopted (the route holds the live folder off) must be
+  // what goes up, not the cached body it would silently revert.
+  const sendable = async (id: string): Promise<{ body: Record<string, unknown>; sent: string } | null> => {
+    const current = await folder.updateElementWith(id, () => null);
+    if (!current) return null;
+    const { local_updated_at, server_updated_at: _s, ...body } = current;
+    return { body, sent: local_updated_at };
+  };
 
-  async function processDecision(dec: LocalDecision): Promise<void> {
+  async function createOne(c: { local: Element; type: ElementType }): Promise<void> {
     try {
-      const { local, type } = dec;
-      // Always re-fetch local before sending to server. Picks up any in-loop
-      // rewrites from previous decisions (e.g. matched-swap registered a swap
-      // and rewriteIdReferences updated this element's FKs).
-      //
-      // BUT: re-fetching the FILE isn't enough for CREATE-references-CREATE
-      // chains in phase 4b-2. Between iterations of the CREATE loop, no
-      // file-level rewrite runs, so a Carol whose friends pointed at Bob's
-      // local id would still send Bob's stale id in her CREATE body even if
-      // Bob's CREATE in the prior iteration produced an idSwap. We therefore
-      // ALSO apply current idSwaps to the in-memory body before sending —
-      // belt-and-suspenders on top of the per-iteration re-fetch.
-      const current = await folder.getElement(local.id);
-      if (!current) {
-        // Silently removed by an in-loop swap targeting this id. Defensive.
-        done++;
-        onProgress?.({ done, total, phase: 'apply' });
-        return;
+      const s = await sendable(c.local.id);
+      if (!s) return;
+      const response = await adapter.createElement(c.type, s.body);
+      if (response.id !== c.local.id) {
+        // keel preserves client ids; a different id is a contract break, not
+        // something to paper over with a second id move here.
+        throw new Error(`the server gave it a different id (${response.id})`);
       }
-      if (dec.kind === 'create') {
-        const { local_updated_at: _l, server_updated_at: _s, ...rawBody } = current;
-        const body = applyIdSwapsToBody(rawBody, idSwaps);
-        const response = await adapter.createElement(type, body);
-        if (response.id !== local.id) {
-          // Server assigned its own id (UUID v7 enforcement). Re-key the local
-          // file to the server's id so refs and the next pull's seenLocalIds
-          // check line up — otherwise pull would flag the old local id as
-          // "vanished from server" and fire the server-delete review modal.
-          console.info('[atlas:sync] merge: server assigned new id on create', {
-            type, localId: local.id, serverId: response.id,
-          });
-          const swapped = { ...body, id: response.id };
-          await folder.applyServerRecord(type, swapped, response.updated_at);
-          await folder.deleteElement(local.id, { silent: true });
-          recordIdSwap(local.id, response.id, type);
-        } else {
-          await folder.stampServerUpdatedAt(local.id, type, response.updated_at);
-        }
-        creates++;
-      } else if (dec.kind === 'matched-same-id') {
-        if (policy === 'b') {
-          const { local_updated_at: _l, server_updated_at: _s, ...rawBody } = current;
-          // Apply current idSwaps defensively. By the time matched UPDATEs run
-          // (phase 4b-4, after 4b-3 rewrote local files), the body's FKs should
-          // already be correct — but body-level rewrite is idempotent and adds
-          // defense in depth at negligible cost.
-          const body = applyIdSwapsToBody(rawBody, idSwaps);
-          const response = await adapter.updateElement(type, dec.server.id, body);
-          // Apply the SERVER's full post-PATCH response to local. PATCH is
-          // partial — fields the user didn't set locally stay on server.
-          // To make local reflect actual server state (so the UI shows the
-          // merged truth, not just what user typed), use the response body.
-          const { updated_at: _ts, ...fullBody } = response;
-          await folder.applyServerRecord(type, fullBody, response.updated_at);
-          updates++;
-        } else {
-          // Policy c: overwrite local with server's full record.
-          const { updated_at, ...serverBody } = dec.server;
-          await folder.applyServerRecord(type, serverBody, updated_at);
-          skipped++;
-        }
-      } else {
-        // matched-swap: local.id !== server.id; server.id wins.
-        const serverId = dec.server.id;
-        if (policy === 'b') {
-          // UPDATE server with local body (server keeps server.id).
-          const { id: _lid, local_updated_at: _l, server_updated_at: _s, ...rawBody } = current;
-          const body = applyIdSwapsToBody(rawBody, idSwaps);
-          const response = await adapter.updateElement(type, serverId, body);
-          // Apply server's full post-PATCH response (not just our local body)
-          // so the local file reflects everything server has — including the
-          // fields server kept untouched. Without this, the merged local would
-          // be missing every field local didn't explicitly set.
-          const { updated_at: _ts, ...fullBody } = response;
-          await folder.applyServerRecord(type, { ...fullBody, ...localOnlyFieldsOf(current) }, response.updated_at);
-          // Remove the old local file silently — never had a server counterpart.
-          await folder.deleteElement(local.id, { silent: true });
-          updates++;
-        } else {
-          // Policy c: pull server's full content into local at server.id.
-          const { updated_at, ...serverBody } = dec.server;
-          // Policy c gives up the local CONTENT (the server's prose wins, so
-          // the local rich-text copy goes too), never atlas's own bindings.
-          await folder.applyServerRecord(
-            type,
-            { ...serverBody, ...localOnlyFieldsOf(current, new Set(['atlas_richtext_json'])) },
-            updated_at,
-          );
-          // Remove the old local file silently.
-          await folder.deleteElement(local.id, { silent: true });
-          skipped++;
-        }
-      }
+      await folder.stampServerUpdatedAt(c.local.id, c.type, response.updated_at, s.sent);
+      counts.creates++;
     } catch (err) {
-      failures.push({
-        element_id: dec.local.id,
-        type: dec.type,
-        operation: dec.kind === 'create' ? 'create' : 'update',
-        message: err instanceof Error ? err.message : String(err),
-      });
+      failures.push({ element_id: c.local.id, type: c.type, operation: 'create', message: errText(err) });
     } finally {
-      done++;
-      onProgress?.({ done, total, phase: 'apply' });
+      tick();
     }
   }
 
-  // Phase ordering — circular FK dependency between matched + new locals:
-  //   - Matched element (e.g. Splashworth) may reference new locals (Bob, Carol)
-  //     via FK fields like friends/rivals
-  //   - New locals may reference the matched element
-  //
-  // To get both directions right server-side, we must:
-  //
-  //   1. Rewrite local files with the match-phase idSwaps (so any local that
-  //      references the matched-old-id now references the matched-server-id).
-  //   2. CREATE the new locals. Their body now correctly references the
-  //      matched-server-id. Their CREATE may produce more idSwaps (server-
-  //      assigned UUID v7).
-  //   3. Rewrite again with CREATE-time swaps (so the matched element's local
-  //      file now references the new locals' server-assigned ids).
-  //   4. UPDATE the matched elements with the now-correct refs in their bodies.
-  //   5. Final rewrite to catch any remaining propagation.
-
-  // 4b-1: Rewrite for match-phase swaps (matched-swap entries built idSwaps
-  // during the match phase already).
-  if (idSwaps.size > 0) {
-    await rewriteIdReferences(folder, idSwaps);
-  }
-
-  // 4b-2: Process CREATEs. Re-fetched local already has the post-rewrite FKs.
-  //
-  // v2 port: batches of ≥2 go through /bulk — one atomic request with
-  // server-side fixpoint FK resolution INCLUDING CYCLES. This is the merge
-  // counterpart of the engine's bulkCreatePhase: without it, a cyclic web of
-  // local-only elements (the Sikelia class) can never fully land through
-  // Route 2 either. Client ids are preserved under v2, so no CREATE-time
-  // id-swaps occur on this path (match-phase swaps were already applied to
-  // files in 4b-1 and to bodies via applyIdSwapsToBody).
-  async function processBulkCreates(decisions: LocalDecision[], isRetry = false): Promise<void> {
-    const batch: Array<{ dec: LocalDecision; item: BulkItem }> = [];
+  // v2: batches of 2+ go through /bulk, one atomic request with server-side
+  // FK resolution INCLUDING CYCLES (a cyclic web of local-only elements, the
+  // Sikelia class, could never land one at a time).
+  async function processBulkCreates(decisions: Array<{ local: Element; type: ElementType }>, isRetry = false): Promise<void> {
+    const batch: Array<{ dec: { local: Element; type: ElementType }; item: BulkItem; sent: string }> = [];
     for (const dec of decisions) {
-      const current = await folder.getElement(dec.local.id);
-      if (!current) {
-        done++;
-        onProgress?.({ done, total, phase: 'apply' });
+      // A file that will not parse is that element's failure, not the batch's
+      // (gate A7: the disk read is strict).
+      let s: Awaited<ReturnType<typeof sendable>>;
+      try {
+        s = await sendable(dec.local.id);
+      } catch (err) {
+        failures.push({ element_id: dec.local.id, type: dec.type, operation: 'create', message: errText(err) });
+        tick();
         continue;
       }
-      const { local_updated_at: _l, server_updated_at: _s, ...rawBody } = current;
-      const body = applyIdSwapsToBody(rawBody, idSwaps);
-      batch.push({ dec, item: { type: dec.type, element: body } });
+      if (!s) { tick(); continue; }
+      batch.push({ dec, item: { type: dec.type, element: s.body }, sent: s.sent });
     }
     if (batch.length === 0) return;
 
@@ -537,11 +402,10 @@ export async function mergeLocalIntoApi(
         idempotencyKey: crypto.randomUUID(),
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = errText(err);
       for (const b of batch) {
         failures.push({ element_id: b.dec.local.id, type: b.dec.type, operation: 'create', message });
-        done++;
-        onProgress?.({ done, total, phase: 'apply' });
+        tick();
       }
       return;
     }
@@ -555,10 +419,18 @@ export async function mergeLocalIntoApi(
       for (let i = 0; i < batch.length; i++) {
         const echo = result.items[i]?.updatedAt;
         if (typeof echo === 'string' && echo) {
-          await folder.stampServerUpdatedAt(batch[i].item.element.id as string, batch[i].dec.type, echo);
-          creates++;
-          done++;
-          onProgress?.({ done, total, phase: 'apply' });
+          // A stamp that throws (a file gone corrupt) is that element's
+          // failure, never the whole merge's (S367 gate A7).
+          try {
+            await folder.stampServerUpdatedAt(batch[i].dec.local.id, batch[i].dec.type, echo, batch[i].sent);
+            counts.creates++;
+          } catch (err) {
+            failures.push({
+              element_id: batch[i].dec.local.id, type: batch[i].dec.type, operation: 'create',
+              message: `created but its baseline could not be saved: ${errText(err)}`,
+            });
+          }
+          tick();
         } else {
           needBackfill.push(batch[i]);
         }
@@ -566,23 +438,22 @@ export async function mergeLocalIntoApi(
       if (needBackfill.length === 0) return;
       if (needBackfill.length <= 20) {
         for (const b of needBackfill) {
-          const id = b.item.element.id as string;
+          const id = b.dec.local.id;
           try {
             const remote = await adapter.getElement(b.dec.type, id);
             if (!remote) throw new Error('created element missing on read-back');
-            await folder.stampServerUpdatedAt(id, b.dec.type, remote.updated_at);
-            creates++;
+            await folder.stampServerUpdatedAt(id, b.dec.type, remote.updated_at, b.sent);
+            counts.creates++;
           } catch (err) {
             failures.push({
               element_id: id, type: b.dec.type, operation: 'create',
-              message: `created but baseline backfill failed: ${err instanceof Error ? err.message : String(err)}`,
+              message: `created but baseline backfill failed: ${errText(err)}`,
             });
           }
-          done++;
-          onProgress?.({ done, total, phase: 'apply' });
+          tick();
         }
       } else {
-        const byType = new Map<ElementType, Array<{ dec: LocalDecision; item: BulkItem }>>();
+        const byType = new Map<ElementType, typeof batch>();
         for (const b of needBackfill) {
           if (!byType.has(b.dec.type)) byType.set(b.dec.type, []);
           byType.get(b.dec.type)!.push(b);
@@ -596,19 +467,25 @@ export async function mergeLocalIntoApi(
             console.warn(`[atlas:sync] merge bulk backfill list walk failed for ${type}:`, err);
           }
           for (const b of group) {
-            const id = b.item.element.id as string;
+            const id = b.dec.local.id;
             const ts = remoteById.get(id);
             if (ts) {
-              await folder.stampServerUpdatedAt(id, type, ts);
-              creates++;
+              try {
+                await folder.stampServerUpdatedAt(id, type, ts, b.sent);
+                counts.creates++;
+              } catch (err) {
+                failures.push({
+                  element_id: id, type, operation: 'create',
+                  message: `created but its baseline could not be saved: ${errText(err)}`,
+                });
+              }
             } else {
               failures.push({
                 element_id: id, type, operation: 'create',
                 message: 'created but baseline backfill failed: not present in post-bulk list walk',
               });
             }
-            done++;
-            onProgress?.({ done, total, phase: 'apply' });
+            tick();
           }
         }
       }
@@ -617,7 +494,7 @@ export async function mergeLocalIntoApi(
 
     // errors: true under atomic → server rolled EVERYTHING back. Fail the bad
     // items, retry the survivors once.
-    const survivors: LocalDecision[] = [];
+    const survivors: Array<{ local: Element; type: ElementType }> = [];
     result.items.forEach((it, i) => {
       const b = batch[i];
       if (!b) return;
@@ -631,8 +508,7 @@ export async function mergeLocalIntoApi(
         operation: 'create',
         message: it.error?.message || 'bulk item failed',
       });
-      done++;
-      onProgress?.({ done, total, phase: 'apply' });
+      tick();
     });
     if (isRetry || survivors.length === 0) {
       for (const s of survivors) {
@@ -640,131 +516,69 @@ export async function mergeLocalIntoApi(
           element_id: s.local.id, type: s.type, operation: 'create',
           message: 'rolled back by failing peers in the atomic batch; retry exhausted',
         });
-        done++;
-        onProgress?.({ done, total, phase: 'apply' });
+        tick();
       }
       return;
     }
     await processBulkCreates(survivors, /* isRetry */ true);
   }
 
-  if (typeof adapter.bulkCreate === 'function' && createDecisions.length >= 2) {
-    await processBulkCreates(createDecisions);
+  if (creates.length > 0) {
+    const ids = creates.map(c => c.local.id);
+    await folder.updateSyncState(st => ({ route2_created: [...new Set([...(st.route2_created ?? []), ...ids])] }));
+  }
+  if (typeof adapter.bulkCreate === 'function' && creates.length >= 2) {
+    await processBulkCreates(creates);
   } else {
-    for (const dec of createDecisions) {
-      await processDecision(dec);
+    for (const c of creates) await createOne(c);
+  }
+
+  // 4c. Matched elements.
+  for (const m of matched) {
+    try {
+      if (unreadable.has(m.id)) {
+        failures.push({ element_id: m.id, type: m.type, operation: 'update', message: 'its file could not be read, so it was not uploaded' });
+        continue;
+      }
+      // An element this route itself uploaded on an earlier, unfinished run is
+      // not a duplicate: its local copy wins whatever the policy (gate A3).
+      if (policy === 'b' || ownUploads.has(m.id)) {
+        const s = await sendable(m.id);
+        if (!s) continue;
+        const response = await adapter.updateElement(m.type, m.id, s.body);
+        // The server's full post-PATCH record lands locally (PATCH is partial:
+        // fields the local copy lacks stay on the server; the store keeps the
+        // file's atlas-only fields). Guarded like every push stamp (conv. 96,
+        // gate A1): if the file changed during the request, nothing lands and
+        // the element stays dirty, so the next round sends the newer text.
+        const { updated_at: _ts, ...fullBody } = response;
+        const landed = await folder.applyServerRecordIfUnchanged(m.type, fullBody, response.updated_at, s.sent);
+        // The edit that beat the response keeps its text; the baseline still
+        // moves to the server's time, lifted past it (sync-stamp), so the
+        // element reads dirty and the next round PATCHes the newer text.
+        if (!landed) await folder.stampServerUpdatedAt(m.id, m.type, response.updated_at, s.sent);
+        counts.updates++;
+      } else {
+        // Policy c: the server's record wins, and the local rich text goes
+        // with the local prose it mirrored; atlas's bindings stay.
+        const { updated_at, ...serverBody } = m.server;
+        await folder.applyServerRecord(m.type, serverBody, updated_at, { dropLocal: ['atlas_richtext_json'] });
+        counts.skipped++;
+      }
+    } catch (err) {
+      failures.push({ element_id: m.id, type: m.type, operation: 'update', message: errText(err) });
+    } finally {
+      tick();
     }
   }
 
-  // 4b-3: Rewrite again — picks up any CREATE-time server-assigned ids so the
-  // matched elements' local files now reference the new server ids.
-  if (idSwaps.size > 0) {
-    await rewriteIdReferences(folder, idSwaps);
-  }
-
-  // 4b-4: Process matched UPDATEs. Re-fetched local body now has the new
-  // server ids for any references to created elements.
-  for (const dec of matchedDecisions) {
-    await processDecision(dec);
-  }
-
-  // 4b-5: Final rewrite — catches anything not yet propagated.
-  if (idSwaps.size > 0) {
-    await rewriteIdReferences(folder, idSwaps);
-  }
-
-  return { creates, updates, skipped, downloaded, failures };
+  // `route2_created` stays until the caller's link succeeds
+  // (`make-online-run.ts`): a link step that throws leaves a rerun to come.
+  return { ...counts, failures, ambiguous: plan.ambiguous, rekeyed, unrewritten, idClashes: plan.idClashes };
 }
 
-type ServerRec = { id: string; updated_at: string } & Record<string, unknown>;
-
-/**
- * Apply id-swaps to a single in-memory body just before sending to the server.
- * Closes the chain-CREATE FK gap: within phase 4b-2's CREATE loop, file-level
- * rewriteIdReferences only runs AFTER the loop (phase 4b-3). Without body-level
- * rewrite, iteration 2 (e.g. Carol whose friends references iteration 1's Bob)
- * would send Bob's stale local id to the server even after Bob's CREATE
- * produced an idSwap.
- *
- * Idempotent — if the body has no fields referencing keys in idMap, it returns
- * the original body unchanged. Safe to call on UPDATE bodies too as defense
- * in depth (local file should already be rewritten by phase 4b-3, but if a
- * timing window opened, this catches it).
- *
- * Walks scalar string fields AND string-array fields. Other shapes (objects,
- * numbers) pass through. Doesn't touch nested objects — atlas writes never
- * nest relations (the adapter and FIELD_SCHEMA both use bare names or _id
- * suffixes at the top level).
- */
-function applyIdSwapsToBody(
-  body: Record<string, unknown>,
-  idMap: Map<string, string>
-): Record<string, unknown> {
-  if (idMap.size === 0) return body;
-  let modified = false;
-  const result: Record<string, unknown> = { ...body };
-  for (const [key, value] of Object.entries(body)) {
-    if (typeof value === 'string') {
-      const next = idMap.get(value);
-      if (next !== undefined) {
-        result[key] = next;
-        modified = true;
-      }
-    } else if (Array.isArray(value)) {
-      let arrChanged = false;
-      const newArr = value.map(v => {
-        if (typeof v === 'string') {
-          const next = idMap.get(v);
-          if (next !== undefined) {
-            arrChanged = true;
-            return next;
-          }
-        }
-        return v;
-      });
-      if (arrChanged) {
-        result[key] = newArr;
-        modified = true;
-      }
-    }
-  }
-  return modified ? result : body;
-}
-
-/**
- * Walk every local element and rewrite any field value (string OR array of
- * strings) whose value matches a key in `idMap`. Updates via updateElement so
- * `local_updated_at` advances — these rewrites are real local edits the engine
- * will push on next sync (the server already has the new ids, so push will
- * succeed cleanly).
- */
-async function rewriteIdReferences(folder: FolderStore, idMap: Map<string, string>): Promise<void> {
-  const SKIP = new Set(['id', 'type', 'name', 'local_updated_at', 'server_updated_at']);
-  const all = await folder.listElements();
-  for (const el of all) {
-    let modified = false;
-    const patch: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(el)) {
-      if (SKIP.has(key)) continue;
-      if (typeof value === 'string' && idMap.has(value)) {
-        patch[key] = idMap.get(value);
-        modified = true;
-      } else if (Array.isArray(value)) {
-        let changed = false;
-        const newArr = value.map(v => {
-          if (typeof v === 'string' && idMap.has(v)) {
-            changed = true;
-            return idMap.get(v)!;
-          }
-          return v;
-        });
-        if (changed) { patch[key] = newArr; modified = true; }
-      }
-    }
-    if (modified) {
-      await folder.updateElement(el.id, patch);
-    }
-  }
+function errText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 // ---------------------------------------------------------------------------

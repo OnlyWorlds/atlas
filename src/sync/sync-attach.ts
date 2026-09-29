@@ -19,23 +19,15 @@ import { adoptPersistedDiskHold, forgetPersistedDiskHold, holdBigBatchAtOpen, is
 import { OwV2ClientAdapter } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
-import { patchSlice, getState, setState } from '../core/state';
+import { patchSlice, getState } from '../core/state';
 import { toastManager } from '../ui/toast-manager';
-import { rekeyRouteHash } from './rekey-route';
 import type { FolderStore } from '../store/folder-store';
-import { rewriteChartScopeIds } from '../visualization/timeline/charts-store';
-import type { Element, WorldRegistryEntry, SyncEngineState, ElementType } from '../core/types';
-import { setWorldFavoriteElement, saveRegistry } from '../registry/registry';
+import type { Element, WorldRegistryEntry, SyncEngineState } from '../core/types';
 import { failureToastOnce, classifyFailure } from './sync-failure-copy';
+import { effectiveSyncPaused } from '../registry/registry';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
-
-// Chart-scope migrations are read-modify-writes on .atlas/charts.json with no
-// store-level serialization (unlike sync-state.json / tombstones.json). Two
-// swaps landing during one make-online could interleave reads and clobber each
-// other's rewrite — serialize them through a module-level chain.
-let chartsMigrationChain: Promise<void> = Promise.resolve();
 
 /**
  * Attach a fresh SyncEngine to the given (api-linked) world's folder. Returns
@@ -98,9 +90,9 @@ export function attachSyncEngine(
     policy: reg.sync_default_policy ?? 'local-wins',
     onStateChange: (s) => publishSyncState(entry.id, s),
     onSyncResult: (phase, result) => emitConflictToasts(phase, result),
-    // NOTE: the engine no longer has an onIdSwap hook — keel preserves client
-    // ids on CREATE (id-swap create-path excised 2026-07-12). handleIdSwap
-    // below survives for the Route 2 MATCH-phase swaps via applyIdSwapToUi.
+    // No onIdSwap hook: keel keeps client ids on CREATE (2026-07-12), and
+    // Route 2 moves ids before any server call through the re-key kernel,
+    // whose screen pass is `rekeyLiveUi` (S367).
   });
   // Apply persisted debounce preference if the user configured one. Engine
   // default (5000ms) stands when registry has no value.
@@ -130,7 +122,7 @@ export function attachSyncEngine(
   });
 
   // Pause if either global or per-world pause flag is set.
-  const shouldPause = !!reg.sync_pause_all || !!entry.sync_paused;
+  const shouldPause = effectiveSyncPaused(entry, reg); // S367 critic C7: one predicate
   if (shouldPause) {
     engine.pause('manual');
   }
@@ -574,196 +566,6 @@ function emitConflictToasts(
 }
 
 /**
- * Migrate UI state when push CREATE results in a server-assigned id (id-swap).
- * Without this, the user keeps viewing the URL `/element/<old-id>` after the
- * engine has moved the local file to `<new-id>` and rewritten refs — the
- * middle pane shows a confusing "element <old-id> not found in this world"
- * empty-state because the elements cache no longer contains the old id.
- *
- * Three migrations:
- *   - `state.ui.selectedElementId` → new_id (if it pointed at old_id)
- *   - URL hash `/element/<old-id>` → `/element/<new-id>` (if visible there)
- *   - URL hash `/map/<mid>/element/<old-id>` → same with new_id
- */
-function handleIdSwap(swap: { old_id: string; new_id: string; type: ElementType }): void {
-  // ATOMIC migration: substitute the element's id in the cached elements list
-  // AND migrate selectedElementId in a single setState call. Without this, two
-  // separate patchSlice writes produce two renders — the in-between one has
-  // ui.selectedElementId = new_id but data.elements still has old_id, so the
-  // middle pane flashes "element <new_id> not found in this world" before the
-  // engine's subsequent refreshElementsCache catches up at idle.
-  //
-  // The substitution carries the OLD entry's content with the NEW id grafted.
-  // This is fine: the content sent on CREATE is what local just had; the
-  // server's response (now under new_id on disk via applyServerRecord) is the
-  // same content + a stamped server_updated_at. refreshElementsCache at engine
-  // idle reconciles to the on-disk version shortly after.
-  const current = getState();
-
-  const oldIndex = current.data.elements.findIndex((e) => e.id === swap.old_id);
-  const nextElements =
-    oldIndex >= 0
-      ? current.data.elements.map((e, i) =>
-          i === oldIndex ? { ...e, id: swap.new_id } : e
-        )
-      : current.data.elements;
-
-  // Also migrate any open map tabs that reference the swapping id. Without
-  // this, after a make-online a tab whose `mapId` was the local pre-swap id
-  // now points at nothing — the map pane shows "map not found" until the
-  // user closes and reopens the tab. (DESIGN_MAPS.md §10b N1, swap fix #2.)
-  let nextRightTabs = current.ui.rightTabs;
-  let tabsChanged = false;
-  if (swap.type === 'map') {
-    nextRightTabs = current.ui.rightTabs.map((t) => {
-      if (t.kind === 'map' && t.mapId === swap.old_id) {
-        tabsChanged = true;
-        return { ...t, mapId: swap.new_id };
-      }
-      return t;
-    });
-    // Migrate the saved camera state too. Without this, a user who panned a
-    // local map (save under v4 id), then linked online (Make-Online assigns
-    // v7 id and rewrites local refs), then refreshed the page — the camera
-    // state would be looked up under the v7 id and miss (returning the
-    // fit-to-image default) because the actual save was under v4. Session
-    // 221 W6 follow-up: migrate camera state in lock-step with the id swap.
-    void import('../core/map-camera-persist').then(({ getCameraState, saveCameraState, clearCameraState }) => {
-      const saved = getCameraState(swap.old_id);
-      if (saved) {
-        saveCameraState(swap.new_id, saved);
-        clearCameraState(swap.old_id);
-      }
-    }).catch((err) => console.warn('[sync-attach] camera-state migration failed:', err));
-  }
-
-  // Migrate saved chart SCOPES on disk. Charts (.atlas/charts.json) are
-  // atlas-local — NOT covered by the element-file id rewrite — so a focus /
-  // selection chart would keep a dead pre-swap id after make-online (mirrors
-  // the camera-state migration above; applies to ANY element type).
-  {
-    const folder = currentFolder;
-    if (folder) {
-      chartsMigrationChain = chartsMigrationChain.then(async () => {
-        try {
-          const charts = await folder.readCharts();
-          const { charts: nextCharts, changed } = rewriteChartScopeIds(charts, swap.old_id, swap.new_id);
-          if (changed) {
-            await folder.writeCharts(nextCharts);
-            window.dispatchEvent(new CustomEvent('atlas:charts-changed'));
-          }
-        } catch (err) {
-          console.warn('[sync-attach] chart-scope id migration failed:', err);
-        }
-      });
-    }
-  }
-
-  // Cast favorites (D2b) live in the REGISTRY keyed by element id — outside
-  // the element-file ref rewrite. A protagonist/home favorited while the
-  // world was local-only would silently vanish from the home cover after
-  // make-online without this remap (same class as the camera-state and
-  // chart-scope migrations above).
-  let nextRegistry = current.registry;
-  if (swap.type === 'character' || swap.type === 'location') {
-    const activeWorldId = current.active?.worldId;
-    const entry = activeWorldId
-      ? current.registry.worlds.find((w) => w.id === activeWorldId)
-      : undefined;
-    const fav = entry?.favorites;
-    if (activeWorldId && fav) {
-      if (fav.protagonist_id === swap.old_id) {
-        nextRegistry = setWorldFavoriteElement(nextRegistry, activeWorldId, 'protagonist', swap.new_id);
-      }
-      if (fav.nexus_id === swap.old_id) {
-        nextRegistry = setWorldFavoriteElement(nextRegistry, activeWorldId, 'nexus', swap.new_id);
-      }
-      if (nextRegistry !== current.registry) saveRegistry(nextRegistry);
-    }
-  }
-
-  // Migrate active pin-placement targeting. Reachable when the user has a
-  // pin-placement banner active for a freshly-created element while
-  // Make-Online Route 1 (or first push) swaps that element's id. Without
-  // this, clicking the map after the swap would silently no-op (the
-  // referenced element_id no longer exists in data.elements).
-  let nextPinPlacement = current.ui.pinPlacement;
-  let placementChanged = false;
-  if (current.ui.pinPlacement && current.ui.pinPlacement.elementId === swap.old_id) {
-    nextPinPlacement = { elementId: swap.new_id };
-    placementChanged = true;
-  }
-
-  let nextUi = current.ui;
-  if (current.ui.selectedElementId === swap.old_id) {
-    nextUi = { ...nextUi, selectedElementId: swap.new_id };
-  }
-  if (tabsChanged) {
-    nextUi = { ...nextUi, rightTabs: nextRightTabs };
-  }
-  if (placementChanged) {
-    nextUi = { ...nextUi, pinPlacement: nextPinPlacement };
-  }
-  // Knowledge lens follows its knower across the swap (same class as the
-  // pin-placement migration — a transient ui ref to a swappable element id).
-  if (current.ui.knowledgeLens && current.ui.knowledgeLens.knowerId === swap.old_id) {
-    nextUi = { ...nextUi, knowledgeLens: { knowerId: swap.new_id } };
-  }
-
-  // Only setState if at least one slice actually changed — avoids a spurious
-  // render when the swap doesn't intersect anything the UI is showing.
-  if (
-    nextElements !== current.data.elements ||
-    nextUi !== current.ui ||
-    nextRegistry !== current.registry
-  ) {
-    setState({
-      ...current,
-      data: { ...current.data, elements: nextElements },
-      ui: nextUi,
-      registry: nextRegistry,
-    });
-  }
-
-  // The URL follows the id (S363: one rewriter for every room, `rekey-route.ts`).
-  // `replace`, not navigate: Back must not lead to an id that no longer exists.
-  const worldId = current.active?.worldId;
-  if (!worldId) return;
-  const next = rekeyRouteHash(window.location.hash, worldId, new Map([[swap.old_id, swap.new_id]]));
-  if (next) window.location.replace(next);
-}
-
-/**
- * Public id-swap propagation. Used by every push path that can produce a
- * server-assigned id different from the local one:
- *
- *   - The long-running engine attached via `attachSyncEngine` — wired through
- *     the engine's `onIdSwap` option above.
- *   - The TRANSIENT engine spun up by Make-Online Route 1 (`make-online-modal.ts`).
- *     That engine pushes everything to a brand-new api world while the modal
- *     is open; without this callback, every id-swapped element leaves the
- *     user's URL/selection pointing at the pre-swap local id, and after the
- *     modal closes the middle pane renders "element <old-id> not found in
- *     this world."
- *   - The Route 2 merge flow (`mergeLocalIntoApi`) — doesn't use a SyncEngine,
- *     but accumulates id-swaps in a Map. The caller passes this same function
- *     via `MergeOpts.onIdSwap` so match-phase + CREATE-time swaps migrate UI
- *     state symmetrically with Route 1.
- *
- * All three call sites land at the same `handleIdSwap` implementation. The
- * atomic-state-transition discipline (convention #124) lives there — single
- * `setState` patching both `data.elements` and `ui.selectedElementId` in one
- * notification so subscribers never observe a half-migrated state.
- */
-export function applyIdSwapToUi(swap: {
-  old_id: string;
-  new_id: string;
-  type: ElementType;
-}): void {
-  handleIdSwap(swap);
-}
-
-/**
  * Test-only: invoke the conflict-toast emitter with a synthetic SyncResult.
  * Used to verify the setTimeout(0) world-switch race guard without standing
  * up a full conflict scenario through MSW.
@@ -773,21 +575,6 @@ export function __test_emitConflictToasts(
   result: import('../core/types').SyncResult
 ): void {
   emitConflictToasts(phase, result);
-}
-
-/**
- * Test-only: invoke the id-swap UI migration directly. Verifies the state +
- * URL transitions without standing up the full engine CREATE flow.
- *
- * Retained for backward compatibility with `sync-attach.idSwap.test.ts`; new
- * call sites should use the public `applyIdSwapToUi` export above.
- */
-export function __test_handleIdSwap(swap: {
-  old_id: string;
-  new_id: string;
-  type: ElementType;
-}): void {
-  handleIdSwap(swap);
 }
 
 /** Re-prime `state.data.elements` from the active folder. Fire-and-forget. */

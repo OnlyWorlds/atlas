@@ -6,7 +6,7 @@
  * `server_updated_at` mirror what the real one will do.
  */
 
-import type { FolderStore, ListElementsOptions, RekeyJournal, RescanResult } from '../../src/store/folder-store';
+import type { FolderStore, ListElementsOptions, RekeyJournal, RescanResult, ApplyServerRecordOpts } from '../../src/store/folder-store';
 import { journalIds, RekeyPendingError } from '../../src/store/folder-store';
 import { newId, nowIso } from '../../src/store/folder-store';
 import { PerIdWriteChain } from '../../src/store/write-chain';
@@ -581,10 +581,13 @@ export class MockFolderStore implements FolderStore {
 
   // Parity with FsFolderStore (S361): pull-apply rides the per-id chain, and
   // the guarded variant checks the local stamp inside the same slot.
-  async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
+  async applyServerRecord(
+    type: ElementType, record: Record<string, unknown>, server_updated_at: string,
+    opts: ApplyServerRecordOpts = {},
+  ): Promise<Element> {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');
-    return this.writeChain.run(id, () => this.applyServerRecordUnchained(type, record, server_updated_at));
+    return this.writeChain.run(id, () => this.applyServerRecordUnchained(type, record, server_updated_at, opts));
   }
 
   async applyServerRecordIfUnchanged(
@@ -601,7 +604,10 @@ export class MockFolderStore implements FolderStore {
     });
   }
 
-  private async applyServerRecordUnchained(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
+  private async applyServerRecordUnchained(
+    type: ElementType, record: Record<string, unknown>, server_updated_at: string,
+    opts: ApplyServerRecordOpts = {},
+  ): Promise<Element> {
     const id = record.id as string;
     const failure = this.applyFailures.get(id);
     if (failure) {
@@ -616,6 +622,7 @@ export class MockFolderStore implements FolderStore {
     const preserved: Record<string, unknown> = {};
     if (existing) {
       for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
+        if (opts.dropLocal?.includes(field)) continue;
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;
       }

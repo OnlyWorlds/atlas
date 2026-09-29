@@ -14,8 +14,8 @@
  *
  * ## The refs mirror (id-swap correctness)
  *
- * `rewriteIdReferences` (sync-engine) walks flat string + string-array fields
- * only — ids nested inside block OBJECTS would silently go stale when the OW
+ * The old flat id rewrite (`rewriteIdReferences`, retired S367) walked flat
+ * string + string-array fields only — ids nested inside block OBJECTS would silently go stale when the OW
  * server assigns its own id on first push (the make-online journey: compose
  * pages locally → make online → every element id-swaps). Instead of teaching
  * the sync layer about block shapes, pages mirror every element-card's id

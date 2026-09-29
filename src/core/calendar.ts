@@ -203,7 +203,19 @@ export function readCalendarConfig(value: unknown): CalendarConfig | null {
   if (cfg.eras?.some((e) => typeof e?.name !== 'string' || !Number.isFinite(e?.start))) return null;
   if (cfg.intercalary && (!Array.isArray(cfg.intercalary)
     || cfg.intercalary.some((i) => typeof i?.name !== 'string' || !Number.isInteger(i?.after_month)))) return null;
+  // S367 critic K1: every divisor and step size must be a positive integer, or
+  // the year arithmetic can loop forever. Values, not just shapes.
+  if (months && !months.lengths.every(isPositiveInt)) return null;
+  const year = cfg.bundles?.year;
+  if (year != null && !isPositiveInt(year.steps)) return null;
+  const week = cfg.bundles?.week;
+  if (week != null && (!isPositiveInt(week.length) || !Array.isArray(week.names))) return null;
+  if (cfg.intercalary?.some((i) => i.every_years != null && !isPositiveInt(i.every_years))) return null;
   return cfg;
+}
+
+function isPositiveInt(n: unknown): n is number {
+  return Number.isSafeInteger(n) && (n as number) >= 1;
 }
 
 // ---- Year arithmetic ----
@@ -255,12 +267,21 @@ export function yearLength(cfg: CalendarConfig, y: number): number {
   return len;
 }
 
+/** Correction laps allowed per direction. A valid config needs about
+ *  (leap periods + 2); the cap only stops a malformed one from hanging. */
+const MAX_YEAR_CORRECTION = 10_000;
+
 /** Absolute year index of a step. Zero-based; closed-form seed + bounded correction. */
 export function absoluteYear(cfg: CalendarConfig, step: number): number {
   const shape = yearShape(cfg);
-  let y = floorDiv(step, shape.baseLen); // seed ignores leap days; correct below
-  while (step < yearStartStep(cfg, y)) y -= 1;
-  while (step >= yearStartStep(cfg, y + 1)) y += 1;
+  // Seed on the MEAN year length (leap days included) so the correction stays
+  // a few laps at any distance from zero (S367 critic K1).
+  const meanLen = shape.leapPeriods.reduce((a, N) => a + 1 / N, shape.baseLen);
+  let y = floorDiv(step, meanLen);
+  if (!Number.isFinite(y)) return y; // non-finite step or zero-length year: nothing to correct
+  // Bounded laps (S367 critic K1): a config that slips the reader must not hang.
+  for (let i = 0; i < MAX_YEAR_CORRECTION && step < yearStartStep(cfg, y); i++) y -= 1;
+  for (let i = 0; i < MAX_YEAR_CORRECTION && step >= yearStartStep(cfg, y + 1); i++) y += 1;
   return y;
 }
 

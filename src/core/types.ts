@@ -284,6 +284,14 @@ export interface SyncState {
    * (`repairRekeyedLinks`); without it the map died with the journal.
    */
   rekeyed?: Record<string, string>;
+  /**
+   * Ids a Route 2 merge created on the server before it finished (S367 gate
+   * A3). Written before the creates go out, cleared when a merge returns. A
+   * rerun that meets one of these as a same-id match knows the server copy
+   * is the user's own upload, not a duplicate, so "keep the server version"
+   * does not revert edits made since.
+   */
+  route2_created?: string[];
 }
 
 export interface ForeignIds {

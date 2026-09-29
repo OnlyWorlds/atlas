@@ -56,6 +56,25 @@ const MONTH_STRIDES = [1, 2, 3, 4, 6];
 /** Hard cap on generated ticks — a wild config never freezes the render loop. */
 const MAX_TICKS = 400;
 
+/**
+ * The i-th rung of the year-stride ladder: YEAR_STRIDES, then continuing its
+ * 1, 2.5, 5 x 10^k pattern without bound (S367 critic K4: deep-time spans ran
+ * out of strides at 50,000 and the tick cap cut the axis short).
+ */
+function yearStrideAt(i: number): number {
+  if (i < YEAR_STRIDES.length) return YEAR_STRIDES[i];
+  const j = i - YEAR_STRIDES.length;
+  const k = 5 + Math.floor(j / 3);
+  return [1, 2.5, 5][j % 3] * Math.pow(10, k);
+}
+
+/** Smallest ladder stride that is at least `minYears` wide. */
+function yearStrideAtLeast(minYears: number): number {
+  let i = 0;
+  while (yearStrideAt(i) < minYears && i < 400) i++;
+  return yearStrideAt(i);
+}
+
 function estLabelW(label: string): number {
   return label.length * 6.2 + 16;
 }
@@ -110,6 +129,8 @@ function yearTicksInRegion(
   const d2 = dispAt(region.hi - 1);
   const dLo = Math.min(d1, d2);
   const dHi = Math.max(d1, d2);
+  // Cap by stepping the stride up, never by truncating (S367 critic K4).
+  if ((dHi - dLo) / stride > MAX_TICKS) stride = yearStrideAtLeast((dHi - dLo) / MAX_TICKS);
   const first = Math.ceil(dLo / stride) * stride;
   let emitted = 0;
   for (let dy = first; dy <= dHi && emitted < MAX_TICKS; dy += stride) {
@@ -234,8 +255,7 @@ export function calendarTicks(
     }
   } else {
     // Year rung — round era-local display years per region.
-    let stride = YEAR_STRIDES[YEAR_STRIDES.length - 1];
-    for (const s of YEAR_STRIDES) { if (s * pxPerYear >= IDEAL_TICK_PX) { stride = s; break; } }
+    const stride = yearStrideAtLeast(IDEAL_TICK_PX / pxPerYear);
     for (const region of regionsInRange(cfg, min, max)) {
       ticks.push(...yearTicksInRegion(cfg, region, stride, min, max));
     }

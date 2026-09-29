@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateTimeRange,
   calculateTicks,
+  MAX_AXIS_TICKS,
   createDateToX,
   createXToDate,
 } from '../../src/visualization/timeline/axis-calculator';
@@ -84,6 +85,31 @@ describe('timeline axis-calculator', () => {
     // ~10 ticks expected at ~100px spacing — interval should be ~10
     expect(ticks.length).toBeGreaterThan(5);
     expect(ticks.length).toBeLessThan(20);
+  });
+
+  it('calculateTicks keeps readable spacing on wide spans, no tick wall (S367 critic K4)', () => {
+    // usable width 1000 - 32 - 16 = 952px
+    for (const span of [20_000, 365_000, 100_000_000, 1e12]) {
+      const ticks = calculateTicks({ min: 0, max: span }, 1000);
+      expect(ticks.length, `span ${span}`).toBeGreaterThanOrEqual(3);
+      expect(ticks.length, `span ${span}`).toBeLessThanOrEqual(16);
+      const px = ((ticks[1] - ticks[0]) / span) * 952;
+      expect(px, `span ${span}`).toBeGreaterThanOrEqual(55);
+      expect(px, `span ${span}`).toBeLessThanOrEqual(180);
+      // ticks reach across the whole range, not just its left part
+      expect(ticks[ticks.length - 1], `span ${span}`).toBeGreaterThan(span * 0.8);
+    }
+  });
+
+  it('calculateTicks never computes more than MAX_AXIS_TICKS, even on a huge canvas', () => {
+    const ticks = calculateTicks({ min: 0, max: 1_000_000 }, 200_000);
+    expect(ticks.length).toBeLessThanOrEqual(MAX_AXIS_TICKS + 1);
+    expect(ticks[ticks.length - 1]).toBeGreaterThan(900_000);
+  });
+
+  it('calculateTicks returns nothing for a zero or non-finite span', () => {
+    expect(calculateTicks({ min: 5, max: 5 }, 1000)).toEqual([]);
+    expect(calculateTicks({ min: 0, max: Infinity }, 1000)).toEqual([]);
   });
 
   it('createDateToX maps min/max linearly to canvas usable width', () => {

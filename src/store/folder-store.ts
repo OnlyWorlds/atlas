@@ -248,7 +248,10 @@ export interface FolderStore {
    * Used by SyncEngine.pullPhase when a server element is new locally OR
    * server-newer than the folder version (no local change to preserve).
    */
-  applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element>;
+  applyServerRecord(
+    type: ElementType, record: Record<string, unknown>, server_updated_at: string,
+    opts?: ApplyServerRecordOpts,
+  ): Promise<Element>;
   /** Pull-apply guarded INSIDE the per-id chain: writes only if the element's
    *  `local_updated_at` still equals `expectedLocalUpdatedAt` (null = absent).
    *  Returns false when a local edit landed first (S361, lane b M1). */
@@ -365,6 +368,17 @@ export function journalIds(journal: RekeyJournal | null): Set<string> {
   return out;
 }
 
+export interface ApplyServerRecordOpts {
+  /**
+   * Local-only fields NOT to carry over from the existing file. A server
+   * record normally keeps every atlas-only field the local file had (the
+   * server never knows them); Route 2's "keep the server version" policy
+   * gives up the local rich text, or the editor would show local prose over
+   * the server's (S367).
+   */
+  dropLocal?: readonly string[];
+}
+
 /** An unfinished re-key, on disk until its last step (`store/rekey.ts`). */
 export interface RekeyJournal {
   version: 1;
@@ -379,6 +393,13 @@ export interface RekeyJournal {
   /** Referrers that could not be read (corrupt files) and still name old ids. */
   unrewritten: string[];
   started_at: string;
+  /**
+   * What started it (S367, additive: absent = 'rekey'). 'merge' is Route 2
+   * moving local ids onto a server world's ids before it links; the world
+   * is still local-only, so the copy that speaks about an unfinished run
+   * says to run Make online again rather than "not syncing".
+   */
+  origin?: 'rekey' | 'merge';
 }
 
 export function newId(): string {

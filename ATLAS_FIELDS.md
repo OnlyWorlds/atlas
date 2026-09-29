@@ -38,7 +38,7 @@ Before the v2 port (2026-07-12) the zone visuals were local-only because the old
 | `atlas_aliases` | any element | `string[]` of alternate names for linking, the picker and search | **yes**: writers, pickers and search all want it |
 | `atlas_dismissed_suggestions` | Narrative | element ids dismissed from the context pane's Potentials | no, UI state |
 | `atlas_page_blocks` | Narrative, subtype `page` | the page's block stack, the source of truth (heading, prose, element card, circle, collection, map, chart; `src/core/sharing.ts`) | no, composition is presentation |
-| `atlas_page_refs` | page | the flat element-id mirror of the blocks' bindings, so a re-key or an id swap can follow them (`blocksOf()` heals nested ids) | no, mechanics |
+| `atlas_page_refs` | page | the flat element-id mirror of the blocks' bindings, so a re-key (the Settings re-key or Route 2, both on the kernel) can follow them (`blocksOf()` heals nested ids) | no, mechanics |
 | `atlas_page_intent` | page | show / reference / publish (kept in the model, hidden in the UI) | probably not |
 | `atlas_page_theme` | page | the page's theme tokens (`parsePageTheme`, carried into the publish payload) | no, visual preference |
 | `atlas_page_pub` | page | the published-state mirror `{id, slug, published_at, updated_at, revoked, content_sig}` from the sharing backend; a display cache (the API rows are the truth), per folder | no, sharing metadata |

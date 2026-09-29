@@ -20,7 +20,7 @@
  * via the onStateChange callback.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { FakeOwApiClient } from '../fixtures/fake-ow-client';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
@@ -30,6 +30,9 @@ import type { SyncEngineState } from '../../src/core/types';
 let folder: MockFolderStore;
 let client: FakeOwApiClient;
 let clock: MonotonicClock;
+
+// One fork for every file: fake timers must not outlive this one (S367).
+afterEach(() => { vi.useRealTimers(); });
 
 beforeEach(async () => {
   vi.useFakeTimers();

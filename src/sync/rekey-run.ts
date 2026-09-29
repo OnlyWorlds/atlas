@@ -18,11 +18,13 @@ import type { ElementType, WorldRegistryEntry } from '../core/types';
 import type { FolderStore } from '../store/folder-store';
 import { startRekey, recoverRekey, rollbackRekey, repairRekeyedLinks, staleRekeyedLinks, RekeyRefusedError, type RekeyResult, type RekeyHooks } from '../store/rekey';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
+import { settleLivePass, remapDiskNoticeIds } from '../core/live-folder';
 import { getCurrentSyncEngine, getCurrentSyncWorldId } from './sync-attach';
 import { liveForeignIds } from './foreign-ids';
 import { rekeyRouteHash } from './rekey-route';
 import { readTourState, remapTourReturnHash } from '../tour/tour-engine';
 import { hasPendingZoneEdit } from '../tabs/right/zone-edit-mode';
+import { isZoneGestureActive } from '../core/zone-gesture';
 import { disposeMapTab } from '../tabs/right/map-tab';
 import { remapCollapsedMapIds } from '../tabs/right/map-index-tab';
 import { rekeyRegistryEntry, saveRegistry } from '../registry/registry';
@@ -45,10 +47,28 @@ async function singleFlight<T>(work: () => Promise<T>): Promise<T> {
   if (running) throw new RekeyRefusedError('An id update is already running.');
   running = true;
   try {
+    // Taking the flag stops every new live-folder pass; one already running
+    // could still land a pre-move element list over ours (S367, lane B N2).
+    await settleLivePass();
     return await work();
   } finally {
     running = false;
+    // Surfaces that hid "did not finish" while the run owned the journal
+    // re-read it now (S367 gate B3: Settings' row).
+    window.dispatchEvent(new CustomEvent(ID_MOVE_SETTLED_EVENT));
   }
+}
+
+/** Fired when an id move (re-key or Route 2) lets go of the single flight, however it ended. */
+export const ID_MOVE_SETTLED_EVENT = 'atlas:id-move-settled';
+
+/**
+ * The same single flight for Route 2 (`sync/make-online-run.ts`), which moves
+ * ids too: one id move at a time app-wide, and `isRekeyRunning()` answers for
+ * both, so the live folder and activation recovery stand down for either.
+ */
+export function withIdMoveLock<T>(work: () => Promise<T>): Promise<T> {
+  return singleFlight(work);
 }
 
 export function isRekeyRunning(): boolean {
@@ -107,6 +127,8 @@ export async function rekeyLiveUi(store: FolderStore, worldId: string, map: Read
   const cur = getState();
   if (cur.active?.worldId !== worldId) return;
   const sw = (id: string | null | undefined) => (id && map.get(id)) || id;
+  // Not app state: the live folder's marks, kept per world beside it.
+  remapDiskNoticeIds(worldId, map);
   const ui = cur.ui;
   setState({
     ...cur,
@@ -150,7 +172,7 @@ async function giveUnlocked(opts: Parameters<typeof giveForeignElementsNewIds>[0
     if (entry.demo === true || readTourState()?.worldId === entry.id) {
       throw new RekeyRefusedError('The tour world keeps its ids.');
     }
-    if (getState().ui.zoneEditing || hasPendingZoneEdit(entry.id)) {
+    if (isZoneGestureActive() || hasPendingZoneEdit(entry.id)) {
       throw new RekeyRefusedError('Finish editing the zone first.');
     }
     const foreign = await foreignIdsFor(store, entry);

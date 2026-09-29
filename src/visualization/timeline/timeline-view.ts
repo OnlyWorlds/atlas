@@ -475,11 +475,20 @@ function fitWindow(state: ViewState): TimeWindow | null {
   return { start: state.baseRange.min, end: state.baseRange.max };
 }
 
-/** The navigable bounds: the universe when present (pan across the whole
- *  world's history, not just the scope), else the scoped fit. */
-function navBounds(state: ViewState): { min: number; max: number } | null {
+/** Recorded history: the universe when present (pan across the whole world's
+ *  history, not just the scope), else the scoped fit. The world-edge dim. */
+function recordedBounds(state: Pick<ViewState, 'universe' | 'baseRange'>): { min: number; max: number } | null {
   if (state.universe.length > 0) return calculateTimeRange(state.universe);
   return state.baseRange;
+}
+
+/** The navigable bounds (camera + strip): recorded history widened to take
+ *  in the world's now, so a now outside history can be panned to (S367
+ *  critic K7). The default fit stays on history; DESIGN_CHARTS asks no more. */
+export function navBounds(state: Pick<ViewState, 'universe' | 'baseRange' | 'now'>): { min: number; max: number } | null {
+  const rec = recordedBounds(state);
+  if (!rec || state.now == null || !Number.isFinite(state.now)) return rec;
+  return { min: Math.min(rec.min, state.now), max: Math.max(rec.max, state.now) };
 }
 
 /** The window currently ON SCREEN: animation frame > explicit window > fit. */
@@ -1135,7 +1144,7 @@ function drawWorldEdges(
   w: number,
   axisY: number,
 ): void {
-  const nav = navBounds(state);
+  const nav = recordedBounds(state);
   if (!nav || !(state.universe.length > 0 || state.nodes.length > 0)) return;
   const top = TOP_PAD - 4;
   for (const side of ['min', 'max'] as const) {
@@ -1727,7 +1736,8 @@ function renderCard(state: ViewState): void {
     dateBtn.title = 'Change the date';
     dateBtn.addEventListener('click', () => {
       const r = dateBtn.getBoundingClientRect();
-      openDropDatePopover(state, node.id, Math.round(node.startDate), r.left + r.width / 2, r.bottom + 4);
+      // The stored value itself, unrounded, marked as current (S367 critic K3).
+      openDropDatePopover(state, node.id, node.startDate, r.left + r.width / 2, r.bottom + 4, 'start', true);
     });
     meta.appendChild(dateBtn);
   } else {
@@ -2081,8 +2091,16 @@ function buildDragGhost(type: string, name: string): HTMLElement {
 
 /** Drop-confirm popover (reuses the field-edit popover — number input, Enter
  *  saves, Esc/backdrop cancels; the backdrop intercepts click-away so the
- *  canvas mouse handlers never fire, gate finding). */
-function openDropDatePopover(state: ViewState, id: string, dropDate: number, cx: number, cy: number, edge: 'start' | 'end' = 'start'): void {
+ *  canvas mouse handlers never fire, gate finding).
+ *
+ *  `isCurrent` = `dropDate` is the value already stored (the card's date
+ *  edit), not a proposed new one: then an untouched Enter writes nothing, and
+ *  a prefill the lens cannot round-trip exactly becomes the raw number
+ *  (S367 critic K3). A drop leaves it false: Enter confirms the drop. */
+function openDropDatePopover(
+  state: ViewState, id: string, dropDate: number, cx: number, cy: number,
+  edge: 'start' | 'end' = 'start', isCurrent = false,
+): void {
   const anchor = document.createElement('div');
   anchor.style.cssText = `position:fixed;left:${cx}px;top:${cy}px;width:1px;height:1px;pointer-events:none;`;
   document.body.appendChild(anchor);
@@ -2098,14 +2116,22 @@ function openDropDatePopover(state: ViewState, id: string, dropDate: number, cx:
     const r = parseDate(cal, raw, { now: state.now });
     return isParseError(r) ? null : r.step;
   };
+  // S367 critic K3: speak the stored value through the lens only when that
+  // text parses back to exactly the same step; else show the raw number.
+  const spoken = cal ? formatStep(cal, Math.round(dropDate)) : null;
+  const prefill = spoken != null && (!isCurrent || resolve(spoken) === dropDate)
+    ? spoken
+    : String(dropDate);
+  const unchanged = (raw: string): boolean => isCurrent && raw.trim() === prefill.trim();
   openFieldEditPopover({
     anchor,
     label: edge === 'end' ? 'End date' : 'Date',
-    value: cal ? formatStep(cal, dropDate) : String(dropDate),
+    value: prefill,
     widget: cal ? 'text-short' : 'number',
     liveHint: cal
       ? (raw) => {
           if (raw.trim() === '') return null;
+          if (unchanged(raw)) return `= ${formatStep(cal, Math.round(dropDate))} (step ${dropDate})`;
           const r = parseDate(cal, raw, { now: state.now });
           if (isParseError(r)) return `· ${r.error}`;
           return `= ${formatStep(cal, r.step)} (step ${r.step})`;
@@ -2113,8 +2139,12 @@ function openDropDatePopover(state: ViewState, id: string, dropDate: number, cx:
       : undefined,
     onSave: (v: unknown) => {
       anchor.remove();
+      // Number widget hands back a number; compare as typed text.
+      if (v != null && unchanged(String(v))) return;
       const step = resolve(String(v));
-      if (step != null) state.onDateElement?.(id, step, edge);
+      if (step == null) return;
+      if (isCurrent && step === dropDate) return; // resolves to what is stored: no write
+      state.onDateElement?.(id, step, edge);
     },
     onCancel: () => { anchor.remove(); },
   });

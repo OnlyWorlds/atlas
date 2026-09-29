@@ -2,10 +2,10 @@
  * The URL after ids change (S363, re-key gate lens 3 F6). Pure.
  *
  * One rewriter for every route that carries an element id, used by the
- * re-key's live pass, by recovery (the tour's saved return hash) and by
- * Route 2's id swap. It replaced four hand-written branches in `handleIdSwap`
- * that sent `/timeline/<id>` to the element room, left `/writing/<id>` on the
- * old id, and kept a map route's old map id.
+ * re-key's live pass (`rekeyLiveUi`, which Route 2 runs too) and by recovery
+ * (the tour's saved return hash). It replaced four hand-written branches in
+ * the old id-swap handler that sent `/timeline/<id>` to the element room, left
+ * `/writing/<id>` on the old id, and kept a map route's old map id.
  *
  * Callers apply the result with `location.replace`, never `navigate`: Back
  * must not lead to an id that no longer exists.

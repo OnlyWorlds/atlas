@@ -168,6 +168,9 @@ const MD_OW_LINK_RE = /\[([^\]]+?)\]\(ow:\/\/([a-z_-]+)\/([\w-]+)\)/gi;
 /** Bare ow:// URI outside link syntax (hand-typed) — same leak, no label. */
 const BARE_OW_LINK_RE = /ow:\/\/([a-z_-]+)\/([\w-]+)/gi;
 
+/** Scrub target for text that never chips (card field values): drop every link. */
+const NO_IDS: ReadonlySet<string> = new Set<string>();
+
 /**
  * Pre-resolve markdown for the payload (contract §2): ow:// links whose
  * target is NOT included become plain label text BEFORE the payload ships.
@@ -305,6 +308,10 @@ export function buildPagePayload(page: Element, elements: Element[], charts: Cha
       const frozen = freezeCircleBlock(b, elements, byId);
       return {
         ...frozen,
+        // S367 critic C12a: the knower's id ships only when the knower is
+        // itself included (the relation-token `ref` rule). Empty string, not
+        // absent: the viewer's parser drops a circle block without one.
+        knowerId: includedIds.has(frozen.knowerId) ? frozen.knowerId : '',
         entries: frozen.entries.map(e => ({
           ...e, markdown: scrubMarkdownForPayload(e.markdown, includedIds, byId),
         })),
@@ -360,7 +367,10 @@ export function projectElementEntry(
     if (!isPopulatedValue(raw)) continue;
     const kind = relationKindOf(el.type, field);
     if (kind === null) {
-      entry.fields[field] = raw;
+      // S367 critic C6: field text is public wire too. Scrub every ow:// link
+      // to its label (empty included set: cards render fields as plain text,
+      // so no link survives, disclosed or not).
+      entry.fields[field] = typeof raw === 'string' ? scrubMarkdownForPayload(raw, NO_IDS, byId) : raw;
       continue;
     }
     const rawIds = kind === 'single' ? [raw] : (Array.isArray(raw) ? raw : []);

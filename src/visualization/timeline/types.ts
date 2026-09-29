@@ -163,7 +163,7 @@ export interface ChartConfig {
    * The calendar LENS this chart was saved under (2B): a calendar Construct's
    * element id. Additive + optional — older readers ignore it, and a dangling
    * or malformed reference degrades to bare numbers (design §3). Covered by
-   * rewriteChartScopeIds on id-swap like the scope ids.
+   * rewriteChartScopeIds (the re-key kernel's step 5) like the scope ids.
    */
   calendarId?: string;
 }

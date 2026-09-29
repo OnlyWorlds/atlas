@@ -55,6 +55,21 @@ function levelFor(x: number, lastXAtLevel: Map<number, number>, maxLevel: number
   return maxLevel;
 }
 
+/** Half-width drawn around a zero-span axis; mirrors the room's S301 rule
+ *  (axis-calculator ZERO_SPAN_HALF_WINDOW), kept local so the show copy
+ *  stays import-free. */
+const ZERO_SPAN_HALF = 50;
+
+/**
+ * The axis range a frozen block DRAWS. A zero span (one dated element, or all
+ * on one date) is padded symmetrically so the date sits centred, as the live
+ * room does since S301 (S367 critic K6: it used to pin every node to PAD_X).
+ */
+export function drawnAxis(axisMin: number, axisMax: number): { lo: number; span: number } {
+  if (axisMax <= axisMin) return { lo: axisMin - ZERO_SPAN_HALF, span: 2 * ZERO_SPAN_HALF };
+  return { lo: axisMin, span: Math.max(1, axisMax - axisMin) };
+}
+
 export interface ChartViewOptions {
   /** Called when a node with a `ref` (a carded element) is clicked. */
   onRef?: (ref: string) => void;
@@ -114,11 +129,11 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, cssW, height);
 
-    const span = Math.max(1, block.axisMax - block.axisMin);
+    const { lo: axisLo, span } = drawnAxis(block.axisMin, block.axisMax);
     const plotW = cssW - 2 * PAD_X;
     const midY = PAD_TOP + (height - PAD_TOP - PAD_BOTTOM) / 2;
     const maxLevel = Math.max(1, Math.floor((height - PAD_TOP - PAD_BOTTOM) / 2 / Y_STEP));
-    const dateToX = (d: number): number => PAD_X + ((d - block.axisMin) / span) * plotW;
+    const dateToX = (d: number): number => PAD_X + ((d - axisLo) / span) * plotW;
 
     // Axis baseline.
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -135,10 +150,9 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       // this renderer just places text. Greedy left-to-right collision drop —
       // the bake pruned for a nominal width, the live width re-prunes.
       ctx.textAlign = 'center';
-      const span = Math.max(1, block.axisMax - block.axisMin);
       let lastRight = -Infinity;
       for (const t of block.axisTicks) {
-        const x = PAD_X + ((t.position - block.axisMin) / span) * plotW;
+        const x = dateToX(t.position);
         const half = ctx.measureText(t.label).width / 2 + 6;
         if (x - half < lastRight) continue;
         ctx.beginPath();
@@ -150,13 +164,16 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
         lastRight = x + half;
       }
       ctx.textAlign = 'left';
+    } else if (block.axisMax <= block.axisMin) {
+      // Zero span (S367 critic K6): the one date sits centred, labelled there.
+      ctx.textAlign = 'center';
+      ctx.fillText(String(block.axisMin), dateToX(block.axisMin), height - 8);
+      ctx.textAlign = 'left';
     } else {
       ctx.textAlign = 'left';
       ctx.fillText(String(block.axisMin), PAD_X, height - 8);
-      if (block.axisMax !== block.axisMin) {
-        ctx.textAlign = 'right';
-        ctx.fillText(String(block.axisMax), cssW - PAD_X, height - 8);
-      }
+      ctx.textAlign = 'right';
+      ctx.fillText(String(block.axisMax), cssW - PAD_X, height - 8);
     }
 
     if (opts.layout === 'strip') {

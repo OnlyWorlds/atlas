@@ -128,7 +128,9 @@ function buildSuggested(narrative: Element, dismissed: Set<string>): SuggestedRo
   let cursor: Element | null = narrative;
   while (cursor) {
     const parentId: string | undefined = (cursor as Element & { parent_narrative?: string }).parent_narrative;
-    if (!parentId) break;
+    // A parent cycle in world data would loop forever; stop at the first
+    // repeat (S367 critic C1).
+    if (!parentId || parentId === narrative.id || ancestorChain.has(parentId)) break;
     ancestorChain.add(parentId);
     cursor = byId.get(parentId) ?? null;
   }

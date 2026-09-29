@@ -1,5 +1,7 @@
 # Changelog
 
+> Pre-launch log, kept for history. Releases since v1.0 (2026-07-24) live in `src/changelog/changelog.data.ts`, published as `/changelog.html` and the RSS feed.
+
 ## Unreleased
 
 - The first screen is quieter: no boxes, no headings repeating their own buttons, just the mark, the name, what atlas is, and two small buttons. The OnlyWorlds mark opens onlyworlds.com.

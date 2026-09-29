@@ -449,3 +449,63 @@ describe('reconcile — a renamed element in the world\'s own export (S362)', ()
     expect(plan.creates.map(c => c.type).sort()).toEqual(['character', 'event']);
   });
 });
+
+describe('reconcile: the incoming-id remap reaches ow:// prose (S367 critic C8)', () => {
+  const X = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; // Dampworth in the export
+  const Y = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'; // Dampworth already in this world
+  const Z = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'; // a fresh id minted on collision
+  const N = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  function exportWith(chars: Array<{ id: string; name: string }>, story: string, cast: string[]) {
+    return parsePayload({
+      format: 'onlyworlds-world-export',
+      world: { name: 'Source' },
+      elements: {
+        character: chars,
+        narrative: [{
+          id: N, name: 'Chapter 3', characters: cast, story,
+          atlas_richtext_json: { type: 'doc', content: [{ type: 'elementChip', attrs: { id: cast[0], type: 'character' } }] },
+        }],
+      },
+    });
+  }
+  const chapter = (plan: ReturnType<typeof reconcile>) =>
+    plan.creates.find(c => c.type === 'narrative')!.data as Record<string, unknown>;
+
+  it('name-match merge: the story chip and the sidecar follow the existing id', () => {
+    const plan = reconcile(
+      exportWith([{ id: X, name: 'Dampworth' }], `Rain. [Dampworth](ow://character/${X}) waits. Raw ${X} stays.`, [X]),
+      [existingEl({ id: Y, type: 'character', name: 'Dampworth' })], {},
+    );
+    const ch = chapter(plan);
+    expect(ch.characters).toEqual([Y]);
+    expect(ch.story).toBe(`Rain. [Dampworth](ow://character/${Y}) waits. Raw ${X} stays.`); // bare uuid is text
+    const doc = ch.atlas_richtext_json as { content: Array<{ attrs: { id: string } }> };
+    expect(doc.content[0].attrs.id).toBe(Y);
+  });
+
+  it('id collision: the chip follows the re-minted id, not the unrelated element holding the old one', () => {
+    const plan = reconcile(
+      exportWith([{ id: X, name: 'Dampworth' }], `[Dampworth](ow://character/${X})`, [X]),
+      [existingEl({ id: X, type: 'character', name: 'Someone Else' })], { genId: () => Z },
+    );
+    const ch = chapter(plan);
+    expect(ch.characters).toEqual([Z]);
+    expect(ch.story).toBe(`[Dampworth](ow://character/${Z})`);
+  });
+
+  it('no chained rewrite: a relation already resolved to an id that is itself remapped stays put', () => {
+    // X merges into existing Y by name; the export's own Y collides with it and is re-minted to Z.
+    const plan = reconcile(
+      exportWith(
+        [{ id: X, name: 'Dampworth' }, { id: Y, name: 'Other' }],
+        `[D](ow://character/${X}) and [O](ow://character/${Y})`,
+        [X, Y],
+      ),
+      [existingEl({ id: Y, type: 'character', name: 'Dampworth' })], { genId: () => Z },
+    );
+    const ch = chapter(plan);
+    expect(ch.characters).toEqual([Y, Z]);
+    expect(ch.story).toBe(`[D](ow://character/${Y}) and [O](ow://character/${Z})`);
+  });
+});

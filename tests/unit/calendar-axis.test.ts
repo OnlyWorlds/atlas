@@ -111,6 +111,18 @@ describe('calendarTicks — year rung', () => {
     expect(ticks.length).toBeGreaterThan(2);
     expect(ticks.length).toBeLessThan(60);
   });
+
+  it('deep time spreads year ticks across the WHOLE axis, not the first 400 strides (S367 critic K4)', () => {
+    const cfg: CalendarConfig = { version: 1, grain: 'year', eras: [{ name: 'Aeon', abbrev: 'AE', start: 0 }] };
+    const min = 0; const max = 100_000_000; const w = 1000;
+    const toX = linearToX(min, max, w);
+    const years = calendarTicks(cfg, min, max, w, toX).filter(t => t.rung === 'year');
+    expect(years.length).toBeGreaterThanOrEqual(3);
+    expect(years.length).toBeLessThan(20);
+    expect(Math.max(...years.map(t => t.step))).toBeGreaterThan(max * 0.6);
+    const xs = years.map(t => toX(t.step)).sort((a, b) => a - b);
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(60);
+  });
 });
 
 describe('calendarTicks — month rung', () => {

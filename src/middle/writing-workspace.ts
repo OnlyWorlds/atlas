@@ -307,7 +307,10 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
    */
   const onWorkspaceHotkey = (e: KeyboardEvent): void => {
     const isMeta = e.ctrlKey || e.metaKey;
-    if (!isMeta) return;
+    // Shift combos belong to the global dispatcher: Ctrl+Shift+F is focus
+    // mode and used to open Find as well, pulling the caret out of the prose
+    // (S367 critic C10). Same rule for H.
+    if (!isMeta || e.shiftKey) return;
     // The compiled view is a rendering, not the source: find works, replace
     // is hidden (Ctrl+H opens find there), linking writes the subtree.
     const readOnly = !editorHandle && compiledCountFor !== null;

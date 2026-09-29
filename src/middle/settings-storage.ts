@@ -15,6 +15,7 @@ import {
   setSyncDefaultPolicy,
   setSyncConfirmServerDeletes,
   setSyncPauseAll,
+  effectiveSyncPaused,
 } from '../registry/registry';
 import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
 import { finishSetupDoor } from '../setup/world-doors';
@@ -22,6 +23,7 @@ import { ToastManager } from '../ui/toast-manager';
 import {
   getCurrentSyncEngine,
   getCurrentSyncFolder,
+  getCurrentSyncWorldId,
   refreshConflictsCount,
 } from '../sync/sync-attach';
 import type { WorldsRegistry } from '../core/types';
@@ -210,13 +212,18 @@ function wireSyncTab(toasts: ToastManager): void {
     const next = setSyncPauseAll(getState().registry, pauseAll.checked);
     saveRegistry(next);
     patchSlice('registry', next);
-    // Toggle engine pause state to match.
+    // Match the engine to the EFFECTIVE pause: turning Pause all off must not
+    // resume a world the user keeps offline (S367 critic C7).
     const engine = getCurrentSyncEngine();
+    const entry = next.worlds.find(w => w.id === getCurrentSyncWorldId());
+    const stillPaused = effectiveSyncPaused(entry, next);
     if (engine) {
-      if (pauseAll.checked) engine.pause('manual');
+      if (stillPaused) engine.pause('manual');
       else engine.resume();
     }
-    toasts.info(pauseAll.checked ? 'All sync paused' : 'Sync resumed');
+    toasts.info(pauseAll.checked
+      ? 'All sync paused'
+      : entry?.sync_paused ? 'Sync resumed. This world stays offline.' : 'Sync resumed');
   });
 
   pullOnAct?.addEventListener('change', () => {

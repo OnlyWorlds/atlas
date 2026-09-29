@@ -15,11 +15,13 @@
  *      but they're equally part of the user's keyboard + mouse vocabulary.
  */
 
-import { formatCombo, getInstalledBindings } from '../core/hotkeys';
+import { comboParts, getInstalledBindings } from '../core/hotkeys';
 
 interface Row {
   /** kbd-rendered combo or affordance label (e.g. "Ctrl+E", "Right-click pin"). */
   combo: string;
+  /** Hotkey rows: the binding's parts, each rendered as a chip (S367 critic C12c). */
+  parts?: string[];
   /** Plain-language description shown next to the combo. */
   description: string;
   /** Whether `combo` should render as a <kbd>-styled chip or plain text. */
@@ -85,7 +87,8 @@ function hotkeySections(): Section[] {
   const grouped = new Map<string, Row[]>();
   for (const b of bindings) {
     const row: Row = {
-      combo: formatCombo(b),
+      combo: comboParts(b).join('+'),
+      parts: comboParts(b),
       description: b.description,
       comboAsKbd: true,
     };
@@ -130,7 +133,14 @@ export function buildShortcutsContent(): HTMLElement {
     list.className = 'atlas-shortcuts-list';
     for (const row of rows) {
       const dt = document.createElement('dt');
-      if (row.comboAsKbd) {
+      if (row.parts) {
+        row.parts.forEach((p, i) => {
+          if (i > 0) dt.appendChild(document.createTextNode(' + '));
+          const kbd = document.createElement('kbd');
+          kbd.textContent = p;
+          dt.appendChild(kbd);
+        });
+      } else if (row.comboAsKbd) {
         renderKbdCombo(dt, row.combo);
       } else {
         dt.textContent = row.combo;

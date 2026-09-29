@@ -143,7 +143,7 @@ Builder guarantees (all test-locked): prose blocks ship markdown only (no TipTap
 
 **Theme** (session 239, S3 — live): the `theme` slot carries allowlist-validated tokens only — `accent` (curated hex set) · `font` (pairing key) · `mode` (dark/light) · `density` (compact/cozy/airy) · `width` (narrow/regular/wide) · `cover` (https URL). Unknown keys/values are dropped at build AND at viewer parse (no style injection path).
 
-**Circle blocks** (session 238, atlas+viewer concern — opaque to Django): in the payload a circle block carries its compilation FROZEN at build time: `{ "id", "kind": "circle", "knowerId", "title": "<knower name>", "knowerType": "collective"|"character", "entries": [ { "title", "markdown" } ] }`. Entry markdown follows the same prose disclosure rule at render time.
+**Circle blocks** (session 238, atlas+viewer concern — opaque to Django): in the payload a circle block carries its compilation FROZEN at build time: `{ "id", "kind": "circle", "knowerId", "title": "<knower name>", "knowerType": "collective"|"character", "entries": [ { "title", "markdown" } ] }`. Entry markdown follows the same prose disclosure rule at render time. `knowerId` carries the knower's id only when the knower is itself included in `elements{}`, else `""` (atlas 1.14, S367: the same ref-only-when-included rule as relation tokens; the key stays a string because the viewer drops a circle block without one).
 
 ### 5.2 GET response envelope
 

@@ -5,7 +5,7 @@
  * coalesce into one push. Used by element-detail.ts after every folder write.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { FakeOwApiClient } from '../fixtures/fake-ow-client';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
@@ -15,6 +15,10 @@ let folder: MockFolderStore;
 let client: FakeOwApiClient;
 let engine: SyncEngine;
 let clock: MonotonicClock;
+
+// Every test file shares ONE fork (vitest.config.ts): fake timers left on
+// here froze every later file's timeouts (S367: the route2-gate files).
+afterEach(() => { vi.useRealTimers(); });
 
 beforeEach(async () => {
   vi.useFakeTimers();

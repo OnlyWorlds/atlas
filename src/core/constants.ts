@@ -6,8 +6,18 @@ import { ELEMENT_ICONS as SDK_ELEMENT_ICONS } from '@onlyworlds/sdk';
 import type { ElementType } from './types';
 import { ELEMENT_FAMILIES, elementColor } from './element-colors';
 
-/** Material Symbol name per element type (re-exported from SDK with strict typing). */
-export const ELEMENT_ICONS = SDK_ELEMENT_ICONS as Record<ElementType, string>;
+/**
+ * Material Symbol name per element type (re-exported from SDK with strict typing).
+ * One local override: SDK 4.3.0 gives Marker `location_on`, the glyph the map
+ * toolbar's show/hide pins button already uses. Skeld's next dist serial moves
+ * Marker to `polyline` (a marker is a vertex of a zone's line); atlas takes it
+ * now. `place` is no stopgap: it is an alias of the same pin glyph. Drop the
+ * override once the SDK ships `polyline`.
+ */
+export const ELEMENT_ICONS = {
+  ...(SDK_ELEMENT_ICONS as Record<ElementType, string>),
+  marker: 'polyline',
+} as Record<ElementType, string>;
 
 /**
  * Element-type color palette — used by the context-pane graph for optional
@@ -222,8 +232,9 @@ export const ATLAS_LOCAL_ONLY_FIELDS = [
   // Sharing page composition (DESIGN_SHARING.md, core/sharing.ts). Stored on
   // Narrative elements with subtype 'page'. The blocks array is the page's
   // source of truth; `atlas_page_refs` is the flat element-id mirror that
-  // keeps element-card bindings id-swap-safe (rewriteIdReferences handles
-  // flat arrays; blocksOf() heals nested ids from the mirror). Intent is the
+  // keeps element-card bindings safe when ids change (the re-key kernel's
+  // rekeyBody handles flat arrays and walks the blocks too; blocksOf() heals
+  // nested ids from the mirror). Intent is the
   // sharing axis (show/reference/publish); theme is reserved for the S3
   // token work. The canonical `story` field carries a derived plain-markdown
   // compilation (synced); these four never reach the OW API.

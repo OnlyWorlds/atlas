@@ -24,7 +24,7 @@ If you ever touch the adapter, run `ow-v2-client-adapter.test.ts`.
 
 ## Server-assigned ids — DORMANT under keel (id-swap machinery kept dead-but-safe)
 
-**Keel preserves client ids** (v1 AND v2, probed live 2026-07-12): `crypto.randomUUID()` v4 ids land verbatim; a duplicate POST returns 409 `id_conflict`; v2 PUT is create-or-replace upsert. **EXCISED (cleanup bout, 2026-07-12 evening)**: the engine's create-path swap branch and the engine `onIdSwap` hook are gone (`rewriteIdReferences` survives in Route 2's merge, `make-online.ts`, a flat rewrite that misses chips, `ow://` prose and page blocks until the Route 2 bout moves it onto the re-key kernel) — a server that reassigns an id on CREATE now produces a loud per-element failure (contract violation; nothing stamped, retried next round). Route 2's MATCH-phase swaps (same name+type, different ids across machines) remain real and keep `applyIdSwapToUi`/`handleIdSwap` (UI + URL + favorites migration). The legacy v1 `OwClientAdapter` and its dedicated suites were retired in the same bout (its 5 flow suites migrated to `statefulV2Handlers`/the v2 adapter); the v1 `worldsync` create-world route stays (still v1 in production).
+**Keel preserves client ids** (v1 AND v2, probed live 2026-07-12): `crypto.randomUUID()` v4 ids land verbatim; a duplicate POST returns 409 `id_conflict`; v2 PUT is create-or-replace upsert. **EXCISED (cleanup bout, 2026-07-12 evening)**: the engine's create-path swap branch and the engine `onIdSwap` hook are gone (`rewriteIdReferences` survived in Route 2's merge until S367 moved Route 2 onto the re-key kernel) — a server that reassigns an id on CREATE now produces a loud per-element failure (contract violation; nothing stamped, retried next round). Route 2's name matches (same name+type, different ids across machines) remain real; since S367 they move through the re-key kernel and `rekeyLiveUi`. The legacy v1 `OwClientAdapter` and its dedicated suites were retired in the same bout (its 5 flow suites migrated to `statefulV2Handlers`/the v2 adapter); the v1 `worldsync` create-world route stays (still v1 in production).
 
 HISTORY (pre-keel): the old Django server assigned its OWN UUID v7 on CREATE, overriding client v4 ids — everything below was load-bearing then.
 
@@ -38,7 +38,7 @@ History (pre-keel), no longer the code path. keel keeps client ids, so this cann
 
 ### The id-swap fix
 
-History (pre-keel), no longer the code path. The engine's create-path swap was excised 2026-07-12; Route 2's match-phase swaps are the only swaps left (DESIGN_SYNC "Make Online").
+History (pre-keel), no longer the code path. The engine's create-path swap was excised 2026-07-12; Route 2's name matches are the only id moves left besides the Settings re-key, and both run on the re-key kernel (DESIGN_SYNC "Make Online").
 
 Both `pushPhase` and `mergeLocalIntoApi`'s CREATE branch do this:
 
@@ -68,11 +68,13 @@ If you create Location locally and link a Character to it (`birthplace`), then p
 
 `pushPhase` partitions `changed` into [no-server-baseline (CREATEs)] then [has-server-baseline (UPDATEs)]. Within each partition, iteration order doesn't matter for non-chain cases.
 
-For Route 2 merge (`mergeLocalIntoApi`), bidirectional FK between matched + new locals required a **5-phase order** — see "Merge phase ordering" below.
+For Route 2 merge (`mergeLocalIntoApi`), bidirectional FK between matched + new locals once required a 5-phase order ("Merge phase ordering" below, now history). Since S367 the kernel moves ids first, so the server phase is plain: downloads, creates, matched updates.
 
 ---
 
 ## Merge phase ordering (the hardest piece)
+
+History (S367), no longer the code path: Route 2 moves name-matched locals onto their server ids with the re-key kernel BEFORE any server call ("Route 2 on the re-key kernel" below), so every server decision is same-id and no rewrite runs between phases. What follows is why the old order existed.
 
 Route 2 merge has a unique circular-FK problem:
 - Matched element (e.g. Splashworth on api) may reference new locals (Bob, Carol) via friends/rivals
@@ -389,6 +391,8 @@ The `OwClientAdapter` maintains the paginated-types Set as part of its hot state
 
 ## Chain-CREATE FK gap in Route 2 merge (closed Bout V)
 
+History (S367): `applyIdSwapsToBody` is gone with the old phase order; creates now read their bodies from disk after the kernel moved every id.
+
 (Added Bout V, session 202.)
 
 `mergeLocalIntoApi`'s phase 4b-2 processes all `createDecisions` sequentially. The five-phase comment claims phase 4b-3's `rewriteIdReferences` corrects any server-assigned-id mismatches before phase 4b-4's matched UPDATEs. True — but only for LOCAL files.
@@ -442,7 +446,7 @@ Same fix covers `resolveConflict('overwrite-mine')` — that path also does an U
 
 ## ID-swap propagates to UI state + URL (closed Bouts 9 + 9b)
 
-History (pre-keel), no longer the code path. The engine has no `onIdSwap` hook (`sync-attach.ts`); `handleIdSwap` survives for Route 2's match-phase swaps through `applyIdSwapToUi`, and the atomic-transition rule below still holds there.
+History, no longer the code path. The engine has no `onIdSwap` hook, and `handleIdSwap` / `applyIdSwapToUi` were deleted in S367 with their last caller: Route 2 now moves ids through the re-key kernel and the screen follows once through `rekeyLiveUi` (`sync/rekey-run.ts`), which reloads elements from disk instead of grafting (the graft below was rejected by the re-key gate, lens 3 F7).
 
 (Added Bout 9, session 204.)
 
@@ -458,7 +462,7 @@ The in-memory id-substitution carries the old entry's content with the new id gr
 
 Verified by a regression test that subscribes + counts notifications (dual-patch produces 2, atomic `setState` produces 1).
 
-**Other id-swap call sites**: `mergeLocalIntoApi` accumulates `idSwaps`, applies file-level rewrites between phases, and DOES emit `onIdSwap` for UI propagation (`make-online.ts`; the S365 lane A census found the older line here stale). Merge runs inside the make-online modal — user typically isn't viewing a specific merged element when the modal closes. Defer wiring unless smoke surfaces a flash there. Same for `resolveConflict('overwrite-mine')` CREATE branch (also doesn't id-swap currently — separate corner case).
+**Other id-swap call sites**: none since S367 (`mergeLocalIntoApi` lost `idSwaps` and `onIdSwap`; see "Route 2 on the re-key kernel"). `resolveConflict('overwrite-mine')`'s CREATE branch never id-swapped.
 
 ---
 
@@ -505,7 +509,7 @@ Updated through session 257. Listed by surface — none are cutover blockers.
 - ~~**Concurrent-edit race on autosave**~~ CLOSED: an edit landing while its push is in flight stays dirty (S360 H1, `store/sync-stamp.ts`, convention 96); a create adopted after a lost response compares content and stays dirty when it differs (S361, `adoptServerCopy`). Pull-apply rides the per-id chain with its race check inside the slot (S361, `applyServerRecordIfUnchanged`). Push still stamps only, never applies the response body (by design).
 - **`pushPhase` UPDATE doesn't apply server response back to local**: refuted-by-design from session-205 pressure-test (push asserts local is correct). Revisit only if OW server starts normalizing fields server-side.
 - History (pre-keel), no longer the code path. **`resolveConflict` CREATE path id-swap**: corner case — resolve-conflict on never-synced element doesn't swap if server returns a different id. Not tripped in practice.
-- **`rewriteIdReferences` bumps `local_updated_at`** (Route 2 only, `make-online.ts`; the engine no longer calls it): causes harmless re-push on next sync after id-swap. Add a "rewrite without bumping" mode if the trailing-push cost ever shows up in profiling.
+- ~~**`rewriteIdReferences` bumps `local_updated_at`**~~ GONE (S367): the function went with the old Route 2. The kernel's referrer rewrites stamp too, and the server phase then uploads them (a referrer is created or matched in the same run).
 
 ### Reliability edges
 - **Cascade-delete loop crash leaves inconsistent state** (pressure-test Path 10): FS Access API has no transactions. Pre-collect tombstones into one write before unlinking files would harden. Worst case today: "confusing server-delete modal on next sync."
@@ -754,3 +758,13 @@ keel preserves client ids and refuses a create whose id lives in another world. 
 - **The journal gate is a round's first disk touch**, so its throw must settle like any round error or the pill sits on "Saving" for good.
 - **The mock cannot see directories.** The crash matrix passed on MockFolderStore while the real store deleted loose media, left a body-type/directory mismatch on disk, and ignored a cross-layout shadow copy. The composition gate ran the REAL FsFolderStore on an in-memory FS (`tests/fixtures/fake-fs.ts`) to find them; keep a real-store variant of any kernel test.
 - **Discard is an undo, not a forget.** Forgetting a journal left new elements naming new elements never written, and twins with nothing to say which to keep.
+
+## Route 2 on the re-key kernel (S367)
+
+The old Route 2 decided "local O is server N" from disk in a match phase, told the UI at once, and then walked a flat id rewrite between five server phases. Three lessons made the rebuild:
+
+- **A matcher that re-derives identity from disk cannot read a half-done move.** A crash between writing N and removing O left both; on the rerun the id-tail order of the two filenames decided whether O re-matched or fell to a create, so the server got a second Alice about half the time (S365 lane A H9). The fix was not a smarter matcher but an order: the journaled kernel moves O onto N BEFORE any server call, nothing matches against a world while a journal exists, and after the kernel every server decision is keyed by an id that never changes again.
+- **A one-pass matcher lets a same-named local steal an id match** (H10), and `'   '` is truthy (H11). `planMerge` runs ids over every local before names, and an empty normalised name never matches. A name shared on one side is skipped and reported, not guessed (Captain).
+- **The UI moved before the disk** (H7): favourites, camera, URL and a grafted element on ids the folder never got when the merge then failed. Now nothing moves before the kernel; `onRekeyed` lets the screen follow the moment the disk has.
+
+The runner shares the Settings re-key's single flight (`withIdMoveLock`), which also waits out a live-folder pass already running (`settleLivePass`), and runs the link step inside the lock. A kernel failure is finished from its journal and merged again; a second failure leaves a journal whose `origin: 'merge'` makes the copy say to run Make online again. Records: design `Forge/Notes/2026-09-29-s365-orient/lane-a-route2.md`, recheck `Forge/Notes/2026-09-29-s366-orient/lane-b-route2-recheck.md`, gate `Forge/Notes/2026-09-29-s367-gate/`.

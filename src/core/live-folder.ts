@@ -21,6 +21,7 @@
 
 import { getState, patchSlice } from './state';
 import { getActiveStore } from './active-store';
+import { isZoneGestureActive } from './zone-gesture';
 import { flushBeforeLeavingWorld } from './leave-flush';
 import { onHashChange, parseHash } from './router';
 import type { DiskChange, FolderStore } from '../store/folder-store';
@@ -142,6 +143,21 @@ export function setDiskShowOnly(on: boolean): void {
   setNotice({ ...n, showOnly: on });
 }
 
+/**
+ * Ids moved (the re-key, Route 2): the marks follow them, or a notice would
+ * count an element that is gone and miss its successor (S367 lane B N8).
+ */
+export function remapDiskNoticeIds(worldId: string, map: ReadonlyMap<string, string>): void {
+  const n = notices.get(worldId);
+  if (!n) return;
+  const re = (s: Set<string>): Set<string> =>
+    [...s].some(id => map.has(id)) ? new Set([...s].map(id => map.get(id) ?? id)) : s;
+  const marked = re(n.marked);
+  const notSynced = re(n.notSynced);
+  if (marked === n.marked && notSynced === n.notSynced) return;
+  setNotice({ ...n, marked, notSynced });
+}
+
 /** Opening an element (in any room) clears its mark. */
 function markSeen(id: string): void {
   const n = getDiskNotice();
@@ -221,6 +237,16 @@ export function adoptPersistedDiskHold(worldId: string, engine: { hold(reason: '
 }
 
 /**
+ * Wait out a pass already in flight (S367, lane B N2). An id move takes the
+ * re-key single-flight first, which stops every NEW pass; one that started
+ * before could still land its element list over the move's. Never throws.
+ */
+export async function settleLivePass(): Promise<void> {
+  const r = running;
+  if (r) await r.promise.catch(() => undefined);
+}
+
+/**
  * One pass for the active world. `force` skips the focus throttle (revive,
  * the command, tests); `full` confirms every file by content. Never runs while
  * a world is loading, while touring (the tour world is Atlas's own scaffold),
@@ -252,7 +278,7 @@ export function rescanNow(opts: { force?: boolean; full?: boolean } = {}): Promi
   // Atlas's own scaffold; asked of the ACTIVE world, not the tour flag,
   // which is shared by every tab (S365 lane B L1).
   const touring = getState().registry.worlds.find(w => w.id === worldId)?.demo === true;
-  if (getState().data.loading || touring || ui.zoneEditing || ui.pinPlacement) {
+  if (getState().data.loading || touring || isZoneGestureActive() || ui.pinPlacement) {
     return Promise.resolve({ changes: [], skipped: 'busy' });
   }
   // Claimed SYNCHRONOUSLY (B9): a focus and a visibilitychange in one tick

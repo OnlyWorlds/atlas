@@ -65,7 +65,7 @@ import type {
   WorldMeta,
   Zone,
 } from '../core/types';
-import type { FolderStore, ListElementsOptions, RekeyJournal, DiskChange, RescanResult } from './folder-store';
+import type { FolderStore, ListElementsOptions, RekeyJournal, ApplyServerRecordOpts, DiskChange, RescanResult } from './folder-store';
 import { journalIds, RekeyPendingError } from './folder-store';
 import type { ChartConfig } from '../visualization/timeline/types';
 import { newId, nowIso } from './folder-store';
@@ -2239,10 +2239,13 @@ export class FsFolderStore implements FolderStore {
    * the one element write outside it, so a user save landing between the
    * engine's race check and this write was overwritten and read as synced.
    */
-  async applyServerRecord(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
+  async applyServerRecord(
+    type: ElementType, record: Record<string, unknown>, server_updated_at: string,
+    opts: ApplyServerRecordOpts = {},
+  ): Promise<Element> {
     const id = record.id as string;
     if (!id) throw new Error('applyServerRecord: record missing id');
-    return this.writeChain.run(id, () => this.applyServerRecordUnchained(type, record, server_updated_at));
+    return this.writeChain.run(id, () => this.applyServerRecordUnchained(type, record, server_updated_at, opts));
   }
 
   /**
@@ -2271,7 +2274,10 @@ export class FsFolderStore implements FolderStore {
     });
   }
 
-  private async applyServerRecordUnchained(type: ElementType, record: Record<string, unknown>, server_updated_at: string): Promise<Element> {
+  private async applyServerRecordUnchained(
+    type: ElementType, record: Record<string, unknown>, server_updated_at: string,
+    opts: ApplyServerRecordOpts = {},
+  ): Promise<Element> {
     const id = record.id as string;
 
     // Preserve atlas-extension fields from the existing local file per the
@@ -2290,6 +2296,7 @@ export class FsFolderStore implements FolderStore {
     const preserved: Record<string, unknown> = {};
     if (existing) {
       for (const field of ATLAS_LOCAL_ONLY_FIELDS) {
+        if (opts.dropLocal?.includes(field)) continue;
         const value = (existing as Record<string, unknown>)[field];
         if (value !== undefined) preserved[field] = value;
       }
