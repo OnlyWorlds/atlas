@@ -56,6 +56,85 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.12',
+    date: '2026-09-29',
+    theme: 'open what your AI made',
+    entries: [
+      {
+        id: 'open-a-world-folder-first',
+        title: 'Open a world folder on your first visit',
+        body: 'The first screen now has "open a world folder": pick a folder your AI or another tool made and it opens where it is, with nothing copied. Atlas asks where to keep new worlds only when you first make one, and "set up a folder" pointed at a world folder opens that world too.',
+        tags: ['folders'],
+      },
+      {
+        id: 'add-a-world-button',
+        title: 'Add a world: one button that says every way in, in words',
+        body: 'Under the icons at the top of the Worlds list, "add a world" lists each way to start, open, bring down or view a world, with a line on each. Ctrl+K finds it too, and Settings, then General can hide the icon row.',
+        tags: ['sidebar'],
+      },
+      {
+        id: 'scene-edited-while-closed',
+        title: 'A scene edited while Atlas was closed opens with the new text',
+        body: 'When another tool changed the text of a scene or knowledge entry while Atlas was closed, Atlas opened its own older copy, and its next save wrote over the change. It now opens the new text and says so once.',
+        tags: ['writing', 'folders', 'fix'],
+      },
+      {
+        id: 'big-batch-at-open',
+        title: 'A big batch of outside edits asks before it uploads when a world opens',
+        body: 'When more than 50 elements are waiting to upload as a linked world opens, for example after an AI rewrote the folder overnight, sync waits until you choose Upload them or Stay offline, as it already did with Atlas open.',
+        tags: ['sync', 'folders'],
+      },
+      {
+        id: 'delete-world-stays-home',
+        title: 'Deleting a world only ever deletes that world\'s own folder',
+        body: 'Delete world and folder now checks that the world\'s folder sits inside your OnlyWorlds folder before anything happens. A world opened from elsewhere is left alone and Atlas says how to remove it; before, it could delete a different world with the same folder name.',
+        tags: ['worlds', 'safety', 'fix'],
+      },
+      {
+        id: 'quick-return-still-checks',
+        title: 'An edit made seconds after you left Atlas still shows',
+        body: 'Atlas checks the folder at most once every 5 seconds when you come back to its window. Coming back sooner now checks again once the 5 seconds pass, so the edit shows without switching windows again.',
+        tags: ['folders', 'fix'],
+      },
+      {
+        id: 'tour-tab-leaves-live-folder',
+        title: 'A tour in another tab no longer stops Atlas noticing outside edits',
+        body: 'Running the guided tour in one tab stopped every other Atlas tab from picking up changes to its world folder. Only the tour world itself is skipped now.',
+        tags: ['folders', 'fix'],
+      },
+      {
+        id: 'two-tabs-keep-settings',
+        title: 'Two Atlas tabs no longer undo each other\'s world changes',
+        body: 'Notes typed in one tab, or a world taken online there, could go back to the old version when the other tab opened that world. Each tab now saves only what it changed, and picks up what the other tab saved.',
+        tags: ['worlds', 'safety'],
+      },
+      {
+        id: 'world-notes-merge-while-open',
+        title: 'World notes changed on another computer survive while the world is open',
+        body: 'If a world\'s notes or cast changed through Dropbox, OneDrive or git while you had it open, your next change no longer writes over them, and when both sides changed the notes, both are kept. Notes on a view-only world no longer repeat at each open.',
+        tags: ['folders', 'fix'],
+      },
+      {
+        id: 'folder-of-worlds-says-so',
+        title: 'Picking a folder that holds several worlds says so',
+        body: '"Open a world folder" pointed at a folder of world folders now says how many worlds it found and to pick one of them, instead of "no world.json".',
+        tags: ['folders'],
+      },
+      {
+        id: 'link-all-keeps-clear',
+        title: 'The link-all button no longer covers the first line of text',
+        body: 'The corner button that links every mention sat over the last words of the first line. Scenes and knowledge entries now keep room for it.',
+        tags: ['writing', 'layout', 'fix'],
+      },
+      {
+        id: 'tour-maps-offline',
+        title: 'The tour\'s maps show offline after one run online',
+        body: 'Map pictures are kept once they have loaded, so the tour and the example page show them offline afterwards.',
+        tags: ['tour', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.11',
     date: '2026-09-29',
     theme: 'what you wrote stays yours',

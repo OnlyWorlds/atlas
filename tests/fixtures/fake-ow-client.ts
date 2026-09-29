@@ -13,8 +13,9 @@
  *     per-element createOrder tests still exercise the fallback path);
  *   - `pullChanges` implements `/changes` over an internal commit-ordered op
  *     log (every create/update/bulk/delete/__server_mutate appends an op);
- *     opt-in via `__enable_changes()` for the same reason as bulkCreate — the
- *     engine dispatches its pull phase on the method's mere presence.
+ *     ON by default since S365, because production's adapter always has it and
+ *     the engine dispatches its pull phase on the method's mere presence;
+ *     `__enable_changes(false)` opts a test into the full-list fallback.
  */
 
 import type { OwApiClient, BulkItem, BulkResult, ChangesPage, WorldMetaWire } from '../../src/sync/sync-engine';
@@ -134,6 +135,13 @@ export class FakeOwApiClient implements OwApiClient {
     | { method: 'getWorldMeta' }
     | { method: 'patchWorldMeta'; body: Record<string, unknown> }
   > = [];
+  /**
+   * `/changes` pages served, counted apart from `calls` so the tests that
+   * assert exact call sequences keep their meaning. It tells "no pull ran"
+   * from "a /changes pull ran" (S365 gate lens A M4: `list` counts alone went
+   * blind when /changes became the default).
+   */
+  changesPulls = 0;
 
   setClock(fn: () => string): void { this.clock = fn; }
 
@@ -416,15 +424,15 @@ export class FakeOwApiClient implements OwApiClient {
   }
 
   /**
-   * GET /changes — one page of the internal commit-ordered op log. OPT-IN via
-   * `__enable_changes()`, mirroring `__enable_bulk`: the engine's pullPhase
-   * DISPATCHES on `typeof client.pullChanges === 'function'`, so an
-   * always-present method would reroute every legacy pull test (including the
-   * absence-inference pagination-guard trio in sync-engine.serverDelete)
-   * through the cursor path. Off by default keeps the full-list fallback
-   * exercised; changes-pull tests call `__enable_changes()`.
+   * GET /changes — one page of the internal commit-ordered op log. ON by
+   * default (S365): production's adapter always defines it and the engine's
+   * pullPhase DISPATCHES on `typeof client.pullChanges === 'function'`, so a
+   * fake without it ran every pull test through a full-list path no user ever
+   * gets (25 files did). Tests of that fallback on purpose (the serverDelete
+   * pagination-guard trio, one authBlocked case) call `__enable_changes(false)`.
    */
-  pullChanges?: (since: string | null, limit?: number) => Promise<ChangesPage>;
+  pullChanges?: (since: string | null, limit?: number) => Promise<ChangesPage> =
+    (since, limit) => this.runPullChanges(since, limit);
 
   /** Test seam: attach (or detach) the optional `/changes` method. */
   __enable_changes(enabled = true): void {
@@ -441,6 +449,7 @@ export class FakeOwApiClient implements OwApiClient {
    * is empty.
    */
   private async runPullChanges(since: string | null, limit = 100): Promise<ChangesPage> {
+    this.changesPulls++;
     this.throwIfAuthBlocked();
     const sinceSeq = since ? parseInt(since.split(':')[0], 10) : 0;
     const pending = this.opLog.filter(o => o.seq > sinceSeq);
@@ -636,6 +645,8 @@ export class FakeOwApiClient implements OwApiClient {
   __server_get(type: ElementType, id: string): ServerRecord | undefined { return this.bucket(type).get(id); }
   /** Directly drop a record from the store WITHOUT a call/op — simulates an
    *  out-of-band server delete for dangling-link routing tests. */
+  /** Drops a record WITHOUT a delete op: /changes never reports it (a server
+   *  that lost a row silently). Use `deleteElement` for a delete the feed sees. */
   __server_evict(type: ElementType, id: string): void { this.bucket(type).delete(id); }
 }
 

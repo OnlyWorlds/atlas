@@ -16,7 +16,86 @@ import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 
 // ---- Persistence ----
 
+/**
+ * TWO TABS, ONE REGISTRY (S365 lane B M2). Every tab holds the whole registry
+ * in memory and every save used to write all of it, so a tab saving for world
+ * V (a world switch stamps last_opened_at) put back ITS old copy of world W:
+ * notes typed in the other tab, a Make Online done there. A save now merges
+ * per entry against `tabBase`, this tab's view as it last loaded or saved it:
+ * an entry (or top-level field) this tab did not change is taken from storage
+ * as it is now; one it changed, added or removed is this tab's. Inside an
+ * entry the same rule runs PER FIELD (gate lens A H1: opening world W stamps
+ * `last_opened_at`, and a whole-entry rule then let this tab's stale copy of
+ * W erase the other tab's notes or Make Online). Two tabs changing the SAME
+ * field: the later save wins. And a tab learns of another's saves as they
+ * happen (`adoptStoredRegistry`, called on the `storage` event), so its
+ * memory does not go stale in the first place.
+ */
+let tabBase: WorldsRegistry | null = null;
+
+const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+/** Three-way per key: a key this side left as the base says takes the stored value. */
+function mergeFields(b: Record<string, unknown>, m: Record<string, unknown>, d: Record<string, unknown>, skip?: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of new Set([...Object.keys(b), ...Object.keys(m), ...Object.keys(d)])) {
+    if (k === skip) continue;
+    const src = same(m[k], b[k]) ? d : m;
+    if (k in src && src[k] !== undefined) out[k] = src[k];
+  }
+  return out;
+}
+
+/** The merge behind `saveRegistry`: per entry, and per field inside an entry. Pure; exported for tests. */
+export function mergeRegistry(base: WorldsRegistry, mine: WorldsRegistry, stored: WorldsRegistry): WorldsRegistry {
+  const out = mergeFields(base as unknown as Record<string, unknown>, mine as unknown as Record<string, unknown>, stored as unknown as Record<string, unknown>, 'worlds');
+  const baseById = new Map(base.worlds.map(w => [w.id, w]));
+  const storedById = new Map(stored.worlds.map(w => [w.id, w]));
+  const mineIds = new Set(mine.worlds.map(w => w.id));
+  const worlds: WorldRegistryEntry[] = [];
+  for (const w of mine.worlds) {
+    const was = baseById.get(w.id);
+    const now = storedById.get(w.id);
+    if (was && same(w, was)) {
+      if (now) worlds.push(now); // unchanged here: storage's copy (absent = another tab forgot it)
+    } else if (was && now) {
+      // Changed here AND still stored: field by field.
+      worlds.push(mergeFields(was as unknown as Record<string, unknown>, w as unknown as Record<string, unknown>, now as unknown as Record<string, unknown>) as unknown as WorldRegistryEntry);
+    } else {
+      worlds.push(w);
+    }
+  }
+  for (const w of stored.worlds) {
+    if (!mineIds.has(w.id) && !baseById.has(w.id)) worlds.push(w); // another tab added it
+  }
+  out.worlds = worlds;
+  return out as unknown as WorldsRegistry;
+}
+
 export function loadRegistry(): WorldsRegistry {
+  const reg = readRegistry();
+  tabBase = JSON.parse(JSON.stringify(reg)) as WorldsRegistry;
+  return reg;
+}
+
+/**
+ * Another tab saved (the `storage` event): fold storage into this tab's view,
+ * keeping what this tab changed and has not saved yet, and re-base. Returns
+ * the registry to patch into state, or null when nothing changed here.
+ */
+export function adoptStoredRegistry(current: WorldsRegistry): WorldsRegistry | null {
+  const stored = readRegistry();
+  const merged = tabBase ? mergeRegistry(tabBase, current, stored) : stored;
+  tabBase = JSON.parse(JSON.stringify(stored)) as WorldsRegistry;
+  return same(merged, current) ? null : merged;
+}
+
+/** Tests: make the next save merge as a tab whose view is `reg` would. */
+export function __setRegistryTabBaseForTests(reg: WorldsRegistry | null): void {
+  tabBase = reg ? JSON.parse(JSON.stringify(reg)) as WorldsRegistry : null;
+}
+
+function readRegistry(): WorldsRegistry {
   try {
     const raw = localStorage.getItem(REGISTRY_STORAGE_KEY);
     if (!raw) return defaultRegistry();
@@ -43,7 +122,19 @@ export function loadRegistry(): WorldsRegistry {
 
 export function saveRegistry(reg: WorldsRegistry): void {
   try {
-    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(reg));
+    let out = reg;
+    if (tabBase) {
+      const raw = localStorage.getItem(REGISTRY_STORAGE_KEY);
+      // Nothing stored = nothing another tab kept: entries this tab did not
+      // change are dropped with it (a save after "clear site data" must not
+      // bring the forgotten worlds back, S364's flake).
+      // Stored but unreadable: write this tab's copy whole, as before.
+      let readable = true;
+      try { readable = !raw || Array.isArray((JSON.parse(raw) as { worlds?: unknown })?.worlds); } catch { readable = false; }
+      if (readable) out = mergeRegistry(tabBase, reg, raw ? readRegistry() : defaultRegistry());
+    }
+    localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(out));
+    tabBase = JSON.parse(JSON.stringify(reg)) as WorldsRegistry;
   } catch (err) {
     console.error('[registry] save failed:', err);
   }

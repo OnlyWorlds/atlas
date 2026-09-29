@@ -14,6 +14,7 @@
  * JSON via the session-254 script in PROGRESS (source: Forge/Notes/sikelia/).
  */
 
+import { isAtlasGrounded } from '../core/grounded';
 import { navigate } from '../core/router';
 import { getState } from '../core/state';
 import { hasFolderMode } from '../core/capabilities';
@@ -87,7 +88,9 @@ export function mountDemo(): void {
   // browsers the folder picker does not exist, so the setup CTA would be a
   // silently dead button (its catch swallows the throw by design, for
   // user-cancel). No folder mode -> no folder CTA; the back door stays.
-  if (getState().atlasRoot || !hasFolderMode()) setupBtn.remove();
+  // "Has worlds" is the question, not "has a home folder": a world opened in
+  // place on a first visit has no root and needs no setup offer (S365 lens B F4).
+  if (isAtlasGrounded() || !hasFolderMode()) setupBtn.remove();
   else backBtn.remove();
   backBtn.addEventListener('click', exit);
   setupBtn.addEventListener('click', async () => {
@@ -95,7 +98,14 @@ export function mountDemo(): void {
     try {
       const { setupAtlasRoot } = await import('../setup/atlas-root-flow');
       const result = await setupAtlasRoot();
-      if (result) exit();
+      if (result) {
+        exit();
+        // A world pick opens in place; a folder pick says what it found (S365).
+        const [{ finishSetupDoor }, { toastManager }] = await Promise.all([
+          import('../setup/world-doors'), import('../ui/toast-manager'),
+        ]);
+        await finishSetupDoor(result, toastManager);
+      }
     } catch {
       // Cancelled or failed — stay in the demo; the welcome page offers it again.
     } finally {

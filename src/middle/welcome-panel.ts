@@ -13,26 +13,11 @@ import { hasFolderMode } from '../core/capabilities';
 import { escapeText } from '../core/dom-utils';
 import { navigate, timelineHash } from '../core/router';
 import { getState, subscribe } from '../core/state';
-import { recoverAtlasRoot, setupAtlasRoot, adoptPickedWorldFolder, WORLD_FOLDER_PICKED_HINT } from '../setup/atlas-root-flow';
-
-/**
- * A setup door was pointed at a world folder (S354). With a root already in
- * place, open the world where it is; on a first launch there is no root to
- * stand beside it yet, so say which door was meant.
- */
-async function handlePickedWorldFolder(picked: FileSystemDirectoryHandle): Promise<void> {
-  const worldId = await adoptPickedWorldFolder(picked);
-  if (!worldId) {
-    toastManager.info(WORLD_FOLDER_PICKED_HINT);
-    return;
-  }
-  toastManager.success(`"${picked.name}" is a world folder. Opened it in place; the folder stays where it is`);
-  const { activateWorld } = await import('../sidebar/worlds-sidebar');
-  await activateWorld(worldId, toastManager);
-}
+import { recoverAtlasRoot, setupAtlasRoot } from '../setup/atlas-root-flow';
+import { finishSetupDoor, pickAndOpenWorldFolder } from '../setup/world-doors';
+import { isAtlasGrounded } from '../core/grounded';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
-import { PICKER_CANCELLED_HINT } from '../ui/directory-picker';
 
 export function mountWelcomePanel(target: HTMLElement): () => void {
   target.innerHTML = '';
@@ -55,7 +40,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // continuous (Captain's call, 2026-07-19). The class drops the moment a
     // root exists, a world is active, or the tour itself is running (the
     // tour's build-up owns the chrome then).
-    const bare = !atlasRoot && !active && !isTourFlagActive();
+    const grounded = isAtlasGrounded(state);
+    const bare = !grounded && !active && !isTourFlagActive();
     document.body.classList.toggle('atlas-preroot', bare);
 
     // Recoverable: vault has an orphan atlas-root handle (typically after a
@@ -81,18 +67,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       altBtn.addEventListener('click', async () => {
         altBtn.disabled = true;
         try {
-          const result = await setupAtlasRoot();
-          if (result?.worldFolder) {
-            await handlePickedWorldFolder(result.worldFolder);
-          } else if (result) {
-            toastManager.success(
-              result.imported > 0
-                ? `OnlyWorlds folder set up: found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
-                : 'OnlyWorlds folder is set up'
-            );
-          } else {
-            toastManager.info(PICKER_CANCELLED_HINT);
-          }
+          await finishSetupDoor(await setupAtlasRoot(), toastManager);
         } catch (err) {
           toastManager.error(err instanceof Error ? err.message : String(err));
         } finally {
@@ -126,7 +101,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
     // form; tour door added 2026-07-19 — Freek's "jarring first screen"): the
     // tour needs NO folder (browser storage), so it leads; the folder CTA
     // carries honest context about where worlds live; about-link for depth.
-    if (!atlasRoot) {
+    if (!grounded) {
       // OPFS-only browsers (Safari 18.2+, Firefox: tour-capable boot) have no
       // folder picker — the folder door becomes an honest line instead of a
       // button that would fail on click. After a completed tour the emphasis
@@ -145,10 +120,17 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // cut the redundant TITLES (they repeated their own buttons) but took
       // the explanations with them, so the pair read as two bare unlabelled
       // buttons. One muted line each, no time claim, tool voice.
+      // The third door (S365): the toolkit sends people here with a world
+      // folder an AI made. It opens in place, no home folder asked; the home
+      // folder is asked for when they first make a NEW world.
       const folderDoor = folderMode
         ? `<span class="atlas-landing-choice">
              <button class="${folderBtnClass} atlas-landing-btn" data-action="setup-atlas">set up a folder</button>
-             <span class="atlas-landing-choice-note">Atlas works with text files on your local drive</span>
+             <span class="atlas-landing-choice-note">a place on your drive where Atlas keeps your worlds</span>
+           </span>
+           <span class="atlas-landing-choice">
+             <button class="atlas-btn-ghost atlas-landing-btn" data-action="open-world-folder">open a world folder</button>
+             <span class="atlas-landing-choice-note">one you already have, or one your AI made</span>
            </span>`
         : '';
       // The note names the DESKTOP part of the constraint (S323). The gate is
@@ -222,6 +204,15 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           tourBtn.textContent = tourLabel;
         }
       });
+      const openBtn = root.querySelector<HTMLButtonElement>('[data-action="open-world-folder"]');
+      openBtn?.addEventListener('click', async () => {
+        openBtn.disabled = true;
+        try {
+          await pickAndOpenWorldFolder(toastManager);
+        } finally {
+          openBtn.disabled = false;
+        }
+      });
       const btn = root.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]');
       if (!btn) return;
       btn.addEventListener('click', async () => {
@@ -229,18 +220,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         btn.disabled = true;
         btn.textContent = 'Picking…';
         try {
-          const result = await setupAtlasRoot();
-          if (result?.worldFolder) {
-            await handlePickedWorldFolder(result.worldFolder);
-          } else if (result) {
-            toastManager.success(
-              result.imported > 0
-                ? `OnlyWorlds folder set up: found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
-                : 'OnlyWorlds folder is set up'
-            );
-          } else {
-            toastManager.info(PICKER_CANCELLED_HINT);
-          }
+          await finishSetupDoor(await setupAtlasRoot(), toastManager);
         } catch (err) {
           toastManager.error(err instanceof Error ? err.message : String(err));
         } finally {
@@ -268,14 +248,15 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           <div class="atlas-landing atlas-grounded">
             <div class="atlas-landing-hero">
               <p class="atlas-grounded-check"><span class="material-symbols-outlined">check_circle</span>Your OnlyWorlds folder is ready</p>
-              <p class="atlas-grounded-path"><code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
-              <p class="atlas-grounded-next">Now make a world to put in it. The
+              <p class="atlas-grounded-path"><code>${escapeText(atlasRoot?.pathHint ?? atlasRoot?.folderName ?? "")}</code></p>
+              <p class="atlas-grounded-next">${state.registry.worlds_add_icons === false
+                ? 'Now make a world to put in it: <strong>add a world</strong>, at the top of the Worlds list, shows every way to start one.'
+                : `Now make a world to put in it. The
                 <span class="atlas-grounded-next-glyph"
                   ><span class="material-symbols-outlined atlas-add-glyph-plus">add</span
                   ><span class="material-symbols-outlined atlas-add-glyph-main">folder</span></span>
-                button in the top left creates one; the others beside it open a
-                folder you already have, create a world on onlyworlds.com, or
-                bring one down from there.</p>
+                button in the top left creates one; <strong>add a world</strong> under it
+                shows every way in, in words.`}</p>
             </div>
             <div class="atlas-grounded-detail" data-role="path-detail"></div>
           </div>
@@ -287,6 +268,11 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           `<p class="atlas-grounded-detail-ow"><img src="${import.meta.env.BASE_URL}owlogo.png" alt="" />` +
           `the OnlyWorlds icon in the footer has more info</p>`;
         const DETAILS: Record<string, string> = {
+          'add-world': `
+            <span class="material-symbols-outlined atlas-grounded-detail-icon">add</span>
+            <h3>add a world</h3>
+            <p>Every way in, in words: start a new world, open a world folder, or bring down or view one from OnlyWorlds.</p>
+            <p class="atlas-grounded-detail-hint">click to choose</p>`,
           'create-local': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>
             <h3>create a world</h3>
@@ -328,12 +314,17 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         hoverCleanup = () => window.removeEventListener('atlas:worlds-path-hover', onPathHover);
         return;
       }
+      // Worlds but no home folder (opened in place on a first visit, S365):
+      // no path to show; the home folder is asked for at the first new world.
+      const pathLine = atlasRoot
+        ? `<p class="atlas-grounded-path"><code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>`
+        : '';
       root.innerHTML = `
         <div class="atlas-landing atlas-grounded">
           <div class="atlas-landing-hero">
             <div class="atlas-landing-mark atlas-landing-mark-sm">Atlas</div>
             <p class="atlas-landing-tag">No world open. Pick one from the sidebar.</p>
-            <p class="atlas-grounded-path"><code>${escapeText(atlasRoot.pathHint ?? atlasRoot.folderName)}</code></p>
+            ${pathLine}
           </div>
         </div>
       `;

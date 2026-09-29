@@ -8,6 +8,8 @@
  * and the footer gear (in shell.sidebarFooter).
  */
 
+import { isAtlasGrounded } from '../core/grounded';
+import { openAddWorldChooser, runAddWorldAction, type AddWorldAction } from '../setup/world-doors';
 import { currentActivationGen, enqueueActivation } from '../core/activation-chain';
 import { awaitEviction, evictParkedStore, getActiveStore, parkStore, setActiveStore, takeParkedStore } from '../core/active-store';
 import { escapeAttr, escapeText, installRowKeydownActivation } from '../core/dom-utils';
@@ -27,8 +29,6 @@ import { deleteWorldEntry, saveRegistry, setActiveWorld, setFavorite, setWorldPa
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
 import { deleteHandle, ensureWritable, loadHandle, queryWritable } from '../store/handle-vault';
 import { CreateWorldModal } from '../ui/create-world-modal';
-import { LinkWorldModal } from '../ui/link-world-modal';
-import { PICKER_CANCELLED_HINT } from '../ui/directory-picker';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
 import type { WorldRegistryEntry } from '../core/types';
 import { resetElementDetailScrollMemory } from '../middle/element-detail';
@@ -79,7 +79,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
 
   function renderHeader(): void {
     const state = getState();
-    const root = state.atlasRoot;
+    const root = isAtlasGrounded(state);
     const recoverable = state.atlasRootRecoverable;
     // ORDER IS LOAD-BEARING: the tour branch is tested FIRST. A replayer has a
     // root (finishing the tour is what sets one), and the root branch's create
@@ -89,7 +89,10 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // reads "+target" via a small `add` glyph + a target glyph, with the
       // full action surfaced in the tooltip. Matches the [+map] / [+pin]
       // pattern in element-detail headers for visual coherence.
-      header.innerHTML = `
+      // The icon row is Captain's (S219) and stays the default; the labelled
+      // "add a world" button under it opens the same five as plain rows, and
+      // Settings → General can hide the icons (S365).
+      const icons = state.registry.worlds_add_icons === false ? '' : `<div class="atlas-worlds-add-icons">
         <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="create-local" title="New local world (in your OnlyWorlds folder)">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
@@ -110,6 +113,11 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">visibility</span>
         </button>
+        </div>`;
+      header.innerHTML = `${icons}
+        <button type="button" class="atlas-worlds-add-btn" data-action="add-world">
+          <span class="material-symbols-outlined" aria-hidden="true">add</span>add a world
+        </button>
       `;
     } else if (isTouring()) {
       // Guided tour, stage 1: the sidebar shows its TRUE
@@ -117,7 +125,10 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // only create-world live and the rest greyed (Captain's call: the
       // landscape appears once, in its exact geometry; nothing jumps into
       // existence later).
+      // Same geometry as the real header: the icon wrapper and the labelled
+      // button, locked (S365 gate lens C L3: nothing appears after the tour).
       header.innerHTML = `
+        <div class="atlas-worlds-add-icons">
         <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-create-pulse" data-action="create-local" title="Create a world. This one is the tour’s: Hyperion.">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
@@ -137,6 +148,10 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" aria-disabled="true" title="Open someone else's world with a read key, look but do not touch. Yours to use after the tour.">
           <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
           <span class="material-symbols-outlined atlas-add-glyph-main">visibility</span>
+        </button>
+        </div>
+        <button type="button" class="atlas-worlds-add-btn atlas-tour-locked" aria-disabled="true" title="Every way to add a world, in words. Yours to use after the tour.">
+          <span class="material-symbols-outlined" aria-hidden="true">add</span>add a world
         </button>
       `;
       header.querySelector<HTMLButtonElement>('[data-action="create-local"]')
@@ -161,65 +176,20 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       header.innerHTML = '';
     }
     const createBtn = header.querySelector<HTMLButtonElement>('[data-action="create-local"]');
-    createBtn?.addEventListener('click', () => new CreateWorldModal(toasts).open());
     const newApiBtn = header.querySelector<HTMLButtonElement>('[data-action="new-api"]');
-    newApiBtn?.addEventListener('click', () => {
-      void import('../ui/new-api-world-modal').then(({ NewApiWorldModal }) => {
-        new NewApiWorldModal(toasts).open();
-      });
-    });
     const linkBtn = header.querySelector<HTMLButtonElement>('[data-action="link-api"]');
-    linkBtn?.addEventListener('click', () => new LinkWorldModal(toasts).open());
     const viewBtn = header.querySelector<HTMLButtonElement>('[data-action="view-api"]');
-    viewBtn?.addEventListener('click', () => {
-      void import('../ui/view-world-modal').then(({ ViewWorldModal }) => {
-        new ViewWorldModal(toasts).open();
-      });
-    });
     const openFolderBtn = header.querySelector<HTMLButtonElement>('[data-action="open-folder"]');
-    openFolderBtn?.addEventListener('click', () => {
-      void (async () => {
-        // Through the one picker seam (S354): the test API can inject a
-        // handle, and a picker failure surfaces instead of vanishing. This
-        // used to call `showDirectoryPicker` directly and swallow EVERY
-        // error as "cancelled", so a refused folder looked like nothing.
-        let picked: FileSystemDirectoryHandle | null;
-        try {
-          const { pickDirectory } = await import('../ui/directory-picker');
-          picked = await pickDirectory();
-        } catch (err) {
-          toasts.error(err instanceof Error ? err.message : String(err));
-          return;
-        }
-        if (!picked) {
-          toasts.info(PICKER_CANCELLED_HINT);
-          return;
-        }
-        try {
-          const { openWorldFolder } = await import('../setup/atlas-root-flow');
-          const { worldId, already } = await openWorldFolder(picked);
-          if (already) toasts.info('That world is already in atlas. Opening it');
-          else toasts.success(`Opened "${picked.name}" in place. The folder stays where it is`);
-          const ok = await activateWorld(worldId, toasts);
-          // Rollback a JUST-registered folder whose first open failed
-          // (read-only media, dead handle) so it doesn't sit permanently
-          // unopenable in the sidebar (close-gate LOW). Guarded against the
-          // supersede case: never roll back a world that became active.
-          if (!ok && !already && getState().active?.worldId !== worldId) {
-            const entry = getState().registry.worlds.find(w => w.id === worldId);
-            if (entry) {
-              await deleteHandle(entry.folder.handle_key).catch(() => {});
-              const cleaned = deleteWorldEntry(getState().registry, worldId);
-              saveRegistry(cleaned);
-              patchSlice('registry', cleaned);
-              toasts.info('Removed the folder from the list: it could not be opened');
-            }
-          }
-        } catch (err) {
-          toasts.error(err instanceof Error ? err.message : String(err));
-        }
-      })();
-    });
+    // One runner for the icon row, the chooser and Ctrl+K (S365,
+    // setup/world-doors.ts): the four that make a world folder ask for the
+    // home folder first when there is none; open-folder opens a world in
+    // place, or recognises a folder that keeps worlds.
+    for (const btn of [createBtn, newApiBtn, linkBtn, viewBtn, openFolderBtn]) {
+      const action = btn?.getAttribute('data-action') as AddWorldAction | null;
+      if (btn && action) btn.addEventListener('click', () => { void runAddWorldAction(action, toasts); });
+    }
+    header.querySelector<HTMLButtonElement>('[data-action="add-world"]')
+      ?.addEventListener('click', () => openAddWorldChooser(toasts));
 
     // Hover trail (S255v2): hovering a create button paints its explanation
     // into the grounded welcome's detail zone. The welcome panel listens for
@@ -230,7 +200,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     // Focus teaches too (S309): a keyboard user tabbing the row gets the same
     // trail — and open-folder joins the loop, which had NO teaching on any
     // input path (its DETAILS entry lives with the welcome panel's map).
-    for (const btn of [createBtn, newApiBtn, linkBtn, viewBtn, openFolderBtn]) {
+    const addWorldBtn = header.querySelector<HTMLButtonElement>('[data-action="add-world"]');
+    for (const btn of [createBtn, newApiBtn, linkBtn, viewBtn, openFolderBtn, addWorldBtn]) {
       if (!btn) continue;
       const path = btn.getAttribute('data-action');
       btn.addEventListener('mouseenter', () => dispatchHover(path));
@@ -250,14 +221,16 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
     // The floating "start here" tag KEEPS its one-time behaviour — a label that
     // reappears every session reads as nagging. The persistent half is the
     // quiet highlight on the button; the loud half still fires once.
-    if (root && getState().registry.worlds.length === 0 && createBtn) {
-      createBtn.classList.add('atlas-tour-target');
+    // With the icon row hidden in Settings, the signal goes on "add a world" (S365 lens C M5).
+    const startBtn = createBtn ?? addWorldBtn;
+    if (root && getState().registry.worlds.length === 0 && startBtn) {
+      startBtn.classList.add('atlas-tour-target');
       if (!localStorage.getItem(TOUR_CREATE_SEEN_KEY)) {
         const tag = document.createElement('span');
         tag.className = 'atlas-tour-tag';
         tag.textContent = 'start here';
         header.appendChild(tag);
-        createBtn.addEventListener('mouseenter', () => {
+        startBtn.addEventListener('mouseenter', () => {
           localStorage.setItem(TOUR_CREATE_SEEN_KEY, '1');
           tag.remove();
         }, { once: true });
@@ -295,7 +268,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // Minting is owner-only (server 404s) — the honest path for a shared
       // world is a key from its owner via the existing link flow.
       toasts.info('Shared world: ask its owner for an API key, then link it');
-      new LinkWorldModal(toasts).open();
+      void runAddWorldAction('link-api', toasts);
       return;
     }
     await openAccountWorld(remote, toasts);
@@ -404,7 +377,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   function renderRemote(): void {
     const state = getState();
     const token = state.registry.account_token;
-    if (!token || !state.atlasRoot) {
+    if (!token || !isAtlasGrounded(state)) {
       remoteEl.innerHTML = '';
       return;
     }

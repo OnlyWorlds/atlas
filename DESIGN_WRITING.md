@@ -144,7 +144,7 @@ Two fields on every Narrative:
 - **`story`** (canonical OW text-long field) — markdown serialization of the document. Source of truth for OW interop. Other OW tools see this.
 - **`atlas_richtext_json`** (atlas-local extension field, added to `ATLAS_LOCAL_EXTENSION_FIELDS` in `core/constants.ts`) — full TipTap JSON document, preserves atlas-only formatting and custom node types. Stripped on API push; persists in folder storage.
 
-**On load**: atlas reads `atlas_richtext_json` if present; otherwise parses `story` markdown into a TipTap doc. The "no sidecar, only markdown" case is the migration path for narratives already in the world (AtlasMoppetopia, others).
+**On load**: atlas reads `atlas_richtext_json` if present, unless `story` holds text it does not (DESIGN conv. 116, S365: plain text wins); otherwise parses `story` markdown into a TipTap doc. The "no sidecar, only markdown" case is the migration path for narratives already in the world (AtlasMoppetopia, others).
 
 **On save** (debounced via existing sync debounce window):
 1. TipTap doc → markdown serializer → write to `story` field.
@@ -152,7 +152,7 @@ Two fields on every Narrative:
 3. Auto-derive relation fields (see below).
 4. Single `folder.updateElement` call. Sync push fires via existing `requestPushIfLinked()` pipeline.
 
-**Coherence**: the two representations are atomically updated in the same write. ⚠ **OUT-OF-BAND `story` EDITS ARE NOT YET RECONCILED (verified 2026-07-13, S260)**: the editor prefers `atlas_richtext_json` unconditionally when non-empty (`writing-workspace-editor.ts` initial-content rule), so a `story` edited by another tool (API pull or folder handoff) is silently shadowed by the stale sidecar and would be OVERWRITTEN by atlas's next save. The earlier text here described the intended mechanism as if built; it is not. **The story-coherence bout (banked, gate-worthy — persisted shape)**: store a `story` fingerprint alongside the sidecar; on load, fingerprint mismatch → re-parse markdown, regenerate the sidecar (atlas-only styling lost = the documented tradeoff, then actually enforced). Prerequisite for blessing `story` as the cross-tool prose contract (Skeld's Track H ask, 2026-07-13).
+**Coherence**: the two representations are atomically updated in the same write. **Out-of-band `story` edits (RECONCILED, S364 + S365)**: made while atlas is open, the live folder reloads the scene (DESIGN conv. 111); made while it was closed, the sidecar rule at open opens `story` (conv. 116). No fingerprint was needed: the comparison is `serialize(sidecar)` against `story`, then against the NORMALISED story, and every Atlas writer keeps the two halves equal (the bulk writers derive `story` from the sidecar). Atlas-only styling is the documented cost when `story` wins. (S260 found the shadowing; this paragraph used to say so.)
 
 ### TipTap stack (the library decision)
 
@@ -283,7 +283,7 @@ Big-picture context-pane work moved into `DESIGN.md` "Context Pane" — that's t
 - ✅ **Reading mode redesign** — hides right pane, disables link visuals, keeps writer's font (session 230).
 - ✅ **Spellcheck toggle per world** + autolink hints always-`spellcheck=false` (session 230).
 - ✅ **Backspace-on-chip unlinks**, **right-click chip → unlink**, **right-click autolink hint → Link to {name}** (session 230).
-- ✅ **Bulk link/unlink (S265)**: corner link-all icon (one transaction, Ctrl+Z undoes) + selection right-click link/unlink + writing-tree right-click over a subtree. Kernel `src/core/prose-autolink.ts` transforms BOTH `story` markdown and the `atlas_richtext_json` sidecar for closed narratives (story-only writes are shadowed by the sidecar); the open narrative routes through live-editor ops (`writing-live-editor-ops.ts`). Same matching rules as the autolink plugin — the index moved to core and is shared.
+- ✅ **Bulk link/unlink (S265)**: corner link-all icon (one transaction, Ctrl+Z undoes) + selection right-click link/unlink + writing-tree right-click over a subtree. Kernel `src/core/prose-autolink.ts` writes BOTH halves for closed narratives, from ONE authoritative half (S365, conv. 116: the sidecar while it still holds the scene, `story` derived from it; `story` when it outranks, the stale sidecar dropped), because two halves transformed apart parted on a first mention in italics; the open narrative routes through live-editor ops (`writing-live-editor-ops.ts`). Same matching rules as the autolink plugin — the index moved to core and is shared.
 - ✅ **Unlinked mentions (S355)**: `core/unlinked-mentions.ts` counts an element's name ∪ aliases as plain prose across all narratives (whole-word, case-insensitive, links protected, cached per elements-array reference). Surfaces: the context-pane preview line "Mentioned, unlinked (N in M scenes) · Link all" (`context-pane-preview.ts`) and the create modal's toast nudge. Link all = `bulkLinkTerm` over the same terms; count and link share `findTermSpansMarkdown`.
 - ✅ **Find bar "Link to element" (S355)**: every match of the typed word becomes a chip to a picked element, in the scene (one transaction) or across a chapter/book from the compiled view (disk write over the subtree, `writing-compiled-search.ts` + `bulkLinkTerm`). Not first-mention by design (convention #49e). The compiled view gained find itself the same session.
 - ✅ **Aliases editor modal, focus mode, hover preview, find/replace, word goal, inline element creation, split-into-sibling, character cast strip, per-world font family, first-mention autolink, TipTap code-split** — see session 228 batch in archive.
@@ -327,7 +327,7 @@ Big-picture context-pane work moved into `DESIGN.md` "Context Pane" — that's t
 
 ## Conventions added in v3.0
 
-- **#47**: `atlas_richtext_json` lives on Narrative elements as an atlas-local extension field. Holds the full TipTap JSON document. Stripped on API push. The canonical `story` field on the same element holds the markdown serialization for OW-tool interop. Both representations are written atomically on every workspace save; load prefers `atlas_richtext_json` and falls back to parsing `story` markdown.
+- **#47**: `atlas_richtext_json` lives on Narrative elements as an atlas-local extension field. Holds the full TipTap JSON document. Stripped on API push. The canonical `story` field on the same element holds the markdown serialization for OW-tool interop. Both representations are written atomically on every workspace save; load prefers `atlas_richtext_json` unless the story outranks it (conv. 116), and falls back to parsing `story` markdown.
 
 - **#48**: Element references in narrative prose are stored as markdown links with the OW URL scheme: `[Display Name](ow://<element-type>/<uuid>)`. Display text is resolved dynamically from the atlas store at render time (so renames propagate). Manual display-text overrides (where `displayText !== element.name`) are preserved on save.
 

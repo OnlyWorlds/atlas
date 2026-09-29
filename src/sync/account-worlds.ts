@@ -116,7 +116,14 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
   if (state.accountWorlds.opening) return false; // one open at a time
 
   // ---- Preconditions BEFORE the mint (gate R1: no orphaned keys) ----
+  // No home folder yet (a world opened in place on a first visit): ask for
+  // it here, before any key is minted (S365).
   if (!state.atlasRoot) {
+    const { ensureAtlasRoot } = await import('../setup/world-doors');
+    // A "Cancel" there is the user's answer, not an error: stop quietly.
+    if (!(await ensureAtlasRoot(toasts, 'Opening an online world downloads it into a new folder.'))) return false;
+  }
+  if (!getState().atlasRoot) {
     toasts.error('Set up your OnlyWorlds folder first');
     return false;
   }

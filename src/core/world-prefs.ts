@@ -103,9 +103,12 @@ function mergePrefs(entry: WorldRegistryEntry, file: Record<string, unknown>): W
     if (k in file) next[k] = file[k as PrefKey];
   }
   const theirs = typeof file.notes === 'string' ? (file.notes as string).trim() : '';
-  if (mine && theirs && mine !== theirs && !theirs.includes(mine)) {
+  if (mine && theirs && mine !== theirs && !theirs.includes(mine) && !mine.includes(theirs)) {
     next.notes = `${file.notes as string}\n\nNotes from this browser:\n${entry.notes}`;
-  } else if (mine && !theirs) {
+  } else if (mine && (!theirs || mine.includes(theirs))) {
+    // Ours already holds theirs: the merge done at an earlier open whose
+    // write-out failed (a view-only world). It re-runs at every open and
+    // must neither grow nor shrink (S365 lane B L2).
     next.notes = entry.notes;
   }
   return next as unknown as WorldRegistryEntry;
@@ -132,11 +135,62 @@ const lastSeen = new Map<string, string>();
 /** Worlds whose open-time reconcile ran in this page session (at most once each). */
 const reconciled = new Set<string>();
 
+/** The base a key encodes (`prefsKey` is canonical JSON of the pairs). */
+function fromKey(key: string): Record<string, unknown> | null {
+  try {
+    const pairs = JSON.parse(key) as unknown;
+    return Array.isArray(pairs) ? Object.fromEntries(pairs as [string, unknown][]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The file moved since this browser last synced it while the world stayed
+ * open (another machine through Dropbox or git): per key, a pref this browser
+ * changed since the base is ours, any other is the file's; two different new
+ * notes are both kept, the file's first (S365 lane B M1).
+ */
+function threeWay(base: Record<string, unknown>, mine: Record<string, unknown>, file: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...file };
+  for (const k of WORLD_PREF_KEYS) {
+    const ours = JSON.stringify(mine[k]) !== JSON.stringify(base[k]);
+    if (!ours) continue;
+    const theirs = JSON.stringify(file[k]) !== JSON.stringify(base[k]);
+    if (k === 'notes' && theirs && typeof file.notes === 'string' && typeof mine.notes === 'string' && file.notes.trim() && mine.notes.trim()) {
+      out.notes = `${file.notes}\n\nNotes from this browser:\n${mine.notes}`;
+    } else if (mine[k] === undefined) {
+      delete out[k];
+    } else {
+      out[k] = mine[k];
+    }
+  }
+  return out;
+}
+
 /** Write the entry's prefs to the file and remember what was written. View-only and corrupt files are left alone. */
 async function writeOut(store: FolderStore, worldId: string): Promise<void> {
   const entry = getState().registry.worlds.find(w => w.id === worldId);
   if (!entry || entry.demo) return;
-  const prefs = prefsOf(entry);
+  let prefs = prefsOf(entry);
+  const base = prefsSyncedFor(worldId);
+  if (base !== undefined && prefsKey(prefs) !== base) {
+    let file: Record<string, unknown> | null = null;
+    try { file = await store.readWorldPrefs(); } catch { file = null; }
+    const baseObj = fromKey(base);
+    if (file && baseObj && prefsKey(file) !== base) {
+      const merged = threeWay(baseObj, prefs, file);
+      // The file is folded in now, so it is the base: a write that then fails
+      // (view-only, permission dropped, a synced file locked) must not merge
+      // the same file again at every later pref change (S365 gate lens A M2).
+      setPrefsSynced(worldId, prefsKey(file));
+      lastSeen.set(worldId, prefsKey({ ...prefsOf(entry), ...merged }));
+      patchEntry(worldId, e => withFilePrefs(e, merged));
+      const applied = getState().registry.worlds.find(w => w.id === worldId);
+      if (!applied) return;
+      prefs = prefsOf(applied);
+    }
+  }
   const key = prefsKey(prefs);
   lastSeen.set(worldId, key);
   if (prefsSyncedFor(worldId) === key) return;

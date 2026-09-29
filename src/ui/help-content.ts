@@ -97,6 +97,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'merge into the current world or create a new one',
       'export the whole world or a subset by type',
       'copy the AI prompt (it carries your world\'s exact fields) to turn freeform notes into importable JSON',
+      'or let an AI assistant edit the world folder directly: Atlas shows its changes when you come back to its window',
     ],
   },
   settings: {
@@ -107,6 +108,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'choose how sync behaves, or keep a world fully local',
       'rename the writing tiers',
       'tune editing and web-pane behavior',
+      'hide the row of add-world icons (General); "add a world" stays',
     ],
   },
   // `map` is a real router mode (router.ts:207) and was the ONLY one with no

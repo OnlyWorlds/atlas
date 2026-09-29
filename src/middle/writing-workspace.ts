@@ -23,6 +23,7 @@ import type { Element } from '../core/types';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
+import { noteOpenedFromStory } from './story-notice';
 import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderHeader, isEditingIn } from './element-detail-header';
 import { mountWorkspaceEditor, linkTermInEditor, type WorkspaceEditorHandle, type SearchController } from './writing-workspace-editor';
@@ -691,6 +692,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
         target: proseHost,
         initialJson,
         initialMarkdown,
+        storyOutranksStaleSidecar: true,
         autolinkSeed: { elements: getState().data.elements },
         onUpdate: (snap) => {
           scheduleSave({ markdown: snap.markdown, json: snap.json });
@@ -723,6 +725,9 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       // read as dirty and every flush, now run before each live-folder pass,
       // wrote Atlas's stale text over the outside edit it was about to show.
       lastSavedMarkdown = editorHandle.getMarkdown();
+      // `story` changed while Atlas was closed and outranked the stale
+      // rich-text copy (S365): say so, once per scene per session.
+      if (editorHandle.openedFromStory) noteOpenedFromStory(el.id, 'scene');
 
       // Sync chip labels to current element names immediately on mount —
       // covers the case where atlas_richtext_json was stored when elements

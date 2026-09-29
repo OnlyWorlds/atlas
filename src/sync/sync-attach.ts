@@ -15,7 +15,7 @@
  * we log + skip engine creation; the UI surfaces this via the pill state.
  */
 
-import { adoptPersistedDiskHold } from '../core/live-folder';
+import { adoptPersistedDiskHold, holdBigBatchAtOpen, isDiskHoldPersisted, BIG_BATCH } from '../core/live-folder';
 import { OwV2ClientAdapter } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import { SyncEngine } from './sync-engine';
@@ -147,7 +147,7 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
       // state, and the local-first push asymmetry doesn't apply (no pushes).
       if (!readOnly) {
         try {
-          await flushPendingOnAttach(engine, folder, entry.name);
+          await flushPendingOnAttach(engine, folder, entry.name, entry.id);
         } catch (err) {
           // flushPendingOnAttach swallows its own errors; outer catch is defense-
           // in-depth in case the helper is ever refactored to throw.
@@ -180,13 +180,21 @@ export function attachSyncEngine(entry: WorldRegistryEntry, folder: FolderStore)
 async function flushPendingOnAttach(
   engine: SyncEngine,
   folder: FolderStore,
-  worldName: string
+  worldName: string,
+  worldId: string,
 ): Promise<void> {
   try {
     const changed = await folder.listLocallyChangedSince(null);
     const tombstones = await folder.listTombstonesSince(null);
     const pending = changed.length + tombstones.length;
     if (pending === 0) return;
+    // A batch too big to upload unasked waits for the user, as it would with
+    // the window open (S365, `holdBigBatchAtOpen`). A hold already persisted
+    // was adopted before this ran and refuses the round by itself.
+    if (changed.length > BIG_BATCH && !isDiskHoldPersisted(worldId)) {
+      holdBigBatchAtOpen(worldId, changed.length, engine);
+      return;
+    }
     console.info('[atlas:sync] flush-on-attach: pending writes found', {
       world: worldName,
       changed: changed.length,
@@ -196,7 +204,9 @@ async function flushPendingOnAttach(
     const synced = result.pushed.creates + result.pushed.updates + result.pushed.deletes;
     if (synced > 0) {
       // Notify the user — these writes were stuck from a prior session.
-      toastManager.success(`Synced ${synced} pending change${synced === 1 ? '' : 's'} from previous session`);
+      // Neutral about WHO made them (S365 lane B M3): the user's own offline
+      // edits, or another tool's while Atlas was closed.
+      toastManager.success(`Uploaded ${synced} ${synced === 1 ? 'change that was' : 'changes that were'} waiting in the folder`);
     }
     if (result.failures.length > 0) {
       console.warn('[atlas:sync] flush-on-attach: some writes failed', result.failures);

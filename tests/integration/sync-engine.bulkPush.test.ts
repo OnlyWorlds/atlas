@@ -239,7 +239,7 @@ describe('FakeOwApiClient.pullChanges (unit — the engine wiring has its own su
     // pullChanges is OPT-IN (mirrors __enable_bulk): the engine dispatches on
     // its presence, so the fake keeps it detached by default and this unit
     // block attaches it explicitly.
-    client.__enable_changes();
+    client.__enable_changes(); // on by default since S365; kept to state the intent
     const pull = client.pullChanges!;
     await client.createElement('character', { id: 'c1', name: 'A' });   // seq 1 upsert
     await client.createElement('character', { id: 'c2', name: 'B' });   // seq 2 upsert

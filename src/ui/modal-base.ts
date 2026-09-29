@@ -171,6 +171,13 @@ export class BaseModal {
         this.modal?.addEventListener('pointerdown', (e) => {
             pressedOnOverlay = e.target === this.modal;
         });
+        // The second press of a double-click is not a click outside: it is the
+        // rest of the double-click on the button that opened this modal
+        // (S365 gate lens B F6: "add a world" opened and closed at once).
+        // `mousedown` carries the click count; it fires after `pointerdown`.
+        this.modal?.addEventListener('mousedown', (e) => {
+            if (e.detail > 1) pressedOnOverlay = false;
+        });
         this.modal?.addEventListener('pointerup', (e) => {
             if (pressedOnOverlay && e.target === this.modal && !this.dismissLocked) this.hide();
             pressedOnOverlay = false;

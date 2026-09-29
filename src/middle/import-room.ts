@@ -17,6 +17,7 @@ import { getActiveStore } from '../core/active-store';
 import { ELEMENT_ICONS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
 import { escapeText } from '../core/dom-utils';
 import { getState, subscribe } from '../core/state';
+import { hasFolderMode } from '../core/capabilities';
 import { parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
 import { completeWaypoint } from '../core/waypoints';
@@ -139,6 +140,13 @@ function estimateTokens(s: string): number {
 let carriedPayload: { text: string; sourceLabel: string; pasted: boolean } | null = null;
 
 export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () => void {
+  // The folder half of the AI story (S365): only where it is true, a real
+  // folder (not the tour's browser-storage world, which the live folder skips).
+  const activeId = getState().active?.worldId;
+  const onTourWorld = getState().registry.worlds.find(w => w.id === activeId)?.demo === true;
+  const agentLine = hasFolderMode() && !onTourWorld
+    ? '<p class="atlas-import-ai-note">Or let an AI assistant edit this world\'s folder directly: Atlas shows its changes when you come back to this window.</p>'
+    : '';
   target.innerHTML = '';
   const root = document.createElement('div');
   root.className = 'atlas-import-room';
@@ -189,6 +197,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
               <a class="atlas-btn-link" href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">open the OnlyWorlds AI toolkit</a>
             </div>
             <p class="atlas-import-ai-size">the prompt carries the full field list for every type · ~${Math.max(1, Math.round(estimateTokens(buildConvertNotesPrompt()) / 1000))}k tokens</p>
+            ${agentLine}
           </div>
         </div>
       </div>
@@ -531,6 +540,8 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const stillMine = () => parsed === runParsed;
     try {
       if (mode === 'new') {
+        const { ensureAtlasRoot } = await import('../setup/world-doors');
+        if (!(await ensureAtlasRoot(toasts, 'Importing as a new world makes a new world folder.'))) return;
         // Adopt the exported world id ONLY when nothing local already uses it —
         // otherwise a separate copy would collide with the existing world's
         // identity. The collision case chooses merge (below) or a fresh mint here.

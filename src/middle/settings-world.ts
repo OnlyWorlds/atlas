@@ -16,7 +16,7 @@ import {
 } from '../registry/registry';
 import { deleteHandle, loadHandle } from '../store/handle-vault';
 import { getActiveStore, setActiveStore, evictParkedStore } from '../core/active-store';
-import { deleteWorldFolderUnderRoot } from '../setup/atlas-root-flow';
+import { deleteWorldFolderUnderRoot, whyWorldFolderNotDeletable } from '../setup/atlas-root-flow';
 import { MakeOnlineModal } from '../ui/make-online-modal';
 import { ToastManager } from '../ui/toast-manager';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
@@ -349,6 +349,14 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     );
     if (!ok) return;
     deletePermBtn.disabled = true;
+    // Asked BEFORE anything closes: a refusal must leave the world open and
+    // working (S365 gate lens B F1).
+    const refusal = await whyWorldFolderNotDeletable(world);
+    if (refusal) {
+      toasts.error(refusal);
+      deletePermBtn.disabled = false;
+      return;
+    }
     try {
       const store = getActiveStore();
       if (store) await store.close().catch(() => {});
@@ -357,7 +365,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       // Detach any sync engine for this world before destroying its folder.
       detachSyncEngine();
       // Delete the on-disk folder first (we still have a working handle).
-      await deleteWorldFolderUnderRoot(world.folder.folder_name);
+      await deleteWorldFolderUnderRoot(world);
       // Now drop registry + handle.
       const next = deleteWorldEntry(getState().registry, world.id);
       saveRegistry(next);

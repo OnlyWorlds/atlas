@@ -183,6 +183,8 @@ describe('SyncEngine auth-blocked rounds', () => {
       // bailed after the push 401.
       const listCalls = client.calls.filter((c) => c.method === 'list');
       expect(listCalls).toHaveLength(0);
+      // And no /changes pull either (the path production runs).
+      expect(client.changesPulls).toBe(0);
     });
   });
 
@@ -218,6 +220,8 @@ describe('SyncEngine auth-blocked rounds', () => {
 
   describe('non-auth pull errors', () => {
     it('non-auth pull throws propagate to the caller (preserves existing contract)', async () => {
+      // The full-list fallback: production pulls via /changes (twin below).
+      client.__enable_changes(false);
       // Inject a generic failure mid-list (simulate a network blip).
       vi.spyOn(client, 'listElements').mockRejectedValueOnce(
         new Error('network unreachable')
@@ -226,6 +230,19 @@ describe('SyncEngine auth-blocked rounds', () => {
       await expect(engine.pullNow()).rejects.toThrow('network unreachable');
 
       // Engine state should be idle (not stuck at 'syncing').
+      const last = stateHistory[stateHistory.length - 1];
+      expect(last.kind).toBe('idle');
+    });
+
+    it('the same contract on the /changes path production runs', async () => {
+      const listSpy = vi.spyOn(client, 'listElements');
+      vi.spyOn(client, 'pullChanges').mockRejectedValueOnce(
+        new Error('network unreachable')
+      );
+
+      await expect(engine.pullNow()).rejects.toThrow('network unreachable');
+
+      expect(listSpy).not.toHaveBeenCalled();
       const last = stateHistory[stateHistory.length - 1];
       expect(last.kind).toBe('idle');
     });

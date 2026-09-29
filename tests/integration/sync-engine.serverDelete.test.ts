@@ -69,7 +69,10 @@ describe('server-side delete detection', () => {
     expect(deletes).toEqual([]);
   });
 
-  it('dedupes existing server-delete entries on subsequent pulls', async () => {
+  it('dedupes existing server-delete entries on subsequent pulls (full-list re-detect)', async () => {
+    // /changes consumes the delete op on the first pull; the dedupe guards the
+    // full-list path's re-detection, so this case runs there (S365 lens A M4).
+    client.__enable_changes(false);
     await client.createElement('character', { id: 'c1', name: 'Alice', type: 'character' });
     await engine.syncNow();
     await client.deleteElement('character', 'c1');
@@ -133,6 +136,10 @@ describe('server-delete detection — pagination safety', () => {
    * Engine now reads `client.getPaginatedTypes()` and skips server-delete
    * detection for any type whose list was paginated.
    */
+
+  // The full-list fallback on purpose: `/changes` carries explicit delete ops
+  // and has no absence inference to guard. Goes when pullPhaseFullList does.
+  beforeEach(() => client.__enable_changes(false));
 
   it('does NOT flag a local element as server-deleted when its type was paginated', async () => {
     // Establish a previously-synced local element via the normal sync path.

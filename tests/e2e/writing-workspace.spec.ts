@@ -930,6 +930,69 @@ test('link-all corner icon: counts candidates, one click chips them all (S265)',
   await expect(corner).toBeHidden();
 });
 
+test('a scene whose story changed while Atlas was closed opens the new text, not the stale copy (S365)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'sidecar-rule-root');
+  await createWorld(page, 'sidecar rule world');
+  const para = (text: string) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
+  // Atlas's own copy says one thing; the story (what an agent edited) says another.
+  const edited = await createElement(page, 'narrative', {
+    name: 'edited outside', supertype: 'Book',
+    story: 'The ferryman waited.\n\nThe agent wrote this line.',
+    atlas_richtext_json: { type: 'doc', content: [para('The ferryman waited.')] },
+  });
+  // Control: the two halves agree, so the copy (with its formatting) opens.
+  const untouched = await createElement(page, 'narrative', {
+    name: 'untouched', supertype: 'Book',
+    story: 'The **river** was high.',
+    atlas_richtext_json: { type: 'doc', content: [{ type: 'paragraph', content: [
+      { type: 'text', text: 'The ' }, { type: 'text', text: 'river', marks: [{ type: 'bold' }] }, { type: 'text', text: ' was high.' },
+    ] }] },
+  });
+
+  await gotoWriting(page, untouched);
+  await waitForEditor(page);
+  const prose = page.locator('.atlas-writing-workspace-prose .ProseMirror');
+  await expect(prose.locator('strong', { hasText: 'river' })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: 'changed outside Atlas' })).toHaveCount(0);
+
+  await gotoWriting(page, edited);
+  await waitForEditor(page);
+  await expect(prose).toContainText('The agent wrote this line.');
+  await expect(page.locator('.ow-toast', { hasText: 'This scene changed outside Atlas' })).toBeVisible();
+});
+
+test('link-all corner never covers the prose: no text rect under the pill (S365)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'linkall-ink-root');
+  await createWorld(page, 'linkall ink world');
+  await createElement(page, 'character', { name: 'Aralia' });
+  // A first line that runs to the right edge, where the pill sits: short
+  // filler words, so the wrap lands within a few pixels of the edge (a long
+  // repeated word wraps early and passed on the broken layout too).
+  const nid = await createElement(page, 'narrative', {
+    name: 'the long line', supertype: 'Book',
+    story: `Aralia ${'a b '.repeat(150).trim()}`,
+  });
+  await gotoWriting(page, nid);
+  await waitForEditor(page);
+  const corner = page.locator('.atlas-writing-linkall-corner');
+  await expect(corner).toBeVisible();
+
+  // Measure the INK (the text's own rects), never the boxes: a box stays the
+  // size it was told while its text paints under a neighbour.
+  const hits = await page.evaluate(() => {
+    const pill = document.querySelector('.atlas-writing-linkall-corner')!.getBoundingClientRect();
+    const p = document.querySelector('.atlas-writing-workspace-prose .ProseMirror p')!;
+    const range = document.createRange();
+    range.selectNodeContents(p);
+    return [...range.getClientRects()].filter(r =>
+      r.width > 0 && r.left < pill.right && r.right > pill.left && r.top < pill.bottom && r.bottom > pill.top,
+    ).length;
+  });
+  expect(hits).toBe(0);
+});
+
 test('tree bulk link: right-click a book links mentions in its closed scenes, story + sidecar + derive (S265)', async ({ page }) => {
   await freshBoot(page);
   await setupAtlasRoot(page, 'bulklink-root');

@@ -8,6 +8,8 @@
 import { ToastManager } from '../ui/toast-manager';
 import { getTheme, setTheme } from '../core/theme';
 import pkg from '../../package.json';
+import { getState, patchSlice } from '../core/state';
+import { saveRegistry } from '../registry/registry';
 
 export function renderGeneralTab(): string {
   const theme = getTheme();
@@ -21,6 +23,10 @@ export function renderGeneralTab(): string {
           <label class="atlas-settings-radio"><input type="radio" name="app-theme" value="light" ${theme === 'light' ? 'checked' : ''}> light</label>
         </div>
       </div>
+      <label class="atlas-settings-toggle">
+        <input type="checkbox" name="worlds-add-icons" ${getState().registry.worlds_add_icons === false ? '' : 'checked'} />
+        <span>Show the row of add-world icons in the Worlds list (the "add a world" button stays either way)</span>
+      </label>
     </section>
     <section class="atlas-settings-section">
       <h3>About</h3>
@@ -36,6 +42,14 @@ export function renderGeneralTab(): string {
 }
 
 export function wireGeneralTab(toasts: ToastManager): void {
+  document.querySelector<HTMLInputElement>('.atlas-settings input[name="worlds-add-icons"]')
+    ?.addEventListener('change', (e) => {
+      const on = (e.target as HTMLInputElement).checked;
+      const next = { ...getState().registry, worlds_add_icons: on ? undefined : false };
+      saveRegistry(next);
+      patchSlice('registry', next);
+      toasts.info(on ? 'Add-world icons shown' : 'Add-world icons hidden');
+    });
   // The app theme — device-local; applies instantly via the data-theme
   // attribute, no re-render needed.
   document.querySelectorAll<HTMLInputElement>('.atlas-settings input[name="app-theme"]')

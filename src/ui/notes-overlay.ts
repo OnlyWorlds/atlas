@@ -12,7 +12,7 @@
  */
 
 import { BaseModal } from './modal-base';
-import { getState, patchSlice } from '../core/state';
+import { getState, patchSlice, subscribe } from '../core/state';
 import { saveRegistry } from '../registry/registry';
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -49,18 +49,42 @@ export class NotesOverlay extends BaseModal {
     const ta = body.querySelector<HTMLTextAreaElement>('textarea')!;
     const status = body.querySelector<HTMLElement>('[data-role="status"]')!;
     ta.value = entry.notes ?? '';
+    // What the textarea last took from, or gave to, the registry. The notes
+    // can move under an open overlay (the world-prefs merge folding in
+    // another machine's notes, another tab's save): S365 gate lens A M1.
+    let loaded = ta.value;
+    const notesNow = (): string => getState().registry.worlds.find(w => w.id === active.worldId)?.notes ?? '';
 
     const persist = (): void => {
       const next = getState().registry;
       const idx = next.worlds.findIndex(w => w.id === active.worldId);
       if (idx < 0) return;
-      const updated = { ...next.worlds[idx], notes: ta.value };
+      const current = next.worlds[idx].notes ?? '';
+      let value = ta.value;
+      if (current !== loaded) {
+        // Moved underneath while typing: keep both. The part this overlay
+        // loaded is replaced by what was typed; anything else stays.
+        value = loaded && current.includes(loaded)
+          ? current.replace(loaded, ta.value)
+          : `${current}\n\nNotes from this browser:\n${ta.value}`;
+        ta.value = value;
+      }
+      loaded = value;
+      const updated = { ...next.worlds[idx], notes: value };
       const updatedReg = { ...next, worlds: next.worlds.map((w, i) => (i === idx ? updated : w)) };
       saveRegistry(updatedReg);
       patchSlice('registry', updatedReg);
       status.textContent = 'saved';
       status.classList.remove('dirty');
     };
+
+    // Not typing: the textarea follows the registry.
+    const unsub = subscribe(() => {
+      if (!ta.isConnected) { unsub(); return; }
+      if (this.debounceTimer != null) return;
+      const now = notesNow();
+      if (now !== loaded) { ta.value = now; loaded = now; }
+    });
 
     ta.addEventListener('input', () => {
       status.textContent = 'saving…';

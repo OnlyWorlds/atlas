@@ -25,6 +25,8 @@ import { setSidebarModePref } from '../core/ui-prefs';
 import { scoreElementMatch } from '../core/element-search';
 import { roomOf, openElementTarget } from '../core/element-room';
 import { ELEMENT_ICONS } from '../core/constants';
+import { hasFolderMode } from '../core/capabilities';
+import { isTourFlagActive } from '../tour/tour-flag';
 import type { Element, ElementType } from '../core/types';
 
 const MAX_ELEMENT_RESULTS = 12;
@@ -55,8 +57,11 @@ export interface PaletteResult {
  * Commands reachable by name (S364: the palette's first). `id` is what
  * `activate` switches on.
  */
-const ACTIONS: Array<{ label: string; id: string; icon: string; aliases?: string[] }> = [
+const ACTIONS: Array<{ label: string; id: string; icon: string; aliases?: string[]; folderOnly?: boolean }> = [
   { label: 'reload from disk', id: 'reload-disk', icon: 'folder_open', aliases: ['refresh from disk', 'rescan', 'files'] },
+  // The world doors (S365): the same runner as the Worlds list's buttons.
+  { label: 'add a world', id: 'add-world', icon: 'add', aliases: ['new world', 'create world', 'world'], folderOnly: true },
+  { label: 'open a world folder', id: 'open-world-folder', icon: 'folder_open', aliases: ['open folder', 'open world'], folderOnly: true },
 ];
 
 const ROOMS: Array<{ label: string; segment: string; icon: string; aliases?: string[] }> = [
@@ -92,6 +97,9 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
   }
 
   for (const action of ACTIONS) {
+    // The world doors are locked during the tour, as its sidebar locks them
+    // (S365 gate lens B F5 / C M3).
+    if (action.folderOnly && (!hasFolderMode() || isTourFlagActive())) continue;
     const names = [action.label, ...(action.aliases ?? [])];
     if (names.some(n => n.startsWith(q))) {
       out.push({ kind: 'action', id: action.id, name: action.label, hint: 'command', score: 85 });
@@ -297,6 +305,7 @@ class CommandPalette extends BaseModal {
     }
     if (r.kind === 'action') {
       if (r.id === 'reload-disk') void reloadFromDisk();
+      else if (r.id === 'add-world' || r.id === 'open-world-folder') void openWorldDoor(r.id);
       return;
     }
     // Route to the room the element actually LIVES in (S306). This used to be
@@ -330,6 +339,15 @@ class CommandPalette extends BaseModal {
 export function openCommandPalette(): void {
   if (openInstance) return;
   new CommandPalette().open();
+}
+
+/** Ctrl+K's world doors (S365): the same runner as the Worlds list's buttons. */
+async function openWorldDoor(id: 'add-world' | 'open-world-folder'): Promise<void> {
+  const [{ openAddWorldChooser, runAddWorldAction }, { toastManager }] = await Promise.all([
+    import('../setup/world-doors'), import('./toast-manager'),
+  ]);
+  if (id === 'add-world') openAddWorldChooser(toastManager);
+  else await runAddWorldAction('open-folder', toastManager);
 }
 
 /**

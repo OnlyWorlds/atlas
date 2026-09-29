@@ -62,8 +62,9 @@ export interface SetupAtlasRootResult {
    * than a place to keep worlds (S354, Captain pointed "Change folder" at
    * Skeld's `sikelia-world` and expected an import). No root was created and
    * nothing was written: nesting an atlas root inside someone's world repo is
-   * exactly the litter this guards against. The caller decides what to do
-   * with the handle: open it in place when a root already exists, or explain.
+   * exactly the litter this guards against. Every door hands the handle to
+   * `finishSetupDoor` (setup/world-doors.ts), which opens the world in place,
+   * with or without a root (S365).
    */
   worldFolder?: FileSystemDirectoryHandle;
 }
@@ -71,7 +72,11 @@ export interface SetupAtlasRootResult {
 export async function setupAtlasRoot(): Promise<SetupAtlasRootResult | null> {
   const picked = await pickDirectory();
   if (!picked) return null;
+  return setupAtlasRootFrom(picked);
+}
 
+/** `setupAtlasRoot` for a folder already picked (the open-a-world door hands over a root it recognised, S365). */
+export async function setupAtlasRootFrom(picked: FileSystemDirectoryHandle): Promise<SetupAtlasRootResult> {
   const granted = await ensureWritable(picked);
   if (!granted) {
     throw new Error('Folder is read-only; atlas needs write access');
@@ -180,6 +185,15 @@ export async function discoverWorldsInRoot(
     // whether world.json carries an `api` block. Without this, recovered
     // api-linked worlds would lose their sync wiring on recovery.
     const handleKey = `world-${meta.id}`;
+    // A world with this id is already registered from ANOTHER folder (opened
+    // in place on a first visit, then a copy of it found here): storing this
+    // handle would overwrite that entry's vault slot and both rows would open
+    // the copy (S365 gate lens B F2). Same rule as `openWorldFolder`.
+    if (getState().registry.worlds.some(w => w.folder.handle_key === handleKey)) {
+      console.info(`[discover] ${entry.name}: world ${meta.id} is already open from another folder; skipped`);
+      alreadyTrackedCount++;
+      continue;
+    }
     await storeHandle(handleKey, folderHandle);
     const reg = getState().registry;
     const hasApi = !!(meta.api && typeof meta.api.world_id === 'string' && typeof meta.api.api_key === 'string');
@@ -276,7 +290,9 @@ export async function openWorldFolder(
       folderName: picked.name,
       handleKey,
       pathHint: picked.name,
-      demo: meta.demo === true,
+      // A folder the USER picked is never the tour's sandbox, whatever its
+      // world.json says: a demo world is ungrounded and hidden (S365 lens B F10).
+      demo: false,
     }));
   }
   saveRegistry(next);
@@ -318,7 +334,7 @@ async function resolveOrCreateRoot(picked: FileSystemDirectoryHandle): Promise<F
 }
 
 /** True when `dir` holds a readable `world.json` with an id: it IS a world. */
-async function isWorldFolder(dir: FileSystemDirectoryHandle): Promise<boolean> {
+export async function isWorldFolder(dir: FileSystemDirectoryHandle): Promise<boolean> {
   try {
     const meta = await readJson<{ id?: unknown }>(dir, 'world.json');
     return !!meta && typeof meta.id === 'string' && meta.id.length > 0;
@@ -328,21 +344,17 @@ async function isWorldFolder(dir: FileSystemDirectoryHandle): Promise<boolean> {
 }
 
 /**
- * The sentence both setup doors say when the pick was a world folder (S354).
- * Names the right door so the next click lands.
+ * True when `dir` is an atlas root, or holds one under the current or a
+ * legacy wrapper name: a place worlds are KEPT, not a world. Read-only (the
+ * open-a-world door uses it to recognise a wrong-door pick, S365).
  */
-export const WORLD_FOLDER_PICKED_HINT =
-  'That folder is a world, not a place to keep worlds. To open it, use the open-folder button next to the + in the worlds sidebar.';
-
-/**
- * Open a world folder that was picked through a setup door, in place, when
- * a root already exists (S354). Returns the world id to activate, or null
- * when there is no root yet (the caller explains instead).
- */
-export async function adoptPickedWorldFolder(picked: FileSystemDirectoryHandle): Promise<string | null> {
-  if (!getState().atlasRoot) return null;
-  const { worldId } = await openWorldFolder(picked);
-  return worldId;
+export async function isAtlasRootFolder(dir: FileSystemDirectoryHandle): Promise<boolean> {
+  if (await hasAtlasRootMarker(dir)) return true;
+  for (const name of [ATLAS_ROOT_SUBFOLDER, ...ATLAS_ROOT_SUBFOLDER_LEGACY_NAMES]) {
+    const child = await tryGetDir(dir, [name]);
+    if (child && await hasAtlasRootMarker(child)) return true;
+  }
+  return false;
 }
 
 async function hasAtlasRootMarker(dir: FileSystemDirectoryHandle): Promise<boolean> {
@@ -1011,20 +1023,38 @@ export async function linkExistingApiWorldInRoot(
  *
  * Throws on any failure — caller surfaces as toast.
  */
-export async function deleteWorldFolderUnderRoot(folderName: string): Promise<void> {
+/**
+ * Why this world's folder may NOT be deleted from here, or null when it may.
+ * A delete removes `<root>/<folder_name>` BY NAME, so it is only safe when the
+ * world's own folder IS that entry: a world opened in place (S365 made that
+ * the first-visit path) lives outside the root, and a same-named sibling in
+ * the root is a different world (S365 gate lens B F1: it deleted one).
+ * Callers ask BEFORE closing anything, so a refusal leaves the world usable.
+ */
+export async function whyWorldFolderNotDeletable(world: { folder: { handle_key: string; folder_name: string } }): Promise<string | null> {
+  const outside = 'This world\'s folder is not inside your OnlyWorlds folder, so Atlas will not delete it. Use Forget world, then delete the folder yourself.';
   const reg = getState().registry;
-  if (!reg.atlas_root) {
-    throw new Error('OnlyWorlds folder not configured; cannot delete');
-  }
+  if (!reg.atlas_root) return outside;
   const rootHandle = await loadHandle(reg.atlas_root.handle_key);
-  if (!rootHandle) {
-    throw new Error('OnlyWorlds folder link missing. Re-pick it in settings');
-  }
+  if (!rootHandle) return 'OnlyWorlds folder link missing. Re-pick it in Settings, then try again.';
+  const worldHandle = await loadHandle(world.folder.handle_key);
+  if (!worldHandle) return outside;
+  let path: string[] | null = null;
+  try { path = await rootHandle.resolve(worldHandle); } catch { path = null; }
+  if (!path || path.length !== 1 || path[0] !== world.folder.folder_name) return outside;
+  return null;
+}
+
+export async function deleteWorldFolderUnderRoot(world: { folder: { handle_key: string; folder_name: string } }): Promise<void> {
+  const reason = await whyWorldFolderNotDeletable(world);
+  if (reason) throw new Error(reason);
+  const reg = getState().registry;
+  const rootHandle = (await loadHandle(reg.atlas_root!.handle_key))!;
   const granted = await ensureWritable(rootHandle);
   if (!granted) {
     throw new Error('Write permission denied for the OnlyWorlds folder');
   }
-  await rootHandle.removeEntry(folderName, { recursive: true });
+  await rootHandle.removeEntry(world.folder.folder_name, { recursive: true });
 }
 
 /**

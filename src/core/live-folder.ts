@@ -23,7 +23,6 @@ import { getState, patchSlice } from './state';
 import { getActiveStore } from './active-store';
 import { flushBeforeLeavingWorld } from './leave-flush';
 import { onHashChange, parseHash } from './router';
-import { isTourFlagActive } from '../tour/tour-flag';
 import type { DiskChange, FolderStore } from '../store/folder-store';
 import type { Element } from './types';
 
@@ -65,6 +64,10 @@ export interface RescanOutcome {
 const notices = new Map<string, DiskNotice>();
 const listeners = new Set<() => void>();
 let lastRunAt = 0;
+/** A focus inside the throttle arms ONE trailing pass for when the window
+ *  reopens, so an agent's edit made seconds after the last pass still shows
+ *  without another alt-tab (S365 lane B M4). */
+let trailing: ReturnType<typeof setTimeout> | null = null;
 /** The pass in flight, and the store it is for (B5: a pass for another world never answers for this one). */
 let running: { store: FolderStore; full: boolean; promise: Promise<RescanOutcome> } | null = null;
 /** Changes a pass found for a store whose world was left mid-pass: carried to that store's next pass (B5). */
@@ -172,6 +175,23 @@ export async function answerHeldBatch(upload: boolean): Promise<void> {
   held.release(); // pushes on release unless the world is now paused
 }
 
+/** True when a big-batch question is waiting for this world (persisted across reloads). */
+export function isDiskHoldPersisted(worldId: string): boolean {
+  return !!heldMap()[worldId];
+}
+
+/**
+ * THE SAME QUESTION AT OPEN (S365 lane B M3, Captain's yes): more than
+ * `BIG_BATCH` elements waiting to upload when a linked world opens (an agent
+ * re-parsed the folder overnight, a branch switch while Atlas was closed)
+ * wait for Upload them / Stay offline, exactly as the batch seen with the
+ * window open does. Persisted, so a reload asks again.
+ */
+export function holdBigBatchAtOpen(worldId: string, count: number, engine: { hold(reason: 'disk'): Promise<() => void> }): void {
+  persistHeld(worldId, count);
+  adoptPersistedDiskHold(worldId, engine);
+}
+
 /**
  * A batch that was waiting for its answer when the world was left or the page
  * reloaded keeps waiting (B3). Called by `attachSyncEngine` BEFORE the
@@ -204,16 +224,28 @@ export function rescanNow(opts: { force?: boolean; full?: boolean } = {}): Promi
     return running.promise.catch(() => undefined).then(() => rescanNow({ ...opts, force: true }));
   }
   const now = Date.now();
-  if (!opts.force && now - lastRunAt < FOCUS_THROTTLE_MS) return Promise.resolve({ changes: [], skipped: 'throttled' });
+  if (!opts.force && now - lastRunAt < FOCUS_THROTTLE_MS) {
+    if (!trailing) {
+      trailing = setTimeout(() => {
+        trailing = null;
+        if (document.visibilityState !== 'hidden') void rescanNow({ force: true });
+      }, FOCUS_THROTTLE_MS - (now - lastRunAt));
+    }
+    return Promise.resolve({ changes: [], skipped: 'throttled' });
+  }
   const ui = getState().ui;
   // A zone drag or a pin placement holds positions the store has not seen
-  // yet; the next focus after it finishes runs the pass.
-  if (getState().data.loading || isTourFlagActive() || ui.zoneEditing || ui.pinPlacement) {
+  // yet; the next focus after it finishes runs the pass. The tour world is
+  // Atlas's own scaffold; asked of the ACTIVE world, not the tour flag,
+  // which is shared by every tab (S365 lane B L1).
+  const touring = getState().registry.worlds.find(w => w.id === worldId)?.demo === true;
+  if (getState().data.loading || touring || ui.zoneEditing || ui.pinPlacement) {
     return Promise.resolve({ changes: [], skipped: 'busy' });
   }
   // Claimed SYNCHRONOUSLY (B9): a focus and a visibilitychange in one tick
   // run one pass, not two.
   lastRunAt = now;
+  if (trailing) { clearTimeout(trailing); trailing = null; }
   const full = !!opts.full;
   const promise = (async (): Promise<RescanOutcome> => {
     try {
@@ -293,14 +325,27 @@ async function runPass(store: FolderStore, worldId: string, full: boolean): Prom
       if (willUpload) { pending++; notSynced.delete(c.id); }
       else notSynced.add(c.id);
     }
+    // A hold may have been taken since `prev` was read (the one at open, S365).
+    held = notices.get(worldId)?.held ?? held;
+    // The question's count is what is WAITING, recounted, never a running
+    // sum: the hold at open and the revive pass after it see the same edits
+    // (S365 gate lens A M3 asked about 102 changes when there were 51).
+    const waiting = async (): Promise<number> => (await store.listLocallyChangedSince(null)).length;
     if (held) {
-      held = { ...held, count: held.count + pending };
+      held = { ...held, count: await waiting() };
       persistHeld(worldId, held.count);
     } else if (pending > BIG_BATCH) {
       const release = await engine.hold('disk');
       if (!stillHere()) { release(); abandoned.set(store, changes); return { changes: [], skipped: 'closed' }; } // B4
-      held = { count: pending, release };
-      persistHeld(worldId, pending);
+      const standing = notices.get(worldId)?.held;
+      if (standing) {
+        // Another path held while this one awaited: one question, one hold.
+        release();
+        held = { ...standing, count: await waiting() };
+      } else {
+        held = { count: await waiting(), release };
+      }
+      persistHeld(worldId, held.count);
     } else if (pending > 0) {
       requestPushIfLinked();
     }
@@ -353,6 +398,7 @@ export function installLiveFolder(): () => void {
     if (opened) markSeen(opened);
   });
   return () => {
+    if (trailing) { clearTimeout(trailing); trailing = null; }
     window.removeEventListener('focus', onFocus);
     document.removeEventListener('visibilitychange', onVisible);
     unsubHash();
@@ -385,6 +431,7 @@ export function __resetLiveFolderForTests(): void {
   notices.clear();
   lastRunAt = 0;
   running = null;
+  if (trailing) { clearTimeout(trailing); trailing = null; }
   try { localStorage.removeItem(HELD_KEY); } catch { /* none */ }
   emit();
 }

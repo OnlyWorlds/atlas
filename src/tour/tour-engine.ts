@@ -1024,6 +1024,15 @@ export async function setupFolderFromTour(): Promise<boolean> {
   ]);
   const result = await setupAtlasRoot();
   if (!result) return false;
+  if (result.worldFolder) {
+    // The pick was a world, not a home folder (S365 gate lens B F3 / C M4):
+    // end the tour and open it in place, like every other setup door. The old
+    // path said "Folder ready" with no folder made.
+    await exitTour();
+    const { finishSetupDoor } = await import('../setup/world-doors');
+    await finishSetupDoor(result, toastManager);
+    return true;
+  }
   await exitTour();
   patchSlice('ui', { ...getState().ui, sidebarMode: 'worlds' });
   toastManager.success(

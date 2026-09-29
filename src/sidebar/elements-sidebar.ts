@@ -9,6 +9,7 @@
  * by `activateWorld`); mutations refresh that slice with a new array reference.
  */
 
+import { isAtlasGrounded } from '../core/grounded';
 import { getState, subscribe, patchSlice } from '../core/state';
 import { onHashChange, navigate, elementHash, homeHash } from '../core/router';
 import { setWorldFavoriteElement, saveRegistry } from '../registry/registry';
@@ -543,7 +544,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       // Pre-setup the panes stay silent — the middle pane is the only voice
       // on first launch (S255). With a root, the copy names the real action.
       let msg: string;
-      if (!state.atlasRoot) {
+      if (!isAtlasGrounded(state)) {
         msg = '';
       } else if (state.registry.worlds.length === 0) {
         msg = 'No worlds yet. Create one from the Worlds tab.';

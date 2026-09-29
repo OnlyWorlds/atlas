@@ -24,7 +24,7 @@ If you ever touch the adapter, run `ow-v2-client-adapter.test.ts`.
 
 ## Server-assigned ids — DORMANT under keel (id-swap machinery kept dead-but-safe)
 
-**Keel preserves client ids** (v1 AND v2, probed live 2026-07-12): `crypto.randomUUID()` v4 ids land verbatim; a duplicate POST returns 409 `id_conflict`; v2 PUT is create-or-replace upsert. **EXCISED (cleanup bout, 2026-07-12 evening)**: the engine's create-path swap branch, `rewriteIdReferences`, and the engine `onIdSwap` hook are gone — a server that reassigns an id on CREATE now produces a loud per-element failure (contract violation; nothing stamped, retried next round). Route 2's MATCH-phase swaps (same name+type, different ids across machines) remain real and keep `applyIdSwapToUi`/`handleIdSwap` (UI + URL + favorites migration). The legacy v1 `OwClientAdapter` and its dedicated suites were retired in the same bout (its 5 flow suites migrated to `statefulV2Handlers`/the v2 adapter); the v1 `worldsync` create-world route stays (still v1 in production).
+**Keel preserves client ids** (v1 AND v2, probed live 2026-07-12): `crypto.randomUUID()` v4 ids land verbatim; a duplicate POST returns 409 `id_conflict`; v2 PUT is create-or-replace upsert. **EXCISED (cleanup bout, 2026-07-12 evening)**: the engine's create-path swap branch and the engine `onIdSwap` hook are gone (`rewriteIdReferences` survives in Route 2's merge, `make-online.ts`, a flat rewrite that misses chips, `ow://` prose and page blocks until the Route 2 bout moves it onto the re-key kernel) — a server that reassigns an id on CREATE now produces a loud per-element failure (contract violation; nothing stamped, retried next round). Route 2's MATCH-phase swaps (same name+type, different ids across machines) remain real and keep `applyIdSwapToUi`/`handleIdSwap` (UI + URL + favorites migration). The legacy v1 `OwClientAdapter` and its dedicated suites were retired in the same bout (its 5 flow suites migrated to `statefulV2Handlers`/the v2 adapter); the v1 `worldsync` create-world route stays (still v1 in production).
 
 HISTORY (pre-keel): the old Django server assigned its OWN UUID v7 on CREATE, overriding client v4 ids — everything below was load-bearing then.
 
@@ -248,7 +248,7 @@ When `pushPhase` or `pullPhase` sees a 401/403:
 3. **Surface via state.** Caller (runPushOnly / runPullOnly / runSync) checks `result.auth_blocked` and calls `setAuthError()` instead of transitioning to idle. `setAuthError` sets `paused=true` AND state to `{kind: 'error', message: 'authentication failed...', recoverable: true}`. The pill maps `error` to red display.
 4. **Bail pull when push auth-blocks.** `runSync` skips the pull phase if push hit auth — same dead key would 401 there too.
 5. **Surface via toast.** `sync-attach.emitConflictToasts` (despite the name) now checks `result.auth_blocked` first and fires the dedicated "sync paused: authentication failed..." error toast pointing to settings. The conflict-handling code stays below.
-6. **Surface flush-on-attach failures.** Previously logged to console only. Now toasts "couldn't sync N pending change(s)" when post-attach push has failures with no successes. Auth case gets the dedicated toast; generic failures get the generic message.
+6. **Surface flush-on-attach failures.** Previously logged to console only. Now toasts "couldn't sync N pending change(s)" when post-attach push has failures with no successes. Auth case gets the dedicated toast; generic failures get the generic message. (S365: the success toast reads "Uploaded N change(s) that were waiting in the folder", neutral about who made them; above 50 changed elements the flush holds and asks instead, DESIGN conv. 117.)
 
 ### Detection
 
@@ -448,7 +448,7 @@ The in-memory id-substitution carries the old entry's content with the new id gr
 
 Verified by a regression test that subscribes + counts notifications (dual-patch produces 2, atomic `setState` produces 1).
 
-**Other id-swap call sites not yet wired**: `mergeLocalIntoApi` accumulates `idSwaps` and applies file-level rewrites between phases, but doesn't emit `onIdSwap` for UI propagation. Merge runs inside the make-online modal — user typically isn't viewing a specific merged element when the modal closes. Defer wiring unless smoke surfaces a flash there. Same for `resolveConflict('overwrite-mine')` CREATE branch (also doesn't id-swap currently — separate corner case).
+**Other id-swap call sites**: `mergeLocalIntoApi` accumulates `idSwaps`, applies file-level rewrites between phases, and DOES emit `onIdSwap` for UI propagation (`make-online.ts`; the S365 lane A census found the older line here stale). Merge runs inside the make-online modal — user typically isn't viewing a specific merged element when the modal closes. Defer wiring unless smoke surfaces a flash there. Same for `resolveConflict('overwrite-mine')` CREATE branch (also doesn't id-swap currently — separate corner case).
 
 ---
 
@@ -596,6 +596,8 @@ Protocol (gate 10.6, rollback verified live):
 ## /changes cursor pull (v2) — explicit delete ops replace absence inference
 
 `pullPhase` dispatches to `pullPhaseChanges` whenever the client has `pullChanges`: a cursor walk of the per-world change feed (`{cursor, changes, has_more}`, continuation via `since=`). Deletions arrive as EXPLICIT ops — the absence-inference server-delete detection (and its incomplete-list false-positive class) doesn't exist on this path. Full design + the 3-lens gate resolutions (delete-then-recreate revival, cursor/side-effect atomicity, the stop() abort latch, single-sourced timestamps, the non-advancing-cursor trap): `Forge/Notes/2026-07-12-v2-changes-pull-design.md`. The legacy full-list pull remains as the fallback and keeps the `getIncompleteListTypes` suppression guard.
+
+**Test fakes speak /changes (S365)**: `FakeOwApiClient.pullChanges` is ON by default, because production's adapter always has it; 25 test files had been running a full-list pull no user gets. Tests of the full-list fallback opt out by name with `__enable_changes(false)` (the serverDelete pagination trio and dedupe case, one authBlocked case, the pullConflictPolicy dedupe case); they go when `pullPhaseFullList` does. `client.changesPulls` counts feed pages, so "no pull ran" is assertable without `list` calls. `__server_evict` drops a record WITHOUT a delete op (the feed never reports it).
 
 ⚠ The /changes continuation param is **`since=`**, not `cursor=`. HISTORY: keel originally ignored unknown query params silently (a wrong param name replayed page 1 forever with has_more:true); since Skeld's v2 tail (2026-07-12 evening) unknown params get a loud 422 naming the param, killing the trap at the root. The adapter's advance-verification stays as belt-and-suspenders. Both fakes encode the 422.
 

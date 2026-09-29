@@ -61,6 +61,16 @@ export default defineConfig({
         // ~50 KB — deferred optimization. For now, bump the precache size
         // ceiling so the font lands in the offline cache.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        // The bundled .webp images (the tour's maps, the example page's
+        // Sikelia map at 1.6 MB) are NOT precached: every visitor would pay
+        // ~2 MB for pictures most never open. Cache-first once fetched, so a
+        // tour run online works offline afterwards (S365 lane B L3: offline,
+        // the tour's maps were blank).
+        runtimeCaching: [{
+          urlPattern: ({ sameOrigin, url }) => sameOrigin && url.pathname.endsWith('.webp'),
+          handler: 'CacheFirst',
+          options: { cacheName: 'atlas-images', expiration: { maxEntries: 16 } },
+        }],
         // Keep the SW out of the way of dev tools.
         navigateFallback: null,
       },

@@ -13,7 +13,7 @@
 import L from 'leaflet';
 import { getState, patchSlice } from '../../core/state';
 import { getActiveStore } from '../../core/active-store';
-import { loadRegistry, findWorld } from '../../registry/registry';
+import { findWorld } from '../../registry/registry';
 import type { WorldMap } from '../../core/types';
 import { pickMapImageSource } from './map-image-source';
 import { extractEdgeColor } from './edge-color';
@@ -181,7 +181,9 @@ export async function applyMapBackground(
     if (!(typeof map.width === 'number' && map.width > 0 && typeof map.height === 'number' && map.height > 0)) {
       const store = getActiveStore();
       const worldId = getState().active?.worldId;
-      const entryReg = worldId ? findWorld(loadRegistry(), worldId) : undefined;
+      // Memory, not storage: `loadRegistry` re-bases the two-tab merge and is
+      // boot-only (S365 gate lens A L1).
+      const entryReg = worldId ? findWorld(getState().registry, worldId) : undefined;
       if (store && worldId && entryReg && !entryReg.api) {
         store.updateMap(map.id, { width: defaultWidth, height: defaultHeight })
           .then(() => refreshElementsIfStillActive(store, worldId))

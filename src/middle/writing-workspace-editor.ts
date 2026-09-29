@@ -18,6 +18,7 @@ import { ElementChip } from './writing-workspace-element-chip';
 import { serializeDocToMarkdown } from './writing-workspace-markdown';
 import { countWords } from './writing-word-count';
 import { convertLinkMarksToChips } from './writing-workspace-load';
+import { storyOutranksSidecar } from './story-sidecar';
 import {
   createSearchPlugin,
   setSearchQuery,
@@ -45,6 +46,13 @@ export interface WorkspaceEditorOptions {
   initialJson?: JSONContent | null;
   /** Initial markdown (fallback when no JSON exists yet — e.g. legacy narratives). */
   initialMarkdown?: string;
+  /**
+   * THE SIDECAR RULE AT OPEN (S365, `story-sidecar.ts`): when `initialMarkdown`
+   * is the element's `story` and holds text `initialJson` (the sidecar) does
+   * not, open the story. Scenes and knowledge entries pass true; a page block's
+   * markdown is Atlas's own, so the share editor does not.
+   */
+  storyOutranksStaleSidecar?: boolean;
   /**
    * Fired after every content change, debounced upstream by the workspace.
    * Provides both markdown + JSON snapshots so the workspace can persist both
@@ -133,6 +141,8 @@ export interface WorkspaceEditorHandle {
   refreshAutolink: (elements: Element[]) => void;
   /** Tear down the editor and detach DOM listeners. */
   destroy: () => void;
+  /** True when this mount opened `story` over a stale sidecar (the caller says so once). */
+  openedFromStory: boolean;
 }
 
 /**
@@ -189,7 +199,9 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
   // Pick initial content: JSON wins if non-empty, else parse markdown via
   // @tiptap/markdown then convert ow:// link marks to chip nodes, else empty.
   let initial: JSONContent | string;
-  if (initialJson && !isEmptyJsonDoc(initialJson)) {
+  const openedFromStory = !!opts.storyOutranksStaleSidecar && !!initialJson && !isEmptyJsonDoc(initialJson)
+    && storyOutranksSidecar(initialJson, initialMarkdown);
+  if (initialJson && !isEmptyJsonDoc(initialJson) && !openedFromStory) {
     initial = initialJson;
   } else if (initialMarkdown && initialMarkdown.trim().length > 0) {
     initial = initialMarkdown; // Markdown extension parses on input.
@@ -394,6 +406,7 @@ export function mountWorkspaceEditor(opts: WorkspaceEditorOptions): WorkspaceEdi
 
   return {
     editor,
+    openedFromStory,
     getMarkdown: () => serializeDocToMarkdown(editor.getJSON()),
     getJson: () => editor.getJSON(),
     setContent: (json, markdown) => {

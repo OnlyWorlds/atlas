@@ -11,6 +11,7 @@
  * independently.
  */
 
+import { isAtlasGrounded } from '../core/grounded';
 import { getState, patchSlice, subscribe, type SidebarMode } from '../core/state';
 import { onHashChange, parseHash, navigate, elementHash, settingsHash } from '../core/router';
 // elementsHash removed from imports — session 223 decoupling no longer routes
@@ -119,7 +120,7 @@ export function mountSidebar(mount: SidebarMount): () => void {
     // hiding the toggle left the tour stuck in worlds mode, 2026-07-19) —
     // OR during the tour's world-create step (the sidebar must appear in its
     // exact final structure, Worlds tab included).
-    if (!getState().atlasRoot && !entry && !isTourFlagActive()) return;
+    if (!isAtlasGrounded() && !entry && !isTourFlagActive()) return;
     // When the writing-room takeover is active, neither toggle button is lit —
     // the body is the writing tree, the toggle is an escape hatch.
     const effective = resolveEffectiveBody();

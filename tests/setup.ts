@@ -9,14 +9,34 @@
  */
 
 import 'fake-indexeddb/auto';
-import { afterAll, afterEach, beforeAll } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
 import { setupServer } from 'msw/node';
+import { __setRegistryTabBaseForTests } from '../src/registry/registry';
 
 export const mswServer = setupServer();
 
 beforeAll(() => mswServer.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => mswServer.resetHandlers());
+// The registry's two-tab merge base is module state: a base left by one
+// test must not shape the next test's saves (S365 gate lens A L2).
+beforeEach(() => __setRegistryTabBaseForTests(null));
 afterAll(() => mswServer.close());
 
 // jsdom doesn't pin navigator.onLine reliably; default to true.
 Object.defineProperty(window.navigator, 'onLine', { configurable: true, value: true });
+
+// jsdom has no Range layout. A TipTap `focus()` scrolls the selection into
+// view (prosemirror `scrollToSelection` → `Range.getClientRects`), inside a
+// rAF, so a test that opens an editor ended the RUN with an unhandled
+// TypeError and exit 1 while every test passed (Boss, 1.11). Zero rects:
+// nothing here measures layout; e2e owns geometry.
+const zeroRect = (): DOMRect => ({
+  x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0,
+  toJSON: () => ({}),
+}) as DOMRect;
+if (typeof Range !== 'undefined') {
+  if (!Range.prototype.getClientRects) {
+    Range.prototype.getClientRects = () => Object.assign([] as DOMRect[], { item: () => null }) as unknown as DOMRectList;
+  }
+  if (!Range.prototype.getBoundingClientRect) Range.prototype.getBoundingClientRect = zeroRect;
+}

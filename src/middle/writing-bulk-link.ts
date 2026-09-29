@@ -24,6 +24,36 @@ import {
 import { computeRelationPatch, linkTargetsIn } from './writing-workspace-derive';
 import { getLiveEditorOps } from './writing-live-editor-ops';
 import type { Element } from '../core/types';
+import type { JSONContent } from '@tiptap/core';
+import { serializeDocToMarkdown } from './writing-workspace-markdown';
+
+/**
+ * ONE HALF IS THE TRUTH (S365 gate lens A H3). Every Atlas save keeps
+ * `story === serializeDocToMarkdown(sidecar)`, and the sidecar rule at open
+ * (story-sidecar.ts) reads any other disagreement as an outside edit. These
+ * writers used to transform the two halves separately, and they part ways
+ * (a first mention in italics: an unmarked chip in the sidecar, a link inside
+ * the emphasis in markdown), so the next open reported "changed outside
+ * Atlas" about a scene nobody touched and dropped its detail. Now: when the
+ * sidecar still holds the scene, transform IT and derive `story` from it;
+ * when `story` outranks it (an outside edit), transform `story` and drop the
+ * stale sidecar; with no sidecar, `story` alone, as before.
+ */
+async function authoritativeHalf(story: string, sidecar: unknown): Promise<'sidecar' | 'story'> {
+  if (!sidecar) return 'story';
+  if (serializeDocToMarkdown(sidecar as JSONContent) === story) return 'sidecar';
+  const { storyOutranksSidecar } = await import('./story-sidecar');
+  return storyOutranksSidecar(sidecar as JSONContent, story) ? 'story' : 'sidecar';
+}
+
+function fromSidecar<R extends { doc: unknown }>(r: R, countOf: (r: R) => number): { n: number; patch: Partial<Element> } {
+  const doc = r.doc as JSONContent;
+  return { n: countOf(r), patch: { story: serializeDocToMarkdown(doc), atlas_richtext_json: doc } as Partial<Element> };
+}
+
+function fromStory<R extends { story: string }>(r: R, countOf: (r: R) => number, sidecar: unknown): { n: number; patch: Partial<Element> } {
+  return { n: countOf(r), patch: { story: r.story, ...(sidecar ? { atlas_richtext_json: null } : {}) } as Partial<Element> };
+}
 
 export interface BulkLinkSummary {
   /** Narratives that actually changed. */
@@ -56,30 +86,22 @@ export async function bulkLinkNarratives(
     if (!el || el.type !== 'narrative') continue;
     const story = typeof el.story === 'string' ? el.story : '';
     const sidecar = (el as Record<string, unknown>).atlas_richtext_json;
+    const half = await authoritativeHalf(story, sidecar);
 
     if (mode === 'link') {
-      const md = autolinkMarkdown(story, index!);
-      const rt = sidecar ? autolinkRichtext(sidecar, index!) : { doc: sidecar, linked: [] };
-      const n = Math.max(md.linked.length, rt.linked.length);
-      if (n === 0) continue;
-      const patch: Partial<Element> = {
-        story: md.story,
-        ...(sidecar ? { atlas_richtext_json: rt.doc } : {}),
-        ...computeRelationPatch(el, md.story, exists),
-      };
-      await folder.updateElement(id, patch);
-      changed++; count += n; wroteDisk = true;
+      const out = half === 'sidecar'
+        ? fromSidecar(autolinkRichtext(sidecar, index!), r => r.linked.length)
+        : fromStory(autolinkMarkdown(story, index!), r => r.linked.length, sidecar);
+      if (out.n === 0) continue;
+      await folder.updateElement(id, { ...out.patch, ...computeRelationPatch(el, out.patch.story as string, exists) });
+      changed++; count += out.n; wroteDisk = true;
     } else {
-      const md = unlinkMarkdown(story);
-      const rt = sidecar ? unlinkRichtext(sidecar) : { doc: sidecar, unlinked: 0 };
-      const n = Math.max(md.unlinked, rt.unlinked);
-      if (n === 0) continue;
-      const patch: Partial<Element> = {
-        story: md.story,
-        ...(sidecar ? { atlas_richtext_json: rt.doc } : {}),
-      };
-      await folder.updateElement(id, patch);
-      changed++; count += n; wroteDisk = true;
+      const out = half === 'sidecar'
+        ? fromSidecar(unlinkRichtext(sidecar), r => r.unlinked)
+        : fromStory(unlinkMarkdown(story), r => r.unlinked, sidecar);
+      if (out.n === 0) continue;
+      await folder.updateElement(id, out.patch);
+      changed++; count += out.n; wroteDisk = true;
     }
   }
 
@@ -123,15 +145,13 @@ export async function bulkLinkTerm(
     const story = typeof el.story === 'string' ? el.story : '';
     const sidecar = (el as Record<string, unknown>).atlas_richtext_json;
 
-    const md = linkTermMarkdown(story, term, target, opts);
-    const rt = sidecar ? linkTermRichtext(sidecar, term, target, opts) : { doc: sidecar, linked: 0 };
-    const n = Math.max(md.linked, rt.linked);
+    const half = await authoritativeHalf(story, sidecar);
+    const out = half === 'sidecar'
+      ? fromSidecar(linkTermRichtext(sidecar, term, target, opts), r => r.linked)
+      : fromStory(linkTermMarkdown(story, term, target, opts), r => r.linked, sidecar);
+    const n = out.n;
     if (n === 0) continue;
-    const patch: Partial<Element> = {
-      story: md.story,
-      ...(sidecar ? { atlas_richtext_json: rt.doc } : {}),
-      ...computeRelationPatch(el, md.story, exists),
-    };
+    const patch: Partial<Element> = { ...out.patch, ...computeRelationPatch(el, out.patch.story as string, exists) };
     await folder.updateElement(id, patch);
     changed++; count += n; wroteDisk = true;
   }

@@ -272,7 +272,7 @@ export function autolinkRichtext(doc: unknown, index: AutolinkIndex): RichtextAu
     if (!Array.isArray(n.content)) return;
     const next: RtNode[] = [];
     for (const child of n.content) {
-      if (child.type === 'text' && typeof child.text === 'string' && child.text.length > 0) {
+      if (child.type === 'text' && typeof child.text === 'string' && child.text.length > 0 && !inWebLink(child)) {
         next.push(...splitTextNode(child, index, already, proposed, linked));
       } else {
         transform(child);
@@ -284,6 +284,16 @@ export function autolinkRichtext(doc: unknown, index: AutolinkIndex): RichtextAu
   transform(root);
 
   return { doc: root, linked };
+}
+
+/**
+ * Text already inside a web link is left alone, as the markdown side leaves
+ * `[text](url)` spans alone: splitting it made the two halves of a scene
+ * disagree, and the sidecar rule then read Atlas's own write as an outside
+ * edit (S365 gate lens A H3).
+ */
+function inWebLink(node: RtNode): boolean {
+  return Array.isArray(node.marks) && node.marks.some(m => (m as { type?: string } | null)?.type === 'link');
 }
 
 function splitTextNode(
@@ -504,7 +514,7 @@ export function linkTermRichtext(
     if (!Array.isArray(n.content)) return;
     const next: RtNode[] = [];
     for (const child of n.content) {
-      if (child.type === 'text' && typeof child.text === 'string' && child.text.length > 0) {
+      if (child.type === 'text' && typeof child.text === 'string' && child.text.length > 0 && !inWebLink(child)) {
         next.push(...splitOne(child));
       } else {
         transform(child);

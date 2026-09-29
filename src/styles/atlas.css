@@ -4341,6 +4341,10 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
    tool's own voice rather than a marketing hero's. */
 .atlas-landing-compact .atlas-landing-actions {
   display: flex;
+  /* Wraps (S365 gate lens C M2): three or four doors in a narrow desktop
+     window pushed the first one off-screen to the left. */
+  flex-wrap: wrap;
+  row-gap: 14px;
   gap: 22px;
   align-items: flex-start;
   justify-content: center;
@@ -4386,6 +4390,7 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   min-width: 152px;
   line-height: 1.4;
   font-weight: 500;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4526,6 +4531,64 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 /* Tour tag: the one-time "start here" label under +folder. */
 .atlas-worlds-header { position: relative; }
+/* "add a world" (S365): the labelled door under the icon row; opens the
+   chooser, which names the same five in words. Quiet at rest, full width, so
+   it reads as a caption for the row above rather than a sixth button. */
+.atlas-worlds-add-btn {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: transparent;
+  border: 1px dashed rgba(var(--atlas-ink-rgb), 0.14);
+  border-radius: 6px;
+  color: var(--atlas-text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.atlas-worlds-add-btn:first-child { margin-top: 0; }
+.atlas-worlds-add-btn:hover,
+.atlas-worlds-add-btn:focus-visible {
+  color: var(--atlas-cyan);
+  border-color: rgba(var(--atlas-accent-rgb), 0.45);
+}
+.atlas-worlds-add-btn .material-symbols-outlined { font-size: 16px; }
+
+/* The add-world chooser: five plain rows, icon + title + one line. */
+.atlas-add-world-list { display: flex; flex-direction: column; gap: 4px; }
+.atlas-add-world-row {
+  appearance: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--atlas-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.atlas-add-world-row:hover {
+  background: rgba(var(--atlas-ink-rgb), 0.05);
+  border-color: rgba(var(--atlas-accent-rgb), 0.35);
+}
+.atlas-add-world-row:focus-visible {
+  background: rgba(var(--atlas-ink-rgb), 0.05);
+  outline: 2px solid var(--atlas-cyan-soft);
+  outline-offset: -2px;
+}
+.atlas-add-world-icon { font-size: 20px; color: var(--atlas-cyan); margin-top: 1px; }
+.atlas-add-world-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.atlas-add-world-text strong { font-weight: 600; font-size: 13px; }
+.atlas-add-world-text span { font-size: 12px; color: var(--atlas-text-muted); line-height: 1.4; }
 
 .atlas-tour-target {
   border-color: var(--atlas-cyan-soft) !important;
@@ -8335,7 +8398,10 @@ a.atlas-writing-workspace-crumb-seg:hover {
     radial-gradient(ellipse at top, rgba(255, 246, 230, 0.018), transparent 70%),
     linear-gradient(180deg, rgba(255, 248, 235, 0.012), rgba(255, 248, 235, 0.006));
   border-radius: 4px;
-  padding: 12px 32px 24px;
+  /* 34px on top is the link-all pill's lane (top 8 + ~21 tall): it sat over
+     the first line's last words (S365, measured 20px of ink under it). Always
+     reserved, so the text never jumps when the pill appears mid-typing. */
+  padding: 34px 32px 24px;
 }
 
 .atlas-writing-workspace-prose .ProseMirror {
@@ -8485,7 +8551,7 @@ a.atlas-writing-workspace-crumb-seg:hover {
 }
 .atlas-writing-linkall-corner {
   position: absolute;
-  top: 10px;
+  top: 8px;
   right: 12px;
   z-index: 4;
   appearance: none;
@@ -10190,6 +10256,9 @@ td.atlas-writing-setup-promote-count {
   padding: 10px 14px;
 }
 
+/* The link-all pill's lane in the knowledge editor too (S365 gate lens C M7:
+   the scene host got it, this host's own padding overrode it). */
+.atlas-writing-workspace-prose.atlas-knowledge-prose-rich { padding-top: 32px; }
 .atlas-writing-workspace-prose.atlas-knowledge-prose-rich:focus-within {
   border-color: var(--atlas-cyan-soft);
 }
@@ -10759,6 +10828,7 @@ td.atlas-writing-setup-promote-count {
 .atlas-import-ai-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .atlas-import-ai-lead { margin: 0; font-size: 12px; line-height: 1.5; color: var(--atlas-text-muted); }
 .atlas-import-ai-size { margin: 4px 0 0 0; font-size: 11px; color: var(--atlas-text-muted); opacity: 0.75; }
+.atlas-import-ai-note { margin: 10px 0 0 0; font-size: 12px; color: var(--atlas-text-muted); }
 .atlas-import-ai-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
 /* IE3: grouped two-column take-out type list (content | spatial). */

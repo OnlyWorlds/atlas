@@ -704,6 +704,9 @@ export interface WorldsRegistry {
   /** Master kill switch — pauses every engine if true. Default: false. */
   sync_pause_all?: boolean;
 
+  /** The Worlds list's row of add-world icons (S219). Default: shown; false leaves the labelled "add a world" button alone (S365). */
+  worlds_add_icons?: boolean;
+
   /**
    * Autosave debounce window for pushes (ms). After a local write, the
    * SyncEngine waits this long before pushing — coalesces bursts of edits

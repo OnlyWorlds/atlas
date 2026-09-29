@@ -38,6 +38,7 @@ describe('SyncEngine.pullNow', () => {
     await client.createElement('character', { id: 'srv-1', name: 'ServerOnly', type: 'character' });
 
     const callsBefore = client.calls.length;
+    const pullsBefore = client.changesPulls;
     const result = await engine.pullNow();
 
     // Pulled the server element.
@@ -48,6 +49,8 @@ describe('SyncEngine.pullNow', () => {
     const newCalls = client.calls.slice(callsBefore);
     // Only reads (list + the S262 world-meta GET), no create/update.
     expect(newCalls.every(c => c.method === 'list' || c.method === 'getWorldMeta')).toBe(true);
+    // ...and the pull really ran, through the /changes feed production uses.
+    expect(client.changesPulls).toBeGreaterThan(pullsBefore);
   });
 
   it('no-op while paused', async () => {

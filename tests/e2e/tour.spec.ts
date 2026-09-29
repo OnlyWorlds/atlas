@@ -165,7 +165,8 @@ async function createWorldViaModal(page: Page) {
   // The sidebar materialized in its full final structure: create live, the
   // four siblings greyed.
   await expect(page.locator('.atlas-worlds-header [data-action="create-local"]')).toBeVisible();
-  await expect(page.locator('.atlas-worlds-header .atlas-tour-locked')).toHaveCount(4);
+  // Four locked icons plus the locked "add a world" (S365).
+  await expect(page.locator('.atlas-worlds-header .atlas-tour-locked')).toHaveCount(5);
   await page.locator('.atlas-worlds-header [data-action="create-local"]').click();
   const nameInput = page.locator('[data-modal="create-world"] input[name="world-name"]');
   await expect(nameInput).toHaveValue('Hyperion');

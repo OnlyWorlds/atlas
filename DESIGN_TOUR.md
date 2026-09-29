@@ -61,8 +61,10 @@ at the 'online' step as the deeper schema story).
   variant (rides his copy pass). The bare splash below is the pre-tour landing;
   the opener is the tour's own first beat.
 - **The bare splash** (`body.atlas-preroot`): pre-setup, atlas shows NO shell
-  chrome at all — just the Atlas mark and two side-by-side doors ("Take the
-  tour" / "Set up a folder") on black. Settings stays live at the
+  chrome at all — the Atlas mark and the doors on black: take the tour, and on
+  a folder-mode browser set up a folder and open a world folder (S365). The
+  splash shows while Atlas is not grounded (DESIGN conv. 114: no home folder
+  AND no world of the user's own), no longer merely while it has no root. Settings stays live at the
   `#/settings` route. After a completed tour (`atlas_tour_done_v1`) the doors
   swap emphasis: folder primary, tour reads "Replay the tour".
 - **One narrator, ONE position** (S298 — the centered opener was retired,

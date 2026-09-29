@@ -570,3 +570,28 @@ test('deleting an entry right after typing writes nothing to it', async ({ page 
   expect(await page.evaluate(() => (window as any).__updates)).toBe(0);
   await expect(page.locator('.ow-toast', { hasText: 'Could not update knowledge entry' })).toHaveCount(0);
 });
+
+test('the link-all pill never covers an entry\'s prose (S365 gate lens C M7)', async ({ page }) => {
+  await setupWorld(page);
+  await createElement(page, 'character', { name: 'Ireena' });
+  // A first line that runs to the right edge, where the pill sits.
+  await createElement(page, 'narrative', {
+    name: 'the long line', subtype: 'knowledge',
+    story: `Ireena ${'a b '.repeat(150).trim()}`,
+  });
+  await openKnowledge(page);
+  await page.click('.atlas-knowledge-row:has-text("the long line")');
+  await expect(page.locator('.atlas-knowledge-prose-rich .atlas-writing-linkall-corner')).toBeVisible({ timeout: 20000 });
+  // The INK, not the boxes.
+  const hits = await page.evaluate(() => {
+    const host = document.querySelector('.atlas-knowledge-prose-rich')!;
+    const pill = host.querySelector('.atlas-writing-linkall-corner')!.getBoundingClientRect();
+    const p = host.querySelector('.ProseMirror p')!;
+    const range = document.createRange();
+    range.selectNodeContents(p);
+    return [...range.getClientRects()].filter(r =>
+      r.width > 0 && r.left < pill.right && r.right > pill.left && r.top < pill.bottom && r.bottom > pill.top,
+    ).length;
+  });
+  expect(hits).toBe(0);
+});

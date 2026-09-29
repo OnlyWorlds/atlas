@@ -142,6 +142,7 @@ describe('SyncEngine push resilience — per-element failures', () => {
     expect(result.failures).toHaveLength(0);
     // No list calls — pull phase didn't run.
     expect(client.calls.some(c => c.method === 'list')).toBe(false);
+    expect(client.changesPulls).toBe(0); // nor a /changes pull (S365 lens A M4)
   });
 
   it('pushOnce honors per-element failure tolerance', async () => {

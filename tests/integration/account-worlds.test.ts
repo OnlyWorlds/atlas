@@ -13,7 +13,7 @@
  * Handlers' default base) to intercept.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
 import { mswServer } from '../setup';
 import { statefulAccountHandlers } from '../msw-account-handlers';
@@ -240,16 +240,19 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     expect(toasts.calls).toHaveLength(0);
   });
 
-  it('returns false and never mints when no atlas root is set', async () => {
+  it('with no home folder it asks where worlds live; Cancel returns false and never mints (S365)', async () => {
     const state = mount();
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
     patchSlice('atlasRoot', null);
     const toasts = makeToasts();
 
-    const ok = await openAccountWorld(row, toasts);
+    const pending = openAccountWorld(row, toasts);
+    await vi.waitFor(() => expect(document.querySelector('[data-modal="home-folder"]')).not.toBeNull());
+    document.querySelector<HTMLButtonElement>('[data-modal="home-folder"] [data-action="cancel"]')!.click();
+    const ok = await pending;
     expect(ok).toBe(false);
     expect(state.minted).toHaveLength(0);
-    expect(toasts.calls.some(c => c.level === 'error' && /OnlyWorlds folder/i.test(c.msg))).toBe(true);
+    expect(toasts.calls.some(c => c.level === 'error')).toBe(false);
   });
 
   it('returns false when the row is already represented in the registry', async () => {

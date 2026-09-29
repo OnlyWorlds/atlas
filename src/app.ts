@@ -27,7 +27,8 @@ import { installContextTabLifecycle } from './tabs/right/context-tab-lifecycle';
 import { openMapTab } from './tabs/right/map-index-tab';
 import { loadPersistedRightTabs } from './tabs/right/right-tabs-persistence';
 import { toastManager, ToastManager } from './ui/toast-manager';
-import { loadRegistry } from './registry/registry';
+import { loadRegistry, adoptStoredRegistry } from './registry/registry';
+import { REGISTRY_STORAGE_KEY } from './core/constants';
 import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
 import { loadUiPrefs } from './core/ui-prefs';
 import { onHashChange, parseHash, navigate, homeHash } from './core/router';
@@ -49,6 +50,14 @@ export interface AppHandle {
 export function startApp(container: HTMLElement): AppHandle {
   // Hydrate registry from localStorage into observable state.
   patchSlice('registry', loadRegistry());
+  // Another tab saved the registry: take its changes in, keep ours (S365
+  // gate lens A H1/H2). Without this a tab's memory went stale and its next
+  // save of the same world put the old copy back.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== REGISTRY_STORAGE_KEY) return;
+    const merged = adoptStoredRegistry(getState().registry);
+    if (merged) patchSlice('registry', merged);
+  });
   // Hydrate UI prefs (sidebar mode is state-driven since session 223 —
   // decoupled from URL routing; persists across reloads as a user preference).
   const prefs = loadUiPrefs();
