@@ -29,7 +29,7 @@ import { attachApi, saveRegistry, setPin, setEmail, findLinkedWorld } from '../r
 import { completeWaypoint } from '../core/waypoints';
 import { getActiveStore } from '../core/active-store';
 import { attachSyncEngine, detachSyncEngine } from '../sync/sync-attach';
-import { runRoute2, ambiguousLine } from '../sync/make-online-run';
+import { runRoute2, ambiguousLine, childClashLine } from '../sync/make-online-run';
 import { SyncEngine } from '../sync/sync-engine';
 import {
   createApiWorld,
@@ -522,7 +522,8 @@ export class MakeOnlineModal extends BaseModal {
       const summary = parts.length ? parts.join(', ') : 'Nothing to merge';
       const verb = failed > 0 ? this.toasts.error.bind(this.toasts) : this.toasts.success.bind(this.toasts);
       const unmatched = ambiguousLine(mergeResult.ambiguous);
-      verb(`Linked to ${world.name || 'world'} · ${summary}${unmatched ? `. ${unmatched}` : ''}${failureDetail ? `. ${failureDetail}` : ''}`);
+      const spatial = childClashLine(mergeResult.childClashes);
+      verb(`Linked to ${world.name || 'world'} · ${summary}${unmatched ? `. ${unmatched}` : ''}${spatial ? `. ${spatial}` : ''}${failureDetail ? `. ${failureDetail}` : ''}`);
       // Files the id move could not open keep their old links (S367 gate B2),
       // said as the Settings re-key says it.
       if (mergeResult.unrewritten.length > 0) {

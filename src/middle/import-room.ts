@@ -167,7 +167,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     </div>
     <div class="atlas-import-body">
       <div class="atlas-import-panel" data-panel="in" role="tabpanel">
-        <p class="atlas-import-lead">Bring in a world exported from onlyworlds.com, or loose elements. Drop a file or paste the JSON, then it gets reviewedbefore it lands.</p>
+        <p class="atlas-import-lead">Bring in a world exported from onlyworlds.com, or loose elements. Drop a file or paste the JSON, then it gets reviewed before it lands.</p>
         <div class="atlas-import-drop" data-role="drop" tabindex="0" title="drop or click to choose a .json file">
           <span class="material-symbols-outlined">place_item</span>
           <p>drop a world or elements <b>.json</b> here</p>

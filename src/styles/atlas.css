@@ -2199,27 +2199,40 @@ body.atlas-touring:not(.atlas-tour-collapsed) .atlas-sidebar {
 .atlas-tour-collapse .material-symbols-outlined { font-size: 16px; }
 .atlas-tour-collapse:hover { color: var(--atlas-cyan); }
 body.atlas-tour-collapsed .atlas-tour-bar { display: none; }
+/* The restore pill (S368 B4). It used to be a round "+" fixed bottom-RIGHT,
+   which sat on the map's zoom-out control and on the writing room's word
+   counter, and read as "create" like every other + in Atlas. Now it is a
+   text pill, bottom-CENTRE where the dock itself lived, inside a strip the
+   collapsed shell gives up for it: the shell ends above the strip, so no app
+   control can ever sit under the pill, at any width. */
+:root { --tour-restore-strip: 40px; }
 .atlas-tour-restore {
   display: none;
   position: fixed;
-  right: 18px;
-  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 6px;
   z-index: 900;
-  width: 34px;
-  height: 34px;
+  height: 28px;
+  padding: 0 12px 0 8px;
+  gap: 4px;
   align-items: center;
   justify-content: center;
   background: rgba(8, 13, 18, 0.92);
   border: 1px solid rgba(var(--atlas-accent-rgb), 0.35);
-  border-radius: 50%;
+  border-radius: 14px;
   color: var(--atlas-cyan);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
-.atlas-tour-restore .material-symbols-outlined { font-size: 22px; }
+.atlas-tour-restore .material-symbols-outlined { font-size: 18px; }
+.atlas-tour-restore:hover { border-color: var(--atlas-cyan); }
 body.atlas-tour-collapsed .atlas-tour-restore { display: inline-flex; }
 body.atlas-touring.atlas-tour-collapsed .atlas-shell {
-  height: calc(100vh - 12px);
+  height: calc(100vh - var(--tour-restore-strip));
 }
 /* Tour arrivals (S317): a subtle STICKY tint on rows revealed by the current
    step — no animation, no timer; it simply marks "these just joined" until
@@ -3913,6 +3926,13 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   margin-top: 6px;
 }
 
+/* B1 (S368): "No type called ..." under the type field; tight to the grid. */
+.atlas-modal-hint.atlas-create-type-hint {
+  margin: 6px 0 0;
+  /* full warn, not warn-soft: the soft tone is ~3.4:1 on the light panel */
+  color: var(--atlas-warn);
+}
+
 .atlas-create-type-btn {
   display: flex;
   flex-direction: column;
@@ -4246,13 +4266,6 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   display: flex;
   gap: 8px;
 }
-
-.atlas-welcome-demo-link {
-  color: var(--atlas-cyan);
-  text-decoration: none;
-}
-
-.atlas-welcome-demo-link:hover { text-decoration: underline; }
 
 /* ============================================================
    Landing (first launch + grounded states) — session 255.
@@ -5264,10 +5277,13 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   margin-bottom: 8px;
 }
 
+/* Themed (S368): the old literal pink-on-pink foreground was unreadable on
+   the light theme's white panel. Wash + border + text all answer to the
+   danger family, which flips with the theme. */
 .atlas-modal-error {
-  background: rgba(239, 68, 68, 0.10);
-  border: 1px solid rgba(239, 68, 68, 0.30);
-  color: rgba(255, 200, 200, 0.95);
+  background: var(--atlas-danger-hover-tint);
+  border: 1px solid var(--atlas-danger);
+  color: var(--atlas-danger-hover);
   padding: 8px 12px;
   border-radius: 4px;
   font-size: 12px;
@@ -14549,8 +14565,6 @@ a.atlas-share-map-pin { cursor: pointer; }
   font-style: italic;
 }
 
-.atlas-share-example-line { margin-top: 14px; }
-
 /* S3: the standalone full-page preview document body. */
 body.atlas-share-fullpreview {
   margin: 0;
@@ -15514,6 +15528,9 @@ body.atlas-share-fullpreview > * {
   font-size: 12.5px;
   color: rgba(var(--atlas-ink-rgb), 0.8);
 }
+/* S368: the delete line leads, at full ink; the replay line tucks under it. */
+.atlas-tour-exit-loss { color: var(--atlas-text); }
+.atlas-tour-exit-loss + .atlas-tour-exit-replay { margin-top: 2px; }
 .atlas-tour-exit-rooms {
   list-style: none;
   margin: 0 0 18px;
@@ -15929,3 +15946,39 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
 .atlas-settings-dangling .atlas-settings-hint { margin-bottom: 8px; }
 /* S362: a zone drawn as its linked zones (a road as its segments) says how many parts it lights. */
 .atlas-zone-chip-parts { margin-left: auto; padding-left: 8px; font-size: 11px; color: var(--atlas-text-muted); white-space: nowrap; }
+
+/* ============================================================
+   S368 lane X: problem toasts (fix buttons, Details, close).
+   A toast with buttons or details stays until closed.
+   ============================================================ */
+.ow-toast.ow-toast-rich { align-items: flex-start; }
+.ow-toast-rich .ow-toast-icon { margin-top: 1px; }
+.ow-toast-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.ow-toast-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.ow-toast-action { font-size: 11px; padding: 2px 8px; text-decoration: none; }
+.ow-toast-close {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--atlas-text-muted);
+  line-height: 1;
+}
+.ow-toast-close:hover,
+.ow-toast-close:focus-visible { color: var(--atlas-text); }
+.ow-toast-details summary { cursor: pointer; color: var(--atlas-text-soft); font-size: 11px; }
+.ow-toast-details-text {
+  margin: 6px 0;
+  padding: 6px 8px;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--atlas-text-soft);
+  background: rgba(var(--atlas-ink-rgb), 0.05);
+  border: 1px solid rgba(var(--atlas-ink-rgb), 0.1);
+  border-radius: 3px;
+  user-select: text;
+}

@@ -23,6 +23,7 @@ import type { FolderStore } from '../store/folder-store';
 import { ALL_ELEMENT_TYPES } from '../core/types';
 import { planMerge, type ServerRec } from './plan-merge';
 import { startRekey, type RekeyHooks } from '../store/rekey';
+import { isPageNarrative, newBlockId, type PageBlock } from '../core/sharing';
 
 import type { Element, ElementType, PerElementFailure } from '../core/types';
 import type { OwApiClient, BulkItem } from './sync-engine';
@@ -177,6 +178,8 @@ export interface MergeResult {
   failures: PerElementFailure[];
   /** Names left unmatched because two or more on one side share them (per type). */
   ambiguous: Array<{ type: ElementType; name: string }>;
+  /** Maps and zones left unmatched because both sides have pins or markers on them (gate A4/A5). */
+  childClashes: Array<{ type: ElementType; name: string }>;
   /** Local id → server id, the elements that took the server's id. */
   rekeyed: Map<string, string>;
   /** Elements whose file could not be read, so their links still name old ids. */
@@ -221,8 +224,10 @@ export class MergeRefusedError extends Error {
  *   - **Server-only**: DOWNLOAD into the folder.
  *   - **Matched**: policy (b) the local content goes up (PATCH, then the
  *     server's full response lands locally); policy (c) the server's record
- *     lands locally and the local content, rich text included, is given up.
- *     Atlas's own bindings (map image, aliases, page blocks) survive both.
+ *     lands locally and the local content, rich text included, is given up;
+ *     a page's blocks are its content, so they go too and are rebuilt from
+ *     the server's story (gate A9). Atlas's own bindings (map image, aliases)
+ *     survive both.
  *
  * The order is the design (`Forge/Notes/2026-09-29-s365-orient/lane-a-route2.md`
  * §3 Option A). A name match means a local element O IS server element N, so
@@ -313,10 +318,10 @@ export async function mergeLocalIntoApi(
   // Ids an earlier, unfinished run of this route created (gate A3): on a
   // rerun they meet their own upload as a same-id match.
   const ownUploads = new Set((await folder.readSyncState()).route2_created ?? []);
-  type Matched = { id: string; server: ServerRec; type: ElementType };
+  type Matched = { id: string; local: Element; server: ServerRec; type: ElementType };
   const matched: Matched[] = [
-    ...plan.sameId.map(m => ({ id: m.local.id, server: m.server, type: m.type })),
-    ...plan.renamed.map(m => ({ id: m.server.id, server: m.server, type: m.type })),
+    ...plan.sameId.map(m => ({ id: m.local.id, local: m.local, server: m.server, type: m.type })),
+    ...plan.renamed.map(m => ({ id: m.server.id, local: m.local, server: m.server, type: m.type })),
   ];
   const creates = plan.creates.filter(c => !unreadable.has(c.local.id));
   const total = plan.downloads.length + creates.length + matched.length;
@@ -562,7 +567,21 @@ export async function mergeLocalIntoApi(
         // Policy c: the server's record wins, and the local rich text goes
         // with the local prose it mirrored; atlas's bindings stay.
         const { updated_at, ...serverBody } = m.server;
-        await folder.applyServerRecord(m.type, serverBody, updated_at, { dropLocal: ['atlas_richtext_json'] });
+        const dropLocal = ['atlas_richtext_json'];
+        let body: Record<string, unknown> = serverBody;
+        // A page's blocks are its text (`story` is compiled from them on
+        // every save), so they go too, or the next save would put the local
+        // page back over the server's (gate A9, Captain's ruling 2026-10-04).
+        // Blocks are rebuilt only when the server's copy is a page: a local
+        // page the server holds as a scene becomes that scene, with no page
+        // fields left on it (gate lens B L2).
+        if (m.type === 'narrative' && (isPageNarrative(m.local) || isPageNarrative(serverBody as unknown as Element))) {
+          dropLocal.push('atlas_page_blocks', 'atlas_page_refs');
+          if (isPageNarrative(serverBody as unknown as Element)) {
+            body = { ...serverBody, ...pageBlocksFromStory(serverBody.story) };
+          }
+        }
+        await folder.applyServerRecord(m.type, body, updated_at, { dropLocal });
         counts.skipped++;
       }
     } catch (err) {
@@ -574,11 +593,29 @@ export async function mergeLocalIntoApi(
 
   // `route2_created` stays until the caller's link succeeds
   // (`make-online-run.ts`): a link step that throws leaves a rerun to come.
-  return { ...counts, failures, ambiguous: plan.ambiguous, rekeyed, unrewritten, idClashes: plan.idClashes };
+  return {
+    ...counts, failures, ambiguous: plan.ambiguous, childClashes: plan.childClashes,
+    rekeyed, unrewritten, idClashes: plan.idClashes,
+  };
 }
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * A page's blocks rebuilt from the server's `story`: one prose block holding
+ * it, so the page shows the online text and its next save compiles the same
+ * text back (`compilePageStory` writes a prose block's markdown, trimmed).
+ * Cards and other blocks the story only names come back as their text; that
+ * is the cost of keeping the online version. An empty story gives no blocks.
+ */
+function pageBlocksFromStory(story: unknown): { atlas_page_blocks: PageBlock[]; atlas_page_refs: string[] } {
+  const text = typeof story === 'string' ? story : '';
+  return {
+    atlas_page_blocks: text.trim() ? [{ id: newBlockId(), kind: 'prose', markdown: text, richtextJson: null }] : [],
+    atlas_page_refs: [],
+  };
 }
 
 // ---------------------------------------------------------------------------

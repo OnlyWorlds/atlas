@@ -123,7 +123,7 @@ There is no per-element entry: each element's baseline is its own `server_update
 - **`rekey-journal.json`**: written first by a re-key and removed when it finishes; while it exists every sync round refuses and a UI delete of a named id throws (conv. 105).
 - **`quarantine/<type>/`**: where the index moves a second file claiming an element id when its content differs from the survivor (conv. 94). Nothing reads it back; it exists so atlas never deletes a file it cannot prove is a copy.
 
-**One writer per file** (conv. 118): every one of these files, and `world.json`, is written through its own chain in `FsFolderStore`, because `writeJsonAtomic` stages through one fixed `<name>.tmp` and two overlapping writes of one file corrupt each other. A new shared file gets a chain the day it is born.
+**One writer per file** (conv. 118): every one of these files, and `world.json`, is written through its own chain in `FsFolderStore`, because two overlapping writes of one file fail each other (the first write's read-back verify reads the second's bytes). A new shared file gets a chain the day it is born.
 
 Reads that feed a whole-file write use `readJsonStrict`: a file that exists and will not parse throws `CorruptFileError` instead of reading as absent (world.json, sync-state, tombstones; charts and styles are checked before their writes).
 

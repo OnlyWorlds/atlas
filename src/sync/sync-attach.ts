@@ -24,6 +24,9 @@ import { toastManager } from '../ui/toast-manager';
 import type { FolderStore } from '../store/folder-store';
 import type { Element, WorldRegistryEntry, SyncEngineState } from '../core/types';
 import { failureToastOnce, classifyFailure } from './sync-failure-copy';
+import { buildFailureDetails, type FixId } from '../core/problems';
+import { detailsContext, resolveFixes } from '../ui/problem-fixes';
+import type { PerElementFailure } from '../core/types';
 import { effectiveSyncPaused } from '../registry/registry';
 
 let currentEngine: SyncEngine | null = null;
@@ -222,13 +225,42 @@ async function flushPendingOnAttach(
       // shown. Auth failures get their own dedicated toast via emitRoundToasts
       // below (pill also goes red); skip the generic warning in that case.
       if (!result.auth_blocked && !result.transient_blocked) {
-        const text = failureToastOnce(result.failures);
-        if (text) toastManager.error(text);
+        toastFailuresOnce(result.failures, engine, worldId);
       }
     }
   } catch (err) {
     console.warn('[atlas:sync] flush-on-attach failed:', err);
   }
+}
+
+/**
+ * The failure toast for a round (S368): the plain sentence from
+ * `failureToastOnce`, a button for the fix it names (Give new ids for a
+ * foreign id, Retry now for a held file), and the causes behind Details,
+ * scrubbed, for Copy details and Send feedback. Nothing when this set was
+ * already shown.
+ */
+function toastFailuresOnce(
+  failures: readonly PerElementFailure[],
+  engine: SyncEngine | null,
+  worldId: string | null,
+): void {
+  if (failures.length === 0) return;
+  const text = failureToastOnce(failures);
+  if (!text) return;
+  const kinds = new Set(failures.map(classifyFailure));
+  const fixIds: FixId[] = [];
+  if (kinds.has('foreign_id')) fixIds.push('new-ids');
+  if (kinds.has('file_busy')) fixIds.push('retry');
+  // A push is safe to repeat; only on the engine (and world) that failed.
+  const retry = engine ? () => {
+    if (currentEngine !== engine) return;
+    void engine.pushOnce().catch(err => console.warn('[atlas:sync] retry push failed:', err));
+  } : undefined;
+  toastManager.show(text, 'error', 8000, {
+    actions: resolveFixes(fixIds, { worldId, retry }),
+    details: buildFailureDetails(failures, detailsContext()),
+  });
 }
 
 /**
@@ -498,10 +530,11 @@ function emitConflictToasts(
   // anything else synced, and when nothing did, the advice was "test
   // connection", which passes.
   if (result.failures.length > 0) {
-    const text = synced === 0
-      ? failureToastOnce(result.failures)
-      : failureToastOnce(result.failures.filter(f => classifyFailure(f) !== 'other'));
-    if (text) toastManager.error(text);
+    toastFailuresOnce(
+      synced === 0 ? result.failures : result.failures.filter(f => classifyFailure(f) !== 'other'),
+      currentEngine,
+      currentWorldId,
+    );
     // Fall through — there might be conflicts to surface too.
   }
 

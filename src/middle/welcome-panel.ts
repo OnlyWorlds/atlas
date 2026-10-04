@@ -152,17 +152,9 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       const folderNote = folderMode
         ? ''
         : `<p class="atlas-landing-note">Atlas requires a desktop Chromium browser to keep worlds as real files on your drive: Chrome, Edge or Brave.</p>`;
-      // The example-page door shows ONLY on a folder-mode browser after the
-      // tour is done (Captain, S354: a non-Chromium splash offers the tour and
-      // nothing else). The S323 reading, that a phone visitor after the tour
-      // needed a forward door, is retired by that call; the sigil still links
-      // out to onlyworlds.com.
-      const exampleDoor = folderMode && tourDone
-        ? `<span class="atlas-landing-choice">
-             <button class="atlas-btn-ghost atlas-landing-btn" data-action="see-example">see an example page</button>
-             <span class="atlas-landing-choice-note">a published world, as a visitor sees it</span>
-           </span>`
-        : '';
+      // (The example-page door, "see an example page" → #/demo, was removed in
+      // S368 with the other two example-page links. The #/demo route itself
+      // still answers, for old links.)
       // The OnlyWorlds sigil + eyebrow (Skeld's opener note, Captain's nod,
       // 2026-07-19): users routed here from onlyworlds.com need the mark and
       // the stated relationship to read "same universe". Bundled local copy
@@ -184,15 +176,12 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
                 <button class="${tourBtnClass} atlas-landing-btn" data-action="start-tour">${tourDone ? 'replay the tour' : 'take the tour'}</button>
               </span>
               ${folderDoor}
-              ${exampleDoor}
             </div>
             <p class="atlas-landing-tag">An OnlyWorlds worldbuilding solution.</p>
             ${folderNote}
           </div>
         </div>
       `;
-      root.querySelector<HTMLButtonElement>('[data-action="see-example"]')
-        ?.addEventListener('click', () => { window.location.hash = '#/demo'; });
       const tourBtn = root.querySelector<HTMLButtonElement>('[data-action="start-tour"]')!;
       // Without a folder picker the tour is the only door, so a window that
       // refuses browser storage (a Firefox private window) says why up front

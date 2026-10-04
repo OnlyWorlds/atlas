@@ -1,11 +1,13 @@
 /**
  * Filesystem utilities for the FS Access API-backed FolderStore.
  *
- * Atomic write strategy: write to `<name>.tmp`, then rename to `<name>`.
- * The FS Access API doesn't expose true atomic rename across all browsers, so
- * we fall back to "write tmp, write final, delete tmp" with best-effort
- * crash safety. The tmp file is the recovery breadcrumb — readers can detect
- * an interrupted write by the presence of a stranded `<name>.tmp`.
+ * Write strategy (S368): ONE writable per write, then a read-back verify. A
+ * writable stream already stages into its own swap file and swaps it in on
+ * `close()`, so a crash mid-write leaves the old file whole. The old
+ * "write `<name>.tmp`, then write `<name>`" staging doubled the window in
+ * which another program holding the file (a cloud sync client, antivirus)
+ * makes the swap fail, and left stray `.tmp` files behind when it did.
+ * Readers still skip `.tmp` names, which older versions may have left.
  *
  * JSON read is corruption-tolerant: a malformed file logs and returns null
  * rather than throwing. Callers decide how to handle missing/bad payloads.
@@ -211,9 +213,30 @@ export interface FileStamp {
 }
 
 /**
- * Atomic-ish write: encode JSON, write to `<name>.tmp`, then move to `<name>`.
- * Removes the tmp after success. On crash mid-write, the tmp file is the
- * breadcrumb; the next read can ignore it and use the prior `<name>`.
+ * A file another program holds open, as the File System Access API reports
+ * it (S368, the Discord report). On Windows the swap-in at `close()` fails
+ * while OneDrive, Dropbox, antivirus or the search indexer has the file open,
+ * and Chromium words every such failure as an `InvalidStateError` ("An
+ * operation that depends on state cached in an interface object was made but
+ * the state had changed since it was read from disk."). `NotReadableError` is
+ * the same hold met by the read-back. All three pass once the hold ends.
+ */
+export function isFileBusyError(err: unknown): boolean {
+  const name = (err as { name?: unknown } | null)?.name;
+  return name === 'InvalidStateError' || name === 'NoModificationAllowedError' || name === 'NotReadableError';
+}
+
+/** Waits between attempts while a file is busy: about two seconds in all. */
+let busyRetryDelays: readonly number[] = [100, 250, 500, 1000];
+/** Test seam: shorter waits (`null` restores the defaults). */
+export function setBusyRetryDelaysForTests(delays: readonly number[] | null): void {
+  busyRetryDelays = delays ?? [100, 250, 500, 1000];
+}
+
+/**
+ * Write JSON: one writable, then a read-back verify. A write refused because
+ * another program holds the file is retried whole (same bytes, so a retry is
+ * safe) for about two seconds before the error reaches the caller.
  *
  * Returns the final file's stamp, read from the verify pass it already does:
  * a later stat of an untouched file equals it (measured, Chromium OPFS), so
@@ -224,7 +247,6 @@ export async function writeJsonAtomic(
   name: string,
   value: unknown
 ): Promise<FileStamp> {
-  const tmpName = `${name}${TMP_SUFFIX}`;
   // Trailing newline (S354, the git hop of the migration bout): every other
   // writer of the format ends a file with one, and git shows "no newline at
   // end of file" plus a phantom last-line change for each atlas edit in a
@@ -235,45 +257,54 @@ export async function writeJsonAtomic(
   // Quick read of the existing file (if any) so we can detect "write succeeded
   // but content didn't actually change" — a Chromium FS Access API quirk
   // observed in the wild. Diagnostic only; doesn't change behavior on success.
+  // (`return await`: a held file's read rejects in `text()`, which must land
+  // in this catch, not escape the write before its retries; S368 gate A H2.)
   const before = await (async () => {
     try {
       const h = await dir.getFileHandle(name);
-      return (await h.getFile()).text();
+      return await (await h.getFile()).text();
     } catch { return null; }
   })();
 
-  // Write tmp — explicitly truncate so we don't inherit stale bytes from any
-  // prior write.
-  const tmpHandle = await dir.getFileHandle(tmpName, { create: true });
-  const writer = await tmpHandle.createWritable();
-  await writer.truncate(0);
-  await writer.write(json);
-  await writer.close();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await writeJsonOnce(dir, name, json, before);
+    } catch (err) {
+      // Only a refused WRITE retries. A NotReadableError at the read-back
+      // means the file changed after our close succeeded: someone else wrote
+      // it, and writing our bytes again would put them over theirs (gate A M2).
+      const name = (err as { name?: unknown } | null)?.name;
+      const writeRefused = name === 'InvalidStateError' || name === 'NoModificationAllowedError';
+      if (!writeRefused || attempt >= busyRetryDelays.length) throw err;
+      await new Promise(resolve => setTimeout(resolve, busyRetryDelays[attempt]));
+    }
+  }
+}
 
-  // Read back tmp content to verify it's intact (catches truncated writes).
-  const verify = await (await tmpHandle.getFile()).text();
-  if (verify !== json) {
-    // Don't promote a corrupted tmp into the final slot.
-    await dir.removeEntry(tmpName).catch(() => {});
-    throw new Error(`writeJsonAtomic: verify failed for ${name}`);
+async function writeJsonOnce(
+  dir: FileSystemDirectoryHandle,
+  name: string,
+  json: string,
+  before: string | null,
+): Promise<FileStamp> {
+  // Truncate first: a writable opened with keepExistingData would otherwise
+  // leave the old tail behind a shorter body (malformed JSON on the next read).
+  const handle = await dir.getFileHandle(name, { create: true });
+  const writer = await handle.createWritable();
+  try {
+    await writer.truncate(0);
+    await writer.write(json);
+    await writer.close();
+  } catch (err) {
+    // Release the swap file so the retry (or the next save) starts clean.
+    await (writer as { abort?: () => Promise<void> }).abort?.().catch(() => {});
+    throw err;
   }
 
-  // Promote: write final, then drop tmp. (Real rename isn't exposed by FS
-  // Access API; this two-step is the best portable approximation.)
-  // Truncate first — without this, if the new content is shorter than the
-  // existing file, trailing bytes from the old content remain and produce
-  // malformed JSON on the next read.
-  const finalHandle = await dir.getFileHandle(name, { create: true });
-  const finalWriter = await finalHandle.createWritable();
-  await finalWriter.truncate(0);
-  await finalWriter.write(json);
-  await finalWriter.close();
-
-  // Read-back verify on the FINAL file too. Catches the silent-write quirk
-  // where close() reports success but the on-disk content didn't actually
-  // change. If this fires, we throw rather than letting the caller believe
-  // the write succeeded.
-  const finalFile = await finalHandle.getFile();
+  // Read-back verify. Catches the silent-write quirk where close() reports
+  // success but the on-disk content didn't actually change. If this fires,
+  // we throw rather than letting the caller believe the write succeeded.
+  const finalFile = await handle.getFile();
   const finalVerify = await finalFile.text();
   if (finalVerify !== json) {
     console.warn(`[fs-utils] writeJsonAtomic final read-back diverges from intent`, {
@@ -285,11 +316,8 @@ export async function writeJsonAtomic(
       gotPreview: finalVerify.slice(0, 200),
       sameAsBefore: before !== null && finalVerify === before,
     });
-    await dir.removeEntry(tmpName).catch(() => {});
     throw new Error(`writeJsonAtomic: final file does not match intent for ${name} (silent-write quirk?)`);
   }
-
-  await dir.removeEntry(tmpName).catch(() => {});
   return { lastModified: finalFile.lastModified, size: finalFile.size };
 }
 
@@ -317,6 +345,14 @@ export async function readJson<T = unknown>(
     console.warn(`[fs-utils] failed to read/parse ${name}:`, err);
     return null;
   }
+}
+
+/**
+ * What the user reads about a damaged file (S368): the file name and the fix,
+ * never the parser's own text. Shared by the sync pill and `core/problems.ts`.
+ */
+export function damagedFileSentence(fileName: string): string {
+  return `${fileName} in this world's folder is damaged, so Atlas will not write over it. A git merge or an interrupted copy can do this. Once you fix or remove the file, reload it from disk.`;
 }
 
 /** A file exists but will not parse: never treat it as absent and write over it. */

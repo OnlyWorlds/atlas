@@ -13,7 +13,7 @@ import { FakeOwApiClient } from '../fixtures/fake-ow-client';
 import { getState, setState, patchSlice } from '../../src/core/state';
 import { defaultRegistry, type Element, type WorldRegistryEntry } from '../../src/core/types';
 import { __setRegistryTabBaseForTests } from '../../src/registry/registry';
-import { runRoute2, ambiguousLine, MergeRefusedError } from '../../src/sync/make-online-run';
+import { runRoute2, ambiguousLine, childClashLine, MergeRefusedError } from '../../src/sync/make-online-run';
 import { giveForeignElementsNewIds, isRekeyRunning } from '../../src/sync/rekey-run';
 
 // One jsdom document for every file (vitest singleFork): leave it empty.
@@ -169,5 +169,22 @@ describe('ambiguousLine', () => {
     expect(ambiguousLine([{ type: 'character', name: 'Alice' }])).toMatch(/^One name was not matched .*\(Alice\)/);
     const five = ['A', 'B', 'C', 'D', 'E'].map(name => ({ type: 'character' as const, name }));
     expect(ambiguousLine(five)).toMatch(/^5 names were not matched .*\(A, B, C and 2 more\)/);
+  });
+});
+
+describe('childClashLine (gate A4/A5)', () => {
+  it('says map, zone or both, names up to three, and has no em-dash', () => {
+    expect(childClashLine([])).toBeNull();
+    expect(childClashLine([{ type: 'map', name: 'World' }])).toBe(
+      'One map was not matched because the local and the online one both have pins or markers on it (World): each stays its own element',
+    );
+    expect(childClashLine([{ type: 'zone', name: 'Forest' }, { type: 'zone', name: 'Moor' }])).toBe(
+      '2 zones were not matched because the local and the online ones both have markers on them (Forest, Moor): each stays its own element',
+    );
+    const mixed = childClashLine([
+      { type: 'map', name: 'A' }, { type: 'map', name: 'B' }, { type: 'zone', name: 'C' }, { type: 'zone', name: 'D' },
+    ])!;
+    expect(mixed).toMatch(/^4 maps and zones were not matched .*pins or markers on them \(A, B, C and 1 more\)/);
+    expect(mixed).not.toContain('—');
   });
 });

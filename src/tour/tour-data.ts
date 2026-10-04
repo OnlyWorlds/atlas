@@ -529,7 +529,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
           // the editor. The gesture is click-then-Tab.
           'The writing room is where you write and organize long-form stories.' +
           '\nStories organize in three customizable tiers: Book, Chapter, Scene as defaults.' +
-          '\nThe text detectes elements by names and lets you link to them.' +
+          '\nThe text detects elements by names and lets you link to them.' +
           '\n\nClick one of the blue underlined words, or hover + Tab to make one.',
  
    
@@ -720,7 +720,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'That\'s the tour. Every room has a help icon once you open a world.' +
         '\nQuestions, bugs and feature requests are welcome: through [Discord](https://discord.gg/twCjqvVBwb), ' +
         'the [feedback tracker](https://github.com/OnlyWorlds/feedback), or email at info@onlyworlds.com.',
-      meta: 'The tour world leaves nothing behind. Replay it anytime from settings.',
+      // S368: "leaves nothing behind" was too soft for a delete. Finish and
+      // "Set up a folder" both end the tour, and both delete its world.
+      meta: 'Ending the tour deletes the tour world and everything you made in it. Replay the tour anytime from settings.',
     }],
     // The closing view is the ebony spaceship (Captain, S318 — "just for
     // cools"): the tour ends looking at the sentence's grandest object, its

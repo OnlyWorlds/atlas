@@ -23,6 +23,7 @@ import type { FolderStore } from '../store/folder-store';
 import type { OwApiClient } from './sync-engine';
 import type { ElementType, PerElementFailure } from '../core/types';
 import { ALL_ELEMENT_TYPES } from '../core/types';
+import { PlainError } from '../core/plain-error';
 
 export interface InitialDownloadProgress {
   /** Elements written so far (success OR failure). */
@@ -54,7 +55,7 @@ export interface InitialDownloadResult {
 export type DownloadStop = 'finish' | 'cancel' | null;
 
 /** Thrown when the user cancels the download; nothing downloaded is kept. */
-export class DownloadCancelledError extends Error {
+export class DownloadCancelledError extends PlainError {
   constructor() {
     super('Link cancelled');
     this.name = 'DownloadCancelledError';

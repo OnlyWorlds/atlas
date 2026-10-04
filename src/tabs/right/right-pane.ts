@@ -24,6 +24,7 @@ import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map
 import { navigate, parseHash, worldHash, elementHash } from '../../core/router';
 import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount, diagnoseSyncUnavailable } from '../../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../../ui/sync-toasts';
+import { showProblem } from '../../ui/problem-fixes';
 import { ConflictReviewModal } from '../../ui/conflict-review-modal';
 import { savePersistedRightTabs } from './right-tabs-persistence';
 import { clearCameraState } from '../../core/map-camera-persist';
@@ -358,17 +359,19 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       <span>View only</span>
       <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from API">refresh</span>
     `;
-    pill.onclick = async () => {
+    const refreshView = async (): Promise<void> => {
       try {
         const result = await pullNowAndRefresh();
-        if (!result) { toasts.info('Engine not ready'); return; }
+        if (!result) { surfaceSyncUnavailable(toasts); return; }
         const totalPulled = result.pulled.creates + result.pulled.updates + result.pulled.deletes
           + (result.meta_pulled?.length ?? 0);
         if (totalPulled === 0) toasts.info('Already up to date');
       } catch (err) {
-        toasts.error(err instanceof Error ? err.message : String(err));
+        console.warn('[right-pane] view-only refresh failed:', err);
+        showProblem(err, { doing: 'refreshing from OnlyWorlds', retry: refreshView, toasts });
       }
     };
+    pill.onclick = refreshView;
     return;
   }
 
@@ -432,11 +435,15 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       return;
     }
     if (currentPendingPush) {
-      try {
-        await eng.flushPendingPush();
-      } catch (err) {
-        toasts.error(err instanceof Error ? err.message : String(err));
-      }
+      const pushNow = async (): Promise<void> => {
+        try {
+          await eng.flushPendingPush();
+        } catch (err) {
+          console.warn('[right-pane] push now failed:', err);
+          showProblem(err, { doing: 'uploading changes', retry: pushNow, toasts });
+        }
+      };
+      await pushNow();
       return;
     }
     const cur = state.sync.activeSync;
@@ -454,7 +461,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
     try {
       const result = await pullNowAndRefresh();
       if (!result) {
-        toasts.info('Engine not ready');
+        surfaceSyncUnavailable(toasts);
         return;
       }
       const totalPulled = result.pulled.creates + result.pulled.updates + result.pulled.deletes
@@ -475,7 +482,8 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
         toasts.info('Already up to date');
       }
     } catch (err) {
-      toasts.error(err instanceof Error ? err.message : String(err));
+      console.warn('[right-pane] refresh failed:', err);
+      showProblem(err, { doing: 'refreshing from OnlyWorlds', retry: () => { void pullNowAndRefresh().catch(e => showProblem(e, { doing: 'refreshing from OnlyWorlds', toasts })); }, toasts });
     }
   };
 }

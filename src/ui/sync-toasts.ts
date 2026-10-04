@@ -49,7 +49,7 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
     //  compile until it is handled.)
     case 'engine-not-ready':
     default:
-      toasts.info('Sync engine not ready. Try again in a moment');
+      toasts.info('Sync is still starting. Try again in a moment.');
       return reason;
   }
 }

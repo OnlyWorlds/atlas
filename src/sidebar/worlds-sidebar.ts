@@ -35,6 +35,7 @@ import { resetElementDetailScrollMemory } from '../middle/element-detail';
 import { openAccountWorld, refreshAccountWorlds, remoteAccountWorlds } from '../sync/account-worlds';
 import { attachSyncEngine, getCurrentSyncEngine, getCurrentSyncWorldId, pullNowAndRefresh } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
+import { showProblem } from '../ui/problem-fixes';
 import { ToastManager } from '../ui/toast-manager';
 import { rightTabHashFor } from './sidebar';
 
@@ -334,7 +335,14 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         if (elementTotal + metaTotal === 0) toasts.success('Already up to date');
         else if (elementTotal > 0) toasts.success(`Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
       } catch (err) {
-        toasts.error(err instanceof Error ? err.message : String(err));
+        console.warn('[worlds-sidebar] refresh failed:', err);
+        showProblem(err, {
+          doing: 'refreshing from OnlyWorlds', worldId, toasts,
+          retry: () => {
+            if (worldId !== getCurrentSyncWorldId()) return;
+            void pullNowAndRefresh().catch(e2 => showProblem(e2, { doing: 'refreshing from OnlyWorlds', worldId, toasts }));
+          },
+        });
       }
       return;
     }
@@ -775,12 +783,14 @@ async function doActivateWorld(
       try {
         await store.open(handle);
       } catch (err2) {
-        toasts.error(`Failed to open ${entry.name}: ${err2 instanceof Error ? err2.message : String(err2)}`);
+        console.warn('[worlds-sidebar] open after take-over failed:', err2);
+        showProblem(err2, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
         if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
         return false;
       }
     } else {
-      if (!silent) toasts.error(`Failed to open ${entry.name}: ${err instanceof Error ? err.message : String(err)}`);
+      console.warn('[worlds-sidebar] open failed:', err);
+      if (!silent) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }

@@ -354,7 +354,7 @@ async function openWorldDoor(id: 'add-world' | 'open-world-folder'): Promise<voi
  * "Reload from disk" (S364): a FULL live-folder pass, every file confirmed by
  * content. Says what it found, including nothing.
  */
-async function reloadFromDisk(): Promise<void> {
+export async function reloadFromDisk(): Promise<void> {
   const { rescanNow } = await import('../core/live-folder');
   const { toastManager } = await import('./toast-manager');
   const { changes, skipped } = await rescanNow({ force: true, full: true });

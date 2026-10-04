@@ -54,6 +54,9 @@ const PROBES: Probe[] = [
   // Ordinary light-page chrome that carried literal white foregrounds.
   { name: 'unsupported heading', chain: ['atlas-unsupported', 'h1:atlas-unsupported-h1'] },
   { name: 'demo intro heading', chain: ['atlas-demo-overlay', 'atlas-demo-intro', 'h1:demo-h1'] },
+  // Modal error box (S368): a literal pale-pink foreground on a pink wash over
+  // the light theme's white panel. Body text, so the 4.5:1 floor.
+  { name: 'modal error', chain: ['atlas-modal-panel', 'atlas-modal-error'], min: 4.5 },
 ];
 
 /**

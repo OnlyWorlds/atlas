@@ -318,10 +318,9 @@ export class FsFolderStore implements FolderStore {
     return next;
   }
   /**
-   * ONE WRITER PER FILE (S366). `writeJsonAtomic` stages through one fixed
-   * `<name>.tmp`, so two overlapping writes of the same file corrupt each
-   * other's staging (the first verify reads the second's bytes and removes
-   * the tmp; the second then fails). The lock had four writers (claim,
+   * ONE WRITER PER FILE (S366). Two overlapping writes of the same file fail
+   * each other: the first write's read-back verify reads the second's bytes
+   * and throws (the `.tmp` staging that made it worse is gone since S368). The lock had four writers (claim,
    * heartbeat, park's staling, unpark) and park never waited for its own:
    * a tab switch under load came back "not revived" (lane C: 21 of 320).
    * Every lock read-modify-write runs here, in call order.

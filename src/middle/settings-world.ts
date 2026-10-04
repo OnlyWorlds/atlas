@@ -21,6 +21,7 @@ import { deleteWorldFolderUnderRoot, whyWorldFolderNotDeletable } from '../setup
 import { MakeOnlineModal } from '../ui/make-online-modal';
 import { ToastManager } from '../ui/toast-manager';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
+import { showProblem } from '../ui/problem-fixes';
 import { navigate } from '../core/router';
 import {
   detachSyncEngine,
@@ -199,7 +200,14 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       if (elementTotal + metaTotal === 0) toasts.success('Already up to date');
       else if (elementTotal > 0) toasts.success(`Pulled ${result.pulled.creates} new + ${result.pulled.updates} updated`);
     } catch (err) {
-      toasts.error(err instanceof Error ? err.message : String(err));
+      console.warn('[settings-world] refresh failed:', err);
+      showProblem(err, {
+        doing: 'refreshing from OnlyWorlds', worldId: world.id, toasts,
+        retry: () => {
+          if (world.id !== getCurrentSyncWorldId()) return;
+          void pullNowAndRefresh().catch(e2 => showProblem(e2, { doing: 'refreshing from OnlyWorlds', worldId: world.id, toasts }));
+        },
+      });
     } finally {
       refreshBtn.disabled = false;
     }

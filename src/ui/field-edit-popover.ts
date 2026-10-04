@@ -24,6 +24,8 @@
  */
 
 import { toastManager } from './toast-manager';
+import { showProblem } from './problem-fixes';
+import { problemWasShown } from '../core/problems';
 
 export interface FieldEditOptions {
   /** Element whose bounding rect anchors the popover. */
@@ -229,8 +231,11 @@ export function openFieldEditPopover(opts: FieldEditOptions): void {
     // forward-moving.
     cleanup();
     void Promise.resolve(opts.onSave(nextValue)).catch((err) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      toastManager.error(`Could not save: ${msg}`);
+      // A save that already said what went wrong (the element page's own
+      // field save does) is not said twice (S368).
+      if (problemWasShown(err)) return;
+      console.warn('[field-edit-popover] save failed:', err);
+      showProblem(err, { doing: 'saving this field' });
     });
   }
 

@@ -42,6 +42,7 @@ import type { FolderStore, RekeyJournal } from './folder-store';
 import { newId, nowIso } from './folder-store';
 import { rekeyBody, type IdMap } from './rekey-body';
 import { CorruptFileError } from './fs-utils';
+import { PlainError } from '../core/plain-error';
 import { rewriteChartScopeIds } from '../visualization/timeline/charts-store';
 
 export interface RekeyHooks {
@@ -60,7 +61,7 @@ export interface RekeyResult {
   origin?: 'rekey' | 'merge';
 }
 
-export class RekeyRefusedError extends Error {
+export class RekeyRefusedError extends PlainError {
   constructor(message: string) {
     super(message);
     this.name = 'RekeyRefusedError';

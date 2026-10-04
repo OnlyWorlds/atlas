@@ -26,6 +26,7 @@ import type {
 } from '../core/types';
 import type { ChartConfig } from '../visualization/timeline/types';
 import type { WorldStyles } from '../core/world-styles';
+import { PlainError } from '../core/plain-error';
 
 /**
  * Options for listElements. `onProgress(done, total)` fires per file during a
@@ -353,7 +354,7 @@ export interface RescanResult {
  * copy). Deleting either one would scrub the links that already moved to it
  * (S363 gate lens A F6): finish or discard the id update first.
  */
-export class RekeyPendingError extends Error {
+export class RekeyPendingError extends PlainError {
   constructor() {
     super('Finish or discard the id update in Settings first.');
     this.name = 'RekeyPendingError';

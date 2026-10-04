@@ -23,6 +23,7 @@ import type { Element } from '../core/types';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import { noteOpenedFromStory } from './story-notice';
 import { diskChangeFor, storyChangedAlone } from '../core/live-folder';
 import { renderHeader, isEditingIn } from './element-detail-header';
@@ -124,6 +125,11 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
    * right element (S323 — the room-exit data-loss class; see persistSnapshot).
    */
   let pendingSnapshot: PendingWrite | null = null;
+  // The latest save started per narrative (S368): "Retry now" on a failed
+  // save runs only while no later save of that narrative has started, so an
+  // older text never overwrites a newer one.
+  const latestSave = new Map<string, number>();
+  let saveSeq = 0;
   // Track last-seen elements array reference so we only rebuild the autolink
   // index (and dispatch a tx) when state.data.elements actually swaps.
   let lastSeenElementsRef: Element[] | null = null;
@@ -529,6 +535,8 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
    * route and the mounted editor are simply not consulted.
    */
   async function persistSnapshot(snap: PendingWrite): Promise<void> {
+    const seq = ++saveSeq;
+    latestSave.set(snap.id, seq);
     const el = getState().data.elements.find(e => e.id === snap.id) ?? null;
     if (!el) return; // deleted out from under us — nothing to write to
     const folder = getActiveStore();
@@ -557,9 +565,12 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       // Save-state indicator no longer rendered here — the element-header's
       // sync dot (sets data-state via local_updated_at vs server_updated_at)
       // is now the single source of truth for save/sync visual feedback.
-    } catch (err: any) {
+    } catch (err) {
       console.error('[writing-workspace] save failed', err);
-      toastManager.error('Save failed: ' + (err?.message ?? 'unknown error'));
+      showProblem(err, {
+        doing: 'saving this scene',
+        retry: () => { if (latestSave.get(snap.id) === seq) void persistSnapshot(snap); },
+      });
     }
   }
 

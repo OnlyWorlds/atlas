@@ -137,3 +137,23 @@ export function ambiguousLine(ambiguous: MergeResult['ambiguous']): string | nul
   const list = names.join(', ') + (rest > 0 ? ` and ${rest} more` : '');
   return `${ambiguous.length === 1 ? 'One name was' : `${ambiguous.length} names were`} not matched because more than one element has it (${list}): each stays its own element`;
 }
+
+/**
+ * The toast's line about maps and zones left unmatched because the local and
+ * the online one both have pins or markers on them (gate A4/A5, Captain's
+ * ruling 2026-10-04). Same shape as `ambiguousLine`.
+ */
+export function childClashLine(clashes: MergeResult['childClashes']): string | null {
+  if (clashes.length === 0) return null;
+  const names = clashes.slice(0, 3).map(c => c.name || 'unnamed');
+  const rest = clashes.length - names.length;
+  const list = names.join(', ') + (rest > 0 ? ` and ${rest} more` : '');
+  const one = clashes.length === 1;
+  const maps = clashes.every(c => c.type === 'map');
+  const zones = clashes.every(c => c.type === 'zone');
+  const noun = maps ? (one ? 'map' : 'maps') : zones ? (one ? 'zone' : 'zones') : 'maps and zones';
+  const head = one ? `One ${noun} was` : `${clashes.length} ${noun} were`;
+  const children = zones ? 'markers' : 'pins or markers';
+  const sides = one ? 'the local and the online one both have' : 'the local and the online ones both have';
+  return `${head} not matched because ${sides} ${children} on ${one ? 'it' : 'them'} (${list}): each stays its own element`;
+}

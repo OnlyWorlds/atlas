@@ -40,11 +40,21 @@ export class FakeBlob {
   async text() { contentReads++; return this.data; }
 }
 
+/**
+ * Chromium's wording when the swap-in at `close()` fails because another
+ * program holds the file (S368, the Discord report; `native_file_util.cc` maps
+ * every failed move to FILE_ERROR_FAILED, `file_error.cc` words it so).
+ */
+export const HELD_FILE_MESSAGE =
+  'An operation that depends on state cached in an interface object was made but the state had changed since it was read from disk.';
+
 export class FakeFileHandle {
   readonly kind = 'file';
   lastModified = tick();
   /** Set by `removeEntry`: a removed file's handle throws on read, as Chromium's does (S364 gate). */
   removed = false;
+  /** Closes still to refuse while another program "holds" the file (`FakeDirHandle.hold`). */
+  heldCloses = 0;
   constructor(public name: string, public data: string = '') {}
   async getFile() {
     await settle();
@@ -62,7 +72,12 @@ export class FakeFileHandle {
         else if (v && typeof (v as { text?: unknown }).text === 'function') buf += await (v as Blob).text();
         else buf += String(v);
       },
-      close: async () => { await settle(); this.data = buf; this.lastModified = tick(); },
+      close: async () => {
+        await settle();
+        if (this.heldCloses > 0) { this.heldCloses--; throw err('InvalidStateError', HELD_FILE_MESSAGE); }
+        this.data = buf; this.lastModified = tick();
+      },
+      abort: async () => { buf = ''; },
     };
   }
 }
@@ -111,10 +126,24 @@ export class FakeDirHandle {
   }
   /** Bump a file's `lastModified` without changing its bytes (a `touch`). */
   touch(path: string): void {
+    this.fileAt(path).lastModified = tick();
+  }
+  /**
+   * Another program holds this file (S368): its next `closes` writable closes
+   * fail as Chromium's do on Windows, leaving the bytes untouched. `Infinity`
+   * holds until `release(path)`.
+   */
+  hold(path: string, closes = Infinity): void {
+    this.fileAt(path).heldCloses = closes;
+  }
+  release(path: string): void {
+    this.fileAt(path).heldCloses = 0;
+  }
+  private fileAt(path: string): FakeFileHandle {
     let cur: FakeDirHandle | FakeFileHandle | undefined = this;
     for (const s of path.split('/')) cur = cur && cur.kind === 'directory' ? (cur as FakeDirHandle).children.get(s) : undefined;
     if (!cur || cur.kind !== 'file') throw err('NotFoundError', `file ${path} not found`);
-    (cur as FakeFileHandle).lastModified = tick();
+    return cur as FakeFileHandle;
   }
   get(path: string): string | null {
     let cur: FakeDirHandle | FakeFileHandle | undefined = this;

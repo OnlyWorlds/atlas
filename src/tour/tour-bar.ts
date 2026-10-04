@@ -100,12 +100,55 @@ export function ensureTourBar(container: HTMLElement): void {
   else if (!isTourActive() && root) unmount();
 }
 
+/**
+ * Escape closes an open "more information" flyout (S368 B5: it ignored Escape
+ * and sat over the page through later actions). Bound for the life of the
+ * bar, but it only acts when a flyout is actually open, and it stands aside
+ * whenever something else owns Escape: an open modal (its own handler closes
+ * it), or focus in an editable field (field editors cancel on Escape). The
+ * narrow shape the opener-Escape note below asks for.
+ *
+ * Window CAPTURE, and the key stops here when it closed a flyout: the open
+ * flyout is the topmost thing, and the global "deselect to home" hotkey
+ * otherwise took the same Escape first (it prevents the default, so this
+ * handler stood aside and the step's element was deselected instead).
+ */
+let deeperEscapeHandler: ((e: KeyboardEvent) => void) | null = null;
+
+function closeDeeperFlyout(): boolean {
+  const open = root?.querySelector<HTMLElement>('.atlas-tour-deeper:not([hidden])');
+  if (!open) return false;
+  open.hidden = true;
+  flyoutOpenFor = null;
+  flyoutScrollTop = 0;
+  return true;
+}
+
+function bindDeeperEscape(): void {
+  if (deeperEscapeHandler) return;
+  deeperEscapeHandler = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (document.querySelector('.atlas-modal-overlay')) return;
+    const t = e.target;
+    if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if (closeDeeperFlyout()) { e.preventDefault(); e.stopPropagation(); }
+  };
+  window.addEventListener('keydown', deeperEscapeHandler, true);
+}
+
+function unbindDeeperEscape(): void {
+  if (!deeperEscapeHandler) return;
+  window.removeEventListener('keydown', deeperEscapeHandler, true);
+  deeperEscapeHandler = null;
+}
+
 function mount(container: HTMLElement): void {
   root = document.createElement('div');
   root.className = 'atlas-tour-root';
   container.appendChild(root);
   document.body.classList.add('atlas-touring');
   lastSignature = null;
+  bindDeeperEscape();
   unsub = onTourChange(() => {
     if (!isTourActive()) { unmount(); return; }
     // Settling covers this listener too: `writeTourState` emits at the TOP of
@@ -145,6 +188,7 @@ function unmount(): void {
   lastSignature = null;
   flyoutOpenFor = null;
   flyoutScrollTop = 0;
+  unbindDeeperEscape();
   root?.remove();
   root = null;
   dockCollapsed = false;
@@ -612,7 +656,7 @@ function render(): void {
     const finish = document.createElement('button');
     finish.type = 'button';
     finish.className = folderMode ? 'atlas-btn-ghost' : 'atlas-btn-primary';
-    finish.title = 'End the tour (the tour world folds away)';
+    finish.title = 'End the tour and delete the tour world';
     finish.textContent = 'Finish';
     finish.addEventListener('click', () => { void exitTour(); });
     controls.appendChild(finish);
@@ -669,7 +713,8 @@ function render(): void {
   restore.className = 'atlas-tour-restore';
   restore.title = 'Show the tour panel';
   restore.setAttribute('aria-label', 'Show the tour panel');
-  restore.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">add</span>';
+  // S368 B4: a word, not a "+" (every other + in Atlas means create).
+  restore.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">expand_less</span><span>Show the tour</span>';
   restore.addEventListener('click', () => setDockCollapsed(false));
   root!.appendChild(restore);
   root!.appendChild(panel);
@@ -925,7 +970,7 @@ function appendExit(controls: HTMLElement): void {
   const exit = document.createElement('button');
   exit.type = 'button';
   exit.className = 'atlas-btn-ghost atlas-tour-exit';
-  exit.title = 'Leave the tour (the tour world folds away)';
+  exit.title = 'Leave the tour and delete the tour world';
   exit.textContent = 'Exit tour';
   // Exit goes through the confirm (Captain, S301): every beat is gated on a
   // gesture, so leaving early is a legitimate move that deserves a real door —

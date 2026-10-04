@@ -392,6 +392,12 @@ export interface PerElementFailure {
   type: ElementType | 'world';
   operation: 'create' | 'update' | 'delete' | 'read';
   message: string;
+  /**
+   * The thrown error's `name` when it carried one (S368): `InvalidStateError`
+   * from a file another program holds reads the same in every locale, where
+   * its message does not. What the toast classifies on.
+   */
+  error_name?: string;
 }
 
 // ---- Registry ----

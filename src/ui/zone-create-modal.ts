@@ -87,6 +87,8 @@ class ZoneCreateModal extends BaseModal {
           />
         </div>
 
+        <div class="atlas-modal-error" data-role="zone-create-error" hidden></div>
+
         <div class="atlas-modal-actions">
           <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
           <button type="button" class="atlas-btn-primary" data-action="create">Create zone</button>
@@ -96,10 +98,19 @@ class ZoneCreateModal extends BaseModal {
       const nameInput = body.querySelector<HTMLInputElement>('[data-role="zone-create-name"]')!;
       const supertypeInput = body.querySelector<HTMLInputElement>('[data-role="zone-create-supertype"]')!;
       const subtypeInput = body.querySelector<HTMLInputElement>('[data-role="zone-create-subtype"]')!;
+      const errorBox = body.querySelector<HTMLElement>('[data-role="zone-create-error"]')!;
+
+      // B6 (S368): an empty name used to do nothing at all. Same rule and
+      // same words as the element create modal: say it, clear it on typing.
+      nameInput.addEventListener('input', () => {
+        if (nameInput.value.trim()) errorBox.hidden = true;
+      });
 
       const submit = () => {
         const name = nameInput.value.trim();
         if (!name) {
+          errorBox.textContent = 'Name is required';
+          errorBox.hidden = false;
           nameInput.focus();
           nameInput.select();
           return;

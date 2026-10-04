@@ -243,10 +243,19 @@ describe('DEFECT F7: Atlas\'s own create, caught between its write and its index
     await s.listElements();
     const charDir = await dirOf(root, 'elements', 'character');
     const reached = gate(); const hold = gate();
-    const origRemove = charDir.removeEntry.bind(charDir);
-    charDir.removeEntry = async (name: string, o?: { recursive?: boolean }) => {
-      if (name.endsWith('.json.tmp')) { reached.open(); await hold.p; }
-      return origRemove(name, o);
+    // Hold at the write's read-back verify: the final file is committed and
+    // writeJsonAtomic has not returned. (Until S368 the hook was the `.tmp`
+    // removal; the writer no longer stages through a `.tmp`.)
+    const origGetHandle = charDir.getFileHandle.bind(charDir);
+    let patched = false;
+    charDir.getFileHandle = async (name: string, o?: { create?: boolean }) => {
+      const h = await origGetHandle(name, o);
+      if (o?.create && name.endsWith('.json') && !patched) {
+        patched = true;
+        const g = h.getFile.bind(h);
+        h.getFile = async () => { h.getFile = g; reached.open(); await hold.p; return g(); };
+      }
+      return h;
     };
     const c = s.createElement('character', { name: 'Nova' });
     await reached.p;                       // the final file is on disk; writeJsonAtomic has not returned

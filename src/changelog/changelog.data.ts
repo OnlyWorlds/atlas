@@ -56,6 +56,92 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.15',
+    date: '2026-10-04',
+    theme: 'errors you can read',
+    entries: [
+      {
+        id: 'errors-in-plain-words',
+        title: 'Errors say what happened and what you can do',
+        body: 'When saving, opening a world or syncing fails, Atlas now says why in plain words instead of passing on the browser\'s or server\'s own message, and offers the fix where it has one: Retry now, Allow access to the folder again, or Give new ids.',
+        tags: ['editor', 'sync'],
+        credit: { handle: 'a Discord user', platform: 'discord' },
+      },
+      {
+        id: 'error-details-feedback',
+        title: 'Copy the details of an error, or send them as feedback',
+        body: 'Each error has a Details part with Copy details and Send feedback. The details name the Atlas version, the browser and the kind of error, never your world\'s names, text, keys or file paths. Feedback opens the OnlyWorlds feedback page, where you see everything before it is sent.',
+        tags: ['editor'],
+      },
+      {
+        id: 'held-files-sync-later',
+        title: 'Syncing waits out OneDrive, Dropbox and antivirus',
+        body: 'When another program had a file in your world folder open at the wrong moment, often a cloud sync app or antivirus, a change could fail to sync with a message nobody could read, and it only synced after your next edit. Atlas now waits a moment and tries again on its own, keeps the rest of the sync going, and if a file stays busy it says so in plain words. Your change was always safe on disk.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'no-more-tmp-files',
+        title: 'No more stray .tmp files in your world folder',
+        body: 'Atlas saved every file twice, through a temporary copy, and a busy file could leave that copy behind. It now saves each file once and checks it afterwards.',
+        tags: ['folder', 'fix'],
+      },
+      {
+        id: 'link-existing-maps-with-pins',
+        title: 'Linking keeps two maps apart when both have pins',
+        body: 'When linking to an existing online world, a map or zone with the same name on both sides is matched as before, unless both have their own pins or markers on it. Then each stays its own element, so no map ends up with two pins for one place and no zone outline mixes two sets of points. The message after linking names them.',
+        tags: ['sync', 'maps'],
+      },
+      {
+        id: 'keep-online-pages',
+        title: 'Keeping the online version of a page keeps all of it',
+        body: 'Choosing to keep the online version while linking now replaces a page\'s local blocks too, so the next save no longer puts your local page back over the online one.',
+        tags: ['sync', 'pages'],
+      },
+      {
+        id: 'create-type-no-guess',
+        title: 'The type field no longer picks a type you did not mean',
+        body: 'Typing a word that is not a type, like "plan", kept the last match (Phenomenon) and created one. Now nothing is picked until you choose a type, and the window says so.',
+        tags: ['editor', 'fix'],
+      },
+      {
+        id: 'readable-modal-errors',
+        title: 'Error lines in windows are readable in the light theme',
+        body: 'Lines like "Name is required" were pale pink on pink in the light theme. They now read in both themes and go away once you fix the field. A zone with no name says so too.',
+        tags: ['editor', 'fix'],
+      },
+      {
+        id: 'tour-show-button',
+        title: 'The hidden tour comes back from a button that says so',
+        body: 'With the tour panel hidden, its round + button sat over the map\'s zoom-out and the writing word count. It is now a "Show the tour" button below the app.',
+        tags: ['tour', 'fix'],
+      },
+      {
+        id: 'tour-says-world-goes',
+        title: 'The tour says that ending it deletes the tour world',
+        body: 'Leaving or finishing the tour deletes the tour world and everything made in it, and now the tour says so before you do. "More information" in a step also closes with Escape.',
+        tags: ['tour'],
+      },
+      {
+        id: 'help-and-feedback',
+        title: 'Help and feedback in Settings',
+        body: 'Settings, General, has a Help and feedback group: send feedback, Discord, what is new, and email. The version at the foot of Settings opens this page.',
+        tags: ['settings'],
+      },
+      {
+        id: 'example-page-off-landing',
+        title: 'The example page is off the landing for now',
+        body: 'The example page is being rebuilt from a better world. Its old link still opens it.',
+        tags: ['pages'],
+      },
+      {
+        id: 'two-typos',
+        title: 'Two typos fixed',
+        body: 'In the Data room and the tour\'s writing step.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.14',
     date: '2026-09-29',
     theme: 'linking keeps everything',

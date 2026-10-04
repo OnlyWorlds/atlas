@@ -32,11 +32,18 @@ export function renderGeneralTab(): string {
       <h3>About</h3>
       <p class="atlas-settings-hint">Atlas v${pkg.version}: the OnlyWorlds world browser and editor. Your worlds live as files on your own disk; syncing with onlyworlds.com is optional.</p>
       <div class="atlas-settings-row">
-        <a class="atlas-settings-link" href="changelog.html" target="_blank" rel="noopener">what's new</a>
         <a class="atlas-settings-link" href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a>
         <a class="atlas-settings-link" href="https://onlyworlds.github.io" target="_blank" rel="noopener">documentation</a>
-        <a class="atlas-settings-link" href="https://github.com/OnlyWorlds/feedback" target="_blank" rel="noopener">report an issue</a>
       </div>
+    </section>
+    <section class="atlas-settings-section" data-role="help-feedback">
+      <h3>Help and feedback</h3>
+      <div class="atlas-settings-row">
+        <a class="atlas-settings-link" data-link="feedback" href="https://onlyworlds.com/feedback?category=atlas" target="_blank" rel="noopener">Send feedback</a>
+        <a class="atlas-settings-link" data-link="discord" href="https://discord.gg/twCjqvVBwb" target="_blank" rel="noopener">Discord</a>
+        <a class="atlas-settings-link" data-link="changelog" href="changelog.html" target="_blank" rel="noopener">What's new</a>
+      </div>
+      <p class="atlas-settings-hint">Email: <a class="atlas-settings-link atlas-settings-email" data-link="email" href="mailto:info@onlyworlds.com">info@onlyworlds.com</a></p>
     </section>
   `;
 }

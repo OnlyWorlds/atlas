@@ -55,6 +55,7 @@ class TourExitModal extends BaseModal {
     body.innerHTML = `
       ${unseenBlock}
       ${seenBlock}
+      <p class="atlas-tour-exit-replay atlas-tour-exit-loss" data-role="tour-exit-loss">Leaving deletes the tour world and everything you made in it.</p>
       <p class="atlas-tour-exit-replay">Replay the tour any time from the settings.</p>
       <div class="atlas-modal-actions">
         <button type="button" class="atlas-btn-ghost" data-action="tour-exit-cancel">Keep going</button>

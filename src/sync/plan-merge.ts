@@ -12,6 +12,15 @@
  * on one side is skipped and reported, never guessed (Captain's ruling: a
  * visible duplicate beats a silent overwrite).
  *
+ * A map or zone whose name matches is NOT matched when both sides already
+ * have children on it (pins or markers on the map, markers on the zone):
+ * the kernel would move the local children onto the server's map or zone
+ * beside the server's own, so one element ended with two pins on one map,
+ * or a zone outline drawn from two interleaved marker sets (S367 gate
+ * A4/A5, Captain's ruling 2026-10-04). It stays its own element and is
+ * reported in `childClashes`. Children on one side only, or none, still
+ * match. Children are read from the same lists, so this stays pure.
+ *
  * Output order is deterministic: local-side lists follow the input order of
  * `locals`; server-side lists follow ALL_ELEMENT_TYPES, then each type's
  * array order.
@@ -34,6 +43,8 @@ export interface MergePlan {
   downloads: Array<{ server: ServerRec; type: ElementType }>;
   /** Names skipped because two or more on one side share them (per type). */
   ambiguous: Array<{ type: ElementType; name: string }>;
+  /** Maps and zones whose name matched but that both sides have children on: not matched (gate A4/A5). */
+  childClashes: Array<{ type: ElementType; name: string }>;
   /** A server record whose id is a local element of ANOTHER type: never downloaded (it would overwrite that file). */
   idClashes: Array<{ id: string; localType: ElementType; serverType: ElementType }>;
 }
@@ -42,6 +53,32 @@ export interface MergePlan {
 export function normalizeMatchName(name: unknown): string {
   if (typeof name !== 'string') return '';
   return name.normalize('NFC').trim().toLowerCase();
+}
+
+/** A link value as a single id, or null. */
+function linkId(value: unknown): string | null {
+  return typeof value === 'string' && value ? value : null;
+}
+
+/**
+ * The map and zone ids that carry children on one side: a pin or marker's
+ * map, a marker's zone. Both spellings are read (`map_id` in memory, `map`
+ * from a record that kept the schema name), so a stray spelling never hides
+ * a child.
+ */
+function parentsWithChildren(records: Iterable<{ type: ElementType; rec: Record<string, unknown> }>): { maps: Set<string>; zones: Set<string> } {
+  const maps = new Set<string>();
+  const zones = new Set<string>();
+  for (const { type, rec } of records) {
+    if (type !== 'pin' && type !== 'marker') continue;
+    const map = linkId(rec.map_id) ?? linkId(rec.map);
+    if (map) maps.add(map);
+    if (type === 'marker') {
+      const zone = linkId(rec.zone_id) ?? linkId(rec.zone);
+      if (zone) zones.add(zone);
+    }
+  }
+  return { maps, zones };
 }
 
 export function planMerge(
@@ -56,6 +93,7 @@ export function planMerge(
     creates: [],
     downloads: [],
     ambiguous: [],
+    childClashes: [],
     idClashes: [],
   };
 
@@ -126,23 +164,71 @@ export function planMerge(
       if (bucket) bucket.push(server);
       else serversByKey.set(bucketKey, [server]);
     }
-    // Ambiguity is reported per type in ALL_ELEMENT_TYPES order, then by the
-    // first local carrying the name.
+    // A map or zone both sides have children on is never a name match. Only
+    // each side's OWN children count: a pin matched by id is the same element
+    // on both sides, not a second set (S368 gate lens B M1).
+    const localParents = parentsWithChildren(
+      locals.filter(l => !localMatch.has(l)).map(l => ({ type: l.type, rec: l as unknown as Record<string, unknown> })),
+    );
+    const serverParents = parentsWithChildren(
+      serverOrder.filter(({ server }) => !matchedServers.has(server)).map(({ server, type }) => ({ type, rec: server as Record<string, unknown> })),
+    );
+    const bothHaveChildren = (type: ElementType, localId: string, serverId: string): boolean => {
+      if (type === 'map') return localParents.maps.has(localId) && serverParents.maps.has(serverId);
+      if (type === 'zone') return localParents.zones.has(localId) && serverParents.zones.has(serverId);
+      return false;
+    };
+    // Ambiguity (and a child clash) is reported per type in ALL_ELEMENT_TYPES
+    // order, then by the first local carrying the name.
     const ambiguousByType = new Map<ElementType, Array<{ type: ElementType; name: string }>>();
+    const childClashByType = new Map<ElementType, Array<{ type: ElementType; name: string }>>();
+    const report = (into: typeof ambiguousByType, local: Element) => {
+      const list = into.get(local.type) ?? [];
+      list.push({ type: local.type, name: local.name.trim() });
+      into.set(local.type, list);
+    };
+    // First the maps and zones that clash, so their children can stay out of
+    // name matching: a named marker (converter worlds name every one) matched
+    // to its server twin would move onto the server id under its LOCAL zone,
+    // and policy b would then strip the online outline (gate lens B H1).
+    const clashedLocal = new Set<string>();
+    const clashedServer = new Set<string>();
     for (const [bucketKey, bucketLocals] of localsByKey) {
+      const first = bucketLocals[0];
+      if (first.type !== 'map' && first.type !== 'zone') continue;
       const bucketServers = serversByKey.get(bucketKey);
-      if (!bucketServers) continue;
+      if (bucketLocals.length !== 1 || bucketServers?.length !== 1) continue;
+      if (!bothHaveChildren(first.type, first.id, bucketServers[0].id)) continue;
+      clashedLocal.add(first.id);
+      clashedServer.add(bucketServers[0].id);
+      report(childClashByType, first);
+    }
+    const onClashed = (type: ElementType, rec: Record<string, unknown>, clashed: Set<string>): boolean => {
+      if (type !== 'pin' && type !== 'marker') return false;
+      const map = linkId(rec.map_id) ?? linkId(rec.map);
+      if (map && clashed.has(map)) return true;
+      const zone = type === 'marker' ? linkId(rec.zone_id) ?? linkId(rec.zone) : null;
+      return !!zone && clashed.has(zone);
+    };
+    for (const [bucketKey, allLocals] of localsByKey) {
+      const allServers = serversByKey.get(bucketKey);
+      if (!allServers) continue;
+      if (clashedLocal.has(allLocals[0].id) && allLocals.length === 1) continue; // reported above
+      // Children of a clashed map or zone stay with their own side: the
+      // locals go up as creates, the server's come down.
+      const bucketLocals = allLocals.filter(l => !onClashed(l.type, l as unknown as Record<string, unknown>, clashedLocal));
+      const bucketServers = allServers.filter(s => !onClashed(allLocals[0].type, s as Record<string, unknown>, clashedServer));
+      if (bucketLocals.length === 0 || bucketServers.length === 0) continue;
       const first = bucketLocals[0];
       if (bucketLocals.length === 1 && bucketServers.length === 1) {
         namePairs.set(first, bucketServers[0]);
         continue;
       }
-      const list = ambiguousByType.get(first.type) ?? [];
-      list.push({ type: first.type, name: first.name.trim() });
-      ambiguousByType.set(first.type, list);
+      report(ambiguousByType, first);
     }
     for (const type of ALL_ELEMENT_TYPES) {
       plan.ambiguous.push(...(ambiguousByType.get(type) ?? []));
+      plan.childClashes.push(...(childClashByType.get(type) ?? []));
     }
   }
 

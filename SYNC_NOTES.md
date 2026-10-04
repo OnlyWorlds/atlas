@@ -131,7 +131,7 @@ The race risk: if user is mid-edit during a refresh, the cache snapshot might ov
 
 ## writeJsonAtomic — Chromium FS Access API quirks
 
-The atomic write pattern is `write tmp → verify → write final → verify`. Two quirks make this necessary:
+The write pattern is `one writable → close → read-back verify` (S368: the old `write tmp → verify → write final → verify` doubled the window in which a file held by another program (OneDrive, antivirus) refuses the swap at `close()`, which Chromium reports as an `InvalidStateError`; such a refusal is retried whole for about two seconds, `isFileBusyError`). Two quirks shape it:
 
 1. **createWritable doesn't always truncate by default** — explicitly call `await writer.truncate(0)` before `write(json)`. Without this, shorter new content leaves trailing bytes from old content, producing malformed JSON.
 

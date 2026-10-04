@@ -255,3 +255,21 @@ test('general tab: theme toggle flips data-theme, persists across reload, dark r
   await page.check('input[name="app-theme"][value="dark"]');
   await expect(page.locator('html')).not.toHaveAttribute('data-theme', 'light');
 });
+
+test('general tab: a "Help and feedback" group, and the footer version opens the changelog (S368)', async ({ page }) => {
+  await page.goto('/#/settings/general');
+  const group = page.locator('.atlas-settings [data-role="help-feedback"]');
+  await expect(group.locator('h3')).toHaveText('Help and feedback');
+  await expect(group.locator('[data-link="feedback"]')).toHaveAttribute('href', 'https://onlyworlds.com/feedback?category=atlas');
+  await expect(group.locator('[data-link="feedback"]')).toHaveAttribute('target', '_blank');
+  await expect(group.locator('[data-link="discord"]')).toHaveAttribute('href', 'https://discord.gg/twCjqvVBwb');
+  await expect(group.locator('[data-link="changelog"]')).toHaveAttribute('href', 'changelog.html');
+  await expect(group.locator('[data-link="email"]')).toHaveText('info@onlyworlds.com');
+  // The GitHub tracker link was replaced by Send feedback.
+  await expect(page.locator('.atlas-settings a[href*="github.com/OnlyWorlds/feedback"]')).toHaveCount(0);
+
+  const version = page.locator('.atlas-settings-version [data-link="version-changelog"]');
+  await expect(version).toHaveText(/^Atlas v\d/);
+  await expect(version).toHaveAttribute('href', 'changelog.html');
+  await expect(version).toHaveAttribute('target', '_blank');
+});

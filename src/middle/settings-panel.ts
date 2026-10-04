@@ -115,7 +115,7 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
           }).join('')}
           <button type="button" class="atlas-settings-replay-chip" data-action="replay-tour"
             title="Replay the guided tour. It always starts fresh: the tour world is rebuilt from scratch and folds away again at the end.">Replay the tour</button>
-          <div class="atlas-settings-version">Atlas v${pkg.version} · <a href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a></div>
+          <div class="atlas-settings-version"><a href="changelog.html" target="_blank" rel="noopener" data-link="version-changelog" title="What's new in Atlas">Atlas v${pkg.version}</a> · <a href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a></div>
         </nav>
         <section class="atlas-settings-body" role="tabpanel" data-active-tab="${tab}">
           ${renderTab(tab, reg, activeWorld)}

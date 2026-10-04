@@ -882,6 +882,68 @@ test('armed pin placement disarms on navigation — no stray second pin (S299 cl
   expect(pinCount).toBe(0); // no pin placed yet, and no stray from the dead arm
 });
 
+test('"more information" closes on Escape and when the step changes (S368 B5)', async ({ page }) => {
+  await freshBoot(page);
+  await openOpener(page);
+  await beginToWorld(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+  await nextStep(page, 4);
+  await nextStep(page, 5);
+  await nextStep(page, 6); // the map step carries a "more information" flyout
+
+  const bulb = page.locator('.atlas-tour-controls [data-tour-control="deeper"]');
+  const flyout = page.locator('.atlas-tour-deeper');
+  await bulb.click();
+  await expect(flyout).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(flyout).toBeHidden();
+  // Escape closed only the flyout, never the tour (no exit confirm).
+  await expect(page.locator('[data-modal="tour-exit"]')).toHaveCount(0);
+
+  // Open again, then change step: the flyout belonged to the old step.
+  await bulb.click();
+  await expect(flyout).toBeVisible();
+  await page.locator('.atlas-tour-controls button', { hasText: /^Back$/ }).click();
+  await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '5');
+  await nextStep(page, 6);
+  await expect(flyout).toBeHidden();
+});
+
+test('the collapsed tour pill says what it does and sits below every app control (S368 B4)', async ({ page }) => {
+  await freshBoot(page);
+  await openOpener(page);
+  await beginToWorld(page);
+  await createWorldViaModal(page);
+  await createConsulViaModal(page);
+  await nextStep(page, 4);
+  await nextStep(page, 5);
+  await nextStep(page, 6); // the map is open: its zoom control was the collision
+
+  await page.locator('.atlas-tour-collapse').click();
+  const pill = page.locator('.atlas-tour-restore');
+  await expect(pill).toBeVisible();
+  await expect(pill).toHaveText(/Show the tour/);
+
+  // Geometry, not a rule restated: the pill lives in a strip BELOW the shell,
+  // so nothing inside the app (map zoom, word counter, chart brush) can be
+  // under it, and it does not touch the map's zoom-out button.
+  const box = (await pill.boundingBox())!;
+  const shell = (await page.locator('.atlas-shell').boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(shell.y + shell.height - 0.5);
+  const zoomOut = page.locator('.leaflet-control-zoom-out');
+  if (await zoomOut.count()) {
+    const z = (await zoomOut.first().boundingBox())!;
+    const overlaps = box.x < z.x + z.width && z.x < box.x + box.width
+      && box.y < z.y + z.height && z.y < box.y + box.height;
+    expect(overlaps).toBe(false);
+  }
+
+  await pill.click();
+  await expect(page.locator('.atlas-tour-bar')).toBeVisible();
+  await expect(pill).toBeHidden();
+});
+
 test('the DRAG gesture satisfies the pin gate — a dragged-in Consul adopts the bundle pin (S318)', async ({ page }) => {
   // The map step's copy offers TWO gestures ("clicking the + pin icon ... or
   // dragging him in from the sidebar"). The drop path used to mint an
@@ -1049,7 +1111,8 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   await expect(page.locator('.atlas-landing-note')).toContainText('desktop');
   await expect(page.locator('.atlas-landing-note')).toContainText('Chromium');
   // The splash offers the tour and nothing else on a folder-less browser
-  // (Captain, S354): the example-page door is Chromium-after-tour only.
+  // (Captain, S354). The example-page door is gone everywhere since S368;
+  // this stays as a guard against it coming back.
   await expect(page.locator('[data-action="see-example"]')).toHaveCount(0);
   // The tour boots and walks.
   await openOpener(page);
@@ -1088,6 +1151,9 @@ test('the exit confirm names the rooms the tour never reached, and can be declin
   await expect(modal).toContainText('Pages');
   await expect(modal).toContainText('Data');
   await expect(modal).toContainText('Charts');
+  // And it says plainly what leaving costs (S368).
+  await expect(modal.locator('[data-role="tour-exit-loss"]'))
+    .toHaveText('Leaving deletes the tour world and everything you made in it.');
 
   // Declining keeps the tour exactly where it was, world intact.
   await page.click('[data-action="tour-exit-cancel"]');

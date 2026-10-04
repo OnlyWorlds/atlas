@@ -1,10 +1,10 @@
 /**
  * ONE WRITER PER FILE (S366, the park/unpark flake, lane C's mechanism).
  *
- * `writeJsonAtomic` stages every write through one fixed `<name>.tmp`, so two
- * writes of the same file that overlap corrupt each other's staging: the
- * first one's verify reads the second one's bytes, removes the tmp, and the
- * second one then fails on a missing file. `park()` fired a lock write it
+ * `writeJsonAtomic` staged every write through one fixed `<name>.tmp` until
+ * S368, so two writes of the same file that overlapped corrupted each other's
+ * staging. With one writable per write the overlap still fails: the first
+ * write's read-back verify reads the second one's bytes and throws. `park()` fired a lock write it
  * never waited for and `unpark()` wrote the same lock in the same tick, so a
  * tab switch under load came back "not revived" (21 of 320 under 4 workers).
  * The rule since: every read-modify-write or whole-file write of a shared

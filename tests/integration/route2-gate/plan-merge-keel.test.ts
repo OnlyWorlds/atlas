@@ -1,4 +1,4 @@
-// Rows for pins and markers under a name-matched map or zone (gate A4/A5) stay in Forge/Notes/2026-09-29-s367-gate/probes/lens-a/f-plan-merge-keel.probe.test.ts until Captain rules which side survives.
+// Rows for pins and markers under a name-matched map or zone (gate A4/A5) were promoted to map-zone-children.test.ts after the Captain's ruling (2026-10-04).
 /**
  * Promoted from the S367 composition gate (lens A).
  * Lens A attack 2: `planMerge` (and its composition with the kernel) against

@@ -25,6 +25,7 @@
  * under-fires, which is exactly today's behaviour and therefore safe.
  */
 import type { Element, Pin } from './types';
+import { PlainError } from './plain-error';
 
 /**
  * The refusal, as a TYPE rather than a message.
@@ -36,7 +37,7 @@ import type { Element, Pin } from './types';
  * have. The name check keeps the guard working even if the class identity is
  * duplicated across a chunk boundary.
  */
-export class DuplicatePinError extends Error {
+export class DuplicatePinError extends PlainError {
   readonly existingPinId: string;
   constructor(existingPinId: string) {
     super('That element already has a pin on this map.');

@@ -28,6 +28,7 @@ import { openFieldEditPopover } from '../ui/field-edit-popover';
 import { openFieldEditInline } from '../ui/field-edit-inline';
 import { AliasesEditModal } from '../ui/aliases-edit-modal';
 import { toastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import type { FieldMeta, SectionLayout } from '../editor/field-schema';
 import { relationFieldsFor } from '../editor/field-schema';
 import { completeWaypoint, completeTaxonomyHalf } from '../core/waypoints';
@@ -574,7 +575,18 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: () => void): HTMLE
 
 // ====== Persistence ======
 
+/**
+ * The latest save started per element field (S368): "Retry now" on a failed
+ * save runs only while no later save of that field has started, so it never
+ * writes an older value over a newer one.
+ */
+const latestFieldSave = new Map<string, number>();
+let fieldSaveSeq = 0;
+
 async function persistFieldPatch(el: Element, fieldName: string, nextValue: unknown): Promise<void> {
+  const saveKey = `${el.id}|${fieldName}`;
+  const seq = ++fieldSaveSeq;
+  latestFieldSave.set(saveKey, seq);
   const store = getActiveStore();
   if (!store) {
     toastManager.error('No active store');
@@ -662,7 +674,15 @@ async function persistFieldPatch(el: Element, fieldName: string, nextValue: unkn
     }
   } catch (err) {
     console.error('[element-detail] update failed:', err);
-    toastManager.error(err instanceof Error ? err.message : String(err));
+    // This toast is the one (S368): the field popover sees the error as shown
+    // and stays quiet. Callers still get the rejection.
+    showProblem(err, {
+      doing: 'saving this field',
+      retry: () => {
+        if (latestFieldSave.get(saveKey) !== seq) return;
+        void persistFieldPatch(el, fieldName, nextValue).catch(() => { /* toasted in persist */ });
+      },
+    });
     throw err;
   }
 }

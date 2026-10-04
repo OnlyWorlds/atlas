@@ -23,7 +23,7 @@ import {
   ALL_ELEMENT_TYPES,
 } from '../core/types';
 import { ATLAS_LOCAL_ONLY_FIELDS } from '../core/constants';
-import { CorruptFileError } from '../store/fs-utils';
+import { CorruptFileError, damagedFileSentence, isFileBusyError } from '../store/fs-utils';
 import { mergeForeignIds } from './foreign-ids';
 import type {
   Conflict,
@@ -490,6 +490,8 @@ export class SyncEngine {
    * persist, and said nothing anywhere.
    */
   private transientRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Push rounds in a row that met a held file (S368): caps the busy retries. */
+  private busyRounds = 0;
 
   /** One retry after a busy/unreachable round, never a loop: the timer is
    *  single, and a round that fails again schedules the next one itself. */
@@ -507,7 +509,8 @@ export class SyncEngine {
     if (err instanceof CorruptFileError) {
       this.paused = true;
       this.pauseReason = 'manual';
-      this.setState({ kind: 'error', message: err.message, recoverable: true });
+      // The pill title is user copy: the file and the fix, not JSON.parse's text (S368).
+      this.setState({ kind: 'error', message: damagedFileSentence(err.fileName), recoverable: true });
       return;
     }
     this.setState({ kind: 'idle', last_sync_at: null });
@@ -874,6 +877,12 @@ export class SyncEngine {
     try {
       return await this.executeMetaStep(opts);
     } catch (err) {
+      // A held `.atlas/sync-state.json` (or `world.json`) past the writer's
+      // retries is a failure of this step, not of the round: the element
+      // push still runs and the busy retry still arms (S368 gate A H1).
+      if (isFileBusyError(err)) {
+        return { meta_pushed: [], meta_pulled: [], failures: [failureOf('world', 'world', 'update', err)], auth_blocked: false };
+      }
       this.settleThrownRound(err);
       throw err;
     }
@@ -1545,13 +1554,28 @@ export class SyncEngine {
       // without the seam) falls back to the read-back backfill.
       let stamped = 0;
       const needBackfill: BulkItem[] = [];
+      // Three held files in a row means the folder is held, not one file:
+      // the rest are recorded at once rather than each waiting out its own
+      // retries (S368 gate A M3: 500 creates once cost ~15 minutes). They
+      // stay dirty; the next round's re-POST answers 409 and adopts.
+      let heldInARow = 0;
       for (let i = 0; i < items.length; i++) {
         if (this.stopped) break;
         const echo = result.items[i]?.updatedAt;
         if (typeof echo === 'string' && echo) {
           const sentId = items[i].element.id as string;
-          await this.folder.stampServerUpdatedAt(sentId, items[i].type, echo, sentStamps.get(sentId));
-          stamped++;
+          if (heldInARow >= 3) {
+            const last = failures[failures.length - 1];
+            failures.push({ ...last, element_id: sentId, type: items[i].type, operation: 'create' });
+            continue;
+          }
+          if (await this.localStep(failures, sentId, items[i].type, 'create',
+            () => this.folder.stampServerUpdatedAt(sentId, items[i].type, echo, sentStamps.get(sentId)))) {
+            stamped++;
+            heldInARow = 0;
+          } else if (isFileBusyError({ name: failures[failures.length - 1]?.error_name })) {
+            heldInARow++;
+          }
         } else {
           needBackfill.push(items[i]);
         }
@@ -1586,10 +1610,11 @@ export class SyncEngine {
         const remote = await this.client.getElement(item.type, id).catch(() => null);
         const local = candidates.find(c => c.id === id);
         if (remote && local) {
-          await this.adoptServerCopy(local, remote);
-          console.info('[atlas:sync] bulk item id_conflict — element already on server; baseline adopted', {
-            id, type: item.type,
-          });
+          if (await this.localStep(failures, id, item.type, 'create', () => this.adoptServerCopy(local, remote))) {
+            console.info('[atlas:sync] bulk item id_conflict — element already on server; baseline adopted', {
+              id, type: item.type,
+            });
+          }
           onItemDone();
           continue;
         }
@@ -1664,6 +1689,32 @@ export class SyncEngine {
    * re-push next round — CREATE turns into 409/id_conflict territory, which
    * surfaces loudly rather than silently corrupting baselines).
    */
+  /**
+   * A local write after the server already answered (a baseline stamp, an
+   * adopt, a tombstone clear), run so a refusal stays with its element
+   * (S368). Before, a file another program held made the stamp throw out of
+   * the round: the rest of the elements, the tombstones and the sync state
+   * were skipped. The element stays dirty, so the next round redoes it (a
+   * CREATE re-POST answers 409 and adopts). A damaged file still ends the
+   * round, which pauses the engine with the file named (conv. 99).
+   */
+  private async localStep(
+    failures: PerElementFailure[],
+    id: string,
+    type: ElementType,
+    operation: PerElementFailure['operation'],
+    step: () => Promise<unknown>,
+  ): Promise<boolean> {
+    try {
+      await step();
+      return true;
+    } catch (err) {
+      if (err instanceof CorruptFileError) throw err;
+      failures.push(failureOf(id, type, operation, err));
+      return false;
+    }
+  }
+
   private async backfillBulkTimestamps(
     items: BulkItem[],
     failures: PerElementFailure[],
@@ -1680,10 +1731,8 @@ export class SyncEngine {
           await this.folder.stampServerUpdatedAt(id, it.type, remote.updated_at, sentStamps.get(id));
           stamped++;
         } catch (err) {
-          failures.push({
-            element_id: id, type: it.type, operation: 'create',
-            message: `created but baseline backfill failed: ${err instanceof Error ? err.message : String(err)}`,
-          });
+          if (err instanceof CorruptFileError) throw err;
+          failures.push(failureOf(id, it.type, 'create', err, 'created but baseline backfill failed: '));
         }
       }
       return stamped;
@@ -1706,8 +1755,10 @@ export class SyncEngine {
         const id = it.element.id as string;
         const ts = remoteById.get(id);
         if (ts) {
-          await this.folder.stampServerUpdatedAt(id, type, ts, sentStamps.get(id));
-          stamped++;
+          if (await this.localStep(failures, id, type, 'create',
+            () => this.folder.stampServerUpdatedAt(id, type, ts, sentStamps.get(id)))) {
+            stamped++;
+          }
         } else {
           failures.push({
             element_id: id, type, operation: 'create',
@@ -1788,8 +1839,12 @@ export class SyncEngine {
      * with it; it waits instead (S363, re-key gate lens 2 F5: a re-keyed
      * element refused on upload must not drag every referrer's PATCH along).
      */
+    // A create whose only failure was a held file WAS accepted by the server
+    // (the refusal was the local stamp after it), so it blocks nobody (S368
+    // gate A M1: its referrers waited under "OnlyWorlds refused" copy).
+    const acceptedButHeld = (f: PerElementFailure) => isFileBusyError({ name: f.error_name });
     const refusedCreates = new Set<string>(
-      failures.filter(f => f.operation === 'create').map(f => f.element_id),
+      failures.filter(f => f.operation === 'create' && !acceptedButHeld(f)).map(f => f.element_id),
     );
 
     for (const elem of changed) {
@@ -2029,10 +2084,11 @@ export class SyncEngine {
             }
           }
           if (remote) {
-            await this.adoptServerCopy(elem, remote);
-            console.info('[atlas:sync] CREATE 409 id_conflict — element already on server; baseline adopted', {
-              id: elem.id, type: elem.type,
-            });
+            if (await this.localStep(failures, elem.id, elem.type, 'create', () => this.adoptServerCopy(elem, remote))) {
+              console.info('[atlas:sync] CREATE 409 id_conflict — element already on server; baseline adopted', {
+                id: elem.id, type: elem.type,
+              });
+            }
           } else if (readErr === null) {
             // A single POST 409s for a same-world id too, so only a read-back
             // that ANSWERED "not here" proves the id belongs to another world.
@@ -2055,17 +2111,12 @@ export class SyncEngine {
           // record and continue. Caller inspects result.failures to decide what
           // to surface. This matters most for Make-Online flows uploading dozens
           // of elements — one bad element shouldn't abort the rest.
-          failures.push({
-            element_id: elem.id,
-            type: elem.type,
-            operation: isCreate ? 'create' : 'update',
-            message: err instanceof Error ? err.message : String(err),
-          });
+          failures.push(failureOf(elem.id, elem.type, isCreate ? 'create' : 'update', err));
         }
       } finally {
         done++;
         this.onPushProgress(done, total);
-        if (isCreate && failures.slice(failuresBefore).some(f => f.element_id === elem.id)) {
+        if (isCreate && failures.slice(failuresBefore).some(f => f.element_id === elem.id && !acceptedButHeld(f))) {
           refusedCreates.add(elem.id);
         }
       }
@@ -2114,15 +2165,11 @@ export class SyncEngine {
           console.info('[atlas:sync] tombstone target already gone (404) — clearing', {
             id: tomb.id, type: tomb.type,
           });
-          await this.folder.clearTombstone(tomb.id);
-          deletes++;
+          if (await this.localStep(failures, tomb.id, tomb.type, 'delete', () => this.folder.clearTombstone(tomb.id))) {
+            deletes++;
+          }
         } else {
-          failures.push({
-            element_id: tomb.id,
-            type: tomb.type,
-            operation: 'delete',
-            message: err instanceof Error ? err.message : String(err),
-          });
+          failures.push(failureOf(tomb.id, tomb.type, 'delete', err));
         }
       } finally {
         done++;
@@ -2145,16 +2192,36 @@ export class SyncEngine {
         (await this.folder.listLocallyChangedSince(null)).filter(e => !e.server_updated_at).map(e => e.id),
       );
       const roundNow = nowIso();
-      await this.folder.updateSyncState(curr => {
-        const foreignNext = (curr.foreign || roundForeign.length > 0)
-          ? { foreign: mergeForeignIds(curr.foreign, this.apiWorldId, roundForeign, stillUnsynced, roundNow, attemptedCreates) }
-          : {};
-        if (serverDeletesDetected.length === 0) return { last_push_at: roundNow, ...foreignNext };
-        const existing = curr.server_deletes ?? [];
-        const existingIds = new Set(existing.map(d => d.id));
-        const fresh = serverDeletesDetected.filter(d => !existingIds.has(d.id));
-        return { last_push_at: roundNow, server_deletes: [...existing, ...fresh], ...foreignNext };
-      });
+      try {
+        await this.folder.updateSyncState(curr => {
+          const foreignNext = (curr.foreign || roundForeign.length > 0)
+            ? { foreign: mergeForeignIds(curr.foreign, this.apiWorldId, roundForeign, stillUnsynced, roundNow, attemptedCreates) }
+            : {};
+          if (serverDeletesDetected.length === 0) return { last_push_at: roundNow, ...foreignNext };
+          const existing = curr.server_deletes ?? [];
+          const existingIds = new Set(existing.map(d => d.id));
+          const fresh = serverDeletesDetected.filter(d => !existingIds.has(d.id));
+          return { last_push_at: roundNow, server_deletes: [...existing, ...fresh], ...foreignNext };
+        });
+      } catch (err) {
+        // A cloud client re-uploading `.atlas/sync-state.json` each round
+        // holds it exactly now (S368 gate A H1): the throw used to drop every
+        // failure of the round, toast nothing and arm no retry. What this
+        // write records is found again next round (a 404 re-detects a server
+        // delete, a refusal re-proves a foreign id), so it waits with the rest.
+        if (!isFileBusyError(err)) throw err;
+        failures.push(failureOf('world', 'world', 'update', err));
+      }
+    }
+    // A file another program held past the writer's own retries (S368): the
+    // element stays dirty, so try again shortly instead of waiting for the
+    // user's next edit (the Discord report: it healed only on the next save).
+    // Five rounds in a row at most: a file that never frees up (read-only,
+    // locked for good) stops costing a round every 30 s (gate A L4).
+    const busy = failures.some(f => isFileBusyError({ name: f.error_name }));
+    this.busyRounds = busy ? this.busyRounds + 1 : 0;
+    if (busy && !transient && !authBlocked && !this.stopped && this.busyRounds <= 5) {
+      this.scheduleTransientRetry(undefined);
     }
     return {
       pushed: { creates, updates, deletes },
@@ -2643,6 +2710,26 @@ export class SyncEngine {
 }
 
 // ---- Helpers ----
+
+/**
+ * A per-element failure from a thrown error, keeping its `name` (S368): the
+ * toast classifies on it, because a held file's message is Chromium's stock
+ * text and says nothing a user can act on.
+ */
+function failureOf(
+  element_id: string,
+  type: ElementType | 'world',
+  operation: PerElementFailure['operation'],
+  err: unknown,
+  prefix = '',
+): PerElementFailure {
+  const name = (err as { name?: unknown } | null)?.name;
+  return {
+    element_id, type, operation,
+    message: prefix + (err instanceof Error ? err.message : String(err)),
+    ...(typeof name === 'string' && name !== 'Error' ? { error_name: name } : {}),
+  };
+}
 
 function stripSyncFields(elem: Element): Record<string, unknown> {
   const { local_updated_at, server_updated_at, ...rest } = elem;

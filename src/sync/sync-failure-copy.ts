@@ -12,11 +12,16 @@
  * toasted once per session, not on every autosave.
  */
 import type { PerElementFailure } from '../core/types';
+import { isFileBusyError } from '../store/fs-utils';
 
-export type FailureKind = 'foreign_id' | 'too_large' | 'other';
+export type FailureKind = 'foreign_id' | 'too_large' | 'file_busy' | 'other';
+
+/** Chromium's stock text for a file another program holds (S368); the name is the real signal. */
+const HELD_FILE_TEXT = /operation that depends on state cached in an interface object/i;
 
 export function classifyFailure(f: PerElementFailure): FailureKind {
   const m = f.message ?? '';
+  if (isFileBusyError({ name: f.error_name }) || HELD_FILE_TEXT.test(m)) return 'file_busy';
   // Evidence only (S363): a 409 whose read-back FAILED says nothing about
   // which world holds the id, so its message no longer matches here.
   if (/already exists in another world|a copied world folder needs fresh ids/i.test(m)) return 'foreign_id';
@@ -45,10 +50,17 @@ export function describeFailures(failures: readonly PerElementFailure[]): string
   if (large) {
     parts.push(`${plural(large.length, 'element holds', 'elements hold')} more than 64 KB of custom fields, which is more than OnlyWorlds accepts per element. Shorten a custom field to let ${large.length === 1 ? 'it' : 'them'} sync.`);
   }
+  // Counted by element: the world's own sync record can report twice in one
+  // round (the world step and the round's end), and it is one change.
+  const busy = [...new Set(byKind.get('file_busy')?.map(f => f.element_id) ?? [])];
+  if (busy.length > 0) {
+    parts.push(`${plural(busy.length, 'change', 'changes')} could not sync yet because another program was using ${busy.length === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this. ${busy.length === 1 ? 'It is' : 'They are'} saved on your disk, and Atlas will try again in a moment.`);
+  }
   const other = byKind.get('other');
   if (other) {
-    const first = other[0].message?.replace(/^API Error \d+:\s*/, '').slice(0, 140) || 'unknown error';
-    parts.push(`${plural(other.length, 'change', 'changes')} could not sync (${first}).`);
+    // The cause stays out of the sentence (S368): it was raw browser or
+    // server text. It rides in the toast's Details instead (sync-attach).
+    parts.push(`${plural(other.length, 'change', 'changes')} could not sync. Atlas will try again with your next save.`);
   }
   return parts.join(' ');
 }
@@ -60,14 +72,32 @@ const shownThisSession = new Set<string>();
  * already shown this session (a persistent failure retried every autosave).
  */
 export function failureToastOnce(failures: readonly PerElementFailure[]): string | null {
-  if (failures.length === 0) return null;
-  const key = failures.map(f => `${classifyFailure(f)}:${f.element_id}`).sort().join('|');
+  // One round's result reaches this twice (the engine's result handler, then
+  // the attach flush or Make online): the second call must not undo the
+  // quiet first busy failure (S368 gate A L1).
+  // Keyed on the failure objects, which a filtered copy of the list shares.
+  const fresh = failures.filter(f => !decided.has(f));
+  for (const f of fresh) decided.add(f);
+  // A held file is usually let go within seconds and the engine retries on
+  // its own (S368), so an element's FIRST busy failure stays quiet; it is
+  // said only if that element meets a held file again.
+  const toShow = fresh.filter(f => {
+    if (classifyFailure(f) !== 'file_busy' || busySeen.has(f.element_id)) return true;
+    busySeen.add(f.element_id);
+    return false;
+  });
+  if (toShow.length === 0) return null;
+  const key = toShow.map(f => `${classifyFailure(f)}:${f.element_id}`).sort().join('|');
   if (shownThisSession.has(key)) return null;
   shownThisSession.add(key);
-  return describeFailures(failures);
+  return describeFailures(toShow);
 }
+
+const busySeen = new Set<string>();
+const decided = new WeakSet<PerElementFailure>();
 
 /** Test seam. */
 export function __resetFailureToasts(): void {
   shownThisSession.clear();
+  busySeen.clear();
 }

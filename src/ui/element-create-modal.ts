@@ -142,6 +142,12 @@ export class ElementCreateModal extends BaseModal {
   private nameGhostSuffix!: HTMLSpanElement;
   private modeChip!: HTMLSpanElement;
   private submitBtn!: HTMLButtonElement;
+  // B1 (S368): typed text that matches NO type used to leave the last match
+  // selected ("p" picked Phenomenon, "plan" kept it, Create made one). Now an
+  // unmatched type field means NO type is chosen: the grid clears, a line says
+  // so, and Create stays off until a type is picked.
+  private noType = false;
+  private typeHint!: HTMLElement;
 
   constructor(toasts: ToastManager, opts: ElementCreateOptions = {}) {
     super();
@@ -249,6 +255,7 @@ export class ElementCreateModal extends BaseModal {
             <span class="atlas-input-ghost"><span class="ghost-typed"></span><span class="ghost-suffix"></span></span>
             <input class="atlas-input" type="text" name="element-type" placeholder="Type to filter (e.g. 'char')" autocomplete="off" />
           </div>
+          <div class="atlas-modal-hint atlas-modal-hint-warn atlas-create-type-hint" data-role="type-hint" hidden></div>
           <div class="atlas-create-type-grid" data-role="type-grid"></div>
         </div>
         <div class="atlas-modal-error" data-role="error" hidden></div>
@@ -263,6 +270,7 @@ export class ElementCreateModal extends BaseModal {
     this.typeInput = body.querySelector<HTMLInputElement>('input[name="element-type"]')!;
     this.ghostTyped = body.querySelector<HTMLSpanElement>('.ghost-typed')!;
     this.ghostSuffix = body.querySelector<HTMLSpanElement>('.ghost-suffix')!;
+    this.typeHint = body.querySelector<HTMLElement>('[data-role="type-hint"]')!;
 
     // Guard: if the preselected type (from opts or the user default) isn't in
     // the effective set — e.g. default is 'map' but this contextual flow
@@ -282,9 +290,26 @@ export class ElementCreateModal extends BaseModal {
 
     // Type filtering: best-match category from the typed text → highlight + ghost.
     const effective = this.effectiveTypes();
+    // No match → no type (B1). An emptied field keeps whatever state it had:
+    // a real selection stays selected, a cleared one stays cleared.
+    // The field shows the chosen type's name, so typing into it must replace
+    // that name, not extend it ("plan" typed after "character" read as
+    // "plancharacter", S368 own eyes). Select on focus, mouse included.
+    this.typeInput.addEventListener('focus', () => this.typeInput.select());
+    this.typeInput.addEventListener('mouseup', (e) => {
+      // The click that focused the field keeps the selection; later clicks place the caret.
+      if (this.typeInput.dataset.justFocused) e.preventDefault();
+      delete this.typeInput.dataset.justFocused;
+    });
+    this.typeInput.addEventListener('mousedown', () => {
+      if (document.activeElement !== this.typeInput) this.typeInput.dataset.justFocused = '1';
+    });
     this.typeInput.addEventListener('input', () => {
-      const matched = matchCategory(this.typeInput.value, effective);
+      const typed = this.typeInput.value.trim();
+      const matched = matchCategory(typed, effective);
       if (matched) this.setType(matched);
+      else if (typed) this.showNoType(typed);
+      else if (this.noType) this.showNoType(null);
       this.updateGhost();
     });
 
@@ -321,15 +346,32 @@ export class ElementCreateModal extends BaseModal {
 
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
 
+    // B3 (S368): the "Name is required" line used to stay up after a name was
+    // typed. It goes as soon as the name field has text again.
+    this.nameInput.addEventListener('input', () => {
+      if (errorBox.dataset.reason === 'name' && this.nameInput.value.trim()) {
+        errorBox.hidden = true;
+        delete errorBox.dataset.reason;
+      }
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorBox.hidden = true;
+      delete errorBox.dataset.reason;
       const nameInput = form.querySelector<HTMLInputElement>('input[name="element-name"]')!;
       const name = nameInput.value.trim();
       if (!name) {
         errorBox.textContent = 'Name is required';
+        errorBox.dataset.reason = 'name';
         errorBox.hidden = false;
         nameInput.focus();
+        return;
+      }
+      // B1: an unmatched type field is no type at all; never fall back to the
+      // last match.
+      if (this.noType) {
+        this.typeInput.focus();
         return;
       }
       if (!this.effectiveTypes().includes(this.selected)) {
@@ -487,7 +529,29 @@ export class ElementCreateModal extends BaseModal {
     if (label && field) label.textContent = `Date · ${field}`;
   }
 
+  /** B1: no type chosen. `typed` is the unmatched text, or null when the
+   *  field was emptied after a miss. Create stays off until a type is picked. */
+  private showNoType(typed: string | null): void {
+    this.noType = true;
+    this.typeButtons.forEach(btn => btn.classList.remove('active'));
+    this.typeHint.textContent = typed
+      ? `No type called "${typed}". Pick one below.`
+      : 'Pick a type below.';
+    this.typeHint.hidden = false;
+    if (this.submitBtn) this.submitBtn.disabled = true;
+    if (this.placingExistingId) this.clearPlaceExisting();
+  }
+
+  private clearNoType(): void {
+    if (!this.noType) return;
+    this.noType = false;
+    this.typeHint.hidden = true;
+    this.typeHint.textContent = '';
+    if (this.submitBtn) this.submitBtn.disabled = false;
+  }
+
   private setType(type: ElementType): void {
+    this.clearNoType();
     this.selected = type;
     this.typeButtons.forEach((btn, t) => btn.classList.toggle('active', t === type && !this.opts.lockAll));
     this.updateDateLabel();
@@ -570,7 +634,7 @@ export class ElementCreateModal extends BaseModal {
 
   private updateGhost(): void {
     const typed = this.typeInput.value;
-    if (!typed) {
+    if (!typed || this.noType) {
       this.ghostTyped.textContent = '';
       this.ghostSuffix.textContent = '';
       return;

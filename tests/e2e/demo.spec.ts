@@ -3,8 +3,9 @@
  *
  * The demo is NOT a world: no registry entry, no OPFS write, no folder.
  * It's an overlay built from the share renderer's payload path plus a
- * Leaflet hero. These tests lock the entry paths (share room's example
- * link), the view-only surface (map + pins + modal + cards), and the exits.
+ * Leaflet hero. These tests lock the direct route (its in-app doors were
+ * removed in S368; old links still land), the view-only surface (map + pins
+ * + modal + cards), and the exits.
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -22,7 +23,11 @@ async function freshBoot(page: Page) {
   await page.waitForSelector('.atlas-shell');
 }
 
-test('the share room links into the demo; the demo renders map, pins, and cards', async ({ page }) => {
+// S368: the three doors into the demo (landing "see an example page", the
+// share room's empty-state line, the settings Links entry) were removed. The
+// route stays for old links, so this test now proves both halves: no door in
+// the share room, and #/demo still renders when visited directly.
+test('the share room no longer links to the demo; #/demo still renders map, pins, and cards', async ({ page }) => {
   await freshBoot(page);
   await page.evaluate(async () => {
     const api = (window as any).__atlasTestApi;
@@ -40,9 +45,10 @@ test('the share room links into the demo; the demo renders map, pins, and cards'
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
 
   await page.click('.atlas-room-nav-btn[data-room="share"]');
-  await expect(page.locator('.atlas-share-example-line a')).toHaveText('See an example page');
-  await page.locator('.atlas-share-example-line a').click();
+  await expect(page.locator('.atlas-share-empty')).toBeVisible();
+  await expect(page.locator('a[href="#/demo"]')).toHaveCount(0);
 
+  await page.evaluate(() => { window.location.hash = '#/demo'; });
   await expect(page).toHaveURL(/#\/demo/);
   await expect(page.locator('.atlas-demo-band-title')).toHaveText('Sikelia · example page · view only');
   // The Leaflet hero with all 196 pins (lazy chunks: generous timeout).
