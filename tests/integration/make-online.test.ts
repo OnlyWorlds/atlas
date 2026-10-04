@@ -104,7 +104,7 @@ describe('createApiWorld (Route 1)', () => {
     );
     await expect(
       createApiWorld({ name: 'X', email: 'a@b.c', pin: '1234' })
-    ).rejects.toThrow(/Invalid email or PIN/i);
+    ).rejects.toThrow(/did not accept that email and PIN/i);
   });
 });
 

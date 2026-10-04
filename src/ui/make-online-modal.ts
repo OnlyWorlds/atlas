@@ -39,8 +39,15 @@ import {
 } from '../sync/make-online';
 import { escapeAttr } from '../core/dom-utils';
 import { describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
+import { PlainError, problemFor } from '../core/problems';
+import { keyCheckError } from '../setup/key-check-errors';
 
 type Route = 'create' | 'link';
+
+/** Make online refuses a world another local world is already linked to. */
+function alreadyLinkedLine(otherName: string): string {
+  return `This OnlyWorlds world is already linked here as "${otherName}". Open that world from the sidebar, or unlink it first.`;
+}
 
 export class MakeOnlineModal extends BaseModal {
   private toasts: ToastManager;
@@ -66,7 +73,7 @@ export class MakeOnlineModal extends BaseModal {
   open(): void {
     const active = getState().active;
     if (!active) {
-      this.toasts.error('No active world');
+      this.toasts.error('No world is open. Open one from the sidebar, then make it online.');
       return;
     }
     const entry = getState().registry.worlds.find(w => w.id === active.worldId);
@@ -83,7 +90,7 @@ export class MakeOnlineModal extends BaseModal {
       return;
     }
     if (!getActiveStore()) {
-      this.toasts.error('Active store not open');
+      this.toasts.error('This world is not open. Open it from the sidebar, then try again.');
       return;
     }
     this.modal = this.buildModal();
@@ -304,7 +311,7 @@ export class MakeOnlineModal extends BaseModal {
       const active1 = getState().active!;
       const dupe1 = findLinkedWorld(getState().registry, world.id, active1.worldId);
       if (dupe1) {
-        throw new Error(`This API world is already linked to "${dupe1.name}" locally. Unlink it first or open it from the sidebar.`);
+        throw new PlainError(alreadyLinkedLine(dupe1.name));
       }
 
       // 4. Push all local elements as CREATEs via pushOnce on a transient engine.
@@ -371,9 +378,10 @@ export class MakeOnlineModal extends BaseModal {
       void pushDone; void pushTotal;
       this.hide();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      errorBox.textContent = message;
-      errorBox.hidden = false;
+      console.warn('[make-online] create route failed:', err);
+      const sentence = problemFor(err, { inline: true, doing: 'creating the world online' }).sentence;
+      errorBox.textContent = sentence;
+      errorBox.hidden = !sentence;
       progressBox.hidden = true;
       inputs.forEach((i) => (i.disabled = false));
       submitBtn.disabled = false;
@@ -436,10 +444,9 @@ export class MakeOnlineModal extends BaseModal {
       try {
         world = await client.getWorld();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (/401|403/.test(msg)) throw new Error('API key or PIN invalid');
-        if (/404/.test(msg)) throw new Error('No world found for that API key');
-        throw new Error(msg);
+        // A refused key, an unknown world or no connection, in words (A38,
+        // S369: offline used to show "Failed to fetch"); the rest as it came.
+        throw keyCheckError(err);
       }
       if (!world.id) throw new Error('Server returned no world ID');
 
@@ -448,7 +455,7 @@ export class MakeOnlineModal extends BaseModal {
       const active0 = getState().active!;
       const dupe0 = findLinkedWorld(getState().registry, world.id, active0.worldId);
       if (dupe0) {
-        throw new Error(`This API world is already linked to "${dupe0.name}" locally. Unlink it first or open it from the sidebar.`);
+        throw new PlainError(alreadyLinkedLine(dupe0.name));
       }
 
       // 2. The merge, through the Route 2 runner (S367): the id-move lock, the
@@ -481,7 +488,7 @@ export class MakeOnlineModal extends BaseModal {
           // linked a different local world to this api world during the merge.
           const dupe = findLinkedWorld(getState().registry, world.id!, worldId);
           if (dupe) {
-            throw new Error(`While linking, "${dupe.name}" was linked to this API world in another tab. Unlink one of them, then run Make online again.`);
+            throw new PlainError(`While linking, "${dupe.name}" was linked to this OnlyWorlds world in another tab. Unlink one of them, then run Make online again.`);
           }
           // 3. Registry transition + persist creds (read now: the id move
           //    rewrote this world's entry).
@@ -535,10 +542,12 @@ export class MakeOnlineModal extends BaseModal {
       this.hide();
     } catch (err) {
       // A twice-stopped id move arrives already worded (the runner's
-      // LINK_STOPPED_LINE, S367 gate B3).
-      const message = err instanceof Error ? err.message : String(err);
-      errorBox.textContent = message;
-      errorBox.hidden = false;
+      // LINK_STOPPED_LINE, S367 gate B3, a MergeRefusedError): problemFor
+      // passes refusals through and words the rest (S369).
+      console.warn('[make-online] link route failed:', err);
+      const sentence = problemFor(err, { inline: true, doing: 'linking this world' }).sentence;
+      errorBox.textContent = sentence;
+      errorBox.hidden = !sentence;
       progressBox.hidden = true;
       inputs.forEach((i) => (i.disabled = false));
       submitBtn.disabled = false;

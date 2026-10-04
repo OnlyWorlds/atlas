@@ -52,7 +52,13 @@ export function describeFailures(failures: readonly PerElementFailure[]): string
   }
   // Counted by element: the world's own sync record can report twice in one
   // round (the world step and the round's end), and it is one change.
-  const busy = [...new Set(byKind.get('file_busy')?.map(f => f.element_id) ?? [])];
+  // An upload's held file is retried by the engine; a held file on the pull
+  // side (operation `read`) waits for the next refresh (S369 gate A M4).
+  const busyPull = [...new Set(byKind.get('file_busy')?.filter(f => f.operation === 'read').map(f => f.element_id) ?? [])];
+  if (busyPull.length > 0) {
+    parts.push(`${plural(busyPull.length, 'newer copy', 'newer copies')} from OnlyWorlds could not be saved because another program was using ${busyPull.length === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this. Refresh in a moment to try again.`);
+  }
+  const busy = [...new Set(byKind.get('file_busy')?.filter(f => f.operation !== 'read').map(f => f.element_id) ?? [])];
   if (busy.length > 0) {
     parts.push(`${plural(busy.length, 'change', 'changes')} could not sync yet because another program was using ${busy.length === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this. ${busy.length === 1 ? 'It is' : 'They are'} saved on your disk, and Atlas will try again in a moment.`);
   }

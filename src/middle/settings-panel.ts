@@ -21,6 +21,7 @@
 import { isCodeLoadError } from '../core/reload-offer';
 import { getState, subscribe } from '../core/state';
 import { ToastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import { navigate, parseHash, settingsHash, SETTINGS_TABS, SETTINGS_TAB_GROUPS, onHashChange, type SettingsTab } from '../core/router';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import { escapeText } from '../core/dom-utils';
@@ -145,7 +146,10 @@ export function mountSettingsPanel(mount: SettingsMount): () => void {
         const engine = await import('../tour/tour-engine');
         await engine.launchTour();
       } catch (err) {
-        if (!isCodeLoadError(err)) toasts.error(err instanceof Error ? err.message : String(err));
+        if (!isCodeLoadError(err)) {
+          console.warn('[settings] tour launch failed:', err);
+          showProblem(err, { doing: 'starting the tour', toasts });
+        }
         btn.disabled = false;
         btn.textContent = 'Replay the tour';
       }

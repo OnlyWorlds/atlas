@@ -10,6 +10,7 @@
  */
 
 import { ToastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
 import { escapeText } from '../core/dom-utils';
@@ -75,7 +76,9 @@ export function buildMapLocalImageRow(m: WorldMap, toasts: ToastManager): HTMLEl
       await refreshElementsAfterWrite(store);
       toasts.success('Local image cleared');
     } catch (err) {
-      toasts.error(err instanceof Error ? err.message : String(err));
+      console.error('[map-image] clear failed:', err);
+      // No retry (gate B L1): an image set since would be cleared.
+      showProblem(err, { doing: 'clearing the map image', toasts });
     }
   };
 
@@ -129,7 +132,9 @@ export function buildMapLocalImageRow(m: WorldMap, toasts: ToastManager): HTMLEl
       const hint = dims ? smallMapImageHint(dims) : null;
       if (hint) toasts.info(hint);
     } catch (err) {
-      toasts.error(err instanceof Error ? err.message : String(err));
+      // No retry: the file is stored again on every attempt.
+      console.error('[map-image] set image failed:', err);
+      showProblem(err, { doing: 'setting the map image', toasts });
     }
   });
 

@@ -19,6 +19,7 @@ import { createApiWorld, buildV2Adapter } from '../sync/make-online';
 import { attachSyncEngine } from '../sync/sync-attach';
 import { getActiveStore } from '../core/active-store';
 import { escapeAttr, escapeText } from '../core/dom-utils';
+import { problemFor } from '../core/problems';
 
 export class NewApiWorldModal extends BaseModal {
   constructor(private toasts: ToastManager) {
@@ -74,6 +75,16 @@ export class NewApiWorldModal extends BaseModal {
 
     cancelBtn.addEventListener('click', () => this.hide());
 
+    // The local world a failed attempt already made (S369): Create again
+    // retries only the online step, rather than making a second folder.
+    let madeLocally: { id: string; name: string } | null = null;
+    // Reused only while it is still the open, local-only world.
+    const reusableLocal = (): { id: string; name: string } | null => {
+      const made = madeLocally;
+      if (!made || getState().active?.worldId !== made.id || !getActiveStore()) return null;
+      return getState().registry.worlds.find(w => w.id === made.id)?.state === 'local-only' ? made : null;
+    };
+
     submitBtn.addEventListener('click', async () => {
       const name = nameInput.value.trim();
       const email = emailInput?.value.trim() ?? '';
@@ -104,14 +115,21 @@ export class NewApiWorldModal extends BaseModal {
           patchSlice('registry', regAfter);
         }
 
-        progressEl.textContent = `Creating local folder for "${name}"...`;
-        const { entry } = await createWorldInRoot(name);
-        // Waypoint: a real folder world exists from here on, even if the
-        // later API step fails (hookmap wp1 — ungated by construction).
-        completeWaypoint('first-world');
+        const reuse = reusableLocal();
+        let entry: { id: string; name: string };
+        if (reuse) {
+          entry = reuse;
+        } else {
+          progressEl.textContent = `Creating local folder for "${name}"...`;
+          ({ entry } = await createWorldInRoot(name));
+          madeLocally = { id: entry.id, name: entry.name };
+          // Waypoint: a real folder world exists from here on, even if the
+          // later API step fails (hookmap wp1 — ungated by construction).
+          completeWaypoint('first-world');
+        }
 
         progressEl.textContent = `Creating API world on onlyworlds.com...`;
-        const created = await createApiWorld({ name, email, pin });
+        const created = await createApiWorld({ name: entry.name, email, pin });
         const apiKey = created.apiKey;
 
         // World id + name come straight from the create response (keel
@@ -146,17 +164,23 @@ export class NewApiWorldModal extends BaseModal {
           attachSyncEngine(updatedEntry, folder, { justLinked: true });
         }
 
-        this.toasts.success(`${name} created online`);
+        this.toasts.success(`${entry.name} created online`);
         completeWaypoint('ecosystem'); // this modal IS Route 1 (new api world)
         this.hide();
       } catch (err) {
         progressEl.hidden = true;
-        const msg = err instanceof Error ? err.message : String(err);
-        errorEl.textContent = msg;
-        errorEl.hidden = false;
+        console.warn('[new-api-world] create failed:', err);
+        const sentence = problemFor(err, { inline: true, doing: 'creating the world online' }).sentence;
+        // Once the folder exists, say so: Create now retries only the online
+        // step, under the same name (the name field stays locked).
+        const reusable = !!reusableLocal();
+        errorEl.textContent = reusable
+          ? `${sentence} The world's folder is already made, so Create tries only the online step again.`.trim()
+          : sentence;
+        errorEl.hidden = !errorEl.textContent;
         submitBtn.disabled = false;
         cancelBtn.hidden = false;
-        nameInput.disabled = false;
+        nameInput.disabled = reusable;
         if (emailInput) emailInput.disabled = false;
         pinInput.disabled = false;
       }

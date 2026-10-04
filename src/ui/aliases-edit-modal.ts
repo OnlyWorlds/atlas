@@ -10,6 +10,7 @@
  */
 
 import { BaseModal } from './modal-base';
+import { problemFor, problemWasShown } from '../core/problems';
 
 export interface AliasesEditModalOpts {
   /** Element name — shown in the modal title for context. */
@@ -44,6 +45,7 @@ export class AliasesEditModal extends BaseModal {
       <button type="button" class="atlas-aliases-add-link" data-role="add-row">
         + add alias
       </button>
+      <div class="atlas-modal-error" data-role="error" hidden></div>
       <div class="atlas-modal-actions">
         <button type="button" class="atlas-btn-ghost" data-role="cancel">Cancel</button>
         <button type="button" class="atlas-btn-primary" data-role="save">Save</button>
@@ -132,12 +134,23 @@ export class AliasesEditModal extends BaseModal {
 
   private async save(): Promise<void> {
     const cleaned = this.collect();
+    const errorBox = this.modal?.querySelector<HTMLElement>('[data-role="error"]') ?? null;
+    if (errorBox) errorBox.hidden = true;
     try {
       await this.opts.onSave(cleaned);
       this.hide();
     } catch (err) {
       console.error('[aliases-edit] save failed', err);
-      // Stay open so the user can retry without losing their edits.
+      // Stay open so the user can retry without losing their edits, and say
+      // so (S369: it used to stay open with no word at all). When the caller
+      // already toasted the reason, the line only says what it means here.
+      if (!errorBox) return;
+      const problem = problemFor(err, { inline: true, doing: 'saving the aliases' });
+      if (problem.quiet) return;
+      errorBox.textContent = problemWasShown(err)
+        ? 'The aliases were not saved. Your rows are still here, so you can save again.'
+        : problem.sentence;
+      errorBox.hidden = false;
     }
   }
 }

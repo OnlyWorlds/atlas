@@ -25,6 +25,7 @@
  */
 
 import { hasFolderMode } from '../core/capabilities';
+import { showProblem } from '../ui/problem-fixes';
 import { confirmExitTour } from './tour-exit-modal';
 import { showTourPane, tourPaneFor } from './tour-pane';
 import { ELEMENT_ICONS, ELEMENT_LABELS, ELEMENT_TYPE_COLORS } from '../core/constants';
@@ -668,7 +669,13 @@ function render(): void {
       setup.textContent = 'Set up a folder';
       setup.addEventListener('click', () => {
         setup.disabled = true;
-        void setupFolderFromTour().finally(() => { setup.disabled = false; });
+        // A failed setup used to vanish (an unhandled rejection, S369).
+        void setupFolderFromTour()
+          .catch((err) => {
+            console.warn('[tour] folder setup failed:', err);
+            showProblem(err, { doing: 'setting up your OnlyWorlds folder' });
+          })
+          .finally(() => { setup.disabled = false; });
       });
       controls.appendChild(setup);
     }

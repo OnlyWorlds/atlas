@@ -19,7 +19,7 @@ import { escapeText } from '../core/dom-utils';
 import { getState, subscribe } from '../core/state';
 import { hasFolderMode } from '../core/capabilities';
 import { parseHash } from '../core/router';
-import { ALL_ELEMENT_TYPES, type Element, type ElementType } from '../core/types';
+import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
 import { completeWaypoint } from '../core/waypoints';
 import { sectionsFor } from '../editor/field-schema';
 import { buildWorldExport } from '../import/export-world';
@@ -34,6 +34,9 @@ import {
 } from '../setup/atlas-root-flow';
 import { activateWorld } from '../sidebar/worlds-sidebar';
 import { ToastManager } from '../ui/toast-manager';
+import { detailsContext, showProblem } from '../ui/problem-fixes';
+import { buildFailureDetails } from '../core/problems';
+import { PlainError } from '../core/plain-error';
 
 type Mode = 'new' | 'merge';
 
@@ -124,6 +127,29 @@ export function buildConvertNotesPrompt(): string {
     '<paste your notes here>',
   ].join('\n');
 }
+
+/**
+ * Where a JSON.parse failure sits, as " near line 3, column 14", or "" when
+ * the browser did not say (S369). Only the position is read out of the
+ * engine's message (V8: "at position N", newer V8 also "(line L column C)";
+ * Firefox: "at line L column C"); the message itself is never shown, since
+ * its wording differs by browser and quotes the user's text.
+ */
+export function jsonErrorWhere(text: string, err: unknown): string {
+  const raw = err instanceof SyntaxError ? err.message : '';
+  const lc = /line (\d+) column (\d+)/i.exec(raw);
+  if (lc) return ` near line ${lc[1]}, column ${lc[2]}`;
+  const p = /position (\d+)/i.exec(raw);
+  if (!p) return '';
+  const pos = Math.min(Number(p[1]), text.length);
+  const before = text.slice(0, pos);
+  const line = before.split('\n').length;
+  const column = pos - before.lastIndexOf('\n');
+  return ` near line ${line}, column ${column}`;
+}
+
+/** The clipboard refused a write (no focus, or the permission is off). */
+export const CLIPBOARD_BLOCKED = 'The browser did not let Atlas use the clipboard. Click in the page, then try again.';
 
 /** Rough token estimate for the size hint (chars/4 is close enough for UI). */
 function estimateTokens(s: string): number {
@@ -276,8 +302,8 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     let raw: unknown;
     try {
       raw = JSON.parse(text);
-    } catch {
-      showError(`${sourceLabel} isn't valid JSON. Check for a missing comma, quote, or bracket.`);
+    } catch (err) {
+      showError(`${sourceLabel} isn't valid JSON${jsonErrorWhere(text, err)}. Check for a missing comma, quote, or bracket.`);
       return;
     }
     const result = parsePayload(raw);
@@ -341,8 +367,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       raw = JSON.parse(text);
     } catch (err) {
       pasteEl.classList.add('is-invalid');
-      const detail = err instanceof Error ? err.message : 'invalid JSON';
-      setLive('invalid', `Not valid JSON: ${detail}.`);
+      setLive('invalid', `Not valid JSON${jsonErrorWhere(text, err)}. Check for a missing comma, quote, or bracket.`);
       return;
     }
     const result = parsePayload(raw);
@@ -508,9 +533,11 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const nameInput = reviewMount.querySelector<HTMLInputElement>('[data-role="world-name"]');
     nameInput?.addEventListener('input', () => { worldName = nameInput.value; });
     reviewMount.querySelector<HTMLButtonElement>('[data-action="copy-fix"]')?.addEventListener('click', () => {
+      // Clipboard failures never go through showProblem: a clipboard
+      // NotAllowedError would read as a folder permission problem.
       void navigator.clipboard.writeText(generateFixPrompt(issues))
         .then(() => toasts.success('Fix prompt copied'))
-        .catch(() => toasts.error('Could not copy to clipboard'));
+        .catch(() => toasts.error(CLIPBOARD_BLOCKED));
     });
     reviewMount.querySelector<HTMLButtonElement>('[data-action="import"]')?.addEventListener('click', () => void runImport());
   }
@@ -550,7 +577,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         const plan = buildPlan();
         const { applied } = await createWorldFromImportedData(plan, { name: worldName, onProgress, adoptWorldId });
         toasts.success(`Created "${plan.worldMeta?.name ?? 'world'}" · ${applied.created} element${applied.created === 1 ? '' : 's'}`);
-        reportFailures(applied.failures.length, plan.report.droppedLinks.length);
+        reportFailures(applied.failures, plan.report.droppedLinks.length);
         // The file carried API credentials — guide to the (separate, consent-gated) sync link.
         if (hadCreds) toasts.info('Imported as a local world. To sync it, use "make online" in settings.');
         if (stillMine()) {
@@ -565,18 +592,18 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         // unmount; guard the DOM touches afterward (toasts are global).
         const idMatch = idMatchWorld();
         const targetId = idMatch?.id ?? activeWorld()?.worldId ?? null;
-        if (!targetId) throw new Error('No world to merge into');
+        if (!targetId) throw new PlainError('No world is open to import into. Open one from the sidebar, or import as a new world.');
         const targetName = idMatch?.name ?? activeWorld()?.meta?.name ?? 'world';
         // Fail fast on a view-only target (the UI disables the button, but the
         // room can be driven by keyboard/state races — one clear message beats
         // N per-element write failures).
         const targetEntry = getState().registry.worlds.find(w => w.id === targetId);
         if (targetEntry?.api?.read_only === true) {
-          throw new Error(`"${targetName}" is view-only. Import as a separate copy instead`);
+          throw new PlainError(`"${targetName}" is view-only. Import as a separate copy instead.`);
         }
         if (targetId !== activeWorld()?.worldId) {
           const ok = await activateWorld(targetId, toasts);
-          if (!ok) throw new Error(`Could not open "${targetName}" to merge into`);
+          if (!ok) throw new PlainError(`Atlas could not open "${targetName}", so nothing was imported.`);
         }
         const plan = buildPlan(); // existing = the now-active target's elements
         const applied = await importIntoActiveWorld(plan, { onProgress });
@@ -584,7 +611,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         if (applied.updated) bits.push(`${applied.updated} updated`);
         if (plan.report.skipped) bits.push(`${plan.report.skipped} skipped`);
         toasts.success(`Merged into ${targetName} · ${bits.join(', ')}`);
-        reportFailures(applied.failures.length, plan.report.droppedLinks.length);
+        reportFailures(applied.failures, plan.report.droppedLinks.length);
         if (reviewMount.isConnected && stillMine()) { clearLoaded(); renderExport(); }
       }
       // Waypoint (hookmap wp7): the import BUTTON gesture is the waypoint —
@@ -592,16 +619,25 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       completeWaypoint('import');
     } catch (err) {
       console.error('[import] failed', err);
-      toasts.error(err instanceof Error ? err.message : 'Import failed');
+      // No retry button: a half-finished import run again could duplicate.
+      showProblem(err, { doing: 'importing', toasts });
     } finally {
       importing = false;
       if (parsed) renderReview();
     }
   }
 
-  function reportFailures(failures: number, droppedLinks: number): void {
-    if (failures > 0) toasts.error(`${failures} element${failures === 1 ? '' : 's'} failed to write`);
-    else if (droppedLinks > 0) toasts.info(`${droppedLinks} unresolved link${droppedLinks === 1 ? '' : 's'} dropped`);
+  function reportFailures(failures: readonly PerElementFailure[], droppedLinks: number): void {
+    const n = failures.length;
+    if (n > 0) {
+      // The per-element reasons ride in the Details block (scrubbed: no names).
+      toasts.show(
+        `${n} element${n === 1 ? '' : 's'} could not be saved to the world's folder, so ${n === 1 ? 'it was' : 'they were'} left out. The rest were imported.`,
+        'error',
+        8000,
+        { details: buildFailureDetails(failures, { ...detailsContext(), doing: 'importing' }) },
+      );
+    } else if (droppedLinks > 0) toasts.info(`${droppedLinks} unresolved link${droppedLinks === 1 ? '' : 's'} dropped`);
   }
 
   // ---------------------------------------------------------------------------
@@ -709,7 +745,8 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       toasts.success(`Exported ${n} element${n === 1 ? '' : 's'}`);
     } catch (err) {
       console.error('[export] failed', err);
-      toasts.error('Export failed');
+      // Safe to run again: it only reads the world and offers the file.
+      showProblem(err, { doing: 'exporting this world', retry: () => runExport(), toasts });
     }
   }
 
@@ -721,17 +758,27 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const checked = Array.from(exportMount.querySelectorAll<HTMLInputElement>('.atlas-import-type-row input'))
       .filter(c => c.checked).map(c => c.value as ElementType);
     const all = exportMount.querySelectorAll('.atlas-import-type-row input').length;
+    // Reading the world and writing the clipboard fail for different reasons,
+    // and a clipboard refusal must not be worded as a folder problem.
+    let data: Awaited<ReturnType<typeof buildWorldExport>>;
     try {
-      const data = await buildWorldExport(store, {
+      data = await buildWorldExport(store, {
                 types: checked.length === all ? undefined : new Set(checked),
       });
-      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-      const n = checked.reduce((sum, t) => sum + (activeElements().filter(e => e.type === t).length), 0);
-      toasts.success(`Copied ${n} element${n === 1 ? '' : 's'} as JSON`);
     } catch (err) {
       console.error('[export] copy failed', err);
-      toasts.error('Could not copy to clipboard');
+      showProblem(err, { doing: 'exporting this world', retry: () => runCopyJson(), toasts });
+      return;
     }
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+    } catch (err) {
+      console.error('[export] copy failed', err);
+      toasts.error(CLIPBOARD_BLOCKED);
+      return;
+    }
+    const n = checked.reduce((sum, t) => sum + (activeElements().filter(e => e.type === t).length), 0);
+    toasts.success(`Copied ${n} element${n === 1 ? '' : 's'} as JSON`);
   }
 
   // ---- wire static controls -------------------------------------------------
@@ -742,13 +789,13 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     e.preventDefault();
     dropEl.classList.remove('is-over');
     const file = e.dataTransfer?.files?.[0];
-    if (file) void file.text().then(t => ingest(t, 'The dropped file'));
+    if (file) void file.text().then(t => ingest(t, 'The dropped file'), err => { console.error('[import] file read failed', err); showProblem(err, { doing: 'reading the dropped file', folder: 'picked', toasts }); });
   });
   dropEl.addEventListener('click', () => fileInput.click());
   dropEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
-    if (file) void file.text().then(t => ingest(t, 'The chosen file'));
+    if (file) void file.text().then(t => ingest(t, 'The chosen file'), err => { console.error('[import] file read failed', err); showProblem(err, { doing: 'reading the chosen file', folder: 'picked', toasts }); });
     fileInput.value = '';
   });
   root.querySelector<HTMLButtonElement>('[data-action="load"]')!.addEventListener('click', () => {
@@ -770,7 +817,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   root.querySelector<HTMLButtonElement>('[data-action="example-copy"]')!.addEventListener('click', () => {
     void navigator.clipboard.writeText(EXAMPLE_JSON)
       .then(() => { toasts.success('Example JSON copied'); completeWaypoint('import'); })
-      .catch(() => toasts.error('Could not copy to clipboard'));
+      .catch(() => toasts.error(CLIPBOARD_BLOCKED));
   });
   root.querySelector<HTMLButtonElement>('[data-action="example-download"]')!.addEventListener('click', () => {
     downloadText(EXAMPLE_JSON, 'onlyworlds_example.json');
@@ -781,7 +828,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   root.querySelector<HTMLButtonElement>('[data-action="convert-prompt"]')!.addEventListener('click', () => {
     void navigator.clipboard.writeText(buildConvertNotesPrompt())
       .then(() => toasts.success('Convert-notes prompt copied'))
-      .catch(() => toasts.error('Could not copy to clipboard'));
+      .catch(() => toasts.error(CLIPBOARD_BLOCKED));
   });
 
   // ---- react to element changes (a world switch remounts the room since S364, conv. 109; the payload is carried) ----

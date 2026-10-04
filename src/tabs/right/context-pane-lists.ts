@@ -23,6 +23,7 @@ import type { Element } from '../../core/types';
 import { ELEMENT_ICONS } from '../../core/constants';
 import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
+import { showProblem } from '../../ui/problem-fixes';
 
 export interface ContextListsHandle {
   /** Visually emphasize a row whose element id matches (or clear). */
@@ -232,6 +233,11 @@ export function mountContextLists(opts: ContextListsOpts): ContextListsHandle {
   // "Potentials" reads more openly than "Suggested" — these aren't system
   // recommendations, they're elements the writer might pull into the scene.
   sugHeader.textContent = 'Potentials';
+  // Potentials come from LINKS (the cast's neighbours, nearby narratives'
+  // casts), never from names in the text: those are the dotted mentions in
+  // the prose, linked from there. Said here and in the empty line, so "No
+  // potentials" beside dotted names does not read as a contradiction (S369).
+  sugHeader.title = 'Elements linked to your cast, or to nearby parts of the story, that are not in this cast yet';
   sugCol.appendChild(sugHeader);
 
   const sugBody = document.createElement('div');
@@ -242,7 +248,7 @@ export function mountContextLists(opts: ContextListsOpts): ContextListsHandle {
   if (suggested.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'atlas-context-pane-empty';
-    empty.textContent = 'No potentials right now.';
+    empty.textContent = 'No potentials yet. They come from links in the world, not from names in the text.';
     sugBody.appendChild(empty);
   } else {
     for (const s of suggested) {
@@ -366,5 +372,7 @@ async function dismissSuggestion(narrativeId: string, suggestedId: string): Prom
     requestPushIfLinked();
   } catch (err) {
     console.error('[context-lists] dismiss failed', err);
+    // Safe to run again: it re-reads the list and adds the one id.
+    showProblem(err, { doing: 'dismissing the suggestion', retry: () => dismissSuggestion(narrativeId, suggestedId) });
   }
 }

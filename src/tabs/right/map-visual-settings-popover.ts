@@ -33,9 +33,11 @@ import type { MapTabCacheEntry } from './map-tab-cache';
 import { syncPins } from './map-tab-pins';
 import { syncZones } from './map-tab-zones';
 import { getActiveStore } from '../../core/active-store';
+import { getState } from '../../core/state';
 import { refreshElementsAfterWrite } from '../../sync/sync-attach';
 import { flipMapVertically } from '../../core/map-flip';
 import { toastManager } from '../../ui/toast-manager';
+import { showProblem } from '../../ui/problem-fixes';
 
 interface OpenPopover {
   wrapper: HTMLDivElement;
@@ -396,6 +398,13 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
   flipBtn?.addEventListener('click', async () => {
     const store = getActiveStore();
     if (!store) return;
+    // The flip's own refusal, said here: core/map-flip throws it as a plain
+    // Error, which the problem wording would treat as a bug (S369).
+    const mapEl = getState().data.elements.find(e => e.id === mapId) as { height?: unknown } | undefined;
+    if (mapEl && !(typeof mapEl.height === 'number' && mapEl.height > 0)) {
+      toastManager.info('This map has no size yet, so it cannot be flipped. Set an image or reopen it first.');
+      return;
+    }
     flipBtn.disabled = true;
     try {
       const { pins, points } = await flipMapVertically(store, mapId);
@@ -408,7 +417,9 @@ function wireControls(wrapper: HTMLDivElement, entry: MapTabCacheEntry, rerender
         ? 'Nothing to flip on this map'
         : `Flipped ${parts.join(' and ')}. Press again to undo`);
     } catch (err) {
-      toastManager.error(err instanceof Error ? err.message : String(err));
+      // No retry: the flip is its own inverse, so running it twice undoes it.
+      console.error('[map-visual] flip failed:', err);
+      showProblem(err, { doing: 'flipping the map' });
     } finally {
       flipBtn.disabled = false;
     }

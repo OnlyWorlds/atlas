@@ -12,6 +12,8 @@
 import { getState, patchSlice, subscribe } from '../core/state';
 import { onHashChange, parseHash, navigate, writingHash } from '../core/router';
 import { ToastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
+import { PlainError } from '../core/plain-error';
 import { WritingCreateModal } from '../ui/writing-create-modal';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
@@ -42,10 +44,8 @@ async function createNarrativeAtTier(
   toasts: ToastManager,
 ): Promise<Element | null> {
   const folder = getActiveStore();
-  if (!folder) {
-    toasts.error('No active world.');
-    return null;
-  }
+  // Thrown, not toasted: the create modal shows it inline and stays open.
+  if (!folder) throw new PlainError('This world is not open. Open it from the sidebar, then try again.');
   const idx = buildNarrativeIndex(getState().data.elements, worldId);
   const supertype = supertypeForTier(tier, worldId);
   const created = await folder.createElement('narrative', {
@@ -734,6 +734,6 @@ async function deleteNarrativeSubtree(node: NarrativeNode, toasts: ToastManager)
     toasts.success(`Deleted ${el.name || 'narrative'}`);
   } catch (err) {
     console.error('[writing-sidebar] delete failed', err);
-    toasts.error(err instanceof Error ? err.message : String(err));
+    showProblem(err, { doing: 'deleting the narrative', toasts });
   }
 }

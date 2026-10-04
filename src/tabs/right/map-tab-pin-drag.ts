@@ -17,6 +17,7 @@ import { leafletToStorage } from '../../visualization/leaflet-2d/CoordinateUtils
 import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import type { MapTabCacheEntry } from './map-tab-cache';
+import { showProblem } from '../../ui/problem-fixes';
 
 /**
  * Clamp a pin coord to [0, max]. Defense-in-depth alongside Leaflet's
@@ -104,6 +105,9 @@ export function enablePinDrag(entry: MapTabCacheEntry, marker: any, pinId: strin
       requestPushIfLinked();
     } catch (err) {
       console.error('[map-tab] pin drag persist failed:', err);
+      // Was silent: the pin stayed where it was dropped though nothing was
+      // saved (S369).
+      showProblem(err, { doing: droppedOnTrash ? 'deleting the pin' : 'moving the pin' });
     }
   });
 }

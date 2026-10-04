@@ -20,6 +20,7 @@
 
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
+import { showProblem } from './problem-fixes';
 import { getState } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite } from '../sync/sync-attach';
@@ -72,6 +73,8 @@ export class CalendarBuilderModal extends BaseModal {
   private grain: string;
   /** The config as stored, on edit (S367 critic K2): save patches it, never rebuilds it. */
   private stored: CalendarConfig | null = null;
+  /** Set once a new calendar is written, so Save after a later failure updates it instead of making a second (S369). */
+  private createdId: string | null = null;
 
   constructor(private toasts: ToastManager, private opts: CalendarBuilderOpts) {
     super();
@@ -468,9 +471,9 @@ export class CalendarBuilderModal extends BaseModal {
       return;
     }
     const store = getActiveStore();
-    if (!store) { this.toasts.error('no active world'); return; }
+    if (!store) { this.toasts.error('This world is not open. Open it from the sidebar, then try again.'); return; }
     try {
-      let id = this.opts.elementId;
+      let id = this.opts.elementId ?? this.createdId ?? undefined;
       if (id) {
         await store.updateElement(id, { name: this.draft.name.trim(), atlas_calendar: config });
       } else {
@@ -482,14 +485,17 @@ export class CalendarBuilderModal extends BaseModal {
           ...(this.opts.seed?.description ? { description: this.opts.seed.description } : {}),
         });
         id = el.id;
+        this.createdId = el.id;
       }
       await refreshElementsAfterWrite(store);
       this.hide();
-      this.toasts.success(this.opts.elementId ? 'calendar saved' : `“${this.draft.name.trim()}” is your calendar now`);
+      this.toasts.success(this.opts.elementId ? 'Calendar saved' : `“${this.draft.name.trim()}” is your calendar now`);
       this.opts.onSaved?.(id);
     } catch (err) {
+      // The builder stays open, so Save again is the retry (a create retried
+      // from a toast could make a second calendar).
       console.error('[calendar] save failed:', err);
-      this.toasts.error(err instanceof Error ? err.message : 'could not save the calendar');
+      showProblem(err, { doing: 'saving the calendar', toasts: this.toasts });
     }
   }
 }

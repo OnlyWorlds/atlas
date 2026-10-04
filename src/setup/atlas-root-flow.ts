@@ -42,6 +42,15 @@ import { applyImportPlan, type ApplyProgress, type ApplyResult } from '../import
 import type { ImportPlan } from '../import/types';
 import type { WorldRegistryEntry, PerElementFailure, WorldMeta } from '../core/types';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
+import { PlainError } from '../core/plain-error';
+import { keyCheckError } from './key-check-errors';
+
+// The refusals below are user copy (S369): each is a `PlainError`, so the
+// catch site shows it as its own sentence. Developer text stays a plain
+// `Error` and is worded by `problemFor` where it is caught.
+const NO_HOME_FOLDER = 'Atlas has no OnlyWorlds folder yet. Choose one in Settings, under Storage, then try again.';
+const HOME_FOLDER_LOST = 'Atlas lost its link to your OnlyWorlds folder. Choose it again in Settings, under Storage, then try again.';
+const HOME_FOLDER_DENIED = 'Atlas needs permission to change your OnlyWorlds folder. Try again, and choose Allow when the browser asks.';
 
 /**
  * Prompt the user to pick the atlas root folder. On success: resolve the
@@ -79,7 +88,7 @@ export async function setupAtlasRoot(): Promise<SetupAtlasRootResult | null> {
 export async function setupAtlasRootFrom(picked: FileSystemDirectoryHandle): Promise<SetupAtlasRootResult> {
   const granted = await ensureWritable(picked);
   if (!granted) {
-    throw new Error('Folder is read-only; atlas needs write access');
+    throw new PlainError('Atlas needs permission to change that folder. Pick it again, and choose Allow when the browser asks.');
   }
 
   // A world folder is the wrong kind of thing for this door. Detect BEFORE
@@ -251,10 +260,10 @@ export async function openWorldFolder(
     if (!isNotFound(err)) throw err;
   }
   if (!meta) {
-    throw new Error('That folder has no world.json. Pick the world folder itself (the one containing world.json, elements/, spatial/).');
+    throw new PlainError('That folder is not a world: it has no world.json. Pick the world folder itself, the one that holds world.json.');
   }
   if (typeof meta.id !== 'string' || !meta.id || typeof meta.name !== 'string') {
-    throw new Error('world.json must carry a valid id and name.');
+    throw new PlainError('The world.json in that folder has no valid id or name, so Atlas cannot open it.');
   }
 
   // Registry entry ids are minted fresh (never the world.json id — existing
@@ -265,6 +274,10 @@ export async function openWorldFolder(
   const handleKey = `world-${meta.id}`;
   const existing = getState().registry.worlds.find(w => w.folder.handle_key === handleKey);
   if (existing) {
+    // The entry lost its handle (cleared site data, another profile): the
+    // pick IS the reconnect, so the handle comes back (S369, the lost-access
+    // toast's "Open the folder"). A live handle is never replaced.
+    if (!(await loadHandle(handleKey))) await storeHandle(handleKey, picked);
     return { worldId: existing.id, already: true };
   }
 
@@ -421,7 +434,7 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
   }
   const granted = await ensureWritable(handle);
   if (!granted) {
-    throw new Error('Write permission denied');
+    throw new PlainError('Atlas needs permission to use your OnlyWorlds folder. Try again, and choose Allow when the browser asks.');
   }
   // Validate marker so a re-purposed folder doesn't masquerade as an atlas
   // root. If the marker's gone, clear the orphan and let the user pick fresh.
@@ -429,7 +442,7 @@ export async function recoverAtlasRoot(): Promise<{ imported: number } | null> {
   if (!hasMarker) {
     await deleteHandle(ATLAS_ROOT_HANDLE_KEY);
     patchSlice('atlasRootRecoverable', null);
-    throw new Error('Folder no longer looks like an OnlyWorlds folder. Pick again');
+    throw new PlainError('That folder no longer looks like an OnlyWorlds folder. Set up a folder again.');
   }
   const pathHint = handle.name;
   const nextRegistry = setAtlasRoot(getState().registry, {
@@ -589,16 +602,16 @@ export async function scaffoldWorldInRoot(
   } else {
     const reg = getState().registry;
     if (!reg.atlas_root) {
-      throw new Error('OnlyWorlds folder is not set up. Pick a folder first');
+      throw new PlainError(NO_HOME_FOLDER);
     }
     const loaded = await loadHandle(reg.atlas_root.handle_key);
     if (!loaded) {
-      throw new Error('OnlyWorlds folder link is missing. Re-pick it in settings');
+      throw new PlainError(HOME_FOLDER_LOST);
     }
     // Re-grant permission on the root (user gesture at click-time is acceptable here).
     const granted = await ensureWritable(loaded);
     if (!granted) {
-      throw new Error('Write permission for the OnlyWorlds folder was denied');
+      throw new PlainError(HOME_FOLDER_DENIED);
     }
     rootHandle = loaded;
     rootLabel = reg.atlas_root.folder_name;
@@ -727,7 +740,7 @@ export async function importIntoActiveWorld(
   opts: { onProgress?: (p: ApplyProgress) => void } = {},
 ): Promise<ApplyResult> {
   const store = getActiveStore();
-  if (!store) throw new Error('No active world to import into');
+  if (!store) throw new PlainError('No world is open to import into. Open one from the sidebar, then try again.');
   const applied = await applyImportPlan(store, plan, { onProgress: opts.onProgress });
   await refreshElementsAfterWrite(store); // re-prime state + requestPushIfLinked once
   return applied;
@@ -816,10 +829,10 @@ export async function linkExistingApiWorldInRoot(
 ): Promise<LinkExistingApiWorldResult> {
   const reg = getState().registry;
   if (!reg.atlas_root) {
-    throw new Error('OnlyWorlds folder is not set up. Pick a folder first');
+    throw new PlainError(NO_HOME_FOLDER);
   }
   const apiKey = opts.apiKey.trim();
-  if (!apiKey) throw new Error('API key is required');
+  if (!apiKey) throw new PlainError(opts.readOnly ? 'Paste the read key first.' : 'Paste the world\'s API key first.');
   // Demo-range keys are READ scope SERVER-side (keel resolves 0000000000-
   // 0000000009 to read, so nothing can write with them on any route). Linking
   // one is therefore always a view-only link, whatever the caller asked for:
@@ -837,10 +850,12 @@ export async function linkExistingApiWorldInRoot(
   // already says must never happen from a view-only link).
   const apiPin = readOnly ? '' : opts.apiPin.trim();
   // View-only links run on a READ key — keel reads are keyless-PIN (S264).
-  if (!apiPin && !readOnly) throw new Error('PIN is required');
+  if (!apiPin && !readOnly) throw new PlainError('Enter your PIN first.');
 
   // Validate creds via v2 GET /world (live 2026-07-12; replaced the v1 SDK
-  // lane). OwV2Error keeps the "API Error NNN: ..." prefix these regexes read.
+  // lane). A refused key, an unknown world or no connection is worded by
+  // `keyCheckError` (S369); anything else is rethrown as it came, for the
+  // modal to word.
   // Skipped when the caller already holds the world identity (account-mode
   // list → open; gate R1b — the fresh minted key needs no re-validation).
   let world: { id?: string; name?: string };
@@ -851,11 +866,7 @@ export async function linkExistingApiWorldInRoot(
     try {
       world = await client.getWorld();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (/401|403/.test(msg)) throw new Error('API key or PIN invalid');
-      if (/404/.test(msg)) throw new Error('No world found for that API key');
-      if (/network|fetch/i.test(msg)) throw new Error('Could not reach onlyworlds. Check your connection');
-      throw new Error(msg);
+      throw keyCheckError(err, { readOnly });
     }
   }
   if (!world.id) throw new Error('Server returned no world ID (unexpected)');
@@ -875,22 +886,22 @@ export async function linkExistingApiWorldInRoot(
     ?? findWorldByServerId(getState().registry, serverWorldId);
   if (existingLink) {
     const live = existingLink.state === 'api-linked';
-    throw new Error(
+    throw new PlainError(
       live
-        ? `This API world is already linked to a local world ("${existingLink.name}"). ` +
-          `Open it from the sidebar, or unlink it first if you want to start fresh.`
-        : `This world is already here as a local folder ("${existingLink.name}") from an earlier link. ` +
-          `Open it from the sidebar; use Make Online → link to reconnect it.`
+        ? `This OnlyWorlds world is already linked here as "${existingLink.name}". ` +
+          `Open it from the sidebar, or unlink it first to start fresh.`
+        : `This world is already here as "${existingLink.name}", from an earlier link. ` +
+          `Open it from the sidebar, then use Make online to link it again.`
     );
   }
 
   const rootHandle = await loadHandle(reg.atlas_root.handle_key);
   if (!rootHandle) {
-    throw new Error('OnlyWorlds folder link is missing. Re-pick it in settings');
+    throw new PlainError(HOME_FOLDER_LOST);
   }
   const granted = await ensureWritable(rootHandle);
   if (!granted) {
-    throw new Error('Write permission for the OnlyWorlds folder was denied');
+    throw new PlainError(HOME_FOLDER_DENIED);
   }
 
   // The prior world stays open and usable through the download; it is
@@ -910,7 +921,7 @@ export async function linkExistingApiWorldInRoot(
     } catch {
       break; // name is free
     }
-    if (n > 20) throw new Error('Could not find a free folder name for this world');
+    if (n > 20) throw new PlainError('Your OnlyWorlds folder already holds many folders with this world\'s name. Move or remove old copies there, then try again.');
   }
 
   // Create the subfolder under the root.
@@ -1036,7 +1047,7 @@ export async function whyWorldFolderNotDeletable(world: { folder: { handle_key: 
   const reg = getState().registry;
   if (!reg.atlas_root) return outside;
   const rootHandle = await loadHandle(reg.atlas_root.handle_key);
-  if (!rootHandle) return 'OnlyWorlds folder link missing. Re-pick it in Settings, then try again.';
+  if (!rootHandle) return HOME_FOLDER_LOST;
   const worldHandle = await loadHandle(world.folder.handle_key);
   if (!worldHandle) return outside;
   let path: string[] | null = null;
@@ -1047,12 +1058,12 @@ export async function whyWorldFolderNotDeletable(world: { folder: { handle_key: 
 
 export async function deleteWorldFolderUnderRoot(world: { folder: { handle_key: string; folder_name: string } }): Promise<void> {
   const reason = await whyWorldFolderNotDeletable(world);
-  if (reason) throw new Error(reason);
+  if (reason) throw new PlainError(reason);
   const reg = getState().registry;
   const rootHandle = (await loadHandle(reg.atlas_root!.handle_key))!;
   const granted = await ensureWritable(rootHandle);
   if (!granted) {
-    throw new Error('Write permission denied for the OnlyWorlds folder');
+    throw new PlainError(HOME_FOLDER_DENIED);
   }
   await rootHandle.removeEntry(world.folder.folder_name, { recursive: true });
 }

@@ -21,9 +21,10 @@ import { mountMapTab, disposeMapTab, disposeAllMapTabs } from './map-tab';
 import { mountContextTab } from './context-tab';
 import { mapTabCache } from './map-tab-cache';
 import { retargetVisualSettingsPopover, closeVisualSettingsPopover } from './map-visual-settings-popover';
-import { navigate, parseHash, worldHash, elementHash } from '../../core/router';
+import { navigate, parseHash, worldHash, elementHash, settingsHash } from '../../core/router';
 import { getCurrentSyncEngine, pullNowAndRefresh, refreshConflictsCount, diagnoseSyncUnavailable } from '../../sync/sync-attach';
 import { surfaceSyncUnavailable } from '../../ui/sync-toasts';
+import { issuesFor } from '../../sync/sync-issues';
 import { showProblem } from '../../ui/problem-fixes';
 import { ConflictReviewModal } from '../../ui/conflict-review-modal';
 import { savePersistedRightTabs } from './right-tabs-persistence';
@@ -395,12 +396,24 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   const conflictBadge = conflictCount > 0
     ? `<span class="atlas-sync-pill-conflict" data-role="review-conflicts" title="${conflictCount} conflict${conflictCount === 1 ? '' : 's'} to review">⚠ ${conflictCount}</span>`
     : '';
+  // Elements still not syncing (S369): the place to come back to after a
+  // failure toast. A first busy-file failure is left out: it usually clears
+  // by itself in the next round, which is why its toast stays quiet too.
+  const issueCount = issuesFor(active.worldId).filter(i => i.kind !== 'file_busy' || i.rounds > 1).length;
+  const issueBadge = issueCount > 0
+    ? `<span class="atlas-sync-pill-conflict atlas-sync-pill-issues" data-role="sync-issues" title="${issueCount} change${issueCount === 1 ? '' : 's'} not syncing · click to see why">⚠ ${issueCount}</span>`
+    : '';
   pill.innerHTML = `
     <span class="atlas-sync-pill-dot"></span>
     <span>${label}</span>
     ${conflictBadge}
+    ${issueBadge}
     <span class="material-symbols-outlined atlas-sync-pill-refresh" data-role="refresh" aria-label="Refresh from API">refresh</span>
   `;
+  pill.querySelector<HTMLElement>('[data-role="sync-issues"]')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    navigate(settingsHash(active.worldId, 'world'));
+  });
 
   // Pending-push decay ring: if the engine has a debounced push scheduled,
   // surface it via a `data-pending="true"` attribute + `--decay-fraction` CSS
@@ -440,13 +453,19 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
           await eng.flushPendingPush();
         } catch (err) {
           console.warn('[right-pane] push now failed:', err);
-          showProblem(err, { doing: 'uploading changes', retry: pushNow, toasts });
+          showProblem(err, { doing: 'uploading changes', savedLocally: true, retry: pushNow, toasts });
         }
       };
       await pushNow();
       return;
     }
     const cur = state.sync.activeSync;
+    // An errored pill says why in Settings → World, with the fix (S369):
+    // a pull cannot help a dead key or a damaged file.
+    if (cur?.kind === 'error') {
+      navigate(settingsHash(active.worldId, 'world'));
+      return;
+    }
     if (cur?.kind === 'syncing') {
       // Already in flight; the engine will dedupe but no need to fire again.
       return;
@@ -483,7 +502,7 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
       }
     } catch (err) {
       console.warn('[right-pane] refresh failed:', err);
-      showProblem(err, { doing: 'refreshing from OnlyWorlds', retry: () => { void pullNowAndRefresh().catch(e => showProblem(e, { doing: 'refreshing from OnlyWorlds', toasts })); }, toasts });
+      showProblem(err, { doing: 'refreshing from OnlyWorlds', savedLocally: true, retry: () => { void pullNowAndRefresh().catch(e => showProblem(e, { doing: 'refreshing from OnlyWorlds', savedLocally: true, toasts })); }, toasts });
     }
   };
 }

@@ -70,6 +70,9 @@ test('create page → detail; rename + revert both persist; intent stays hidden 
   // "+ new page" creates immediately and lands on the detail view.
   await page.click('button.atlas-share-new');
   await expect(page).toHaveURL(/\/share\/[0-9a-f-]+$/);
+  // S369: a new page opens on its name, ready to type; Escape keeps the default.
+  await expect(page.locator('.atlas-share-detail-header input.atlas-element-name-input')).toHaveValue('new page');
+  await page.keyboard.press('Escape');
   await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
   await expect(page.locator('[data-action="copy-payload"]')).toBeVisible();
   // T-S7: Theme + Publish sit behind the meta summary row — expand first.
@@ -107,6 +110,8 @@ test('create page → detail; rename + revert both persist; intent stays hidden 
 
   // A second create gets a unique default name.
   await page.click('button.atlas-share-new');
+  await expect(page.locator('.atlas-share-detail-header input.atlas-element-name-input')).toHaveValue('new page');
+  await page.keyboard.press('Escape');
   await expect(page.locator('.atlas-share-detail-header .atlas-element-name')).toHaveText('new page');
   await page.click('.atlas-drillin-prefix');
   await expect(page.locator('.atlas-share-row')).toHaveCount(2);

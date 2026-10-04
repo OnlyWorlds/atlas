@@ -56,6 +56,79 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.16',
+    date: '2026-10-05',
+    theme: 'errors that help',
+    entries: [
+      {
+        id: 'every-error-in-plain-words',
+        title: 'Every error now says what happened, in plain words',
+        body: 'The rest of Atlas follows what 1.15 started: opening, linking and creating worlds, elements, maps, zones, pins, calendars, writing, knowledge, pages, charts and the Data room all say what went wrong and what you can do, instead of passing on the browser\'s own error text, with Retry where running the step again is safe.',
+        tags: ['editor'],
+      },
+      {
+        id: 'not-syncing-list',
+        title: 'See what is not syncing, and why',
+        body: 'When elements keep failing to sync, the sync pill shows a ⚠ with how many, and Settings, under This world, lists each one with the reason and the fix: give it a new id, shorten a custom field, or try again. A sync error on the pill now opens that list too.',
+        tags: ['sync'],
+      },
+      {
+        id: 'error-details-fields-only',
+        title: 'Error details carry no names, paths or text',
+        body: 'The details you can copy or send as feedback are now built from fixed facts only: the kind of error, its code and the field it names. An unexpected error still includes its own message, with capitalised names, file and folder paths, keys and email addresses taken out. A name typed in lowercase can still show, and you see the whole text on the feedback page before you send it.',
+        tags: ['editor'],
+      },
+      {
+        id: 'held-files-pull',
+        title: 'Refreshing waits out OneDrive and antivirus too',
+        body: 'A file another program held could still stop a refresh from OnlyWorlds, report your own new element as a conflict, or quietly stop the lock that keeps two tabs apart. A refresh now saves everything else and says which copy to try again, your own element is recognised, and the lock keeps going.',
+        tags: ['sync', 'fix'],
+      },
+      {
+        id: 'quiet-failures-said',
+        title: 'Saves that failed without a word now say so',
+        body: 'A failed pin move, zone colour, chart save, alias edit, link removal or world list save used to fail silently. Each now says so, and a problem nothing else caught shows once, with details you can send.',
+        tags: ['editor', 'fix'],
+      },
+      {
+        id: 'cmdk-create-as',
+        title: 'Ctrl+K can create what it cannot find',
+        body: 'When nothing matches what you typed, the palette offers Create "…" as…, which opens the new element dialog with the name filled in.',
+        tags: ['editor'],
+      },
+      {
+        id: 'dates-in-your-calendar',
+        title: 'Element pages show dates in your calendar',
+        body: 'With a calendar set up, every date field on an element page also shows the date as your calendar says it, under the number. The stored number does not change.',
+        tags: ['editor', 'charts'],
+      },
+      {
+        id: 'filter-strip-in-words',
+        title: 'The type filter says what it shows',
+        body: 'A line under the search box says in words which types the filter strip is showing, and the add-world icons now have names a screen reader can read.',
+        tags: ['editor'],
+      },
+      {
+        id: 'new-page-name-first',
+        title: 'A new page asks for its name',
+        body: 'Making a page now opens it with its name ready to type, so it does not sit in your element list as "new page".',
+        tags: ['pages'],
+      },
+      {
+        id: 'json-error-line',
+        title: 'Pasted JSON says where it broke',
+        body: 'When pasted or dropped JSON does not parse, the Data room now names the line and column to look at, when the browser reports where it stopped.',
+        tags: ['data'],
+      },
+      {
+        id: 'no-second-map-or-calendar',
+        title: 'Trying again no longer makes a second map, calendar or world folder',
+        body: 'Pressing Create again after an error used to make a second map or calendar, or a second local folder when making a world on OnlyWorlds. It now finishes the first one.',
+        tags: ['maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.15',
     date: '2026-10-04',
     theme: 'errors you can read',

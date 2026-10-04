@@ -5619,12 +5619,14 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 
 /* Conflict badge inside the pill — actionable, warm-tinted. */
 .atlas-sync-pill-conflict {
-  background: rgba(224, 166, 74, 0.15);
-  color: #e0a64a;
+  /* Theme tokens (S369): the literal amber read pale on the light theme
+     (#c2703d on white is ~3.6:1; --atlas-warn is ~5:1 there). */
+  background: var(--atlas-warn-soft-tint);
+  color: var(--atlas-warn);
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 8px;
-  border: 1px solid rgba(224, 166, 74, 0.4);
+  border: 1px solid var(--atlas-warn-soft-border);
   cursor: pointer;
   margin-left: 4px;
   font-weight: 500;
@@ -5632,8 +5634,8 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 }
 
 .atlas-sync-pill-conflict:hover {
-  background: rgba(224, 166, 74, 0.3);
-  border-color: rgba(224, 166, 74, 0.7);
+  background: var(--atlas-warn-soft-border);
+  border-color: var(--atlas-warn-soft);
 }
 
 /* Refresh icon — only meaningful when api-linked + clickable. */
@@ -15944,6 +15946,22 @@ body.atlas-narrow-sidebar .atlas-tour-bar:not(.is-opener) .atlas-tour-extras {
 /* S362: the dangling-links repair row in Settings → World sits above Make online. */
 .atlas-settings-dangling { margin: 4px 0 14px; }
 .atlas-settings-dangling .atlas-settings-hint { margin-bottom: 8px; }
+/* S369: a date's reading in the world's calendar, under its number (element page). */
+.atlas-field-value-col { min-width: 0; }
+.atlas-field-calendar-date { padding: 0 8px; }
+/* S369: the element type strip's selection, in words, under the search row. */
+.atlas-filter-summary { padding: 2px 10px 0; }
+/* S369: Settings → World "Not syncing": the place a failure toast and the pill's ⚠ lead to. */
+.atlas-settings-sync-issues { margin: 4px 0 14px; padding: 10px 12px; border: 1px solid var(--atlas-warn-soft-border); border-radius: 8px; background: var(--atlas-warn-soft-tint); }
+.atlas-settings-sync-issues h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--atlas-text); }
+.atlas-settings-issue-list { list-style: none; margin: 0 0 8px; padding: 0; max-height: 320px; overflow-y: auto; }
+.atlas-settings-issue { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 5px 0; border-top: 1px solid var(--atlas-divider); font-size: 12px; }
+.atlas-settings-issue:first-child { border-top: none; }
+.atlas-settings-issue-name { font-weight: 600; color: var(--atlas-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+button.atlas-settings-issue-name { background: none; border: none; padding: 0; font: inherit; font-weight: 600; color: var(--atlas-accent); cursor: pointer; text-align: left; }
+button.atlas-settings-issue-name:hover { text-decoration: underline; }
+.atlas-settings-issue-line { flex: 1 1 240px; color: var(--atlas-text-muted); min-width: 0; }
+.atlas-settings-issue [data-action="copy-issue"] { font-size: 11px; padding: 2px 8px; }
 /* S362: a zone drawn as its linked zones (a road as its segments) says how many parts it lights. */
 .atlas-zone-chip-parts { margin-left: auto; padding-left: 8px; font-size: 11px; color: var(--atlas-text-muted); white-space: nowrap; }
 

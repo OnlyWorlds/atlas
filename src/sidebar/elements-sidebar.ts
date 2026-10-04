@@ -34,6 +34,29 @@ import { answerHeldBatch, dismissDiskNotice, getDiskNotice, notSyncedNow, onDisk
 // by default (core/type-mutes.ts), always the last two slots.
 const FILTER_TYPES_WITH_MAP: ElementType[] = [...CONTENT_ELEMENT_TYPES, 'map', 'zone', ...MUTED_TAIL_TYPES];
 
+/** "a", "a and b", "a, b and c", "a, b, c and 2 more". */
+function joinTypeNames(names: string[]): string {
+  if (names.length <= 1) return names.join('');
+  if (names.length > 4) return `${names.slice(0, 3).join(', ')} and ${names.length - 3} more`;
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
+ * The filter strip in words (S369): "All types", "Showing characters and
+ * locations". Types the user hid by right-click are named; pins and markers,
+ * hidden by default, are not. Strip order. Pure; exported for unit tests.
+ */
+export function filterSummary(filters: ReadonlySet<ElementType>, muted: ReadonlySet<ElementType>): string {
+  if (filters.size > 0) {
+    const shown = FILTER_TYPES_WITH_MAP.filter(t => filters.has(t)).map(t => ELEMENT_LABELS[t].plural);
+    return `Showing ${joinTypeNames(shown)}`;
+  }
+  const hidden = FILTER_TYPES_WITH_MAP
+    .filter(t => muted.has(t) && !MUTED_TAIL_TYPES.includes(t))
+    .map(t => ELEMENT_LABELS[t].plural);
+  return hidden.length === 0 ? 'All types' : `All types except ${joinTypeNames(hidden)}`;
+}
+
 /**
  * Single-flight lock for the right-click filter-chip refresh. Prevents
  * spam-clicks from stacking pulls and overlapping toasts (W4).
@@ -139,6 +162,16 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
   searchRow.appendChild(createBtn);
 
   content.appendChild(searchRow);
+
+  // ----- What the strip is showing, in words (S369) -----
+  // The strip is 22 glyphs and no words; this line says what they select.
+  // Under the search row, not under the strip: the strip band's height is
+  // matched by the writing sidebar so the two search rows line up.
+  const filterSummaryLine = document.createElement('div');
+  filterSummaryLine.className = 'atlas-row-meta atlas-filter-summary';
+  filterSummaryLine.setAttribute('data-role', 'filter-summary');
+  filterSummaryLine.setAttribute('aria-live', 'polite');
+  content.appendChild(filterSummaryLine);
 
   searchInput.addEventListener('input', () => {
     patchSlice('ui', { ...getState().ui, search: searchInput.value });
@@ -452,6 +485,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     for (const el of elements) countByType.set(el.type, (countByType.get(el.type) ?? 0) + 1);
 
     strip.innerHTML = '';
+    filterSummaryLine.textContent = filterSummary(filters, muted);
     // During the tour the strip shows only types the world actually holds —
     // it GROWS as the world does, matching the reveal grammar (precision
     // audit #1, Captain-blessed 2026-07-20). Outside the tour: all types.
@@ -473,6 +507,8 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       // icon-a11y sweep created that gap and its audit caught it. A visual
       // tooltip is not a label.
       btn.setAttribute('aria-label', ELEMENT_LABELS[type].plural);
+      // The selected state, for assistive tech as for the eye (S369).
+      btn.setAttribute('aria-pressed', filters.has(type) ? 'true' : 'false');
       btn.setAttribute('data-filter-type', type);
 
       const icon = document.createElement('span');

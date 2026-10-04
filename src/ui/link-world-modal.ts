@@ -25,6 +25,7 @@ import { enqueueActivationTask } from '../core/activation-chain';
 import { completeWaypoint } from '../core/waypoints';
 import { DownloadCancelledError, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
 import { escapeAttr } from '../core/dom-utils';
+import { problemFor } from '../core/problems';
 
 export class LinkWorldModal extends BaseModal {
   private toasts: ToastManager;
@@ -187,9 +188,12 @@ export class LinkWorldModal extends BaseModal {
           this.hide();
           return;
         }
-        const message = err instanceof Error ? err.message : String(err);
-        errorBox.textContent = message;
-        errorBox.hidden = false;
+        // A refused key, an unknown world or no connection arrives worded
+        // (keyCheckError); the rest is worded here (S369).
+        console.warn('[link-world] link failed:', err);
+        const sentence = problemFor(err, { inline: true, doing: 'linking the world' }).sentence;
+        errorBox.textContent = sentence;
+        errorBox.hidden = !sentence;
         progressBox.hidden = true;
         restoreForm();
       }

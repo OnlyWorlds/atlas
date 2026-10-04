@@ -17,6 +17,7 @@
 import { getState, patchSlice, subscribe, type RightTabRef } from '../../core/state';
 import type { WorldMap, Pin, Element } from '../../core/types';
 import { ToastManager, toastManager } from '../../ui/toast-manager';
+import { showProblem } from '../../ui/problem-fixes';
 import { createMapDialog } from '../../ui/map-create-modal';
 import { navigate, mapHash, elementHash } from '../../core/router';
 import { getActiveStore } from '../../core/active-store';
@@ -232,7 +233,7 @@ export function mountMapIndexTab(target: HTMLElement, toasts: ToastManager): () 
       toasts.success(`Reordered ${writes.length} map${writes.length === 1 ? '' : 's'}`);
     } catch (err) {
       console.error('[map-index] reorder failed:', err);
-      toasts.error('Failed to reorder maps');
+      showProblem(err, { doing: 'reordering the maps', toasts });
     }
   });
 
@@ -591,7 +592,7 @@ async function handleMapDelete(m: WorldMap, pinCount: number, toasts: ToastManag
     toasts.success(`Deleted map "${m.name}"`);
   } catch (err) {
     console.error('[map-index] delete failed:', err);
-    toasts.error(err instanceof Error ? err.message : String(err));
+    showProblem(err, { doing: 'deleting the map', toasts });
   }
 }
 

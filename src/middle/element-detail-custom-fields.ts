@@ -25,7 +25,9 @@ import { knownFieldsFor, type FieldMeta, type WidgetKind, type SectionLayout } f
 import { renderSection, humanizeFieldName } from './element-detail-fields';
 import { customFieldNameSuggestions } from '../core/taxonomy';
 import { toastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import { TANGLE_CARD_RENDERERS } from './tangle-cards';
+import { WORLD_NOT_OPEN } from './element-detail-fields';
 
 const SECTION_NAME = 'Custom fields';
 const MAX_FIELD_NAME_LEN = 60;
@@ -214,22 +216,28 @@ async function removeField(el: Element, fieldName: string, opts?: { alwaysConfir
     const ok = window.confirm(`Remove "${humanizeFieldName(fieldName)}" and its value from this element?`);
     if (!ok) return;
   }
+  await removeFieldNow(el.id, fieldName);
+}
+
+/** The write itself, after any confirm. "Retry now" reruns it: the same null again is safe. */
+async function removeFieldNow(elementId: string, fieldName: string): Promise<void> {
   const store = getActiveStore();
-  if (!store) { toastManager.error('No active store'); return; }
+  if (!store) { toastManager.error(WORLD_NOT_OPEN); return; }
   try {
     // null (not key-removal) — the push must carry an explicit clear or the
     // server keeps the old value and the next pull resurrects the field.
-    await store.updateElement(el.id, { [fieldName]: null } as Partial<Element>);
+    await store.updateElement(elementId, { [fieldName]: null } as Partial<Element>);
     await refreshElementsAfterWrite(store);
   } catch (err) {
     console.error('[custom-fields] remove failed:', err);
-    toastManager.error(err instanceof Error ? err.message : String(err));
+    // No retry (gate B L1): the field may have been added again since.
+    showProblem(err, { doing: 'removing this field' });
   }
 }
 
 async function createField(el: Element, key: string): Promise<void> {
   const store = getActiveStore();
-  if (!store) { toastManager.error('No active store'); return; }
+  if (!store) { toastManager.error(WORLD_NOT_OPEN); return; }
   try {
     pendingEdit = { elementId: el.id, fieldName: key };
     await store.updateElement(el.id, { [key]: '' } as Partial<Element>);
@@ -237,7 +245,7 @@ async function createField(el: Element, key: string): Promise<void> {
   } catch (err) {
     pendingEdit = null;
     console.error('[custom-fields] create failed:', err);
-    toastManager.error(err instanceof Error ? err.message : String(err));
+    showProblem(err, { doing: 'adding this field' });
   }
 }
 

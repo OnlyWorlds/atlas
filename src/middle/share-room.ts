@@ -48,6 +48,7 @@ import { humanizeFieldName } from './element-detail-fields';
 import { pickElement } from '../ui/element-picker-modal';
 import type { Element } from '../core/types';
 import { ToastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import { diskChangeFor } from '../core/live-folder';
 import type { JSONContent } from '@tiptap/core';
 import type { ShareEditorHandle } from './share-editor';
@@ -108,11 +109,13 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   let writeChain: Promise<void> = Promise.resolve();
 
   /** Resolves true when the write landed — publish uses this to avoid toasting
-   *  success over a failed mirror write. The chain itself never rejects. */
+   *  success over a failed mirror write. The chain itself never rejects.
+   *  `quiet`: the caller says what failed itself (one toast, not two). */
   function patchPage(
     id: string,
     patch: Record<string, unknown>,
     store?: ReturnType<typeof getActiveStore>,
+    opts: { quiet?: boolean } = {},
   ): Promise<boolean> {
     const step = writeChain.then(async () => {
       // S367 critic C4: a caller that captured its store before an await
@@ -128,7 +131,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         return true;
       } catch (err) {
         console.error('[share-room] update failed', err);
-        toasts.error('Could not update page');
+        // No retry button: page writes are serialized patches, and a stale
+        // one replayed later could undo a newer edit.
+        if (!opts.quiet) showProblem(err, { doing: 'saving this page', toasts });
         return false;
       }
     });
@@ -140,6 +145,13 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
   function saveBlocks(pageId: string, next: readonly PageBlock[]): Promise<boolean> {
     return patchPage(pageId, pageBlocksPatch(next, resolveName));
   }
+
+  /**
+   * A page created this moment: its detail view opens with the title already
+   * in edit mode, so the page gets a real name at once instead of sitting in
+   * the element list as "new page" (S369). Consumed by the first build.
+   */
+  let renameOnOpen: string | null = null;
 
   /** "+ new page": create immediately with a unique name, land in the detail view. */
   async function createPage(): Promise<void> {
@@ -159,10 +171,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       completeWaypoint('first-element');
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
+      renameOnOpen = created.id;
       navigate(shareHash(worldId, created.id));
     } catch (err) {
       console.error('[share-room] create failed', err);
-      toasts.error('Could not create page');
+      showProblem(err, { doing: 'creating the page', toasts });
     }
   }
 
@@ -197,7 +210,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           await client.revoke(pub.slug);
         } catch (err) {
           if (!(err instanceof SharingApiError && err.code === 'not_found')) {
-            surfaceSharingError(err, 'Could not take the public page down; page not deleted');
+            surfaceSharingError(err, 'taking the public page down');
             return; // abort: retry the delete once the server is reachable
           }
           // not_found = already gone server-side; the delete may proceed.
@@ -228,7 +241,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         toasts.success(`Deleted ${el?.name || 'page'}`);
       } catch (err) {
         console.error('[share-room] delete failed', err);
-        toasts.error('Could not delete page');
+        showProblem(err, { doing: 'deleting the page', toasts });
       }
     });
     await writeChain;
@@ -1412,10 +1425,11 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     return new SharingClient({ apiKey: entry.api.api_key, pin: reg.pin });
   }
 
-  function surfaceSharingError(err: unknown, fallback: string): void {
-    if (err instanceof SharingApiError) toasts.error(sharingErrorMessage(err));
-    else toasts.error(fallback);
+  /** A sharing-server refusal speaks its code's sentence; anything else is a problem worded for `doing`. */
+  function surfaceSharingError(err: unknown, doing: string): void {
     console.error('[share-room] sharing api', err);
+    if (err instanceof SharingApiError) toasts.error(sharingErrorMessage(err));
+    else showProblem(err, { doing, toasts });
   }
 
   /** Publish (or revive a tombstoned slug) → write the mirror → rebuild. */
@@ -1442,18 +1456,18 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           id: res.id, slug: res.slug, published_at: stamp, updated_at: stamp, revoked: false,
           content_sig: pageContentSig(page),
         },
-      });
+      }, undefined, { quiet: true });
       if (mirrored) {
         toasts.success(`Published at ${publicUrlFor(res.slug)}`);
       } else {
         // The page IS live; only the local record failed. Don't claim success,
-        // don't lose the URL.
-        toasts.error(`Published at ${publicUrlFor(res.slug)}, but atlas couldn't record it locally. Keep that URL.`);
+        // don't lose the URL. The one toast for it (patchPage stays quiet).
+        toasts.error(`Published at ${publicUrlFor(res.slug)}, but Atlas couldn't record it in the folder. Keep that URL.`);
       }
       completeWaypoint('share'); // hookmap wp9 — the publish gesture succeeded
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
-      surfaceSharingError(err, 'Could not publish page');
+      surfaceSharingError(err, 'publishing this page');
     }
   }
 
@@ -1480,13 +1494,13 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           updated_at: row?.updated_at ?? new Date().toISOString(),
           content_sig: pageContentSig(page),
         },
-      });
+      }, undefined, { quiet: true });
       if (mirrored) {
         toasts.success('Republished; the public page is up to date');
       } else {
         // Same rule as publishPage: the public page IS updated; only the
         // local record failed. Don't claim the mirror is current.
-        toasts.error('Republished; the public page is up to date, but atlas couldn\'t record it locally.');
+        toasts.error('Republished; the public page is up to date, but Atlas couldn\'t record it in the folder.');
       }
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {
@@ -1499,7 +1513,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
         return;
       }
-      surfaceSharingError(err, 'Could not republish page');
+      surfaceSharingError(err, 'republishing this page');
     }
   }
 
@@ -1528,7 +1542,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
         if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
         return;
       }
-      surfaceSharingError(err, 'Could not revoke page');
+      surfaceSharingError(err, 'revoking this page');
     }
   }
 
@@ -2021,10 +2035,14 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     picon.title = 'Page';
     header.appendChild(picon);
 
+    // A page made this moment opens on its name (S369), once.
+    const autoEdit = renameOnOpen === pageId;
+    if (autoEdit) renameOnOpen = null;
     pageTitleHandle = makeEditableTitle({
       initial: page.name || '',
       placeholder: 'page name…',
       ariaLabel: 'Page name',
+      autoEdit,
       onCommit: (next) => {
         const current = elOf(pageId)?.name || '';
         if (next && next !== current) void patchPage(pageId, { name: next });
@@ -2095,7 +2113,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
           toasts.success('Page JSON copied');
         } catch {
           console.info('[share-room] page JSON (clipboard unavailable):\n' + json);
-          toasts.info('Clipboard unavailable; page JSON logged to console');
+          toasts.info('The browser did not let Atlas use the clipboard. Click in the page, then try again.');
         }
       })();
     });

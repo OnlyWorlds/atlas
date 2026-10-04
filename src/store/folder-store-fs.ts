@@ -29,6 +29,7 @@
  * chain (conv. 118).
  */
 
+import { PlainError } from '../core/plain-error';
 import {
   ATLAS_INTERNAL_DIR,
   ATLAS_LOCAL_ONLY_FIELDS,
@@ -108,6 +109,7 @@ import {
   elementFilenameFullId,
   getDir,
   idFromFilename,
+  isFileBusyError,
   isNotFound,
   listFiles,
   readJson,
@@ -177,7 +179,7 @@ export class FsFolderStore implements FolderStore {
   /** The view-only guard. Sits on the UI-facing mutators; the engine's write
    *  channels (applyServerRecord, silent deletes, fromSync meta) skip it. */
   private assertWritable(): void {
-    if (this.viewOnly) throw new Error('This world is view-only');
+    if (this.viewOnly) throw new PlainError('This world is view-only, so it cannot be changed here. Make your own copy to edit it.');
   }
 
   /**
@@ -524,7 +526,17 @@ export class FsFolderStore implements FolderStore {
     return this.runLockOp(async () => {
       if (!this.root) return;
       const atlasDir = await getDir(this.root, [ATLAS_INTERNAL_DIR]);
-      const existing = await readJson<LockPayload>(atlasDir, LOCK_FILE);
+      // A lock another program holds for a moment (OneDrive, antivirus) is
+      // not a lock another TAB took: skip this beat and try the next one
+      // (S368 gate A L5; a plain readJson read the held file as absent and
+      // stopped the heartbeat for good, so the world read as stale in 90 s).
+      let existing: LockPayload | null;
+      try {
+        existing = await readJsonStrict<LockPayload>(atlasDir, LOCK_FILE);
+      } catch (err) {
+        if (isFileBusyError(err)) return;
+        existing = null;
+      }
       if (!existing || existing.tab_id !== this.tabId) {
         // Lock was taken by another tab; stop heartbeating.
         if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }

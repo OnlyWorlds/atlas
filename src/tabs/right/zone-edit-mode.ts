@@ -41,6 +41,7 @@ import { markersForZoneOnMap, partitionZonesAndMarkers, getZoneShape } from './z
 import { computeInsertion, commitVertexPosition } from './zone-edit-kernels';
 import type { Marker, Zone } from '../../core/types';
 import type { ToastManager } from '../../ui/toast-manager';
+import { showProblem } from '../../ui/problem-fixes';
 import { finiteOr } from '../../core/dom-utils';
 
 interface MarkerSnapshot {
@@ -327,7 +328,7 @@ export function enterEditMode(
 
   const entry = mapTabCache.get(mapId);
   if (!entry) {
-    toasts.error('Cannot edit: map tab not open');
+    toasts.error('Open the map this zone is on, then edit the zone there.');
     return;
   }
   const lMap = entry.manager.getMap();
@@ -606,7 +607,7 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
       rebuildHandles(); // re-render so segment overlays follow the new position
     } catch (err) {
       console.error('[zone-edit] update marker failed:', err);
-      active?.toasts.error('Failed to move marker');
+      if (active) showProblem(err, { doing: 'moving the marker', toasts: active.toasts });
       // Snap visual back by rebuilding from current (unchanged) state.
       rebuildHandles();
     }
@@ -739,7 +740,7 @@ function buildCentroidHandle(center: Point, canvasHeight: number): L.Marker {
       rebuildHandles();
     } catch (err) {
       console.error('[zone-edit] centroid drag commit failed:', err);
-      session.toasts.error('Failed to move zone');
+      showProblem(err, { doing: 'moving the zone', toasts: session.toasts });
       rebuildHandles();
     }
   });
@@ -913,7 +914,8 @@ async function optimisticInsertMarker(args: {
     rebuildHandles();
   } catch (err) {
     console.error('[zone-edit] optimistic insert background-write failed:', err);
-    active?.toasts.error('Failed to insert marker; reverting');
+    // The handles re-prime from disk below, so the new marker goes away.
+    if (active) showProblem(err, { doing: 'adding the marker', toasts: active.toasts });
     // Re-prime from disk (truth) and re-render handles.
     try {
       const fresh = await store.listElements();
@@ -927,6 +929,8 @@ async function optimisticInsertMarker(args: {
 
 async function deleteMarkerInEdit(markerId: string): Promise<void> {
   if (!active) return;
+  // Held so a failure is still said if the edit session ends mid-write.
+  const session = active;
   const store = getActiveStore();
   if (!store) return;
   // Don't allow deleting below shape minimum (3 polygon, 2 line). Refuse
@@ -956,7 +960,7 @@ async function deleteMarkerInEdit(markerId: string): Promise<void> {
     rebuildHandles();
   } catch (err) {
     console.error('[zone-edit] delete marker failed:', err);
-    active.toasts.error('Failed to delete marker');
+    showProblem(err, { doing: 'deleting the marker', toasts: session.toasts });
   }
 }
 
@@ -1028,7 +1032,7 @@ export async function recoverFromOrphanSnapshot(activatedWorldId: string, toasts
     segmentOverlays: [],
     centroidHandle: null,
     centroidDragStart: null,
-    toasts: toasts ?? ({ info: () => {}, success: () => {}, error: () => {}, warn: () => {} } as unknown as ToastManager),
+    toasts: toasts ?? ({ info: () => {}, success: () => {}, error: () => {}, warn: () => {}, problem: () => {} } as unknown as ToastManager),
     defaultDoubleClickZoom: false,
   };
   try {
@@ -1089,7 +1093,10 @@ async function restoreFromSnapshot(session: EditSession): Promise<void> {
     session.toasts.info('Edit cancelled');
   } catch (err) {
     console.error('[zone-edit] restore from snapshot failed:', err);
-    session.toasts.error('Failed to fully restore; manual cleanup may be needed');
+    // No retry button (S369 gate B H2): it would run against whatever world
+    // and zone edit is open when clicked. The stored snapshot is restored at
+    // the next open of this world.
+    showProblem(err, { doing: 'undoing the zone edit', toasts: session.toasts });
   }
 }
 

@@ -27,8 +27,16 @@ export async function loadWorldStyles(store: FolderStore): Promise<void> {
   if (getActiveStore() === store) patchSlice('styles', styles);
 }
 
-/** Replace the rule list: state first (the map re-renders on the tick), then disk. */
+let saveSeq = 0;
+
+/**
+ * Replace the rule list: state first (the map re-renders on the tick), then
+ * disk. A failed write is said (S369: it was silent, and the colours were
+ * gone on the next open). Retry writes the same rules, and only while they
+ * are still the newest.
+ */
 export async function saveWorldStyleRules(rules: StyleRule[]): Promise<void> {
+  const seq = ++saveSeq;
   const next: WorldStyles = { version: getState().styles.version, rules };
   patchSlice('styles', next);
   const store = getActiveStore();
@@ -37,5 +45,12 @@ export async function saveWorldStyleRules(rules: StyleRule[]): Promise<void> {
     await store.writeStyles(next);
   } catch (err) {
     console.warn('[world-styles] write failed:', err);
+    // Loaded on demand: core does not import the UI layer statically.
+    void import('../ui/problem-fixes').then(({ showProblem }) => {
+      showProblem(err, {
+        doing: 'saving the zone styles',
+        retry: () => { if (seq === saveSeq && getActiveStore() === store) return saveWorldStyleRules(rules); },
+      });
+    });
   }
 }

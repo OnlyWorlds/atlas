@@ -22,7 +22,10 @@ import { MakeOnlineModal } from '../ui/make-online-modal';
 import { ToastManager } from '../ui/toast-manager';
 import { surfaceSyncUnavailable } from '../ui/sync-toasts';
 import { showProblem } from '../ui/problem-fixes';
-import { navigate } from '../core/router';
+import { elementHash, navigate } from '../core/router';
+import { issuesFor, clearSyncIssues, type SyncIssue } from '../sync/sync-issues';
+import { buildFailureDetails } from '../core/problems';
+import { detailsContext } from '../ui/problem-fixes';
 import {
   detachSyncEngine,
   getCurrentSyncEngine,
@@ -49,6 +52,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         <p class="atlas-settings-hint" data-role="foreign-text">${escapeText(foreignLine(lastForeignCount[world.id] ?? 0))}</p>
         <button class="atlas-btn-ghost" data-action="give-new-ids">${lastForeignCount[world.id] === 1 ? 'Give it a new id' : 'Give them new ids'}</button>
       </div>
+      ${renderSyncIssues(world)}
       <div class="atlas-settings-actions">
         <button class="atlas-btn-ghost" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from API</button>
         <button class="atlas-btn-ghost" data-action="test-connection">Test connection</button>
@@ -132,6 +136,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
 
   wireDanglingLinks(toasts);
   void wireForeignIds(world, toasts);
+  wireSyncIssues(world, toasts);
 
   const nameInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="world-name"]');
   nameInput?.addEventListener('change', () => {
@@ -155,7 +160,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       if (v.length > 1024) { toasts.error('Image URL is too long (max 1024 characters)'); return; }
       const store = getActiveStore();
       const active = getState().active;
-      if (!store || !active) { toasts.error('No active world'); return; }
+      if (!store || !active) { toasts.error('This world is not open. Open it from the sidebar, then try again.'); return; }
       try {
         await store.writeWorldMeta({ image_url: v });
         patchSlice('active', { ...active, meta: { ...active.meta, image_url: v } });
@@ -163,7 +168,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
         toasts.info(v ? 'World image saved' : 'World image cleared');
       } catch (err) {
         console.error('[settings] world image save failed:', err);
-        toasts.error('Failed to save world image');
+        showProblem(err, { doing: 'saving the world image', worldId: world.id, toasts });
       }
     })();
   });
@@ -202,10 +207,10 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     } catch (err) {
       console.warn('[settings-world] refresh failed:', err);
       showProblem(err, {
-        doing: 'refreshing from OnlyWorlds', worldId: world.id, toasts,
+        doing: 'refreshing from OnlyWorlds', savedLocally: true, worldId: world.id, toasts,
         retry: () => {
           if (world.id !== getCurrentSyncWorldId()) return;
-          void pullNowAndRefresh().catch(e2 => showProblem(e2, { doing: 'refreshing from OnlyWorlds', worldId: world.id, toasts }));
+          void pullNowAndRefresh().catch(e2 => showProblem(e2, { doing: 'refreshing from OnlyWorlds', savedLocally: true, worldId: world.id, toasts }));
         },
       });
     } finally {
@@ -255,17 +260,17 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       // engine has distinguished these for a while (sync-engine noteAuthBail);
       // "test connection" was still giving one answer for three causes (S323).
       const code = (err as { code?: string } | null)?.code;
-      const msg = err instanceof Error ? err.message : String(err);
+      const status = (err as { status?: number } | null)?.status;
       if (code === 'key_revoked') {
         toasts.error('This world\'s access key was revoked. Unlink it here, then reopen it from the sidebar to get a new key.');
       } else if (code === 'permission_error') {
         toasts.error('This access key is read-only, so edits can\'t sync. Reopen the world with a write key.');
-      } else if (code === 'invalid_credentials' || /401|403/.test(msg)) {
-        toasts.error('API key or PIN invalid');
-      } else if (/404/.test(msg)) {
-        toasts.error('No world for that API key');
+      } else if (code === 'invalid_credentials' || status === 401 || status === 403) {
+        toasts.error('OnlyWorlds did not accept this world\'s key or your PIN. Check your PIN on the OnlyWorlds tab.');
+      } else if (status === 404) {
+        toasts.error('OnlyWorlds has no world for this key. It may have been deleted there.');
       } else {
-        toasts.error(msg);
+        showProblem(err, { doing: 'testing the connection', worldId: world.id, toasts });
       }
     } finally {
       testBtn.disabled = false;
@@ -311,6 +316,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     //      "world is online but empty").
     //   3. Update the registry. The world flips to local-only with no api block.
     detachSyncEngine();
+    clearSyncIssues(world.id);
     const folder = getActiveStore();
     if (folder) {
       try {
@@ -320,7 +326,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
         // still proceeds, but warn loudly so the next Make-Online doesn't
         // silently produce an empty world.
         console.warn('[unlink] resetSyncBaseline failed:', err);
-        toasts.error('Warning: could not fully clear sync history. Re-linking may produce an empty world; check console.');
+        toasts.error('The world is unlinked, but Atlas could not clear its old sync record in the folder. Before taking it online again, reload the page; if Make online then shows an empty world, tell us at onlyworlds.com/feedback.');
       }
     }
     const next = detachApi(getState().registry, world.id);
@@ -393,8 +399,8 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       toasts.success(`Deleted ${world.name} permanently`);
       navigate('#/');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toasts.error(`Delete failed: ${msg}`);
+      console.error('[settings] delete world + folder failed:', err);
+      showProblem(err, { doing: 'deleting the world folder', worldId: world.id, toasts });
       deletePermBtn.disabled = false;
     }
   });
@@ -525,9 +531,108 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
       toasts.success(fixed.length === 1 ? 'Updated the links in 1 element.' : `Updated the links in ${fixed.length} elements.`);
     } catch (err) {
       console.error('[settings] updating stale links failed:', err);
-      toasts.error(refused(err) ?? 'Could not update the links');
+      if (refused(err)) toasts.error(refused(err)!);
+      else showProblem(err, { doing: 'updating the links', toasts });
     }
     await show();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sync issues (S369): the elements still not syncing, why, and what to do.
+// The list is `sync/sync-issues.ts`, rebuilt by every round; this tab is the
+// place a failure toast, the pill's ⚠ badge and an errored pill all lead to.
+// ---------------------------------------------------------------------------
+
+const ISSUE_ROWS_SHOWN = 50;
+
+/** One plain line per issue. Matches only text Atlas itself writes, never server text. */
+export function syncIssueLine(issue: SyncIssue): string {
+  const f = issue.failure;
+  switch (issue.kind) {
+    case 'foreign_id':
+      return 'Its id belongs to another OnlyWorlds world. Give it a new id above.';
+    case 'too_large':
+      return 'It holds more than 64 KB of custom fields, more than OnlyWorlds accepts. Shorten one to let it sync.';
+    case 'file_busy':
+      return f.operation === 'read'
+        ? 'Its newer copy from OnlyWorlds could not be saved: another program was using its file in the folder. Try again now, or refresh later.'
+        : 'Another program was using its file in the folder. Atlas tries again by itself.';
+    case 'other':
+    default: {
+      const m = f.message ?? '';
+      if (/^waits for an element OnlyWorlds refused/.test(m) || /^rolled back by failing peers/.test(m)) {
+        return 'It links to an element OnlyWorlds refused, so it waits for that one.';
+      }
+      if (/^referenced \w+ (was deleted|not found)/.test(m)) {
+        return 'It links to something that is no longer on OnlyWorlds.';
+      }
+      if (f.source === 'disk') return 'OnlyWorlds has it, but Atlas could not note that in the folder. Atlas tries again by itself.';
+      if (typeof f.status === 'number' && f.status >= 500) return 'OnlyWorlds had a problem on its side. Atlas tries again with your next save.';
+      if (typeof f.status === 'number' && f.status >= 400) {
+        const field = f.param && /^[a-z][a-z0-9_]*$/.test(f.param) && !/^(x|shadow)_/.test(f.param)
+          ? ` It named the ${f.param.replace(/_/g, ' ')} field.` : '';
+        return `OnlyWorlds did not accept it.${field} Open it to check, or copy the details to report it.`;
+      }
+      return 'It could not sync. Atlas tries again with your next save; copy the details if it keeps happening.';
+    }
+  }
+}
+
+function issueName(issue: SyncIssue): string {
+  if (issue.type === 'world') return 'This world\'s details';
+  const el = getState().data.elements.find(e => e.id === issue.element_id);
+  if (!el) return issue.operation === 'delete' ? `A deleted ${issue.type}` : `A ${issue.type}`;
+  return el.name?.trim() || `An unnamed ${issue.type}`;
+}
+
+function renderSyncIssues(world: WorldRegistryEntry): string {
+  const issues = issuesFor(world.id);
+  const engine = getState().sync.byWorld[world.id];
+  const stopped = engine?.kind === 'error' ? engine.message : '';
+  if (issues.length === 0 && !stopped) return '<div data-role="sync-issues" hidden></div>';
+  const rows = issues.slice(0, ISSUE_ROWS_SHOWN).map(i => `
+    <li class="atlas-settings-issue" data-issue-id="${escapeAttr(i.element_id)}">
+      ${i.type === 'world' || !getState().data.elements.some(e => e.id === i.element_id)
+        ? `<span class="atlas-settings-issue-name">${escapeText(issueName(i))}</span>`
+        : `<button class="atlas-link-btn atlas-settings-issue-name" data-action="open-issue">${escapeText(issueName(i))}</button>`}
+      <span class="atlas-settings-issue-line">${escapeText(syncIssueLine(i))}</span>
+      ${i.kind === 'other' ? '<button class="atlas-btn-ghost atlas-btn-small" data-action="copy-issue">Copy details</button>' : ''}
+    </li>`).join('');
+  const more = issues.length > ISSUE_ROWS_SHOWN ? `<p class="atlas-settings-hint">And ${issues.length - ISSUE_ROWS_SHOWN} more.</p>` : '';
+  // The engine's own sentence, as written; one full stop at the end (gate B L2).
+  const stoppedLine = stopped
+    ? `<p class="atlas-settings-hint" data-role="sync-stopped">Sync stopped: ${escapeText(stopped.replace(/\.?\s*$/, '.'))}</p>`
+    : '';
+  return `
+    <div class="atlas-settings-sync-issues" data-role="sync-issues">
+      <h4>${issues.length > 0 ? `Not syncing (${issues.length})` : 'Not syncing'}</h4>
+      ${stoppedLine}
+      ${issues.length > 0 ? `<ul class="atlas-settings-issue-list">${rows}</ul>${more}` : ''}
+      ${issues.length > 0 ? '<div class="atlas-settings-actions"><button class="atlas-btn-ghost" data-action="retry-sync-issues">Try again now</button></div>' : ''}
+    </div>`;
+}
+
+function wireSyncIssues(world: WorldRegistryEntry, toasts: ToastManager): void {
+  const box = document.querySelector<HTMLElement>('.atlas-settings [data-role="sync-issues"]');
+  if (!box || box.hidden) return;
+  box.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const row = target.closest<HTMLElement>('[data-issue-id]');
+    const id = row?.dataset.issueId;
+    const action = target.closest<HTMLElement>('[data-action]')?.dataset.action;
+    if (action === 'open-issue' && id) {
+      navigate(elementHash(world.id, id));
+    } else if (action === 'copy-issue' && id) {
+      const issue = issuesFor(world.id).find(i => i.element_id === id);
+      if (!issue) return;
+      void navigator.clipboard?.writeText(buildFailureDetails([issue.failure], detailsContext()))
+        .then(() => toasts.info('Details copied'), () => toasts.info('The browser did not allow copying here.'));
+    } else if (action === 'retry-sync-issues') {
+      const engine = getCurrentSyncWorldId() === world.id ? getCurrentSyncEngine() : null;
+      if (!engine) { surfaceSyncUnavailable(toasts); return; }
+      void engine.syncNow().catch(err => showProblem(err, { doing: 'syncing with OnlyWorlds', savedLocally: true, worldId: world.id, toasts }));
+    }
   });
 }
 
@@ -552,7 +657,7 @@ function wireDanglingLinks(toasts: ToastManager): void {
   show();
   btn.addEventListener('click', async () => {
     const store = getActiveStore();
-    if (!store) { toasts.error('No active world'); return; }
+    if (!store) { toasts.error('This world is not open. Open it from the sidebar, then try again.'); return; }
     const missing = new Set(findDanglingLinks(getState().data.elements).map(d => d.missingId));
     btn.disabled = true;
     try {
@@ -561,7 +666,7 @@ function wireDanglingLinks(toasts: ToastManager): void {
       toasts.success(`Removed the broken links from ${changed.length} ${changed.length === 1 ? 'element' : 'elements'}`);
     } catch (err) {
       console.error('[settings] remove dangling links failed:', err);
-      toasts.error('Could not remove the links');
+      showProblem(err, { doing: 'removing the broken links', toasts });
     } finally {
       btn.disabled = false;
       show();

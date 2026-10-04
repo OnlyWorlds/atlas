@@ -27,6 +27,13 @@ export async function flushBeforeLeavingWorld(): Promise<void> {
   if (flushes.size === 0) return;
   const results = await Promise.allSettled([...flushes].map(fn => Promise.resolve().then(fn)));
   for (const r of results) {
-    if (r.status === 'rejected') console.warn('[atlas] a pending save failed while leaving the world:', r.reason);
+    if (r.status !== 'rejected') continue;
+    console.warn('[atlas] a pending save failed while leaving the world:', r.reason);
+    // Said, not only logged (S369): the last keystrokes did not reach the
+    // folder. Loaded on demand: core does not import the UI layer statically.
+    const reason = r.reason;
+    void import('../ui/problem-fixes').then(({ showProblem }) => {
+      showProblem(reason, { doing: 'saving your last changes before leaving the world' });
+    }).catch(() => {});
   }
 }

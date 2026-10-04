@@ -18,6 +18,7 @@
 import { BaseModal } from './modal-base';
 import { pickElement } from './element-picker-modal';
 import { ToastManager } from './toast-manager';
+import { problemFor } from '../core/problems';
 import { getState, patchSlice } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
@@ -86,7 +87,7 @@ class MapCreateModal extends BaseModal {
 
   open(): void {
     if (!getState().active || !getActiveStore()) {
-      this.toasts.error('No active world');
+      this.toasts.error('This world is not open. Open it from the sidebar, then try again.');
       this.onDone(null);
       return;
     }
@@ -104,7 +105,7 @@ class MapCreateModal extends BaseModal {
         (e): e is WorldMap => e.type === 'map' && e.id === this.opts.existingMapId,
       );
       if (!found) {
-        this.toasts.error('Map not found');
+        this.toasts.error('That map is not in this world any more.');
         this.onDone(null);
         return;
       }
@@ -296,6 +297,9 @@ class MapCreateModal extends BaseModal {
     const errorBox = body.querySelector<HTMLElement>('[data-role="error"]')!;
     const submitBtn = body.querySelector<HTMLButtonElement>('[data-action="submit"]')!;
 
+    // Set once createMap succeeds, so pressing Create again after a later
+    // step failed (the image file, the refresh) does not make a second map.
+    let createdMapId: string | null = null;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorBox.hidden = true;
@@ -365,8 +369,13 @@ class MapCreateModal extends BaseModal {
         let map: WorldMap;
         if (isConfigure && this.opts.existingMapId) {
           map = await store.updateMap(this.opts.existingMapId, patch);
+        } else if (createdMapId) {
+          // A later step failed after the create last time: finish that map
+          // rather than make a second one (S369).
+          map = await store.updateMap(createdMapId, patch);
         } else {
           map = await store.createMap(patch);
+          createdMapId = map.id;
         }
 
         if (file) {
@@ -382,7 +391,7 @@ class MapCreateModal extends BaseModal {
         this.hide();
       } catch (err) {
         console.error(isConfigure ? '[map-configure] failed:' : '[map-create] failed:', err);
-        errorBox.textContent = err instanceof Error ? err.message : String(err);
+        errorBox.textContent = problemFor(err, { inline: true, doing: isConfigure ? 'saving the map' : 'creating the map' }).sentence;
         errorBox.hidden = false;
         submitBtn.disabled = false;
         submitBtn.textContent = isConfigure ? 'Save' : 'Create';

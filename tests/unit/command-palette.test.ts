@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { searchPalette } from '../../src/ui/command-palette';
+import { paletteRows, searchPalette } from '../../src/ui/command-palette';
 import type { Element } from '../../src/core/types';
 
 let n = 0;
@@ -119,5 +119,28 @@ describe('searchPalette: commands (S364)', () => {
       expect(searchPalette(q, []).some(r => r.kind === 'action' && r.id === 'reload-disk'), q).toBe(true);
     }
     expect(searchPalette('di', []).some(r => r.kind === 'action')).toBe(false);
+  });
+});
+
+describe('paletteRows: the create row (S369)', () => {
+  it('offers one create row, first, when the query names nothing', () => {
+    const rows = paletteRows('Zephyrine', [el({ name: 'Aldric' })]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: 'create', id: 'Zephyrine', name: 'Create "Zephyrine" as…' });
+  });
+
+  it('carries the trimmed query as the name to prefill', () => {
+    expect(paletteRows('  Old Mill  ', []).find(r => r.kind === 'create')?.id).toBe('Old Mill');
+  });
+
+  it('comes after room and command matches, so they keep Enter', () => {
+    const rows = paletteRows('reload', []);
+    expect(rows[0].kind).toBe('action');
+    expect(rows[rows.length - 1].kind).toBe('create');
+  });
+
+  it('is not offered when an element matches, or for an empty query', () => {
+    expect(paletteRows('ald', [el({ name: 'Aldric' })]).some(r => r.kind === 'create')).toBe(false);
+    expect(paletteRows('   ', [el({ name: 'Aldric' })])).toEqual([]);
   });
 });

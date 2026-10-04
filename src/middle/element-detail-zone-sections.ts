@@ -21,6 +21,7 @@ import { openMapTab } from '../tabs/right/map-index-tab';
 import { panMapTabTo } from '../tabs/right/map-tab';
 import { enterEditMode, isEditing, getEditingZoneId, doneEdit, cancelEdit } from '../tabs/right/zone-edit-mode';
 import type { ToastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import { escapeText, hexColourOr, finiteOr } from '../core/dom-utils';
 import { decideDeleteConfirm } from '../core/delete-confirm';
 import { getEditorSettings } from '../registry/registry';
@@ -109,7 +110,7 @@ function buildZoneVisualsSection(zone: Zone, toasts: ToastManager): HTMLElement 
       const elements = await refreshElementsAfterWrite(store);
     } catch (err) {
       console.error('[zone-visuals] update failed:', err);
-      toasts.error('Failed to update zone visual');
+      showProblem(err, { doing: 'saving the zone style', toasts });
     }
   };
 
@@ -196,7 +197,7 @@ async function deleteZone(zone: Zone, toasts: ToastManager): Promise<void> {
     if (worldId) navigate(elementsHash(worldId));
   } catch (err) {
     console.error('[zone-sections] delete zone failed:', err);
-    toasts.error('Failed to delete zone');
+    showProblem(err, { doing: 'deleting the zone', toasts });
   }
 }
 
@@ -363,7 +364,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
       // Open the map tab if not already open, then pan.
       const map = elements.find((el): el is WorldMap => el.type === 'map' && el.id === marker.map_id);
       if (!map) {
-        toasts.error('Marker map not found');
+        toasts.error('The map this marker belongs to is not in this world any more.');
         return;
       }
       openMapTab(map);
@@ -381,7 +382,7 @@ function buildZoneMarkersSection(zone: Zone, toasts: ToastManager): HTMLElement 
         const updated = await refreshElementsAfterWrite(store);
       } catch (err) {
         console.error('[zone-markers] delete marker failed:', err);
-        toasts.error('Failed to delete marker');
+        showProblem(err, { doing: 'deleting the marker', toasts });
       }
     }
   });

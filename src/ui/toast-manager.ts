@@ -20,6 +20,13 @@ export interface ToastOptions {
   details?: string;
   /** No auto-dismiss. Implied by actions or details. */
   sticky?: boolean;
+  /**
+   * Same key, same message: the new toast replaces the one on screen (a save
+   * failing on every autosave of ONE scene). Without a key nothing is
+   * replaced: two scenes failing alike each keep their own Retry (S369 gate
+   * B M1, gate A L3).
+   */
+  dedupeKey?: string;
 }
 
 interface Toast {
@@ -70,6 +77,12 @@ export class ToastManager {
     }
 
     const rich = (opts.actions?.length ?? 0) > 0 || !!opts.details;
+    // The same sticky problem again (a save failing on every keystroke's
+    // autosave) replaces the one on screen instead of stacking three of it
+    // (S369). The newer one wins: its buttons hold the newest retry.
+    if (opts.dedupeKey) {
+      for (const t of this.toasts.filter(t => t.opts.dedupeKey === opts.dedupeKey && t.type === type && t.message === message)) this.removeToast(t.id);
+    }
     const toast: Toast = {
       id: `toast-${Date.now()}-${Math.random()}`,
       message,
@@ -111,9 +124,9 @@ export class ToastManager {
    * A problem from `core/problems.ts`: its sentence, its fix buttons and,
    * when given, the details block. A quiet problem (nothing to say) shows nothing.
    */
-  problem(problem: { sentence: string; quiet?: boolean }, opts: { details?: string; fixes?: ToastAction[] } = {}): void {
+  problem(problem: { sentence: string; quiet?: boolean }, opts: { details?: string; fixes?: ToastAction[]; dedupeKey?: string } = {}): void {
     if (problem.quiet || !problem.sentence) return;
-    this.show(problem.sentence, 'error', 8000, { actions: opts.fixes, details: opts.details });
+    this.show(problem.sentence, 'error', 8000, { actions: opts.fixes, details: opts.details, dedupeKey: opts.dedupeKey });
   }
 
   /**

@@ -25,6 +25,8 @@ import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { navigate, writingHash } from '../core/router';
 import { toastManager } from '../ui/toast-manager';
+import { detailsContext, showProblem } from '../ui/problem-fixes';
+import { buildDetails, problemFor } from '../core/problems';
 import { escapeAttr, escapeText } from '../core/dom-utils';
 import { serializeDocToMarkdown } from './writing-workspace-markdown';
 import {
@@ -145,7 +147,7 @@ interface PerformSplitArgs {
 async function performSplit(args: PerformSplitArgs): Promise<void> {
   const folder = getActiveStore();
   if (!folder) {
-    toastManager.error('No active store.');
+    toastManager.error('This world is not open. Open it from the sidebar, then try again.');
     return;
   }
 
@@ -183,7 +185,8 @@ async function performSplit(args: PerformSplitArgs): Promise<void> {
     created = await folder.createElement('narrative', newPayload);
   } catch (err) {
     console.error('[split] create sibling failed', err);
-    toastManager.error('Could not create the new narrative.');
+    // Nothing changed yet. No retry button: a second create could duplicate.
+    showProblem(err, { doing: 'creating the new narrative' });
     return;
   }
 
@@ -201,22 +204,35 @@ async function performSplit(args: PerformSplitArgs): Promise<void> {
   }
 
   // Truncate the current narrative's story to the before-cursor content.
+  // No retry button: by the time it is clicked the writer may have edited
+  // the original again, and this write would replace that text.
+  let truncated = true;
   try {
     await folder.updateElement(args.currentNarrative.id, {
       story: args.currentBeforeMarkdown,
       atlas_richtext_json: args.currentBeforeJson,
     } as Partial<Element>);
   } catch (err) {
+    truncated = false;
     console.error('[split] truncate current narrative failed', err);
-    toastManager.error('Created the new narrative but could not truncate the current one. You may need to manually clean up.');
-    // Don't bail — the new one exists; better to navigate than leave the
+    // Its own sentence (what the writer must do differs from any problem
+    // kind's advice), with the problem's details block behind it.
+    const problem = problemFor(err, { inline: true, doing: 'removing the moved text from the original narrative' });
+    toastManager.show(
+      'The new narrative was created, but the moved text is still in the original too. Delete it there by hand.',
+      'error',
+      8000,
+      { details: buildDetails(problem, detailsContext()) },
+    );
+    // Don't bail: the new one exists; better to navigate than leave the
     // writer guessing whether anything happened.
   }
 
   await refreshElementsAfterWrite(folder);
   requestPushIfLinked();
 
-  toastManager.success(`Split into new narrative.`);
+  // A failed truncate already toasted; "split" would claim more than happened.
+  if (truncated) toastManager.success(`Split into new narrative.`);
   args.onDone?.(created.id);
   navigate(writingHash(args.worldId, created.id));
 }
@@ -293,9 +309,10 @@ class SplitConfirmModal extends BaseModal {
         await this.opts.onConfirm(name);
         this.hide();
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        errorBox.textContent = message;
-        errorBox.hidden = false;
+        console.error('[split] split failed', err);
+        const problem = problemFor(err, { inline: true, doing: 'splitting the narrative' });
+        errorBox.textContent = problem.sentence;
+        errorBox.hidden = problem.quiet;
         confirmBtn.disabled = false;
         cancelBtn.disabled = false;
       }

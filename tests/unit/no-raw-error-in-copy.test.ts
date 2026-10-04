@@ -19,6 +19,12 @@
  *   - a string literal saying "check the console", "see console",
  *     "unknown error", "went wrong", "Engine not ready" or "active store".
  *
+ * A line that reads an error's text for a RECORD or a CLASSIFICATION, never
+ * for a person to read (a failure's internal message, a console object, a
+ * check on a known browser string), says so with a trailing
+ * `// raw-error-ok: <why>` comment and is not counted (S369). The reason is
+ * the point: an unexplained marker is a review finding.
+ *
  * To lower the baseline after routing sites: run this file with
  * UPDATE_RAW_ERROR_BASELINE=1, then read the diff of the JSON.
  */
@@ -60,6 +66,7 @@ export function countRawErrorLines(source: string): number {
     const line = raw.trim();
     if (!line || line.startsWith('//') || line.startsWith('*') || line.startsWith('/*')) continue;
     if (line.includes('console.')) continue;
+    if (/\/\/ raw-error-ok: \S/.test(line)) continue;
     // A trailing line comment is developer prose.
     const code = line.replace(/\s\/\/\s.*$/, '');
     if (RULES.some(r => r.test(code))) n++;

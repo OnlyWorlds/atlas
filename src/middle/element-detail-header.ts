@@ -31,6 +31,8 @@ import type { Element, WorldMap } from '../core/types';
 import { ELEMENT_ICONS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
 import { getActiveStore } from '../core/active-store';
 import { toastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
+import { WORLD_NOT_OPEN } from './element-detail-fields';
 import { pickElement } from '../ui/element-picker-modal';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { getAssociatedMaps } from '../tabs/right/auto-open-map';
@@ -187,6 +189,25 @@ export function isEditingIn(root: ParentNode): boolean {
   return active.matches('input, textarea') || active.isContentEditable;
 }
 
+/**
+ * "Retry now" on a failed rename (S369): writes the same name again, but only
+ * while the element still carries the name it had before, so a later rename
+ * is never written over.
+ */
+async function retryRename(elementId: string, original: string, next: string): Promise<void> {
+  const store = getActiveStore();
+  if (!store) { toastManager.error(WORLD_NOT_OPEN); return; }
+  const current = getState().data.elements.find(e => e.id === elementId);
+  if (!current || (current.name || '') !== original) return;
+  try {
+    await store.updateElement(elementId, { name: next });
+    await refreshElementsAfterWrite(store);
+  } catch (err) {
+    console.error('[element-detail] rename retry failed:', err);
+    showProblem(err, { doing: 'renaming this element' });
+  }
+}
+
 function startInlineNameEdit(host: HTMLElement, el: Element): void {
   if (host.querySelector('input')) return; // already editing
 
@@ -221,7 +242,7 @@ function startInlineNameEdit(host: HTMLElement, el: Element): void {
     const store = getActiveStore();
     if (!store) {
       host.textContent = original || '(unnamed)';
-      toastManager.error('Cannot rename: no active world');
+      toastManager.error(WORLD_NOT_OPEN);
       return;
     }
     try {
@@ -233,7 +254,7 @@ function startInlineNameEdit(host: HTMLElement, el: Element): void {
     } catch (err) {
       console.error('[element-detail] inline rename failed:', err);
       host.textContent = original || '(unnamed)';
-      toastManager.error('Failed to rename');
+      showProblem(err, { doing: 'renaming this element', retry: () => retryRename(el.id, original, next) });
     }
   };
 
@@ -887,7 +908,7 @@ async function deletePinFromHeader(pinId: string, mapName: string): Promise<void
     toastManager.success(`pin on ${mapName} deleted`);
   } catch (err) {
     console.error('[element-detail] deletePinFromHeader failed:', err);
-    toastManager.error('failed to delete pin');
+    showProblem(err, { doing: 'deleting the pin' });
   }
 }
 
@@ -971,6 +992,6 @@ async function onDelete(el: Element): Promise<void> {
     }
   } catch (err) {
     console.error('[element-detail] delete failed:', err);
-    toastManager.error(err instanceof Error ? err.message : String(err));
+    showProblem(err, { doing: 'deleting this element' });
   }
 }

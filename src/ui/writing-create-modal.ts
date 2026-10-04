@@ -15,6 +15,7 @@
 
 import { BaseModal } from './modal-base';
 import { escapeAttr } from '../core/dom-utils';
+import { problemFor } from '../core/problems';
 
 export interface WritingCreateOptions {
   label: string;
@@ -80,9 +81,10 @@ export class WritingCreateModal extends BaseModal {
         await this.opts.onCreate(name);
         this.hide();
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        errorBox.textContent = message;
-        errorBox.hidden = false;
+        console.error('[writing-create] create failed', err);
+        const problem = problemFor(err, { inline: true, doing: 'creating the narrative' });
+        errorBox.textContent = problem.sentence;
+        errorBox.hidden = problem.quiet;
         createBtn.disabled = false;
         cancelBtn.disabled = false;
       }

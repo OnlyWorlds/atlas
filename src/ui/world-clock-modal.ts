@@ -16,6 +16,7 @@
 
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
+import { showProblem } from './problem-fixes';
 import { getState, patchSlice } from '../core/state';
 import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
@@ -113,11 +114,12 @@ export class WorldClockModal extends BaseModal {
       patchSlice('active', { ...active, meta: { ...active.meta, ...patch } });
       requestPushIfLinked();
       this.hide();
-      this.toasts.success('world clock set');
+      this.toasts.success('World clock set');
       this.opts.onSaved?.();
     } catch (err) {
+      // The modal stays open: Save again is the retry.
       console.error('[calendar] world clock save failed:', err);
-      this.toasts.error(err instanceof Error ? err.message : 'could not save the clock');
+      showProblem(err, { doing: 'saving the world clock', toasts: this.toasts });
     }
   }
 }

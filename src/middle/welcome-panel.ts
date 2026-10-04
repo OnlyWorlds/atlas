@@ -19,6 +19,7 @@ import { finishSetupDoor, pickAndOpenWorldFolder } from '../setup/world-doors';
 import { isAtlasGrounded } from '../core/grounded';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import { isNarrowSidebar, openDrawer } from '../layout/narrow-layout';
 
 /**
@@ -80,7 +81,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         try {
           await finishSetupDoor(await setupAtlasRoot(), toastManager);
         } catch (err) {
-          toastManager.error(err instanceof Error ? err.message : String(err));
+          console.warn('[welcome] folder setup failed:', err);
+          showProblem(err, { doing: 'setting up your OnlyWorlds folder', folder: 'picked' });
         } finally {
           altBtn.disabled = false;
         }
@@ -99,7 +101,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             );
           }
         } catch (err) {
-          toastManager.error(err instanceof Error ? err.message : String(err));
+          console.warn('[welcome] folder re-link failed:', err);
+          showProblem(err, { doing: 're-linking your OnlyWorlds folder', folder: 'picked' });
         } finally {
           btn.disabled = false;
           btn.textContent = 'Re-link OnlyWorlds folder';
@@ -210,7 +213,10 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           const engine = await import('../tour/tour-engine');
           await engine.launchTour();
         } catch (err) {
-          if (!isCodeLoadError(err)) toastManager.error(err instanceof Error ? err.message : String(err));
+          if (!isCodeLoadError(err)) {
+            console.warn('[welcome] tour launch failed:', err);
+            showProblem(err, { doing: 'starting the tour' });
+          }
           tourBtn.disabled = false;
           tourBtn.textContent = tourLabel;
         }
@@ -233,7 +239,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         try {
           await finishSetupDoor(await setupAtlasRoot(), toastManager);
         } catch (err) {
-          toastManager.error(err instanceof Error ? err.message : String(err));
+          console.warn('[welcome] folder setup failed:', err);
+          showProblem(err, { doing: 'setting up your OnlyWorlds folder', folder: 'picked' });
         } finally {
           // On success a state change re-renders this panel away; on cancel
           // the button stays visible, so restore the label it actually had.
@@ -276,8 +283,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
                 <span class="atlas-grounded-next-glyph"
                   ><span class="material-symbols-outlined atlas-add-glyph-plus">add</span
                   ><span class="material-symbols-outlined atlas-add-glyph-main">folder</span></span>
-                button in the top left creates one; <strong>add a world</strong> under it
-                shows every way in, in words.`}</p>
+                button in the top left creates one. The <strong>add a world</strong> button
+                under it lists every way to start one, each with a line on what it does.`}</p>
             </div>
             <div class="atlas-grounded-detail" data-role="path-detail"></div>
           </div>
@@ -292,7 +299,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           'add-world': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">add</span>
             <h3>add a world</h3>
-            <p>Every way in, in words: start a new world, open a world folder, or bring down or view one from OnlyWorlds.</p>
+            <p>Every way to start a world, each with a line on what it does: start a new world, open a world folder, or bring down or view one from OnlyWorlds.</p>
             <p class="atlas-grounded-detail-hint">click to choose</p>`,
           'create-local': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>
@@ -308,13 +315,13 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           'link-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">link</span>
             <h3>link an OnlyWorlds world</h3>
-            <p>Already have a world online? Paste its key: atlas downloads a full local copy and keeps the two in sync.</p>
+            <p>Already have a world online? Paste its key: Atlas downloads a full local copy and keeps the two in sync.</p>
             ${owLine}
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
           'view-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">visibility</span>
             <h3>view a shared world</h3>
-            <p>Someone shared a read key with you? Paste it: atlas downloads their world to browse, view only. No PIN needed.</p>
+            <p>Someone shared a read key with you? Paste it: Atlas downloads their world to browse, view only. No PIN needed.</p>
             ${owLine}
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
           // S309: open-folder was the ONE create button with no entry here —
@@ -322,7 +329,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           'open-folder': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">folder_open</span>
             <h3>open a world folder</h3>
-            <p>Already have a world as files on your drive, from atlas or another OnlyWorlds tool? Point at its folder and atlas opens it in place. Nothing is copied or moved.</p>
+            <p>Already have a world as files on your drive, from Atlas or another OnlyWorlds tool? Point at its folder and Atlas opens it in place. Nothing is copied or moved.</p>
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
         };
         const onPathHover = (e: Event): void => {

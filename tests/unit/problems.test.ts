@@ -98,6 +98,23 @@ describe('problemFor', () => {
     expect(problemFor(dom('AbortError')).quiet).toBe(true);
   });
 
+  it('says changes are safe in the folder only when the caller says so (S369)', () => {
+    const offline = new TypeError('Failed to fetch');
+    expect(problemFor(offline, { doing: 'signing in' }).sentence).not.toMatch(/saved/);
+    expect(problemFor(offline, { doing: 'uploading changes', savedLocally: true }).sentence).toContain('Your changes are saved in the folder');
+    const busy = new OwV2Error(503, { code: 'server_busy', message: 'busy' }, '');
+    expect(problemFor(busy, { doing: 'linking the world' }).sentence).not.toMatch(/saved/);
+  });
+
+  it('a refused folder pick is not the open world\'s folder, and gets no Allow access (S369)', () => {
+    const denied = dom('NotAllowedError');
+    const picked = problemFor(denied, { doing: 'choosing a folder', folder: 'picked' });
+    expect(picked.sentence).toContain('did not let Atlas use that folder');
+    expect(picked.sentence).not.toContain("this world's folder");
+    expect(picked.fixes).not.toContain('allow-access');
+    expect(problemFor(denied, { doing: 'opening this world' }).fixes).toContain('allow-access');
+  });
+
   it('remembers an error it already showed', () => {
     const err = new Error('x');
     expect(problemWasShown(err)).toBe(false);
@@ -113,10 +130,25 @@ describe('scrubForReport', () => {
     expect(scrubForReport('key ow_w_abc123 refused')).toBe('key <key> refused');
     expect(scrubForReport('pin 1234567890 bad')).toBe('pin <number> bad');
     expect(scrubForReport('mail titus@example.com now')).toBe('mail <email> now');
-    expect(scrubForReport('GET https://x.test/api?a=b&pin=1')).toBe('GET https://x.test/api?<query>');
+    expect(scrubForReport('GET https://x.test/api?a=b&pin=1')).toBe('GET https://x.test/…');
     expect(scrubForReport("name 'Aldric Vane' is too long")).toBe('name "…" is too long');
     expect(scrubForReport('name "Aldric Vane" is too long')).toBe('name "…" is too long');
     expect(scrubForReport('could not write aldric-vane--1a2b3c4d.json')).toBe('could not write <file>');
+  });
+
+  it('strips paths of every shape (S369: the 1.15 changelog promised it)', () => {
+    for (const [input, out] of [
+      ['could not open C:\\Users\\titus\\Worlds\\Aldric\\world.json now', 'could not open <path> now'],
+      ['could not open \\\\nas\\share\\Aldric\\world.json', 'could not open <path>'],
+      ['could not open /Users/titus/Worlds/Aldric/world.json', 'could not open <path>'],
+      ['could not open /home/titus now', 'could not open <path> now'],
+      ['could not open file:///C:/Users/titus/Aldric/world.json', 'could not open <path>'],
+      ['wrote elements/character/notes.json', 'wrote <path>'],
+      ['under worlds\\Aldric', 'under <path>'],
+    ] as const) {
+      expect(scrubForReport(input)).toBe(out);
+      expect(scrubForReport(input)).not.toMatch(/titus|aldric/i);
+    }
   });
 
   it('caps at 600 characters', () => {
@@ -136,7 +168,8 @@ describe('buildDetails', () => {
     expect(text).toContain('World: linked, sync on');
     expect(text).toContain('While: saving this scene');
     expect(text).toContain('Kind: bug');
-    expect(text).toContain('Error: Error: writeJsonAtomic: final file does not match intent for <file> "…"');
+    expect(text).toContain('Error: Error');
+    expect(text).toContain('Message: writeJsonAtomic: final file does not match intent for <file>');
     expect(text).toContain('Time: 2026-10-04T10:11:12Z');
     expect(text).not.toMatch(/aldric/i);
   });
@@ -147,13 +180,58 @@ describe('buildDetails', () => {
     expect(text).not.toContain('Aldric');
   });
 
-  it('lists at most three sync failures, scrubbed', () => {
-    const f = (i: number) => ({ type: 'character', operation: 'update', error_name: 'InvalidStateError', message: `bad aldric--${i}abc.json for ow_w_k${i}` });
-    const text = buildFailureDetails([f(1), f(2), f(3), f(4)], ctx);
+  it('lists at most three sync failures, by type, operation, source, name, status and code only', () => {
+    const f = (i: number) => ({ type: 'character', operation: 'update', error_name: 'InvalidStateError', source: 'disk', message: `bad aldric--${i}abc.json for ow_w_k${i}` });
+    const server = { type: 'location', operation: 'create', error_name: 'OwV2Error', source: 'server', status: 422, code: 'invalid', param: 'x_secret_lair', message: 'Moon Base is not a valid location for Aldric Vane' };
+    const text = buildFailureDetails([server, f(1), f(2), f(3)], ctx);
     expect(text).toContain('Failed: 4');
-    expect(text).toContain('- character update: InvalidStateError: bad <file> for <key>');
+    expect(text).toContain('- location create: server, OwV2Error, 422, invalid, field (custom)');
+    expect(text).toContain('- character update: disk, InvalidStateError');
     expect(text).toContain('and 1 more');
-    expect(text).not.toMatch(/aldric|ow_w_/i);
+    expect(text).not.toMatch(/aldric|ow_w_|moon|secret/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The promise (S369): the details block never carries a world or element
+// name, a path, a key or an email, whatever the error kind. Names below are
+// planted UNQUOTED and in every place an error can carry them; only the bug
+// kind prints a message at all, and its residue is scrubbed.
+// ---------------------------------------------------------------------------
+describe('details never leak (every kind)', () => {
+  const ctx = { world: 'local' as const, now: new Date('2026-10-04T10:00:00Z'), browser: 'Chrome 141, Windows' };
+  const LEAK = /aldric|vane|moon ?base|titus|ow_[wra]_|@example|C:\\|\/Users\//i;
+  const planted = 'Aldric Vane and Moon Base at C:\\Users\\titus\\Moon Base\\aldric-vane--1a2b3c4d.json, key ow_w_secret, mail titus@example.com';
+  const withName = (name: string) => { const e = new Error(planted); e.name = name; return e; };
+  const ERRORS: unknown[] = [
+    ...CASES.map(([, err]) => err),
+    withName('InvalidStateError'), withName('NotAllowedError'), withName('NotFoundError'),
+    withName('QuotaExceededError'), withName('SyntaxError'),
+    new OwV2Error(422, { code: 'invalid', message: planted, param: 'x_aldric_secret' }, ''),
+    new OwV2Error(500, null, planted),
+    new OwV2Error(401, { code: 'invalid_credentials', message: planted }, ''),
+    new TypeError(`Failed to fetch ${planted}`),
+    new PlainError(planted),
+    new Error(planted),
+    planted,
+  ];
+
+  for (const [i, err] of ERRORS.entries()) {
+    it(`error ${i} (${classifyError(err)})`, () => {
+      const text = buildDetails(problemFor(err, { doing: 'saving this scene' }), ctx);
+      expect(text).not.toMatch(LEAK);
+    });
+  }
+
+  it('a sync failure list built from any of them', () => {
+    const failures = ERRORS.map((err, i) => ({
+      type: 'character', operation: 'update', message: String((err as Error)?.message ?? err),
+      error_name: (err as Error)?.name, code: (err as { code?: string })?.code, param: (err as { param?: string })?.param ?? undefined,
+      source: i % 2 ? 'server' : 'disk',
+    }));
+    for (let i = 0; i < failures.length; i += 3) {
+      expect(buildFailureDetails(failures.slice(i, i + 3), ctx)).not.toMatch(LEAK);
+    }
   });
 
   it('names the browser from client hints or the user agent', () => {

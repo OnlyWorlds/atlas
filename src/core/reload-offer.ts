@@ -48,7 +48,7 @@ export function installStaleCodeRecovery(): void {
  * rather than printing the raw browser message beside the banner.
  */
 export function isCodeLoadError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err);
+  const msg = err instanceof Error ? err.message : String(err); // raw-error-ok: matched against the browser's own wording, never shown
   return /dynamically imported module|Importing a module script failed|error loading dynamically imported module|Unable to preload CSS/i.test(msg);
 }
 

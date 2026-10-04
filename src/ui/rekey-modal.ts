@@ -12,6 +12,7 @@ import type { ToastManager } from './toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
 import type { FolderStore } from '../store/folder-store';
 import { getState } from '../core/state';
+import { problemFor } from '../core/problems';
 import { giveForeignElementsNewIds, RekeyRefusedError, elementsWord, willUploadNow } from '../sync/rekey-run';
 
 /** The app behind every modal: made inert for the run, restored on every exit. */
@@ -100,7 +101,7 @@ export class RekeyModal extends BaseModal {
           // Only a journal means something started (lens C F3): without one
           // the kernel wrote nothing, and "finish the update" would be false.
           const unfinished = !refused && await this.store.hasRekeyJournal().catch(() => false);
-          progress.textContent = refused ? err.message
+          progress.textContent = refused ? problemFor(err, { doing: 'giving new ids' }).sentence
             : unfinished ? 'The ids could not all be updated, so this world is not syncing. Settings, under This world, can finish the update.'
             : 'The ids could not be updated. Nothing was changed.';
           cancel.focus();

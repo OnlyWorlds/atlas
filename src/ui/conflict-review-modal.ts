@@ -14,6 +14,8 @@ import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
 import { getCurrentSyncEngine, getCurrentSyncFolder, refreshConflictsCount, refreshMetaCacheNow } from '../sync/sync-attach';
 import { surfaceSyncUnavailable } from './sync-toasts';
+import { showProblem } from './problem-fixes';
+import { PlainError } from '../core/plain-error';
 import { patchSlice, getState } from '../core/state';
 import type { Conflict } from '../core/types';
 import { escapeText } from '../core/dom-utils';
@@ -45,7 +47,8 @@ export class ConflictReviewModal extends BaseModal {
       this.conflicts = await engine.listConflicts();
       this.metaConflicts = await engine.listMetaConflicts();
     } catch (err) {
-      this.toasts.error(err instanceof Error ? err.message : String(err));
+      console.error('[conflict-review] listing failed:', err);
+      showProblem(err, { doing: 'reading the conflicts', toasts: this.toasts });
       return;
     }
     if (this.conflicts.length === 0 && this.metaConflicts.length === 0) {
@@ -103,7 +106,7 @@ export class ConflictReviewModal extends BaseModal {
         row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = true));
         try {
           const engine = getCurrentSyncEngine();
-          if (!engine) throw new Error('Engine not ready');
+          if (!engine) throw new PlainError('Sync is not running for this world right now. Close this, wait a moment, then try again.');
           await engine.resolveMetaConflict(field, choice);
           row.remove();
           this.metaConflicts = this.metaConflicts.filter((f) => f !== field);
@@ -116,7 +119,9 @@ export class ConflictReviewModal extends BaseModal {
           }
         } catch (err) {
           row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = false));
-          this.toasts.error(err instanceof Error ? err.message : String(err));
+          // The row's buttons are live again: pressing one is the retry.
+          console.error('[conflict-review] resolve failed:', err);
+          showProblem(err, { doing: 'resolving the conflict', toasts: this.toasts });
         }
       });
     });
@@ -154,7 +159,7 @@ export class ConflictReviewModal extends BaseModal {
         row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = true));
         try {
           const engine = getCurrentSyncEngine();
-          if (!engine) throw new Error('Engine not ready');
+          if (!engine) throw new PlainError('Sync is not running for this world right now. Close this, wait a moment, then try again.');
           await engine.resolveConflict(c.element_id, action);
           row.remove();
           this.conflicts = this.conflicts.filter((x) => x.element_id !== c.element_id);
@@ -181,7 +186,9 @@ export class ConflictReviewModal extends BaseModal {
           }
         } catch (err) {
           row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = false));
-          this.toasts.error(err instanceof Error ? err.message : String(err));
+          // The row's buttons are live again: pressing one is the retry.
+          console.error('[conflict-review] resolve failed:', err);
+          showProblem(err, { doing: 'resolving the conflict', toasts: this.toasts });
         }
       });
     });

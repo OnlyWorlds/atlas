@@ -6,6 +6,7 @@
  * `server_updated_at` mirror what the real one will do.
  */
 
+import { PlainError } from '../../src/core/plain-error';
 import type { FolderStore, ListElementsOptions, RekeyJournal, RescanResult, ApplyServerRecordOpts } from '../../src/store/folder-store';
 import { journalIds, RekeyPendingError } from '../../src/store/folder-store';
 import { newId, nowIso } from '../../src/store/folder-store';
@@ -76,7 +77,7 @@ export class MockFolderStore implements FolderStore {
   private viewOnly = false;
   setViewOnly(viewOnly: boolean): void { this.viewOnly = viewOnly; }
   private assertWritable(): void {
-    if (this.viewOnly) throw new Error('This world is view-only');
+    if (this.viewOnly) throw new PlainError('This world is view-only, so it cannot be changed here. Make your own copy to edit it.');
   }
 
   async open(_handle: FileSystemDirectoryHandle | null): Promise<void> {

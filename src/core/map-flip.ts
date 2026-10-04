@@ -13,6 +13,7 @@
  */
 
 import type { FolderStore } from '../store/folder-store';
+import { PlainError } from './plain-error';
 
 export function flippedY(y: number, height: number): number {
   return height - y;
@@ -27,7 +28,7 @@ export async function flipMapVertically(store: FolderStore, mapId: string): Prom
   const map = (await store.getElement(mapId)) as unknown as { height?: unknown } | null;
   const height = map && typeof map.height === 'number' ? map.height : NaN;
   if (!Number.isFinite(height) || height <= 0) {
-    throw new Error('This map has no size yet, so it cannot be flipped. Set an image or reopen it first');
+    throw new PlainError('This map has no size yet, so it cannot be flipped. Set an image or reopen it first.');
   }
   const result: MapFlipResult = { pins: 0, points: 0 };
   for (const type of ['pin', 'marker'] as const) {

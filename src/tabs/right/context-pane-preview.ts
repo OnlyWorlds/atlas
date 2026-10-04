@@ -33,6 +33,7 @@ import { findUnlinkedMentions, mentionsPhrase, MENTION_MATCH } from '../../core/
 import { bulkLinkTerm } from '../../middle/writing-bulk-link';
 import { getWritingLabels } from '../../middle/writing-helpers';
 import { toastManager } from '../../ui/toast-manager';
+import { showProblem } from '../../ui/problem-fixes';
 
 export interface ContextPreviewHandle {
   show(el: Element): void;
@@ -255,7 +256,9 @@ function buildPreview(
         card.replaceWith(buildPreview(fresh, subject, mode, onClose));
       }).catch((err) => {
         console.error('[context-preview] link mentions failed', err);
-        toastManager.error('Could not link the mentions');
+        // No retry button: some scenes may already be linked; the re-enabled
+        // button below runs the rest again by hand.
+        showProblem(err, { doing: 'linking the mentions' });
         linkAll.disabled = false;
       });
     });

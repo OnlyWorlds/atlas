@@ -71,7 +71,9 @@ describe('adopting a create that is already on the server', () => {
   it('a read-back that fails on the network is one failure, not the end of the round (lane b L2)', async () => {
     const a = await folder.createElement('character', { name: 'Rhea' });
     loseFirstCreateResponse();
-    await engine.syncNow(); // A committed, response lost
+    // Push only: a full sync's pull would adopt A already (S369, gate A L3:
+    // same content on the server, never stamped = our own create).
+    await engine.pushOnce(); // A committed, response lost
     await folder.createElement('character', { name: 'Ione' }); // B, never pushed
     const realGet = client.getElement.bind(client);
     client.getElement = async (type, id) => {
@@ -81,5 +83,21 @@ describe('adopting a create that is already on the server', () => {
     const result = await engine.syncNow(); // A: 409 + failed read-back; B must still go out
     expect(result.failures.some(f => f.element_id === a.id)).toBe(true);
     expect(client.__server_count('character')).toBe(2);
+  });
+
+  it('a pull adopts our own lost create instead of reporting a conflict with ourselves (S369, gate A L3)', async () => {
+    const a = await folder.createElement('character', { name: 'Rhea', description: 'one' });
+    loseFirstCreateResponse();
+    const result = await engine.syncNow(); // push: committed, response lost; pull: same content
+    expect(result.conflicts).toHaveLength(0);
+    expect(await folder.listLocallyChangedSince(null)).toHaveLength(0);
+    expect((await folder.getElement(a.id))!.server_updated_at).toBeTruthy();
+  });
+
+  it('a pull still reports a conflict when our unstamped copy differs from the server', async () => {
+    const a = await folder.createElement('character', { name: 'Rhea', description: 'one' });
+    loseFirstCreateResponse(() => folder.updateElement(a.id, { description: 'two' }).then(() => {}));
+    const result = await engine.syncNow();
+    expect(result.conflicts.map(c => c.element_id)).toContain(a.id);
   });
 });

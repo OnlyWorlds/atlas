@@ -238,7 +238,7 @@ export function toggleGhostsAtSourcePin(args: ToggleArgs): number {
   const elements = getState().data.elements;
   const sourceEl = elements.find(e => e.id === sourcePinElementId);
   if (!sourceEl) {
-    onToast('source pin element not found', 'error');
+    onToast('The element this pin stands for is not in this world any more.', 'error');
     return 0;
   }
   const locId = resolveSourceLocationId(sourceEl);
@@ -246,12 +246,12 @@ export function toggleGhostsAtSourcePin(args: ToggleArgs): number {
     // Content-element source with no location link. Location-element sources
     // never trip this since their own id is the locId. Toast wording reflects
     // that nuance.
-    onToast("this pin's element has no location set; nothing to ghost", 'info');
+    onToast("This pin's element has no location set, so there is nothing to show beside it.", 'info');
     return 0;
   }
   const candidates = computeGhostCandidates(sourcePinElementId, mapId, elements);
   if (candidates.length === 0) {
-    onToast('no other elements at this location', 'info');
+    onToast('No other elements are at this location.', 'info');
     return 0;
   }
 

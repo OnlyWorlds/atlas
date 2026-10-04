@@ -21,6 +21,7 @@ import { navigate, worldHash } from '../core/router';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
 import { completeWaypoint } from '../core/waypoints';
 import { escapeText } from '../core/dom-utils';
+import { problemFor } from '../core/problems';
 import type { WorldRegistryEntry } from '../core/types';
 
 export interface CreateWorldResult {
@@ -112,7 +113,8 @@ export class CreateWorldModal extends BaseModal {
           await this.tour.overrideCreate();
           this.hide();
         } catch (err) {
-          this.showError(errorBox, err instanceof Error ? err.message : String(err));
+          console.warn('[create-world] tour create failed:', err);
+          this.showError(errorBox, problemFor(err, { inline: true, doing: 'creating the tour world' }).sentence);
           submitBtn.disabled = false;
           submitBtn.textContent = 'Create';
           cancelBtn.hidden = false;
@@ -140,7 +142,10 @@ export class CreateWorldModal extends BaseModal {
         setSidebarModePref('elements');
         navigate(worldHash(entry.id));
       } catch (err) {
-        this.showError(errorBox, err instanceof Error ? err.message : String(err));
+        // A refusal (no home folder, no permission) reads as itself; the rest
+        // is worded (S369).
+        console.warn('[create-world] create failed:', err);
+        this.showError(errorBox, problemFor(err, { inline: true, doing: 'creating the world' }).sentence);
         submitBtn.disabled = false;
         submitBtn.textContent = 'Create';
         cancelBtn.hidden = false;
@@ -152,7 +157,8 @@ export class CreateWorldModal extends BaseModal {
 
   private showError(box: HTMLElement, message: string): void {
     box.textContent = message;
-    box.hidden = false;
+    // A cancelled step has nothing to say (an empty problem sentence).
+    box.hidden = !message;
   }
 }
 

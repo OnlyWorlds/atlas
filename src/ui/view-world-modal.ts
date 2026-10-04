@@ -18,6 +18,7 @@ import { navigate, homeHash } from '../core/router';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
 import { enqueueActivationTask } from '../core/activation-chain';
 import type { InitialDownloadProgress } from '../sync/initial-download';
+import { problemFor } from '../core/problems';
 
 export class ViewWorldModal extends BaseModal {
   private toasts: ToastManager;
@@ -117,9 +118,12 @@ export class ViewWorldModal extends BaseModal {
         this.hide();
         navigate(homeHash(result.entry.id));
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        errorBox.textContent = message;
-        errorBox.hidden = false;
+        // A refused key, an unknown world or no connection arrives worded
+        // (keyCheckError); the rest is worded here (S369).
+        console.warn('[view-world] view failed:', err);
+        const sentence = problemFor(err, { inline: true, doing: 'downloading the shared world' }).sentence;
+        errorBox.textContent = sentence;
+        errorBox.hidden = !sentence;
         progressBox.hidden = true;
         inputs.forEach(i => (i.disabled = false));
         submitBtn.disabled = false;

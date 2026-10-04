@@ -398,6 +398,15 @@ export interface PerElementFailure {
    * its message does not. What the toast classifies on.
    */
   error_name?: string;
+  /**
+   * A server refusal's HTTP status, error code and named field (S369). The
+   * details block prints these instead of `message`, which is server or
+   * browser text and can quote a name.
+   */
+  status?: number;
+  code?: string;
+  param?: string;
+  source?: 'server' | 'disk';
 }
 
 // ---- Registry ----

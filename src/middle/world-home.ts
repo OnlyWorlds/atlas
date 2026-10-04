@@ -18,6 +18,7 @@ import { getState, patchSlice, subscribe } from '../core/state';
 import { buildLooseThreads } from './home-loose-threads';
 import { setSidebarModePref } from '../core/ui-prefs';
 import { ToastManager } from '../ui/toast-manager';
+import { PlainError } from '../core/plain-error';
 import {
   navigate, writingHash, elementHash, importHash, knowledgeHash, shareHash, mapHash,
 } from '../core/router';
@@ -788,13 +789,15 @@ function openIdentityEdit(
     widget: field === 'name' ? 'text-short' : 'text-long',
     onSave: async (next: unknown) => {
       const value = String(next ?? '').trim();
+      // Refusals are PlainErrors: the popover shows them as they are, where a
+      // plain Error would be worded as an unexpected problem (S369).
       if (field === 'name' && !value) {
-        throw new Error('name is required');
+        throw new PlainError('A world needs a name.');
       }
       const store = getActiveStore();
       const active = getState().active;
       if (!store || !active) {
-        throw new Error('No active world');
+        throw new PlainError('This world is not open. Open it from the sidebar, then try again.');
       }
       await store.writeWorldMeta({ [field]: value });
       patchSlice('active', {

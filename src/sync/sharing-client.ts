@@ -80,7 +80,7 @@ export function sharingErrorMessage(err: SharingApiError): string {
     case 'slug_invalid': {
       // The server's detail beats the generic rule recital (e.g. a RESERVED
       // slug passes the format rules — "must be 4–40 chars" would gaslight).
-      const detail = err.message && err.message !== 'slug_invalid' ? err.message : '';
+      const detail = err.message && err.message !== 'slug_invalid' ? err.message : ''; // raw-error-ok: the sharing server's slug detail is written for users (a reserved word)
       return detail
         ? `Slug rejected: ${detail}`
         : 'Slug must be 4–40 chars: a–z, 0–9, hyphens (not at the edges). Some words are reserved.';
@@ -228,7 +228,7 @@ export class SharingClient {
         body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       });
     } catch (err) {
-      throw new SharingApiError('network', 0, err instanceof Error ? err.message : 'fetch failed');
+      throw new SharingApiError('network', 0, err instanceof Error ? err.message : 'fetch failed'); // raw-error-ok: worded by its code ('network'), never shown
     }
 
     if (res.ok) {

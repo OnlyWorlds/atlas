@@ -530,7 +530,7 @@ test('saved entry: a prose save that fails is retried when you leave the entry',
   });
   await page.locator('.atlas-knowledge-prose-rich .ProseMirror').click();
   await page.keyboard.type('the tithe is overdue');
-  await expect(page.locator('.ow-toast', { hasText: 'Could not update knowledge entry' })).toBeVisible();
+  await expect(page.locator('.ow-toast', { hasText: 'saving this knowledge entry' })).toBeVisible();
 
   // Leave the entry without typing again: back to the list.
   await page.evaluate(() => {
@@ -568,7 +568,7 @@ test('deleting an entry right after typing writes nothing to it', async ({ page 
   await expect(page.locator('.atlas-knowledge-row:has-text("ledger")')).toHaveCount(0);
   await page.waitForTimeout(1500);
   expect(await page.evaluate(() => (window as any).__updates)).toBe(0);
-  await expect(page.locator('.ow-toast', { hasText: 'Could not update knowledge entry' })).toHaveCount(0);
+  await expect(page.locator('.ow-toast', { hasText: 'saving this knowledge entry' })).toHaveCount(0);
 });
 
 test('the link-all pill never covers an entry\'s prose (S365 gate lens C M7)', async ({ page }) => {

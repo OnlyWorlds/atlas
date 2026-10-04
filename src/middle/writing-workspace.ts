@@ -569,6 +569,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       console.error('[writing-workspace] save failed', err);
       showProblem(err, {
         doing: 'saving this scene',
+        dedupeKey: `scene-save:${snap.id}`,
         retry: () => { if (latestSave.get(snap.id) === seq) void persistSnapshot(snap); },
       });
     }

@@ -61,7 +61,7 @@ export async function applyImportPlan(
         created++;
       }
     } catch (err) {
-      failures.push({ element_id: id ?? '', type: c.type, operation: 'create', message: errMsg(err) });
+      failures.push({ element_id: id ?? '', type: c.type, operation: 'create', message: errMsg(err), ...errName(err) });
     }
     opts.onProgress?.({ done: ++done, total, phase: 'create' });
   }
@@ -72,7 +72,7 @@ export async function applyImportPlan(
       existingIds.add(u.id);
       updated++;
     } catch (err) {
-      failures.push({ element_id: u.id, type: u.type, operation: 'update', message: errMsg(err) });
+      failures.push({ element_id: u.id, type: u.type, operation: 'update', message: errMsg(err), ...errName(err) });
     }
     opts.onProgress?.({ done: ++done, total, phase: 'update' });
   }
@@ -84,6 +84,12 @@ function stripId(data: RawRecord): RawRecord {
   const rest: RawRecord = { ...data };
   delete rest.id;
   return rest;
+}
+
+/** The error's class name, for the details block (S369): a disk refusal reads the same in every locale. */
+function errName(err: unknown): { error_name?: string; source: 'disk' } {
+  const name = (err as { name?: unknown } | null)?.name;
+  return typeof name === 'string' && name !== 'Error' ? { error_name: name, source: 'disk' } : { source: 'disk' };
 }
 
 function errMsg(err: unknown): string {

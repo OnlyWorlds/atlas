@@ -21,6 +21,7 @@ import { escapeText } from '../core/dom-utils';
 import { getActiveStore } from '../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { toastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import { openSplitDialog } from './writing-workspace-split';
 import {
@@ -385,6 +386,10 @@ export function createProseContextMenu(deps: {
       requestPushIfLinked();
     } catch (err) {
       console.error('[writing-workspace] unlink: field write failed', err);
+      // No retry: the narrative may have changed since, and this writes the
+      // whole link list. The chip is gone from the text; the field keeps the
+      // link, which the user can remove from the element page.
+      showProblem(err, { doing: 'removing the link' });
     }
   }
 

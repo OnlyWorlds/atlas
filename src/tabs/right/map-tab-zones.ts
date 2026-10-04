@@ -25,6 +25,7 @@ import type { Zone } from '../../core/types';
 import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import type { ToastManager } from '../../ui/toast-manager';
+import { showProblem } from '../../ui/problem-fixes';
 
 /**
  * Sync the ZoneOverlay to the current state. Adds new zones, updates changed
@@ -147,7 +148,11 @@ async function applyColorToZones(zones: Zone[], color: string, toasts: ToastMana
     toasts.success(`Colour written into ${zones.length} zone${zones.length === 1 ? '' : 's'}`);
   } catch (err) {
     console.error('[zone-panel] apply colour failed:', err);
-    toasts.error('Could not write the colour into every zone');
+    // No retry (S369 gate B L1): an older colour would overwrite a newer one.
+    showProblem(err, {
+      doing: 'writing the colour into the zones',
+      toasts,
+    });
   }
 }
 
@@ -157,10 +162,13 @@ async function deleteZoneFromChip(zoneId: string, toasts: ToastManager): Promise
   const zone = getState().data.elements.find(e => e.id === zoneId);
   if (!zone) return;
   // Confirm via the standard delete pattern. Cascade tombstones markers.
-  const dependents = await store.findDependents(zoneId);
-  const ok = window.confirm(
-    `Delete zone "${zone.name}"? This will also remove ${dependents.length} marker(s).`,
-  );
+  // A failed count must not throw away the delete (it used to reject unseen).
+  let markerCount: number | null = null;
+  try { markerCount = (await store.findDependents(zoneId)).length; }
+  catch (err) { console.warn('[zone-chip] dependents probe failed:', err); }
+  const ok = window.confirm(markerCount === null
+    ? `Delete zone "${zone.name}"? This will also remove its markers.`
+    : `Delete zone "${zone.name}"? This will also remove ${markerCount} marker(s).`);
   if (!ok) return;
   try {
     await store.deleteZone(zoneId);
@@ -174,7 +182,7 @@ async function deleteZoneFromChip(zoneId: string, toasts: ToastManager): Promise
     toasts.success(`Zone deleted`);
   } catch (err) {
     console.error('[zone-chip] delete failed:', err);
-    toasts.error('Failed to delete zone');
+    showProblem(err, { doing: 'deleting the zone', toasts });
   }
 }
 
@@ -227,7 +235,7 @@ async function renameZone(zoneId: string, toasts: ToastManager): Promise<void> {
     const elements = await refreshElementsAfterWrite(store);
   } catch (err) {
     console.error('[zone-chip] rename failed:', err);
-    toasts.error('Failed to rename zone');
+    showProblem(err, { doing: 'renaming the zone', toasts });
   }
 }
 

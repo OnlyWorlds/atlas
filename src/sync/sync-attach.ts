@@ -24,6 +24,7 @@ import { toastManager } from '../ui/toast-manager';
 import type { FolderStore } from '../store/folder-store';
 import type { Element, WorldRegistryEntry, SyncEngineState } from '../core/types';
 import { failureToastOnce, classifyFailure } from './sync-failure-copy';
+import { noteRoundIssues } from './sync-issues';
 import { buildFailureDetails, type FixId } from '../core/problems';
 import { detailsContext, resolveFixes } from '../ui/problem-fixes';
 import type { PerElementFailure } from '../core/types';
@@ -92,7 +93,12 @@ export function attachSyncEngine(
     apiWorldId: entry.api.world_id,
     policy: reg.sync_default_policy ?? 'local-wins',
     onStateChange: (s) => publishSyncState(entry.id, s),
-    onSyncResult: (phase, result) => emitConflictToasts(phase, result),
+    onSyncResult: (phase, result) => {
+      // The list Settings → World and the pill read (S369). Repaint the pill
+      // when it moved: the sync slice is the pill's subscription.
+      if (noteRoundIssues(entry.id, phase, result)) patchSlice('sync', { ...getState().sync });
+      emitConflictToasts(phase, result);
+    },
     // No onIdSwap hook: keel keeps client ids on CREATE (2026-07-12), and
     // Route 2 moves ids before any server call through the re-key kernel,
     // whose screen pass is `rekeyLiveUi` (S367).
@@ -252,10 +258,13 @@ function toastFailuresOnce(
   const fixIds: FixId[] = [];
   if (kinds.has('foreign_id')) fixIds.push('new-ids');
   if (kinds.has('file_busy')) fixIds.push('retry');
-  // A push is safe to repeat; only on the engine (and world) that failed.
+  // Give new ids already leads to the same Settings tab.
+  if (!kinds.has('foreign_id')) fixIds.push('sync-issues');
+  // A round is safe to repeat; only on the engine (and world) that failed. A
+  // full sync, so a held file on the pull side is retried too (gate A M4).
   const retry = engine ? () => {
     if (currentEngine !== engine) return;
-    void engine.pushOnce().catch(err => console.warn('[atlas:sync] retry push failed:', err));
+    void engine.syncNow().catch(err => console.warn('[atlas:sync] retry sync failed:', err));
   } : undefined;
   toastManager.show(text, 'error', 8000, {
     actions: resolveFixes(fixIds, { worldId, retry }),

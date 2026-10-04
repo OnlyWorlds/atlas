@@ -18,6 +18,8 @@ import { ToastManager } from './toast-manager';
 import { getCurrentSyncEngine, getCurrentSyncFolder } from '../sync/sync-attach';
 import { patchSlice, getState } from '../core/state';
 import { surfaceSyncUnavailable } from './sync-toasts';
+import { showProblem } from './problem-fixes';
+import { PlainError } from '../core/plain-error';
 import type { ServerDeleteRecord } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 
@@ -44,7 +46,8 @@ export class ServerDeleteReviewModal extends BaseModal {
     try {
       this.records = await engine.listServerDeletes();
     } catch (err) {
-      this.toasts.error(err instanceof Error ? err.message : String(err));
+      console.error('[server-delete] listing failed:', err);
+      showProblem(err, { doing: 'reading the deletes from OnlyWorlds', toasts: this.toasts });
       return;
     }
     if (this.records.length === 0) {
@@ -107,7 +110,7 @@ export class ServerDeleteReviewModal extends BaseModal {
         row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = true));
         try {
           const engine = getCurrentSyncEngine();
-          if (!engine) throw new Error('Engine not ready');
+          if (!engine) throw new PlainError('Sync is not running for this world right now. Close this, wait a moment, then try again.');
           await engine.resolveServerDelete(r.id, action);
           row.remove();
           this.records = this.records.filter((x) => x.id !== r.id);
@@ -142,7 +145,9 @@ export class ServerDeleteReviewModal extends BaseModal {
           }
         } catch (err) {
           row.querySelectorAll<HTMLButtonElement>('button').forEach((b) => (b.disabled = false));
-          this.toasts.error(err instanceof Error ? err.message : String(err));
+          // The row's buttons are live again: pressing one is the retry.
+          console.error('[server-delete] resolve failed:', err);
+          showProblem(err, { doing: 'resolving the delete', toasts: this.toasts });
         }
       });
     });

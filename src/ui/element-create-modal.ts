@@ -14,6 +14,7 @@
 
 import { BaseModal } from './modal-base';
 import { ToastManager } from './toast-manager';
+import { problemFor } from '../core/problems';
 import { getState, patchSlice } from '../core/state';
 import { navigate, elementHash } from '../core/router';
 import { findUnlinkedMentions, createdToastText } from '../core/unlinked-mentions';
@@ -184,11 +185,11 @@ export class ElementCreateModal extends BaseModal {
 
   open(): void {
     if (!getState().active) {
-      this.toasts.error('No active world');
+      this.toasts.error('Open a world from the sidebar first.');
       return;
     }
     if (!getActiveStore()) {
-      this.toasts.error('Active store not open');
+      this.toasts.error('This world is not open. Open it from the sidebar, then try again.');
       return;
     }
     this.modal = this.buildModal();
@@ -389,7 +390,8 @@ export class ElementCreateModal extends BaseModal {
           await this.opts.overrideCreate();
           this.hide();
         } catch (err) {
-          errorBox.textContent = err instanceof Error ? err.message : String(err);
+          console.error('[element-create] scripted create failed:', err);
+          errorBox.textContent = problemFor(err, { inline: true, doing: 'creating the element' }).sentence;
           errorBox.hidden = false;
           if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Create'; }
         }
@@ -418,7 +420,7 @@ export class ElementCreateModal extends BaseModal {
         const targetId = this.placingExistingId;
         const targetEl = getState().data.elements.find(e => e.id === targetId);
         if (!targetEl) {
-          errorBox.textContent = 'Existing element no longer exists';
+          errorBox.textContent = 'That element is not in this world any more.';
           errorBox.hidden = false;
           this.clearPlaceExisting();
           return;
@@ -431,7 +433,7 @@ export class ElementCreateModal extends BaseModal {
           this.opts.onPlaceExisting?.(targetEl.id, targetEl.type);
         } catch (err) {
           console.error('[element-create] place existing failed:', err);
-          errorBox.textContent = err instanceof Error ? err.message : String(err);
+          errorBox.textContent = problemFor(err, { inline: true, doing: 'placing the pin' }).sentence;
           errorBox.hidden = false;
           submitBtn.disabled = false;
           submitBtn.textContent = 'Place';
@@ -508,7 +510,7 @@ export class ElementCreateModal extends BaseModal {
         }
       } catch (err) {
         console.error('[element-create] failed:', err);
-        errorBox.textContent = err instanceof Error ? err.message : String(err);
+        errorBox.textContent = problemFor(err, { inline: true, doing: 'creating the element' }).sentence;
         errorBox.hidden = false;
         submitBtn.disabled = false;
         submitBtn.textContent = 'Create';

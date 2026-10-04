@@ -33,7 +33,7 @@ const MAX_ELEMENT_RESULTS = 12;
 const MAX_ROOM_RESULTS = 3;
 
 export interface PaletteResult {
-  kind: 'element' | 'room' | 'action';
+  kind: 'element' | 'room' | 'action' | 'create';
   /** Element id, or the room's route segment ('' = home). */
   id: string;
   name: string;
@@ -136,6 +136,21 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
   return [...rooms, ...actions, ...els].sort((a, b) => (b.score - a.score) || (a.name ?? '').localeCompare(b.name ?? ''));
 }
 
+/**
+ * The rows the palette shows (S369): the search, plus one "Create "<query>"
+ * as…" row when the query names no element. It sits after any room or command
+ * matches, so with nothing else matched it is the first row and Enter runs
+ * it. `id` carries the name to prefill. Not offered during the tour.
+ * Exported for unit tests.
+ */
+export function paletteRows(query: string, elements: readonly Element[]): PaletteResult[] {
+  const results = searchPalette(query, elements);
+  const name = query.trim();
+  // The tour scripts every create; a typed name would be ignored there.
+  if (!name || isTourFlagActive() || results.some(r => r.kind === 'element')) return results;
+  return [...results, { kind: 'create', id: name, name: `Create "${name}" as…`, hint: 'new element', score: 0 }];
+}
+
 // ---------------------------------------------------------------------------
 // The overlay.
 // ---------------------------------------------------------------------------
@@ -172,7 +187,7 @@ class CommandPalette extends BaseModal {
 
     input.addEventListener('input', () => {
       this.query = input.value;
-      this.results = searchPalette(this.query, getState().data.elements);
+      this.results = paletteRows(this.query, getState().data.elements);
       this.activeIndex = 0;
       this.renderList();
     });
@@ -232,7 +247,9 @@ class CommandPalette extends BaseModal {
         ? (ROOMS.find(rm => rm.segment === r.id)?.icon ?? 'door_open')
         : r.kind === 'action'
           ? (ACTIONS.find(a => a.id === r.id)?.icon ?? 'bolt')
-          : (r.type ? ELEMENT_ICONS[r.type] : 'category');
+          : r.kind === 'create'
+            ? 'add'
+            : (r.type ? ELEMENT_ICONS[r.type] : 'category');
       row.appendChild(icon);
 
       const main = document.createElement('span');
@@ -267,7 +284,7 @@ class CommandPalette extends BaseModal {
     seeAll.className = 'atlas-cmdk-row atlas-cmdk-seeall'
       + (this.activeIndex === this.results.length ? ' is-active' : '');
     seeAll.setAttribute('data-action', 'cmdk-see-all');
-    seeAll.textContent = this.results.length > 0
+    seeAll.textContent = this.results.some(r => r.kind !== 'create')
       ? 'see all in the sidebar →'
       : 'no quick matches: filter the sidebar →';
     seeAll.addEventListener('mouseenter', () => {
@@ -308,6 +325,10 @@ class CommandPalette extends BaseModal {
       else if (r.id === 'add-world' || r.id === 'open-world-folder') void openWorldDoor(r.id);
       return;
     }
+    if (r.kind === 'create') {
+      void openCreateWithName(r.id);
+      return;
+    }
     // Route to the room the element actually LIVES in (S306). This used to be
     // a bare `navigate(elementHash(...))` for every non-room result, so Cmd+K
     // on a map, a page, a knowledge entry or a chapter landed in the generic
@@ -341,6 +362,17 @@ export function openCommandPalette(): void {
   new CommandPalette().open();
 }
 
+/**
+ * Ctrl+K's create row (S369): the shared create door (so the tour's scripting
+ * still holds), the name prefilled and the type left to the modal.
+ */
+async function openCreateWithName(name: string): Promise<void> {
+  const [{ openCreateDoor }, { toastManager }] = await Promise.all([
+    import('./create-element-door'), import('./toast-manager'),
+  ]);
+  openCreateDoor(toastManager, { initialName: name });
+}
+
 /** Ctrl+K's world doors (S365): the same runner as the Worlds list's buttons. */
 async function openWorldDoor(id: 'add-world' | 'open-world-folder'): Promise<void> {
   const [{ openAddWorldChooser, runAddWorldAction }, { toastManager }] = await Promise.all([
@@ -357,7 +389,17 @@ async function openWorldDoor(id: 'add-world' | 'open-world-folder'): Promise<voi
 export async function reloadFromDisk(): Promise<void> {
   const { rescanNow } = await import('../core/live-folder');
   const { toastManager } = await import('./toast-manager');
-  const { changes, skipped } = await rescanNow({ force: true, full: true });
+  let scan: Awaited<ReturnType<typeof rescanNow>>;
+  try {
+    scan = await rescanNow({ force: true, full: true });
+  } catch (err) {
+    // A rescan only reads: running it again is safe.
+    console.error('[palette] reload from disk failed:', err);
+    const { showProblem } = await import('./problem-fixes');
+    showProblem(err, { doing: 'reloading from disk', retry: reloadFromDisk });
+    return;
+  }
+  const { changes, skipped } = scan;
   if (skipped) {
     // Never "nothing changed" when it did not look (S364 gate lens B B10).
     const why = skipped === 'rekey' ? 'ids are being updated' : skipped === 'busy' ? 'the world is busy (loading, the tour, or a map edit)' : 'no world is open';

@@ -31,6 +31,7 @@ import { navigate, elementHash } from '../../core/router';
 import { openZoneCreateModal } from '../../ui/zone-create-modal';
 import type { Zone } from '../../core/types';
 import type { ToastManager } from '../../ui/toast-manager';
+import { showProblem } from '../../ui/problem-fixes';
 
 export type DrawMode = 'polygon' | 'line';
 
@@ -256,7 +257,7 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
 
   const store = getActiveStore();
   if (!store) {
-    draft.toasts.error('No active world store; cannot save zone');
+    draft.toasts.error('This world is not open, so the zone was not saved. Open it from the sidebar, then draw it again.');
     return;
   }
 
@@ -297,7 +298,7 @@ export async function finishDrawing(_toasts: ToastManager): Promise<void> {
     }
   } catch (err) {
     console.error('[zone-drawing] finish failed:', err);
-    draft.toasts.error(`Failed to save ${draft.mode}`);
+    showProblem(err, { doing: draft.mode === 'line' ? 'saving the line' : 'saving the zone', toasts: draft.toasts });
     return; // keep draft active so user can retry
   }
 

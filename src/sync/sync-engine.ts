@@ -6,6 +6,7 @@
  * timestamps + tombstone log fully describe what's pending.
  */
 
+import { PlainError } from '../core/plain-error';
 import type { FolderStore } from '../store/folder-store';
 import { nowIso } from '../store/folder-store';
 import {
@@ -411,7 +412,7 @@ export class SyncEngine {
   /** Resolving a conflict writes to the server directly; never during a hold. */
   private async assertNotHeld(): Promise<void> {
     if (this.holds > 0 || await this.folder.hasRekeyJournal()) {
-      throw new Error('Ids are being updated in this world. Try again when that finishes.');
+      throw new PlainError('Ids are being updated in this world. Try again when that finishes.');
     }
   }
 
@@ -501,7 +502,14 @@ export class SyncEngine {
     this.transientRetryTimer = setTimeout(() => {
       this.transientRetryTimer = null;
       if (this.stopped || this.blocked) return;
-      void this.pushOnce().catch(err => console.warn('[atlas:sync] transient retry failed:', err));
+      // A pull in flight would hand pushOnce its own promise and the retry
+      // would never push (S368 gate A L2): wait for it, then push.
+      const retry = (): void => {
+        if (this.stopped || this.blocked) return;
+        void this.pushOnce().catch(err => console.warn('[atlas:sync] transient retry failed:', err));
+      };
+      if (this.inFlight && this.inFlightKind === 'pull') void this.inFlight.then(retry, retry);
+      else retry();
     }, delay);
   }
 
@@ -805,14 +813,72 @@ export class SyncEngine {
    * errs toward "differs" (one redundant UPDATE), never toward "same" (a lost
    * edit).
    */
+  /**
+   * The round-end conflict write (S369, gate A M3): a held sync-state file is
+   * a world failure like the other round-end writes; anything else settles
+   * the state (never a pill stuck on 'Saving') and ends the round.
+   */
+  private async persistConflictsGuarded(conflicts: Conflict[], failures: PerElementFailure[]): Promise<void> {
+    try {
+      await this.persistConflicts(conflicts);
+    } catch (err) {
+      if (isFileBusyError(err)) {
+        failures.push({ ...failureOf('world', 'world', 'update', err), source: 'disk' });
+        return;
+      }
+      this.settleThrownRound(err);
+      throw err;
+    }
+  }
+
   private async adoptServerCopy(local: Element, remote: { updated_at: string } & Record<string, unknown>): Promise<void> {
-    const ignore = new Set<string>(['created_at', 'created_by', 'change_seq', 'world', ...ATLAS_LOCAL_ONLY_FIELDS]);
-    const differs = diffFieldNames(local, remote)
-      .some(k => !ignore.has(k));
     await this.folder.stampServerUpdatedAt(
       local.id, local.type as ElementType, remote.updated_at,
-      differs ? null : (local.local_updated_at as string | undefined),
+      sameWireContent(local, remote) ? (local.local_updated_at as string | undefined) : null,
     );
+  }
+
+  /**
+   * A pull-side local write (S369, gate A M4). A file another program holds
+   * (OneDrive, antivirus) is a per-element failure and the pull goes on, as
+   * the push's `localStep` does; anything else still ends the round.
+   */
+  private async pullWrite(
+    failures: PerElementFailure[],
+    id: string,
+    type: ElementType,
+    step: () => Promise<unknown>,
+  ): Promise<boolean> {
+    try {
+      await step();
+      return true;
+    } catch (err) {
+      if (!isFileBusyError(err)) throw err;
+      failures.push({ ...failureOf(id, type, 'read', err), source: 'disk' });
+      return false;
+    }
+  }
+
+  /**
+   * A never-stamped local the server holds with the SAME content is our own
+   * create whose stamp a held file refused (S368 gate A L3): adopt the
+   * server's stamp instead of reporting a conflict with ourselves. Returns
+   * true when the element was handled (adopted, or the adopt was refused by a
+   * held file and recorded).
+   */
+  private async adoptOwnCreate(
+    failures: PerElementFailure[],
+    local: Element,
+    type: ElementType,
+    remoteBody: Record<string, unknown>,
+    serverStamp: string,
+  ): Promise<'no' | 'adopted' | 'held'> {
+    if (local.server_updated_at || !sameWireContent(local, remoteBody)) return 'no';
+    const wrote = await this.pullWrite(failures, local.id, type, () =>
+      this.folder.stampServerUpdatedAt(local.id, type, serverStamp, local.local_updated_at as string | undefined));
+    if (!wrote) return 'held'; // the /changes walk must not pass it (gate A M1)
+    console.info(`[atlas:sync] pull: ${type}/${local.id} is our own create with an unrecorded stamp; baseline adopted`);
+    return 'adopted';
   }
 
   async resolveMetaConflict(field: string, choice: 'mine' | 'theirs'): Promise<void> {
@@ -922,12 +988,8 @@ export class SyncEngine {
       }
     }
 
-    const metaFailure = (operation: 'read' | 'update', err: unknown): PerElementFailure => ({
-      element_id: 'world',
-      type: 'world',
-      operation,
-      message: err instanceof Error ? err.message : String(err),
-    });
+    const metaFailure = (operation: 'read' | 'update', err: unknown): PerElementFailure =>
+      failureOf('world', 'world', operation, err);
 
     let server: WorldMetaWire;
     try {
@@ -1182,7 +1244,7 @@ export class SyncEngine {
     // informational (server already overwritten) — persisting would falsely
     // fire the badge for resolved divergence.
     if (this.policy === 'pause-and-review') {
-      await this.persistConflicts(pushResult.conflicts);
+      await this.persistConflictsGuarded(pushResult.conflicts, pushResult.failures);
     }
     if (pushResult.auth_blocked) {
       this.setAuthError();
@@ -1267,12 +1329,20 @@ export class SyncEngine {
       this.onSyncResult('sync', result);
       return result;
     }
-    const pushResult = await this.pushPhase();
+    // Settled like runPushOnly's (S369, gate A M3): a throw here left the
+    // pill on 'Saving' forever on the full-sync path.
+    let pushResult: Awaited<ReturnType<SyncEngine['pushPhase']>>;
+    try {
+      pushResult = await this.pushPhase();
+    } catch (err) {
+      this.settleThrownRound(err);
+      throw err;
+    }
     // Persist push conflicts BEFORE pull phase (so pull's currentState read
     // sees them when computing the union). Under local-wins, skip — server
     // is already in our state, the entries would be misleading.
     if (this.policy === 'pause-and-review') {
-      await this.persistConflicts(pushResult.conflicts);
+      await this.persistConflictsGuarded(pushResult.conflicts, pushResult.failures);
     }
     // If push bailed for auth, skip pulling — same dead key would 401 there
     // too. Surface via error state + result.auth_blocked.
@@ -1529,7 +1599,7 @@ export class SyncEngine {
       });
     } catch (err) {
       const auth = isAuthError(err);
-      const message = err instanceof Error ? err.message : String(err);
+      const message = err instanceof Error ? err.message : String(err); // raw-error-ok: internal, classified below; never shown
       for (const it of items) {
         failures.push({
           element_id: it.element.id as string,
@@ -1640,6 +1710,10 @@ export class SyncEngine {
               ? `referenced ${parsed.refType} was deleted on the server; review in sync panel`
               : `referenced ${parsed.refType} not found on the server`)
           : errObj.message || 'bulk item failed',
+        ...(typeof res?.status === 'number' ? { status: res.status } : {}),
+        ...(errObj.code ? { code: errObj.code } : {}),
+        ...(errObj.param ? { param: errObj.param } : {}),
+        source: 'server',
       });
       onItemDone();
     }
@@ -1710,7 +1784,7 @@ export class SyncEngine {
       return true;
     } catch (err) {
       if (err instanceof CorruptFileError) throw err;
-      failures.push(failureOf(id, type, operation, err));
+      failures.push({ ...failureOf(id, type, operation, err), source: 'disk' });
       return false;
     }
   }
@@ -2002,26 +2076,16 @@ export class SyncEngine {
         if (isAuthError(err)) {
           authBlocked = true;
           this.noteAuthBail(err);
-          failures.push({
-            element_id: elem.id,
-            type: elem.type,
-            operation: isCreate ? 'create' : 'update',
-            message: err instanceof Error ? err.message : String(err),
-          });
+          failures.push(failureOf(elem.id, elem.type, isCreate ? 'create' : 'update', err));
           console.warn('[atlas:sync] push hit auth error — bailing round', {
-            id: elem.id, type: elem.type, message: err instanceof Error ? err.message : String(err),
+            id: elem.id, type: elem.type, message: err instanceof Error ? err.message : String(err), // raw-error-ok: inside a console.warn object
           });
         }
         else if (isTransientError(err)) {
           transient = err;
-          failures.push({
-            element_id: elem.id,
-            type: elem.type,
-            operation: isCreate ? 'create' : 'update',
-            message: err instanceof Error ? err.message : String(err),
-          });
+          failures.push(failureOf(elem.id, elem.type, isCreate ? 'create' : 'update', err));
           console.warn('[atlas:sync] push hit a busy or unreachable server — ending the round', {
-            id: elem.id, type: elem.type, message: err instanceof Error ? err.message : String(err),
+            id: elem.id, type: elem.type, message: err instanceof Error ? err.message : String(err), // raw-error-ok: inside a console.warn object
           });
         }
         // 404 on a non-CREATE means the server lost the element between our
@@ -2101,10 +2165,7 @@ export class SyncEngine {
             // A read-back that failed proves nothing (S363, re-key gate lens 2
             // F3: a 409 plus a 503 used to read as foreign and would have been
             // offered a re-key, duplicating a same-world element).
-            failures.push({
-              element_id: elem.id, type: elem.type, operation: 'create',
-              message: `id_conflict, and checking it failed: ${readErr instanceof Error ? readErr.message : String(readErr)}`,
-            });
+            failures.push(failureOf(elem.id, elem.type, 'create', readErr, 'id_conflict, and checking it failed: '));
           }
         } else {
           // Per-element failure (4xx, validation, transient network) is non-fatal:
@@ -2133,24 +2194,14 @@ export class SyncEngine {
         if (isAuthError(err)) {
           authBlocked = true;
           this.noteAuthBail(err);
-          failures.push({
-            element_id: tomb.id,
-            type: tomb.type,
-            operation: 'delete',
-            message: err instanceof Error ? err.message : String(err),
-          });
+          failures.push(failureOf(tomb.id, tomb.type, 'delete', err));
           console.warn('[atlas:sync] push (tombstone) hit auth error — bailing round', {
             id: tomb.id, type: tomb.type,
           });
         }
         else if (isTransientError(err)) {
           transient = err;
-          failures.push({
-            element_id: tomb.id,
-            type: tomb.type,
-            operation: 'delete',
-            message: err instanceof Error ? err.message : String(err),
-          });
+          failures.push(failureOf(tomb.id, tomb.type, 'delete', err));
         }
         // 404 means "server doesn't have it" — that IS the desired post-
         // condition of a DELETE, so we treat it as success and clear the
@@ -2293,6 +2344,10 @@ export class SyncEngine {
     let lastAppliedSeq: number | null = syncState.changes_last_seq ?? null;
     let rewindDetected = false;
     let walkComplete = false;
+    /** Local writes another program's hold refused (S369): per element, not the round. */
+    const failures: PerElementFailure[] = [];
+    /** A held file stopped the walk mid-page: the cursor must not pass it. */
+    let heldStop = false;
 
     const tombstones = await this.folder.listTombstonesSince(null);
     const tombstoneIds = new Set(tombstones.map(t => t.id));
@@ -2339,7 +2394,7 @@ export class SyncEngine {
             authBlocked = true;
             this.noteAuthBail(err);
             console.warn('[atlas:sync] changes walk hit auth error — bailing round', {
-              message: err instanceof Error ? err.message : String(err),
+              message: err instanceof Error ? err.message : String(err), // raw-error-ok: inside a console.warn object
             });
             break;
           }
@@ -2387,7 +2442,8 @@ export class SyncEngine {
             const serverStamp = op.element.updated_at;
             const local = await this.folder.getElement(op.id);
             if (!local) {
-              await this.folder.applyServerRecord(op.type, remoteBody, serverStamp);
+              if (!await this.pullWrite(failures, op.id, op.type, () =>
+                this.folder.applyServerRecord(op.type, remoteBody, serverStamp))) { heldStop = true; continue; }
               creates++;
               pulledIds.push(op.id);
               console.info(`[atlas:sync] changes create ${op.type}/${op.id} (server: ${serverStamp})`);
@@ -2398,6 +2454,9 @@ export class SyncEngine {
             const localChanged = local.local_updated_at > baseline;
             if (!serverChanged) continue; // own echo or stale replay — idempotent skip
             if (localChanged) {
+              const adopt = await this.adoptOwnCreate(failures, local, op.type, remoteBody, serverStamp);
+              if (adopt === 'held') heldStop = true;
+              if (adopt !== 'no') continue;
               conflicts.push({
                 element_id: op.id,
                 type: op.type,
@@ -2416,8 +2475,11 @@ export class SyncEngine {
             // M3 race guard, INSIDE the per-id chain (S361): the check and
             // the write are one slot, so a save cannot land between them.
             if (this.stopped) break;
-            const applied = await this.folder.applyServerRecordIfUnchanged(
-              op.type, remoteBody, serverStamp, local.local_updated_at ?? null);
+            let applied = false;
+            if (!await this.pullWrite(failures, op.id, op.type, async () => {
+              applied = await this.folder.applyServerRecordIfUnchanged(
+                op.type, remoteBody, serverStamp, local.local_updated_at ?? null);
+            })) { heldStop = true; continue; }
             if (!applied) {
               console.info(`[atlas:sync] changes skip ${op.type}/${op.id} — local edited during round`);
               continue;
@@ -2454,7 +2516,11 @@ export class SyncEngine {
             }
           }
         }
-        if (this.stopped) break;
+        // A held file (S369, gate A M1/M2): the rest of its page still
+        // applies, so one locked file does not stop every other element's
+        // news; then the walk stops with the cursor before this page, which
+        // is replayed next pull (replays are idempotent).
+        if (this.stopped || heldStop) break;
 
         // Page fully applied — its cursor is now a safe resume point.
         const nextCursor = pageResult.cursor ?? null;
@@ -2493,8 +2559,15 @@ export class SyncEngine {
       };
     }
 
-    await persistRound();
-    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures: [], pulled_ids: pulledIds };
+    // A held sync-state file leaves the cursor where it was: the next pull
+    // replays from there (S369, gate A M4), never the round's end.
+    try {
+      await persistRound();
+    } catch (err) {
+      if (!isFileBusyError(err)) throw err;
+      failures.push({ ...failureOf('world', 'world', 'read', err), source: 'disk' });
+    }
+    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures, pulled_ids: pulledIds };
   }
 
   private async pullPhaseFullList(skipIds: Set<string> = new Set()): Promise<SyncResult> {
@@ -2514,6 +2587,8 @@ export class SyncEngine {
      * the un-pulled types as "vanished from server."
      */
     let authBlocked = false;
+    /** Local writes another program's hold refused (S369): per element, not the round. */
+    const failures: PerElementFailure[] = [];
 
     const tombstones = await this.folder.listTombstonesSince(null);
     const tombstoneIds = new Set(tombstones.map(t => t.id));
@@ -2531,7 +2606,7 @@ export class SyncEngine {
           authBlocked = true;
           this.noteAuthBail(err);
           console.warn('[atlas:sync] pull hit auth error — bailing round', {
-            type, message: err instanceof Error ? err.message : String(err),
+            type, message: err instanceof Error ? err.message : String(err), // raw-error-ok: inside a console.warn object
           });
           break;
         }
@@ -2553,7 +2628,8 @@ export class SyncEngine {
 
         if (!local) {
           // New on server → write locally with both timestamps = server's.
-          await this.folder.applyServerRecord(type, remoteBody, remote.updated_at);
+          if (!await this.pullWrite(failures, remote.id, type, () =>
+            this.folder.applyServerRecord(type, remoteBody, remote.updated_at))) continue;
           creates++;
           pulledIds.push(remote.id);
           console.info(`[atlas:sync] pull create ${type}/${remote.id} (server: ${remote.updated_at})`);
@@ -2576,6 +2652,7 @@ export class SyncEngine {
         }
 
         if (localChanged) {
+          if (await this.adoptOwnCreate(failures, local, type, remoteBody, remote.updated_at) !== 'no') continue;
           // Both sides changed since last sync → conflict.
           conflicts.push({
             element_id: remote.id,
@@ -2605,8 +2682,11 @@ export class SyncEngine {
         // Re-read and bail if local has moved; the next pull (or autosave-
         // triggered push) reconciles cleanly.
         // The re-check now happens INSIDE the per-id chain (S361, lane b M1).
-        const applied = await this.folder.applyServerRecordIfUnchanged(
-          type, remoteBody, remote.updated_at, local.local_updated_at ?? null);
+        let applied = false;
+        if (!await this.pullWrite(failures, remote.id, type, async () => {
+          applied = await this.folder.applyServerRecordIfUnchanged(
+            type, remoteBody, remote.updated_at, local.local_updated_at ?? null);
+        })) continue;
         if (!applied) {
           console.info(`[atlas:sync] pull skip ${type}/${remote.id} — local edited during round, deferring to next sync`);
           continue;
@@ -2673,26 +2753,32 @@ export class SyncEngine {
     // Skipped when the engine was stopped mid-round (detach/unlink): a
     // post-reset write would resurrect state resetSyncBaseline just cleared.
     if (this.stopped) {
-      return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures: [], pulled_ids: pulledIds };
+      return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures, pulled_ids: pulledIds };
     }
-    await this.folder.updateSyncState(currentState => {
-      const existingServerDeletes = currentState.server_deletes ?? [];
-      const existingDeleteIds = new Set(existingServerDeletes.map(d => d.id));
-      const freshServerDeletes = newServerDeletes.filter(d => !existingDeleteIds.has(d.id));
-      let persistedConflicts = currentState.conflicts;
-      if (this.policy === 'pause-and-review') {
-        const existingIds = new Set(currentState.conflicts.map(c => c.element_id));
-        const fresh = conflicts.filter(c => !existingIds.has(c.element_id));
-        persistedConflicts = [...currentState.conflicts, ...fresh];
-      }
-      return {
-        last_pull_at: nowIso(),
-        conflicts: persistedConflicts,
-        server_deletes: [...existingServerDeletes, ...freshServerDeletes],
-      };
-    });
+    try {
+      await this.folder.updateSyncState(currentState => {
+        const existingServerDeletes = currentState.server_deletes ?? [];
+        const existingDeleteIds = new Set(existingServerDeletes.map(d => d.id));
+        const freshServerDeletes = newServerDeletes.filter(d => !existingDeleteIds.has(d.id));
+        let persistedConflicts = currentState.conflicts;
+        if (this.policy === 'pause-and-review') {
+          const existingIds = new Set(currentState.conflicts.map(c => c.element_id));
+          const fresh = conflicts.filter(c => !existingIds.has(c.element_id));
+          persistedConflicts = [...currentState.conflicts, ...fresh];
+        }
+        return {
+          last_pull_at: nowIso(),
+          conflicts: persistedConflicts,
+          server_deletes: [...existingServerDeletes, ...freshServerDeletes],
+        };
+      });
+    } catch (err) {
+      // A held sync-state file: the next pull derives the same again (S369).
+      if (!isFileBusyError(err)) throw err;
+      failures.push({ ...failureOf('world', 'world', 'read', err), source: 'disk' });
+    }
 
-    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures: [], pulled_ids: pulledIds };
+    return { pushed: zero(), pulled: { creates, updates, deletes: 0 }, conflicts, failures, pulled_ids: pulledIds };
   }
 
   // ---- Internals ----
@@ -2724,10 +2810,14 @@ function failureOf(
   prefix = '',
 ): PerElementFailure {
   const name = (err as { name?: unknown } | null)?.name;
+  const typed = typedError(err);
   return {
     element_id, type, operation,
-    message: prefix + (err instanceof Error ? err.message : String(err)),
+    message: prefix + (err instanceof Error ? err.message : String(err)), // raw-error-ok: the failure record; Details print its fields, never this
     ...(typeof name === 'string' && name !== 'Error' ? { error_name: name } : {}),
+    // What the details block may print (S369): the server's status and code,
+    // never its message, which can quote a name.
+    ...(typed ? { status: typed.status, code: typed.code, ...(typed.param ? { param: typed.param } : {}), source: 'server' as const } : {}),
   };
 }
 
@@ -2761,6 +2851,12 @@ function stripServerOnlyFields(record: Record<string, unknown>): Record<string, 
  * different key order don't show up as diverged (the API doesn't guarantee key
  * ordering, and JSON.stringify is order-sensitive).
  */
+/** Same content on the wire's terms: server stamps and atlas's local-only fields do not count. */
+function sameWireContent(local: Element, remote: Record<string, unknown>): boolean {
+  const ignore = new Set<string>(['created_at', 'created_by', 'change_seq', 'world', ...ATLAS_LOCAL_ONLY_FIELDS]);
+  return !diffFieldNames(local, remote).some(k => !ignore.has(k));
+}
+
 function diffFieldNames(local: Element, remote: Record<string, unknown>): string[] {
   // created_by is server-authored and read-only: a local file that never saw a
   // pull lacks it, which is not a difference anyone made.
@@ -2899,7 +2995,7 @@ export function parseInvalidLinkError(
 ): { field: string; refType: string; refId: string } | null {
   const t = typedError(err);
   const code = t?.code;
-  const message = t?.message ?? (err instanceof Error ? err.message : null);
+  const message = t?.message ?? (err instanceof Error ? err.message : null); // raw-error-ok: parsed for the dangling id, never shown
   if (!message) return null;
   // Typed path requires the code; legacy fallback requires the exact message
   // shape (fakes throwing plain Errors during the transition).

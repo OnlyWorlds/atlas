@@ -43,6 +43,7 @@ export type FixId =
   | 'new-ids'
   | 'open-settings'
   | 'reload-from-disk'
+  | 'sync-issues'
   | 'copy-details'
   | 'send-feedback';
 
@@ -117,14 +118,19 @@ export function classifyError(err: unknown): ProblemKind {
 
 const DEFAULT_DOING = 'doing that';
 
-function sentenceFor(kind: ProblemKind, err: unknown, doing: string): string {
+function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: ProblemOpts): string {
+  // True only where the failed step was an upload of edits already on disk
+  // (S369): "your changes are saved" is false for signing in or linking.
+  const saved = opts.savedLocally ? ' Your changes are saved in the folder.' : '';
   switch (kind) {
     case 'refused': return messageOf(err);
     case 'cancelled': return '';
     case 'disk-busy':
       return `Another program is using a file in this world's folder, so Atlas could not finish ${doing}. A cloud sync app such as OneDrive or Dropbox often does this. Wait a moment, then try again.`;
     case 'disk-permission':
-      return `Atlas does not have permission to change this world's folder, so it could not finish ${doing}. Allow access, then try again.`;
+      return opts.folder === 'picked'
+        ? `The browser did not let Atlas use that folder, so it could not finish ${doing}. Try again, and choose Allow when the browser asks.`
+        : `Atlas does not have permission to change this world's folder, so it could not finish ${doing}. Allow access, then try again.`;
     case 'disk-missing':
       return `Atlas could not find a file it needed while ${doing}. If this world's folder was moved or renamed, open it again from the sidebar. Your other worlds are fine.`;
     case 'disk-full':
@@ -138,16 +144,18 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string): string {
     case 'auth':
       return `OnlyWorlds did not accept this world's key or your PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, or reopen the world from the sidebar.`;
     case 'offline':
-      return `OnlyWorlds could not be reached while Atlas was ${doing}. Your changes are saved in the folder. Check your connection, then try again.`;
+      return `OnlyWorlds could not be reached while Atlas was ${doing}.${saved} Check your connection, then try again.`;
     case 'server-busy':
-      return `OnlyWorlds is busy, so Atlas could not finish ${doing}. Your changes are saved in the folder. Try again in a minute.`;
+      return `OnlyWorlds is busy, so Atlas could not finish ${doing}.${saved} Try again in a minute.`;
     case 'server-refused':
-      return `OnlyWorlds did not accept a change while Atlas was ${doing}. It stays saved in your folder. If this keeps happening, send the details as feedback.`;
+      return `OnlyWorlds did not accept something while Atlas was ${doing}.${opts.savedLocally ? ' It stays saved in your folder.' : ''}${opts.inline ? '' : ' If this keeps happening, send the details as feedback.'}`;
     case 'server':
-      return `OnlyWorlds had a problem on its side while Atlas was ${doing}. Your changes are saved in the folder. Try again in a while.`;
+      return `OnlyWorlds had a problem on its side while Atlas was ${doing}.${saved} Try again in a while.`;
     case 'bug':
     default:
-      return `Atlas ran into a problem it did not expect while ${doing}. Send the details as feedback so it can be fixed.`;
+      return opts.inline
+        ? `Atlas ran into a problem it did not expect while ${doing}. Try again; if it keeps happening, tell us at onlyworlds.com/feedback.`
+        : `Atlas ran into a problem it did not expect while ${doing}. Send the details as feedback so it can be fixed.`;
   }
 }
 
@@ -170,13 +178,30 @@ const FIXES: Record<ProblemKind, FixId[]> = {
 
 const REPORTED = new Set<ProblemKind>(['disk-busy', 'disk-full', 'disk-damaged', 'server-refused', 'server', 'bug']);
 
-export function problemFor(err: unknown, opts: { doing?: string } = {}): Problem {
+export interface ProblemOpts {
+  /** What Atlas was doing, a short lowercase gerund phrase. Never a name: it goes into a public report. */
+  doing?: string;
+  /** The failed step uploads edits already in the folder (a sync), so the sentence may say they are safe. */
+  savedLocally?: boolean;
+  /** `picked`: a folder the user was choosing, not the open world's (no Allow access button). */
+  folder?: 'world' | 'picked';
+  /** Shown as a line inside a dialog, with no Details to send (no "send the details"). */
+  inline?: boolean;
+  /** Nothing caught it: a browser refusal here is not about a folder, so it reads as unexpected. */
+  unexpected?: boolean;
+}
+
+export function problemFor(err: unknown, opts: ProblemOpts = {}): Problem {
   const doing = opts.doing?.trim() || DEFAULT_DOING;
-  const kind = classifyError(err);
+  const classified = classifyError(err);
+  // An uncaught clipboard or storage refusal is not the open world's folder
+  // (S369 gate B M4).
+  const kind: ProblemKind = opts.unexpected && classified.startsWith('disk-') ? 'bug' : classified;
+  const fixes = FIXES[kind].filter(f => !(f === 'allow-access' && opts.folder === 'picked'));
   return {
     kind,
-    sentence: sentenceFor(kind, err, doing),
-    fixes: FIXES[kind].slice(),
+    sentence: sentenceFor(kind, err, doing, opts),
+    fixes,
     raw: err,
     doing,
     report: REPORTED.has(kind),
@@ -207,14 +232,28 @@ export const REPORT_CAP = 600;
 /**
  * Strip what could identify a world or a person from error text bound for a
  * public report. Errs on the side of removing too much.
+ *
+ * A scrubber cannot know every shape a name takes (a server message can
+ * quote an element name without quotes), so the details block never relies
+ * on it alone: free error text goes in only for the `bug` kind (S369), and
+ * every other line is built from fields Atlas chose (`detailFields`).
  */
 export function scrubForReport(text: string): string {
-  let t = String(text ?? '');
+  // Cut first (S369 gate A L1): the patterns below are not all linear, and
+  // a long message would freeze the tab before the cap applied.
+  let t = String(text ?? '').slice(0, REPORT_CAP * 4);
   t = t.replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<email>');
   t = t.replace(/\bow_[wra]_\S+/gi, '<key>');
+  // Paths carry folder and user names. A web address keeps its host only;
+  // file:// URLs, drive, UNC and absolute paths, and any token with a slash
+  // between its parts ("worlds/aldric") go entirely.
+  t = t.replace(/\bfile:\/\/\S+/gi, '<path>');
+  t = t.replace(/\b(https?):\/\/([^\s/?#"']+)[^\s"']*/gi, '$1://$2/…');
+  t = t.replace(/(?:\b[A-Za-z]:|(?<![:\w/\\]))(?:[\\/]{1,2}[^\s\\/"'<>|]+)+[\\/]?/g, '<path>');
+  t = t.replace(/(?<![:/\w])[\w.-]+(?:[\\/][\w.-]+)+/g, '<path>');
   t = t.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<id>');
   // Element files are named "<name slug>--<id tail>.json": the slug is the name.
-  t = t.replace(/[\w.-]*\w--[\w.-]+/g, '<file>');
+  t = t.replace(/(?<![\w.-])[\w.-]*?\w--[\w.-]+/g, '<file>');
   t = t.replace(/\?[^\s=&#]+=[^\s#]*/g, '?<query>');
   t = t.replace(/\d{10,}/g, '<number>');
   t = t.replace(/"[^"\n]*"/g, '"…"');
@@ -280,36 +319,118 @@ function timeLine(ctx: DetailsContext): string {
   return `Time: ${(ctx.now ?? new Date()).toISOString().replace(/\.\d{3}Z$/, 'Z')}`;
 }
 
-/** The error as one scrubbed line. A refusal's text is user copy and can name things, so only its name goes. */
+/** An identifier-shaped token (an error name, a code): safe to print as is. */
+const TOKEN = /^[A-Za-z][\w.-]{0,63}$/;
+/** A schema field name; `x_` / `shadow_` names are the user's own words. */
+const SCHEMA_FIELD = /^(?!x_|shadow_)[a-z][a-z0-9_]{0,63}$/;
+
+function tokenOr(value: unknown, fallback: string): string {
+  return typeof value === 'string' && TOKEN.test(value) ? value : fallback;
+}
+
+/**
+ * The structured facts about an error, each chosen by Atlas and none free
+ * text: the error's class name, a server's error code, HTTP status and the
+ * schema field it named. A custom field's name is the user's, so it shows as
+ * "a custom field".
+ */
+export function detailFields(err: unknown): string[] {
+  const e = (err ?? {}) as { code?: unknown; status?: unknown; param?: unknown };
+  const lines = [`Error: ${tokenOr(nameOf(err), typeof err === 'object' && err !== null ? 'Error' : typeof err)}`];
+  const status = serverStatus(err);
+  if (status !== null) lines.push(`Status: ${status}`);
+  if (typeof e.code === 'string' && TOKEN.test(e.code)) lines.push(`Code: ${e.code}`);
+  if (typeof e.param === 'string' && e.param) {
+    lines.push(`Field: ${SCHEMA_FIELD.test(e.param) ? e.param : 'a custom field'}`);
+  }
+  return lines;
+}
+
+/**
+ * The error for the details block. Structured fields always; the error's own
+ * text only when Atlas did not expect it (`bug`), scrubbed, because that is
+ * the case where nobody can fix it without reading it. Every other kind is
+ * fully described by its kind and fields, so its text (which can carry names
+ * the scrubber cannot recognise) never leaves.
+ */
+export function errorLines(err: unknown, kind: ProblemKind): string[] {
+  const lines = detailFields(err);
+  if (kind === 'bug' && !isPlainError(err) && !REFUSAL_NAMES.has(nameOf(err))) {
+    // The engine's own text up to its first quote: past it, browsers quote
+    // the user's input (JSON.parse), with quotes inside that the pairwise
+    // quote scrub cannot pair (S369 gate A M6).
+    const unquoted = messageOf(err).split(/["'“‘]/)[0];
+    const text = maskCapitalisedWords(scrubForReport(unquoted)).trim();
+    if (text) lines.push(`Message: ${text}`);
+  }
+  return lines;
+}
+
+/** Words an unexpected error's own text starts with; everything else capitalised may be a name. */
+const ERROR_WORDS = new Set([
+  'A', 'An', 'The', 'No', 'Not', 'Cannot', 'Could', 'Failed', 'Unexpected', 'Invalid', 'Maximum',
+  'Error', 'TypeError', 'RangeError', 'SyntaxError', 'ReferenceError', 'DOMException',
+  'JSON', 'API', 'URL', 'HTTP', 'NaN', 'Infinity', 'Atlas', 'OnlyWorlds', 'OPFS',
+]);
+
+/**
+ * An unexpected error's message is the one free text the details keep, and
+ * a name in it is usually Capitalised ("Moon Base not found"): every
+ * capitalised word that is not an error word becomes "<name>" (a
+ * PascalCase code name too: losing `FolderStore` is cheaper than a leak).
+ * A name typed in lowercase can still pass; the person sees the whole block
+ * on the feedback form before anything is sent.
+ */
+function maskCapitalisedWords(text: string): string {
+  // Any capital, not only ASCII (Éowyn), and no camelCase pass (McAllister,
+  // DeVries are names): only the error words stay (S369 gate A M6).
+  return text.replace(/(?<![\p{L}\p{N}_])\p{Lu}[\p{L}\p{N}'’-]*/gu, w => (ERROR_WORDS.has(w) ? w : '<name>'));
+}
+
+/** @deprecated kept for callers outside the details block; prefer `errorLines`. */
 export function errorLine(err: unknown): string {
-  const name = nameOf(err) || (typeof err === 'object' ? 'Error' : typeof err);
-  if (isPlainError(err) || REFUSAL_NAMES.has(nameOf(err))) return `${name}`;
-  return `${name}: ${scrubForReport(messageOf(err))}`;
+  return errorLines(err, classifyError(err)).join('; ');
 }
 
 export function buildDetails(problem: Problem, ctx: DetailsContext = {}): string {
   const lines = [
     ...headerLines(ctx),
-    `While: ${problem.doing}`,
+    `While: ${scrubForReport(problem.doing)}`,
     `Kind: ${problem.kind}`,
-    `Error: ${errorLine(problem.raw)}`,
+    ...errorLines(problem.raw, problem.kind),
     ...(ctx.extra ?? []).map(scrubForReport),
     timeLine(ctx),
   ];
   return lines.join('\n');
 }
 
-/** The same block for a sync round's per-element failures (at most three listed). */
+/**
+ * The same block for a sync round's per-element failures (at most three
+ * listed): type, operation and the error's class name. The failure's message
+ * stays out (S369): it is server or browser text and can quote a name.
+ */
 export function buildFailureDetails(
-  failures: readonly { type?: string; operation?: string; error_name?: string; message?: string }[],
-  ctx: DetailsContext = {},
+  failures: readonly {
+    type?: string; operation?: string; error_name?: string; message?: string;
+    source?: string; status?: number; code?: string; param?: string;
+  }[],
+  ctx: DetailsContext & { doing?: string } = {},
 ): string {
-  const listed = failures.slice(0, 3).map(f =>
-    `- ${f.type ?? 'element'} ${f.operation ?? 'change'}: ${f.error_name ? `${f.error_name}: ` : ''}${scrubForReport(f.message ?? '')}`);
+  const listed = failures.slice(0, 3).map(f => {
+    const what = [tokenOr(f.type, 'element'), tokenOr(f.operation, 'change')].join(' ');
+    const why = [
+      f.source === 'server' || f.source === 'disk' ? f.source : null,
+      f.error_name && TOKEN.test(f.error_name) ? f.error_name : null,
+      typeof f.status === 'number' && Number.isInteger(f.status) ? String(f.status) : null,
+      f.code && TOKEN.test(f.code) ? f.code : null,
+      f.param ? `field ${SCHEMA_FIELD.test(f.param) ? f.param : '(custom)'}` : null,
+    ].filter(Boolean).join(', ');
+    return `- ${what}${why ? `: ${why}` : ''}`;
+  });
   const more = failures.length > 3 ? [`and ${failures.length - 3} more`] : [];
   return [
     ...headerLines(ctx),
-    'While: syncing with OnlyWorlds',
+    `While: ${scrubForReport(ctx.doing ?? 'syncing with OnlyWorlds')}`,
     `Failed: ${failures.length}`,
     ...listed,
     ...more,

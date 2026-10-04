@@ -31,6 +31,7 @@
 import { OwV2Error, DEFAULT_V2_BASE } from './ow-v2-client-adapter';
 import { devV2Base } from './dev-api-base';
 import type { AccountWorldRow } from '../core/types';
+import { problemFor } from '../core/problems';
 
 export type { AccountWorldRow };
 
@@ -73,9 +74,10 @@ export function accountErrorMessage(err: unknown): string {
     if (err.code === 'key_revoked') return 'This account token was revoked. Mint a new one on onlyworlds.com.';
     if (err.status === 401) return 'Account token not recognized. Check it on onlyworlds.com → Settings → Account tokens.';
     if (err.code === 'rate_limited') return 'Too many attempts. Wait a moment and try again.';
-    return err.message.replace(/^API Error \d+: /, '');
   }
-  return err instanceof Error ? err.message : String(err);
+  // Anything else is worded, never read out (S369): the fallback used to be
+  // the server's or the browser's own text.
+  return problemFor(err, { inline: true, doing: 'talking to your OnlyWorlds account' }).sentence;
 }
 
 export class AccountClient {

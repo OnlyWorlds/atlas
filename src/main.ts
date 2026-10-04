@@ -22,6 +22,7 @@ import { installIconA11y } from './ui/icon-a11y';
 import { installDocumentTitle } from './ui/document-title';
 import { installTruncationTitles } from './ui/truncation-title';
 import { applyTheme } from './core/theme';
+import { installUnexpectedErrorReporter } from './ui/unexpected-errors';
 
 function renderUnsupportedPage(root: HTMLElement): void {
   root.innerHTML = '';
@@ -71,6 +72,8 @@ function boot(): void {
     return;
   }
   startApp(root);
+  // A failure nothing caught says so once, with details (S369).
+  installUnexpectedErrorReporter();
   // Pin-placement feedback (crosshair + map banner + Esc). State-driven, one
   // subscriber; safe to install once here after the app mounts.
   installPlacementHintWatcher();

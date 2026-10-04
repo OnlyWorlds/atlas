@@ -20,6 +20,7 @@ import { saveRegistry } from '../registry/registry';
 import { getActiveStore } from '../core/active-store';
 import { requestPushIfLinked } from '../sync/sync-attach';
 import { ToastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import {
   getWritingLabels,
   DEFAULT_WRITING_LABELS,
@@ -258,8 +259,9 @@ export function mountWritingSetup(
       await finish(opts);
     } catch (err) {
       console.error('[atlas:writing-setup] save failed:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      toasts.error(`Could not save writing setup: ${msg}`);
+      // No retry button: the setup can rename narratives, and the button below
+      // is enabled again for a deliberate second try.
+      showProblem(err, { doing: 'saving the writing setup', toasts });
       button.disabled = false;
       button.textContent = originalText;
     }
@@ -268,7 +270,7 @@ export function mountWritingSetup(
   async function finish(opts: { promote: boolean }): Promise<void> {
     const folder = getActiveStore();
     if (!folder) {
-      toasts.error('No active world.');
+      toasts.error('This world is not open. Open it from the sidebar, then try again.');
       return;
     }
 
@@ -319,7 +321,7 @@ export function mountWritingSetup(
     if (opts.promote && candidates.length > 0) {
       const finalCandidates = buildPromoteCandidates(getState().data.elements, labels);
       let written = 0;
-      const failures: Array<{ id: string; error: string }> = [];
+      const failures: Array<{ id: string; error: unknown }> = [];
       for (const c of finalCandidates) {
         const patch: Record<string, unknown> = {};
         if (c.currentSupertype !== c.proposedSupertype) patch.supertype = c.proposedSupertype;
@@ -329,8 +331,7 @@ export function mountWritingSetup(
           await folder.updateElement(c.el.id, patch as never);
           written++;
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          failures.push({ id: c.el.id, error: msg });
+          failures.push({ id: c.el.id, error: err });
           console.warn(`[atlas:writing-setup] failed to write ${c.el.name} (${c.el.id}):`, err);
         }
       }
@@ -340,7 +341,13 @@ export function mountWritingSetup(
         toasts.success(`Added ${written} narrative${written === 1 ? '' : 's'} to the writing tree.`);
       }
       if (failures.length > 0) {
-        toasts.error(`${failures.length} narrative${failures.length === 1 ? '' : 's'} could not be updated. See console.`);
+        // One toast for the batch, worded from the first failure (they share
+        // a cause in practice: the folder). The count is not a user value.
+        const n = failures.length;
+        showProblem(failures[0].error, {
+          doing: n === 1 ? 'adding a narrative to the writing tree' : `adding ${n} narratives to the writing tree`,
+          toasts,
+        });
       }
     } else {
       // Even when not promoting we re-list to ensure state is fresh.

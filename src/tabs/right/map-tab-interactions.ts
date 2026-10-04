@@ -22,6 +22,7 @@ import { Leaflet2DManager } from '../../visualization/leaflet-2d/Leaflet2DManage
 import type { Pin } from '../../core/types';
 import { isDuplicatePinError } from '../../core/pin-uniqueness';
 import { ToastManager } from '../../ui/toast-manager';
+import { showProblem } from '../../ui/problem-fixes';
 import { ElementCreateModal } from '../../ui/element-create-modal';
 import { toggleGhostsAtSourcePin } from './ghost-pins';
 import { buildPinTooltipHtml } from './map-tab-tooltip';
@@ -53,7 +54,8 @@ function reportPinFailure(err: unknown, toasts: ToastManager, where: string): vo
     return;
   }
   console.error(`[map-tab] ${where}:`, err);
-  toasts.error('Failed to place pin');
+  // No retry: placing again could make a second pin.
+  showProblem(err, { doing: 'placing the pin', toasts });
 }
 
 export function wireMapInteractions(deps: MapInteractionDeps): void {
@@ -102,7 +104,7 @@ export function wireMapInteractions(deps: MapInteractionDeps): void {
       const cached = getState().data.elements.find(e => e.id === placement.elementId);
       const pinned = cached ?? await store.getElement(placement.elementId);
       if (!pinned) {
-        toasts.error('Cannot place pin: element not found');
+        toasts.error('That element is not in this world any more, so it cannot be pinned.');
         return;
       }
       // Tour beat (S299): a placement in the tour world adopts the bundle

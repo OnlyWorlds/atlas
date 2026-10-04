@@ -26,6 +26,7 @@ import { BaseModal } from '../ui/modal-base';
 import { PICKER_CANCELLED_HINT } from '../ui/directory-picker';
 import { isTourFlagActive } from '../tour/tour-flag';
 import type { ToastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import {
   openWorldFolder, isWorldFolder, isAtlasRootFolder, setupAtlasRoot, setupAtlasRootFrom,
   type SetupAtlasRootResult,
@@ -84,7 +85,8 @@ export async function pickAndOpenWorldFolder(toasts: Toasts): Promise<void> {
     const { pickDirectory } = await import('../ui/directory-picker');
     picked = await pickDirectory();
   } catch (err) {
-    toasts.error(err instanceof Error ? err.message : String(err));
+    console.warn('[world-doors] folder pick failed:', err);
+    showProblem(err, { doing: 'choosing a folder', folder: 'picked', toasts: toasts as ToastManager });
     return;
   }
   if (!picked) {
@@ -121,7 +123,10 @@ export async function pickAndOpenWorldFolder(toasts: Toasts): Promise<void> {
     // Not a world and not a home folder: openWorldFolder says why, plainly.
     await openPickedWorld(picked, toasts);
   } catch (err) {
-    toasts.error(err instanceof Error ? err.message : String(err));
+    // A refusal ("That folder is not a world") arrives as a PlainError and
+    // reads as itself; anything else is worded (S369).
+    console.warn('[world-doors] open world folder failed:', err);
+    showProblem(err, { doing: 'opening the world folder', folder: 'picked', toasts: toasts as ToastManager });
   }
 }
 
@@ -177,7 +182,8 @@ export async function ensureAtlasRoot(toasts: Toasts, purpose: string): Promise<
     sayRootSetUp(result, toasts);
     return !!getState().atlasRoot;
   } catch (err) {
-    toasts.error(err instanceof Error ? err.message : String(err));
+    console.warn('[world-doors] home folder setup failed:', err);
+    showProblem(err, { doing: 'setting up your OnlyWorlds folder', folder: 'picked', toasts: toasts as ToastManager });
     return false;
   }
 }
@@ -230,6 +236,15 @@ const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line
   { action: 'link-api', icon: 'link', title: 'Bring down a world from OnlyWorlds', line: 'Paste its key: Atlas downloads a full copy and keeps the two in sync.' },
   { action: 'view-api', icon: 'visibility', title: 'View a shared world', line: 'Someone gave you a read key: browse their world, view only. No PIN needed.' },
 ];
+
+/**
+ * The plain name of one way in: the chooser row's title, and the accessible
+ * name of the sidebar icon button for the same action (S369), so a screen
+ * reader hears the same words the chooser shows.
+ */
+export function addWorldLabel(action: AddWorldAction): string {
+  return CHOICES.find(c => c.action === action)?.title ?? 'Add a world';
+}
 
 /** "Add a world": the five ways in, as plain rows. */
 export function openAddWorldChooser(toasts: ToastManager): void {

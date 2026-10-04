@@ -120,7 +120,7 @@ export async function initialDownloadAll(
           element_id: record.id,
           type,
           operation: 'create',
-          message: err instanceof Error ? err.message : String(err),
+          message: err instanceof Error ? err.message : String(err), // raw-error-ok: the failure record; Details print its fields, never this
         });
       } finally {
         done++;

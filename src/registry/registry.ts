@@ -137,8 +137,21 @@ export function saveRegistry(reg: WorldsRegistry): void {
     tabBase = JSON.parse(JSON.stringify(reg)) as WorldsRegistry;
   } catch (err) {
     console.error('[registry] save failed:', err);
+    // Said once per session (S369): the list of worlds lives in this
+    // browser's storage, and a failed save is lost on the next reload.
+    if (!registrySaveFailureSaid) {
+      registrySaveFailureSaid = true;
+      void import('../ui/toast-manager').then(({ toastManager }) => {
+        toastManager.show(
+          'Atlas could not save your list of worlds in this browser, so changes to it may be gone after a reload. Your world folders are not affected. If the browser is low on storage, free some, then reload.',
+          'error', 8000, { sticky: true },
+        );
+      }).catch(() => {});
+    }
   }
 }
+
+let registrySaveFailureSaid = false;
 
 // ---- Constructors ----
 

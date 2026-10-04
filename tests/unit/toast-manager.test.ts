@@ -93,6 +93,19 @@ describe('toast manager', () => {
     expect(url.startsWith(FEEDBACK_BASE)).toBe(true);
   });
 
+  it('the same problem for the same key replaces the one on screen; another key keeps its own (S369)', () => {
+    const run1 = vi.fn(); const run2 = vi.fn(); const other = vi.fn();
+    toasts.show('Saving failed.', 'error', 8000, { actions: [{ label: 'Retry now', run: other }], dedupeKey: 'scene:b' });
+    toasts.show('Saving failed.', 'error', 8000, { actions: [{ label: 'Retry now', run: run1 }], dedupeKey: 'scene:a' });
+    toasts.show('Saving failed.', 'error', 8000, { actions: [{ label: 'Retry now', run: run2 }], dedupeKey: 'scene:a' });
+    const shown = live().filter(t => t.textContent!.includes('Saving failed.'));
+    expect(shown).toHaveLength(2);
+    for (const t of shown) t.querySelector<HTMLButtonElement>('.ow-toast-action')!.click();
+    expect(other).toHaveBeenCalled();
+    expect(run2).toHaveBeenCalled();
+    expect(run1).not.toHaveBeenCalled();
+  });
+
   it('evicts plain toasts before sticky ones at the cap', () => {
     toasts.show('Sticky one.', 'error', 8000, { actions: [{ label: 'Retry now', run: () => {} }] });
     toasts.info('plain a');

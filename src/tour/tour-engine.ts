@@ -36,6 +36,7 @@ import type { Element, ElementType } from '../core/types';
 import { isQuietRef, TOUR_MAP_REF, TOUR_PIN_REF, TOUR_STEPS, type TourStep } from './tour-data';
 import { mergeHealArray } from './tour-heal';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
+import { PlainError } from '../core/plain-error';
 import { rekeyRouteHash } from '../sync/rekey-route';
 
 const TOUR_STATE_KEY = 'atlas_tour_v1';
@@ -940,9 +941,10 @@ export async function startTour(returnHash?: string): Promise<void> {
 export async function launchTour(): Promise<void> {
   // Every door ends here (landing, Settings replay): a window that refuses
   // browser storage says so in one plain line instead of stalling at the
-  // first create with a raw SecurityError (S366). Callers toast the message.
+  // first create with a raw SecurityError (S366). A PlainError (S369): the
+  // callers' showProblem shows it as its own sentence.
   const { opfsUsable, NO_BROWSER_STORAGE_LINE } = await import('../core/capabilities');
-  if (!(await opfsUsable())) throw new Error(NO_BROWSER_STORAGE_LINE);
+  if (!(await opfsUsable())) throw new PlainError(NO_BROWSER_STORAGE_LINE);
   const here = window.location.hash;
   // Launching from the tour's own world (shouldn't happen) or from nowhere →
   // return to the landing.

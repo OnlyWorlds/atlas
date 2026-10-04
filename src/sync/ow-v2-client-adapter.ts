@@ -426,7 +426,7 @@ export class OwV2ClientAdapter implements OwApiClient {
       } catch (err) {
         this.incompleteListTypes.add(type);
         console.warn(`[ow-v2] skipping malformed ${type} list item — type marked incomplete`, {
-          message: err instanceof Error ? err.message : String(err),
+          message: err instanceof Error ? err.message : String(err), // raw-error-ok: inside a console.warn object
         });
       }
     }
@@ -581,7 +581,7 @@ function logWireError(
   err: unknown
 ): void {
   const path = id ? `/${type}/${id}` : `/${type}`;
-  const msg = err instanceof Error ? err.message : String(err);
+  const msg = err instanceof Error ? err.message : String(err); // raw-error-ok: the console line below
   const param = isOwV2Error(err) && err.param ? ` param=${err.param}` : '';
   console.warn(`[atlas:sync] ${method} ${path} failed — ${msg}${param}`, { body });
 }

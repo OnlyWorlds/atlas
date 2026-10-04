@@ -40,6 +40,9 @@ import { countSpatialOnMap, spatialPhrase, rescaleSketchOntoImage } from './map-
 import { getEditorSettings } from '../registry/registry';
 import { suggestionsForField, reservedValueHint } from '../core/taxonomy';
 import { styleValueHint } from '../core/world-styles';
+import { resolveCalendarLens, type WorldCalendar } from '../core/calendar-lens';
+import { formatStep } from '../core/calendar';
+import { parseTemporalValue } from '../visualization/timeline/temporal-fields';
 
 /** Known acronyms uppercased in labels: "image_url" → "Image URL". */
 const ACRONYMS = new Set(['url', 'id', 'api', 'ui', 'ip', 'html', 'http', 'dns', 'uuid', 'sdk', 'pin', 'gps']);
@@ -325,6 +328,24 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
       },
     });
   });
+  // A date with a calendar (S369): the number stays the editable value; the
+  // calendar's reading sits under it, read-only, in the same column. Outside
+  // the value element, so editing and copying the number never touch it.
+  const lens = isSchemaDateField(meta) && !isEmpty ? activeCalendarLens() : null;
+  const dateText = calendarDateText(meta, raw, lens);
+  if (lens && dateText) {
+    const col = document.createElement('div');
+    col.className = 'atlas-field-value-col';
+    col.appendChild(valueEl);
+    const dateEl = document.createElement('div');
+    dateEl.className = 'atlas-row-meta atlas-field-calendar-date';
+    dateEl.setAttribute('data-role', 'calendar-date');
+    dateEl.textContent = dateText;
+    dateEl.title = `Calendar: ${lens.name}. The stored number does not change.`;
+    col.appendChild(dateEl);
+    wrap.appendChild(col);
+    return wrap;
+  }
   wrap.appendChild(valueEl);
   return wrap;
 }
@@ -576,6 +597,12 @@ function buildLinkChip(id: string, meta: FieldMeta, onRemove: () => void): HTMLE
 // ====== Persistence ======
 
 /**
+ * Said when an edit lands while no world store is open (a world closing under
+ * the page). Shared by the element page's writers (S369).
+ */
+export const WORLD_NOT_OPEN = 'This world is not open. Open it from the sidebar, then try again.';
+
+/**
  * The latest save started per element field (S368): "Retry now" on a failed
  * save runs only while no later save of that field has started, so it never
  * writes an older value over a newer one.
@@ -589,7 +616,7 @@ async function persistFieldPatch(el: Element, fieldName: string, nextValue: unkn
   latestFieldSave.set(saveKey, seq);
   const store = getActiveStore();
   if (!store) {
-    toastManager.error('No active store');
+    toastManager.error(WORLD_NOT_OPEN);
     return;
   }
   // Never persist Infinity or NaN: JSON writes both as null, which clears the
@@ -723,6 +750,40 @@ async function autoUpdateMapDims(
 }
 
 // ====== Pure helpers (exported for unit testing) ======
+
+/**
+ * The schema's date fields (S369): integer fields named `date` or `*_date`
+ * (birth_date, founding_date, start_date, grant_date...). Custom fields are
+ * not schema dates, whatever their name.
+ */
+export function isSchemaDateField(meta: Pick<FieldMeta, 'name' | 'widget'>): boolean {
+  if (meta.widget !== 'number' || isExtensionField(meta.name)) return false;
+  return meta.name === 'date' || /^[a-z]+(?:_[a-z]+)*_date$/.test(meta.name);
+}
+
+/**
+ * A stored date as the world's calendar says it (S369), shown beside the
+ * number, read-only: the stored integer never changes. Null when there is no
+ * calendar, the field is not a date, or the value is not a whole number.
+ */
+export function calendarDateText(
+  meta: Pick<FieldMeta, 'name' | 'widget'>,
+  raw: unknown,
+  lens: WorldCalendar | null,
+): string | null {
+  if (!lens || !isSchemaDateField(meta)) return null;
+  const n = parseTemporalValue(raw);
+  if (n === null || !Number.isInteger(n)) return null;
+  return formatStep(lens.config, n);
+}
+
+/** The calendar the element page speaks: the world's active one, as the charts room and home resolve it. */
+function activeCalendarLens(): WorldCalendar | null {
+  const s = getState();
+  const worldId = s.active?.worldId;
+  const entry = worldId ? s.registry.worlds.find(w => w.id === worldId) : undefined;
+  return resolveCalendarLens(s.data.elements, entry?.active_calendar_id, { fallbackToOnly: true });
+}
 
 /** "image_url" → "Image URL" via the ACRONYMS set. */
 export function humanizeFieldName(name: string): string {

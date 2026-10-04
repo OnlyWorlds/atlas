@@ -20,6 +20,7 @@ import {
 import { setupAtlasRoot, recoverAtlasRoot } from '../setup/atlas-root-flow';
 import { finishSetupDoor } from '../setup/world-doors';
 import { ToastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import {
   getCurrentSyncEngine,
   getCurrentSyncFolder,
@@ -113,7 +114,8 @@ function wireStorageDeviceActions(toasts: ToastManager): void {
       const had = !!getState().atlasRoot;
       await finishSetupDoor(await setupAtlasRoot(), toasts, had ? 'updated' : 'set up');
     } catch (err) {
-      toasts.error(err instanceof Error ? err.message : String(err));
+      console.warn('[settings] folder change failed:', err);
+      showProblem(err, { doing: 'setting up your OnlyWorlds folder', folder: 'picked', toasts });
     } finally {
       btn.disabled = false;
     }
@@ -133,7 +135,8 @@ function wireStorageDeviceActions(toasts: ToastManager): void {
         );
       }
     } catch (err) {
-      toasts.error(err instanceof Error ? err.message : String(err));
+      console.warn('[settings] folder re-link failed:', err);
+      showProblem(err, { doing: 're-linking your OnlyWorlds folder', folder: 'picked', toasts });
     } finally {
       recoverBtn.disabled = false;
       recoverBtn.textContent = 'Re-link folder';

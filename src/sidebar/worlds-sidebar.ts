@@ -9,7 +9,7 @@
  */
 
 import { isAtlasGrounded } from '../core/grounded';
-import { openAddWorldChooser, runAddWorldAction, type AddWorldAction } from '../setup/world-doors';
+import { addWorldLabel, openAddWorldChooser, runAddWorldAction, type AddWorldAction } from '../setup/world-doors';
 import { currentActivationGen, enqueueActivation } from '../core/activation-chain';
 import { awaitEviction, evictParkedStore, getActiveStore, parkStore, setActiveStore, takeParkedStore } from '../core/active-store';
 import { escapeAttr, escapeText, installRowKeydownActivation } from '../core/dom-utils';
@@ -93,27 +93,15 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // The icon row is Captain's (S219) and stays the default; the labelled
       // "add a world" button under it opens the same five as plain rows, and
       // Settings → General can hide the icons (S365).
+      // Each icon names its action twice (S369): `title` for the pointer,
+      // `aria-label` (the chooser's own row title) for a screen reader, which
+      // would otherwise read the glyphs' ligature text ("add folder_open").
       const icons = state.registry.worlds_add_icons === false ? '' : `<div class="atlas-worlds-add-icons">
-        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="create-local" title="New local world (in your OnlyWorlds folder)">
-          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
-          <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
-        </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="open-folder" title="Open an existing world folder from your disk (no copy, no download)">
-          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
-          <span class="material-symbols-outlined atlas-add-glyph-main">folder_open</span>
-        </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="new-api" title="New API world (creates on onlyworlds.com AND locally)">
-          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
-          <span class="material-symbols-outlined atlas-add-glyph-main">cloud_upload</span>
-        </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="link-api" title="Add existing API world (downloads into atlas)">
-          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
-          <span class="material-symbols-outlined atlas-add-glyph-main">link</span>
-        </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph" data-action="view-api" title="View a world with a read key (downloads it, view only)">
-          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
-          <span class="material-symbols-outlined atlas-add-glyph-main">visibility</span>
-        </button>
+        ${addIconButton('create-local', 'folder', 'Start a new world: a new folder inside your OnlyWorlds folder')}
+        ${addIconButton('open-folder', 'folder_open', 'Open a world folder you already have. It opens where it is; nothing is copied.')}
+        ${addIconButton('new-api', 'cloud_upload', 'New world on OnlyWorlds: made on onlyworlds.com and on your drive')}
+        ${addIconButton('link-api', 'link', 'Bring down a world from OnlyWorlds with its API key')}
+        ${addIconButton('view-api', 'visibility', 'View a shared world with a read key, view only')}
         </div>`;
       header.innerHTML = `${icons}
         <button type="button" class="atlas-worlds-add-btn" data-action="add-world">
@@ -130,28 +118,13 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // button, locked (S365 gate lens C L3: nothing appears after the tour).
       header.innerHTML = `
         <div class="atlas-worlds-add-icons">
-        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-create-pulse" data-action="create-local" title="Create a world. This one is the tour’s: Hyperion.">
-          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
-          <span class="material-symbols-outlined atlas-add-glyph-main">folder</span>
-        </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" aria-disabled="true" title="Open a world folder already on your drive. Yours to use after the tour.">
-          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
-          <span class="material-symbols-outlined atlas-add-glyph-main">folder_open</span>
-        </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" aria-disabled="true" title="Create a world that lives on onlyworlds.com as well as on your drive. Yours to use after the tour.">
-          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
-          <span class="material-symbols-outlined atlas-add-glyph-main">cloud_upload</span>
-        </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" aria-disabled="true" title="Bring in a world you already keep on onlyworlds.com. Yours to use after the tour.">
-          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
-          <span class="material-symbols-outlined atlas-add-glyph-main">link</span>
-        </button>
-        <button class="atlas-create-icon-btn atlas-header-add-glyph atlas-tour-locked" aria-disabled="true" title="Open someone else's world with a read key, look but do not touch. Yours to use after the tour.">
-          <span class="material-symbols-outlined atlas-add-glyph-plus">add</span>
-          <span class="material-symbols-outlined atlas-add-glyph-main">visibility</span>
-        </button>
+        ${addIconButton('create-local', 'folder', 'Create a world. This one is the tour’s: Hyperion.', { pulse: true })}
+        ${addIconButton('open-folder', 'folder_open', 'Open a world folder already on your drive. Yours to use after the tour.', { locked: true })}
+        ${addIconButton('new-api', 'cloud_upload', 'Create a world that lives on onlyworlds.com as well as on your drive. Yours to use after the tour.', { locked: true })}
+        ${addIconButton('link-api', 'link', 'Bring in a world you already keep on onlyworlds.com. Yours to use after the tour.', { locked: true })}
+        ${addIconButton('view-api', 'visibility', 'Open someone else\'s world with a read key, look but do not touch. Yours to use after the tour.', { locked: true })}
         </div>
-        <button type="button" class="atlas-worlds-add-btn atlas-tour-locked" aria-disabled="true" title="Every way to add a world, in words. Yours to use after the tour.">
+        <button type="button" class="atlas-worlds-add-btn atlas-tour-locked" aria-disabled="true" title="Every way to add a world, each with a line on what it does. Yours to use after the tour.">
           <span class="material-symbols-outlined" aria-hidden="true">add</span>add a world
         </button>
       `;
@@ -337,10 +310,10 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       } catch (err) {
         console.warn('[worlds-sidebar] refresh failed:', err);
         showProblem(err, {
-          doing: 'refreshing from OnlyWorlds', worldId, toasts,
+          doing: 'refreshing from OnlyWorlds', savedLocally: true, worldId, toasts,
           retry: () => {
             if (worldId !== getCurrentSyncWorldId()) return;
-            void pullNowAndRefresh().catch(e2 => showProblem(e2, { doing: 'refreshing from OnlyWorlds', worldId, toasts }));
+            void pullNowAndRefresh().catch(e2 => showProblem(e2, { doing: 'refreshing from OnlyWorlds', savedLocally: true, worldId, toasts }));
           },
         });
       }
@@ -453,6 +426,27 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   const unsubHash = onHashChange(renderAll);
   renderAll();
   return () => { unsubState(); unsubHash(); };
+}
+
+/**
+ * One "+target" icon button of the add-a-world row. `title` explains it on
+ * hover; `aria-label` names it in the chooser's words; the two glyphs are
+ * hidden from assistive tech. A tour-locked button carries no `data-action`
+ * (nothing may wire it while the tour runs).
+ */
+function addIconButton(
+  action: AddWorldAction,
+  glyph: string,
+  title: string,
+  opts: { locked?: boolean; pulse?: boolean } = {},
+): string {
+  const cls = ['atlas-create-icon-btn', 'atlas-header-add-glyph', opts.pulse ? 'atlas-create-pulse' : '', opts.locked ? 'atlas-tour-locked' : '']
+    .filter(Boolean).join(' ');
+  const wiring = opts.locked ? 'aria-disabled="true"' : `data-action="${action}"`;
+  return `<button type="button" class="${cls}" ${wiring} title="${escapeAttr(title)}" aria-label="${escapeAttr(addWorldLabel(action))}">
+          <span class="material-symbols-outlined atlas-add-glyph-plus" aria-hidden="true">add</span>
+          <span class="material-symbols-outlined atlas-add-glyph-main" aria-hidden="true">${glyph}</span>
+        </button>`;
 }
 
 function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: boolean, globalPaused: boolean): string {
@@ -581,7 +575,9 @@ async function doActivateWorld(
   const state = getState();
   const entry = state.registry.worlds.find(w => w.id === worldId);
   if (!entry) {
-    if (!silent) toasts.error(`World ${worldId} not found in registry`);
+    // A stale link or a world removed in another tab (C2, S369: the id and
+    // the word "registry" were the whole message).
+    if (!silent) toasts.error('That world is no longer in your list. If its folder is still on your drive, use Open a world folder to bring it back.');
     return false;
   }
   // Already active? Click should still "open" — switch to the right-tab view
@@ -685,7 +681,15 @@ async function doActivateWorld(
     // moved folder). "Delete + recreate to recover" (the wording until S307)
     // pointed at the one action that actually loses the world, while the real
     // one-click fix is the [+folder_open] button in this very header.
-    if (!silent) toasts.error(`Lost access to ${entry.name}'s folder. Your files are safe: use "open an existing world folder" in the sidebar header to point atlas at it again.`);
+    // The toast carries that fix itself (S369): picking the folder again
+    // restores this entry's handle (`openWorldFolder` re-stores a missing one).
+    if (!silent) {
+      toasts.show(
+        `Atlas lost access to the folder of "${entry.name}". Your files are safe. Open the folder and pick it again to reconnect.`,
+        'error', 8000,
+        { actions: [{ label: 'Open the folder', run: () => runAddWorldAction('open-folder', toasts) }] },
+      );
+    }
     if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
     return false;
   }
@@ -693,7 +697,14 @@ async function doActivateWorld(
     ? await queryWritable(handle)
     : await ensureWritable(handle);
   if (!granted) {
-    if (!silent) toasts.error(`Folder permission denied for ${entry.name}`);
+    // Worded as a disk-permission problem (S369), whose fix is Allow access:
+    // it asks for this world's folder inside the click, then opens it again.
+    if (!silent) {
+      showProblem(new DOMException('Folder permission was not granted', 'NotAllowedError'), {
+        doing: 'opening this world', worldId, toasts,
+        retry: () => { void activateWorld(worldId, toasts); },
+      });
+    }
     if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
     return false;
   }
@@ -750,7 +761,7 @@ async function doActivateWorld(
         const cleaned = deleteWorldEntry(getState().registry, worldId);
         saveRegistry(cleaned);
         patchSlice('registry', cleaned);
-        if (!silent) toasts.info(`"${entry.name}" folder is gone; removed from atlas`);
+        if (!silent) toasts.info(`The folder of "${entry.name}" is gone, so Atlas took it off the list.`);
         if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
         return false;
       }
@@ -759,7 +770,7 @@ async function doActivateWorld(
       console.error('[worlds-sidebar] open failed but the root directory exists', err);
       evictParkedStore(worldId);
       if (!silent) {
-        toasts.error(`Could not open ${entry.name}. The folder is still there, so nothing was removed. Try again, and check that no other atlas tab has it open.`);
+        toasts.error(`Could not open ${entry.name}. The folder is still there, so nothing was removed. Try again, and check that no other Atlas tab has it open.`);
       }
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
@@ -771,7 +782,7 @@ async function doActivateWorld(
       const hb = Date.parse(err.lock.last_heartbeat);
       const ageS = Number.isFinite(hb) ? Math.max(0, Math.round((Date.now() - hb) / 1000)) : null;
       const take = window.confirm(
-        `"${entry.name}" appears to be open in another atlas tab` +
+        `"${entry.name}" appears to be open in another Atlas tab` +
         (ageS != null ? ` (last active ${ageS}s ago)` : '') +
         `.\n\nClose the other tab, or take over here. Taking over while the other tab is still live can cause conflicting writes.\n\nTake over?`
       );

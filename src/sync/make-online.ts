@@ -17,6 +17,7 @@
 
 import { OwV2ClientAdapter, OwV2Error } from './ow-v2-client-adapter';
 import { AccountClient, accountErrorMessage } from './account-client';
+import { PlainError } from '../core/plain-error';
 import { getState } from '../core/state';
 import { devWorldapiBase, devV2Base } from './dev-api-base';
 import type { FolderStore } from '../store/folder-store';
@@ -99,17 +100,20 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
     } catch (err) {
       if (err instanceof OwV2Error && err.status === 422 && err.param === 'pin') {
         // Fresh account: the PIN is required and becomes the account PIN.
-        if (!pin) throw new Error('PIN is required');
+        if (!pin) throw new PlainError('Enter your PIN first. A new account sets its PIN here.');
         created = await client.createWorld(name, pin);
       } else {
-        throw new Error(accountErrorMessage(err));
+        // Only the account refusals Atlas has words for pass as refusals;
+        // anything else keeps its kind and details (S369 gate B M6).
+        const coded = err instanceof OwV2Error && (err.code === 'key_revoked' || err.status === 401 || err.code === 'rate_limited');
+        throw coded ? new PlainError(accountErrorMessage(err)) : err;
       }
     }
     return { apiKey: created.key, worldId: created.id, worldName: created.name };
   }
 
-  if (!email) throw new Error('Email is required');
-  if (!pin) throw new Error('PIN is required');
+  if (!email) throw new PlainError('Enter the email of your onlyworlds.com account first.');
+  if (!pin) throw new PlainError('Enter your PIN first.');
 
   const response = await fetch(getWorldsyncUrl(), {
     method: 'POST',
@@ -128,13 +132,16 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
     } catch {
       // Non-JSON body — fall through to the generic message.
     }
-    throw new Error(serverMessage ?? 'Invalid email or PIN. Verify your onlyworlds.com account');
+    // This endpoint's 400 text is written for people ("no account with that
+    // email"), so it is shown as a refusal; Details never print a refusal's
+    // words (S369). Anything else gets Atlas's own sentence.
+    throw new PlainError(serverMessage ?? 'OnlyWorlds did not accept that email and PIN. Check them against your onlyworlds.com account.');
   }
   if (response.status === 429) {
-    throw new Error('Too many requests. Try again later');
+    throw new PlainError('OnlyWorlds is getting too many requests. Wait a minute, then try again.');
   }
   if (!response.ok) {
-    throw new Error(`Server error ${response.status}; unable to create world`);
+    throw new PlainError('OnlyWorlds had a problem on its side, so the world was not created. Try again in a while.');
   }
   const data = await response.json() as {
     success?: boolean;
@@ -144,7 +151,8 @@ export async function createApiWorld(opts: CreateApiWorldOpts): Promise<CreateAp
     name?: string;
   };
   if (!data.success || !data.api_key) {
-    throw new Error(data.message ?? 'Server reported failure creating world');
+    if (data.message) console.warn('[make-online] create-world failed:', data.message);
+    throw new PlainError('OnlyWorlds could not create the world. Try again in a while.');
   }
   return {
     apiKey: data.api_key,
@@ -600,7 +608,7 @@ export async function mergeLocalIntoApi(
 }
 
 function errText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  return err instanceof Error ? err.message : String(err); // raw-error-ok: failure records only (Route 2's result), never shown
 }
 
 /**

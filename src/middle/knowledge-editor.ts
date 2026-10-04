@@ -36,6 +36,7 @@ import { createLinkAllCorner } from './prose-linkall-corner';
 import { pushRecent } from './writing-workspace-recents';
 import { findAutolinkCandidateAt, convertAutolinkAt } from './writing-workspace-autolink';
 import { ElementCreateModal } from '../ui/element-create-modal';
+import { showProblem } from '../ui/problem-fixes';
 import type { ToastManager } from '../ui/toast-manager';
 import type { Element } from '../core/types';
 import type { JSONContent } from '@tiptap/core';
@@ -197,6 +198,8 @@ export function mountKnowledgeEditor(opts: KnowledgeEditorOptions): KnowledgeEdi
       requestPushIfLinked();
     } catch (err) {
       console.error('[knowledge-editor] unlink: field write failed', err);
+      // No retry: the entry may have changed since, and this writes the whole list.
+      showProblem(err, { doing: 'removing the link', toasts });
     }
   }
 

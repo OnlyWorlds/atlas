@@ -13,6 +13,7 @@
 import { getState, subscribe, patchSlice } from '../core/state';
 import { navigate, elementHash, timelineHash, parseHash, onHashChange, type Route } from '../core/router';
 import { ToastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import { openCreateDoor } from '../ui/create-element-door';
 import { mountTimelineView, type TimelineViewHandle, type TimelineViewExtras } from '../visualization/timeline/timeline-view';
 import { mountScrollView } from '../visualization/timeline/scroll-view';
@@ -170,7 +171,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
   /** Persist the now to world.json + mirror into state so the room re-renders.
    *  A cleared now writes undefined on disk; the meta step's canonicalization
    *  turns that into an explicit wire null so the clear syncs (never resurrects). */
+  let nowSeq = 0;
   async function setNow(value: number | null): Promise<void> {
+    const seq = ++nowSeq;
     const store = getActiveStore();
     const active = getState().active;
     if (!store || !active) return;
@@ -185,7 +188,13 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       await store.writeWorldMeta({ time_current: value ?? undefined });
     } catch (err) {
       console.error('[charts] now write failed:', err);
-      toasts.error('could not save the now');
+      // Writing the same value again is safe.
+      // Retry only while this is still the world open and the newest now set
+      // (S369 gate B H1: a toast outlives a world switch and a newer set).
+      showProblem(err, {
+        doing: "saving the world's now time", toasts,
+        retry: () => { if (getActiveStore() === store && seq === nowSeq) return setNow(value); },
+      });
       return;
     }
     patchSlice('active', {
@@ -422,7 +431,9 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       queueMicrotask(() => showDatedElement(id, el.name, date));
     } catch (err) {
       console.error('[charts] drag-to-date write failed:', err);
-      toasts.error('could not save the date');
+      // Writing the same date again is safe (the bounds are checked again too).
+      // No retry (gate B L1): a later drag would be written over by this one.
+      showProblem(err, { doing: 'saving the date', toasts });
     }
   }
 
@@ -767,7 +778,14 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       // it was saved under. Absent = bare numbers.
       ...(lens ? { calendarId: lens.id } : {}),
     };
-    await mutateCharts(store, charts => upsertChart(charts, chart));
+    try {
+      await mutateCharts(store, charts => upsertChart(charts, chart));
+    } catch (err) {
+      // Was an unhandled rejection: the button did nothing, silently (S369).
+      console.error('[charts] save chart failed:', err);
+      showProblem(err, { doing: 'saving the chart', toasts });
+      return;
+    }
     render(); // full render — the rail heading names the (now-active) chart
     toasts.success(`saved "${chart.name}"`);
   }
@@ -815,8 +833,14 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // confirm IS the safety. Same `window.confirm` shape as those two.
     if (!window.confirm(`Delete chart "${chart.name ?? 'untitled'}"?`)) return;
     const store = getActiveStore();
-    if (store) await mutateCharts(store, charts => removeChart(charts, chart.id));
-    else savedCharts = removeChart(savedCharts, chart.id);
+    try {
+      if (store) await mutateCharts(store, charts => removeChart(charts, chart.id));
+      else savedCharts = removeChart(savedCharts, chart.id);
+    } catch (err) {
+      console.error('[charts] delete chart failed:', err);
+      showProblem(err, { doing: 'deleting the chart', toasts });
+      return;
+    }
     // Deleting the APPLIED chart must release its lens — a stale
     // appliedSelection kept scoping the room invisibly (chips unlit), so
     // e.g. drag-to-date toasted "not in this view" against a ghost member
@@ -851,7 +875,12 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       suppressGallery = false;
       if (save) {
         const store = getActiveStore();
-        if (store) await mutateCharts(store, charts => renameChart(charts, chart.id, input.value));
+        try {
+          if (store) await mutateCharts(store, charts => renameChart(charts, chart.id, input.value));
+        } catch (err) {
+          console.error('[charts] rename chart failed:', err);
+          showProblem(err, { doing: 'renaming the chart', toasts });
+        }
       }
       render(); // full render — the rail's chart-name label tracks renames too
     };

@@ -44,6 +44,7 @@ import { pickElement } from '../ui/element-picker-modal';
 import { ElementCreateModal } from '../ui/element-create-modal';
 import type { Element } from '../core/types';
 import { ToastManager } from '../ui/toast-manager';
+import { showProblem } from '../ui/problem-fixes';
 import type { JSONContent } from '@tiptap/core';
 import type { KnowledgeEditorHandle } from './knowledge-editor';
 import { makeEditableTitle, type EditableTitleHandle } from './editable-title';
@@ -231,7 +232,9 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       return true;
     } catch (err) {
       console.error('[knowledge-room] update failed', err);
-      toasts.error('Could not update knowledge entry');
+      // No retry button: a failed prose save is captured again on the way out,
+      // and a stale patch must not land over newer typing.
+      showProblem(err, { doing: 'saving this knowledge entry', toasts });
       return false;
     }
   }
@@ -307,7 +310,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       toasts.success(`Deleted ${el?.name || 'knowledge entry'}`);
     } catch (err) {
       console.error('[knowledge-room] delete failed', err);
-      toasts.error('Could not delete knowledge entry');
+      showProblem(err, { doing: 'deleting the knowledge entry', toasts });
     }
   }
 
@@ -454,7 +457,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       }
     } catch (err) {
       console.error('[knowledge-room] create failed', err);
-      toasts.error('Could not create knowledge entry');
+      showProblem(err, { doing: 'creating the knowledge entry', toasts });
     }
   }
 
@@ -951,7 +954,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
           navigate(shareHash(worldId, created.id));
         } catch (err) {
           console.error('[knowledge-room] create page failed', err);
-          toasts.error('Could not create the page');
+          showProblem(err, { doing: 'creating the page', toasts });
         }
       })();
     });

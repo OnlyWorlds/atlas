@@ -18,6 +18,27 @@ import { ToastManager } from '../ui/toast-manager';
 import type { WorldsRegistry } from '../core/types';
 import { escapeAttr, escapeText } from '../core/dom-utils';
 import { AccountClient, accountErrorMessage } from '../sync/account-client';
+import { OwV2Error } from '../sync/ow-v2-client-adapter';
+import { classifyError, problemFor } from '../core/problems';
+import { CANNOT_REACH_LINE } from '../setup/key-check-errors';
+
+/**
+ * The sign-in error line (B6, S369). `accountErrorMessage`'s code branches
+ * (revoked, not recognised, rate limited) are written copy and stay; its
+ * fallback read out the server's or the browser's raw text, so every other
+ * error is worded here.
+ */
+export function signInErrorLine(err: unknown): string {
+  if (err instanceof OwV2Error) {
+    if (err.code === 'key_revoked' || err.status === 401 || err.code === 'rate_limited') return accountErrorMessage(err);
+    if (err.status === 429) return 'Too many attempts. Wait a moment and try again.';
+    if (err.status >= 400 && err.status < 500) {
+      return 'OnlyWorlds did not accept that account token. Check it on onlyworlds.com, under Settings, then Account tokens.';
+    }
+  }
+  if (classifyError(err) === 'offline') return CANNOT_REACH_LINE;
+  return problemFor(err, { inline: true, doing: 'signing in' }).sentence;
+}
 
 export function renderAccountTab(reg: WorldsRegistry): string {
   return `
@@ -148,7 +169,8 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
       // The settings panel re-renders from the registry patch; the block
       // flips to the signed-in state on that pass.
     } catch (err) {
-      showError(accountErrorMessage(err));
+      console.warn('[settings] sign-in failed:', err);
+      showError(signInErrorLine(err));
       signInBtn.disabled = false;
       signInBtn.textContent = 'sign in';
     }
