@@ -114,8 +114,9 @@ export interface FolderStore {
    * UI flows must use the default to avoid orphaning dependents.
    *
    * Pass `silent: true` to remove the file WITHOUT writing tombstones. Used by
-   * id-swap during Route 2 merge — the local file at the old id never had a
-   * server counterpart, so no DELETE should propagate. Silent also implies
+   * the re-key kernel (removing the old id after the copy at the new one,
+   * and on rollback) and by the engine's resolution of a server-side delete:
+   * no DELETE should propagate for either. Silent also implies
    * `cascade: false` (silent delete is a surgical operation, not a sweep).
    */
   deleteElement(id: string, opts?: { cascade?: boolean; silent?: boolean }): Promise<{ tombstones: Tombstone[] }>;

@@ -1475,8 +1475,9 @@ export class FsFolderStore implements FolderStore {
    * Found reviewing the toolkit's in-place editing rules: the cache is
    * filled at open and atlas does not watch the folder, so before this every
    * atlas edit wrote its stale copy over an outside edit to the same
-   * element. One file read per write; a file that vanished or will not parse
-   * falls back to the cache (the pre-S359 behaviour), never to a failure.
+   * element. One file read per write; a file that vanished falls back to the
+   * cache (the pre-S359 behaviour), and a file that will not parse throws
+   * `CorruptFileError` (S361, conv. 99): it is never written over.
    * Seeing outside edits WITHOUT an atlas write (lists, the open element) is
    * a separate question: the reopen/revive bout.
    */
