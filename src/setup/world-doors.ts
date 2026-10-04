@@ -23,7 +23,9 @@ import { getState, patchSlice } from '../core/state';
 import { saveRegistry, deleteWorldEntry } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
 import { BaseModal } from '../ui/modal-base';
-import { PICKER_CANCELLED_HINT } from '../ui/directory-picker';
+import { NO_FOLDER_PICKER_LINE, PICKER_CANCELLED_HINT } from '../ui/directory-picker';
+import { hasFolderMode } from '../core/capabilities';
+import { PlainError } from '../core/plain-error';
 import { isTourFlagActive } from '../tour/tour-flag';
 import type { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
@@ -203,6 +205,12 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
     return;
   }
   if (action === 'open-folder') {
+    // Folder-only (conv. 129): the door is hidden where the picker is missing;
+    // this is the backstop, said plainly rather than as a bug.
+    if (!hasFolderMode()) {
+      showProblem(new PlainError(NO_FOLDER_PICKER_LINE), { doing: 'choosing a folder', folder: 'picked', toasts });
+      return;
+    }
     await pickAndOpenWorldFolder(toasts);
     return;
   }
@@ -260,7 +268,8 @@ class AddWorldChooser extends BaseModal {
 
   open(): void {
     const { overlay, body } = this.buildModalShell({ title: 'Add a world', dataModal: 'add-world' });
-    body.innerHTML = `<div class="atlas-add-world-list">${CHOICES.map(c => `
+    const rows = CHOICES.filter(c => c.action !== 'open-folder' || hasFolderMode());
+    body.innerHTML = `<div class="atlas-add-world-list">${rows.map(c => `
       <button type="button" class="atlas-add-world-row" data-choice="${c.action}">
         <span class="material-symbols-outlined atlas-add-world-icon" aria-hidden="true">${c.icon}</span>
         <span class="atlas-add-world-text"><strong>${c.title}</strong><span>${c.line}</span></span>

@@ -2977,6 +2977,14 @@ body.atlas-preroot .atlas-middle {
   color: var(--atlas-text-muted);
 }
 
+/* A browser world the browser cleared (1.17, conv. 129): the warn tokens,
+   which flip with the theme. The row stays until the user removes it. */
+.atlas-world-state-chip.cleared {
+  background: var(--atlas-warn-soft-tint);
+  color: var(--atlas-warn);
+  font-weight: 500;
+}
+
 /* "On OnlyWorlds" — account worlds not yet on disk (account mode, S260).
    Dimmed rows below the local list; opening one downloads it and it moves up. */
 .atlas-remote-worlds {

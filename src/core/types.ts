@@ -468,7 +468,12 @@ export interface WorldRegistryEntry {
    * reappears "On OnlyWorlds" and re-opening it would duplicate the folder.
    */
   former_api_world_id?: string;
-  /** Present for every world — Atlas always has a folder. */
+  /**
+   * Every world is a folder of files: on the user's drive, or in this
+   * browser's storage (`where`, 1.17). For a browser world `folder_name` is
+   * its directory under `browser-worlds/` and `handle_key` stays its identity
+   * (`world-<id>`) though no vault entry is kept for it.
+   */
   folder: {
     handle_key: string;
     folder_name: string;
@@ -503,6 +508,19 @@ export interface WorldRegistryEntry {
   tour_dismissed?: string[];
   /** Mirror of `WorldMeta.demo` — the bundled sample world. Gestures in a demo world never complete waypoints. */
   demo?: boolean;
+  /**
+   * Where the world lives (1.17): `'browser'` = in this browser's storage,
+   * under `browser-worlds/`; absent = a folder (vault handle). Top level, not
+   * inside `folder`, so the two-tab registry merge carries it as one field.
+   * Read through `isBrowserWorld` (`core/browser-worlds.ts`).
+   */
+  where?: 'browser';
+  /**
+   * When Atlas found a browser world's storage gone (the browser cleared it).
+   * The entry is kept, with its `api` block, until the user removes it
+   * (DESIGN_LAWS conv. 129).
+   */
+  cleared_at?: string;
   created_at: string;
   last_opened_at?: string;
   /**

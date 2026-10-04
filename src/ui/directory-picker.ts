@@ -8,6 +8,8 @@
  * Returns null if the user cancels (AbortError).
  */
 
+import { PlainError } from '../core/plain-error';
+
 interface TestApiPick {
   pickDirectory?: () => Promise<FileSystemDirectoryHandle | null>;
 }
@@ -25,6 +27,10 @@ declare global {
  * returns exactly like a cancel, so "Change folder" looked like it did
  * nothing at all. One quiet line covers both readings.
  */
+/** Said when a folder door is reached on a browser without the folder picker. */
+export const NO_FOLDER_PICKER_LINE =
+  'This browser cannot open folders. Worlds here live in this browser instead.';
+
 export const PICKER_CANCELLED_HINT =
   'No folder chosen. If the picker refused one, choose a subfolder: the browser does not open the top of Desktop, Documents or Downloads.';
 
@@ -34,7 +40,8 @@ export async function pickDirectory(): Promise<FileSystemDirectoryHandle | null>
     return test.pickDirectory();
   }
   if (!window.showDirectoryPicker) {
-    throw new Error('File System Access API is not available. Atlas requires Chromium.');
+    // A backstop: folder doors are hidden where the picker is missing (conv. 129).
+    throw new PlainError(NO_FOLDER_PICKER_LINE);
   }
   try {
     return await window.showDirectoryPicker({ mode: 'readwrite' });

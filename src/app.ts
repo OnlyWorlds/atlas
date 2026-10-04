@@ -27,7 +27,10 @@ import { installContextTabLifecycle } from './tabs/right/context-tab-lifecycle';
 import { openMapTab } from './tabs/right/map-index-tab';
 import { loadPersistedRightTabs } from './tabs/right/right-tabs-persistence';
 import { toastManager, ToastManager } from './ui/toast-manager';
-import { loadRegistry, adoptStoredRegistry } from './registry/registry';
+import { loadRegistry, adoptStoredRegistry, saveRegistry } from './registry/registry';
+import { enqueueActivationTask } from './core/activation-chain';
+import { hasOpfsMode } from './core/capabilities';
+import { isTourFlagActive } from './tour/tour-flag';
 import { REGISTRY_STORAGE_KEY } from './core/constants';
 import { patchSlice, getState, subscribe, type MiddleMode } from './core/state';
 import { loadUiPrefs } from './core/ui-prefs';
@@ -75,7 +78,30 @@ export function startApp(container: HTMLElement): AppHandle {
     });
   }
   // Resolve atlas root reference (runtime info only; handle stays in vault).
-  void hydrateAtlasRoot();
+  const rootHydrated = hydrateAtlasRoot();
+
+  // The browser home's reconciliation (1.17, conv. 129): FIRST in the
+  // activation chain, so no activation, resume or make in this tab runs
+  // before it. It re-adopts browser worlds the registry lost, removes crashed
+  // makes, marks worlds the browser cleared, and deletes nothing else.
+  void enqueueActivationTask(async () => {
+    await rootHydrated.catch(() => {});
+    if (!hasOpfsMode()) return;
+    try {
+      const { reconcileBrowserHome } = await import('./core/browser-home');
+      const before = getState().registry;
+      const out = await reconcileBrowserHome(before, { tourActive: isTourFlagActive() });
+      if (out.next !== before) {
+        saveRegistry(out.next);
+        patchSlice('registry', out.next);
+      }
+      if (out.adopted.length || out.removed.length || out.cleared.length || out.stale.length) {
+        console.info('[browser-home] reconciled', { adopted: out.adopted, removed: out.removed, cleared: out.cleared.length, stale: out.stale });
+      }
+    } catch (err) {
+      console.warn('[browser-home] reconciliation skipped', err); // raw-error-ok: a console record, never shown
+    }
+  });
 
   // Mount toast surface (uses #toast-container element from index.html)
   toastManager.init();

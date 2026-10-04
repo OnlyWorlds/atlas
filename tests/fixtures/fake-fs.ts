@@ -109,6 +109,17 @@ export class FakeDirHandle {
     };
     detach(c);
   }
+  /** The path from this directory to a descendant, or null (as OPFS `resolve()`). */
+  async resolve(target: FakeDirHandle | FakeFileHandle): Promise<string[] | null> {
+    for (const [name, child] of this.children) {
+      if (child === target) return [name];
+      if (child.kind === 'directory') {
+        const rest = await (child as FakeDirHandle).resolve(target);
+        if (rest) return [name, ...rest];
+      }
+    }
+    return null;
+  }
   async *values() { for (const v of [...this.children.values()]) yield v; }
   async *entries() { for (const [k, v] of [...this.children.entries()]) yield [k, v] as const; }
   async *keys() { for (const k of [...this.children.keys()]) yield k; }

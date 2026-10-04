@@ -11,10 +11,11 @@ import { sweepTourFolders } from '../../src/tour/tour-engine';
 const j = (v: unknown) => JSON.stringify(v, null, 2) + '\n';
 
 describe('sweepTourFolders', () => {
-  it('removes tour worlds and interrupted scaffolds, keeps a user world with the same name', async () => {
+  it('removes tour worlds and empty interrupted scaffolds, keeps a user world with the same name and a world.json-less folder holding elements', async () => {
     const root = new FakeDirHandle('opfs');
     root.put('hyperion-tour-aaaaaaaa/world.json', j({ id: 'a', name: 'Hyperion', demo: true }));
-    root.put('hyperion-tour-bbbbbbbb/elements/character/x.json', j({ id: 'x' })); // no world.json yet
+    root.put('hyperion-tour-bbbbbbbb/elements/character/.keep', ''); // no world.json yet, no element file
+    root.put('hyperion-tour-ffffffff/elements/character/x.json', j({ id: 'x' })); // no world.json, but elements: keep (S370)
     root.put('hyperion-tour-cccccccc/world.json', j({ id: 'c', name: 'Hyperion Tour' })); // the user's
     root.put('hyperion-tour-dddddddd/world.json', '{ not json'); // unreadable: keep
     root.put('my-world-eeeeeeee/world.json', j({ id: 'e', name: 'Mine', demo: true })); // not nominated
@@ -22,6 +23,7 @@ describe('sweepTourFolders', () => {
     expect(removed.sort()).toEqual(['hyperion-tour-aaaaaaaa', 'hyperion-tour-bbbbbbbb']);
     expect(root.get('hyperion-tour-cccccccc/world.json')).not.toBeNull();
     expect(root.get('hyperion-tour-dddddddd/world.json')).not.toBeNull();
+    expect(root.get('hyperion-tour-ffffffff/elements/character/x.json')).not.toBeNull();
     expect(root.get('my-world-eeeeeeee/world.json')).not.toBeNull();
   });
 });

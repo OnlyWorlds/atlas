@@ -8,6 +8,7 @@
  * and the footer gear (in shell.sidebarFooter).
  */
 
+import { hasFolderMode } from '../core/capabilities';
 import { isAtlasGrounded } from '../core/grounded';
 import { addWorldLabel, openAddWorldChooser, runAddWorldAction, type AddWorldAction } from '../setup/world-doors';
 import { currentActivationGen, enqueueActivation } from '../core/activation-chain';
@@ -27,7 +28,8 @@ import {
 import { getState, patchSlice, subscribe } from '../core/state';
 import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused } from '../registry/registry';
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
-import { deleteHandle, ensureWritable, loadHandle, queryWritable } from '../store/handle-vault';
+import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vault';
+import { deriveBrowserWorldHandle, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
 import type { WorldRegistryEntry } from '../core/types';
@@ -98,7 +100,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // would otherwise read the glyphs' ligature text ("add folder_open").
       const icons = state.registry.worlds_add_icons === false ? '' : `<div class="atlas-worlds-add-icons">
         ${addIconButton('create-local', 'folder', 'Start a new world: a new folder inside your OnlyWorlds folder')}
-        ${addIconButton('open-folder', 'folder_open', 'Open a world folder you already have. It opens where it is; nothing is copied.')}
+        ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder you already have. It opens where it is; nothing is copied.') : ''}
         ${addIconButton('new-api', 'cloud_upload', 'New world on OnlyWorlds: made on onlyworlds.com and on your drive')}
         ${addIconButton('link-api', 'link', 'Bring down a world from OnlyWorlds with its API key')}
         ${addIconButton('view-api', 'visibility', 'View a shared world with a read key, view only')}
@@ -252,6 +254,20 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   installRowKeydownActivation(listEl);
   listEl.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
+    const removeBtn = target.closest<HTMLElement>('[data-role="remove-cleared"]');
+    if (removeBtn) {
+      // A world the browser cleared leaves the list only on the user's word
+      // (conv. 129); its storage is already gone, so nothing else is removed.
+      e.stopPropagation();
+      const worldId = removeBtn.getAttribute('data-world-id')!;
+      const entry = getState().registry.worlds.find(w => w.id === worldId);
+      if (!entry?.cleared_at) return;
+      if (!window.confirm(`Remove "${entry.name}" from your list? The browser has already cleared its storage.`)) return;
+      const next = deleteWorldEntry(getState().registry, worldId);
+      saveRegistry(next);
+      patchSlice('registry', next);
+      return;
+    }
     const favBtn = target.closest<HTMLElement>('[data-role="fav-toggle"]');
     if (favBtn) {
       e.stopPropagation();
@@ -457,11 +473,18 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   // View-only worlds (S264, read-key link): the EYE is the identity — the row
   // says at a glance this world is someone else's, read-not-write.
   const viewOnly = world.state === 'api-linked' && !!world.api?.read_only;
-  const stateIcon = viewOnly ? 'visibility'
+  // A world in this browser's storage carries its own glyph (conv. 129);
+  // one the browser cleared says so in the row, never "folder".
+  const inBrowser = isBrowserWorld(world);
+  const cleared = inBrowser && !!world.cleared_at && world.demo !== true;
+  const stateIcon = cleared ? 'browser_not_supported'
+    : viewOnly ? 'visibility'
     : world.state === 'api-linked'
       ? (isPaused ? 'cloud_off' : 'cloud')
-      : 'folder';
-  const stateChip = viewOnly
+      : inBrowser ? 'web' : 'folder';
+  const stateChip = cleared
+    ? '<span class="atlas-world-state-chip cleared" title="Cleared by this browser">cleared</span>'
+    : viewOnly
     ? '<span class="atlas-world-state-chip view-only">view</span>'
     : world.state === 'api-linked'
       ? '<span class="atlas-world-state-chip api-linked">online</span>'
@@ -478,7 +501,14 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
           <span class="material-symbols-outlined">${world.sync_paused ? 'play_arrow' : 'pause'}</span>
         </button>`
     : '';
-  const pathHint = world.folder?.last_path_hint ?? '';
+  const pathHint = cleared
+    ? 'Cleared by this browser: its storage for this world is gone.'
+    : inBrowser ? 'Stored in this browser' : world.folder?.last_path_hint ?? '';
+  const removeCleared = cleared
+    ? `<button type="button" class="atlas-icon-btn-sm" data-role="remove-cleared" data-world-id="${escapeAttr(world.id)}" title="Remove from the list" aria-label="Remove from the list">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>`
+    : '';
   const stateIconHtml = world.state === 'api-linked'
     ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="Refresh from API">
         <span class="material-symbols-outlined">${stateIcon}</span>
@@ -489,7 +519,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
       ${stateIconHtml}
       <span class="atlas-row-main">${escapeText(world.name)}</span>
       ${stateChip}
-      <span class="atlas-inline-actions">${syncActions}
+      <span class="atlas-inline-actions">${syncActions}${removeCleared}
         <button type="button" class="atlas-icon-btn-sm fav-btn ${favCls}" data-role="fav-toggle" data-world-id="${escapeAttr(world.id)}" title="${world.favorite ? 'Unfavorite' : 'Favorite'}">
           <span class="material-symbols-outlined">${favIcon}</span>
         </button>
@@ -674,7 +704,31 @@ async function doActivateWorld(
     patchSlice('data', { ...getState().data, loading: true, loadingProgress: null });
   }
 
-  const handle = await loadHandle(entry.folder.handle_key);
+  // The world's directory: derived for a browser world (conv. 129), from the
+  // vault for a folder world. A browser world whose directory the browser no
+  // longer holds keeps its row (and its link) as "Cleared by this browser";
+  // the tour's sandbox is torn down instead, and the tour rebuilds it.
+  let resolved: Awaited<ReturnType<typeof worldHandleFor>>;
+  try {
+    resolved = await worldHandleFor(entry);
+  } catch (err) {
+    console.warn('[worlds-sidebar] could not reach the world', err);
+    if (!silent) showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
+    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    return false;
+  }
+  if (resolved.kind === 'gone') {
+    settleGoneBrowserWorld(entry, silent, toasts);
+    if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+    return false;
+  }
+  if (isBrowserWorld(entry) && entry.cleared_at) {
+    // Its directory is back (a restore that finished, or a mark made in error).
+    const back = unmarkWorldCleared(getState().registry, worldId);
+    saveRegistry(back);
+    patchSlice('registry', back);
+  }
+  const handle = resolved.kind === 'ok' ? resolved.handle : null;
   if (!handle) {
     // NEVER advise deletion here. The files are intact on disk — only the
     // browser's handle to them is gone (cleared storage, another profile, a
@@ -687,15 +741,19 @@ async function doActivateWorld(
       toasts.show(
         `Atlas lost access to the folder of "${entry.name}". Your files are safe. Open the folder and pick it again to reconnect.`,
         'error', 8000,
-        { actions: [{ label: 'Open the folder', run: () => runAddWorldAction('open-folder', toasts) }] },
+        // The fix is a folder pick, which only a folder-mode browser has.
+        hasFolderMode() ? { actions: [{ label: 'Open the folder', run: () => runAddWorldAction('open-folder', toasts) }] } : undefined,
       );
     }
     if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
     return false;
   }
-  const granted = permissionMode === 'query'
-    ? await queryWritable(handle)
-    : await ensureWritable(handle);
+  // Browser storage needs no permission; only a folder on the drive asks.
+  const granted = isBrowserWorld(entry)
+    ? true
+    : permissionMode === 'query'
+      ? await queryWritable(handle)
+      : await ensureWritable(handle);
   if (!granted) {
     // Worded as a disk-permission problem (S369), whose fix is Allow access:
     // it asks for this world's folder inside the click, then opens it again.
@@ -750,6 +808,21 @@ async function doActivateWorld(
     // IDB is now a dead reference — clean up the registry entry + handle so
     // the world stops appearing in the sidebar. No data loss: the folder is
     // already gone; we're just removing the pointer to it.
+    // A browser world removed between the derive and the open: re-derive.
+    // Gone = cleared (the row stays); anything else is a problem. This catch
+    // never deletes a browser world's entry (S370 gate B10).
+    if (isBrowserWorld(entry) && isFolderMissing(err)) {
+      evictParkedStore(worldId);
+      let gone = false;
+      try { await deriveBrowserWorldHandle(entry); } catch (e) { gone = isGoneError(e); }
+      if (gone) {
+        settleGoneBrowserWorld(entry, silent, toasts);
+      } else if (!silent) {
+        showProblem(err, { doing: 'opening this world', worldId, toasts, retry: () => { void activateWorld(worldId, toasts); } });
+      }
+      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      return false;
+    }
     if (isFolderMissing(err)) {
       // Confirm against the filesystem before destroying anything. The error
       // name alone is not evidence: it can come from any one of the ~30
@@ -947,6 +1020,29 @@ function navigateAfterActivate(worldId: string): void {
     // independent state — activation doesn't dictate sidebar mode.
     navigate(worldHash(worldId));
   }
+}
+
+/**
+ * A browser world whose directory is gone (conv. 129). A world of the user's
+ * own keeps its row, marked "Cleared by this browser", with its link intact,
+ * until the user removes it. The tour's sandbox is removed as before and the
+ * tour rebuilds it when it resumes (S370 gate B7).
+ */
+function settleGoneBrowserWorld(entry: WorldRegistryEntry, silent: boolean, toasts: ToastManager): void {
+  evictParkedStore(entry.id);
+  if (entry.demo === true) {
+    void deleteHandle(entry.folder.handle_key).catch(() => {});
+    const cleaned = deleteWorldEntry(getState().registry, entry.id);
+    saveRegistry(cleaned);
+    patchSlice('registry', cleaned);
+    return;
+  }
+  if (!entry.cleared_at) {
+    const marked = markWorldCleared(getState().registry, entry.id);
+    saveRegistry(marked);
+    patchSlice('registry', marked);
+  }
+  if (!silent) toasts.info(`"${entry.name}" was cleared by this browser, so it is no longer here.`);
 }
 
 /**

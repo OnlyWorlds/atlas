@@ -84,13 +84,25 @@ describe('activateWorld failure copy (S369)', () => {
     expect(said[0].text).toMatch(/no longer in your list/);
   });
 
-  it('a lost handle offers "Open the folder"', async () => {
+  it('a lost handle offers "Open the folder" where the browser can pick folders', async () => {
+    (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker = () => Promise.resolve(null);
+    try {
+      const said: Said[] = [];
+      expect(await activateWorld('entry-1', fakeToasts(said))).toBe(false);
+      expect(said).toHaveLength(1);
+      expect(said[0].kind).toBe('error');
+      expect(said[0].actions).toEqual(['Open the folder']);
+      expect(said[0].text).toMatch(/Your files are safe/);
+    } finally {
+      delete (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker;
+    }
+  });
+
+  it('without a folder picker the lost-handle toast offers no folder button (1.17, conv. 129)', async () => {
     const said: Said[] = [];
     expect(await activateWorld('entry-1', fakeToasts(said))).toBe(false);
     expect(said).toHaveLength(1);
-    expect(said[0].kind).toBe('error');
-    expect(said[0].actions).toEqual(['Open the folder']);
-    expect(said[0].text).toMatch(/Your files are safe/);
+    expect(said[0].actions ?? []).toEqual([]);
   });
 
   it('a refused permission is a disk-permission problem with Allow access', async () => {
@@ -165,6 +177,7 @@ describe('signInErrorLine (S369, B6)', () => {
 
 describe('add-a-world icons (S369, 1g)', () => {
   it('every icon button has a title and an aria-label; the glyphs are hidden', () => {
+    (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker = () => Promise.resolve(null);
     patchSlice('atlasRoot', { folderName: 'onlyworlds-atlas', pathHint: 'Docs/onlyworlds-atlas' });
     const content = document.createElement('div');
     document.body.appendChild(content);
@@ -180,6 +193,20 @@ describe('add-a-world icons (S369, 1g)', () => {
       'Start a new world', 'Open a world folder', 'New world on OnlyWorlds',
       'Bring down a world from OnlyWorlds', 'View a shared world',
     ]);
+    unmount();
+    content.remove();
+    patchSlice('atlasRoot', null);
+    delete (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker;
+  });
+
+  it('without a folder picker the open-folder icon is not offered (1.17, conv. 129)', () => {
+    patchSlice('atlasRoot', { folderName: 'onlyworlds-atlas', pathHint: 'Docs/onlyworlds-atlas' });
+    const content = document.createElement('div');
+    document.body.appendChild(content);
+    const unmount = mountWorldsBody({ content, toasts: fakeToasts([]) });
+    const labels = [...content.querySelectorAll<HTMLButtonElement>('.atlas-create-icon-btn')].map(b => b.getAttribute('aria-label'));
+    expect(labels).not.toContain('Open a world folder');
+    expect(labels).toHaveLength(4);
     unmount();
     content.remove();
     patchSlice('atlasRoot', null);

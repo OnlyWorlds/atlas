@@ -27,12 +27,13 @@
  */
 
 import { getState, patchSlice } from '../core/state';
-import { getActiveStore, setActiveStore } from '../core/active-store';
+import { awaitEviction, evictParkedStore, getActiveStore, setActiveStore } from '../core/active-store';
 import { navigate, elementHash, mapHash, writingHash, timelineHash } from '../core/router';
 import { saveRegistry, deleteWorldEntry } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
 import { detachSyncEngine } from '../sync/sync-attach';
-import type { Element, ElementType } from '../core/types';
+import type { Element, ElementType, WorldRegistryEntry } from '../core/types';
+import { isBrowserWorld, removeBrowserWorldDir } from '../core/browser-worlds';
 import { isQuietRef, TOUR_MAP_REF, TOUR_PIN_REF, TOUR_STEPS, type TourStep } from './tour-data';
 import { mergeHealArray } from './tour-heal';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
@@ -1112,6 +1113,30 @@ export async function isTourFolder(dir: FileSystemDirectoryHandle): Promise<bool
 }
 
 /**
+ * A folder with no world.json that still holds element files is not provably
+ * the tour's (a world whose world.json was lost): keep it (S370, lane C row i).
+ * A tour folder WITH its world.json saying demo is the tour's whatever it holds.
+ */
+async function holdsUnclaimedElements(dir: FileSystemDirectoryHandle): Promise<boolean> {
+  try {
+    await dir.getFileHandle('world.json');
+    return false;
+  } catch { /* no world.json: look for element files */ }
+  try {
+    const elements = await dir.getDirectoryHandle('elements');
+    const types = (elements as unknown as { values(): AsyncIterable<FileSystemHandle> }).values();
+    for await (const t of types) {
+      if (t.kind !== 'directory') continue;
+      const files = (t as unknown as { values(): AsyncIterable<FileSystemHandle> }).values();
+      for await (const f of files) {
+        if (f.kind === 'file' && f.name.endsWith('.json')) return true;
+      }
+    }
+  } catch { /* no elements directory */ }
+  return false;
+}
+
+/**
  * Remove prior tour folders from browser storage. A tour folder is named
  * `hyperion-tour-<uuid8>`, but so is a user's world called "Hyperion Tour"
  * (the same scaffold names both), so the NAME only nominates: a folder goes
@@ -1123,11 +1148,30 @@ export async function sweepTourFolders(opfs: FileSystemDirectoryHandle): Promise
   const entries = (opfs as unknown as { entries(): AsyncIterable<[string, FileSystemHandle]> }).entries();
   for await (const [name, handle] of entries) {
     if (!name.startsWith(TOUR_FOLDER) || handle.kind !== 'directory') continue;
-    if (await isTourFolder(handle as FileSystemDirectoryHandle)) {
+    if (await isTourFolder(handle as FileSystemDirectoryHandle) && !(await holdsUnclaimedElements(handle as FileSystemDirectoryHandle))) {
       await opfs.removeEntry(name, { recursive: true }).then(() => removed.push(name), () => {});
     }
   }
   return removed;
+}
+
+/**
+ * Which registry entry is the tour's sandbox? (S370 gate A4/B13.) The one the
+ * tour state names, but only while it is still demo (a kept world is not the
+ * tour's to delete); else a demo world in browser storage (the scaffold-race
+ * rollback runs with no tour state); else a 1.16 tour entry (no `where`, its
+ * folder at the OPFS root under the old prefix).
+ */
+export function pickTourEntry(
+  worlds: readonly WorldRegistryEntry[],
+  priorWorldId: string | undefined | null,
+): WorldRegistryEntry | undefined {
+  if (priorWorldId) {
+    const named = worlds.find(w => w.id === priorWorldId && w.demo === true);
+    if (named) return named;
+  }
+  return worlds.find(w => w.demo === true && isBrowserWorld(w))
+    ?? worlds.find(w => w.demo === true && !w.where && w.folder.folder_name.startsWith(TOUR_FOLDER));
 }
 
 /** Remove the tour world entirely (registry entry + handle + OPFS folder). */
@@ -1140,7 +1184,7 @@ async function teardownPriorTourWorld(): Promise<void> {
   }
   const prior = readTourState();
   const reg = getState().registry;
-  const entry = reg.worlds.find(w => (prior && prior.worldId && w.id === prior.worldId) || (w.demo === true && w.folder.folder_name.startsWith(TOUR_FOLDER)));
+  const entry = pickTourEntry(reg.worlds, prior?.worldId);
   if (entry) {
     const store = getActiveStore();
     if (getState().active?.worldId === entry.id && store) {
@@ -1149,6 +1193,13 @@ async function teardownPriorTourWorld(): Promise<void> {
       detachSyncEngine();
       patchSlice('active', null);
       patchSlice('data', { elements: [] });
+    }
+    // A tour world in the browser home goes by its registered entry, never by
+    // name (contract §1.2); a parked store for it is closed first.
+    if (isBrowserWorld(entry)) {
+      evictParkedStore(entry.id);
+      await awaitEviction(entry.id);
+      await removeBrowserWorldDir(entry).catch(err => console.warn('[tour] could not remove the tour world', err));
     }
     const next = deleteWorldEntry(reg, entry.id);
     saveRegistry(next);

@@ -13,6 +13,7 @@
  * folder; Mode B merges into the active world (convention #81-85).
  */
 
+import { isAtlasOnlyStorage } from '../core/browser-worlds';
 import { getActiveStore } from '../core/active-store';
 import { ELEMENT_ICONS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
 import { escapeText } from '../core/dom-utils';
@@ -167,10 +168,10 @@ let carriedPayload: { text: string; sourceLabel: string; pasted: boolean } | nul
 
 export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () => void {
   // The folder half of the AI story (S365): only where it is true, a real
-  // folder (not the tour's browser-storage world, which the live folder skips).
+  // folder (not a world in browser storage, which no other program can reach).
   const activeId = getState().active?.worldId;
-  const onTourWorld = getState().registry.worlds.find(w => w.id === activeId)?.demo === true;
-  const agentLine = hasFolderMode() && !onTourWorld
+  const inBrowser = isAtlasOnlyStorage(getState().registry.worlds.find(w => w.id === activeId));
+  const agentLine = hasFolderMode() && !inBrowser
     ? '<p class="atlas-import-ai-note">Or let an AI assistant edit this world\'s folder directly: Atlas shows its changes when you come back to this window.</p>'
     : '';
   target.innerHTML = '';

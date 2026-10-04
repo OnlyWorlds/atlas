@@ -19,6 +19,7 @@
  * for the manifest design to decide (Captain's ruling, S364).
  */
 
+import { isAtlasOnlyStorage } from './browser-worlds';
 import { getState, patchSlice } from './state';
 import { getActiveStore } from './active-store';
 import { isZoneGestureActive } from './zone-gesture';
@@ -274,10 +275,11 @@ export function rescanNow(opts: { force?: boolean; full?: boolean } = {}): Promi
   }
   const ui = getState().ui;
   // A zone drag or a pin placement holds positions the store has not seen
-  // yet; the next focus after it finishes runs the pass. The tour world is
-  // Atlas's own scaffold; asked of the ACTIVE world, not the tour flag,
-  // which is shared by every tab (S365 lane B L1).
-  const touring = getState().registry.worlds.find(w => w.id === worldId)?.demo === true;
+  // yet; the next focus after it finishes runs the pass. A world in browser
+  // storage (and the tour's sandbox) can only be written by Atlas tabs, under
+  // the lock, so there is nothing outside to notice (conv. 129); asked of the
+  // ACTIVE world, not the tour flag, which is shared by every tab (S365 L1).
+  const touring = isAtlasOnlyStorage(getState().registry.worlds.find(w => w.id === worldId));
   if (getState().data.loading || touring || isZoneGestureActive() || ui.pinPlacement) {
     return Promise.resolve({ changes: [], skipped: 'busy' });
   }
