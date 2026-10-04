@@ -32,7 +32,16 @@ export interface ApplyResult {
 
 export interface ApplyOptions {
   onProgress?: (p: ApplyProgress) => void;
+  /**
+   * Into a world in browser storage (1.17, contract §2.2): the browser's
+   * storage filling up is fatal to the whole import, so the first
+   * QuotaExceededError is rethrown instead of recorded (a full origin would
+   * otherwise leave 0-byte files and a world registered half-imported).
+   */
+  stopOnQuota?: boolean;
 }
+
+const isQuota = (err: unknown) => (err as { name?: unknown } | null)?.name === 'QuotaExceededError';
 
 export async function applyImportPlan(
   store: FolderStore,
@@ -61,6 +70,7 @@ export async function applyImportPlan(
         created++;
       }
     } catch (err) {
+      if (opts.stopOnQuota && isQuota(err)) throw err;
       failures.push({ element_id: id ?? '', type: c.type, operation: 'create', message: errMsg(err), ...errName(err) });
     }
     opts.onProgress?.({ done: ++done, total, phase: 'create' });
@@ -72,6 +82,7 @@ export async function applyImportPlan(
       existingIds.add(u.id);
       updated++;
     } catch (err) {
+      if (opts.stopOnQuota && isQuota(err)) throw err;
       failures.push({ element_id: u.id, type: u.type, operation: 'update', message: errMsg(err), ...errName(err) });
     }
     opts.onProgress?.({ done: ++done, total, phase: 'update' });

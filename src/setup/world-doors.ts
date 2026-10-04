@@ -220,7 +220,13 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
     'link-api': 'Linking a world downloads it into a new folder.',
     'view-api': 'Viewing a shared world downloads it into a new folder.',
   };
-  if (!(await ensureAtlasRoot(toasts, purpose[action]))) return;
+  // Where it goes (1.17, conv. 129): the create dialog asks for itself; the
+  // other doors use the home folder when set, else this browser, and ask for
+  // a home folder only when the folder is the destination.
+  if (action !== 'create-local') {
+    const { defaultWorldWhere } = await import('./world-parent');
+    if (defaultWorldWhere() === 'folder' && !(await ensureAtlasRoot(toasts, purpose[action]))) return;
+  }
   if (action === 'create-local') {
     const { CreateWorldModal } = await import('../ui/create-world-modal');
     new CreateWorldModal(toasts).open();

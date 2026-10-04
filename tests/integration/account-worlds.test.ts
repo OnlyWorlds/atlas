@@ -241,6 +241,9 @@ describe('openAccountWorld — synchronous short-circuits', () => {
   });
 
   it('with no home folder it asks where worlds live; Cancel returns false and never mints (S365)', async () => {
+    // A folder destination (1.17): the picker exists and the user last chose a folder.
+    (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker = () => Promise.resolve(null);
+    localStorage.setItem('atlas_ui_prefs', JSON.stringify({ sidebarMode: 'worlds', defaultCreateType: 'character', newWorldWhere: 'folder' }));
     const state = mount();
     patchSlice('registry', setAccountToken(defaultRegistry(), TOKEN, 'titus'));
     patchSlice('atlasRoot', null);
@@ -253,6 +256,8 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     expect(ok).toBe(false);
     expect(state.minted).toHaveLength(0);
     expect(toasts.calls.some(c => c.level === 'error')).toBe(false);
+    delete (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker;
+    localStorage.removeItem('atlas_ui_prefs');
   });
 
   it('returns false when the row is already represented in the registry', async () => {

@@ -20,6 +20,8 @@ import { CONTENT_ELEMENT_TYPES, type ElementType } from './types';
 export interface UiPrefs {
   sidebarMode: SidebarMode;
   defaultCreateType: ElementType;
+  /** Where the user last chose to put a new world (1.17); only read with no home folder. */
+  newWorldWhere?: 'folder' | 'browser';
 }
 
 /** Types the create modal can default to — content types plus 'map'. */
@@ -43,7 +45,8 @@ export function loadUiPrefs(): UiPrefs {
       parsed.defaultCreateType && CREATABLE_TYPES.includes(parsed.defaultCreateType)
         ? parsed.defaultCreateType
         : DEFAULT_PREFS.defaultCreateType;
-    return { sidebarMode, defaultCreateType };
+    const newWorldWhere = parsed.newWorldWhere === 'folder' || parsed.newWorldWhere === 'browser' ? parsed.newWorldWhere : undefined;
+    return { sidebarMode, defaultCreateType, ...(newWorldWhere ? { newWorldWhere } : {}) };
   } catch {
     return { ...DEFAULT_PREFS };
   }
@@ -59,6 +62,10 @@ export function saveUiPrefs(prefs: UiPrefs): void {
 
 export function setSidebarModePref(mode: SidebarMode): void {
   saveUiPrefs({ ...loadUiPrefs(), sidebarMode: mode });
+}
+
+export function setNewWorldWherePref(where: 'folder' | 'browser'): void {
+  saveUiPrefs({ ...loadUiPrefs(), newWorldWhere: where });
 }
 
 export function setDefaultCreateTypePref(type: ElementType): void {

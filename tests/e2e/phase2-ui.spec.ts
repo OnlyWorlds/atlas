@@ -128,7 +128,9 @@ test('create local world inside atlas root → sidebar + welcome + URL', async (
   await page.click('[data-action="create-local"]');
   await expect(page.locator('[data-modal="create-world"]')).toBeVisible();
   // No folder picker prompt — the modal hint references the existing root.
-  await expect(page.locator('.atlas-modal-hint')).toContainText('atlas-root-b');
+  // 1.17: the folder row is pre-selected and names the existing root.
+  await expect(page.locator('[data-modal="create-world"] .atlas-where-choice')).toContainText('atlas-root-b');
+  await expect(page.locator('[data-modal="create-world"] input[name="where"][value="folder"]')).toBeChecked();
 
   await page.fill('input[name="world-name"]', 'My First World');
   await page.click('[data-action="pick"]');

@@ -30,7 +30,9 @@ import {
   saveRegistry,
   findLinkedWorld,
   findWorldByServerId,
+  updateWorldEntry,
 } from '../registry/registry';
+import { isQuotaError, openBrowserMake, type BrowserMake } from '../core/browser-home';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { newId } from '../store/folder-store';
 import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-utils';
@@ -637,22 +639,75 @@ export async function scaffoldWorldInRoot(
   return { store, worldUuid, subName, handleKey, rootFolderName: rootLabel };
 }
 
-export async function createWorldInRoot(name: string): Promise<{ entry: WorldRegistryEntry }> {
-  const trimmed = name.trim() || 'Untitled world';
-  const { store, worldUuid, subName, handleKey, rootFolderName } = await scaffoldWorldInRoot(trimmed);
-  await store.writeWorldMeta({ id: worldUuid, name: trimmed });
+/** Said when a make into the browser home meets a full origin (contract §2.2). */
+export const BROWSER_STORAGE_FULL = (doing: string) =>
+  `This browser's storage for Atlas is full, so Atlas could not finish ${doing}. Free some space or move a world to a folder, then try again.`;
 
-  // Register + activate.
-  await releasePriorWorld();
-  const { next, entry } = createLocalWorld(getState().registry, {
+/**
+ * Make a world in this browser's storage (1.17, conv. 129): a fresh nonced
+ * directory under `browser-worlds/`, held by the make's Web Lock with
+ * `.atlas/making` until the caller's registry save (`make.finish`). Every
+ * failure after this must close the store and `make.abort()`.
+ */
+export async function scaffoldBrowserWorld(name: string, adoptId?: string): Promise<{
+  store: FsFolderStore; worldUuid: string; subName: string; handleKey: string; make: BrowserMake;
+}> {
+  const trimmed = name.trim() || 'Untitled world';
+  const worldUuid = adoptId ?? newId();
+  const make = await openBrowserMake(trimmed, worldUuid);
+  const store = new FsFolderStore();
+  try {
+    await store.open(make.handle);
+  } catch (err) {
+    await store.close().catch(() => {});
+    await make.abort().catch(() => {});
+    throw err;
+  }
+  return { store, worldUuid, subName: make.dir, handleKey: `world-${worldUuid}`, make };
+}
+
+/** Undo a failed browser make: close its store, remove its directory, and word a full origin. */
+export async function abandonBrowserMake(store: FsFolderStore, make: BrowserMake, err: unknown, doing: string): Promise<never> {
+  await store.close().catch(() => {});
+  await make.abort().catch(e => console.warn('[browser-make] could not remove the half-made world', e)); // raw-error-ok: a console record
+  if (isQuotaError(err)) throw new PlainError(BROWSER_STORAGE_FULL(doing));
+  throw err;
+}
+
+export async function createWorldInRoot(
+  name: string,
+  opts: { where?: 'folder' | 'browser' } = {},
+): Promise<{ entry: WorldRegistryEntry }> {
+  const trimmed = name.trim() || 'Untitled world';
+  const inBrowser = opts.where === 'browser';
+  let store: FsFolderStore; let worldUuid: string; let subName: string; let handleKey: string;
+  let rootFolderName = 'browser storage';
+  let make: BrowserMake | null = null;
+  if (inBrowser) {
+    ({ store, worldUuid, subName, handleKey, make } = await scaffoldBrowserWorld(trimmed));
+    try {
+      await store.writeWorldMeta({ id: worldUuid, name: trimmed });
+      await releasePriorWorld();
+    } catch (err) {
+      return abandonBrowserMake(store, make, err, 'creating the world');
+    }
+  } else {
+    ({ store, worldUuid, subName, handleKey, rootFolderName } = await scaffoldWorldInRoot(trimmed));
+    await store.writeWorldMeta({ id: worldUuid, name: trimmed });
+    // Register + activate.
+    await releasePriorWorld();
+  }
+  const { next, entry: made } = createLocalWorld(getState().registry, {
     name: trimmed,
     folderName: subName,
     handleKey,
     pathHint: `${rootFolderName}/${subName}`,
   });
-  const activated = setActiveWorld(next, entry.id);
-  saveRegistry(activated);
-  patchSlice('registry', activated);
+  const placed = inBrowser ? updateWorldEntry(next, made.id, { where: 'browser' }) : next;
+  const entry = placed.worlds.find(w => w.id === made.id)!;
+  const activated = setActiveWorld(placed, entry.id);
+  const commit = () => { saveRegistry(activated); patchSlice('registry', activated); };
+  if (make) await make.finish(commit); else commit();
   // The store first (S364 gate lens C C9): a room mounts on the `active` patch
   // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
@@ -684,6 +739,8 @@ export async function createWorldFromImportedData(
     parentHandle?: { handle: FileSystemDirectoryHandle; label: string };
     /** ONLY the bundled sample world sets this (Bout OW demo-origin contract). */
     demo?: boolean;
+    /** Make the world in this browser's storage (1.17) instead of the home folder. */
+    where?: 'folder' | 'browser';
     /** Adopt this world id (the exported envelope's) instead of minting a fresh
      *  one — a lossless round-trip. The import room passes it only when no local
      *  world already uses it (S313). */
@@ -691,8 +748,12 @@ export async function createWorldFromImportedData(
   } = {},
 ): Promise<{ entry: WorldRegistryEntry; applied: ApplyResult }> {
   const name = (plan.worldMeta?.name ?? opts.name ?? '').trim() || 'Imported world';
-  const { store, worldUuid, subName, handleKey, rootFolderName } =
-    await scaffoldWorldInRoot(name, opts.parentHandle, opts.adoptWorldId);
+  const inBrowser = opts.where === 'browser';
+  let store: FsFolderStore; let worldUuid: string; let subName: string; let handleKey: string;
+  let rootFolderName = 'browser storage';
+  let make: BrowserMake | null = null;
+  if (inBrowser) ({ store, worldUuid, subName, handleKey, make } = await scaffoldBrowserWorld(name, opts.adoptWorldId));
+  else ({ store, worldUuid, subName, handleKey, rootFolderName } = await scaffoldWorldInRoot(name, opts.parentHandle, opts.adoptWorldId));
 
   // World metadata from the import; id/name forced to the scaffolded worldUuid
   // (which is the adopted id when the caller adopted one, else a fresh mint).
@@ -700,22 +761,29 @@ export async function createWorldFromImportedData(
   // it (an exported demo world must re-import as an ordinary world, or its
   // gestures would silently stop completing waypoints).
   const { demo: _dropDemo, ...importedMeta } = plan.worldMeta ?? {};
-  await store.writeWorldMeta({ ...importedMeta, id: worldUuid, name, ...(opts.demo ? { demo: true } : {}) });
-
-  // Apply the elements BEFORE the world goes active.
-  const applied = await applyImportPlan(store, plan, { onProgress: opts.onProgress });
-
-  await releasePriorWorld();
-  const { next, entry } = createLocalWorld(getState().registry, {
+  let applied: ApplyResult;
+  try {
+    await store.writeWorldMeta({ ...importedMeta, id: worldUuid, name, ...(opts.demo ? { demo: true } : {}) });
+    // Apply the elements BEFORE the world goes active. Into browser storage a
+    // full origin is fatal to the whole import (contract §2.2).
+    applied = await applyImportPlan(store, plan, { onProgress: opts.onProgress, stopOnQuota: inBrowser });
+    await releasePriorWorld();
+  } catch (err) {
+    if (make) return abandonBrowserMake(store, make, err, 'importing the world');
+    throw err;
+  }
+  const { next, entry: made } = createLocalWorld(getState().registry, {
     name,
     folderName: subName,
     handleKey,
     pathHint: `${rootFolderName}/${subName}`,
     demo: opts.demo === true,
   });
-  const activated = setActiveWorld(next, entry.id);
-  saveRegistry(activated);
-  patchSlice('registry', activated);
+  const placed = inBrowser ? updateWorldEntry(next, made.id, { where: 'browser' }) : next;
+  const entry = placed.worlds.find(w => w.id === made.id)!;
+  const activated = setActiveWorld(placed, entry.id);
+  const commit = () => { saveRegistry(activated); patchSlice('registry', activated); };
+  if (make) await make.finish(commit); else commit();
   // The store first (S364 gate lens C C9): a room mounts on the `active` patch
   // (DESIGN conv. 109) and must find its world's store already there.
   setActiveStore(store);
@@ -764,6 +832,8 @@ export async function importIntoActiveWorld(
  * returned in `failures` for the modal to surface as a toast count.
  */
 export interface LinkExistingApiWorldOpts {
+  /** Bring the world down into this browser's storage (1.17) instead of the home folder. */
+  where?: 'folder' | 'browser';
   apiKey: string;
   apiPin: string;
   /** Optional override; empty falls back to the server-reported world name. */
@@ -828,7 +898,9 @@ export async function linkExistingApiWorldInRoot(
   opts: LinkExistingApiWorldOpts
 ): Promise<LinkExistingApiWorldResult> {
   const reg = getState().registry;
-  if (!reg.atlas_root) {
+  // Into this browser's storage (1.17, conv. 129), or into the home folder.
+  const inBrowser = opts.where === 'browser';
+  if (!inBrowser && !reg.atlas_root) {
     throw new PlainError(NO_HOME_FOLDER);
   }
   const apiKey = opts.apiKey.trim();
@@ -895,7 +967,9 @@ export async function linkExistingApiWorldInRoot(
     );
   }
 
-  const rootHandle = await loadHandle(reg.atlas_root.handle_key);
+  if (inBrowser) return linkIntoBrowser(opts, { apiKey, apiPin, readOnly, world, serverWorldId, displayName });
+
+  const rootHandle = await loadHandle(reg.atlas_root!.handle_key);
   if (!rootHandle) {
     throw new PlainError(HOME_FOLDER_LOST);
   }
@@ -985,7 +1059,7 @@ export async function linkExistingApiWorldInRoot(
     apiKey,
     folderName: subName,
     handleKey,
-    pathHint: `${reg.atlas_root.folder_name}/${subName}`,
+    pathHint: `${reg.atlas_root!.folder_name}/${subName}`,
     apiWorldName: world.name,
     readOnly,
   });
@@ -1013,6 +1087,62 @@ export async function linkExistingApiWorldInRoot(
   // Attach SyncEngine — api-linked entry, so the engine spins up.
   attachSyncEngine(entry, store);
 
+  return {
+    entry,
+    downloaded: downloadResult.totalDownloaded,
+    failures: downloadResult.failures,
+    ...(downloadResult.stoppedEarly ? { stoppedEarly: downloadResult.stoppedEarly } : {}),
+  };
+}
+
+/**
+ * The link's browser half (1.17, conv. 129; contract §2.2): download into a
+ * fresh `browser-worlds/` directory held by the make's lock. ANY failure
+ * (cancel, network, a full origin) removes the directory: nothing half-made
+ * stays, and a full origin is fatal to the whole download rather than a list
+ * of per-element failures over 0-byte files (S370 gate B8).
+ */
+async function linkIntoBrowser(
+  opts: LinkExistingApiWorldOpts,
+  v: { apiKey: string; apiPin: string; readOnly: boolean; world: { id?: string; name?: string }; serverWorldId: string; displayName: string },
+): Promise<LinkExistingApiWorldResult> {
+  const { apiKey, apiPin, readOnly, world, serverWorldId, displayName } = v;
+  const { store, subName, make } = await scaffoldBrowserWorld(displayName, serverWorldId);
+  // Identity stays `world-<id>`; a key some entry already holds gets a suffix,
+  // as the folder path's vault loop does.
+  let handleKey = `world-${serverWorldId}`;
+  for (let n = 2; getState().registry.worlds.some(w => w.folder.handle_key === handleKey); n++) handleKey = `world-${serverWorldId}-${n}`;
+  let downloadResult: Awaited<ReturnType<typeof initialDownloadAll>>;
+  try {
+    await store.writeWorldMeta(linkedWorldMeta({ serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly }));
+    downloadResult = await initialDownloadAll(store, buildV2Adapter(apiKey, apiPin), opts.onProgress, opts.shouldStop);
+    const full = downloadResult.failures.find(f => f.error_name === 'QuotaExceededError');
+    if (full) throw new DOMException('The browser storage is full', 'QuotaExceededError');
+    await releasePriorWorld();
+  } catch (err) {
+    return abandonBrowserMake(store, make, err, 'bringing the world down');
+  }
+  let regAfter = getState().registry;
+  if (!regAfter.pin && apiPin) regAfter = setPin(regAfter, apiPin);
+  const { next, entry: made } = createApiLinkedWorld(regAfter, {
+    name: displayName, apiWorldId: serverWorldId, apiKey, folderName: subName, handleKey,
+    pathHint: `browser storage/${subName}`, apiWorldName: world.name, readOnly,
+  });
+  const placed = updateWorldEntry(next, made.id, { where: 'browser' });
+  const entry = placed.worlds.find(w => w.id === made.id)!;
+  const activated = setActiveWorld(placed, entry.id);
+  await make.finish(() => { saveRegistry(activated); patchSlice('registry', activated); });
+  if (readOnly) store.setViewOnly(true);
+  setActiveStore(store);
+  patchSlice('active', { worldId: entry.id, meta: { id: serverWorldId, name: displayName }, opened: true });
+  try {
+    patchSlice('data', { elements: await store.listElements() });
+  } catch (err) {
+    console.warn('[link-api] failed to prime elements after download:', err);
+    patchSlice('data', { elements: [] });
+  }
+  patchSlice('ui', { ...getState().ui, selectedElementId: null });
+  attachSyncEngine(entry, store);
   return {
     entry,
     downloaded: downloadResult.totalDownloaded,

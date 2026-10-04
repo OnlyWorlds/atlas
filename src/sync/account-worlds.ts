@@ -118,12 +118,14 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
   // ---- Preconditions BEFORE the mint (gate R1: no orphaned keys) ----
   // No home folder yet (a world opened in place on a first visit): ask for
   // it here, before any key is minted (S365).
-  if (!state.atlasRoot) {
+  const { defaultWorldWhere } = await import('../setup/world-parent');
+  const where = defaultWorldWhere();
+  if (where === 'folder' && !state.atlasRoot) {
     const { ensureAtlasRoot } = await import('../setup/world-doors');
     // A "Cancel" there is the user's answer, not an error: stop quietly.
     if (!(await ensureAtlasRoot(toasts, 'Opening an online world downloads it into a new folder.'))) return false;
   }
-  if (!getState().atlasRoot) {
+  if (where === 'folder' && !getState().atlasRoot) {
     toasts.error('Set up your OnlyWorlds folder first');
     return false;
   }
@@ -160,6 +162,7 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
     overlay.update('Waiting for a free slot…');
     const result = await enqueueActivationTask(() =>
       linkExistingApiWorldInRoot({
+        where,
         apiKey: minted.key,
         apiPin: pin!,
         displayName: row.name,

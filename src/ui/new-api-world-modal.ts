@@ -10,6 +10,7 @@
  */
 
 import { BaseModal } from './modal-base';
+import { defaultWorldWhere, requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { saveRegistry, attachApi, setPin, setEmail } from '../registry/registry';
@@ -22,12 +23,15 @@ import { escapeAttr, escapeText } from '../core/dom-utils';
 import { problemFor } from '../core/problems';
 
 export class NewApiWorldModal extends BaseModal {
+  /** Where the new world lives (1.17): resolved by the door that opened this. */
+  private where: 'folder' | 'browser' = defaultWorldWhere();
+
   constructor(private toasts: ToastManager) {
     super();
   }
 
   open(): void {
-    if (!getState().registry.atlas_root) {
+    if (this.where === 'folder' && !getState().atlasRoot) {
       this.toasts.error('Set up your OnlyWorlds folder first');
       return;
     }
@@ -121,7 +125,8 @@ export class NewApiWorldModal extends BaseModal {
           entry = reuse;
         } else {
           progressEl.textContent = `Creating local folder for "${name}"...`;
-          ({ entry } = await createWorldInRoot(name));
+          if (this.where === 'browser') requestPersistOnFirstBrowserWorld();
+          ({ entry } = await createWorldInRoot(name, { where: this.where }));
           madeLocally = { id: entry.id, name: entry.name };
           // Waypoint: a real folder world exists from here on, even if the
           // later API step fails (hookmap wp1 — ungated by construction).

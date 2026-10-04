@@ -126,3 +126,48 @@ test('boot re-adopts browser worlds whose registry was lost', async ({ page }) =
 test('@firefox boot re-adopts browser worlds whose registry was lost', async ({ page }) => {
   await lostRegistryReadopts(page);
 });
+
+/** Open the create dialog the way every door does (the runner). */
+async function openCreate(page: Page) {
+  await page.evaluate(async () => {
+    const { runAddWorldAction } = await import('/src/setup/world-doors.ts');
+    const { toastManager } = await import('/src/ui/toast-manager.ts');
+    void (runAddWorldAction as any)('create-local', toastManager);
+  });
+  await page.waitForSelector('[data-modal="create-world"]');
+}
+
+async function createdWorld(page: Page, name: string) {
+  return page.evaluate(async (n) => {
+    const { getState } = await import('/src/core/state.ts');
+    const e = getState().registry.worlds.find((w: any) => w.name === n);
+    if (!e) return null;
+    const home = await (await navigator.storage.getDirectory()).getDirectoryHandle('browser-worlds');
+    const dir = await home.getDirectoryHandle(e.folder.folder_name);
+    let marker = true;
+    try { await (await dir.getDirectoryHandle('.atlas')).getFileHandle('making'); } catch { marker = false; }
+    return { where: e.where ?? null, folder: e.folder.folder_name, marker, active: getState().active?.worldId === e.id };
+  }, name);
+}
+
+test('on Chromium the create dialog asks where, folder first, and "In this browser" makes a browser world', async ({ page }) => {
+  await boot(page);
+  await openCreate(page);
+  const rows = page.locator('[data-modal="create-world"] .atlas-where-row strong');
+  await expect(rows).toHaveText(['In a folder on your drive (your AI can work on it)', 'In this browser']);
+  // No home folder and no earlier pick: this browser is pre-selected.
+  await expect(page.locator('[data-modal="create-world"] input[name="where"][value="browser"]')).toBeChecked();
+  await page.fill('[data-modal="create-world"] input[name="world-name"]', 'Hollow Reach');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect.poll(() => createdWorld(page, 'Hollow Reach')).toMatchObject({ where: 'browser', marker: false, active: true });
+});
+
+test('@firefox the create dialog says the world lives in this browser, and makes it there', async ({ page }) => {
+  await boot(page);
+  await openCreate(page);
+  await expect(page.locator('[data-modal="create-world"] .atlas-where-row')).toHaveCount(0);
+  await expect(page.locator('[data-modal="create-world"] [data-role="where-browser"]')).toHaveText('It lives in this browser.');
+  await page.fill('[data-modal="create-world"] input[name="world-name"]', 'Hollow Reach');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect.poll(() => createdWorld(page, 'Hollow Reach')).toMatchObject({ where: 'browser', marker: false, active: true });
+});

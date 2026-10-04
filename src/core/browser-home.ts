@@ -20,7 +20,7 @@
  */
 
 import type { WorldRegistryEntry, WorldsRegistry } from './types';
-import { BROWSER_HOME, browserHome, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared } from './browser-worlds';
+import { BROWSER_HOME, browserHome, isBrowserWorld, isGoneError, markWorldCleared, removeBrowserWorldDir, unmarkWorldCleared } from './browser-worlds';
 import { slugify } from '../store/fs-utils';
 import { createApiLinkedWorld, createLocalWorld, findWorldByOwIdentity, updateWorldEntry } from '../registry/registry';
 
@@ -79,6 +79,65 @@ export async function beginBrowserMake(dir: string): Promise<FileSystemDirectory
   await w.write(new Date().toISOString());
   await w.close();
   return handle;
+}
+
+/**
+ * A make in progress, holding its Web Lock until `finish` or `abort`
+ * (contract §2.2). `finish(commit)` removes the marker, runs the synchronous
+ * registry save, then releases the lock; `abort()` removes the directory
+ * (after the caller closed any store on it) and releases the lock. Any
+ * failure between `openBrowserMake` and `finish` must end in `abort`.
+ */
+export interface BrowserMake {
+  dir: string;
+  handle: FileSystemDirectoryHandle;
+  finish(commit: () => void): Promise<void>;
+  abort(): Promise<void>;
+}
+
+export async function openBrowserMake(name: string, worldId: string): Promise<BrowserMake> {
+  const dir = mintBrowserDirName(name, worldId);
+  let release: () => void = () => {};
+  const l = locks();
+  if (l) {
+    await new Promise<void>(acquired => {
+      void l.request(lockName(dir), {}, () => {
+        acquired();
+        return new Promise<void>(done => { release = done; });
+      });
+    });
+  }
+  let handle: FileSystemDirectoryHandle;
+  try {
+    handle = await beginBrowserMake(dir);
+  } catch (err) {
+    release();
+    throw err;
+  }
+  let settled = false;
+  return {
+    dir,
+    handle,
+    async finish(commit) {
+      if (settled) return;
+      await finishBrowserMake(handle);
+      try { commit(); } finally { settled = true; release(); }
+    },
+    async abort() {
+      if (settled) return;
+      settled = true;
+      try {
+        await removeBrowserWorldDir({ where: 'browser', folder: { handle_key: '', folder_name: dir } });
+      } finally {
+        release();
+      }
+    },
+  };
+}
+
+/** Is this error the browser's storage being full? A make treats it as fatal (contract §2.2). */
+export function isQuotaError(err: unknown): boolean {
+  return (err as { name?: unknown } | null)?.name === 'QuotaExceededError';
 }
 
 export async function finishBrowserMake(handle: FileSystemDirectoryHandle): Promise<void> {

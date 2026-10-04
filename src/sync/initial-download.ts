@@ -121,6 +121,8 @@ export async function initialDownloadAll(
           type,
           operation: 'create',
           message: err instanceof Error ? err.message : String(err), // raw-error-ok: the failure record; Details print its fields, never this
+          // The name lets a browser-storage link treat a full origin as fatal (S370 gate B8).
+          ...(typeof (err as { name?: unknown })?.name === 'string' ? { error_name: (err as { name: string }).name } : {}),
         });
       } finally {
         done++;

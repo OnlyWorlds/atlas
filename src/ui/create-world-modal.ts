@@ -1,11 +1,12 @@
 /**
  * Create-Local-World modal.
  *
- * When the atlas root IS set: name-only flow. Atlas creates a subfolder under
- * the root. No file picker — the location is implied by the root.
- *
- * When the atlas root is NOT set: this modal is not shown — the sidebar
- * shows a "set up atlas" button first.
+ * Where the world lives (1.17, ruling 2, conv. 129): on a browser with the
+ * folder picker the dialog asks, folder first and browser second; the folder
+ * row is pre-selected when a home folder is set (and shows its path), else
+ * the user's last pick decides. Choosing the folder with no home folder asks
+ * for one inside the click (`ensureAtlasRoot`). A browser without the picker
+ * makes the world in this browser and says so.
  *
  * Test seam: directory-picker.pickDirectory() is overridable via
  * `window.__atlasTestApi.pickDirectory` so Playwright can inject an OPFS handle
@@ -19,6 +20,9 @@ import { getState, patchSlice } from '../core/state';
 import { setSidebarModePref } from '../core/ui-prefs';
 import { navigate, worldHash } from '../core/router';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
+import { hasFolderMode, opfsUsable } from '../core/capabilities';
+import { loadUiPrefs, setNewWorldWherePref } from '../core/ui-prefs';
+import { requestPersistOnFirstBrowserWorld, WHERE_BROWSER_CAPTION, WHERE_BROWSER_ONLY_LINE } from '../setup/world-parent';
 import { completeWaypoint } from '../core/waypoints';
 import { escapeText } from '../core/dom-utils';
 import { problemFor } from '../core/problems';
@@ -69,11 +73,23 @@ export class CreateWorldModal extends BaseModal {
     const atlasRoot = getState().atlasRoot;
     const rootDisplay = atlasRoot?.pathHint ?? atlasRoot?.folderName;
     const tour = this.tour;
-    const hint = tour
-      ? escapeText(tour.hint)
-      : rootDisplay
-        ? `Creates a new world folder inside your OnlyWorlds folder (<code>${escapeText(rootDisplay)}</code>). You can move it online (sync with OnlyWorlds API) later.`
-        : 'Atlas needs an OnlyWorlds folder before creating worlds. Set one up from the welcome panel.';
+    const folderMode = hasFolderMode();
+    const preselect: 'folder' | 'browser' = rootDisplay ? 'folder' : (loadUiPrefs().newWorldWhere ?? 'browser');
+    const whereBlock = tour ? '' : folderMode
+      ? `<fieldset class="atlas-where-choice" data-role="where">
+          <legend>Where should this world live?</legend>
+          <label class="atlas-where-row">
+            <input type="radio" name="where" value="folder" ${preselect === 'folder' ? 'checked' : ''} />
+            <span><strong>In a folder on your drive (your AI can work on it)</strong>
+            <span>${rootDisplay ? `In <code>${escapeText(rootDisplay)}</code>` : 'Pick a folder once; Atlas keeps your new worlds in it as plain files.'}</span></span>
+          </label>
+          <label class="atlas-where-row">
+            <input type="radio" name="where" value="browser" ${preselect === 'browser' ? 'checked' : ''} />
+            <span><strong>In this browser</strong><span>${WHERE_BROWSER_CAPTION}</span></span>
+          </label>
+        </fieldset>`
+      : `<p class="atlas-modal-hint" data-role="where-browser">${WHERE_BROWSER_ONLY_LINE}</p>`;
+    const hint = tour ? escapeText(tour.hint) : '';
     body.innerHTML = `
       <form data-form="create-world">
         <label class="atlas-modal-field">
@@ -82,10 +98,11 @@ export class CreateWorldModal extends BaseModal {
             ${tour ? `value="${escapeText(tour.lockedName)}" readonly` : ''} />
         </label>
         ${hint ? `<p class="atlas-modal-hint">${hint}</p>` : ''}
+        ${whereBlock}
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-actions">
           <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="pick" ${(rootDisplay || tour) ? '' : 'disabled'}>Create</button>
+          <button type="submit" class="atlas-btn-primary" data-action="pick">Create</button>
         </div>
       </form>
     `;
@@ -122,6 +139,21 @@ export class CreateWorldModal extends BaseModal {
         return;
       }
 
+      const picked = form.querySelector<HTMLInputElement>('input[name="where"]:checked')?.value;
+      const where: 'folder' | 'browser' = folderMode ? (picked === 'folder' ? 'folder' : 'browser') : 'browser';
+      // Asked synchronously, inside the click, before the first await (Firefox
+      // shows a prompt and may never answer; nothing waits on it).
+      if (where === 'browser') requestPersistOnFirstBrowserWorld();
+      if (folderMode) setNewWorldWherePref(where);
+      if (where === 'browser' && (await opfsUsable()) !== true) {
+        this.showError(errorBox, 'This window does not allow browser storage, so no world can live in this browser here. If it is a private window, open Atlas in a normal one.');
+        return;
+      }
+      if (where === 'folder' && !getState().atlasRoot) {
+        const { ensureAtlasRoot } = await import('../setup/world-doors');
+        if (!(await ensureAtlasRoot(this.toasts, 'A new world is a new folder.'))) return;
+      }
+
       submitBtn.disabled = true;
       submitBtn.textContent = 'Creating…';
       // Hide cancel during the in-flight operation so the user can't cancel
@@ -129,7 +161,7 @@ export class CreateWorldModal extends BaseModal {
       // failure below; not needed on success since the modal closes.
       cancelBtn.hidden = true;
       try {
-        const { entry } = await createWorldInRoot(name);
+        const { entry } = await createWorldInRoot(name, { where });
         // Waypoint: the created world is non-demo by construction — ungated
         // even when the sample world is active at click time (hookmap wp1).
         completeWaypoint('first-world');

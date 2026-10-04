@@ -568,15 +568,19 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const stillMine = () => parsed === runParsed;
     try {
       if (mode === 'new') {
-        const { ensureAtlasRoot } = await import('../setup/world-doors');
-        if (!(await ensureAtlasRoot(toasts, 'Importing as a new world makes a new world folder.'))) return;
+        const { defaultWorldWhere } = await import('../setup/world-parent');
+        const where = defaultWorldWhere();
+        if (where === 'folder') {
+          const { ensureAtlasRoot } = await import('../setup/world-doors');
+          if (!(await ensureAtlasRoot(toasts, 'Importing as a new world makes a new world folder.'))) return;
+        }
         // Adopt the exported world id ONLY when nothing local already uses it —
         // otherwise a separate copy would collide with the existing world's
         // identity. The collision case chooses merge (below) or a fresh mint here.
         const eid = exportWorldId();
         const adoptWorldId = (parsed.format === 'full-world' && eid && !idMatchWorld()) ? eid : undefined;
         const plan = buildPlan();
-        const { applied } = await createWorldFromImportedData(plan, { name: worldName, onProgress, adoptWorldId });
+        const { applied } = await createWorldFromImportedData(plan, { name: worldName, onProgress, adoptWorldId, where });
         toasts.success(`Created "${plan.worldMeta?.name ?? 'world'}" · ${applied.created} element${applied.created === 1 ? '' : 's'}`);
         reportFailures(applied.failures, plan.report.droppedLinks.length);
         // The file carried API credentials — guide to the (separate, consent-gated) sync link.

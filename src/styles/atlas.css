@@ -4611,6 +4611,20 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
 .atlas-add-world-text strong { font-weight: 600; font-size: 13px; }
 .atlas-add-world-text span { font-size: 12px; color: var(--atlas-text-muted); line-height: 1.4; }
 
+/* Where a new world lives (1.17, ruling 2): two rows, folder first. */
+.atlas-where-choice { border: 0; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.atlas-where-choice legend { font-size: 12px; color: var(--atlas-text-muted); margin-bottom: 4px; padding: 0; }
+.atlas-where-row {
+  display: flex; align-items: flex-start; gap: 10px; padding: 9px 11px; cursor: pointer;
+  border: 1px solid rgba(var(--atlas-ink-rgb), 0.12); border-radius: 8px; color: var(--atlas-text);
+}
+.atlas-where-row:hover { background: rgba(var(--atlas-ink-rgb), 0.05); }
+.atlas-where-row:has(input:checked) { border-color: rgba(var(--atlas-accent-rgb), 0.55); background: rgba(var(--atlas-accent-rgb), 0.06); }
+.atlas-where-row input { margin-top: 3px; accent-color: var(--atlas-cyan); }
+.atlas-where-row > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.atlas-where-row strong { font-weight: 600; font-size: 13px; }
+.atlas-where-row > span > span { font-size: 12px; color: var(--atlas-text-muted); line-height: 1.4; }
+
 .atlas-tour-target {
   border-color: var(--atlas-cyan-soft) !important;
   animation: atlas-tour-pulse 2.2s ease-in-out infinite;

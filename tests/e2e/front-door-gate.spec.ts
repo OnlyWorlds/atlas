@@ -166,18 +166,24 @@ test('B8 Escape and an outside click on the home-folder question settle it as ca
   await freshBoot(page);
   await openInPlaceFromLanding(page, 'lensb-b8/w', A, 'Esc World');
   const ask = page.locator('[data-modal="home-folder"]');
+  // 1.17: the home-folder question comes from the create dialog's folder row.
   await page.locator('.atlas-worlds-header [data-action="create-local"]').click();
-  await expect(ask).toBeVisible();
+  const dialog = page.locator('[data-modal="create-world"]');
+  await dialog.locator('input[name="where"][value="folder"]').check();
+  const askAgain = async () => {
+    await dialog.locator('[data-action="pick"]').click();
+    await expect(ask).toBeVisible();
+  };
+  await askAgain();
   await page.keyboard.press('Escape');
   await expect(ask).toHaveCount(0);
-  await page.locator('.atlas-worlds-header [data-action="create-local"]').click();
-  await expect(ask).toBeVisible();
+  await askAgain();
   await page.mouse.click(5, 5);
   await expect(ask).toHaveCount(0);
-  // A third ask still works (no dangling promise / listener).
-  await page.locator('.atlas-worlds-header [data-action="create-local"]').click();
-  await expect(ask).toBeVisible();
-  await expect(page.locator('[data-modal="create-world"]')).toHaveCount(0);
+  // A third ask still works (no dangling promise / listener), and nothing was made.
+  await askAgain();
+  const made = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length);
+  expect(made).toBe(1);
 });
 
 test('B9 a double-click on "add a world" leaves the chooser open', async ({ page }) => {

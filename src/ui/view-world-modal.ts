@@ -12,6 +12,7 @@
  */
 
 import { BaseModal } from './modal-base';
+import { defaultWorldWhere, requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
 import { ToastManager } from './toast-manager';
 import { getState } from '../core/state';
 import { navigate, homeHash } from '../core/router';
@@ -23,13 +24,16 @@ import { problemFor } from '../core/problems';
 export class ViewWorldModal extends BaseModal {
   private toasts: ToastManager;
 
+  /** Where the world is brought down to (1.17): resolved by the door that opened this. */
+  private where: 'folder' | 'browser' = defaultWorldWhere();
+
   constructor(toasts: ToastManager) {
     super();
     this.toasts = toasts;
   }
 
   open(): void {
-    if (!getState().atlasRoot) {
+    if (this.where === 'folder' && !getState().atlasRoot) {
       this.toasts.error('Set up your OnlyWorlds folder first');
       return;
     }
@@ -107,6 +111,7 @@ export class ViewWorldModal extends BaseModal {
       try {
         const result = await enqueueActivationTask(() =>
           linkExistingApiWorldInRoot({
+            where: this.where,
             apiKey,
             apiPin: '',
             displayName,

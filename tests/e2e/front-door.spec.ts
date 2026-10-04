@@ -84,7 +84,13 @@ test('the first NEW world asks where worlds live, then creates it there', async 
 
   await page.goto('/#/');
   await page.waitForSelector('.atlas-shell');
+  // 1.17: the create dialog asks where first; the folder row asks for a home
+  // folder inside the Create click, then makes the world there.
   await page.locator('[data-action="create-local"]').click();
+  const dialog = page.locator('[data-modal="create-world"]');
+  await dialog.locator('input[name="where"][value="folder"]').check();
+  await dialog.locator('input[name="world-name"]').fill('Folder World');
+  await dialog.locator('[data-action="pick"]').click();
   const ask = page.locator('[data-modal="home-folder"]');
   await expect(ask).toBeVisible();
 
@@ -94,9 +100,14 @@ test('the first NEW world asks where worlds live, then creates it there', async 
     (window as any).__atlasTestApi.setNextDirectory(home);
   });
   await ask.locator('[data-action="choose"]').click();
-  await expect(page.locator('[data-modal="create-world"]')).toBeVisible();
-  const root = await page.evaluate(() => (window as any).__atlasTestApi.getState().atlasRoot);
-  expect(root).not.toBeNull();
+  await expect(dialog).toHaveCount(0);
+  const after = await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    const w = s.registry.worlds.find((x: any) => x.name === 'Folder World');
+    return { root: s.atlasRoot, where: w ? (w.where ?? 'folder') : null };
+  });
+  expect(after.root).not.toBeNull();
+  expect(after.where).toBe('folder');
 });
 
 test('cancelling the home-folder question creates nothing', async ({ page }) => {
@@ -107,11 +118,19 @@ test('cancelling the home-folder question creates nothing', async ({ page }) => 
   await page.goto('/#/');
   await page.waitForSelector('.atlas-shell');
   await page.locator('[data-action="create-local"]').click();
+  const dialog = page.locator('[data-modal="create-world"]');
+  await dialog.locator('input[name="where"][value="folder"]').check();
+  await dialog.locator('[data-action="pick"]').click();
   await page.locator('[data-modal="home-folder"] [data-action="cancel"]').click();
   await expect(page.locator('[data-modal="home-folder"]')).toHaveCount(0);
-  await expect(page.locator('[data-modal="create-world"]')).toHaveCount(0);
-  const root = await page.evaluate(() => (window as any).__atlasTestApi.getState().atlasRoot);
-  expect(root).toBeNull();
+  // The create dialog stays, so the user can choose again (1.17); nothing is made.
+  await expect(dialog).toBeVisible();
+  const after = await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    return { root: s.atlasRoot, worlds: s.registry.worlds.length };
+  });
+  expect(after.root).toBeNull();
+  expect(after.worlds).toBe(1); // only the world opened in place above
 });
 
 test('"add a world" opens the chooser; its open-a-world row opens a picked world', async ({ page }) => {
