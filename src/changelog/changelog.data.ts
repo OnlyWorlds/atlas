@@ -70,7 +70,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'error-details-feedback',
         title: 'Copy the details of an error, or send them as feedback',
-        body: 'Each error has a Details part with Copy details and Send feedback. The details name the Atlas version, the browser and the kind of error, never your world\'s names, text, keys or file paths. Feedback opens the OnlyWorlds feedback page, where you see everything before it is sent.',
+        body: 'Errors worth reporting have a Details part with Copy details and Send feedback. The details name the Atlas version, the browser and the kind of error, and are built to leave out your world\'s names, text, keys and file names. Feedback opens the OnlyWorlds feedback page, where you can read and edit everything before you send it.',
         tags: ['editor'],
       },
       {
