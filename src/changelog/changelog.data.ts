@@ -57,7 +57,7 @@ export interface ChangelogRelease {
 export const CHANGELOG: ChangelogRelease[] = [
   {
     version: '1.16',
-    date: '2026-10-05',
+    date: '2026-10-04',
     theme: 'errors that help',
     entries: [
       {

@@ -4,7 +4,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 ---
 
-## CURRENT STATE (2026-10-05, SESSION 369: **ERRORS THAT HELP** (the Captain's build list, run autonomously: three builder agents swept the error census on disjoint files while the keeper built the core; a 2-lens gate and its fixes); gates on a quiet machine: typecheck 0 + **2383 vitest** (247 files, 2 skipped = banked probes, exit 0) + **378 e2e (chromium 376 + firefox 1 + firefox-private 1, each = its `--list`, PLAYWRIGHT_EXIT=0, zero flaky)** + build clean (precache 38); changelog **1.16** written (11 entries); package 1.16.0)
+## CURRENT STATE (2026-10-04, SESSION 369: **ERRORS THAT HELP** (the Captain's build list, run autonomously: three builder agents swept the error census on disjoint files while the keeper built the core; a 2-lens gate and its fixes); gates on a quiet machine: typecheck 0 + **2383 vitest** (247 files, 2 skipped = banked probes, exit 0) + **378 e2e (chromium 376 + firefox 1 + firefox-private 1, each = its `--list`, PLAYWRIGHT_EXIT=0, zero flaky)** + build clean (precache 38); changelog **1.16** written (11 entries); package 1.16.0)
 
 **Records**: run note `Forge/Notes/2026-10-04-s369-atlas-run.md` (rulings, run log); sweep brief `Forge/Notes/2026-10-04-s369-orient/sweep-brief.md`; gate probes `Forge/Notes/2026-10-04-s369-gate/lens-{a,b}/` (promoted as `tests/integration/s369-gate-a/`, `tests/unit/s369-gate-b/`); the 1.17 runway recheck `Forge/Notes/2026-10-04-s369-orient/lane-r-browser-worlds-recheck.md`; the parked usage note `Forge/Notes/2026-10-04-s369-orient/usage-note-parked/`. Shots: `Forge/Notes/ui-snapshots/2026-10-04-s369/`.
 

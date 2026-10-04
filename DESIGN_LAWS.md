@@ -1,6 +1,6 @@
 # Atlas: The Laws (Critical Conventions)
 
-**Updated**: 2026-10-05 (S369: 126-128) · 2026-10-04 (S368: 123-125) · 2026-09-29 (S366 split from DESIGN.md; every convention's full original wording, with its session archaeology, is in `docs-archive/DESIGN-2026-09-29-pre-split.md`).
+**Updated**: 2026-10-04 (S368: 123-125; S369: 126-128) · 2026-09-29 (S366 split from DESIGN.md; every convention's full original wording, with its session archaeology, is in `docs-archive/DESIGN-2026-09-29-pre-split.md`).
 **Job**: the numbered rules new code must keep. **Numbers never change**: conv. 1-128 are cited by number in code comments, tests, notes and other docs, and "DESIGN conv. N" anywhere means convention N in this file. A retired rule keeps its number with a pointer. A new rule takes the next number (129) and goes under its area.
 
 Each entry: the rule, why, and the file or test that guards it. Session tags are kept to one, for finding the history.
