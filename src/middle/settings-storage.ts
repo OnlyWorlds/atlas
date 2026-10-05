@@ -29,7 +29,8 @@ import {
 } from '../sync/sync-attach';
 import type { WorldsRegistry } from '../core/types';
 import { escapeText } from '../core/dom-utils';
-import { hasFolderMode } from '../core/capabilities';
+import { hasFolderMode, hasOpfsMode } from '../core/capabilities';
+import { isBrowserWorld } from '../core/browser-worlds';
 
 const CADENCE_OPTIONS: Array<{ label: string; ms: number | null }> = [
   { label: 'Off', ms: null },
@@ -67,6 +68,7 @@ export function renderStorageTab(reg: WorldsRegistry): string {
 
 export function wireStorageTab(toasts: ToastManager): void {
   wireStorageDeviceActions(toasts);
+  wireBrowserStorageSection();
   wireSyncTab(toasts);
 }
 
@@ -79,7 +81,7 @@ function renderStorageDeviceSection(): string {
   return `
     <section class="atlas-settings-section">
       <h3>On this device</h3>
-      <p class="atlas-settings-hint">Where atlas keeps your worlds. New local worlds default here; existing worlds stay where they were created.</p>
+      <p class="atlas-settings-hint">The folder on your drive where Atlas keeps the new worlds you choose to keep in a folder. Existing worlds stay where they were made.</p>
       ${ar
         ? `<dl class="atlas-settings-meta">
             <dt>Folder</dt><dd><code>${escapeText(ar.pathHint ?? ar.folderName)}</code></dd>
@@ -98,10 +100,83 @@ function renderStorageDeviceSection(): string {
              <div class="atlas-settings-actions">
                <button class="atlas-btn-primary" data-action="change-atlas-root">Set up OnlyWorlds folder</button>
              </div>`
-            : `<p>Not set up yet. Atlas requires a desktop Chromium browser to open local folders:
-               Chrome, Edge or Brave.</p>`}
+            : `<p>Keeping worlds in a folder on your drive needs a desktop Chromium browser: Chrome, Edge or Brave.</p>`}
     </section>
+    ${showBrowserStorageSection() ? renderBrowserStorageSection() : ''}
   `;
+}
+
+// ---- In this browser (1.17, contract §3.4, lens C R3-k) ----
+
+/** Shown where worlds live in this browser, or can only live there (no folder picker). */
+function showBrowserStorageSection(): boolean {
+  if (!hasOpfsMode()) return false;
+  return !hasFolderMode() || getState().registry.worlds.some(w => isBrowserWorld(w) && w.demo !== true);
+}
+
+/** Filled in by `wireBrowserStorageSection`: the estimate and `persisted()` are async. */
+function renderBrowserStorageSection(): string {
+  const n = getState().registry.worlds.filter(w => isBrowserWorld(w) && w.demo !== true).length;
+  return `
+    <section class="atlas-settings-section" data-role="browser-storage">
+      <h3>In this browser</h3>
+      <p class="atlas-settings-hint" data-role="browser-count">${n} world${n === 1 ? '' : 's'} kept in this browser.<span data-role="browser-usage"></span></p>
+      <p class="atlas-settings-hint" data-role="browser-persisted" hidden></p>
+      <div class="atlas-settings-actions" data-role="browser-persist-actions" hidden>
+        <button class="atlas-btn-ghost" data-action="ask-persist">Ask the browser to keep ${n === 1 ? 'it' : 'them'}</button>
+      </div>
+      <p class="atlas-settings-hint-sub" data-role="browser-persist-note" hidden></p>
+    </section>`;
+}
+
+/** "12.4 MB": a size for people, never more exact than it can be. */
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return 'an unknown amount';
+  if (bytes < 1024) return `${bytes} bytes`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = bytes / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+}
+
+function wireBrowserStorageSection(): void {
+  const section = document.querySelector<HTMLElement>('.atlas-settings [data-role="browser-storage"]');
+  if (!section) return;
+  const storage = (navigator as unknown as {
+    storage?: { estimate?: () => Promise<{ usage?: number }>; persisted?: () => Promise<boolean>; persist?: () => Promise<boolean> };
+  }).storage;
+  // `estimate()` is the whole origin, so the line says Atlas, never "your worlds".
+  void storage?.estimate?.().then(({ usage }) => {
+    const span = section.querySelector<HTMLElement>('[data-role="browser-usage"]');
+    if (span && typeof usage === 'number') span.textContent = ` Atlas uses ${formatBytes(usage)} of this browser's storage.`;
+  }).catch(() => {});
+  const line = section.querySelector<HTMLElement>('[data-role="browser-persisted"]')!;
+  const actions = section.querySelector<HTMLElement>('[data-role="browser-persist-actions"]')!;
+  const note = section.querySelector<HTMLElement>('[data-role="browser-persist-note"]')!;
+  const n = getState().registry.worlds.filter(w => isBrowserWorld(w) && w.demo !== true).length;
+  const them = n === 1 ? 'it' : 'them';
+  const show = (kept: boolean): void => {
+    line.textContent = kept
+      ? `This browser has agreed not to clear ${them} when space runs low. Clearing this site's data still removes ${them}.`
+      : `This browser may clear ${them} when space runs low, and clearing this site's data removes ${them}.`;
+    line.hidden = false;
+    actions.hidden = kept;
+  };
+  // Read live every time; nothing about it is stored (contract §2.3).
+  void storage?.persisted?.().then(show).catch(() => {});
+  section.querySelector<HTMLButtonElement>('[data-action="ask-persist"]')?.addEventListener('click', () => {
+    if (typeof storage?.persist !== 'function') return;
+    // Inside the click, never awaited (Firefox may never answer, gate B M8).
+    void storage.persist().then(kept => {
+      show(kept);
+      if (!kept && hasFolderMode()) {
+        // Chromium answers without asking anyone, by how the site is used.
+        note.textContent = 'This browser decides by how you use Atlas, and has not agreed yet. A copy outside the browser is the sure way to keep a world.';
+        note.hidden = false;
+      }
+    }).catch(() => {});
+  });
 }
 
 function wireStorageDeviceActions(toasts: ToastManager): void {

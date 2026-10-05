@@ -141,9 +141,14 @@ export function saveRegistry(reg: WorldsRegistry): void {
     // browser's storage, and a failed save is lost on the next reload.
     if (!registrySaveFailureSaid) {
       registrySaveFailureSaid = true;
+      // Worlds kept in this browser share its storage (1.17): the same
+      // pressure can reach them, so "not affected" is said only of folders.
+      const browserWorlds = reg.worlds.some(w => w.where === 'browser' && w.demo !== true);
       void import('../ui/toast-manager').then(({ toastManager }) => {
         toastManager.show(
-          'Atlas could not save your list of worlds in this browser, so changes to it may be gone after a reload. Your world folders are not affected. If the browser is low on storage, free some, then reload.',
+          browserWorlds
+            ? 'Atlas could not save your list of worlds in this browser, so changes to it may be gone after a reload. Worlds kept in this browser share its storage, so free some space, then reload.'
+            : 'Atlas could not save your list of worlds in this browser, so changes to it may be gone after a reload. Your world folders are not affected. If the browser is low on storage, free some, then reload.',
           'error', 8000, { sticky: true },
         );
       }).catch(() => {});

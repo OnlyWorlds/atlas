@@ -944,8 +944,10 @@ export async function launchTour(): Promise<void> {
   // browser storage says so in one plain line instead of stalling at the
   // first create with a raw SecurityError (S366). A PlainError (S369): the
   // callers' showProblem shows it as its own sentence.
-  const { opfsUsable, NO_BROWSER_STORAGE_LINE } = await import('../core/capabilities');
-  if (!(await opfsUsable())) throw new PlainError(NO_BROWSER_STORAGE_LINE);
+  const { opfsStatus, NO_BROWSER_STORAGE_LINE } = await import('../core/capabilities');
+  const storage = await opfsStatus();
+  if (storage === 'full') throw new PlainError((await import('../core/problems')).browserStorageFullSentence('starting the tour'));
+  if (storage !== 'ok') throw new PlainError(NO_BROWSER_STORAGE_LINE);
   const here = window.location.hash;
   // Launching from the tour's own world (shouldn't happen) or from nowhere →
   // return to the landing.

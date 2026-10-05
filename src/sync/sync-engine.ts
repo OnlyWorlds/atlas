@@ -207,6 +207,8 @@ export interface SyncEngineOptions {
    * `requestPush` boundary, and the meta step is pull-apply only (no PATCH).
    */
   readOnly?: boolean;
+  /** Where the world's files are (1.17): the pill's damaged-file sentence says it. */
+  where?: 'folder' | 'browser';
   /**
    * The api world this engine pushes to. Scopes the recorded foreign ids
    * (sync-state `foreign`): ids refused by one world say nothing about another.
@@ -240,6 +242,7 @@ export class SyncEngine {
   private policy: CanonicalPolicy;
   /** View-only engine (S264): pull-only, no push of any kind. */
   private readOnly = false;
+  private where: 'folder' | 'browser' = 'folder';
   private apiWorldId: string | null = null;
   private onConflict: (conflict: Conflict) => void;
   private onStateChange: (state: SyncEngineState) => void;
@@ -292,6 +295,7 @@ export class SyncEngine {
     this.folder = opts.folder;
     this.client = opts.client;
     this.readOnly = !!opts.readOnly;
+    this.where = opts.where ?? 'folder';
     this.apiWorldId = opts.apiWorldId ?? null;
     this.policy = normalizePolicy(opts.policy);
     this.onConflict = opts.onConflict ?? (() => {});
@@ -518,7 +522,7 @@ export class SyncEngine {
       this.paused = true;
       this.pauseReason = 'manual';
       // The pill title is user copy: the file and the fix, not JSON.parse's text (S368).
-      this.setState({ kind: 'error', message: damagedFileSentence(err.fileName), recoverable: true });
+      this.setState({ kind: 'error', message: damagedFileSentence(err.fileName, this.where), recoverable: true });
       return;
     }
     this.setState({ kind: 'idle', last_sync_at: null });

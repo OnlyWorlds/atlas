@@ -22,9 +22,9 @@ export const WHERE_BROWSER_CAPTION =
 export const WHERE_BROWSER_ONLY_LINE = 'It lives in this browser.';
 
 /**
- * The destination a door uses when it has no dialog of its own to ask in:
- * the home folder when one is set, otherwise this browser (and always this
- * browser without the folder picker).
+ * The row the where-question pre-selects (`ui/where-choice.ts`): the home
+ * folder when one is set, else the user's last pick, else this browser (and
+ * always this browser without the folder picker).
  */
 export function defaultWorldWhere(): WorldWhere {
   if (!hasFolderMode()) return 'browser';

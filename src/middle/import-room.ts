@@ -545,6 +545,21 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
 
   async function runImport(): Promise<void> {
     if (!parsed || importing) return;
+    // Import as new asks where the world lives first, as its own small step
+    // (1.17, conv. 129; lens C R2-d): before `importing` is set, so a Cancel
+    // leaves the review as it was.
+    let where: 'folder' | 'browser' = 'browser';
+    if (mode === 'new') {
+      const { askWhere } = await import('../ui/where-choice');
+      const asked = await askWhere({
+        title: 'Import as a new world',
+        action: 'Import',
+        purpose: 'Importing as a new world makes a new world folder.',
+        toasts,
+      });
+      if (!asked || !parsed || importing) return;
+      where = asked;
+    }
     importing = true;
     const hadCreds = typeof parsed.world?.api_key === 'string' && parsed.world.api_key.trim().length > 0;
     renderReview(); // re-renders with the disabled button + progress bar
@@ -568,12 +583,6 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     const stillMine = () => parsed === runParsed;
     try {
       if (mode === 'new') {
-        const { defaultWorldWhere } = await import('../setup/world-parent');
-        const where = defaultWorldWhere();
-        if (where === 'folder') {
-          const { ensureAtlasRoot } = await import('../setup/world-doors');
-          if (!(await ensureAtlasRoot(toasts, 'Importing as a new world makes a new world folder.'))) return;
-        }
         // Adopt the exported world id ONLY when nothing local already uses it —
         // otherwise a separate copy would collide with the existing world's
         // identity. The collision case chooses merge (below) or a fresh mint here.
@@ -637,7 +646,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     if (n > 0) {
       // The per-element reasons ride in the Details block (scrubbed: no names).
       toasts.show(
-        `${n} element${n === 1 ? '' : 's'} could not be saved to the world's folder, so ${n === 1 ? 'it was' : 'they were'} left out. The rest were imported.`,
+        `${n} element${n === 1 ? '' : 's'} could not be saved to the world, so ${n === 1 ? 'it was' : 'they were'} left out. The rest were imported.`,
         'error',
         8000,
         { details: buildFailureDetails(failures, { ...detailsContext(), doing: 'importing' }) },

@@ -249,7 +249,7 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
     remountCompiledView();
     toastManager.info(
       `Linked ${count} mention${count === 1 ? '' : 's'} to ${name} across `
-      + `${changed} narrative${changed === 1 ? '' : 's'} (written to disk, no undo)`,
+      + `${changed} narrative${changed === 1 ? '' : 's'} (saved, no undo)`,
     );
   }
 

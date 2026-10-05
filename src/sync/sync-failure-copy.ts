@@ -33,8 +33,13 @@ function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/** One plain sentence per failure kind present, most actionable first. */
-export function describeFailures(failures: readonly PerElementFailure[]): string {
+/**
+ * One plain sentence per failure kind present, most actionable first. Every
+ * place word is true for where the world keeps its files (1.17): in this
+ * browser only another Atlas tab holds a file, never OneDrive.
+ */
+export function describeFailures(failures: readonly PerElementFailure[], where: 'folder' | 'browser' = 'folder'): string {
+  const inBrowser = where === 'browser';
   const byKind = new Map<FailureKind, PerElementFailure[]>();
   for (const f of failures) {
     const k = classifyFailure(f);
@@ -44,7 +49,7 @@ export function describeFailures(failures: readonly PerElementFailure[]): string
   const parts: string[] = [];
   const foreign = byKind.get('foreign_id');
   if (foreign) {
-    parts.push(`${plural(foreign.length, 'element', 'elements')} could not upload because ${foreign.length === 1 ? 'its id already belongs' : 'their ids already belong'} to another OnlyWorlds world. This happens with a copied or imported folder, or a world taken online a second time. ${foreign.length === 1 ? 'It stays safe on your disk, and Settings can give it a new id.' : 'They stay safe on your disk, and Settings can give them new ids.'}`);
+    parts.push(`${plural(foreign.length, 'element', 'elements')} could not upload because ${foreign.length === 1 ? 'its id already belongs' : 'their ids already belong'} to another OnlyWorlds world. This happens with ${inBrowser ? 'an imported world' : 'a copied or imported folder'}, or a world taken online a second time. ${foreign.length === 1 ? 'It stays safe' : 'They stay safe'} ${inBrowser ? 'in this browser' : 'on your disk'}, and Settings can give ${foreign.length === 1 ? 'it a new id' : 'them new ids'}.`);
   }
   const large = byKind.get('too_large');
   if (large) {
@@ -56,11 +61,15 @@ export function describeFailures(failures: readonly PerElementFailure[]): string
   // side (operation `read`) waits for the next refresh (S369 gate A M4).
   const busyPull = [...new Set(byKind.get('file_busy')?.filter(f => f.operation === 'read').map(f => f.element_id) ?? [])];
   if (busyPull.length > 0) {
-    parts.push(`${plural(busyPull.length, 'newer copy', 'newer copies')} from OnlyWorlds could not be saved because another program was using ${busyPull.length === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this. Refresh in a moment to try again.`);
+    parts.push(inBrowser
+      ? `${plural(busyPull.length, 'newer copy', 'newer copies')} from OnlyWorlds could not be saved because another Atlas tab was saving to this world. Refresh in a moment to try again.`
+      : `${plural(busyPull.length, 'newer copy', 'newer copies')} from OnlyWorlds could not be saved because another program was using ${busyPull.length === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this. Refresh in a moment to try again.`);
   }
   const busy = [...new Set(byKind.get('file_busy')?.filter(f => f.operation !== 'read').map(f => f.element_id) ?? [])];
   if (busy.length > 0) {
-    parts.push(`${plural(busy.length, 'change', 'changes')} could not sync yet because another program was using ${busy.length === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this. ${busy.length === 1 ? 'It is' : 'They are'} saved on your disk, and Atlas will try again in a moment.`);
+    parts.push(inBrowser
+      ? `${plural(busy.length, 'change', 'changes')} could not sync yet because another Atlas tab was saving to this world. ${busy.length === 1 ? 'It is' : 'They are'} saved in this browser, and Atlas will try again in a moment.`
+      : `${plural(busy.length, 'change', 'changes')} could not sync yet because another program was using ${busy.length === 1 ? 'its file' : 'their files'} in this world's folder. A cloud sync app such as OneDrive or Dropbox, or antivirus, often does this. ${busy.length === 1 ? 'It is' : 'They are'} saved on your disk, and Atlas will try again in a moment.`);
   }
   const other = byKind.get('other');
   if (other) {
@@ -77,7 +86,7 @@ const shownThisSession = new Set<string>();
  * The toast text for this round's failures, or null when this exact set was
  * already shown this session (a persistent failure retried every autosave).
  */
-export function failureToastOnce(failures: readonly PerElementFailure[]): string | null {
+export function failureToastOnce(failures: readonly PerElementFailure[], where: 'folder' | 'browser' = 'folder'): string | null {
   // One round's result reaches this twice (the engine's result handler, then
   // the attach flush or Make online): the second call must not undo the
   // quiet first busy failure (S368 gate A L1).
@@ -96,7 +105,7 @@ export function failureToastOnce(failures: readonly PerElementFailure[]): string
   const key = toShow.map(f => `${classifyFailure(f)}:${f.element_id}`).sort().join('|');
   if (shownThisSession.has(key)) return null;
   shownThisSession.add(key);
-  return describeFailures(toShow);
+  return describeFailures(toShow, where);
 }
 
 const busySeen = new Set<string>();

@@ -164,10 +164,198 @@ test('on Chromium the create dialog asks where, folder first, and "In this brows
 
 test('@firefox the create dialog says the world lives in this browser, and makes it there', async ({ page }) => {
   await boot(page);
+  // Firefox may never answer persist() (contract §2.3, gate B M8): the make
+  // must not wait on it. Pinned here as a promise that never settles.
+  await page.evaluate(() => {
+    (window as any).__persistCalls = 0;
+    (navigator.storage as any).persist = () => { (window as any).__persistCalls++; return new Promise(() => {}); };
+  });
   await openCreate(page);
   await expect(page.locator('[data-modal="create-world"] .atlas-where-row')).toHaveCount(0);
   await expect(page.locator('[data-modal="create-world"] [data-role="where-browser"]')).toHaveText('It lives in this browser.');
   await page.fill('[data-modal="create-world"] input[name="world-name"]', 'Hollow Reach');
   await page.click('[data-modal="create-world"] [data-action="pick"]');
   await expect.poll(() => createdWorld(page, 'Hollow Reach')).toMatchObject({ where: 'browser', marker: false, active: true });
+  expect(await page.evaluate(() => (window as any).__persistCalls)).toBe(1);
+});
+
+// ---------------------------------------------------------------------------
+// Bringing a world down into this browser (bout 2): the link door through a
+// page.route fake keel (the recipe of phase3-link-api.spec).
+// ---------------------------------------------------------------------------
+
+const V2 = 'https://www.onlyworlds.com/api/v2';
+const SERVER_WORLD = '11111111-2222-4333-8444-555555555555';
+
+async function mockKeel(page: Page, characters: number) {
+  const now = '2026-10-05T12:00:00.000Z';
+  const chars = Array.from({ length: characters }, (_, i) => ({
+    id: `c0000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+    type: 'character', name: `Character ${i}`, updated_at: now, created_at: now,
+  }));
+  await page.route(`${V2}/**`, async (route) => {
+    const path = new URL(route.request().url()).pathname.replace('/api/v2', '');
+    if (path === '/world' || path === '/world/') {
+      return route.fulfill({ json: { id: SERVER_WORLD, name: 'Big World', updated_at: now } });
+    }
+    const type = path.split('/').filter(Boolean)[0];
+    return route.fulfill({ json: { data: type === 'character' ? chars : [], has_more: false, next_cursor: null } });
+  });
+}
+
+async function openLink(page: Page) {
+  await page.evaluate(async () => {
+    const { runAddWorldAction } = await import('/src/setup/world-doors.ts');
+    const { toastManager } = await import('/src/ui/toast-manager.ts');
+    void (runAddWorldAction as any)('link-api', toastManager);
+  });
+  await page.waitForSelector('[data-modal="link-world"]');
+  await page.fill('[data-modal="link-world"] input[name="api-key"]', 'ow_w_testkey');
+  await page.fill('[data-modal="link-world"] input[name="api-pin"]', '1234');
+}
+
+async function linkedBrowserWorld(page: Page) {
+  return page.evaluate(async (serverId) => {
+    const { getState } = await import('/src/core/state.ts');
+    const e = getState().registry.worlds.find((w: any) => w.api?.world_id === serverId);
+    if (!e) return null;
+    const home = await (await navigator.storage.getDirectory()).getDirectoryHandle('browser-worlds');
+    const dir = await home.getDirectoryHandle(e.folder.folder_name);
+    let marker = true;
+    try { await (await dir.getDirectoryHandle('.atlas')).getFileHandle('making'); } catch { marker = false; }
+    const meta = JSON.parse(await (await (await dir.getFileHandle('world.json')).getFile()).text());
+    return {
+      where: e.where ?? null, state: e.state, marker, worldJsonApi: meta.api?.world_id ?? null,
+      active: getState().active?.worldId === e.id, elements: getState().data.elements.length,
+    };
+  }, SERVER_WORLD);
+}
+
+async function browserHomeDirs(page: Page): Promise<string[]> {
+  return page.evaluate(async () => {
+    let home: FileSystemDirectoryHandle;
+    try { home = await (await navigator.storage.getDirectory()).getDirectoryHandle('browser-worlds'); } catch { return []; }
+    const names: string[] = [];
+    // @ts-expect-error values() is FS Access API
+    for await (const e of home.values()) names.push(e.name);
+    return names.sort(); // listing order is the engine's
+  });
+}
+
+async function linkLandsInBrowser(page: Page, folderMode: boolean) {
+  await boot(page);
+  await mockKeel(page, 30);
+  await openLink(page);
+  const modal = page.locator('[data-modal="link-world"]');
+  if (folderMode) {
+    await expect(modal.locator('.atlas-where-row strong')).toHaveText(['In a folder on your drive (your AI can work on it)', 'In this browser']);
+    await expect(modal.locator('input[name="where"][value="browser"]')).toBeChecked();
+  } else {
+    await expect(modal.locator('.atlas-where-row')).toHaveCount(0);
+    await expect(modal.locator('[data-role="where-browser"]')).toHaveText('It lives in this browser.');
+  }
+  await modal.locator('[data-action="link"]').click();
+  await expect(modal).toHaveCount(0);
+  await expect.poll(() => linkedBrowserWorld(page)).toEqual({
+    where: 'browser', state: 'api-linked', marker: false, worldJsonApi: SERVER_WORLD, active: true, elements: 30,
+  });
+}
+
+test('a world brought down from OnlyWorlds lands in this browser, whole', async ({ page }) => {
+  await linkLandsInBrowser(page, true);
+});
+
+test('@firefox a world brought down from OnlyWorlds lands in this browser, whole', async ({ page }) => {
+  await linkLandsInBrowser(page, false);
+});
+
+test('Cancel link into this browser leaves no directory and no row', async ({ page }) => {
+  await boot(page);
+  await mockKeel(page, 1500);
+  await openLink(page);
+  const modal = page.locator('[data-modal="link-world"]');
+  await modal.locator('[data-action="link"]').click();
+  await expect(modal.locator('[data-role="progress"]')).toContainText('Downloading');
+  await modal.locator('[data-action="cancel-link"]').click();
+  await expect(modal).toHaveCount(0);
+  await expect(page.locator('.ow-toast', { hasText: 'Link cancelled' })).toBeVisible();
+  expect(await browserHomeDirs(page)).toEqual([]);
+  expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(0);
+});
+
+test('two tabs: B reloads during A\'s slow link into this browser, and both end with one row', async ({ page }) => {
+  // B's boot reconciliation meets A's half-made directory: its Web Lock is
+  // held, so B skips it (never adopts it); A's commit then reaches B through
+  // the registry's storage event (contract §3.2 rule 1, invariant 17).
+  await boot(page);
+  await mockKeel(page, 600);
+  const tabB = await page.context().newPage();
+  await tabB.goto('/');
+  await tabB.waitForSelector('.atlas-shell');
+  await openLink(page);
+  const modal = page.locator('[data-modal="link-world"]');
+  await modal.locator('[data-action="link"]').click();
+  await expect(modal.locator('[data-role="progress"]')).toContainText('Downloading');
+  expect((await browserHomeDirs(page)).length).toBe(1); // the make's directory exists, half-made
+  await tabB.reload();
+  await tabB.waitForSelector('.atlas-shell');
+  await expect(modal).toHaveCount(0, { timeout: 60_000 });
+  const rows = (p: Page) => p.evaluate(async (serverId) => {
+    const { getState } = await import('/src/core/state.ts');
+    return getState().registry.worlds.filter((w: any) => w.api?.world_id === serverId || w.folder?.handle_key?.startsWith(`world-${serverId}`)).length;
+  }, SERVER_WORLD);
+  await expect.poll(() => rows(page)).toBe(1);
+  await expect.poll(() => rows(tabB)).toBe(1);
+  expect((await browserHomeDirs(page)).length).toBe(1);
+  // And B, reloaded once more, still sees one.
+  await tabB.reload();
+  await tabB.waitForSelector('.atlas-shell');
+  await expect.poll(() => rows(tabB)).toBe(1);
+  await tabB.close();
+});
+
+// ---------------------------------------------------------------------------
+// Bout 3: Settings for a browser world, and Delete (contract §3.1, §3.4).
+// ---------------------------------------------------------------------------
+
+async function browserWorldSettingsAndDelete(page: Page) {
+  await boot(page);
+  const { a, b } = await seedTwoBrowserWorlds(page);
+  expect(await activate(page, a)).toBe(true);
+  await page.evaluate((id) => { window.location.hash = `#/w/${id}/settings/world`; }, a);
+  const tab = page.locator('.atlas-settings');
+  await expect(tab.locator('[data-role="stored-in"]')).toHaveText('This browser');
+  await expect(tab.locator('[data-action="show-folder"]')).toHaveCount(0);
+  await expect(tab.locator('[data-action="delete-world"]')).toHaveCount(0); // no Forget
+  await expect(tab.locator('[data-action="delete-world-permanent"]')).toHaveCount(0);
+  await expect(tab.locator('[data-action="delete-browser-world"]')).toHaveText('Delete world');
+
+  // The dialog: what goes, no linked line for a local world; Cancel changes nothing.
+  await tab.locator('[data-action="delete-browser-world"]').click();
+  const modal = page.locator('[data-modal="delete-browser-world"]');
+  await expect(modal).toContainText('deletes it from this browser: elements, maps and media. There is no undo.');
+  await expect(modal.locator('[data-role="linked-line"]')).toHaveCount(0);
+  await modal.locator('[data-action="cancel"]').click();
+  await expect(modal).toHaveCount(0);
+  expect(await browserHomeDirs(page)).toEqual(['alpha-0192a000-1a2b', 'beta-0192b000-3c4d']);
+
+  // Delete: the open world closes, its directory goes, then its row; Beta stays.
+  await tab.locator('[data-action="delete-browser-world"]').click();
+  await modal.locator('[data-action="delete"]').click();
+  await expect(modal).toHaveCount(0);
+  expect(await browserHomeDirs(page)).toEqual(['beta-0192b000-3c4d']);
+  const after = await page.evaluate(async () => {
+    const { getState } = await import('/src/core/state.ts');
+    return { ids: getState().registry.worlds.map((w: any) => w.id), active: getState().active?.worldId ?? null };
+  });
+  expect(after).toEqual({ ids: [b], active: null });
+  await expect(page.locator('.ow-toast', { hasText: 'Deleted Alpha' })).toBeVisible();
+}
+
+test('a browser world: Settings says This browser, offers one Delete, and Delete removes it from the browser', async ({ page }) => {
+  await browserWorldSettingsAndDelete(page);
+});
+
+test('@firefox a browser world: Settings says This browser, offers one Delete, and Delete removes it from the browser', async ({ page }) => {
+  await browserWorldSettingsAndDelete(page);
 });

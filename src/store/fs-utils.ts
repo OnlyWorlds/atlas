@@ -351,7 +351,9 @@ export async function readJson<T = unknown>(
  * What the user reads about a damaged file (S368): the file name and the fix,
  * never the parser's own text. Shared by the sync pill and `core/problems.ts`.
  */
-export function damagedFileSentence(fileName: string): string {
+export function damagedFileSentence(fileName: string, where: 'folder' | 'browser' = 'folder'): string {
+  // In this browser no person or tool can reach the file to fix it (1.17).
+  if (where === 'browser') return `${fileName} in this world is damaged, so Atlas will not write over it. Send the details as feedback.`;
   return `${fileName} in this world's folder is damaged, so Atlas will not write over it. A git merge or an interrupted copy can do this. Once you fix or remove the file, reload it from disk.`;
 }
 

@@ -67,6 +67,12 @@ export async function initialDownloadAll(
   adapter: OwApiClient,
   onProgress?: (p: InitialDownloadProgress) => void,
   shouldStop: () => DownloadStop = () => null,
+  /**
+   * Into browser storage a full origin is fatal (contract §2.2, S370 gate
+   * B8): rethrow the first `QuotaExceededError` instead of recording it and
+   * writing on over 0-byte files.
+   */
+  opts: { stopOnQuota?: boolean } = {},
 ): Promise<InitialDownloadResult> {
   // ---- List phase: gather all records per type so we know the total ----
   // Type walks run concurrently in a bounded pool (speed bout 2026-07-19):
@@ -116,6 +122,7 @@ export async function initialDownloadAll(
         const { updated_at: _ignored, ...body } = record;
         await folder.applyServerRecord(type, body, record.updated_at);
       } catch (err) {
+        if (opts.stopOnQuota && (err as { name?: unknown } | null)?.name === 'QuotaExceededError') throw err;
         failures.push({
           element_id: record.id,
           type,

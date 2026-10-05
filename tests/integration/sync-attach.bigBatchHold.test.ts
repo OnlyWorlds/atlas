@@ -91,6 +91,23 @@ describe('flush on attach, by batch size', () => {
     await settle();
     expect(pushSpy).toHaveBeenCalledTimes(1);
   });
+
+  it(`a world kept in this browser never asks: its ${BIG_BATCH + 10} waiting are its own offline edits, and upload (1.17, gate B15)`, async () => {
+    const browserEntry: WorldRegistryEntry = { ...entry, where: 'browser' };
+    patchSlice('registry', setPin({ ...defaultRegistry(), worlds: [browserEntry] }, '1234'));
+    const { toastManager } = await import('../../src/ui/toast-manager');
+    const said = vi.spyOn(toastManager, 'success').mockImplementation(() => {});
+    const folder = await folderWith(BIG_BATCH + 10);
+    attachSyncEngine(browserEntry, folder);
+    const engine = getCurrentSyncEngine()!;
+    const pushSpy = vi.spyOn(engine, 'pushOnce').mockResolvedValue({ ...noopResult, pushed: { creates: BIG_BATCH + 10, updates: 0, deletes: 0 } } as never);
+    await settle();
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+    const { getDiskNotice } = await import('../../src/core/live-folder');
+    expect(getDiskNotice()?.held ?? null).toBeNull();
+    expect(localStorage.getItem('atlas_disk_held')).toBeNull();
+    expect(said).toHaveBeenCalledWith(`Uploaded ${BIG_BATCH + 10} changes that were waiting in this browser`);
+  });
 });
 
 describe('the flush toast says the count in words that agree', () => {

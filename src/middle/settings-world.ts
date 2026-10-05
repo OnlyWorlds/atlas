@@ -36,11 +36,26 @@ import {
 } from '../sync/sync-attach';
 import { buildV2Adapter } from '../sync/make-online';
 import type { WorldRegistryEntry } from '../core/types';
+import { filesWhereOf, isBrowserWorld } from '../core/browser-worlds';
 import { escapeText, escapeAttr } from '../core/dom-utils';
 import { findDanglingLinks, scrubReferrers } from '../store/scrub-links';
 
 export function renderWorldTab(world: WorldRegistryEntry): string {
   const stateLabel = world.state === 'api-linked' ? 'api-linked' : 'local-only';
+  // Where the world lives (1.17, conv. 129): a browser world has no folder to
+  // show or keep, so Delete only (contract §3.1, §3.4); the tour sandbox
+  // offers none of them (its lifecycle is the tour's, gate B12).
+  const inBrowser = filesWhereOf(world) === 'browser';
+  const dangerActions = world.demo === true
+    ? ''
+    : isBrowserWorld(world)
+      ? `<div class="atlas-settings-actions atlas-settings-actions-danger">
+        <button class="atlas-btn-ghost" data-action="delete-browser-world" title="Remove it from Atlas and from this browser">Delete world</button>
+      </div>`
+      : `<div class="atlas-settings-actions atlas-settings-actions-danger">
+        <button class="atlas-btn-ghost" data-action="delete-world">Forget world (keep folder)</button>
+        <button class="atlas-btn-ghost" data-action="delete-world-permanent" title="Remove from atlas AND delete the world folder on disk">Delete world + folder</button>
+      </div>`;
   const paused = !!world.sync_paused;
   const apiActions = world.state === 'api-linked'
     ? `
@@ -82,9 +97,11 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
       </label>
       <dl class="atlas-settings-meta">
         <dt>State</dt><dd>${stateLabel}</dd>
-        <dt>Folder</dt><dd><code>${escapeText(world.folder.last_path_hint ?? world.folder.folder_name)}</code>
+        ${inBrowser
+          ? '<dt>Stored in</dt><dd data-role="stored-in">This browser</dd>'
+          : `<dt>Folder</dt><dd><code>${escapeText(world.folder.last_path_hint ?? world.folder.folder_name)}</code>
           <button class="atlas-btn-ghost" data-action="show-folder"
-            title="A web page cannot open your file explorer, so this opens the folder picker inside this world's folder. Close it when you have looked.">Show folder</button></dd>
+            title="A web page cannot open your file explorer, so this opens the folder picker inside this world's folder. Close it when you have looked.">Show folder</button></dd>`}
         <dt>ID</dt><dd><code>${escapeText(world.id)}</code></dd>
         ${world.state === 'api-linked' && world.api
           ? `<dt>API world ID</dt><dd><code>${escapeText(world.api.world_id)}</code></dd>`
@@ -111,10 +128,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         <p class="atlas-settings-hint" data-role="rekey-stale-text"></p>
         <button class="atlas-btn-ghost" data-action="rekey-repair">Update links</button>
       </div>
-      <div class="atlas-settings-actions atlas-settings-actions-danger">
-        <button class="atlas-btn-ghost" data-action="delete-world">Forget world (keep folder)</button>
-        <button class="atlas-btn-ghost" data-action="delete-world-permanent" title="Remove from atlas AND delete the world folder on disk">Delete world + folder</button>
-      </div>
+      ${dangerActions}
     </section>
   `;
 }
@@ -294,7 +308,9 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       `Unlink "${world.name}" from API?`,
       '',
       `WHAT HAPPENS:`,
-      `  • Local folder${elementCount > 0 ? ` (${elementCount} element${elementCount === 1 ? '' : 's'})` : ''} stays exactly where it is`,
+      filesWhereOf(world) === 'browser'
+        ? `  • The world${elementCount > 0 ? ` (${elementCount} element${elementCount === 1 ? '' : 's'})` : ''} stays in this browser`
+        : `  • Local folder${elementCount > 0 ? ` (${elementCount} element${elementCount === 1 ? '' : 's'})` : ''} stays exactly where it is`,
       `  • Sync stops immediately: no more push or pull`,
       `  • Local sync history is cleared (server timestamps, pending tombstones)`,
       `  • The world on onlyworlds.com is NOT deleted`,
@@ -326,7 +342,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
         // still proceeds, but warn loudly so the next Make-Online doesn't
         // silently produce an empty world.
         console.warn('[unlink] resetSyncBaseline failed:', err);
-        toasts.error('The world is unlinked, but Atlas could not clear its old sync record in the folder. Before taking it online again, reload the page; if Make online then shows an empty world, tell us at onlyworlds.com/feedback.');
+        toasts.error('The world is unlinked, but Atlas could not clear its old sync record in this world. Before taking it online again, reload the page; if Make online then shows an empty world, tell us at onlyworlds.com/feedback.');
       }
     }
     const next = detachApi(getState().registry, world.id);
@@ -359,6 +375,12 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     toasts.success(`Forgot ${world.name}`);
     navigate('#/');
   });
+
+  document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="delete-browser-world"]')
+    ?.addEventListener('click', async () => {
+      const { DeleteBrowserWorldModal } = await import('../ui/delete-browser-world-modal');
+      new DeleteBrowserWorldModal(world, toasts).open();
+    });
 
   const deletePermBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="delete-world-permanent"]');
   deletePermBtn?.addEventListener('click', async () => {
@@ -546,15 +568,24 @@ async function wireForeignIds(world: WorldRegistryEntry, toasts: ToastManager): 
 
 const ISSUE_ROWS_SHOWN = 50;
 
-/** One plain line per issue. Matches only text Atlas itself writes, never server text. */
-export function syncIssueLine(issue: SyncIssue): string {
+/**
+ * One plain line per issue. Matches only text Atlas itself writes, never
+ * server text. Place words follow where the world keeps its files (1.17).
+ */
+export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'folder'): string {
   const f = issue.failure;
+  const inBrowser = where === 'browser';
   switch (issue.kind) {
     case 'foreign_id':
       return 'Its id belongs to another OnlyWorlds world. Give it a new id above.';
     case 'too_large':
       return 'It holds more than 64 KB of custom fields, more than OnlyWorlds accepts. Shorten one to let it sync.';
     case 'file_busy':
+      if (inBrowser) {
+        return f.operation === 'read'
+          ? 'Its newer copy from OnlyWorlds could not be saved: another Atlas tab was saving to this world. Try again now, or refresh later.'
+          : 'Another Atlas tab was saving to this world. Atlas tries again by itself.';
+      }
       return f.operation === 'read'
         ? 'Its newer copy from OnlyWorlds could not be saved: another program was using its file in the folder. Try again now, or refresh later.'
         : 'Another program was using its file in the folder. Atlas tries again by itself.';
@@ -567,7 +598,7 @@ export function syncIssueLine(issue: SyncIssue): string {
       if (/^referenced \w+ (was deleted|not found)/.test(m)) {
         return 'It links to something that is no longer on OnlyWorlds.';
       }
-      if (f.source === 'disk') return 'OnlyWorlds has it, but Atlas could not note that in the folder. Atlas tries again by itself.';
+      if (f.source === 'disk') return `OnlyWorlds has it, but Atlas could not note that ${inBrowser ? 'in this browser' : 'in the folder'}. Atlas tries again by itself.`;
       if (typeof f.status === 'number' && f.status >= 500) return 'OnlyWorlds had a problem on its side. Atlas tries again with your next save.';
       if (typeof f.status === 'number' && f.status >= 400) {
         const field = f.param && /^[a-z][a-z0-9_]*$/.test(f.param) && !/^(x|shadow)_/.test(f.param)
@@ -596,7 +627,7 @@ function renderSyncIssues(world: WorldRegistryEntry): string {
       ${i.type === 'world' || !getState().data.elements.some(e => e.id === i.element_id)
         ? `<span class="atlas-settings-issue-name">${escapeText(issueName(i))}</span>`
         : `<button class="atlas-link-btn atlas-settings-issue-name" data-action="open-issue">${escapeText(issueName(i))}</button>`}
-      <span class="atlas-settings-issue-line">${escapeText(syncIssueLine(i))}</span>
+      <span class="atlas-settings-issue-line">${escapeText(syncIssueLine(i, filesWhereOf(world)))}</span>
       ${i.kind === 'other' ? '<button class="atlas-btn-ghost atlas-btn-small" data-action="copy-issue">Copy details</button>' : ''}
     </li>`).join('');
   const more = issues.length > ISSUE_ROWS_SHOWN ? `<p class="atlas-settings-hint">And ${issues.length - ISSUE_ROWS_SHOWN} more.</p>` : '';

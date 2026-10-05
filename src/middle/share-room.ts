@@ -1462,7 +1462,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       } else {
         // The page IS live; only the local record failed. Don't claim success,
         // don't lose the URL. The one toast for it (patchPage stays quiet).
-        toasts.error(`Published at ${publicUrlFor(res.slug)}, but Atlas couldn't record it in the folder. Keep that URL.`);
+        toasts.error(`Published at ${publicUrlFor(res.slug)}, but Atlas couldn't record it in the world. Keep that URL.`);
       }
       completeWaypoint('share'); // hookmap wp9 — the publish gesture succeeded
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
@@ -1500,7 +1500,7 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       } else {
         // Same rule as publishPage: the public page IS updated; only the
         // local record failed. Don't claim the mirror is current.
-        toasts.error('Republished; the public page is up to date, but Atlas couldn\'t record it in the folder.');
+        toasts.error('Republished; the public page is up to date, but Atlas couldn\'t record it in the world.');
       }
       if (mountedView === pageId) rebuildPreservingScroll(() => buildDetail(pageId));
     } catch (err) {

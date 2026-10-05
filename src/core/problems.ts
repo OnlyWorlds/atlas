@@ -17,6 +17,9 @@ import pkg from '../../package.json';
 import { PlainError, isPlainError } from './plain-error';
 import { damagedFileSentence, isFileBusyError } from '../store/fs-utils';
 import { isAuthError, isTransientError } from '../sync/sync-engine';
+import { getState } from './state';
+import { hasFolderMode } from './capabilities';
+import { filesWhereOf, type FilesWhere } from './browser-worlds';
 
 export { PlainError, isPlainError };
 
@@ -118,26 +121,47 @@ export function classifyError(err: unknown): ProblemKind {
 
 const DEFAULT_DOING = 'doing that';
 
-function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: ProblemOpts): string {
+/**
+ * This browser's storage is full (contract §2.2). Moving a world to a folder
+ * is offered only where folders exist (desktop Chromium).
+ */
+export function browserStorageFullSentence(doing: string): string {
+  const way = hasFolderMode() ? 'Free some space or move a world to a folder' : 'Free some space';
+  return `This browser's storage for Atlas is full, so Atlas could not finish ${doing}. ${way}, then try again.`;
+}
+
+function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: ProblemOpts, where: FilesWhere): string {
   // True only where the failed step was an upload of edits already on disk
   // (S369): "your changes are saved" is false for signing in or linking.
-  const saved = opts.savedLocally ? ' Your changes are saved in the folder.' : '';
+  const inBrowser = where === 'browser' && opts.folder !== 'picked';
+  const savedPlace = inBrowser ? 'in this browser' : 'in the folder';
+  const saved = opts.savedLocally ? ` Your changes are saved ${savedPlace}.` : '';
   switch (kind) {
     case 'refused': return messageOf(err);
     case 'cancelled': return '';
     case 'disk-busy':
-      return `Another program is using a file in this world's folder, so Atlas could not finish ${doing}. A cloud sync app such as OneDrive or Dropbox often does this. Wait a moment, then try again.`;
+      // In this browser only another Atlas tab (or a stale writer) holds a
+      // file; never OneDrive (1.17, census §3.1).
+      return inBrowser
+        ? `Another Atlas tab may be saving to this world, so Atlas could not finish ${doing}. Wait a moment, then try again.`
+        : `Another program is using a file in this world's folder, so Atlas could not finish ${doing}. A cloud sync app such as OneDrive or Dropbox often does this. Wait a moment, then try again.`;
     case 'disk-permission':
       return opts.folder === 'picked'
         ? `The browser did not let Atlas use that folder, so it could not finish ${doing}. Try again, and choose Allow when the browser asks.`
-        : `Atlas does not have permission to change this world's folder, so it could not finish ${doing}. Allow access, then try again.`;
+        : inBrowser
+          ? `This window does not let Atlas use browser storage, so it could not finish ${doing}. If it is a private window, open Atlas in a normal one.`
+          : `Atlas does not have permission to change this world's folder, so it could not finish ${doing}. Allow access, then try again.`;
     case 'disk-missing':
-      return `Atlas could not find a file it needed while ${doing}. If this world's folder was moved or renamed, open it again from the sidebar. Your other worlds are fine.`;
+      return inBrowser
+        ? `Atlas could not find a file it needed while ${doing}. The browser may have cleared some of its storage. Your other worlds are fine.`
+        : `Atlas could not find a file it needed while ${doing}. If this world's folder was moved or renamed, open it again from the sidebar. Your other worlds are fine.`;
     case 'disk-full':
-      return `Your disk is full, so Atlas could not finish ${doing}. Free some space, then try again.`;
+      return inBrowser
+        ? browserStorageFullSentence(doing)
+        : `Your disk is full, so Atlas could not finish ${doing}. Free some space, then try again.`;
     case 'disk-damaged': {
       const file = (err as { fileName?: unknown }).fileName;
-      return damagedFileSentence(typeof file === 'string' && file ? file : 'A file');
+      return damagedFileSentence(typeof file === 'string' && file ? file : 'A file', inBrowser ? 'browser' : 'folder');
     }
     case 'tab-lock':
       return 'Another Atlas tab still has this world open. Close that tab, then try again.';
@@ -148,7 +172,7 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
     case 'server-busy':
       return `OnlyWorlds is busy, so Atlas could not finish ${doing}.${saved} Try again in a minute.`;
     case 'server-refused':
-      return `OnlyWorlds did not accept something while Atlas was ${doing}.${opts.savedLocally ? ' It stays saved in your folder.' : ''}${opts.inline ? '' : ' If this keeps happening, send the details as feedback.'}`;
+      return `OnlyWorlds did not accept something while Atlas was ${doing}.${opts.savedLocally ? (inBrowser ? ' It stays saved in this browser.' : ' It stays saved in your folder.') : ''}${opts.inline ? '' : ' If this keeps happening, send the details as feedback.'}`;
     case 'server':
       return `OnlyWorlds had a problem on its side while Atlas was ${doing}.${saved} Try again in a while.`;
     case 'bug':
@@ -189,6 +213,18 @@ export interface ProblemOpts {
   inline?: boolean;
   /** Nothing caught it: a browser refusal here is not about a folder, so it reads as unexpected. */
   unexpected?: boolean;
+  /**
+   * Where the world's files are (1.17, conv. 129): every disk sentence and
+   * "saved" clause is true for it. Defaults to the open world's.
+   */
+  where?: FilesWhere;
+}
+
+/** The open world's `where`, for a caller that did not say. */
+function activeWhere(): FilesWhere {
+  const s = getState();
+  const id = s.active?.worldId;
+  return filesWhereOf(id ? s.registry.worlds.find(w => w.id === id) : undefined);
 }
 
 export function problemFor(err: unknown, opts: ProblemOpts = {}): Problem {
@@ -197,10 +233,13 @@ export function problemFor(err: unknown, opts: ProblemOpts = {}): Problem {
   // An uncaught clipboard or storage refusal is not the open world's folder
   // (S369 gate B M4).
   const kind: ProblemKind = opts.unexpected && classified.startsWith('disk-') ? 'bug' : classified;
-  const fixes = FIXES[kind].filter(f => !(f === 'allow-access' && opts.folder === 'picked'));
+  const where = opts.where ?? activeWhere();
+  // Allow access asks for a folder: never for a picked folder's refusal, and
+  // never in this browser, whose storage has no permission to grant.
+  const fixes = FIXES[kind].filter(f => !(f === 'allow-access' && (opts.folder === 'picked' || where === 'browser')));
   return {
     kind,
-    sentence: sentenceFor(kind, err, doing, opts),
+    sentence: sentenceFor(kind, err, doing, opts, where),
     fixes,
     raw: err,
     doing,
@@ -297,6 +336,8 @@ export function describeBrowser(nav: NavLike | undefined = globalThis.navigator 
 export interface DetailsContext {
   /** The open world's kind: linked to OnlyWorlds, local only, or none open. */
   world?: 'linked' | 'local' | 'none';
+  /** Where the open world's files are (1.17): printed only for this browser. */
+  where?: FilesWhere;
   syncPaused?: boolean;
   /** Further lines (already free of names): scrubbed again and capped. */
   extra?: string[];
@@ -305,9 +346,10 @@ export interface DetailsContext {
 }
 
 function headerLines(ctx: DetailsContext): string[] {
-  const world = ctx.world === 'linked' ? `linked, sync ${ctx.syncPaused ? 'paused' : 'on'}`
+  const base = ctx.world === 'linked' ? `linked, sync ${ctx.syncPaused ? 'paused' : 'on'}`
     : ctx.world === 'local' ? 'local'
     : 'none open';
+  const world = ctx.world !== 'none' && ctx.where === 'browser' ? `${base}, browser` : base;
   return [
     `Atlas ${pkg.version}`,
     `Browser: ${ctx.browser ?? describeBrowser()}`,

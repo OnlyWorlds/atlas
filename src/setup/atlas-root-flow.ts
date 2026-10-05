@@ -45,6 +45,7 @@ import type { ImportPlan } from '../import/types';
 import type { WorldRegistryEntry, PerElementFailure, WorldMeta } from '../core/types';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
 import { PlainError } from '../core/plain-error';
+import { browserStorageFullSentence } from '../core/problems';
 import { keyCheckError } from './key-check-errors';
 
 // The refusals below are user copy (S369): each is a `PlainError`, so the
@@ -640,8 +641,7 @@ export async function scaffoldWorldInRoot(
 }
 
 /** Said when a make into the browser home meets a full origin (contract §2.2). */
-export const BROWSER_STORAGE_FULL = (doing: string) =>
-  `This browser's storage for Atlas is full, so Atlas could not finish ${doing}. Free some space or move a world to a folder, then try again.`;
+export const BROWSER_STORAGE_FULL = (doing: string) => browserStorageFullSentence(doing);
 
 /**
  * Make a world in this browser's storage (1.17, conv. 129): a fresh nonced
@@ -1115,9 +1115,7 @@ async function linkIntoBrowser(
   let downloadResult: Awaited<ReturnType<typeof initialDownloadAll>>;
   try {
     await store.writeWorldMeta(linkedWorldMeta({ serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly }));
-    downloadResult = await initialDownloadAll(store, buildV2Adapter(apiKey, apiPin), opts.onProgress, opts.shouldStop);
-    const full = downloadResult.failures.find(f => f.error_name === 'QuotaExceededError');
-    if (full) throw new DOMException('The browser storage is full', 'QuotaExceededError');
+    downloadResult = await initialDownloadAll(store, buildV2Adapter(apiKey, apiPin), opts.onProgress, opts.shouldStop, { stopOnQuota: true });
     await releasePriorWorld();
   } catch (err) {
     return abandonBrowserMake(store, make, err, 'bringing the world down');

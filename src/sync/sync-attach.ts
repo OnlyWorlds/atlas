@@ -26,6 +26,7 @@ import type { Element, WorldRegistryEntry, SyncEngineState } from '../core/types
 import { failureToastOnce, classifyFailure } from './sync-failure-copy';
 import { noteRoundIssues } from './sync-issues';
 import { buildFailureDetails, type FixId } from '../core/problems';
+import { filesWhereOf, isBrowserWorld } from '../core/browser-worlds';
 import { detailsContext, resolveFixes } from '../ui/problem-fixes';
 import type { PerElementFailure } from '../core/types';
 import { effectiveSyncPaused } from '../registry/registry';
@@ -90,6 +91,7 @@ export function attachSyncEngine(
     folder,
     client: adapter,
     readOnly,
+    where: filesWhereOf(entry),
     apiWorldId: entry.api.world_id,
     policy: reg.sync_default_policy ?? 'local-wins',
     onStateChange: (s) => publishSyncState(entry.id, s),
@@ -161,7 +163,7 @@ export function attachSyncEngine(
       // state, and the local-first push asymmetry doesn't apply (no pushes).
       if (!readOnly) {
         try {
-          await flushPendingOnAttach(engine, folder, entry.name, entry.id, !!opts.justLinked);
+          await flushPendingOnAttach(engine, folder, entry.name, entry.id, !!opts.justLinked, isBrowserWorld(entry));
         } catch (err) {
           // flushPendingOnAttach swallows its own errors; outer catch is defense-
           // in-depth in case the helper is ever refactored to throw.
@@ -197,6 +199,7 @@ async function flushPendingOnAttach(
   worldName: string,
   worldId: string,
   justLinked = false,
+  inBrowser = false,
 ): Promise<void> {
   try {
     const changed = await folder.listLocallyChangedSince(null);
@@ -205,8 +208,10 @@ async function flushPendingOnAttach(
     if (pending === 0) return;
     // A batch too big to upload unasked waits for the user, as it would with
     // the window open (S365, `holdBigBatchAtOpen`). A hold already persisted
-    // was adopted before this ran and refuses the round by itself.
-    if (!justLinked && changed.length > BIG_BATCH && !isDiskHoldPersisted(worldId)) {
+    // was adopted before this ran and refuses the round by itself. Never for
+    // a world kept in this browser (1.17, gate B15): nothing outside Atlas can
+    // write its files, so what waits is the user's own offline editing.
+    if (!justLinked && !inBrowser && changed.length > BIG_BATCH && !isDiskHoldPersisted(worldId)) {
       holdBigBatchAtOpen(worldId, changed.length, engine);
       return;
     }
@@ -221,7 +226,7 @@ async function flushPendingOnAttach(
       // Notify the user — these writes were stuck from a prior session.
       // Neutral about WHO made them (S365 lane B M3): the user's own offline
       // edits, or another tool's while Atlas was closed.
-      toastManager.success(`Uploaded ${synced} ${synced === 1 ? 'change that was' : 'changes that were'} waiting in the folder`);
+      toastManager.success(`Uploaded ${synced} ${synced === 1 ? 'change that was' : 'changes that were'} waiting in ${inBrowser ? 'this browser' : 'the folder'}`);
     }
     if (result.failures.length > 0) {
       console.warn('[atlas:sync] flush-on-attach: some writes failed', result.failures);
@@ -252,7 +257,7 @@ function toastFailuresOnce(
   worldId: string | null,
 ): void {
   if (failures.length === 0) return;
-  const text = failureToastOnce(failures);
+  const text = failureToastOnce(failures, filesWhereOf(getState().registry.worlds.find(w => w.id === worldId)));
   if (!text) return;
   const kinds = new Set(failures.map(classifyFailure));
   const fixIds: FixId[] = [];
@@ -327,6 +332,12 @@ export function getCurrentSyncWorldId(): string | null {
 
 /** Currently-attached folder store, or null. Set by attachSyncEngine. */
 let currentFolder: FolderStore | null = null;
+/** "in this browser" or "in the folder": where the syncing world keeps its edits (1.17). */
+function savedPlaceOfSyncWorld(): string {
+  const id = getCurrentSyncWorldId();
+  return filesWhereOf(getState().registry.worlds.find(w => w.id === id)) === 'browser' ? 'in this browser' : 'in the folder';
+}
+
 export function getCurrentSyncFolder(): FolderStore | null {
   return currentFolder;
 }
@@ -510,8 +521,8 @@ function emitConflictToasts(
       result.transient_reason === 'rate_limited'
         ? `OnlyWorlds is limiting requests, which happens after too many wrong PIN tries. Atlas will try again in ${when}.`
         : result.transient_reason === 'offline'
-          ? `OnlyWorlds could not be reached. Your changes are saved in the folder, and Atlas will try again in ${when}.`
-          : `OnlyWorlds is busy. Your changes are saved in the folder, and Atlas will try again in ${when}.`
+          ? `OnlyWorlds could not be reached. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas will try again in ${when}.`
+          : `OnlyWorlds is busy. Your changes are saved ${savedPlaceOfSyncWorld()}, and Atlas will try again in ${when}.`
     );
     return;
   }

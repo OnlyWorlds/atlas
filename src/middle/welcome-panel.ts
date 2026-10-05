@@ -10,7 +10,8 @@
 
 import { isCodeLoadError } from '../core/reload-offer';
 import { getActiveStore } from '../core/active-store';
-import { hasFolderMode, opfsUsable, NO_BROWSER_STORAGE_LINE } from '../core/capabilities';
+import { hasFolderMode, opfsStatus, NO_BROWSER_STORAGE_LINE } from '../core/capabilities';
+import { browserStorageFullSentence } from '../core/problems';
 import { escapeText } from '../core/dom-utils';
 import { navigate, timelineHash } from '../core/router';
 import { getState, subscribe } from '../core/state';
@@ -190,11 +191,12 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // refuses browser storage (a Firefox private window) says why up front
       // rather than on the click (S366).
       if (!folderMode) {
-        void opfsUsable().then((ok) => {
-          if (ok || !tourBtn.isConnected) return;
+        void opfsStatus().then((status) => {
+          if (status === 'ok' || !tourBtn.isConnected) return;
           tourBtn.closest('.atlas-landing-choice')?.remove();
           const note = root.querySelector('.atlas-landing-note');
-          if (note) note.textContent = NO_BROWSER_STORAGE_LINE;
+          // A full origin is not a private window (gate B20): say which.
+          if (note) note.textContent = status === 'full' ? browserStorageFullSentence('starting the tour') : NO_BROWSER_STORAGE_LINE;
         });
       }
       tourBtn.addEventListener('click', async () => {

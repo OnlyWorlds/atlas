@@ -193,11 +193,7 @@ export async function ensureAtlasRoot(toasts: Toasts, purpose: string): Promise<
 /** The five ways into a world, named by the sidebar buttons' `data-action`. */
 export type AddWorldAction = 'create-local' | 'open-folder' | 'new-api' | 'link-api' | 'view-api';
 
-/**
- * Run one way into a world, from any surface (the icon row, the chooser,
- * Ctrl+K). The four that make a world folder ask for the home folder first
- * when there is none (`ensureAtlasRoot`).
- */
+/** Run one way into a world, from any surface (the icon row, the chooser, Ctrl+K). */
 export async function runAddWorldAction(action: AddWorldAction, toasts: ToastManager): Promise<void> {
   // Backstop: the tour owns the world list while it runs (S365 gate lens B F5).
   if (isTourFlagActive()) {
@@ -214,19 +210,9 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
     await pickAndOpenWorldFolder(toasts);
     return;
   }
-  const purpose: Record<Exclude<AddWorldAction, 'open-folder'>, string> = {
-    'create-local': 'A new world is a new folder.',
-    'new-api': 'A new OnlyWorlds world also gets a folder on your drive.',
-    'link-api': 'Linking a world downloads it into a new folder.',
-    'view-api': 'Viewing a shared world downloads it into a new folder.',
-  };
-  // Where it goes (1.17, conv. 129): the create dialog asks for itself; the
-  // other doors use the home folder when set, else this browser, and ask for
-  // a home folder only when the folder is the destination.
-  if (action !== 'create-local') {
-    const { defaultWorldWhere } = await import('./world-parent');
-    if (defaultWorldWhere() === 'folder' && !(await ensureAtlasRoot(toasts, purpose[action]))) return;
-  }
+  // Where it goes (1.17, conv. 129): each dialog asks the where-question
+  // (`ui/where-choice.ts`) and asks for a home folder only when the folder is
+  // the answer and none is set.
   if (action === 'create-local') {
     const { CreateWorldModal } = await import('../ui/create-world-modal');
     new CreateWorldModal(toasts).open();
@@ -244,9 +230,9 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
 
 /** The chooser's rows: the icon row's five, said in words (S365). */
 const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line: string }> = [
-  { action: 'create-local', icon: 'create_new_folder', title: 'Start a new world', line: 'A new folder of plain files on your drive. Works offline; take it online any time.' },
+  { action: 'create-local', icon: 'create_new_folder', title: 'Start a new world', line: 'Plain files, in a folder on your drive or in this browser. Works offline; take it online any time.' },
   { action: 'open-folder', icon: 'folder_open', title: 'Open a world folder', line: 'One you already have, from Atlas, another tool, or your AI. It opens where it is; nothing is copied.' },
-  { action: 'new-api', icon: 'cloud_upload', title: 'New world on OnlyWorlds', line: 'Created on onlyworlds.com and on your drive, synced from the start. Needs a free account.' },
+  { action: 'new-api', icon: 'cloud_upload', title: 'New world on OnlyWorlds', line: 'Created on onlyworlds.com and here, synced from the start. Needs a free account.' },
   { action: 'link-api', icon: 'link', title: 'Bring down a world from OnlyWorlds', line: 'Paste its key: Atlas downloads a full copy and keeps the two in sync.' },
   { action: 'view-api', icon: 'visibility', title: 'View a shared world', line: 'Someone gave you a read key: browse their world, view only. No PIN needed.' },
 ];

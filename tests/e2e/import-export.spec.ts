@@ -43,6 +43,23 @@ async function openImport(page: Page) {
   await expect(page.locator('.atlas-import-room h1')).toHaveText('Data');
 }
 
+/**
+ * Import as new asks where the world lives as its own step (1.17, conv. 129):
+ * two rows, the folder first and pre-selected when a home folder is set.
+ */
+async function importAsNew(page: Page, where: 'folder' | 'browser' = 'folder') {
+  await page.click('[data-action="import"]');
+  const ask = page.locator('[data-modal="where-ask"]');
+  await expect(ask.locator('.atlas-where-row strong')).toHaveText([
+    'In a folder on your drive (your AI can work on it)',
+    'In this browser',
+  ]);
+  await expect(ask.locator('input[name="where"][value="folder"]')).toBeChecked();
+  await ask.locator(`input[name="where"][value="${where}"]`).check();
+  await ask.locator('[data-action="go"]').click();
+  await expect(ask).toHaveCount(0);
+}
+
 const FULL_WORLD = {
   World: { api_key: '0000000099', name: 'Blood Meridian', description: 'The Glanton gang rides.' },
   Character: [
@@ -61,7 +78,7 @@ test('import full-world JSON creates a new world (Mode A)', async ({ page }) => 
   await expect(page.locator('input[name="imp-mode"][value="new"]')).toBeChecked();
   await expect(page.locator('.atlas-import-name')).toHaveValue('Blood Meridian');
 
-  await page.click('[data-action="import"]');
+  await importAsNew(page);
   // Import (Mode A) creates and activates the new world; sidebar mode is
   // untouched by the import flow itself, but stays wherever setupWorld left
   // it (elements). Switch back to worlds mode to assert on the row.
@@ -74,6 +91,26 @@ test('import full-world JSON creates a new world (Mode A)', async ({ page }) => 
     const kid = els.find((e: any) => e.name === 'The Kid');
     return kid?.birthplace ?? null;
   })).toBe('068e5110-a410-7cbb-8000-5168e2a14b51');
+});
+
+test('import as new into this browser: the where-step lands a browser world, and Cancel imports nothing', async ({ page }) => {
+  await setupWorld(page);
+  await openImport(page);
+  await page.fill('[data-role="paste"]', JSON.stringify(FULL_WORLD));
+  await page.click('[data-action="load"]');
+  // Cancel at the where-step: nothing imported, the review still there.
+  await page.click('[data-action="import"]');
+  await page.locator('[data-modal="where-ask"] [data-action="cancel"]').click();
+  await expect(page.locator('[data-modal="where-ask"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="import"]')).toBeEnabled();
+  expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(1);
+  // Then into this browser.
+  await importAsNew(page, 'browser');
+  await expect.poll(async () => page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    const w = s.registry.worlds.find((x: any) => x.name === 'Blood Meridian');
+    return w ? { where: w.where ?? null, active: s.active?.worldId === w.id } : null;
+  })).toEqual({ where: 'browser', active: true });
 });
 
 test('import loose elements merges into the current world (Mode B)', async ({ page }) => {
@@ -109,7 +146,7 @@ test('import the keel envelope creates a world and ADOPTS its world id (S313)', 
 
   await expect(page.locator('.atlas-import-badge')).toHaveText('full world');
   await expect(page.locator('input[name="imp-mode"][value="new"]')).toBeChecked();
-  await page.click('[data-action="import"]');
+  await importAsNew(page);
 
   await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
   // The created world carries the EXPORTED id verbatim — a lossless round-trip,
@@ -125,7 +162,7 @@ test('re-importing a world that already exists offers merge-or-new and merges wi
   // First import adopts the id, creating + activating the world.
   await page.fill('[data-role="paste"]', JSON.stringify(ENVELOPE));
   await page.click('[data-action="load"]');
-  await page.click('[data-action="import"]');
+  await importAsNew(page);
   // Completion signal: the ADOPTED world is active. The old wait (elements
   // search visible) was vacuous — it is already visible from setupWorld's
   // Barovia, so the test raced on and loaded the second payload while the

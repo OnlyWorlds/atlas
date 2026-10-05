@@ -6,11 +6,12 @@
  * resulting registry entry is api-linked from the start.
  *
  * For users who don't have local content yet but want to start a fresh
- * cloud-synced world.
+ * cloud-synced world. Where the local half lives is the where-question
+ * (1.17, `where-choice.ts`).
  */
 
 import { BaseModal } from './modal-base';
-import { defaultWorldWhere, requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
+import { lockWhereChoice, readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { saveRegistry, attachApi, setPin, setEmail } from '../registry/registry';
@@ -23,18 +24,11 @@ import { escapeAttr, escapeText } from '../core/dom-utils';
 import { problemFor } from '../core/problems';
 
 export class NewApiWorldModal extends BaseModal {
-  /** Where the new world lives (1.17): resolved by the door that opened this. */
-  private where: 'folder' | 'browser' = defaultWorldWhere();
-
   constructor(private toasts: ToastManager) {
     super();
   }
 
   open(): void {
-    if (this.where === 'folder' && !getState().atlasRoot) {
-      this.toasts.error('Set up your OnlyWorlds folder first');
-      return;
-    }
     const reg = getState().registry;
     const { overlay, body } = this.buildModalShell({
       title: 'New API world',
@@ -43,7 +37,7 @@ export class NewApiWorldModal extends BaseModal {
     });
 
     body.innerHTML = `
-      <p class="atlas-modal-hint">Creates a local folder AND a new API world on onlyworlds.com. You can then add elements to both at once.</p>
+      <p class="atlas-modal-hint">Creates the world here AND a new API world on onlyworlds.com. You can then add elements to both at once.</p>
       <label class="atlas-modal-field">
         <span>World name</span>
         <input class="atlas-input" type="text" name="api-name" placeholder="My new world" autocomplete="off" required />
@@ -60,6 +54,7 @@ export class NewApiWorldModal extends BaseModal {
         <span>PIN</span>
         <input class="atlas-input" type="password" name="api-pin" placeholder="OnlyWorlds PIN (4 digits)" value="${escapeAttr(reg.pin ?? '')}" inputmode="numeric" maxlength="4" required />
       </label>
+      ${whereChoiceHtml()}
       <p class="atlas-modal-error" data-role="error" hidden></p>
       <div class="atlas-modal-progress" data-role="progress" hidden></div>
       <div class="atlas-modal-actions">
@@ -78,6 +73,7 @@ export class NewApiWorldModal extends BaseModal {
     const cancelBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
 
     cancelBtn.addEventListener('click', () => this.hide());
+    wireWhereChoice(body);
 
     // The local world a failed attempt already made (S369): Create again
     // retries only the online step, rather than making a second folder.
@@ -99,7 +95,20 @@ export class NewApiWorldModal extends BaseModal {
       if (!signedIn && !email) { errorEl.textContent = 'Email is required'; errorEl.hidden = false; return; }
       if (!pin) { errorEl.textContent = 'PIN is required'; errorEl.hidden = false; return; }
 
+      // Taken synchronously, inside the click, before the first await. A retry
+      // that reuses the world already made skips the question's step.
+      const where = takeWhereInClick(body);
+      if (!reusableLocal()) {
+        const ready = await readyWhere(where, this.toasts, 'A new OnlyWorlds world also gets a folder on your drive.');
+        if (ready !== true) {
+          errorEl.textContent = ready || '';
+          errorEl.hidden = !ready;
+          return;
+        }
+      }
+
       submitBtn.disabled = true;
+      lockWhereChoice(body, true);
       // Hide cancel: this flow does local + remote work in sequence, and
       // bailing mid-way is hard to recover from cleanly. Hidden > disabled —
       // user shouldn't even see the affordance.
@@ -124,9 +133,8 @@ export class NewApiWorldModal extends BaseModal {
         if (reuse) {
           entry = reuse;
         } else {
-          progressEl.textContent = `Creating local folder for "${name}"...`;
-          if (this.where === 'browser') requestPersistOnFirstBrowserWorld();
-          ({ entry } = await createWorldInRoot(name, { where: this.where }));
+          progressEl.textContent = where === 'browser' ? `Creating "${name}" in this browser...` : `Creating "${name}" in your folder...`;
+          ({ entry } = await createWorldInRoot(name, { where }));
           madeLocally = { id: entry.id, name: entry.name };
           // Waypoint: a real folder world exists from here on, even if the
           // later API step fails (hookmap wp1 — ungated by construction).
@@ -180,12 +188,13 @@ export class NewApiWorldModal extends BaseModal {
         // step, under the same name (the name field stays locked).
         const reusable = !!reusableLocal();
         errorEl.textContent = reusable
-          ? `${sentence} The world's folder is already made, so Create tries only the online step again.`.trim()
+          ? `${sentence} The world is already made here, so Create tries only the online step again.`.trim()
           : sentence;
         errorEl.hidden = !errorEl.textContent;
         submitBtn.disabled = false;
         cancelBtn.hidden = false;
         nameInput.disabled = reusable;
+        lockWhereChoice(body, reusable);
         if (emailInput) emailInput.disabled = false;
         pinInput.disabled = false;
       }

@@ -127,7 +127,7 @@ describe('share room — republish honors the mirror write result (S9)', () => {
 
     republishButton().click();
     await vi.waitFor(() =>
-      expect(toasts.error).toHaveBeenCalledWith(expect.stringContaining("couldn't record it in the folder")));
+      expect(toasts.error).toHaveBeenCalledWith(expect.stringContaining("couldn't record it in the world")));
     expect(toasts.success).not.toHaveBeenCalled();
   });
 });

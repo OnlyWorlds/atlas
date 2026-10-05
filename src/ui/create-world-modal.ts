@@ -20,9 +20,7 @@ import { getState, patchSlice } from '../core/state';
 import { setSidebarModePref } from '../core/ui-prefs';
 import { navigate, worldHash } from '../core/router';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
-import { hasFolderMode, opfsUsable } from '../core/capabilities';
-import { loadUiPrefs, setNewWorldWherePref } from '../core/ui-prefs';
-import { requestPersistOnFirstBrowserWorld, WHERE_BROWSER_CAPTION, WHERE_BROWSER_ONLY_LINE } from '../setup/world-parent';
+import { readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { completeWaypoint } from '../core/waypoints';
 import { escapeText } from '../core/dom-utils';
 import { problemFor } from '../core/problems';
@@ -70,25 +68,8 @@ export class CreateWorldModal extends BaseModal {
       dataModal: 'create-world',
     });
 
-    const atlasRoot = getState().atlasRoot;
-    const rootDisplay = atlasRoot?.pathHint ?? atlasRoot?.folderName;
     const tour = this.tour;
-    const folderMode = hasFolderMode();
-    const preselect: 'folder' | 'browser' = rootDisplay ? 'folder' : (loadUiPrefs().newWorldWhere ?? 'browser');
-    const whereBlock = tour ? '' : folderMode
-      ? `<fieldset class="atlas-where-choice" data-role="where">
-          <legend>Where should this world live?</legend>
-          <label class="atlas-where-row">
-            <input type="radio" name="where" value="folder" ${preselect === 'folder' ? 'checked' : ''} />
-            <span><strong>In a folder on your drive (your AI can work on it)</strong>
-            <span>${rootDisplay ? `In <code>${escapeText(rootDisplay)}</code>` : 'Pick a folder once; Atlas keeps your new worlds in it as plain files.'}</span></span>
-          </label>
-          <label class="atlas-where-row">
-            <input type="radio" name="where" value="browser" ${preselect === 'browser' ? 'checked' : ''} />
-            <span><strong>In this browser</strong><span>${WHERE_BROWSER_CAPTION}</span></span>
-          </label>
-        </fieldset>`
-      : `<p class="atlas-modal-hint" data-role="where-browser">${WHERE_BROWSER_ONLY_LINE}</p>`;
+    const whereBlock = tour ? '' : whereChoiceHtml();
     const hint = tour ? escapeText(tour.hint) : '';
     body.innerHTML = `
       <form data-form="create-world">
@@ -113,6 +94,7 @@ export class CreateWorldModal extends BaseModal {
     const submitBtn = body.querySelector<HTMLButtonElement>('[data-action="pick"]')!;
 
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
+    wireWhereChoice(form);
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -139,19 +121,12 @@ export class CreateWorldModal extends BaseModal {
         return;
       }
 
-      const picked = form.querySelector<HTMLInputElement>('input[name="where"]:checked')?.value;
-      const where: 'folder' | 'browser' = folderMode ? (picked === 'folder' ? 'folder' : 'browser') : 'browser';
-      // Asked synchronously, inside the click, before the first await (Firefox
-      // shows a prompt and may never answer; nothing waits on it).
-      if (where === 'browser') requestPersistOnFirstBrowserWorld();
-      if (folderMode) setNewWorldWherePref(where);
-      if (where === 'browser' && (await opfsUsable()) !== true) {
-        this.showError(errorBox, 'This window does not allow browser storage, so no world can live in this browser here. If it is a private window, open Atlas in a normal one.');
+      // Taken synchronously, inside the click, before the first await.
+      const where = takeWhereInClick(form);
+      const ready = await readyWhere(where, this.toasts, 'A new world is a new folder.');
+      if (ready !== true) {
+        if (ready) this.showError(errorBox, ready);
         return;
-      }
-      if (where === 'folder' && !getState().atlasRoot) {
-        const { ensureAtlasRoot } = await import('../setup/world-doors');
-        if (!(await ensureAtlasRoot(this.toasts, 'A new world is a new folder.'))) return;
       }
 
       submitBtn.disabled = true;

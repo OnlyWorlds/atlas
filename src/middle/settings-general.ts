@@ -30,7 +30,7 @@ export function renderGeneralTab(): string {
     </section>
     <section class="atlas-settings-section">
       <h3>About</h3>
-      <p class="atlas-settings-hint">Atlas v${pkg.version}: the OnlyWorlds world browser and editor. Your worlds live as files on your own disk; syncing with onlyworlds.com is optional.</p>
+      <p class="atlas-settings-hint">Atlas v${pkg.version}: the OnlyWorlds world browser and editor. Your worlds live as files, in a folder on your drive or in this browser; syncing with onlyworlds.com is optional.</p>
       <div class="atlas-settings-row">
         <a class="atlas-settings-link" href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a>
         <a class="atlas-settings-link" href="https://onlyworlds.github.io" target="_blank" rel="noopener">documentation</a>

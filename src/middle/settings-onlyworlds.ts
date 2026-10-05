@@ -57,7 +57,7 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
     </section>
     <section class="atlas-settings-section">
       <h3>For developers</h3>
-      <p class="atlas-settings-hint">The folder is the API: every world is plain JSON on disk, one file per element. Read the type folders and key on each file's internal id.</p>
+      <p class="atlas-settings-hint">The folder is the API: every world is plain JSON on disk, one file per element. Read the type folders and key on each file's internal id. A world kept in this browser is readable by Atlas only.</p>
       <div class="atlas-ow-links">
         <a href="${OW_SDK_URL}" target="_blank" rel="noopener">@onlyworlds/sdk</a>
         <a href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">schema reference</a>

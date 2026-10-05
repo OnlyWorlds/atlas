@@ -41,32 +41,51 @@ export function hasOpfsMode(): boolean {
  * `SecurityError` from `getDirectory()` (measured, Firefox 150), and the tour
  * then stalled at its first create with that raw message. This probe makes
  * the call and a throwaway write, once per page, and caches the answer.
+ *
+ * The answer is a reason (1.17, contract §1.2, gate B20): `absent` (no API),
+ * `refused` (a private window), `full` (the origin's quota), or `ok`. A full
+ * origin is never cached: freeing space must be able to change the answer,
+ * and it must never read as a private window.
  */
-let opfsUsableCache: Promise<boolean> | null = null;
-export function opfsUsable(): Promise<boolean> {
-  if (!opfsUsableCache) {
-    opfsUsableCache = (async () => {
-      if (!hasOpfsMode()) return false;
+export type OpfsStatus = 'ok' | 'refused' | 'full' | 'absent';
+
+let opfsStatusCache: Promise<OpfsStatus> | null = null;
+export function opfsStatus(): Promise<OpfsStatus> {
+  if (!opfsStatusCache) {
+    const probe = (async (): Promise<OpfsStatus> => {
+      if (!hasOpfsMode()) return 'absent';
       try {
         const root = await navigator.storage.getDirectory();
         // A real file write (the tour's first act is one), under a reserved
         // name no world folder can take (`.atlas-` prefix; browser worlds
-        // will live under their own directory).
-        const probe = '.atlas-storage-probe';
-        const file = await root.getFileHandle(probe, { create: true });
+        // live under their own directory).
+        const name = '.atlas-storage-probe';
+        const file = await root.getFileHandle(name, { create: true });
         const w = await file.createWritable();
         await w.write('ok');
         await w.close();
-        await root.removeEntry(probe).catch(() => {});
-        return true;
-      } catch {
-        return false;
+        await root.removeEntry(name).catch(() => {});
+        return 'ok';
+      } catch (err) {
+        return (err as { name?: unknown } | null)?.name === 'QuotaExceededError' ? 'full' : 'refused';
       }
     })();
+    opfsStatusCache = probe;
+    void probe.then(s => { if (s === 'full' && opfsStatusCache === probe) opfsStatusCache = null; });
   }
-  return opfsUsableCache;
+  return opfsStatusCache;
 }
 
-/** The one plain line for a window that refuses browser storage. */
+/** Can this window use browser storage right now? `opfsStatus` says why not. */
+export async function opfsUsable(): Promise<boolean> {
+  return (await opfsStatus()) === 'ok';
+}
+
+/** Test seam: forget the cached answer. */
+export function __resetOpfsStatusForTests(): void {
+  opfsStatusCache = null;
+}
+
+/** The one plain line for a window that refuses browser storage (lens C R3-h). */
 export const NO_BROWSER_STORAGE_LINE =
-  'This window does not allow the browser storage the tour needs. If it is a private window, open Atlas in a normal one.';
+  'This window does not allow browser storage, so no world can live in this browser here. If it is a private window, open Atlas in a normal one.';

@@ -138,7 +138,7 @@ export function renderZonePanel(entry: MapTabCacheEntry, zones: Zone[], selected
         <div class="atlas-zone-kind-row" data-action="toggle-kind">
           <span class="material-symbols-outlined atlas-zone-kind-caret" aria-hidden="true">${open ? 'expand_more' : 'chevron_right'}</span>
           ${hasKind
-            ? `<button type="button" class="atlas-zone-kind-swatch" title="Colour for every ${escapeAttr(kindLabel(kind))} zone (a world style, saved with the folder)" data-action="swatch" data-color="${escapeAttr(color)}" aria-label="Colour for ${escapeAttr(kindLabel(kind))}">
+            ? `<button type="button" class="atlas-zone-kind-swatch" title="Colour for every ${escapeAttr(kindLabel(kind))} zone (a world style, saved with the world)" data-action="swatch" data-color="${escapeAttr(color)}" aria-label="Colour for ${escapeAttr(kindLabel(kind))}">
                  <span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span>
                </button>`
             : `<span class="atlas-zone-kind-swatch is-inert"><span class="atlas-zone-kind-swatch-dot" style="background:${escapeAttr(color)}"></span></span>`}

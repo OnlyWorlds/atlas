@@ -30,6 +30,7 @@ import { ConflictReviewModal } from '../../ui/conflict-review-modal';
 import { savePersistedRightTabs } from './right-tabs-persistence';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText } from '../../core/dom-utils';
+import { filesWhereOf } from '../../core/browser-worlds';
 
 export interface RightPaneMount {
   tabBar: HTMLElement;
@@ -338,7 +339,9 @@ function renderSyncIndicator(state: ReturnType<typeof getState>, toasts: ToastMa
   const linked = entry?.state === 'api-linked';
   if (!linked) {
     pill.dataset.state = 'local';
-    pill.title = 'Local-only world: folder is the source of truth';
+    pill.title = filesWhereOf(entry) === 'browser'
+      ? 'Local-only world: kept in this browser'
+      : 'Local-only world: folder is the source of truth';
     pill.innerHTML = `
       <span class="atlas-sync-pill-dot"></span>
       <span>Local</span>

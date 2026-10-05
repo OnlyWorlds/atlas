@@ -11,13 +11,13 @@
  *   4. On success: toast + close + navigate to the world's elements view.
  *   5. On error: form re-enabled with the error message inline.
  *
- * Prereqs:
- *   - Atlas root must be configured (modal errors out otherwise).
- *   - Modal is opened from the sidebar header `+ link api` button.
+ * Where it lands (1.17, conv. 129): the dialog asks the where-question
+ * (`where-choice.ts`); a folder answer with no home folder asks for one
+ * inside the click.
  */
 
 import { BaseModal } from './modal-base';
-import { defaultWorldWhere, requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
+import { readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { ToastManager } from './toast-manager';
 import { getState } from '../core/state';
 import { navigate, homeHash } from '../core/router';
@@ -31,19 +31,12 @@ import { problemFor } from '../core/problems';
 export class LinkWorldModal extends BaseModal {
   private toasts: ToastManager;
 
-  /** Where the world is brought down to (1.17): resolved by the door that opened this. */
-  private where: 'folder' | 'browser' = defaultWorldWhere();
-
   constructor(toasts: ToastManager) {
     super();
     this.toasts = toasts;
   }
 
   open(): void {
-    if (this.where === 'folder' && !getState().atlasRoot) {
-      this.toasts.error('Set up your OnlyWorlds folder first');
-      return;
-    }
     this.modal = this.buildModal();
     this.show();
     queueMicrotask(() => {
@@ -73,8 +66,9 @@ export class LinkWorldModal extends BaseModal {
           <span>Display name (optional)</span>
           <input class="atlas-input" type="text" name="display-name" placeholder="Defaults to server world name" autocomplete="off" />
         </label>
+        ${whereChoiceHtml()}
         <p class="atlas-modal-hint">
-          Atlas will download every element of this world into a new folder inside your OnlyWorlds folder. You can keep editing while offline; changes sync back next time you open it.
+          Atlas downloads every element of this world. You can keep editing while offline; changes sync back the next time you open it.
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-progress" data-role="progress" hidden></div>
@@ -83,7 +77,7 @@ export class LinkWorldModal extends BaseModal {
           <button type="submit" class="atlas-btn-primary" data-action="link">Link</button>
         </div>
         <div class="atlas-modal-actions" data-role="busy-actions" hidden>
-          <button type="button" class="atlas-btn-ghost" data-action="cancel-link" title="Stop now and remove the new folder; nothing is kept">Cancel link</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel-link" title="Stop now and remove what was downloaded; nothing is kept">Cancel link</button>
           <button type="button" class="atlas-btn-primary" data-action="finish-early" title="Stop now and open the world with what has downloaded; Refresh from API brings the rest">Stop and keep what's here</button>
         </div>
       </form>
@@ -114,11 +108,21 @@ export class LinkWorldModal extends BaseModal {
     });
 
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
+    wireWhereChoice(form);
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorBox.hidden = true;
       progressBox.hidden = true;
+
+      // Taken synchronously, inside the click, before the first await.
+      const where = takeWhereInClick(form);
+      const ready = await readyWhere(where, this.toasts, 'Linking a world downloads it into a new folder.');
+      if (ready !== true) {
+        errorBox.textContent = ready || '';
+        errorBox.hidden = !ready;
+        return;
+      }
 
       const apiKey = (form.querySelector<HTMLInputElement>('input[name="api-key"]')!).value;
       const apiPin = (form.querySelector<HTMLInputElement>('input[name="api-pin"]')!).value;
@@ -165,7 +169,7 @@ export class LinkWorldModal extends BaseModal {
         // just-activated world.
         const result = await enqueueActivationTask(() =>
           linkExistingApiWorldInRoot({
-            where: this.where,
+            where,
             apiKey,
             apiPin,
             displayName,

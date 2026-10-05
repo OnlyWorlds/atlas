@@ -58,6 +58,10 @@ test('+ link api opens a modal with api-key, pin, and display-name fields', asyn
   await expect(page.locator('input[name="api-pin"]')).toBeVisible();
   await expect(page.locator('input[name="display-name"]')).toBeVisible();
   await expect(page.locator('[data-modal="link-world"] [data-action="link"]')).toBeVisible();
+  // The busy exits show only while a link runs (S372: a class's `display`
+  // beat the `hidden` attribute, so they showed from the start).
+  await expect(page.locator('[data-modal="link-world"] [data-action="cancel-link"]')).toBeHidden();
+  await expect(page.locator('[data-modal="link-world"] [data-action="finish-early"]')).toBeHidden();
 });
 
 test('link modal pin field is pre-filled from registry.pin', async ({ page }) => {

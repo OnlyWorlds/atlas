@@ -240,8 +240,8 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     expect(toasts.calls).toHaveLength(0);
   });
 
-  it('with no home folder it asks where worlds live; Cancel returns false and never mints (S365)', async () => {
-    // A folder destination (1.17): the picker exists and the user last chose a folder.
+  it('asks where the world lives first; a folder answer with no home folder asks for one; Cancel never mints (S365, 1.17)', async () => {
+    // The picker exists and the user last chose a folder: the folder row is pre-selected.
     (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker = () => Promise.resolve(null);
     localStorage.setItem('atlas_ui_prefs', JSON.stringify({ sidebarMode: 'worlds', defaultCreateType: 'character', newWorldWhere: 'folder' }));
     const state = mount();
@@ -250,8 +250,15 @@ describe('openAccountWorld — synchronous short-circuits', () => {
     const toasts = makeToasts();
 
     const pending = openAccountWorld(row, toasts);
+    await vi.waitFor(() => expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull());
+    expect(document.querySelector<HTMLInputElement>('[data-modal="where-ask"] input[value="folder"]')!.checked).toBe(true);
+    document.querySelector<HTMLButtonElement>('[data-modal="where-ask"] [data-action="go"]')!.click();
     await vi.waitFor(() => expect(document.querySelector('[data-modal="home-folder"]')).not.toBeNull());
     document.querySelector<HTMLButtonElement>('[data-modal="home-folder"] [data-action="cancel"]')!.click();
+    // Back at the question (the browser row is still there to choose); Cancel it.
+    await vi.waitFor(() => expect(document.querySelector('[data-modal="home-folder"]')).toBeNull());
+    expect(document.querySelector('[data-modal="where-ask"]')).not.toBeNull();
+    document.querySelector<HTMLButtonElement>('[data-modal="where-ask"] [data-action="cancel"]')!.click();
     const ok = await pending;
     expect(ok).toBe(false);
     expect(state.minted).toHaveLength(0);

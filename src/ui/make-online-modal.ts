@@ -39,8 +39,15 @@ import {
 } from '../sync/make-online';
 import { escapeAttr } from '../core/dom-utils';
 import { describeFailures, failureToastOnce } from '../sync/sync-failure-copy';
+import { filesWhereOf } from '../core/browser-worlds';
 import { PlainError, problemFor } from '../core/problems';
 import { keyCheckError } from '../setup/key-check-errors';
+
+/** Where the world being taken online keeps its files: the open world (1.17). */
+function activeFilesWhere(): 'folder' | 'browser' {
+  const s = getState();
+  return filesWhereOf(s.registry.worlds.find(w => w.id === s.active?.worldId));
+}
 
 type Route = 'create' | 'link';
 
@@ -369,7 +376,7 @@ export class MakeOnlineModal extends BaseModal {
         // Registered as shown (re-key gate lens 2 F11): the flush-on-attach
         // round re-sends the same failing set a moment later and must not
         // repeat the paragraph.
-        this.toasts.error(`${name} is online. ${failureToastOnce(pushResult.failures) ?? describeFailures(pushResult.failures)}`);
+        this.toasts.error(`${name} is online. ${failureToastOnce(pushResult.failures, activeFilesWhere()) ?? describeFailures(pushResult.failures, activeFilesWhere())}`);
       } else {
         const uploaded = pushResult.pushed.creates + pushResult.pushed.updates;
         this.toasts.success(`${name} is online · ${uploaded} element${uploaded === 1 ? '' : 's'} uploaded`);
@@ -510,7 +517,7 @@ export class MakeOnlineModal extends BaseModal {
           // attach's flush retries the same set a moment later and must not
           // toast the same paragraph a second time.
           failureDetail = result.failures.length > 0
-            ? (failureToastOnce(result.failures) ?? describeFailures(result.failures))
+            ? (failureToastOnce(result.failures, activeFilesWhere()) ?? describeFailures(result.failures, activeFilesWhere()))
             : null;
           const updatedEntry = reg.worlds.find((w) => w.id === worldId)!;
           attachSyncEngine(updatedEntry, folder, { justLinked: true });

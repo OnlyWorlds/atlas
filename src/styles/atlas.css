@@ -23,6 +23,15 @@ html {
   box-sizing: inherit;
 }
 
+/* The `hidden` attribute always hides (S372). The browser's own rule is a
+   plain `display: none`, so any class here that sets `display` silently beat
+   it: the link dialog showed "Cancel link" and "Stop and keep what's here"
+   from the moment it opened (`.atlas-modal-actions { display: flex }`).
+   One rule at the boundary, so no class can forget its own `[hidden]`. */
+[hidden]:not([hidden="until-found"]) {
+  display: none !important;
+}
+
 /* Open Sans — the OnlyWorlds ecosystem standard (--ow-font-sans in
    onlyworlds-base.css; council/workshop run it). Self-hosted variable woff2
    (latin subset), bundled by vite so URLs survive base:'./' deploys. */

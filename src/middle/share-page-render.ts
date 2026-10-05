@@ -449,7 +449,7 @@ export function renderMapView(
     const hint = document.createElement('p');
     hint.className = 'atlas-share-hint atlas-share-map-unpublishable';
     hint.textContent = 'This map can\'t publish yet: it needs a web image URL '
-      + '(local files never leave your folder; host the image and set image_url '
+      + '(images stored with the world never leave it; host the image and set image_url '
       + 'on the map). Dimensions fill in automatically when the image loads in atlas.';
     return hint;
   }

@@ -6,15 +6,15 @@
  * asked for anywhere. The world downloads into a normal folder, registers
  * api-linked with `api.read_only`, the engine attaches pull-only, and every
  * edit surface is blocked at the store seam ("This world is view-only").
+ * Where it lands is the where-question (1.17, `where-choice.ts`).
  *
  * Sibling of LinkWorldModal — same download pipeline (`linkExistingApiWorldInRoot`
  * with `readOnly: true`), same activation-chain ride.
  */
 
 import { BaseModal } from './modal-base';
-import { defaultWorldWhere, requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
+import { readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { ToastManager } from './toast-manager';
-import { getState } from '../core/state';
 import { navigate, homeHash } from '../core/router';
 import { linkExistingApiWorldInRoot } from '../setup/atlas-root-flow';
 import { enqueueActivationTask } from '../core/activation-chain';
@@ -24,19 +24,12 @@ import { problemFor } from '../core/problems';
 export class ViewWorldModal extends BaseModal {
   private toasts: ToastManager;
 
-  /** Where the world is brought down to (1.17): resolved by the door that opened this. */
-  private where: 'folder' | 'browser' = defaultWorldWhere();
-
   constructor(toasts: ToastManager) {
     super();
     this.toasts = toasts;
   }
 
   open(): void {
-    if (this.where === 'folder' && !getState().atlasRoot) {
-      this.toasts.error('Set up your OnlyWorlds folder first');
-      return;
-    }
     this.modal = this.buildModal();
     this.show();
     queueMicrotask(() => {
@@ -61,8 +54,9 @@ export class ViewWorldModal extends BaseModal {
           <span>Display name (optional)</span>
           <input class="atlas-input" type="text" name="display-name" placeholder="Defaults to the world's name" autocomplete="off" />
         </label>
+        ${whereChoiceHtml()}
         <p class="atlas-modal-hint">
-          The world downloads into your OnlyWorlds folder and stays current when its owner makes changes. View only: you can read everything, edit nothing. No PIN needed.
+          The world downloads and stays current when its owner makes changes. View only: you can read everything, edit nothing. No PIN needed.
         </p>
         <div class="atlas-modal-error" data-role="error" hidden></div>
         <div class="atlas-modal-progress" data-role="progress" hidden></div>
@@ -80,11 +74,21 @@ export class ViewWorldModal extends BaseModal {
     const submitBtn = body.querySelector<HTMLButtonElement>('[data-action="view"]')!;
 
     cancelBtn.addEventListener('click', (e) => { e.preventDefault(); this.hide(); });
+    wireWhereChoice(form);
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorBox.hidden = true;
       progressBox.hidden = true;
+
+      // Taken synchronously, inside the click, before the first await.
+      const where = takeWhereInClick(form);
+      const ready = await readyWhere(where, this.toasts, 'Viewing a shared world downloads it into a new folder.');
+      if (ready !== true) {
+        errorBox.textContent = ready || '';
+        errorBox.hidden = !ready;
+        return;
+      }
 
       const apiKey = (form.querySelector<HTMLInputElement>('input[name="api-key"]')!).value;
       const displayName = (form.querySelector<HTMLInputElement>('input[name="display-name"]')!).value;
@@ -111,7 +115,7 @@ export class ViewWorldModal extends BaseModal {
       try {
         const result = await enqueueActivationTask(() =>
           linkExistingApiWorldInRoot({
-            where: this.where,
+            where,
             apiKey,
             apiPin: '',
             displayName,

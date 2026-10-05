@@ -42,6 +42,7 @@ import { createMapDialog } from '../ui/map-create-modal';
 import { getMapsSettings } from '../registry/registry';
 import { escapeText } from '../core/dom-utils';
 import { decideDeleteConfirm } from '../core/delete-confirm';
+import { filesWhereOf } from '../core/browser-worlds';
 
 /**
  * Pending "auto-edit on next render" signal. When set to an element id, the
@@ -336,7 +337,7 @@ function buildSyncDot(el: Element): HTMLElement {
   let state: 'local' | 'synced' | 'dirty';
   if (!isApi) {
     icon = 'save';
-    title = 'Saved to folder';
+    title = filesWhereOf(worldEntry) === 'browser' ? 'Saved in this browser' : 'Saved to folder';
     state = 'local';
   } else {
     const localStamp = el.local_updated_at ?? '';

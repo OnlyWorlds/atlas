@@ -7,6 +7,10 @@
  * router's middle modes.
  */
 
+import { getState } from '../core/state';
+import { hasFolderMode } from '../core/capabilities';
+import { filesWhereOf } from '../core/browser-worlds';
+
 export interface RoomHelp {
   /** Sentence-case room name for the overlay title. */
   name: string;
@@ -14,6 +18,8 @@ export interface RoomHelp {
   purpose: string;
   /** 3-4 verb-first "you can…" lines. */
   can: string[];
+  /** Lines true only for a world kept in a folder; left out for a browser world or a browser without folders. */
+  folderCan?: string[];
 }
 
 export const HELP_CONTENT: Record<string, RoomHelp> = {
@@ -97,6 +103,8 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'merge into the current world or create a new one',
       'export the whole world or a subset by type',
       'copy the AI prompt (it carries your world\'s exact fields) to turn freeform notes into importable JSON',
+    ],
+    folderCan: [
       'or let an AI assistant edit the world folder directly: Atlas shows its changes when you come back to its window',
     ],
   },
@@ -131,5 +139,12 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
 
 /** Resolve help for a router middle-mode; null = no help surface (welcome). */
 export function helpForRoom(mode: string): RoomHelp | null {
-  return HELP_CONTENT[mode] ?? null;
+  const help = HELP_CONTENT[mode];
+  if (!help) return null;
+  if (!help.folderCan) return help;
+  // Folder-only lines need a browser with folders and an open world kept in one.
+  const { registry, active } = getState();
+  const entry = registry.worlds.find(w => w.id === active?.worldId);
+  const inFolder = hasFolderMode() && filesWhereOf(entry) === 'folder';
+  return inFolder ? { ...help, can: [...help.can, ...help.folderCan] } : help;
 }

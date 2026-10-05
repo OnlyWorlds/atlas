@@ -29,7 +29,7 @@ import { getState, patchSlice, subscribe } from '../core/state';
 import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused } from '../registry/registry';
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
 import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vault';
-import { deriveBrowserWorldHandle, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
+import { deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
 import type { WorldRegistryEntry } from '../core/types';
@@ -99,9 +99,9 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // `aria-label` (the chooser's own row title) for a screen reader, which
       // would otherwise read the glyphs' ligature text ("add folder_open").
       const icons = state.registry.worlds_add_icons === false ? '' : `<div class="atlas-worlds-add-icons">
-        ${addIconButton('create-local', 'folder', 'Start a new world: a new folder inside your OnlyWorlds folder')}
+        ${addIconButton('create-local', 'folder', hasFolderMode() ? 'Start a new world: in a folder on your drive or in this browser' : 'Start a new world: kept in this browser')}
         ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder you already have. It opens where it is; nothing is copied.') : ''}
-        ${addIconButton('new-api', 'cloud_upload', 'New world on OnlyWorlds: made on onlyworlds.com and on your drive')}
+        ${addIconButton('new-api', 'cloud_upload', hasFolderMode() ? 'New world on OnlyWorlds: made on onlyworlds.com and on your drive or in this browser' : 'New world on OnlyWorlds: made on onlyworlds.com and in this browser')}
         ${addIconButton('link-api', 'link', 'Bring down a world from OnlyWorlds with its API key')}
         ${addIconButton('view-api', 'visibility', 'View a shared world with a read key, view only')}
         </div>`;
@@ -121,8 +121,8 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       header.innerHTML = `
         <div class="atlas-worlds-add-icons">
         ${addIconButton('create-local', 'folder', 'Create a world. This one is the tour’s: Hyperion.', { pulse: true })}
-        ${addIconButton('open-folder', 'folder_open', 'Open a world folder already on your drive. Yours to use after the tour.', { locked: true })}
-        ${addIconButton('new-api', 'cloud_upload', 'Create a world that lives on onlyworlds.com as well as on your drive. Yours to use after the tour.', { locked: true })}
+        ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder already on your drive. Yours to use after the tour.', { locked: true }) : ''}
+        ${addIconButton('new-api', 'cloud_upload', hasFolderMode() ? 'Create a world that lives on onlyworlds.com as well as on your drive or in this browser. Yours to use after the tour.' : 'Create a world that lives on onlyworlds.com as well as in this browser. Yours to use after the tour.', { locked: true })}
         ${addIconButton('link-api', 'link', 'Bring in a world you already keep on onlyworlds.com. Yours to use after the tour.', { locked: true })}
         ${addIconButton('view-api', 'visibility', 'Open someone else\'s world with a read key, look but do not touch. Yours to use after the tour.', { locked: true })}
         </div>
@@ -414,7 +414,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         : '';
       return `
         <div class="atlas-row atlas-remote-row ${opening ? 'is-opening' : ''}" data-remote-world-id="${escapeAttr(r.id)}" role="button" tabindex="0"
-             title="${r.role === 'collaborator' ? 'Shared with you: link with a key from its owner' : 'Open: download this world into your OnlyWorlds folder'}">
+             title="${r.role === 'collaborator' ? 'Shared with you: link with a key from its owner' : (hasFolderMode() && getState().atlasRoot) ? 'Open: download this world into your OnlyWorlds folder' : 'Open: download this world into this browser'}">
           <span class="material-symbols-outlined">${opening ? 'downloading' : 'cloud'}</span>
           <span class="atlas-row-main">${escapeText(r.name)}</span>
           ${roleChip}
@@ -607,7 +607,9 @@ async function doActivateWorld(
   if (!entry) {
     // A stale link or a world removed in another tab (C2, S369: the id and
     // the word "registry" were the whole message).
-    if (!silent) toasts.error('That world is no longer in your list. If its folder is still on your drive, use Open a world folder to bring it back.');
+    if (!silent) toasts.error(hasFolderMode()
+      ? 'That world is no longer in your list. If its folder is still on your drive, use Open a world folder to bring it back.'
+      : 'That world is no longer in your list.');
     return false;
   }
   // Already active? Click should still "open" — switch to the right-tab view
@@ -843,7 +845,7 @@ async function doActivateWorld(
       console.error('[worlds-sidebar] open failed but the root directory exists', err);
       evictParkedStore(worldId);
       if (!silent) {
-        toasts.error(`Could not open ${entry.name}. The folder is still there, so nothing was removed. Try again, and check that no other Atlas tab has it open.`);
+        toasts.error(`Could not open ${entry.name}. ${filesWhereOf(entry) === 'browser' ? 'Its storage' : 'The folder'} is still there, so nothing was removed. Try again, and check that no other Atlas tab has it open.`);
       }
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;

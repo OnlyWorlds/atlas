@@ -15,6 +15,7 @@ import { getState } from '../core/state';
 import { navigate, settingsHash } from '../core/router';
 import { effectiveSyncPaused } from '../registry/registry';
 import { ensureWritable, loadHandle } from '../store/handle-vault';
+import { filesWhereOf, type FilesWhere } from '../core/browser-worlds';
 import { toastManager, type ToastAction, type ToastManager } from './toast-manager';
 
 export interface FixContext {
@@ -33,9 +34,17 @@ export function detailsContext(): DetailsContext {
   const id = s.active?.worldId;
   const entry = id ? s.registry.worlds.find(w => w.id === id) : undefined;
   if (!entry) return { world: 'none' };
+  const where = filesWhereOf(entry);
   return entry.state === 'api-linked'
-    ? { world: 'linked', syncPaused: effectiveSyncPaused(entry, s.registry) }
-    : { world: 'local' };
+    ? { world: 'linked', where, syncPaused: effectiveSyncPaused(entry, s.registry) }
+    : { world: 'local', where };
+}
+
+/** Where the problem's world keeps its files: the given world, else the open one. */
+function whereFor(worldId: string | null | undefined): FilesWhere {
+  const s = getState();
+  const id = worldId ?? s.active?.worldId;
+  return filesWhereOf(id ? s.registry.worlds.find(w => w.id === id) : undefined);
 }
 
 /** Ask the browser for the folder again. Must run inside the click. */
@@ -81,7 +90,10 @@ export function resolveFixes(ids: readonly FixId[], ctx: FixContext = {}): Toast
         if (worldId) out.push({ label: 'See what is not syncing', run: () => navigate(settingsHash(worldId, 'world')) });
         break;
       case 'reload-from-disk':
-        out.push({ label: 'Reload from disk', run: async () => (await import('./command-palette')).reloadFromDisk() });
+        out.push({
+          label: whereFor(ctx.worldId) === 'browser' ? 'Reload the world' : 'Reload from disk',
+          run: async () => (await import('./command-palette')).reloadFromDisk(),
+        });
         break;
       case 'copy-details':
       case 'send-feedback':
@@ -97,7 +109,10 @@ export function resolveFixes(ids: readonly FixId[], ctx: FixContext = {}): Toast
  * caller further up (`problemWasShown`) does not toast it a second time.
  */
 export function showProblem(err: unknown, opts: FixContext & ProblemOpts & { doing: string }): Problem {
-  const problem = problemFor(err, { doing: opts.doing, savedLocally: opts.savedLocally, folder: opts.folder, unexpected: opts.unexpected });
+  const problem = problemFor(err, {
+    doing: opts.doing, savedLocally: opts.savedLocally, folder: opts.folder, unexpected: opts.unexpected,
+    where: opts.where ?? whereFor(opts.worldId),
+  });
   markProblemShown(err);
   if (problem.quiet) return problem;
   const details = problem.report ? buildDetails(problem, detailsContext()) : undefined;

@@ -38,6 +38,13 @@ export function isAtlasOnlyStorage(entry: Pick<WorldRegistryEntry, 'where' | 'de
   return isBrowserWorld(entry) || entry?.demo === true;
 }
 
+/** Where a world's files are, as the copy says it: this browser, or a folder (the default). */
+export type FilesWhere = 'folder' | 'browser';
+
+export function filesWhereOf(entry: Pick<WorldRegistryEntry, 'where' | 'demo'> | null | undefined): FilesWhere {
+  return isAtlasOnlyStorage(entry) ? 'browser' : 'folder';
+}
+
 type RootGetter = () => Promise<FileSystemDirectoryHandle>;
 let rootGetter: RootGetter = () => navigator.storage.getDirectory();
 

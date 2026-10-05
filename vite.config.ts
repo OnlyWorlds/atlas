@@ -30,9 +30,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'favicon.png', 'owlogo.png'],
       manifest: {
-        name: 'Atlas — OnlyWorlds',
+        name: 'Atlas · OnlyWorlds',
         short_name: 'Atlas',
-        description: 'Folder-first OnlyWorlds world browser and editor.',
+        description: 'Local-first OnlyWorlds world browser and editor.',
         theme_color: '#0a0a0a',
         background_color: '#0a0a0a',
         display: 'standalone',

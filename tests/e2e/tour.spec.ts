@@ -165,8 +165,12 @@ async function createWorldViaModal(page: Page) {
   // The sidebar materialized in its full final structure: create live, the
   // four siblings greyed.
   await expect(page.locator('.atlas-worlds-header [data-action="create-local"]')).toBeVisible();
-  // Four locked icons plus the locked "add a world" (S365).
-  await expect(page.locator('.atlas-worlds-header .atlas-tour-locked')).toHaveCount(5);
+  // Four locked icons plus the locked "add a world" (S365); without the folder
+  // picker the open-a-world-folder icon is not there at all (1.17, conv. 129).
+  const folderMode = await page.evaluate(() => 'showDirectoryPicker' in window);
+  await expect(page.locator('.atlas-worlds-header .atlas-tour-locked')).toHaveCount(folderMode ? 5 : 4);
+  // Locked icons carry no data-action (they are aria-disabled): find the folder door by its glyph.
+  await expect(page.locator('.atlas-worlds-header .atlas-tour-locked', { hasText: 'folder_open' })).toHaveCount(folderMode ? 1 : 0);
   await page.locator('.atlas-worlds-header [data-action="create-local"]').click();
   const nameInput = page.locator('[data-modal="create-world"] input[name="world-name"]');
   await expect(nameInput).toHaveValue('Hyperion');

@@ -26,6 +26,7 @@ import { scoreElementMatch } from '../core/element-search';
 import { roomOf, openElementTarget } from '../core/element-room';
 import { ELEMENT_ICONS } from '../core/constants';
 import { hasFolderMode } from '../core/capabilities';
+import { filesWhereOf } from '../core/browser-worlds';
 import { isTourFlagActive } from '../tour/tour-flag';
 import type { Element, ElementType } from '../core/types';
 
@@ -57,11 +58,12 @@ export interface PaletteResult {
  * Commands reachable by name (S364: the palette's first). `id` is what
  * `activate` switches on.
  */
-const ACTIONS: Array<{ label: string; id: string; icon: string; aliases?: string[]; folderOnly?: boolean }> = [
-  { label: 'reload from disk', id: 'reload-disk', icon: 'folder_open', aliases: ['refresh from disk', 'rescan', 'files'] },
+const ACTIONS: Array<{ label: string; id: string; icon: string; aliases?: string[]; folderOnly?: boolean; door?: boolean; diskOnly?: boolean }> = [
+  // A world kept in this browser has no folder to rescan, so it hides this.
+  { label: 'reload from disk', id: 'reload-disk', icon: 'folder_open', aliases: ['refresh from disk', 'rescan', 'files'], diskOnly: true },
   // The world doors (S365): the same runner as the Worlds list's buttons.
-  { label: 'add a world', id: 'add-world', icon: 'add', aliases: ['new world', 'create world', 'world'], folderOnly: true },
-  { label: 'open a world folder', id: 'open-world-folder', icon: 'folder_open', aliases: ['open folder', 'open world'], folderOnly: true },
+  { label: 'add a world', id: 'add-world', icon: 'add', aliases: ['new world', 'create world', 'world'], door: true },
+  { label: 'open a world folder', id: 'open-world-folder', icon: 'folder_open', aliases: ['open folder', 'open world'], folderOnly: true, door: true },
 ];
 
 const ROOMS: Array<{ label: string; segment: string; icon: string; aliases?: string[] }> = [
@@ -73,6 +75,11 @@ const ROOMS: Array<{ label: string; segment: string; icon: string; aliases?: str
   { label: 'data', segment: 'import', icon: 'swap_vert', aliases: ['import', 'export'] },
   { label: 'settings', segment: 'settings', icon: 'settings' },
 ];
+
+function openWorldEntry() {
+  const { registry, active } = getState();
+  return registry.worlds.find(w => w.id === active?.worldId);
+}
 
 function normalize(s: string): string {
   return s.trim().toLowerCase();
@@ -99,7 +106,9 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
   for (const action of ACTIONS) {
     // The world doors are locked during the tour, as its sidebar locks them
     // (S365 gate lens B F5 / C M3).
-    if (action.folderOnly && (!hasFolderMode() || isTourFlagActive())) continue;
+    if (action.folderOnly && !hasFolderMode()) continue;
+    if (action.door && isTourFlagActive()) continue;
+    if (action.diskOnly && filesWhereOf(openWorldEntry()) === 'browser') continue;
     const names = [action.label, ...(action.aliases ?? [])];
     if (names.some(n => n.startsWith(q))) {
       out.push({ kind: 'action', id: action.id, name: action.label, hint: 'command', score: 85 });

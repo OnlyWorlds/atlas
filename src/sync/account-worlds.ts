@@ -7,7 +7,7 @@
  * transition while mounted). Offline-first law: failures land in the slice
  * as a quiet error string; local rendering never waits on this.
  *
- * `openAccountWorld` is the owned-row click: preconditions (atlas root, PIN)
+ * `openAccountWorld` is the owned-row click: preconditions (where it lands, PIN)
  * → mint a WRITE key → download via the existing link pipeline ON the
  * activation chain → navigate home + waypoint. Ordering is the gate's R1:
  * every precondition resolves BEFORE the mint so a failed open never leaves
@@ -116,19 +116,6 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
   if (state.accountWorlds.opening) return false; // one open at a time
 
   // ---- Preconditions BEFORE the mint (gate R1: no orphaned keys) ----
-  // No home folder yet (a world opened in place on a first visit): ask for
-  // it here, before any key is minted (S365).
-  const { defaultWorldWhere } = await import('../setup/world-parent');
-  const where = defaultWorldWhere();
-  if (where === 'folder' && !state.atlasRoot) {
-    const { ensureAtlasRoot } = await import('../setup/world-doors');
-    // A "Cancel" there is the user's answer, not an error: stop quietly.
-    if (!(await ensureAtlasRoot(toasts, 'Opening an online world downloads it into a new folder.'))) return false;
-  }
-  if (where === 'folder' && !getState().atlasRoot) {
-    toasts.error('Set up your OnlyWorlds folder first');
-    return false;
-  }
   // The duplicate check re-runs inside the link flow (on the chain); this
   // early one just avoids a pointless mint on an obviously-stale row.
   if (findLinkedWorld(state.registry, row.id) ?? findWorldByServerId(state.registry, row.id)) {
@@ -136,6 +123,17 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
     refreshAccountWorlds(true);
     return false;
   }
+  // Where it lands (1.17, conv. 129): the where-question as its own step,
+  // with the home folder asked for inside it when the folder is the answer
+  // and none is set. A Cancel is the user's answer: stop quietly.
+  const { askWhere } = await import('../ui/where-choice');
+  const where = await askWhere({
+    title: `Open "${row.name}"`,
+    action: 'Open',
+    purpose: 'Opening an online world downloads it into a new folder.',
+    toasts,
+  });
+  if (!where) return false;
   let pin = state.registry.pin;
   if (!pin) {
     const entered = await new PinPromptModal().prompt(

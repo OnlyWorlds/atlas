@@ -27,7 +27,7 @@ export function buildMapLocalImageRow(m: WorldMap, toasts: ToastManager): HTMLEl
   const label = document.createElement('div');
   label.className = 'atlas-field-label';
   label.textContent = 'Local image';
-  label.title = 'An image file stored in this world folder. Used as the map background when no image URL is set.';
+  label.title = 'An image file stored with this world. Used as the map background when no image URL is set.';
   wrap.appendChild(label);
 
   const value = document.createElement('div');
