@@ -4,7 +4,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 ---
 
-## CURRENT STATE (2026-10-05, SESSION 373: **1.17 BOUT 4 BUILT AND GATED (Move to a folder), BOUT 5 BUILT AND GATED (download, open a world file, restore, the keep-safe card, the waypoints)**; gates on a quiet machine: typecheck 0 + **2530 vitest** (265 files, 2 skipped = banked probes, exit 0) + **398 e2e (chromium 390 + firefox 7 + firefox-private 1, each = its `--list`, PLAYWRIGHT_EXIT=0, zero flaky)**; package still 1.16.0, no changelog yet; NOT committed this session until the Captain asks; atlas local commits from S370-S372 still unpushed: 1.17 is mid-build)
+## CURRENT STATE (2026-10-05, SESSION 373: **1.17 BOUT 4 BUILT AND GATED (Move to a folder), BOUT 5 BUILT AND GATED (download, open a world file, restore, the keep-safe card, the waypoints)**; gates on a quiet machine: typecheck 0 + **2530 vitest** (265 files, 2 skipped = banked probes, exit 0) + **398 e2e (chromium 390 + firefox 7 + firefox-private 1, each = its `--list`, PLAYWRIGHT_EXIT=0, zero flaky)**; package still 1.16.0, no changelog yet; COMMITTED locally on the Captain's word (`a891a0c` + this docs commit); with S370-S372, unpushed: 1.17 is mid-build)
 
 **Records**: the contract `Forge/Notes/2026-10-04-browser-worlds-contract.md` (build progress line); two gates `Forge/Notes/2026-10-05-s373-gate/move-lens/report.md` and `.../world-file-lens/report.md`; own eyes `Forge/Notes/ui-snapshots/2026-10-05-s373/` (move dialog dark, light, 800; after the move; the keep-safe card dark, light, 800; Settings download; Delete's "Download it first"; the six-row chooser; the Data room drop); handover `Forge/Notes/2026-10-05-s373-handover.md`.
 
@@ -16,7 +16,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 - **NOT YET (bout 5 rest)**: on Chromium with a home folder, opening a world file does not ask the where-question (§5.2: it always lands in this browser; Move to a folder follows); "Bring it down again" for a cleared linked world (§3.3); the cleared row's file door restores only through the file's own id. **Named limits**: the reader's declared-size check is backed by the inflated-bytes check and was not revert-checked alone (it would mean allocating a bomb); the e2e world-file spec failed once on its first run after installing fflate (consistent with Vite's dep optimizer reloading mid-test; 3/3 and the full run green since).
 - **Then bout 6**: the landing (folder words in the census baseline), the palette, the tour in `browser-worlds/`, keep the tour world (K0-K4); then the 3-lens composition gate, changelog 1.17, the capability card, push, Boss.
 - **The `offline-reload` flake**: green in every run this session.
-- ⚡ **NEXT**: the Captain's word on committing S373 (atlas and Forge); then bout 5's rest or bout 6 (contract §7, §8, §11). Handover: `Forge/Notes/2026-10-05-s373-handover.md`. Six of the Captain's seven defaults (contract §12) are built as written (5, keep at the finale only, is bout 6's); he may overrule any.
+- ⚡ **NEXT**: bout 5's rest, then bout 6 (contract §7, §8, §11). Handover: `Forge/Notes/2026-10-05-s373-handover.md`. Six of the Captain's seven defaults (contract §12) are built as written (5, keep at the finale only, is bout 6's); he may overrule any.
 
 ---
 
