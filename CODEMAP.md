@@ -29,9 +29,9 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/live-folder.ts`: THE LIVE FOLDER (S364, conv. 111): when to rescan, flush first, notices, linked-world rulings.
 - `src/core/world-prefs.ts`: notes/cast/calendar/labels mirrored to `.atlas/world-prefs.json` (S364, conv. 112).
 - `src/core/grounded.ts`: `isAtlasGrounded`: a root OR any non-demo world (S365, conv. 114).
-- `src/core/browser-worlds.ts`: BROWSER WORLDS (1.17, conv. 129): `where` / `isBrowserWorld` / `isAtlasOnlyStorage`, `worldHandleFor` (derived), `removeBrowserWorldDir`.
+- `src/core/browser-worlds.ts`: BROWSER WORLDS (1.17, conv. 129): `where` / `isBrowserWorld` / `isAtlasOnlyStorage`, `worldHandleFor` (derived), `removeBrowserWorldDir`, `filesWhereOf` (where the copy says the files are).
 - `src/core/browser-home.ts`: the browser home: nonced names, the make protocol (`openBrowserMake`: Web Lock + `.atlas/making`), boot `reconcileBrowserHome`.
-- `src/core/capabilities.ts`: boot gating by capability (folder picker, OPFS); DESIGN_TOUR "browser support".
+- `src/core/capabilities.ts`: boot gating by capability (folder picker, OPFS); `opfsStatus` (ok / refused / full / absent); DESIGN_TOUR "browser support".
 - `src/core/theme.ts`: dark + light (`data-theme`, the ink/accent/scrim RGB-triplet system; conv. 90 for the two token pairs).
 - `src/core/element-colors.ts`: the four-family palette: colour carries FAMILY, the icon carries TYPE. Cross-surface (the ow.com about page): change only with Skeld.
 - `src/core/prose-autolink.ts`: `promotionLabel` is the one site of the label law (DESIGN_WRITING #49b).
@@ -115,6 +115,8 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/ui/modal-base.ts`: `BaseModal.buildModalShell` (every modal uses it); `dismissLocked` for long flows; topmost-only Escape via `isTopmost()`.
 - `src/ui/problem-fixes.ts`: `showProblem(err, {doing, retry, dedupeKey, savedLocally, folder})`: sentence + fix buttons + Details (conv. 125, 127).
 - `src/ui/toast-manager.ts`: queue, max 3, XSS-safe; opts {actions, details, sticky} + Dismiss.
+- `src/ui/where-choice.ts`: THE WHERE-QUESTION (1.17, conv. 129): the rows, `takeWhereInClick` (persist in the gesture), `readyWhere`, `askWhere` for doors without a dialog.
+- `src/ui/delete-browser-world-modal.ts`: the Delete dialog for a browser world.
 - `src/ui/unexpected-errors.ts`: unhandled rejections said once, max 3 a session.
 - `src/ui/sync-toasts.ts`: `surfaceSyncUnavailable()`, the one helper for engine-not-ready toasts.
 - `src/ui/icon-a11y.ts`: stamps `aria-hidden` on every icon ligature span at boot.
@@ -141,6 +143,7 @@ The guided tour (DESIGN_TOUR).
 - `src/setup/atlas-root-flow.ts`: `setupAtlasRoot` + `recoverAtlasRoot` + `discoverWorldsInRoot` + `openWorldFolder` + the link flow; browser-world scaffolding (1.17).
 - `src/setup/world-doors.ts`: THE WORLD DOORS (conv. 114): open a picked world in place; `ensureAtlasRoot`; `runAddWorldAction`.
 - `src/setup/world-parent.ts`: where a new world goes (1.17): `defaultWorldWhere`, the persist ask, the where captions.
+- `src/setup/browser-world-delete.ts`: Delete for a browser world (1.17, conv. 129): close first, remove, then drop the entry; a failure keeps both.
 - `src/setup/key-check-errors.ts`: `keyCheckError`: a refused key / unknown world / offline as PlainErrors.
 - `src/import/`: the Data room engine: parse, normalize, validate, reconcile, `src/import/apply-import-plan.ts`, `src/import/export-world.ts` (the keel envelope).
 - `src/changelog/changelog.data.ts`: the ONE edit surface for the public changelog; `src/changelog/render-changelog.ts` renders it.
