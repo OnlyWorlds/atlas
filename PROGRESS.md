@@ -16,7 +16,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 - **NOT YET (bout 5 rest)**: on Chromium with a home folder, opening a world file does not ask the where-question (§5.2: it always lands in this browser; Move to a folder follows); "Bring it down again" for a cleared linked world (§3.3); the cleared row's file door restores only through the file's own id. **Named limits**: the reader's declared-size check is backed by the inflated-bytes check and was not revert-checked alone (it would mean allocating a bomb); the e2e world-file spec failed once on its first run after installing fflate (consistent with Vite's dep optimizer reloading mid-test; 3/3 and the full run green since).
 - **Then bout 6**: the landing (folder words in the census baseline), the palette, the tour in `browser-worlds/`, keep the tour world (K0-K4); then the 3-lens composition gate, changelog 1.17, the capability card, push, Boss.
 - **The `offline-reload` flake**: green in every run this session.
-- ⚡ **NEXT**: bout 5's rest, then bout 6 (contract §7, §8, §11). Handover: `Forge/Notes/2026-10-05-s373-handover.md`. Six of the Captain's seven defaults (contract §12) are built as written (5, keep at the finale only, is bout 6's); he may overrule any.
+- ⚡ **NEXT**: three sessions before the Captain's full smoke, each runway in the handover's Front door: **A** bout 5's rest + the front door (Deck #40), **B** keep the tour world (#41), **C** claim-taking: composition gate, own walk, smoke work order, drafts (#42). Handover: `Forge/Notes/2026-10-05-s373-handover.md`. Six of the Captain's seven defaults (contract §12) are built as written (5, keep at the finale only, is bout 6's); he may overrule any.
 
 ---
 
