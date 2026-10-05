@@ -31,6 +31,7 @@ import type { WorldsRegistry } from '../core/types';
 import { escapeText } from '../core/dom-utils';
 import { hasFolderMode, hasOpfsMode } from '../core/capabilities';
 import { isBrowserWorld } from '../core/browser-worlds';
+import { staleBrowserCopies } from '../core/browser-home';
 
 const CADENCE_OPTIONS: Array<{ label: string; ms: number | null }> = [
   { label: 'Off', ms: null },
@@ -111,7 +112,16 @@ function renderStorageDeviceSection(): string {
 /** Shown where worlds live in this browser, or can only live there (no folder picker). */
 function showBrowserStorageSection(): boolean {
   if (!hasOpfsMode()) return false;
-  return !hasFolderMode() || getState().registry.worlds.some(w => isBrowserWorld(w) && w.demo !== true);
+  return !hasFolderMode() || staleBrowserCopies().length > 0 || getState().registry.worlds.some(w => isBrowserWorld(w) && w.demo !== true);
+}
+
+/** Copies a move left in this browser whose world now lives in a folder (contract §3.2 rule 5, §3.4). */
+function staleCopiesLine(): string {
+  const k = staleBrowserCopies().length;
+  if (k === 0) return '';
+  return `<p class="atlas-settings-hint" data-role="browser-stale">${k === 1
+    ? 'An older copy of a world that now lives in a folder is still in this browser. Atlas does not open it.'
+    : `${k} older copies of worlds that now live in folders are still in this browser. Atlas does not open them.`}</p>`;
 }
 
 /** Filled in by `wireBrowserStorageSection`: the estimate and `persisted()` are async. */
@@ -126,6 +136,7 @@ function renderBrowserStorageSection(): string {
         <button class="atlas-btn-ghost" data-action="ask-persist">Ask the browser to keep ${n === 1 ? 'it' : 'them'}</button>
       </div>
       <p class="atlas-settings-hint-sub" data-role="browser-persist-note" hidden></p>
+      ${staleCopiesLine()}
     </section>`;
 }
 

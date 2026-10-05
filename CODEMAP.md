@@ -49,6 +49,8 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/store/disk-link-names.ts`: pin/marker link fields read under BOTH disk spellings (`map`/`map_id`); per-FILE spelling recorded in fileIndex and written back the way it came (conv. 8).
 - `src/store/fs-utils.ts`: `writeJsonAtomic` (ONE writable + read-back verify, busy files retried about 2 s; conv. 123), slugify / idTail / elementFilename / validElementFilenames / `sameFsName` (the File-naming contract).
 - `src/store/scrub-links.ts`: a delete removes the dead ids from every link (conv. 101).
+- `src/store/world-tree.ts`: a world as a tree of files: `isTransientPath` (the ONE skip predicate), `walkWorld`, `copyWorldTree` (byte copy, the move token first, `world.json` last), `verifyWorldTree`, `unportableName`, `worldFileName` (1.17, conv. 129).
+- `src/store/world-file.ts`: the world file: `collectWorldFiles` (the portable copy: no `api`, no sync files, no transient file), `zipWorld`, `portableStamps`/`sameStamps` (the two-walk torn check), `readWorldZip` (the reader that refuses before anything is written). fflate, a lazy chunk.
 - `src/store/rekey.ts`: THE RE-KEY KERNEL: journaled new ids, recovery, `rollbackRekey` (conv. 105).
 - `src/store/rekey-body.ts`: `rekeyBody`, the reference id transform (chips, `ow://`, page blocks; conv. 106).
 - `src/store/handle-vault.ts`: FileSystemDirectoryHandle persistence, over `src/store/idb.ts` (promise-wrapped IDB, handle-vault only).
@@ -98,6 +100,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/middle/welcome-panel.ts`: first launch: the doors (tour, set up a folder, open a world folder, example page), "Re-link OnlyWorlds folder" when recoverable.
 - `src/middle/story-sidecar.ts`: `storyOutranksSidecar`: plain text wins at open (conv. 116); `src/middle/story-notice.ts`: the once-per-element notice.
 - `src/middle/timeline.ts`: the Charts room (owns ChartConfig, control bar, gallery; DESIGN_CHARTS).
+- `src/middle/world-home.ts`: the world home (cover, intro cards, the keep-safe band, charts strip, desk, loose threads; memoised on its inputs, conv. 103); `src/middle/home-keepsafe.ts`: the keep-safe card's rules, pure (contract §6.1).
 
 ## src/tabs/right, src/visualization
 
@@ -117,6 +120,9 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/ui/toast-manager.ts`: queue, max 3, XSS-safe; opts {actions, details, sticky} + Dismiss.
 - `src/ui/where-choice.ts`: THE WHERE-QUESTION (1.17, conv. 129): the rows, `takeWhereInClick` (persist in the gesture), `readyWhere`, `askWhere` for doors without a dialog.
 - `src/ui/delete-browser-world-modal.ts`: the Delete dialog for a browser world.
+- `src/ui/move-browser-world-modal.ts`: Move to a folder: step 1 inside the click (the home folder, writable), then a locked run with progress.
+- `src/ui/download-world.ts`: Download the whole world from a click (the save picker inside the gesture), one path for Settings, the keep-safe card and Delete's "Download it first".
+- `src/ui/open-world-file.ts`: the Open a world file door: the file input inside the click, `isWorldFile`, `openWorldFileFrom`.
 - `src/ui/unexpected-errors.ts`: unhandled rejections said once, max 3 a session.
 - `src/ui/sync-toasts.ts`: `surfaceSyncUnavailable()`, the one helper for engine-not-ready toasts.
 - `src/ui/icon-a11y.ts`: stamps `aria-hidden` on every icon ligature span at boot.
@@ -144,6 +150,9 @@ The guided tour (DESIGN_TOUR).
 - `src/setup/world-doors.ts`: THE WORLD DOORS (conv. 114): open a picked world in place; `ensureAtlasRoot`; `runAddWorldAction`.
 - `src/setup/world-parent.ts`: where a new world goes (1.17): `defaultWorldWhere`, the persist ask, the where captions.
 - `src/setup/browser-world-delete.ts`: Delete for a browser world (1.17, conv. 129): close first, remove, then drop the entry; a failure keeps both.
+- `src/setup/browser-world-move.ts`: Move to a folder (1.17, conv. 129): the registry journal, the moving lock, copy and verify, the one-save commit, the browser copy removed; `recoverBrowserMove` finishes a crashed move at boot and at open.
+- `src/setup/world-download.ts`: the download: `pickSaveTarget`, `downloadWorld` (push then hold for a linked world, two walks, `kept_download_at`).
+- `src/setup/world-file-open.ts`: open a world file: a new browser world through the make protocol, the same world refused, a cleared one restored under its own entry (`api` back from the registry, `review_first_sync`).
 - `src/setup/key-check-errors.ts`: `keyCheckError`: a refused key / unknown world / offline as PlainErrors.
 - `src/import/`: the Data room engine: parse, normalize, validate, reconcile, `src/import/apply-import-plan.ts`, `src/import/export-world.ts` (the keel envelope).
 - `src/changelog/changelog.data.ts`: the ONE edit surface for the public changelog; `src/changelog/render-changelog.ts` renders it.
@@ -155,7 +164,8 @@ The guided tour (DESIGN_TOUR).
 - `tests/setup.ts`: MSW + jsdom + fake-indexeddb.
 - `tests/msw-handlers.ts`: `statefulOwHandlers` (paginate option, strict unknown-field validator).
 - `tests/fixtures/mock-folder-store.ts`: the in-memory FolderStore (no directories: kernel tests also need fake-fs).
-- `tests/fixtures/fake-fs.ts`: an in-memory FS so the REAL FsFolderStore runs in vitest (lastModified, touch, read counter, `hold()/release()`).
+- `tests/fixtures/fake-fs.ts`: an in-memory FS so the REAL FsFolderStore runs in vitest (lastModified, touch, read counter, `hold()/release()`, byte writes).
+- `tests/fixtures/fake-locks.ts`: a Web Locks API for vitest (`hold(name)` plays another tab).
 - `tests/fixtures/fake-ow-client.ts`: `FakeOwApiClient`: speaks `/changes` by default; rejects LOCAL_ONLY fields + stamps.
 - `tests/fixtures/monotonic-clock.ts`: strictly increasing ISO timestamps.
 - `tests/fixtures/folder-conformance/`: the Folder Format conformance fixture (an ecosystem artifact). `tests/fixtures/map-worlds/`: map fixture worlds.

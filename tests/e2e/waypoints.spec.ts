@@ -59,7 +59,7 @@ test('creating a world completes first-world; OW page shows it lit + counted', a
   await expect(page.locator('.atlas-settings')).toBeVisible();
   expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings\/onlyworlds$/);
   await expect(page.locator('[data-waypoint="first-world"]')).toHaveClass(/is-met/);
-  await expect(page.locator('.atlas-ow-waypoints-count')).toHaveText('1 of 10');
+  await expect(page.locator('.atlas-ow-waypoints-count')).toHaveText('1 of 11');
 });
 
 test('creating an element via the modal completes first-element', async ({ page }) => {
@@ -93,6 +93,6 @@ test('mark all as familiar stamps every waypoint', async ({ page }) => {
   await createWorld(page, 'Veteran World');
   await page.click('[data-action="open-onlyworlds"]');
   await page.click('[data-action="waypoints-mark-all"]');
-  await expect(page.locator('.atlas-ow-waypoints-count')).toHaveText('10 of 10');
-  await expect(page.locator('.atlas-ow-waypoint.is-met')).toHaveCount(10);
+  await expect(page.locator('.atlas-ow-waypoints-count')).toHaveText('11 of 11');
+  await expect(page.locator('.atlas-ow-waypoint.is-met')).toHaveCount(11);
 });

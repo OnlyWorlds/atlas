@@ -29,7 +29,7 @@ import { getState, patchSlice, subscribe } from '../core/state';
 import { deleteWorldEntry, effectiveSyncPaused, saveRegistry, setActiveWorld, setFavorite, setWorldPaused } from '../registry/registry';
 import { ELockHeld, FsFolderStore } from '../store/folder-store-fs';
 import { deleteHandle, ensureWritable, queryWritable } from '../store/handle-vault';
-import { deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
+import { MOVING_IN_ANOTHER_TAB, deriveBrowserWorldHandle, filesWhereOf, isBrowserWorld, isGoneError, markWorldCleared, unmarkWorldCleared, worldHandleFor } from '../core/browser-worlds';
 import { CreateWorldModal } from '../ui/create-world-modal';
 // setupAtlasRoot/recoverAtlasRoot are wired in the welcome panel only (W2).
 import type { WorldRegistryEntry } from '../core/types';
@@ -254,6 +254,12 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
   installRowKeydownActivation(listEl);
   listEl.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
+    if (target.closest('[data-role="open-file-cleared"]')) {
+      // The world's own download restores it under this row (contract §5.2).
+      e.stopPropagation();
+      void runAddWorldAction('open-file', toasts);
+      return;
+    }
     const removeBtn = target.closest<HTMLElement>('[data-role="remove-cleared"]');
     if (removeBtn) {
       // A world the browser cleared leaves the list only on the user's word
@@ -505,7 +511,10 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
     ? 'Cleared by this browser: its storage for this world is gone.'
     : inBrowser ? 'Stored in this browser' : world.folder?.last_path_hint ?? '';
   const removeCleared = cleared
-    ? `<button type="button" class="atlas-icon-btn-sm" data-role="remove-cleared" data-world-id="${escapeAttr(world.id)}" title="Remove from the list" aria-label="Remove from the list">
+    ? `<button type="button" class="atlas-icon-btn-sm" data-role="open-file-cleared" title="Open a world file: a download of this world brings it back" aria-label="Open a world file">
+          <span class="material-symbols-outlined" aria-hidden="true">file_open</span>
+        </button>
+        <button type="button" class="atlas-icon-btn-sm" data-role="remove-cleared" data-world-id="${escapeAttr(world.id)}" title="Remove from the list" aria-label="Remove from the list">
           <span class="material-symbols-outlined" aria-hidden="true">close</span>
         </button>`
     : '';
@@ -603,7 +612,7 @@ async function doActivateWorld(
 ): Promise<boolean> {
   const { silent = false, preserveSelection = false, permissionMode = 'request' } = opts;
   const state = getState();
-  const entry = state.registry.worlds.find(w => w.id === worldId);
+  let entry = state.registry.worlds.find(w => w.id === worldId);
   if (!entry) {
     // A stale link or a world removed in another tab (C2, S369: the id and
     // the word "registry" were the whole message).
@@ -710,6 +719,27 @@ async function doActivateWorld(
   // vault for a folder world. A browser world whose directory the browser no
   // longer holds keeps its row (and its link) as "Cleared by this browser";
   // the tour's sandbox is torn down instead, and the tour rebuilds it.
+  // A move to a folder a crash interrupted finishes first (contract §4.3):
+  // before its commit the browser copy is the world; after it, the stale
+  // browser copy goes. A no-op when nothing is pending or it must wait.
+  if (entry.move || entry.moved_from) {
+    const { recoverBrowserMove } = await import('../setup/browser-world-move');
+    await recoverBrowserMove(worldId).catch(err => console.warn('[worlds-sidebar] move recovery waits', err)); // raw-error-ok: a console record
+    // The registry may have moved on under it (recovery, or another tab's commit).
+    entry = getState().registry.worlds.find(w => w.id === worldId) ?? entry;
+  }
+  // A world being moved (or made) in any tab holds its Web Lock: opening it
+  // now would edit a copy about to be removed (S373 gate F2, F8: a duplicated
+  // tab shares this tab's id, so the lock file alone cannot tell).
+  if (isBrowserWorld(entry)) {
+    const { ifWorldLockFree } = await import('../core/browser-home');
+    const free = await ifWorldLockFree(entry.folder.folder_name, async () => true);
+    if (!free.ran) {
+      if (!silent) toasts.info(MOVING_IN_ANOTHER_TAB);
+      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      return false;
+    }
+  }
   let resolved: Awaited<ReturnType<typeof worldHandleFor>>;
   try {
     resolved = await worldHandleFor(entry);
@@ -847,6 +877,13 @@ async function doActivateWorld(
       if (!silent) {
         toasts.error(`Could not open ${entry.name}. ${filesWhereOf(entry) === 'browser' ? 'Its storage' : 'The folder'} is still there, so nothing was removed. Try again, and check that no other Atlas tab has it open.`);
       }
+      if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
+      return false;
+    }
+    // Another tab is moving this world to a folder: never offered for
+    // take-over (1.17, contract §4.4), only said.
+    if (err instanceof ELockHeld && err.moving) {
+      if (!silent) toasts.info(MOVING_IN_ANOTHER_TAB);
       if (!preserveSelection && window.location.hash !== priorHash) navigate(priorHash);
       return false;
     }

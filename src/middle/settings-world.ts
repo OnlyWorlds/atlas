@@ -37,19 +37,27 @@ import {
 import { buildV2Adapter } from '../sync/make-online';
 import type { WorldRegistryEntry } from '../core/types';
 import { filesWhereOf, isBrowserWorld } from '../core/browser-worlds';
+import { hasFolderMode } from '../core/capabilities';
+import { downloadWorldFromClick } from '../ui/download-world';
 import { escapeText, escapeAttr } from '../core/dom-utils';
 import { findDanglingLinks, scrubReferrers } from '../store/scrub-links';
 
 export function renderWorldTab(world: WorldRegistryEntry): string {
   const stateLabel = world.state === 'api-linked' ? 'api-linked' : 'local-only';
   // Where the world lives (1.17, conv. 129): a browser world has no folder to
-  // show or keep, so Delete only (contract §3.1, §3.4); the tour sandbox
-  // offers none of them (its lifecycle is the tour's, gate B12).
+  // show or keep, so Delete only (contract §3.1, §3.4); its ways out are Move
+  // to a folder (Chromium) and Download the whole world (every browser). The
+  // tour sandbox offers none of them (its lifecycle is the tour's, gate B12).
   const inBrowser = filesWhereOf(world) === 'browser';
   const dangerActions = world.demo === true
     ? ''
     : isBrowserWorld(world)
-      ? `<div class="atlas-settings-actions atlas-settings-actions-danger">
+      ? `<div class="atlas-settings-actions">
+        ${hasFolderMode() ? '<button class="atlas-btn-ghost" data-action="move-to-folder" title="Copy it into a folder on your drive, where your AI can work on it, and remove it from this browser">Move to a folder</button>' : ''}
+        <button class="atlas-btn-ghost" data-action="download-world">Download the whole world</button>
+      </div>
+      <p class="atlas-settings-hint" data-role="download-hint">One file holding the whole world: elements, pages, notes, charts and images. Atlas 1.17 or later opens it in any browser.${world.state === 'api-linked' ? ' It leaves out the OnlyWorlds link and its key, so the copy opens as a local world.' : ''}</p>
+      <div class="atlas-settings-actions atlas-settings-actions-danger">
         <button class="atlas-btn-ghost" data-action="delete-browser-world" title="Remove it from Atlas and from this browser">Delete world</button>
       </div>`
       : `<div class="atlas-settings-actions atlas-settings-actions-danger">
@@ -376,6 +384,19 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
     navigate('#/');
   });
 
+  const downloadBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="download-world"]');
+  downloadBtn?.addEventListener('click', async () => {
+    // The save picker opens inside this click (static import: no chunk wait).
+    await downloadWorldFromClick(world, toasts, on => {
+      downloadBtn.disabled = on;
+      downloadBtn.textContent = on ? 'Saving…' : 'Download the whole world';
+    });
+  });
+  document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="move-to-folder"]')
+    ?.addEventListener('click', async () => {
+      const { MoveBrowserWorldModal } = await import('../ui/move-browser-world-modal');
+      new MoveBrowserWorldModal(world, toasts).open();
+    });
   document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="delete-browser-world"]')
     ?.addEventListener('click', async () => {
       const { DeleteBrowserWorldModal } = await import('../ui/delete-browser-world-modal');

@@ -38,6 +38,7 @@ export class FakeBlob {
   constructor(public readonly data: string, public readonly type = '', public readonly lastModified = 0) {}
   get size() { return this.data.length; }
   async text() { contentReads++; return this.data; }
+  async arrayBuffer() { contentReads++; return new TextEncoder().encode(this.data).buffer; }
 }
 
 /**
@@ -69,6 +70,8 @@ export class FakeFileHandle {
         await settle();
         if (typeof v === 'string') buf += v;
         else if (v instanceof FakeBlob) buf += v.data;
+        // Bytes from either realm (jsdom's and Node's Uint8Array differ).
+        else if (ArrayBuffer.isView(v)) buf += new TextDecoder().decode(v as Uint8Array);
         else if (v && typeof (v as { text?: unknown }).text === 'function') buf += await (v as Blob).text();
         else buf += String(v);
       },

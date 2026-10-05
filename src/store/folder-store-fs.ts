@@ -135,6 +135,8 @@ interface LockPayload {
   tab_id: string;
   started_at: string;
   last_heartbeat: string;
+  /** Set while this tab moves the world to a folder (1.17, contract §4.2 step 3): no other tab may take it. */
+  moving?: boolean;
 }
 
 export interface FsFolderStoreOptions {
@@ -163,6 +165,10 @@ export class ELockHeld extends Error {
     super(`folder lock held by tab ${lock.tab_id} (heartbeat ${lock.last_heartbeat})`);
     this.name = 'ELockHeld';
   }
+  /** The other tab is moving this world to a folder: refused, never offered for take-over. */
+  get moving(): boolean {
+    return this.lock.moving === true;
+  }
 }
 
 export class FsFolderStore implements FolderStore {
@@ -173,13 +179,19 @@ export class FsFolderStore implements FolderStore {
   private opts: FsFolderStoreOptions;
   /** View-only world (S264) — UI mutations throw; sync channels bypass. */
   private viewOnly = false;
+  /** Between `beginMove` and `endMove` (or the close): the files are being copied to a folder. */
+  private moving = false;
 
   setViewOnly(viewOnly: boolean): void { this.viewOnly = viewOnly; }
 
   /** The view-only guard. Sits on the UI-facing mutators; the engine's write
-   *  channels (applyServerRecord, silent deletes, fromSync meta) skip it. */
+   *  channels (applyServerRecord, silent deletes, fromSync meta) skip it.
+   *  It also refuses edits while the world is being moved: the app is inert
+   *  behind the move's modal, and this is the backstop, so nothing written
+   *  after the copy's verify is lost when the browser copy goes (1.17). */
   private assertWritable(): void {
     if (this.viewOnly) throw new PlainError('This world is view-only, so it cannot be changed here. Make your own copy to edit it.');
+    if (this.moving) throw new PlainError('This world is being moved to a folder. Try again when that finishes.');
   }
 
   /**
@@ -386,6 +398,7 @@ export class FsFolderStore implements FolderStore {
     this.indexedTypes.clear();
     this.bodyCache.clear();
     this.indexBuilds.clear();
+    this.moving = false;
   }
 
   /**
@@ -454,6 +467,36 @@ export class FsFolderStore implements FolderStore {
     return true;
   }
 
+  /**
+   * Move to a folder, step 3 (1.17, contract §4.2): keep this tab's lock,
+   * heartbeating, marked `moving`, so no other tab opens the world while its
+   * files are copied (closing would remove the lock: gate A2 M1). Edits are
+   * refused until `endMove` or the close. Throws when the lock is not ours.
+   */
+  async beginMove(): Promise<void> {
+    await this.setMovingMark(true);
+    this.moving = true;
+  }
+
+  /** The move did not finish: the lock goes back to an ordinary one, and edits are taken again. */
+  async endMove(): Promise<void> {
+    this.moving = false;
+    await this.setMovingMark(false);
+  }
+
+  private setMovingMark(on: boolean): Promise<void> {
+    return this.runLockOp(async () => {
+      const atlasDir = await getDir(this.requireRoot(), [ATLAS_INTERNAL_DIR]);
+      const lock = await readJsonStrict<LockPayload>(atlasDir, LOCK_FILE);
+      if (!lock || lock.tab_id !== this.tabId) {
+        if (on) throw new PlainError('Another Atlas tab has this world open, so it cannot be moved from here.');
+        return;
+      }
+      const { moving: _was, ...rest } = lock;
+      await writeJsonAtomic(atlasDir, LOCK_FILE, on ? { ...rest, moving: true, last_heartbeat: this.clock() } : { ...rest, last_heartbeat: this.clock() });
+    });
+  }
+
   // ---- Layout setup + lock ----
 
   /**
@@ -501,6 +544,12 @@ export class FsFolderStore implements FolderStore {
     if (existing) {
       const heartbeat = Date.parse(existing.last_heartbeat);
       const age = Date.now() - heartbeat;
+      // A world another tab is moving to a folder is never taken, not even
+      // with the take-over consent: edits here would be lost when the browser
+      // copy goes (1.17, gate A2/B4). Stale (the mover crashed): taken below.
+      if (existing.moving === true && existing.tab_id !== this.tabId && Number.isFinite(heartbeat) && age < LOCK_STALE_MS) {
+        throw new ELockHeld(existing);
+      }
       if (Number.isFinite(heartbeat) && age < LOCK_STALE_MS && !this.opts.forceTakeLock) {
         if (this.opts.takeStaleLock === false) {
           throw new ELockHeld(existing);
@@ -2421,6 +2470,11 @@ export { idFromFilename };
  *
  * Tests that need a deterministic id pass `opts.tabId` directly and bypass this.
  */
+/** This tab's id, as its locks carry it (a move's recovery asks whether a lock is ours). */
+export function currentTabId(): string {
+  return getOrCreateTabId();
+}
+
 function getOrCreateTabId(): string {
   const KEY = 'atlas_tab_id';
   try {

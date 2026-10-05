@@ -29,7 +29,7 @@ import { buildFailureDetails, type FixId } from '../core/problems';
 import { filesWhereOf, isBrowserWorld } from '../core/browser-worlds';
 import { detailsContext, resolveFixes } from '../ui/problem-fixes';
 import type { PerElementFailure } from '../core/types';
-import { effectiveSyncPaused } from '../registry/registry';
+import { effectiveSyncPaused, saveRegistry, updateWorldEntry } from '../registry/registry';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
@@ -60,7 +60,8 @@ let currentWorldId: string | null = null;
 export function attachSyncEngine(
   entry: WorldRegistryEntry,
   folder: FolderStore,
-  opts: { justLinked?: boolean } = {},
+  /** `justMoved`: the world just moved from this browser to a folder (1.17): what waits is the user's own editing. */
+  opts: { justLinked?: boolean; justMoved?: boolean } = {},
 ): SyncEngine | null {
   // Always detach the previous engine first — at most one active at a time.
   detachSyncEngine();
@@ -87,15 +88,33 @@ export function attachSyncEngine(
     apiPin: readOnly ? '' : (pin as string),
     baseUrl: devV2Base() ?? undefined,
   });
+  // A linked world restored from a world file (1.17, contract §5.2): its
+  // first round is reviewed whatever the policy, so the file's older edits
+  // never overwrite newer ones on OnlyWorlds (gate A9). Then the policy.
+  let reviewFirst = entry.review_first_sync === true;
   const engine = new SyncEngine({
     folder,
     client: adapter,
     readOnly,
     where: filesWhereOf(entry),
     apiWorldId: entry.api.world_id,
-    policy: reg.sync_default_policy ?? 'local-wins',
+    policy: reviewFirst ? 'pause-and-review' : reg.sync_default_policy ?? 'local-wins',
     onStateChange: (s) => publishSyncState(entry.id, s),
     onSyncResult: (phase, result) => {
+      // The review ends only after a round that really compared (not offline,
+      // busy or refused) and left nothing open: a held conflict stays dirty,
+      // and the next round under local-wins would push it (S373 gate F1).
+      if (reviewFirst && !result.transient_blocked && !result.auth_blocked
+        && result.conflicts.length === 0 && result.failures.length === 0) {
+        void folder.readSyncState().then(st => {
+          if (!reviewFirst || (st.conflicts?.length ?? 0) > 0 || currentEngine !== engine) return;
+          reviewFirst = false;
+          engine.setPolicy(getState().registry.sync_default_policy ?? 'local-wins');
+          const next = updateWorldEntry(getState().registry, entry.id, { review_first_sync: undefined });
+          saveRegistry(next);
+          patchSlice('registry', next);
+        }).catch(() => {});
+      }
       // The list Settings → World and the pill read (S369). Repaint the pill
       // when it moved: the sync slice is the pill's subscription.
       if (noteRoundIssues(entry.id, phase, result)) patchSlice('sync', { ...getState().sync });
@@ -163,7 +182,7 @@ export function attachSyncEngine(
       // state, and the local-first push asymmetry doesn't apply (no pushes).
       if (!readOnly) {
         try {
-          await flushPendingOnAttach(engine, folder, entry.name, entry.id, !!opts.justLinked, isBrowserWorld(entry));
+          await flushPendingOnAttach(engine, folder, entry.name, entry.id, !!opts.justLinked, isBrowserWorld(entry) || !!opts.justMoved);
         } catch (err) {
           // flushPendingOnAttach swallows its own errors; outer catch is defense-
           // in-depth in case the helper is ever refactored to throw.

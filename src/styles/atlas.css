@@ -7937,6 +7937,19 @@ svg .atlas-zone-hovered {
   margin-bottom: 8px;
 }
 
+/* The keep-safe card (1.17, contract §6.1): the intro cards' chrome, a title row with ×, a row of ways out. */
+.atlas-home-keepsafe-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.atlas-home-keepsafe-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .atlas-home-onboarding-copy {
   margin: 0 0 16px 0;
   font-size: 13px;

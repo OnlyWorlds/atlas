@@ -24,7 +24,9 @@ import { saveRegistry, deleteWorldEntry } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
 import { BaseModal } from '../ui/modal-base';
 import { NO_FOLDER_PICKER_LINE, PICKER_CANCELLED_HINT } from '../ui/directory-picker';
-import { hasFolderMode } from '../core/capabilities';
+import { hasFolderMode, hasOpfsMode } from '../core/capabilities';
+import { completeWaypoint } from '../core/waypoints';
+import { pickWorldFile, openWorldFileFrom } from '../ui/open-world-file';
 import { PlainError } from '../core/plain-error';
 import { isTourFlagActive } from '../tour/tour-flag';
 import type { ToastManager } from '../ui/toast-manager';
@@ -52,6 +54,8 @@ export async function openPickedWorld(picked: FileSystemDirectoryHandle, toasts:
   else toasts.success(`Opened "${name}" in place. Its folder stays where it is`);
   const { activateWorld } = await import('../sidebar/worlds-sidebar');
   const ok = await activateWorld(worldId, toasts as ToastManager);
+  // Opening a world folder is a first world too (1.17, contract §6.2).
+  if (ok && !already) completeWaypoint('first-world');
   if (!ok && !already && getState().active?.worldId !== worldId) {
     const entry = getState().registry.worlds.find(w => w.id === worldId);
     if (entry) {
@@ -164,7 +168,11 @@ export async function finishSetupDoor(result: SetupAtlasRootResult | null, toast
  * the picker runs inside that click, which is the gesture it needs. Resolves
  * true only when a home folder now exists.
  */
-export async function ensureAtlasRoot(toasts: Toasts, purpose: string): Promise<boolean> {
+export async function ensureAtlasRoot(
+  toasts: Toasts,
+  purpose: string,
+  opts: { worldPicked?: 'open' | 'refuse' } = {},
+): Promise<boolean> {
   if (getState().atlasRoot) return true;
   const go = await new HomeFolderModal().ask(purpose);
   if (!go) return false;
@@ -172,6 +180,12 @@ export async function ensureAtlasRoot(toasts: Toasts, purpose: string): Promise<
     const result = await setupAtlasRoot();
     if (!result) {
       toasts.info(PICKER_CANCELLED_HINT);
+      return false;
+    }
+    if (result.worldFolder && opts.worldPicked === 'refuse') {
+      // Moving a world (1.17, lens C W4): opening the picked world here would
+      // leave the world being moved.
+      toasts.info('That folder is a world. Pick the folder where Atlas should keep worlds, not a world itself.');
       return false;
     }
     if (result.worldFolder) {
@@ -190,14 +204,20 @@ export async function ensureAtlasRoot(toasts: Toasts, purpose: string): Promise<
   }
 }
 
-/** The five ways into a world, named by the sidebar buttons' `data-action`. */
-export type AddWorldAction = 'create-local' | 'open-folder' | 'new-api' | 'link-api' | 'view-api';
+/** The ways into a world, named by the sidebar buttons' `data-action` (and the chooser's sixth row, a world file). */
+export type AddWorldAction = 'create-local' | 'open-folder' | 'new-api' | 'link-api' | 'view-api' | 'open-file';
 
 /** Run one way into a world, from any surface (the icon row, the chooser, Ctrl+K). */
 export async function runAddWorldAction(action: AddWorldAction, toasts: ToastManager): Promise<void> {
   // Backstop: the tour owns the world list while it runs (S365 gate lens B F5).
   if (isTourFlagActive()) {
     toasts.info('That is yours to use after the tour.');
+    return;
+  }
+  if (action === 'open-file') {
+    // The file picker opens inside this click, before any await (1.17, contract §5.2).
+    const file = await pickWorldFile();
+    if (file) await openWorldFileFrom(file, toasts);
     return;
   }
   if (action === 'open-folder') {
@@ -235,6 +255,7 @@ const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line
   { action: 'new-api', icon: 'cloud_upload', title: 'New world on OnlyWorlds', line: 'Created on onlyworlds.com and here, synced from the start. Needs a free account.' },
   { action: 'link-api', icon: 'link', title: 'Bring down a world from OnlyWorlds', line: 'Paste its key: Atlas downloads a full copy and keeps the two in sync.' },
   { action: 'view-api', icon: 'visibility', title: 'View a shared world', line: 'Someone gave you a read key: browse their world, view only. No PIN needed.' },
+  { action: 'open-file', icon: 'file_open', title: 'Open a world file', line: 'A world file Atlas saved, from this or any other browser.' },
 ];
 
 /**
@@ -260,7 +281,7 @@ class AddWorldChooser extends BaseModal {
 
   open(): void {
     const { overlay, body } = this.buildModalShell({ title: 'Add a world', dataModal: 'add-world' });
-    const rows = CHOICES.filter(c => c.action !== 'open-folder' || hasFolderMode());
+    const rows = CHOICES.filter(c => (c.action !== 'open-folder' || hasFolderMode()) && (c.action !== 'open-file' || hasOpfsMode()));
     body.innerHTML = `<div class="atlas-add-world-list">${rows.map(c => `
       <button type="button" class="atlas-add-world-row" data-choice="${c.action}">
         <span class="material-symbols-outlined atlas-add-world-icon" aria-hidden="true">${c.icon}</span>

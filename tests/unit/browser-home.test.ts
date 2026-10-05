@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { FakeDirHandle } from '../fixtures/fake-fs';
 import { BROWSER_HOME } from '../../src/core/browser-worlds';
-import { mintBrowserDirName, reconcileBrowserHome, worldAlreadyHere } from '../../src/core/browser-home';
+import { mintBrowserDirName, reconcileBrowserHome, staleBrowserCopies, worldAlreadyHere } from '../../src/core/browser-home';
 import { defaultRegistry } from '../../src/core/types';
 import type { WorldRegistryEntry, WorldsRegistry } from '../../src/core/types';
 
@@ -108,9 +108,12 @@ describe('reconcileBrowserHome', () => {
     expect(left.adopted).toEqual([]);
     expect(left.removed).toEqual([]);
     expect(left.stale).toEqual(['alpha-0192a000-1a2b']);
+    // Settings, Storage counts what the last pass left (contract §3.4).
+    expect(staleBrowserCopies()).toEqual(['alpha-0192a000-1a2b']);
     const moved = { ...folderWorld, moved_from: 'alpha-0192a000-1a2b' } as WorldRegistryEntry;
     const done = await reconcileBrowserHome(regOf(moved), { tourActive: false, home: asDir(homeWith(files)) });
     expect(done.removed).toEqual(['alpha-0192a000-1a2b']);
+    expect(staleBrowserCopies()).toEqual([]);
   });
 
   it('marks every browser world of the user own whose directory is gone, keeps its link, leaves the tour alone', async () => {

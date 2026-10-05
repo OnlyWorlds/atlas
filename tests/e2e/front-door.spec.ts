@@ -150,7 +150,9 @@ test('"add a world" opens the chooser; its open-a-world row opens a picked world
   });
   await page.locator('[data-action="add-world"]').click();
   const chooser = page.locator('[data-modal="add-world"]');
-  await expect(chooser.locator('[data-choice]')).toHaveCount(5);
+  // Six ways in since 1.17: the sixth opens a world file (contract §5.2).
+  await expect(chooser.locator('[data-choice]')).toHaveCount(6);
+  await expect(chooser.locator('[data-choice="open-file"] strong')).toHaveText('Open a world file');
   await chooser.locator('[data-choice="open-folder"]').click();
   await expect(page.locator('h1', { hasText: 'Second World' })).toBeVisible();
 });

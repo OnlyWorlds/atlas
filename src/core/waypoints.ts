@@ -1,7 +1,7 @@
 /**
  * Waypoints (Bout OW, workplan D11c) — the OnlyWorlds learning track.
  *
- * Ten named waypoints, each dual-teaching one OnlyWorlds concept + one app
+ * Eleven named waypoints (the eleventh, keep-a-copy, since 1.17), each dual-teaching one OnlyWorlds concept + one app
  * surface. Completion hooks live at USER-GESTURE call sites only (button
  * clicks, field commits, explicit node clicks) — NEVER in FolderStore or any
  * data layer. Import-, sync- and demo-originated mutations can never complete
@@ -39,7 +39,8 @@ export type WaypointId =
   | 'import'
   | 'ecosystem'
   | 'share'
-  | 'council';
+  | 'council'
+  | 'keep-copy';
 
 export interface WaypointDef {
   id: WaypointId;
@@ -64,9 +65,10 @@ export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'first-world',
     name: 'Your world, your files',
-    concept: 'Your world is plain files on your disk: no account, no lock-in. The open format is why any tool can read them.',
-    action: 'Create your first world. Peek in the folder afterwards.',
-    toast: 'Your world lives in a folder you own.',
+    // True for a world in this browser too (1.17, contract §6.2).
+    concept: 'Your world is plain files in an open format, no account needed: in a folder on your drive any tool can read it, and a world in this browser can leave as one file any time.',
+    action: 'Create your first world.',
+    toast: 'Your world is plain files, and it can always leave.',
     glyph: 'folder',
     link: () => '#/',
   },
@@ -151,6 +153,16 @@ export const WAYPOINTS: readonly WaypointDef[] = [
     glyph: 'gavel',
     link: () => null, // external — the page renders the council URL directly
   },
+  {
+    // 1.17, contract §6.2: atlas-level, once ever; a world of the user's own.
+    id: 'keep-copy',
+    name: 'Keep a copy',
+    concept: 'A world is plain files, so it can always leave whole: as one downloaded file, in a folder, or in your account.',
+    action: 'Download your world, move it to a folder, or take it online.',
+    toast: 'Your world has a copy outside this browser.',
+    glyph: 'download',
+    link: (w) => (w ? settingsHash(w, 'world') : null),
+  },
 ] as const;
 
 /** World-data waypoints — gated on the active world being the demo world. */
@@ -161,6 +173,7 @@ const DEMO_GATED: ReadonlySet<WaypointId> = new Set([
   'maps',
   'time',
   'share',
+  'keep-copy',
 ]);
 
 // ---- State ----
@@ -242,10 +255,11 @@ export function isDemoWorldActive(): boolean {
  * active. Portability waypoints ('first-world', 'import', 'ecosystem') and
  * 'council' always count.
  */
-export function completeWaypoint(id: WaypointId): void {
+export function completeWaypoint(id: WaypointId, opts: { toast?: string } = {}): void {
   const s = loadWaypointsState();
   if (s.completed[id]) return;
   if (DEMO_GATED.has(id) && isDemoWorldActive()) return;
+  if (opts.toast) toastOverrides.set(id, opts.toast);
   const next: WaypointsState = {
     ...s,
     completed: { ...s.completed, [id]: new Date().toISOString() },
@@ -301,6 +315,9 @@ let showing = false;
 let drainWired = false;
 
 const TOAST_MS = 7000;
+
+/** A completion that says its own line (keep-copy by JSON export: "a copy of its own"). */
+const toastOverrides = new Map<WaypointId, string>();
 
 function enqueueToast(id: WaypointId): void {
   if (loadWaypointsState().muted) return;
@@ -363,7 +380,7 @@ function renderWaypointToast(id: WaypointId): void {
     <img class="atlas-waypoint-toast-glyph" src="${import.meta.env.BASE_URL}owlogo.png" alt="" />
     <span class="atlas-waypoint-toast-text">
       <span class="atlas-waypoint-toast-name">${escapeText(def.name)}</span>
-      <span class="atlas-waypoint-toast-line">${escapeText(def.toast)}</span>
+      <span class="atlas-waypoint-toast-line">${escapeText(toastOverrides.get(def.id) ?? def.toast)}</span>
     </span>
   `;
   body.addEventListener('click', () => {

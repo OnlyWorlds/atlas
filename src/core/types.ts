@@ -327,11 +327,14 @@ export interface Tombstone {
 
 // ---- Sync engine state (observable for UI) ----
 
+/** Why the engine is held (`SyncEngine.hold`): the pill says each in its own sentence. */
+export type SyncHoldReason = 'rekey' | 'disk' | 'move' | 'download';
+
 export type SyncEngineState =
   | { kind: 'idle'; last_sync_at: string | null }
   | { kind: 'syncing'; phase: 'pull' | 'push'; progress?: { done: number; total: number } }
   /** `held`: an exclusive local operation (the re-key, S363) owns the world; nothing syncs until it ends. */
-  | { kind: 'paused'; reason: 'manual' | 'network' | 'held'; pending_changes: number; held_for?: 'rekey' | 'disk' }
+  | { kind: 'paused'; reason: 'manual' | 'network' | 'held'; pending_changes: number; held_for?: SyncHoldReason }
   | { kind: 'error'; message: string; recoverable: boolean };
 
 export interface SyncResult {
@@ -521,6 +524,36 @@ export interface WorldRegistryEntry {
    * (DESIGN_LAWS conv. 129).
    */
   cleared_at?: string;
+  /**
+   * A move to a folder that has started and not committed (1.17, contract
+   * §4.2 step 2): saved BEFORE the destination folder exists, so a crash
+   * leaves a record of which folder on the drive was this move's. Recovery
+   * removes that folder only when its `.atlas/move-incoming.json` carries
+   * this `move_id` (gate A1); the browser copy stays the world.
+   */
+  move?: { move_id: string; to_folder_name: string; started_at: string };
+  /**
+   * After a move's commit, the browser directory the world left, until it is
+   * removed (contract §4.2 step 7, §4.3). Boot and activation finish it.
+   */
+  moved_from?: string;
+  /**
+   * When this browser last handed the whole world over as one file (1.17,
+   * contract §5.1, §6.1). The keep-safe card reads it; Atlas cannot know the
+   * file was kept, only that the download was handed to the browser.
+   */
+  kept_download_at?: string;
+  /** When this world was last exported as JSON from the Data room (the keep-safe card's reduced form). */
+  kept_export_at?: string;
+  /** The keep-safe card's × hides it until then (a week). */
+  keep_nudge_snoozed_until?: string;
+  /**
+   * A linked world restored from a world file (1.17, contract §5.2): its first
+   * sync round runs as pause-and-review whatever the policy, so the file's
+   * older edits never overwrite newer ones on OnlyWorlds (gate A9; Skeld's
+   * third condition, h20 #511). Cleared once a round has run.
+   */
+  review_first_sync?: boolean;
   created_at: string;
   last_opened_at?: string;
   /**

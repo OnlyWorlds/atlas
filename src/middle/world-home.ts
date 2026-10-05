@@ -31,7 +31,10 @@ import { ELEMENT_ICONS, ELEMENT_LABELS } from '../core/constants';
 import type { Element, ElementType, WorldMap } from '../core/types';
 import { isWritingNarrative } from './writing-helpers';
 import { escapeText, relativeTime } from '../core/dom-utils';
-import { setWorldFavoriteElement, dismissTourCard, saveRegistry } from '../registry/registry';
+import { setWorldFavoriteElement, dismissTourCard, saveRegistry, updateWorldEntry } from '../registry/registry';
+import { keepSafeCard, snoozeUntil } from './home-keepsafe';
+import { downloadWorldFromClick } from '../ui/download-world';
+import { hasFolderMode } from '../core/capabilities';
 import { computeTourCards, type TourWaveEntry } from './home-tour';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
@@ -146,6 +149,10 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
       const tour = buildTour(counts, totalElements, worldId, toasts);
       if (tour) root.appendChild(tour);
     }
+    // The keep-safe card (1.17, contract §6.1): after the intro cards, in
+    // their chrome; a world kept only in this browser asks for a copy.
+    const keep = buildKeepSafe(worldId, elements, toasts);
+    if (keep) root.appendChild(keep);
     if (totalElements === 0) return;
     // The chart strip (S15: the "starred chart") — the shape of the world's
     // history between the cover and the desk (timeline-mini's old slot, now
@@ -635,6 +642,58 @@ function persistDismiss(worldId: string, cardId: string): void {
   const next = dismissTourCard(getState().registry, worldId, cardId);
   saveRegistry(next);
   patchSlice('registry', next);
+}
+
+/** The keep-safe band (contract §6.1): what `keepSafeCard` answers, with its three ways out and ×. */
+function buildKeepSafe(worldId: string, elements: Element[], toasts: ToastManager): HTMLElement | null {
+  const s = getState();
+  const entry = s.registry.worlds.find(w => w.id === worldId);
+  const card = keepSafeCard({ entry, elements, loading: !!s.data.loading, now: Date.now() });
+  if (!card || !entry) return null;
+  const line = card.reduced
+    ? `${card.reduced === 'online' ? 'Your OnlyWorlds account holds' : 'Your JSON file holds'} this world's elements, but not its pages, aliases, notes, writing formatting, saved charts or images kept in Atlas. A download holds all of it.`
+    : hasFolderMode()
+      ? 'If the browser clears its storage, the world goes with it. Download a copy, or move it to a folder on your drive.'
+      : 'If the browser clears its storage, the world goes with it. Download a copy you can open again anywhere.';
+  const section = document.createElement('section');
+  section.className = 'atlas-home-onboarding atlas-home-keepsafe';
+  section.setAttribute('data-role', 'keepsafe');
+  section.innerHTML = `
+    <div class="atlas-home-keepsafe-head">
+      <h2 class="atlas-home-section-title">${card.reduced ? 'Part of this world lives only in this browser' : 'This world lives only in this browser'}</h2>
+      <button type="button" class="atlas-icon-btn-sm" data-action="keepsafe-hide" title="Hide for a week" aria-label="Hide for a week">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </div>
+    <p class="atlas-home-onboarding-copy"></p>
+    <div class="atlas-home-keepsafe-actions">
+      <button type="button" class="atlas-btn-primary" data-action="keepsafe-download">Download the whole world</button>
+      ${hasFolderMode() ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-move">Move to a folder</button>' : ''}
+      ${entry.state !== 'api-linked' ? '<button type="button" class="atlas-btn-ghost" data-action="keepsafe-online">Take it online</button>' : ''}
+    </div>`;
+  section.querySelector<HTMLElement>('.atlas-home-onboarding-copy')!.textContent = line;
+  section.querySelector<HTMLButtonElement>('[data-action="keepsafe-hide"]')!.addEventListener('click', () => {
+    // A gesture, never a render, sets the week (contract §6.1).
+    const next = updateWorldEntry(getState().registry, worldId, { keep_nudge_snoozed_until: snoozeUntil(Date.now()) });
+    saveRegistry(next);
+    patchSlice('registry', next);
+  });
+  const download = section.querySelector<HTMLButtonElement>('[data-action="keepsafe-download"]')!;
+  download.addEventListener('click', () => {
+    const now = getState().registry.worlds.find(w => w.id === worldId);
+    if (now) void downloadWorldFromClick(now, toasts, on => { download.disabled = on; download.textContent = on ? 'Saving…' : 'Download the whole world'; });
+  });
+  section.querySelector<HTMLButtonElement>('[data-action="keepsafe-move"]')?.addEventListener('click', async () => {
+    const now = getState().registry.worlds.find(w => w.id === worldId);
+    if (!now) return;
+    const { MoveBrowserWorldModal } = await import('../ui/move-browser-world-modal');
+    new MoveBrowserWorldModal(now, toasts).open();
+  });
+  section.querySelector<HTMLButtonElement>('[data-action="keepsafe-online"]')?.addEventListener('click', async () => {
+    const { MakeOnlineModal } = await import('../ui/make-online-modal');
+    new MakeOnlineModal(toasts).open();
+  });
+  return section;
 }
 
 function buildTour(

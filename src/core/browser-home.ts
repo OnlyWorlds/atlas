@@ -33,10 +33,19 @@ export function mintBrowserDirName(name: string, worldId: string): string {
   return `${slug}-${worldId.slice(0, 8)}-${nonce}`;
 }
 
+/**
+ * Is this handle key the world's own: `world-<id>`, or a later link's
+ * `world-<id>-N`? An exact string match: nothing in the id is stripped, so a
+ * crafted id never matches another world's key (S373 gate F7).
+ */
+export function isOwnHandleKey(handleKey: string, worldId: string): boolean {
+  const base = `world-${worldId}`;
+  return handleKey === base || (handleKey.startsWith(`${base}-`) && /^\d+$/.test(handleKey.slice(base.length + 1)));
+}
+
 /** A world with this world.json id is already in the registry, under any spelling of its identity. */
 export function worldAlreadyHere(reg: WorldsRegistry, worldId: string): WorldRegistryEntry | undefined {
-  const keyed = new RegExp(`^world-${worldId.replace(/[^0-9a-zA-Z-]/g, '')}(-\\d+)?$`);
-  return findWorldByOwIdentity(reg, worldId) ?? reg.worlds.find(w => keyed.test(w.folder?.handle_key ?? ''));
+  return findWorldByOwIdentity(reg, worldId) ?? reg.worlds.find(w => isOwnHandleKey(w.folder?.handle_key ?? '', worldId));
 }
 
 type Locks = { request: (name: string, opts: unknown, cb: (lock: unknown) => Promise<unknown> | unknown) => Promise<unknown> };
@@ -168,6 +177,12 @@ async function readFacts(dir: FileSystemDirectoryHandle, name: string): Promise<
   return { name, making, meta };
 }
 
+/** What the last reconciliation left as a move's stale copy (Settings, Storage counts them). Session only. */
+let lastStale: string[] = [];
+export function staleBrowserCopies(): readonly string[] {
+  return lastStale;
+}
+
 export interface ReconcileOutcome {
   next: WorldsRegistry;
   adopted: string[];
@@ -244,6 +259,7 @@ export async function reconcileBrowserHome(
 
   out.next = markMissing(out.next, listed, out.cleared);
   out.next = collapseTwins(out.next);
+  lastStale = [...out.stale];
   return out;
 }
 

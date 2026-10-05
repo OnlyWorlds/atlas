@@ -101,6 +101,16 @@ export function startApp(container: HTMLElement): AppHandle {
     } catch (err) {
       console.warn('[browser-home] reconciliation skipped', err); // raw-error-ok: a console record, never shown
     }
+    // A move to a folder that a crash interrupted (contract §4.3): finished
+    // here when it can be without a gesture, else when the world opens or
+    // the next Move click.
+    const moves = getState().registry.worlds.filter(w => w.move || w.moved_from);
+    if (moves.length > 0) {
+      const { recoverBrowserMove } = await import('./setup/browser-world-move');
+      for (const w of moves) {
+        await recoverBrowserMove(w.id).catch(err => console.warn('[browser-home] move recovery waits', err)); // raw-error-ok: a console record
+      }
+    }
   });
 
   // Mount toast surface (uses #toast-container element from index.html)

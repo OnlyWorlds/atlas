@@ -9,6 +9,7 @@
  * link that opens the feature. No tour machinery.
  */
 
+import { hasFolderMode } from '../core/capabilities';
 import { navigate } from '../core/router';
 import { escapeText } from '../core/dom-utils';
 import { ToastManager } from '../ui/toast-manager';
@@ -57,7 +58,7 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
     </section>
     <section class="atlas-settings-section">
       <h3>For developers</h3>
-      <p class="atlas-settings-hint">The folder is the API: every world is plain JSON on disk, one file per element. Read the type folders and key on each file's internal id. A world kept in this browser is readable by Atlas only.</p>
+      <p class="atlas-settings-hint">The folder is the API: every world is plain JSON on disk, one file per element. Read the type folders and key on each file's internal id. A world kept in this browser is readable by Atlas only, until you ${hasFolderMode() ? 'move it to a folder or ' : ''}download it as one file (Settings, This world).</p>
       <div class="atlas-ow-links">
         <a href="${OW_SDK_URL}" target="_blank" rel="noopener">@onlyworlds/sdk</a>
         <a href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">schema reference</a>
@@ -100,7 +101,7 @@ function renderWaypointsSection(activeWorld: WorldRegistryEntry | undefined): st
         <h3>Waypoints</h3>
         <span class="atlas-ow-waypoints-count">${count} of ${WAYPOINTS.length}</span>
       </div>
-      <p class="atlas-settings-hint">Ten small ways atlas and OnlyWorlds fit together. Each one opens the feature it describes.</p>
+      <p class="atlas-settings-hint">Small ways Atlas and OnlyWorlds fit together. Each one opens the feature it describes.</p>
       ${demoActive ? '<p class="atlas-settings-hint atlas-ow-demo-hint">You are exploring the sample world; these light up in a world of your own.</p>' : ''}
       <div class="atlas-ow-waypoint-grid">${rows}</div>
       <div class="atlas-ow-waypoints-foot">

@@ -3,13 +3,14 @@
  * a modal, not `window.confirm`, saying what goes and what stays. The work is
  * `deleteBrowserWorld` (close first, removal retried, the entry kept on any
  * failure); a failure reopens the world and says nothing was removed.
- * "Download it first" joins this dialog with the download (bout 5).
+ * "Download it first" downloads the whole world and keeps the dialog open.
  */
 
 import { BaseModal } from './modal-base';
 import type { ToastManager } from './toast-manager';
 import { navigate } from '../core/router';
 import { deleteBrowserWorld, BROWSER_DELETE_FAILED } from '../setup/browser-world-delete';
+import { downloadWorldFromClick } from './download-world';
 import type { WorldRegistryEntry } from '../core/types';
 
 export class DeleteBrowserWorldModal extends BaseModal {
@@ -26,12 +27,29 @@ export class DeleteBrowserWorldModal extends BaseModal {
       <div class="atlas-modal-error" data-role="error" hidden></div>
       <div class="atlas-modal-actions">
         <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
+        <button type="button" class="atlas-btn-ghost" data-action="download-first">Download it first</button>
         <button type="button" class="atlas-btn-ghost atlas-btn-danger" data-action="delete">Delete</button>
       </div>`;
     const errorBox = body.querySelector<HTMLElement>('[data-role="error"]')!;
     const cancelBtn = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
     const deleteBtn = body.querySelector<HTMLButtonElement>('[data-action="delete"]')!;
     cancelBtn.addEventListener('click', () => this.hide());
+    const downloadBtn = body.querySelector<HTMLButtonElement>('[data-action="download-first"]')!;
+    downloadBtn.addEventListener('click', () => {
+      // The dialog stays: the user deletes once the file is theirs.
+      errorBox.hidden = true;
+      void downloadWorldFromClick(w, this.toasts, on => {
+        downloadBtn.disabled = on;
+        deleteBtn.disabled = on;
+        downloadBtn.textContent = on ? 'Saving…' : 'Download it first';
+      }).then(ok => {
+        // Said here, beside Delete, not only in a toast (S373 gate F8).
+        if (ok === false && this.modal?.isConnected) {
+          errorBox.textContent = 'The download did not finish, so no copy was saved. Deleting now removes the world for good.';
+          errorBox.hidden = false;
+        }
+      });
+    });
     deleteBtn.addEventListener('click', async () => {
       errorBox.hidden = true;
       deleteBtn.disabled = true;

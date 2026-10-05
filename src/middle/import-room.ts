@@ -17,7 +17,7 @@ import { isAtlasOnlyStorage } from '../core/browser-worlds';
 import { getActiveStore } from '../core/active-store';
 import { ELEMENT_ICONS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants';
 import { escapeText } from '../core/dom-utils';
-import { getState, subscribe } from '../core/state';
+import { getState, patchSlice, subscribe } from '../core/state';
 import { hasFolderMode } from '../core/capabilities';
 import { parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
@@ -28,7 +28,7 @@ import { parsePayload } from '../import/parse';
 import { reconcile } from '../import/reconcile';
 import type { ImportPlan, ParseResult, ValidationIssue } from '../import/types';
 import { generateFixPrompt, validatePayload } from '../import/validate';
-import { findWorldByOwIdentity } from '../registry/registry';
+import { findWorldByOwIdentity, saveRegistry, updateWorldEntry } from '../registry/registry';
 import {
   createWorldFromImportedData,
   importIntoActiveWorld,
@@ -38,6 +38,9 @@ import { ToastManager } from '../ui/toast-manager';
 import { detailsContext, showProblem } from '../ui/problem-fixes';
 import { buildFailureDetails } from '../core/problems';
 import { PlainError } from '../core/plain-error';
+import { isWorldFile, openWorldFileFrom } from '../ui/open-world-file';
+import { downloadWorldFromClick } from '../ui/download-world';
+import { filesWhereOf } from '../core/browser-worlds';
 
 type Mode = 'new' | 'merge';
 
@@ -194,12 +197,12 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     </div>
     <div class="atlas-import-body">
       <div class="atlas-import-panel" data-panel="in" role="tabpanel">
-        <p class="atlas-import-lead">Bring in a world exported from onlyworlds.com, or loose elements. Drop a file or paste the JSON, then it gets reviewed before it lands.</p>
-        <div class="atlas-import-drop" data-role="drop" tabindex="0" title="drop or click to choose a .json file">
+        <p class="atlas-import-lead">Bring in a world exported from onlyworlds.com, or loose elements. Drop a file or paste the JSON, then it gets reviewed before it lands. A world file Atlas saved (.zip) opens as its own world.</p>
+        <div class="atlas-import-drop" data-role="drop" tabindex="0" title="drop or click to choose a .json file, or a world file Atlas saved (.zip)">
           <span class="material-symbols-outlined">place_item</span>
-          <p>drop a world or elements <b>.json</b> here</p>
+          <p>drop a world or elements <b>.json</b>, or a world file <b>.zip</b>, here</p>
           <span class="atlas-import-drop-sub">or click to choose a file</span>
-          <input type="file" accept="application/json,.json" data-role="file" hidden />
+          <input type="file" accept="application/json,.json,.zip,application/zip" data-role="file" hidden />
         </div>
         <textarea class="atlas-import-paste" data-role="paste" rows="6"
           placeholder="…or paste OnlyWorlds JSON: a full world export, or loose element lists"></textarea>
@@ -691,9 +694,16 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         <input type="checkbox" value="${t}" checked />
       </label>`;
 
+    // Where the world's files are decides what "the full copy" is (1.17,
+    // contract §5.1): the folder, or the one-file download of a browser world.
+    const outEntry = getState().registry.worlds.find(w => w.id === aw.worldId);
+    const outInBrowser = filesWhereOf(outEntry) === 'browser';
+    const outWholeFile = outInBrowser && outEntry?.demo !== true;
     exportMount.innerHTML = `
       <p class="atlas-share-section-hint">Download <b>${escapeText(aw.meta?.name ?? 'this world')}</b> as an onlyworlds.com world export, the same file the site downloads. Untick types to export a subset.</p>
-      <p class="atlas-share-section-hint">The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images kept in the folder stay in your world folder, which is the full copy of your world.</p>
+      <p class="atlas-share-section-hint">${outInBrowser
+        ? "The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images stay in this browser. Download the whole world keeps all of it in one file."
+        : "The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images kept in the folder stay in your world folder, which is the full copy of your world."}</p>
       <div class="atlas-import-typelist">
         <label class="atlas-import-type-all">
           <input type="checkbox" data-role="all" checked />
@@ -712,8 +722,14 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       <div class="atlas-import-export-actions">
         <button type="button" class="atlas-btn-primary" data-action="export">Save to file</button>
         <button type="button" class="atlas-btn-ghost" data-action="copy-json">Copy JSON</button>
+        ${outWholeFile ? '<button type="button" class="atlas-btn-ghost" data-action="download-whole">Download the whole world</button>' : ''}
       </div>
     `;
+    const wholeBtn = exportMount.querySelector<HTMLButtonElement>('[data-action="download-whole"]');
+    wholeBtn?.addEventListener('click', () => {
+      const w = getState().registry.worlds.find(x => x.id === aw.worldId);
+      if (w) void downloadWorldFromClick(w, toasts, on => { wholeBtn.disabled = on; wholeBtn.textContent = on ? 'Saving…' : 'Download the whole world'; });
+    });
 
     const allBox = exportMount.querySelector<HTMLInputElement>('[data-role="all"]')!;
     const exportBtn = exportMount.querySelector<HTMLButtonElement>('[data-action="export"]')!;
@@ -755,6 +771,14 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
       const slug = (aw.meta?.name ?? 'world').replace(/[^a-z0-9]+/gi, '_').toLowerCase().replace(/^_+|_+$/g, '') || 'world';
       const date = new Date().toISOString().slice(0, 10);
       downloadJson(data, `onlyworlds_${slug}_${date}.json`);
+      // A whole-world export is a copy of its elements outside this browser:
+      // the keep-safe card goes to its reduced form (1.17, contract §6.1).
+      if (checked.length === all) {
+        const next = updateWorldEntry(getState().registry, aw.worldId, { kept_export_at: new Date().toISOString() });
+        saveRegistry(next);
+        patchSlice('registry', next);
+        completeWaypoint('keep-copy', { toast: 'Your world has a copy of its own.' });
+      }
       const n = checked.reduce((sum, t) => sum + (activeElements().filter(e => e.type === t).length), 0);
       toasts.success(`Exported ${n} element${n === 1 ? '' : 's'}`);
     } catch (err) {
@@ -803,12 +827,15 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     e.preventDefault();
     dropEl.classList.remove('is-over');
     const file = e.dataTransfer?.files?.[0];
+    // A world file opens as its own world (1.17, contract §5.2), never merged in.
+    if (file && isWorldFile(file)) { void openWorldFileFrom(file, toasts); return; }
     if (file) void file.text().then(t => ingest(t, 'The dropped file'), err => { console.error('[import] file read failed', err); showProblem(err, { doing: 'reading the dropped file', folder: 'picked', toasts }); });
   });
   dropEl.addEventListener('click', () => fileInput.click());
   dropEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
+    if (file && isWorldFile(file)) { void openWorldFileFrom(file, toasts); fileInput.value = ''; return; }
     if (file) void file.text().then(t => ingest(t, 'The chosen file'), err => { console.error('[import] file read failed', err); showProblem(err, { doing: 'reading the chosen file', folder: 'picked', toasts }); });
     fileInput.value = '';
   });

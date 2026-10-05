@@ -142,6 +142,9 @@ export async function removeBrowserWorldDir(
   }
 }
 
+/** Said to a tab that tries to open a world another tab is moving to a folder (contract §4.4). */
+export const MOVING_IN_ANOTHER_TAB = 'This world is being moved to a folder in another tab.';
+
 /** Mark a browser world as cleared by the browser. Pure; the caller saves. */
 export function markWorldCleared(reg: WorldsRegistry, worldId: string, at = new Date().toISOString()): WorldsRegistry {
   return updateWorldEntry(reg, worldId, { cleared_at: at });

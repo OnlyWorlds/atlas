@@ -32,6 +32,7 @@ import type {
   ElementType,
   PerElementFailure,
   SyncEngineState,
+  SyncHoldReason,
   SyncResult,
 } from '../core/types';
 
@@ -352,7 +353,7 @@ export class SyncEngine {
    */
   private holds = 0;
   /** Why each standing hold was taken, oldest first: the pill names the newest. */
-  private holdReasons: Array<'rekey' | 'disk'> = [];
+  private holdReasons: SyncHoldReason[] = [];
 
   private get blocked(): boolean {
     return this.paused || this.holds > 0;
@@ -371,7 +372,7 @@ export class SyncEngine {
    * it pushes only when no other hold or pause remains (a world the user set to
    * stay offline stays offline).
    */
-  async hold(reason: 'rekey' | 'disk'): Promise<() => void> {
+  async hold(reason: SyncHoldReason): Promise<() => void> {
     this.holds++;
     this.holdReasons.push(reason);
     if (this.debouncePushTimer) {

@@ -95,6 +95,11 @@ export function __setRegistryTabBaseForTests(reg: WorldsRegistry | null): void {
   tabBase = reg ? JSON.parse(JSON.stringify(reg)) as WorldsRegistry : null;
 }
 
+/** The registry as it sits in storage now (a save that must have landed reads it back). */
+export function storedRegistry(): WorldsRegistry {
+  return readRegistry();
+}
+
 function readRegistry(): WorldsRegistry {
   try {
     const raw = localStorage.getItem(REGISTRY_STORAGE_KEY);
@@ -120,7 +125,8 @@ function readRegistry(): WorldsRegistry {
   }
 }
 
-export function saveRegistry(reg: WorldsRegistry): void {
+/** Saves the registry; answers whether it reached storage (a step that must not run on a lost save checks it). */
+export function saveRegistry(reg: WorldsRegistry): boolean {
   try {
     let out = reg;
     if (tabBase) {
@@ -135,6 +141,7 @@ export function saveRegistry(reg: WorldsRegistry): void {
     }
     localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(out));
     tabBase = JSON.parse(JSON.stringify(reg)) as WorldsRegistry;
+    return true;
   } catch (err) {
     console.error('[registry] save failed:', err);
     // Said once per session (S369): the list of worlds lives in this
@@ -153,6 +160,7 @@ export function saveRegistry(reg: WorldsRegistry): void {
         );
       }).catch(() => {});
     }
+    return false;
   }
 }
 

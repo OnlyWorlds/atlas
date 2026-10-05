@@ -27,6 +27,13 @@ import { ToastManager } from './toast-manager';
 import { getState, patchSlice } from '../core/state';
 import { attachApi, saveRegistry, setPin, setEmail, findLinkedWorld } from '../registry/registry';
 import { completeWaypoint } from '../core/waypoints';
+import { isBrowserWorld } from '../core/browser-worlds';
+
+/** Taking a browser world online gives it a copy outside this browser (contract §6.2); a folder world already had one. */
+function completeKeepCopyIfBrowserWorld(): void {
+  const s = getState();
+  if (isBrowserWorld(s.registry.worlds.find(w => w.id === s.active?.worldId))) completeWaypoint('keep-copy');
+}
 import { getActiveStore } from '../core/active-store';
 import { attachSyncEngine, detachSyncEngine } from '../sync/sync-attach';
 import { runRoute2, ambiguousLine, childClashLine } from '../sync/make-online-run';
@@ -381,7 +388,7 @@ export class MakeOnlineModal extends BaseModal {
         const uploaded = pushResult.pushed.creates + pushResult.pushed.updates;
         this.toasts.success(`${name} is online · ${uploaded} element${uploaded === 1 ? '' : 's'} uploaded`);
       }
-      completeWaypoint('ecosystem');
+      completeWaypoint('ecosystem'); completeKeepCopyIfBrowserWorld();
       void pushDone; void pushTotal;
       this.hide();
     } catch (err) {
@@ -544,7 +551,7 @@ export class MakeOnlineModal extends BaseModal {
         const { unrewrittenMessage } = await import('./rekey-modal');
         this.toasts.error(unrewrittenMessage(mergeResult.unrewritten), 10_000);
       }
-      completeWaypoint('ecosystem');
+      completeWaypoint('ecosystem'); completeKeepCopyIfBrowserWorld();
 
       this.hide();
     } catch (err) {
