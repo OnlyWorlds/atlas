@@ -122,18 +122,9 @@ test('B4 rootless with a world: the example page offers "back to atlas", not "se
   await expect(page.locator('[data-action="demo-exit-setup"]')).toHaveCount(0);
 });
 
-test('B5 the tour finale\'s "set up your folder", pointed at a world folder, opens it (no false "Folder ready")', async ({ page }) => {
-  await freshBoot(page);
-  await seed(page, { 'lensb-b5/w/world.json': { id: A, name: 'Finale World' } }, 'lensb-b5/w');
-  await page.evaluate(async () => {
-    const m = await import('/src/tour/tour-engine.ts' as string);
-    await m.setupFolderFromTour();
-  });
-  await page.waitForTimeout(500);
-  const toasts = await page.locator('.ow-toast-message').allTextContents();
-  expect(toasts.join(' | ')).not.toMatch(/Folder ready/);
-  await expect(page.locator('h1', { hasText: 'Finale World' })).toBeVisible();
-});
+// B5 (the finale's folder setup pointed at a world folder) moved with 1.17:
+// the finale's Save it to a folder refuses a world folder as its destination,
+// and tour-keep.spec holds that test.
 
 test('B6 during the tour, Ctrl+K does not offer the world doors the sidebar locks', async ({ page }) => {
   await freshBoot(page);

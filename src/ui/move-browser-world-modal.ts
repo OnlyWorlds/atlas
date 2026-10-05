@@ -71,7 +71,11 @@ export class MoveBrowserWorldModal extends BaseModal {
    * earlier click (opening a world file into a folder, contract §5.2): the
    * same locked run and progress, no confirm. Resolves whether it moved.
    */
-  start(ready: { home: FileSystemDirectoryHandle; hint: string }): Promise<boolean> {
+  start(
+    ready: { home: FileSystemDirectoryHandle; hint: string },
+    /** The keep's own sentences (Save it to a folder, contract §7.5): the world is the user's whichever way the move ends. */
+    lines: { success?: string; failed?: string } = {},
+  ): Promise<boolean> {
     // Already asked (the where-question): a statement, not a question, and no
     // confirm button (S374 gate F7).
     const { cancel, confirm, progress } = this.shell(
@@ -80,7 +84,7 @@ export class MoveBrowserWorldModal extends BaseModal {
     cancel.addEventListener('click', () => this.hide());
     confirm.hidden = true;
     this.lock(cancel, confirm, true);
-    return this.run(ready, { cancel, confirm, progress });
+    return this.run(ready, { cancel, confirm, progress }, lines);
   }
 
   private shell(intro: string, title = `Move "${this.world.name}" to a folder?`): { body: HTMLElement; cancel: HTMLButtonElement; confirm: HTMLButtonElement; progress: HTMLElement } {
@@ -116,6 +120,7 @@ export class MoveBrowserWorldModal extends BaseModal {
   private async run(
     ready: { home: FileSystemDirectoryHandle; hint: string },
     els: { cancel: HTMLButtonElement; confirm: HTMLButtonElement; progress: HTMLElement },
+    lines: { success?: string; failed?: string } = {},
   ): Promise<boolean> {
     const w = this.world;
     const { cancel, confirm, progress } = els;
@@ -138,14 +143,14 @@ export class MoveBrowserWorldModal extends BaseModal {
     if (outcome?.ok) {
       this.hide();
       completeWaypoint('keep-copy');
-      this.toasts.success(`"${w.name}" now lives in a folder on your drive: ${outcome.pathHint}.`
+      this.toasts.success((lines.success ?? `"${w.name}" now lives in a folder on your drive: ${outcome.pathHint}.`)
         + (outcome.leftBrowserCopy ? ' Its old copy in this browser is removed the next time Atlas starts.' : ''));
       return true;
     }
     if (outcome && !outcome.ok) console.warn('[atlas:move] did not finish:', outcome.error);
     const err = refusal ?? (outcome as { error: unknown }).error;
     const why = problemFor(err, { doing: 'moving this world to a folder', where: 'folder', folder: 'picked', inline: true }).sentence;
-    progress.textContent = refusal ? why : `${MOVE_DID_NOT_FINISH(w.name)} ${why}`;
+    progress.textContent = lines.failed ? `${lines.failed} ${why}` : refusal ? why : `${MOVE_DID_NOT_FINISH(w.name)} ${why}`;
     cancel.disabled = false;
     cancel.textContent = 'Close';
     confirm.hidden = true;

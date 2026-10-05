@@ -138,10 +138,12 @@ test('at 800 the swamps map, every objects mint, back to the map, and the-rest s
   await expectReachable(page, page.locator('.atlas-sidebar .atlas-sidebar-content')); // the-rest: route elements
 });
 
-// S366 gate B3: the finale's "Set up a folder" lands on the no-world screen,
-// whose only door is the sidebar; the tour had used up the once, and the exit
-// navigation's hashchange closed what the screen opened.
-test('at 760 the finale\u2019s set up a folder lands with the sidebar in reach', async ({ page }) => {
+// S366 gate B3: ending the tour at the finale landed on a screen whose only
+// door was the sidebar; the tour had used up the once, and the exit
+// navigation's hashchange closed what the screen opened. Since 1.17 the
+// finale's Keep lands in the kept world: the way to its elements must be in
+// reach at a narrow width too.
+test('at 760 the finale’s keep lands with the sidebar in reach', async ({ page }) => {
   await page.setViewportSize({ width: 760, height: 820 });
   await freshBoot(page);
   await page.click('[data-action="start-tour"]');
@@ -151,14 +153,9 @@ test('at 760 the finale\u2019s set up a folder lands with the sidebar in reach',
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '3');
   await page.evaluate(async () => { const e = await import('/src/tour/tour-engine.ts'); await (e as any).enterStep(15); });
   await expect(page.locator('.atlas-tour-bar')).toHaveAttribute('data-tour-step', '16');
-  await page.evaluate(async () => {
-    const api = (window as any).__atlasTestApi;
-    const fsRoot = await navigator.storage.getDirectory();
-    api.setNextDirectory(await fsRoot.getDirectoryHandle('finale-home', { create: true }));
-  });
-  await page.locator('.atlas-tour-controls button', { hasText: /^Set up a folder$/ }).click();
+  await page.locator('.atlas-tour-controls button', { hasText: /^Keep this world$/ }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
-  await expectReachable(page, page.locator('.atlas-worlds-header [data-action="create-local"]'));
+  await expectReachable(page, page.locator('.atlas-room-nav-drawer-btn.is-sidebar'));
 });
 
 test('a drawer closed by hand during the tour can be reopened from its toggle', async ({ page }) => {

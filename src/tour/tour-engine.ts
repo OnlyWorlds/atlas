@@ -9,10 +9,13 @@
  * if the user activates another world mid-tour, the tour pauses rather than
  * touch it.
  *
- * THE RESIDUE CONTRACT (v2, Captain's ruling): the tour leaves NOTHING
- * behind. The world is created at the first hands-on step (not at boot) and
- * torn down on exit or finish — registry entry, handle, OPFS folder, all of
- * it. Exit returns to wherever the tour was launched from.
+ * THE RESIDUE CONTRACT (v2, Captain's ruling; 1.17 adds the keep): the tour
+ * leaves NOTHING behind unless the user keeps its world. The world is created
+ * at the first hands-on step (not at boot) and torn down on a mid-tour Exit
+ * or the finale's Start fresh — registry entry, handle, directory, all of it.
+ * Exit returns to wherever the tour was launched from. The finale's Keep
+ * makes it the user's own instead (`keepTourWorld`, `tour-keep.ts`), and a
+ * keep once begun is finished, never torn down (contract §7.2).
  *
  * Reveal model: the world starts empty; steps write elements from the baked
  * bundle (`src/demo/hyperion-world.json`) as the user advances. Link fields
@@ -29,11 +32,11 @@
 import { getState, patchSlice } from '../core/state';
 import { awaitEviction, evictParkedStore, getActiveStore, setActiveStore } from '../core/active-store';
 import { navigate, elementHash, mapHash, writingHash, timelineHash } from '../core/router';
-import { saveRegistry, deleteWorldEntry } from '../registry/registry';
+import { saveRegistry, deleteWorldEntry, updateWorldEntry } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
 import { detachSyncEngine } from '../sync/sync-attach';
 import type { Element, ElementType, WorldRegistryEntry } from '../core/types';
-import { isBrowserWorld, removeBrowserWorldDir } from '../core/browser-worlds';
+import { isBrowserWorld, removeBrowserWorldDir, worldHandleFor } from '../core/browser-worlds';
 import { isQuietRef, TOUR_MAP_REF, TOUR_PIN_REF, TOUR_STEPS, type TourStep } from './tour-data';
 import { mergeHealArray } from './tour-heal';
 import { flushBeforeLeavingWorld } from '../core/leave-flush';
@@ -132,11 +135,18 @@ export function tourWorldExists(): boolean {
   return getState().registry.worlds.some(w => w.id === p.worldId && w.demo === true);
 }
 
-/** The active world is the tour's demo world (write-safety precondition). */
+/**
+ * The active world is the tour's demo world (write-safety precondition). Its
+ * world.json mirror must say demo too: a keep un-demoes world.json first (K2)
+ * and the registry last (K4), and between them no step may write a bundle id
+ * into a world whose ids are moving (S375 gate K1). An unreadable world.json
+ * mirrors no `demo` either, so the tour writes nothing into it.
+ */
 export function tourWorldIsActive(): boolean {
   const p = readTourState();
   const active = getState().active;
   if (!p || !p.worldId || !active?.opened || active.worldId !== p.worldId) return false;
+  if (active.meta?.demo !== true) return false;
   const entry = getState().registry.worlds.find(w => w.id === p.worldId);
   return entry?.demo === true;
 }
@@ -539,7 +549,7 @@ export async function createTourWorld(): Promise<void> {
   // Teardown's demo+prefix sweep is exactly the rollback.
   const after = readTourState();
   if (!after?.active) {
-    await teardownPriorTourWorld();
+    await teardownPriorTourWorld(entry.id);
     return;
   }
   writeTourState({ ...after, worldId: entry.id });
@@ -587,8 +597,10 @@ export function enterStep(index: number): Promise<void> {
  */
 let enteringStep = false;
 let tearingDown = false;
+/** A keep is running (contract §7.3 K0): ids move under the panel, which must not repaint. */
+let keeping = false;
 export function tourIsSettling(): boolean {
-  return enteringStep || tearingDown;
+  return enteringStep || tearingDown || keeping;
 }
 
 async function enterStepNow(index: number): Promise<void> {
@@ -928,7 +940,11 @@ async function clearStageForTour(): Promise<void> {
  * The world is NOT created here — that is the first hands-on beat.
  */
 export async function startTour(returnHash?: string): Promise<void> {
-  await teardownPriorTourWorld();
+  // A keep that began and cannot finish yet is never replaced by a new tour:
+  // its tour state stays, so the next boot finishes it (S375 gate K3).
+  if (await teardownPriorTourWorld() === 'stays') {
+    throw new PlainError('The last tour world is not kept yet. Reload Atlas to finish keeping it, then replay the tour.');
+  }
   await clearStageForTour();
   writeTourState({ active: true, step: 0, worldId: '', returnHash });
   await enterStep(0);
@@ -963,6 +979,14 @@ export async function resumeTour(): Promise<void> {
   if (p.worldId) {
     const entry = getState().registry.worlds.find(w => w.id === p.worldId && w.demo === true);
     if (!entry) { writeTourState(null); return; }
+    // A keep that began before the tab closed (world.json un-demoed, K2) is
+    // finished, never re-entered as a step: a reveal would bring back bundle
+    // ids beside the new ones (contract §7.2, lens A A5). The keep opens the
+    // world itself and changes nothing when it cannot.
+    if (isBrowserWorld(entry) && await entryFolderState(entry) === 'kept') {
+      await keepTourWorld();
+      return;
+    }
     const [{ activateWorld }, { toastManager }] = await Promise.all([
       import('../sidebar/worlds-sidebar'),
       import('../ui/toast-manager'),
@@ -1006,13 +1030,21 @@ async function exitTourInner(p: TourPersist): Promise<void> {
   const returnTo = p.returnHash || '#/';
   // Flag BEFORE teardown: the teardown's registry patch is the state tick
   // the landing re-renders on — set after, the emphasis swap misses it.
+  const wasDone = tourWasCompleted();
   try { localStorage.setItem(TOUR_DONE_KEY, '1'); } catch { /* private mode */ }
   // A still-armed pin placement must not survive into the next world (a
   // stray map click there would toast "element not found").
   if (getState().ui.pinPlacement) {
     patchSlice('ui', { ...getState().ui, pinPlacement: null });
   }
-  await teardownPriorTourWorld();
+  // A keep that had begun is finished, not deleted (contract §7.2): the
+  // user stays in the kept world, or at the finale when it could not finish,
+  // and then the tour is not done (S375 gate K2).
+  const outcome = await teardownPriorTourWorld();
+  if (outcome === 'stays' && !wasDone) {
+    try { localStorage.removeItem(TOUR_DONE_KEY); } catch { /* private mode */ }
+  }
+  if (outcome !== 'gone') return;
   navigate(returnTo);
   // The teardown's state ticks ran while the tour flag was still set — tick
   // once more so tour-aware chrome (the bare splash, sidebar) settles on the
@@ -1021,36 +1053,67 @@ async function exitTourInner(p: TourPersist): Promise<void> {
 }
 
 /**
- * The finale's "Set up your folder" — runs the ordinary atlas-root setup
- * (the click's user gesture carries through to the picker), then ends the
- * tour on success: world torn down (the residue contract), sidebar on
- * Worlds where the create-a-world actions now live. A cancelled picker
- * leaves the tour exactly where it was.
+ * Keep the tour world (1.17, contract §7.3): the finale's Keep and Save it to
+ * a folder run here, ON the step chain like `exitTour`, so a queued Next,
+ * Back or Finish finishes first and anything queued after finds no tour.
+ * K0 lives here because it needs the engine's own chains: the `keeping` flag
+ * (the bar stays mounted and must not repaint while ids move), the mint
+ * chain drained (a mint that passed its checks before the click could write
+ * a bundle id after the re-key, a twin), pin placement disarmed. The rest is
+ * `tour-keep.ts`.
  */
-export async function setupFolderFromTour(): Promise<boolean> {
-  const [{ setupAtlasRoot }, { toastManager }] = await Promise.all([
-    import('../setup/atlas-root-flow'),
-    import('../ui/toast-manager'),
-  ]);
-  const result = await setupAtlasRoot();
-  if (!result) return false;
-  if (result.worldFolder) {
-    // The pick was a world, not a home folder (S365 gate lens B F3 / C M4):
-    // end the tour and open it in place, like every other setup door. The old
-    // path said "Folder ready" with no folder made.
-    await exitTour();
-    const { finishSetupDoor } = await import('../setup/world-doors');
-    await finishSetupDoor(result, toastManager);
-    return true;
-  }
-  await exitTour();
-  patchSlice('ui', { ...getState().ui, sidebarMode: 'worlds' });
-  toastManager.success(
-    result.imported > 0
-      ? `OnlyWorlds folder set up: found ${result.imported} existing world${result.imported === 1 ? '' : 's'}`
-      : 'Folder ready: create your first world from the Worlds sidebar'
-  );
-  return true;
+export function keepTourWorld(opts: { quiet?: boolean } = {}): Promise<{ kind: 'kept' | 'refused' | 'gone'; entry?: WorldRegistryEntry }> {
+  let outcome: { kind: 'kept' | 'refused' | 'gone'; entry?: WorldRegistryEntry } = { kind: 'gone' };
+  stepChain = stepChain
+    .catch(() => { /* prior step failed — the keep proceeds regardless */ })
+    .then(async () => {
+      const p = readTourState();
+      if (!p?.active || !p.worldId) return;
+      keeping = true;
+      try {
+        await mintChain.catch(() => { /* a failed mint wrote nothing */ });
+        if (getState().ui.pinPlacement) {
+          patchSlice('ui', { ...getState().ui, pinPlacement: null });
+        }
+        const { keepTourWorldNow } = await import('./tour-keep');
+        outcome = await keepTourWorldNow(p.worldId, opts);
+      } finally {
+        keeping = false;
+      }
+      // A keep that did not finish leaves the tour at the finale: repaint it.
+      if (outcome.kind !== 'kept') emit();
+    });
+  return stepChain.then(() => outcome);
+}
+
+/**
+ * K4, the keep's commit (contract §7.3): one synchronous run, ordered so every
+ * prefix a crash could leave is safe. (1) the done key; (2) the registry
+ * entry loses `demo` (with TK still set, boot's resume finds no demo entry
+ * and clears TK: a normal kept world); (3) TK goes, without emitting; (4) the
+ * state learns it, then one emit, so no render sees half of it (TK on with
+ * the registry off would drop the world from the touring list). REG before
+ * TK: the other order leaves a demo world with no tour, hidden and sandboxed.
+ */
+export function commitTourKeep(worldId: string): void {
+  try { localStorage.setItem(TOUR_DONE_KEY, '1'); } catch { /* private mode */ }
+  const next = updateWorldEntry(getState().registry, worldId, { demo: undefined });
+  saveRegistry(next);
+  try { localStorage.removeItem(TOUR_STATE_KEY); } catch { /* private mode */ }
+  patchSlice('registry', next);
+  emit();
+}
+
+/**
+ * The tour world was made by 1.16 or earlier (no `where`, its folder at the
+ * OPFS root): its finale offers Start fresh only (contract §7.1, lens B B14),
+ * since keeping it would leave a world outside the browser home.
+ */
+export function tourWorldIsLegacy(): boolean {
+  const p = readTourState();
+  if (!p?.worldId) return false;
+  const entry = getState().registry.worlds.find(w => w.id === p.worldId);
+  return !!entry && !entry.where;
 }
 
 /**
@@ -1111,6 +1174,42 @@ export async function isTourFolder(dir: FileSystemDirectoryHandle): Promise<bool
     return (JSON.parse(text) as { demo?: unknown })?.demo === true;
   } catch {
     return false; // unreadable: never delete what we cannot identify
+  }
+}
+
+/**
+ * What the tour world's own directory says it is (1.17, contract §7.2): the
+ * keep un-demos world.json first (K2), so this is the one place that knows a
+ * keep began. 'tour': world.json says demo, or is not written yet. 'kept':
+ * it parses and does not say demo. 'unknown': empty (a crash inside the write,
+ * lens A M5) or unreadable, and nothing is decided on it. Never read from
+ * `active.meta`: an unreadable file falls back to `{ id: '', name: '' }`
+ * there, which would read as kept.
+ */
+export type TourFolderState = 'tour' | 'kept' | 'unknown';
+export async function tourFolderState(dir: FileSystemDirectoryHandle): Promise<TourFolderState> {
+  let text: string;
+  try {
+    text = await (await (await dir.getFileHandle('world.json')).getFile()).text();
+  } catch (err) {
+    return (err as { name?: string })?.name === 'NotFoundError' ? 'tour' : 'unknown';
+  }
+  try {
+    const meta = JSON.parse(text) as unknown;
+    if (!meta || typeof meta !== 'object') return 'unknown';
+    return (meta as { demo?: unknown }).demo === true ? 'tour' : 'kept';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/** `tourFolderState` of a browser tour world's registered directory; 'tour' when it is gone. */
+async function entryFolderState(entry: WorldRegistryEntry): Promise<TourFolderState> {
+  try {
+    const found = await worldHandleFor(entry);
+    return found.kind === 'ok' ? await tourFolderState(found.handle) : 'tour';
+  } catch {
+    return 'unknown';
   }
 }
 
@@ -1176,8 +1275,18 @@ export function pickTourEntry(
     ?? worlds.find(w => w.demo === true && !w.where && w.folder.folder_name.startsWith(TOUR_FOLDER));
 }
 
-/** Remove the tour world entirely (registry entry + handle + OPFS folder). */
-async function teardownPriorTourWorld(): Promise<void> {
+/**
+ * Remove the tour world entirely (registry entry + handle + its directory).
+ * `knownId`: the scaffold-race rollback names the world it just made, since
+ * the tour state has no world id then (lens A A4).
+ *
+ * A browser tour world's own world.json is read first (contract §7.2, lane K
+ * headline 2): 'kept' means a keep began (K2 ran), so the keep is finished
+ * (K3, K4, the world opened first) and nothing is deleted; when it cannot
+ * finish, nothing changes and the next teardown or boot tries again.
+ * 'unknown' deletes nothing either: the tour ends and the directory stays.
+ */
+async function teardownPriorTourWorld(knownId?: string): Promise<'gone' | 'kept' | 'stays'> {
   // Disarm any pending pin placement (gate MED scenario B, S299): a restart
   // that leaves it armed would toast "element not found" on the next run's
   // pre-consul map click.
@@ -1186,7 +1295,26 @@ async function teardownPriorTourWorld(): Promise<void> {
   }
   const prior = readTourState();
   const reg = getState().registry;
-  const entry = pickTourEntry(reg.worlds, prior?.worldId);
+  const entry = pickTourEntry(reg.worlds, knownId ?? prior?.worldId);
+  const state = entry && isBrowserWorld(entry) ? await entryFolderState(entry) : 'tour';
+  if (entry && state === 'kept') {
+    const { keepTourWorldNow } = await import('./tour-keep');
+    return (await keepTourWorldNow(entry.id)).kind === 'kept' ? 'kept' : 'stays';
+  }
+  if (entry && state === 'unknown') {
+    console.warn('[tour] the tour world\'s world.json is unreadable; it is left in place', entry.folder.folder_name);
+    // Closed, not left open behind the landing (S375 gate K4).
+    const store = getActiveStore();
+    if (getState().active?.worldId === entry.id && store) {
+      await store.close().catch(() => {});
+      setActiveStore(null);
+      detachSyncEngine();
+      patchSlice('active', null);
+      patchSlice('data', { elements: [] });
+    }
+    writeTourState(null);
+    return 'gone';
+  }
   if (entry) {
     const store = getActiveStore();
     if (getState().active?.worldId === entry.id && store) {
@@ -1213,6 +1341,7 @@ async function teardownPriorTourWorld(): Promise<void> {
     await sweepTourFolders(await navigator.storage.getDirectory());
   } catch { /* OPFS unavailable — nothing to clean */ }
   writeTourState(null);
+  return 'gone';
 }
 
 export { TOUR_FOLDER };

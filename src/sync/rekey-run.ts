@@ -197,6 +197,41 @@ async function giveUnlocked(opts: Parameters<typeof giveForeignElementsNewIds>[0
   }
 }
 
+/**
+ * Keep the tour world, step K3 (1.17, contract §7.3, §7.4): give every bundle
+ * element still in this world a new id, so the kept world shares none with the
+ * live demo world or a later tour. `giveUnlocked`'s discipline without its two
+ * refusals (the world is still the tour's while this runs, and a local-only
+ * world has no foreign ids). `bundleIds` is the tour bundle's; only the ones
+ * this world's own store holds are moved (a user may have deleted some).
+ * Resumable: a journal left by an earlier run is finished first, then the rest
+ * move, so a second call after a crash or a refusal ends in the same world.
+ */
+export function giveTourWorldNewIds(opts: {
+  store: FolderStore;
+  entry: WorldRegistryEntry;
+  bundleIds: ReadonlySet<string>;
+  onProgress?: (done: number, total: number) => void;
+}): Promise<RekeyResult> {
+  return singleFlight(async () => {
+    const { store, entry } = opts;
+    await flushBeforeLeavingWorld();
+    if (isZoneGestureActive() || hasPendingZoneEdit(entry.id)) {
+      throw new RekeyRefusedError('Finish editing the zone first.');
+    }
+    const hooks: RekeyHooks = { onProgress: opts.onProgress, rekeyPersistedState };
+    if (await store.hasRekeyJournal()) {
+      const recovered = await recoverRekey(store, hooks);
+      if (recovered) await rekeyLiveUi(store, entry.id, recovered.map);
+      if (await store.hasRekeyJournal()) throw new RekeyRefusedError('An earlier id update in this world is unfinished. Finish it first.');
+    }
+    const ids = (await store.listElements()).map(e => e.id).filter(id => opts.bundleIds.has(id));
+    const result = await startRekey(store, { worldId: entry.id, ids }, hooks);
+    await rekeyLiveUi(store, entry.id, result.map);
+    return result;
+  });
+}
+
 /** Finish an interrupted re-key (Settings' Retry, and activation's automatic pass). */
 export function finishInterruptedRekey(store: FolderStore, worldId: string): Promise<RekeyResult | null> {
   return singleFlight(async () => {

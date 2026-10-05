@@ -26,13 +26,14 @@
 
 import { hasFolderMode } from '../core/capabilities';
 import { showProblem } from '../ui/problem-fixes';
+import { requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
 import { confirmExitTour } from './tour-exit-modal';
 import { showTourPane, tourPaneFor } from './tour-pane';
 import { ELEMENT_ICONS, ELEMENT_LABELS, ELEMENT_TYPE_COLORS } from '../core/constants';
 import { getState, subscribe } from '../core/state';
 import type { ElementType } from '../core/types';
 import {
-  capabilitiesUpTo, previewRefsFor,
+  capabilitiesUpTo, finaleMeta, previewRefsFor,
   TOUR_CAPABILITIES, TOUR_CHAPTER_REF,
   TOUR_SENTENCE, TOUR_STEPS,
   type TourStep,
@@ -45,9 +46,11 @@ import {
   isTourActive,
   nextStep,
   onTourChange,
+  keepTourWorld,
+  readTourState,
   refToIdSync,
-  setupFolderFromTour,
   tourIsSettling,
+  tourWorldIsLegacy,
   tourWorldExists,
   tourWorldIsActive,
 } from './tour-engine';
@@ -200,6 +203,12 @@ function unmount(): void {
     'atlas-tour-collapsed', 'atlas-tour-basefull');
   for (const cap of TOUR_CAPABILITIES) document.body.classList.remove(`atlas-tour-cap-${cap}`);
   document.getElementById(FIELD_HL_STYLE_ID)?.remove();
+}
+
+/** The tour world's name, for the finale's button titles. */
+function tourWorldName(): string {
+  const id = readTourState()?.worldId;
+  return getState().registry.worlds.find(w => w.id === id)?.name || 'Hyperion';
 }
 
 /** The tour's view of the world, for phase predicates. Pure read. */
@@ -548,7 +557,9 @@ function render(): void {
     // The same token pass as bodies — the hegemony meta names *issuer* and
     // *holders*, which rendered as literal asterisks under textContent
     // (own-eyes, S316 walk).
-    renderBodyText(meta, phase.meta);
+    // The finale's line says what its buttons do, and they differ by browser
+    // and by where the tour world lives (contract §7.7).
+    renderBodyText(meta, step.handsOn === 'keep-world' ? finaleMeta({ folderMode: hasFolderMode(), legacy: tourWorldIsLegacy() }) : phase.meta);
     extras.appendChild(meta);
   }
 
@@ -613,7 +624,7 @@ function render(): void {
   const pinInZoneOk = step.placeInZone
     ? view.pinInZone(step.placeInZone.pinRef, step.placeInZone.zoneRef)
     : true;
-  const handsOnGate = step.handsOn && step.handsOn !== 'setup-folder'
+  const handsOnGate = step.handsOn && step.handsOn !== 'keep-world'
     ? (step.handsOn === 'create-world' ? tourWorldExists()
       : step.handsOn === 'place-pin' ? (handsOnDone && pinInZoneOk)
       // The now beat has no bundle element of its own: the deed is a world-meta
@@ -636,7 +647,7 @@ function render(): void {
   // read as confusion on the hands-on beats. It rides the same conditions as
   // the live forward control, so the icons and the button appear together.
   const forwardLive = advance
-    && !(step.handsOn && step.handsOn !== 'setup-folder' && !handsOnGate);
+    && !(step.handsOn && step.handsOn !== 'keep-world' && !handsOnGate);
   const previewStack = forwardLive && !opener ? buildPreviewStack(idx) : null;
   // When a stack exists, the copy reserves the right-hand lane the icons
   // occupy — long bodies never collide with the column (S315 gate).
@@ -644,40 +655,50 @@ function render(): void {
   if (previewStack) panel.appendChild(previewStack);
   const mountForward = (btn: HTMLElement) => { controls.appendChild(btn); };
 
-  if (step.handsOn && step.handsOn !== 'setup-folder' && !handsOnGate) {
+  if (step.handsOn && step.handsOn !== 'keep-world' && !handsOnGate) {
     // No LIVE forward control: the gesture is the way. But the SLOT stays —
     // see ghostNext below (Captain, S311).
     mountForward(ghostNext());
-  } else if (step.handsOn === 'setup-folder') {
-    // The finale: Finish (ghost) ends the tour — the world folds away
-    // (residue contract); the primary hands over to the real folder setup.
-    // OPFS-only browsers (Safari/Firefox tour mode) have no folder picker:
-    // Finish is the primary there.
-    const folderMode = hasFolderMode();
-    const finish = document.createElement('button');
-    finish.type = 'button';
-    finish.className = folderMode ? 'atlas-btn-ghost' : 'atlas-btn-primary';
-    finish.title = 'End the tour and delete the tour world';
-    finish.textContent = 'Finish';
-    finish.addEventListener('click', () => { void exitTour(); });
-    controls.appendChild(finish);
-
-    if (folderMode) {
-      const setup = document.createElement('button');
-      setup.type = 'button';
-      setup.className = 'atlas-btn-primary';
-      setup.textContent = 'Set up a folder';
-      setup.addEventListener('click', () => {
-        setup.disabled = true;
-        // A failed setup used to vanish (an unhandled rejection, S369).
-        void setupFolderFromTour()
-          .catch((err) => {
-            console.warn('[tour] folder setup failed:', err);
-            showProblem(err, { doing: 'setting up your OnlyWorlds folder' });
+  } else if (step.handsOn === 'keep-world') {
+    // The finale (1.17, contract §7.1): Keep this world · Save it to a folder
+    // (with the folder picker) · Start fresh. A 1.16 tour world still running
+    // across the upgrade lives outside the browser home: Start fresh only.
+    // The bar sits outside `.atlas-shell`, so the keep dialog's `inert` does
+    // not reach it: every button is disabled for the run (lane K K0).
+    const legacy = tourWorldIsLegacy();
+    const name = tourWorldName();
+    // Back too (own eyes, S375): a Back queued behind the keep is a no-op
+    // once it commits, but a live button the run will ignore is a lie.
+    const lockAll = (locked: boolean) => {
+      controls.querySelectorAll<HTMLButtonElement>('button').forEach(b => { b.disabled = locked; });
+    };
+    const add = (label: string, title: string, cls: string, control: string, onClick: () => Promise<unknown>) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = cls;
+      b.title = title;
+      b.textContent = label;
+      b.dataset.tourControl = control;
+      b.addEventListener('click', () => {
+        // Before anything else: the browser is asked to keep worlds only
+        // inside the click, never awaited (contract §2.3, invariant 10).
+        if (control === 'keep') requestPersistOnFirstBrowserWorld();
+        lockAll(true);
+        void onClick()
+          .catch((err: unknown) => {
+            console.warn('[tour] finale action failed:', err);
+            showProblem(err, { doing: control === 'save' ? 'saving the tour world to a folder' : 'keeping the tour world' });
           })
-          .finally(() => { setup.disabled = false; });
+          .finally(() => { if (b.isConnected) lockAll(false); });
       });
-      controls.appendChild(setup);
+      controls.appendChild(b);
+    };
+    add('Start fresh', 'End the tour and delete the tour world', 'atlas-btn-ghost', 'start-fresh', () => exitTour());
+    if (!legacy && hasFolderMode()) {
+      add('Save it to a folder', `Keep ${name} as a folder on your drive`, 'atlas-btn-ghost', 'save', () => import('./tour-keep').then(m => m.saveTourWorldToFolder()));
+    }
+    if (!legacy) {
+      add('Keep this world', `Keep ${name} and everything you made in it`, 'atlas-btn-primary', 'keep', () => keepTourWorld());
     }
     panel.appendChild(controls);
     root!.appendChild(panel);

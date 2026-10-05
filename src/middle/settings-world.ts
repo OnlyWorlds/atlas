@@ -82,7 +82,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         <button class="atlas-btn-ghost" data-action="unlink-from-api">Unlink from API</button>
       </div>`
     : world.demo === true
-      ? `<p class="atlas-settings-hint">The tour world is a sandbox and is removed when the tour ends, so it cannot go online. Create your own world for that.</p>`
+      ? `<p class="atlas-settings-hint">The tour world is a sandbox until you keep it at the end of the tour. Kept, it can go online.</p>`
       : `<div class="atlas-settings-dangling" data-role="dangling-links" hidden>
         <p class="atlas-settings-hint" data-role="dangling-text"></p>
         <button class="atlas-btn-ghost" data-action="remove-dangling-links">Remove those links</button>

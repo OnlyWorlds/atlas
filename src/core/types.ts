@@ -183,8 +183,8 @@ export interface WorldMeta {
   /**
    * True only for the bundled sample world (Bout OW/DEMO). Gestures inside a
    * demo world never complete waypoints. Lives in world.json so the flag
-   * survives localStorage wipes + rediscovery; make-online clears it (the
-   * world is genuinely yours then). Normal imports never set it — the import
+   * survives localStorage wipes + rediscovery; make-online and keeping the
+   * tour world at its finale clear it (the world is genuinely yours then). Normal imports never set it — the import
    * world-block mapper whitelists fields, and createWorldFromImportedData
    * strips it defensively.
    */

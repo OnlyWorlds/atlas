@@ -178,17 +178,46 @@ throwaway world:
    placed pin IS the bundle pin. The drop path missed the bake until S318 —
    a dragged-in pin was nameless, the gate never opened, and +pin (hidden
    once the element is pinned) left no retry; revert-checked e2e locks it.
-4. **Set up your folder** (the finale, `data-tour-step="16"`): the real `setupAtlasRoot`
-   picker; success ends the tour. On OPFS-only browsers Finish is primary
-   and no folder button renders. The finale ROUTES to `object:Ebony
+4. **Keep this world** (the finale, `data-tour-step="16"`, `handsOn:
+   'keep-world'`; 1.17, S375): Keep this world · Save it to a folder (with the
+   folder picker) · Start fresh, and the meta line says which (`finaleMeta`).
+   Keep makes the tour world the user's own in this browser; Save it to a
+   folder keeps it, then moves it into the home folder; Start fresh tears it
+   down. A 1.16 tour world still running across the upgrade offers Start fresh
+   only. The keep is "Keeping the tour world" below. The finale ROUTES to `object:Ebony
    Spaceship` (Captain, S318): the closing view is the sentence's grandest
    object, links radiating back. The exit confirm carries no title and ends
    with "Replay the tour any time from the settings."
 
+## Keeping the tour world (1.17, S375)
+
+The finale's Keep (`keepTourWorld` in `tour-engine.ts`, the steps in
+`tour-keep.ts`; contract `Forge/Notes/2026-10-04-browser-worlds-contract.md`
+§7) runs on the step chain and in an order where every crash point is safe:
+K0 the tour quiesced (`keeping` in `tourIsSettling`, the mint chain drained,
+pin placement disarmed) and the world open; K1 the world's home and every
+pending save flushed; K2 world.json loses `demo` FIRST; K3 every bundle
+element still in the world gets a new id (`giveTourWorldNewIds`, journaled,
+finishing a leftover journal first); K4 one synchronous commit
+(`commitTourKeep`: done key, registry entry un-demoed, `atlas_tour_v1` gone,
+then one emit). A refusal before K4 leaves the registry and the tour state
+as they were. From K2 on, `tourFolderState` reads the tour world's own
+world.json as 'kept', and boot's resume and every teardown FINISH the keep
+instead of re-entering a step or deleting (an empty or unreadable
+world.json, 'unknown', deletes nothing). The re-key is why a kept world can
+go online and why a later tour's teardown never clears its map camera: no id
+is shared with the bundle. `forgetTourMapUiState` never runs on a kept
+world. Keep's click asks `persist()` synchronously. Guards:
+`tests/integration/tour-keep.test.ts` (the tri-state, the kernel, the
+refusals, teardown and resume), `tests/e2e/tour-keep.spec.ts` (the finale per
+browser, the crash points as reloads, a second tab that cannot take over, a
+second tour, Save it to a folder).
+
 ## The residue contract
 
-The tour leaves NOTHING behind. The world is created at step 1 (not boot)
-and exit or Finish — anywhere, anytime — tears it down completely. Exit
+The tour leaves NOTHING behind unless its world is kept. The world is created
+at step 1 (not boot) and a mid-tour Exit or the finale's Start fresh,
+anywhere, anytime, tears it down completely. Exit
 returns to the launch location (`returnHash`: the landing for fresh users,
 the exact prior route for a settings replay). `atlas_tour_done_v1` survives
 as the only trace, driving the landing's emphasis swap.
@@ -273,7 +302,7 @@ already drawn).
   S303). Steps reference bundle elements as `"type:Name"`; spans are word-index
   ranges + element type. Route kinds: home · elements · element · map · writing ·
   chart; flags `webTab`, `unlocks`, `creates`, `placeInZone`,
-  `handsOn: 'create-world' | 'create-consul' | 'place-pin' | 'setup-folder'`.
+  `handsOn: 'create-world' | 'create-consul' | 'place-pin' | 'set-now' | 'keep-world' | 'link-word'`.
   `TOUR_PIN_REF` / `TOUR_SWAMPS_ZONE_REF` are the pin beat's refs.
 - **`tour-engine.ts`** — state (localStorage `atlas_tour_v1`:
   active/step/worldId/returnHash), boot/resume/exit, the reveal system,

@@ -149,7 +149,7 @@ export interface TourStep {
    * kind needs its own branch in `tour-bar`'s forward gate; a kind with no
    * bundle ref that falls through to the default is un-advanceable forever.
    */
-  handsOn?: 'create-world' | 'create-consul' | 'place-pin' | 'set-now' | 'setup-folder' | 'link-word';
+  handsOn?: 'create-world' | 'create-consul' | 'place-pin' | 'set-now' | 'keep-world' | 'link-word';
   /**
    * For a `place-pin` step: the forward gate ALSO requires the pin to sit
    * inside this zone (the soft correction — Captain’s ruling). The pin can be
@@ -201,6 +201,23 @@ export function previewRefsFor(stepIndex: number): string[] {
  */
 export const TOUR_WRITING_LINKABLE = 7;
 
+/**
+ * The finale's meta line, per what its buttons offer (1.17, contract §7.1,
+ * §7.7). A 1.16 tour world still running across the upgrade can only be
+ * ended, so its line is the old one (S368: "leaves nothing behind" was too
+ * soft for a delete).
+ */
+export const FINALE_META = {
+  folder: 'Keep this world to go on building in it, save it to a folder on your drive, or start fresh. Start fresh deletes the tour world and everything you made in it.',
+  browser: 'Keep this world to go on building in it in this browser, or start fresh. Start fresh deletes the tour world and everything you made in it.',
+  legacy: 'Ending the tour deletes the tour world and everything you made in it. Replay the tour anytime from settings.',
+} as const;
+
+export function finaleMeta(opts: { folderMode: boolean; legacy: boolean }): string {
+  if (opts.legacy) return FINALE_META.legacy;
+  return opts.folderMode ? FINALE_META.folder : FINALE_META.browser;
+}
+
 export const TOUR_STEPS: readonly TourStep[] = [
   // ---------------------------------------------------------------- Opener
   // Step 0 (S303 rework): the sentence centre-stage on black, then it hands
@@ -229,7 +246,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
       body:
         'How do you create a world for something as big or as small as a single sentence?\nAtlas uses a folder per world, that contains elements as text files.' +
         '\n\nClick the **create local world** icon in the top left. Call it Hyperion after the novel.',
-      meta: 'This tour world does not create a local folder, it is stored temporarily in your browser.',
+      meta: 'The tour world lives in this browser, not in a folder on your drive. At the end of the tour you can keep it.',
     }],
     handsOn: 'create-world',
   },
@@ -720,15 +737,16 @@ export const TOUR_STEPS: readonly TourStep[] = [
         'That\'s the tour. Every room has a help icon once you open a world.' +
         '\nQuestions, bugs and feature requests are welcome: through [Discord](https://discord.gg/twCjqvVBwb), ' +
         'the [feedback tracker](https://github.com/OnlyWorlds/feedback), or email at info@onlyworlds.com.',
-      // S368: "leaves nothing behind" was too soft for a delete. Finish and
-      // "Set up a folder" both end the tour, and both delete its world.
-      meta: 'Ending the tour deletes the tour world and everything you made in it. Replay the tour anytime from settings.',
+      // The bar shows `finaleMeta` here: the line names the buttons, which
+      // differ by browser (1.17, contract §7.7). This one is the folder-mode
+      // version, kept so every copy scan over the steps still reads it.
+      meta: FINALE_META.folder,
     }],
     // The closing view is the ebony spaceship (Captain, S318 — "just for
     // cools"): the tour ends looking at the sentence's grandest object, its
     // links radiating back through everything the user just built.
     route: { kind: 'element', ref: 'object:Ebony Spaceship' },
-    handsOn: 'setup-folder',
+    handsOn: 'keep-world',
   },
 ];
 

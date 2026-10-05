@@ -518,8 +518,9 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   await expect(page.locator('.atlas-room-nav-selected')).toContainText('Ebony Spaceship');
 
   // The finale's control set, asserted POSITIVELY (S301 gate, MED): the
-  // shipped early-return renders Finish + the folder button and NO Exit.
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Set up a folder$/ })).toBeVisible();
+  // early-return renders its three choices (1.17, contract §7.1) and NO Exit.
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Keep this world$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Save it to a folder$/ })).toBeVisible();
   await expect(page.locator('.atlas-tour-controls button', { hasText: /^Exit tour$/ })).toHaveCount(0);
 
   // S316 — the finale's copy names the help icon in the footer, so the footer
@@ -527,8 +528,8 @@ test('full walk: opener → real-modal beats → maps → objects → acts → f
   // this walk). Copy naming a control is a behavioural claim.
   await expect(page.locator('.atlas-sidebar-footer')).toBeVisible();
 
-  // Finish: the residue contract — world gone, landing back, emphasis swapped.
-  await page.locator('.atlas-tour-controls button', { hasText: /^Finish$/ }).click();
+  // Start fresh: the residue contract — world gone, landing back, emphasis swapped.
+  await page.locator('.atlas-tour-controls button', { hasText: /^Start fresh$/ }).click();
   await expect(page.locator('.atlas-tour-bar')).toHaveCount(0);
   await expect(page.locator('.atlas-landing-actions')).toBeVisible();
   const after = await page.evaluate(() => {
@@ -1171,10 +1172,11 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
     if (step === 10) await linkAllViaCorner(page);
     if (step === 12) await setNowViaButton(page);
   }
-  // The label is 'Set up a folder' (tour-bar.ts); on an OPFS-only browser no
-  // folder button renders and Finish is primary.
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Set up a folder$/ })).toHaveCount(0);
-  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Finish$/ })).toBeVisible();
+  // On an OPFS-only browser the finale offers Keep and Start fresh, no folder
+  // (1.17, contract §7.1): the tour world can be kept in this browser.
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Save it to a folder$/ })).toHaveCount(0);
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Keep this world$/ })).toBeVisible();
+  await expect(page.locator('.atlas-tour-controls button', { hasText: /^Start fresh$/ })).toBeVisible();
 });
 
 test('the exit confirm names the rooms the tour never reached, and can be declined', async ({ page }) => {
@@ -1198,7 +1200,7 @@ test('the exit confirm names the rooms the tour never reached, and can be declin
   await expect(modal).toContainText('Charts');
   // And it says plainly what leaving costs (S368).
   await expect(modal.locator('[data-role="tour-exit-loss"]'))
-    .toHaveText('Leaving deletes the tour world and everything you made in it.');
+    .toHaveText('Leaving deletes the tour world and everything you made in it. To keep it, go on to the end of the tour.');
 
   // Declining keeps the tour exactly where it was, world intact.
   await page.click('[data-action="tour-exit-cancel"]');

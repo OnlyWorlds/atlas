@@ -143,7 +143,7 @@ The guided tour (DESIGN_TOUR).
 - `src/tour/tour-engine.ts`: boot/reveal/teardown, step state, routeFor. `startTour` CLEARS THE STAGE (route, active world, sidebar mode, right tabs). `resolveRef` resolves against the BUNDLE, so a route must also check the element is ON DISK.
 - `src/tour/tour-data.ts`: `TOUR_STEPS`, the script (phases, spans, reveal/creates, route, handsOn).
 - `src/tour/tour-bar.ts`: the docked narrator + forward gate. Each `handsOn` kind needs its OWN branch or the step is un-advanceable forever.
-- `src/tour/tour-view.ts` (derived phases + suspension), `src/tour/tour-world.ts` (scaffolds the demo world), `src/tour/tour-heal.ts` (link strip/heal as elements reveal), `src/tour/tour-door.ts` (the scripted create door), `src/tour/tour-exit-modal.ts` over `src/tour/tour-exit-summary.ts`, `src/tour/tour-flag.ts` (`isTourFlagActive`).
+- `src/tour/tour-view.ts` (derived phases + suspension), `src/tour/tour-world.ts` (scaffolds the demo world), `src/tour/tour-keep.ts` (keep the tour world: K1-K4, Save it to a folder), `src/tour/tour-heal.ts` (link strip/heal as elements reveal), `src/tour/tour-door.ts` (the scripted create door), `src/tour/tour-exit-modal.ts` over `src/tour/tour-exit-summary.ts`, `src/tour/tour-flag.ts` (`isTourFlagActive`).
 
 ## src/setup, src/import, src/changelog, the rest
 
