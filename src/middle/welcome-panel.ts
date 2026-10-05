@@ -11,8 +11,7 @@
 
 import { isCodeLoadError } from '../core/reload-offer';
 import { getActiveStore } from '../core/active-store';
-import { hasFolderMode, opfsStatus, NO_BROWSER_STORAGE_LINE } from '../core/capabilities';
-import { browserStorageFullSentence } from '../core/problems';
+import { BROWSER_STORAGE_FULL_LINE, hasFolderMode, opfsStatus, NO_BROWSER_STORAGE_LINE } from '../core/capabilities';
 import { escapeText } from '../core/dom-utils';
 import { navigate, timelineHash } from '../core/router';
 import { getState, subscribe } from '../core/state';
@@ -202,7 +201,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         const note = root.querySelector<HTMLElement>('[data-role="storage-note"]');
         if (!note) return;
         // A full origin is not a private window (gate B20): say which.
-        note.textContent = status === 'full' ? browserStorageFullSentence('making a world in this browser') : NO_BROWSER_STORAGE_LINE;
+        note.textContent = status === 'full' ? BROWSER_STORAGE_FULL_LINE : NO_BROWSER_STORAGE_LINE;
         note.hidden = false;
       });
       root.querySelector<HTMLButtonElement>('[data-action="start-world"]')?.addEventListener('click', () => {

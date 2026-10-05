@@ -682,7 +682,11 @@ function render(): void {
       b.addEventListener('click', () => {
         // Before anything else: the browser is asked to keep worlds only
         // inside the click, never awaited (contract §2.3, invariant 10).
-        if (control === 'keep') requestPersistOnFirstBrowserWorld();
+        // Save it to a folder too: a move that fails leaves the kept world in
+        // this browser (S376 lens A A9).
+        if (control === 'keep' || control === 'save') {
+          requestPersistOnFirstBrowserWorld(line => { void import('../ui/toast-manager').then(({ toastManager }) => toastManager.info(line, 10_000)); });
+        }
         lockAll(true);
         void onClick()
           .catch((err: unknown) => {

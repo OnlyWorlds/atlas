@@ -22,6 +22,8 @@ import { setNewWorldWherePref } from '../core/ui-prefs';
 import {
   defaultWorldWhere,
   requestPersistOnFirstBrowserWorld,
+  keepsABrowserWorld,
+  FIREFOX_PERSIST_NOTE,
   WHERE_BROWSER_CAPTION,
   WHERE_BROWSER_ONLY_LINE,
   type WorldWhere,
@@ -37,8 +39,7 @@ async function browserStorageProblem(doing: string): Promise<string | null> {
 }
 
 /** Firefox's own storage prompt, explained before it appears (contract §2.3, lens C R6-c). */
-export const FIREFOX_PERSIST_NOTE =
-  'Firefox will ask whether Atlas may keep data on this device. Allow it so the browser does not clear your worlds when space runs low.';
+export { FIREFOX_PERSIST_NOTE };
 
 /** The question's markup: the two rows, or the browser-only line. */
 export function whereChoiceHtml(): string {
@@ -71,7 +72,7 @@ export function whereChoiceHtml(): string {
 export function wireWhereChoice(root: ParentNode): void {
   const note = root.querySelector<HTMLElement>('[data-role="persist-note"]');
   if (!note || !/firefox/i.test(navigator.userAgent)) return;
-  if (getState().registry.worlds.some(w => isBrowserWorld(w) && w.demo !== true)) return;
+  if (keepsABrowserWorld()) return;
   const storage = (navigator as unknown as { storage?: { persisted?: () => Promise<boolean> } }).storage;
   if (typeof storage?.persisted !== 'function') return;
   void storage.persisted().then(kept => { note.hidden = kept; }).catch(() => {});

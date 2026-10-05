@@ -5,6 +5,7 @@
  * (`setup/bring-down-again.ts`) with progress, the dialog locked meanwhile.
  */
 import { BaseModal } from './modal-base';
+import { askBrowserToKeepWorlds } from '../setup/world-parent';
 import type { ToastManager } from './toast-manager';
 import type { WorldRegistryEntry } from '../core/types';
 import { problemFor } from '../core/problems';
@@ -38,7 +39,7 @@ export class BringDownAgainModal extends BaseModal {
       // A cleared world is exactly the case for asking the browser to keep
       // worlds: inside the click, before the first await, never awaited
       // (contract §2.3, invariant 10).
-      void (navigator as unknown as { storage?: { persist?: () => Promise<boolean> } }).storage?.persist?.().catch(() => {});
+      askBrowserToKeepWorlds(line => this.toasts.info(line, 10_000));
       go.disabled = true;
       cancel.disabled = true;
       this.dismissLocked = true;
@@ -52,7 +53,7 @@ export class BringDownAgainModal extends BaseModal {
         });
         this.dismissLocked = false;
         this.hide();
-        const missing = out.failures > 0 ? ` ${out.failures} element${out.failures === 1 ? '' : 's'} did not come down.` : '';
+        const missing = out.failures > 0 ? ` ${out.failures} element${out.failures === 1 ? '' : 's'} did not come down. Refresh from API brings ${out.failures === 1 ? 'it' : 'them'}.` : '';
         if (missing) this.toasts.error(`"${w.name}" is back in this browser.${missing}`);
         else this.toasts.success(`"${w.name}" is back in this browser.`);
         navigate(homeHash(w.id));

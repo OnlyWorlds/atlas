@@ -46,36 +46,57 @@ export function hasOpfsMode(): boolean {
  * `refused` (a private window), `full` (the origin's quota), or `ok`. A full
  * origin is never cached: freeing space must be able to change the answer,
  * and it must never read as a private window.
+ *
+ * `refused` is ONE error, `SecurityError` (the measured private-window
+ * answer, S370 lens B M10). Any other error (two tabs probing at once, a
+ * file the browser holds) is retried once and then reads as usable without
+ * being cached: the door stays and the act itself says what went wrong, and
+ * the next ask probes again. Each probe writes its own file name, so two
+ * tabs booting together never race one file (S376 gate B2).
  */
 export type OpfsStatus = 'ok' | 'refused' | 'full' | 'absent';
+
+type ProbeAnswer = OpfsStatus | 'unsure';
+
+async function probeOnce(): Promise<ProbeAnswer> {
+  try {
+    const root = await navigator.storage.getDirectory();
+    // A real file write (the tour's first act is one), under a reserved
+    // name no world folder can take (`.atlas-` prefix; browser worlds live
+    // under their own directory), unique to this probe.
+    const name = `.atlas-storage-probe-${Array.from(crypto.getRandomValues(new Uint8Array(4)), b => b.toString(16).padStart(2, '0')).join('')}`;
+    const file = await root.getFileHandle(name, { create: true });
+    const w = await file.createWritable();
+    await w.write('ok');
+    await w.close();
+    await root.removeEntry(name).catch(() => {});
+    return 'ok';
+  } catch (err) {
+    const name = (err as { name?: unknown } | null)?.name;
+    if (name === 'QuotaExceededError') return 'full';
+    if (name === 'SecurityError') return 'refused';
+    return 'unsure';
+  }
+}
 
 let opfsStatusCache: Promise<OpfsStatus> | null = null;
 /** The last answer the probe settled on, for a synchronous reader (null until one has). */
 let opfsStatusKnown: OpfsStatus | null = null;
 export function opfsStatus(): Promise<OpfsStatus> {
   if (!opfsStatusCache) {
+    let unsure = false;
     const probe = (async (): Promise<OpfsStatus> => {
       if (!hasOpfsMode()) return 'absent';
-      try {
-        const root = await navigator.storage.getDirectory();
-        // A real file write (the tour's first act is one), under a reserved
-        // name no world folder can take (`.atlas-` prefix; browser worlds
-        // live under their own directory).
-        const name = '.atlas-storage-probe';
-        const file = await root.getFileHandle(name, { create: true });
-        const w = await file.createWritable();
-        await w.write('ok');
-        await w.close();
-        await root.removeEntry(name).catch(() => {});
-        return 'ok';
-      } catch (err) {
-        return (err as { name?: unknown } | null)?.name === 'QuotaExceededError' ? 'full' : 'refused';
-      }
+      let answer = await probeOnce();
+      if (answer === 'unsure') answer = await probeOnce();
+      if (answer !== 'unsure') return answer;
+      unsure = true;
+      return 'ok';
     })();
     opfsStatusCache = probe;
     void probe.then(s => {
       opfsStatusKnown = s;
-      if (s === 'full' && opfsStatusCache === probe) opfsStatusCache = null;
+      if ((s === 'full' || unsure) && opfsStatusCache === probe) opfsStatusCache = null;
     });
   }
   return opfsStatusCache;
@@ -112,3 +133,7 @@ export function __resetOpfsStatusForTests(): void {
 /** The one plain line for a window that refuses browser storage (lens C R3-h). */
 export const NO_BROWSER_STORAGE_LINE =
   'This window does not allow browser storage, so no world can live in this browser here. If it is a private window, open Atlas in a normal one.';
+
+/** The plain line for a full origin, where no act is under way (the landing, Settings; S376 lens C C16). */
+export const BROWSER_STORAGE_FULL_LINE =
+  "This browser's storage for Atlas is full, so no world can be made in this browser now. Free some space, then reload.";

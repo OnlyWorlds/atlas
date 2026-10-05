@@ -40,9 +40,9 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
       <p class="atlas-settings-hint">
         <a href="${OW_SITE_URL}" target="_blank" rel="noopener">OnlyWorlds</a>
         is an open format for whole worlds: 22 element types, one schema, and
-        a free account that stores your worlds online. Atlas writes that
-        format to your folder, so other OnlyWorlds tools can read your worlds,
-        and syncs with your account when you link one.
+        a free account that stores your worlds online. Atlas keeps your
+        worlds in that format, as files other OnlyWorlds tools can read, and
+        syncs with your account when you link one.
       </p>
     </section>
     ${renderAccountTab(reg)}

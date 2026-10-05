@@ -32,7 +32,7 @@ import {
   findWorldByServerId,
   updateWorldEntry,
 } from '../registry/registry';
-import { isQuotaError, openBrowserMake, worldAlreadyHere, type BrowserMake } from '../core/browser-home';
+import { clearedOwnTwin, isQuotaError, openBrowserMake, worldAlreadyHere, type BrowserMake } from '../core/browser-home';
 import { isBrowserWorld } from '../core/browser-worlds';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { newId } from '../store/folder-store';
@@ -277,23 +277,29 @@ export async function openWorldFolder(
   // overwritten by a second folder carrying the same world id.
   const handleKey = `world-${meta.id}`;
   // A world kept in this browser with this id (1.17, contract §5.2, S370
-  // gate B17; any spelling of its identity): a CLEARED one takes this folder
-  // as its home, its row, link and settings kept; a LIVE one is the world,
-  // so nothing is stored and the user is told where it is.
+  // gate B17): a LIVE one is the world, so nothing is stored and the user is
+  // told where it is. A CLEARED one takes this folder as its home, its row,
+  // link and settings kept, only when it holds this exact id (the file
+  // door's rule, `clearedOwnTwin`); a linked one's first sync then reviews
+  // before it writes, since an unzipped copy has no sync history (S376 gate
+  // B3, Skeld's condition 3). A cleared row matched only through a former
+  // link is not this world: the folder opens as its own.
   const browserTwin = worldAlreadyHere(getState().registry, meta.id);
-  if (browserTwin && isBrowserWorld(browserTwin) && browserTwin.demo !== true) {
-    if (!browserTwin.cleared_at) {
-      throw new PlainError('This world is already in Atlas, kept in this browser. Use Move to a folder in Settings, under This world.');
-    }
-    await storeHandle(browserTwin.folder.handle_key, picked);
-    const adopted = updateWorldEntry(getState().registry, browserTwin.id, {
+  if (browserTwin && isBrowserWorld(browserTwin) && browserTwin.demo !== true && !browserTwin.cleared_at) {
+    throw new PlainError('This world is already in Atlas, kept in this browser. Use Move to a folder in Settings, under This world.');
+  }
+  const restore = clearedOwnTwin(getState().registry, meta.id);
+  if (restore) {
+    await storeHandle(restore.folder.handle_key, picked);
+    const adopted = updateWorldEntry(getState().registry, restore.id, {
       where: undefined,
       cleared_at: undefined,
-      folder: { ...browserTwin.folder, folder_name: picked.name, last_path_hint: picked.name },
+      folder: { ...restore.folder, folder_name: picked.name, last_path_hint: picked.name },
+      ...(restore.api ? { review_first_sync: true } : {}),
     });
     saveRegistry(adopted);
     patchSlice('registry', adopted);
-    return { worldId: browserTwin.id, already: true };
+    return { worldId: restore.id, already: true };
   }
   const existing = getState().registry.worlds.find(w => w.folder.handle_key === handleKey);
   if (existing) {

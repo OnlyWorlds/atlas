@@ -984,7 +984,7 @@ export async function resumeTour(): Promise<void> {
     // ids beside the new ones (contract §7.2, lens A A5). The keep opens the
     // world itself and changes nothing when it cannot.
     if (isBrowserWorld(entry) && await entryFolderState(entry) === 'kept') {
-      await keepTourWorld();
+      await keepTourWorld({ finishing: true });
       return;
     }
     const [{ activateWorld }, { toastManager }] = await Promise.all([
@@ -1062,7 +1062,7 @@ async function exitTourInner(p: TourPersist): Promise<void> {
  * a bundle id after the re-key, a twin), pin placement disarmed. The rest is
  * `tour-keep.ts`.
  */
-export function keepTourWorld(opts: { quiet?: boolean } = {}): Promise<{ kind: 'kept' | 'refused' | 'gone'; entry?: WorldRegistryEntry }> {
+export function keepTourWorld(opts: { quiet?: boolean; finishing?: boolean } = {}): Promise<{ kind: 'kept' | 'refused' | 'gone'; entry?: WorldRegistryEntry }> {
   let outcome: { kind: 'kept' | 'refused' | 'gone'; entry?: WorldRegistryEntry } = { kind: 'gone' };
   stepChain = stepChain
     .catch(() => { /* prior step failed — the keep proceeds regardless */ })
@@ -1095,13 +1095,17 @@ export function keepTourWorld(opts: { quiet?: boolean } = {}): Promise<{ kind: '
  * the registry off would drop the world from the touring list). REG before
  * TK: the other order leaves a demo world with no tour, hidden and sandboxed.
  */
-export function commitTourKeep(worldId: string): void {
+export function commitTourKeep(worldId: string): boolean {
   try { localStorage.setItem(TOUR_DONE_KEY, '1'); } catch { /* private mode */ }
   const next = updateWorldEntry(getState().registry, worldId, { demo: undefined });
-  saveRegistry(next);
+  // A save that did not land (a full localStorage) stops here, TK kept: a
+  // demo entry with no tour is the state this order exists to avoid, and
+  // resume finishes the keep once the list saves (S376 lens A A2).
+  if (!saveRegistry(next)) return false;
   try { localStorage.removeItem(TOUR_STATE_KEY); } catch { /* private mode */ }
   patchSlice('registry', next);
   emit();
+  return true;
 }
 
 /**
@@ -1299,7 +1303,7 @@ async function teardownPriorTourWorld(knownId?: string): Promise<'gone' | 'kept'
   const state = entry && isBrowserWorld(entry) ? await entryFolderState(entry) : 'tour';
   if (entry && state === 'kept') {
     const { keepTourWorldNow } = await import('./tour-keep');
-    return (await keepTourWorldNow(entry.id)).kind === 'kept' ? 'kept' : 'stays';
+    return (await keepTourWorldNow(entry.id, { finishing: true })).kind === 'kept' ? 'kept' : 'stays';
   }
   if (entry && state === 'unknown') {
     console.warn('[tour] the tour world\'s world.json is unreadable; it is left in place', entry.folder.folder_name);

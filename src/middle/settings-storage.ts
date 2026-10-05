@@ -29,7 +29,7 @@ import {
 } from '../sync/sync-attach';
 import type { WorldsRegistry } from '../core/types';
 import { escapeText } from '../core/dom-utils';
-import { hasFolderMode, hasOpfsMode } from '../core/capabilities';
+import { BROWSER_STORAGE_FULL_LINE, NO_BROWSER_STORAGE_LINE, hasFolderMode, hasOpfsMode, knownOpfsStatus, opfsStatus, type OpfsStatus } from '../core/capabilities';
 import { isBrowserWorld } from '../core/browser-worlds';
 import { staleBrowserCopies } from '../core/browser-home';
 
@@ -82,7 +82,7 @@ function renderStorageDeviceSection(): string {
   return `
     <section class="atlas-settings-section">
       <h3>On this device</h3>
-      <p class="atlas-settings-hint">The folder on your drive where Atlas keeps the new worlds you choose to keep in a folder. Existing worlds stay where they were made.</p>
+      ${hasFolderMode() ? '<p class="atlas-settings-hint">The folder on your drive where Atlas keeps the new worlds you choose to keep in a folder. Existing worlds stay where they were made.</p>' : ''}
       ${ar
         ? `<dl class="atlas-settings-meta">
             <dt>Folder</dt><dd><code>${escapeText(ar.pathHint ?? ar.folderName)}</code></dd>
@@ -115,6 +115,23 @@ function showBrowserStorageSection(): boolean {
   return !hasFolderMode() || staleBrowserCopies().length > 0 || getState().registry.worlds.some(w => isBrowserWorld(w) && w.demo !== true);
 }
 
+/**
+ * The worlds this browser keeps, and the ones it cleared: a cleared row is
+ * not kept, and asking the browser to keep it means nothing (S376 gate B4).
+ */
+function browserWorldCounts(): { kept: number; cleared: number } {
+  const own = getState().registry.worlds.filter(w => isBrowserWorld(w) && w.demo !== true);
+  const cleared = own.filter(w => w.cleared_at).length;
+  return { kept: own.length - cleared, cleared };
+}
+
+/** A window whose browser storage refuses or is full says only that (S376 gate B4). */
+function storageStatusLine(status: OpfsStatus | null): string | null {
+  if (status === 'refused') return NO_BROWSER_STORAGE_LINE;
+  if (status === 'full') return BROWSER_STORAGE_FULL_LINE;
+  return null;
+}
+
 /** Copies a move left in this browser whose world now lives in a folder (contract §3.2 rule 5, §3.4). */
 function staleCopiesLine(): string {
   const k = staleBrowserCopies().length;
@@ -126,11 +143,20 @@ function staleCopiesLine(): string {
 
 /** Filled in by `wireBrowserStorageSection`: the estimate and `persisted()` are async. */
 function renderBrowserStorageSection(): string {
-  const n = getState().registry.worlds.filter(w => isBrowserWorld(w) && w.demo !== true).length;
+  const statusLine = storageStatusLine(knownOpfsStatus());
+  if (statusLine) {
+    return `
+    <section class="atlas-settings-section" data-role="browser-storage">
+      <h3>In this browser</h3>
+      <p class="atlas-settings-hint" data-role="browser-status">${escapeText(statusLine)}</p>
+    </section>`;
+  }
+  const { kept: n, cleared } = browserWorldCounts();
+  const clearedLine = cleared > 0 ? ` ${cleared} cleared by this browser.` : '';
   return `
     <section class="atlas-settings-section" data-role="browser-storage">
       <h3>In this browser</h3>
-      <p class="atlas-settings-hint" data-role="browser-count">${n} world${n === 1 ? '' : 's'} kept in this browser.<span data-role="browser-usage"></span></p>
+      <p class="atlas-settings-hint" data-role="browser-count">${n} world${n === 1 ? '' : 's'} kept in this browser.${clearedLine}<span data-role="browser-usage"></span></p>
       <p class="atlas-settings-hint" data-role="browser-persisted" hidden></p>
       <div class="atlas-settings-actions" data-role="browser-persist-actions" hidden>
         <button class="atlas-btn-ghost" data-action="ask-persist">Ask the browser to keep ${n === 1 ? 'it' : 'them'}</button>
@@ -154,6 +180,14 @@ export function formatBytes(bytes: number): string {
 function wireBrowserStorageSection(): void {
   const section = document.querySelector<HTMLElement>('.atlas-settings [data-role="browser-storage"]');
   if (!section) return;
+  // The probe may settle after the render: a refusal or a full origin then
+  // replaces the section's body with its one line.
+  void opfsStatus().then(status => {
+    const statusLine = storageStatusLine(status);
+    if (!statusLine || section.querySelector('[data-role="browser-status"]')) return;
+    section.innerHTML = `<h3>In this browser</h3><p class="atlas-settings-hint" data-role="browser-status">${escapeText(statusLine)}</p>`;
+  }).catch(() => {});
+  if (section.querySelector('[data-role="browser-status"]')) return;
   const storage = (navigator as unknown as {
     storage?: { estimate?: () => Promise<{ usage?: number }>; persisted?: () => Promise<boolean>; persist?: () => Promise<boolean> };
   }).storage;
@@ -165,7 +199,7 @@ function wireBrowserStorageSection(): void {
   const line = section.querySelector<HTMLElement>('[data-role="browser-persisted"]')!;
   const actions = section.querySelector<HTMLElement>('[data-role="browser-persist-actions"]')!;
   const note = section.querySelector<HTMLElement>('[data-role="browser-persist-note"]')!;
-  const n = getState().registry.worlds.filter(w => isBrowserWorld(w) && w.demo !== true).length;
+  const n = browserWorldCounts().kept;
   const them = n === 1 ? 'it' : 'them';
   const show = (kept: boolean): void => {
     line.textContent = kept

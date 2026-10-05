@@ -183,7 +183,7 @@ export class NewApiWorldModal extends BaseModal {
       } catch (err) {
         progressEl.hidden = true;
         console.warn('[new-api-world] create failed:', err);
-        const sentence = problemFor(err, { inline: true, doing: 'creating the world online' }).sentence;
+        const sentence = problemFor(err, { inline: true, doing: 'creating the world online', where }).sentence;
         // Once the folder exists, say so: Create now retries only the online
         // step, under the same name (the name field stays locked).
         const reusable = !!reusableLocal();

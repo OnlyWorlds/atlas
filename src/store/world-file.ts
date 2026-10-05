@@ -170,6 +170,16 @@ export function readWorldZip(
     if (worldTops.length === 0) throw new PlainError(NOT_A_WORLD);
     if (worldTops.length > 1 || tops.size > 1) throw new PlainError(MORE_THAN_ONE);
     prefix = worldTops[0];
+    // Nor does a world in its one folder (S376 gate B10: F10 ran only at the root).
+    if (names.some(n => n !== `${prefix}${WORLD_FILE}` && n.endsWith(`/${WORLD_FILE}`))) throw new PlainError(MORE_THAN_ONE);
+  }
+  // A path under `.atlas/` whose first part is a transient FILE's name
+  // (`.atlas/making/x`) would collide with the make's own marker (S376 gate B10).
+  for (const name of names) {
+    const path = name.slice(prefix.length);
+    if (!path.startsWith(`${ATLAS_INTERNAL_DIR}/`)) continue;
+    const rest = path.slice(ATLAS_INTERNAL_DIR.length + 1);
+    if (rest.includes('/') && isTransientPath(`${ATLAS_INTERNAL_DIR}/${rest.split('/')[0]}`)) throw new PlainError(NOT_OPENABLE);
   }
 
   let meta: { id?: unknown; name?: unknown; demo?: unknown };

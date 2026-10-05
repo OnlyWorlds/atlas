@@ -111,6 +111,16 @@ describe('the reader refuses before anything is written', () => {
     refuses({ 'world.json': strToU8(j({ id: WID, name: 'W' })), 'other/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
   });
 
+  it('a world in its one folder with another world nested inside, or a world.json under .atlas (S376 gate B10)', () => {
+    refuses({ ...world, 'w/inner/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
+    refuses({ ...world, 'w/.atlas/world.json': strToU8(j({ id: 'o', name: 'O' })) }, /more than one world/);
+  });
+
+  it('a path under .atlas whose first part is a transient file\'s name (S376 gate B10)', () => {
+    refuses({ ...world, 'w/.atlas/making/x': strToU8('x') }, /not a world Atlas can open|cannot be opened safely/);
+    refuses({ ...world, 'w/.atlas/lock/x': strToU8('x') }, /not a world Atlas can open|cannot be opened safely/);
+  });
+
   it('the tour\'s sandbox', () => {
     refuses({ 'w/world.json': strToU8(j({ id: WID, name: 'Hyperion', demo: true })) }, /not a world Atlas can open/);
   });

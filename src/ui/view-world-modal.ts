@@ -130,7 +130,7 @@ export class ViewWorldModal extends BaseModal {
         // A refused key, an unknown world or no connection arrives worded
         // (keyCheckError); the rest is worded here (S369).
         console.warn('[view-world] view failed:', err);
-        const sentence = problemFor(err, { inline: true, doing: 'downloading the shared world' }).sentence;
+        const sentence = problemFor(err, { inline: true, doing: 'downloading the shared world', where }).sentence;
         errorBox.textContent = sentence;
         errorBox.hidden = !sentence;
         progressBox.hidden = true;

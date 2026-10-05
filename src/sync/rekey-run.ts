@@ -212,6 +212,12 @@ export function giveTourWorldNewIds(opts: {
   entry: WorldRegistryEntry;
   bundleIds: ReadonlySet<string>;
   onProgress?: (done: number, total: number) => void;
+  /**
+   * Told the files that kept old links as soon as the journal is done, before
+   * the screen pass: a throw after that point still reaches the caller's
+   * toast (S376 lens A A1).
+   */
+  onRekeyed?: (result: RekeyResult) => void;
 }): Promise<RekeyResult> {
   return singleFlight(async () => {
     const { store, entry } = opts;
@@ -220,13 +226,20 @@ export function giveTourWorldNewIds(opts: {
       throw new RekeyRefusedError('Finish editing the zone first.');
     }
     const hooks: RekeyHooks = { onProgress: opts.onProgress, rekeyPersistedState };
+    let earlier: string[] = [];
     if (await store.hasRekeyJournal()) {
       const recovered = await recoverRekey(store, hooks);
-      if (recovered) await rekeyLiveUi(store, entry.id, recovered.map);
+      if (recovered) {
+        earlier = recovered.unrewritten;
+        opts.onRekeyed?.(recovered);
+        await rekeyLiveUi(store, entry.id, recovered.map);
+      }
       if (await store.hasRekeyJournal()) throw new RekeyRefusedError('An earlier id update in this world is unfinished. Finish it first.');
     }
     const ids = (await store.listElements()).map(e => e.id).filter(id => opts.bundleIds.has(id));
-    const result = await startRekey(store, { worldId: entry.id, ids }, hooks);
+    const run = await startRekey(store, { worldId: entry.id, ids }, hooks);
+    const result = { ...run, unrewritten: [...new Set([...earlier, ...run.unrewritten])] };
+    opts.onRekeyed?.(result);
     await rekeyLiveUi(store, entry.id, result.map);
     return result;
   });

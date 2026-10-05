@@ -17,12 +17,20 @@
  * The RECONCILIATION runs once per boot, first in the activation chain. It
  * re-adopts worlds the registry lost, removes crashed makes and orphaned tour
  * scaffolds, marks entries whose directory is gone, and deletes nothing else.
+ * It decides on facts read inside each directory's lock against the registry
+ * as STORED (another tab's make commits before it releases that lock), and it
+ * returns DELTAS that the caller applies to the registry as it is when the
+ * pass ends: a save built from the snapshot it started with would revert,
+ * field by field, whatever any tab saved meanwhile (S376 gate B1). Every make
+ * in this tab waits for it (`openBrowserMake`, contract §3.2).
  */
 
 import type { WorldRegistryEntry, WorldsRegistry } from './types';
 import { BROWSER_HOME, browserHome, isBrowserWorld, isGoneError, markWorldCleared, removeBrowserWorldDir, unmarkWorldCleared } from './browser-worlds';
 import { slugify } from '../store/fs-utils';
-import { createApiLinkedWorld, createLocalWorld, findWorldByOwIdentity, updateWorldEntry } from '../registry/registry';
+import { adoptStoredRegistry, createApiLinkedWorld, createLocalWorld, findWorldByOwIdentity, saveRegistry, storedRegistry, updateWorldEntry } from '../registry/registry';
+import { getState, patchSlice } from './state';
+import { isTourFlagActive } from '../tour/tour-flag';
 
 export const MAKING_MARKER = 'making';
 
@@ -46,6 +54,19 @@ export function isOwnHandleKey(handleKey: string, worldId: string): boolean {
 /** A world with this world.json id is already in the registry, under any spelling of its identity. */
 export function worldAlreadyHere(reg: WorldsRegistry, worldId: string): WorldRegistryEntry | undefined {
   return findWorldByOwIdentity(reg, worldId) ?? reg.worlds.find(w => isOwnHandleKey(w.folder?.handle_key ?? '', worldId));
+}
+
+/**
+ * The cleared browser world a world.json of this id restores: one the browser
+ * cleared, holding this EXACT world id (its own handle key, or its link's
+ * server id). Never one matched only through a former link: the link goes
+ * back only to the world it was made for (Skeld's second condition, S373
+ * F7). The file door and the folder door both ask it (S376 gate B3).
+ */
+export function clearedOwnTwin(reg: WorldsRegistry, worldId: string): WorldRegistryEntry | null {
+  const here = worldAlreadyHere(reg, worldId);
+  if (!here || !isBrowserWorld(here) || !here.cleared_at || here.demo === true) return null;
+  return isOwnHandleKey(here.folder.handle_key, worldId) || here.api?.world_id === worldId ? here : null;
 }
 
 type Locks = { request: (name: string, opts: unknown, cb: (lock: unknown) => Promise<unknown> | unknown) => Promise<unknown> };
@@ -104,7 +125,31 @@ export interface BrowserMake {
   abort(): Promise<void>;
 }
 
+/**
+ * The boot reconciliation's gate: settled once the pass has applied its
+ * deltas. Every make awaits it, so none commits inside the pass's window
+ * (contract §3.2; S376 gate B1: five makes rode outside the activation chain).
+ */
+let reconciled: Promise<void> = Promise.resolve();
+
+/** How long a make waits for a pass that never ends (a hung `hydrateAtlasRoot`). */
+export const RECONCILE_WAIT_LIMIT_MS = 15_000;
+
+/**
+ * Opens the gate; the returned function settles it. Called synchronously at
+ * boot. It also settles itself after `RECONCILE_WAIT_LIMIT_MS`: a pass stuck
+ * behind a blocked IndexedDB open must not hang every make with no word
+ * (S377 D2 gate F3).
+ */
+export function beginBootReconciliation(): () => void {
+  let settle: () => void = () => {};
+  reconciled = new Promise<void>(r => { settle = r; });
+  const backstop = setTimeout(() => settle(), RECONCILE_WAIT_LIMIT_MS);
+  return () => { clearTimeout(backstop); settle(); };
+}
+
 export async function openBrowserMake(name: string, worldId: string): Promise<BrowserMake> {
+  await reconciled;
   const dir = mintBrowserDirName(name, worldId);
   let release: () => void = () => {};
   const l = locks();
@@ -156,12 +201,23 @@ export async function finishBrowserMake(handle: FileSystemDirectoryHandle): Prom
 
 // ---- the reconciliation ----
 
+type WorldFacts = { id?: unknown; name?: unknown; demo?: unknown; api?: { world_id?: unknown; api_key?: unknown; world_name?: unknown; read_only?: unknown } };
+
 interface DirFacts {
   name: string;
   making: boolean;
   /** Parsed world.json, `null` when absent, `'unreadable'` when it will not parse. */
-  meta: { id?: unknown; name?: unknown; demo?: unknown; api?: { world_id?: unknown; api_key?: unknown; world_name?: unknown; read_only?: unknown } } | null | 'unreadable';
+  meta: WorldFacts | null | 'unreadable';
 }
+
+/**
+ * One change the pass decided. `applyReconcile` applies it to the registry as
+ * it is THEN, re-checked there: a change another tab made meanwhile wins.
+ */
+export type ReconcileOp =
+  | { kind: 'adopt'; dir: string; id: string; meta: WorldFacts }
+  | { kind: 'unmark'; entryId: string; dir: string }
+  | { kind: 'mark'; entryId: string; dir: string };
 
 async function readFacts(dir: FileSystemDirectoryHandle, name: string): Promise<DirFacts> {
   let making = false;
@@ -184,6 +240,9 @@ export function staleBrowserCopies(): readonly string[] {
 }
 
 export interface ReconcileOutcome {
+  /** The deltas, for the caller to apply to the registry as it is when the pass ends. */
+  ops: ReconcileOp[];
+  /** The deltas applied to the registry the pass started from: a record, never saved as such. */
   next: WorldsRegistry;
   adopted: string[];
   removed: string[];
@@ -194,20 +253,26 @@ export interface ReconcileOutcome {
 
 /**
  * Reconcile the browser home against the registry (contract §3.2). `tourActive`
- * is `atlas_tour_v1.active`. Removals happen only inside a free lock.
+ * is `atlas_tour_v1.active`, read when each directory is decided. `fresh`
+ * gives the registry as it is NOW (stored, and this tab's), checked inside
+ * each directory's lock beside the snapshot `reg`. Removals happen only
+ * inside a free lock.
  */
 export async function reconcileBrowserHome(
   reg: WorldsRegistry,
-  opts: { tourActive: boolean; home?: FileSystemDirectoryHandle },
+  opts: { tourActive: boolean | (() => boolean); home?: FileSystemDirectoryHandle; fresh?: () => WorldsRegistry[] },
 ): Promise<ReconcileOutcome> {
-  const out: ReconcileOutcome = { next: reg, adopted: [], removed: [], cleared: [], stale: [] };
+  const out: ReconcileOutcome = { ops: [], next: reg, adopted: [], removed: [], cleared: [], stale: [] };
+  const tourActive = () => typeof opts.tourActive === 'function' ? opts.tourActive() : opts.tourActive;
+  const views = () => [out.next, ...(opts.fresh?.() ?? [])];
   let home: FileSystemDirectoryHandle;
   try {
     home = opts.home ?? await browserHome();
   } catch (err) {
     if (!isGoneError(err)) throw err;
     // No browser home: every browser world of the user's own is gone.
-    out.next = markMissing(out.next, new Set(), out.cleared);
+    markMissing(reg, new Set(), out);
+    out.next = applyReconcile(reg, out.ops);
     return out;
   }
 
@@ -223,7 +288,10 @@ export async function reconcileBrowserHome(
       const f = await readFacts(dir, name);
       const claimed = out.next.worlds.find(w => isBrowserWorld(w) && w.folder.folder_name === name);
       if (claimed) {
-        if (claimed.cleared_at && f.meta && f.meta !== 'unreadable') out.next = unmarkWorldCleared(out.next, claimed.id);
+        if (claimed.cleared_at && f.meta && f.meta !== 'unreadable') {
+          out.ops.push({ kind: 'unmark', entryId: claimed.id, dir: name });
+          out.next = unmarkWorldCleared(out.next, claimed.id);
+        }
         return;
       }
       if (f.making) {
@@ -234,10 +302,12 @@ export async function reconcileBrowserHome(
       const id = typeof f.meta.id === 'string' ? f.meta.id : '';
       if (!id) return;
       if (f.meta.demo === true) {
-        if (!opts.tourActive) await home.removeEntry(name, { recursive: true }).then(() => out.removed.push(name), () => {});
+        if (!tourActive()) await home.removeEntry(name, { recursive: true }).then(() => out.removed.push(name), () => {});
         return;
       }
-      const owner = worldAlreadyHere(out.next, id);
+      // The owner as stored NOW, not only in the snapshot: another tab's make
+      // commits before it releases this lock (S376 gate B1).
+      const owner = views().map(v => worldAlreadyHere(v, id)).find(Boolean);
       if (owner) {
         if (!isBrowserWorld(owner)) {
           // A move's stale copy: the registry places this world in a folder.
@@ -251,19 +321,69 @@ export async function reconcileBrowserHome(
         }
         return; // a browser world already registered under another directory: leave this one
       }
-      out.next = adopt(out.next, name, f.meta as Exclude<DirFacts['meta'], null | 'unreadable'>, id);
+      out.ops.push({ kind: 'adopt', dir: name, id, meta: f.meta });
+      out.next = adopt(out.next, name, f.meta, id);
       out.adopted.push(name);
     });
     if (!result.ran) continue; // another tab's make or move is live
   }
 
-  out.next = markMissing(out.next, listed, out.cleared);
-  out.next = collapseTwins(out.next);
+  markMissing(reg, listed, out);
+  out.next = applyReconcile(reg, out.ops);
   lastStale = [...out.stale];
   return out;
 }
 
-function adopt(reg: WorldsRegistry, dir: string, meta: Exclude<DirFacts['meta'], null | 'unreadable'>, id: string): WorldsRegistry {
+/**
+ * Apply the pass's deltas to `reg` (the registry as it is when the pass
+ * ends), each re-checked against it: an adoption only for a directory and an
+ * id no entry holds; a mark or unmark only for an entry still in this browser
+ * under the same directory, still as the pass saw it. Then twins collapse.
+ * Returns `reg` itself when nothing changed.
+ */
+export function applyReconcile(reg: WorldsRegistry, ops: readonly ReconcileOp[]): WorldsRegistry {
+  let next = reg;
+  const at = (id: string, dir: string) => next.worlds.find(w => w.id === id && isBrowserWorld(w) && w.folder.folder_name === dir);
+  for (const op of ops) {
+    if (op.kind === 'adopt') {
+      if (next.worlds.some(w => isBrowserWorld(w) && w.folder.folder_name === op.dir) || worldAlreadyHere(next, op.id)) continue;
+      next = adopt(next, op.dir, op.meta, op.id);
+    } else if (op.kind === 'unmark') {
+      if (at(op.entryId, op.dir)?.cleared_at) next = unmarkWorldCleared(next, op.entryId);
+    } else {
+      const w = at(op.entryId, op.dir);
+      if (w && !w.cleared_at && w.demo !== true) next = markWorldCleared(next, op.entryId);
+    }
+  }
+  return collapseTwins(next);
+}
+
+/**
+ * The boot pass (`app.ts`, first in the activation chain): reconcile against
+ * the registry as stored and as this tab holds it, then apply the deltas to
+ * the registry as it is AFTER the last await, and save once.
+ */
+export async function reconcileAtBoot(opts: { home?: FileSystemDirectoryHandle } = {}): Promise<ReconcileOutcome> {
+  const out = await reconcileBrowserHome(getState().registry, {
+    tourActive: isTourFlagActive,
+    home: opts.home,
+    fresh: () => [storedRegistry(), getState().registry],
+  });
+  // Fold in what is stored first: another tab's save can land before its
+  // storage event reaches this tab, and a delta re-checked against a lagging
+  // view would bring back a world that tab deleted (S377 D2 gate F1, F2).
+  const folded = adoptStoredRegistry(getState().registry);
+  if (folded) patchSlice('registry', folded);
+  const current = getState().registry;
+  const next = applyReconcile(current, out.ops);
+  if (next !== current) {
+    saveRegistry(next);
+    patchSlice('registry', next);
+  }
+  return out;
+}
+
+function adopt(reg: WorldsRegistry, dir: string, meta: WorldFacts, id: string): WorldsRegistry {
   const name = typeof meta.name === 'string' && meta.name ? meta.name : 'Untitled world';
   const handleKey = `world-${id}`;
   const pathHint = `browser storage/${dir}`;
@@ -278,16 +398,14 @@ function adopt(reg: WorldsRegistry, dir: string, meta: Exclude<DirFacts['meta'],
   return updateWorldEntry(next, entry.id, { where: 'browser' });
 }
 
-/** Mark every unlisted browser world of the user's own as cleared. */
-function markMissing(reg: WorldsRegistry, listed: Set<string>, cleared: string[]): WorldsRegistry {
-  let next = reg;
+/** Every unlisted browser world of the user's own (in the snapshot) is to be marked cleared. */
+function markMissing(reg: WorldsRegistry, listed: Set<string>, out: ReconcileOutcome): void {
   for (const w of reg.worlds) {
     if (!isBrowserWorld(w) || w.demo === true || w.cleared_at) continue;
     if (listed.has(w.folder.folder_name)) continue;
-    next = markWorldCleared(next, w.id);
-    cleared.push(w.id);
+    out.ops.push({ kind: 'mark', entryId: w.id, dir: w.folder.folder_name });
+    out.cleared.push(w.id);
   }
-  return next;
 }
 
 /** Two entries naming the same browser directory (a two-tab merge twin): keep the older. */

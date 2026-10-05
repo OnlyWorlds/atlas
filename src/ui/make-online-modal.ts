@@ -134,7 +134,7 @@ export class MakeOnlineModal extends BaseModal {
 
       <div data-route-pane="create">
         <p class="atlas-modal-hint">
-          Create a new world on onlyworlds.com and upload this folder's contents.
+          Create a new world on onlyworlds.com and upload this world's contents.
         </p>
         <form data-form="create-route">
           <label class="atlas-modal-field">
@@ -160,7 +160,7 @@ export class MakeOnlineModal extends BaseModal {
 
       <div data-route-pane="link" hidden>
         <p class="atlas-modal-hint">
-          Link this folder to a world you've already created on onlyworlds.com. Choose how to handle elements that exist on both sides.
+          Link this world to a world you've already created on onlyworlds.com. Choose how to handle elements that exist on both sides.
         </p>
         <form data-form="link-route">
           <label class="atlas-modal-field">

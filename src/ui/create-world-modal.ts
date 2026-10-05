@@ -113,7 +113,7 @@ export class CreateWorldModal extends BaseModal {
           this.hide();
         } catch (err) {
           console.warn('[create-world] tour create failed:', err);
-          this.showError(errorBox, problemFor(err, { inline: true, doing: 'creating the tour world' }).sentence);
+          this.showError(errorBox, problemFor(err, { inline: true, doing: 'creating the tour world', where: 'browser' }).sentence);
           submitBtn.disabled = false;
           submitBtn.textContent = 'Create';
           cancelBtn.hidden = false;
@@ -152,7 +152,7 @@ export class CreateWorldModal extends BaseModal {
         // A refusal (no home folder, no permission) reads as itself; the rest
         // is worded (S369).
         console.warn('[create-world] create failed:', err);
-        this.showError(errorBox, problemFor(err, { inline: true, doing: 'creating the world' }).sentence);
+        this.showError(errorBox, problemFor(err, { inline: true, doing: 'creating the world', where }).sentence);
         submitBtn.disabled = false;
         submitBtn.textContent = 'Create';
         cancelBtn.hidden = false;

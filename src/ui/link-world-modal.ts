@@ -181,7 +181,7 @@ export class LinkWorldModal extends BaseModal {
         if (result.stoppedEarly) {
           this.toasts.info(`Linked ${result.entry.name} with ${result.downloaded} of ${result.stoppedEarly.total} elements. Use Refresh from API (the refresh icon on the sync pill) to download the rest.`);
         } else if (failures > 0) {
-          this.toasts.error(`Linked ${result.entry.name}, but ${failures} element${failures === 1 ? '' : 's'} failed (will retry on next sync)`);
+          this.toasts.error(`Linked ${result.entry.name}. ${failures} element${failures === 1 ? '' : 's'} did not download. Refresh from API brings ${failures === 1 ? 'it' : 'them'}.`);
         } else {
           this.toasts.success(`Linked ${result.entry.name} · ${result.downloaded} element${result.downloaded === 1 ? '' : 's'} downloaded`);
         }
@@ -200,7 +200,7 @@ export class LinkWorldModal extends BaseModal {
         // A refused key, an unknown world or no connection arrives worded
         // (keyCheckError); the rest is worded here (S369).
         console.warn('[link-world] link failed:', err);
-        const sentence = problemFor(err, { inline: true, doing: 'linking the world' }).sentence;
+        const sentence = problemFor(err, { inline: true, doing: 'linking the world', where }).sentence;
         errorBox.textContent = sentence;
         errorBox.hidden = !sentence;
         progressBox.hidden = true;

@@ -219,7 +219,7 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
     // The file picker opens inside this click, before any await (1.17, contract §5.2),
     // and a file that lands in this browser is a browser world: ask the browser
     // to keep worlds while the gesture is live (§2.3, invariant 10; S374 gate F8).
-    requestPersistOnFirstBrowserWorld();
+    requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
     const file = await pickWorldFile();
     if (file) await openWorldFileFrom(file, toasts);
     return;
@@ -252,9 +252,18 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
   }
 }
 
+/**
+ * The new-world door's glyph: never a folder, since the world may live in this
+ * browser (S376 lens C C6). Without the folder picker it is the browser
+ * world's own glyph; with it, a world.
+ */
+export function newWorldGlyph(): string {
+  return hasFolderMode() ? 'public' : 'web';
+}
+
 /** The chooser's rows: the icon row's five, said in words (S365). */
 const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line: string; /** Said instead without the folder picker. */ browserOnlyLine?: string }> = [
-  { action: 'create-local', icon: 'create_new_folder', title: 'Start a new world', line: 'Plain files, in a folder on your drive or in this browser. Works offline; take it online any time.', browserOnlyLine: 'Plain files, in this browser. Works offline; take it online any time.' },
+  { action: 'create-local', get icon() { return newWorldGlyph(); }, title: 'Start a new world', line: 'Plain files, in a folder on your drive or in this browser. Works offline; take it online any time.', browserOnlyLine: 'Plain files, in this browser. Works offline; take it online any time.' },
   { action: 'open-folder', icon: 'folder_open', title: 'Open a world folder', line: 'One you already have, from Atlas, another tool, or your AI. It opens where it is; nothing is copied.' },
   { action: 'new-api', icon: 'cloud_upload', title: 'New world on OnlyWorlds', line: 'Created on onlyworlds.com and here, synced from the start. Needs a free account.' },
   { action: 'link-api', icon: 'link', title: 'Bring down a world from OnlyWorlds', line: 'Paste its key: Atlas downloads a full copy and keeps the two in sync.' },

@@ -53,6 +53,29 @@ describe('opening a world folder that is a browser world', () => {
     expect(vault.handles.get(`world-${WID}`)).toBe(dir);
   });
 
+  it('a cleared LINKED twin adopts the folder with its first sync held for review (S376 gate B3, Skeld condition 3)', async () => {
+    const linked = browserEntry({ cleared_at: '2026-10-05T09:00:00.000Z', state: 'api-linked', api: { world_id: WID, api_key: 'k' } });
+    patchSlice('registry', { ...defaultRegistry(), worlds: [linked] });
+    expect(await openWorldFolder(picked())).toEqual({ worldId: 'w1', already: true });
+    const e = getState().registry.worlds[0];
+    expect(e.api?.world_id).toBe(WID);
+    expect(e.review_first_sync).toBe(true);
+  });
+
+  it('a cleared row matched only through a former link is not adopted: the folder opens as its own world (S376 gate B3)', async () => {
+    const former = browserEntry({
+      id: 'w9', cleared_at: '2026-10-05T09:00:00.000Z', former_api_world_id: WID,
+      folder: { handle_key: 'world-0192ffff-other', folder_name: 'other-0192ffff-9a9a', last_path_hint: 'browser storage/other-0192ffff-9a9a' },
+    } as Partial<WorldRegistryEntry>);
+    patchSlice('registry', { ...defaultRegistry(), worlds: [former] });
+    const out = await openWorldFolder(picked());
+    expect(out.worldId).not.toBe('w9');
+    const w9 = getState().registry.worlds.find(w => w.id === 'w9')!;
+    expect(w9.where).toBe('browser');
+    expect(w9.cleared_at).toBeTruthy();
+    expect(vault.handles.get(`world-${WID}`)).toBeTruthy();
+  });
+
   it('a live browser world refuses, says where the world is, and stores nothing', async () => {
     patchSlice('registry', { ...defaultRegistry(), worlds: [browserEntry()] });
     await expect(openWorldFolder(picked())).rejects.toThrow(/already in Atlas, kept in this browser/);

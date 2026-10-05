@@ -10,7 +10,7 @@
 
 import { hasFolderMode } from '../core/capabilities';
 import { isAtlasGrounded } from '../core/grounded';
-import { addWorldLabel, openAddWorldChooser, runAddWorldAction, type AddWorldAction } from '../setup/world-doors';
+import { addWorldLabel, newWorldGlyph, openAddWorldChooser, runAddWorldAction, type AddWorldAction } from '../setup/world-doors';
 import { currentActivationGen, enqueueActivation } from '../core/activation-chain';
 import { awaitEviction, evictParkedStore, getActiveStore, parkStore, setActiveStore, takeParkedStore } from '../core/active-store';
 import { escapeAttr, escapeText, installRowKeydownActivation } from '../core/dom-utils';
@@ -99,7 +99,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // `aria-label` (the chooser's own row title) for a screen reader, which
       // would otherwise read the glyphs' ligature text ("add folder_open").
       const icons = state.registry.worlds_add_icons === false ? '' : `<div class="atlas-worlds-add-icons">
-        ${addIconButton('create-local', 'folder', hasFolderMode() ? 'Start a new world: in a folder on your drive or in this browser' : 'Start a new world: kept in this browser')}
+        ${addIconButton('create-local', newWorldGlyph(), hasFolderMode() ? 'Start a new world: in a folder on your drive or in this browser' : 'Start a new world: kept in this browser')}
         ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder you already have. It opens where it is; nothing is copied.') : ''}
         ${addIconButton('new-api', 'cloud_upload', hasFolderMode() ? 'New world on OnlyWorlds: made on onlyworlds.com and on your drive or in this browser' : 'New world on OnlyWorlds: made on onlyworlds.com and in this browser')}
         ${addIconButton('link-api', 'link', 'Bring down a world from OnlyWorlds with its API key')}
@@ -120,7 +120,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // button, locked (S365 gate lens C L3: nothing appears after the tour).
       header.innerHTML = `
         <div class="atlas-worlds-add-icons">
-        ${addIconButton('create-local', 'folder', 'Create a world. This one is the tour’s: Hyperion.', { pulse: true })}
+        ${addIconButton('create-local', newWorldGlyph(), 'Create a world. This one is the tour’s: Hyperion.', { pulse: true })}
         ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder already on your drive. Yours to use after the tour.', { locked: true }) : ''}
         ${addIconButton('new-api', 'cloud_upload', hasFolderMode() ? 'Create a world that lives on onlyworlds.com as well as on your drive or in this browser. Yours to use after the tour.' : 'Create a world that lives on onlyworlds.com as well as in this browser. Yours to use after the tour.', { locked: true })}
         ${addIconButton('link-api', 'link', 'Bring in a world you already keep on onlyworlds.com. Yours to use after the tour.', { locked: true })}
@@ -509,7 +509,8 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   // Hover-reveal sync controls only for api-linked worlds. The dedicated
   // refresh button is gone: the CLOUD state icon is the refresh action now
   // (Captain, 2026-07-10) — one icon fewer, same reach.
-  const syncActions = world.state === 'api-linked'
+  // A cleared row has nothing to sync: no pause, no refresh (S376 lens C C13).
+  const syncActions = world.state === 'api-linked' && !cleared
     ? `
         <button type="button" class="atlas-icon-btn-sm sync-action-btn ${world.sync_paused ? 'is-paused' : ''}" data-role="toggle-paused" data-world-id="${escapeAttr(world.id)}" title="${world.sync_paused ? 'Resume sync' : 'Stay offline'}">
           <span class="material-symbols-outlined">${world.sync_paused ? 'play_arrow' : 'pause'}</span>
@@ -532,7 +533,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
           <span class="material-symbols-outlined" aria-hidden="true">close</span>
         </button>`
     : '';
-  const stateIconHtml = world.state === 'api-linked'
+  const stateIconHtml = world.state === 'api-linked' && !cleared
     ? `<button type="button" class="atlas-world-cloud-btn" data-role="refresh-world" data-world-id="${escapeAttr(world.id)}" title="Refresh from API">
         <span class="material-symbols-outlined">${stateIcon}</span>
       </button>`
@@ -554,6 +555,12 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
 export interface ActivateWorldOpts {
   /** No toasts on failure paths. Useful for silent boot-time auto-activation. */
   silent?: boolean;
+  /**
+   * No "Finished giving N elements new ids" when the open finishes a re-key:
+   * the caller says its own outcome (the tour keep's K0: one "yours now", no
+   * id jargon, contract §7.3; S376 lens A A7).
+   */
+  quietRekey?: boolean;
   /** Keep `selectedElementId` as-is (so a URL like /element/<eid> survives activation). Default false. */
   preserveSelection?: boolean;
   /**
@@ -624,7 +631,7 @@ async function doActivateWorld(
   toasts: ToastManager,
   opts: ActivateWorldOpts = {}
 ): Promise<boolean> {
-  const { silent = false, preserveSelection = false, permissionMode = 'request' } = opts;
+  const { silent = false, quietRekey = false, preserveSelection = false, permissionMode = 'request' } = opts;
   const state = getState();
   let entry = state.registry.worlds.find(w => w.id === worldId);
   if (!entry) {
@@ -966,7 +973,7 @@ async function doActivateWorld(
         // A finished Route 2 journal speaks even on the silent boot path: the
         // link itself is still not done, and nothing else would say so (S367
         // gate B6: a reload mid-link reopens the world silently).
-        if ((!silent || done.origin === 'merge') && done.map.size > 0) {
+        if (((!silent && !quietRekey) || done.origin === 'merge') && done.map.size > 0) {
           toasts.info(done.origin === 'merge'
             ? `Finished matching ${done.map.size} ${done.map.size === 1 ? 'element' : 'elements'} to OnlyWorlds. Linking did not finish: run Make online again with the same key.`
             : `Finished giving ${done.map.size} ${done.map.size === 1 ? 'element a new id' : 'elements new ids'}.`);
@@ -1095,7 +1102,12 @@ function settleGoneBrowserWorld(entry: WorldRegistryEntry, silent: boolean, toas
     saveRegistry(marked);
     patchSlice('registry', marked);
   }
-  if (!silent) toasts.info(`"${entry.name}" was cleared by this browser, so it is no longer here.`);
+  // The row is still there, with the ways back on it (S376 lens C C13).
+  if (!silent) {
+    toasts.info(entry.api?.api_key
+      ? `"${entry.name}" was cleared by this browser. Its row can bring it back from onlyworlds.com or from a world file.`
+      : `"${entry.name}" was cleared by this browser. Its row can bring it back from a world file.`);
+  }
 }
 
 /**

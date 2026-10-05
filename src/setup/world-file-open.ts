@@ -25,7 +25,7 @@ import { getState, patchSlice } from '../core/state';
 import { PlainError } from '../core/plain-error';
 import { browserStorageFullSentence } from '../core/problems';
 import { isBrowserWorld, removeBrowserWorldDir } from '../core/browser-worlds';
-import { isOwnHandleKey, isQuotaError, openBrowserMake, withWorldLock, worldAlreadyHere } from '../core/browser-home';
+import { clearedOwnTwin, isQuotaError, openBrowserMake, withWorldLock, worldAlreadyHere } from '../core/browser-home';
 import { createLocalWorld, saveRegistry, updateWorldEntry } from '../registry/registry';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import type { WorldFileEntry } from '../store/world-file';
@@ -53,18 +53,9 @@ const REGISTRY_NOT_SAVED =
 /** World ids being opened from a file in this tab. */
 const opening = new Set<string>();
 
-/** The entry this file restores: a browser world the browser cleared, holding this EXACT world id. */
-function restoreTarget(reg: WorldsRegistry, worldId: string): WorldRegistryEntry | null {
-  const here = worldAlreadyHere(reg, worldId);
-  if (!here || !isBrowserWorld(here) || !here.cleared_at || here.demo === true) return null;
-  // Skeld's second condition: the link goes back only to the world it was
-  // made for, never to one matched through a former link.
-  return isOwnHandleKey(here.folder.handle_key, worldId) || here.api?.world_id === worldId ? here : null;
-}
-
 /** What the file is, against the registry as it is now. */
 function placeOf(reg: WorldsRegistry, worldId: string): { restore: WorldRegistryEntry | null; already: WorldRegistryEntry | null } {
-  const restore = restoreTarget(reg, worldId);
+  const restore = clearedOwnTwin(reg, worldId);
   if (restore) return { restore, already: null };
   const here = worldAlreadyHere(reg, worldId);
   // A cleared world that is not this one (matched through a former link)

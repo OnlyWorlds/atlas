@@ -51,8 +51,10 @@ const afterRoute = () => new Promise<void>(r => setTimeout(r, 0));
  * K0's open, then K1-K4. Says every outcome itself (a toast), so the finale,
  * boot's resume and a teardown all speak the same sentences. `quiet` leaves
  * out the success toast (Save it to a folder says its own once the move ends).
+ * `finishing`: world.json already reads kept (resume, a teardown), so the next
+ * start does finish it; from the finale it does not (S376 lens C C11).
  */
-export async function keepTourWorldNow(worldId: string, opts: { quiet?: boolean } = {}): Promise<KeepOutcome> {
+export async function keepTourWorldNow(worldId: string, opts: { quiet?: boolean; finishing?: boolean } = {}): Promise<KeepOutcome> {
   const [{ toastManager }, { showProblem }] = await Promise.all([
     import('../ui/toast-manager'),
     import('../ui/problem-fixes'),
@@ -76,9 +78,11 @@ export async function keepTourWorldNow(worldId: string, opts: { quiet?: boolean 
   // or this is boot finishing a keep a closed tab began).
   if (!isOpen(worldId)) {
     const { activateWorld } = await import('../sidebar/worlds-sidebar');
-    const opened = await activateWorld(worldId, toastManager);
+    const opened = await activateWorld(worldId, toastManager, { quietRekey: true });
     if (!opened || !isOpen(worldId)) {
-      return refuse(new PlainError(`Atlas could not open ${name} to keep it. Close any other tab that has it open; Atlas tries again the next time it starts.`));
+      return refuse(new PlainError(opts.finishing
+        ? `Atlas could not open ${name} to keep it. Close any other tab that has it open; Atlas tries again the next time it starts.`
+        : `Atlas could not open ${name} to keep it. Close any other tab that has it open, then press Keep this world again.`));
     }
   }
   const store = getActiveStore()!;
@@ -91,8 +95,12 @@ export async function keepTourWorldNow(worldId: string, opts: { quiet?: boolean 
   const bundle = await import('../demo/hyperion-world.json');
   const bundleIds = new Set((bundle.default as unknown as { elements: Array<{ id: string }> }).elements.map(e => e.id));
   // What K3 will move, read before K2: after a failure it tells "nothing
-  // moved" from "everything moved" (S375 gate K2).
+  // moved" from "some moved" (S375 gate K2).
   const toMove = (await store.listElements()).map(e => e.id).filter(id => bundleIds.has(id));
+  // Whether K2 is THIS call's write. A resume finds world.json already kept
+  // (K0's activation may even have finished the re-key), and undoing a K2
+  // this call never made re-demos a world whose ids all moved (S376 lens A A1).
+  const wasDemo = (await store.readWorldMeta()).demo === true;
 
   const modal = new KeepingModal(name);
   modal.open();
@@ -102,24 +110,34 @@ export async function keepTourWorldNow(worldId: string, opts: { quiet?: boolean 
     mirrorMeta(worldId, await store.writeWorldMeta({ demo: undefined }));
     // K3.
     const { giveTourWorldNewIds } = await import('../sync/rekey-run');
-    const result = await giveTourWorldNewIds({ store, entry, bundleIds, onProgress: (done, total) => modal.progress(done, total) });
-    unrewritten = result.unrewritten;
+    await giveTourWorldNewIds({
+      store, entry, bundleIds,
+      onProgress: (done, total) => modal.progress(done, total),
+      onRekeyed: (r) => { unrewritten = r.unrewritten; },
+    });
   } catch (err) {
     modal.close();
     console.warn('[tour] keep stopped before its commit:', err);
-    const after = await afterFailedRekey(store, worldId, toMove);
+    const after = await afterFailedRekey(store, worldId, bundleIds, toMove, wasDemo);
     if (after === 'undone') return refuse(err);
     if (after === 'begun') {
       return refuse(new PlainError(`Keeping ${name} did not finish. Press Keep this world to try again; Atlas also finishes it the next time it starts.`));
     }
     // 'finished': every id moved and only what came after failed. The
-    // world is consistent: commit it, with the screen reloaded from disk.
-    patchSlice('data', { ...getState().data, elements: await store.listElements() });
+    // world is consistent: commit it, with the screen reloaded from disk
+    // when the disk answers (a failed read here is the next activation's).
+    try {
+      patchSlice('data', { ...getState().data, elements: await store.listElements() });
+    } catch (readErr) {
+      console.warn('[tour] could not reload the kept world\'s elements:', readErr);
+    }
   }
   modal.close();
 
   // K4.
-  commitTourKeep(worldId);
+  if (!commitTourKeep(worldId)) {
+    return refuse(new PlainError(`Atlas could not save your list of worlds, so keeping ${name} did not finish. Free some space in this browser, then press Keep this world again; Atlas also finishes it the next time it starts.`));
+  }
   patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
   if (!opts.quiet) toastManager.success(`${name} is yours now. It lives in this browser.`);
   if (unrewritten.length > 0) {
@@ -139,16 +157,24 @@ function mirrorMeta(worldId: string, meta: WorldMeta): void {
  * and resume, Keep or a teardown finishes it (world.json stays un-demoed, so
  * no step writes into it: `tourWorldIsActive`). No journal and every id still
  * there: nothing moved, so K2 is undone and the world is the sandbox again
- * (Start fresh deletes it, as its button says). No journal and none left: the
- * re-key finished and only what came after failed.
+ * (Start fresh deletes it, as its button says). No journal and no bundle id
+ * left in the store: the re-key finished (in this call, or in the activation
+ * that opened the world) and only what came after failed. K2 is undone only
+ * when this call made it (`wasDemo`); otherwise the world stays 'kept' and
+ * the next Keep, resume or teardown finishes it (S376 lens A A1).
  */
-async function afterFailedRekey(store: FolderStore, worldId: string, toMove: readonly string[]): Promise<'begun' | 'undone' | 'finished'> {
+async function afterFailedRekey(
+  store: FolderStore,
+  worldId: string,
+  bundleIds: ReadonlySet<string>,
+  toMove: readonly string[],
+  wasDemo: boolean,
+): Promise<'begun' | 'undone' | 'finished'> {
   try {
     if (await store.hasRekeyJournal()) return 'begun';
-    const here = new Set((await store.listElements()).map(e => e.id));
-    const left = toMove.filter(id => here.has(id)).length;
-    if (left === 0 && toMove.length > 0) return 'finished';
-    if (left < toMove.length) return 'begun';
+    const left = (await store.listElements()).filter(e => bundleIds.has(e.id)).length;
+    if (left === 0) return 'finished';
+    if (!wasDemo || left < toMove.length) return 'begun';
     mirrorMeta(worldId, await store.writeWorldMeta({ demo: true }));
     return 'undone';
   } catch (err) {

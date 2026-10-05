@@ -24,6 +24,8 @@ import { AccountClient, accountErrorMessage, isAccountAuthError } from './accoun
 import { PinPromptModal } from '../ui/pin-prompt-modal';
 import { showLoadingOverlay } from '../ui/loading-overlay';
 import { ToastManager } from '../ui/toast-manager';
+import { hasFolderMode } from '../core/capabilities';
+import { requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
 import type { AccountWorldRow } from '../core/types';
 
 /**
@@ -114,6 +116,10 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
   const token = state.registry.account_token;
   if (!token) return false;
   if (state.accountWorlds.opening) return false; // one open at a time
+  // Without the folder picker the world lands in this browser: ask the
+  // browser to keep worlds inside the click, before the first await
+  // (contract §2.3; S376 gate B6).
+  if (!hasFolderMode()) requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
 
   // ---- Preconditions BEFORE the mint (gate R1: no orphaned keys) ----
   // The duplicate check re-runs inside the link flow (on the chain); this
@@ -182,7 +188,7 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
     navigate(homeHash(result.entry.id));
     completeWaypoint('ecosystem');
     if (result.failures.length > 0) {
-      toasts.error(`Opened ${row.name} · ${result.failures.length} of ${result.downloaded + result.failures.length} elements failed to download (refresh from API to retry)`);
+      toasts.error(`Opened ${row.name}. ${result.failures.length} element${result.failures.length === 1 ? '' : 's'} did not download. Refresh from API brings ${result.failures.length === 1 ? 'it' : 'them'}.`);
     } else {
       toasts.success(`Opened ${row.name} · ${result.downloaded} elements`);
     }

@@ -69,7 +69,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
     concept: 'Your world is plain files in an open format, no account needed: in a folder on your drive any tool can read it, and a world in this browser can leave as one file any time.',
     action: 'Create your first world.',
     toast: 'Your world is plain files, and it can always leave.',
-    glyph: 'folder',
+    glyph: 'description', // plain files, wherever they live: never a folder (S376 lens C C6)
     link: () => '#/',
   },
   {

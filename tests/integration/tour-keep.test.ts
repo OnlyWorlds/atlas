@@ -9,10 +9,11 @@ import { MockFolderStore } from '../fixtures/mock-folder-store';
 import { MonotonicClock } from '../fixtures/monotonic-clock';
 
 const activations: string[] = [];
+const activationOpts: unknown[] = [];
 let activationOpens = false;
 vi.mock('../../src/sidebar/worlds-sidebar', () => ({
   // Activation is the app's whole open path; these tests decide only whether it opened.
-  activateWorld: async (id: string) => { activations.push(id); return activationOpens; },
+  activateWorld: async (id: string, _t: unknown, opts?: unknown) => { activations.push(id); activationOpts.push(opts); return activationOpens; },
 }));
 const toasts: string[] = [];
 vi.mock('../../src/ui/toast-manager', () => {
@@ -70,6 +71,7 @@ let tourEntry: WorldRegistryEntry;
 async function setUpFinale(worldJson: Record<string, unknown> = { id: 'wid', name: 'Hyperion', demo: true }): Promise<void> {
   localStorage.clear();
   activations.length = 0;
+  activationOpts.length = 0;
   toasts.length = 0;
   activationOpens = false;
   opfs = new FakeDirHandle('opfs');
@@ -204,6 +206,66 @@ describe('the keep (contract §7.3, invariants 15-16)', () => {
     expect(getState().registry.worlds[0].demo).toBeUndefined();
     expect(readTourState()).toBeNull();
     expect((await realList()).map(e => e.id)).not.toContain(CONSUL);
+  });
+
+  it('resume after a crash inside K3 (every id already moved) and a throw in the empty K3: the keep commits, K2 is never undone (S376 lens A A1)', async () => {
+    // Boot's activation finished the journal: world.json kept, no bundle id left.
+    await setUpFinale({ id: 'wid', name: 'Hyperion' });
+    await store.deleteElement(CONSUL, { silent: true } as never);
+    await store.deleteElement(MAP, { silent: true } as never);
+    await store.createElement('character', { id: '11111111-1111-4111-8111-111111111111', name: 'The Consul' } as Partial<Element>);
+    const realHas = store.hasRekeyJournal.bind(store);
+    let first = true;
+    store.hasRekeyJournal = async () => {
+      if (first) { first = false; throw Object.assign(new Error('read failed'), { name: 'NotReadableError' }); }
+      return realHas();
+    };
+    const out = await keepTourWorldNow(W);
+    expect((await store.readWorldMeta()).demo).toBeUndefined();
+    expect(getState().active?.meta?.demo).toBeUndefined();
+    expect(out.kind).toBe('kept');
+    expect(getState().registry.worlds[0].demo).toBeUndefined();
+    const { enterStep } = await import('../../src/tour/tour-engine');
+    const before = (await store.listElements()).map(e => e.id).sort();
+    await enterStep(16);
+    expect((await store.listElements()).map(e => e.id).sort()).toEqual(before);
+  });
+
+  it('a throw in K3 on a world this call did not un-demo never writes demo back, even with bundle ids left (S376 lens A A1)', async () => {
+    await setUpFinale({ id: 'wid', name: 'Hyperion' }); // K2 ran in an earlier tab
+    store.writeRekeyJournal = async () => { throw new Error('disk said no'); };
+    const out = await keepTourWorldNow(W);
+    expect(out.kind).toBe('refused');
+    expect((await store.readWorldMeta()).demo).toBeUndefined(); // still 'kept': the next boot finishes it
+    expect(getState().registry.worlds[0].demo).toBe(true);
+  });
+
+  it('a commit whose registry save fails stops before the tour ends: TK and the demo entry stay (S376 lens A A2)', async () => {
+    const realSet = Storage.prototype.setItem;
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      if (k === 'atlas_worlds_registry') throw new DOMException('full', 'QuotaExceededError');
+      return realSet.call(this, k, v);
+    });
+    try {
+      const out = await keepTourWorldNow(W);
+      expect(out.kind).toBe('refused');
+      expect(readTourState()?.worldId).toBe(W);
+      expect(getState().registry.worlds[0].demo).toBe(true);
+      expect(toasts.some(t => /could not save your list of worlds, so keeping Hyperion did not finish/.test(t))).toBe(true);
+      expect(toasts.some(t => /yours now/.test(t))).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('K0 opens the world without the re-key toast, and its refusal from the finale names the button (S376 lens A A7, lens C C11)', async () => {
+    setActiveStore(null);
+    patchSlice('active', null);
+    const out = await keepTourWorldNow(W);
+    expect(out.kind).toBe('refused');
+    expect(activationOpts[0]).toEqual({ quietRekey: true });
+    expect(toasts.some(t => /then press Keep this world again/.test(t))).toBe(true);
+    expect(toasts.some(t => /next time it starts/.test(t))).toBe(false);
   });
 
   it('refuses a 1.16 tour world (no `where`): its directory sits outside the browser home', async () => {

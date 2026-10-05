@@ -19,6 +19,7 @@ import { ELEMENT_ICONS, ELEMENT_LABELS, SPATIAL_TYPES } from '../core/constants'
 import { escapeText } from '../core/dom-utils';
 import { getState, patchSlice, subscribe } from '../core/state';
 import { hasFolderMode } from '../core/capabilities';
+import { requestPersistOnFirstBrowserWorld } from '../setup/world-parent';
 import { parseHash } from '../core/router';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type PerElementFailure } from '../core/types';
 import { completeWaypoint } from '../core/waypoints';
@@ -553,6 +554,9 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     // leaves the review as it was.
     let where: 'folder' | 'browser' = 'browser';
     if (mode === 'new') {
+      // Without the folder picker the answer is this browser: ask the browser
+      // to keep worlds before the first await (contract §2.3; S376 gate B6).
+      if (!hasFolderMode()) requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
       const { askWhere } = await import('../ui/where-choice');
       const asked = await askWhere({
         title: 'Import as a new world',
@@ -702,7 +706,10 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     exportMount.innerHTML = `
       <p class="atlas-share-section-hint">Download <b>${escapeText(aw.meta?.name ?? 'this world')}</b> as an onlyworlds.com world export, the same file the site downloads. Untick types to export a subset.</p>
       <p class="atlas-share-section-hint">${outInBrowser
-        ? "The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images stay in this browser. Download the whole world keeps all of it in one file."
+        ? (outWholeFile
+          ? "The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images stay in this browser. Download the whole world keeps all of it in one file."
+          // The tour world has no whole-world download (S376 lens C C15).
+          : "The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images stay with the tour world. Keep it at the end of the tour to download it whole.")
         : "The file holds the world's elements. Pages, aliases, saved charts, notes, writing formatting and images kept in the folder stay in your world folder, which is the full copy of your world."}</p>
       <div class="atlas-import-typelist">
         <label class="atlas-import-type-all">
@@ -828,14 +835,14 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     dropEl.classList.remove('is-over');
     const file = e.dataTransfer?.files?.[0];
     // A world file opens as its own world (1.17, contract §5.2), never merged in.
-    if (file && isWorldFile(file)) { void openWorldFileFrom(file, toasts); return; }
+    if (file && isWorldFile(file)) { requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000)); void openWorldFileFrom(file, toasts); return; }
     if (file) void file.text().then(t => ingest(t, 'The dropped file'), err => { console.error('[import] file read failed', err); showProblem(err, { doing: 'reading the dropped file', folder: 'picked', toasts }); });
   });
   dropEl.addEventListener('click', () => fileInput.click());
   dropEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
-    if (file && isWorldFile(file)) { void openWorldFileFrom(file, toasts); fileInput.value = ''; return; }
+    if (file && isWorldFile(file)) { requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000)); void openWorldFileFrom(file, toasts); fileInput.value = ''; return; }
     if (file) void file.text().then(t => ingest(t, 'The chosen file'), err => { console.error('[import] file read failed', err); showProblem(err, { doing: 'reading the chosen file', folder: 'picked', toasts }); });
     fileInput.value = '';
   });

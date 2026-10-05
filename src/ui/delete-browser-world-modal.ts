@@ -60,7 +60,8 @@ export class DeleteBrowserWorldModal extends BaseModal {
       this.dismissLocked = false;
       if (result.ok) {
         this.hide();
-        this.toasts.success(`Deleted ${w.name}`);
+        if (result.listSaved) this.toasts.success(`Deleted ${w.name}`);
+        else this.toasts.info(`Deleted ${w.name}. Atlas could not save your list of worlds, so after a reload it may show as cleared by this browser: remove it from the list then.`, 10_000);
         navigate('#/');
         return;
       }

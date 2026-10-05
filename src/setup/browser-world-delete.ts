@@ -25,7 +25,12 @@ import { clearSyncIssues } from '../sync/sync-issues';
 import type { WorldRegistryEntry } from '../core/types';
 
 export type BrowserDeleteResult =
-  | { ok: true }
+  /**
+   * `listSaved: false`: the directory is gone but the list of worlds could
+   * not be saved (a full localStorage), so after a reload the row comes back
+   * as cleared by this browser (S376 lens A A2).
+   */
+  | { ok: true; listSaved: boolean }
   /** Nothing was removed; the entry is kept. `wasActive`: reopen it. */
   | { ok: false; error: unknown; wasActive: boolean };
 
@@ -58,13 +63,13 @@ export async function deleteBrowserWorld(world: WorldRegistryEntry): Promise<Bro
     // Removed: only now does the entry go.
     clearSyncIssues(world.id);
     const next = deleteWorldEntry(getState().registry, world.id);
-    saveRegistry(next);
+    const listSaved = saveRegistry(next);
     patchSlice('registry', next);
     if (wasActive) {
       patchSlice('active', null);
       patchSlice('data', { elements: [] });
       patchSlice('ui', { ...getState().ui, selectedElementId: null });
     }
-    return { ok: true as const };
+    return { ok: true as const, listSaved };
   });
 }

@@ -59,7 +59,7 @@ describe('deleteBrowserWorld', () => {
     const realRemove = home.removeEntry.bind(home);
     home.removeEntry = async (name: string, opts?: { recursive?: boolean }) => { order.push('remove'); return realRemove(name, opts); };
     const result = await deleteBrowserWorld(world);
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, listSaved: true });
     expect(order).toEqual(['detach', 'close', 'remove']);
     expect(home.children.has(DIR)).toBe(false);
     expect(getState().registry.worlds).toHaveLength(0);
@@ -78,10 +78,25 @@ describe('deleteBrowserWorld', () => {
   it('a world that is not open is removed without touching the open one', async () => {
     patchSlice('active', { worldId: 'other', meta: { id: 'o', name: 'Other' }, opened: true } as never);
     const result = await deleteBrowserWorld(world);
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, listSaved: true });
     expect(order).not.toContain('close');
     expect(getActiveStore()).toBe(store);
     expect(home.children.has(DIR)).toBe(false);
+  });
+
+  it('a removal whose list save fails says so: the row would come back as cleared (S376 lens A A2)', async () => {
+    const realSet = Storage.prototype.setItem;
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k: string, v: string) {
+      if (k === 'atlas_worlds_registry') throw new DOMException('full', 'QuotaExceededError');
+      return realSet.call(this, k, v);
+    });
+    try {
+      const result = await deleteBrowserWorld(world);
+      expect(result).toEqual({ ok: true, listSaved: false });
+      expect(home.children.has(DIR)).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('refuses a folder world (Delete for a folder is a different path)', async () => {
