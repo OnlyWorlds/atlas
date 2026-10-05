@@ -76,6 +76,20 @@ describe('opening a world folder that is a browser world', () => {
     expect(vault.handles.get(`world-${WID}`)).toBeTruthy();
   });
 
+  it('the exact cleared twin is found even behind a row matched only through a former link (S377 D2 gate note)', async () => {
+    const former = browserEntry({
+      id: 'w9', cleared_at: '2026-10-05T09:00:00.000Z', former_api_world_id: WID,
+      folder: { handle_key: 'world-0192ffff-other', folder_name: 'other-0192ffff-9a9a', last_path_hint: 'browser storage/other-0192ffff-9a9a' },
+    } as Partial<WorldRegistryEntry>);
+    // The own twin is matched by its link's server id (a world made online keeps its local handle key).
+    const own = browserEntry({
+      cleared_at: '2026-10-05T09:00:00.000Z', state: 'api-linked', api: { world_id: WID, api_key: 'k' },
+      folder: { handle_key: 'world-0192eeee-local', folder_name: 'hollow-reach-0192eeee-1a2b', last_path_hint: 'browser storage/hollow-reach-0192eeee-1a2b' },
+    });
+    patchSlice('registry', { ...defaultRegistry(), worlds: [former, own] });
+    expect(await openWorldFolder(picked())).toEqual({ worldId: 'w1', already: true });
+  });
+
   it('a live browser world refuses, says where the world is, and stores nothing', async () => {
     patchSlice('registry', { ...defaultRegistry(), worlds: [browserEntry()] });
     await expect(openWorldFolder(picked())).rejects.toThrow(/already in Atlas, kept in this browser/);

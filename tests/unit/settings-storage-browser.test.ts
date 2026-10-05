@@ -74,6 +74,24 @@ describe('Settings, Storage, in this browser', () => {
     expect(count).toMatch(/^1 world kept in this browser\. 1 cleared by this browser\./);
   });
 
+  it('with no world kept here (none yet, or all cleared) it offers no Ask and no "may clear them"', async () => {
+    await opfsStatus();
+    const host = mount({ ...defaultRegistry(), worlds: [browserWorld('b', { cleared_at: '2026-10-05T09:00:00.000Z' })] });
+    await new Promise(r => setTimeout(r, 0));
+    const section = host.querySelector('[data-role="browser-storage"]')!;
+    expect(section.querySelector<HTMLElement>('[data-role="browser-persisted"]')!.hidden).toBe(true);
+    expect(section.querySelector<HTMLElement>('[data-role="browser-persist-actions"]')!.hidden).toBe(true);
+  });
+
+  it('control: one world kept shows the line and the Ask', async () => {
+    await opfsStatus();
+    const host = mount({ ...defaultRegistry(), worlds: [browserWorld('a')] });
+    await new Promise(r => setTimeout(r, 0));
+    const section = host.querySelector('[data-role="browser-storage"]')!;
+    expect(section.querySelector<HTMLElement>('[data-role="browser-persisted"]')!.textContent).toMatch(/may clear it/);
+    expect(section.querySelector<HTMLElement>('[data-role="browser-persist-actions"]')!.hidden).toBe(false);
+  });
+
   it('a window that refuses browser storage says only its line', async () => {
     refuse = true;
     await opfsStatus();

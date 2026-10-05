@@ -64,9 +64,12 @@ export function worldAlreadyHere(reg: WorldsRegistry, worldId: string): WorldReg
  * F7). The file door and the folder door both ask it (S376 gate B3).
  */
 export function clearedOwnTwin(reg: WorldsRegistry, worldId: string): WorldRegistryEntry | null {
-  const here = worldAlreadyHere(reg, worldId);
-  if (!here || !isBrowserWorld(here) || !here.cleared_at || here.demo === true) return null;
-  return isOwnHandleKey(here.folder.handle_key, worldId) || here.api?.world_id === worldId ? here : null;
+  // Searched by the exact rule itself, never through `worldAlreadyHere`,
+  // whose first identity match can be a row a former link names (S377 D2 gate).
+  return reg.worlds.find(w =>
+    isBrowserWorld(w) && !!w.cleared_at && w.demo !== true
+    && (isOwnHandleKey(w.folder.handle_key, worldId) || w.api?.world_id === worldId),
+  ) ?? null;
 }
 
 type Locks = { request: (name: string, opts: unknown, cb: (lock: unknown) => Promise<unknown> | unknown) => Promise<unknown> };

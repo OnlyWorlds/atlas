@@ -200,6 +200,9 @@ function wireBrowserStorageSection(): void {
   const actions = section.querySelector<HTMLElement>('[data-role="browser-persist-actions"]')!;
   const note = section.querySelector<HTMLElement>('[data-role="browser-persist-note"]')!;
   const n = browserWorldCounts().kept;
+  // No world kept here: nothing for the browser to keep or clear, so no
+  // line and no Ask (S377 own walk, the rest of gate B4). The first make asks.
+  if (n === 0) return;
   const them = n === 1 ? 'it' : 'them';
   const show = (kept: boolean): void => {
     line.textContent = kept
