@@ -120,6 +120,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/ui/toast-manager.ts`: queue, max 3, XSS-safe; opts {actions, details, sticky} + Dismiss.
 - `src/ui/where-choice.ts`: THE WHERE-QUESTION (1.17, conv. 129): the rows, `takeWhereInClick` (persist in the gesture), `readyWhere`, `askWhere` for doors without a dialog.
 - `src/ui/delete-browser-world-modal.ts`: the Delete dialog for a browser world.
+- `src/ui/download-progress.ts`: the one progress line for a world coming down (link, view, account open, Bring it down again); a big world into this browser says it takes a while (S377).
 - `src/ui/move-browser-world-modal.ts`: Move to a folder: step 1 inside the click (the home folder, writable), then a locked run with progress; `start(ready)` runs it at once with a home folder readied in an earlier click (a world file opened into a folder).
 - `src/ui/bring-down-again-modal.ts`: the Cleared row's "Bring it down again": what comes back and what does not, then the restore with progress.
 - `src/ui/download-world.ts`: Download the whole world from a click (the save picker inside the gesture), one path for Settings, the keep-safe card and Delete's "Download it first".

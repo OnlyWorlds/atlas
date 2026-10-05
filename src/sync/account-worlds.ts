@@ -14,6 +14,7 @@
  * an orphaned server-side key.
  */
 
+import { downloadingLine } from '../ui/download-progress';
 import { getState, patchSlice } from '../core/state';
 import { navigate, homeHash } from '../core/router';
 import { saveRegistry, setPin, findWorldByServerId, findLinkedWorld } from '../registry/registry';
@@ -177,7 +178,7 @@ export async function openAccountWorld(row: AccountWorldRow, toasts: ToastManage
           } else {
             overlay.update(p.total === 0
               ? 'Empty world; finishing up…'
-              : `Downloading ${p.done} of ${p.total} elements…`);
+              : downloadingLine(p.done, p.total, where));
           }
         },
       })

@@ -56,6 +56,55 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.17',
+    date: '2026-10-05',
+    theme: 'worlds in your browser',
+    entries: [
+      {
+        id: 'worlds-in-your-browser',
+        title: 'A world can live in your browser',
+        body: 'On Firefox a world now lives in the browser\'s own storage, and that is a full home: start a world, bring one down from OnlyWorlds, import one, or open a world file. On Chrome, Edge and Brave every new world asks where it should live: in a folder on your drive, where your AI and other tools can work on it, or in this browser.',
+        tags: ['world'],
+      },
+      {
+        id: 'move-to-a-folder',
+        title: 'Move a world from the browser to a folder',
+        body: 'On Chrome, Edge and Brave, Settings, under This world, moves a browser world into your folder: Atlas copies it, checks the copy, then removes it from the browser. Sync carries on from the folder.',
+        tags: ['world', 'folder'],
+      },
+      {
+        id: 'world-file',
+        title: 'Download the whole world as one file',
+        body: 'One .zip holds the world: elements, pages, notes, charts and images. Atlas 1.17 or later opens it on any browser, as a world of its own. The file leaves out the OnlyWorlds link and its key.',
+        tags: ['world', 'safety'],
+      },
+      {
+        id: 'cleared-world-keeps-its-row',
+        title: 'A cleared world keeps its place',
+        body: 'If the browser clears its storage but keeps Atlas\'s list, the world\'s row says "Cleared by this browser" and keeps its link: bring it down again from OnlyWorlds, or open the file you downloaded. Clearing the site\'s data removes the list too, so the download is the way back.',
+        tags: ['world', 'safety'],
+      },
+      {
+        id: 'keep-safe-card',
+        title: 'A card asks for a copy before it matters',
+        body: 'Once a browser world holds 25 elements, a written scene or a map image, its home shows "This world lives only in this browser" with Download, Move to a folder and Take it online. The × hides it for a week; a download hides it until the world has changed and a week has passed.',
+        tags: ['world', 'safety'],
+      },
+      {
+        id: 'keep-the-tour-world',
+        title: 'Keep the tour world',
+        body: 'At the end of the tour: Keep this world, Save it to a folder (Chrome, Edge and Brave), or Start fresh. A kept Hyperion gets its own ids, so it can go online and sit beside a later tour.',
+        tags: ['tour'],
+      },
+      {
+        id: 'link-dialog-busy-buttons',
+        title: 'Fixed: the link dialog\'s busy buttons',
+        body: '"Cancel link" and "Stop and keep what\'s here" showed from the moment the dialog opened. They now show only while a link is running. Elements that do not download now say that Refresh from API brings them, instead of promising a retry that never came.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.16',
     date: '2026-10-04',
     theme: 'errors that help',

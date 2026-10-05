@@ -4,6 +4,7 @@
   "src/core/problems.ts": 10,
   "src/core/waypoints.ts": 4,
   "src/demo/demo-view.ts": 1,
+  "src/main.ts": 2,
   "src/middle/element-detail-header.ts": 1,
   "src/middle/import-room.ts": 4,
   "src/middle/knowledge-room.ts": 3,

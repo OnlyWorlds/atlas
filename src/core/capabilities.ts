@@ -9,13 +9,11 @@
  *     (`navigator.storage.getDirectory` + `createWritable`). Safari 26+ and
  *     Firefox 111+ have this (Safari's `createWritable` arrived in 26, not
  *     18.2 as this line once said; S366 lane A, cited from WebKit). It is
- *     enough for the guided tour (the tour world lives in browser storage by
- *     design) and, later, for a full
- *     "atlas without a folder" mode.
+ *     enough for worlds kept in browser storage (1.17, conv. 129): the only
+ *     home on Firefox and Safari, a choice on Chromium.
  *
- * The boot gate in main.ts admits folder-mode browsers fully, admits
- * OPFS-only browsers in tour-capable mode, and shows the unsupported page
- * to the rest.
+ * The boot gate in main.ts admits a browser with either mode and shows the
+ * unsupported page to the rest.
  */
 
 export function hasFolderMode(): boolean {

@@ -20,7 +20,7 @@ npm run e2e:ui       # Playwright UI mode
 
 ## Stack
 
-TypeScript + Vite + `@onlyworlds/sdk` (version in `package.json`) + Leaflet 1.9 + Vitest + MSW + fake-indexeddb + Playwright. Vanilla DOM, no React. `base: './'` for Cloudflare Pages compatibility. Folder mode needs the File System Access API (Chromium); Safari 26+ / Firefox 111+ take the guided tour in browser storage, and worlds kept in browser storage are being built as 1.17 (conv. 129).
+TypeScript + Vite + `@onlyworlds/sdk` (version in `package.json`) + Leaflet 1.9 + Vitest + MSW + fake-indexeddb + Playwright. Vanilla DOM, no React. `base: './'` for Cloudflare Pages compatibility. Folder mode needs the File System Access API (Chromium); since 1.17 a world can also live in browser storage (OPFS), the only home on Firefox 111+ and Safari 26+ and a choice on Chromium (conv. 129).
 
 ## Architecture (one-line)
 

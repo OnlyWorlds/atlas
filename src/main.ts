@@ -31,18 +31,14 @@ function renderUnsupportedPage(root: HTMLElement): void {
   wrap.innerHTML = `
     <div class="atlas-unsupported-panel">
       <div class="atlas-unsupported-icon">
-        <span class="material-symbols-outlined">folder_special</span>
+        <span class="material-symbols-outlined">public</span>
       </div>
-      <h1>Atlas needs a Chromium browser</h1>
+      <h1>Atlas needs a newer browser</h1>
       <p>
-        Atlas stores your worlds as real files on your computer using the
-        <b>File System Access API</b>, which is currently only available in
-        Chromium browsers.
-      </p>
-      <p>
-        Open this page in <b>Chrome</b> or <b>Brave</b> (or Edge) to use Atlas.
-        Recent Safari and Firefox can take the guided tour, which runs in
-        browser storage: if you are seeing this page, your browser has neither.
+        Atlas keeps your worlds as files: in a folder on your drive in
+        <b>Chrome</b>, <b>Edge</b> or <b>Brave</b>, or in the browser's own
+        storage in a recent <b>Firefox</b> or <b>Safari</b>. This browser can
+        do neither.
       </p>
       <div class="atlas-unsupported-actions">
         <a href="https://www.google.com/chrome/" target="_blank" rel="noopener">Download Chrome →</a>
@@ -63,10 +59,9 @@ function boot(): void {
     console.error('[atlas] #app element missing');
     return;
   }
-  // Folder-mode browsers (Chromium) get the full app. OPFS-capable browsers
-  // (Safari 26+, Firefox 111+) boot in tour-capable mode — the guided tour
-  // and browser-storage worlds work; folder pickers stay honestly gated in
-  // the UI (welcome-panel folder CTA + directory-picker's clean error).
+  // Folder-mode browsers (Chromium) get the full app. OPFS-only browsers
+  // (Safari 26+, Firefox 111+) get it with every world in browser storage
+  // (1.17, conv. 129): the folder-only doors are hidden there.
   if (!hasFolderMode() && !hasOpfsMode()) {
     renderUnsupportedPage(root);
     return;
