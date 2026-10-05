@@ -4,7 +4,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 ---
 
-## CURRENT STATE (2026-10-05, SESSION 374: **1.17 SESSION A DONE: bout 5's rest (a world file asks where; Bring it down again) and the front door (the landing, the palette, the tour world in `browser-worlds/`), gated, folded**; gates on a quiet machine: typecheck 0 + **2550 vitest** (268 files, 2 skipped = banked probes, exit 0) + **407 e2e (chromium 397 + firefox 9 + firefox-private 1, each = its `--list`, PLAYWRIGHT_EXIT=0, zero flaky)**; package still 1.16.0, no changelog yet; NOT committed: waits on the Captain's word; S370-S373 local commits unpushed: 1.17 is mid-build)
+## CURRENT STATE (2026-10-05, SESSION 374: **1.17 SESSION A DONE: bout 5's rest (a world file asks where; Bring it down again) and the front door (the landing, the palette, the tour world in `browser-worlds/`), gated, folded**; gates on a quiet machine: typecheck 0 + **2550 vitest** (268 files, 2 skipped = banked probes, exit 0) + **407 e2e (chromium 397 + firefox 9 + firefox-private 1, each = its `--list`, PLAYWRIGHT_EXIT=0, zero flaky)**; package still 1.16.0, no changelog yet; COMMITTED locally on the Captain's word (`6c798ba` + this docs commit); with S370-S373, unpushed: 1.17 is mid-build)
 
 **Records**: the contract `Forge/Notes/2026-10-04-browser-worlds-contract.md` (build progress line); the gate `Forge/Notes/2026-10-05-s374-gate/report.md`; own eyes `Forge/Notes/ui-snapshots/2026-10-05-s374/` (the landing, Chromium dark 1400 and 800, Firefox dark 1400 and light 800; Firefox's chooser; start a world's dialog, light; the world file's where-question; Bring it down again, light); handover `Forge/Notes/2026-10-05-s374-handover.md`.
 
