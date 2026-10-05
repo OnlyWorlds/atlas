@@ -28,7 +28,7 @@ async function setupWorld(page: Page) {
     const root = await navigator.storage.getDirectory();
     api.setNextDirectory(await root.getDirectoryHandle('hostile-root', { create: true }));
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForSelector('[data-action="create-local"]');
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'hostile world');

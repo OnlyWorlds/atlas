@@ -4387,6 +4387,11 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
      the statement gets its beat before the actions ask for a decision. */
   margin-top: 34px;
 }
+/* Four doors (1.17): when they no longer fit on one row they go two by two,
+   never three over a lone fourth. */
+@media (max-width: 900px) {
+  .atlas-landing-compact .atlas-landing-actions:has(> .atlas-landing-choice:nth-child(4)) { max-width: 440px; }
+}
 .atlas-landing-compact .atlas-landing-tag { order: 2; }
 /* Each door is a button over its own caption (S302). The captions balance the
    pair; a single line under both would favour whichever button it sat closer
@@ -4430,7 +4435,10 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-size: 13.5px;
 }
 .atlas-landing-note {
-  margin: 12px 0 0;
+  /* After the doors (1.17): mark, name, what it is, what you can do, then
+     where those worlds live. */
+  order: 4;
+  margin: 26px 0 0;
   max-width: 46ch;
   text-align: center;
   font-size: 12.5px;

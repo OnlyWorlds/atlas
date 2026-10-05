@@ -80,7 +80,7 @@ test('linking a local world to a server world moves every link onto the server i
     const root = await navigator.storage.getDirectory();
     api.setNextDirectory(await root.getDirectoryHandle('route2-root', { create: true }));
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Sandbox');
   await page.click('[data-modal="create-world"] [data-action="pick"]');

@@ -25,7 +25,7 @@ import { setSidebarModePref } from '../core/ui-prefs';
 import { scoreElementMatch } from '../core/element-search';
 import { roomOf, openElementTarget } from '../core/element-room';
 import { ELEMENT_ICONS } from '../core/constants';
-import { hasFolderMode } from '../core/capabilities';
+import { browserStorageDoorOpen, hasFolderMode } from '../core/capabilities';
 import { filesWhereOf } from '../core/browser-worlds';
 import { isTourFlagActive } from '../tour/tour-flag';
 import type { Element, ElementType } from '../core/types';
@@ -58,12 +58,14 @@ export interface PaletteResult {
  * Commands reachable by name (S364: the palette's first). `id` is what
  * `activate` switches on.
  */
-const ACTIONS: Array<{ label: string; id: string; icon: string; aliases?: string[]; folderOnly?: boolean; door?: boolean; diskOnly?: boolean }> = [
+const ACTIONS: Array<{ label: string; id: string; icon: string; aliases?: string[]; folderOnly?: boolean; door?: boolean; diskOnly?: boolean; browserStorage?: boolean; makesWorld?: boolean }> = [
   // A world kept in this browser has no folder to rescan, so it hides this.
   { label: 'reload from disk', id: 'reload-disk', icon: 'folder_open', aliases: ['refresh from disk', 'rescan', 'files'], diskOnly: true },
   // The world doors (S365): the same runner as the Worlds list's buttons.
-  { label: 'add a world', id: 'add-world', icon: 'add', aliases: ['new world', 'create world', 'world'], door: true },
+  { label: 'add a world', id: 'add-world', icon: 'add', aliases: ['new world', 'create world', 'world'], door: true, makesWorld: true },
   { label: 'open a world folder', id: 'open-world-folder', icon: 'folder_open', aliases: ['open folder', 'open world'], folderOnly: true, door: true },
+  // 1.17 (contract §8): a world file opens wherever browser storage works.
+  { label: 'open a world file', id: 'open-world-file', icon: 'file_open', aliases: ['world file', 'open file', 'zip'], door: true, browserStorage: true },
 ];
 
 const ROOMS: Array<{ label: string; segment: string; icon: string; aliases?: string[] }> = [
@@ -107,6 +109,10 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
     // The world doors are locked during the tour, as its sidebar locks them
     // (S365 gate lens B F5 / C M3).
     if (action.folderOnly && !hasFolderMode()) continue;
+    // A door that needs browser storage asks the probe (conv. 120); a world
+    // can be made where either a folder or browser storage works.
+    if (action.browserStorage && !browserStorageDoorOpen()) continue;
+    if (action.makesWorld && !hasFolderMode() && !browserStorageDoorOpen()) continue;
     if (action.door && isTourFlagActive()) continue;
     if (action.diskOnly && filesWhereOf(openWorldEntry()) === 'browser') continue;
     const names = [action.label, ...(action.aliases ?? [])];
@@ -331,7 +337,7 @@ class CommandPalette extends BaseModal {
     }
     if (r.kind === 'action') {
       if (r.id === 'reload-disk') void reloadFromDisk();
-      else if (r.id === 'add-world' || r.id === 'open-world-folder') void openWorldDoor(r.id);
+      else if (r.id === 'add-world' || r.id === 'open-world-folder' || r.id === 'open-world-file') void openWorldDoor(r.id);
       return;
     }
     if (r.kind === 'create') {
@@ -383,12 +389,12 @@ async function openCreateWithName(name: string): Promise<void> {
 }
 
 /** Ctrl+K's world doors (S365): the same runner as the Worlds list's buttons. */
-async function openWorldDoor(id: 'add-world' | 'open-world-folder'): Promise<void> {
+async function openWorldDoor(id: 'add-world' | 'open-world-folder' | 'open-world-file'): Promise<void> {
   const [{ openAddWorldChooser, runAddWorldAction }, { toastManager }] = await Promise.all([
     import('../setup/world-doors'), import('./toast-manager'),
   ]);
   if (id === 'add-world') openAddWorldChooser(toastManager);
-  else await runAddWorldAction('open-folder', toastManager);
+  else await runAddWorldAction(id === 'open-world-file' ? 'open-file' : 'open-folder', toastManager);
 }
 
 /**

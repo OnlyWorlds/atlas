@@ -1,11 +1,12 @@
 /**
  * Middle pane: welcome / empty state.
  *
- * Three modes:
- * - No atlas root yet → "set up atlas folder" CTA (first launch).
- * - Atlas root set, no active world → "create or open a world" prompt.
- * - Active world  → "Welcome to {name}" with a few stats (placeholder until
- *   elements list lands in Phase 4).
+ * Modes:
+ * - A home folder the vault still holds after a storage clear → re-link it.
+ * - Not set up (`isAtlasGrounded` false) → the landing: the tour, start a
+ *   world, open a world folder (Chromium), other ways in.
+ * - Set up, no active world → the next step, or "pick one from the sidebar".
+ * - Active world → its name and a few stats.
  */
 
 import { isCodeLoadError } from '../core/reload-offer';
@@ -16,7 +17,7 @@ import { escapeText } from '../core/dom-utils';
 import { navigate, timelineHash } from '../core/router';
 import { getState, subscribe } from '../core/state';
 import { recoverAtlasRoot, setupAtlasRoot } from '../setup/atlas-root-flow';
-import { finishSetupDoor, pickAndOpenWorldFolder } from '../setup/world-doors';
+import { finishSetupDoor, openAddWorldChooser, pickAndOpenWorldFolder, runAddWorldAction } from '../setup/world-doors';
 import { isAtlasGrounded } from '../core/grounded';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { toastManager } from '../ui/toast-manager';
@@ -112,50 +113,45 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       return;
     }
 
-    // First-launch: no atlas folder yet. The landing (session 255 minimal
-    // form; tour door added 2026-07-19 — Freek's "jarring first screen"): the
-    // tour needs NO folder (browser storage), so it leads; the folder CTA
-    // carries honest context about where worlds live; about-link for depth.
+    // First-launch: no home folder and no world of the user's own. The landing
+    // (session 255 minimal form; tour door added 2026-07-19, Freek's "jarring
+    // first screen"): the tour needs no folder, so it leads.
     if (!grounded) {
-      // OPFS-only browsers (Safari 26+, Firefox: tour-capable boot) have no
-      // folder picker — the folder door becomes an honest line instead of a
-      // button that would fail on click. After a completed tour the emphasis
-      // swaps: the folder is the primary door, the tour a replay.
+      // 1.17 (contract §8, lens C R2-c, W5): a world can live in this browser,
+      // so every browser gets "start a world" (the dialog asks where on
+      // Chromium) and "other ways in" (the chooser: bring one down, view a
+      // shared world, open a world file). After a full clear of site data this
+      // screen is the only surface, so the world file's door must be on it.
+      // Chromium keeps "open a world folder" (S365: the toolkit sends people
+      // here with a world folder an AI made; it opens in place, and a folder
+      // that keeps worlds becomes the home folder). "Set up a folder" is gone:
+      // the home folder is asked for when a world is first made in a folder.
+      // After a completed tour the emphasis swaps to starting a world.
       const folderMode = hasFolderMode();
       let tourDone = false;
       try { tourDone = localStorage.getItem('atlas_tour_done_v1') === '1'; } catch { /* private mode */ }
       const tourBtnClass = tourDone ? 'atlas-btn-ghost' : 'atlas-btn-primary';
-      const folderBtnClass = tourDone ? 'atlas-btn-primary' : 'atlas-btn-ghost';
-      // S301 (Captain's round): the doors lost their headings and their boxes
-      // — a heading that repeats its own button is noise, and the panels made
-      // two small actions look like a decision. What is left is a compact
-      // button pair sitting with the tagline, plus the honest folder line on
-      // browsers that cannot pick a folder.
-      // The compact doors kept a caption each (Captain, S302): the S301 pass
-      // cut the redundant TITLES (they repeated their own buttons) but took
-      // the explanations with them, so the pair read as two bare unlabelled
-      // buttons. One muted line each, no time claim, tool voice.
-      // The third door (S365): the toolkit sends people here with a world
-      // folder an AI made. It opens in place, no home folder asked; the home
-      // folder is asked for when they first make a NEW world.
-      const folderDoor = folderMode
-        ? `<span class="atlas-landing-choice">
-             <button class="${folderBtnClass} atlas-landing-btn" data-action="setup-atlas">set up a folder</button>
-             <span class="atlas-landing-choice-note">a place on your drive where Atlas keeps your worlds</span>
-           </span>
-           <span class="atlas-landing-choice">
-             <button class="atlas-btn-ghost atlas-landing-btn" data-action="open-world-folder">open a world folder</button>
-             <span class="atlas-landing-choice-note">one you already have, or one your AI made</span>
-           </span>`
-        : '';
-      // The note names the DESKTOP part of the constraint (S323). The gate is
-      // capability-based (`showDirectoryPicker`), and mobile Chrome does not
-      // have it — so a phone visitor, arguably our most common cold arrival
-      // since launch, was being told to go and get the browser they were
-      // already using. No UA sniffing needed; the sentence just has to be true.
+      const startBtnClass = tourDone ? 'atlas-btn-primary' : 'atlas-btn-ghost';
+      // S301 (Captain's round): the doors lost their headings and their boxes;
+      // the compact doors kept a caption each (Captain, S302), one muted line,
+      // no time claim, tool voice.
+      const choice = (action: string, cls: string, label: string, note: string): string =>
+        `<span class="atlas-landing-choice">
+           <button class="${cls} atlas-landing-btn" data-action="${action}">${label}</button>
+           <span class="atlas-landing-choice-note">${note}</span>
+         </span>`;
+      const doors = [
+        choice('start-world', startBtnClass, 'start a world', folderMode
+          ? 'your first world, in a folder on your drive or in this browser'
+          : 'it lives in this browser'),
+        folderMode ? choice('open-world-folder', 'atlas-btn-ghost', 'open a world folder', 'one you already have, or one your AI made') : '',
+        choice('other-ways-in', 'atlas-btn-ghost', 'other ways in', 'bring one down from OnlyWorlds, view a shared world, open a world file'),
+      ].join('');
+      // The note names the DESKTOP part of the constraint (S323): mobile
+      // Chrome has no folder picker either, so the sentence says "desktop".
       const folderNote = folderMode
         ? ''
-        : `<p class="atlas-landing-note">Atlas requires a desktop Chromium browser to keep worlds as real files on your drive: Chrome, Edge or Brave.</p>`;
+        : 'Worlds you make here live in this browser. Folders on your drive, which your AI can work on, need a desktop Chromium browser: Chrome, Edge or Brave.';
       // (The example-page door, "see an example page" → #/demo, was removed in
       // S368 with the other two example-page links. The #/demo route itself
       // still answers, for old links.)
@@ -179,26 +175,42 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
               <span class="atlas-landing-choice">
                 <button class="${tourBtnClass} atlas-landing-btn" data-action="start-tour">${tourDone ? 'replay the tour' : 'take the tour'}</button>
               </span>
-              ${folderDoor}
+              ${doors}
             </div>
             <p class="atlas-landing-tag">An OnlyWorlds worldbuilding solution.</p>
-            ${folderNote}
+            <p class="atlas-landing-note" data-role="storage-note"${folderNote ? '' : ' hidden'}>${folderNote}</p>
           </div>
         </div>
       `;
       const tourBtn = root.querySelector<HTMLButtonElement>('[data-action="start-tour"]')!;
-      // Without a folder picker the tour is the only door, so a window that
-      // refuses browser storage (a Firefox private window) says why up front
-      // rather than on the click (S366).
-      if (!folderMode) {
-        void opfsStatus().then((status) => {
-          if (status === 'ok' || !tourBtn.isConnected) return;
-          tourBtn.closest('.atlas-landing-choice')?.remove();
-          const note = root.querySelector('.atlas-landing-note');
-          // A full origin is not a private window (gate B20): say which.
-          if (note) note.textContent = status === 'full' ? browserStorageFullSentence('starting the tour') : NO_BROWSER_STORAGE_LINE;
-        });
-      }
+      // A window that refuses browser storage (a Firefox private window), or
+      // whose storage is full, says why up front rather than on a click
+      // (S366, conv. 120). Without a folder picker every door needs that
+      // storage, so only the line is left; on Chromium the tour goes and the
+      // folder doors stay (the dialog's browser row says why when chosen).
+      void opfsStatus().then((status) => {
+        if (status === 'ok' || !tourBtn.isConnected) return;
+        const doomed = folderMode ? ['start-tour'] : ['start-tour', 'start-world', 'other-ways-in'];
+        for (const action of doomed) root.querySelector(`[data-action="${action}"]`)?.closest('.atlas-landing-choice')?.remove();
+        // The doors that stay say only what still works here (S374 gate F6).
+        const caption = (action: string, text: string): void => {
+          const note = root.querySelector(`[data-action="${action}"]`)?.closest('.atlas-landing-choice')?.querySelector('.atlas-landing-choice-note');
+          if (note) note.textContent = text;
+        };
+        caption('start-world', 'your first world, in a folder on your drive');
+        caption('other-ways-in', 'bring one down from OnlyWorlds, or view a shared world');
+        const note = root.querySelector<HTMLElement>('[data-role="storage-note"]');
+        if (!note) return;
+        // A full origin is not a private window (gate B20): say which.
+        note.textContent = status === 'full' ? browserStorageFullSentence('making a world in this browser') : NO_BROWSER_STORAGE_LINE;
+        note.hidden = false;
+      });
+      root.querySelector<HTMLButtonElement>('[data-action="start-world"]')?.addEventListener('click', () => {
+        void runAddWorldAction('create-local', toastManager);
+      });
+      root.querySelector<HTMLButtonElement>('[data-action="other-ways-in"]')?.addEventListener('click', () => {
+        openAddWorldChooser(toastManager);
+      });
       tourBtn.addEventListener('click', async () => {
         tourBtn.disabled = true;
         // CAPTURE the rendered label rather than restating it (S310). Both
@@ -230,24 +242,6 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           await pickAndOpenWorldFolder(toastManager);
         } finally {
           openBtn.disabled = false;
-        }
-      });
-      const btn = root.querySelector<HTMLButtonElement>('[data-action="setup-atlas"]');
-      if (!btn) return;
-      btn.addEventListener('click', async () => {
-        const setupLabel = btn.textContent ?? '';
-        btn.disabled = true;
-        btn.textContent = 'Picking…';
-        try {
-          await finishSetupDoor(await setupAtlasRoot(), toastManager);
-        } catch (err) {
-          console.warn('[welcome] folder setup failed:', err);
-          showProblem(err, { doing: 'setting up your OnlyWorlds folder', folder: 'picked' });
-        } finally {
-          // On success a state change re-renders this panel away; on cancel
-          // the button stays visible, so restore the label it actually had.
-          btn.disabled = false;
-          btn.textContent = setupLabel;
         }
       });
       return;
@@ -301,12 +295,12 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           'add-world': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">add</span>
             <h3>add a world</h3>
-            <p>Every way to start a world, each with a line on what it does: start a new world, open a world folder, or bring down or view one from OnlyWorlds.</p>
+            <p>Every way to start a world, each with a line on what it does: start a new world, open a world folder or a world file, or bring down or view one from OnlyWorlds.</p>
             <p class="atlas-grounded-detail-hint">click to choose</p>`,
           'create-local': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>
             <h3>create a world</h3>
-            <p>A new subfolder in your OnlyWorlds folder. Elements become files as you build, and everything works offline. You can take it online later.</p>
+            <p>A new world, in your OnlyWorlds folder or in this browser: the dialog asks. Elements become files as you build, and everything works offline. You can take it online later.</p>
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
           'new-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">cloud_upload</span>

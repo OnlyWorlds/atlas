@@ -50,7 +50,8 @@ export interface FolderStore {
 
   /**
    * View-only mode (S264 — worlds linked with a READ key). When set, every
-   * UI-originated mutation throws "This world is view-only"; the sync engine's
+   * UI-originated mutation throws a `PlainError` ("This world is view-only, so
+   * it cannot be changed here. ..."); the sync engine's
    * legitimate write channels stay open (applyServerRecord + friends,
    * `deleteElement` with `silent` — the server-delete channel — and
    * `writeWorldMeta` with `fromSync`). One seam, both stores, so no UI call
@@ -103,8 +104,14 @@ export interface FolderStore {
    *
    * Cascade rules (default `opts.cascade = true`):
    * - Content element delete → also tombstones every pin whose `element_id` references it.
-   * - Map delete → also tombstones every pin / zone / marker on that map.
-   * - Pin / zone / marker delete → no cascade (leaves of the graph).
+   * - Narrative delete → also every descendant narrative (`parent_narrative`
+   *   chain) and every pin on it or a descendant (conv. 43).
+   * - Map delete → also every pin and marker on that map; zones stay, as
+   *   orphan metadata (DESIGN_ZONES §1).
+   * - Zone delete → also every marker whose `zone_id` names it.
+   * - Pin / marker delete → no cascade (leaves of the graph).
+   * A non-silent delete then removes the dead ids from every link that named
+   * them (conv. 101), each referrer through its own chain, after the delete.
    *
    * Cascade tombstones are pushed BEFORE the primary tombstone so server DELETEs
    * execute in dependency-safe order. Returns every tombstone written (primary

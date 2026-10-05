@@ -22,7 +22,7 @@ async function setupWorld(page: Page, name: string): Promise<void> {
     const sub = await root.getDirectoryHandle('live-root', { create: true });
     (window as any).__atlasTestApi.setNextDirectory(sub);
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', name);
   await page.click('[data-modal="create-world"] [data-action="pick"]');

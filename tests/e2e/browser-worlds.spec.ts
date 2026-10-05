@@ -269,6 +269,49 @@ test('@firefox a world brought down from OnlyWorlds lands in this browser, whole
   await linkLandsInBrowser(page, false);
 });
 
+/** Contract §3.3: the browser clears a linked world; its row says so and brings it down again, under the same row. */
+async function bringDownAgainRestores(page: Page, folderMode: boolean) {
+  await linkLandsInBrowser(page, folderMode);
+  const before = await page.evaluate((serverId) => {
+    const e = (window as any).__atlasTestApi.getState().registry.worlds.find((w: any) => w.api?.world_id === serverId);
+    return { id: e.id, dir: e.folder.folder_name };
+  }, SERVER_WORLD);
+  // The browser clears the world's storage, and keeps Atlas's list.
+  await page.evaluate(async () => {
+    const { getActiveStore } = await import('/src/core/active-store.ts');
+    await getActiveStore()?.close();
+    await (await navigator.storage.getDirectory()).removeEntry('browser-worlds', { recursive: true });
+  });
+  await page.goto('/');
+  await page.waitForSelector('.atlas-shell');
+  const row = page.locator(`.atlas-row[data-world-id="${before.id}"]`);
+  await expect(row.locator('.atlas-world-state-chip.cleared')).toBeVisible();
+  await row.hover();
+  await row.locator('[data-role="bring-down-cleared"]').click();
+  const modal = page.locator('[data-modal="bring-down-again"]');
+  await expect(modal).toContainText('not its pages');
+  await modal.locator('[data-action="bring-down"]').click();
+  await expect(page.locator('.ow-toast', { hasText: '"Big World" is back in this browser.' })).toBeVisible();
+  const after = await page.evaluate(async (serverId) => {
+    const s = (window as any).__atlasTestApi.getState();
+    const rows = s.registry.worlds.filter((w: any) => w.api?.world_id === serverId);
+    const e = rows[0];
+    return { rows: rows.length, id: e.id, dir: e.folder.folder_name, cleared: e.cleared_at ?? null, review: e.review_first_sync ?? null, active: s.active?.worldId === e.id, elements: s.data.elements.length };
+  }, SERVER_WORLD);
+  expect(after).toMatchObject({ rows: 1, id: before.id, cleared: null, review: true, active: true, elements: 30 });
+  expect(after.dir).not.toBe(before.dir);
+  await expect(row.locator('.atlas-world-state-chip.cleared')).toHaveCount(0);
+  expect(await browserHomeDirs(page)).toEqual([after.dir]);
+}
+
+test('a cleared linked world: its row brings it down again, under the same row', async ({ page }) => {
+  await bringDownAgainRestores(page, true);
+});
+
+test('@firefox a cleared linked world: its row brings it down again, under the same row', async ({ page }) => {
+  await bringDownAgainRestores(page, false);
+});
+
 test('Cancel link into this browser leaves no directory and no row', async ({ page }) => {
   await boot(page);
   await mockKeel(page, 1500);

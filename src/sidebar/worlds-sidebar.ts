@@ -260,6 +260,14 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       void runAddWorldAction('open-file', toasts);
       return;
     }
+    const bringDownBtn = target.closest<HTMLElement>('[data-role="bring-down-cleared"]');
+    if (bringDownBtn) {
+      e.stopPropagation();
+      const entry = getState().registry.worlds.find(w => w.id === bringDownBtn.getAttribute('data-world-id'));
+      if (!entry?.cleared_at) return;
+      void import('../ui/bring-down-again-modal').then(({ BringDownAgainModal }) => new BringDownAgainModal(entry, toasts).open());
+      return;
+    }
     const removeBtn = target.closest<HTMLElement>('[data-role="remove-cleared"]');
     if (removeBtn) {
       // A world the browser cleared leaves the list only on the user's word
@@ -510,8 +518,14 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
   const pathHint = cleared
     ? 'Cleared by this browser: its storage for this world is gone.'
     : inBrowser ? 'Stored in this browser' : world.folder?.last_path_hint ?? '';
+  // A linked world comes back from onlyworlds.com under this row (contract §3.3).
+  const bringDown = cleared && world.api?.api_key
+    ? `<button type="button" class="atlas-icon-btn-sm" data-role="bring-down-cleared" data-world-id="${escapeAttr(world.id)}" title="Bring it down again from onlyworlds.com" aria-label="Bring it down again">
+          <span class="material-symbols-outlined" aria-hidden="true">cloud_download</span>
+        </button>`
+    : '';
   const removeCleared = cleared
-    ? `<button type="button" class="atlas-icon-btn-sm" data-role="open-file-cleared" title="Open a world file: a download of this world brings it back" aria-label="Open a world file">
+    ? `${bringDown}<button type="button" class="atlas-icon-btn-sm" data-role="open-file-cleared" title="Open a world file: a download of this world brings it back" aria-label="Open a world file">
           <span class="material-symbols-outlined" aria-hidden="true">file_open</span>
         </button>
         <button type="button" class="atlas-icon-btn-sm" data-role="remove-cleared" data-world-id="${escapeAttr(world.id)}" title="Remove from the list" aria-label="Remove from the list">

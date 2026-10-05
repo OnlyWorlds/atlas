@@ -32,7 +32,7 @@ async function setupAtlasRoot(page: Page, dirName: string = 'atlas-test-root') {
   }, dirName);
   // The setup button can be in welcome (no root yet) or in sidebar header.
   // Welcome's CTA is more visible after a fresh reset.
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   // Wait for sidebar to flip into "create local" mode.
   await page.waitForSelector('[data-action="create-local"]');
 }
@@ -41,17 +41,18 @@ test.beforeEach(async ({ page }) => {
   await freshBoot(page);
 });
 
-test('first launch shows the setup-atlas CTA, not create-local', async ({ page }) => {
+test('first launch shows the landing, not create-local', async ({ page }) => {
   await expect(page.locator('.atlas-shell')).toBeVisible();
-  await expect(page.locator('[data-action="setup-atlas"]').first()).toBeVisible();
+  await expect(page.locator('[data-action="start-world"]')).toBeVisible();
   await expect(page.locator('[data-action="create-local"]')).toHaveCount(0);
   await expect(page.locator('.atlas-landing-mark')).toHaveText('Atlas');
   // Tagline = Captain's copy (rewritten 2026-07-24 launch day); the assertion
   // follows his `atlas-landing-tag` text, not the other way round.
   await expect(page.locator('.atlas-middle')).toContainText('An OnlyWorlds worldbuilding solution.');
   // S301: the landing doors lost their headings and boxes; the buttons carry
-  // the label, in the tool's lowercase voice.
-  await expect(page.locator('.atlas-middle')).toContainText('set up a folder');
+  // the label, in the tool's lowercase voice (1.17: "set up a folder" became
+  // "start a world", whose dialog asks where).
+  await expect(page.locator('.atlas-middle')).toContainText('start a world');
   // The tour door (2026-07-19) leads the landing.
   await expect(page.locator('[data-action="start-tour"]')).toBeVisible();
 });
@@ -60,7 +61,7 @@ test('set up atlas folder flips the UI into create-local mode', async ({ page })
   await setupAtlasRoot(page, 'atlas-root-a');
   // Sidebar now offers create local.
   await expect(page.locator('[data-action="create-local"]')).toBeVisible();
-  await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="start-world"]')).toHaveCount(0);
   // Welcome shows the wrapped root: "atlas-worlds" inside the picked folder.
   await expect(page.locator('.atlas-middle')).toContainText('onlyworlds-atlas');
 });
@@ -93,7 +94,7 @@ test('re-use: picking a folder that is already an atlas root does NOT double-wra
     const api = (window as any).__atlasTestApi;
     api.setNextDirectory(dir);
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForSelector('[data-action="create-local"]');
 
   // Settings panel should show the picked folder as the root (no wrapper created).
@@ -255,7 +256,7 @@ test('legacy "atlas-worlds" wrapper is detected on re-pick (no double-wrap)', as
     const api = (window as any).__atlasTestApi;
     api.setNextDirectory(parent);
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForSelector('[data-action="create-local"]');
 
   // Verify no onlyworlds-atlas/ was created alongside the legacy one.
@@ -291,9 +292,9 @@ test('reload → atlas root + world both persist, click re-activates', async ({ 
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
 
-  // Sidebar still in create-local mode (not setup-atlas) → root recalled from registry+vault.
+  // Sidebar still in create-local mode (not the landing) → root recalled from registry+vault.
   await expect(page.locator('[data-action="create-local"]')).toBeVisible();
-  await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="start-world"]')).toHaveCount(0);
 
   // World is listed but not active (URL hash was cleared, nothing to auto-restore).
   const row = page.locator('.atlas-row[data-world-id]', { hasText: 'Persistent' });
@@ -361,7 +362,7 @@ test('forget world removes it from sidebar + nav to root, atlas root preserved',
   await page.click('.atlas-mode-btn[data-action="mode-worlds"]');
   await expect(page.locator('.atlas-row[data-world-id]')).toHaveCount(0);
   await expect(page.locator('[data-action="create-local"]')).toBeVisible();
-  await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="start-world"]')).toHaveCount(0);
 });
 
 test('change atlas folder swaps the root without losing existing worlds', async ({ page }) => {
@@ -440,18 +441,20 @@ test('rescan: re-picking an existing root after a localStorage wipe imports worl
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
 
-  // First-launch CTA returns; sidebar renders nothing pre-root (S255: the
+  // The landing returns; sidebar renders nothing pre-root (S255: the
   // middle pane is the only voice on screen before a root is set).
-  await expect(page.locator('[data-action="setup-atlas"]').first()).toBeVisible();
+  await expect(page.locator('[data-action="start-world"]')).toBeVisible();
   await expect(page.locator('.atlas-sidebar .atlas-row')).toHaveCount(0);
 
-  // 3. Re-pick the SAME parent folder. Discovery should find both worlds.
+  // 3. Re-pick the SAME parent folder through the landing's own door (1.17:
+  // "open a world folder" takes a folder that keeps worlds as the home
+  // folder). Discovery should find both worlds.
   await page.evaluate(async () => {
     const root = await navigator.storage.getDirectory();
     const sub = await root.getDirectoryHandle('persistent-root', { create: true });
     (window as any).__atlasTestApi.setNextDirectory(sub);
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.click('[data-action="open-world-folder"]');
   await page.waitForSelector('[data-action="create-local"]');
 
   // Both worlds should be visible in the sidebar again.

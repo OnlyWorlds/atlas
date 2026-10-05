@@ -33,7 +33,19 @@ import type { WorldFileEntry } from '../store/world-file';
 export type OpenWorldFileOutcome =
   | { kind: 'opened' | 'restored'; worldId: string }
   /** The same world is already in Atlas: nothing was written. */
-  | { kind: 'already'; worldId: string };
+  | { kind: 'already'; worldId: string }
+  /** The where-question was cancelled: nothing was written. */
+  | { kind: 'cancelled' };
+
+export interface OpenWorldFileOpts {
+  /**
+   * Asked only when the file is a NEW world (never for a restore, never for
+   * one already here), before anything is written (contract §5.2). The answer
+   * itself is the caller's to act on: the world always lands in this browser
+   * first, and a folder answer is the §4 move after it opens. Null cancels.
+   */
+  chooseWhere?: () => Promise<'browser' | 'folder' | null>;
+}
 
 const REGISTRY_NOT_SAVED =
   'Atlas could not save its list of worlds in this browser, so the world file was not opened. Free some space in this browser, then try again.';
@@ -80,22 +92,23 @@ async function writeAll(dir: FileSystemDirectoryHandle, files: WorldFileEntry[],
 }
 
 /** Open a world file's bytes. Refusals throw a `PlainError`, having written nothing. */
-export async function openWorldFile(bytes: Uint8Array): Promise<OpenWorldFileOutcome> {
+export async function openWorldFile(bytes: Uint8Array, opts: OpenWorldFileOpts = {}): Promise<OpenWorldFileOutcome> {
   const { readWorldZip } = await import('../store/world-file');
   const read = readWorldZip(bytes);
   if (opening.has(read.worldId)) throw new PlainError('This world file is already opening.');
   opening.add(read.worldId);
   try {
-    return await withWorldLock(`open-${read.worldId}`, () => openRead(read));
+    return await withWorldLock(`open-${read.worldId}`, () => openRead(read, opts));
   } finally {
     opening.delete(read.worldId);
   }
 }
 
-async function openRead(read: { worldId: string; worldName: string; files: WorldFileEntry[] }): Promise<OpenWorldFileOutcome> {
+async function openRead(read: { worldId: string; worldName: string; files: WorldFileEntry[] }, opts: OpenWorldFileOpts): Promise<OpenWorldFileOutcome> {
   const first = placeOf(getState().registry, read.worldId);
   if (first.already) return { kind: 'already', worldId: first.already.id };
   const restore = first.restore;
+  if (!restore && opts.chooseWhere && !(await opts.chooseWhere())) return { kind: 'cancelled' };
 
   let worldJson = read.files.find(f => f.path === 'world.json')!.data;
   if (restore?.api) {

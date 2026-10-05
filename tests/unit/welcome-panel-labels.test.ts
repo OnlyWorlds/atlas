@@ -28,7 +28,7 @@ const source = readFileSync(
 describe('welcome-panel label restores', () => {
   it('restores captured labels, never restated literals', () => {
     // The restore assignments must read a captured variable.
-    expect(source).toContain('btn.textContent = setupLabel;');
+    // (1.17: "set up a folder" left the landing, and its restore with it.)
     expect(source).toContain('tourBtn.textContent = tourLabel;');
   });
 
@@ -40,7 +40,7 @@ describe('welcome-panel label restores', () => {
   });
 
   it('still renders the lowercase door labels the design calls for', () => {
-    expect(source).toContain('>set up a folder<');
+    for (const label of ["'start a world'", "'open a world folder'", "'other ways in'"]) expect(source).toContain(label);
   });
 
   it('the tour door has TWO labels, which is why capturing beats restating', () => {

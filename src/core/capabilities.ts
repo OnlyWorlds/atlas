@@ -50,6 +50,8 @@ export function hasOpfsMode(): boolean {
 export type OpfsStatus = 'ok' | 'refused' | 'full' | 'absent';
 
 let opfsStatusCache: Promise<OpfsStatus> | null = null;
+/** The last answer the probe settled on, for a synchronous reader (null until one has). */
+let opfsStatusKnown: OpfsStatus | null = null;
 export function opfsStatus(): Promise<OpfsStatus> {
   if (!opfsStatusCache) {
     const probe = (async (): Promise<OpfsStatus> => {
@@ -71,9 +73,29 @@ export function opfsStatus(): Promise<OpfsStatus> {
       }
     })();
     opfsStatusCache = probe;
-    void probe.then(s => { if (s === 'full' && opfsStatusCache === probe) opfsStatusCache = null; });
+    void probe.then(s => {
+      opfsStatusKnown = s;
+      if (s === 'full' && opfsStatusCache === probe) opfsStatusCache = null;
+    });
   }
   return opfsStatusCache;
+}
+
+/**
+ * The probe's last answer without waiting, for a synchronous surface (the
+ * palette's search, the chooser's rows): null while nothing has settled yet,
+ * which such a surface reads as "offer it" (the door says why on the click).
+ * Calling it starts a probe when none has run.
+ */
+export function knownOpfsStatus(): OpfsStatus | null {
+  void opfsStatus();
+  return opfsStatusKnown;
+}
+
+/** May a door that needs browser storage be offered? Only a settled refusal says no. */
+export function browserStorageDoorOpen(): boolean {
+  const known = knownOpfsStatus();
+  return hasOpfsMode() && (known === null || known === 'ok');
 }
 
 /** Can this window use browser storage right now? `opfsStatus` says why not. */
@@ -84,6 +106,7 @@ export async function opfsUsable(): Promise<boolean> {
 /** Test seam: forget the cached answer. */
 export function __resetOpfsStatusForTests(): void {
   opfsStatusCache = null;
+  opfsStatusKnown = null;
 }
 
 /** The one plain line for a window that refuses browser storage (lens C R3-h). */

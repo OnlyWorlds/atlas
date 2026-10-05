@@ -54,7 +54,7 @@ async function setupWorld(page: Page, root: string) {
     const fsRoot = await navigator.storage.getDirectory();
     api.setNextDirectory(await fsRoot.getDirectoryHandle(dir, { create: true }));
   }, root);
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForSelector('[data-action="create-local"]');
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'narrow world');
@@ -238,7 +238,7 @@ test('at 760 with a home folder and no world open, the sidebar is in reach', asy
     const fsRoot = await navigator.storage.getDirectory();
     api.setNextDirectory(await fsRoot.getDirectoryHandle('narrow-noworld', { create: true }));
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   const create = page.locator('.atlas-worlds-header [data-action="create-local"]');
   const inReach = async () => {
     const box = await create.boundingBox();

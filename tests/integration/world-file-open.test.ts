@@ -49,7 +49,7 @@ describe('openWorldFile', () => {
     let out;
     try { out = await openWorldFile(worldZip()); } finally { FakeDirHandle.prototype.getFileHandle = real; }
     expect(out).toMatchObject({ kind: 'opened' });
-    const e = reg().worlds.find(w => w.id === out!.worldId)!;
+    const e = reg().worlds.find(w => w.id === (out as { worldId: string }).worldId)!;
     expect(e).toMatchObject({ name: 'Hollow Reach', where: 'browser', folder: { handle_key: `world-${WID}` } });
     const dir = home.children.get(e.folder.folder_name) as FakeDirHandle;
     expect(dir.list()).toEqual(['elements/character/ana--00000001.json', 'media/map.png', 'world.json']);
@@ -137,7 +137,7 @@ describe('openWorldFile', () => {
       'w/.atlas/tombstones.json': strToU8('[]'),
     });
     const out = await openWorldFile(zip);
-    const e = reg().worlds.find(w => w.id === out.worldId)!;
+    const e = reg().worlds.find(w => w.id === (out as { worldId: string }).worldId)!;
     const dir = home.children.get(e.folder.folder_name) as FakeDirHandle;
     expect(dir.list()).toEqual(['world.json']);
     expect(dir.get('world.json')).not.toContain('ow_w_theirs');
@@ -179,5 +179,35 @@ describe('openWorldFile', () => {
   it('a file that is not a world creates nothing', async () => {
     await expect(openWorldFile(strToU8('not a zip'))).rejects.toThrow(/not a world Atlas can open/);
     expect(dirs()).toEqual([]);
+  });
+
+  describe('the where-question (contract §5.2: a NEW world only, asked before anything is written)', () => {
+    it('is asked for a new world, and a cancelled answer writes nothing', async () => {
+      let asked = 0;
+      const out = await openWorldFile(worldZip(), { chooseWhere: async () => { asked++; expect(dirs()).toEqual([]); return null; } });
+      expect(out).toEqual({ kind: 'cancelled' });
+      expect(asked).toBe(1);
+      expect(dirs()).toEqual([]);
+      expect(reg().worlds).toHaveLength(0);
+    });
+
+    it('either answer lands the world in this browser first (a folder answer is the caller\'s move after it)', async () => {
+      const out = await openWorldFile(worldZip(), { chooseWhere: async () => 'folder' });
+      expect(out.kind).toBe('opened');
+      expect(reg().worlds[0]).toMatchObject({ where: 'browser' });
+      expect(dirs()).toHaveLength(1);
+    });
+
+    it('is never asked for a world already here, or for a restore', async () => {
+      const ask = async (): Promise<'folder'> => { throw new Error('asked'); };
+      const here: WorldRegistryEntry = {
+        id: 'w1', name: 'Hollow Reach', state: 'local-only', created_at: '2026-10-05T00:00:00.000Z',
+        folder: { handle_key: `world-${WID}`, folder_name: 'hollow-reach-0192a000' },
+      };
+      patchSlice('registry', { ...defaultRegistry(), worlds: [here] });
+      expect(await openWorldFile(worldZip(), { chooseWhere: ask })).toEqual({ kind: 'already', worldId: 'w1' });
+      patchSlice('registry', { ...defaultRegistry(), worlds: [{ ...here, where: 'browser', cleared_at: '2026-10-05T09:00:00.000Z', folder: { ...here.folder, folder_name: 'hollow-reach-0192a000-dead' } }] });
+      expect(await openWorldFile(worldZip(), { chooseWhere: ask })).toEqual({ kind: 'restored', worldId: 'w1' });
+    });
   });
 });

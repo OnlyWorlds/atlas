@@ -182,6 +182,18 @@ if (import.meta.env.DEV) {
         await root.removeEntry(entry.name, { recursive: true }).catch(() => {});
       }
     },
+    /**
+     * Set up a home folder from the next picked directory, through the same
+     * door code the landing's old "set up a folder" button ran (1.17 removed
+     * that button: the home folder is asked for at a world's first make). For
+     * specs whose setup needs a home folder and is not about the landing.
+     */
+    async setupHomeFolder(): Promise<void> {
+      const { setupAtlasRoot } = await import('./setup/atlas-root-flow');
+      const { finishSetupDoor } = await import('./setup/world-doors');
+      const { toastManager } = await import('./ui/toast-manager');
+      await finishSetupDoor(await setupAtlasRoot(), toastManager);
+    },
     /** Tests use these to read state and refresh the elements cache after direct store edits. */
     getState: () => _getState(),
     getActiveStore: () => _getActiveStore(),

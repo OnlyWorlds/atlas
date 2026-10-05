@@ -1008,6 +1008,44 @@ test('exit tears down mid-tour and returns to the landing', async ({ page }) => 
   expect(state).toEqual({ worlds: 0, active: false });
 });
 
+test('the tour world lives in browser-worlds/, made like any browser world, and goes with the tour (1.17)', async ({ page }) => {
+  // Contract §1.2, §2.2, §7.1: a nonced directory under the browser home,
+  // `where: 'browser'` and `demo: true`, nothing new at the OPFS root.
+  await freshBoot(page);
+  await openOpener(page);
+  await beginToWorld(page);
+  await createWorldViaModal(page);
+  const during = await page.evaluate(async () => {
+    const s = (window as any).__atlasTestApi.getState();
+    const w = s.registry.worlds.find((x: any) => x.demo === true);
+    const opfs = await navigator.storage.getDirectory();
+    const rootNames: string[] = [];
+    for await (const [name] of (opfs as any).entries()) rootNames.push(name);
+    const home = await opfs.getDirectoryHandle('browser-worlds');
+    const homeNames: string[] = [];
+    for await (const [name] of (home as any).entries()) homeNames.push(name);
+    let making = true;
+    try { await (await (await home.getDirectoryHandle(w.folder.folder_name)).getDirectoryHandle('.atlas')).getFileHandle('making'); } catch { making = false; }
+    return { where: w?.where, demo: w?.demo, dir: w?.folder.folder_name, rootNames, homeNames, making };
+  });
+  expect(during.where).toBe('browser');
+  expect(during.demo).toBe(true);
+  expect(during.dir).toMatch(/^hyperion-[0-9a-f]{8}-[0-9a-f]{4}$/);
+  expect(during.homeNames).toEqual([during.dir]);
+  expect(during.rootNames.filter(n => n.startsWith('hyperion'))).toEqual([]);
+  expect(during.making).toBe(false);
+
+  await exitViaConfirm(page);
+  await expect(page.locator('.atlas-landing-actions')).toBeVisible();
+  const after = await page.evaluate(async () => {
+    const home = await (await navigator.storage.getDirectory()).getDirectoryHandle('browser-worlds');
+    const names: string[] = [];
+    for await (const [name] of (home as any).entries()) names.push(name);
+    return names;
+  });
+  expect(after).toEqual([]);
+});
+
 test('back-navigation does not strip links off elements that still exist (S301 gate R2)', async ({ page }) => {
   await freshBoot(page);
   await openOpener(page);
@@ -1103,9 +1141,13 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   await page.evaluate(async () => { await (window as any).__atlasTestApi.resetAll(); });
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
-  // Landing: tour leads; the folder door is an honest line, not a button.
+  // Landing: tour leads; no folder door, and the folder is an honest line.
+  // 1.17 (contract §8): worlds live in this browser here, so "start a world"
+  // and "other ways in" join the tour.
   await expect(page.locator('[data-action="start-tour"]')).toBeVisible();
-  await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="open-world-folder"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="start-world"]')).toBeVisible();
+  await expect(page.locator('[data-action="other-ways-in"]')).toBeVisible();
   // The note must be HONEST about the capability, not merely present. It used
   // to say "needs a Chromium browser", which is what every phone visitor on
   // mobile Chrome was reading (S323) — the gate is the folder picker, which
@@ -1114,9 +1156,8 @@ test('OPFS-only browser (Safari-shaped): app boots, tour runs, folder door hones
   // honesty does.
   await expect(page.locator('.atlas-landing-note')).toContainText('desktop');
   await expect(page.locator('.atlas-landing-note')).toContainText('Chromium');
-  // The splash offers the tour and nothing else on a folder-less browser
-  // (Captain, S354). The example-page door is gone everywhere since S368;
-  // this stays as a guard against it coming back.
+  // The example-page door is gone everywhere since S368; this stays as a
+  // guard against it coming back.
   await expect(page.locator('[data-action="see-example"]')).toHaveCount(0);
   // The tour boots and walks.
   await openOpener(page);
@@ -1245,7 +1286,7 @@ test('replay from settings with a world open clears the stage and can be complet
     const sub = await root.getDirectoryHandle('replay-test-root', { create: true });
     api.setNextDirectory(sub);
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForSelector('[data-action="create-local"]');
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'my own world');

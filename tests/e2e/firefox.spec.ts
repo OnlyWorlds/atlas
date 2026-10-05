@@ -25,7 +25,7 @@ async function boot(page: Page) {
 test('@firefox the landing offers the tour, and the tour builds its world in browser storage', async ({ page }) => {
   await boot(page);
   await expect(page.locator('[data-action="start-tour"]')).toBeVisible();
-  await expect(page.locator('[data-action="setup-atlas"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="open-world-folder"]')).toHaveCount(0);
   await expect(page.locator('.atlas-landing-note')).toContainText('Chromium');
 
   await page.click('[data-action="start-tour"]');
@@ -40,11 +40,43 @@ test('@firefox the landing offers the tour, and the tour builds its world in bro
   await expect(page.locator('.atlas-element-name').first()).toContainText('The Consul');
 });
 
+test('@firefox the landing starts a world in this browser, and other ways in has no folder door', async ({ page }) => {
+  await boot(page);
+  // The landing is the front door for 1.17's worlds on Firefox (contract §8).
+  await expect(page.locator('[data-action="start-world"]')).toBeVisible();
+  await page.click('[data-action="other-ways-in"]');
+  const chooser = page.locator('[data-modal="add-world"]');
+  await expect(chooser.locator('[data-choice="open-file"]')).toBeVisible();
+  await expect(chooser.locator('[data-choice="open-folder"]')).toHaveCount(0);
+  // Every line true for this browser (found by own eyes, S374): no folder here.
+  await expect(chooser.locator('[data-choice="create-local"] .atlas-add-world-text')).toContainText('in this browser');
+  await expect(chooser.locator('[data-choice="create-local"] .atlas-add-world-text')).not.toContainText('folder');
+  await page.keyboard.press('Escape');
+  await expect(chooser).toHaveCount(0);
+
+  await page.click('[data-action="start-world"]');
+  const dialog = page.locator('[data-modal="create-world"]');
+  await expect(dialog.locator('[data-role="where-browser"]')).toHaveText('It lives in this browser.');
+  await expect(dialog.locator('input[name="where"]')).toHaveCount(0);
+  await dialog.locator('input[name="world-name"]').fill('Fox World');
+  await dialog.locator('[data-action="pick"]').click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  const where = await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    return s.registry.worlds.find((w: any) => w.name === 'Fox World')?.where ?? null;
+  });
+  expect(where).toBe('browser');
+});
+
 test('@private a private window says why there is no tour, and offers no door that would stall', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
   await expect(page.locator('.atlas-landing-note')).toContainText('does not allow browser storage, so no world can live in this browser here');
   await expect(page.locator('[data-action="start-tour"]')).toHaveCount(0);
+  // 1.17: every landing door needs browser storage here, so none is offered.
+  await expect(page.locator('[data-action="start-world"]')).toHaveCount(0);
+  await expect(page.locator('[data-action="other-ways-in"]')).toHaveCount(0);
   // Any other door into the tour refuses with the same line.
   const refused = await page.evaluate(async () => {
     const engine = await import('/src/tour/tour-engine.ts');

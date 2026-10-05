@@ -88,12 +88,9 @@ async function roundTrip(page: Page, chromium: boolean) {
   await page.waitForSelector('.atlas-shell');
   expect(await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds.length)).toBe(0);
 
-  // Open the file through "add a world".
-  await page.evaluate(async () => {
-    const { openAddWorldChooser } = await import('/src/setup/world-doors.ts');
-    const { toastManager } = await import('/src/ui/toast-manager.ts');
-    (openAddWorldChooser as any)(toastManager);
-  });
+  // Open the file through the landing's own door (lens C W5: after a full
+  // clear the landing is the only surface, so it must reach the world file).
+  await page.click('[data-action="other-ways-in"]');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     page.locator('[data-modal="add-world"] [data-choice="open-file"]').click(),
@@ -129,4 +126,73 @@ test('a world downloaded as one file comes back whole after the site data is cle
 
 test('@firefox a world downloaded as one file comes back whole after the site data is cleared', async ({ page }) => {
   await roundTrip(page, false);
+});
+
+test('Chromium with a home folder: a new world file asks where, and the folder answer lands it there, no browser copy left', async ({ page }) => {
+  await boot(page);
+  const id = await seedBrowserWorld(page);
+  expect(await activate(page, id)).toBe(true);
+  const bytes = await downloadToBytes(page, id, true);
+
+  // A fresh start with a home folder set (contract §5.2: the question needs one).
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.resetAll().catch(() => {}); });
+  await page.goto('/');
+  await page.waitForSelector('.atlas-shell');
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    api.setNextDirectory(await (await navigator.storage.getDirectory()).getDirectoryHandle('wf-home', { create: true }));
+    await api.setupHomeFolder();
+  });
+  await page.locator('[data-action="add-world"]').click();
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.locator('[data-modal="add-world"] [data-choice="open-file"]').click(),
+  ]);
+  await chooser.setFiles({ name: 'alpha.zip', mimeType: 'application/zip', buffer: bytes });
+  const ask = page.locator('[data-modal="where-ask"]');
+  await expect(ask.locator('input[name="where"]').first()).toHaveAttribute('value', 'folder');
+  await expect(ask.locator('input[name="where"][value="folder"]')).toBeChecked();
+  await ask.locator('[data-action="go"]').click();
+  await expect(page.locator('.ow-toast', { hasText: '"Alpha" now lives in a folder on your drive' })).toBeVisible();
+
+  const after = await page.evaluate(async () => {
+    const { getState } = await import('/src/core/state.ts');
+    const s = getState();
+    const e = s.registry.worlds[0];
+    const opfs = await navigator.storage.getDirectory();
+    const left: string[] = [];
+    try { for await (const [n] of (await opfs.getDirectoryHandle('browser-worlds') as any).entries()) left.push(n); } catch { /* none */ }
+    const wrap = await (await opfs.getDirectoryHandle('wf-home')).getDirectoryHandle('onlyworlds-atlas');
+    let inFolder = false;
+    try { await (await wrap.getDirectoryHandle(e.folder.folder_name)).getFileHandle('world.json'); inFolder = true; } catch { /* absent */ }
+    return { n: s.registry.worlds.length, where: e?.where ?? null, active: s.active?.worldId === e?.id, names: s.data.elements.map((x: any) => x.name), left, inFolder };
+  });
+  expect(after).toEqual({ n: 1, where: null, active: true, names: ['Ada'], left: [], inFolder: true });
+});
+
+test('Chromium with a home folder: "In this browser" keeps a new world file in this browser', async ({ page }) => {
+  await boot(page);
+  const id = await seedBrowserWorld(page);
+  expect(await activate(page, id)).toBe(true);
+  const bytes = await downloadToBytes(page, id, true);
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.resetAll().catch(() => {}); });
+  await page.goto('/');
+  await page.waitForSelector('.atlas-shell');
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    api.setNextDirectory(await (await navigator.storage.getDirectory()).getDirectoryHandle('wf-home-2', { create: true }));
+    await api.setupHomeFolder();
+  });
+  await page.locator('[data-action="add-world"]').click();
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.locator('[data-modal="add-world"] [data-choice="open-file"]').click(),
+  ]);
+  await chooser.setFiles({ name: 'alpha.zip', mimeType: 'application/zip', buffer: bytes });
+  const ask = page.locator('[data-modal="where-ask"]');
+  await ask.locator('input[name="where"][value="browser"]').check();
+  await ask.locator('[data-action="go"]').click();
+  await expect(page.locator('.ow-toast', { hasText: 'Opened "Alpha". It lives in this browser.' })).toBeVisible();
+  const where = await page.evaluate(() => (window as any).__atlasTestApi.getState().registry.worlds[0]?.where ?? null);
+  expect(where).toBe('browser');
 });

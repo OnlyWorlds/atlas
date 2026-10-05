@@ -25,7 +25,7 @@ async function setupAtlasRoot(page: Page, dirName: string = 'polish-test-root') 
   }, dirName);
   // Session 222 W2: setup-atlas button moved off the sidebar — welcome panel
   // is the single CTA. Drop the .atlas-sidebar prefix to find the button.
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForSelector('[data-action="create-local"]');
 }
 

@@ -24,11 +24,12 @@ import { saveRegistry, deleteWorldEntry } from '../registry/registry';
 import { deleteHandle } from '../store/handle-vault';
 import { BaseModal } from '../ui/modal-base';
 import { NO_FOLDER_PICKER_LINE, PICKER_CANCELLED_HINT } from '../ui/directory-picker';
-import { hasFolderMode, hasOpfsMode } from '../core/capabilities';
+import { browserStorageDoorOpen, hasFolderMode } from '../core/capabilities';
 import { completeWaypoint } from '../core/waypoints';
 import { pickWorldFile, openWorldFileFrom } from '../ui/open-world-file';
 import { PlainError } from '../core/plain-error';
 import { isTourFlagActive } from '../tour/tour-flag';
+import { requestPersistOnFirstBrowserWorld } from './world-parent';
 import type { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import {
@@ -215,7 +216,10 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
     return;
   }
   if (action === 'open-file') {
-    // The file picker opens inside this click, before any await (1.17, contract §5.2).
+    // The file picker opens inside this click, before any await (1.17, contract §5.2),
+    // and a file that lands in this browser is a browser world: ask the browser
+    // to keep worlds while the gesture is live (§2.3, invariant 10; S374 gate F8).
+    requestPersistOnFirstBrowserWorld();
     const file = await pickWorldFile();
     if (file) await openWorldFileFrom(file, toasts);
     return;
@@ -249,8 +253,8 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
 }
 
 /** The chooser's rows: the icon row's five, said in words (S365). */
-const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line: string }> = [
-  { action: 'create-local', icon: 'create_new_folder', title: 'Start a new world', line: 'Plain files, in a folder on your drive or in this browser. Works offline; take it online any time.' },
+const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line: string; /** Said instead without the folder picker. */ browserOnlyLine?: string }> = [
+  { action: 'create-local', icon: 'create_new_folder', title: 'Start a new world', line: 'Plain files, in a folder on your drive or in this browser. Works offline; take it online any time.', browserOnlyLine: 'Plain files, in this browser. Works offline; take it online any time.' },
   { action: 'open-folder', icon: 'folder_open', title: 'Open a world folder', line: 'One you already have, from Atlas, another tool, or your AI. It opens where it is; nothing is copied.' },
   { action: 'new-api', icon: 'cloud_upload', title: 'New world on OnlyWorlds', line: 'Created on onlyworlds.com and here, synced from the start. Needs a free account.' },
   { action: 'link-api', icon: 'link', title: 'Bring down a world from OnlyWorlds', line: 'Paste its key: Atlas downloads a full copy and keeps the two in sync.' },
@@ -281,11 +285,11 @@ class AddWorldChooser extends BaseModal {
 
   open(): void {
     const { overlay, body } = this.buildModalShell({ title: 'Add a world', dataModal: 'add-world' });
-    const rows = CHOICES.filter(c => (c.action !== 'open-folder' || hasFolderMode()) && (c.action !== 'open-file' || hasOpfsMode()));
+    const rows = CHOICES.filter(c => (c.action !== 'open-folder' || hasFolderMode()) && (c.action !== 'open-file' || browserStorageDoorOpen()));
     body.innerHTML = `<div class="atlas-add-world-list">${rows.map(c => `
       <button type="button" class="atlas-add-world-row" data-choice="${c.action}">
         <span class="material-symbols-outlined atlas-add-world-icon" aria-hidden="true">${c.icon}</span>
-        <span class="atlas-add-world-text"><strong>${c.title}</strong><span>${c.line}</span></span>
+        <span class="atlas-add-world-text"><strong>${c.title}</strong><span>${!hasFolderMode() && c.browserOnlyLine ? c.browserOnlyLine : c.line}</span></span>
       </button>`).join('')}</div>`;
     body.querySelectorAll<HTMLButtonElement>('[data-choice]').forEach(btn => {
       btn.addEventListener('click', () => {

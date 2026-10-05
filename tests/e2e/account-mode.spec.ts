@@ -33,7 +33,7 @@ async function setupAtlasRoot(page: Page, dirName: string = 'account-mode-root')
     const sub = await root.getDirectoryHandle(name, { create: true });
     api.setNextDirectory(sub);
   }, dirName);
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForSelector('[data-action="create-local"]');
 }
 

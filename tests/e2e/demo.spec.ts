@@ -35,7 +35,7 @@ test('the share room no longer links to the demo; #/demo still renders map, pins
     const sub = await root.getDirectoryHandle('demo-entry-root', { create: true });
     api.setNextDirectory(sub);
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForSelector('[data-action="create-local"]');
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Demo Entry World');
@@ -80,7 +80,7 @@ test('the demo writes NOTHING: no registry entry, and exit returns to welcome', 
 
   await page.locator('[data-action="demo-exit"]').click();
   await expect(page.locator('.atlas-demo-overlay')).toHaveCount(0);
-  await expect(page.locator('[data-action="setup-atlas"]').first()).toBeVisible();
+  await expect(page.locator('[data-action="start-world"]').first()).toBeVisible();
 });
 
 test('Escape exits the demo', async ({ page }) => {

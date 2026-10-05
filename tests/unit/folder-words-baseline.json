@@ -40,9 +40,10 @@
   "src/ui/help-content.ts": 1,
   "src/ui/link-world-modal.ts": 1,
   "src/ui/make-online-modal.ts": 2,
-  "src/ui/move-browser-world-modal.ts": 11,
+  "src/ui/move-browser-world-modal.ts": 13,
   "src/ui/new-api-world-modal.ts": 3,
+  "src/ui/open-world-file.ts": 3,
   "src/ui/problem-fixes.ts": 4,
   "src/ui/view-world-modal.ts": 1,
-  "src/ui/where-choice.ts": 5
+  "src/ui/where-choice.ts": 6
 }

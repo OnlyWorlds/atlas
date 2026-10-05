@@ -206,7 +206,7 @@ named here, or the next one leaks the same way:
 |---|---|---|
 | registry entry | `atlas_worlds_registry` | `deleteWorldEntry` |
 | directory handle | handle vault (IDB) | `deleteHandle` |
-| world folder | OPFS `hyperion-tour-*` | `removeEntry(recursive)` |
+| world folder | OPFS `browser-worlds/hyperion-<id8>-<n4>` (1.17; 1.16 and earlier: `hyperion-tour-*` at the OPFS root) | `removeBrowserWorldDir` by the entry; the legacy root sweep for old ones |
 | right-pane map tabs | `atlas_right_tabs` | `dropPersistedTabsForWorld` |
 | per-map cameras | `atlas_map_camera_state` | `clearCameraState` per bundle map |
 | tour step state | `atlas_tour_v1` | `writeTourState(null)` |
@@ -283,8 +283,10 @@ already drawn).
   ui slice (force-render idiom) so stage-dependent chrome re-renders; exit
   ticks once more after the flag clears. Boot/resume set
   `sidebarMode: 'elements'` (state only, never the pref).
-- **`tour-world.ts`** — scaffolds the OPFS demo world via
-  `scaffoldWorldInRoot`'s parentOverride (no picker, no permission).
+- **`tour-world.ts`** — scaffolds the demo world as a browser world (1.17,
+  conv. 129): the make protocol (`scaffoldBrowserWorld`: Web Lock,
+  `.atlas/making`, a nonced `browser-worlds/` directory), `where: 'browser'`
+  and `demo: true`; no picker, no permission, no `persist()`.
 - **`tour-bar.ts`** — the panel (both positions), the annotated sentence,
   the hands-on buttons. Mounted by welcome/app-boot/settings-replay.
 - **`tour-flag.ts`** — pure localStorage read for chrome that must know "is

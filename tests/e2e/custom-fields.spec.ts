@@ -26,7 +26,7 @@ async function setupWorld(page: Page) {
     const sub = await root.getDirectoryHandle('custom-fields-test-root', { create: true });
     api.setNextDirectory(sub);
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForSelector('[data-action="create-local"]');
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'cfworld');

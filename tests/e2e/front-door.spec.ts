@@ -52,16 +52,76 @@ test('first visit: "open a world folder" opens the world in place, no home folde
   expect(root).toBeNull();
 });
 
-test('first visit: the setup door, pointed at a world folder, opens it instead of refusing', async ({ page }) => {
+test('first visit: the landing offers the tour, start a world, open a world folder and other ways in', async ({ page }) => {
+  // 1.17 (contract §8, lens C R2-c): "set up a folder" became "start a world",
+  // whose dialog asks where; "other ways in" is the chooser.
+  await freshBoot(page);
+  const doors = page.locator('.atlas-landing-actions .atlas-landing-btn');
+  await expect(doors).toHaveText(['take the tour', 'start a world', 'open a world folder', 'other ways in']);
+  await expect(page.locator('.atlas-landing-note')).toBeHidden();
+
+  await page.click('[data-action="other-ways-in"]');
+  const chooser = page.locator('[data-modal="add-world"]');
+  await expect(chooser.locator('[data-choice]')).toHaveCount(6);
+  await expect(chooser.locator('[data-choice="open-file"]')).toBeVisible();
+});
+
+test('first visit, browser storage refused on Chromium: no tour, and the doors left say only what works (S374 gate F6)', async ({ page }) => {
+  await page.addInitScript(() => {
+    const storage = navigator.storage as any;
+    storage.getDirectory = async () => { throw Object.assign(new Error('refused'), { name: 'SecurityError' }); };
+  });
+  await page.goto('/');
+  await page.waitForSelector('.atlas-shell');
+  await expect(page.locator('.atlas-landing-note')).toContainText('does not allow browser storage');
+  await expect(page.locator('[data-action="start-tour"]')).toHaveCount(0);
+  const notes = page.locator('.atlas-landing-choice-note');
+  await expect(notes).toHaveText(['your first world, in a folder on your drive', 'one you already have, or one your AI made', 'bring one down from OnlyWorlds, or view a shared world']);
+});
+
+test('first visit: start a world asks where, folder first, and the browser row lands a world in this browser', async ({ page }) => {
+  await freshBoot(page);
+  await page.click('[data-action="start-world"]');
+  const dialog = page.locator('[data-modal="create-world"]');
+  await expect(dialog.locator('input[name="where"]')).toHaveCount(2);
+  await expect(dialog.locator('input[name="where"]').first()).toHaveAttribute('value', 'folder');
+  await dialog.locator('input[name="where"][value="browser"]').check();
+  await dialog.locator('input[name="world-name"]').fill('Landing World');
+  await dialog.locator('[data-action="pick"]').click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  const after = await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    const w = s.registry.worlds.find((x: any) => x.name === 'Landing World');
+    return { root: s.atlasRoot, where: w?.where ?? null };
+  });
+  expect(after).toEqual({ root: null, where: 'browser' });
+  // Set up now: the landing is gone for good after a reload.
+  await page.goto('/');
+  await page.waitForSelector('.atlas-shell');
+  await expect(page.locator('[data-action="start-world"]')).toHaveCount(0);
+  await expect(page.locator('.atlas-sidebar').getByText('Landing World').first()).toBeVisible();
+});
+
+test('first visit: start a world in a folder, pointed at a world folder for its home, opens that world instead', async ({ page }) => {
   await freshBoot(page);
   await seedWorldFolderForPicker(page, 'agent-world-2');
-  await page.click('[data-action="setup-atlas"]');
+  await page.click('[data-action="start-world"]');
+  const dialog = page.locator('[data-modal="create-world"]');
+  await dialog.locator('input[name="where"][value="folder"]').check();
+  await dialog.locator('input[name="world-name"]').fill('Never Made');
+  await dialog.locator('[data-action="pick"]').click();
+  await page.locator('[data-modal="home-folder"] [data-action="choose"]').click();
 
   await expect(page.locator('h1', { hasText: 'Agent World' })).toBeVisible();
   await expect(page.getByText('Gil the Agent').first()).toBeVisible();
-  // It opened the WORLD; it did not make a home folder inside someone's world.
-  const root = await page.evaluate(() => (window as any).__atlasTestApi.getState().atlasRoot);
-  expect(root).toBeNull();
+  // It opened the WORLD; it did not make a home folder inside someone's
+  // world, and it made no new one.
+  const after = await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    return { root: s.atlasRoot, made: s.registry.worlds.some((w: any) => w.name === 'Never Made') };
+  });
+  expect(after).toEqual({ root: null, made: false });
 });
 
 test('a world opened without a home folder: a reload shows the world list, not the landing', async ({ page }) => {
@@ -188,7 +248,7 @@ test('the open-a-world door does not switch an existing home folder', async ({ p
     const home = await opfs.getDirectoryHandle('door-home-1', { create: true });
     (window as any).__atlasTestApi.setNextDirectory(home);
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.waitForFunction(() => !!(window as any).__atlasTestApi.getState().atlasRoot);
   const before = await page.evaluate(() => (window as any).__atlasTestApi.getState().atlasRoot.folderName);
 

@@ -110,7 +110,7 @@ test('object-valued extension fields render read-only, never as an editable row'
     const root = await api.opfsRoot();
     api.setNextDirectory(root);
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Hazardville');
   await page.click('[data-action="pick"]');
@@ -166,7 +166,7 @@ test('character war record lists recorded battles chronologically; absent withou
     const root = await api.opfsRoot();
     api.setNextDirectory(root);
   });
-  await page.click('[data-action="setup-atlas"]');
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
   await page.click('[data-action="create-local"]');
   await page.fill('input[name="world-name"]', 'Warville');
   await page.click('[data-action="pick"]');

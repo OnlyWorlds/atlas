@@ -125,13 +125,47 @@ export async function askWhere(opts: { title: string; action: string; purpose: s
     opts.toasts.error(problem);
     return null;
   }
-  return new WhereAskModal().ask(opts);
+  return (await new WhereAskModal().ask(opts))?.where ?? null;
 }
 
-class WhereAskModal extends BaseModal {
-  private resolve: ((where: WorldWhere | null) => void) | null = null;
+/** A browser answer, or a folder answer with the home folder made writable inside the click. */
+export type WhereWithHome =
+  | { where: 'browser' }
+  | { where: 'folder'; home: FileSystemDirectoryHandle; hint: string };
 
-  ask(opts: { title: string; action: string; purpose: string; toasts: ToastManager }): Promise<WorldWhere | null> {
+/**
+ * The question for a world that lands in this browser first and then moves to
+ * the home folder (opening a world file, contract §5.2: the unpack, then the
+ * §4 move). A folder answer makes the home folder writable INSIDE the answer's
+ * click, the gesture the permission prompt needs, so the move can run later
+ * without one. For a browser with the folder picker; null when cancelled.
+ */
+export async function askWhereWithHome(opts: { title: string; action: string; purpose: string; toasts: ToastManager }): Promise<WhereWithHome | null> {
+  const answer = await new WhereAskModal().ask({ ...opts, withHome: true });
+  if (!answer) return null;
+  return answer.where === 'folder' && answer.home
+    ? { where: 'folder', home: answer.home, hint: answer.hint ?? answer.home.name }
+    : { where: 'browser' };
+}
+
+/** The home folder, writable, from inside a click; a sentence when it cannot be. */
+async function writableHome(): Promise<{ home: FileSystemDirectoryHandle; hint: string } | string> {
+  const { loadHandle, ensureWritable } = await import('../store/handle-vault');
+  const { ATLAS_ROOT_HANDLE_KEY } = await import('../core/constants');
+  const home = await loadHandle(ATLAS_ROOT_HANDLE_KEY).catch(() => undefined);
+  if (!home || !(await ensureWritable(home).catch(() => false))) {
+    return 'Atlas needs to be allowed to change your OnlyWorlds folder to put the world there. Allow it, or choose this browser.';
+  }
+  const root = getState().atlasRoot;
+  return { home, hint: root?.pathHint ?? root?.folderName ?? home.name };
+}
+
+interface WhereAnswer { where: WorldWhere; home?: FileSystemDirectoryHandle; hint?: string }
+
+class WhereAskModal extends BaseModal {
+  private resolve: ((answer: WhereAnswer | null) => void) | null = null;
+
+  ask(opts: { title: string; action: string; purpose: string; toasts: ToastManager; withHome?: boolean }): Promise<WhereAnswer | null> {
     return new Promise((resolve) => {
       this.resolve = resolve;
       const { overlay, body } = this.buildModalShell({ title: opts.title, dataModal: 'where-ask' });
@@ -152,9 +186,22 @@ class WhereAskModal extends BaseModal {
         errorBox.hidden = true;
         const where = takeWhereInClick(form);
         const ready = await readyWhere(where, opts.toasts, opts.purpose);
-        if (ready === true) { this.settle(where); return; }
-        errorBox.textContent = ready || '';
-        errorBox.hidden = !ready;
+        if (ready !== true) {
+          errorBox.textContent = ready || '';
+          errorBox.hidden = !ready;
+          return;
+        }
+        if (where === 'folder' && opts.withHome) {
+          const home = await writableHome();
+          if (typeof home === 'string') {
+            errorBox.textContent = home;
+            errorBox.hidden = false;
+            return;
+          }
+          this.settle({ where, ...home });
+          return;
+        }
+        this.settle({ where });
       });
       this.modal = overlay;
       this.show();
@@ -162,11 +209,11 @@ class WhereAskModal extends BaseModal {
     });
   }
 
-  private settle(where: WorldWhere | null): void {
+  private settle(answer: WhereAnswer | null): void {
     const r = this.resolve;
     this.resolve = null;
     this.hide();
-    r?.(where);
+    r?.(answer);
   }
 
   protected hide(): void {

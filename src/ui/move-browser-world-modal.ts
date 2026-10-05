@@ -22,8 +22,12 @@ function appRoot(): HTMLElement | null {
   return document.querySelector<HTMLElement>('.atlas-shell');
 }
 
+function unlockApp(): void {
+  appRoot()?.removeAttribute('inert');
+}
+
 /** Step 1, inside the click: the home folder, writable. `null`: the user did not give one (already said). */
-async function readyHome(toasts: ToastManager): Promise<{ home: FileSystemDirectoryHandle; hint: string } | null> {
+export async function readyHome(toasts: ToastManager): Promise<{ home: FileSystemDirectoryHandle; hint: string } | null> {
   if (!getState().atlasRoot) {
     const ok = await ensureAtlasRoot(toasts, 'move this world to a folder on your drive', { worldPicked: 'refuse' });
     if (!ok) return null;
@@ -45,10 +49,44 @@ export class MoveBrowserWorldModal extends BaseModal {
   open(): void {
     const w = this.world;
     const root = getState().atlasRoot;
-    const { overlay, body } = this.buildModalShell({ title: `Move "${w.name}" to a folder?`, dataModal: 'move-browser-world' });
-    body.innerHTML = `
+    const { cancel, confirm, progress } = this.shell(`
       <p class="atlas-modal-hint">Atlas copies the world into ${root ? `your OnlyWorlds folder, <code>${escapeText(root.pathHint ?? root.folderName)}</code>` : 'a folder on your drive'}, checks the copy, then removes it from this browser. In the folder, your AI and other tools can work on it.</p>
-      ${root ? '' : '<p class="atlas-modal-hint">You pick that folder once; Atlas keeps your worlds in it as plain files.</p>'}
+      ${root ? '' : '<p class="atlas-modal-hint">You pick that folder once; Atlas keeps your worlds in it as plain files.</p>'}`);
+    confirm.focus();
+    cancel.addEventListener('click', () => this.hide());
+    confirm.addEventListener('click', async () => {
+      // Locked from the click (S373 gate F9): readying the home folder can
+      // take a dialog, a picker and a permission prompt, and a dialog closed
+      // meanwhile must not leave a move running with nothing on screen.
+      this.lock(cancel, confirm, true);
+      const ready = await readyHome(this.toasts);
+      if (!this.modal?.isConnected) return;
+      if (!ready) { this.lock(cancel, confirm, false); return; }
+      await this.run(ready, { cancel, confirm, progress });
+    });
+  }
+
+  /**
+   * Run the move at once with a home folder already made writable inside an
+   * earlier click (opening a world file into a folder, contract §5.2): the
+   * same locked run and progress, no confirm. Resolves whether it moved.
+   */
+  start(ready: { home: FileSystemDirectoryHandle; hint: string }): Promise<boolean> {
+    // Already asked (the where-question): a statement, not a question, and no
+    // confirm button (S374 gate F7).
+    const { cancel, confirm, progress } = this.shell(
+      `<p class="atlas-modal-hint">Atlas copies the world into your OnlyWorlds folder, <code>${escapeText(ready.hint)}</code>, checks the copy, then removes it from this browser.</p>`,
+      `Moving "${this.world.name}" to your folder`);
+    cancel.addEventListener('click', () => this.hide());
+    confirm.hidden = true;
+    this.lock(cancel, confirm, true);
+    return this.run(ready, { cancel, confirm, progress });
+  }
+
+  private shell(intro: string, title = `Move "${this.world.name}" to a folder?`): { body: HTMLElement; cancel: HTMLButtonElement; confirm: HTMLButtonElement; progress: HTMLElement } {
+    const { overlay, body } = this.buildModalShell({ title, dataModal: 'move-browser-world' });
+    body.innerHTML = `
+      ${intro}
       <div class="atlas-modal-progress" data-role="move-progress" hidden></div>
       <div class="atlas-modal-actions">
         <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
@@ -56,57 +94,62 @@ export class MoveBrowserWorldModal extends BaseModal {
       </div>`;
     this.modal = overlay;
     this.show();
-    const cancel = body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!;
-    const confirm = body.querySelector<HTMLButtonElement>('[data-action="move-confirm"]')!;
-    const progress = body.querySelector<HTMLElement>('[data-role="move-progress"]')!;
-    confirm.focus();
-    const unlock = (): void => { appRoot()?.removeAttribute('inert'); };
+    // The app behind goes back to normal whenever the dialog leaves the page.
     const observer = new MutationObserver(() => {
-      if (!overlay.isConnected) { observer.disconnect(); unlock(); }
+      if (!overlay.isConnected) { observer.disconnect(); unlockApp(); }
     });
     observer.observe(document.body, { childList: true });
-    cancel.addEventListener('click', () => this.hide());
-    confirm.addEventListener('click', async () => {
-      // Locked from the click (S373 gate F9): readying the home folder can
-      // take a dialog, a picker and a permission prompt, and a dialog closed
-      // meanwhile must not leave a move running with nothing on screen.
-      confirm.disabled = true;
-      cancel.disabled = true;
-      this.dismissLocked = true;
-      const ready = await readyHome(this.toasts);
-      if (!overlay.isConnected) return;
-      if (!ready) { confirm.disabled = false; cancel.disabled = false; this.dismissLocked = false; return; }
-      appRoot()?.setAttribute('inert', '');
-      progress.hidden = false;
-      progress.textContent = 'Getting the world ready…';
-      let outcome: Awaited<ReturnType<typeof moveBrowserWorldToFolder>> | null = null;
-      let refusal: unknown = null;
-      try {
-        outcome = await moveBrowserWorldToFolder(w, {
-          home: ready.home,
-          homeHint: ready.hint,
-          onProgress: (done, total) => { progress.textContent = `Copying: ${done} of ${total} files`; },
-        });
-      } catch (err) {
-        refusal = err;
-      }
-      unlock();
-      this.dismissLocked = false;
-      if (outcome?.ok) {
-        this.hide();
-        completeWaypoint('keep-copy');
-        this.toasts.success(`"${w.name}" now lives in a folder on your drive: ${outcome.pathHint}.`
-          + (outcome.leftBrowserCopy ? ' Its old copy in this browser is removed the next time Atlas starts.' : ''));
-        return;
-      }
-      if (outcome && !outcome.ok) console.warn('[atlas:move] did not finish:', outcome.error);
-      const err = refusal ?? (outcome as { error: unknown }).error;
-      const why = problemFor(err, { doing: 'moving this world to a folder', where: 'folder', folder: 'picked', inline: true }).sentence;
-      progress.textContent = refusal ? why : `${MOVE_DID_NOT_FINISH(w.name)} ${why}`;
-      cancel.disabled = false;
-      cancel.textContent = 'Close';
-      confirm.hidden = true;
-      cancel.focus();
-    });
+    return {
+      body,
+      cancel: body.querySelector<HTMLButtonElement>('[data-action="cancel"]')!,
+      confirm: body.querySelector<HTMLButtonElement>('[data-action="move-confirm"]')!,
+      progress: body.querySelector<HTMLElement>('[data-role="move-progress"]')!,
+    };
+  }
+
+  private lock(cancel: HTMLButtonElement, confirm: HTMLButtonElement, locked: boolean): void {
+    confirm.disabled = locked;
+    cancel.disabled = locked;
+    this.dismissLocked = locked;
+  }
+
+  private async run(
+    ready: { home: FileSystemDirectoryHandle; hint: string },
+    els: { cancel: HTMLButtonElement; confirm: HTMLButtonElement; progress: HTMLElement },
+  ): Promise<boolean> {
+    const w = this.world;
+    const { cancel, confirm, progress } = els;
+    appRoot()?.setAttribute('inert', '');
+    progress.hidden = false;
+    progress.textContent = 'Getting the world ready…';
+    let outcome: Awaited<ReturnType<typeof moveBrowserWorldToFolder>> | null = null;
+    let refusal: unknown = null;
+    try {
+      outcome = await moveBrowserWorldToFolder(w, {
+        home: ready.home,
+        homeHint: ready.hint,
+        onProgress: (done, total) => { progress.textContent = `Copying: ${done} of ${total} files`; },
+      });
+    } catch (err) {
+      refusal = err;
+    }
+    unlockApp();
+    this.dismissLocked = false;
+    if (outcome?.ok) {
+      this.hide();
+      completeWaypoint('keep-copy');
+      this.toasts.success(`"${w.name}" now lives in a folder on your drive: ${outcome.pathHint}.`
+        + (outcome.leftBrowserCopy ? ' Its old copy in this browser is removed the next time Atlas starts.' : ''));
+      return true;
+    }
+    if (outcome && !outcome.ok) console.warn('[atlas:move] did not finish:', outcome.error);
+    const err = refusal ?? (outcome as { error: unknown }).error;
+    const why = problemFor(err, { doing: 'moving this world to a folder', where: 'folder', folder: 'picked', inline: true }).sentence;
+    progress.textContent = refusal ? why : `${MOVE_DID_NOT_FINISH(w.name)} ${why}`;
+    cancel.disabled = false;
+    cancel.textContent = 'Close';
+    confirm.hidden = true;
+    cancel.focus();
+    return false;
   }
 }
