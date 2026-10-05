@@ -1,7 +1,7 @@
 # Atlas: The Shell
 
 **Updated**: 2026-09-29 (S366 split from DESIGN.md; the pre-split text is `docs-archive/DESIGN-2026-09-29-pre-split.md`).
-**Job**: the three-pane shell, the rooms, the state shape, the routes and the context pane. The state and route sections are regenerated from `src/core/state.ts` and `src/core/router.ts`; when they disagree with the code, the code wins and this file is the bug. The per-module file tree lives in the atlas-tool skill, not here.
+**Job**: the three-pane shell, the rooms, the state shape, the routes and the context pane. The state and route sections are regenerated from `src/core/state.ts` and `src/core/router.ts`; when they disagree with the code, the code wins and this file is the bug. The per-module file tree lives in `CODEMAP.md`, not here.
 
 ---
 

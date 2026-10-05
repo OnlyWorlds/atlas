@@ -30,6 +30,6 @@
 
 **The record this project keeps** (not items): `PROGRESS.md` (CURRENT STATE and each session), `DESIGN_LAWS.md` (the numbered conventions), the public changelog (`src/changelog/changelog.data.ts`), the dated decision notes and handovers in `Forge/Notes/`, the repo's history.
 
-**Retired when items land**: the build list in `Forge/Notes/2026-10-04-s368-handover.md`, the "NEXT" lines of PROGRESS CURRENT STATE, and Atlas's active-fire line in Temper's memory index (all become items or pointers to them).
+**Retired when items land**: the build list in `Forge/Notes/2026-10-04-s368-handover.md`, the "NEXT" lines of PROGRESS CURRENT STATE, and Atlas's live-thread line in Temper's memory index (all become items or pointers to them).
 
 Signed: ________

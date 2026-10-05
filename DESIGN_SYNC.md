@@ -11,6 +11,14 @@ The folder is the world; the API is a sync target. A `SyncEngine` exists only fo
 
 Local-first by default: pushes follow user intent (you typed, it saves), pulls are opt-in (pull-on-activate and the cadence both default off; the manual refresh is always there).
 
+**Wire facts the rest of this file leans on** (probed; the frozen contract is the v2 probed-facts note above):
+- Element `type`: the v2 wire DOES return it (probed 2026-07-28, a 43-field character body). The adapter re-stamps it from the path anyway, the same value. An older line in the atlas-tool skill said "the server omits it"; that was false and misled a folder-writer design in Assembly.
+- `change_seq` rides read responses and must NEVER reach disk (`adaptV2Record` drops it; `SERVER_MANAGED_FIELDS` strips it from legacy files on push). `world` is not on the wire at all, so element files carry no world reference: that is what lets a folder snapshot take a fresh world id.
+- `name: ""` passes on every type; an absent `name` KEY is a 422. Nothing in atlas gates unnamed elements.
+- Extension namespaces (`atlas_*`, `x_*`, `shadow_*`) round-trip; a non-namespaced unknown field is a 422 naming it in `param`.
+- Errors are `{error:{type,code,message,param}}`. Only `invalid_credentials`, `key_revoked` and a 401/403 count as auth (the round bails); `rate_limited` and 429 are NOT auth, they are transient (conv. 100).
+- Lists ask `?limit=500` (the wire's max page) and walk `?cursor=`; an incomplete walk suppresses server-delete detection. `/changes` continues with `since=`, never `cursor=`.
+
 ## Attaching the engine
 
 `attachSyncEngine(entry, folder)` in `src/sync/sync-attach.ts` is the one place an engine is made. It no-ops (and detaches any prior engine) for a local-only world. For an api-linked world it builds the adapter from `world.json`'s key and the registry PIN, creates the engine with `onStateChange` publishing into `state.sync`, applies the registry's `sync_debounce_ms`, adopts a persisted big-batch hold (conv. 111) BEFORE anything can push, pauses when `sync_pause_all` or the world's `sync_paused` is set, and then runs, in order: the flush-on-attach, then pull-on-activate (conv. 25). A view-only world skips the flush and always pulls on activate.

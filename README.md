@@ -20,7 +20,7 @@ npm run e2e:ui       # Playwright UI mode
 
 ## Stack
 
-TypeScript + Vite + `@onlyworlds/sdk` ^4.3.0 + Leaflet 1.9 + Vitest + MSW + fake-indexeddb + Playwright. Vanilla DOM, no React. `base: './'` for Cloudflare Pages compatibility. Chromium-only for full folder-mode editing; Safari 26+ / Firefox 111+ can take the guided tour (browser storage); browser-storage worlds are designed, not built (folder mode needs the File System Access API).
+TypeScript + Vite + `@onlyworlds/sdk` (version in `package.json`) + Leaflet 1.9 + Vitest + MSW + fake-indexeddb + Playwright. Vanilla DOM, no React. `base: './'` for Cloudflare Pages compatibility. Folder mode needs the File System Access API (Chromium); Safari 26+ / Firefox 111+ take the guided tour in browser storage, and worlds kept in browser storage are being built as 1.17 (conv. 129).
 
 ## Architecture (one-line)
 
@@ -40,4 +40,4 @@ The doc system has five live layers. **Rule: Forge/Notes decide, DESIGN docs hol
 | Arc pickups | `*_HANDOVER.md` | Warm-start doc for a live arc; rebuilt per arc, archived when the arc closes (none open today: the charts and release handovers are in `docs-archive/`) |
 | Cross-bay contracts | `SHARING_CONTRACT.md`, `SHARING_CF_DELIVERY.md` | Live agreements (Anchor backend, Boss CF delivery) |
 
-Reference: `SYNC_NOTES.md` (sync lessons), `PORTED.md` (legacy port log), `CHANGELOG.md`. Superseded docs live in `docs-archive/`, never the root.
+Reference: `CODEMAP.md` (the per-module map of `src/` and `tests/`), `SYNC_NOTES.md` (sync lessons), `PORTED.md` (legacy port log), `CHANGELOG.md`. Superseded docs live in `docs-archive/`, never the root.

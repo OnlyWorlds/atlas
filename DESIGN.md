@@ -44,7 +44,7 @@ There is no api-only mode. If you want a world online, you attach credentials an
 - **View-only worlds** are a FLAG on api-linked, not a third state: `api.read_only` (registry and `world.json`). Linked with a READ key and no PIN; the engine is pull-only and the store refuses every UI write. The sister-shares-with-her-DM flow.
 - **local-only to api-linked**: Make Online, two routes (create a new api world, or link into an existing one). DESIGN_SYNC "Make Online".
 - **api-linked to local-only**: unlink. The folder stays, sync stops, the baselines are wiped (conv. 24), and the server world id is remembered as `former_api_world_id`.
-- **Where a world comes from**: made new in the home folder, downloaded from onlyworlds.com, imported from a file, or any world folder opened in place (DESIGN_FOLDER "Opening a world folder in place"). A browser without the folder picker (Firefox, Safari 26+) gets the guided tour only today; browser-storage worlds are the next design.
+- **Where a world comes from**: made new in the home folder, downloaded from onlyworlds.com, imported from a file, or any world folder opened in place (DESIGN_FOLDER "Opening a world folder in place"). A browser without the folder picker (Firefox, Safari 26+) gets the guided tour only in 1.16; worlds kept in browser storage are being built as 1.17 (conv. 129, contract `Forge/Notes/2026-10-04-browser-worlds-contract.md`).
 
 ## Doc map
 
@@ -70,12 +70,13 @@ The rule (README): Forge/Notes decide, DESIGN docs hold. A dated decision record
 | `SYNC_NOTES.md` | sync lessons and bug classes, closed bouts, open soft edges (read before touching sync) |
 | `SHARING_CONTRACT.md` | the atlas and onlyworlds.com sharing backend contract |
 | `SHARING_CF_DELIVERY.md` | the Cloudflare edge-caching design for the page viewer |
-| `PROGRESS.md` | operational state: CURRENT STATE, the queue, session entries |
+| `PROGRESS.md` | operational state: CURRENT STATE and the queue (earlier session entries: `docs-archive/PROGRESS-history.md`) |
 | `CHANGELOG.md` | release notes (the public page is generated from `src/changelog/changelog.data.ts`) |
 | `PORTED.md` | the port log from the legacy build and zoner |
+| `CODEMAP.md` | the per-module map of `src/` and `tests/`, path-checked by the docs guard |
 | `README.md` | run commands, stack, the doc-system layers |
 
-Superseded docs live in `docs-archive/`, never the root. The per-module file tree and the test cadence live in the atlas-tool skill (`Forge/.claude/skills/atlas-tool/SKILL.md`).
+Superseded docs live in `docs-archive/`, never the root (session history before the current state: `docs-archive/PROGRESS-history.md`). The per-module file tree is `CODEMAP.md`; the test cadence is "Testing" below.
 
 ## The subsystems
 
@@ -95,9 +96,9 @@ Superseded docs live in `docs-archive/`, never the root. The per-module file tre
 
 **Home, data, charts** (`DESIGN_HOME.md`, `DESIGN_IMPORT.md`, `DESIGN_CHARTS.md`). The world's identity room; import and export in the keel envelope; charts of the world along time, with calendars as a display layer over integer dates.
 
-**The tour** (`DESIGN_TOUR.md`). The onboarding: the opening sentence of *Hyperion* becomes a linked world while the workspace builds itself around the user, then everything is torn down. Lives in `src/tour/`, bundle in `src/demo/hyperion-world.json`. Boot gating by capability (`src/core/capabilities.ts`) and the bare pre-setup splash (`body.atlas-preroot`) are described there.
+**The tour** (`DESIGN_TOUR.md`). The onboarding: the opening sentence of *Hyperion* becomes a linked world while the workspace builds itself around the user, then everything is torn down. Lives in `src/tour/`, bundle in `src/demo/hyperion-world.json`. Guards: `tests/unit/tour-step-ids.test.ts` (data to spec map), `tests/unit/tour-data.test.ts` (bundle invariants), `tests/unit/tour-preview.test.ts`, `tests/unit/tour-copy-hygiene.test.ts` (a scan of all tour copy for concatenation and lost breaks). Boot gating by capability (`src/core/capabilities.ts`) and the bare pre-setup splash (`body.atlas-preroot`) are described there.
 
-**The changelog** (`src/changelog/changelog.data.ts`). The one edit surface for the public changelog page and its RSS feed; every user-visible change lands its entry there in the same commit.
+**The changelog** (`src/changelog/changelog.data.ts`). The one edit surface for the public changelog page and its RSS feed; every user-visible change lands its entry there in the same commit. `npm run changelog` (run by `predev` and first in `build`) regenerates `changelog.html` and `public/changelog-feed.xml`; entry ids are global permalinks, so a duplicate id fails the build.
 
 ## File naming
 
@@ -118,15 +119,22 @@ Code comments and older notes cite pre-split section names; they land here.
 | The Guided Tour | `DESIGN_TOUR.md` |
 | Maps Subsystem | `DESIGN_MAPS.md` |
 | Test Strategy | "Testing" below |
-| File Layout | the atlas-tool skill's tree |
+| File Layout | `CODEMAP.md` |
 | Build History, Tradeoffs Accepted, Open Questions | `docs-archive/DESIGN-2026-09-29-pre-split.md` only (history) |
 
 ## Testing
 
-- **Unit and integration** (Vitest, jsdom, one fork): `tests/unit/` for pure logic, `tests/integration/` for loops over `FakeOwApiClient`, the MSW handlers and the in-memory store; kernel tests also run the real store on `tests/fixtures/fake-fs.ts`. About 1,950 tests in about 21 s.
-- **E2E** (Playwright, the dev server; Chromium for the suite, plus the `firefox` and `firefox-private` projects for the `@firefox`/`@private` tagged specs, so a default run needs `npx playwright install firefox` once): specs boot fresh on OPFS with isolated storage (not the folder picker), and mock the API with `page.route` where a flow needs it. The spec files in `tests/e2e/` are named by area; the width-aware ones are `tests/e2e/narrow-layout.spec.ts` and `tests/e2e/tour-narrow.spec.ts`; the rest run at one width. `dev/fake-keel.mjs` serves manual checks against a keel stand-in.
+Counts are never pinned here: `npx vitest run` and `npx playwright test --list` give today's (PROGRESS CURRENT STATE records the last gate).
+
+- **Unit and integration** (Vitest, jsdom): `tests/unit/` for pure logic, `tests/integration/` for loops over `FakeOwApiClient`, the MSW handlers and the in-memory store; kernel tests also run the real store on `tests/fixtures/fake-fs.ts`. The full run takes well under a minute; never worth skipping at a bout's end. **Every file runs in ONE fork** (`singleFork` in `vitest.config.ts`), so jsdom's window, `window.location`, localStorage, fake timers and the DOM outlive a file: a file that leaks any of them poisons the files after it. A test that swaps `window.location` puts the real one back; a test that reads the hash or storage sets its own. A test failing only in the full run means bisect by file, not a longer timeout.
+- **E2E** (Playwright, the dev server; Chromium for the suite, plus the `firefox` and `firefox-private` projects for the `@firefox`/`@private` tagged specs, so a default run needs `npx playwright install firefox` once): specs boot fresh on OPFS with isolated storage (not the folder picker), and mock the API with `page.route` where a flow needs it. The spec files in `tests/e2e/` are named by area; the width-aware ones are `tests/e2e/narrow-layout.spec.ts` and `tests/e2e/tour-narrow.spec.ts`; the rest run at one width, so layout work still needs own eyes at several widths. `dev/fake-keel.mjs` serves manual checks against a keel stand-in.
+- **Reading an e2e run**: 4 workers, `retries: 2`, a 45 s test and 12 s expect timeout (`playwright.config.ts` says why: TipTap chunk compilation starves under load). A `flaky` line (failed, then healed on retry) is GREEN; only `failed` is red. Read the exit code directly (`PLAYWRIGHT_EXIT`), never `$?` after a pipe or a grep of the summary. The count rule is per project: `--list --project=<name>` equals that project's run. If flakiness worsens, bisect with `--workers=1` before touching specs.
+- **E2E setup traps**: a world whose narratives are not all tier-labelled opens "Set up writing" instead of the workspace, so a writing spec sets `writing_initialized: true` on the registry entry (or the header never renders and the failure looks like a missing locator). A check right after a world switch reads the OLD room, still on screen: mark the old node and wait for it to go.
+- **The cadence**: per edit, `npm run typecheck`; per bout, typecheck + `npx vitest run` + only the affected spec file(s) (or `npx playwright test <file> --grep "<name>"`); at the session close or before a commit, the full `npx playwright test` once; docs-only changes, typecheck alone. The general law (narrowest scope, the revert-check) is `Forge/Knowledge/forge-operations-manual.md`.
+- **Checks outside the suites**: the CSP blocks axe-core injection on the production build, so run axe against the dev server. The service worker registers with `registerType: 'prompt'` (`vite.config.ts`): check a service-worker change with two real builds (visit v1, change an asset, build v2, reload). Whether live matches HEAD: compare the `dist/assets/main-*.js` hash of a HEAD build with the one the live index serves, never a handover's claim.
+- **The dense-map fixture** is Skeld's Sikelia world (4,771 elements: 196 pins, 332 zones, 3,143 markers on one imageless map): `tools/atlas/Notes/ui-snapshots/sikelia-seed/build_bundle.py` (atlas's own Notes, not Forge's) bundles the world folder for Vite to serve, the page fetches it into OPFS, a home folder is set up first (first launch refuses a world folder), then the open-folder door opens it; a reload reopens it. The script lives in a gitignored folder (this machine only); the run that used it: `Notes/2026-09-11-s356-density-and-zone-panel.md`.
 - **The docs guard**: `tests/unit/docs-paths.test.ts` fails when a live doc here cites a `src/` or `tests/` path that does not exist.
-- **Smoke** against real OnlyWorlds is manual, recorded in PROGRESS. The cadence (what to run per edit, per bout, per commit) is in the atlas-tool skill.
+- **Smoke** against real OnlyWorlds is manual, recorded in PROGRESS.
 
 ## References
 
