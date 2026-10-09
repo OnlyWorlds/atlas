@@ -11341,20 +11341,16 @@ h3.atlas-share-block-heading { font-size: 14px; color: var(--atlas-text-muted); 
   color: inherit;
 }
 
+/* Centred on a candidate point the label pass picks (share-page-render.ts
+   `labelCandidatesOf`: inside the top edge, inside the bottom, the centroid). */
 .atlas-share-map-zone-label {
   position: absolute;
   transform: translate(-50%, -50%);
-}
-/* Polygon labels hang BELOW the zone's bottom edge (the app's S313
-   labels-below default on the published surface too): anchored at the
-   bounding-box bottom-centre, offset clear of the fill. Line zones stay
-   centred on their trace. */
-.atlas-share-map-zone-label.is-below {
-  transform: translate(-50%, 4px);
-}
-.atlas-share-map-zone-label {
   pointer-events: none;
   font-size: 11px;
+  /* The frame sets line-height 0 (no gap under the image); without its own,
+     this box measured 2px tall while its text painted over its neighbours. */
+  line-height: 1.4;
   letter-spacing: 0.02em;
   color: rgba(var(--atlas-ink-rgb), 0.92);
   /* The backdrop is the author's map art, so it can be any colour. A dark
@@ -11416,6 +11412,14 @@ a.atlas-share-map-pin { cursor: pointer; }
   font-size: 10px;
   padding: 2px 6px;
 }
+/* Other sides, chosen by the label pass when above is taken
+   (share-page-render.ts `declutterMapLabels`; show's copy, a327199). */
+.atlas-share-map-pin-label.is-below { bottom: auto; top: 16px; }
+.atlas-share-map-pin-label.is-right { bottom: auto; top: 50%; left: 16px; transform: translateY(-50%); }
+.atlas-share-map-pin-label.is-left { bottom: auto; top: 50%; left: auto; right: 16px; transform: translateY(-50%); }
+.atlas-share-map-pin-label.is-static.is-culled { display: none; }
+.atlas-share-map-pin:hover .atlas-share-map-pin-label.is-static.is-culled,
+.atlas-share-map-pin:focus .atlas-share-map-pin-label.is-static.is-culled { display: block; z-index: 3; }
 .atlas-share-map-pin:hover .atlas-share-map-pin-label.is-static {
   background: rgba(var(--atlas-scrim-rgb), 0.88);
   z-index: 3;

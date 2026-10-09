@@ -9,7 +9,7 @@ import {
   pinLabelPlacements,
   medianNearestNeighbour,
   pinScaleForSpacing,
-  anchorThreshold,
+  labelNameKey,
   PIN_SCALE_MIN,
   type Box,
   type LabelCandidate,
@@ -63,19 +63,32 @@ describe('chooseVisibleLabels', () => {
     expect(chosen.has('other')).toBe(false);
   });
 
-  it('an anchor may, as a last resort, sit over a LIGHTER icon; a non-anchor may not; a heavier icon never', () => {
-    const lighter = { id: 'p1', box: box(100, 100, 32, 32), weight: 1 };
-    const heavier = { id: 'p2', box: box(100, 100, 32, 32), weight: 50 };
-    const overIt = box(110, 110);
-    expect(chooseVisibleLabels([cand('a', overIt, { owner: 'x', weight: 10, anchor: true })], VIEW, [lighter]).has('a')).toBe(true);
-    expect(chooseVisibleLabels([cand('a', overIt, { owner: 'x', weight: 10 })], VIEW, [lighter]).has('a')).toBe(false);
-    expect(chooseVisibleLabels([cand('a', overIt, { owner: 'x', weight: 10, anchor: true })], VIEW, [heavier]).has('a')).toBe(false);
+  it('a heavy label never covers another pin: it takes a clear side or is culled (S382, show\'s rule)', () => {
+    const icon = { id: 'p1', box: box(100, 100, 32, 32) };
+    const heavy = cand('a', box(110, 110), { owner: 'x', weight: 1000, pri: 0 });
+    expect(chooseVisibleLabels([heavy], VIEW, [icon]).has('a')).toBe(false);
+    const withSide: LabelCandidate = { ...heavy, boxes: [box(110, 110), box(300, 300)] };
+    expect(chooseVisibleLabels([withSide], VIEW, [icon]).get('a')).toBe(1);
   });
 
-  it('the last resort is a second round: a clean later placement beats covering an icon', () => {
-    const lighter = { id: 'p1', box: box(100, 100, 32, 32), weight: 1 };
-    const c: LabelCandidate = { id: 'c', pri: 1, weight: 10, boxes: [box(110, 110), box(300, 300)], owner: 'x', anchor: true };
-    expect(chooseVisibleLabels([c], VIEW, [lighter]).get('c')).toBe(1);
+  it('prints a name once: the pin carries it, its same-name zone stays quiet', () => {
+    const pin = cand('pin', box(10, 10), { pri: 1, name: 'snack nebula' });
+    const zone = cand('zone', box(400, 400), { pri: 2, name: 'snack nebula' });
+    const other = cand('other', box(400, 600), { pri: 2, name: 'crumblefields' });
+    expect([...chooseVisibleLabels([zone, pin, other], VIEW).keys()].sort()).toEqual(['other', 'pin']);
+  });
+
+  it('a culled pin hands its name to the zone of the same name', () => {
+    const blocker = cand('blocker', box(10, 10), { pri: 0 });
+    const pin = cand('pin', box(12, 12), { pri: 1, name: 'snack nebula' });
+    const zone = cand('zone', box(400, 400), { pri: 2, name: 'snack nebula' });
+    expect([...chooseVisibleLabels([blocker, pin, zone], VIEW).keys()].sort()).toEqual(['blocker', 'zone']);
+  });
+
+  it('a box across the viewport edge is not taken: another side, else culled', () => {
+    const c: LabelCandidate = { id: 'c', pri: 1, weight: 0, boxes: [box(-20, 100), box(40, 100)] };
+    expect(chooseVisibleLabels([c], VIEW).get('c')).toBe(1);
+    expect(chooseVisibleLabels([cand('edge', box(970, 100))], VIEW).has('edge')).toBe(false);
   });
 
   it('labels off screen neither compete nor get culled', () => {
@@ -128,11 +141,10 @@ describe('pinScaleForSpacing', () => {
   });
 });
 
-describe('anchorThreshold', () => {
-  it('is the weight of the top tenth, at least three', () => {
-    expect(anchorThreshold([])).toBe(Infinity);
-    expect(anchorThreshold([5, 1, 9])).toBe(1);
-    const fifty = Array.from({ length: 50 }, (_, i) => i + 1);
-    expect(anchorThreshold(fifty)).toBe(46);
+describe('labelNameKey', () => {
+  it('compares names trimmed and case-folded; an empty name is no name', () => {
+    expect(labelNameKey('  Snack Nebula ')).toBe('snack nebula');
+    expect(labelNameKey('')).toBeUndefined();
+    expect(labelNameKey(null)).toBeUndefined();
   });
 });

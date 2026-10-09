@@ -72,6 +72,18 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'In a world you view with a read key, an element no longer shows a Delete button that could only be refused.',
         tags: ['world'],
       },
+      {
+        id: 'map-labels-never-clash',
+        title: 'Map labels no longer sit on pins or each other',
+        body: 'A pin\'s name takes the first clear side of its pin; when no side is clear, hover the pin to read it. A zone and a pin with the same name show it once. The same holds in a page\'s map preview, which now matches the published page.',
+        tags: ['maps', 'pages'],
+      },
+      {
+        id: 'home-chart-labels',
+        title: 'Names on the Home chart stay readable',
+        body: 'On the chart on a world\'s Home, names no longer print over each other or over another element, and a timespan\'s line passes behind a name instead of through it.',
+        tags: ['charts'],
+      },
     ],
   },
   {

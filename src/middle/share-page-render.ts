@@ -418,26 +418,88 @@ function centroidOf(points: Array<{ xPct: number; yPct: number }>): { xPct: numb
 }
 
 /**
- * Bottom-centre of the points' bounding box in %-space — where a polygon
- * zone's label hangs, matching the app's `zone_label_position: 'below'`
- * default (S313; a centred label sits on the fill and markers and gets
- * blocked — the same occlusion on a published page, where labels are
- * always-on). Line zones keep the centroid mean (a line has no interior for
- * the label to block). Kept local for the same store-free lift contract as
- * `centroidOf` above.
+ * Where a zone's label may sit, in order: just inside its topmost vertex,
+ * just inside its bottommost (each at the mean of that vertex's x and the
+ * vertices' mean x), then the centroid. The centroid is where a zone's own
+ * pin and its busiest places tend to be (S380: the Treaty Neutral Zone's
+ * label sat on Feltropolis), and a label along the top edge reads like a
+ * region name on a printed map. The label pass takes the first clear one.
+ * LIFTED BACK FROM SHOW (a327199, S380), so the preview is the page. Kept
+ * local for the same store-free lift contract as `centroidOf` above.
  */
-function labelAnchorOf(
-  points: Array<{ xPct: number; yPct: number }>,
-  isLine: boolean,
-): { xPct: number; yPct: number } {
-  if (isLine || points.length === 0) return centroidOf(points);
-  let minX = Infinity, maxX = -Infinity, maxY = -Infinity;
+function labelCandidatesOf(points: Array<{ xPct: number; yPct: number }>): Array<{ xPct: number; yPct: number }> {
+  if (points.length === 0) return [{ xPct: 50, yPct: 50 }];
+  const c = centroidOf(points);
+  let top = points[0], bottom = points[0];
   for (const p of points) {
-    if (p.xPct < minX) minX = p.xPct;
-    if (p.xPct > maxX) maxX = p.xPct;
-    if (p.yPct > maxY) maxY = p.yPct;
+    if (p.yPct < top.yPct) top = p;
+    if (p.yPct > bottom.yPct) bottom = p;
   }
-  return { xPct: (minX + maxX) / 2, yPct: maxY };
+  const clampY = (y: number): number => Math.min(Math.max(y, 3), 97);
+  return [
+    { xPct: (top.xPct + c.xPct) / 2, yPct: clampY(top.yPct + 2.5) },
+    { xPct: (bottom.xPct + c.xPct) / 2, yPct: clampY(bottom.yPct - 2.5) },
+    c,
+  ];
+}
+
+/** Pin label sides, in order of preference: above (the CSS default), below, right, left. */
+const PIN_LABEL_SIDES = ['', 'is-below', 'is-right', 'is-left'] as const;
+
+/**
+ * Keep a map's labels off the pins and off each other (S380, the Captain on
+ * Moppetopia's space map: "labels not clash with pins and other labels").
+ * Runs on the laid-out frame, so it measures real ink, not percentages.
+ * Pins are labelled first (the first clear side, else the label shows only on
+ * hover or focus); a zone label takes the first clear candidate, else it is
+ * hidden and the zone keeps its name on hover (its SVG <title>).
+ * LIFTED BACK FROM SHOW (render.ts `declutterMapLabels`, a327199).
+ */
+function declutterMapLabels(frame: HTMLElement): void {
+  const pad = 2;
+  const frameBox = frame.getBoundingClientRect();
+  if (frameBox.width === 0) return;
+  const dots = Array.from(frame.querySelectorAll<HTMLElement>('.atlas-share-map-pin'));
+  const dotBoxes = dots.map(d => d.getBoundingClientRect());
+  const placed: DOMRect[] = [];
+  const hits = (r: DOMRect, ignore?: DOMRect): boolean =>
+    r.left < frameBox.left || r.right > frameBox.right || r.top < frameBox.top || r.bottom > frameBox.bottom
+    || placed.some(p => r.left < p.right + pad && r.right > p.left - pad && r.top < p.bottom + pad && r.bottom > p.top - pad)
+    || dotBoxes.some(d => d !== ignore && r.left < d.right && r.right > d.left && r.top < d.bottom && r.bottom > d.top);
+  dots.forEach((dot, i) => {
+    const label = dot.querySelector<HTMLElement>('.atlas-share-map-pin-label.is-static');
+    if (!label) return;
+    let chosen: DOMRect | null = null;
+    // Un-cull before measuring: a culled label is display:none and measures as
+    // an empty box at 0,0, which would cull it again on every later pass.
+    label.classList.remove('is-culled');
+    for (const side of PIN_LABEL_SIDES) {
+      label.classList.remove(...PIN_LABEL_SIDES.filter(Boolean));
+      if (side) label.classList.add(side);
+      const r = label.getBoundingClientRect();
+      if (!hits(r, dotBoxes[i])) { chosen = r; break; }
+    }
+    if (!chosen) {
+      // No clear side (a small screen): the label waits for hover or focus
+      // rather than printing over another one.
+      label.classList.remove(...PIN_LABEL_SIDES.filter(Boolean));
+      label.classList.add('is-culled');
+      return;
+    }
+    placed.push(chosen);
+  });
+  for (const el of Array.from(frame.querySelectorAll<HTMLElement>('.atlas-share-map-zone-label'))) {
+    const cands = JSON.parse(el.dataset.candidates || '[]') as Array<{ xPct: number; yPct: number }>;
+    el.hidden = false;
+    let ok = false;
+    for (const c of cands) {
+      el.style.left = `${c.xPct}%`;
+      el.style.top = `${c.yPct}%`;
+      const r = el.getBoundingClientRect();
+      if (!hits(r)) { placed.push(r); ok = true; break; }
+    }
+    if (!ok) el.hidden = true;
+  }
 }
 
 export function renderMapView(
@@ -473,7 +535,8 @@ export function renderMapView(
     svg.setAttribute('class', 'atlas-share-map-zones');
     svg.setAttribute('viewBox', '0 0 100 100');
     svg.setAttribute('preserveAspectRatio', 'none');
-    const zoneLabels: Array<{ name: string; below: boolean; xPct: number; yPct: number }> = [];
+    const zoneLabels: Array<{ name: string; cands: Array<{ xPct: number; yPct: number }> }> = [];
+    const pinNames = new Set(frozen.pins.map(p => (p.name || '').trim().toLowerCase()).filter(Boolean));
     for (const zone of frozen.zones) {
       const isLine = zone.shape === 'line';
       const shapeEl = document.createElementNS(svgNS, isLine ? 'polyline' : 'polygon');
@@ -510,18 +573,21 @@ export function renderMapView(
       // via a counter-scaled transform... which SVG cannot express here, so it
       // rides in a sibling HTML layer instead (below), where the font is
       // simply a font.
-      // Anchored below the zone (bounding-box bottom-centre) for polygons —
-      // the app's S313 labels-below default, applied to the published surface
-      // too (Captain, S315: "ideally, yes"). tools/show re-lift owed.
-      zoneLabels.push({ name: zone.name, below: !isLine, ...labelAnchorOf(zone.points, isLine) });
+      // A pin of the same name already labels this place (S380, Moppetopia's
+      // space map: 'Snack Nebula' printed twice), so the zone stays unlabelled.
+      // Placed at the first clear candidate by the label pass below.
+      if (!pinNames.has((zone.name || '').trim().toLowerCase())) {
+        zoneLabels.push({ name: zone.name, cands: labelCandidatesOf(zone.points) });
+      }
     }
     frame.appendChild(svg);
     for (const zl of zoneLabels) {
       const el = document.createElement('span');
-      el.className = 'atlas-share-map-zone-label' + (zl.below ? ' is-below' : '');
+      el.className = 'atlas-share-map-zone-label';
       el.textContent = zl.name;
-      el.style.left = `${zl.xPct}%`;
-      el.style.top = `${zl.yPct}%`;
+      el.style.left = `${zl.cands[0].xPct}%`;
+      el.style.top = `${zl.cands[0].yPct}%`;
+      el.dataset.candidates = JSON.stringify(zl.cands);
       frame.appendChild(el);
     }
   }
@@ -547,6 +613,19 @@ export function renderMapView(
     frame.appendChild(dot);
   }
   wrap.appendChild(frame);
+  // Labels are placed against real layout: once the image has its size, and
+  // again whenever the frame is resized (one pass per animation frame).
+  if (showLabels) {
+    let queued = false;
+    const run = (): void => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; if (frame.isConnected) declutterMapLabels(frame); });
+    };
+    if (img.complete && img.naturalWidth > 0) run();
+    else img.addEventListener('load', run, { once: true });
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(run).observe(frame);
+  }
   const caption = document.createElement('figcaption');
   caption.className = 'atlas-share-map-caption';
   caption.textContent = frozen.title;

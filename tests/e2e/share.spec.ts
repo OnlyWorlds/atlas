@@ -505,6 +505,62 @@ test('map block: a pin moved elsewhere re-renders on the open page (no re-add ne
   await expect(page.locator('.atlas-share-map-pin')).toHaveAttribute('style', /top: 25%/);
 });
 
+test('map block: labels follow show\'s rule (S382, #121): a name prints once, no label on another pin or label', async ({ page }) => {
+  await setupWorld(page);
+  // The label pass measures laid-out ink once the image has its size, so the
+  // map needs an image that loads: serve one for the fixture URL.
+  await page.route('https://example.com/space.svg', route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800"><rect width="1000" height="800" fill="#123"/></svg>',
+  }));
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = await store.createElement('map', {
+      name: 'Space', image_url: 'https://example.com/space.svg', width: 1000, height: 800,
+    });
+    // Moppetopia's shapes: a place inside the zone of its own name, and a
+    // tight cluster whose labels cannot all sit above their dots.
+    const pin = async (name: string, x: number, y: number) => {
+      const loc = await store.createElement('location', { name });
+      await store.createPin({ map_id: map.id, element_id: loc.id, element_type: 'location', x, y });
+    };
+    await pin('Snack Nebula', 700, 500);
+    const cluster = ['Feltropolis', 'The Leaky Bucket', 'USS Fuzzball', 'Drip Drop', 'Crumblefields', 'Stale Vengeance'];
+    for (let i = 0; i < cluster.length; i++) await pin(cluster[i], 300 + (i % 3) * 25, 400 + Math.floor(i / 3) * 20);
+    const zone = await store.createElement('zone', { name: 'Snack Nebula', atlas_shape: 'polygon' });
+    const pts = [[550, 350], [850, 350], [850, 650], [550, 650]];
+    for (let i = 0; i < pts.length; i++) {
+      await store.createMarker({ name: `Snack Nebula - Point ${i}`, map_id: map.id, zone_id: zone.id, x: pts[i][0], y: pts[i][1], order: i });
+    }
+    api.patchData(await store.listElements());
+  });
+
+  await openShare(page);
+  await page.click('button.atlas-share-new');
+  await page.click('.atlas-share-block-add-btn:has-text("map")');
+  await page.locator('.atlas-picker-row', { hasText: 'Space' }).click();
+  await page.click('.atlas-share-block-done');
+  await expect(page.locator('.atlas-share-map-pin')).toHaveCount(7);
+
+  const measure = () => page.locator('.atlas-share-map-frame').evaluate((frame) => {
+    const ov = (a: DOMRect, b: DOMRect) => a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+    const dots = Array.from(frame.querySelectorAll<HTMLElement>('.atlas-share-map-pin'));
+    const labels = Array.from(frame.querySelectorAll<HTMLElement>('.atlas-share-map-pin-label.is-static, .atlas-share-map-zone-label'))
+      .filter(l => !l.hidden && getComputedStyle(l).display !== 'none');
+    let onDot = 0, onLabel = 0;
+    for (const l of labels) for (const d of dots) if (l.parentElement !== d && ov(l.getBoundingClientRect(), d.getBoundingClientRect())) onDot++;
+    for (let a = 0; a < labels.length; a++) for (let b = a + 1; b < labels.length; b++) {
+      if (ov(labels[a].getBoundingClientRect(), labels[b].getBoundingClientRect())) onLabel++;
+    }
+    const names = labels.map(l => l.textContent!.trim());
+    return { onDot, onLabel, snack: names.filter(n => n === 'Snack Nebula').length, shown: names.length };
+  });
+  // The pass runs a frame after the image lands: poll the settled state.
+  await expect.poll(measure).toMatchObject({ onDot: 0, onLabel: 0, snack: 1 });
+  expect((await measure()).shown).toBeGreaterThan(1);
+});
+
 async function readPayloadMapZones(page: Page) {
   return page.evaluate(async () => {
     const api = (window as any).__atlasTestApi;

@@ -50,20 +50,22 @@ export interface LabelCandidate {
   boxes: readonly Box[];
   /** The obstacle this label belongs to (its own pin icon), which it may overlap. */
   owner?: string;
-  /** An anchor may, as a last resort, sit over icons lighter than itself. */
-  anchor?: boolean;
+  /** The text the label prints, normalised. A map prints a name once: a zone
+   *  and the pin of the same name (Moppetopia's Snack Nebula, S380) share one
+   *  label, and the higher-ranked candidate (the pin) carries it. */
+  name?: string;
 }
 
 /**
- * Something a label must not cover: a pin icon. Labels are exempt from their
- * own pin (the label hangs off it by design). `weight` is the pin's own
- * importance: a label that fits NOWHERE cleanly may, as a last resort, sit
- * over an icon of strictly lower weight (Syrakousai ringed by its harbour
- * towns at fit zoom had no clean slot and lost its name; an unlabelled
- * Syracuse is a bigger loss than a covered Plemmyrion). Omitted = never
- * coverable.
+ * Something a label must never cover: a pin icon. Labels are exempt from
+ * their own pin (the label hangs off it by design). A label with no clear
+ * placement is culled and its pin names itself on hover (the pin tooltip),
+ * the rule the published page follows (show a327199). S356 let a heavy pin's
+ * label cover a lighter icon as a last resort; at fit zoom on Moppetopia that
+ * put Feltropolis and USS Fuzzball over their neighbours (S381 pre-smoke), and
+ * the Captain's rule for the page is that labels never clash with pins.
  */
-export interface Obstacle { id: string; box: Box; weight?: number }
+export interface Obstacle { id: string; box: Box }
 
 /** Breathing room between two placed labels — a label ending flush against
  *  the next reads as one word (the charts finding, same number). */
@@ -77,14 +79,19 @@ function padded(b: Box): Box {
   return { x0: b.x0 - LABEL_PAD_PX, x1: b.x1 + LABEL_PAD_PX, y0: b.y0, y1: b.y1 };
 }
 
+function inside(b: Box, screen: Box): boolean {
+  return b.x0 >= screen.x0 && b.x1 <= screen.x1 && b.y0 >= screen.y0 && b.y1 <= screen.y1;
+}
+
 /**
  * Greedy placement: sort by (pri asc, weight desc, id asc for determinism);
- * for each candidate take the first of its boxes whose padded extent clears
- * every placed box and every obstacle that is not its own. Candidates whose
- * first box lies entirely outside the viewport are kept at placement 0
- * without competing: they cannot collide with anything the user can see, and
- * hiding them would only make the next pan flash. Returns id → index of the
- * chosen box; absent = culled.
+ * for each candidate take the first of its boxes that lies inside the
+ * viewport and whose padded extent clears every placed box and every
+ * obstacle that is not its own; a name already placed is not placed again.
+ * Candidates whose first box lies entirely outside the viewport are kept at
+ * placement 0 without competing: they cannot collide with anything the user
+ * can see, and hiding them would only make the next pan flash. Returns id →
+ * index of the chosen box; absent = culled.
  */
 export function chooseVisibleLabels(
   cands: readonly LabelCandidate[],
@@ -94,32 +101,38 @@ export function chooseVisibleLabels(
   const sorted = [...cands].sort((a, b) =>
     a.pri - b.pri || b.weight - a.weight || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const placed: Box[] = [];
+  const names = new Set<string>();
   const chosen = new Map<string, number>();
   const screen: Box = { x0: 0, y0: 0, x1: viewport.w, y1: viewport.h };
   const onScreen = obstacles.filter(o => overlaps(o.box, screen));
   for (const c of sorted) {
     if (c.boxes.length === 0) continue;
-    if (!overlaps(c.boxes[0], screen)) { chosen.set(c.id, 0); continue; }
-    // Round one: a clean slot (no label, no icon but its own). Round two,
-    // anchors only, and only if round one found nothing: a slot that covers
-    // icons of strictly lower weight. Other labels are never covered.
-    let taken = false;
-    for (const lastResort of c.anchor ? [false, true] : [false]) {
-      for (let i = 0; i < c.boxes.length && !taken; i++) {
-        const pb = padded(c.boxes[i]);
-        if (placed.some(b => overlaps(pb, b))) continue;
-        const blocked = onScreen.some(o =>
-          o.id !== c.owner && overlaps(pb, o.box)
-          && !(lastResort && o.weight !== undefined && o.weight < c.weight));
-        if (blocked) continue;
-        placed.push(c.boxes[i]);
-        chosen.set(c.id, i);
-        taken = true;
-      }
-      if (taken) break;
+    if (c.name && names.has(c.name)) continue;
+    if (!overlaps(c.boxes[0], screen)) {
+      chosen.set(c.id, 0);
+      if (c.name) names.add(c.name);
+      continue;
+    }
+    for (let i = 0; i < c.boxes.length; i++) {
+      // A box across the viewport's edge prints a clipped name ("aky Bucket"
+      // on a phone): another side, or hover.
+      if (!inside(c.boxes[i], screen)) continue;
+      const pb = padded(c.boxes[i]);
+      if (placed.some(b => overlaps(pb, b))) continue;
+      if (onScreen.some(o => o.id !== c.owner && overlaps(pb, o.box))) continue;
+      placed.push(c.boxes[i]);
+      chosen.set(c.id, i);
+      if (c.name) names.add(c.name);
+      break;
     }
   }
   return chosen;
+}
+
+/** The key a label's text is compared by: trimmed, case-folded. */
+export function labelNameKey(text: string | null | undefined): string | undefined {
+  const k = (text ?? '').trim().toLowerCase();
+  return k || undefined;
 }
 
 /**
@@ -186,20 +199,6 @@ export function pinScaleForSpacing(spacingPx: number, iconPx: number): number {
   const raw = (spacingPx * PIN_GAP_FILL) / iconPx;
   const clamped = Math.min(1, Math.max(PIN_SCALE_MIN, raw));
   return Math.round(clamped * 100) / 100;
-}
-
-/**
- * The anchors: the top share of pins by weight, the names a map must carry
- * at any zoom (the charts room's anchor tier, same idea). Only they get the
- * last-resort placement over a lighter icon.
- */
-const ANCHOR_SHARE = 0.1;
-const ANCHOR_MIN = 3;
-export function anchorThreshold(weights: readonly number[]): number {
-  if (weights.length === 0) return Infinity;
-  const sorted = [...weights].sort((a, b) => b - a);
-  const n = Math.min(sorted.length, Math.max(ANCHOR_MIN, Math.ceil(sorted.length * ANCHOR_SHARE)));
-  return sorted[n - 1];
 }
 
 /**
@@ -414,14 +413,18 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
     const pinEl = byId.get(pinId) as { element_id?: string } | undefined;
     return pinEl?.element_id ? byId.get(pinEl.element_id) : undefined;
   };
+  // A pin-shape icon stands on its point (Leaflet2DManager's 'bottom-tip'
+  // anchor: its bottom edge 2px below the latlng), so its box is centred
+  // above the anchor, not on it.
+  const iconLift = prefs.pin_style === 'pin-shape' ? iconHalf - 2 : 0;
   for (const { id, anchor } of pinLabelEls) {
-    const box = { x0: anchor.x - iconHalf, y0: anchor.y - iconHalf, x1: anchor.x + iconHalf, y1: anchor.y + iconHalf };
+    const cy = anchor.y - iconLift;
+    const box = { x0: anchor.x - iconHalf, y0: cy - iconHalf, x1: anchor.x + iconHalf, y1: cy + iconHalf };
     iconBoxes.set(id, box);
-    obstacles.push({ id, box, weight: pinWeight(targetOf(id), elements) });
+    obstacles.push({ id, box });
   }
 
   if (pinsAuto && pinMetrics) {
-    const anchorAt = anchorThreshold(obstacles.map(o => o.weight ?? 0));
     for (const { id, el, anchor } of pinLabelEls) {
       if (el.style.display === 'none') continue;
       const icon = iconBoxes.get(id);
@@ -437,16 +440,26 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
         weight,
         boxes: pinLabelPlacements(ink, icon, gap),
         owner: id,
-        anchor: selected || weight >= anchorAt,
+        name: labelNameKey(el.textContent),
       });
       pinById.set(key, { el, ink });
     }
   }
   if (zonesAuto && zoneMetrics && entry.zoneOverlay) {
     const rules = state.styles.rules;
+    // Pin labels the pass does not place (their mode is 'always') still print
+    // their names, so a zone of the same name stays quiet.
+    const fixedPinNames = new Set<string>();
+    if (!pinsAuto) {
+      for (const { el } of pinLabelEls) {
+        const k = el.style.display === 'none' ? undefined : labelNameKey(el.textContent);
+        if (k) fixedPinNames.add(k);
+      }
+    }
     for (const { id, el, anchor } of zoneLabelEls) {
       // A hidden zone's label is already at opacity 0; it must not claim space.
       if (!entry.zoneOverlay.isZoneVisible(id)) continue;
+      if (fixedPinNames.has(labelNameKey(el.textContent) ?? '')) { el.classList.add(LABEL_CULLED_CLASS); continue; }
       const extent = entry.zoneOverlay.getZoneScreenExtent(id);
       const line = entry.zoneOverlay.getZoneMode(id) === 'line';
       const selected = selectedId === id;
@@ -455,7 +468,13 @@ function runLabelDensity(entry: MapTabCacheEntry): void {
       const zone = byId.get(id);
       const prioritised = zone ? Boolean(resolveStyle(rules, zone).label_priority) : false;
       const key = `zone:${id}`;
-      cands.push({ id: key, pri: selected ? 0 : prioritised ? 1 : line ? 3 : 2, weight: extent, boxes: [inkBox(zoneMetrics, anchor, el.textContent ?? '')] });
+      cands.push({
+        id: key,
+        pri: selected ? 0 : prioritised ? 1 : line ? 3 : 2,
+        weight: extent,
+        boxes: [inkBox(zoneMetrics, anchor, el.textContent ?? '')],
+        name: labelNameKey(el.textContent),
+      });
       zoneById.set(key, el);
     }
   }

@@ -470,7 +470,10 @@ test('the density layer (S356): a 40-pin cluster keeps its icons apart and its l
     const st = api.getState();
     const map = st.data.elements.find((e: any) => e.type === 'map' && e.name === 'Dense Canvas');
     for (let i = 0; i < 40; i++) {
-      const loc = await store.createElement('location', { name: `Town ${i}` });
+      // Interior towns outweigh their neighbours (a description is weight):
+      // S356's last resort let such a label cover a lighter icon (S382).
+      const heavy = [9, 18, 27, 36].includes(i);
+      const loc = await store.createElement('location', { name: `Town ${i}`, ...(heavy ? { description: 'A great city. '.repeat(40) } : {}) });
       await store.createPin({ map_id: map.id, element_id: loc.id, x: 800 + (i % 8) * 50, y: 800 + Math.floor(i / 8) * 50 });
     }
     const zone = await store.createZone({ name: 'the Long River', supertype: 'Line', subtype: 'River' });
@@ -488,22 +491,33 @@ test('the density layer (S356): a 40-pin cluster keeps its icons apart and its l
 
   const measure = async () => container.evaluate((c) => {
     const ov = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-    const labels = Array.from(c.querySelectorAll('.leaflet-2d-pin-label:not(.atlas-label-culled) .pin-label-text'))
-      .map(e => e.getBoundingClientRect()).filter(r => r.width > 0);
+    const labelEls = Array.from(c.querySelectorAll<HTMLElement>('.leaflet-2d-pin-label:not(.atlas-label-culled)'))
+      .map(el => ({ el, r: el.querySelector('.pin-label-text')!.getBoundingClientRect() })).filter(l => l.r.width > 0);
+    const labels = labelEls.map(l => l.r);
     let overlaps = 0;
     for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++) if (ov(labels[i], labels[j])) overlaps++;
-    const icon = c.querySelector('.leaflet-marker-icon.leaflet-interactive') as HTMLElement;
-    return { visibleLabels: labels.length, overlaps, iconPx: icon.getBoundingClientRect().width };
+    // A pin's icon and its label are two markers at one latlng with the same
+    // transform; any other icon under a label is another pin covered (S382).
+    const icons = Array.from(c.querySelectorAll<HTMLElement>('.leaflet-marker-icon.leaflet-interactive'));
+    let onIcons = 0;
+    for (const l of labelEls) for (const i of icons) {
+      if (i.style.transform !== l.el.style.transform && ov(l.r, i.getBoundingClientRect())) onIcons++;
+    }
+    const icon = icons[0];
+    return { visibleLabels: labels.length, overlaps, onIcons, iconPx: icon.getBoundingClientRect().width };
   });
 
   // 'auto' (the factory default): the 50-unit gap at the mounted zoom is
   // narrower than a 32px icon, so icons shrink, and only the labels that
-  // have room stay. What stays never overprints — measured on rendered ink.
+  // have room stay. What stays never overprints a label or another pin —
+  // measured on rendered ink (S382: a heavy pin's label no longer covers a
+  // lighter icon as a last resort; it waits for hover like the rest).
   const auto = await measure();
   expect(auto.iconPx).toBeLessThan(32);
   expect(auto.visibleLabels).toBeGreaterThan(0);
   expect(auto.visibleLabels).toBeLessThan(40);
   expect(auto.overlaps).toBe(0);
+  expect(auto.onIcons).toBe(0);
 
   // 'always' restores every label without a remount (the popover path).
   await page.evaluate(() => {
@@ -514,6 +528,42 @@ test('the density layer (S356): a 40-pin cluster keeps its icons apart and its l
   await expect.poll(async () => (await measure()).visibleLabels).toBe(40);
   await page.click('.atlas-popover-radio-row[data-field="pin_labels"] label:has(input[value="auto"])');
   await expect.poll(async () => (await measure()).visibleLabels).toBeLessThan(40);
+});
+
+test('a map prints a name once (S382, #121): a zone and the pin of the same name share one label', async ({ page }) => {
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', 'Name Canvas');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Name Canvas' })).toBeVisible();
+
+  // Moppetopia's shape: a place pinned inside the zone of the same name, plus
+  // a zone with no pin of its name.
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const map = api.getState().data.elements.find((e: any) => e.type === 'map' && e.name === 'Name Canvas');
+    const loc = await store.createElement('location', { name: 'Snack Nebula' });
+    await store.createPin({ map_id: map.id, element_id: loc.id, x: 1000, y: 1000 });
+    const square = async (name: string, x0: number, y0: number) => {
+      const z = await store.createZone({ name, supertype: 'Polygon' });
+      const pts = [[x0, y0], [x0 + 600, y0], [x0 + 600, y0 + 600], [x0, y0 + 600]];
+      for (let i = 0; i < pts.length; i++) {
+        await store.createMarker({ map_id: map.id, zone_id: z.id, x: pts[i][0], y: pts[i][1], order: i + 1 });
+      }
+    };
+    await square('Snack Nebula', 700, 700);
+    await square('Crumblefields', 100, 100);
+    api.patchData(await store.listElements());
+  });
+  const container = page.locator('.atlas-map-tab-wrapper .leaflet-container').first();
+  await expect(container.locator('.leaflet-2d-pin-label')).toHaveCount(1);
+  await expect(container.locator('.atlas-zone-label')).toHaveCount(2);
+
+  const shown = async () => container.evaluate((c) =>
+    Array.from(c.querySelectorAll<HTMLElement>('.leaflet-2d-pin-label .pin-label-text, .atlas-zone-label span'))
+      .filter(e => e.getBoundingClientRect().width > 0 && getComputedStyle(e.closest('.leaflet-marker-icon')!).display !== 'none')
+      .map(e => e.textContent!.trim()).sort());
+  await expect.poll(shown).toEqual(['Crumblefields', 'Snack Nebula']);
 });
 
 test('the zone panel (S356): kinds group, a kind colour is a world style that survives reload, the eye hides a kind, the zone page says what it inherits', async ({ page }) => {

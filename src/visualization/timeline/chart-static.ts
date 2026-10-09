@@ -35,8 +35,85 @@ interface Placed {
   cast?: 'protagonist' | 'home';
   ref?: string;
   endX?: number;
-  /** Strip layout only: this node won a label slot (default layout labels anchors/cast). */
-  labelled?: boolean;
+  /** Strip layout only: the side this node's label won, or none (the default
+   *  layout labels anchors and cast, flipping left at the right edge). */
+  side?: 'right' | 'left';
+}
+
+/** One node as the strip lays it out: its x, its glyph size, its label's
+ *  measured width, and whether it is a name the strip keeps (anchor, cast). */
+export interface StripInput { x: number; size: number; labelW: number; keep?: boolean }
+/** Where the strip put a node: its row (0 = midline, ± outward) and its label's side, if any. */
+export interface StripPlacement { level: number; side: 'right' | 'left' | null }
+
+/** Clear space between two things on one strip row (glyph or label). */
+const STRIP_PAD = 6;
+/** A label starts this far from its glyph's centre, as a share of the glyph size. */
+const LABEL_OFFSET = 0.7;
+
+/**
+ * The home strip's layout (S256, rebuilt S382 for #121): the kept names
+ * (anchors, cast) first, then the rest, each group in date order, each node
+ * on the nearest free row, centre-out. A node takes the first clear spot for
+ * glyph plus label (each row: label right, then left), else a clear spot for
+ * its glyph alone, else a row where its glyph covers no label (glyphs may
+ * touch glyphs). Past that, the row with the fewest labels in the way takes
+ * the glyph and those labels give way, plain names before kept ones; a node
+ * is never dropped. Rows hold every interval placed, not only a right
+ * edge, so a left-hanging label is checked against what is behind it. Pure,
+ * so the property it promises (no label over a glyph or a label on its row)
+ * is unit-tested; the draw paints exactly the side decided here.
+ */
+export function layoutStrip(nodes: readonly StripInput[], cssW: number, maxLevel: number): StripPlacement[] {
+  type Span = { a: number; b: number; node: number; label: boolean };
+  const rows = new Map<number, Span[]>();
+  const order: number[] = [0];
+  for (let s = 1; s <= maxLevel; s++) order.push(s, -s);
+  const free = (level: number, a: number, b: number, labelsOnly = false): boolean =>
+    !(rows.get(level) ?? []).some(sp => (!labelsOnly || sp.label) && a < sp.b + STRIP_PAD && b > sp.a - STRIP_PAD);
+  const put = (level: number, sp: Span): void => {
+    const r = rows.get(level);
+    if (r) r.push(sp); else rows.set(level, [sp]);
+  };
+  const out: StripPlacement[] = nodes.map(() => ({ level: 0, side: null }));
+  const sequence = nodes.map((_, i) => i).sort((a, b) =>
+    Number(!!nodes[b].keep) - Number(!!nodes[a].keep) || nodes[a].x - nodes[b].x || a - b);
+  for (const i of sequence) {
+    const n = nodes[i];
+    const g = n.size / 2;
+    const off = n.size * LABEL_OFFSET;
+    const right = n.x + off + n.labelW <= cssW - 2 ? { a: n.x - g, b: n.x + off + n.labelW } : null;
+    const left = n.x - off - n.labelW >= 2 ? { a: n.x - off - n.labelW, b: n.x + g } : null;
+    const labelled = order.flatMap(level =>
+      ([['right', right], ['left', left]] as const).map(([side, span]) => ({ level, side, span })))
+      .find(c => c.span && free(c.level, c.span.a, c.span.b));
+    if (labelled?.span) {
+      put(labelled.level, { ...labelled.span, node: i, label: true });
+      out[i] = { level: labelled.level, side: labelled.side };
+      continue;
+    }
+    let level = order.find(lv => free(lv, n.x - g, n.x + g))
+      ?? order.find(lv => free(lv, n.x - g, n.x + g, true));
+    if (level === undefined) {
+      // Every row has a label here: the row with the fewest labels in the way
+      // gives them up, plain names before kept ones (the node is never dropped).
+      const covered = (lv: number): Span[] =>
+        (rows.get(lv) ?? []).filter(sp => sp.label && n.x - g < sp.b + STRIP_PAD && n.x + g > sp.a - STRIP_PAD);
+      const keptIn = (lv: number): number => covered(lv).filter(sp => nodes[sp.node].keep).length;
+      const cost = (lv: number): number => keptIn(lv) * 1000 + covered(lv).length;
+      level = order.reduce((best, lv) => cost(lv) < cost(best) ? lv : best);
+      for (const sp of covered(level)) {
+        const victim = nodes[sp.node];
+        sp.label = false;
+        sp.a = victim.x - victim.size / 2;
+        sp.b = victim.x + victim.size / 2;
+        out[sp.node] = { level, side: null };
+      }
+    }
+    put(level, { a: n.x - g, b: n.x + g, node: i, label: false });
+    out[i] = { level, side: null };
+  }
+  return out;
 }
 
 /** Centered greedy beeswarm: level order 0, +1, -1, +2, -2 … nearest free wins. */
@@ -177,62 +254,33 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
     }
 
     if (opts.layout === 'strip') {
-      // Strip layout (S256): pure date order + label-aware row occupancy.
-      // A labelled node (anchor/cast) reserves its glyph + text width on its
-      // row; a bare dot reserves ~20px. Rows fill greedily centre-out, so a
-      // short band spreads into a fan instead of one flat line whose labels
-      // overlap (Captain's home-strip shots, 2026-07-12).
+      // Strip layout: pure date order, every node trying for a label (the
+      // room's label-budget spirit: labels keep a preview from reading as a
+      // monotone dot-run), rows filled centre-out by `layoutStrip`, so a short
+      // band fans instead of piling its labels on one line (Captain's
+      // home-strip shots, 2026-07-12; Skeld's pre-smoke, S381).
       const ordered = block.nodes
         .map((n, i) => ({ n, i }))
         .sort((a, b) => a.n.date - b.n.date || a.i - b.i);
-      const rightEdgeAtLevel = new Map<number, number>();
-      // Try to fit a node on a row, centre-out. A label that would clip at the
-      // right edge FLIPS left at draw time, so its reservation flips too: it
-      // needs clearance BEHIND the dot instead of ahead of it. Returns the
-      // row, or null when every row is taken — the caller then retries with
-      // bare-dot occupancy (label dropped, node never dropped).
-      const tryPlace = (x: number, occupied: number, flip: boolean): number | null => {
-        for (let step = 0; step <= maxLevel; step++) {
-          for (const level of step === 0 ? [0] : [step, -step]) {
-            const edge = rightEdgeAtLevel.get(level);
-            const fits = flip ? (edge === undefined || x - occupied >= edge) : (edge === undefined || x >= edge);
-            if (fits) {
-              rightEdgeAtLevel.set(level, flip ? x + 12 : x + occupied);
-              return level;
-            }
-          }
-        }
-        return null;
-      };
-      placed = ordered.map(({ n }) => {
-        const x = dateToX(n.date);
-        const size = n.cast ? ICON_ANCHOR + 3 : n.anchor ? ICON_ANCHOR : ICON;
-        // EVERY node tries for a label in the strip (the room's label-budget
-        // spirit): labels are the content that keeps a preview from reading
-        // as a monotone dot-run. Cast/anchors measure at 12px, the rest 11px.
+      const inputs = ordered.map(({ n }) => {
+        // Cast and anchors measure at 12px, the rest 11px, as they draw.
         ctx.font = n.anchor || n.cast ? "12px system-ui, sans-serif" : "11px system-ui, sans-serif";
-        const labelOccupied = size * 0.7 + ctx.measureText(n.name).width + 14;
-        const flip = x + labelOccupied > cssW - PAD_X;
-        let labelled = true;
-        let level = tryPlace(x, labelOccupied, flip);
-        if (level == null) { labelled = false; level = tryPlace(x - 10, 20, false); }
-        if (level == null) {
-          // Every row full even for a bare dot — overflow onto the
-          // least-crowded row (never drop the node itself).
-          let best = 0; let bestEdge = Infinity;
-          for (const [lv, edge] of rightEdgeAtLevel) {
-            if (edge < bestEdge) { bestEdge = edge; best = lv; }
-          }
-          rightEdgeAtLevel.set(best, x + 20);
-          level = best;
-        }
+        return {
+          x: dateToX(n.date),
+          size: n.cast ? ICON_ANCHOR + 3 : n.anchor ? ICON_ANCHOR : ICON,
+          labelW: ctx.measureText(n.name).width,
+          keep: !!(n.anchor || n.cast),
+        };
+      });
+      const layout = layoutStrip(inputs, cssW, maxLevel);
+      placed = ordered.map(({ n }, k) => {
         const color = ELEMENT_TYPE_COLORS[n.type as ElementType] ?? '#94a3b8';
         return {
-          x, y: midY + level * Y_STEP,
+          x: inputs[k].x, y: midY + layout[k].level * Y_STEP,
           icon: ELEMENT_ICONS[n.type as ElementType] ?? 'category',
           color, name: n.name, anchor: !!n.anchor, cast: n.cast, ref: n.ref,
           endX: n.endDate != null ? dateToX(n.endDate) : undefined,
-          labelled,
+          side: layout[k].side ?? undefined,
         };
       });
     } else {
@@ -275,8 +323,11 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
     for (const p of placed) {
       const size = p.cast ? ICON_ANCHOR + 3 : p.anchor ? ICON_ANCHOR : ICON;
       if (p.anchor && !p.cast) {
+        // In the strip the halo stays inside its row: at size * 0.85 it
+        // reached halfway into the next row's labels (S382).
+        const halo = opts.layout === 'strip' ? Math.min(size * 0.85, Y_STEP / 2 - 1) : size * 0.85;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, size * 0.85, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, halo, 0, Math.PI * 2);
         ctx.fillStyle = applyAlpha(p.color, 0.12);
         ctx.fill();
       }
@@ -285,23 +336,25 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
       ctx.textAlign = 'center';
       ctx.fillText(p.icon, p.x, p.y);
 
-      const drawLabel = opts.layout === 'strip' ? p.labelled : (p.anchor || p.cast);
-      if (drawLabel) {
+      const strip = opts.layout === 'strip';
+      if (strip ? p.side : (p.anchor || p.cast)) {
         const plain = !p.anchor && !p.cast;
         ctx.font = plain ? "11px system-ui, sans-serif" : "12px system-ui, sans-serif";
+        const lw = ctx.measureText(p.name).width;
+        // The strip paints the side its layout decided; the default layout
+        // flips left so an anchor near the right edge isn't clipped.
+        const left = strip ? p.side === 'left' : p.x + size * LABEL_OFFSET + lw > cssW - PAD_X;
+        const x0 = left ? p.x - size * LABEL_OFFSET - lw : p.x + size * LABEL_OFFSET;
+        if (strip) {
+          // A range line on the row runs behind the name, not through it.
+          ctx.fillStyle = '#0a0a0a';
+          ctx.fillRect(x0 - 2, p.y - 8, lw + 4, 16);
+        }
         ctx.fillStyle = p.cast ? 'rgba(34,211,238,0.95)'
           : plain ? 'rgba(255,255,255,0.62)'
           : 'rgba(255,255,255,0.85)';
-        const lw = ctx.measureText(p.name).width;
-        const rightX = p.x + size * 0.7;
-        if (rightX + lw > cssW - PAD_X) {
-          // Flip to the left so an anchor near the right edge isn't clipped.
-          ctx.textAlign = 'right';
-          ctx.fillText(p.name, p.x - size * 0.7, p.y);
-        } else {
-          ctx.textAlign = 'left';
-          ctx.fillText(p.name, rightX, p.y);
-        }
+        ctx.textAlign = 'left';
+        ctx.fillText(p.name, x0, p.y);
       }
     }
   };
