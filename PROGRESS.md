@@ -4,7 +4,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 ---
 
-## CURRENT STATE (2026-10-09, SESSION 383: **1.20.0 pushed** on the Captain's walk of 1.19 (h20 #2081): the home's cards kept in place and done, "Grow your world" as the route, one heading and one label column for "What do you have?", the Data room as one flow, Moppetopia onto its elements; **1.19.0 LIVE** (Boss 99475cdb, walked live 19:02). Gates on the 1.20 tree: typecheck 0 + **2635 vitest** (exit 0) + **423 e2e (= `--list`, PLAYWRIGHT_EXIT=0, zero flaky)** + a production build)
+## CURRENT STATE (2026-10-09, SESSION 383: **1.20.0 LIVE** (Boss 84ed85b1, walked live 19:52 in Chromium and Firefox from fresh contexts: the question, Grow your world with done cards kept, #/start answered, #/bring-in into the Data room, zero page errors) on the Captain's walk of 1.19 (h20 #2081): the home's cards kept in place and done, "Grow your world" as the route, one heading and one label column for "What do you have?", the Data room as one flow, Moppetopia onto its elements; **1.19.0 LIVE** (Boss 99475cdb, walked live 19:02). Gates on the 1.20 tree: typecheck 0 + **2635 vitest** (exit 0) + **423 e2e (= `--list`, PLAYWRIGHT_EXIT=0, zero flaky)** + a production build)
 
 **Records**: the design and both rounds: `Forge/Notes/2026-10-09-s383-newcomer-flow-design.md` (its "1.20" block); the front door for what is next: the handover `Forge/Notes/2026-10-09-s383-handover.md`. DESIGN_HOME "The newcomer flow" holds the living truth.
 
@@ -12,7 +12,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 - **Revert-checked**: the core receipts (e2e), the answered mark (observer), the Moppetopia sidebar (e2e); the kernel by unit tests.
 - **Waiting on the Captain** (h20 #2087): Q1 the four grow cards or the old six; Q2 waypoint toasts kept (built so); Q3 the AI docs URL; the Forge commit.
 - **Deck**: #127 done (1.19 live walk); #139 submap from a pin and #140 fully forget, accepted, carried; #126 Firefox demo speed open; OW Infra #104 next.
-- ⚡ **NEXT**: Boss deploys 1.20, I walk it live; then #104's door both ways; the upload button (Keel #59); #139, #140 (gate it); #126.
+- ⚡ **NEXT**: the Captain's home page v4 notes for me (a work bout, h37 #2097); Tangle for Skeld's Q2; then #104's door both ways; the upload button (Keel #59); #139, #140 (gate it); #126.
 
 ---
 
