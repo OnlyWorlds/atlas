@@ -1144,7 +1144,7 @@ async function linkIntoBrowser(
     downloadResult = await initialDownloadAll(store, buildV2Adapter(apiKey, apiPin), opts.onProgress, opts.shouldStop, { stopOnQuota: true });
     await releasePriorWorld();
   } catch (err) {
-    return abandonBrowserMake(store, make, err, 'bringing the world down');
+    return abandonBrowserMake(store, make, err, 'downloading the world');
   }
   let regAfter = getState().registry;
   if (!regAfter.pin && apiPin) regAfter = setPin(regAfter, apiPin);

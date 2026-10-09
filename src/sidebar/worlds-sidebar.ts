@@ -102,7 +102,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         ${addIconButton('create-local', newWorldGlyph(), hasFolderMode() ? 'Start a new world: in a folder on your drive or in this browser' : 'Start a new world: kept in this browser')}
         ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder you already have. It opens where it is; nothing is copied.') : ''}
         ${addIconButton('new-api', 'cloud_upload', hasFolderMode() ? 'New world on OnlyWorlds: made on onlyworlds.com and on your drive or in this browser' : 'New world on OnlyWorlds: made on onlyworlds.com and in this browser')}
-        ${addIconButton('link-api', 'link', 'Bring down a world from OnlyWorlds with its API key')}
+        ${addIconButton('link-api', 'link', 'Download a world from OnlyWorlds with its API key')}
         ${addIconButton('view-api', 'visibility', 'View a shared world with a read key, view only')}
         </div>`;
       header.innerHTML = `${icons}
@@ -521,7 +521,7 @@ function renderRow(world: WorldRegistryEntry, active: boolean, _settingsActive: 
     : inBrowser ? 'Stored in this browser' : world.folder?.last_path_hint ?? '';
   // A linked world comes back from onlyworlds.com under this row (contract §3.3).
   const bringDown = cleared && world.api?.api_key
-    ? `<button type="button" class="atlas-icon-btn-sm" data-role="bring-down-cleared" data-world-id="${escapeAttr(world.id)}" title="Bring it down again from onlyworlds.com" aria-label="Bring it down again">
+    ? `<button type="button" class="atlas-icon-btn-sm" data-role="bring-down-cleared" data-world-id="${escapeAttr(world.id)}" title="Download it again from onlyworlds.com" aria-label="Download it again">
           <span class="material-symbols-outlined" aria-hidden="true">cloud_download</span>
         </button>`
     : '';

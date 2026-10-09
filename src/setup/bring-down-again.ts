@@ -74,16 +74,16 @@ export function bringDownAgain(
 async function run(worldId: string, opts: BringDownAgainOpts): Promise<{ entry: WorldRegistryEntry; downloaded: number; failures: number }> {
   const entry = entryNow(worldId);
   if (!entry || !isBrowserWorld(entry) || entry.demo === true) {
-    throw new PlainError('Only a world this browser cleared can be brought down again.');
+    throw new PlainError('Only a world this browser cleared can be downloaded again.');
   }
   if (!entry.cleared_at) throw new PlainError(NOT_CLEARED_NOW);
   if (!entry.api?.api_key || !entry.api.world_id) {
-    throw new PlainError('This world was never online, so there is no copy to bring down. Open a world file of it instead.');
+    throw new PlainError('This world was never online, so there is no copy to download. Open a world file of it instead.');
   }
   const readOnly = !!entry.api.read_only;
   const pin = readOnly ? '' : (getState().registry.pin ?? '');
   if (!readOnly && !pin) {
-    throw new PlainError('Atlas needs your OnlyWorlds PIN to bring this world down. Enter it in Settings, under OnlyWorlds, then try again.');
+    throw new PlainError('Atlas needs your OnlyWorlds PIN to download this world. Enter it in Settings, under OnlyWorlds, then try again.');
   }
   const ownId = ownWorldIdOf(entry);
   const oldDir = entry.folder.folder_name;
@@ -97,7 +97,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<{ entry: 
     await store.writeWorldMeta({ id: ownId, name: entry.name, api: { ...entry.api } });
     downloaded = await initialDownloadAll(store, buildV2Adapter(entry.api.api_key, pin), opts.onProgress, undefined, { stopOnQuota: true });
   } catch (err) {
-    return abandonBrowserMake(store, make, err, 'bringing the world down');
+    return abandonBrowserMake(store, make, err, 'downloading the world');
   }
 
   // The commit: the restored entry, saved strictly, while the world that was

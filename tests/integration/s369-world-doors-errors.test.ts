@@ -191,7 +191,7 @@ describe('add-a-world icons (S369, 1g)', () => {
     }
     expect(icons.map(b => b.getAttribute('aria-label'))).toEqual([
       'Start a new world', 'Open a world folder', 'New world on OnlyWorlds',
-      'Bring down a world from OnlyWorlds', 'View a shared world',
+      'Download a world from OnlyWorlds', 'View a shared world',
     ]);
     unmount();
     content.remove();

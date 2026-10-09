@@ -53,7 +53,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
     ? ''
     : isBrowserWorld(world)
       ? `<div class="atlas-settings-actions">
-        ${hasFolderMode() ? '<button class="atlas-btn-ghost" data-action="move-to-folder" title="Copy it into a folder on your drive, where your AI can work on it, and remove it from this browser">Move to a folder</button>' : ''}
+        ${hasFolderMode() ? '<button class="atlas-btn-ghost" data-action="move-to-folder" title="Copy it into a folder on your drive, where other tools can open it, and remove it from this browser">Move to a folder</button>' : ''}
         <button class="atlas-btn-ghost" data-action="download-world">Download the whole world</button>
       </div>
       <p class="atlas-settings-hint" data-role="download-hint">One file holding the whole world: elements, pages, notes, charts and images. Atlas 1.17 or later opens it in any browser.${world.state === 'api-linked' ? ' It leaves out the OnlyWorlds link and its key, so the copy opens as a local world.' : ''}</p>

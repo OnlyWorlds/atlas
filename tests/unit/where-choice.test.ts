@@ -30,7 +30,7 @@ describe('whereChoiceHtml', () => {
   it('with the picker: two rows, the folder first', () => {
     pickerOn();
     const rows = [...mount().querySelectorAll('.atlas-where-row strong')].map(s => s.textContent);
-    expect(rows).toEqual(['In a folder on your drive (your AI can work on it)', 'In this browser']);
+    expect(rows).toEqual(['In a folder on your drive', 'In this browser']);
   });
   it('pre-selects the folder, with its path, when a home folder is set', () => {
     pickerOn();

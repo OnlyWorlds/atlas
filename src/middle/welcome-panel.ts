@@ -143,16 +143,16 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         choice('start-world', startBtnClass, 'start a world', folderMode
           ? 'your first world, in a folder on your drive or in this browser'
           : 'it lives in this browser'),
-        folderMode ? choice('open-world-folder', 'atlas-btn-ghost', 'open a world folder', 'one you already have, or one your AI made') : '',
+        folderMode ? choice('open-world-folder', 'atlas-btn-ghost', 'open a world folder', 'one you already have') : '',
         // #113: the demo world as the user's own copy (needs browser storage).
         choice('try-demo', 'atlas-btn-ghost', 'try a demo world', 'Moppetopia, your own copy to explore and change'),
-        choice('other-ways-in', 'atlas-btn-ghost', 'other ways in', 'bring one down from OnlyWorlds, view a shared world, open a world file'),
+        choice('other-ways-in', 'atlas-btn-ghost', 'other ways in', 'download one from OnlyWorlds, view a shared world, open a world file'),
       ].join('');
       // The note names the DESKTOP part of the constraint (S323): mobile
       // Chrome has no folder picker either, so the sentence says "desktop".
       const folderNote = folderMode
         ? ''
-        : 'Worlds you make here live in this browser. Folders on your drive, which your AI can work on, need a desktop Chromium browser: Chrome, Edge or Brave.';
+        : 'Worlds you make here live in this browser. Folders on your drive need a desktop Chromium browser: Chrome, Edge or Brave.';
       // (The example-page door, "see an example page" → #/demo, was removed in
       // S368 with the other two example-page links. The #/demo route itself
       // still answers, for old links.)
@@ -199,7 +199,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           if (note) note.textContent = text;
         };
         caption('start-world', 'your first world, in a folder on your drive');
-        caption('other-ways-in', 'bring one down from OnlyWorlds, or view a shared world');
+        caption('other-ways-in', 'download one from OnlyWorlds, or view a shared world');
         const note = root.querySelector<HTMLElement>('[data-role="storage-note"]');
         if (!note) return;
         // A full origin is not a private window (gate B20): say which.
@@ -299,7 +299,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           'add-world': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">add</span>
             <h3>add a world</h3>
-            <p>Every way to start a world, each with a line on what it does: start a new world, open a world folder or a world file, or bring down or view one from OnlyWorlds.</p>
+            <p>Every way to start a world, each with a line on what it does: start a new world, open a world folder or a world file, or download or view one from OnlyWorlds.</p>
             <p class="atlas-grounded-detail-hint">click to choose</p>`,
           'create-local': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>

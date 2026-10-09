@@ -63,7 +63,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'try-the-demo-world',
         title: 'Try the demo world',
-        body: 'The first screen, and add a world, offer Moppetopia: a small world brought down from OnlyWorlds as your own copy in this browser. Change anything in it; nothing goes back to OnlyWorlds. Trying it again opens the copy you have.',
+        body: 'The first screen, and add a world, offer Moppetopia: a small world downloaded from OnlyWorlds as your own copy in this browser. Change anything in it; nothing goes back to OnlyWorlds. Trying it again opens the copy you have.',
         tags: ['world'],
       },
       {
@@ -83,6 +83,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         title: 'Names on the Home chart stay readable',
         body: 'On the chart on a world\'s Home, names no longer print over each other or over another element, and a timespan\'s line passes behind a name instead of through it.',
         tags: ['charts'],
+      },
+      {
+        id: 'download-wording',
+        title: 'One word for getting a world from OnlyWorlds',
+        body: 'Every button, title and message that copies a world from OnlyWorlds to you now says download.',
+        tags: ['world'],
       },
     ],
   },

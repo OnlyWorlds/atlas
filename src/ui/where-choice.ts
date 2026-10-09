@@ -54,7 +54,7 @@ export function whereChoiceHtml(): string {
       <legend>Where should this world live?</legend>
       <label class="atlas-where-row">
         <input type="radio" name="where" value="folder" ${preselect === 'folder' ? 'checked' : ''} />
-        <span><strong>In a folder on your drive (your AI can work on it)</strong>
+        <span><strong>In a folder on your drive</strong>
         <span>${rootDisplay ? `In <code>${escapeText(rootDisplay)}</code>` : 'Pick a folder once; Atlas keeps your new worlds in it as plain files.'}</span></span>
       </label>
       <label class="atlas-where-row">

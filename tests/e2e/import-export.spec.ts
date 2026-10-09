@@ -51,7 +51,7 @@ async function importAsNew(page: Page, where: 'folder' | 'browser' = 'folder') {
   await page.click('[data-action="import"]');
   const ask = page.locator('[data-modal="where-ask"]');
   await expect(ask.locator('.atlas-where-row strong')).toHaveText([
-    'In a folder on your drive (your AI can work on it)',
+    'In a folder on your drive',
     'In this browser',
   ]);
   await expect(ask.locator('input[name="where"][value="folder"]')).toBeChecked();

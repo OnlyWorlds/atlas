@@ -96,9 +96,9 @@ export async function openDemoWorld(toasts: ToastManager): Promise<void> {
 let demoRunning = false;
 
 const DEMO_WORDS: OpenWords = {
-  doing: `bringing down ${DEMO_WORLD_NAME}`,
+  doing: `downloading ${DEMO_WORLD_NAME}`,
   title: `Try ${DEMO_WORLD_NAME}`,
-  opening: `Bringing down ${DEMO_WORLD_NAME}…`,
+  opening: `Downloading ${DEMO_WORLD_NAME}…`,
   cancelled: `${DEMO_WORLD_NAME} was not opened.`,
   already: `${DEMO_WORLD_NAME} is already in Atlas.`,
   opened: name => `Opened "${name}": your own copy, in this browser. Nothing you change goes back to OnlyWorlds.`,

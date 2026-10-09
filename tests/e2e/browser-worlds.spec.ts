@@ -161,7 +161,7 @@ test('on Chromium the create dialog asks where, folder first, and "In this brows
   await boot(page);
   await openCreate(page);
   const rows = page.locator('[data-modal="create-world"] .atlas-where-row strong');
-  await expect(rows).toHaveText(['In a folder on your drive (your AI can work on it)', 'In this browser']);
+  await expect(rows).toHaveText(['In a folder on your drive', 'In this browser']);
   // No home folder and no earlier pick: this browser is pre-selected.
   await expect(page.locator('[data-modal="create-world"] input[name="where"][value="browser"]')).toBeChecked();
   await page.fill('[data-modal="create-world"] input[name="world-name"]', 'Hollow Reach');
@@ -255,7 +255,7 @@ async function linkLandsInBrowser(page: Page, folderMode: boolean) {
   await openLink(page);
   const modal = page.locator('[data-modal="link-world"]');
   if (folderMode) {
-    await expect(modal.locator('.atlas-where-row strong')).toHaveText(['In a folder on your drive (your AI can work on it)', 'In this browser']);
+    await expect(modal.locator('.atlas-where-row strong')).toHaveText(['In a folder on your drive', 'In this browser']);
     await expect(modal.locator('input[name="where"][value="browser"]')).toBeChecked();
   } else {
     await expect(modal.locator('.atlas-where-row')).toHaveCount(0);

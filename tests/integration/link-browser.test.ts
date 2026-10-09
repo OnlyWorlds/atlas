@@ -154,7 +154,7 @@ describe('linking a world into this browser', () => {
       if (++calls === 2) throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
       return real.apply(this, args);
     });
-    await expect(link()).rejects.toMatchObject({ name: 'PlainError', message: BROWSER_STORAGE_FULL('bringing the world down') });
+    await expect(link()).rejects.toMatchObject({ name: 'PlainError', message: BROWSER_STORAGE_FULL('downloading the world') });
     expect(calls).toBe(2);
     expect(getState().registry.worlds).toHaveLength(0);
     expect(home()?.children.size ?? 0).toBe(0);

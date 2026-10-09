@@ -78,7 +78,7 @@ test('first visit, browser storage refused on Chromium: no tour, and the doors l
   await expect(page.locator('.atlas-landing-note')).toContainText('does not allow browser storage');
   await expect(page.locator('[data-action="start-tour"]')).toHaveCount(0);
   const notes = page.locator('.atlas-landing-choice-note');
-  await expect(notes).toHaveText(['your first world, in a folder on your drive', 'one you already have, or one your AI made', 'bring one down from OnlyWorlds, or view a shared world']);
+  await expect(notes).toHaveText(['your first world, in a folder on your drive', 'one you already have', 'download one from OnlyWorlds, or view a shared world']);
 });
 
 test('first visit: start a world asks where, folder first, and the browser row lands a world in this browser', async ({ page }) => {
