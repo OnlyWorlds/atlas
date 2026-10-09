@@ -10,7 +10,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 - **1.20 BUILT**: `home-tour.ts` `computeHomeCards` (core pair, then the grow wave: event, narrative, map, collective; construct and object left on my lean to his Q1); `world-home.ts` `buildTour`/`cardTile`/`openCardRoom` (a made card stays, greyed with a check, opens its room; the question stays until both cores exist; × hides the grow block, `home-cards`); the waypoints are achievements (13, toasting where earned; the core phase is first-world's and first-element's receipt); the Data room's lead and convert line as one flow (`OW_AI_DOCS_URL`, still the toolkit page until his Q3 names the AI docs page); Moppetopia sets the elements sidebar (`open-world-file.ts`).
 - **Revert-checked**: the core receipts (e2e), the answered mark (observer), the Moppetopia sidebar (e2e); the kernel by unit tests.
-- **Waiting on the Captain** (h20 #2087): Q1 the four grow cards or the old six; Q2 waypoint toasts kept (built so); Q3 the AI docs URL; the Forge commit.
+- **1.20.1**: the Captain answered (h20 #2123): Q1 four cards, Q2 toasts kept, as built; Q3 the docs link is now https://onlyworlds.github.io/docs/development/ai.html (200). Also: 1.20 went out with one red unit test (`changelog-render`: an entry title with double quotes, added after my last full run); 1.20.1 rewords it, 2635 vitest green. Still open: the Forge commit (board B4).
 - **Deck**: #127 done (1.19 live walk); #139 submap from a pin and #140 fully forget, accepted, carried; #126 Firefox demo speed open; OW Infra #104 next.
 - ⚡ **NEXT**: the Captain's home page v4 notes for me (a work bout, h37 #2097); Tangle for Skeld's Q2; then #104's door both ways; the upload button (Keel #59); #139, #140 (gate it); #126.
 

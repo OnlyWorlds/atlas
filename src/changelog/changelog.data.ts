@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.20.1',
+    date: '2026-10-09',
+    theme: 'the right page',
+    entries: [
+      {
+        id: 'ai-docs-link',
+        title: 'More ways to convert opens the AI docs',
+        body: 'In the Data room, the link to more ways to convert now opens the OnlyWorlds docs page on working with AI, which covers every way in, instead of the toolkit\'s front page.',
+        tags: ['data'],
+      },
+    ],
+  },
+  {
     version: '1.20',
     date: '2026-10-09',
     theme: 'the first hour, steadier',
@@ -74,7 +87,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       },
       {
         id: 'what-do-you-have-clearer',
-        title: '"What do you have?" reads as one question',
+        title: 'One clear question on a new world',
         body: 'It is a clear heading over its three answers, and the answers line up in one column.',
         tags: ['world'],
       },

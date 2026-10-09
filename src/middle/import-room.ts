@@ -46,10 +46,10 @@ import { filesWhereOf } from '../core/browser-worlds';
 type Mode = 'new' | 'merge';
 
 /**
- * Where the ways to convert notes with an AI are written up (1.20: the
- * Captain asked for the AI docs page, not the toolkit repo; h20 #2081).
+ * Where the ways to convert notes with an AI are written up: the docs' AI
+ * page, not the toolkit repo (the Captain, h20 #2081, #2123; 200 on 2026-10-09).
  */
-const OW_AI_DOCS_URL = 'https://onlyworlds.github.io';
+const OW_AI_DOCS_URL = 'https://onlyworlds.github.io/docs/development/ai.html';
 
 /**
  * IE7: a minimal valid full-world export. Doubles as format documentation —
