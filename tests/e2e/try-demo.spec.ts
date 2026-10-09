@@ -151,6 +151,30 @@ test('@firefox try a demo world: one click opens an editable, unlinked Moppetopi
   await tryDemoOpensACopy(page);
 });
 
+test('the #/try-demo link (1.18.1) opens the same copy once; a reload does not ask again', async ({ page }) => {
+  await boot(page);
+  const seen = await mockMoppetopia(page);
+  // The onlyworlds.com home page links here: a fresh load straight onto the hash.
+  await page.goto('/#/try-demo');
+  await expect(page.locator('.ow-toast', { hasText: 'your own copy, in this browser' })).toBeVisible({ timeout: 20_000 });
+  expect(await page.evaluate(() => window.location.hash)).not.toContain('try-demo');
+  const read = async () => page.evaluate(async () => {
+    const { getState } = await import('/src/core/state.ts');
+    const s = getState();
+    return { entries: s.registry.worlds.length, active: s.registry.worlds.find((w: any) => w.id === s.active?.worldId)?.name ?? null };
+  });
+  expect(await read()).toEqual({ entries: 1, active: 'Moppetopia' });
+  const worldReads = () => seen.filter(r => /\/api\/v2\/world\/?$/.test(r.path)).length;
+  expect(worldReads()).toBe(1);
+  // Back and a reload land where the link left off; nothing downloads again.
+  await page.reload();
+  await page.waitForSelector('.atlas-shell');
+  await page.waitForTimeout(1500);
+  expect(worldReads()).toBe(1);
+  expect((await read()).entries).toBe(1);
+  expect(seen.filter(r => r.method !== 'GET')).toEqual([]);
+});
+
 test('with Moppetopia already linked (view only), try says how to make room for a copy and downloads nothing', async ({ page }) => {
   await boot(page);
   const seen = await mockMoppetopia(page);

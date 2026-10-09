@@ -46,7 +46,7 @@ A room is a top-level mode of the middle pane (`MiddleMode` in `src/core/state.t
 | `import` (the **Data** room) | `#/w/<id>/import` | Bring in (full-world or loose JSON, as a new world or a merge, with validation) and take out (keel export envelope, by-type subset) | DESIGN_IMPORT |
 | `settings` | `#/w/<id>/settings[/<tab>]`, `#/settings[/<tab>]` | Atlas-wide tabs `general`, `onlyworlds`, `storage`, `elements`, `maps`; per-world tabs `world`, `writing`, `context` (labelled "Web") | conv. 64, 65 |
 
-`#/demo` is not a room: it mounts the view-only example page (Sikelia) as a full-viewport overlay above the shell (`src/demo/demo-view.ts`), entered from the welcome panel, the Pages room's empty state and Settings → OnlyWorlds. The old `search` and `templates` rooms were deleted; their URLs land on home.
+`#/demo` is not a room: it mounts the view-only example page (Sikelia) as a full-viewport overlay above the shell (`src/demo/demo-view.ts`); its three links in the app were removed in S368, and the route still answers for old links. The old `search` and `templates` rooms were deleted; their URLs land on home.
 
 **Room-stable world switch** (`activateWorld` in `src/sidebar/worlds-sidebar.ts`): activating another world keeps the current room KIND at its landing level. Writing, knowledge, charts, pages and data follow to the new world; settings keeps its tab; element and map routes fall to home (their ids are world-bound). The instance still remounts (conv. 109); a Data room payload is carried across on purpose so a loaded file can be merged into the world you click.
 
@@ -103,12 +103,13 @@ interface UiState {
 
 ## Routes (`src/core/router.ts`)
 
-Hash-based, so no server rewrites (Cloudflare Pages friendly). `parseHash` returns a `Route` with `mode` (`welcome`, `demo`, `home`, `settings`, `elements`, `element`, `map`, `timeline`, `writing`, `knowledge`, `share`, `import`) and the ids that mode carries.
+Hash-based, so no server rewrites (Cloudflare Pages friendly). `parseHash` returns a `Route` with `mode` (`welcome`, `demo`, `try-demo`, `home`, `settings`, `elements`, `element`, `map`, `timeline`, `writing`, `knowledge`, `share`, `import`) and the ids that mode carries.
 
 | Hash | Route | Middle shows |
 |---|---|---|
 | `#/` (or empty) | `welcome` | the welcome panel |
 | `#/demo` | `demo` | the example page overlay above whatever the middle resolves to |
+| `#/try-demo` | `try-demo` | an action, not a place (1.18.1): `app.ts` replaces the hash with `#/` and runs the "try a demo world" door once (the onlyworlds.com home page's "explore Moppetopia") |
 | `#/settings[/<tab>]` | `settings`, no world | settings with only atlas-wide tabs live |
 | `#/w/<id>` | `home` | home (the default for an active world) |
 | `#/w/<id>/element/<eid>` | `element` | element detail |

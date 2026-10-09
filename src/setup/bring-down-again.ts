@@ -49,7 +49,7 @@ export function ownWorldIdOf(entry: Pick<WorldRegistryEntry, 'folder' | 'api'>):
 const REGISTRY_NOT_SAVED =
   'Atlas could not save its list of worlds in this browser, so the world was not brought back. Free some space in this browser, then try again.';
 const CHANGED_ELSEWHERE =
-  'This world changed in another tab while it was coming down. Look at its row, then try again.';
+  'This world changed in another tab while it was downloading. Look at its row, then try again.';
 
 const NOT_CLEARED_NOW = 'This world is no longer cleared: another tab may have brought it back. Look at its row.';
 

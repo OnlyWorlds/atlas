@@ -41,6 +41,7 @@
 export type RouteMode =
   | 'welcome'
   | 'demo'
+  | 'try-demo'
   | 'home'
   | 'settings'
   | 'elements'
@@ -143,6 +144,13 @@ export function parseHash(hash: string): Route {
   // /demo — the view-only sample-world presentation (no world, no registry).
   if (parts[0] === 'demo') {
     return { worldId: null, mode: 'demo' };
+  }
+
+  // /try-demo — a link that runs the "try a demo world" door (1.18.1, for the
+  // onlyworlds.com home page's "explore Moppetopia"). An action, not a place:
+  // app.ts runs it once and replaces the hash.
+  if (parts[0] === 'try-demo') {
+    return { worldId: null, mode: 'try-demo' };
   }
 
   // /w/<id>...

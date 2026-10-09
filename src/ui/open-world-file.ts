@@ -82,7 +82,7 @@ export async function openWorldFileFrom(file: File, toasts: ToastManager): Promi
 export async function openDemoWorld(toasts: ToastManager): Promise<void> {
   // One at a time in this tab: a second click while it comes down is the same ask.
   if (demoRunning) {
-    toasts.info(`${DEMO_WORLD_NAME} is still coming down.`);
+    toasts.info(`${DEMO_WORLD_NAME} is still downloading.`);
     return;
   }
   demoRunning = true;

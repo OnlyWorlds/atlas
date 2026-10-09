@@ -54,7 +54,7 @@ export class BringDownAgainModal extends BaseModal {
         });
         this.dismissLocked = false;
         this.hide();
-        const missing = out.failures > 0 ? ` ${out.failures} element${out.failures === 1 ? '' : 's'} did not come down. Refresh from API brings ${out.failures === 1 ? 'it' : 'them'}.` : '';
+        const missing = out.failures > 0 ? ` ${out.failures} element${out.failures === 1 ? '' : 's'} did not download. Refresh from API brings ${out.failures === 1 ? 'it' : 'them'}.` : '';
         if (missing) this.toasts.error(`"${w.name}" is back in this browser.${missing}`);
         else this.toasts.success(`"${w.name}" is back in this browser.`);
         navigate(homeHash(w.id));

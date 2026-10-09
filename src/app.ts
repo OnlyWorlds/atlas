@@ -185,6 +185,14 @@ export function startApp(container: HTMLElement): AppHandle {
   let demoWasMounted = false;
 
   function renderMiddle(): void {
+    // #/try-demo (1.18.1): the home page's link into the demo world. It runs
+    // the same door as the landing's button, once: the hash goes first, so a
+    // reload, Back or the next state tick never asks again. The door itself
+    // waits for the boot reconciliation and finds a copy already here.
+    if (parseHash(window.location.hash).mode === 'try-demo') {
+      history.replaceState(history.state, '', '#/');
+      void import('./setup/world-doors').then(m => m.runAddWorldAction('try-demo', toasts));
+    }
     const route = parseHash(window.location.hash);
     const active = getState().active;
 

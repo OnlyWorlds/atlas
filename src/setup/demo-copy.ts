@@ -109,7 +109,7 @@ async function build(opts: DemoCopyOpts): Promise<DemoWorldFile> {
       await store.close().catch(() => {});
     }
     if (failed > 0 || stopped) {
-      throw new PlainError(`${name} did not come down whole, so Atlas did not open it. Try again.`);
+      throw new PlainError(`${name} did not download whole, so Atlas did not open it. Try again.`);
     }
     const ws = await import('../store/world-file');
     const collected = await ws.collectWorldFiles(dir);

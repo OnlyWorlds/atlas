@@ -90,6 +90,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'Every button, title and message that copies a world from OnlyWorlds to you now says download.',
         tags: ['world'],
       },
+      {
+        id: 'try-demo-link',
+        title: 'A link straight into the demo world',
+        body: 'atlas.onlyworlds.com/#/try-demo opens Moppetopia as your own copy, the same as the button on the first screen. If you already have the copy, it opens that one.',
+        tags: ['world'],
+      },
     ],
   },
   {
