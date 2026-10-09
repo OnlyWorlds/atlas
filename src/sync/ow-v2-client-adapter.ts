@@ -562,6 +562,9 @@ function adaptWorldMetaBody(src: Record<string, unknown>): WorldMetaWire {
     time_range_min: int(src.time_range_min),
     time_range_max: int(src.time_range_max),
     time_current: int(src.time_range_current), // the one rename, wire → disk
+    length_unit: text(src.length_unit),
+    mass_unit: text(src.mass_unit),
+    distance_unit: text(src.distance_unit),
     public_read: typeof src.public_read === 'boolean' ? src.public_read : undefined,
     created_at: typeof src.created_at === 'string' ? src.created_at : undefined,
     updated_at: typeof src.updated_at === 'string' ? src.updated_at : '',

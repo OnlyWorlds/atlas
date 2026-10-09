@@ -33,6 +33,7 @@ import type { FieldMeta, SectionLayout } from '../editor/field-schema';
 import { relationFieldsFor } from '../editor/field-schema';
 import { completeWaypoint, completeTaxonomyHalf } from '../core/waypoints';
 import { getFieldDescription } from '../editor/field-descriptions';
+import { unitLabelFor } from '../core/world-units';
 import { pickElement } from '../ui/element-picker-modal';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { readImageDimsFromUrl, smallMapImageHint, IMAGELESS_MAP_SIZE } from '../ui/image-dims';
@@ -239,6 +240,10 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
     valueEl.dataset.widget = meta.widget;
   }
   valueEl.textContent = valueText;
+  // World units (#149): the label rides a data attribute and CSS prints it,
+  // so the value's text stays the bare number the editor and copy use.
+  const unit = meta.widget === 'number' ? unitLabelFor(el.type, meta.name, getState().active?.meta) : '';
+  if (unit) valueEl.dataset.unit = unit;
   // Selection-vs-click discriminator: if the user is dragging to select
   // text, suppress the editor open. mousedown records start coords; on
   // mouseup we check whether the cursor moved (drag = selection intent)
@@ -318,7 +323,7 @@ function renderField(meta: FieldMeta, el: Element): HTMLElement {
     const fieldDesc = getFieldDescription(el.type, meta.name);
     openFieldEditPopover({
       anchor: valueEl,
-      label: humanizeFieldName(meta.name),
+      label: humanizeFieldName(meta.name) + (unit ? ` (${unit})` : ''),
       ...(fieldDesc ? { description: fieldDesc } : {}),
       value: initialValue,
       widget: editWidget,

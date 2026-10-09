@@ -166,6 +166,44 @@ test('world tab — image URL persists to world.json and mirrors to the home cov
   expect(kept).toBe('https://example.com/cover.png');
 });
 
+test('world tab: units save trimmed to world.json and print after the numbers that carry them (#149)', async ({ page }) => {
+  await setupAtlasRoot(page);
+  await createWorld(page, 'Unit World');
+  await page.click('[data-action="open-settings"]');
+  await page.click('[data-settings-tab="world"]');
+
+  const length = page.locator('input[name="world-length-unit"]');
+  await expect(length).toHaveValue('');
+  await length.fill('  cm ');
+  await length.blur();
+  await page.locator('input[name="world-mass-unit"]').fill('stone');
+  await page.locator('input[name="world-mass-unit"]').blur();
+  await expect.poll(() => page.evaluate(async () => {
+    const meta = await (window as any).__atlasTestApi.getActiveStore().readWorldMeta();
+    return [meta.length_unit, meta.mass_unit, meta.distance_unit ?? null];
+  })).toEqual(['cm', 'stone', null]);
+  await expect(length).toHaveValue('cm');
+
+  // A character with a height: the unit rides ::after, the value's text stays the bare number.
+  const ids = await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const c = await store.createElement('character', { name: 'Tall', height: 180, weight: 12 });
+    const m = await store.createElement('map', { name: 'Chart', height: 900 });
+    api.patchData(await store.listElements());
+    return { c: c.id, m: m.id, w: api.getState().active.worldId };
+  });
+  const after = (field: string) => page.locator(`[data-field="${field}"] .atlas-field-value`).first()
+    .evaluate((el) => [el.textContent, getComputedStyle(el, '::after').content]);
+  await page.evaluate(({ w, c }) => { window.location.hash = `#/w/${w}/element/${c}`; }, ids);
+  await expect.poll(() => after('height')).toEqual(['180', '" cm"']);
+  expect(await after('weight')).toEqual(['12', '" stone"']);
+
+  // Map pixels stay bare.
+  await page.evaluate(({ w, m }) => { window.location.hash = `#/w/${w}/element/${m}`; }, ids);
+  await expect.poll(() => after('height')).toEqual(['900', 'none']);
+});
+
 test('world tab — api-linked worlds get stay-offline + refresh + unlink + test', async ({ page }) => {
   await setupAtlasRoot(page);
   await createWorld(page, 'Fake API World');

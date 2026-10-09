@@ -236,6 +236,17 @@ describe('reconcile — world block mapping (full-world)', () => {
     expect('id' in wm).toBe(false);
   });
 
+  it('carries the world units, trimmed; blank ones stay absent (#149)', () => {
+    const parsed = parsePayload({
+      World: { name: 'Units', length_unit: ' cm ', mass_unit: 'stone', distance_unit: '  ' },
+      Character: [{ id: U.kid, name: 'The Kid' }],
+    });
+    const wm = reconcile(parsed, [], { genId: genIdFactory() }).worldMeta!;
+    expect(wm.length_unit).toBe('cm');
+    expect(wm.mass_unit).toBe('stone');
+    expect('distance_unit' in wm).toBe(false);
+  });
+
   it('omits worldMeta for loose payloads', () => {
     const parsed = parsePayload({ Character: [{ name: 'A' }] });
     const plan = reconcile(parsed, [], { genId: genIdFactory() });

@@ -119,6 +119,9 @@ export class FakeOwApiClient implements OwApiClient {
     time_range_min: null,
     time_range_max: null,
     time_current: null,
+    length_unit: '',
+    mass_unit: '',
+    distance_unit: '',
     public_read: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -313,7 +316,10 @@ export class FakeOwApiClient implements OwApiClient {
       if (msg) throw metaError(k, msg);
     }
     if (keys.length === 0) return this.cloneWorldMeta(); // no bump
-    for (const k of keys) (this.worldMeta as unknown as Record<string, unknown>)[k] = wireBody[k];
+    for (const k of keys) {
+      (this.worldMeta as unknown as Record<string, unknown>)[k] =
+        DISK_WORLD_UNIT_FIELDS.has(k) ? (wireBody[k] as string).trim() : wireBody[k];
+    }
     this.worldMeta.updated_at = this.clock();
     return this.cloneWorldMeta();
   }
@@ -756,7 +762,13 @@ const DISK_WORLD_META_WRITABLE: Readonly<Record<string, 'text' | 'list' | 'int'>
   time_range_min: 'int',
   time_range_max: 'int',
   time_current: 'int',
+  length_unit: 'text',
+  mass_unit: 'text',
+  distance_unit: 'text',
 };
+
+/** World units (keel core/world_api.py, Keel #146): trimmed, then capped at 64. */
+const DISK_WORLD_UNIT_FIELDS = new Set(['length_unit', 'mass_unit', 'distance_unit']);
 
 /** First type-validation problem for a DISK-named meta field, or null if ok. */
 function validateDiskWorldMetaField(field: string, v: unknown): string | null {
@@ -764,6 +776,7 @@ function validateDiskWorldMetaField(field: string, v: unknown): string | null {
   if (kind === 'text') {
     if (typeof v !== 'string') return `'${field}' must be a string.`;
     if (field === 'name' && v.trim() === '') return 'name must be a non-empty string.';
+    if (DISK_WORLD_UNIT_FIELDS.has(field) && v.trim().length > 64) return `'${field}' must be 64 characters or fewer.`;
     return null;
   }
   if (kind === 'list') {

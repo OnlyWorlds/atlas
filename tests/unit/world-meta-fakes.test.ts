@@ -39,7 +39,7 @@ describe('FakeOwApiClient — patchWorldMeta validation (disk names)', () => {
     fake.setClock(clock.next);
   });
 
-  it('returns the full 13-field body in disk names and logs the read', async () => {
+  it('returns the full 16-field body in disk names and logs the read', async () => {
     const meta = await fake.getWorldMeta();
     expect(meta.name).toBe('fake world');
     expect(meta.time_current).toBeNull();
@@ -214,12 +214,12 @@ describe('statefulV2Handlers — GET/PATCH /world (wire names)', () => {
       body: JSON.stringify(body),
     });
 
-  it('GET returns the full 13-field body in wire names', async () => {
+  it('GET returns the full 16-field body in wire names', async () => {
     mount();
     const body = await (await getWorld()).json();
     expect(Object.keys(body).sort()).toEqual([
-      'created_at', 'description', 'id', 'image_url', 'name', 'public_read',
-      'time_basic_unit', 'time_format_equivalents', 'time_format_names',
+      'created_at', 'description', 'distance_unit', 'id', 'image_url', 'length_unit',
+      'mass_unit', 'name', 'public_read', 'time_basic_unit', 'time_format_equivalents', 'time_format_names',
       'time_range_current', 'time_range_max', 'time_range_min', 'updated_at',
     ]);
     expect(body).toHaveProperty('time_range_current'); // wire name
@@ -234,7 +234,7 @@ describe('statefulV2Handlers — GET/PATCH /world (wire names)', () => {
     const echo = await res.json();
     expect(echo.description).toBe('a realm');
     expect(echo.time_range_current).toBe(42);
-    expect(Object.keys(echo)).toHaveLength(13); // full body
+    expect(Object.keys(echo)).toHaveLength(16); // full body
     expect(echo.updated_at).not.toBe(before.updated_at); // bumped
     // and it persisted
     const after = await (await getWorld()).json();

@@ -143,14 +143,15 @@ Atlas can hold an OnlyWorlds **account token** (`ow_a_`, minted in the portal's 
 
 ## World-meta sync (S262; design and gate record `Forge/Notes/Archive/2026-07-13-worldmeta-sync-design.md`)
 
-The eight OnlyWorlds world fields in `world.json` (`description`, `image_url`, `time_basic_unit`, `time_format_names`, `time_format_equivalents`, `time_range_min`, `time_range_max`, `time_current`) sync through keel's `GET|PATCH /api/v2/world`, so the now-line travels between devices. **`name` is deliberately NOT synced**: the local world name and the server world name are separate identities (`api.world_name` is a display mirror).
+The eleven OnlyWorlds world fields in `world.json` (`description`, `image_url`, `time_basic_unit`, `time_format_names`, `time_format_equivalents`, `time_range_min`, `time_range_max`, `time_current`, and since 1.21 the units `length_unit`, `mass_unit`, `distance_unit`) sync through keel's `GET|PATCH /api/v2/world`, so the now-line travels between devices. **`name` is deliberately NOT synced**: the local world name and the server world name are separate identities (`api.world_name` is a display mirror).
 
 - **The meta step** (`executeMetaStep`) opens every round: ONE `GET /world` (meta never enters `/changes`; `updated_at` is a skip hint only), then a per-field three-way against `meta_baseline` in sync-state. Server-only changes apply to disk; local-only changes go out as ONE partial PATCH of the changed fields; contested fields follow the policy (local-wins pushes; pause-and-review skips both ways, persists `meta_conflicts`, and the conflict modal gains world-settings rows resolved by `resolveMetaConflict`).
 - **An absent baseline is a seed round, never a PATCH**: adopt the server's values as baseline, fill locally EMPTY fields from the server, push nothing. Locally set fields push next round.
 - **Canonical equality**: disk `undefined` equals the wire empties (`''`, `[]`, `null`); the encoder sends typed empties, so a cleared now goes out as `time_range_current: null`. Kernel: `src/sync/world-meta-sync.ts` (pure, unit-locked; owns the one disk/wire rename `time_current` to `time_range_current`).
 - **The baseline advances per field** (fields the PATCH sent plus fields the pull applied), so a concurrent server change to an untouched field still surfaces. `resetSyncBaseline` clears it.
 - `writeWorldMeta` is serialized store-wide; pull-applied meta reaches `state.active.meta` through `refreshMetaCache`. Meta-only rounds surface honestly (`meta_pushed`/`meta_pulled`, "Pulled world settings").
-- keel validates types, not lengths: atlas guards `image_url` at 1024 and `time_basic_unit` at 128 characters before the wire. A read-only key's 403 has its own reason (`read_only_key`).
+- **The units compare trimmed** (kind `label`): keel trims them before storing, so an untrimmed local value (a hand edit) would never equal its echo and would re-PATCH every round. Labels only: the element view prints them after the nine numbers the standard gives a unit (`src/core/world-units.ts`), nothing converts.
+- atlas guards lengths before the wire: `image_url` at 1024, `time_basic_unit` at 128, each unit at 64 after the trim (keel 422s past its caps). A read-only key's 403 has its own reason (`read_only_key`).
 
 ## Multiple places, one world
 

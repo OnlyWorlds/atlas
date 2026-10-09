@@ -13,14 +13,14 @@
  *  - The wire encoder emits TYPED empties: a cleared time_current goes out as
  *    an explicit null (`time_range_current: null`), never omitted — omission
  *    means "no change" on a PATCH and the cleared now would resurrect.
- *  - Whitelist: only the 8 synced fields ever reach a PATCH body. Keel aborts
+ *  - Whitelist: only the 11 synced fields ever reach a PATCH body. Keel aborts
  *    the WHOLE PATCH on one stray/unknown field, so a single leak would
  *    poison every meta change each round.
  *  - `name` is deliberately NOT synced (D4): local world name and server
  *    world name are separate identities (api.world_name mirror, settings).
  */
 
-export type MetaFieldKind = 'text' | 'list' | 'int';
+export type MetaFieldKind = 'text' | 'label' | 'list' | 'int';
 
 /**
  * The synced world-meta fields, DISK names → kind. Disk `time_current` rides
@@ -35,6 +35,12 @@ export const META_SYNC_FIELDS: Readonly<Record<string, MetaFieldKind>> = {
   time_range_min: 'int',
   time_range_max: 'int',
   time_current: 'int',
+  // World units (standard 00.31.00, Keel #146): free-text labels, "" clears.
+  // Keel trims them, so they compare trimmed ('label'): an untrimmed local
+  // value would otherwise never match its echo and re-push every round.
+  length_unit: 'label',
+  mass_unit: 'label',
+  distance_unit: 'label',
 };
 
 export const META_SYNC_FIELD_NAMES: readonly string[] = Object.keys(META_SYNC_FIELDS);
@@ -70,17 +76,22 @@ export const META_FIELD_MAX_LENGTH: Readonly<Record<string, number>> = {
   name: 255,
   image_url: 1024,
   time_basic_unit: 128,
+  length_unit: 64,
+  mass_unit: 64,
+  distance_unit: 64,
 };
 
 /**
- * Canonical form per kind: text → string ('' when unset/invalid), list →
- * string[] ([] when unset), int → finite number or null. Canonical values
- * compare with plain === (lists element-wise).
+ * Canonical form per kind: text → string ('' when unset/invalid), label →
+ * the same trimmed, list → string[] ([] when unset), int → finite number or
+ * null. Canonical values compare with plain === (lists element-wise).
  */
 export function canonicalMetaValue(kind: MetaFieldKind, v: unknown): string | string[] | number | null {
   switch (kind) {
     case 'text':
       return typeof v === 'string' ? v : '';
+    case 'label':
+      return typeof v === 'string' ? v.trim() : '';
     case 'list':
       return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
     case 'int':
@@ -100,7 +111,7 @@ export function metaEquals(kind: MetaFieldKind, a: unknown, b: unknown): boolean
 }
 
 /**
- * Canonical snapshot of the 8 synced fields from any meta-shaped object
+ * Canonical snapshot of the 11 synced fields from any meta-shaped object
  * (disk WorldMeta or an adapter-returned wire body in disk names). This is
  * the shape meta_baseline stores.
  */
@@ -118,7 +129,7 @@ export function isMetaEmpty(field: string, v: unknown): boolean {
   if (!kind) return true;
   const c = canonicalMetaValue(kind, v);
   if (kind === 'list') return (c as string[]).length === 0;
-  if (kind === 'text') return c === '';
+  if (kind === 'text' || kind === 'label') return c === '';
   return c === null;
 }
 
@@ -126,8 +137,10 @@ export function isMetaEmpty(field: string, v: unknown): boolean {
 export function metaFieldLengthError(field: string, v: unknown): string | null {
   const max = META_FIELD_MAX_LENGTH[field];
   if (!max || typeof v !== 'string') return null;
-  if (v.length <= max) return null;
-  return `${field} exceeds the server's ${max}-character limit (${v.length})`;
+  // A label is measured as keel measures it: after the trim.
+  const s = META_SYNC_FIELDS[field] === 'label' ? v.trim() : v;
+  if (s.length <= max) return null;
+  return `${field} exceeds the server's ${max}-character limit (${s.length})`;
 }
 
 export interface MetaThreeWayDiff {
@@ -173,7 +186,7 @@ export function threeWayMetaDiff(
 }
 
 /**
- * Encode a set of DISK-named fields for the PATCH body: whitelist to the 8,
+ * Encode a set of DISK-named fields for the PATCH body: whitelist to the 11,
  * canonicalize to typed empties (explicit null for cleared ints — omission
  * would mean "no change" and a cleared now would resurrect, gate finding).
  * The RENAME to wire names happens in the adapter, not here — this output is

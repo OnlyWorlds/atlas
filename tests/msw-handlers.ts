@@ -370,7 +370,13 @@ const V2_WORLD_META_WRITABLE: Readonly<Record<string, 'text' | 'list' | 'int'>> 
   time_range_min: 'int',
   time_range_max: 'int',
   time_range_current: 'int',
+  length_unit: 'text',
+  mass_unit: 'text',
+  distance_unit: 'text',
 };
+
+/** World units (keel core/world_api.py, Keel #146): trimmed, then capped at 64. */
+const V2_WORLD_UNIT_FIELDS = new Set(['length_unit', 'mass_unit', 'distance_unit']);
 
 /**
  * Per-field type validation for PATCH /world, WIRE names. Returns the keel
@@ -382,6 +388,9 @@ function validateWorldMetaField(field: string, v: unknown): { message: string; p
   if (kind === 'text') {
     if (typeof v !== 'string') return { message: `'${field}' must be a string.`, param: field };
     if (field === 'name' && v.trim() === '') return { message: 'name must be a non-empty string.', param: 'name' };
+    if (V2_WORLD_UNIT_FIELDS.has(field) && v.trim().length > 64) {
+      return { message: `'${field}' must be 64 characters or fewer.`, param: field };
+    }
     return null;
   }
   if (kind === 'list') {
@@ -442,13 +451,16 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
     time_range_min: null,
     time_range_max: null,
     time_range_current: null,
+    length_unit: '',
+    mass_unit: '',
+    distance_unit: '',
     public_read: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     ...(options.worldMeta ?? {}),
   };
 
-  /** The full 13-field GET /world body (WIRE names), lists copied out. */
+  /** The full 16-field GET /world body (WIRE names), lists copied out. */
   function worldMetaBody(): Record<string, unknown> {
     return {
       id: worldMeta.id,
@@ -461,6 +473,9 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
       time_range_min: worldMeta.time_range_min,
       time_range_max: worldMeta.time_range_max,
       time_range_current: worldMeta.time_range_current,
+      length_unit: worldMeta.length_unit,
+      mass_unit: worldMeta.mass_unit,
+      distance_unit: worldMeta.distance_unit,
       public_read: worldMeta.public_read,
       created_at: worldMeta.created_at,
       updated_at: worldMeta.updated_at,
@@ -633,7 +648,9 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
         const err = validateWorldMetaField(k, body[k]);
         if (err) return envelope({ status: 422, code: 'invalid_request', message: err.message, param: err.param });
       }
-      for (const k of keys) worldMeta[k] = body[k];
+      for (const k of keys) {
+        worldMeta[k] = V2_WORLD_UNIT_FIELDS.has(k) ? (body[k] as string).trim() : body[k];
+      }
       worldMeta.updated_at = clock();
       return HttpResponse.json(worldMetaBody());
     }),

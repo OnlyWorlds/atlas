@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.21',
+    date: '2026-10-09',
+    theme: 'units',
+    entries: [
+      {
+        id: 'world-units',
+        title: 'Units for a world\'s numbers',
+        body: 'Settings, This world now names the units a world counts in: length for heights, mass for weights, distance for range, speed and elevation. Each one shows after its number in the element view, as written, so "hands" and "leagues" work too. Nothing converts. An online world keeps them in sync with OnlyWorlds, where every tool can read them.',
+        tags: ['world', 'sync'],
+      },
+    ],
+  },
+  {
     version: '1.20.1',
     date: '2026-10-09',
     theme: 'the right page',

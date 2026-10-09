@@ -66,6 +66,9 @@ export async function buildWorldExport(
   if (meta.time_current !== undefined) world.time_current = meta.time_current;
   if (meta.time_range_min !== undefined) world.time_range_min = meta.time_range_min;
   if (meta.time_range_max !== undefined) world.time_range_max = meta.time_range_max;
+  if (meta.length_unit) world.length_unit = meta.length_unit;
+  if (meta.mass_unit) world.mass_unit = meta.mass_unit;
+  if (meta.distance_unit) world.distance_unit = meta.distance_unit;
 
   // THE ENVELOPE (S354, converging on keel's `onlyworlds-world-export`, owed
   // to Skeld since S313). One shape both ways now: keel exports it, atlas

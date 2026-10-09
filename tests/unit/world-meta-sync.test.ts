@@ -22,10 +22,10 @@ import {
 } from '../../src/sync/world-meta-sync';
 
 describe('META_SYNC_FIELDS', () => {
-  it('covers exactly the 8 synced fields and excludes name (D4)', () => {
+  it('covers exactly the 11 synced fields and excludes name (D4)', () => {
     expect([...META_SYNC_FIELD_NAMES].sort()).toEqual([
-      'description', 'image_url', 'time_basic_unit',
-      'time_current', 'time_format_equivalents', 'time_format_names',
+      'description', 'distance_unit', 'image_url', 'length_unit', 'mass_unit',
+      'time_basic_unit', 'time_current', 'time_format_equivalents', 'time_format_names',
       'time_range_max', 'time_range_min',
     ]);
     expect(META_SYNC_FIELDS['name']).toBeUndefined();
@@ -61,13 +61,22 @@ describe('canonical equality (the oscillation lock)', () => {
 });
 
 describe('pickSyncedMeta / isMetaEmpty', () => {
-  it('snapshots the 8 fields canonically from a sparse disk meta', () => {
+  it('snapshots the 11 fields canonically from a sparse disk meta', () => {
     const snap = pickSyncedMeta({ id: 'w1', name: 'World', time_current: 38 });
     expect(snap).toEqual({
       description: '', image_url: '', time_basic_unit: '',
       time_format_names: [], time_format_equivalents: [],
       time_range_min: null, time_range_max: null, time_current: 38,
+      length_unit: '', mass_unit: '', distance_unit: '',
     });
+  });
+  it('world units compare trimmed, as keel stores them (an untrimmed local value matches its echo)', () => {
+    expect(metaEquals('label', ' cm ', 'cm')).toBe(true);
+    expect(pickSyncedMeta({ length_unit: '  hands ' }).length_unit).toBe('hands');
+    expect(encodeMetaFieldsForPush({ mass_unit: ' kg' })).toEqual({ mass_unit: 'kg' });
+    expect(isMetaEmpty('distance_unit', '   ')).toBe(true);
+    // description stays byte-exact: only the unit labels trim
+    expect(metaEquals(META_SYNC_FIELDS.description, ' x ', 'x')).toBe(false);
   });
   it('isMetaEmpty matches canonical empties per kind', () => {
     expect(isMetaEmpty('description', undefined)).toBe(true);
@@ -160,6 +169,10 @@ describe('metaFieldLengthError (dig Q9: keel never length-validates)', () => {
     expect(metaFieldLengthError('image_url', 'x'.repeat(1025))).toMatch(/1024/);
     expect(metaFieldLengthError('image_url', 'x'.repeat(1024))).toBeNull();
     expect(metaFieldLengthError('time_basic_unit', 'x'.repeat(129))).toMatch(/128/);
+  });
+  it('flags a world unit over 64 after the trim, as keel measures it', () => {
+    expect(metaFieldLengthError('length_unit', 'x'.repeat(65))).toMatch(/64/);
+    expect(metaFieldLengthError('length_unit', ` ${'x'.repeat(64)} `)).toBeNull();
   });
   it('description is unbounded (TextField)', () => {
     expect(metaFieldLengthError('description', 'x'.repeat(100_000))).toBeNull();

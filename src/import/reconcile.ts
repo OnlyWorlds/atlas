@@ -341,6 +341,10 @@ function mapWorldBlock(world: RawRecord): Partial<WorldMeta> {
   if (trmin !== undefined) out.time_range_min = trmin;
   const trmax = num(world.time_range_max);
   if (trmax !== undefined) out.time_range_max = trmax;
+  for (const f of ['length_unit', 'mass_unit', 'distance_unit'] as const) {
+    const unit = str(world[f])?.trim();
+    if (unit) out[f] = unit;
+  }
   // api_key + id intentionally dropped — never auto-arm sync (convention #85);
   // atlas generates its own WorldMeta.id.
   return out;

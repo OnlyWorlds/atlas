@@ -86,6 +86,29 @@ describe('zero-PATCH idle (the oscillation lock, gate HIGH)', () => {
     await engine.syncNow();
     expect(patchBodies()).toEqual([]);
   });
+
+  it('a hand-typed unit with spaces pushes once, trimmed, then stays idle (keel trims units, #149)', async () => {
+    const engine = makeEngine();
+    await engine.syncNow(); // seed
+    await folder.writeWorldMeta({ length_unit: ' cm ', distance_unit: 'leagues' });
+    await engine.syncNow();
+    await engine.syncNow();
+    await engine.syncNow();
+    expect(patchBodies()).toEqual([{ length_unit: 'cm', distance_unit: 'leagues' }]);
+    const server = await client.getWorldMeta();
+    expect(server.length_unit).toBe('cm');
+    expect(server.distance_unit).toBe('leagues');
+  });
+
+  it('a unit set on the server pulls into world.json (#149)', async () => {
+    const engine = makeEngine();
+    await engine.syncNow(); // seed
+    client.__server_mutate_world_meta({ mass_unit: 'stone' });
+    const result = await engine.syncNow();
+    expect((await folder.readWorldMeta()).mass_unit).toBe('stone');
+    expect(result.meta_pulled).toEqual(['mass_unit']);
+    expect(patchBodies()).toEqual([]);
+  });
 });
 
 describe('three-way rounds', () => {

@@ -213,6 +213,10 @@ export interface WorldMeta {
   time_current?: number;
   time_range_min?: number;
   time_range_max?: number;
+  /** World units (standard 00.31.00, folder spec v0.3.7): free-text labels, synced as world meta. */
+  length_unit?: string;
+  mass_unit?: string;
+  distance_unit?: string;
 }
 
 // ---- Sync state (per-world .atlas/sync-state.json) ----

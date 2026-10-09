@@ -1626,6 +1626,14 @@ html {
   font-weight: 500;
 }
 
+/* World units (#149): the unit after the number, outside the text, so editing
+   and copying the number never carry it. Shown on an empty row too, so the
+   writer knows what to count in before typing. */
+.atlas-field-value[data-unit]::after {
+  content: '\00a0' attr(data-unit);
+  color: var(--atlas-text-dim);
+}
+
 .atlas-field-value.empty[data-widget="text-long"]::before {
   /* text-long fields read better with a slightly longer placeholder hint */
   content: '——';
@@ -4876,6 +4884,29 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-size: 11px;
   letter-spacing: 0.03em;
   color: rgba(var(--atlas-ink-rgb), 0.55);
+}
+
+/* World units (#149): three short labels on one row. */
+.atlas-settings-units-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.atlas-settings-unit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.atlas-settings-unit>span {
+  font-size: 11px;
+  color: rgba(var(--atlas-ink-rgb), 0.45);
+}
+
+.atlas-settings-unit .atlas-input {
+  min-width: 0;
 }
 
 .atlas-settings-pin-row {

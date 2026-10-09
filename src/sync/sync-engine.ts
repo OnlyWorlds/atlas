@@ -80,6 +80,9 @@ export interface WorldMetaWire {
   time_range_min: number | null;
   time_range_max: number | null;
   time_current: number | null;
+  length_unit: string;
+  mass_unit: string;
+  distance_unit: string;
   public_read?: boolean;
   created_at?: string;
   updated_at: string;

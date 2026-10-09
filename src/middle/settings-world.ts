@@ -41,6 +41,58 @@ import { hasFolderMode } from '../core/capabilities';
 import { downloadWorldFromClick } from '../ui/download-world';
 import { escapeText, escapeAttr } from '../core/dom-utils';
 import { findDanglingLinks, scrubReferrers } from '../store/scrub-links';
+import { WORLD_UNIT_FIELDS, WORLD_UNIT_MAX_LENGTH, type WorldUnitField } from '../core/world-units';
+
+/** World units (Atlas #149): label, placeholder, the fields it labels. */
+const UNIT_ROWS: Readonly<Record<WorldUnitField, { label: string; placeholder: string; toast: string }>> = {
+  length_unit: { label: 'Length', placeholder: 'cm, ft, hands', toast: 'Length unit' },
+  mass_unit: { label: 'Mass', placeholder: 'kg, lb, stone', toast: 'Mass unit' },
+  distance_unit: { label: 'Distance', placeholder: 'km, mi, leagues', toast: 'Distance unit' },
+};
+
+function renderUnitFields(): string {
+  const meta = (getState().active?.meta ?? {}) as Partial<Record<WorldUnitField, string>>;
+  const cells = WORLD_UNIT_FIELDS.map((f) => `
+          <label class="atlas-settings-unit">
+            <span>${UNIT_ROWS[f].label}</span>
+            <input class="atlas-input" type="text" name="world-${f.replace('_', '-')}" data-unit-field="${f}"
+              maxlength="${WORLD_UNIT_MAX_LENGTH}" autocomplete="off"
+              value="${escapeAttr(meta[f] ?? '')}" placeholder="${escapeAttr(UNIT_ROWS[f].placeholder)}" />
+          </label>`).join('');
+  return `
+      <div class="atlas-settings-field" data-role="world-units">
+        <span>Units</span>
+        <div class="atlas-settings-units-row">${cells}
+        </div>
+        <p class="atlas-settings-hint">Length for heights, mass for weights, distance for range, speed and elevation. Atlas shows each unit after its number and converts nothing.</p>
+      </div>`;
+}
+
+/** Each unit saves like the image URL: world.json, the active mirror, then the world-meta sync. */
+function wireUnitFields(world: WorldRegistryEntry, toasts: ToastManager): void {
+  document.querySelectorAll<HTMLInputElement>('.atlas-settings input[data-unit-field]').forEach((input) => {
+    const field = input.dataset.unitField as WorldUnitField;
+    input.addEventListener('change', () => {
+      void (async () => {
+        const v = input.value.trim();
+        input.value = v;
+        if (v.length > WORLD_UNIT_MAX_LENGTH) { toasts.error(`${UNIT_ROWS[field].toast} is too long (max ${WORLD_UNIT_MAX_LENGTH} characters)`); return; }
+        const store = getActiveStore();
+        const active = getState().active;
+        if (!store || !active) { toasts.error('This world is not open. Open it from the sidebar, then try again.'); return; }
+        try {
+          await store.writeWorldMeta({ [field]: v });
+          patchSlice('active', { ...active, meta: { ...active.meta, [field]: v } });
+          requestPushIfLinked();
+          toasts.info(v ? `${UNIT_ROWS[field].toast} saved` : `${UNIT_ROWS[field].toast} cleared`);
+        } catch (err) {
+          console.error('[settings] world unit save failed:', err);
+          showProblem(err, { doing: 'saving the world\'s units', worldId: world.id, toasts });
+        }
+      })();
+    });
+  });
+}
 
 export function renderWorldTab(world: WorldRegistryEntry): string {
   const stateLabel = world.state === 'api-linked' ? 'api-linked' : 'local-only';
@@ -103,6 +155,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
           value="${escapeAttr(((getState().active?.meta ?? {}) as { image_url?: string }).image_url ?? '')}"
           placeholder="https://… (the world's cover image)" />
       </label>
+      ${renderUnitFields()}
       <dl class="atlas-settings-meta">
         <dt>State</dt><dd>${stateLabel}</dd>
         ${inBrowser
@@ -194,6 +247,8 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       }
     })();
   });
+
+  wireUnitFields(world, toasts);
 
   const pausedInput = document.querySelector<HTMLInputElement>('.atlas-settings input[name="world-paused"]');
   pausedInput?.addEventListener('change', () => {
