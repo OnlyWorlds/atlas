@@ -12,6 +12,13 @@ async function boot(page: Page) {
   await page.evaluate(async () => { await (window as any).__atlasTestApi.resetAll().catch(() => {}); });
   await page.goto('/');
   await page.waitForSelector('.atlas-shell');
+  // The boot reconciliation runs first on the activation chain; a seed that
+  // writes browser-worlds/ raw (no make lock) while it runs gets adopted twice
+  // (S381: one Firefox run in five). A no-op task queued behind it waits it out.
+  await page.evaluate(async () => {
+    const { enqueueActivationTask } = await import('/src/core/activation-chain.ts');
+    await enqueueActivationTask(async () => {});
+  });
 }
 
 const ALPHA = '0192a000-0000-7000-8000-00000000aaaa';

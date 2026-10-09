@@ -6,7 +6,7 @@
  * tests/integration/make-online-run.test.ts once the keeper fixes it.
  *
  * Run: from tools/atlas,
- *   npx vitest run --config ../../Notes/2026-09-29-s367-gate/probes/lens-b/vitest.lensb.config.ts
+ *   npx vitest run --config ../../Notes/Archive/2026-09-29-s367-gate/probes/lens-b/vitest.lensb.config.ts
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { MockFolderStore } from '../../fixtures/mock-folder-store';
