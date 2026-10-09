@@ -79,6 +79,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         tags: ['world', 'safety'],
       },
       {
+        id: 'seat-secret',
+        title: 'Link a world with an agent seat',
+        body: 'Bring down a world from OnlyWorlds takes a seat\'s secret (ow_s_…) where it asks for the PIN, so a seat someone invited you to works in Atlas, with its own key and without the account PIN.',
+        tags: ['world'],
+      },
+      {
         id: 'cleared-world-keeps-its-row',
         title: 'A cleared world keeps its place',
         body: 'If the browser clears its storage but keeps Atlas\'s list, the world\'s row says "Cleared by this browser" and keeps its link: bring it down again from OnlyWorlds, or open the file you downloaded. Clearing the site\'s data removes the list too, so the download is the way back.',

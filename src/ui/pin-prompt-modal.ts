@@ -28,8 +28,8 @@ export class PinPromptModal extends BaseModal {
           <label class="atlas-modal-field">
             <span>PIN</span>
             <input class="atlas-input" type="password" name="pin"
-                   placeholder="Four digits" inputmode="numeric"
-                   autocomplete="off" maxlength="8" />
+                   placeholder="Four digits, or a seat secret"
+                   autocomplete="off" maxlength="64" />
           </label>
           <div class="atlas-modal-error" data-role="error" hidden></div>
           <div class="atlas-modal-actions">
@@ -49,8 +49,10 @@ export class PinPromptModal extends BaseModal {
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         const pin = input.value.trim();
-        if (!/^\d{4}$/.test(pin)) {
-          errorEl.textContent = 'The PIN is four digits.';
+        // A PIN is four digits; an agent seat sends its secret (ow_s_ + 32
+        // urlsafe characters, keel accounts/agents.py) in the same header.
+        if (!/^\d{4}$/.test(pin) && !/^ow_s_[\w-]{16,}$/.test(pin)) {
+          errorEl.textContent = 'The PIN is four digits, or a seat secret starting ow_s_.';
           errorEl.hidden = false;
           return;
         }
