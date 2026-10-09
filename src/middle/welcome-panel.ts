@@ -144,6 +144,8 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           ? 'your first world, in a folder on your drive or in this browser'
           : 'it lives in this browser'),
         folderMode ? choice('open-world-folder', 'atlas-btn-ghost', 'open a world folder', 'one you already have, or one your AI made') : '',
+        // #113: the demo world as the user's own copy (needs browser storage).
+        choice('try-demo', 'atlas-btn-ghost', 'try a demo world', 'Moppetopia, your own copy to explore and change'),
         choice('other-ways-in', 'atlas-btn-ghost', 'other ways in', 'bring one down from OnlyWorlds, view a shared world, open a world file'),
       ].join('');
       // The note names the DESKTOP part of the constraint (S323): mobile
@@ -189,7 +191,7 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // folder doors stay (the dialog's browser row says why when chosen).
       void opfsStatus().then((status) => {
         if (status === 'ok' || !tourBtn.isConnected) return;
-        const doomed = folderMode ? ['start-tour'] : ['start-tour', 'start-world', 'other-ways-in'];
+        const doomed = folderMode ? ['start-tour', 'try-demo'] : ['start-tour', 'try-demo', 'start-world', 'other-ways-in'];
         for (const action of doomed) root.querySelector(`[data-action="${action}"]`)?.closest('.atlas-landing-choice')?.remove();
         // The doors that stay say only what still works here (S374 gate F6).
         const caption = (action: string, text: string): void => {
@@ -206,6 +208,9 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       });
       root.querySelector<HTMLButtonElement>('[data-action="start-world"]')?.addEventListener('click', () => {
         void runAddWorldAction('create-local', toastManager);
+      });
+      root.querySelector<HTMLButtonElement>('[data-action="try-demo"]')?.addEventListener('click', () => {
+        void runAddWorldAction('try-demo', toastManager);
       });
       root.querySelector<HTMLButtonElement>('[data-action="other-ways-in"]')?.addEventListener('click', () => {
         openAddWorldChooser(toastManager);

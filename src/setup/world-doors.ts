@@ -26,7 +26,7 @@ import { BaseModal } from '../ui/modal-base';
 import { NO_FOLDER_PICKER_LINE, PICKER_CANCELLED_HINT } from '../ui/directory-picker';
 import { browserStorageDoorOpen, hasFolderMode } from '../core/capabilities';
 import { completeWaypoint } from '../core/waypoints';
-import { pickWorldFile, openWorldFileFrom } from '../ui/open-world-file';
+import { pickWorldFile, openWorldFileFrom, openDemoWorld } from '../ui/open-world-file';
 import { PlainError } from '../core/plain-error';
 import { isTourFlagActive } from '../tour/tour-flag';
 import { requestPersistOnFirstBrowserWorld } from './world-parent';
@@ -206,7 +206,7 @@ export async function ensureAtlasRoot(
 }
 
 /** The ways into a world, named by the sidebar buttons' `data-action` (and the chooser's sixth row, a world file). */
-export type AddWorldAction = 'create-local' | 'open-folder' | 'new-api' | 'link-api' | 'view-api' | 'open-file';
+export type AddWorldAction = 'create-local' | 'open-folder' | 'new-api' | 'link-api' | 'view-api' | 'open-file' | 'try-demo';
 
 /** Run one way into a world, from any surface (the icon row, the chooser, Ctrl+K). */
 export async function runAddWorldAction(action: AddWorldAction, toasts: ToastManager): Promise<void> {
@@ -222,6 +222,12 @@ export async function runAddWorldAction(action: AddWorldAction, toasts: ToastMan
     requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
     const file = await pickWorldFile();
     if (file) await openWorldFileFrom(file, toasts);
+    return;
+  }
+  if (action === 'try-demo') {
+    // A copy of the demo world lands in this browser like a world file (#113).
+    requestPersistOnFirstBrowserWorld(line => toasts.info(line, 10_000));
+    await openDemoWorld(toasts);
     return;
   }
   if (action === 'open-folder') {
@@ -269,6 +275,7 @@ const CHOICES: Array<{ action: AddWorldAction; icon: string; title: string; line
   { action: 'link-api', icon: 'link', title: 'Bring down a world from OnlyWorlds', line: 'Paste its key: Atlas downloads a full copy and keeps the two in sync.' },
   { action: 'view-api', icon: 'visibility', title: 'View a shared world', line: 'Someone gave you a read key: browse their world, view only. No PIN needed.' },
   { action: 'open-file', icon: 'file_open', title: 'Open a world file', line: 'A world file Atlas saved, from this or any other browser.' },
+  { action: 'try-demo', icon: 'explore', title: 'Try the demo world', line: 'Moppetopia, as your own copy in this browser to explore and change. Nothing goes back to OnlyWorlds.' },
 ];
 
 /**
@@ -294,7 +301,8 @@ class AddWorldChooser extends BaseModal {
 
   open(): void {
     const { overlay, body } = this.buildModalShell({ title: 'Add a world', dataModal: 'add-world' });
-    const rows = CHOICES.filter(c => (c.action !== 'open-folder' || hasFolderMode()) && (c.action !== 'open-file' || browserStorageDoorOpen()));
+    const needsStorage = (a: AddWorldAction): boolean => a === 'open-file' || a === 'try-demo';
+    const rows = CHOICES.filter(c => (c.action !== 'open-folder' || hasFolderMode()) && (!needsStorage(c.action) || browserStorageDoorOpen()));
     body.innerHTML = `<div class="atlas-add-world-list">${rows.map(c => `
       <button type="button" class="atlas-add-world-row" data-choice="${c.action}">
         <span class="material-symbols-outlined atlas-add-world-icon" aria-hidden="true">${c.icon}</span>

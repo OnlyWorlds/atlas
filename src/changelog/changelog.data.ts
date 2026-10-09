@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.18',
+    date: '2026-10-09',
+    theme: 'the demo world',
+    entries: [
+      {
+        id: 'try-the-demo-world',
+        title: 'Try the demo world',
+        body: 'The first screen, and add a world, offer Moppetopia: a small world brought down from OnlyWorlds as your own copy in this browser. Change anything in it; nothing goes back to OnlyWorlds. Trying it again opens the copy you have.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.17',
     date: '2026-10-09',
     theme: 'worlds in your browser',

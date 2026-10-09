@@ -57,13 +57,15 @@ test('first visit: the landing offers the tour, start a world, open a world fold
   // whose dialog asks where; "other ways in" is the chooser.
   await freshBoot(page);
   const doors = page.locator('.atlas-landing-actions .atlas-landing-btn');
-  await expect(doors).toHaveText(['take the tour', 'start a world', 'open a world folder', 'other ways in']);
+  // 1.18 (#113): "try a demo world" brings Moppetopia down as the user's own copy.
+  await expect(doors).toHaveText(['take the tour', 'start a world', 'open a world folder', 'try a demo world', 'other ways in']);
   await expect(page.locator('.atlas-landing-note')).toBeHidden();
 
   await page.click('[data-action="other-ways-in"]');
   const chooser = page.locator('[data-modal="add-world"]');
-  await expect(chooser.locator('[data-choice]')).toHaveCount(6);
+  await expect(chooser.locator('[data-choice]')).toHaveCount(7);
   await expect(chooser.locator('[data-choice="open-file"]')).toBeVisible();
+  await expect(chooser.locator('[data-choice="try-demo"] strong')).toHaveText('Try the demo world');
 });
 
 test('first visit, browser storage refused on Chromium: no tour, and the doors left say only what works (S374 gate F6)', async ({ page }) => {
@@ -210,8 +212,9 @@ test('"add a world" opens the chooser; its open-a-world row opens a picked world
   });
   await page.locator('[data-action="add-world"]').click();
   const chooser = page.locator('[data-modal="add-world"]');
-  // Six ways in since 1.17: the sixth opens a world file (contract §5.2).
-  await expect(chooser.locator('[data-choice]')).toHaveCount(6);
+  // Six ways in since 1.17 (the sixth opens a world file, contract §5.2); the
+  // seventh since 1.18 is the demo world (#113).
+  await expect(chooser.locator('[data-choice]')).toHaveCount(7);
   await expect(chooser.locator('[data-choice="open-file"] strong')).toHaveText('Open a world file');
   await chooser.locator('[data-choice="open-folder"]').click();
   await expect(page.locator('h1', { hasText: 'Second World' })).toBeVisible();

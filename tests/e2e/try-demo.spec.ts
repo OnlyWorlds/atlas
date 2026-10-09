@@ -1,0 +1,195 @@
+/**
+ * Try the demo world (#113, S381): one click on the landing brings Moppetopia
+ * down by its demo key as an unlinked, editable copy in this browser, and no
+ * request ever writes to OnlyWorlds. Keel is mocked; every request to it is
+ * recorded, so the claim "nothing goes back" is an assertion, not a hope.
+ */
+import { test, expect, Page } from '@playwright/test';
+
+const V2 = 'https://www.onlyworlds.com/api/v2';
+const WORLD_ID = '0695db52-5433-7332-8000-db7fe10da375';
+const NOW = '2026-10-09T12:00:00.000Z';
+
+async function boot(page: Page) {
+  await page.goto('/');
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.resetAll().catch(() => {}); });
+  await page.goto('/');
+  await page.waitForSelector('.atlas-shell');
+  await page.evaluate(async () => {
+    const { enqueueActivationTask } = await import('/src/core/activation-chain.ts');
+    await enqueueActivationTask(async () => {});
+  });
+}
+
+interface Seen { method: string; path: string; key: string | null; pin: string | null }
+
+/** Moppetopia in miniature: three characters and a location that links one. */
+async function mockMoppetopia(page: Page, opts: { failType?: string } = {}): Promise<Seen[]> {
+  const seen: Seen[] = [];
+  const chars = ['Admiral Fluffington', 'Captain Snoot', 'Drip'].map((name, i) => ({
+    id: `0695db83-b69a-772b-8000-00000000000${i}`, type: 'character', name, updated_at: NOW, created_at: NOW,
+  }));
+  const place = { id: '0695db83-b69a-772b-8000-0000000000aa', type: 'location', name: 'Crumblefields', primary_power_id: chars[0].id, updated_at: NOW, created_at: NOW };
+  await page.route('https://www.onlyworlds.com/**', async (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    const headers = await req.allHeaders();
+    seen.push({ method: req.method(), path: url.pathname, key: headers['api-key'] ?? null, pin: headers['api-pin'] ?? null });
+    const path = url.pathname.replace('/api/v2', '');
+    if (path === '/world' || path === '/world/') {
+      return route.fulfill({ json: {
+        id: WORLD_ID, name: 'Moppetopia', description: 'A world of moppets.', image_url: '',
+        time_basic_unit: 'Year', time_format_names: [], time_format_equivalents: [],
+        time_range_min: 0, time_range_max: 1000, time_range_current: 453, updated_at: NOW,
+      } });
+    }
+    const type = path.split('/').filter(Boolean)[0];
+    if (type === opts.failType) return route.fulfill({ status: 500, body: 'boom' });
+    const data = type === 'character' ? chars : type === 'location' ? [place] : [];
+    return route.fulfill({ json: { data, has_more: false, next_cursor: null } });
+  });
+  return seen;
+}
+
+async function scratchLeft(page: Page): Promise<string[]> {
+  return page.evaluate(async () => {
+    let dir: FileSystemDirectoryHandle;
+    try { dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('atlas-scratch'); } catch { return []; }
+    const names: string[] = [];
+    // @ts-expect-error values() is FS Access API
+    for await (const e of dir.values()) names.push(e.name);
+    return names;
+  });
+}
+
+async function tryDemoOpensACopy(page: Page) {
+  await boot(page);
+  const seen = await mockMoppetopia(page);
+  // What an interrupted try (a reload mid-download) leaves behind is swept by the next one.
+  await page.evaluate(async () => {
+    const scratch = await (await navigator.storage.getDirectory()).getDirectoryHandle('atlas-scratch', { create: true });
+    const left = await scratch.getDirectoryHandle('try-left-by-a-reload', { create: true });
+    await (await (await left.getFileHandle('world.json', { create: true })).createWritable()).close();
+  });
+  // A double click is one ask: one copy, and no "already opening" error.
+  await page.locator('[data-action="try-demo"]').dblclick();
+  await expect(page.locator('.ow-toast', { hasText: 'your own copy, in this browser' })).toBeVisible({ timeout: 20_000 });
+
+  const state = await page.evaluate(async () => {
+    const { getState } = await import('/src/core/state.ts');
+    const s = getState();
+    const e = s.registry.worlds.find((w: any) => w.name === 'Moppetopia');
+    const meta = await (window as any).__atlasTestApi.worldMetaOnDisk();
+    return {
+      entries: s.registry.worlds.length,
+      state: e?.state, where: e?.where, api: e?.api ?? null,
+      active: s.active?.worldId === e?.id && s.active?.opened === true,
+      names: s.data.elements.map((x: any) => x.name).sort(),
+      meta,
+    };
+  });
+  expect(state.entries).toBe(1);
+  await expect(page.locator('.ow-toast-error')).toHaveCount(0);
+  const worldReads = () => seen.filter(r => /\/api\/v2\/world\/?$/.test(r.path)).length;
+  await page.waitForTimeout(1000); // a second run would have read the world by now
+  expect(worldReads()).toBe(1);
+  expect(state).toMatchObject({ state: 'local-only', where: 'browser', api: null, active: true });
+  expect(state.names).toEqual(['Admiral Fluffington', 'Captain Snoot', 'Crumblefields', 'Drip']);
+  // The world's own fields came down; the link and the key did not.
+  expect(state.meta).toMatchObject({ id: WORLD_ID, name: 'Moppetopia', time_current: 453, time_basic_unit: 'Year', description: 'A world of moppets.' });
+  expect((state.meta as any).api).toBeUndefined();
+
+  // Editable: a new element and an edit land on disk.
+  await page.evaluate(async () => {
+    const store = (window as any).__atlasTestApi.getActiveStore();
+    await store.createElement('character', { name: 'Moppet of My Own' });
+    const fluff = (await store.listElements()).find((x: any) => x.name === 'Admiral Fluffington');
+    await store.updateElement(fluff.id, { description: 'Mine now.' });
+  });
+  const after = await page.evaluate(async () => {
+    const store = (window as any).__atlasTestApi.getActiveStore();
+    const all = await store.listElements();
+    return { mine: all.some((x: any) => x.name === 'Moppet of My Own'), fluff: all.find((x: any) => x.name === 'Admiral Fluffington')?.description };
+  });
+  expect(after).toEqual({ mine: true, fluff: 'Mine now.' });
+
+  // The demo is not the user's first world or an import (S381 gate F6).
+  expect(await page.evaluate(async () => {
+    const { loadWaypointsState } = await import('/src/core/waypoints.ts');
+    const done = loadWaypointsState().completed as Record<string, unknown>;
+    return { first: !!done['first-world'], imp: !!done['import'] };
+  })).toEqual({ first: false, imp: false });
+
+  // A second try, from another world, opens the copy: no download, no twin (gate F3).
+  await page.evaluate(async () => { const { navigate } = await import('/src/core/router.ts'); navigate('#/'); });
+  await page.evaluate(async () => {
+    const { runAddWorldAction } = await import('/src/setup/world-doors.ts');
+    const { toastManager } = await import('/src/ui/toast-manager.ts');
+    await (runAddWorldAction as any)('try-demo', toastManager);
+  });
+  await expect(page.locator('.ow-toast', { hasText: 'Opened your copy of Moppetopia.' })).toBeVisible();
+  expect(worldReads()).toBe(1);
+  expect(await page.evaluate(async () => {
+    const { getState } = await import('/src/core/state.ts');
+    return getState().registry.worlds.length;
+  })).toBe(1);
+
+  // Nothing ever wrote to OnlyWorlds, and every read rode the demo key alone.
+  await page.waitForTimeout(1500); // a stray push would have fired by now
+  expect(seen.length).toBeGreaterThan(0);
+  expect(seen.filter(r => r.method !== 'GET')).toEqual([]);
+  expect(seen.every(r => r.key === '0000000001' && r.pin === null)).toBe(true);
+  expect(await scratchLeft(page)).toEqual([]);
+}
+
+test('try a demo world: one click opens an editable, unlinked Moppetopia, and nothing writes to OnlyWorlds', async ({ page }) => {
+  await tryDemoOpensACopy(page);
+});
+
+test('@firefox try a demo world: one click opens an editable, unlinked Moppetopia, and nothing writes to OnlyWorlds', async ({ page }) => {
+  await tryDemoOpensACopy(page);
+});
+
+test('with Moppetopia already linked (view only), try says how to make room for a copy and downloads nothing', async ({ page }) => {
+  await boot(page);
+  const seen = await mockMoppetopia(page);
+  await page.evaluate(async (worldId) => {
+    const { getState, patchSlice } = await import('/src/core/state.ts');
+    const reg = await import('/src/registry/registry.ts');
+    const { next } = (reg as any).createApiLinkedWorld(getState().registry, {
+      name: 'Moppetopia', apiWorldId: worldId, apiKey: '0000000001', readOnly: true,
+      handleKey: `world-${worldId}`, folderName: 'moppetopia-0695db52-ab12', pathHint: 'browser storage/moppetopia-0695db52-ab12',
+    });
+    (reg as any).saveRegistry(next);
+    patchSlice('registry', next);
+  }, WORLD_ID);
+  // A world in the list grounds Atlas, so the landing has gone: the chooser's row.
+  await page.locator('[data-action="add-world"]').click();
+  await page.locator('[data-modal="add-world"] [data-choice="try-demo"]').click();
+  await expect(page.locator('.ow-toast', { hasText: 'linked to OnlyWorlds. To try your own copy, remove that one first' })).toBeVisible();
+  expect(seen).toEqual([]);
+  expect(await page.evaluate(async () => {
+    const { getState } = await import('/src/core/state.ts');
+    return getState().registry.worlds.length;
+  })).toBe(1);
+});
+
+test('a demo world that does not come down whole opens nothing and leaves nothing behind', async ({ page }) => {
+  await boot(page);
+  await mockMoppetopia(page, { failType: 'location' });
+  await page.locator('[data-action="try-demo"]').click();
+  await expect(page.locator('.ow-toast-error')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => scratchLeft(page)).toEqual([]);
+  const left = await page.evaluate(async () => {
+    const { getState } = await import('/src/core/state.ts');
+    let dirs: string[] = [];
+    try {
+      const home = await (await navigator.storage.getDirectory()).getDirectoryHandle('browser-worlds');
+      // @ts-expect-error values() is FS Access API
+      for await (const e of home.values()) dirs.push(e.name);
+    } catch { dirs = []; }
+    return { worlds: getState().registry.worlds.length, dirs };
+  });
+  expect(left).toEqual({ worlds: 0, dirs: [] });
+});
