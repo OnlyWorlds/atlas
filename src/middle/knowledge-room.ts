@@ -441,6 +441,7 @@ export function mountKnowledgeRoom(target: HTMLElement, toasts: ToastManager): (
       // Waypoint: entry creation is a gesture path that bypasses the
       // element-create modal (hookmap wp2).
       completeWaypoint('first-element');
+      completeWaypoint('knowledge');
       await refreshElementsAfterWrite(folder);
       requestPushIfLinked();
       draft = null;

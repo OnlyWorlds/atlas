@@ -1,8 +1,9 @@
 /**
  * Waypoints (Bout OW, workplan D11c) — the OnlyWorlds learning track.
  *
- * Eleven named waypoints (the eleventh, keep-a-copy, since 1.17), each dual-teaching one OnlyWorlds concept + one app
- * surface. Completion hooks live at USER-GESTURE call sites only (button
+ * Thirteen named waypoints (keep-a-copy since 1.17; story and knowledge since
+ * #127, when the home's room cards merged into this track), each
+ * dual-teaching one OnlyWorlds concept + one app surface. Completion hooks live at USER-GESTURE call sites only (button
  * clicks, field commits, explicit node clicks) — NEVER in FolderStore or any
  * data layer. Import-, sync- and demo-originated mutations can never complete
  * a waypoint because no hook exists on those paths.
@@ -11,7 +12,8 @@
  *   Forge/Notes/2026-07-07-atlas-waypoint-hookmap.md (v2, gate-settled)
  *
  * Gating class rule:
- * - World-data waypoints (first-element, taxonomy, links, maps, time, share)
+ * - World-data waypoints (first-element, taxonomy, links, maps, time, story,
+ *   knowledge, share, keep-copy)
  *   are gated on the ACTIVE world being the demo world (`entry.demo`).
  * - Portability waypoints (first-world, import, ecosystem) + council are
  *   UNGATED: first-world's created world is non-demo by construction (never
@@ -27,7 +29,7 @@
  */
 
 import { getState } from './state';
-import { settingsHash } from './router';
+import { knowledgeHash, settingsHash, writingHash } from './router';
 
 export type WaypointId =
   | 'first-world'
@@ -36,6 +38,8 @@ export type WaypointId =
   | 'links'
   | 'maps'
   | 'time'
+  | 'story'
+  | 'knowledge'
   | 'import'
   | 'ecosystem'
   | 'share'
@@ -61,13 +65,15 @@ export interface WaypointDef {
   link: (worldId: string | null) => string | null;
 }
 
+export const OW_COUNCIL_URL = 'https://council.onlyworlds.com';
+
 export const WAYPOINTS: readonly WaypointDef[] = [
   {
     id: 'first-world',
     name: 'Your world, your files',
     // True for a world in this browser too (1.17, contract §6.2).
     concept: 'Your world is plain files in an open format, no account needed: in a folder on your drive any tool can read it, and a world in this browser can leave as one file any time.',
-    action: 'Create your first world.',
+    action: 'Start your first world.',
     toast: 'Your world is plain files, and it can always leave.',
     glyph: 'description', // plain files, wherever they live: never a folder (S376 lens C C6)
     link: () => '#/',
@@ -118,6 +124,26 @@ export const WAYPOINTS: readonly WaypointDef[] = [
     link: (w) => (w ? `#/w/${w}/timeline` : null),
   },
   {
+    // #127: the home's "Write" card, now a step of the one track.
+    id: 'story',
+    name: 'Tell it as a story',
+    concept: 'A narrative is an element too, and its text can link the elements it mentions.',
+    action: 'Start a book or a draft in the writing room.',
+    toast: 'Your world has a story now.',
+    glyph: 'menu_book',
+    link: (w) => (w ? writingHash(w) : null),
+  },
+  {
+    // #127: the home's "Know" card, now a step of the one track.
+    id: 'knowledge',
+    name: 'Who knows what',
+    concept: 'What characters know is world data: a knowledge entry, the elements it is about, and who holds it.',
+    action: 'Record something a character knows, in the knowledge room.',
+    toast: 'Your world records who knows what.',
+    glyph: 'psychology',
+    link: (w) => (w ? knowledgeHash(w) : null),
+  },
+  {
     id: 'import',
     name: 'Turn messy notes into a world',
     concept: 'The format is a clean target: an AI assistant can convert most notes into importable JSON.',
@@ -130,7 +156,7 @@ export const WAYPOINTS: readonly WaypointDef[] = [
     id: 'ecosystem',
     name: 'One world, many tools',
     concept: 'Your world travels by API key and PIN: the same world in any OnlyWorlds tool.',
-    action: 'Make a world online, or link an existing one.',
+    action: 'Take a world online, or download one from OnlyWorlds.',
     toast: 'Your world can travel between tools.',
     glyph: 'cloud_sync',
     link: (w) => (w ? settingsHash(w, 'world') : null),
@@ -172,6 +198,8 @@ const DEMO_GATED: ReadonlySet<WaypointId> = new Set([
   'links',
   'maps',
   'time',
+  'story',
+  'knowledge',
   'share',
   'keep-copy',
 ]);
@@ -312,6 +340,22 @@ export function consumePendingHighlight(): WaypointId | null {
 
 const queue: WaypointId[] = [];
 let showing = false;
+
+/**
+ * The steps the mounted world home has shown since it opened this world
+ * (#127): the core pair's first-world and first-element, and every line of
+ * the next-steps list. Their toasts are dropped; the home clears the set when
+ * it unmounts or changes world.
+ */
+let homeReceipts = new Set<WaypointId>();
+
+export function addHomeReceipts(ids: Iterable<WaypointId>): void {
+  for (const id of ids) homeReceipts.add(id);
+}
+
+export function clearHomeReceipts(): void {
+  homeReceipts = new Set();
+}
 let drainWired = false;
 
 const TOAST_MS = 7000;
@@ -355,6 +399,12 @@ function drain(): void {
     return;
   }
   if (suppressed()) return;
+  // A step the world home showed is its own receipt (#127): no toast on top
+  // of the list (or the core pair) that just ticked it off. Everything else
+  // still toasts, wherever it was earned (gate S383 A1: a guess from the
+  // route dropped toasts earned in a dialog that then landed on the home).
+  while (queue.length > 0 && homeReceipts.has(queue[0])) queue.shift();
+  if (queue.length === 0) return;
   const id = queue.shift()!;
   renderWaypointToast(id);
 }

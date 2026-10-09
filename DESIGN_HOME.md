@@ -48,7 +48,18 @@ The home that renders today is the **cover-page × study-desk hybrid** (bout H r
 └──────────────────────────────────────────────────────────────┘
 ```
 
-On an empty (or tutorial-state) world the desk and stat line give way to the **home-tour CTA cards** (`buildTour`, S264) — the create pair, then the next wave / room CTAs. The tour renders nothing on a built-out (or dismissed) world, and never on a view-only world.
+On an empty (or young) world the desk and stat line give way to the onboarding (`buildTour`): "What do you have?" on an empty world, the core pair until a character and a location exist, then the next steps. It renders nothing on a world with every step done (or the list dismissed), never on a view-only world, and never while the guided tour runs. See "The newcomer flow" below.
+
+## The newcomer flow (1.19, #127)
+
+Decided with the Captain (h37 #2015, his answers to `Forge/Notes/2026-10-09-s382-atlas-flow/MAP.md`); built as recorded in `Forge/Notes/2026-10-09-s383-newcomer-flow-design.md`.
+
+- **The landing** (`welcome-panel.ts`): two doors, start a world (primary) and explore Moppetopia, each with its caption; under them one line of links: take the tour, open a world folder (Chromium), other ways in (their hints are `title`s). A window that refuses browser storage drops what needs it (the tour, the demo; without folders also start and other ways in) and says why.
+- **"What do you have?"** (`buildTour`, zero elements): optional, never blocking, three quiet rows. Nothing yet: the core tiles (character, location, anything else). A world somewhere else: bring it in (this world's Data room), and on Chromium a world folder opens where it is. Just looking: Moppetopia or the tour. Nothing is chosen or stored; the sidebar + and every room work as before. A world started from `#/start` or `#/bring-in` was answered on onlyworlds.com, so its empty home shows only the tiles (`core/newcomer.ts`, in memory for the page session).
+- **The core pair**: while a character or a location is missing, its highlighted tile, plus "anything else"; "Every world starts with someone, somewhere." once the world is not empty.
+- **The next steps** (`home-tour.ts` kernel, `buildNextSteps`): the waypoints are the one track (thirteen since 1.19: story and knowledge joined, so the rooms the old CTA cards taught are still taught). After the core pair the home shows the next three undone steps in `HOME_STEPS` order (links, taxonomy, time, story, maps, knowledge, share, keep-copy, ecosystem, import, council), one line each: glyph, name, the waypoint's action; each opens the place the step is done (`runNextStep`). A step is done on this home when its waypoint is completed OR the world holds it (`worldHolds`: a story, a pin, a knowledge entry, a page, a copy outside this browser, a link to OnlyWorlds), so a world that arrived with stories is not asked for one; the gesture-only waypoint contract stands. "see all" opens Settings, OnlyWorlds (the whole track); the × hides the list for this world (`tour_dismissed` holds `next-steps`).
+- **No toast on the home**: the waypoint queue drops what completes while the world home is the route (`waypoints.ts` `drain`): the list is the receipt. This is also why creating a world no longer toasts "Your world, your files" over the question.
+- **Guards**: `tests/unit/home-tour.test.ts` (the kernel), `tests/unit/waypoints.test.ts` (the home rule, with a control), `tests/e2e/home-tour.spec.ts` (the question, the steps, the deep links; its no-toast checks take focus away and count once, since a retrying `toHaveCount(0)` outwaits a toast's 7 s life).
 
 The room nav strip is shared across all rooms (see `DESIGN_SHELL.md` Rooms section). It's not "part of" home — home content begins below it.
 
@@ -170,7 +181,7 @@ Subscribes to state changes via standard `subscribe()` and re-renders on data/ac
 - **Pinned/featured element** card on home
 - **Mini graph preview** (relationship visualization snippet)
 - **Customize home layout** (which sections, in what order, hide/show)
-- **Empty-world onboarding** (when `state.data.elements` is empty, show "your world is empty — start here" with create CTAs)
+- **Empty-world onboarding**: built, see "The newcomer flow" (1.19).
 - **Multi-world overview** (Worlds mode in sidebar already covers this; not a home concern)
 
 ---

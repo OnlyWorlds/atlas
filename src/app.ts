@@ -193,6 +193,13 @@ export function startApp(container: HTMLElement): AppHandle {
       history.replaceState(history.state, '', '#/');
       void import('./setup/world-doors').then(m => m.runAddWorldAction('try-demo', toasts));
     }
+    // #/start and #/bring-in (#127): the Start page's other two answers, the
+    // same way: the hash goes first, then the start-a-world dialog opens once.
+    const linkMode = parseHash(window.location.hash).mode;
+    if (linkMode === 'start' || linkMode === 'bring-in') {
+      history.replaceState(history.state, '', '#/');
+      void import('./setup/world-doors').then(m => m.startWorldFromLink(linkMode === 'bring-in' ? 'bring-in' : 'home', toasts));
+    }
     const route = parseHash(window.location.hash);
     const active = getState().active;
 

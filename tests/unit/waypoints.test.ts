@@ -9,7 +9,7 @@
  * (createLocalWorld sets it, attachApi clears it — make-online un-demos).
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getState, patchSlice } from '../../src/core/state';
 import {
   WAYPOINTS,
@@ -21,6 +21,8 @@ import {
   setMuted,
   isMuted,
   isDemoWorldActive,
+  addHomeReceipts,
+  clearHomeReceipts,
 } from '../../src/core/waypoints';
 import { createLocalWorld, attachApi } from '../../src/registry/registry';
 import { defaultRegistry } from '../../src/core/types';
@@ -136,5 +138,57 @@ describe('demo-flag registry lifecycle', () => {
     expect(flipped.state).toBe('api-linked');
     expect(flipped.demo).toBeUndefined();
     expect('demo' in flipped).toBe(false);
+  });
+});
+
+describe('the toast, after #127', () => {
+  const container = (): HTMLElement => {
+    let c = document.getElementById('toast-container');
+    if (!c) {
+      c = document.createElement('div');
+      c.id = 'toast-container';
+      document.body.appendChild(c);
+    }
+    return c;
+  };
+  const flush = async (): Promise<void> => { await Promise.resolve(); await Promise.resolve(); };
+  // The stage comes first: a toast with no container is dropped unseen, and
+  // a "no toast" assertion would pass for that reason alone.
+  beforeEach(() => { container(); });
+
+  it('a step the home showed is its own receipt: recorded, no toast', async () => {
+    addHomeReceipts(['links']);
+    try {
+      completeWaypoint('links');
+      await flush();
+      expect(loadWaypointsState().completed['links']).toBeTruthy();
+      expect(container().querySelector('.atlas-waypoint-toast')).toBeNull();
+    } finally {
+      clearHomeReceipts();
+    }
+  });
+
+  it('a step the home did not show still toasts, home or not (the control; gate S383 A1)', async () => {
+    vi.useFakeTimers();
+    addHomeReceipts(['links']);
+    try {
+      completeWaypoint('ecosystem');
+      await flush();
+      expect(container().querySelector('.atlas-waypoint-toast')).not.toBeNull();
+      // Let it leave, so the queue is idle for the files after this one.
+      vi.advanceTimersByTime(8000);
+      vi.advanceTimersByTime(400);
+      expect(container().querySelector('.atlas-waypoint-toast')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      clearHomeReceipts();
+    }
+  });
+
+  it('story and knowledge are world-data: gated in the demo world', () => {
+    activate([entry({ demo: true })]);
+    completeWaypoint('story');
+    completeWaypoint('knowledge');
+    expect(completedCount()).toBe(0);
   });
 });

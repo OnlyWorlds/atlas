@@ -11,6 +11,7 @@
 
 import { getState, patchSlice, subscribe } from '../core/state';
 import { onHashChange, parseHash, navigate, writingHash } from '../core/router';
+import { completeWaypoint } from '../core/waypoints';
 import { ToastManager } from '../ui/toast-manager';
 import { showProblem } from '../ui/problem-fixes';
 import { PlainError } from '../core/plain-error';
@@ -54,6 +55,8 @@ async function createNarrativeAtTier(
     ...(parentId ? { parent_narrative: parentId } : {}),
     order: nextOrder(idx, parentId),
   } as Partial<Element>);
+  // Waypoint (#127): reached only from the writing create dialog's submit.
+  completeWaypoint('story');
   const all = await refreshElementsAfterWrite(folder);
   return created;
 }

@@ -99,7 +99,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       // `aria-label` (the chooser's own row title) for a screen reader, which
       // would otherwise read the glyphs' ligature text ("add folder_open").
       const icons = state.registry.worlds_add_icons === false ? '' : `<div class="atlas-worlds-add-icons">
-        ${addIconButton('create-local', newWorldGlyph(), hasFolderMode() ? 'Start a new world: in a folder on your drive or in this browser' : 'Start a new world: kept in this browser')}
+        ${addIconButton('create-local', newWorldGlyph(), hasFolderMode() ? 'Start a world: in a folder on your drive or in this browser' : 'Start a world: kept in this browser')}
         ${hasFolderMode() ? addIconButton('open-folder', 'folder_open', 'Open a world folder you already have. It opens where it is; nothing is copied.') : ''}
         ${addIconButton('new-api', 'cloud_upload', hasFolderMode() ? 'New world on OnlyWorlds: made on onlyworlds.com and on your drive or in this browser' : 'New world on OnlyWorlds: made on onlyworlds.com and in this browser')}
         ${addIconButton('link-api', 'link', 'Download a world from OnlyWorlds with its API key')}

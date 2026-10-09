@@ -4387,11 +4387,26 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
      the statement gets its beat before the actions ask for a decision. */
   margin-top: 34px;
 }
-/* Four doors (1.17): when they no longer fit on one row they go two by two,
-   never three over a lone fourth. */
-@media (max-width: 900px) {
-  .atlas-landing-compact .atlas-landing-actions:has(> .atlas-landing-choice:nth-child(4)) { max-width: 440px; }
+/* #127: two doors, then one quiet line for the rest (the tour, a world
+   folder, other ways in): links, not buttons, so the pair stays the decision. */
+.atlas-landing-more {
+  order: 3;
+  margin: 22px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 12.5px;
 }
+.atlas-landing-more[hidden] { display: none; }
+.atlas-landing-more-link {
+  font-size: inherit;
+  color: var(--atlas-text-soft);
+}
+.atlas-landing-more-link:hover,
+.atlas-landing-more-link:focus-visible { color: var(--atlas-accent); }
+.atlas-landing-more-sep { color: var(--atlas-text-muted); }
 .atlas-landing-compact .atlas-landing-tag { order: 2; }
 /* Each door is a button over its own caption (S302). The captions balance the
    pair; a single line under both would favour whichever button it sat closer
@@ -8003,62 +8018,94 @@ svg .atlas-zone-hovered {
 }
 
 /* Room CTA cards — a verb + one quiet clause; the room glyph teaches the nav. */
-.atlas-home-tile-cta {
-  background: rgba(var(--atlas-ink-rgb), 0.02);
-  max-width: 150px;
+/* "What do you have?" (#127): the empty home's three quiet rows. A label
+   column and a line column; the core tiles sit under the first row's line. */
+.atlas-home-have { container-type: inline-size; }
+.atlas-home-have .atlas-home-section-title { margin-bottom: 14px; }
+.atlas-home-have-row {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) 1fr;
+  column-gap: 16px;
+  row-gap: 10px;
+  align-items: baseline;
+  font-size: 13px;
+  line-height: 1.5;
 }
-.atlas-home-tile-cta .material-symbols-outlined { color: var(--atlas-cyan-soft); }
-.atlas-home-tile-cta-verb { font-weight: 600; }
-.atlas-home-tile-cta-line {
-  font-size: 10.5px;
-  color: var(--atlas-text-muted);
-  line-height: 1.3;
-  text-align: center;
-}
-
-/* Dismiss × — visible on hover only, top-right of a dismissible card. */
-.atlas-home-tile-dismiss {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 13px !important;
-  color: var(--atlas-text-dim);
-  opacity: 0;
-  padding: 2px;
-  border-radius: 50%;
-  transition: opacity 100ms ease, color 100ms ease;
-}
-.atlas-home-onboarding-tile:hover .atlas-home-tile-dismiss { opacity: 0.7; }
-.atlas-home-tile-dismiss:hover { opacity: 1 !important; color: rgb(var(--atlas-ink-rgb)); background: rgba(var(--atlas-ink-rgb), 0.08); }
-
-/* The next-wave phase label — quieter than a section title. */
-.atlas-home-tour-label {
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--atlas-text-muted);
-}
-
-/* Empty-world room links: Write · Chart · Import. */
-.atlas-home-tour-links {
-  display: flex;
-  gap: 10px;
+.atlas-home-have-row + .atlas-home-have-row {
   margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--atlas-divider);
 }
-.atlas-home-tour-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.atlas-home-have-label { color: var(--atlas-text); font-weight: 500; }
+.atlas-home-have-line { color: var(--atlas-text-muted); max-width: 520px; }
+/* Three tiles, never a scroller: in the question's narrower column they wrap. */
+.atlas-home-have-row .atlas-home-onboarding-grid { grid-column: 2; flex-wrap: wrap; overflow: visible; }
+.atlas-home-have-act { font-size: inherit; padding: 0; }
+.atlas-home-have-end { white-space: nowrap; }
+/* A narrow middle pane stacks the label over its line. */
+@container (max-width: 420px) {
+  .atlas-home-have-row { grid-template-columns: 1fr; row-gap: 4px; }
+  .atlas-home-have-row .atlas-home-onboarding-grid { grid-column: 1; margin-top: 6px; }
+}
+
+/* The next steps (#127): a quiet list, one line each, no panel. */
+.atlas-home-next { flex: 0 0 auto; }
+.atlas-home-next-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.atlas-home-next-title {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--atlas-text-muted);
+}
+.atlas-home-next-all { font-size: 12px; }
+.atlas-home-next-dismiss {
+  margin-left: auto;
   border: none;
   background: transparent;
   color: var(--atlas-text-muted);
-  font-size: 12px;
   cursor: pointer;
-  padding: 3px 6px;
+  padding: 2px;
+  border-radius: 4px;
+  line-height: 0;
+  opacity: 0.6;
+}
+.atlas-home-next-dismiss .material-symbols-outlined { font-size: 15px; }
+.atlas-home-next-dismiss:hover,
+.atlas-home-next-dismiss:focus-visible { opacity: 1; color: var(--atlas-text); background: rgba(var(--atlas-ink-rgb), 0.08); }
+.atlas-home-next-list { list-style: none; margin: 0; padding: 0; }
+.atlas-home-next-step {
+  /* The glyph beside two lines: the step's name, then what to do. Side by
+     side, a narrow middle pane squeezed the action into a column of words. */
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  column-gap: 8px;
+  align-items: start;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--atlas-text-muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 5px 6px;
+  margin-left: -6px;
   border-radius: 5px;
+  cursor: pointer;
   transition: color 100ms ease, background 100ms ease;
 }
-.atlas-home-tour-link:hover { color: var(--atlas-cyan); background: rgba(var(--atlas-accent-rgb), 0.06); }
-.atlas-home-tour-link .material-symbols-outlined { font-size: 15px; }
+.atlas-home-next-step:hover,
+.atlas-home-next-step:focus-visible { background: rgba(var(--atlas-accent-rgb), 0.06); }
+.atlas-home-next-step:hover .atlas-home-next-name,
+.atlas-home-next-step:focus-visible .atlas-home-next-name { color: var(--atlas-cyan); }
+.atlas-home-next-glyph { grid-row: span 2; font-size: 16px; margin-top: 2px; color: var(--atlas-cyan-soft); }
+.atlas-home-next-name { color: var(--atlas-text); }
+.atlas-home-next-action { min-width: 0; font-size: 12px; }
 
 /* The first element's Recent row — the tour's next step, unmissable. */
 .atlas-home-first-element {

@@ -56,6 +56,49 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.19',
+    date: '2026-10-09',
+    theme: 'the first hour',
+    entries: [
+      {
+        id: 'landing-two-doors',
+        title: 'Two doors on the first screen',
+        body: 'The first screen leads with start a world and Moppetopia. The tour, a world folder and the other ways in sit on one line under them.',
+        tags: ['world'],
+      },
+      {
+        id: 'what-do-you-have',
+        title: 'A new world asks what you have',
+        body: 'An empty world\'s Home asks one quiet question with three answers: start with a character and a location, bring in a world you have somewhere else, or look around Moppetopia or the tour. Nothing has to be answered.',
+        tags: ['world'],
+      },
+      {
+        id: 'next-steps',
+        title: 'One list of next steps',
+        body: 'Once a world has a character and a location, its Home shows the next three steps in the order a world tends to grow, each opening the place where it is done. A step leaves when you have done it, or when the world already has it. See all opens the whole list in Settings, OnlyWorlds, where telling a story and who knows what are now steps too.',
+        tags: ['world'],
+      },
+      {
+        id: 'start-links',
+        title: 'A link for each way in',
+        body: 'atlas.onlyworlds.com/#/start starts a world, and #/bring-in starts one and opens its Data room, beside #/try-demo for Moppetopia. A world started from one of these links is not asked again.',
+        tags: ['world'],
+      },
+      {
+        id: 'convert-prompt-plainly',
+        title: 'The notes prompt, said plainly',
+        body: 'The Data room says what the prompt is for: give it and your notes to an AI assistant, then paste the JSON it returns, which you review before it lands. The prompt now asks the assistant to convert only what your notes say.',
+        tags: ['data'],
+      },
+      {
+        id: 'one-name-each',
+        title: 'One name for each way in',
+        body: 'Start a world, explore Moppetopia and download a world from OnlyWorlds now read the same on the first screen, in add a world and in their dialogs, and the dialog for a new world on OnlyWorlds no longer says API world.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.18',
     date: '2026-10-09',
     theme: 'the demo world',

@@ -504,9 +504,10 @@ export interface WorldRegistryEntry {
    */
   active_calendar_id?: string | null;
   /**
-   * Home-tour cards this world has dismissed (S264) — ids like `create-event`
-   * / `cta-object`. Absent = nothing dismissed. The tour itself is computed
-   * from element counts; only dismissals persist.
+   * Home onboarding this world has dismissed: since 1.19 (#127) only
+   * `next-steps` (the next-steps list's ×) is read; older ids from the S264
+   * cards (`create-event`, `cta-object`) linger harmlessly. Absent = nothing
+   * dismissed.
    */
   tour_dismissed?: string[];
   /** Mirror of `WorldMeta.demo` — the bundled sample world. Gestures in a demo world never complete waypoints. */

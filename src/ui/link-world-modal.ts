@@ -48,7 +48,7 @@ export class LinkWorldModal extends BaseModal {
 
   private buildModal(): HTMLElement {
     const { overlay, body } = this.buildModalShell({
-      title: 'Link existing world',
+      title: 'Download a world from OnlyWorlds',
       dataModal: 'link-world',
     });
 
@@ -65,7 +65,7 @@ export class LinkWorldModal extends BaseModal {
         </label>
         <label class="atlas-modal-field">
           <span>Display name (optional)</span>
-          <input class="atlas-input" type="text" name="display-name" placeholder="Defaults to server world name" autocomplete="off" />
+          <input class="atlas-input" type="text" name="display-name" placeholder="Defaults to the name on onlyworlds.com" autocomplete="off" />
         </label>
         ${whereChoiceHtml()}
         <p class="atlas-modal-hint">
@@ -75,10 +75,10 @@ export class LinkWorldModal extends BaseModal {
         <div class="atlas-modal-progress" data-role="progress" hidden></div>
         <div class="atlas-modal-actions">
           <button type="button" class="atlas-btn-ghost" data-action="cancel">Cancel</button>
-          <button type="submit" class="atlas-btn-primary" data-action="link">Link</button>
+          <button type="submit" class="atlas-btn-primary" data-action="link">Download</button>
         </div>
         <div class="atlas-modal-actions" data-role="busy-actions" hidden>
-          <button type="button" class="atlas-btn-ghost" data-action="cancel-link" title="Stop now and remove what was downloaded; nothing is kept">Cancel link</button>
+          <button type="button" class="atlas-btn-ghost" data-action="cancel-link" title="Stop now and remove what was downloaded; nothing is kept">Cancel download</button>
           <button type="button" class="atlas-btn-primary" data-action="finish-early" title="Stop now and open the world with what has downloaded; Refresh from API brings the rest">Stop and keep what's here</button>
         </div>
       </form>
@@ -137,7 +137,7 @@ export class LinkWorldModal extends BaseModal {
       const inputs = form.querySelectorAll<HTMLInputElement>('input');
       inputs.forEach(i => (i.disabled = true));
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Linking…';
+      submitBtn.textContent = 'Downloading…';
       stop = null;
       formActions.hidden = true;
       busyActions.hidden = false;
@@ -149,7 +149,7 @@ export class LinkWorldModal extends BaseModal {
         formActions.hidden = false;
         inputs.forEach(i => (i.disabled = false));
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Link';
+        submitBtn.textContent = 'Download';
       };
 
       const renderProgress = (p: InitialDownloadProgress) => {

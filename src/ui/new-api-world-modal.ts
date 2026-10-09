@@ -31,13 +31,13 @@ export class NewApiWorldModal extends BaseModal {
   open(): void {
     const reg = getState().registry;
     const { overlay, body } = this.buildModalShell({
-      title: 'New API world',
+      title: 'New world on OnlyWorlds',
       panelClass: 'atlas-create-api-panel',
       dataModal: 'new-api-world',
     });
 
     body.innerHTML = `
-      <p class="atlas-modal-hint">Creates the world here AND a new API world on onlyworlds.com. You can then add elements to both at once.</p>
+      <p class="atlas-modal-hint">Creates the world here and on onlyworlds.com, synced from the start.</p>
       <label class="atlas-modal-field">
         <span>World name</span>
         <input class="atlas-input" type="text" name="api-name" placeholder="My new world" autocomplete="off" required />
@@ -141,7 +141,7 @@ export class NewApiWorldModal extends BaseModal {
           completeWaypoint('first-world');
         }
 
-        progressEl.textContent = `Creating API world on onlyworlds.com...`;
+        progressEl.textContent = `Creating the world on onlyworlds.com…`;
         const created = await createApiWorld({ name: entry.name, email, pin });
         const apiKey = created.apiKey;
 

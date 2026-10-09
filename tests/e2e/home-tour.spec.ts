@@ -1,8 +1,11 @@
 /**
- * The home tour e2e (S264). Drives the real tutorial flow: empty world →
- * highlighted core pair (+ room links) → stay-on-home create → first-element
- * highlight → next wave after both cores → create→CTA flip → dismissal
- * persists across re-render.
+ * The home onboarding e2e (S264 core pair; #127 the question and the next
+ * steps). Drives the real flow: an empty world asks "What do you have?" (three
+ * quiet rows, nothing blocking) → stay-on-home create → first-element
+ * highlight → after both cores, the next steps (waypoints, in world order) →
+ * a step leaves when its waypoint is done OR the world holds it → a step's
+ * line opens its room → the × hides the list for this world. Plus the two
+ * Start-page links, #/start and #/bring-in.
  */
 
 import { test, expect, Page } from '@playwright/test';
@@ -47,17 +50,40 @@ async function createViaStore(page: Page, type: string, data: Record<string, unk
   }, { type, data });
 }
 
-test('empty world: highlighted core pair + anything else + room links', async ({ page }) => {
+const steps = (page: Page) => page.locator('.atlas-home-next-step');
+
+/**
+ * A waypoint toast waits while an input has focus (the sidebar search often
+ * does) and drains on the next click. So a "no toast" check first takes focus
+ * away and clicks something inert, or it passes for that reason alone.
+ */
+async function letToastsDrain(page: Page, inert: string) {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.locator(inert).click();
+  await page.waitForTimeout(400);
+}
+
+/** One look, no retry: a retrying toHaveCount(0) outwaits a toast's 7 s life and passes anyway. */
+const toastsNow = (page: Page) => page.locator('.atlas-waypoint-toast').count();
+const stepIds = (page: Page) => steps(page).evaluateAll(els => els.map(e => e.getAttribute('data-step')));
+
+test('empty world: "What do you have?" with three rows, the core pair under the first', async ({ page }) => {
   await setupWorld(page);
-  await expect(page.locator('.atlas-home-onboarding')).toContainText('Your world is empty');
-  await expect(page.locator('[data-create-type="character"].atlas-home-tile-core')).toBeVisible();
-  await expect(page.locator('[data-create-type="location"].atlas-home-tile-core')).toBeVisible();
-  await expect(page.locator('[data-create-type="event"]')).toHaveCount(0); // next wave waits
-  await expect(page.locator('[data-create-any]')).toBeVisible();
-  // The empty-world room links.
-  await expect(page.locator('.atlas-home-tour-link', { hasText: 'Write' })).toBeVisible();
-  await expect(page.locator('.atlas-home-tour-link', { hasText: 'Chart' })).toBeVisible();
-  await expect(page.locator('.atlas-home-tour-link', { hasText: 'Import' })).toBeVisible();
+  const home = page.locator('.atlas-home-have');
+  await expect(home).toContainText('What do you have?');
+  await expect(home.locator('[data-have]')).toHaveCount(3);
+  const nothing = home.locator('[data-have="nothing"]');
+  await expect(nothing.locator('[data-create-type="character"].atlas-home-tile-core')).toBeVisible();
+  await expect(nothing.locator('[data-create-type="location"].atlas-home-tile-core')).toBeVisible();
+  await expect(nothing.locator('[data-create-any]')).toBeVisible();
+  // Nothing blocks: the sidebar + still creates.
+  await expect(page.locator('[data-action="create-element"]')).toBeEnabled();
+  // No toast speaks over the question (first-world completes silently).
+  await letToastsDrain(page, '.atlas-home-have .atlas-home-section-title');
+  expect(await toastsNow(page)).toBe(0);
+  // "Bring it in" opens this world's Data room.
+  await home.locator('[data-have-action="bring-in"]').click();
+  await expect(page).toHaveURL(/\/import$/);
 });
 
 test('creating from a home tile stays on home; the first element row is highlighted', async ({ page }) => {
@@ -75,44 +101,104 @@ test('creating from a home tile stays on home; the first element row is highligh
   await expect(first).toBeVisible();
   await expect(first).toContainText('Gale');
   await expect(first).toContainText('your first element');
-  // The character card is done; location still shows highlighted.
+  // The question has gone; the character card is done; location still shows highlighted.
+  await expect(page.locator('.atlas-home-have')).toHaveCount(0);
+  await expect(page.locator('.atlas-home-onboarding')).toContainText('Every world starts with someone, somewhere.');
   await expect(page.locator('[data-create-type="character"]')).toHaveCount(0);
   await expect(page.locator('[data-create-type="location"].atlas-home-tile-core')).toBeVisible();
 });
 
-test('both cores → the next wave; a created type flips to its room CTA; dismissal persists', async ({ page }) => {
+test('both cores → the next steps; done or held steps leave; a line opens its room; × persists', async ({ page }) => {
   await setupWorld(page);
   await createViaStore(page, 'character', { name: 'Gale' });
+  await expect(page.locator('.atlas-home-next')).toHaveCount(0); // waits for both cores
   await createViaStore(page, 'location', { name: 'Old Harbor' });
 
-  // The quiet next wave (no highlights), event card present.
-  await expect(page.locator('[data-create-type="event"]')).toBeVisible();
+  // The first three, in world order, no highlights.
+  await expect(steps(page)).toHaveCount(3);
+  expect(await stepIds(page)).toEqual(['links', 'taxonomy', 'time']);
   await expect(page.locator('.atlas-home-tile-core')).toHaveCount(0);
 
-  // Create an event → its card becomes the Chart CTA.
-  await createViaStore(page, 'event', { name: 'The Sundering', start_date: 3 });
-  const cta = page.locator('[data-tour-cta="event"]');
-  await expect(cta).toBeVisible();
-  await expect(cta).toContainText('Chart');
-  await expect(page.locator('[data-create-type="event"]')).toHaveCount(0);
+  // A waypoint done elsewhere leaves the list (it reads the waypoints).
+  await page.evaluate(async () => {
+    const m = await import('/src/core/waypoints.ts');
+    m.completeWaypoint('links');
+  });
+  await expect.poll(() => stepIds(page)).toEqual(['taxonomy', 'time', 'story']);
+  // On home the list is the receipt: no toast for it.
+  await letToastsDrain(page, '.atlas-home-next-title');
+  expect(await toastsNow(page)).toBe(0);
 
-  // Dismiss the narrative create card — it stays gone after a re-render.
-  const narrative = page.locator('[data-create-type="narrative"]');
-  await narrative.hover();
-  await narrative.locator('.atlas-home-tile-dismiss').click();
-  await expect(page.locator('[data-create-type="narrative"]')).toHaveCount(0);
-  await createViaStore(page, 'object', { name: 'The Astrolabe' }); // forces re-render
-  await expect(page.locator('[data-create-type="narrative"]')).toHaveCount(0);
+  // A step the world already holds leaves too: a story narrative.
+  await createViaStore(page, 'narrative', { name: 'Book One', supertype: 'Book' });
+  await expect.poll(() => stepIds(page)).toEqual(['taxonomy', 'time', 'maps']);
 
-  // Clicking a CTA navigates to its room and retires the card.
-  await page.locator('[data-tour-cta="event"]').click();
+  // A line opens its room.
+  await page.locator('.atlas-home-next-step[data-step="time"]').click();
   await expect(page.locator('.atlas-timeline-room')).toBeVisible();
   await page.evaluate(() => {
     const s = (window as any).__atlasTestApi.getState();
     window.location.hash = `#/w/${s.active.worldId}/home`;
   });
   await expect(page.locator('.atlas-world-home')).toBeVisible();
-  await expect(page.locator('[data-tour-cta="event"]')).toHaveCount(0);
+
+  // The × hides the list for this world, and it stays hidden after a re-render.
+  await page.locator('[data-action="next-dismiss"]').click();
+  await expect(page.locator('.atlas-home-next')).toHaveCount(0);
+  await createViaStore(page, 'object', { name: 'The Astrolabe' }); // forces re-render
+  await expect(page.locator('.atlas-home-next')).toHaveCount(0);
+
+  // The control for the two "no toast" checks: away from home, a completion
+  // does toast in this harness.
+  await page.evaluate(() => {
+    const s = (window as any).__atlasTestApi.getState();
+    window.location.hash = `#/w/${s.active.worldId}/timeline`;
+  });
+  await expect(page.locator('.atlas-timeline-room')).toBeVisible();
+  await page.evaluate(async () => {
+    const m = await import('/src/core/waypoints.ts');
+    m.completeWaypoint('council');
+  });
+  await letToastsDrain(page, '.atlas-timeline-room h1');
+  await expect(page.locator('.atlas-waypoint-toast')).toHaveCount(1);
+});
+
+test('the Start-page links: #/start asks nothing; #/bring-in lands in the Data room', async ({ page }) => {
+  await freshBoot(page);
+  await page.goto('/#/start');
+  await page.waitForSelector('.atlas-shell');
+  const dialog = page.locator('[data-modal="create-world"]');
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('Start a world');
+  // The hash went first: a reload does not ask again.
+  expect(await page.evaluate(() => window.location.hash)).toBe('#/');
+  // Count every moment the question is in the page, not just the end state
+  // (gate S383 A2: it drew once under the dialog before the mark landed).
+  await page.evaluate(() => {
+    (window as any).__sawQuestion = 0;
+    new MutationObserver(() => {
+      if (document.querySelector('.atlas-home-have')) (window as any).__sawQuestion++;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  const rows = dialog.locator('.atlas-where-row input');
+  if (await rows.count() > 1) await rows.nth(1).check();
+  await page.fill('input[name="world-name"]', 'From the site');
+  await dialog.locator('[data-action="pick"]').click();
+  await expect(page.locator('.atlas-world-home')).toBeVisible();
+  // Answered on onlyworlds.com: the tiles, and the question never drawn.
+  await expect(page.locator('[data-create-type="character"]')).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => (window as any).__sawQuestion)).toBe(0);
+
+  await page.goto('/#/bring-in');
+  await page.waitForSelector('.atlas-shell');
+  await expect(dialog).toBeVisible();
+  const rows2 = dialog.locator('.atlas-where-row input');
+  if (await rows2.count() > 1) await rows2.nth(1).check();
+  await page.fill('input[name="world-name"]', 'Notes from elsewhere');
+  await dialog.locator('[data-action="pick"]').click();
+  await expect(page).toHaveURL(/\/import$/);
+  await expect(page.locator('.atlas-import-ai')).toContainText('add nothing your notes do not say');
 });
 
 test('desk map rows: imageless map opens its flat canvas tab (S300, was the S265 divert)', async ({ page }) => {

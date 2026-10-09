@@ -52,20 +52,22 @@ test('first visit: "open a world folder" opens the world in place, no home folde
   expect(root).toBeNull();
 });
 
-test('first visit: the landing offers the tour, start a world, open a world folder and other ways in', async ({ page }) => {
+test('first visit: two doors, start a world and Moppetopia, then the tour, a world folder and other ways in', async ({ page }) => {
   // 1.17 (contract §8, lens C R2-c): "set up a folder" became "start a world",
   // whose dialog asks where; "other ways in" is the chooser.
   await freshBoot(page);
   const doors = page.locator('.atlas-landing-actions .atlas-landing-btn');
-  // 1.18 (#113): "try a demo world" brings Moppetopia down as the user's own copy.
-  await expect(doors).toHaveText(['take the tour', 'start a world', 'open a world folder', 'try a demo world', 'other ways in']);
+  // #127 (the Captain's Q4): two doors; the rest is one quiet line of links,
+  // the tour one click from the first screen (his Q5).
+  await expect(doors).toHaveText(['start a world', 'explore Moppetopia']);
+  await expect(page.locator('.atlas-landing-more-link')).toHaveText(['take the tour', 'open a world folder', 'other ways in']);
   await expect(page.locator('.atlas-landing-note')).toBeHidden();
 
   await page.click('[data-action="other-ways-in"]');
   const chooser = page.locator('[data-modal="add-world"]');
   await expect(chooser.locator('[data-choice]')).toHaveCount(7);
   await expect(chooser.locator('[data-choice="open-file"]')).toBeVisible();
-  await expect(chooser.locator('[data-choice="try-demo"] strong')).toHaveText('Try the demo world');
+  await expect(chooser.locator('[data-choice="try-demo"] strong')).toHaveText('Explore Moppetopia');
 });
 
 test('first visit, browser storage refused on Chromium: no tour, and the doors left say only what works (S374 gate F6)', async ({ page }) => {
@@ -78,7 +80,11 @@ test('first visit, browser storage refused on Chromium: no tour, and the doors l
   await expect(page.locator('.atlas-landing-note')).toContainText('does not allow browser storage');
   await expect(page.locator('[data-action="start-tour"]')).toHaveCount(0);
   const notes = page.locator('.atlas-landing-choice-note');
-  await expect(notes).toHaveText(['your first world, in a folder on your drive', 'one you already have', 'download one from OnlyWorlds, or view a shared world']);
+  await expect(notes).toHaveText(['your first world, in a folder on your drive']);
+  // The link line keeps the folder doors, without a dangling separator.
+  await expect(page.locator('.atlas-landing-more-link')).toHaveText(['open a world folder', 'other ways in']);
+  await expect(page.locator('.atlas-landing-more-sep')).toHaveCount(1);
+  await expect(page.locator('[data-action="other-ways-in"]')).toHaveAttribute('title', 'download one from OnlyWorlds, or view a shared world');
 });
 
 test('first visit: start a world asks where, folder first, and the browser row lands a world in this browser', async ({ page }) => {

@@ -116,6 +116,7 @@ export function buildConvertNotesPrompt(): string {
     '- Only the fields listed below exist. Do not invent field names (no Character.age, no Object.owner). A detail that deserves its own field can be a custom field prefixed x_ (like "x_mood": "grim"); when unsure, put it in "description".',
     '- Field grammar in the list: a bare field is text · #field is a number (dates are plain numbers in the world\'s own timeline) · field>Type is a single link, its value the target element\'s name · field>>Type is a list of links.',
     '- Only reference elements you also include. Prefer fields over tiny elements (physicality: "tall" beats a Trait named "Tall"). Only make elements for things specific to this world.',
+    '- Convert only what the notes say: add no people, places, events or details that are not in them.',
     '- Optionally add a "World" block with "name" and "description" to make it a full world.',
     '',
     'Example of the shape (two elements, sparse on purpose; note the JSON keys are the bare field names, and the # and > marks below are list notation only):',
@@ -222,9 +223,9 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         <div class="atlas-import-ai">
           <span class="material-symbols-outlined">auto_awesome</span>
           <div class="atlas-import-ai-body">
-            <p class="atlas-import-ai-lead">Bring notes from anywhere: any AI assistant can turn freeform notes into importable JSON.</p>
+            <p class="atlas-import-ai-lead">Notes in another shape? Give an AI assistant this prompt and your notes, then paste the JSON it returns above. The prompt asks it to add nothing your notes do not say, and you review the result before it lands.</p>
             <div class="atlas-import-ai-actions">
-              <button type="button" class="atlas-btn-ghost" data-action="convert-prompt">copy the convert-my-notes prompt</button>
+              <button type="button" class="atlas-btn-ghost" data-action="convert-prompt">copy the prompt</button>
               <a class="atlas-btn-link" href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">open the OnlyWorlds AI toolkit</a>
             </div>
             <p class="atlas-import-ai-size">the prompt carries the full field list for every type · ~${Math.max(1, Math.round(estimateTokens(buildConvertNotesPrompt()) / 1000))}k tokens</p>

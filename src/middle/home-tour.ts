@@ -1,76 +1,84 @@
 /**
- * The home tour kernel (S264) — the tutorial-state card computation, pure.
- * Design record: `Forge/Notes/2026-07-13-s264-tour-design.md`.
+ * The home's onboarding kernel, pure: the core pair, then one next-steps list.
+ * Design: `Forge/Notes/2026-10-09-s383-newcomer-flow-design.md` (#127);
+ * the core pair since S264 (`Forge/Notes/2026-07-13-s264-tour-design.md`).
  *
- * The tour is a function of world contents + the per-world dismissed set:
+ *   The core pair: while a character or a location is missing, their create
+ *   cards show highlighted (the only highlighted cards, ever).
  *
- *   Phase 1 (the core pair): while character/location are missing, their
- *   create cards show HIGHLIGHTED (the only highlighted cards, ever) — plus
- *   the "anything else" tile, handled by the renderer.
+ *   The next steps (#127, the Captain's Q2): the home's room cards and the
+ *   waypoints were two checklists that did not know each other. Now the
+ *   waypoints are the one track, and the home shows the next few, in the
+ *   order a world grows. A step is done on this home when its waypoint is
+ *   completed (a gesture, once, anywhere) OR this world already holds what
+ *   it asks for (a world that came with stories is not asked for one).
  *
- *   Phase 2 (both cores exist): one quiet, dismissible create card per
- *   missing next-wave type; a created type's card turns into its room CTA
- *   (also dismissible). All present or dismissed → the tour renders nothing.
- *
- * No step counters, no stored progress — imports, deletes, and sync just
+ * No step counters, no stored progress: imports, deletes and sync just
  * recompute the truth.
  */
 
-import type { ElementType } from '../core/types';
+import type { Element, WorldRegistryEntry } from '../core/types';
+import type { WaypointId } from '../core/waypoints';
+import { isKnowledgeNarrative } from '../core/knowledge';
+import { isPageNarrative } from '../core/sharing';
+import { isStoryNarrative } from '../core/narrative-kind';
 
-export type TourRoom = 'timeline' | 'import' | 'writing' | 'map' | 'share' | 'knowledge';
+export type CoreType = 'character' | 'location';
 
-export interface TourWaveEntry {
-  type: ElementType;
-  room: TourRoom;
-  verb: string;
-  icon: string;   // the room-nav glyph, so the CTA teaches the nav icon too
-  line: string;   // one quiet clause under the verb
+/** The core pair's missing members, in order. Empty once both exist. */
+export function coreCards(counts: ReadonlyMap<string, number>): CoreType[] {
+  return (['character', 'location'] as const).filter(t => (counts.get(t) ?? 0) === 0);
 }
 
 /**
- * The next wave, in display order. NOTE the map deviation from Captain's note
- * (he wrote zone→map): zones are only drawn ON a map — the MAP is the
- * creatable element that teaches the same room. Flagged for his round.
- * Collective→Knowledge is his settled call: circles ARE collectives.
+ * The order a world grows in, for the home list (first-world and
+ * first-element are behind the user by then: the core pair covers them).
  */
-export const TOUR_WAVE: TourWaveEntry[] = [
-  { type: 'event',      room: 'timeline',  verb: 'Chart',  icon: 'insights',      line: 'elements in time' },
-  { type: 'narrative',  room: 'writing',   verb: 'Write',  icon: 'menu_book',     line: 'tell it as a story' },
-  { type: 'map',        room: 'map',       verb: 'Map',    icon: 'map',           line: 'ground your world' },
-  { type: 'collective', room: 'knowledge', verb: 'Know',   icon: 'psychology',    line: 'who knows what' },
-  { type: 'construct',  room: 'share',     verb: 'Share',  icon: 'wall_art',      line: 'part of your world' },
-  { type: 'object',     room: 'import',    verb: 'Export', icon: 'import_export', line: 'your entire world' },
+export const HOME_STEPS: readonly WaypointId[] = [
+  'links',
+  'taxonomy',
+  'time',
+  'story',
+  'maps',
+  'knowledge',
+  'share',
+  'keep-copy',
+  'ecosystem',
+  'import',
+  'council',
 ];
 
-export type TourCard =
-  | { kind: 'create'; id: string; type: ElementType; highlighted: boolean; dismissible: boolean }
-  | { kind: 'cta'; id: string; entry: TourWaveEntry };
+/** How many undone steps the home shows at once. */
+export const HOME_STEPS_SHOWN = 3;
 
-/** The cards the home tour shows right now. Pure + deterministic. */
-export function computeTourCards(
-  counts: ReadonlyMap<string, number>,
-  dismissed: ReadonlySet<string>,
-): TourCard[] {
-  const has = (t: string): boolean => (counts.get(t) ?? 0) > 0;
-  const cards: TourCard[] = [];
-  const coreMissing = !has('character') || !has('location');
-  if (coreMissing) {
-    for (const t of ['character', 'location'] as const) {
-      if (!has(t)) cards.push({ kind: 'create', id: `create-${t}`, type: t, highlighted: true, dismissible: false });
-    }
-    return cards; // the next wave waits for both cores
-  }
-  for (const entry of TOUR_WAVE) {
-    if (!has(entry.type)) {
-      const id = `create-${entry.type}`;
-      if (!dismissed.has(id)) {
-        cards.push({ kind: 'create', id, type: entry.type, highlighted: false, dismissible: true });
-      }
-    } else {
-      const id = `cta-${entry.type}`;
-      if (!dismissed.has(id)) cards.push({ kind: 'cta', id, entry });
+/**
+ * The steps this world already holds, read from its contents and its entry:
+ * a story, a pin, a knowledge entry, a page; a copy outside this browser
+ * (a folder world, or a linked one); a world online.
+ */
+export function worldHolds(
+  elements: readonly Element[],
+  entry: Pick<WorldRegistryEntry, 'where' | 'api'> | undefined,
+): Set<WaypointId> {
+  const holds = new Set<WaypointId>();
+  for (const el of elements) {
+    if (el.type === 'pin') holds.add('maps');
+    else if (el.type === 'narrative') {
+      if (isKnowledgeNarrative(el)) holds.add('knowledge');
+      else if (isPageNarrative(el)) holds.add('share');
+      else if (isStoryNarrative(el)) holds.add('story');
     }
   }
-  return cards;
+  if (entry?.api) holds.add('ecosystem');
+  if (entry && (entry.where !== 'browser' || entry.api)) holds.add('keep-copy');
+  return holds;
+}
+
+/** The next undone steps, in order, at most `limit`. */
+export function computeNextSteps(
+  completed: ReadonlySet<WaypointId>,
+  holds: ReadonlySet<WaypointId>,
+  limit = HOME_STEPS_SHOWN,
+): WaypointId[] {
+  return HOME_STEPS.filter(id => !completed.has(id) && !holds.has(id)).slice(0, limit);
 }

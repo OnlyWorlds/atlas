@@ -48,18 +48,25 @@ test('creating a world completes first-world; OW page shows it lit + counted', a
   await setupAtlasRoot(page);
   await createWorld(page, 'Waypoint World');
 
-  // The first-ever waypoint toast appears, with the optional-rider.
-  const toast = page.locator('.atlas-waypoint-toast');
-  await expect(toast).toBeVisible();
-  await expect(toast).toContainText('Your world, your files');
-  await expect(toast).toContainText('These are optional.');
-
-  // The OW page lists it as met with the quiet counter.
+  // The OW page lists it as met with the quiet counter. (Its toast no longer
+  // lands on the new empty home, #127: the home's own question speaks there.)
   await page.click('[data-action="open-onlyworlds"]');
   await expect(page.locator('.atlas-settings')).toBeVisible();
   expect(await page.evaluate(() => window.location.hash)).toMatch(/\/settings\/onlyworlds$/);
   await expect(page.locator('[data-waypoint="first-world"]')).toHaveClass(/is-met/);
-  await expect(page.locator('.atlas-ow-waypoints-count')).toHaveText('1 of 11');
+  await expect(page.locator('.atlas-ow-waypoints-count')).toHaveText('1 of 13');
+
+  // The first toast that does show carries the optional-rider.
+  await page.evaluate(async () => {
+    const m = await import('/src/core/waypoints.ts');
+    m.completeWaypoint('council');
+  });
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.locator('.atlas-settings h1').click();
+  const toast = page.locator('.atlas-waypoint-toast');
+  await expect(toast).toBeVisible();
+  await expect(toast).toContainText('Help shape the format');
+  await expect(toast).toContainText('These are optional.');
 });
 
 test('creating an element via the modal completes first-element', async ({ page }) => {
@@ -93,6 +100,6 @@ test('mark all as familiar stamps every waypoint', async ({ page }) => {
   await createWorld(page, 'Veteran World');
   await page.click('[data-action="open-onlyworlds"]');
   await page.click('[data-action="waypoints-mark-all"]');
-  await expect(page.locator('.atlas-ow-waypoints-count')).toHaveText('11 of 11');
-  await expect(page.locator('.atlas-ow-waypoint.is-met')).toHaveCount(11);
+  await expect(page.locator('.atlas-ow-waypoints-count')).toHaveText('13 of 13');
+  await expect(page.locator('.atlas-ow-waypoint.is-met')).toHaveCount(13);
 });

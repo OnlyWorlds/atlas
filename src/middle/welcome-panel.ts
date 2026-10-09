@@ -125,29 +125,35 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       // here with a world folder an AI made; it opens in place, and a folder
       // that keeps worlds becomes the home folder). "Set up a folder" is gone:
       // the home folder is asked for when a world is first made in a folder.
-      // After a completed tour the emphasis swaps to starting a world.
+      // #127 (the Captain's Q4, h37 #2015): two doors, start a world and the
+      // demo world, and one quiet line under them for the rest. The tour
+      // stays one click from the first screen (his Q5) as a link: a choice,
+      // not the first step.
       const folderMode = hasFolderMode();
       let tourDone = false;
       try { tourDone = localStorage.getItem('atlas_tour_done_v1') === '1'; } catch { /* private mode */ }
-      const tourBtnClass = tourDone ? 'atlas-btn-ghost' : 'atlas-btn-primary';
-      const startBtnClass = tourDone ? 'atlas-btn-primary' : 'atlas-btn-ghost';
       // S301 (Captain's round): the doors lost their headings and their boxes;
       // the compact doors kept a caption each (Captain, S302), one muted line,
       // no time claim, tool voice.
       const choice = (action: string, cls: string, label: string, note: string): string =>
-        `<span class="atlas-landing-choice">
+        `<span class="atlas-landing-choice" data-door="${action}">
            <button class="${cls} atlas-landing-btn" data-action="${action}">${label}</button>
            <span class="atlas-landing-choice-note">${note}</span>
          </span>`;
       const doors = [
-        choice('start-world', startBtnClass, 'start a world', folderMode
+        choice('start-world', 'atlas-btn-primary', 'start a world', folderMode
           ? 'your first world, in a folder on your drive or in this browser'
           : 'it lives in this browser'),
-        folderMode ? choice('open-world-folder', 'atlas-btn-ghost', 'open a world folder', 'one you already have') : '',
         // #113: the demo world as the user's own copy (needs browser storage).
-        choice('try-demo', 'atlas-btn-ghost', 'try a demo world', 'Moppetopia, your own copy to explore and change'),
-        choice('other-ways-in', 'atlas-btn-ghost', 'other ways in', 'download one from OnlyWorlds, view a shared world, open a world file'),
+        choice('try-demo', 'atlas-btn-ghost', 'explore Moppetopia', 'a demo world, your own copy to change'),
       ].join('');
+      const link = (action: string, label: string, hint: string): string =>
+        `<button type="button" class="atlas-btn-link atlas-landing-more-link" data-door="${action}" data-action="${action}" title="${hint}">${label}</button>`;
+      const more = [
+        link('start-tour', tourDone ? 'replay the tour' : 'take the tour', 'a guided build of a world from one sentence of a novel'),
+        folderMode ? link('open-world-folder', 'open a world folder', 'one you already have, from Atlas, another tool or your AI') : '',
+        link('other-ways-in', 'other ways in', 'download one from OnlyWorlds, view a shared world, open a world file'),
+      ].filter(Boolean).join('<span class="atlas-landing-more-sep" aria-hidden="true">·</span>');
       // The note names the DESKTOP part of the constraint (S323): mobile
       // Chrome has no folder picker either, so the sentence says "desktop".
       const folderNote = folderMode
@@ -173,11 +179,9 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
             </a>
             <div class="atlas-landing-mark">Atlas</div>
             <div class="atlas-landing-actions">
-              <span class="atlas-landing-choice">
-                <button class="${tourBtnClass} atlas-landing-btn" data-action="start-tour">${tourDone ? 'replay the tour' : 'take the tour'}</button>
-              </span>
               ${doors}
             </div>
+            <p class="atlas-landing-more">${more}</p>
             <p class="atlas-landing-tag">An OnlyWorlds worldbuilding solution.</p>
             <p class="atlas-landing-note" data-role="storage-note"${folderNote ? '' : ' hidden'}>${folderNote}</p>
           </div>
@@ -192,14 +196,25 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
       void opfsStatus().then((status) => {
         if (status === 'ok' || !tourBtn.isConnected) return;
         const doomed = folderMode ? ['start-tour', 'try-demo'] : ['start-tour', 'try-demo', 'start-world', 'other-ways-in'];
-        for (const action of doomed) root.querySelector(`[data-action="${action}"]`)?.closest('.atlas-landing-choice')?.remove();
+        for (const action of doomed) root.querySelector(`[data-door="${action}"]`)?.remove();
+        // A link row that lost a link loses its separator with it.
+        const moreRow = root.querySelector<HTMLElement>('.atlas-landing-more');
+        if (moreRow) {
+          const links = [...moreRow.querySelectorAll('[data-door]')];
+          moreRow.innerHTML = '';
+          links.forEach((l, i) => {
+            if (i > 0) moreRow.insertAdjacentHTML('beforeend', '<span class="atlas-landing-more-sep" aria-hidden="true">·</span>');
+            moreRow.appendChild(l);
+          });
+          moreRow.hidden = links.length === 0;
+        }
         // The doors that stay say only what still works here (S374 gate F6).
         const caption = (action: string, text: string): void => {
-          const note = root.querySelector(`[data-action="${action}"]`)?.closest('.atlas-landing-choice')?.querySelector('.atlas-landing-choice-note');
+          const note = root.querySelector(`[data-door="${action}"] .atlas-landing-choice-note`);
           if (note) note.textContent = text;
         };
         caption('start-world', 'your first world, in a folder on your drive');
-        caption('other-ways-in', 'download one from OnlyWorlds, or view a shared world');
+        root.querySelector('[data-door="other-ways-in"]')?.setAttribute('title', 'download one from OnlyWorlds, or view a shared world');
         const note = root.querySelector<HTMLElement>('[data-role="storage-note"]');
         if (!note) return;
         // A full origin is not a private window (gate B20): say which.
@@ -299,22 +314,22 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
           'add-world': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">add</span>
             <h3>add a world</h3>
-            <p>Every way to start a world, each with a line on what it does: start a new world, open a world folder or a world file, or download or view one from OnlyWorlds.</p>
+            <p>Every way to start a world, each with a line on what it does: start a world, open a world folder or a world file, or download or view one from OnlyWorlds.</p>
             <p class="atlas-grounded-detail-hint">click to choose</p>`,
           'create-local': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>
-            <h3>create a world</h3>
+            <h3>start a world</h3>
             <p>A new world, in your OnlyWorlds folder or in this browser: the dialog asks. Elements become files as you build, and everything works offline. You can take it online later.</p>
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
           'new-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">cloud_upload</span>
-            <h3>new OnlyWorlds world</h3>
+            <h3>new world on OnlyWorlds</h3>
             <p>Creates the world locally and on onlyworlds.com in one step, synced from the start. Needs a free account.</p>
             ${owLine}
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
           'link-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">link</span>
-            <h3>link an OnlyWorlds world</h3>
+            <h3>download a world from OnlyWorlds</h3>
             <p>Already have a world online? Paste its key: Atlas downloads a full local copy and keeps the two in sync.</p>
             ${owLine}
             <p class="atlas-grounded-detail-hint">click the icon to start</p>`,

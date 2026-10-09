@@ -18,7 +18,8 @@ import { ToastManager } from './toast-manager';
 import { nowIso } from '../store/folder-store';
 import { getState, patchSlice } from '../core/state';
 import { setSidebarModePref } from '../core/ui-prefs';
-import { navigate, worldHash } from '../core/router';
+import { importHash, navigate, worldHash } from '../core/router';
+import { markNewcomerAnswered } from '../core/newcomer';
 import { createWorldInRoot } from '../setup/atlas-root-flow';
 import { readyWhere, takeWhereInClick, whereChoiceHtml, wireWhereChoice } from './where-choice';
 import { completeWaypoint } from '../core/waypoints';
@@ -41,16 +42,32 @@ export interface CreateWorldTourOptions {
   overrideCreate: () => Promise<void>;
 }
 
+/**
+ * A world started from a deep link (#127): the visitor already answered
+ * "What do you have?" on onlyworlds.com, so the new world is marked answered,
+ * and `bring-in` lands in its Data room instead of its home.
+ */
+export interface CreateWorldLinkOptions {
+  then: 'home' | 'bring-in';
+}
+
 export class CreateWorldModal extends BaseModal {
   private onCreated?: (result: CreateWorldResult) => void;
   private toasts: ToastManager;
   private tour?: CreateWorldTourOptions;
+  private link?: CreateWorldLinkOptions;
 
-  constructor(toasts: ToastManager, onCreated?: (r: CreateWorldResult) => void, tour?: CreateWorldTourOptions) {
+  constructor(
+    toasts: ToastManager,
+    onCreated?: (r: CreateWorldResult) => void,
+    tour?: CreateWorldTourOptions,
+    link?: CreateWorldLinkOptions,
+  ) {
     super();
     this.toasts = toasts;
     this.onCreated = onCreated;
     this.tour = tour;
+    this.link = link;
   }
 
   open(): void {
@@ -64,7 +81,7 @@ export class CreateWorldModal extends BaseModal {
 
   private buildModal(): HTMLElement {
     const { overlay, body } = this.buildModalShell({
-      title: 'Create local world',
+      title: 'Start a world',
       dataModal: 'create-world',
     });
 
@@ -136,9 +153,17 @@ export class CreateWorldModal extends BaseModal {
       // failure below; not needed on success since the modal closes.
       cancelBtn.hidden = true;
       try {
-        const { entry } = await createWorldInRoot(name, { where });
+        const link = this.link;
+        const { entry } = await createWorldInRoot(name, {
+          where,
+          // Before activation (gate S383 A2): a world from a Start-page link
+          // never draws the question it was answered, not even under this dialog.
+          beforeActivate: link ? markNewcomerAnswered : undefined,
+        });
         // Waypoint: the created world is non-demo by construction — ungated
         // even when the sample world is active at click time (hookmap wp1).
+        // No toast lands on the empty home this opens (#127): the home's core
+        // pair is first-world's receipt.
         completeWaypoint('first-world');
         this.toasts.success(`Created ${entry.name}`);
         this.hide();
@@ -147,7 +172,7 @@ export class CreateWorldModal extends BaseModal {
         // world's (empty) contents are the visible surface (S255v3).
         patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
         setSidebarModePref('elements');
-        navigate(worldHash(entry.id));
+        navigate(this.link?.then === 'bring-in' ? importHash(entry.id) : worldHash(entry.id));
       } catch (err) {
         // A refusal (no home folder, no permission) reads as itself; the rest
         // is worded (S369).

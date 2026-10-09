@@ -22,6 +22,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/sharing.ts`: the page model (subtype 'page'): blocks heading/prose/element-card/circle; `blocksOf()` heals card + circle ids from the `atlas_page_refs` mirror; `pageBlocksPatch` keeps blocks + refs + derived story in lockstep (conv. 73-78); `pagePubOf` (the `atlas_page_pub` published-state mirror).
 - `src/core/share-payload.ts`: `buildPagePayload()`, the §5 publish payload (schema_version, disclosure tokens ref-only-when-included, `freezeCircleBlock`, `freezeMapBlock`: the ONE y-origin conversion on the publish path).
 - `src/core/narrative-kind.ts`: `narrativeKindOf`: story | knowledge | page, the three-kind seam.
+- `src/core/newcomer.ts`: which worlds came from a Start-page link (`#/start`, `#/bring-in`), so their empty home does not ask "What do you have?" again (#127; in memory only).
 - `src/core/narrative-fields.ts`: `NARRATIVE_RELATION_FIELDS`, the canonical Involves map (writing derive + knowledge).
 - `src/core/narrative-delete.ts`: a count shown to the user mirrors the cascade, never the tree; its test asserts the two walks agree.
 - `src/core/taxonomy.ts`: `suggestionsForField` (derive-from-world autocomplete) + `reservedValueHint`/`reservedRowHint` (writing tier CASE-SENSITIVE; knowledge/page/circle case-insensitive, mirroring the semantic sites).
@@ -97,10 +98,10 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/middle/share-room.ts`: the Pages room: page list / block builder / payload-true preview / publish section; serialized writes.
 - `src/middle/share-editor.ts`: the LAZY page-prose TipTap embed (mentions/chips, NO derive; conv. 76).
 - `src/middle/share-page-render.ts`: the STORE-FREE renderer, two paths: world-backed (builder) and payload-backed (`renderPayloadPage`: preview + the viewer's path; conv. 78).
-- `src/middle/welcome-panel.ts`: first launch: the doors (tour, set up a folder, open a world folder, example page), "Re-link OnlyWorlds folder" when recoverable.
+- `src/middle/welcome-panel.ts`: first launch: two doors (start a world, explore Moppetopia) and one line of links (the tour, open a world folder, other ways in; #127), "Re-link OnlyWorlds folder" when recoverable.
 - `src/middle/story-sidecar.ts`: `storyOutranksSidecar`: plain text wins at open (conv. 116); `src/middle/story-notice.ts`: the once-per-element notice.
 - `src/middle/timeline.ts`: the Charts room (owns ChartConfig, control bar, gallery; DESIGN_CHARTS).
-- `src/middle/world-home.ts`: the world home (cover, intro cards, the keep-safe band, charts strip, desk, loose threads; memoised on its inputs, conv. 103); `src/middle/home-keepsafe.ts`: the keep-safe card's rules, pure (contract §6.1).
+- `src/middle/world-home.ts`: the world home (cover, "What do you have?" on an empty world, the core pair, the next steps, the keep-safe band, charts strip, desk, loose threads; memoised on its inputs, conv. 103); `src/middle/home-keepsafe.ts`: the keep-safe card's rules, pure (contract §6.1).
 
 ## src/tabs/right, src/visualization
 

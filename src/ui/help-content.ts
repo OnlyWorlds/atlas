@@ -31,7 +31,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'set a protagonist or home from any character or location header',
       'jump to any element type from the stat line',
       'pick up where you left off from the Recent list',
-      'follow the create cards on a young world; each opens the room it belongs to',
+      'answer "What do you have?" on an empty world, then follow its next steps; each opens the place where it is done',
     ],
   },
   element: {

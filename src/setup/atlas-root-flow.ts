@@ -702,7 +702,11 @@ export async function abandonBrowserMake(store: FsFolderStore, make: BrowserMake
 
 export async function createWorldInRoot(
   name: string,
-  opts: { where?: 'folder' | 'browser' } = {},
+  opts: {
+    where?: 'folder' | 'browser';
+    /** Runs with the new world's id just before it becomes active (#127: a Start-page world is marked answered before its home first draws). */
+    beforeActivate?: (worldId: string) => void;
+  } = {},
 ): Promise<{ entry: WorldRegistryEntry }> {
   const trimmed = name.trim() || 'Untitled world';
   const inBrowser = opts.where === 'browser';
@@ -731,6 +735,7 @@ export async function createWorldInRoot(
   });
   const placed = inBrowser ? updateWorldEntry(next, made.id, { where: 'browser' }) : next;
   const entry = placed.worlds.find(w => w.id === made.id)!;
+  opts.beforeActivate?.(entry.id);
   const activated = setActiveWorld(placed, entry.id);
   const commit = () => { saveRegistry(activated); patchSlice('registry', activated); };
   if (make) await make.finish(commit); else commit();

@@ -24,11 +24,11 @@ import {
   setMuted,
   completeWaypoint,
   consumePendingHighlight,
+  OW_COUNCIL_URL,
 } from '../core/waypoints';
 
 const OW_SITE_URL = 'https://onlyworlds.com';
 const OW_TOOLKIT_URL = 'https://onlyworlds.github.io';
-const OW_COUNCIL_URL = 'https://council.onlyworlds.com';
 const OW_GITHUB_URL = 'https://github.com/OnlyWorlds';
 const OW_SDK_URL = 'https://www.npmjs.com/package/@onlyworlds/sdk';
 const OW_API_URL = 'https://www.onlyworlds.com/api/worldapi/';

@@ -1,62 +1,70 @@
 /**
- * Home tour kernel (S264) — the tutorial-state card computation is a pure
- * function of world contents + the dismissed set. Locks the phase gate (core
- * pair before next wave), the create→CTA flip, and dismissal.
+ * The home's onboarding kernel (S264 core pair; #127 the next steps), pure.
+ * Locks the core-pair gate, the world order of the steps, the merge (a step
+ * is done by its waypoint OR by what the world holds), and the shown limit.
  */
 
 import { describe, it, expect } from 'vitest';
-import { computeTourCards, TOUR_WAVE } from '../../src/middle/home-tour';
+import { computeNextSteps, coreCards, HOME_STEPS, HOME_STEPS_SHOWN, worldHolds } from '../../src/middle/home-tour';
+import type { Element } from '../../src/core/types';
+import type { WaypointId } from '../../src/core/waypoints';
+import { WAYPOINTS } from '../../src/core/waypoints';
 
 const counts = (obj: Record<string, number>): Map<string, number> => new Map(Object.entries(obj));
-const none = new Set<string>();
+const none = new Set<WaypointId>();
+const el = (type: string, extra: Record<string, unknown> = {}): Element =>
+  ({ id: `${type}-${Math.random()}`, type, name: type, ...extra }) as unknown as Element;
 
-describe('computeTourCards', () => {
-  it('an empty world offers the core pair, highlighted, undismissible', () => {
-    const cards = computeTourCards(counts({}), none);
-    expect(cards).toEqual([
-      { kind: 'create', id: 'create-character', type: 'character', highlighted: true, dismissible: false },
-      { kind: 'create', id: 'create-location', type: 'location', highlighted: true, dismissible: false },
-    ]);
+describe('coreCards', () => {
+  it('an empty world asks for both, character first', () => {
+    expect(coreCards(counts({}))).toEqual(['character', 'location']);
   });
-
-  it('one core down → only the missing one shows; the next wave still waits', () => {
-    const cards = computeTourCards(counts({ character: 1, event: 3 }), none);
-    expect(cards).toEqual([
-      { kind: 'create', id: 'create-location', type: 'location', highlighted: true, dismissible: false },
-    ]);
+  it('one core down: only the missing one', () => {
+    expect(coreCards(counts({ character: 1, event: 3 }))).toEqual(['location']);
   });
-
-  it('both cores present → the full next wave, quiet and dismissible', () => {
-    const cards = computeTourCards(counts({ character: 1, location: 1 }), none);
-    expect(cards.length).toBe(TOUR_WAVE.length);
-    expect(cards.every(c => c.kind === 'create' && !c.highlighted && c.dismissible)).toBe(true);
+  it('both present: none', () => {
+    expect(coreCards(counts({ character: 1, location: 2 }))).toEqual([]);
   });
+});
 
-  it('a created wave type flips its card into the room CTA', () => {
-    const cards = computeTourCards(counts({ character: 1, location: 1, event: 2 }), none);
-    const event = cards.find(c => c.id.endsWith('-event'));
-    expect(event).toMatchObject({ kind: 'cta', id: 'cta-event' });
-    expect(cards.filter(c => c.kind === 'create').length).toBe(TOUR_WAVE.length - 1);
+describe('computeNextSteps', () => {
+  it('a fresh world gets the first three, in world order', () => {
+    expect(computeNextSteps(none, none)).toEqual(HOME_STEPS.slice(0, HOME_STEPS_SHOWN));
+    expect(HOME_STEPS.slice(0, 3)).toEqual(['links', 'taxonomy', 'time']);
   });
-
-  it('dismissals remove exactly their card (create and cta independently)', () => {
-    const dismissed = new Set(['create-object', 'cta-event']);
-    const cards = computeTourCards(counts({ character: 1, location: 1, event: 2 }), dismissed);
-    expect(cards.some(c => c.id === 'create-object')).toBe(false);
-    expect(cards.some(c => c.id === 'cta-event')).toBe(false);
-    expect(cards.some(c => c.id === 'create-narrative')).toBe(true);
+  it('a completed waypoint and a held step both leave the list', () => {
+    const steps = computeNextSteps(new Set<WaypointId>(['links']), new Set<WaypointId>(['taxonomy']));
+    expect(steps).toEqual(['time', 'story', 'maps']);
   });
-
-  it('a built-out (or dismissed-out) world shows no tour at all', () => {
-    const all: Record<string, number> = { character: 1, location: 1 };
-    for (const e of TOUR_WAVE) all[e.type] = 1;
-    const dismissed = new Set(TOUR_WAVE.map(e => `cta-${e.type}`));
-    expect(computeTourCards(counts(all), dismissed)).toEqual([]);
+  it('everything done: an empty list (the home draws nothing)', () => {
+    expect(computeNextSteps(new Set(HOME_STEPS), none)).toEqual([]);
   });
+  it('every home step is a real waypoint, and the core pair covers the other two', () => {
+    const ids = new Set(WAYPOINTS.map(w => w.id));
+    for (const id of HOME_STEPS) expect(ids.has(id)).toBe(true);
+    const rest = WAYPOINTS.map(w => w.id).filter(id => !HOME_STEPS.includes(id));
+    expect(rest.sort()).toEqual(['first-element', 'first-world']);
+  });
+});
 
-  it('core cards are never gated by dismissal (they cannot be dismissed)', () => {
-    const dismissed = new Set(['create-character', 'create-location']);
-    const cards = computeTourCards(counts({}), dismissed);
-    expect(cards.length).toBe(2);
+describe('worldHolds', () => {
+  it('reads stories, knowledge, pages and pins from the world', () => {
+    const holds = worldHolds([
+      el('pin'),
+      el('narrative', { supertype: 'Book' }),
+    ], { where: 'browser' });
+    expect(holds.has('maps')).toBe(true);
+    expect(holds.has('story')).toBe(true);
+    expect(holds.has('knowledge')).toBe(false);
+    expect(holds.has('keep-copy')).toBe(false);
+  });
+  it('a folder world already has a copy outside the browser; a linked one is online too', () => {
+    expect(worldHolds([], {}).has('keep-copy')).toBe(true);
+    const linked = worldHolds([], { where: 'browser', api: { world_id: 'w', api_key: 'k' } as never });
+    expect(linked.has('keep-copy')).toBe(true);
+    expect(linked.has('ecosystem')).toBe(true);
+  });
+  it('an empty browser world holds nothing', () => {
+    expect([...worldHolds([], { where: 'browser' })]).toEqual([]);
   });
 });

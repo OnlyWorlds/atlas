@@ -42,6 +42,8 @@ export type RouteMode =
   | 'welcome'
   | 'demo'
   | 'try-demo'
+  | 'start'
+  | 'bring-in'
   | 'home'
   | 'settings'
   | 'elements'
@@ -151,6 +153,13 @@ export function parseHash(hash: string): Route {
   // app.ts runs it once and replaces the hash.
   if (parts[0] === 'try-demo') {
     return { worldId: null, mode: 'try-demo' };
+  }
+
+  // /start and /bring-in (#127): the onlyworlds.com Start page's other two
+  // answers to "What do you have?". Actions too: start a world, then its
+  // home (nothing yet) or its Data room (a world somewhere else).
+  if (parts[0] === 'start' || parts[0] === 'bring-in') {
+    return { worldId: null, mode: parts[0] };
   }
 
   // /w/<id>...
