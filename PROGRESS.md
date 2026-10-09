@@ -4,7 +4,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 ---
 
-## CURRENT STATE (2026-10-09, SESSION 384: **1.21.0 PUSHED** (`85123b8`, world units, #149; Boss briefed h11 #2249, deploying); **1.20.1 LIVE**. Gates on the 1.21 tree: typecheck 0 + **2646 vitest** (exit 0) + **424 e2e (= `--list`, PLAYWRIGHT_EXIT=0, zero flaky)** + a production build)
+## CURRENT STATE (2026-10-09, SESSION 384: **1.21.0 LIVE** (`85123b8`, world units, #149; Boss f4cf890f, walked live by 23:33 in Chromium and Firefox from fresh contexts, no page errors; #149 closed); 1.20.1 before it. Gates on the 1.21 tree: typecheck 0 + **2646 vitest** (exit 0) + **424 e2e (= `--list`, PLAYWRIGHT_EXIT=0, zero flaky)** + a production build)
 
 **Records**: the room lines h37 #2250 (what 1.21 does, what it leaves out) and h11 #2249 (Boss). The previous front door, `Forge/Notes/2026-10-09-s383-handover.md`, still holds the queue below it.
 
@@ -12,7 +12,8 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 - **Revert-checked**: the trimmed kind (the integration guard goes red with three pushes of " cm "), the `data-unit` line (the e2e goes red).
 - **Own eyes**: Chromium and Firefox, the Settings row at two widths, a character and a creature (`Forge/Notes/ui-snapshots/2026-10-09-s384/`, script `tools/atlas/Notes/ui-snapshots/2026-10-09-s384/walk.mjs`). Firefox renders the unit; its `getComputedStyle` does not resolve `attr()` in `content`, so the e2e asserting the computed value is Chromium-only by the project setup.
 - **Left out on purpose**: share pages print bare numbers (the payload carries no world meta; a contract change with `tools/show`, its own item if wanted, h37 #2250). No fleet gate: a small revert-checked change on an existing, gated sync path.
-- ⚡ **NEXT**: walk 1.21 live when Boss says it is up, then close #149; then the Captain's home page v4 notes for me (h37 #2097); Tangle for Skeld's Q2; #104's door both ways; the upload button (Keel #59); #139, #140 (gate it); #141; #126.
+- **Not walked live**: a sync round on an account world (the integration tests on the fakes and Skeld's live keel PATCH check cover it).
+- ⚡ **NEXT**: #104's door both ways; the upload button (Keel #59); #139, #140 (gate it); #141; #126.
 
 ---
 
