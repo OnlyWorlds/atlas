@@ -47,9 +47,9 @@ type Mode = 'new' | 'merge';
 
 /**
  * Where the ways to convert notes with an AI are written up: the docs' AI
- * page, not the toolkit repo (the Captain, h20 #2081, #2123; 200 on 2026-10-09).
+ *  page, not the toolkit repo (the Captain, h20 #2081, #2123); the bare form, as Boss's URL contract and Kael's docs write it (Skeld, h20 #2124).
  */
-const OW_AI_DOCS_URL = 'https://onlyworlds.github.io/docs/development/ai.html';
+const OW_AI_DOCS_URL = 'https://onlyworlds.github.io/docs/development/ai';
 
 /**
  * IE7: a minimal valid full-world export. Doubles as format documentation —
