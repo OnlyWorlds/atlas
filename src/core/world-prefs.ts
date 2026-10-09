@@ -171,7 +171,10 @@ function threeWay(base: Record<string, unknown>, mine: Record<string, unknown>, 
 /** Write the entry's prefs to the file and remember what was written. View-only and corrupt files are left alone. */
 async function writeOut(store: FolderStore, worldId: string): Promise<void> {
   const entry = getState().registry.worlds.find(w => w.id === worldId);
-  if (!entry || entry.demo) return;
+  // A view-only world's store refuses every write: the prefs stay on the
+  // registry entry, and the file is never tried (S380 row: no warning at
+  // every open).
+  if (!entry || entry.demo || entry.api?.read_only) return;
   let prefs = prefsOf(entry);
   const base = prefsSyncedFor(worldId);
   if (base !== undefined && prefsKey(prefs) !== base) {

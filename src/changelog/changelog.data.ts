@@ -66,6 +66,12 @@ export const CHANGELOG: ChangelogRelease[] = [
         body: 'The first screen, and add a world, offer Moppetopia: a small world brought down from OnlyWorlds as your own copy in this browser. Change anything in it; nothing goes back to OnlyWorlds. Trying it again opens the copy you have.',
         tags: ['world'],
       },
+      {
+        id: 'view-only-no-delete',
+        title: 'A view-only world offers no Delete',
+        body: 'In a world you view with a read key, an element no longer shows a Delete button that could only be refused.',
+        tags: ['world'],
+      },
     ],
   },
   {

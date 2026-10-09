@@ -152,14 +152,20 @@ export function renderHeader(el: Element): HTMLElement {
   // pending push (autosave debounce will fire soon).
   header.appendChild(buildSyncDot(el));
 
-  const delBtn = document.createElement('button');
-  delBtn.type = 'button';
-  delBtn.className = 'atlas-icon-btn-sm danger';
-  delBtn.setAttribute('data-action', 'delete-element');
-  delBtn.title = 'Delete element';
-  delBtn.innerHTML = '<span class="material-symbols-outlined">delete</span>';
-  delBtn.addEventListener('click', () => onDelete(el));
-  header.appendChild(delBtn);
+  // A view-only world offers no Delete: the store would refuse it after the
+  // confirm (S380 row).
+  const activeId = getState().active?.worldId;
+  const viewOnly = !!getState().registry.worlds.find(w => w.id === activeId)?.api?.read_only;
+  if (!viewOnly) {
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'atlas-icon-btn-sm danger';
+    delBtn.setAttribute('data-action', 'delete-element');
+    delBtn.title = 'Delete element';
+    delBtn.innerHTML = '<span class="material-symbols-outlined">delete</span>';
+    delBtn.addEventListener('click', () => onDelete(el));
+    header.appendChild(delBtn);
+  }
 
   return header;
 }
