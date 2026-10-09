@@ -12,7 +12,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 - **Revert-checked**: the core receipts (e2e), the answered mark (observer), the Moppetopia sidebar (e2e); the kernel by unit tests.
 - **1.20.1 LIVE** (Boss f196e79d, `4b94052`; the link walked live 20:07): the Captain answered (h20 #2123): Q1 four cards, Q2 toasts kept, as built; Q3 the docs link is now https://onlyworlds.github.io/docs/development/ai (the bare form, Skeld h20 #2124; 200). Also: 1.20 went out with one red unit test (`changelog-render`: an entry title with double quotes, added after my last full run); 1.20.1 rewords it, 2635 vitest green. Still open: the Forge commit (board B4).
 - **Deck**: #127 done (1.19 live walk); #139 submap from a pin and #140 fully forget, accepted, carried; #126 Firefox demo speed open; OW Infra #104 next.
-- ⚡ **NEXT**: the Captain's home page v4 notes for me (a work bout, h37 #2097); Tangle for Skeld's Q2; then #104's door both ways; the upload button (Keel #59); #139, #140 (gate it); #126.
+- ⚡ **NEXT**: **#149 world units** first (standard 00.31.00, dist.18, keel 8d6f231 live; check the SDK repin; Skeld h37 #2238); then the Captain's home page v4 notes for me (a work bout, h37 #2097); Tangle for Skeld's Q2; then #104's door both ways; the upload button (Keel #59); #139, #140 (gate it); #126.
 
 ---
 
