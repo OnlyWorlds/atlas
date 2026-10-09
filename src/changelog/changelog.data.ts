@@ -56,6 +56,43 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.20',
+    date: '2026-10-09',
+    theme: 'the first hour, steadier',
+    entries: [
+      {
+        id: 'cards-stay-done',
+        title: 'Cards that stay where they are',
+        body: 'On a young world\'s Home, the character and location cards stay in place once made, greyed with a check, and the question above them stays until both exist, so the block no longer changes shape under your first element.',
+        tags: ['world'],
+      },
+      {
+        id: 'grow-your-world',
+        title: 'Grow your world',
+        body: 'After a character and a location, the Home suggests an event, a narrative, a map and a collective, each opening its own room: Charts, Writing, the map and Knowledge. A made one stays, checked, and opens that room. The waypoints are achievements in Settings, OnlyWorlds, not the route.',
+        tags: ['world'],
+      },
+      {
+        id: 'what-do-you-have-clearer',
+        title: '"What do you have?" reads as one question',
+        body: 'It is a clear heading over its three answers, and the answers line up in one column.',
+        tags: ['world'],
+      },
+      {
+        id: 'data-room-one-flow',
+        title: 'The Data room says it in one place',
+        body: 'Bring in takes anything in the OnlyWorlds format, whatever made it, and says right under that how to convert notes that are not in the format yet, with a link to more ways.',
+        tags: ['data'],
+      },
+      {
+        id: 'moppetopia-opens-elements',
+        title: 'Moppetopia opens onto its elements',
+        body: 'Exploring Moppetopia shows its elements in the sidebar, not the worlds list.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.19',
     date: '2026-10-09',
     theme: 'the first hour',

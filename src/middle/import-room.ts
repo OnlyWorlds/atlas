@@ -45,8 +45,11 @@ import { filesWhereOf } from '../core/browser-worlds';
 
 type Mode = 'new' | 'merge';
 
-/** The OnlyWorlds AI toolkit — teaches an assistant the schema + naming rules. */
-const OW_TOOLKIT_URL = 'https://onlyworlds.github.io';
+/**
+ * Where the ways to convert notes with an AI are written up (1.20: the
+ * Captain asked for the AI docs page, not the toolkit repo; h20 #2081).
+ */
+const OW_AI_DOCS_URL = 'https://onlyworlds.github.io';
 
 /**
  * IE7: a minimal valid full-world export. Doubles as format documentation —
@@ -187,7 +190,7 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
   root.innerHTML = `
     <header class="atlas-room-header">
       <h1>Data</h1>
-      <p class="atlas-room-subtitle">Export your world as an OnlyWorlds file, or bring in OnlyWorlds-formatted data.</p>
+      <p class="atlas-room-subtitle">Take your world out as an OnlyWorlds file, or bring in anything in the OnlyWorlds format, whatever made it.</p>
     </header>
     <div class="atlas-room-tabs" role="tablist">
       <button type="button" class="atlas-room-tab is-active" data-tab="in" role="tab">
@@ -199,7 +202,11 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
     </div>
     <div class="atlas-import-body">
       <div class="atlas-import-panel" data-panel="in" role="tabpanel">
-        <p class="atlas-import-lead">Bring in a world exported from onlyworlds.com, or loose elements. Drop a file or paste the JSON, then it gets reviewed before it lands. A world file Atlas saved (.zip) opens as its own world.</p>
+        <p class="atlas-import-lead">Anything in the OnlyWorlds format comes in here: a world from onlyworlds.com, a world file Atlas saved (.zip), loose elements, or JSON an AI assistant made from your notes. Drop it or paste it; you review it before it lands.</p>
+        <div class="atlas-import-ai">
+          <p class="atlas-import-ai-lead">Notes not in the format yet? <button type="button" class="atlas-btn-link" data-action="convert-prompt">Copy our prompt</button> and give it to an AI assistant with your notes, then paste the JSON it returns below. The prompt carries every field (~${Math.max(1, Math.round(estimateTokens(buildConvertNotesPrompt()) / 1000))}k tokens) and asks the assistant to add nothing your notes do not say. <a class="atlas-btn-link" href="${OW_AI_DOCS_URL}" target="_blank" rel="noopener">More ways to convert</a>.</p>
+          ${agentLine}
+        </div>
         <div class="atlas-import-drop" data-role="drop" tabindex="0" title="drop or click to choose a .json file, or a world file Atlas saved (.zip)">
           <span class="material-symbols-outlined">place_item</span>
           <p>drop a world or elements <b>.json</b>, or a world file <b>.zip</b>, here</p>
@@ -220,18 +227,6 @@ export function mountImportRoom(target: HTMLElement, toasts: ToastManager): () =
         </div>
         <p class="atlas-import-error" data-role="error" hidden></p>
         <div data-role="review"></div>
-        <div class="atlas-import-ai">
-          <span class="material-symbols-outlined">auto_awesome</span>
-          <div class="atlas-import-ai-body">
-            <p class="atlas-import-ai-lead">Notes in another shape? Give an AI assistant this prompt and your notes, then paste the JSON it returns above. The prompt asks it to add nothing your notes do not say, and you review the result before it lands.</p>
-            <div class="atlas-import-ai-actions">
-              <button type="button" class="atlas-btn-ghost" data-action="convert-prompt">copy the prompt</button>
-              <a class="atlas-btn-link" href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">open the OnlyWorlds AI toolkit</a>
-            </div>
-            <p class="atlas-import-ai-size">the prompt carries the full field list for every type · ~${Math.max(1, Math.round(estimateTokens(buildConvertNotesPrompt()) / 1000))}k tokens</p>
-            ${agentLine}
-          </div>
-        </div>
       </div>
       <div class="atlas-import-panel" data-panel="out" role="tabpanel" hidden>
         <div data-role="export"></div>

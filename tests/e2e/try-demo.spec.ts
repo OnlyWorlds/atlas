@@ -99,6 +99,11 @@ async function tryDemoOpensACopy(page: Page) {
   // The world's own fields came down; the link and the key did not.
   expect(state.meta).toMatchObject({ id: WORLD_ID, name: 'Moppetopia', time_current: 453, time_basic_unit: 'Year', description: 'A world of moppets.' });
   expect((state.meta as any).api).toBeUndefined();
+  // It opens onto its elements, not the worlds list (the Captain, h20 #2081).
+  expect(await page.evaluate(async () => {
+    const { getState } = await import('/src/core/state.ts');
+    return getState().ui.sidebarMode;
+  })).toBe('elements');
 
   // Editable: a new element and an edit land on disk.
   await page.evaluate(async () => {

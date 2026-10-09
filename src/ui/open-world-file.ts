@@ -5,7 +5,8 @@
  * restore rules are `setup/world-file-open.ts`.
  */
 import type { ToastManager } from './toast-manager';
-import { getState } from '../core/state';
+import { getState, patchSlice } from '../core/state';
+import { setSidebarModePref } from '../core/ui-prefs';
 import { hasFolderMode, opfsStatus, NO_BROWSER_STORAGE_LINE } from '../core/capabilities';
 import { askWhereWithHome } from './where-choice';
 import { browserStorageFullSentence } from '../core/problems';
@@ -88,6 +89,12 @@ export async function openDemoWorld(toasts: ToastManager): Promise<void> {
   demoRunning = true;
   try {
     await openDemoWorldOnce(toasts);
+    // Moppetopia opens onto its elements, not the worlds list (the Captain,
+    // h20 #2081): the world is the thing to look at, as after start a world.
+    if (getState().active?.meta.id === DEMO_WORLD_ID) {
+      patchSlice('ui', { ...getState().ui, sidebarMode: 'elements' });
+      setSidebarModePref('elements');
+    }
   } finally {
     demoRunning = false;
   }

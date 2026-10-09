@@ -1,84 +1,66 @@
 /**
- * The home's onboarding kernel, pure: the core pair, then one next-steps list.
- * Design: `Forge/Notes/2026-10-09-s383-newcomer-flow-design.md` (#127);
- * the core pair since S264 (`Forge/Notes/2026-07-13-s264-tour-design.md`).
+ * The home's onboarding kernel, pure: which cards the world home shows.
+ * Design: `Forge/Notes/2026-10-09-s383-newcomer-flow-design.md` (1.20 block);
+ * the cards since S264 (`Forge/Notes/2026-07-13-s264-tour-design.md`).
  *
- *   The core pair: while a character or a location is missing, their create
- *   cards show highlighted (the only highlighted cards, ever).
+ *   The core pair: a character and a location. While either is missing the
+ *   home asks "What do you have?", and the pair are its first answer.
  *
- *   The next steps (#127, the Captain's Q2): the home's room cards and the
- *   waypoints were two checklists that did not know each other. Now the
- *   waypoints are the one track, and the home shows the next few, in the
- *   order a world grows. A step is done on this home when its waypoint is
- *   completed (a gesture, once, anywhere) OR this world already holds what
- *   it asks for (a world that came with stories is not asked for one).
+ *   Grow: once both exist, more element types are suggested, each one
+ *   introducing the room it lives in (the Captain, h20 #2081: the cards are
+ *   the route; the waypoints are achievements in Settings, not the route).
  *
- * No step counters, no stored progress: imports, deletes and sync just
- * recompute the truth.
+ * A card the world already has stays where it was, done (greyed, checked),
+ * so the layout holds still as the world grows; done, it opens its room.
+ * No stored progress: imports, deletes and sync just recompute the truth.
  */
 
-import type { Element, WorldRegistryEntry } from '../core/types';
-import type { WaypointId } from '../core/waypoints';
-import { isKnowledgeNarrative } from '../core/knowledge';
-import { isPageNarrative } from '../core/sharing';
-import { isStoryNarrative } from '../core/narrative-kind';
+import type { ElementType } from '../core/types';
 
-export type CoreType = 'character' | 'location';
+export type TourRoom = 'element' | 'timeline' | 'writing' | 'map' | 'knowledge';
 
-/** The core pair's missing members, in order. Empty once both exist. */
-export function coreCards(counts: ReadonlyMap<string, number>): CoreType[] {
-  return (['character', 'location'] as const).filter(t => (counts.get(t) ?? 0) === 0);
+export interface CardDef {
+  type: ElementType;
+  /** Where a done card goes: the room this type introduces. */
+  room: TourRoom;
+  /** The room-nav glyph of that room, so the card teaches the nav icon too. */
+  roomIcon: string;
+  /** One quiet clause: what this type gives the world. */
+  line: string;
 }
 
-/**
- * The order a world grows in, for the home list (first-world and
- * first-element are behind the user by then: the core pair covers them).
- */
-export const HOME_STEPS: readonly WaypointId[] = [
-  'links',
-  'taxonomy',
-  'time',
-  'story',
-  'maps',
-  'knowledge',
-  'share',
-  'keep-copy',
-  'ecosystem',
-  'import',
-  'council',
+export const CORE_CARDS: readonly CardDef[] = [
+  { type: 'character', room: 'element', roomIcon: 'person', line: 'someone' },
+  { type: 'location', room: 'element', roomIcon: 'castle', line: 'somewhere' },
 ];
 
-/** How many undone steps the home shows at once. */
-export const HOME_STEPS_SHOWN = 3;
-
 /**
- * The steps this world already holds, read from its contents and its entry:
- * a story, a pin, a knowledge entry, a page; a copy outside this browser
- * (a folder world, or a linked one); a world online.
+ * The grow wave, in display order. Construct and object left it in 1.20 (the
+ * Captain's Q1): Share and Export were never what those types are for.
+ * Collective opens Knowledge because circles ARE collectives (his S264 call).
  */
-export function worldHolds(
-  elements: readonly Element[],
-  entry: Pick<WorldRegistryEntry, 'where' | 'api'> | undefined,
-): Set<WaypointId> {
-  const holds = new Set<WaypointId>();
-  for (const el of elements) {
-    if (el.type === 'pin') holds.add('maps');
-    else if (el.type === 'narrative') {
-      if (isKnowledgeNarrative(el)) holds.add('knowledge');
-      else if (isPageNarrative(el)) holds.add('share');
-      else if (isStoryNarrative(el)) holds.add('story');
-    }
-  }
-  if (entry?.api) holds.add('ecosystem');
-  if (entry && (entry.where !== 'browser' || entry.api)) holds.add('keep-copy');
-  return holds;
+export const GROW_CARDS: readonly CardDef[] = [
+  { type: 'event', room: 'timeline', roomIcon: 'insights', line: 'see it on a chart' },
+  { type: 'narrative', room: 'writing', roomIcon: 'menu_book', line: 'tell it as a story' },
+  { type: 'map', room: 'map', roomIcon: 'map', line: 'put places on it' },
+  { type: 'collective', room: 'knowledge', roomIcon: 'psychology', line: 'who knows what' },
+];
+
+export interface HomeCard {
+  def: CardDef;
+  done: boolean;
 }
 
-/** The next undone steps, in order, at most `limit`. */
-export function computeNextSteps(
-  completed: ReadonlySet<WaypointId>,
-  holds: ReadonlySet<WaypointId>,
-  limit = HOME_STEPS_SHOWN,
-): WaypointId[] {
-  return HOME_STEPS.filter(id => !completed.has(id) && !holds.has(id)).slice(0, limit);
+export type HomeCards =
+  | { phase: 'core'; cards: HomeCard[] }
+  | { phase: 'grow'; cards: HomeCard[] };
+
+/** The cards right now, or null once every card is done. Pure + deterministic. */
+export function computeHomeCards(counts: ReadonlyMap<string, number>): HomeCards | null {
+  const has = (t: string): boolean => (counts.get(t) ?? 0) > 0;
+  const core = CORE_CARDS.map(def => ({ def, done: has(def.type) }));
+  if (core.some(c => !c.done)) return { phase: 'core', cards: core };
+  const grow = GROW_CARDS.map(def => ({ def, done: has(def.type) }));
+  if (grow.every(c => c.done)) return null;
+  return { phase: 'grow', cards: [...core, ...grow] };
 }

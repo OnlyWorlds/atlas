@@ -101,7 +101,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/middle/welcome-panel.ts`: first launch: two doors (start a world, explore Moppetopia) and one line of links (the tour, open a world folder, other ways in; #127), "Re-link OnlyWorlds folder" when recoverable.
 - `src/middle/story-sidecar.ts`: `storyOutranksSidecar`: plain text wins at open (conv. 116); `src/middle/story-notice.ts`: the once-per-element notice.
 - `src/middle/timeline.ts`: the Charts room (owns ChartConfig, control bar, gallery; DESIGN_CHARTS).
-- `src/middle/world-home.ts`: the world home (cover, "What do you have?" on an empty world, the core pair, the next steps, the keep-safe band, charts strip, desk, loose threads; memoised on its inputs, conv. 103); `src/middle/home-keepsafe.ts`: the keep-safe card's rules, pure (contract §6.1).
+- `src/middle/world-home.ts`: the world home (cover, "What do you have?" and "Grow your world" with cards kept done, the keep-safe band, charts strip, desk, loose threads; memoised on its inputs, conv. 103); `src/middle/home-keepsafe.ts`: the keep-safe card's rules, pure (contract §6.1).
 
 ## src/tabs/right, src/visualization
 

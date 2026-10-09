@@ -35,9 +35,9 @@ import { setWorldFavoriteElement, dismissTourCard, saveRegistry, updateWorldEntr
 import { keepSafeCard, snoozeUntil } from './home-keepsafe';
 import { downloadWorldFromClick } from '../ui/download-world';
 import { hasFolderMode } from '../core/capabilities';
-import { computeNextSteps, coreCards, worldHolds } from './home-tour';
+import { computeHomeCards, type CardDef, type HomeCard, type TourRoom } from './home-tour';
 import { isNewcomerAnswered } from '../core/newcomer';
-import { addHomeReceipts, clearHomeReceipts, loadWaypointsState, completeWaypoint, OW_COUNCIL_URL, WAYPOINTS, type WaypointId } from '../core/waypoints';
+import { addHomeReceipts, clearHomeReceipts } from '../core/waypoints';
 import { showProblem } from '../ui/problem-fixes';
 import { isCodeLoadError } from '../core/reload-offer';
 import { isTourFlagActive } from '../tour/tour-flag';
@@ -154,7 +154,7 @@ export function mountWorldHome(target: HTMLElement, toasts: ToastManager): () =>
     // world (inviting creates that can only toast is noise, not teaching).
     const viewOnly = !!getState().registry.worlds.find(w => w.id === worldId)?.api?.read_only;
     if (!viewOnly) {
-      const tour = buildTour(counts, totalElements, worldId, elements, toasts);
+      const tour = buildTour(counts, totalElements, worldId, toasts);
       if (tour) root.appendChild(tour);
     }
     // The keep-safe card (1.17, contract §6.1): after the intro cards, in
@@ -636,7 +636,7 @@ function buildDesk(elements: readonly Element[], worldId: string): HTMLElement |
   return desk.childElementCount > 0 ? desk : null;
 }
 
-// ---- The home onboarding (S264 core pair; #127 the question and the next steps) ----
+// ---- The home onboarding (S264 cards; #127 the question; 1.20 cards kept, done) ----
 
 function persistDismiss(worldId: string, cardId: string): void {
   const next = dismissTourCard(getState().registry, worldId, cardId);
@@ -700,36 +700,41 @@ function buildTour(
   counts: Map<string, number>,
   totalElements: number,
   worldId: string,
-  elements: Element[],
   toasts: ToastManager,
 ): HTMLElement | null {
   // While the GUIDED tour is running, the home onboarding stays silent: two
   // onboardings talking at once (the S264 intersection class). Read the
   // persisted flag directly: cheap, and no tour-engine import here.
   if (isTourFlagActive()) return null;
-  const missing = coreCards(counts);
-  if (missing.length === 0) return buildNextSteps(worldId, elements, toasts);
-  addHomeReceipts(['first-world', 'first-element']);
+  const home = computeHomeCards(counts);
+  if (!home) return null;
 
-  const section = document.createElement('section');
-  section.className = 'atlas-home-onboarding';
   const grid = document.createElement('div');
   grid.className = 'atlas-home-onboarding-grid';
+  for (const card of home.cards) grid.appendChild(cardTile(card, worldId, toasts));
 
-  for (const type of missing) {
-    const tile = document.createElement('button');
-    tile.className = 'atlas-home-onboarding-tile atlas-home-tile-core';
-    tile.setAttribute('data-create-type', type);
-    tile.innerHTML = `
-      <span class="material-symbols-outlined">${ELEMENT_ICONS[type] ?? 'category'}</span>
-      <span>${escapeText(ELEMENT_LABELS[type]?.singular ?? type)}</span>
+  const section = document.createElement('section');
+  section.className = 'atlas-home-onboarding atlas-home-have';
+
+  if (home.phase === 'grow') {
+    const reg = getState().registry.worlds.find(w => w.id === worldId);
+    if (reg?.tour_dismissed?.includes('home-cards')) return null;
+    section.innerHTML = `
+      <div class="atlas-home-have-head">
+        <h2 class="atlas-home-have-title">Grow your world</h2>
+        <button type="button" class="atlas-home-have-dismiss" data-action="cards-dismiss"
+          title="Hide these for this world" aria-label="Hide these for this world"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
+      </div>
+      <p class="atlas-home-have-lead">Each kind of element opens a room of its own.</p>
     `;
-    // Stay on home (Captain, S264): the sidebar flip + the first-element
-    // Recent highlight carry "where did it go", no jarring room jump.
-    tile.addEventListener('click', () =>
-      new ElementCreateModal(toasts, { initialType: type, suppressNavigate: true }).open());
-    grid.appendChild(tile);
+    section.appendChild(grid);
+    section.querySelector('[data-action="cards-dismiss"]')!.addEventListener('click', () => persistDismiss(worldId, 'home-cards'));
+    return section;
   }
+
+  // The core phase: what the home shows here is first-world's and
+  // first-element's receipt, so their toasts stay away (#127).
+  addHomeReceipts(['first-world', 'first-element']);
   // "anything else" rides the core phase; hovering it pulses the sidebar +,
   // the permanent home of creating.
   const anyTile = document.createElement('button');
@@ -745,154 +750,123 @@ function buildTour(
   anyTile.addEventListener('mouseleave', () => sidebarCreate()?.classList.remove('atlas-create-pulse'));
   grid.appendChild(anyTile);
 
-  // "What do you have?" (#127, the Captain's Q1: optional, never blocking,
-  // subtle and minimal). The empty home IS the step: three quiet rows, nothing
-  // chosen or stored, every room and the sidebar + working as before. A world
-  // started from a Start-page link was answered there, so it gets the tiles.
-  if (totalElements === 0 && !isNewcomerAnswered(worldId)) {
-    section.classList.add('atlas-home-have');
-    section.innerHTML = `
-      <h2 class="atlas-home-section-title">What do you have?</h2>
-      <div class="atlas-home-have-row" data-have="nothing">
-        <span class="atlas-home-have-label">Nothing yet</span>
-        <span class="atlas-home-have-line">Start with a character and a location.</span>
-      </div>
-    `;
-    section.querySelector('[data-have="nothing"]')!.appendChild(grid);
-    const row = (have: string, label: string, body: string): HTMLElement => {
-      const r = document.createElement('div');
-      r.className = 'atlas-home-have-row';
-      r.setAttribute('data-have', have);
-      r.innerHTML = `<span class="atlas-home-have-label">${label}</span><span class="atlas-home-have-line">${body}</span>`;
-      section.appendChild(r);
-      return r;
-    };
-    const act = (action: string, label: string): string =>
-      `<button type="button" class="atlas-btn-link atlas-home-have-act" data-have-action="${action}">${label}</button>`;
-    // A button is one box even when inline: the closing one keeps its full
-    // stop beside it, or a wrap leaves the stop alone on the next line.
-    const last = (action: string, label: string): string =>
-      `<span class="atlas-home-have-end">${act(action, label)}.</span>`;
-    const elsewhere = row('elsewhere', 'A world somewhere else',
-      `${act('bring-in', 'Bring it in')}: a world file, OnlyWorlds JSON, or notes an AI assistant converts with our prompt. `
-      + (hasFolderMode()
-        ? `Or ${act('open-folder', 'open a world folder')} where it is, or ${last('download', 'download one from OnlyWorlds')}`
-        : `Or ${last('download', 'download one from OnlyWorlds')}`));
-    const looking = row('looking', 'Just looking',
-      `${act('try-demo', 'Explore Moppetopia')}, a demo world you can change, or ${last('tour', 'take the tour')}`);
-    elsewhere.querySelector('[data-have-action="bring-in"]')?.addEventListener('click', () => navigate(importHash(worldId)));
-    elsewhere.querySelector('[data-have-action="open-folder"]')?.addEventListener('click', () => {
-      void import('../setup/world-doors').then(m => m.pickAndOpenWorldFolder(toasts));
-    });
-    elsewhere.querySelector('[data-have-action="download"]')?.addEventListener('click', () => {
-      void import('../setup/world-doors').then(m => m.runAddWorldAction('link-api', toasts));
-    });
-    looking.querySelector('[data-have-action="try-demo"]')?.addEventListener('click', () => {
-      void import('../setup/world-doors').then(m => m.runAddWorldAction('try-demo', toasts));
-    });
-    const tourBtn = looking.querySelector<HTMLButtonElement>('[data-have-action="tour"]');
-    tourBtn?.addEventListener('click', async () => {
-      tourBtn.disabled = true;
-      try {
-        const engine = await import('../tour/tour-engine');
-        await engine.launchTour();
-      } catch (err) {
-        if (!isCodeLoadError(err)) {
-          console.warn('[home] tour launch failed:', err);
-          showProblem(err, { doing: 'starting the tour' });
-        }
-        tourBtn.disabled = false;
-      }
-    });
+  const row = (have: string, label: string, body: string): HTMLElement => {
+    const r = document.createElement('div');
+    r.className = 'atlas-home-have-row';
+    r.setAttribute('data-have', have);
+    r.innerHTML = `<span class="atlas-home-have-label">${label}</span><span class="atlas-home-have-line">${body}</span>`;
+    section.appendChild(r);
+    return r;
+  };
+
+  // A world started from a Start-page link was answered on onlyworlds.com:
+  // it gets the first answer alone, under no question.
+  if (isNewcomerAnswered(worldId) && totalElements === 0) {
+    row('nothing', 'Start here', 'A character and a location: someone, somewhere.').appendChild(grid);
     return section;
   }
 
-  section.innerHTML = `<p class="atlas-home-onboarding-copy">Every world starts with someone, somewhere.</p>`;
-  section.appendChild(grid);
+  // "What do you have?" (#127, the Captain's Q1: optional, never blocking).
+  // It stays, with its finished cards checked, until the core pair exists,
+  // so the block does not change shape under the first create (h20 #2081).
+  section.insertAdjacentHTML('beforeend', '<h2 class="atlas-home-have-title">What do you have?</h2>');
+  row('nothing', 'Nothing yet', 'Start with a character and a location.').appendChild(grid);
+  const act = (action: string, label: string): string =>
+    `<button type="button" class="atlas-btn-link atlas-home-have-act" data-have-action="${action}">${label}</button>`;
+  // A button is one box even when inline: the closing one keeps its full
+  // stop beside it, or a wrap leaves the stop alone on the next line.
+  const last = (action: string, label: string): string =>
+    `<span class="atlas-home-have-end">${act(action, label)}.</span>`;
+  const elsewhere = row('elsewhere', 'A world somewhere else',
+    `${act('bring-in', 'Bring it in')}: a world file, OnlyWorlds JSON, or notes an AI assistant converts. `
+    + (hasFolderMode()
+      ? `Or ${act('open-folder', 'open a world folder')} where it is, or ${last('download', 'download one from OnlyWorlds')}`
+      : `Or ${last('download', 'download one from OnlyWorlds')}`));
+  const looking = row('looking', 'Just looking',
+    `${act('try-demo', 'Explore Moppetopia')}, a demo world you can change, or ${last('tour', 'take the tour')}`);
+  elsewhere.querySelector('[data-have-action="bring-in"]')?.addEventListener('click', () => navigate(importHash(worldId)));
+  elsewhere.querySelector('[data-have-action="open-folder"]')?.addEventListener('click', () => {
+    void import('../setup/world-doors').then(m => m.pickAndOpenWorldFolder(toasts));
+  });
+  elsewhere.querySelector('[data-have-action="download"]')?.addEventListener('click', () => {
+    void import('../setup/world-doors').then(m => m.runAddWorldAction('link-api', toasts));
+  });
+  looking.querySelector('[data-have-action="try-demo"]')?.addEventListener('click', () => {
+    void import('../setup/world-doors').then(m => m.runAddWorldAction('try-demo', toasts));
+  });
+  const tourBtn = looking.querySelector<HTMLButtonElement>('[data-have-action="tour"]');
+  tourBtn?.addEventListener('click', async () => {
+    tourBtn.disabled = true;
+    try {
+      const engine = await import('../tour/tour-engine');
+      await engine.launchTour();
+    } catch (err) {
+      if (!isCodeLoadError(err)) {
+        console.warn('[home] tour launch failed:', err);
+        showProblem(err, { doing: 'starting the tour' });
+      }
+      tourBtn.disabled = false;
+    }
+  });
   return section;
 }
+
+const ROOM_NAMES: Record<TourRoom, string> = {
+  element: 'it', timeline: 'Charts', writing: 'Writing', map: 'the map', knowledge: 'Knowledge',
+};
 
 /**
- * The next steps (#127, the Captain's Q2): the waypoints are the one track,
- * and the home shows the next few in the order a world grows. A quiet list,
- * one line each; "see all" opens the whole track on the OnlyWorlds page, and
- * the × hides the list for this world.
+ * One card. Not yet in the world: it creates one (staying on home, S264).
+ * Done: it stays in place, greyed and checked, and opens the room its type
+ * introduces (the Captain, h20 #2081).
  */
-function buildNextSteps(worldId: string, elements: Element[], toasts: ToastManager): HTMLElement | null {
-  const reg = getState().registry.worlds.find(w => w.id === worldId);
-  if (reg?.tour_dismissed?.includes('next-steps')) return null;
-  const completed = new Set(Object.keys(loadWaypointsState().completed) as WaypointId[]);
-  const steps = computeNextSteps(completed, worldHolds(elements, reg));
-  if (steps.length === 0) return null;
-  addHomeReceipts(steps);
-
-  const section = document.createElement('section');
-  section.className = 'atlas-home-next';
-  section.innerHTML = `
-    <div class="atlas-home-next-head">
-      <span class="atlas-home-next-title">Next</span>
-      <button type="button" class="atlas-btn-link atlas-home-next-all" data-action="next-see-all">see all</button>
-      <button type="button" class="atlas-home-next-dismiss" data-action="next-dismiss"
-        title="Hide these for this world" aria-label="Hide these for this world"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
-    </div>
-    <ul class="atlas-home-next-list"></ul>
+function cardTile(card: HomeCard, worldId: string, toasts: ToastManager): HTMLButtonElement {
+  const { def, done } = card;
+  const label = ELEMENT_LABELS[def.type]?.singular ?? def.type;
+  const core = def.room === 'element';
+  const tile = document.createElement('button');
+  tile.type = 'button';
+  tile.className = 'atlas-home-onboarding-tile'
+    + (core && !done ? ' atlas-home-tile-core' : '')
+    + (done ? ' atlas-home-tile-done' : '');
+  tile.setAttribute(done ? 'data-done-type' : 'data-create-type', def.type);
+  tile.title = done ? `Open ${ROOM_NAMES[def.room]}` : `Create a ${label}`;
+  tile.innerHTML = `
+    <span class="material-symbols-outlined">${ELEMENT_ICONS[def.type] ?? 'category'}</span>
+    <span>${escapeText(label)}</span>
+    ${core ? '' : `<span class="atlas-home-tile-line">${escapeText(def.line)}</span>`}
+    ${done ? '<span class="material-symbols-outlined atlas-home-tile-check" aria-hidden="true">check_circle</span>' : ''}
   `;
-  const list = section.querySelector('ul')!;
-  for (const id of steps) {
-    const def = WAYPOINTS.find(w => w.id === id);
-    if (!def) continue;
-    const li = document.createElement('li');
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'atlas-home-next-step';
-    btn.setAttribute('data-step', id);
-    btn.innerHTML = `
-      <span class="material-symbols-outlined atlas-home-next-glyph" aria-hidden="true">${def.glyph}</span>
-      <span class="atlas-home-next-name">${escapeText(def.name)}</span>
-      <span class="atlas-home-next-action">${escapeText(def.action)}</span>
-    `;
-    btn.addEventListener('click', () => runNextStep(id, worldId, toasts));
-    li.appendChild(btn);
-    list.appendChild(li);
-  }
-  section.querySelector('[data-action="next-see-all"]')!.addEventListener('click', () =>
-    navigate(settingsHash(worldId, 'onlyworlds')));
-  section.querySelector('[data-action="next-dismiss"]')!.addEventListener('click', () =>
-    persistDismiss(worldId, 'next-steps'));
-  return section;
+  tile.addEventListener('click', () => {
+    if (!done) {
+      // Stay on home (Captain, S264): the sidebar flip + the first-element
+      // Recent highlight carry "where did it go", no jarring room jump.
+      new ElementCreateModal(toasts, { initialType: def.type, suppressNavigate: true }).open();
+      return;
+    }
+    openCardRoom(def, worldId);
+  });
+  return tile;
 }
 
-/** Where a step's line goes: the surface where the step is done. */
-function runNextStep(id: WaypointId, worldId: string, toasts: ToastManager): void {
+function openCardRoom(def: CardDef, worldId: string): void {
   const elements = getState().data.elements;
-  switch (id) {
-    case 'links':
-    case 'taxonomy': {
-      // Both are done on an element's page: open the first character.
-      const el = elements.find(e => e.type === 'character') ?? elements.find(e => e.type === 'location');
+  switch (def.room) {
+    case 'element': {
+      const el = elements.find(e => e.type === def.type);
       if (el) navigate(elementHash(worldId, el.id));
       return;
     }
-    case 'maps': {
+    case 'map': {
+      // The map room is a right-pane tab: openMapTab activates an open one
+      // and gives an imageless map its flat canvas (S265, S300).
       const map = elements.find((e): e is WorldMap => e.type === 'map');
       if (map) openMapTab(map);
-      else new ElementCreateModal(toasts, { initialType: 'map', suppressNavigate: true }).open();
       return;
     }
-    case 'time': navigate(timelineHash(worldId)); return;
-    case 'story': navigate(writingHash(worldId)); return;
+    case 'timeline': navigate(timelineHash(worldId)); return;
+    case 'writing': navigate(writingHash(worldId)); return;
     case 'knowledge': navigate(knowledgeHash(worldId)); return;
-    case 'share': navigate(shareHash(worldId)); return;
-    case 'import': navigate(importHash(worldId)); return;
-    case 'council':
-      // The same gesture as the OnlyWorlds page's council link.
-      window.open(OW_COUNCIL_URL, '_blank', 'noopener');
-      completeWaypoint('council');
-      return;
-    default: {
-      const hash = WAYPOINTS.find(w => w.id === id)?.link(worldId);
-      if (hash) navigate(hash);
-    }
   }
 }
 

@@ -7992,7 +7992,7 @@ svg .atlas-zone-hovered {
 }
 
 .atlas-home-onboarding-tile {
-  position: relative; /* anchors the tour dismiss × (S264) */
+  position: relative; /* anchors the done check (1.20) */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -8017,14 +8017,44 @@ svg .atlas-zone-hovered {
   box-shadow: 0 0 12px rgba(var(--atlas-accent-rgb), 0.10);
 }
 
-/* Room CTA cards — a verb + one quiet clause; the room glyph teaches the nav. */
-/* "What do you have?" (#127): the empty home's three quiet rows. A label
-   column and a line column; the core tiles sit under the first row's line. */
+/* The home's onboarding (#127; 1.20): "What do you have?" while the core
+   pair is missing, "Grow your world" after. One heading over the block, rows
+   that answer it, and one label column shared by every row (h20 #2081: the
+   text column started at a different x on each row). */
 .atlas-home-have { container-type: inline-size; }
-.atlas-home-have .atlas-home-section-title { margin-bottom: 14px; }
+.atlas-home-have-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.atlas-home-have-title {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--atlas-text);
+}
+.atlas-home-have-lead {
+  margin: -8px 0 14px 0;
+  font-size: 13px;
+  color: var(--atlas-text-muted);
+}
+.atlas-home-have-dismiss {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--atlas-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  line-height: 0;
+  opacity: 0.6;
+}
+.atlas-home-have-dismiss .material-symbols-outlined { font-size: 16px; }
+.atlas-home-have-dismiss:hover,
+.atlas-home-have-dismiss:focus-visible { opacity: 1; color: var(--atlas-text); background: rgba(var(--atlas-ink-rgb), 0.08); }
 .atlas-home-have-row {
   display: grid;
-  grid-template-columns: minmax(96px, max-content) 1fr;
+  grid-template-columns: 11.5rem 1fr;
   column-gap: 16px;
   row-gap: 10px;
   align-items: baseline;
@@ -8038,74 +8068,49 @@ svg .atlas-zone-hovered {
 }
 .atlas-home-have-label { color: var(--atlas-text); font-weight: 500; }
 .atlas-home-have-line { color: var(--atlas-text-muted); max-width: 520px; }
-/* Three tiles, never a scroller: in the question's narrower column they wrap. */
-.atlas-home-have-row .atlas-home-onboarding-grid { grid-column: 2; flex-wrap: wrap; overflow: visible; }
+/* The cards: even columns that fill the width and wrap, never a scroller,
+   so a narrow middle pane gets two or three a row, not one. */
+.atlas-home-have .atlas-home-onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  width: 100%;
+  max-width: 600px;
+  min-width: 0;
+  overflow: visible;
+}
+/* A grid item's automatic minimum is its content: without this the card
+   grid sized itself to all its cards and ran out of a stacked column. */
+.atlas-home-have-row > * { min-width: 0; }
+.atlas-home-have-row .atlas-home-onboarding-grid { grid-column: 2; }
 .atlas-home-have-act { font-size: inherit; padding: 0; }
 .atlas-home-have-end { white-space: nowrap; }
 /* A narrow middle pane stacks the label over its line. */
-@container (max-width: 420px) {
+@container (max-width: 460px) {
   .atlas-home-have-row { grid-template-columns: 1fr; row-gap: 4px; }
   .atlas-home-have-row .atlas-home-onboarding-grid { grid-column: 1; margin-top: 6px; }
 }
 
-/* The next steps (#127): a quiet list, one line each, no panel. */
-.atlas-home-next { flex: 0 0 auto; }
-.atlas-home-next-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 6px;
+/* A card the world already has: it stays in its place (the layout holds
+   still), greyed, with a check; it now opens its room. */
+/* One size for every card, so a row reads as one set and nothing shifts
+   when a card turns done. */
+.atlas-home-have .atlas-home-onboarding-tile { min-width: 0; text-align: center; }
+.atlas-home-tile-done { opacity: 0.55; }
+.atlas-home-tile-done:hover,
+.atlas-home-tile-done:focus-visible { opacity: 0.9; }
+.atlas-home-tile-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 14px !important;
+  color: var(--atlas-cyan-soft);
 }
-.atlas-home-next-title {
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
+.atlas-home-tile-line {
+  font-size: 10.5px;
+  line-height: 1.25;
   color: var(--atlas-text-muted);
+  font-weight: 400;
 }
-.atlas-home-next-all { font-size: 12px; }
-.atlas-home-next-dismiss {
-  margin-left: auto;
-  border: none;
-  background: transparent;
-  color: var(--atlas-text-muted);
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 4px;
-  line-height: 0;
-  opacity: 0.6;
-}
-.atlas-home-next-dismiss .material-symbols-outlined { font-size: 15px; }
-.atlas-home-next-dismiss:hover,
-.atlas-home-next-dismiss:focus-visible { opacity: 1; color: var(--atlas-text); background: rgba(var(--atlas-ink-rgb), 0.08); }
-.atlas-home-next-list { list-style: none; margin: 0; padding: 0; }
-.atlas-home-next-step {
-  /* The glyph beside two lines: the step's name, then what to do. Side by
-     side, a narrow middle pane squeezed the action into a column of words. */
-  display: grid;
-  grid-template-columns: 18px 1fr;
-  column-gap: 8px;
-  align-items: start;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: transparent;
-  color: var(--atlas-text-muted);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.45;
-  padding: 5px 6px;
-  margin-left: -6px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: color 100ms ease, background 100ms ease;
-}
-.atlas-home-next-step:hover,
-.atlas-home-next-step:focus-visible { background: rgba(var(--atlas-accent-rgb), 0.06); }
-.atlas-home-next-step:hover .atlas-home-next-name,
-.atlas-home-next-step:focus-visible .atlas-home-next-name { color: var(--atlas-cyan); }
-.atlas-home-next-glyph { grid-row: span 2; font-size: 16px; margin-top: 2px; color: var(--atlas-cyan-soft); }
-.atlas-home-next-name { color: var(--atlas-text); }
-.atlas-home-next-action { min-width: 0; font-size: 12px; }
 
 /* The first element's Recent row — the tour's next step, unmissable. */
 .atlas-home-first-element {
@@ -10926,27 +10931,12 @@ td.atlas-writing-setup-promote-count {
 }
 .atlas-import-example-sep { color: var(--atlas-text-dim); font-size: 11px; }
 
-/* D8: quiet "bring notes from anywhere" section below the main flow. */
-.atlas-import-ai {
-  display: flex;
-  gap: 10px;
-  margin-top: 22px;
-  padding: 12px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--atlas-divider);
-  background: var(--atlas-bg-panel);
-}
-.atlas-import-ai > .material-symbols-outlined {
-  font-size: 18px;
-  color: var(--atlas-text-muted);
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-.atlas-import-ai-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.atlas-import-ai-lead { margin: 0; font-size: 12px; line-height: 1.5; color: var(--atlas-text-muted); }
-.atlas-import-ai-size { margin: 4px 0 0 0; font-size: 11px; color: var(--atlas-text-muted); opacity: 0.75; }
-.atlas-import-ai-note { margin: 10px 0 0 0; font-size: 12px; color: var(--atlas-text-muted); }
-.atlas-import-ai-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+/* The way to convert notes (1.20): part of the Bring in flow, right under
+   its lead, not a box below it (the Captain, h20 #2081: "dangly"). */
+.atlas-import-ai { margin: 0 0 14px 0; }
+.atlas-import-ai-lead { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--atlas-text-muted); max-width: 640px; }
+.atlas-import-ai-lead .atlas-btn-link { font-size: inherit; padding: 0; }
+.atlas-import-ai-note { margin: 8px 0 0 0; font-size: 12.5px; color: var(--atlas-text-muted); }
 
 /* IE3: grouped two-column take-out type list (content | spatial). */
 .atlas-import-typelist { margin: 10px 0; }
