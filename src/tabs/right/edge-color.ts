@@ -10,14 +10,34 @@
  * Safe: returns null on any failure (CORS, decode error, no canvas, etc).
  */
 
+/** Load an image for canvas reads. crossOrigin is required for pixel reads;
+ *  a host without CORS headers makes decode() reject. */
+async function loadCors(src: string): Promise<HTMLImageElement> {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = src;
+  await img.decode();
+  return img;
+}
+
+/** The map overlay loads the same URL as a plain <img> (no Origin sent), and a
+ *  host like R2 then answers without Access-Control-Allow-Origin. The browser
+ *  can serve that cached, header-less copy to this CORS read, which fails even
+ *  though the host allows CORS (Boss, S380, media.onlyworlds.com). So a failed
+ *  http(s) read retries once under a query that keeps it out of that cache
+ *  entry. The first attempt is unchanged, so no host fares worse than before. */
+async function loadForPixels(url: string): Promise<HTMLImageElement> {
+  try {
+    return await loadCors(url);
+  } catch (err) {
+    if (!/^https?:/i.test(url)) throw err;
+    return loadCors(url + (url.includes('?') ? '&' : '?') + 'atlas-pixels=1');
+  }
+}
+
 export async function extractEdgeColor(url: string): Promise<string | null> {
   try {
-    const img = new Image();
-    // Required for canvas pixel reads with cross-origin images. If the host
-    // doesn't send CORS headers, decode() rejects and we return null.
-    img.crossOrigin = 'anonymous';
-    img.src = url;
-    await img.decode();
+    const img = await loadForPixels(url);
 
     const w = img.naturalWidth, h = img.naturalHeight;
     if (w < 8 || h < 8) return null;
