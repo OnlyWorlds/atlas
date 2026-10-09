@@ -4,7 +4,7 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 
 ---
 
-## CURRENT STATE (2026-10-09, SESSION 383: **1.19.0 built: #127, the newcomer flow** (committed and pushed this session, Boss briefed in h11; see the handover for the live check); gates on the release tree: typecheck 0 + **2639 vitest** (276 files, 2 skipped, exit 0) + **423 e2e (= `--list`, PLAYWRIGHT_EXIT=0, zero flaky)** + a production build; after that run only CSS and the question's link wrapping changed, and `home-tour` + `front-door` reran green, 17 of 17)
+## CURRENT STATE (2026-10-09, SESSION 383: **1.19.0 LIVE: #127, the newcomer flow** (Boss 99475cdb, bundle main-1eWK-6lw.js byte-identical to his build; walked live in Chromium and Firefox from fresh contexts: the two doors, the question, the next steps, no toast on the home, #/start with no question, #/bring-in into the Data room, zero page errors; #127 closed); gates on the release tree: typecheck 0 + **2639 vitest** (276 files, 2 skipped, exit 0) + **423 e2e (= `--list`, PLAYWRIGHT_EXIT=0, zero flaky)** + a production build; after that run only CSS and the question's link wrapping changed, and `home-tour` + `front-door` reran green, 17 of 17)
 
 **Records**: the design as built is `Forge/Notes/2026-10-09-s383-newcomer-flow-design.md` (on the Captain's answers in `Forge/Notes/2026-10-09-s382-atlas-flow/MAP.md`); the front door for what is next is the handover `Forge/Notes/2026-10-09-s383-handover.md`. DESIGN_HOME "The newcomer flow" holds the living truth.
 
@@ -12,8 +12,8 @@ Operational state. Architecture: **DESIGN.md** is the index (since S366), with t
 - **Gates**: a two-lens gate (correctness opus, copy sonnet): A1 the route-guess dropped toasts earned in dialogs, replaced by receipts; A2 the question drew once under the dialog for a Start-page world, fixed by `createWorldInRoot`'s `beforeActivate`; A5 two missed "Start a new world" strings; copy: the review overclaim cut, the Moppetopia line, the knowledge and story wording, "Cancel download", no "API world". Not taken: a first-world toast lands on the Data room after `#/bring-in` (low).
 - **Revert-checked**: the receipts (unit + e2e), `worldHolds` story, the answered mark (an observer counts every draw of the question: 5 without the fix, 0 with), the waypoint home rule for first-world. A silent-flag on first-world guarded nothing and was removed.
 - **The instrument trap of the day**: a retrying `toHaveCount(0)` outwaits a toast's 7 s life and passes; no-toast checks take focus away, click something inert and count once (DESIGN_HOME, the guards line).
-- **Deck**: #127 built (closes when 1.19 is live and walked); #126 Firefox demo speed open; #21 waits on the Captain's key-and-PIN station; OW Infra #104 the door both ways is next.
-- ⚡ **NEXT**: walk 1.19 live once Boss deploys; Skeld's Start page can link `#/start`, `#/bring-in`, `#/try-demo`. Then the `#/join/` door (OW Infra #104) both ways. #126 when there is a gap.
+- **Deck**: #127 done (live walk); #105 and #21 closed on Skeld's pass (21's open piece, the Captain's key-and-PIN station, lives in #125); #126 Firefox demo speed open; OW Infra #104 the door both ways is next, then the Atlas upload button for Keel #59 (the SDK leg is done).
+- ⚡ **NEXT**: the `#/join/` door (OW Infra #104) both ways; then the upload button (Keel #59); #126 when there is a gap. Skeld's Start page and the home page can link `#/start`, `#/bring-in`, `#/try-demo` (Boss h11 #2058).
 
 ---
 
