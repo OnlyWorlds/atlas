@@ -5,9 +5,8 @@
  * The pure fold, then both surfaces that read it.
  */
 
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { foldBacklinks, markerFoldLabel, pinBacklink } from '../../src/core/spatial-backlinks';
-import { mountContextGraph, clearContextGraphLayoutMemo } from '../../src/tabs/right/context-pane-graph';
 import { renderReferencedBy } from '../../src/middle/element-detail-refs';
 import { mountContextPreview } from '../../src/tabs/right/context-pane-preview';
 import { patchSlice } from '../../src/core/state';
@@ -88,51 +87,6 @@ describe("the map's element page (Referenced by)", () => {
     const labels = [...refby.querySelectorAll('.atlas-field-label')].map(l => l.textContent);
     expect(labels.slice(-2)).toEqual(['Pins', 'Markers']);
     expect(labels).toContain('Zones');
-  });
-});
-
-describe("the Web tab's graph", () => {
-  beforeAll(() => {
-    // jsdom has no ResizeObserver, and its canvas is "not implemented".
-    (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class { observe() {} disconnect() {} unobserve() {} };
-    HTMLCanvasElement.prototype.getContext = (() => null) as never;
-  });
-  afterEach(() => { document.body.innerHTML = ''; clearContextGraphLayoutMemo(); });
-
-  it('an unnamed pin node reads as its element on the map, and as the map on its element', () => {
-    // The graph only follows id-shaped values (looksLikeId).
-    const u = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-    const gMap = mk(u(1), 'map', 'Space Map');
-    const gPlace = mk(u(2), 'location', 'Feltropolis');
-    const gPin = mk(u(3), 'pin', '', { map_id: u(1), element_id: u(2), x: 1, y: 1 });
-    patchSlice('data', { elements: [gMap, gPlace, gPin] });
-    const labelOf = (subject: Element) => {
-      const host = document.createElement('div');
-      document.body.appendChild(host);
-      const h = mountContextGraph({ host, subject, onSelect: () => {}, hopDepth: 1 });
-      const text = host.querySelector(`[data-element-id="${u(3)}"] .atlas-context-graph-node-label`)?.textContent;
-      h.destroy();
-      return text;
-    };
-    expect(labelOf(gMap)).toBe('Feltropolis');
-    expect(labelOf(gPlace)).toBe('on Space Map');
-  });
-
-  it('an unnamed marker node prints no label, and its tooltip names its zone', () => {
-    const u = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-    const gMap = mk(u(1), 'map', 'Space Map');
-    const gZone = mk(u(4), 'zone', 'Crumblefields');
-    const gMarker = mk(u(5), 'marker', '', { map_id: u(1), zone_id: u(4), x: 1, y: 1 });
-    patchSlice('data', { elements: [gMap, gZone, gMarker] });
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const h = mountContextGraph({ host, subject: gMap, onSelect: () => {}, hopDepth: 1 });
-    const node = host.querySelector<HTMLElement>(`[data-element-id="${u(5)}"]`)!;
-    expect(node).toBeTruthy();
-    expect(node.querySelector('.atlas-context-graph-node-label')).toBeNull();
-    expect(node.title.split('\n')[0]).toBe('Marker of Crumblefields');
-    expect(host.textContent).not.toContain('(unknown)');
-    h.destroy();
   });
 });
 

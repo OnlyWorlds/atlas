@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.28.0',
+    date: '2026-10-10',
+    theme: 'places, not pins',
+    entries: [
+      {
+        id: 'web-places-and-zones',
+        title: 'A map\'s web shows places and zones',
+        body: 'The Web tab drew every pin and every marker as a dot of its own, so a map\'s web was a knot: Moppetopia\'s Space Map drew 73 dots, 67 of them pins and markers. A pin now shows as the place it marks, and a zone\'s markers as the zone, with how many in its tooltip. On a place\'s own web, its pin shows as the map it sits on.',
+        tags: ['context', 'maps'],
+      },
+    ],
+  },
+  {
     version: '1.27.1',
     date: '2026-10-10',
     theme: 'dollar signs',

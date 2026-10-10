@@ -30,7 +30,6 @@
 
 import { getState } from '../../core/state';
 import type { Element, ElementType, Marker, Pin } from '../../core/types';
-import { pinBacklink } from '../../core/spatial-backlinks';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { navigate, elementHash } from '../../core/router';
 import { getTierForNarrative } from '../../middle/writing-helpers';
@@ -302,6 +301,70 @@ export function collectIncomingNeighbors(targetId: string, elements: readonly El
   return Array.from(set);
 }
 
+/**
+ * The web's links, with pins and markers read as what they join (#185,
+ * conv. 138). A pin joins a map to the place it marks and a marker joins a map
+ * to its zone, so neither is drawn as a node of its own: each becomes a
+ * two-way link between its two ends, and a zone's markers become ONE link. The
+ * Space Map's web at depth 2 was 73 nodes, 67 of them pins and markers. A pin
+ * or marker missing either end links nothing (the lists under the web still
+ * name it), and a link INTO a pin or marker is dropped. The center keeps its
+ * own links when it is a pin or marker itself. Pure; built once per render.
+ */
+export interface WebLinks {
+  /** id → ids it links to. */
+  out: Map<string, Set<string>>;
+  /** id → ids that link to it. */
+  inc: Map<string, Set<string>>;
+  /** `${mapId}|${zoneId}` → how many markers draw that zone on that map. */
+  markerCounts: Map<string, number>;
+}
+
+const NO_LINKS: ReadonlySet<string> = new Set();
+
+function isSpatial(el: Element | undefined): boolean {
+  return el?.type === 'pin' || el?.type === 'marker';
+}
+
+export function buildWebLinks(elements: readonly Element[], centerId: string): WebLinks {
+  const byId = new Map<string, Element>();
+  for (const e of elements) byId.set(e.id, e);
+  const out = new Map<string, Set<string>>();
+  const inc = new Map<string, Set<string>>();
+  const markerCounts = new Map<string, number>();
+  const add = (from: string, to: string): void => {
+    if (from === to) return;
+    let o = out.get(from);
+    if (!o) { o = new Set(); out.set(from, o); }
+    o.add(to);
+    let i = inc.get(to);
+    if (!i) { i = new Set(); inc.set(to, i); }
+    i.add(from);
+  };
+  for (const el of elements) {
+    if (isSpatial(el) && el.id !== centerId) {
+      const mapId = (el as Pin | Marker).map_id;
+      const otherId = el.type === 'pin' ? (el as Pin).element_id : (el as Marker).zone_id;
+      const map = typeof mapId === 'string' ? byId.get(mapId) : undefined;
+      const other = typeof otherId === 'string' ? byId.get(otherId) : undefined;
+      if (!map || !other || isSpatial(map) || isSpatial(other) || map.id === other.id) continue;
+      add(map.id, other.id);
+      add(other.id, map.id);
+      if (el.type === 'marker') {
+        const key = `${map.id}|${other.id}`;
+        markerCounts.set(key, (markerCounts.get(key) ?? 0) + 1);
+      }
+      continue;
+    }
+    for (const t of collectDirectNeighbors(el)) {
+      const target = byId.get(t);
+      if (!target || (isSpatial(target) && t !== centerId)) continue;
+      add(el.id, t);
+    }
+  }
+  return { out, inc, markerCounts };
+}
+
 export function mountContextGraph(opts: GraphOpts): GraphHandle {
   const { host, subject, onSelect, onRender } = opts;
   host.innerHTML = '';
@@ -373,6 +436,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
   let lastNodes: SimNode[] = [];
   let lastEdges: SimEdge[] = [];
   let lastNeighborSets = new Map<string, Set<string>>();
+  let lastMarkerCounts = new Map<string, number>();
   let lastNodeEls = new Map<string, HTMLElement>();
   let lastCanvas: HTMLCanvasElement | null = null;
   let lastHighlightedId: string | null = null;
@@ -422,28 +486,29 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // subject links to (cast) plus everything that links to the subject
     // (backlinks). An element that is only ever pointed at, a regime named
     // by ten titles and three houses, used to draw an empty web.
-    const reverse = buildReverseIndex(elements);
-    const allCastIds = collectDirectNeighbors(centerEl).filter(id => byId.has(id));
+    // Pins and markers are read as the links they make (#185, conv. 138).
+    const links = buildWebLinks(elements, centerEl.id);
+    lastMarkerCounts = links.markerCounts;
+    const outOf = (id: string): ReadonlySet<string> => links.out.get(id) ?? NO_LINKS;
+    const allCastIds = Array.from(outOf(centerEl.id));
     const castSet = new Set(allCastIds);
-    const backlinkIds = Array.from(reverse.get(centerEl.id) ?? [])
-      .filter(id => id !== centerEl.id && byId.has(id) && !castSet.has(id));
+    const backlinkIds = Array.from(links.inc.get(centerEl.id) ?? [])
+      .filter(id => !castSet.has(id));
     const backlinkSet = new Set(backlinkIds);
     const ring1All = [...allCastIds, ...backlinkIds];
     const inAnyRing = new Set<string>([centerEl.id, ...ring1All]);
     // Outer rings walk the web undirected: a backlink's own links and
     // linkers are as much "one hop out" as a cast member's.
     const undirected = (id: string): string[] => {
-      const el = byId.get(id);
-      const out = el ? collectDirectNeighbors(el) : [];
-      const inc = reverse.get(id);
-      return inc ? [...out, ...inc] : out;
+      const inc = links.inc.get(id);
+      return inc ? [...outOf(id), ...inc] : Array.from(outOf(id));
     };
     const isHidden = (id: string): boolean => {
       const t = byId.get(id)?.type;
       return t ? currentHiddenTypes.has(t) : false;
     };
     // Ring 1 cap (S367 critic C3), applied AFTER the type filter so hiding
-    // the flood type (markers) lets the rest through. Scored like the outer
+    // a flood type lets the rest through. Scored like the outer
     // rings: edges back into the center and the ring itself; the stable sort
     // keeps cast ahead of backlinks on a tie. The left-out count feeds the
     // legend; the left-out ids stay in inAnyRing so they never pose as ring 2.
@@ -566,9 +631,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     const edges: SimEdge[] = [];
     const edgeByPair = new Map<string, SimEdge>();
     for (const id of visibleSet) {
-      const el = byId.get(id);
-      if (!el) continue;
-      for (const adj of collectDirectNeighbors(el)) {
+      for (const adj of outOf(id)) {
         if (!visibleSet.has(adj)) continue;
         const key = id < adj ? `${id}|${adj}` : `${adj}|${id}`;
         const existing = edgeByPair.get(key);
@@ -595,7 +658,24 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     if (memo && memo.length === nodes.length) {
       memo.forEach(([x, y], i) => { nodes[i].x = x; nodes[i].y = y; });
     } else {
-      runSim(nodes, edges, idToNode, biased, centerLabelSlotFor(centerEl.name || ''));
+      const centerName = centerEl.name || '';
+      runSim(nodes, edges, idToNode, biased, centerLabelSlotFor(centerName));
+      // The slot was sized for the usual scale; a wide web fits the pane
+      // smaller, and the box kept clear shrinks under the label (S389:
+      // Fluffington's label over Commander Vera at depth 2, 1440). Size it
+      // again from the fit this pane gives, and relax again. Never below
+      // the scale where the collision distance still keeps nodes apart: a
+      // bigger slot spreads the web, the fit drops, and nodes touch (41
+      // pairs at 1200 without the floor).
+      const rect = host.getBoundingClientRect();
+      const floor = NODE_DIAMETER / PARAMS.collisionMinDist;
+      let slotScale = SLOT_SCALE;
+      for (let i = 0; i < 3; i++) {
+        const fit = Math.max(floor, fitScale(nodes, rect.width || 320, rect.height || 240));
+        if (fit >= slotScale - 0.01) break;
+        slotScale = fit;
+        relaxLayout(nodes, centerLabelSlotFor(centerName, slotScale));
+      }
       simRuns++;
       layoutMemo.delete(memoKey);
       layoutMemo.set(memoKey, nodes.map(n => [n.x, n.y]));
@@ -673,9 +753,6 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     // DOM nodes.
     const nodeEls = new Map<string, HTMLElement>();
     const paintCenterId = nodes.find(c => c.isCenter)?.id ?? homeId;
-    let worldById: Map<string, Element> | null = null;
-    const elementsById = (): Map<string, Element> =>
-      (worldById ??= new Map(getState().data.elements.map(e => [e.id, e] as const)));
     for (const n of nodes) {
       const nodeEl = document.createElement('button');
       nodeEl.type = 'button';
@@ -691,30 +768,23 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       nodeEl.style.left = `${cx - dia / 2}px`;
       nodeEl.style.top = `${cy - dia / 2}px`;
       const iconName = n.el ? (ELEMENT_ICONS[n.el.type] ?? 'category') : 'edit_note';
-      // An unnamed pin reads as its other end, as in the lists under the
-      // graph (#171): its element on a map's web, its map on the element's.
-      const pinName = n.el?.type === 'pin' && !n.el.name?.trim() && !n.isCenter
-        ? pinBacklink(n.el as Pin, paintCenterId, elementsById()).label : '';
-      // An unnamed marker is a vertex of its zone's line, not a thing: it
-      // prints no label (the map's web drew forty "(unknown)"), and its
-      // tooltip names the zone.
-      const quietMarker = n.el?.type === 'marker' && !n.el.name?.trim() && !n.isCenter;
-      const markerZone = quietMarker
-        ? elementsById().get(String((n.el as Marker).zone_id ?? ''))?.name?.trim() : '';
-      const rawName = n.el?.name?.trim() || pinName
-        || (quietMarker ? (markerZone ? `Marker of ${markerZone}` : 'Marker') : '')
+      const rawName = n.el?.name?.trim()
         || (n.isCenter && n.id === homeId ? subject.name || '(home)' : '(unknown)');
       nodeEl.innerHTML =
         `<span class="material-symbols-outlined">${iconName}</span>` +
-        (quietMarker ? '' : `<span class="atlas-context-graph-node-label">${escapeText(rawName)}</span>`);
+        `<span class="atlas-context-graph-node-label">${escapeText(rawName)}</span>`;
       // Native browser tooltip — name + first ~200 chars of description so
       // the writer can peek at "what is this" without clicking.
       const desc = typeof n.el?.description === 'string' ? n.el.description.trim() : '';
       const descSnippet = desc.length > 200 ? desc.slice(0, 197) + '…' : desc;
       // A backlink's tooltip says so in words, for the reader who has not
-      // yet learned the muted ring + arrow (S354).
+      // yet learned the muted ring + arrow (S354). A zone beside its map
+      // says how many markers draw it there (#185: they are one line now).
       const centerName = nodes.find(c => c.isCenter)?.el?.name || 'this element';
-      const heading = n.isBacklink ? `${rawName}\nlinks to ${centerName}` : rawName;
+      const markers = n.isCenter ? 0
+        : lastMarkerCounts.get(`${paintCenterId}|${n.id}`) ?? lastMarkerCounts.get(`${n.id}|${paintCenterId}`) ?? 0;
+      const markerLine = markers ? `\n${markers} marker${markers === 1 ? '' : 's'} on the map` : '';
+      const heading = (n.isBacklink ? `${rawName}\nlinks to ${centerName}` : rawName) + markerLine;
       nodeEl.title = descSnippet ? `${heading}\n\n${descSnippet}` : heading;
 
       nodeEl.addEventListener('click', (e) => {
@@ -778,8 +848,8 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     for (const n of lastNodes) {
       const el = lastNodeEls.get(n.id);
       if (!el || el.style.display === 'none') continue;
-      // A node with no label (an unnamed marker, #171) is still an obstacle:
-      // it goes in with no size, so others keep off its circle.
+      // A node with no label is still an obstacle: it goes in with no size,
+      // so others keep off its circle.
       const label = el.querySelector<HTMLElement>('.atlas-context-graph-node-label');
       const dia = diameterFor(n);
       const degree = (lastNeighborSets.get(n.id)?.size ?? 1) - 1;
@@ -811,20 +881,11 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
   function computeProjection(nodes: SimNode[], target: HTMLElement): {
     offsetX: number; offsetY: number; scale: number; hostW: number; hostH: number;
   } {
-    let minX = -100, maxX = 100, minY = -100, maxY = 100;
-    for (const n of nodes) {
-      if (n.x < minX) minX = n.x;
-      if (n.x > maxX) maxX = n.x;
-      if (n.y < minY) minY = n.y;
-      if (n.y > maxY) maxY = n.y;
-    }
-    const padding = 50;
-    const layoutW = (maxX - minX) + padding * 2;
-    const layoutH = (maxY - minY) + padding * 2;
+    const { minX, maxX, minY, maxY } = layoutBounds(nodes);
     const rect = target.getBoundingClientRect();
     const hostW = rect.width || 320;
     const hostH = rect.height || 240;
-    const scale = Math.min(hostW / layoutW, hostH / layoutH, 1.4);
+    const scale = fitScale(nodes, hostW, hostH);
     const offsetX = hostW / 2 - ((minX + maxX) / 2) * scale;
     const offsetY = hostH / 2 - ((minY + maxY) / 2) * scale;
     return { offsetX, offsetY, scale, hostW, hostH };
@@ -1423,7 +1484,13 @@ function runSim(
       n.y += n.vy;
     }
   }
-  // Collision relaxation post-sim.
+  relaxLayout(nodes, centerLabelSlot);
+}
+
+/** Collision relaxation post-sim, and the subject's label slot kept clear. */
+function relaxLayout(
+  nodes: SimNode[], centerLabelSlot: { halfW: number; top: number; bottom: number } | null,
+): void {
   for (let pass = 0; pass < PARAMS.collisionPasses; pass++) {
     let moved = false;
     for (let a = 0; a < nodes.length; a++) {
@@ -1463,16 +1530,37 @@ function runSim(
   }
 }
 
+/** The scale a pane usually draws at; the slot is sized for it first. */
+const SLOT_SCALE = 0.75;
+
 /**
  * The center label's slot in sim units: the label's pixel size over the
- * scale a pane usually draws at (about 0.75), from its name's length. An
- * estimate on purpose: the label pass measures the real ink afterwards.
+ * scale the pane draws at, from its name's length. An estimate on purpose:
+ * the label pass measures the real ink afterwards.
  */
-function centerLabelSlotFor(name: string): { halfW: number; top: number; bottom: number } {
-  const SCALE = 0.75;
+function centerLabelSlotFor(name: string, scale = SLOT_SCALE): { halfW: number; top: number; bottom: number } {
   const halfPx = (name.length * 6) / 2 + 4;
   const topPx = CENTER_NODE_DIAMETER / 2 + 2;
-  return { halfW: halfPx / SCALE, top: topPx / SCALE, bottom: (topPx + 14) / SCALE };
+  return { halfW: halfPx / scale, top: topPx / scale, bottom: (topPx + 14) / scale };
+}
+
+/** A layout's bounds in sim units, never smaller than the center's 200 x 200. */
+function layoutBounds(nodes: readonly SimNode[]): { minX: number; maxX: number; minY: number; maxY: number } {
+  let minX = -100, maxX = 100, minY = -100, maxY = 100;
+  for (const n of nodes) {
+    if (n.x < minX) minX = n.x;
+    if (n.x > maxX) maxX = n.x;
+    if (n.y < minY) minY = n.y;
+    if (n.y > maxY) maxY = n.y;
+  }
+  return { minX, maxX, minY, maxY };
+}
+
+/** The fit-to-pane scale for a layout: the base projection's, before any zoom. */
+function fitScale(nodes: readonly SimNode[], hostW: number, hostH: number): number {
+  const { minX, maxX, minY, maxY } = layoutBounds(nodes);
+  const padding = 50;
+  return Math.min(hostW / ((maxX - minX) + padding * 2), hostH / ((maxY - minY) + padding * 2), 1.4);
 }
 
 /**
