@@ -44,6 +44,7 @@ import type { WorldMap } from './core/types';
 import { installLiveFolder } from './core/live-folder';
 import { installWorldPrefsSync } from './core/world-prefs';
 import { captureJoinCode, hasPendingJoin } from './core/join-capture';
+import { installForgetPresence } from './setup/forget-browser';
 
 export interface AppHandle {
   shell: AppShell;
@@ -178,6 +179,10 @@ export function startApp(container: HTMLElement): AppHandle {
   const uninstallLiveFolder = installLiveFolder();
   // The world's notes, cast, calendar lens and writing labels travel in its folder (S364).
   const uninstallWorldPrefs = installWorldPrefsSync();
+  // Fully forget (#140): this tab answers another tab's roll call, and
+  // reloads when another tab has forgotten, so its memory never writes the
+  // list of worlds back.
+  const uninstallForgetPresence = installForgetPresence();
 
   // Middle pane — routed by hash mode + active world.
   let unmountMiddle: (() => void) | null = null;
@@ -352,6 +357,7 @@ export function startApp(container: HTMLElement): AppHandle {
       unsubContextTab();
       uninstallLiveFolder();
       uninstallWorldPrefs();
+      uninstallForgetPresence();
       unsubHash();
       unsubState();
       unmountMiddle?.();

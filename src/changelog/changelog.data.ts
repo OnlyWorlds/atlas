@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.24',
+    date: '2026-10-10',
+    theme: 'a clean slate',
+    entries: [
+      {
+        id: 'forget-browser',
+        title: 'Forget everything in this browser',
+        body: 'Settings, Storage has a button that removes everything Atlas keeps in this browser: the worlds kept here, your PIN and sign-in, the folders it remembers and every setting. It names any world that exists only here before you confirm, and asks you to type forget. Folders on your drive and worlds on onlyworlds.com stay. Afterwards Atlas opens as on a first visit.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.23',
     date: '2026-10-10',
     theme: 'a picture of its own',

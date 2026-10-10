@@ -157,6 +157,7 @@ The guided tour (DESIGN_TOUR).
 - `src/setup/world-doors.ts`: THE WORLD DOORS (conv. 114): open a picked world in place; `ensureAtlasRoot`; `runAddWorldAction`.
 - `src/setup/world-parent.ts`: where a new world goes (1.17): `defaultWorldWhere`, the persist ask, the where captions.
 - `src/setup/browser-world-delete.ts`: Delete for a browser world (1.17, conv. 129): close first, remove, then drop the entry; a failure keeps both.
+- `src/setup/forget-browser.ts`: FULLY FORGET (1.24, #140, conv. 133): `forgetInventory` (what the confirm screen names), the tab roll call (`otherAtlasTabs`, `installForgetPresence`), `forgetEverything` (browser storage first, its worlds' home last, then the vault and both storages, then a reload); the screen is `src/ui/forget-browser-modal.ts`.
 - `src/setup/browser-world-move.ts`: Move to a folder (1.17, conv. 129): the registry journal, the moving lock, copy and verify, the one-save commit, the browser copy removed; `recoverBrowserMove` finishes a crashed move at boot and at open.
 - `src/setup/world-download.ts`: the download: `pickSaveTarget`, `downloadWorld` (push then hold for a linked world, two walks, `kept_download_at`).
 - `src/setup/world-file-open.ts`: open a world file: a new browser world through the make protocol (`chooseWhere` asked for a new world only, before any write), the same world refused, a cleared one restored under its own entry (`api` back from the registry, `review_first_sync`).

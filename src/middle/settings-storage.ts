@@ -64,6 +64,7 @@ export function renderStorageTab(reg: WorldsRegistry): string {
   return `
     ${renderStorageDeviceSection()}
     ${renderSyncTab(reg)}
+    ${renderForgetSection()}
   `;
 }
 
@@ -71,6 +72,21 @@ export function wireStorageTab(toasts: ToastManager): void {
   wireStorageDeviceActions(toasts);
   wireBrowserStorageSection();
   wireSyncTab(toasts);
+  document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="forget-browser"]')?.addEventListener('click', () => {
+    void import('../ui/forget-browser-modal').then(m => new m.ForgetBrowserModal().open());
+  });
+}
+
+// ---- Fully forget (#140) ----
+
+function renderForgetSection(): string {
+  return `
+    <section class="atlas-settings-section" data-role="forget-browser">
+      <h3>Start over in this browser</h3>
+      <p class="atlas-settings-hint">Removes everything Atlas keeps in this browser: the worlds kept here, your PIN and sign-in, the folders it remembers and every setting. Folders on your drive and worlds on onlyworlds.com stay.</p>
+      <button class="atlas-btn-ghost" data-action="forget-browser">Forget everything in this browser</button>
+    </section>
+  `;
 }
 
 // ---- On this device (atlas root) ----
