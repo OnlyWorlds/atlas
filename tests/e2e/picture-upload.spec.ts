@@ -157,5 +157,7 @@ test('an uploaded picture of this world can be removed: asked first, then the im
     return el?.image_url ?? null;
   }, CHAR_ID)).toBeNull();
   await expect(remove).toHaveCount(0);
+  // The clear reaches OnlyWorlds: a push that sends the image URL as empty.
+  await expect.poll(() => seen.patches.some(p => 'image_url' in p && !p.image_url), { timeout: 15_000 }).toBe(true);
   expect(seen.tickets).toEqual([]); // nothing was uploaded on the way
 });

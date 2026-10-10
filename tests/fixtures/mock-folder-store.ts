@@ -27,7 +27,7 @@ import type {
 } from '../../src/core/types';
 import type { ChartConfig } from '../../src/visualization/timeline/types';
 import { EMPTY_STYLES, type WorldStyles } from '../../src/core/world-styles';
-import { stampedBody } from '../../src/store/sync-stamp';
+import { stampedBody, editStamp } from '../../src/store/sync-stamp';
 import { scrubReferrers } from '../../src/store/scrub-links';
 import { CorruptFileError } from '../../src/store/fs-utils';
 import { withoutSeatSecret } from '../../src/core/seat';
@@ -176,7 +176,7 @@ export class MockFolderStore implements FolderStore {
         ...patch,
         id: existing.id,
         type: existing.type,
-        local_updated_at: this.clock(),
+        local_updated_at: editStamp(this.clock(), patch.server_updated_at ?? existing.server_updated_at),
         server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
       };
       this.elements.set(id, next);
@@ -198,7 +198,7 @@ export class MockFolderStore implements FolderStore {
         ...patch,
         id: existing.id,
         type: existing.type,
-        local_updated_at: this.clock(),
+        local_updated_at: editStamp(this.clock(), patch.server_updated_at ?? existing.server_updated_at),
         // Preserve server_updated_at unless patch explicitly sets it.
         server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
       };

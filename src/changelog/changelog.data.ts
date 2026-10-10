@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.26.1',
+    date: '2026-10-10',
+    theme: 'no edit left behind',
+    entries: [
+      {
+        id: 'edit-after-sync-clock',
+        title: 'An edit made just after a sync now always uploads',
+        body: 'When this computer\'s clock ran a little behind OnlyWorlds, a change made in the seconds after a sync could look older than the copy on the server, and Atlas kept it here without uploading it. Every change now counts as newer than the last sync, whatever the clock says.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.26',
     date: '2026-10-10',
     theme: 'and take it back',

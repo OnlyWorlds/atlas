@@ -101,7 +101,7 @@ interface LayoutScan {
   unreadableLc: Set<string>;
 }
 import { PerIdWriteChain } from './write-chain';
-import { stampedBody } from './sync-stamp';
+import { stampedBody, editStamp } from './sync-stamp';
 import { scrubReferrers } from './scrub-links';
 import { withoutSeatSecret } from '../core/seat';
 import {
@@ -1700,7 +1700,8 @@ export class FsFolderStore implements FolderStore {
       ...patch,
       id: existing.id,
       type: existing.type,
-      local_updated_at: this.clock(),
+      // An edit sorts past the baseline it was made on, whatever this clock says (S387).
+      local_updated_at: editStamp(this.clock(), patch.server_updated_at ?? existing.server_updated_at),
       server_updated_at: patch.server_updated_at ?? existing.server_updated_at,
     };
     await this.writeElementAndRename(existing.type, existing.id, next, existing.name);
