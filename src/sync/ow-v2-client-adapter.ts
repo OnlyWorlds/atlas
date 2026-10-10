@@ -43,6 +43,17 @@ type ServerRecord = { id: string; updated_at: string } & Record<string, unknown>
 
 export const DEFAULT_V2_BASE = 'https://www.onlyworlds.com/api/v2';
 
+/** keel's media ticket (keel `media/api.py`): spend it once at `upload_url` before `exp`. */
+export interface MediaTicket {
+  ticket: string;
+  upload_url: string;
+  /** The object key must start with this (`u/<world>/`); the edge names it when no key is sent. */
+  prefix: string;
+  /** 15 MiB, or what the account has left. */
+  max_bytes: number;
+  exp: number;
+}
+
 /**
  * Typed error for every non-2xx v2 response. Fields mirror the server's error
  * envelope. `message` is prefixed "API Error <status>:" so legacy substring
@@ -267,6 +278,19 @@ export class OwV2ClientAdapter implements OwApiClient {
     } catch {
       throw new Error(`v2 response was not JSON (${method} ${path}): ${text.slice(0, 120)}`);
     }
+  }
+
+  /**
+   * POST /media/ticket (Keel #59, Atlas #154): a one-use, short-lived ticket
+   * to put one image on the media edge for this world. Write scope: a read
+   * key gets 403. The bytes never pass through keel (`sync/media-upload.ts`).
+   */
+  async createMediaTicket(): Promise<MediaTicket> {
+    const r = await this.request('POST', '/media/ticket') as Partial<MediaTicket> | undefined;
+    if (!r || typeof r.ticket !== 'string' || typeof r.upload_url !== 'string' || typeof r.max_bytes !== 'number') {
+      throw new Error('media ticket: the reply was missing the ticket, upload_url or max_bytes');
+    }
+    return r as MediaTicket;
   }
 
   /**

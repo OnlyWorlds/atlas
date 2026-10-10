@@ -26,6 +26,7 @@ import { isTourFlagActive } from '../tour/tour-flag';
 import { buildZoneSections } from './element-detail-zone-sections';
 import { buildCustomFieldsSection } from './element-detail-custom-fields';
 import { buildMapLocalImageRow } from './element-detail-map-image';
+import { buildPictureUploadRow, pictureWorld } from './element-detail-picture';
 import { renderReferencedBy } from './element-detail-refs';
 import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
@@ -222,6 +223,16 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // (folder-stored file as map background; session 253).
     if (el.type === 'map') {
       const row = buildMapLocalImageRow(el as import('../core/types').WorldMap, toastManager);
+      const urlRow = detail.querySelector('[data-field="image_url"]');
+      if (urlRow) urlRow.insertAdjacentElement('afterend', row);
+      else detail.querySelector('.atlas-detail-section-body')?.appendChild(row);
+    }
+
+    // "Upload picture" (#154): under the image_url row, only in an online
+    // world this browser can write to (a local world has no host for it).
+    const pictureEntry = pictureWorld();
+    if (pictureEntry && !isTourFlagActive()) {
+      const row = buildPictureUploadRow(el, pictureEntry, toastManager);
       const urlRow = detail.querySelector('[data-field="image_url"]');
       if (urlRow) urlRow.insertAdjacentElement('afterend', row);
       else detail.querySelector('.atlas-detail-section-body')?.appendChild(row);

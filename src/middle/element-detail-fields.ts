@@ -615,7 +615,7 @@ export const WORLD_NOT_OPEN = 'This world is not open. Open it from the sidebar,
 const latestFieldSave = new Map<string, number>();
 let fieldSaveSeq = 0;
 
-async function persistFieldPatch(el: Element, fieldName: string, nextValue: unknown): Promise<void> {
+export async function persistFieldPatch(el: Element, fieldName: string, nextValue: unknown): Promise<void> {
   const saveKey = `${el.id}|${fieldName}`;
   const seq = ++fieldSaveSeq;
   latestFieldSave.set(saveKey, seq);

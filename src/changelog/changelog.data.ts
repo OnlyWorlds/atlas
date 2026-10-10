@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.23',
+    date: '2026-10-10',
+    theme: 'a picture of its own',
+    entries: [
+      {
+        id: 'upload-picture',
+        title: 'Upload a picture for an element',
+        body: 'In a world that is online, an element has an Upload picture row under its image URL. Choose a WebP, PNG, JPEG or AVIF file and Atlas puts it on OnlyWorlds and sets it as the image URL, so it shows on the element here and on onlyworlds.com. Anyone with its link can see an uploaded picture, even in a private world.',
+        tags: ['world', 'sync'],
+      },
+    ],
+  },
+  {
     version: '1.22.1',
     date: '2026-10-10',
     theme: 'the file as it is',

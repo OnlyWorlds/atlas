@@ -65,6 +65,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/sync/sync-failure-copy.ts`: what a failed sync SAYS (foreign ids, 64 KB, held files; push vs pull side); once per set per session.
 - `src/sync/sync-issues.ts`: NOT SYNCING (conv. 126): per world, session only, replaced per side; Settings › This world + the pill's warning count.
 - `src/sync/ow-v2-client-adapter.ts`: the keel v2 dialect, a thin fetch (no SDK in the sync path); spatial disk rename (`map_id`/`map`); strips `ATLAS_LOCAL_ONLY_FIELDS` (WIRE extensions are sent); lists walk `?cursor=`. Wire facts: DESIGN_SYNC "The shape".
+- `src/sync/media-upload.ts`: PICTURES (#154): `uploadPicture`, a keel ticket (`OwV2ClientAdapter.createMediaTicket`, the world's own PIN) then the bytes to the media edge with only the ticket; keel's and the edge's refusals worded.
 - `src/sync/make-online.ts`: Route 1 (`createApiWorld` + pushOnce) + Route 2 (`mergeLocalIntoApi`: plan, re-key kernel, server phase; conv. 122).
 - `src/sync/plan-merge.ts`: `planMerge`: pure, per type, ids first then unique names; ambiguous names skipped and reported.
 - `src/sync/make-online-run.ts`: the Route 2 runner: id-move lock, inert, flush, retry-as-recovery, link inside the lock.
@@ -92,7 +93,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 
 ## src/middle
 
-- `src/middle/element-detail.ts`: the schema-driven editor; widget-aware empty placeholders. Its concerns split into `src/middle/element-detail-header.ts`, `src/middle/element-detail-fields.ts` (`linkIdsOf` reads {id} objects and a lone id string), `src/middle/element-detail-refs.ts`, `src/middle/element-detail-zone-sections.ts`, `src/middle/element-detail-custom-fields.ts`, `src/middle/element-detail-map-image.ts` (a map's Local image row).
+- `src/middle/element-detail.ts`: the schema-driven editor; widget-aware empty placeholders. Its concerns split into `src/middle/element-detail-header.ts`, `src/middle/element-detail-fields.ts` (`linkIdsOf` reads {id} objects and a lone id string), `src/middle/element-detail-refs.ts`, `src/middle/element-detail-zone-sections.ts`, `src/middle/element-detail-custom-fields.ts`, `src/middle/element-detail-map-image.ts` (a map's Local image row), `src/middle/element-detail-picture.ts` (Upload picture, #154: online worlds only).
 - `src/middle/editable-title.ts`: `makeEditableTitle`, the shared click-to-edit entity title (conv. 80).
 - `src/middle/settings-panel.ts`: the orchestrator over per-tab modules: `src/middle/settings-general.ts`, `src/middle/settings-onlyworlds.ts`, `src/middle/settings-storage.ts`, `src/middle/settings-elements.ts`, `src/middle/settings-maps.ts`, `src/middle/settings-world.ts`, `src/middle/settings-writing.ts`, `src/middle/settings-context.ts` (tab id 'context' is LABELED "Web").
 - `src/middle/writing-workspace.ts`: the TipTap prose editor + its `writing-workspace-*` concern modules (DESIGN_WRITING).
