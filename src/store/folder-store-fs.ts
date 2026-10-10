@@ -886,18 +886,28 @@ export class FsFolderStore implements FolderStore {
           await this.writeChain.run(id, async () => {
             if (!this.root) return;
             const entry = this.fileIndex.get(id);
-            const body = this.bodyCache.get(id);
-            if (!entry || entry.type !== type || entry.layout !== layout || !body) return; // deleted or re-homed meanwhile
+            const cached = this.bodyCache.get(id);
+            if (!entry || entry.type !== type || entry.layout !== layout || !cached) return; // deleted or re-homed meanwhile
             const filename = entry.filename;
-            const short = elementFilename(id, body.name);
-            const fullForm = elementFilenameFullId(id, body.name);
-            const target = isFree(short, id) ? short
-              : sameFsName(filename, fullForm) || isFree(fullForm, id) ? fullForm
-              : filename; // both forms taken (pathological) — leave it alone
-            if (sameFsName(filename, target)) {
-              occupied.set(filename.toLowerCase(), id);
-              return;
-            }
+            const targetFor = (name: unknown): string => {
+              const short = elementFilename(id, name as string);
+              const fullForm = elementFilenameFullId(id, name as string);
+              return isFree(short, id) ? short
+                : sameFsName(filename, fullForm) || isFree(fullForm, id) ? fullForm
+                : filename; // both forms taken (pathological) — leave it alone
+            };
+            const settled = () => { occupied.set(filename.toLowerCase(), id); };
+            if (sameFsName(filename, targetFor(cached.name))) { settled(); return; }
+            // A rename writes, so its body comes from DISK like every other
+            // write (#89, conv. 92): the cache is the scan's copy, and an
+            // outside edit since then would be written over and its file
+            // removed. Only a file being renamed is read, so the deferred
+            // open stays cheap. A file that will not parse throws here and
+            // is left as it is (conv. 99).
+            const body = await this.readForWrite(id);
+            if (!body) return;
+            const target = targetFor(body.name);
+            if (sameFsName(filename, target)) { settled(); return; }
             // Distinct entries by construction (target is free, lc-equality
             // excluded), so write-new + remove-old cannot self-delete on a
             // case-folding filesystem.

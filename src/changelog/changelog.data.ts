@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.22.1',
+    date: '2026-10-10',
+    theme: 'the file as it is',
+    entries: [
+      {
+        id: 'tidy-reads-disk',
+        title: 'Renaming a file keeps an outside edit',
+        body: 'When a world opens, Atlas gives hand-named element files their standard name in the background. It now reads each file just before renaming it, so an edit another program made a moment earlier is kept, and a file with unresolved git conflict marks is left where it is.',
+        tags: ['world'],
+      },
+    ],
+  },
+  {
     version: '1.22',
     date: '2026-10-10',
     theme: 'a seat of its own',
