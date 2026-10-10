@@ -34,6 +34,7 @@ import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { navigate, elementHash } from '../../core/router';
 import { getTierForNarrative } from '../../middle/writing-helpers';
 import { escapeText } from '../../core/dom-utils';
+import { placeGraphLabels, GRAPH_LABEL_SIDES, type GraphLabelItem } from './graph-labels';
 
 export interface GraphHandle {
   /** Visually emphasize a node (or clear highlight when id is null). */
@@ -112,8 +113,9 @@ const PARAMS = {
   rest: 150,
   damping: 0.85,
   iters: 500,
-  collisionPasses: 8,
-  collisionMinDist: 56,
+  collisionPasses: 16,
+  collisionMinDist: 64,
+  maxStep: 20,
   /**
    * Hemisphere bias for ring 1 (S354): a constant downward push on backlink
    * nodes and an equal upward push on the subject's own links, so the two
@@ -126,14 +128,6 @@ const PARAMS = {
 
 const NODE_DIAMETER = 36;
 
-/**
- * Max node labels rendered at once. Above this, the label pass keeps the
- * highest-priority labels (center + selection + most-connected) and hides the
- * rest to stop a dense scene from becoming a label-colliding hairball (T-CX2);
- * hidden labels reveal on hover via CSS. Ported idea, not code, from the charts
- * label-priority pass.
- */
-const LABEL_BUDGET = 14;
 /**
  * The center node renders larger (CSS .is-center). The diameter used here
  * MUST match the CSS width/height or the node will sit off-center relative
@@ -167,6 +161,13 @@ const layoutMemo = new Map<string, Array<[number, number]>>();
 let simRuns = 0;
 /** Test seam: how many times the physics sim has actually run. */
 export function contextGraphSimRuns(): number { return simRuns; }
+let lastLayout: Array<{ id: string; x: number; y: number; isCenter: boolean }> = [];
+/** Test seam: the last laid-out nodes, in sim units (the center at 0,0). */
+export function contextGraphLastLayout(): ReadonlyArray<{ id: string; x: number; y: number; isCenter: boolean }> { return lastLayout; }
+/** Test seam: the sim's collision distance and the center label slot it keeps clear. */
+export function contextGraphLayoutRules(centerName: string): { minDist: number; slot: { halfW: number; top: number; bottom: number } } {
+  return { minDist: PARAMS.collisionMinDist, slot: centerLabelSlotFor(centerName) };
+}
 /** Test seam: forget memoised layouts. */
 export function clearContextGraphLayoutMemo(): void { layoutMemo.clear(); }
 
@@ -593,12 +594,13 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     if (memo && memo.length === nodes.length) {
       memo.forEach(([x, y], i) => { nodes[i].x = x; nodes[i].y = y; });
     } else {
-      runSim(nodes, edges, idToNode, biased);
+      runSim(nodes, edges, idToNode, biased, centerLabelSlotFor(centerEl.name || ''));
       simRuns++;
       layoutMemo.delete(memoKey);
       layoutMemo.set(memoKey, nodes.map(n => [n.x, n.y]));
       if (layoutMemo.size > LAYOUT_MEMO_MAX) layoutMemo.delete(layoutMemo.keys().next().value!);
     }
+    lastLayout = nodes.map(n => ({ id: n.id, x: n.x, y: n.y, isCenter: n.isCenter }));
 
     // Compute per-node neighbor sets for hover-fade.
     const neighborSets = new Map<string, Set<string>>();
@@ -742,36 +744,45 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     }
 
     lastNodeEls = nodeEls;
-    applyLabelBudget(nodeEls, nodes, neighborSets);
+    lastNodes = nodes;
+    lastNeighborSets = neighborSets;
+    applyLabelPlacement();
   }
 
   /**
-   * Label-priority pass (T-CX2). On dense graphs, keep only the highest-value
-   * labels visible: the anchor (center) and the currently-selected node always
-   * win; the remaining budget fills by degree (most-connected first). Everyone
-   * else hides their label (CSS reveals it on hover). No-op under the budget.
+   * The label pass (#141, S387; it replaced T-CX2's count budget, which hid by
+   * degree alone and still let fourteen labels print over each other in a
+   * busy ring). Every label takes the first clear side of its node or waits
+   * for hover (`graph-labels.ts`). Priority: the center, then the selection,
+   * then the most connected. Runs on every paint, because a zoom, a pan or a
+   * resize moves the nodes under the labels.
    */
-  function applyLabelBudget(
-    nodeEls: Map<string, HTMLElement>,
-    nodes: SimNode[],
-    neighborSets: Map<string, Set<string>>,
-  ): void {
-    if (nodes.length <= LABEL_BUDGET) {
-      for (const el of nodeEls.values()) el.classList.remove('is-label-hidden');
-      return;
+  function applyLabelPlacement(): void {
+    const items: GraphLabelItem[] = [];
+    for (const n of lastNodes) {
+      const el = lastNodeEls.get(n.id);
+      if (!el || el.style.display === 'none') continue;
+      const label = el.querySelector<HTMLElement>('.atlas-context-graph-node-label');
+      if (!label) continue;
+      const dia = diameterFor(n);
+      const degree = (lastNeighborSets.get(n.id)?.size ?? 1) - 1;
+      items.push({
+        id: n.id,
+        cx: parseFloat(el.style.left) + dia / 2,
+        cy: parseFloat(el.style.top) + dia / 2,
+        r: dia / 2,
+        w: label.offsetWidth,
+        h: label.offsetHeight,
+        priority: n.isCenter ? 1e6 : n.id === lastHighlightedId ? 1e5 : degree,
+        always: n.isCenter || n.id === lastHighlightedId,
+      });
     }
-    const alwaysShow = new Set<string>();
-    for (const n of nodes) if (n.isCenter) alwaysShow.add(n.id);
-    if (lastHighlightedId) alwaysShow.add(lastHighlightedId);
-    const slots = Math.max(0, LABEL_BUDGET - alwaysShow.size);
-    const ranked = nodes
-      .filter(n => !alwaysShow.has(n.id))
-      .map(n => ({ id: n.id, degree: (neighborSets.get(n.id)?.size ?? 1) - 1 }))
-      .sort((a, b) => b.degree - a.degree);
-    const show = new Set<string>(alwaysShow);
-    for (let i = 0; i < ranked.length && i < slots; i++) show.add(ranked[i].id);
-    for (const [id, el] of nodeEls) {
-      el.classList.toggle('is-label-hidden', !show.has(id));
+    const rect = host.getBoundingClientRect();
+    const sides = placeGraphLabels(items, { w: rect.width, h: rect.height });
+    for (const [id, el] of lastNodeEls) {
+      const side = sides.get(id);
+      el.classList.toggle('is-label-hidden', side === null);
+      for (const s of GRAPH_LABEL_SIDES) el.classList.toggle(`is-label-${s}`, side === s && s !== 'below');
     }
   }
 
@@ -961,6 +972,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       el.style.left = `${cx - dia / 2}px`;
       el.style.top = `${cy - dia / 2}px`;
     }
+    applyLabelPlacement();
     ensureFitButton();
   }
 
@@ -1283,6 +1295,7 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     highlight(elementId: string | null): void {
       lastHighlightedId = elementId;
       applyHighlightTo(lastNodeEls, elementId);
+      applyLabelPlacement();
     },
     goBack(): boolean {
       if (centerStack.length === 0) return false;
@@ -1342,7 +1355,10 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
   };
 }
 
-function runSim(nodes: SimNode[], edges: SimEdge[], idToNode: Map<string, SimNode>, hemisphereBias = false): void {
+function runSim(
+  nodes: SimNode[], edges: SimEdge[], idToNode: Map<string, SimNode>, hemisphereBias = false,
+  centerLabelSlot: { halfW: number; top: number; bottom: number } | null = null,
+): void {
   for (let iter = 0; iter < PARAMS.iters; iter++) {
     for (let a = 0; a < nodes.length; a++) {
       for (let b = a + 1; b < nodes.length; b++) {
@@ -1384,6 +1400,8 @@ function runSim(nodes: SimNode[], edges: SimEdge[], idToNode: Map<string, SimNod
       if (n.isCenter) continue;
       n.vx *= PARAMS.damping;
       n.vy *= PARAMS.damping;
+      const speed = Math.hypot(n.vx, n.vy);
+      if (speed > PARAMS.maxStep) { n.vx *= PARAMS.maxStep / speed; n.vy *= PARAMS.maxStep / speed; }
       n.x += n.vx;
       n.y += n.vy;
     }
@@ -1407,8 +1425,37 @@ function runSim(nodes: SimNode[], edges: SimEdge[], idToNode: Map<string, SimNod
         moved = true;
       }
     }
+    // The subject's label slot (#141): a box under the center, sized from
+    // its name, that no node may sit in, so the one label that always
+    // prints has a clear place to print.
+    if (centerLabelSlot) {
+      const r = PARAMS.collisionMinDist / 2;
+      const { halfW, top, bottom } = centerLabelSlot;
+      for (const n of nodes) {
+        if (n.isCenter) continue;
+        if (n.x + r <= -halfW || n.x - r >= halfW || n.y + r <= top || n.y - r >= bottom) continue;
+        const toLeft = -halfW - r - n.x;
+        const toRight = halfW + r - n.x;
+        const toBelow = bottom + r - n.y;
+        const dx = Math.abs(toLeft) < Math.abs(toRight) ? toLeft : toRight;
+        if (Math.abs(dx) < toBelow) n.x += dx; else n.y += toBelow;
+        moved = true;
+      }
+    }
     if (!moved) break;
   }
+}
+
+/**
+ * The center label's slot in sim units: the label's pixel size over the
+ * scale a pane usually draws at (about 0.75), from its name's length. An
+ * estimate on purpose: the label pass measures the real ink afterwards.
+ */
+function centerLabelSlotFor(name: string): { halfW: number; top: number; bottom: number } {
+  const SCALE = 0.75;
+  const halfPx = (name.length * 6) / 2 + 4;
+  const topPx = CENTER_NODE_DIAMETER / 2 + 2;
+  return { halfW: halfPx / SCALE, top: topPx / SCALE, bottom: (topPx + 14) / SCALE };
 }
 
 /**

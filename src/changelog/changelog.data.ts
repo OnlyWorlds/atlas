@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.24.1',
+    date: '2026-10-10',
+    theme: 'room to read',
+    entries: [
+      {
+        id: 'web-tab-knot',
+        title: 'A busy element\'s web no longer knots',
+        body: 'An element with many links drew its neighbours in one pile with their names printed over each other. The web now spreads them out, and each name takes the first free side of its circle or shows when you point at it, so no name covers another.',
+        tags: ['context', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.24',
     date: '2026-10-10',
     theme: 'a clean slate',

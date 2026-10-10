@@ -13489,8 +13489,50 @@ a.atlas-share-map-pin { cursor: pointer; }
   color: var(--atlas-cyan);
   opacity: 1;
 }
-/* Label-budget pass (T-CX2): on dense graphs, lower-priority labels hide to
-   avoid a colliding hairball; hover brings the label back. */
+/* The label pass (#141, graph-labels.ts): a label takes the first clear side
+   of its node, below (the default above) or one of these; with no clear side
+   it hides and hover brings it back. The offsets MUST match labelBoxFor. */
+.atlas-context-graph-node.is-label-above .atlas-context-graph-node-label {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 2px;
+}
+.atlas-context-graph-node.is-label-right .atlas-context-graph-node-label,
+.atlas-context-graph-node.is-label-left .atlas-context-graph-node-label {
+  top: 50%;
+  margin-top: 0;
+  transform: translateY(-50%);
+}
+.atlas-context-graph-node.is-label-right .atlas-context-graph-node-label {
+  left: 100%;
+  margin-left: 4px;
+}
+.atlas-context-graph-node.is-label-left .atlas-context-graph-node-label {
+  left: auto;
+  right: 100%;
+  margin-right: 4px;
+}
+/* Corners: the label's near corner on the circle's 45-degree point
+   (r * 0.75 from the centre on each axis, just outside the rim). */
+.atlas-context-graph-node.is-label-below-right .atlas-context-graph-node-label,
+.atlas-context-graph-node.is-label-below-left .atlas-context-graph-node-label,
+.atlas-context-graph-node.is-label-above-right .atlas-context-graph-node-label,
+.atlas-context-graph-node.is-label-above-left .atlas-context-graph-node-label {
+  margin: 0;
+  transform: none;
+}
+.atlas-context-graph-node.is-label-below-right .atlas-context-graph-node-label { top: 87.5%; left: 87.5%; }
+.atlas-context-graph-node.is-label-below-left .atlas-context-graph-node-label { top: 87.5%; left: auto; right: 87.5%; }
+.atlas-context-graph-node.is-label-above-right .atlas-context-graph-node-label { top: auto; bottom: 87.5%; left: 87.5%; }
+.atlas-context-graph-node.is-label-above-left .atlas-context-graph-node-label { top: auto; bottom: 87.5%; left: auto; right: 87.5%; }
+/* A hidden label shown by hover sits over its neighbours for a moment:
+   it gets the node's z-index (hover) and a floor so it reads. */
+.atlas-context-graph-node.is-label-hidden:hover .atlas-context-graph-node-label {
+  background: var(--atlas-bg);
+  border-radius: 3px;
+  padding: 0 3px;
+}
 .atlas-context-graph-node.is-label-hidden .atlas-context-graph-node-label {
   opacity: 0;
 }

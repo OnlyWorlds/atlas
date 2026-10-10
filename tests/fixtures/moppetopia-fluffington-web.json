@@ -1,0 +1,1111 @@
+[
+{
+"id": "0698c9db-e087-79db-8000-e55850635787",
+"type": "character",
+"name": "Lieutenant Jonas",
+"birthplace": "0695db83-972a-74da-8000-262f1559a7f1",
+"location": "0698c9df-c928-7224-8000-9ec1ffb070ca",
+"friends": [
+"0695db83-b69a-772b-8000-557e9ba0dcc3"
+]
+},
+{
+"id": "0698c9de-e66f-782b-8000-bf427f5471c4",
+"type": "character",
+"name": "Governor Threadsworth",
+"location": "0695db83-972a-74da-8000-262f1559a7f1"
+},
+{
+"id": "0698c9df-3aea-7e42-8000-703879c57db7",
+"type": "character",
+"name": "Commander Vex",
+"species": [
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "0695db83-c206-74d5-8000-9fbde3aa046d",
+"type": "character",
+"name": "Drizzle",
+"location": "0698c9df-ef5c-7896-8000-168554142a47",
+"species": [
+"0695db8a-1642-7449-8000-c896529a4537",
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"friends": [
+"0695db83-b69a-772b-8000-557e9ba0dcc3"
+]
+},
+{
+"id": "0698c9de-d7ce-7094-8000-752088668a85",
+"type": "character",
+"name": "The Crumbler",
+"species": [
+"0698c9df-493f-7af9-8000-8623e279023f"
+],
+"objects": [
+"0698c9e0-9c4e-7fd4-8000-b0ce836f28f0"
+]
+},
+{
+"id": "0698c9de-fd23-727f-8000-96863fdb2469",
+"type": "character",
+"name": "Chief Engineer Wrinkles",
+"species": [
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"objects": [
+"0695db83-da44-7413-8000-7d7b900be996"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"friends": [
+"0695db83-aa04-78be-8000-6e93f683d435",
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0698c9df-337b-70a6-8000-81712fc53c1b"
+]
+},
+{
+"id": "0698c9df-059d-71f0-8000-8eeea1bc7973",
+"type": "character",
+"name": "Thud",
+"species": [
+"0698c9df-493f-7af9-8000-8623e279023f"
+],
+"objects": [
+"0695db83-da44-7413-8000-7d7b900be996"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"friends": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0698c9de-fd23-727f-8000-96863fdb2469",
+"0698c9df-0cee-78a9-8000-849c49356088",
+"0698c9df-1463-78bc-8000-e2eca20d6ee4",
+"0698c9df-1c12-7032-8000-5c6c483ef2ec",
+"0698c9df-24d1-7316-8000-5da03bc81d23",
+"0698c9df-337b-70a6-8000-81712fc53c1b"
+]
+},
+{
+"id": "0698c9df-0cee-78a9-8000-849c49356088",
+"type": "character",
+"name": "Squeaky",
+"species": [
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"objects": [
+"0695db83-da44-7413-8000-7d7b900be996"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"friends": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0698c9de-fd23-727f-8000-96863fdb2469",
+"0698c9df-1463-78bc-8000-e2eca20d6ee4",
+"0698c9df-1c12-7032-8000-5c6c483ef2ec",
+"0698c9df-24d1-7316-8000-5da03bc81d23",
+"0698c9df-337b-70a6-8000-81712fc53c1b"
+]
+},
+{
+"id": "0698c9df-1463-78bc-8000-e2eca20d6ee4",
+"type": "character",
+"name": "Doc Stitch",
+"species": [
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"objects": [
+"0695db83-da44-7413-8000-7d7b900be996"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"friends": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0698c9de-fd23-727f-8000-96863fdb2469",
+"0698c9df-1c12-7032-8000-5c6c483ef2ec",
+"0698c9df-24d1-7316-8000-5da03bc81d23",
+"0698c9df-337b-70a6-8000-81712fc53c1b"
+]
+},
+{
+"id": "0698c9df-1c12-7032-8000-5c6c483ef2ec",
+"type": "character",
+"name": "Rudder",
+"species": [
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"objects": [
+"0695db83-da44-7413-8000-7d7b900be996"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"friends": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0698c9de-fd23-727f-8000-96863fdb2469",
+"0698c9df-24d1-7316-8000-5da03bc81d23",
+"0698c9df-337b-70a6-8000-81712fc53c1b"
+]
+},
+{
+"id": "0698c9df-24d1-7316-8000-5da03bc81d23",
+"type": "character",
+"name": "Sergeant Flop",
+"species": [
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"objects": [
+"0695db83-da44-7413-8000-7d7b900be996"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"friends": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0698c9de-fd23-727f-8000-96863fdb2469",
+"0698c9df-337b-70a6-8000-81712fc53c1b"
+]
+},
+{
+"id": "0698c9df-337b-70a6-8000-81712fc53c1b",
+"type": "character",
+"name": "Commander Vera",
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"0698c9e0-8dd7-7f07-8000-d77fb31085af"
+],
+"friends": [
+"0695db83-afd7-76ee-8000-00f4295f8866"
+]
+},
+{
+"id": "069945d5-c9f0-7bba-8000-fbbc283bf666",
+"type": "character",
+"name": "Nibbles",
+"friends": [
+"0698c9de-f48d-793b-8000-92cc05de8eb5"
+]
+},
+{
+"id": "069945d5-db5a-7de3-8000-1cf9f6d7e309",
+"type": "character",
+"name": "Madame Threadbare",
+"institutions": [
+"0698c9e0-8dd7-7f07-8000-d77fb31085af"
+]
+},
+{
+"id": "06995820-1c0f-78d7-8000-a40b6b591e35",
+"type": "character",
+"name": "Professor Fuzz",
+"location": "0698c9df-c035-7ca2-8000-af87b6b9765b",
+"institutions": [
+"0698c9e0-8766-73c9-8000-d3b34947fe2c"
+]
+},
+{
+"id": "069959a4-8487-7410-8000-c8e175eaf4d9",
+"type": "character",
+"name": "Governor Dampworth",
+"location": "0698c9df-c035-7ca2-8000-af87b6b9765b",
+"institutions": [
+"0698c9e0-8766-73c9-8000-d3b34947fe2c"
+]
+},
+{
+"id": "0695db83-b69a-772b-8000-557e9ba0dcc3",
+"type": "character",
+"name": "Captain Snoot",
+"location": "0698c9df-ef5c-7896-8000-168554142a47",
+"species": [
+"0695db8a-1642-7449-8000-c896529a4537",
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"objects": [
+"0698c9e0-9c4e-7fd4-8000-b0ce836f28f0"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"friends": [
+"069945d5-db5a-7de3-8000-1cf9f6d7e309"
+],
+"rivals": [
+"0695db83-afd7-76ee-8000-00f4295f8866"
+]
+},
+{
+"id": "0695db83-afd7-76ee-8000-00f4295f8866",
+"type": "character",
+"name": "Admiral Fluffington",
+"birthplace": "0695db83-8ce7-7510-8000-5f44d31b8f79",
+"location": "0695db83-972a-74da-8000-262f1559a7f1",
+"species": [
+"0695db8a-1642-7449-8000-c896529a4537",
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"languages": [
+"0695dbac-1eed-7ae1-8000-13ed3ef29291"
+],
+"objects": [
+"0695db83-da44-7413-8000-7d7b900be996",
+"0698c9e0-b787-7379-8000-8db45e83be60",
+"0698c9e0-be04-74ad-8000-7fe4412d77cd"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"family": [
+"069945d9-d873-7076-8000-96d538f41a22"
+],
+"rivals": [
+"0695db83-b69a-772b-8000-557e9ba0dcc3"
+]
+},
+{
+"id": "0695db83-aa04-78be-8000-6e93f683d435",
+"type": "character",
+"name": "Admiral Splashworth",
+"species": [
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"objects": [
+"0698c9e0-a327-7321-8000-bb8e5a7c0cad",
+"0698c9e0-b787-7379-8000-8db45e83be60"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"friends": [
+"0695db83-afd7-76ee-8000-00f4295f8866"
+],
+"rivals": [
+"0698c9df-2c4c-7946-8000-0c3c0d771981"
+]
+},
+{
+"id": "0698c9de-f48d-793b-8000-92cc05de8eb5",
+"type": "character",
+"name": "Pip",
+"species": [
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"objects": [
+"0695db83-da44-7413-8000-7d7b900be996"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+],
+"friends": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0698c9de-fd23-727f-8000-96863fdb2469",
+"0698c9df-059d-71f0-8000-8eeea1bc7973",
+"0698c9df-0cee-78a9-8000-849c49356088",
+"0698c9df-1463-78bc-8000-e2eca20d6ee4",
+"0698c9df-1c12-7032-8000-5c6c483ef2ec",
+"0698c9df-24d1-7316-8000-5da03bc81d23",
+"0698c9df-337b-70a6-8000-81712fc53c1b"
+]
+},
+{
+"id": "0698c9df-2c4c-7946-8000-0c3c0d771981",
+"type": "character",
+"name": "Admiral Stuffington",
+"species": [
+"0698c9df-422f-7255-8000-624e6f5e0a47"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"0698c9e0-8766-73c9-8000-d3b34947fe2c"
+],
+"family": [
+"069945d9-d873-7076-8000-96d538f41a22"
+],
+"rivals": [
+"0695db83-aa04-78be-8000-6e93f683d435"
+]
+},
+{
+"id": "0698c9df-422f-7255-8000-624e6f5e0a47",
+"type": "species",
+"name": "Puddle Moppet",
+"parent_species": "0695db8a-1642-7449-8000-c896529a4537",
+"locations": [
+"0695db83-8ce7-7510-8000-5f44d31b8f79"
+]
+},
+{
+"id": "0698c9df-493f-7af9-8000-8623e279023f",
+"type": "species",
+"name": "Dust Moppet",
+"parent_species": "0695db8a-1642-7449-8000-c896529a4537"
+},
+{
+"id": "0698c9df-4fee-77ed-8000-88bfbf7144c9",
+"type": "species",
+"name": "Space Moppet",
+"parent_species": "0695db8a-1642-7449-8000-c896529a4537",
+"locations": [
+"0695db83-972a-74da-8000-262f1559a7f1"
+]
+},
+{
+"id": "0698c9df-5686-76f0-8000-37269203f01b",
+"type": "species",
+"name": "Feral Moppet",
+"parent_species": "0695db8a-1642-7449-8000-c896529a4537"
+},
+{
+"id": "0698c9df-649a-74e3-8000-2a056ea2be86",
+"type": "species",
+"name": "Coravel",
+"locations": [
+"0695db83-972a-74da-8000-262f1559a7f1"
+]
+},
+{
+"id": "0695db8a-1642-7449-8000-c896529a4537",
+"type": "species",
+"name": "Moppet"
+},
+{
+"id": "0698c9df-5d80-734b-8000-14f41a417d64",
+"type": "species",
+"name": "Bakerfolk",
+"locations": [
+"0695db83-8ce7-7510-8000-5f44d31b8f79"
+]
+},
+{
+"id": "069945d9-d873-7076-8000-96d538f41a22",
+"type": "family",
+"name": "House Stuffington"
+},
+{
+"id": "0698c9e0-76fe-76cf-8000-96726fae9ec5",
+"type": "collective",
+"name": "Cookie Pirates",
+"species": [
+"0698c9df-493f-7af9-8000-8623e279023f",
+"0698c9df-5d80-734b-8000-14f41a417d64"
+],
+"characters": [
+"0695db83-b69a-772b-8000-557e9ba0dcc3",
+"0698c9de-d7ce-7094-8000-752088668a85",
+"069945d5-c9f0-7bba-8000-fbbc283bf666"
+]
+},
+{
+"id": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"type": "institution",
+"name": "Puddle Navy",
+"objects": [
+"0695db83-da44-7413-8000-7d7b900be996",
+"0695db83-e199-7054-8000-d7908bc88b9b",
+"0698c9e0-a327-7321-8000-bb8e5a7c0cad"
+]
+},
+{
+"id": "0698c9e0-8dd7-7f07-8000-d77fb31085af",
+"type": "institution",
+"name": "The Claw",
+"allies": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "0698c9e0-8766-73c9-8000-d3b34947fe2c",
+"type": "institution",
+"name": "Treaty Council"
+},
+{
+"id": "0698c9df-8bc3-7920-8000-7ce8c6ee6887",
+"type": "location",
+"name": "Museum of Moistened History",
+"parent_location": "0695db83-8ce7-7510-8000-5f44d31b8f79"
+},
+{
+"id": "0698c9df-9bf6-7b8f-8000-9e066f68f3c0",
+"type": "location",
+"name": "Feltropolis - Level 1: The Docks",
+"parent_location": "0695db83-972a-74da-8000-262f1559a7f1"
+},
+{
+"id": "0698c9df-a4e5-7b4d-8000-ed1caf90f732",
+"type": "location",
+"name": "Feltropolis - Level 2: Commerce",
+"parent_location": "0695db83-972a-74da-8000-262f1559a7f1"
+},
+{
+"id": "0698c9df-b88f-76d5-8000-42b927715d70",
+"type": "location",
+"name": "Feltropolis - Level 4: Residential",
+"parent_location": "0695db83-972a-74da-8000-262f1559a7f1"
+},
+{
+"id": "0698c9df-c035-7ca2-8000-af87b6b9765b",
+"type": "location",
+"name": "Feltropolis - Level 5: Administration",
+"parent_location": "0695db83-972a-74da-8000-262f1559a7f1"
+},
+{
+"id": "0698c9df-c928-7224-8000-9ec1ffb070ca",
+"type": "location",
+"name": "Feltropolis - Level 6: The Works",
+"parent_location": "0695db83-972a-74da-8000-262f1559a7f1"
+},
+{
+"id": "0698c9e0-352e-75c0-8000-cc268f4ead4b",
+"type": "location",
+"name": "Treaty Hall",
+"parent_location": "0698c9df-c035-7ca2-8000-af87b6b9765b",
+"primary_power": "0698c9e0-8766-73c9-8000-d3b34947fe2c"
+},
+{
+"id": "0698c9df-ef5c-7896-8000-168554142a47",
+"type": "location",
+"name": "The Soggy Sock",
+"parent_location": "0698c9df-adb2-722f-8000-b1cad90400ea"
+},
+{
+"id": "0698c9df-7435-7a9e-8000-7ea53ac4f443",
+"type": "location",
+"name": "The Leaky Bucket",
+"founders": [
+"0695db83-b69a-772b-8000-557e9ba0dcc3"
+]
+},
+{
+"id": "0698c9df-82ec-7b36-8000-febd45711391",
+"type": "location",
+"name": "Drip Plaza",
+"parent_location": "0695db83-8ce7-7510-8000-5f44d31b8f79"
+},
+{
+"id": "0698c9df-adb2-722f-8000-b1cad90400ea",
+"type": "location",
+"name": "Feltropolis - Level 3: The Squeeze",
+"parent_location": "0695db83-972a-74da-8000-262f1559a7f1"
+},
+{
+"id": "0698c9df-d0e0-78ea-8000-f5c94c35059b",
+"type": "location",
+"name": "Feltropolis - Level 7: The Spire",
+"parent_location": "0695db83-972a-74da-8000-262f1559a7f1"
+},
+{
+"id": "0698c9e0-44b3-7c76-8000-80b22cf8d288",
+"type": "location",
+"name": "Crumblefields"
+},
+{
+"id": "0695db83-972a-74da-8000-262f1559a7f1",
+"type": "location",
+"name": "Feltropolis",
+"secondary_powers": [
+"0698c9e0-8766-73c9-8000-d3b34947fe2c"
+]
+},
+{
+"id": "0698c9e3-00d2-7540-8000-f61aa88a9a42",
+"type": "location",
+"name": "Naval Academy",
+"parent_location": "0695db83-8ce7-7510-8000-5f44d31b8f79",
+"primary_power": "0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+},
+{
+"id": "01a12069-7af2-7539-81a4-685f718fd695",
+"type": "location",
+"name": "Soggia"
+},
+{
+"id": "0695db83-8ce7-7510-8000-5f44d31b8f79",
+"type": "location",
+"name": "Puddleton",
+"parent_location": "01a12069-7af2-7539-81a4-685f718fd695",
+"primary_power": "0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+},
+{
+"id": "0698c9df-93aa-71d7-8000-d38848fe10ad",
+"type": "location",
+"name": "The Eternal Drip",
+"parent_location": "0695db83-8ce7-7510-8000-5f44d31b8f79"
+},
+{
+"id": "0695db83-da44-7413-8000-7d7b900be996",
+"type": "object",
+"name": "USS Fuzzball",
+"technology": [
+"0695db83-ce11-7b83-8000-0e9acfde5b4a"
+]
+},
+{
+"id": "0695db83-e199-7054-8000-d7908bc88b9b",
+"type": "object",
+"name": "Felt Cruiser"
+},
+{
+"id": "0698c9e0-be04-74ad-8000-7fe4412d77cd",
+"type": "object",
+"name": "Medal of Damp Valor"
+},
+{
+"id": "0698c9e0-9c4e-7fd4-8000-b0ce836f28f0",
+"type": "object",
+"name": "Googly Eye of Truth",
+"technology": [
+"0695db83-ce11-7b83-8000-0e9acfde5b4a"
+]
+},
+{
+"id": "0698c9e0-a327-7321-8000-bb8e5a7c0cad",
+"type": "object",
+"name": "USS Splashworth"
+},
+{
+"id": "0698c9e0-b787-7379-8000-8db45e83be60",
+"type": "object",
+"name": "Splashworth's Compass"
+},
+{
+"id": "0695db83-ce11-7b83-8000-0e9acfde5b4a",
+"type": "construct",
+"name": "Googly Eye Technology",
+"locations": [
+"0695db83-972a-74da-8000-262f1559a7f1"
+]
+},
+{
+"id": "0698c9e0-d31c-72f9-8000-2f2af55333f6",
+"type": "construct",
+"name": "Zero-Gravity Puddle Combat",
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "0698c9e0-d9ba-7715-8000-f381141c42c6",
+"type": "construct",
+"name": "Zero-Gravity Felt Weaving",
+"locations": [
+"0695db83-972a-74da-8000-262f1559a7f1",
+"0698c9df-c928-7224-8000-9ec1ffb070ca"
+]
+},
+{
+"id": "0698c9e0-e141-7874-8000-f17fbac236c5",
+"type": "construct",
+"name": "Space-Grade Felt",
+"locations": [
+"0695db83-972a-74da-8000-262f1559a7f1"
+],
+"constructs": [
+"0698c9e0-d9ba-7715-8000-f381141c42c6"
+]
+},
+{
+"id": "0698c9e0-e8e6-7a2c-8000-1e6903e09065",
+"type": "construct",
+"name": "Felt Technology Revolution",
+"locations": [
+"0695db83-972a-74da-8000-262f1559a7f1"
+],
+"events": [
+"0695db83-f0d2-71c5-8000-f74fac372c98"
+]
+},
+{
+"id": "0698c9e0-f7b4-7b32-8000-8fa49a395d6b",
+"type": "construct",
+"name": "Puddle Navy Rank System",
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "0698c9e1-086b-7570-8000-332fa0cfd508",
+"type": "construct",
+"name": "Felt Repair",
+"characters": [
+"0698c9df-1463-78bc-8000-e2eca20d6ee4"
+]
+},
+{
+"id": "0698c9e1-3da1-779b-8000-22a3f22fddf0",
+"type": "construct",
+"name": "Moppet Sleep Cycle",
+"species": [
+"0695db8a-1642-7449-8000-c896529a4537"
+]
+},
+{
+"id": "0698c9e1-1019-74bb-8000-8499a2ad9b5b",
+"type": "construct",
+"name": "Institutional Cover-Up",
+"characters": [
+"0695db83-aa04-78be-8000-6e93f683d435",
+"0695db83-b69a-772b-8000-557e9ba0dcc3",
+"0695db83-c206-74d5-8000-9fbde3aa046d",
+"0698c9de-f48d-793b-8000-92cc05de8eb5",
+"0698c9df-2c4c-7946-8000-0c3c0d771981"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"0698c9e0-8766-73c9-8000-d3b34947fe2c",
+"0698c9e0-8dd7-7f07-8000-d77fb31085af"
+],
+"events": [
+"0698c9e0-6241-7005-8000-66cf39115cc1"
+]
+},
+{
+"id": "0698c9e1-2b27-7be7-8000-74a43d19dfb8",
+"type": "construct",
+"name": "Year Zero Anniversary",
+"characters": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0695db83-c206-74d5-8000-9fbde3aa046d"
+],
+"locations": [
+"0698c9e0-352e-75c0-8000-cc268f4ead4b"
+],
+"events": [
+"0695db83-f0d2-71c5-8000-f74fac372c98"
+]
+},
+{
+"id": "069a4113-2e8a-730b-8000-49aa84f38060",
+"type": "construct",
+"name": "We Sail Where the Puddles Flow",
+"founder": "0695db83-aa04-78be-8000-6e93f683d435",
+"custodian": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"characters": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0695db83-b69a-772b-8000-557e9ba0dcc3",
+"0698c9de-d7ce-7094-8000-752088668a85",
+"0698c9de-f48d-793b-8000-92cc05de8eb5"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"0698c9e0-8dd7-7f07-8000-d77fb31085af"
+]
+},
+{
+"id": "0698c9e1-1931-73a2-8000-04e56cf9a017",
+"type": "construct",
+"name": "Absorption Rituals",
+"locations": [
+"0695db83-8ce7-7510-8000-5f44d31b8f79",
+"0698c9df-93aa-71d7-8000-d38848fe10ad"
+]
+},
+{
+"id": "0698c9e3-05b2-7a4e-8000-3acabc26fbca",
+"type": "title",
+"name": "Admiral",
+"body": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"holders": [
+"0695db83-aa04-78be-8000-6e93f683d435",
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0698c9df-2c4c-7946-8000-0c3c0d771981"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "0698c9e3-1e7f-772a-8000-490b715cf180",
+"type": "title",
+"name": "Chief Engineer",
+"body": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"holders": [
+"0698c9de-fd23-727f-8000-96863fdb2469"
+]
+},
+{
+"id": "0698c9e3-2928-7b6d-8000-7b1776cb9062",
+"type": "title",
+"name": "Navigator",
+"body": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"holders": [
+"0698c9de-f48d-793b-8000-92cc05de8eb5"
+]
+},
+{
+"id": "0698c9e3-32f7-7863-8000-07ec53f6ceb5",
+"type": "title",
+"name": "Weapons Officer",
+"body": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"holders": [
+"0698c9df-059d-71f0-8000-8eeea1bc7973"
+]
+},
+{
+"id": "0698c9e3-3d1e-7270-8000-8c07ade5a57c",
+"type": "title",
+"name": "Communications Officer",
+"body": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"holders": [
+"0698c9df-0cee-78a9-8000-849c49356088"
+]
+},
+{
+"id": "0698c9e3-444e-738b-8000-49f7f489b31b",
+"type": "title",
+"name": "Medical Officer",
+"body": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"holders": [
+"0698c9df-1463-78bc-8000-e2eca20d6ee4"
+]
+},
+{
+"id": "0698c9e3-4e52-74c9-8000-5876cbef1457",
+"type": "title",
+"name": "Helmsman",
+"body": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"holders": [
+"0698c9df-1c12-7032-8000-5c6c483ef2ec"
+]
+},
+{
+"id": "0698c9e3-577e-7e9d-8000-6b243ffe5357",
+"type": "title",
+"name": "Marine Commander",
+"body": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"holders": [
+"0698c9df-24d1-7316-8000-5da03bc81d23"
+]
+},
+{
+"id": "0695dbac-1eed-7ae1-8000-13ed3ef29291",
+"type": "language",
+"name": "Standard Moppet"
+},
+{
+"id": "01a1205e-6045-7719-8ceb-e8244c665c2e",
+"type": "law",
+"name": "The Dry Statute",
+"author": "0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+},
+{
+"id": "0695db83-f0d2-71c5-8000-f74fac372c98",
+"type": "event",
+"name": "Treaty of Soft Landings",
+"triggers": [
+"0695db83-e681-7a14-8000-5f411a586fb6"
+],
+"locations": [
+"0695db83-972a-74da-8000-262f1559a7f1",
+"0698c9e0-352e-75c0-8000-cc268f4ead4b"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "0698c9e0-5189-7e8e-8000-0606718da4eb",
+"type": "event",
+"name": "Battle of Damp Ridge",
+"triggers": [
+"0695db83-e681-7a14-8000-5f411a586fb6"
+],
+"characters": [
+"0695db83-aa04-78be-8000-6e93f683d435"
+],
+"locations": [
+"0698c9e3-00d2-7540-8000-f61aa88a9a42"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "0695db83-e681-7a14-8000-5f411a586fb6",
+"type": "event",
+"name": "The Great Puddle War",
+"characters": [
+"0695db83-aa04-78be-8000-6e93f683d435",
+"0695db83-c206-74d5-8000-9fbde3aa046d",
+"0698c9df-2c4c-7946-8000-0c3c0d771981"
+],
+"locations": [
+"0695db83-8ce7-7510-8000-5f44d31b8f79",
+"0698c9df-93aa-71d7-8000-d38848fe10ad"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "0698c9e0-591d-7043-8000-aba84f717706",
+"type": "event",
+"name": "Siege of the Felt Mills",
+"triggers": [
+"0695db83-e681-7a14-8000-5f411a586fb6"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "069945d5-08dc-725f-8000-f8fc0026358d",
+"type": "event",
+"name": "Soggy Sock Incident",
+"characters": [
+"0695db83-b69a-772b-8000-557e9ba0dcc3",
+"0695db83-c206-74d5-8000-9fbde3aa046d",
+"0698c9de-f48d-793b-8000-92cc05de8eb5"
+],
+"locations": [
+"0698c9df-ef5c-7896-8000-168554142a47"
+]
+},
+{
+"id": "069945d5-9f9b-79b2-8000-c17aeeeae720",
+"type": "event",
+"name": "The Crumblefield Standoff",
+"characters": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0698c9de-d7ce-7094-8000-752088668a85",
+"0698c9de-fd23-727f-8000-96863fdb2469",
+"0698c9df-24d1-7316-8000-5da03bc81d23"
+],
+"locations": [
+"0698c9e0-44b3-7c76-8000-80b22cf8d288"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "069945dd-189d-768a-8000-080d687899d2",
+"type": "event",
+"name": "Eternal Drip Failure",
+"characters": [
+"0698c9de-f48d-793b-8000-92cc05de8eb5"
+]
+},
+{
+"id": "0699581f-fc50-7842-8000-41e4c84ec34e",
+"type": "event",
+"name": "The Incident",
+"characters": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0695db83-b69a-772b-8000-557e9ba0dcc3"
+]
+},
+{
+"id": "0698c9e0-6241-7005-8000-66cf39115cc1",
+"type": "event",
+"name": "Moistened Valley Massacre",
+"triggers": [
+"0695db83-e681-7a14-8000-5f411a586fb6"
+],
+"characters": [
+"0695db83-aa04-78be-8000-6e93f683d435",
+"0695db83-b69a-772b-8000-557e9ba0dcc3",
+"0695db83-c206-74d5-8000-9fbde3aa046d",
+"0698c9df-2c4c-7946-8000-0c3c0d771981"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37"
+]
+},
+{
+"id": "01a1201f-df7b-71e9-a29b-39d0886c437e",
+"type": "narrative",
+"name": "What Happened in the Moistened Valley",
+"protagonist": "0695db83-aa04-78be-8000-6e93f683d435",
+"antagonist": "0698c9df-2c4c-7946-8000-0c3c0d771981",
+"narrator": "0695db83-b69a-772b-8000-557e9ba0dcc3",
+"events": [
+"0698c9e0-6241-7005-8000-66cf39115cc1"
+],
+"characters": [
+"0695db83-aa04-78be-8000-6e93f683d435",
+"0698c9df-2c4c-7946-8000-0c3c0d771981",
+"0695db83-b69a-772b-8000-557e9ba0dcc3",
+"0695db83-c206-74d5-8000-9fbde3aa046d",
+"06995820-1c0f-78d7-8000-a40b6b591e35"
+]
+},
+{
+"id": "069a4113-4531-7ed5-8000-4bece3c50bd0",
+"type": "narrative",
+"name": "The Moistened Valley Account",
+"protagonist": "0695db83-aa04-78be-8000-6e93f683d435",
+"conservator": "0698c9e0-8766-73c9-8000-d3b34947fe2c",
+"events": [
+"0695db83-e681-7a14-8000-5f411a586fb6",
+"0695db83-f0d2-71c5-8000-f74fac372c98",
+"0698c9e0-6241-7005-8000-66cf39115cc1"
+],
+"characters": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0695db83-c206-74d5-8000-9fbde3aa046d",
+"0698c9df-2c4c-7946-8000-0c3c0d771981",
+"06995820-1c0f-78d7-8000-a40b6b591e35",
+"069959a4-8487-7410-8000-c8e175eaf4d9"
+],
+"locations": [
+"0698c9df-82ec-7b36-8000-febd45711391",
+"0698c9df-8bc3-7920-8000-7ce8c6ee6887",
+"0698c9e0-352e-75c0-8000-cc268f4ead4b"
+],
+"institutions": [
+"0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"0698c9e0-8766-73c9-8000-d3b34947fe2c"
+],
+"constructs": [
+"0698c9e1-1019-74bb-8000-8499a2ad9b5b",
+"0698c9e1-2b27-7be7-8000-74a43d19dfb8"
+]
+},
+{
+"id": "069a4113-72d1-75b2-8000-3ff6670f2f4e",
+"type": "narrative",
+"name": "Snoot's Counter-History",
+"protagonist": "0695db83-b69a-772b-8000-557e9ba0dcc3",
+"narrator": "0695db83-b69a-772b-8000-557e9ba0dcc3",
+"events": [
+"0698c9e0-6241-7005-8000-66cf39115cc1",
+"0699581f-fc50-7842-8000-41e4c84ec34e"
+],
+"characters": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0695db83-c206-74d5-8000-9fbde3aa046d",
+"069945d5-db5a-7de3-8000-1cf9f6d7e309",
+"06995820-1c0f-78d7-8000-a40b6b591e35"
+],
+"locations": [
+"0698c9df-ef5c-7896-8000-168554142a47"
+],
+"institutions": [
+"0698c9e0-8766-73c9-8000-d3b34947fe2c",
+"0698c9e0-8dd7-7f07-8000-d77fb31085af"
+],
+"constructs": [
+"0698c9e1-1019-74bb-8000-8499a2ad9b5b"
+]
+},
+{
+"id": "069a4113-a084-7523-8000-b2de2d3ca3eb",
+"type": "narrative",
+"name": "The Failing",
+"protagonist": "0698c9de-f48d-793b-8000-92cc05de8eb5",
+"narrator": "0698c9de-f48d-793b-8000-92cc05de8eb5",
+"events": [
+"069945dd-189d-768a-8000-080d687899d2"
+],
+"characters": [
+"069945d5-c9f0-7bba-8000-fbbc283bf666"
+],
+"locations": [
+"0698c9df-93aa-71d7-8000-d38848fe10ad"
+]
+},
+{
+"id": "069a4114-c675-7289-8000-0b374c76de73",
+"type": "narrative",
+"name": "The Ballad of Splashworth",
+"protagonist": "0695db83-aa04-78be-8000-6e93f683d435",
+"conservator": "0695db83-c6e8-7ab6-8000-bf4b7d713f37",
+"events": [
+"0698c9e0-6241-7005-8000-66cf39115cc1"
+],
+"characters": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0695db83-c206-74d5-8000-9fbde3aa046d"
+],
+"locations": [
+"0698c9df-82ec-7b36-8000-febd45711391",
+"0698c9df-ef5c-7896-8000-168554142a47",
+"0698c9e3-00d2-7540-8000-f61aa88a9a42"
+]
+},
+{
+"id": "069a4115-3965-7f34-8000-d0d009976632",
+"type": "narrative",
+"name": "The Whispering Chronicle",
+"protagonist": "0698c9de-d7ce-7094-8000-752088668a85",
+"characters": [
+"0698c9de-f48d-793b-8000-92cc05de8eb5"
+],
+"collectives": [
+"0698c9e0-76fe-76cf-8000-96726fae9ec5"
+],
+"phenomena": [
+"0698c9e1-461f-75bd-8000-33fed28c826f"
+]
+},
+{
+"id": "01a1201f-e082-7184-b3a2-dba0879c7189",
+"type": "narrative",
+"name": "The Drip Is Failing",
+"narrator": "0698c9de-f48d-793b-8000-92cc05de8eb5",
+"events": [
+"069945dd-189d-768a-8000-080d687899d2"
+],
+"characters": [
+"0698c9de-f48d-793b-8000-92cc05de8eb5",
+"069945d5-c9f0-7bba-8000-fbbc283bf666"
+],
+"locations": [
+"0698c9df-93aa-71d7-8000-d38848fe10ad"
+]
+},
+{
+"id": "0698c9e1-461f-75bd-8000-33fed28c826f",
+"type": "phenomenon",
+"name": "Googly Eye Consciousness",
+"triggers": [
+"0695db83-ce11-7b83-8000-0e9acfde5b4a"
+],
+"wielders": [
+"0695db83-aa04-78be-8000-6e93f683d435",
+"0695db83-afd7-76ee-8000-00f4295f8866"
+]
+},
+{
+"id": "0698c9e1-5c7b-7886-8000-184e92e260b3",
+"type": "relation",
+"name": "Fluffington-Snoot Rivalry",
+"actor": "0695db83-afd7-76ee-8000-00f4295f8866",
+"characters": [
+"0695db83-afd7-76ee-8000-00f4295f8866",
+"0695db83-b69a-772b-8000-557e9ba0dcc3"
+],
+"locations": [
+"0698c9e3-00d2-7540-8000-f61aa88a9a42"
+]
+},
+{
+"id": "9de5ca30-dec0-4630-9785-0047020342ee",
+"type": "pin",
+"name": "Feltropolis Station",
+"element_id": "0695db83-972a-74da-8000-262f1559a7f1"
+},
+{
+"id": "6ba4bfa3-f472-4097-92e7-536e3713dd58",
+"type": "pin",
+"name": "USS Fuzzball Patrol",
+"element_id": "0695db83-da44-7413-8000-7d7b900be996"
+},
+{
+"id": "86771bfb-f152-4db8-8290-b73da915a7bb",
+"type": "pin",
+"name": "Puddleton",
+"element_id": "0695db83-8ce7-7510-8000-5f44d31b8f79"
+}
+]
