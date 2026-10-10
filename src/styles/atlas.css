@@ -15104,6 +15104,12 @@ body.atlas-share-fullpreview > * {
   cursor: progress;
   opacity: 0.7;
 }
+/* Remove picture: it deletes for good, so it warms to the danger tone on hover. */
+.atlas-picture-remove-btn:hover:not(:disabled) {
+  color: var(--atlas-danger-hover);
+  border-color: var(--atlas-danger-hover);
+  background: var(--atlas-danger-hover-tint);
+}
 .atlas-picture-upload-hint {
   color: var(--atlas-text-soft);
   font-size: 11.5px;

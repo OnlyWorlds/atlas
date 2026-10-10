@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.26',
+    date: '2026-10-10',
+    theme: 'and take it back',
+    entries: [
+      {
+        id: 'remove-picture',
+        title: 'Remove a picture you uploaded',
+        body: 'An element whose picture you uploaded through Atlas has Remove picture beside Choose a picture. It deletes the picture from OnlyWorlds for good, after asking, and clears the image URL of every element here that showed it. The uploader and the world\'s owner can remove a picture.',
+        tags: ['world', 'sync'],
+      },
+    ],
+  },
+  {
     version: '1.25.1',
     date: '2026-10-10',
     theme: 'a quicker first look',
@@ -63,7 +76,7 @@ export const CHANGELOG: ChangelogRelease[] = [
       {
         id: 'demo-faster-firefox',
         title: 'Moppetopia opens faster, most of all in Firefox',
-        body: 'Exploring Moppetopia wrote every element to this browser twice: once to build the copy, once to keep it. It now builds the copy in memory and writes it once, so it opens in about a third of the time in Firefox, where each write is slow.',
+        body: 'Exploring Moppetopia wrote every element to this browser twice: once to build the copy, once to keep it. It now builds the copy in memory and writes it once, so it opens in about half the time, in Firefox (where each write is slow) and in Chrome alike.',
         tags: ['performance'],
       },
     ],

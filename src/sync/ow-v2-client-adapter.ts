@@ -54,6 +54,16 @@ export interface MediaTicket {
   exp: number;
 }
 
+/** keel's removal ticket (Keel #170): one use, ten minutes, for the edge's `/v1/remove`. */
+export interface MediaRemovalTicket {
+  ticket: string;
+  exp: string;
+  /** The object key the ticket removes (`u/<world>/<name>`). */
+  key: string;
+  /** How many of the world's elements, that this key can see, still show the picture. */
+  referenced: number;
+}
+
 /**
  * Typed error for every non-2xx v2 response. Fields mirror the server's error
  * envelope. `message` is prefixed "API Error <status>:" so legacy substring
@@ -291,6 +301,15 @@ export class OwV2ClientAdapter implements OwApiClient {
       throw new Error('media ticket: the reply was missing the ticket, upload_url or max_bytes');
     }
     return r as MediaTicket;
+  }
+
+  /** POST /media/remove-ticket: a ticket to remove one picture uploaded into this world (write key + PIN). */
+  async createMediaRemovalTicket(key: string): Promise<MediaRemovalTicket> {
+    const r = await this.request('POST', '/media/remove-ticket', { key }) as Partial<MediaRemovalTicket> | undefined;
+    if (!r || typeof r.ticket !== 'string' || typeof r.key !== 'string' || typeof r.referenced !== 'number') {
+      throw new Error('media removal ticket: the reply was missing the ticket, key or referenced');
+    }
+    return r as MediaRemovalTicket;
   }
 
   /**

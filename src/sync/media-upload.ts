@@ -16,7 +16,7 @@
 import { PlainError } from '../core/plain-error';
 import { isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
-import { OwV2Error, type MediaTicket } from './ow-v2-client-adapter';
+import { OwV2Error, type MediaTicket, type MediaRemovalTicket } from './ow-v2-client-adapter';
 import { buildV2Adapter } from './make-online';
 
 /** What the edge takes, read from the file's bytes there; the browser's type is a first check. */
@@ -127,4 +127,96 @@ export async function uploadPicture(
       throw s ? new PlainError(s) : err;
     }
   }
+}
+
+// --- Removing a picture (Boss's removal contract, h37 #2354; Keel #170) ------
+
+/** Where an uploaded picture is served; its object key is the rest of the URL. */
+const MEDIA_ORIGIN = 'https://media.onlyworlds.com/';
+
+/**
+ * The object key of a picture uploaded into this world through a ticket
+ * (`u/<worldId>/<name>`), or null for any other address. Only those can be
+ * removed: keel answers not_found for everything else (the crew's batch
+ * uploads, other worlds' pictures, other hosts).
+ */
+export function uploadedPictureKey(url: unknown, serverWorldId: string): string | null {
+  if (typeof url !== 'string' || !url.startsWith(MEDIA_ORIGIN) || !serverWorldId) return null;
+  const key = url.slice(MEDIA_ORIGIN.length).split(/[?#]/)[0];
+  const prefix = `u/${serverWorldId}/`;
+  return key.startsWith(prefix) && key.length > prefix.length ? key : null;
+}
+
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+/** keel's removal-ticket refusals that have their own sentence. */
+function removalTicketSentence(err: unknown): string | null {
+  if (!(err instanceof OwV2Error)) return null;
+  if (err.status === 404) return 'OnlyWorlds has no picture at this address that can be removed: it was not uploaded into this world, or it is already gone.';
+  if (err.status === 403 && err.code === 'permission_error') return 'Only the person who uploaded this picture, or the world\'s owner, can remove it.';
+  if (err.code === 'removal_in_flight') {
+    const min = Math.max(1, Math.ceil((err.retryAfterMs ?? 600_000) / 60_000));
+    return `A removal of this picture was started in the last ten minutes and not finished. Try again in ${min} minute${min === 1 ? '' : 's'}.`;
+  }
+  if (err.code === 'media_unavailable') return 'Removing pictures is not available on OnlyWorlds right now. Try again later.';
+  return null;
+}
+
+/**
+ * Remove one uploaded picture from OnlyWorlds. Resolves once the edge has
+ * deleted it; the caller clears the image URLs that showed it (keel leaves
+ * them, by contract). A removal asked the instant an upload replied can meet
+ * keel before the edge's upload report does (about 600 ms, Skeld h20 #2496):
+ * a 404, or the coming 409 upload_pending, gets one retry after a second (or
+ * the Retry-After). Rejects with a `PlainError` when the reason has its own
+ * sentence, else the raw error for `showProblem`.
+ */
+export async function removePicture(
+  entry: WorldRegistryEntry,
+  reg: WorldsRegistry,
+  key: string,
+): Promise<{ referenced: number; cacheMayLinger: boolean }> {
+  if (!entry.api || entry.state !== 'api-linked') throw new PlainError('This world is not online, so Atlas cannot remove its pictures.');
+  if (entry.api.read_only) throw new PlainError('This world is view-only here, so it cannot remove a picture.');
+  const pin = worldPin(entry, reg);
+  if (!pin) {
+    throw new PlainError(isSeatWorld(entry) ? SEAT_SECRET_MISSING_LINE
+      : 'Atlas needs your OnlyWorlds PIN to remove a picture. Enter it in Settings, under OnlyWorlds.');
+  }
+  const adapter = buildV2Adapter(entry.api.api_key, pin);
+  let ticket: MediaRemovalTicket;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      ticket = await adapter.createMediaRemovalTicket(key);
+      break;
+    } catch (err) {
+      const notYet = err instanceof OwV2Error && (err.status === 404 || err.code === 'upload_pending');
+      if (attempt === 0 && notYet) {
+        await sleep(Math.min((err as OwV2Error).retryAfterMs ?? 1000, 5000));
+        continue;
+      }
+      const s = removalTicketSentence(err);
+      throw s ? new PlainError(s) : err;
+    }
+  }
+  const edge = (edgeOriginsForTests ?? EDGE_ORIGINS)[0];
+  const res = await fetch(`${edge}/v1/remove`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ticket.ticket}` },
+    referrerPolicy: 'no-referrer',
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const err = await edgeError(res);
+    // not_found: nothing is stored under the key any more, the end state asked for.
+    if (err.status === 404) return { referenced: ticket.referenced, cacheMayLinger: false };
+    if (err.code === 'remove_failed') throw new PlainError('OnlyWorlds could not remove the picture just now. Nothing was removed; try again.');
+    if (err.code === 'not_removable') throw new PlainError('This picture was not uploaded into this world through Atlas or the toolkit, so it cannot be removed here.');
+    // keel holds a second ticket back for ten minutes, so no quiet retry here.
+    if (isTicketSpent(err)) throw new PlainError('OnlyWorlds did not accept the removal in time. Nothing was removed; try again in ten minutes.');
+    throw err;
+  }
+  const body = await res.json().catch(() => ({})) as { cache?: unknown };
+  // The edge purges the cached copy when it can; else the link may answer for a while.
+  return { referenced: ticket.referenced, cacheMayLinger: body.cache !== 'purging' };
 }

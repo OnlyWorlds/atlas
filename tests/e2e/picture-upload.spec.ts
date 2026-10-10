@@ -115,3 +115,47 @@ test('a local world\'s element has no upload row', async ({ page }) => {
   await expect(page.locator('.atlas-detail-section-body').first()).toBeVisible();
   await expect(page.locator('[data-field="upload_picture"]')).toHaveCount(0);
 });
+
+test('an uploaded picture of this world can be removed: asked first, then the image URL is cleared', async ({ page }) => {
+  const seen = await onlineWorld(page);
+  const removable = `https://media.onlyworlds.com/u/${WORLD_ID}/fluffington.webp`;
+  const removals: Array<{ body: unknown; pin: string | null }> = [];
+  const edgeRemoves: Array<string | null> = [];
+  await page.route(`${V2}/media/remove-ticket`, async (route: Route) => {
+    removals.push({ body: route.request().postDataJSON(), pin: route.request().headers()['api-pin'] ?? null });
+    return route.fulfill({ json: { ticket: 'd1.rm', exp: '2099-01-01T00:00:00Z', key: `u/${WORLD_ID}/fluffington.webp`, referenced: 1 } });
+  });
+  await page.route('https://upload.onlyworlds.com/v1/remove', async (route: Route) => {
+    edgeRemoves.push(route.request().headers()['authorization'] ?? null);
+    return route.fulfill({ json: { removed: `u/${WORLD_ID}/fluffington.webp`, bytes: 10, cache: 'may_linger' } });
+  });
+  const worldId = await page.evaluate(async ([c, url]) => {
+    const api = (window as any).__atlasTestApi;
+    await api.getActiveStore().updateElement(c, { image_url: url });
+    api.patchData(await api.getActiveStore().listElements());
+    return api.getState().active.worldId;
+  }, [CHAR_ID, removable]);
+  await page.evaluate(([w, c]) => { window.location.hash = `#/w/${w}/element/${c}`; }, [worldId, CHAR_ID]);
+
+  const remove = page.locator('[data-action="remove-picture"]');
+  await expect(remove).toBeVisible();
+  // A no to the question asks nothing of keel.
+  page.once('dialog', d => { void d.dismiss(); });
+  await remove.click();
+  await page.waitForTimeout(300);
+  expect(removals).toEqual([]);
+
+  let question = '';
+  page.once('dialog', d => { question = d.message(); void d.accept(); });
+  await remove.click();
+  await expect(page.locator('.ow-toast', { hasText: 'Picture removed from OnlyWorlds' })).toBeVisible();
+  expect(question).toContain('for good');
+  expect(removals).toEqual([{ body: { key: `u/${WORLD_ID}/fluffington.webp` }, pin: SECRET }]);
+  expect(edgeRemoves).toEqual(['Bearer d1.rm']);
+  await expect.poll(() => page.evaluate((c) => {
+    const el = (window as any).__atlasTestApi.getState().data.elements.find((e: any) => e.id === c);
+    return el?.image_url ?? null;
+  }, CHAR_ID)).toBeNull();
+  await expect(remove).toHaveCount(0);
+  expect(seen.tickets).toEqual([]); // nothing was uploaded on the way
+});
