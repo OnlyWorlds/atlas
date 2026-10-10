@@ -23,7 +23,7 @@ Areas: **S** state, routing and rooms · **U** shell and UI · **F** folder and 
 | 91-100 | 91 F · 92 F · 93 X · 94 X · 95 S · 96 W · 97 C · 98 S · 99 W · 100 W |
 | 101-110 | 101 F · 102 X · 103 U · 104 C · 105 F · 106 F · 107 W · 108 W · 109 S · 110 C |
 | 111-121 | 111 F · 112 F · 113 U · 114 F · 115 S · 116 C · 117 W · 118 F · 119 U · 120 U · 121 S |
-| 122-138 | 122 W · 123 F · 124 W · 125 U · 126 U · 127 X · 128 T · 129 F · 130 U · 131 F · 132 X · 133 F · 134 U · 135 W · 136 U · 137 X · 138 U |
+| 122-139 | 122 W · 123 F · 124 W · 125 U · 126 U · 127 X · 128 T · 129 F · 130 U · 131 F · 132 X · 133 F · 134 U · 135 W · 136 U · 137 X · 138 U · 139 W |
 
 ---
 
@@ -141,6 +141,8 @@ Areas: **S** state, routing and rooms · **U** shell and UI · **F** folder and 
 124. **A disk refusal after a server answer stays with its element.** A local write that follows a server answer (a baseline stamp, an adopt after 409, a tombstone clear) runs through `SyncEngine.localStep`: a failure is recorded against that element (`failureOf` keeps `error_name`) and the round goes on; a `CorruptFileError` still ends the round (conv. 99). A held `.atlas/sync-state.json` fails the world-meta step and the round-end persist as a `world` failure, never the round. A create whose only failure is a held stamp was accepted, so it blocks no referrer. Three held stamps in a row in a bulk record the rest at once. A round with a busy failure arms the single 30 s retry, five rounds in a row at most. The toast keeps an element's first busy failure quiet and never re-decides a failure it has seen (`failureToastOnce`). Pull-side writes are not covered yet (banked). Guard: `tests/integration/sync.heldFile.test.ts`. (S368)
 
 135. **An edit sorts past the baseline it was made on.** "Unsynced" is `local_updated_at > server_updated_at`, a device stamp against a SERVER stamp, so a device clock behind keel's made an edit in that window after a sync read clean and never upload. Every local edit is stamped `editStamp(now, server_updated_at)`: now, or the baseline plus 1 ms (`src/store/sync-stamp.ts`, beside `stampedBody`, which does the same for an edit made while a push was in flight; both stores). Found live (S387): keel answers about 1.5 s ahead of the crew's laptop, and Remove picture's cleared image URL, saved a second after the upload's push, never reached keel. Guard: `tests/unit/edit-stamp.test.ts` (both stores, red without it). (S387)
+
+139. **A world's list fields read through `metaList`.** `time_format_names` and `time_format_equivalents` hold strings or whole numbers: the standard types the equivalents as numbers, keel stores them so since ca181a3 (h29 #2723), and older worlds hold strings. `metaList` (`src/core/meta-list.ts`) keeps both as they are and drops anything else, so a round trip never changes a world's shape. Sync's canonical form, the first-calendar offer and the import all read it; three string-only filters had read [1, 7, 30, 365] as an empty list (keel was never written to: sync compared both sides in the same stripped form). Guards: rows in `tests/unit/world-meta-sync.test.ts`, `calendar-seed.test.ts`, `import-reconcile.test.ts` (4, red before the fix). (S389)
 
 ## X. Untrusted data and security
 

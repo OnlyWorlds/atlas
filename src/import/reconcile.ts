@@ -28,6 +28,7 @@ import { relationFieldsFor } from '../editor/field-schema';
 import { rekeyBody } from '../store/rekey-body';
 import { ALL_ELEMENT_TYPES, type Element, type ElementType, type WorldMeta } from '../core/types';
 import { isUuid, keyNT, normName, normalizeRecord } from './normalize';
+import { metaList } from '../core/meta-list';
 import type { ImportPlan, ImportReport, ParseResult, RawRecord, ReconcileOptions } from './types';
 
 const ALL_ELEMENT_TYPES_SET = new Set<string>(ALL_ELEMENT_TYPES);
@@ -331,7 +332,8 @@ function mapWorldBlock(world: RawRecord): Partial<WorldMeta> {
   if (image_url) out.image_url = image_url;
   const tfn = strArr(world.time_format_names);
   if (tfn) out.time_format_names = tfn;
-  const tfe = strArr(world.time_format_equivalents);
+  // Equivalents keep whole numbers as the standard types them (keel ca181a3).
+  const tfe = Array.isArray(world.time_format_equivalents) ? metaList(world.time_format_equivalents) : undefined;
   if (tfe) out.time_format_equivalents = tfe;
   const tbu = str(world.time_basic_unit);
   if (tbu) out.time_basic_unit = tbu;

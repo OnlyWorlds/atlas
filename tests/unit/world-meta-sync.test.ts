@@ -178,3 +178,21 @@ describe('metaFieldLengthError (dig Q9: keel never length-validates)', () => {
     expect(metaFieldLengthError('description', 'x'.repeat(100_000))).toBeNull();
   });
 });
+
+describe('a list holds whole numbers too (keel ca181a3, h29 #2723)', () => {
+  it('time_format_equivalents as the standard types them survives the canonical form', () => {
+    expect(canonicalMetaValue('list', [1, 7, 30, 365])).toEqual([1, 7, 30, 365]);
+    expect(canonicalMetaValue('list', ['Day', 7, null, {}, Number.NaN])).toEqual(['Day', 7]);
+    expect(metaEquals('list', [1, 7], [1, 7])).toBe(true);
+    expect(metaEquals('list', [1, 7], ['1', '7'])).toBe(false);
+  });
+
+  it('a server-side change to numbers pulls; an unchanged one stays quiet', () => {
+    const baseline = pickSyncedMeta({ time_format_equivalents: ['1', '7'] });
+    const pulled = threeWayMetaDiff({ time_format_equivalents: ['1', '7'] }, { time_format_equivalents: [1, 7] }, baseline);
+    expect(pulled.pullFields).toEqual({ time_format_equivalents: [1, 7] });
+    const quiet = threeWayMetaDiff({ time_format_equivalents: [1, 7] }, { time_format_equivalents: [1, 7] }, pickSyncedMeta({ time_format_equivalents: [1, 7] }));
+    expect(quiet.pushFields).toEqual({});
+    expect(quiet.pullFields).toEqual({});
+  });
+});

@@ -76,7 +76,7 @@ export interface WorldMetaWire {
   image_url: string;
   time_basic_unit: string;
   time_format_names: string[];
-  time_format_equivalents: string[];
+  time_format_equivalents: Array<string | number>;
   time_range_min: number | null;
   time_range_max: number | null;
   time_current: number | null;

@@ -52,4 +52,13 @@ describe('parseLegacySeed', () => {
     expect(seed.stepName).toBe(null);
     expect(seed.description).toContain('moon');
   });
+
+  it('equivalents stored as whole numbers name the step the same way (keel ca181a3)', () => {
+    const seed = parseLegacySeed({
+      time_format_names: ['Day', 'Week', 'Month', 'Year'],
+      time_format_equivalents: [1, 7, 30, 365],
+    });
+    expect(seed.stepName).toBe('day');
+    expect(seed.description).toContain('Year = 365');
+  });
 });

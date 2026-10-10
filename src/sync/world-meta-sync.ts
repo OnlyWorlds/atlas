@@ -20,6 +20,8 @@
  *    world name are separate identities (api.world_name mirror, settings).
  */
 
+import { metaList, type MetaListItem } from '../core/meta-list';
+
 export type MetaFieldKind = 'text' | 'label' | 'list' | 'int';
 
 /**
@@ -83,17 +85,18 @@ export const META_FIELD_MAX_LENGTH: Readonly<Record<string, number>> = {
 
 /**
  * Canonical form per kind: text → string ('' when unset/invalid), label →
- * the same trimmed, list → string[] ([] when unset), int → finite number or
- * null. Canonical values compare with plain === (lists element-wise).
+ * the same trimmed, list → its strings and whole numbers ([] when unset;
+ * `metaList`), int → finite number or null. Canonical values compare with
+ * plain === (lists element-wise).
  */
-export function canonicalMetaValue(kind: MetaFieldKind, v: unknown): string | string[] | number | null {
+export function canonicalMetaValue(kind: MetaFieldKind, v: unknown): string | MetaListItem[] | number | null {
   switch (kind) {
     case 'text':
       return typeof v === 'string' ? v : '';
     case 'label':
       return typeof v === 'string' ? v.trim() : '';
     case 'list':
-      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+      return metaList(v);
     case 'int':
       return typeof v === 'number' && Number.isFinite(v) ? v : null;
   }
@@ -103,8 +106,8 @@ export function metaEquals(kind: MetaFieldKind, a: unknown, b: unknown): boolean
   const ca = canonicalMetaValue(kind, a);
   const cb = canonicalMetaValue(kind, b);
   if (kind === 'list') {
-    const la = ca as string[];
-    const lb = cb as string[];
+    const la = ca as MetaListItem[];
+    const lb = cb as MetaListItem[];
     return la.length === lb.length && la.every((x, i) => x === lb[i]);
   }
   return ca === cb;
@@ -128,7 +131,7 @@ export function isMetaEmpty(field: string, v: unknown): boolean {
   const kind = META_SYNC_FIELDS[field];
   if (!kind) return true;
   const c = canonicalMetaValue(kind, v);
-  if (kind === 'list') return (c as string[]).length === 0;
+  if (kind === 'list') return (c as MetaListItem[]).length === 0;
   if (kind === 'text' || kind === 'label') return c === '';
   return c === null;
 }

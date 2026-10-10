@@ -592,7 +592,9 @@ export class OwV2ClientAdapter implements OwApiClient {
  */
 function adaptWorldMetaBody(src: Record<string, unknown>): WorldMetaWire {
   const text = (v: unknown): string => canonicalMetaValue('text', v) as string;
-  const list = (v: unknown): string[] => canonicalMetaValue('list', v) as string[];
+  const list = (v: unknown): Array<string | number> => canonicalMetaValue('list', v) as Array<string | number>;
+  // Names are words; a stray number in them reads as its digits.
+  const words = (v: unknown): string[] => list(v).map(String);
   const int = (v: unknown): number | null => canonicalMetaValue('int', v) as number | null;
   return {
     id: src.id as string,
@@ -600,7 +602,7 @@ function adaptWorldMetaBody(src: Record<string, unknown>): WorldMetaWire {
     description: text(src.description),
     image_url: text(src.image_url),
     time_basic_unit: text(src.time_basic_unit),
-    time_format_names: list(src.time_format_names),
+    time_format_names: words(src.time_format_names),
     time_format_equivalents: list(src.time_format_equivalents),
     time_range_min: int(src.time_range_min),
     time_range_max: int(src.time_range_max),

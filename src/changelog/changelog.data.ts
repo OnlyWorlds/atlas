@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.28.1',
+    date: '2026-10-10',
+    theme: 'numbers stay numbers',
+    entries: [
+      {
+        id: 'time-equivalents-numbers',
+        title: 'Time units keep their numbers',
+        body: 'OnlyWorlds now stores a world\'s time unit equivalents as numbers (a week is 7 days), as the standard types them. Atlas read only words in that list, so a world saved that way arrived with the list empty and no calendar to offer. Atlas now keeps numbers and words both, exactly as they are.',
+        tags: ['sync', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.28.0',
     date: '2026-10-10',
     theme: 'places, not pins',

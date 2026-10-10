@@ -12,6 +12,8 @@
  * hand in the builder, which is open in front of them when this seeds it.
  */
 
+import { metaList } from './meta-list';
+
 export interface LegacySeed {
   /** True when either legacy field carries content — gate 1 of the mint offer. */
   present: boolean;
@@ -25,10 +27,8 @@ const MAX_ENTRIES = 24;
 const MAX_ENTRY_LEN = 64;
 
 function cleanList(v: unknown): string[] {
-  if (!Array.isArray(v)) return [];
-  return v
-    .filter((x): x is string => typeof x === 'string')
-    .map((s) => s.trim().slice(0, MAX_ENTRY_LEN))
+  return metaList(v)
+    .map((s) => String(s).trim().slice(0, MAX_ENTRY_LEN))
     .filter((s) => s !== '')
     .slice(0, MAX_ENTRIES);
 }

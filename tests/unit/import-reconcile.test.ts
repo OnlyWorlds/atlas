@@ -247,6 +247,15 @@ describe('reconcile — world block mapping (full-world)', () => {
     expect('distance_unit' in wm).toBe(false);
   });
 
+  it('keeps time equivalents stored as whole numbers (keel ca181a3)', () => {
+    const parsed = parsePayload({
+      World: { name: 'Clock', time_format_names: ['Day', 'Week'], time_format_equivalents: [1, 7] },
+      Character: [{ id: U.kid, name: 'The Kid' }],
+    });
+    const wm = reconcile(parsed, [], { genId: genIdFactory() }).worldMeta!;
+    expect(wm.time_format_equivalents).toEqual([1, 7]);
+  });
+
   it('omits worldMeta for loose payloads', () => {
     const parsed = parsePayload({ Character: [{ name: 'A' }] });
     const plan = reconcile(parsed, [], { genId: genIdFactory() });

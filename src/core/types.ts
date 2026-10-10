@@ -215,7 +215,7 @@ export interface WorldMeta {
   };
   /** Time format config — passes through to OW schema. */
   time_format_names?: string[];
-  time_format_equivalents?: string[];
+  time_format_equivalents?: Array<string | number>;
   time_basic_unit?: string;
   time_current?: number;
   time_range_min?: number;
