@@ -781,11 +781,13 @@ export function getEditorSettings(reg: WorldsRegistry): {
   refs_group_by_field: boolean;
   confirm_before_delete: boolean;
   show_element_images: boolean;
+  hide_empty_fields: boolean;
 } {
   return {
     field_edit_mode: reg.editor_settings?.field_edit_mode ?? 'modal',
     refs_group_by_field: reg.editor_settings?.refs_group_by_field ?? false,
     confirm_before_delete: reg.editor_settings?.confirm_before_delete ?? true,
     show_element_images: reg.editor_settings?.show_element_images ?? true,
+    hide_empty_fields: reg.editor_settings?.hide_empty_fields ?? false,
   };
 }

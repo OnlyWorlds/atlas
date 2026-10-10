@@ -27,6 +27,7 @@ export function renderElementsTab(): string {
   const refsByField = editor.refs_group_by_field;
   const confirmDelete = editor.confirm_before_delete;
   const showImages = editor.show_element_images;
+  const hideEmpty = editor.hide_empty_fields;
   const defaultCreateType = loadUiPrefs().defaultCreateType;
   const createTypeOptions = CREATABLE_TYPES
     .map((t) => `<option value="${t}" ${t === defaultCreateType ? 'selected' : ''}>${ELEMENT_LABELS[t].singular}</option>`)
@@ -75,6 +76,10 @@ export function renderElementsTab(): string {
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="show-element-images" ${showImages ? 'checked' : ''} />
         <span>Show element images (detail view banner + web pane thumbnail)</span>
+      </label>
+      <label class="atlas-settings-toggle">
+        <input type="checkbox" name="hide-empty-fields" ${hideEmpty ? 'checked' : ''} />
+        <span>Hide empty fields on element pages. An element with nothing filled in still shows its first section.</span>
       </label>
     </section>
   `;
@@ -125,6 +130,15 @@ export function wireElementsTab(toasts: ToastManager): void {
     saveRegistry(next);
     patchSlice('registry', next);
     toasts.info(`Element images ${showImagesToggle.checked ? 'shown' : 'hidden'}`);
+  });
+
+  // Hide empty fields (#24): also flipped from the line under an element's fields.
+  const hideEmptyToggle = document.querySelector<HTMLInputElement>('.atlas-settings input[name="hide-empty-fields"]');
+  hideEmptyToggle?.addEventListener('change', () => {
+    const next = setEditorSettings(getState().registry, { hide_empty_fields: hideEmptyToggle.checked });
+    saveRegistry(next);
+    patchSlice('registry', next);
+    toasts.info(`Empty fields ${hideEmptyToggle.checked ? 'hidden' : 'shown'}`);
   });
 
   // Default new-element type — an app-level UI pref (localStorage), read by

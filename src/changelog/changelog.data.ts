@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.27.0',
+    date: '2026-10-10',
+    theme: 'only what is there',
+    entries: [
+      {
+        id: 'hide-empty-fields',
+        title: 'Hide empty fields',
+        body: 'An element page can show only the fields that hold something: a new character was a wall of 38 empty rows. Switch it under the fields ("Hide the 21 empty fields", "Show them") or in Settings, Elements. An element with nothing filled in still shows its first section, so there is always somewhere to start.',
+        tags: ['editor'],
+      },
+    ],
+  },
+  {
     version: '1.26.5',
     date: '2026-10-10',
     theme: 'whole names',

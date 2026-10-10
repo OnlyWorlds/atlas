@@ -30,6 +30,7 @@ import { buildPictureUploadRow, pictureWorld } from './element-detail-picture';
 import { renderReferencedBy } from './element-detail-refs';
 import { buildWarRecordSection } from './element-detail-war-record';
 import { renderSection } from './element-detail-fields';
+import { filledSections, isFieldFilled } from './filled-fields';
 import { renderHeader, isEditingIn } from './element-detail-header';
 import { renderElementImage } from '../ui/element-image';
 import { escapeText, relativeTime } from '../core/dom-utils';
@@ -191,26 +192,22 @@ export function mountElementDetail(target: HTMLElement): () => void {
     // round, S299): a beginner's first element pages show only sections that
     // carry content. If nothing is populated, the first section stays so the
     // page never renders fieldless.
-    if (isTourFlagActive()) {
-      const rec = el as Record<string, unknown>;
-      const populated = (name: string) => {
-        const v = rec[name];
-        if (v === null || v === undefined) return false;
-        if (typeof v === 'string') return v.trim().length > 0;
-        if (Array.isArray(v)) return v.length > 0;
-        return true;
-      };
-      // S311 (Captain): empty FIELDS hide too, not just empty sections — a
-      // beginner's element pages show only rows that carry content. S317
-      // refinement (Captain): Base shows its FULL field set only on the
-      // consul step, where the copy teaches "a set of shared base fields" —
-      // the tour-bar stamps `atlas-tour-basefull` for exactly that step.
-      // Every later step hides Base's empty rows like any other section.
-      const baseFull = document.body.classList.contains('atlas-tour-basefull');
-      const kept = sections
-        .map((s, i) => (i === 0 && baseFull) ? s : ({ ...s, fields: s.fields.filter(f => populated(f.name)) }))
-        .filter(s => s.fields.length > 0);
-      sections = kept.length > 0 ? kept : sections.slice(0, 1);
+    // S311 (Captain): empty FIELDS hide too, not just empty sections — a
+    // beginner's element pages show only rows that carry content. S317
+    // refinement (Captain): Base shows its FULL field set only on the
+    // consul step, where the copy teaches "a set of shared base fields" —
+    // the tour-bar stamps `atlas-tour-basefull` for exactly that step.
+    // Every later step hides Base's empty rows like any other section.
+    // Outside the tour the same rule is the "Hide empty fields" setting (#24).
+    const touring = isTourFlagActive();
+    const hideEmpty = touring || getEditorSettings(getState().registry).hide_empty_fields;
+    let hiddenCount = 0;
+    const allFieldCount = sections.reduce((n, s) => n + s.fields.length, 0);
+    if (hideEmpty) {
+      const baseFull = touring && document.body.classList.contains('atlas-tour-basefull');
+      const filled = filledSections(sections, el, { keepFirstWhole: baseFull });
+      sections = filled.sections;
+      hiddenCount = filled.hidden;
     }
     sections.forEach((section) => {
       // Base collapses like every other section (Captain, S311 — it was the
@@ -218,6 +215,12 @@ export function mountElementDetail(target: HTMLElement): () => void {
       const sectionEl = renderSection(section, el, false);
       if (sectionEl) detail.appendChild(sectionEl);
     });
+    // The setting's own switch, where the rows are (#24). Not in the tour.
+    if (!touring) {
+      const emptyCount = hideEmpty ? hiddenCount
+        : sections.reduce((n, s) => n + s.fields.filter(f => !isFieldFilled(el, f.name)).length, 0);
+      if (emptyCount > 0) detail.appendChild(buildEmptyFieldsToggle(hideEmpty, emptyCount));
+    }
 
     // Map-specific: the "Local image" row, directly under the image_url row
     // (folder-stored file as map background; session 253).
@@ -270,6 +273,35 @@ export function mountElementDetail(target: HTMLElement): () => void {
     }
   }
 
+
+  /**
+   * "12 empty fields hidden · Show them", or "Hide the 12 empty fields": the
+   * Hide empty fields setting (#24), flipped where the rows are. The same
+   * switch sits in Settings, Elements.
+   */
+  function buildEmptyFieldsToggle(hiding: boolean, count: number): HTMLElement {
+    const line = document.createElement('div');
+    line.className = 'atlas-empty-fields-toggle';
+    const fields = `${count} empty field${count === 1 ? '' : 's'}`;
+    if (hiding) {
+      const note = document.createElement('span');
+      note.textContent = `${fields} hidden`;
+      line.append(note, document.createTextNode(' · '));
+    }
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'atlas-btn-ghost';
+    btn.dataset.action = hiding ? 'show-empty-fields' : 'hide-empty-fields';
+    btn.textContent = hiding ? (count === 1 ? 'Show it' : 'Show them')
+      : count === 1 ? 'Hide the empty field' : `Hide the ${fields}`;
+    btn.addEventListener('click', () => {
+      const next = setEditorSettings(getState().registry, { hide_empty_fields: !hiding });
+      saveRegistry(next);
+      patchSlice('registry', next);
+    });
+    line.appendChild(btn);
+    return line;
+  }
 
   // ====== Footer ======
 

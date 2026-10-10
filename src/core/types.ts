@@ -855,6 +855,12 @@ export interface WorldsRegistry {
      * icon-thumbnail flip this same setting in place (session 239).
      */
     show_element_images?: boolean;
+    /**
+     * Element pages show only the fields that hold something (#24: a new
+     * character was ~25 dash rows). An element with nothing filled keeps its
+     * first section whole. Default off; the line under the fields flips it.
+     */
+    hide_empty_fields?: boolean;
   };
 }
 
