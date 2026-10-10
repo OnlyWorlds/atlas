@@ -205,6 +205,13 @@ export interface WorldMeta {
     /** View-only world (S264) — mirror of the registry flag so root discovery
      *  (registry wiped, folder survives) restores view-only status. */
     read_only?: boolean;
+    /**
+     * Opened as an agent seat (#104, S385): its writes carry the seat's own
+     * secret, never the account PIN. Mirrored so discovery knows the world is
+     * a seat. The secret itself is NEVER here (`WorldRegistryEntry.api.seat_secret`):
+     * the folder travels, and the store strips it at every write.
+     */
+    seat?: { role?: string };
   };
   /** Time format config — passes through to OW schema. */
   time_format_names?: string[];
@@ -467,6 +474,14 @@ export interface WorldRegistryEntry {
      * seam. Mirrored in `WorldMeta.api.read_only` so discovery restores it.
      */
     read_only?: boolean;
+    /** An agent seat (#104, S385); mirrored in `WorldMeta.api.seat`. Read through `worldPin`. */
+    seat?: { role?: string };
+    /**
+     * The seat's own `ow_s_` secret: this world's PIN, in this browser only
+     * (never in world.json). Absent on a seat world means this browser lost
+     * it, and the world is opened again from onlyworlds.com.
+     */
+    seat_secret?: string;
   };
   /**
    * Server world id this entry was PREVIOUSLY linked to (set by unlink /

@@ -98,6 +98,22 @@ describe('openWorldFile', () => {
     expect(meta).toMatchObject({ id: WID, api: { world_id: 'srv-1', api_key: 'ow_w_key' } });
   });
 
+  it('a cleared seat world restores its seat marker, never its secret (conv. 132, S386 gate)', async () => {
+    const SECRET = 'ow_s_' + 'S'.repeat(32);
+    const cleared: WorldRegistryEntry = {
+      id: 'w1', name: 'Hollow Reach', state: 'api-linked', where: 'browser', cleared_at: '2026-10-05T09:00:00.000Z',
+      created_at: '2026-10-05T00:00:00.000Z',
+      api: { world_id: 'srv-1', api_key: 'ow_w_seat', seat: { role: 'contributor' }, seat_secret: SECRET },
+      folder: { handle_key: `world-${WID}`, folder_name: 'hollow-reach-0192a000-dead' },
+    };
+    patchSlice('registry', { ...defaultRegistry(), worlds: [cleared] });
+    expect(await openWorldFile(worldZip())).toEqual({ kind: 'restored', worldId: 'w1' });
+    const raw = (home.children.get(reg().worlds[0].folder.folder_name) as FakeDirHandle).get('world.json')!;
+    expect(raw).not.toContain(SECRET);
+    expect(JSON.parse(raw)).toMatchObject({ api: { world_id: 'srv-1', api_key: 'ow_w_seat', seat: { role: 'contributor' } } });
+    expect(reg().worlds[0].api?.seat_secret).toBe(SECRET);
+  });
+
   it('a full browser storage mid-write leaves no directory and no entry, and says so', async () => {
     const real = FakeFileHandle.prototype.createWritable;
     FakeFileHandle.prototype.createWritable = async function (this: FakeFileHandle, o?: { keepExistingData?: boolean }) {

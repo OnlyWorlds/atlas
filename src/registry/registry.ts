@@ -212,6 +212,9 @@ export interface CreateApiLinkedWorldOpts {
   apiWorldName?: string;
   /** View-only world linked with a READ key (S264) — no PIN, engine pull-only. */
   readOnly?: boolean;
+  /** Linked as an agent seat (#104): the marker, and its secret when this browser holds it. */
+  seat?: { role?: string };
+  seatSecret?: string;
 }
 
 /**
@@ -229,6 +232,10 @@ export function createApiLinkedWorld(
   };
   if (opts.apiWorldName) apiBlock.world_name = opts.apiWorldName;
   if (opts.readOnly) apiBlock.read_only = true;
+  if (opts.seat && !opts.readOnly) {
+    apiBlock.seat = { ...opts.seat };
+    if (opts.seatSecret) apiBlock.seat_secret = opts.seatSecret;
+  }
   const entry: WorldRegistryEntry = {
     id: crypto.randomUUID(),
     name: opts.name.trim() || 'untitled world',
@@ -255,7 +262,7 @@ export function createApiLinkedWorld(
 export function attachApi(
   reg: WorldsRegistry,
   worldId: string,
-  api: { worldId: string; apiKey: string; worldName?: string }
+  api: { worldId: string; apiKey: string; worldName?: string; seatSecret?: string }
 ): WorldsRegistry {
   return {
     ...reg,
@@ -266,6 +273,8 @@ export function attachApi(
         api_key: api.apiKey,
       };
       if (api.worldName) apiBlock.world_name = api.worldName;
+      // Linked with a seat's key and secret (#104): the secret is this world's.
+      if (api.seatSecret) { apiBlock.seat = {}; apiBlock.seat_secret = api.seatSecret; }
       // Making a world online also un-demos it (Bout OW class rule): the
       // world is genuinely the user's now, so gestures in it count.
       // A former-link memory is stale the moment a live link exists.

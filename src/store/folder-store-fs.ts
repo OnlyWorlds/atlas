@@ -103,6 +103,7 @@ interface LayoutScan {
 import { PerIdWriteChain } from './write-chain';
 import { stampedBody } from './sync-stamp';
 import { scrubReferrers } from './scrub-links';
+import { withoutSeatSecret } from '../core/seat';
 import {
   elementDirSegmentsIn,
   elementFilename,
@@ -1427,7 +1428,8 @@ export class FsFolderStore implements FolderStore {
       const stamp = born && patch.format_version === undefined
         ? { format_version: FOLDER_FORMAT_VERSION }
         : {};
-      const next: WorldMeta = { ...current, ...stamp, ...patch };
+      // A seat's secret never reaches the folder (#104): the folder travels.
+      const next: WorldMeta = withoutSeatSecret({ ...current, ...stamp, ...patch });
       await writeJsonAtomic(this.requireRoot(), WORLD_META_FILE, next);
       return next;
     });

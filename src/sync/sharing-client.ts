@@ -59,7 +59,7 @@ export type SharingErrorCode =
   | 'slug_taken' | 'slug_invalid' | 'quota_exceeded' | 'payload_too_large'
   | 'title_too_long' | 'intent_invalid'
   | 'revoked' | 'not_found' | 'rate_limited' | 'admin_locked'
-  | 'forbidden' | 'unauthorized'
+  | 'forbidden' | 'unauthorized' | 'owner_only'
   | 'auth_failed' | 'network' | 'unknown';
 
 export class SharingApiError extends Error {
@@ -96,6 +96,8 @@ export function sharingErrorMessage(err: SharingApiError): string {
     // As-built: 403 forbidden fires only for demo-world writes (cross-account
     // mutations are existence-hidden 404s).
     case 'forbidden': return 'This world doesn\'t allow publishing.';
+    // A contributor or guest seat (keel sharing `_require_page_manager`, #104).
+    case 'owner_only': return 'Only the world\'s owner or a co-builder can publish, change or revoke its pages.';
     case 'unauthorized':
     case 'auth_failed': return 'Authentication failed. Check the world\'s API key and PIN in settings.';
     case 'network': return 'Could not reach the sharing server.';
@@ -262,7 +264,7 @@ const KNOWN_CODES: ReadonlySet<string> = new Set([
   'slug_taken', 'slug_invalid', 'quota_exceeded', 'payload_too_large',
   'title_too_long', 'intent_invalid',
   'revoked', 'not_found', 'rate_limited', 'admin_locked',
-  'forbidden', 'unauthorized',
+  'forbidden', 'unauthorized', 'owner_only',
 ]);
 
 function isKnownCode(raw: string): raw is SharingErrorCode {

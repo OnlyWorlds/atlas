@@ -147,6 +147,28 @@ describe('linking a world into this browser', () => {
     expect(home()?.children.size ?? 0).toBe(0);
   });
 
+  it('a seat link keeps its secret on the world, never as the account PIN, never in world.json (#104)', async () => {
+    const secret = 'ow_s_' + 'b'.repeat(32);
+    patchSlice('registry', { ...getState().registry, pin: '1234' });
+    const result = await link({ apiKey: 'ow_w_seatkey', apiPin: secret, seat: { role: 'contributor' } });
+    const entry = getState().registry.worlds.find(w => w.id === result.entry.id)!;
+    expect(entry.api?.seat).toEqual({ role: 'contributor' });
+    expect(entry.api?.seat_secret).toBe(secret);
+    expect(getState().registry.pin).toBe('1234');
+    const meta = await getActiveStore()!.readWorldMeta();
+    expect(meta.api?.seat).toEqual({ role: 'contributor' });
+    expect(JSON.stringify(meta)).not.toContain(secret);
+  });
+
+  it('a seat secret typed as the PIN, with no account PIN set, makes a seat and leaves the account PIN empty', async () => {
+    const secret = 'ow_s_' + 'c'.repeat(32);
+    const result = await link({ apiPin: secret });
+    const entry = getState().registry.worlds.find(w => w.id === result.entry.id)!;
+    expect(entry.api?.seat).toEqual({});
+    expect(entry.api?.seat_secret).toBe(secret);
+    expect(getState().registry.pin).toBeUndefined();
+  });
+
   it('a full origin is fatal at the first refused write: the sentence, nothing kept, nothing written after', async () => {
     let calls = 0;
     const real = MockFolderStore.prototype.applyServerRecord;

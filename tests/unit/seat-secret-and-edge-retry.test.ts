@@ -1,8 +1,8 @@
 /**
  * The two S380 changes riding 1.17, guarded (S381).
  *
- * - The PIN prompt takes a four-digit PIN OR an agent seat's secret
- *   (`ow_s_` + urlsafe characters, keel accounts/agents.py), and refuses
+ * - The PIN prompt takes the four-digit account PIN and names a seat secret
+ *   (`ow_s_`, keel accounts/agents.py) to refuse it (S386); it refuses
  *   anything else with its line.
  * - The map edge colour retries a failed http(s) read once under
  *   `atlas-pixels=1`, past the header-less copy the overlay's plain <img>
@@ -21,28 +21,39 @@ function submit(value: string): void {
     .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 }
 
-describe('the PIN prompt takes a PIN or a seat secret', () => {
+// S386: the prompt's one caller asks for the ACCOUNT PIN, saved for every
+// account world; a seat secret there became `registry.pin` (an R1 breach the
+// gate found), so the prompt now names a seat secret and refuses it.
+describe('the PIN prompt takes the account PIN, never a seat secret', () => {
   beforeEach(() => { document.body.innerHTML = ''; });
 
-  it.each([['1234'], [SECRET], [`  ${SECRET}  `]])('accepts %j', async (value) => {
+  it.each([['1234'], [' 1234 ']])('accepts %j', async (value) => {
     const p = new PinPromptModal().prompt('Opening the world.');
     submit(value);
     expect(await p).toBe(value.trim());
   });
 
+  async function refused(value: string): Promise<string | null> {
+    const p = new PinPromptModal().prompt('Opening the world.');
+    submit(value);
+    const err = document.querySelector<HTMLElement>('[data-role="error"]')!;
+    expect(err.hidden).toBe(false);
+    const line = err.textContent;
+    document.querySelector<HTMLElement>('[data-action="cancel"]')!.click();
+    expect(await p).toBeNull();
+    return line;
+  }
+
+  it.each([[SECRET], [`  ${SECRET}  `]])('refuses the seat secret %j by name', async (value) => {
+    expect(await refused(value)).toBe('That is a seat secret, which opens one world. Here Atlas needs your account PIN: four digits.');
+  });
+
   it.each([['12345'], ['abcd'], ['ow_s_short'], ['ow_x_' + 'a'.repeat(32)], ['ow_s_' + 'a'.repeat(31) + '!']])(
     'refuses %j with its line', async (value) => {
-      const modal = new PinPromptModal();
-      const p = modal.prompt('Opening the world.');
-      submit(value);
-      const err = document.querySelector<HTMLElement>('[data-role="error"]')!;
-      expect(err.hidden).toBe(false);
-      expect(err.textContent).toBe('The PIN is four digits, or a seat secret starting ow_s_.');
-      document.querySelector<HTMLElement>('[data-action="cancel"]')!.click();
-      expect(await p).toBeNull();
+      expect(await refused(value)).toBe('The PIN is four digits.');
     });
 
-  it('lets a whole secret into the field', async () => {
+  it('lets a whole secret into the field, so it is named rather than cut', async () => {
     const p = new PinPromptModal().prompt('Opening the world.');
     const input = document.querySelector<HTMLInputElement>('input[name="pin"]')!;
     expect(input.maxLength).toBeGreaterThanOrEqual(SECRET.length);

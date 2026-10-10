@@ -20,6 +20,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { diskApiBlock, isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
 import { setActiveStore, evictParkedStore, awaitEviction } from '../core/active-store';
 import { enqueueActivationTask } from '../core/activation-chain';
 import { withWorldLock } from '../core/browser-home';
@@ -81,8 +82,9 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<{ entry: 
     throw new PlainError('This world was never online, so there is no copy to download. Open a world file of it instead.');
   }
   const readOnly = !!entry.api.read_only;
-  const pin = readOnly ? '' : (getState().registry.pin ?? '');
+  const pin = readOnly ? '' : (worldPin(entry, getState().registry) ?? '');
   if (!readOnly && !pin) {
+    if (isSeatWorld(entry)) throw new PlainError(SEAT_SECRET_MISSING_LINE);
     throw new PlainError('Atlas needs your OnlyWorlds PIN to download this world. Enter it in Settings, under OnlyWorlds, then try again.');
   }
   const ownId = ownWorldIdOf(entry);
@@ -94,7 +96,7 @@ async function run(worldId: string, opts: BringDownAgainOpts): Promise<{ entry: 
   const { store, subName, make } = await scaffoldBrowserWorld(entry.name, ownId);
   let downloaded;
   try {
-    await store.writeWorldMeta({ id: ownId, name: entry.name, api: { ...entry.api } });
+    await store.writeWorldMeta({ id: ownId, name: entry.name, api: diskApiBlock(entry.api) });
     downloaded = await initialDownloadAll(store, buildV2Adapter(entry.api.api_key, pin), opts.onProgress, undefined, { stopOnQuota: true });
   } catch (err) {
     return abandonBrowserMake(store, make, err, 'downloading the world');

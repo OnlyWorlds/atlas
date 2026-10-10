@@ -40,6 +40,8 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/leave-flush.ts`: leaving a world flushes the rooms (conv. 95): a room with a debounced save registers `onLeaveWorld`.
 - `src/core/map-flip.ts`: "Flip pins and zones", the remedy for maps placed before y went bottom-left (conv. 97).
 - `src/core/dom-utils.ts`: `escapeText` and the other untrusted-data helpers (conv. 93).
+- `src/core/seat.ts`: AGENT SEATS (S385, conv. 132): `worldPin` (the one PIN reader for a world's calls), `isSeatSecret`, `seatFromFile`, `diskApiBlock`, `withoutSeatSecret`.
+- `src/core/join-capture.ts`: the `#/join/` code out of the address bar first (contract R2), held in memory for the door.
 
 ## src/store
 
@@ -150,6 +152,7 @@ The guided tour (DESIGN_TOUR).
 ## src/setup, src/import, src/changelog, the rest
 
 - `src/setup/atlas-root-flow.ts`: `setupAtlasRoot` + `recoverAtlasRoot` + `discoverWorldsInRoot` + `openWorldFolder` + the link flow; browser-world scaffolding (1.17).
+- `src/setup/join-door.ts`: THE JOIN DOOR (S385, OW Infra #104): `previewJoin` / `redeemJoin` against keel's `/join`, `openJoinedWorld` (download as a seat, or open, adopt, say spare), the R5 sentences; the dialog is `src/ui/join-world-modal.ts` (`runPendingJoin`).
 - `src/setup/world-doors.ts`: THE WORLD DOORS (conv. 114): open a picked world in place; `ensureAtlasRoot`; `runAddWorldAction`.
 - `src/setup/world-parent.ts`: where a new world goes (1.17): `defaultWorldWhere`, the persist ask, the where captions.
 - `src/setup/browser-world-delete.ts`: Delete for a browser world (1.17, conv. 129): close first, remove, then drop the entry; a failure keeps both.

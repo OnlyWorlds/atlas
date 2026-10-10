@@ -29,6 +29,7 @@ import { clearedOwnTwin, isQuotaError, openBrowserMake, withWorldLock, worldAlre
 import { createLocalWorld, saveRegistry, updateWorldEntry } from '../registry/registry';
 import type { WorldRegistryEntry, WorldsRegistry } from '../core/types';
 import type { WorldFileEntry } from '../store/world-file';
+import { diskApiBlock } from '../core/seat';
 
 export type OpenWorldFileOutcome =
   | { kind: 'opened' | 'restored'; worldId: string }
@@ -105,7 +106,9 @@ async function openRead(read: { worldId: string; worldName: string; files: World
   if (restore?.api) {
     // The link goes back from this browser's registry, never from the file.
     const meta = JSON.parse(new TextDecoder().decode(worldJson)) as Record<string, unknown>;
-    worldJson = new TextEncoder().encode(JSON.stringify({ ...meta, api: restore.api }, null, 2) + '\n');
+    // diskApiBlock: the mirrored flags, never a seat's secret (conv. 132);
+    // these bytes skip the store's writeWorldMeta and its strip.
+    worldJson = new TextEncoder().encode(JSON.stringify({ ...meta, api: diskApiBlock(restore.api) }, null, 2) + '\n');
   }
 
   const make = await openBrowserMake(read.worldName, read.worldId);

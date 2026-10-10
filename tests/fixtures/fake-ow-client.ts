@@ -233,6 +233,7 @@ export class FakeOwApiClient implements OwApiClient {
     const wireBody = stripUndefined(body);
     this.calls.push({ method: 'update', type, id, body: { ...wireBody } });
     this.throwIfInjected('update', id);
+    this.throwIfMemberRefuses('element', id);
     rejectDoubleSuffix(type, wireBody, 'update');
     rejectAtlasLocalFields(type, wireBody, 'update');
     const m = this.bucket(type);
@@ -253,6 +254,7 @@ export class FakeOwApiClient implements OwApiClient {
     this.throwIfWritePermission();
     this.calls.push({ method: 'delete', type, id });
     this.throwIfInjected('delete', id);
+    this.throwIfMemberRefuses('element', id);
     // v2 contract: DELETE is IDEMPOTENT — a missing id returns 204, same as
     // success (probed 2026-07-12). The engine's 404 catch-arm survives as
     // legacy tolerance; tests that want to exercise it inject a 404 via
@@ -304,6 +306,7 @@ export class FakeOwApiClient implements OwApiClient {
     this.throwIfWritePermission();
     const wireBody = stripUndefined(fields);
     this.calls.push({ method: 'patchWorldMeta', body: { ...wireBody } });
+    this.throwIfMemberRefuses('world');
     const keys = Object.keys(wireBody);
     // Unknown-field pass first (whole PATCH aborts), then per-field type.
     for (const k of keys) {
@@ -615,6 +618,44 @@ export class FakeOwApiClient implements OwApiClient {
    */
   __get_world_meta_state(): Record<string, unknown> {
     return this.cloneWorldMeta() as unknown as Record<string, unknown>;
+  }
+
+  /**
+   * Test seam (#104, conv. 20): the key is a member's seat. keel then refuses
+   * a PATCH /world from any member (403 `owner_only`) and, for a contributor,
+   * any change or delete of an element someone else made (403 `not_author`).
+   * "Someone else's" = every element the world held when the seat was set,
+   * plus any named later with `__mark_made_by_someone_else`.
+   */
+  __as_member_seat(role: 'contributor' | 'co_builder' | 'guest' | null): void {
+    this.memberRole = role;
+    this.othersIds = new Set();
+    if (role === 'contributor') {
+      for (const m of this.byType.values()) for (const id of m.keys()) this.othersIds.add(id);
+    }
+  }
+
+  __mark_made_by_someone_else(id: string): void {
+    this.othersIds.add(id);
+  }
+
+  private memberRole: 'contributor' | 'co_builder' | 'guest' | null = null;
+  private othersIds = new Set<string>();
+
+  private throwIfMemberRefuses(op: 'element' | 'world', id?: string): void {
+    if (!this.memberRole) return;
+    let code: 'owner_only' | 'not_author' | null = null;
+    if (op === 'world') code = 'owner_only';
+    else if (this.memberRole !== 'co_builder' && id && this.othersIds.has(id)) code = 'not_author';
+    if (!code) return;
+    const err = new Error(code === 'owner_only'
+      ? "API Error 403: Only the world's owner can change its settings."
+      : 'API Error 403: You can change only elements you created.') as
+      Error & { status?: number; code?: string; param?: string | null };
+    err.status = 403;
+    err.code = code;
+    err.param = null;
+    throw err;
   }
 
   private throwIfWritePermission(): void {

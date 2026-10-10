@@ -28,6 +28,7 @@ import { getState, patchSlice } from '../core/state';
 import { attachApi, saveRegistry, setPin, setEmail, findLinkedWorld } from '../registry/registry';
 import { completeWaypoint } from '../core/waypoints';
 import { isBrowserWorld } from '../core/browser-worlds';
+import { isSeatSecret } from '../core/seat';
 
 /** Taking a browser world online gives it a copy outside this browser (contract §6.2); a folder world already had one. */
 function completeKeepCopyIfBrowserWorld(): void {
@@ -147,7 +148,7 @@ export class MakeOnlineModal extends BaseModal {
           </label>
           <label class="atlas-modal-field">
             <span>PIN</span>
-            <input class="atlas-input" type="password" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="8" autocomplete="off" />
+            <input class="atlas-input" type="password" name="create-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="64" autocomplete="off" />
           </label>
           <div class="atlas-modal-error" data-role="create-error" hidden></div>
           <div class="atlas-modal-progress" data-role="create-progress" hidden></div>
@@ -169,7 +170,7 @@ export class MakeOnlineModal extends BaseModal {
           </label>
           <label class="atlas-modal-field">
             <span>PIN</span>
-            <input class="atlas-input" type="password" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="8" autocomplete="off" />
+            <input class="atlas-input" type="password" name="link-pin" value="${escapeAttr(prefilledPin)}" placeholder="Four-digit PIN" maxlength="64" autocomplete="off" />
           </label>
           <fieldset class="atlas-modal-field atlas-policy-fieldset">
             <legend>On duplicate (same name + type)</legend>
@@ -354,9 +355,11 @@ export class MakeOnlineModal extends BaseModal {
       // 5. Registry transition + persist global creds.
       const active = getState().active!;
       let reg = getState().registry;
-      if (!reg.pin) reg = setPin(reg, pin);
+      // A seat's secret is this world's PIN only (#104), never the account's.
+      const seatSecret = isSeatSecret(pin) ? pin : undefined;
+      if (!reg.pin && !seatSecret) reg = setPin(reg, pin);
       if (!reg.email) reg = setEmail(reg, email);
-      reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey, worldName: world.name });
+      reg = attachApi(reg, active.worldId, { worldId: world.id, apiKey, worldName: world.name, seatSecret });
       saveRegistry(reg);
       patchSlice('registry', reg);
 
@@ -365,7 +368,7 @@ export class MakeOnlineModal extends BaseModal {
       //    divergence display without a network fetch — atlas-root-flow's
       //    world rescan already reads world.json on import.
       await folder.writeWorldMeta({
-        api: { world_id: world.id, api_key: apiKey, ...(world.name ? { world_name: world.name } : {}) },
+        api: { world_id: world.id, api_key: apiKey, ...(world.name ? { world_name: world.name } : {}), ...(seatSecret ? { seat: {} } : {}) },
         // Un-demo on make-online (attachApi drops the registry mirror; the
         // merge + stringify drops an undefined key from world.json).
         demo: undefined,
@@ -507,14 +510,16 @@ export class MakeOnlineModal extends BaseModal {
           // 3. Registry transition + persist creds (read now: the id move
           //    rewrote this world's entry).
           let reg = getState().registry;
-          if (!reg.pin) reg = setPin(reg, pin);
-          reg = attachApi(reg, worldId, { worldId: world.id!, apiKey, worldName: world.name });
+          // A seat's secret is this world's PIN only (#104), never the account's.
+          const seatSecret = isSeatSecret(pin) ? pin : undefined;
+          if (!reg.pin && !seatSecret) reg = setPin(reg, pin);
+          reg = attachApi(reg, worldId, { worldId: world.id!, apiKey, worldName: world.name, seatSecret });
           saveRegistry(reg);
           patchSlice('registry', reg);
 
           // 4. Persist api credentials + cached server-side name to disk.
           await folder.writeWorldMeta({
-            api: { world_id: world.id!, api_key: apiKey, ...(world.name ? { world_name: world.name } : {}) },
+            api: { world_id: world.id!, api_key: apiKey, ...(world.name ? { world_name: world.name } : {}), ...(seatSecret ? { seat: {} } : {}) },
             // Un-demo on make-online (see Route 1 note).
             demo: undefined,
           });

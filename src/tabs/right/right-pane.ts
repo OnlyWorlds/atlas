@@ -31,6 +31,7 @@ import { savePersistedRightTabs } from './right-tabs-persistence';
 import { clearCameraState } from '../../core/map-camera-persist';
 import { escapeText } from '../../core/dom-utils';
 import { filesWhereOf } from '../../core/browser-worlds';
+import { SEAT_SECRET_MISSING_LINE } from '../../core/seat';
 
 export interface RightPaneMount {
   tabBar: HTMLElement;
@@ -526,6 +527,9 @@ function mapEngineStateToPill(
         label: 'No PIN',
         title: 'This world is linked but cannot sync: no PIN is set. Add your PIN in Settings, then reopen the world.',
       };
+    }
+    if (reason?.kind === 'seat-secret-missing') {
+      return { dataState: 'error', label: 'Not syncing', title: SEAT_SECRET_MISSING_LINE };
     }
     return {
       dataState: 'api',

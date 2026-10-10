@@ -58,7 +58,9 @@ Atlas also reads canon fields in ways other tools cannot see:
 
 **Per world, on the registry entry** (`WorldRegistryEntry` in `src/core/types.ts`, in localStorage, never synced): `writing_labels`, `writing_initialized`, `writing_tree_collapsed`, `last_writing_narrative_id`, `notes`, `favorites` (protagonist and home), `active_calendar_id`, `tour_dismissed`, `right_tabs`, `sync_paused`, `context_filters_off`, `context_hop_depth`, `context_lock_layout`, `context_edge_color`, `former_api_world_id`. Five of these (`WORLD_PREF_KEYS`: notes, favorites, active calendar, writing labels, writing initialized) are also written to `.atlas/world-prefs.json`, so a copied folder carries them (conv. 112). `showcases` is a dead field from the retired publishing model: declared, never read or written.
 
-**Atlas-wide, on the registry**: `pin`, `email`, `account_token`, `account_username`, `atlas_root`, `sync_pull_on_activate`, `sync_cadence_ms`, `sync_default_policy`, `sync_confirm_server_deletes`, `sync_pause_all`, `sync_debounce_ms`, `worlds_add_icons`, `maps_settings`, `editor_settings`.
+**The link, on the registry entry's `api` block** (S385, conv. 132): `world_id`, `api_key`, `world_name`, `read_only`, `seat` (`{ role? }`, an agent seat) and `seat_secret` (that seat's `ow_s_` secret, this world's PIN). All but `seat_secret` are mirrored in `world.json`'s `api` (`diskApiBlock`); `seat_secret` never reaches the folder (`withoutSeatSecret` at both stores' `writeWorldMeta`).
+
+**Atlas-wide, on the registry**: `pin` (the account PIN, never sent for a seat world), `email`, `account_token`, `account_username`, `atlas_root`, `sync_pull_on_activate`, `sync_cadence_ms`, `sync_default_policy`, `sync_confirm_server_deletes`, `sync_pause_all`, `sync_debounce_ms`, `worlds_add_icons`, `maps_settings`, `editor_settings`.
 
 **In the folder, not the registry**: sync bookkeeping (`last_pull_at`, `last_push_at`, the `/changes` cursor, conflicts and the rest) lives in `.atlas/sync-state.json` (DESIGN_FOLDER).
 

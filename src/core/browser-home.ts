@@ -29,6 +29,7 @@ import type { WorldRegistryEntry, WorldsRegistry } from './types';
 import { BROWSER_HOME, browserHome, isBrowserWorld, isGoneError, markWorldCleared, removeBrowserWorldDir, unmarkWorldCleared } from './browser-worlds';
 import { slugify } from '../store/fs-utils';
 import { adoptStoredRegistry, createApiLinkedWorld, createLocalWorld, findWorldByOwIdentity, saveRegistry, storedRegistry, updateWorldEntry } from '../registry/registry';
+import { seatFromFile } from './seat';
 import { getState, patchSlice } from './state';
 import { isTourFlagActive } from '../tour/tour-flag';
 
@@ -396,6 +397,7 @@ function adopt(reg: WorldsRegistry, dir: string, meta: WorldFacts, id: string): 
     ? createApiLinkedWorld(reg, {
       name, apiWorldId: api!.world_id as string, apiKey: api!.api_key as string, folderName: dir, handleKey, pathHint,
       apiWorldName: typeof api!.world_name === 'string' ? api!.world_name : undefined, readOnly: api!.read_only === true,
+      seat: seatFromFile(api),
     })
     : createLocalWorld(reg, { name, folderName: dir, handleKey, pathHint });
   return updateWorldEntry(next, entry.id, { where: 'browser' });

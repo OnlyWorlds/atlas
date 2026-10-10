@@ -30,6 +30,7 @@ import { EMPTY_STYLES, type WorldStyles } from '../../src/core/world-styles';
 import { stampedBody } from '../../src/store/sync-stamp';
 import { scrubReferrers } from '../../src/store/scrub-links';
 import { CorruptFileError } from '../../src/store/fs-utils';
+import { withoutSeatSecret } from '../../src/core/seat';
 
 const defaultMeta: WorldMeta = { id: 'mock-world', name: 'mock world' };
 const defaultSyncState: SyncState = {
@@ -114,7 +115,7 @@ export class MockFolderStore implements FolderStore {
       ? { format_version: FOLDER_FORMAT_VERSION }
       : {};
     this.metaBorn = true;
-    this.meta = { ...this.meta, ...stamp, ...patch };
+    this.meta = withoutSeatSecret({ ...this.meta, ...stamp, ...patch });
     return { ...this.meta };
   }
 

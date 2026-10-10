@@ -27,6 +27,7 @@ import { getState, subscribe } from '../core/state';
 import { navigate, shareHash, elementHash, settingsHash, parseHash, onHashChange } from '../core/router';
 import { getActiveStore } from '../core/active-store';
 import { getEditorSettings } from '../registry/registry';
+import { isSeatWorld, SEAT_SECRET_MISSING_LINE, worldPin } from '../core/seat';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../sync/sync-attach';
 import { completeWaypoint } from '../core/waypoints';
 import { escapeText } from '../core/dom-utils';
@@ -1421,8 +1422,9 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
     const worldId = wid();
     const reg = getState().registry;
     const entry = reg.worlds.find(w => w.id === worldId);
-    if (!entry?.api?.api_key || !reg.pin) return null;
-    return new SharingClient({ apiKey: entry.api.api_key, pin: reg.pin });
+    const pin = worldPin(entry, reg);
+    if (!entry?.api?.api_key || !pin) return null;
+    return new SharingClient({ apiKey: entry.api.api_key, pin });
   }
 
   /** A sharing-server refusal speaks its code's sentence; anything else is a problem worded for `doing`. */
@@ -1687,8 +1689,14 @@ export function mountShareRoom(target: HTMLElement, toasts: ToastManager): () =>
       section.appendChild(hint);
       return section;
     }
-    if (!getState().registry.pin) {
+    if (!worldPin(entry, getState().registry)) {
       const hint = document.createElement('p');
+      if (isSeatWorld(entry)) {
+        hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
+        hint.textContent = SEAT_SECRET_MISSING_LINE;
+        section.appendChild(hint);
+        return section;
+      }
       hint.className = 'atlas-share-section-hint atlas-share-publish-hint';
       hint.append('Set your PIN in ');
       hint.appendChild(settingsLink(worldId, 'onlyworlds', 'Settings → OnlyWorlds'));

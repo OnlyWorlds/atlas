@@ -844,3 +844,84 @@ export function statefulV2Handlers(options: StatefulV2ServerOptions = {}): {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// The join door (#104, conv. 20): keel's /join and /join/preview as built
+// (accounts/join_api.py, keel #119). No API-Key: the code is the credential.
+// Every bad code (unknown, used, expired) answers the SAME 404; the preview
+// never spends a code; a redeem spends it once; agent_name is required.
+// ---------------------------------------------------------------------------
+
+export interface FakePass {
+  code: string;
+  world: { id: string; name: string; description?: string };
+  role?: 'contributor' | 'co_builder' | 'guest';
+  invitedBy?: string | null;
+  ownerCharacter?: string | null;
+  withCharacter?: boolean;
+  /** ISO; default an hour from now. A past value makes the pass expired. */
+  expiresAt?: string;
+}
+
+export function joinV2Handlers(opts: { baseUrl: string; passes: FakePass[] }): {
+  handlers: HttpHandler[];
+  redeemed: Array<{ code: string; agent_name: string; key: string; secret: string }>;
+} {
+  const base = opts.baseUrl.replace(/\/$/, '');
+  const used = new Set<string>();
+  const redeemed: Array<{ code: string; agent_name: string; key: string; secret: string }> = [];
+  const notFound = () => HttpResponse.json(
+    { error: { type: 'not_found', code: 'not_found', message: 'This join code is not valid.', param: null } },
+    { status: 404 },
+  );
+  const live = (code: unknown): FakePass | null => {
+    const p = opts.passes.find(x => x.code === code);
+    if (!p || used.has(p.code)) return null;
+    if (p.expiresAt && Date.parse(p.expiresAt) <= Date.now()) return null;
+    return p;
+  };
+  const expires = (p: FakePass) => p.expiresAt ?? new Date(Date.now() + 3_600_000).toISOString();
+  const handlers: HttpHandler[] = [
+    http.post(`${base}/join/preview`, async ({ request }) => {
+      const body = await request.json().catch(() => null) as { code?: unknown } | null;
+      const p = live(body?.code);
+      if (!p) return notFound();
+      return HttpResponse.json({
+        world: { name: p.world.name, description: p.world.description ?? '' },
+        invited_by: p.invitedBy ?? null,
+        owner_character: p.ownerCharacter ?? null,
+        role: p.role ?? 'contributor',
+        with_character: p.withCharacter ?? false,
+        expires_at: expires(p),
+      });
+    }),
+    http.post(`${base}/join`, async ({ request }) => {
+      const body = await request.json().catch(() => null) as { code?: unknown; agent_name?: unknown } | null;
+      if (typeof body?.agent_name !== 'string' || !body.agent_name.trim() || body.agent_name.length > 80) {
+        return HttpResponse.json(
+          { error: { type: 'invalid_request', code: 'invalid_request', message: 'agent_name is required.', param: 'agent_name' } },
+          { status: 422 },
+        );
+      }
+      const p = live(body.code);
+      if (!p) return notFound();
+      used.add(p.code);
+      const n = redeemed.length + 1;
+      const key = `ow_w_seatkey${n}`.padEnd(37, 'k');
+      const secret = `ow_s_seatsecret${n}`.padEnd(37, 's');
+      redeemed.push({ code: p.code, agent_name: body.agent_name, key, secret });
+      return HttpResponse.json({
+        world: { id: p.world.id, name: p.world.name, description: p.world.description ?? '' },
+        seat: { id: `seat-${n}`, role: p.role ?? 'contributor', agent_name: body.agent_name },
+        with_character: p.withCharacter ?? false,
+        character: p.withCharacter ? { id: `char-${n}`, name: body.agent_name } : null,
+        key,
+        pin: secret,
+        env: '',
+        next: [],
+        members: [],
+      }, { status: 201 });
+    }),
+  ];
+  return { handlers, redeemed };
+}

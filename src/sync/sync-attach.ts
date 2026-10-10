@@ -10,9 +10,10 @@
  * - `attachApi`-flipping flows (Make-Online, Link-Existing-API) after the
  *   registry state transitions.
  *
- * The PIN comes from `state.registry.pin` — it's a global identity field, the
- * same for every api-linked world. If the PIN is missing when attach is called,
- * we log + skip engine creation; the UI surfaces this via the pill state.
+ * The PIN comes from `worldPin` (#104, S385): the account PIN
+ * (`state.registry.pin`), or for a world opened as an agent seat, that seat's
+ * own secret. If it is missing when attach is called, we log + skip engine
+ * creation; the UI surfaces this via the pill state.
  */
 
 import { adoptPersistedDiskHold, forgetPersistedDiskHold, holdBigBatchAtOpen, isDiskHoldPersisted, BIG_BATCH } from '../core/live-folder';
@@ -30,6 +31,7 @@ import { filesWhereOf, isBrowserWorld } from '../core/browser-worlds';
 import { detailsContext, resolveFixes } from '../ui/problem-fixes';
 import type { PerElementFailure } from '../core/types';
 import { effectiveSyncPaused, saveRegistry, updateWorldEntry } from '../registry/registry';
+import { isSeatWorld, worldPin } from '../core/seat';
 
 let currentEngine: SyncEngine | null = null;
 let currentWorldId: string | null = null;
@@ -72,7 +74,7 @@ export function attachSyncEngine(
 
   const reg = getState().registry;
   const readOnly = !!entry.api.read_only;
-  const pin = reg.pin;
+  const pin = worldPin(entry, reg);
   // View-only worlds (S264) run on a READ key — no PIN exists or is needed
   // (keel reads are keyless-PIN; the engine never writes).
   if (!pin && !readOnly) {
@@ -379,6 +381,8 @@ export type SyncUnavailableReason =
   | { kind: 'no-active-world' }
   | { kind: 'local-only'; worldId: string }
   | { kind: 'pin-missing'; worldId: string }
+  /** A seat world whose secret this browser no longer has (#104): opened again from onlyworlds.com. */
+  | { kind: 'seat-secret-missing'; worldId: string }
   // ('attached-but-paused' removed S307 — declared here and handled in
   //  sync-toasts, but never CONSTRUCTED by the function below, so the branch
   //  was unreachable and its toast had never fired. A definition with no
@@ -393,7 +397,9 @@ export function diagnoseSyncUnavailable(): SyncUnavailableReason | null {
   const entry = state.registry.worlds.find((w) => w.id === worldId);
   if (!entry) return { kind: 'engine-not-ready' };
   if (entry.state !== 'api-linked') return { kind: 'local-only', worldId };
-  if (!state.registry.pin) return { kind: 'pin-missing', worldId };
+  if (!entry.api?.read_only && !worldPin(entry, state.registry)) {
+    return isSeatWorld(entry) ? { kind: 'seat-secret-missing', worldId } : { kind: 'pin-missing', worldId };
+  }
   return { kind: 'engine-not-ready' };
 }
 
@@ -547,6 +553,12 @@ function emitConflictToasts(
   }
 
   if (result.auth_blocked) {
+    // A seat (#104) has no PIN to check: removed on onlyworlds.com, it comes
+    // back only through the world's page.
+    if (isSeatWorld(getState().registry.worlds.find(w => w.id === currentWorldId))) {
+      toastManager.error('Sync paused: OnlyWorlds no longer accepts this world\'s seat. The owner may have removed it; open the world again from onlyworlds.com.');
+      return;
+    }
     // Revoked minted key ≠ wrong PIN (gate R4): the PIN advice would send the
     // user to the wrong fix. Re-opening from the sidebar mints a fresh key.
     toastManager.error(

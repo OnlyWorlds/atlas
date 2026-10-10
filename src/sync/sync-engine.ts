@@ -1609,12 +1609,9 @@ export class SyncEngine {
       const auth = isAuthError(err);
       const message = err instanceof Error ? err.message : String(err); // raw-error-ok: internal, classified below; never shown
       for (const it of items) {
-        failures.push({
-          element_id: it.element.id as string,
-          type: it.type,
-          operation: 'create',
-          message,
-        });
+        // failureOf carries keel's status and code, so a whole-request member
+        // refusal reads as not_yours like a per-item one (S386 gate).
+        failures.push(failureOf(it.element.id as string, it.type, 'create', err));
         onItemDone();
       }
       if (auth) {
@@ -2931,6 +2928,18 @@ function typedError(err: unknown): { status: number; code: string; param: string
 }
 
 /**
+ * keel's two member refusals (403, #104): `not_author` (a contributor or guest
+ * changed, relinked or deleted an element someone else made) and `owner_only`
+ * (a member, even a co-builder, changed the world's own settings). Null for
+ * anything else.
+ */
+export function memberRefusal(err: unknown): 'not_author' | 'owner_only' | null {
+  const t = typedError(err);
+  if (!t || t.status !== 403) return null;
+  return t.code === 'not_author' || t.code === 'owner_only' ? t.code : null;
+}
+
+/**
  * Detect a 404 / "not found" server response from an arbitrary thrown error.
  * Typed check first (v2 envelope: status 404 / code "not_found"), then the
  * legacy substring fallback so string-throwing fakes keep working during the
@@ -2964,6 +2973,10 @@ export function isAuthError(err: unknown): boolean {
   const t = typedError(err);
   if (t) {
     if (t.code === 'rate_limited' || t.status === 429) return false;
+    // A member's refusal is about one element or the world's settings, not
+    // the key (#104): a contributor seat changing someone else's element, any
+    // seat changing the world's details. The round goes on without it.
+    if (memberRefusal(err)) return false;
     return t.status === 401 || t.status === 403
       || t.code === 'invalid_credentials' || t.code === 'key_revoked';
   }

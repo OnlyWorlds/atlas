@@ -89,7 +89,7 @@ export function sideOf(f: PerElementFailure): 'push' | 'pull' {
 /** The world's open issues, the most actionable kinds first, then oldest first. */
 export function issuesFor(worldId: string | null | undefined): SyncIssue[] {
   if (!worldId) return [];
-  const order: Record<FailureKind, number> = { foreign_id: 0, too_large: 1, other: 2, file_busy: 3 };
+  const order: Record<FailureKind, number> = { foreign_id: 0, too_large: 1, other: 2, not_yours: 3, file_busy: 4 };
   return [...(byWorld.get(worldId)?.values() ?? [])]
     .sort((a, b) => order[a.kind] - order[b.kind] || a.since.localeCompare(b.since));
 }

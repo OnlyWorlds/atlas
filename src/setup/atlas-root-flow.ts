@@ -34,6 +34,7 @@ import {
 } from '../registry/registry';
 import { clearedOwnTwin, isQuotaError, openBrowserMake, worldAlreadyHere, type BrowserMake } from '../core/browser-home';
 import { isBrowserWorld } from '../core/browser-worlds';
+import { isSeatSecret, seatFromFile } from '../core/seat';
 import { FsFolderStore } from '../store/folder-store-fs';
 import { newId } from '../store/folder-store';
 import { writeJsonAtomic, readJson, tryGetDir, isNotFound } from '../store/fs-utils';
@@ -221,6 +222,7 @@ export async function discoverWorldsInRoot(
         pathHint: `${rootPathHint}/${entry.name}`,
         apiWorldName: meta.api!.world_name,
         readOnly: !!meta.api!.read_only,
+        seat: seatFromFile(meta.api),
       }));
     } else {
       ({ next } = createLocalWorld(reg, {
@@ -325,6 +327,7 @@ export async function openWorldFolder(
       pathHint: picked.name,
       apiWorldName: meta.api!.world_name,
       readOnly: !!meta.api!.read_only,
+      seat: seatFromFile(meta.api),
     }));
   } else {
     ({ next, entry } = createLocalWorld(reg, {
@@ -552,6 +555,7 @@ export async function readoptOrphanWorldHandles(): Promise<number> {
         pathHint: handle.name,
         apiWorldName: meta!.api!.world_name,
         readOnly: !!meta!.api!.read_only,
+        seat: seatFromFile(meta!.api),
       }));
     } else {
       ({ next } = createLocalWorld(reg, {
@@ -878,6 +882,13 @@ export interface LinkExistingApiWorldOpts {
    */
   knownWorld?: { id: string; name: string };
   /**
+   * Linked as an agent seat (#104): the `#/join/` door passes the role the
+   * join returned. A seat secret typed as the PIN makes a seat too (role
+   * unknown). Either way the secret stays on this world's entry, never the
+   * account PIN (R1).
+   */
+  seat?: { role?: string };
+  /**
    * View-only link (S264): the key is a READ key, no PIN required or stored.
    * The world registers with `api.read_only`, the store blocks UI writes,
    * and the engine attaches pull-only.
@@ -909,6 +920,7 @@ export function linkedWorldMeta(opts: {
   apiKey: string;
   serverWorldName?: string | null;
   readOnly?: boolean;
+  seat?: { role?: string };
 }): Partial<WorldMeta> {
   return {
     id: opts.serverWorldId,
@@ -921,6 +933,8 @@ export function linkedWorldMeta(opts: {
       ...(opts.serverWorldName ? { world_name: opts.serverWorldName } : {}),
       // Mirrored so root discovery restores view-only status (S264).
       ...(opts.readOnly ? { read_only: true } : {}),
+      // The marker only, so discovery knows it is a seat; never the secret.
+      ...(opts.seat && !opts.readOnly ? { seat: { ...opts.seat } } : {}),
     },
   };
 }
@@ -954,6 +968,8 @@ export async function linkExistingApiWorldInRoot(
   const apiPin = readOnly ? '' : opts.apiPin.trim();
   // View-only links run on a READ key — keel reads are keyless-PIN (S264).
   if (!apiPin && !readOnly) throw new PlainError('Enter your PIN first.');
+  // A seat (#104): its secret is this world's PIN alone, kept on its entry.
+  const seat = readOnly ? undefined : (opts.seat ?? (isSeatSecret(apiPin) ? {} : undefined));
 
   // Validate creds via v2 GET /world (live 2026-07-12; replaced the v1 SDK
   // lane). A refused key, an unknown world or no connection is worded by
@@ -998,7 +1014,7 @@ export async function linkExistingApiWorldInRoot(
     );
   }
 
-  if (inBrowser) return linkIntoBrowser(opts, { apiKey, apiPin, readOnly, world, serverWorldId, displayName });
+  if (inBrowser) return linkIntoBrowser(opts, { apiKey, apiPin, readOnly, world, serverWorldId, displayName, seat });
 
   const rootHandle = await loadHandle(reg.atlas_root!.handle_key);
   if (!rootHandle) {
@@ -1054,7 +1070,7 @@ export async function linkExistingApiWorldInRoot(
   const store = new FsFolderStore();
   await store.open(worldHandle);
   await store.writeWorldMeta(linkedWorldMeta({
-    serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly,
+    serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat,
   }));
 
   // Initial download — all elements of all types stamped with
@@ -1081,9 +1097,10 @@ export async function linkExistingApiWorldInRoot(
   await releasePriorWorld();
 
   // Register the world in registry. Persist PIN globally if not set yet
-  // (never from a view-only link — there is no PIN to persist).
+  // (never from a view-only link — there is no PIN to persist — and never a
+  // seat's secret, which is this world's alone).
   let regAfter = getState().registry;
-  if (!regAfter.pin && apiPin) regAfter = setPin(regAfter, apiPin);
+  if (!regAfter.pin && apiPin && !seat) regAfter = setPin(regAfter, apiPin);
   const { next, entry } = createApiLinkedWorld(regAfter, {
     name: displayName,
     apiWorldId: serverWorldId,
@@ -1093,6 +1110,8 @@ export async function linkExistingApiWorldInRoot(
     pathHint: `${reg.atlas_root!.folder_name}/${subName}`,
     apiWorldName: world.name,
     readOnly,
+    seat,
+    seatSecret: seat ? apiPin : undefined,
   });
   const activated = setActiveWorld(next, entry.id);
   saveRegistry(activated);
@@ -1135,9 +1154,9 @@ export async function linkExistingApiWorldInRoot(
  */
 async function linkIntoBrowser(
   opts: LinkExistingApiWorldOpts,
-  v: { apiKey: string; apiPin: string; readOnly: boolean; world: { id?: string; name?: string }; serverWorldId: string; displayName: string },
+  v: { apiKey: string; apiPin: string; readOnly: boolean; world: { id?: string; name?: string }; serverWorldId: string; displayName: string; seat?: { role?: string } },
 ): Promise<LinkExistingApiWorldResult> {
-  const { apiKey, apiPin, readOnly, world, serverWorldId, displayName } = v;
+  const { apiKey, apiPin, readOnly, world, serverWorldId, displayName, seat } = v;
   const { store, subName, make } = await scaffoldBrowserWorld(displayName, serverWorldId);
   // Identity stays `world-<id>`; a key some entry already holds gets a suffix,
   // as the folder path's vault loop does.
@@ -1145,17 +1164,18 @@ async function linkIntoBrowser(
   for (let n = 2; getState().registry.worlds.some(w => w.folder.handle_key === handleKey); n++) handleKey = `world-${serverWorldId}-${n}`;
   let downloadResult: Awaited<ReturnType<typeof initialDownloadAll>>;
   try {
-    await store.writeWorldMeta(linkedWorldMeta({ serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly }));
+    await store.writeWorldMeta(linkedWorldMeta({ serverWorldId, displayName, apiKey, serverWorldName: world.name, readOnly, seat }));
     downloadResult = await initialDownloadAll(store, buildV2Adapter(apiKey, apiPin), opts.onProgress, opts.shouldStop, { stopOnQuota: true });
     await releasePriorWorld();
   } catch (err) {
     return abandonBrowserMake(store, make, err, 'downloading the world');
   }
   let regAfter = getState().registry;
-  if (!regAfter.pin && apiPin) regAfter = setPin(regAfter, apiPin);
+  if (!regAfter.pin && apiPin && !seat) regAfter = setPin(regAfter, apiPin);
   const { next, entry: made } = createApiLinkedWorld(regAfter, {
     name: displayName, apiWorldId: serverWorldId, apiKey, folderName: subName, handleKey,
     pathHint: `browser storage/${subName}`, apiWorldName: world.name, readOnly,
+    seat, seatSecret: seat ? apiPin : undefined,
   });
   const placed = updateWorldEntry(next, made.id, { where: 'browser' });
   const entry = placed.worlds.find(w => w.id === made.id)!;

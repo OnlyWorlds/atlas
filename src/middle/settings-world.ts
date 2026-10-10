@@ -6,6 +6,7 @@
  */
 
 import { getState, patchSlice } from '../core/state';
+import { diskApiBlock, isSeatWorld, SEAT_REMOVE_WHERE, SEAT_SECRET_MISSING_LINE, seatRoleWords, worldPin } from '../core/seat';
 import {
   saveRegistry,
   deleteWorldEntry,
@@ -94,6 +95,13 @@ function wireUnitFields(world: WorldRegistryEntry, toasts: ToastManager): void {
   });
 }
 
+/** A seat world's own line (#104): what the seat may do, and a lost secret said plainly. */
+export function seatLine(world: WorldRegistryEntry): string {
+  const what = seatRoleWords(world.api?.seat?.role);
+  const base = `Connected from onlyworlds.com on its own seat.${what ? ` ${what}` : ''} The seat is removed on onlyworlds.com, ${SEAT_REMOVE_WHERE}.`;
+  return world.api?.seat_secret ? base : `${base} ${SEAT_SECRET_MISSING_LINE}`;
+}
+
 export function renderWorldTab(world: WorldRegistryEntry): string {
   const stateLabel = world.state === 'api-linked' ? 'api-linked' : 'local-only';
   // Where the world lives (1.17, conv. 129): a browser world has no folder to
@@ -127,6 +135,7 @@ export function renderWorldTab(world: WorldRegistryEntry): string {
         <p class="atlas-settings-hint" data-role="foreign-text">${escapeText(foreignLine(lastForeignCount[world.id] ?? 0))}</p>
         <button class="atlas-btn-ghost" data-action="give-new-ids">${lastForeignCount[world.id] === 1 ? 'Give it a new id' : 'Give them new ids'}</button>
       </div>
+      ${isSeatWorld(world) ? `<p class="atlas-settings-hint" data-role="seat-line">${escapeText(seatLine(world))}</p>` : ''}
       ${renderSyncIssues(world)}
       <div class="atlas-settings-actions">
         <button class="atlas-btn-ghost" data-action="refresh-from-api" ${paused ? 'disabled' : ''}>Refresh from API</button>
@@ -298,8 +307,8 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
   const testBtn = document.querySelector<HTMLButtonElement>('.atlas-settings [data-action="test-connection"]');
   testBtn?.addEventListener('click', async () => {
     if (!world.api) return;
-    const pin = getState().registry.pin;
-    if (!pin) { toasts.error('Set your PIN first'); return; }
+    const pin = worldPin(world, getState().registry);
+    if (!pin) { toasts.error(isSeatWorld(world) ? SEAT_SECRET_MISSING_LINE : 'Set your PIN first'); return; }
     testBtn.disabled = true;
     try {
       // Test Connection via v2 GET /world (live 2026-07-12); buildV2Adapter
@@ -320,7 +329,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
         if (folder) {
           try {
             await folder.writeWorldMeta({
-              api: { world_id: world.api.world_id, api_key: world.api.api_key, world_name: liveName },
+              api: diskApiBlock(world.api, { world_name: liveName }),
             });
           } catch (err) {
             console.warn('[settings] persist api.world_name to world.json failed:', err);
@@ -342,6 +351,8 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
         toasts.error('This world\'s access key was revoked. Unlink it here, then reopen it from the sidebar to get a new key.');
       } else if (code === 'permission_error') {
         toasts.error('This access key is read-only, so edits can\'t sync. Reopen the world with a write key.');
+      } else if (isSeatWorld(world) && (code === 'invalid_credentials' || status === 401)) {
+        toasts.error('OnlyWorlds did not accept this world\'s seat. It may have been removed there; open the world again from onlyworlds.com.');
       } else if (code === 'invalid_credentials' || status === 401 || status === 403) {
         toasts.error('OnlyWorlds did not accept this world\'s key or your PIN. Check your PIN on the OnlyWorlds tab.');
       } else if (status === 404) {
@@ -377,6 +388,7 @@ export function wireWorldTab(world: WorldRegistryEntry, toasts: ToastManager): v
       `  • Sync stops immediately: no more push or pull`,
       `  • Local sync history is cleared (server timestamps, pending tombstones)`,
       `  • The world on onlyworlds.com is NOT deleted`,
+      ...(isSeatWorld(world) ? [`  • Its seat stays on onlyworlds.com until it is removed there, ${SEAT_REMOVE_WHERE}`] : []),
       '',
       `REVERSIBLE: you can re-link later from settings or via "+ link api".`,
       '',
@@ -656,6 +668,10 @@ export function syncIssueLine(issue: SyncIssue, where: 'folder' | 'browser' = 'f
       return 'Its id belongs to another OnlyWorlds world. Give it a new id above.';
     case 'too_large':
       return 'It holds more than 64 KB of custom fields, more than OnlyWorlds accepts. Shorten one to let it sync.';
+    case 'not_yours':
+      return issue.type === 'world'
+        ? `Only the world's owner can change its details on OnlyWorlds. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`
+        : `Someone else made it, and this world lets Atlas change only what it made. Your change stays ${inBrowser ? 'in this browser' : 'in the folder'}.`;
     case 'file_busy':
       if (inBrowser) {
         return f.operation === 'read'

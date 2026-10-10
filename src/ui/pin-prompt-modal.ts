@@ -10,6 +10,7 @@
  */
 
 import { BaseModal } from './modal-base';
+import { isSeatSecret } from '../core/seat';
 
 export class PinPromptModal extends BaseModal {
   private resolve: ((pin: string | null) => void) | null = null;
@@ -28,7 +29,7 @@ export class PinPromptModal extends BaseModal {
           <label class="atlas-modal-field">
             <span>PIN</span>
             <input class="atlas-input" type="password" name="pin"
-                   placeholder="Four digits, or a seat secret"
+                   placeholder="Four digits"
                    autocomplete="off" maxlength="64" />
           </label>
           <div class="atlas-modal-error" data-role="error" hidden></div>
@@ -49,10 +50,16 @@ export class PinPromptModal extends BaseModal {
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         const pin = input.value.trim();
-        // A PIN is four digits; an agent seat sends its secret (ow_s_ + 32
-        // urlsafe characters, keel accounts/agents.py) in the same header.
-        if (!/^\d{4}$/.test(pin) && !/^ow_s_[\w-]{16,}$/.test(pin)) {
-          errorEl.textContent = 'The PIN is four digits, or a seat secret starting ow_s_.';
+        // The account PIN, four digits: it is saved for every account world.
+        // A seat secret (ow_s_) opens one world and never becomes the account
+        // PIN (conv. 132, R1; S386 gate).
+        if (isSeatSecret(pin)) {
+          errorEl.textContent = 'That is a seat secret, which opens one world. Here Atlas needs your account PIN: four digits.';
+          errorEl.hidden = false;
+          return;
+        }
+        if (!/^\d{4}$/.test(pin)) {
+          errorEl.textContent = 'The PIN is four digits.';
           errorEl.hidden = false;
           return;
         }

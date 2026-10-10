@@ -56,6 +56,22 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.22',
+    date: '2026-10-10',
+    theme: 'a seat of its own',
+    entries: [
+      // The #/join/ door ships in this release too, unannounced: no page can
+      // make its link until keel's Open in Atlas button is live (Skeld, h37
+      // #2286). Its entry lands with that button.
+      {
+        id: 'seat-worlds',
+        title: 'A world on a seat keeps its own secret',
+        body: 'A world linked with a seat\'s key and secret (ow_s_) now keeps that secret for itself: it no longer takes the place of your account PIN, and your PIN is never sent for it. Where a seat may change only what it made, a change to someone else\'s element stays in Atlas and is listed under Not syncing, and the rest of the world keeps syncing. The PIN asked for when you open an account world takes four digits only.',
+        tags: ['sync'],
+      },
+    ],
+  },
+  {
     version: '1.21',
     date: '2026-10-09',
     theme: 'units',

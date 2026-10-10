@@ -12,6 +12,7 @@
 
 import { navigate, settingsHash } from '../core/router';
 import { diagnoseSyncUnavailable } from '../sync/sync-attach';
+import { SEAT_SECRET_MISSING_LINE } from '../core/seat';
 import type { ToastManager } from './toast-manager';
 
 /**
@@ -40,6 +41,10 @@ export function surfaceSyncUnavailable(toasts: ToastManager): ReturnType<typeof 
     case 'pin-missing':
       toasts.info('Enter your PIN in settings to enable sync');
       navigate(settingsHash(reason.worldId, 'onlyworlds'));
+      return reason;
+    case 'seat-secret-missing':
+      toasts.info(SEAT_SECRET_MISSING_LINE);
+      navigate(settingsHash(reason.worldId, 'world'));
       return reason;
     // ('attached-but-paused' was declared in the union and handled here, but
     //  `diagnoseSyncUnavailable` never constructed it — the branch could not

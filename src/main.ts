@@ -23,6 +23,7 @@ import { installDocumentTitle } from './ui/document-title';
 import { installTruncationTitles } from './ui/truncation-title';
 import { applyTheme } from './core/theme';
 import { installUnexpectedErrorReporter } from './ui/unexpected-errors';
+import { captureJoinCode } from './core/join-capture';
 
 function renderUnsupportedPage(root: HTMLElement): void {
   root.innerHTML = '';
@@ -50,6 +51,9 @@ function renderUnsupportedPage(root: HTMLElement): void {
 }
 
 function boot(): void {
+  // A `#/join/` link's code leaves the address bar before anything else runs
+  // (#104, contract R2); the app's render runs the door with it.
+  captureJoinCode();
   // Re-assert the theme (index.html's pre-paint script stamped it; this keeps
   // the meta theme-color in sync and covers any embed that skipped the inline
   // script).

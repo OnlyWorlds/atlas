@@ -43,6 +43,7 @@ import { openCreateDoor } from './ui/create-element-door';
 import type { WorldMap } from './core/types';
 import { installLiveFolder } from './core/live-folder';
 import { installWorldPrefsSync } from './core/world-prefs';
+import { captureJoinCode, hasPendingJoin } from './core/join-capture';
 
 export interface AppHandle {
   shell: AppShell;
@@ -195,6 +196,13 @@ export function startApp(container: HTMLElement): AppHandle {
     }
     // #/start and #/bring-in (#127): the Start page's other two answers, the
     // same way: the hash goes first, then the start-a-world dialog opens once.
+    // #/join/<code> (#104): a world opened from onlyworlds.com. main.ts took a
+    // code present at boot; one opened into this running tab is taken here,
+    // the hash first (R2), then the door runs once.
+    captureJoinCode();
+    if (hasPendingJoin()) {
+      void import('./ui/join-world-modal').then(m => m.runPendingJoin(toasts));
+    }
     const linkMode = parseHash(window.location.hash).mode;
     if (linkMode === 'start' || linkMode === 'bring-in') {
       history.replaceState(history.state, '', '#/');

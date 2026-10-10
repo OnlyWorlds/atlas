@@ -16,7 +16,7 @@
 import pkg from '../../package.json';
 import { PlainError, isPlainError } from './plain-error';
 import { damagedFileSentence, isFileBusyError } from '../store/fs-utils';
-import { isAuthError, isTransientError } from '../sync/sync-engine';
+import { isAuthError, isTransientError, memberRefusal } from '../sync/sync-engine';
 import { getState } from './state';
 import { hasFolderMode } from './capabilities';
 import { filesWhereOf, type FilesWhere } from './browser-worlds';
@@ -37,6 +37,8 @@ export type ProblemKind =
   | 'server'
   | 'cancelled'
   | 'refused'
+  /** A member seat's refusal (#104): someone else's element, or the world's own settings. */
+  | 'not-yours'
   | 'bug';
 
 /** A button a problem can offer. Resolved to actions by `ui/problem-fixes.ts`. */
@@ -111,6 +113,7 @@ export function classifyError(err: unknown): ProblemKind {
   if (isNetworkTypeError(err)) return 'offline';
   const status = serverStatus(err);
   if (status !== null) {
+    if (memberRefusal(err)) return 'not-yours';
     if (isAuthError(err)) return 'auth';
     if (isTransientError(err)) return 'server-busy';
     if (status >= 500) return 'server';
@@ -165,6 +168,10 @@ function sentenceFor(kind: ProblemKind, err: unknown, doing: string, opts: Probl
     }
     case 'tab-lock':
       return 'Another Atlas tab still has this world open. Close that tab, then try again.';
+    case 'not-yours':
+      return memberRefusal(err) === 'owner_only'
+        ? `Only the world's owner can change its details on OnlyWorlds, so Atlas could not finish ${doing}.${saved}`
+        : `This world lets Atlas change only what it made, and someone else made this, so Atlas could not finish ${doing}.${saved}`;
     case 'auth':
       return `OnlyWorlds did not accept this world's key or your PIN, so Atlas could not finish ${doing}. Check your PIN in Settings, or reopen the world from the sidebar.`;
     case 'offline':
@@ -197,6 +204,7 @@ const FIXES: Record<ProblemKind, FixId[]> = {
   server: ['retry'],
   cancelled: [],
   refused: [],
+  'not-yours': [],
   bug: ['retry', 'copy-details', 'send-feedback'],
 };
 
