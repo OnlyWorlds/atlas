@@ -29,6 +29,7 @@ import { navigate, elementHash, writingHash } from '../../core/router';
 import { renderElementImage } from '../../ui/element-image';
 import { narrativeKindOf } from '../../core/narrative-kind';
 import { findIncomingReferences } from '../../middle/element-detail-refs';
+import { foldBacklinks, markerFoldLabel } from '../../core/spatial-backlinks';
 import { findUnlinkedMentions, mentionsPhrase, MENTION_MATCH } from '../../core/unlinked-mentions';
 import { bulkLinkTerm } from '../../middle/writing-bulk-link';
 import { getWritingLabels } from '../../middle/writing-helpers';
@@ -179,33 +180,26 @@ function buildPreview(
 
   // Backlinks — every element that references this one, narratives first
   // (S354: was narratives only). Folded summary; the count names the rest.
-  const backlinks = findBacklinkingElements(el.id);
-  if (backlinks.length > 0) {
-    const bl = document.createElement('div');
-    bl.className = 'atlas-context-preview-backlinks';
-    bl.innerHTML = `<span class="atlas-context-preview-backlinks-label">Linked from (${backlinks.length}):</span> `;
-    backlinks.slice(0, 5).forEach((n, i) => {
-      const link = document.createElement('a');
-      link.href = '#';
-      link.textContent = n.name || '(unnamed)';
-      link.title = ELEMENT_LABELS[n.type]?.singular ?? n.type;
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const worldId = getState().active?.worldId;
-        if (worldId) navigate(elementHash(worldId, n.id));
-      });
-      bl.appendChild(link);
-      if (i < Math.min(backlinks.length, 5) - 1) {
-        const sep = document.createTextNode(', ');
-        bl.appendChild(sep);
-      }
-    });
-    if (backlinks.length > 5) {
-      const more = document.createTextNode(` +${backlinks.length - 5} more`);
-      bl.appendChild(more);
-    }
-    body.appendChild(bl);
-  }
+  // Pins and markers do not vote (#171): they get their own lines, a pin
+  // named by its other end, markers one entry per zone.
+  const byId = new Map(getState().data.elements.map(e => [e.id, e] as const));
+  const folded = foldBacklinks(findBacklinkingElements(el.id), el.id, byId);
+  appendLinkLine(body, 'atlas-context-preview-backlinks', 'Linked from', folded.story.length,
+    folded.story.map(n => ({
+      text: n.name || '(unnamed)',
+      title: ELEMENT_LABELS[n.type]?.singular ?? n.type,
+      navId: n.id,
+    })));
+  appendLinkLine(body, 'atlas-context-preview-backlinks atlas-context-preview-pins', 'Pins', folded.pins.length,
+    folded.pins.map(p => ({ text: p.label, title: 'Pin', navId: p.navId })));
+  appendLinkLine(body, 'atlas-context-preview-backlinks atlas-context-preview-markers', 'Markers', folded.markerCount,
+    // On a zone's own card its markers are only a count: the fold that names
+    // the subject is left out of the entries.
+    folded.markers.filter(f => f.zoneId === null || f.zoneName !== null).map(f => ({
+      text: `${f.zoneName ?? 'no zone'} (${f.count})`,
+      title: markerFoldLabel(f),
+      navId: f.navId,
+    })));
 
   // Unlinked mentions (S355): where the name or an alias sits in prose as
   // plain text. The standing home for "link every mention of this element"
@@ -312,6 +306,54 @@ function buildPreview(
   card.appendChild(footer);
 
   return card;
+}
+
+interface LinkLineEntry {
+  text: string;
+  title: string;
+  /** Where a click goes; null prints the entry as plain text. */
+  navId: string | null;
+}
+
+/** "Label (count): a, b, c, d, e +N more"; nothing when count is 0. */
+function appendLinkLine(
+  body: HTMLElement,
+  className: string,
+  label: string,
+  count: number,
+  entries: LinkLineEntry[],
+): void {
+  if (count === 0) return;
+  const line = document.createElement('div');
+  line.className = className;
+  const head = document.createElement('span');
+  head.className = 'atlas-context-preview-backlinks-label';
+  head.textContent = entries.length > 0 ? `${label} (${count}):` : `${label} (${count})`;
+  line.appendChild(head);
+  if (entries.length > 0) line.appendChild(document.createTextNode(' '));
+  const shown = entries.slice(0, 5);
+  shown.forEach((entry, i) => {
+    let node: HTMLElement;
+    if (entry.navId) {
+      const link = document.createElement('a');
+      link.href = '#';
+      const navId = entry.navId;
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const worldId = getState().active?.worldId;
+        if (worldId) navigate(elementHash(worldId, navId));
+      });
+      node = link;
+    } else {
+      node = document.createElement('span');
+    }
+    node.textContent = entry.text;
+    node.title = entry.title;
+    line.appendChild(node);
+    if (i < shown.length - 1) line.appendChild(document.createTextNode(', '));
+  });
+  if (entries.length > 5) line.appendChild(document.createTextNode(` +${entries.length - 5} more`));
+  body.appendChild(line);
 }
 
 // The generic type label is right for every element type EXCEPT narrative,

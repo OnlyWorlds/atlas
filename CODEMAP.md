@@ -41,6 +41,7 @@ Not a complete listing: modules a doc names elsewhere are found from that doc (D
 - `src/core/map-flip.ts`: "Flip pins and zones", the remedy for maps placed before y went bottom-left (conv. 97).
 - `src/core/dom-utils.ts`: `escapeText` and the other untrusted-data helpers (conv. 93).
 - `src/core/seat.ts`: AGENT SEATS (S385, conv. 132): `worldPin` (the one PIN reader for a world's calls), `isSeatSecret`, `seatFromFile`, `diskApiBlock`, `withoutSeatSecret`.
+- `src/core/spatial-backlinks.ts`: pins and markers do not vote (#171, conv. 136): `foldBacklinks` splits a backlink list into the story's links, pins named by their other end (`pinBacklink`) and markers folded per zone (`markerFoldLabel`); the Web tab's card, the element page's Referenced by and the graph's pin labels read it.
 - `src/core/join-capture.ts`: the `#/join/` code out of the address bar first (contract R2), held in memory for the door.
 
 ## src/store

@@ -2630,6 +2630,16 @@ body.atlas-preroot .atlas-middle {
   color: var(--atlas-text);
 }
 
+/* A chip that goes nowhere (a zone page's own markers, #171) does not answer the pointer. */
+.atlas-link-chip.is-static {
+  cursor: default;
+}
+.atlas-link-chip.is-static:hover {
+  background: rgba(var(--atlas-accent-rgb), 0.04);
+  border-color: rgba(var(--atlas-accent-rgb), 0.16);
+  color: var(--atlas-text-soft);
+}
+
 .atlas-link-chip-unresolved {
   color: var(--atlas-text-muted);
   background: rgba(var(--atlas-ink-rgb), 0.04);

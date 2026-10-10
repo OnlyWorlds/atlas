@@ -30,6 +30,7 @@ import { isKnowledgeNarrative, aboutIdsOf, heldByOf, knowersOfElement } from '..
 import { isPageNarrative } from '../core/sharing';
 import { humanizeFieldName } from './element-detail-fields';
 import { getEditorSettings } from '../registry/registry';
+import { foldBacklinks, markerFoldLabel } from '../core/spatial-backlinks';
 
 /** Field names that never encode a relationship — skipped by the reverse scan. */
 const META_KEYS = new Set(['id', 'name', 'description', 'type', 'local_updated_at', 'server_updated_at']);
@@ -76,6 +77,8 @@ interface RefGroup {
   sources: Element[];
   /** Per-group navigation override (knowledge groups mix targets). */
   navigateTo?: NavTarget;
+  /** Prebuilt chips in place of one per source (pins and markers, #171). */
+  chips?: HTMLElement[];
 }
 
 /**
@@ -182,10 +185,31 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
 
   if (remaining.length > 0) {
     const groupByField = getEditorSettings(getState().registry).refs_group_by_field;
+    // Pins and markers do not vote (#171): they leave the type or field
+    // grouping and close the section, a pin named by its other end, markers
+    // one chip per zone. A map's page listed 131 "(unnamed)" markers.
+    const byId = new Map(getState().data.elements.map(e => [e.id, e] as const));
+    const folded = foldBacklinks(remaining, el.id, byId);
+    const groups = groupByField ? groupOthersByField(el.id, folded.story) : groupOthersByType(folded.story);
+    if (folded.pins.length > 0) {
+      groups.push({
+        label: 'Pins',
+        sources: [],
+        chips: folded.pins.map(p => buildEntryChip(ELEMENT_ICONS.pin, p.label, `pin · id ${p.pin.id}`, p.navId)),
+      });
+    }
+    if (folded.markers.length > 0) {
+      groups.push({
+        label: 'Markers',
+        sources: [],
+        chips: folded.markers.map(f => buildEntryChip(
+          ELEMENT_ICONS.marker, markerFoldLabel(f), f.zoneId ? `zone · id ${f.zoneId}` : 'markers with no zone', f.navId)),
+      });
+    }
     wrap.appendChild(buildSection({
       headerLabel: 'Referenced by',
       count: remaining.length,
-      groups: groupByField ? groupOthersByField(el.id, remaining) : groupOthersByType(remaining),
+      groups,
       navigateTo: 'element',
       sectionClass: 'atlas-detail-section',
     }));
@@ -296,9 +320,13 @@ function buildSection(opts: SectionOpts): HTMLElement {
     wrap.appendChild(label);
     const chips = document.createElement('div');
     chips.className = 'atlas-link-row';
-    const sorted = group.sources.slice().sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-    for (const src of sorted) {
-      chips.appendChild(buildRefChip(src, group.navigateTo ?? navigateTo));
+    if (group.chips) {
+      for (const chip of group.chips) chips.appendChild(chip);
+    } else {
+      const sorted = group.sources.slice().sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+      for (const src of sorted) {
+        chips.appendChild(buildRefChip(src, group.navigateTo ?? navigateTo));
+      }
     }
     wrap.appendChild(chips);
     body.appendChild(wrap);
@@ -335,6 +363,30 @@ function buildRefChip(src: Element, navigateTo: NavTarget): HTMLElement {
       navigate(elementHash(worldId, src.id));
     }
   });
+  return chip;
+}
+
+/** A chip that is not one element's own: a pin read as its other end, a zone's markers. */
+function buildEntryChip(iconName: string, label: string, title: string, navId: string | null): HTMLElement {
+  const chip = document.createElement('span');
+  chip.className = 'atlas-link-chip';
+  if (!navId) chip.classList.add('is-static');
+  chip.title = title;
+  const icon = document.createElement('span');
+  icon.className = 'material-symbols-outlined atlas-link-chip-icon';
+  icon.textContent = iconName;
+  chip.appendChild(icon);
+  const name = document.createElement('span');
+  name.textContent = label;
+  chip.appendChild(name);
+  if (navId) {
+    chip.addEventListener('click', () => {
+      const worldId = getState().active?.worldId;
+      if (!worldId) return;
+      patchSlice('ui', { ...getState().ui, selectedElementId: navId });
+      navigate(elementHash(worldId, navId));
+    });
+  }
   return chip;
 }
 

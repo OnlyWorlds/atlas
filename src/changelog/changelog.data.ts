@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.26.3',
+    date: '2026-10-10',
+    theme: 'pins and markers do not vote',
+    entries: [
+      {
+        id: 'backlinks-pins-markers',
+        title: 'A map lists its pins by place and its markers by zone',
+        body: 'On a map, the Web tab and the element page listed every pin and marker as "(unnamed)": Moppetopia\'s Space Map was linked from 118 things. Now "Linked from" counts what the story links, each pin reads as the element it marks, and markers fold into one entry per zone ("Crumblefields: 16 markers"). In the web itself an unnamed pin is named the same way, and a marker shows its zone when you point at it.',
+        tags: ['maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.26.2',
     date: '2026-10-10',
     theme: 'no promise too far',

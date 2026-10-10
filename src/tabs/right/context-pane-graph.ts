@@ -29,7 +29,8 @@
  */
 
 import { getState } from '../../core/state';
-import type { Element, ElementType } from '../../core/types';
+import type { Element, ElementType, Marker, Pin } from '../../core/types';
+import { pinBacklink } from '../../core/spatial-backlinks';
 import { ELEMENT_ICONS, ELEMENT_TYPE_COLORS } from '../../core/constants';
 import { navigate, elementHash } from '../../core/router';
 import { getTierForNarrative } from '../../middle/writing-helpers';
@@ -671,6 +672,10 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
 
     // DOM nodes.
     const nodeEls = new Map<string, HTMLElement>();
+    const paintCenterId = nodes.find(c => c.isCenter)?.id ?? homeId;
+    let worldById: Map<string, Element> | null = null;
+    const elementsById = (): Map<string, Element> =>
+      (worldById ??= new Map(getState().data.elements.map(e => [e.id, e] as const)));
     for (const n of nodes) {
       const nodeEl = document.createElement('button');
       nodeEl.type = 'button';
@@ -686,11 +691,22 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
       nodeEl.style.left = `${cx - dia / 2}px`;
       nodeEl.style.top = `${cy - dia / 2}px`;
       const iconName = n.el ? (ELEMENT_ICONS[n.el.type] ?? 'category') : 'edit_note';
-      const rawName = n.el?.name
+      // An unnamed pin reads as its other end, as in the lists under the
+      // graph (#171): its element on a map's web, its map on the element's.
+      const pinName = n.el?.type === 'pin' && !n.el.name?.trim() && !n.isCenter
+        ? pinBacklink(n.el as Pin, paintCenterId, elementsById()).label : '';
+      // An unnamed marker is a vertex of its zone's line, not a thing: it
+      // prints no label (the map's web drew forty "(unknown)"), and its
+      // tooltip names the zone.
+      const quietMarker = n.el?.type === 'marker' && !n.el.name?.trim() && !n.isCenter;
+      const markerZone = quietMarker
+        ? elementsById().get(String((n.el as Marker).zone_id ?? ''))?.name?.trim() : '';
+      const rawName = n.el?.name?.trim() || pinName
+        || (quietMarker ? (markerZone ? `Marker of ${markerZone}` : 'Marker') : '')
         || (n.isCenter && n.id === homeId ? subject.name || '(home)' : '(unknown)');
       nodeEl.innerHTML =
         `<span class="material-symbols-outlined">${iconName}</span>` +
-        `<span class="atlas-context-graph-node-label">${escapeText(rawName)}</span>`;
+        (quietMarker ? '' : `<span class="atlas-context-graph-node-label">${escapeText(rawName)}</span>`);
       // Native browser tooltip — name + first ~200 chars of description so
       // the writer can peek at "what is this" without clicking.
       const desc = typeof n.el?.description === 'string' ? n.el.description.trim() : '';
@@ -762,8 +778,9 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
     for (const n of lastNodes) {
       const el = lastNodeEls.get(n.id);
       if (!el || el.style.display === 'none') continue;
+      // A node with no label (an unnamed marker, #171) is still an obstacle:
+      // it goes in with no size, so others keep off its circle.
       const label = el.querySelector<HTMLElement>('.atlas-context-graph-node-label');
-      if (!label) continue;
       const dia = diameterFor(n);
       const degree = (lastNeighborSets.get(n.id)?.size ?? 1) - 1;
       items.push({
@@ -771,8 +788,8 @@ export function mountContextGraph(opts: GraphOpts): GraphHandle {
         cx: parseFloat(el.style.left) + dia / 2,
         cy: parseFloat(el.style.top) + dia / 2,
         r: dia / 2,
-        w: label.offsetWidth,
-        h: label.offsetHeight,
+        w: label?.offsetWidth ?? 0,
+        h: label?.offsetHeight ?? 0,
         priority: n.isCenter ? 1e6 : n.id === lastHighlightedId ? 1e5 : degree,
         always: n.isCenter || n.id === lastHighlightedId,
       });
