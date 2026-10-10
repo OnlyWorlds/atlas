@@ -56,6 +56,21 @@ describe('B1: the notes overlay is open when the write-time merge lands', () => 
   });
 });
 
+describe('the overlay merge keeps typed text verbatim (S388)', () => {
+  it("notes holding $' or $& survive a merge with notes that moved underneath", async () => {
+    const s = await store();
+    await openWorld(s, entry({ notes: 'base' }));
+    openNotesOverlay();
+    const ta = document.querySelector<HTMLTextAreaElement>('[data-modal="notes-overlay"] textarea')!;
+    // The user types text that a replacement STRING would expand ($' = the part after the match)...
+    ta.value = "base: cloth costs $' a bolt, $& a reel"; ta.dispatchEvent(new Event('input'));
+    // ...and another tab changes the notes before the overlay's save lands.
+    patchSlice('registry', { ...getState().registry, worlds: [{ ...cur(), notes: 'base\nfrom B' }] });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(cur().notes).toBe("base: cloth costs $' a bolt, $& a reel\nfrom B");
+  });
+});
+
 describe('B2: a write-time merge whose write fails', () => {
   it('notes do not grow with every later pref change while the write keeps failing', async () => {
     const s = await store();

@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.27.1',
+    date: '2026-10-10',
+    theme: 'dollar signs',
+    entries: [
+      {
+        id: 'notes-dollar-signs',
+        title: 'Notes keep their dollar signs',
+        body: 'When a world\'s notes changed in another tab while you were typing in them, Atlas merged the two, and a "$\'" or "$&" in what you typed was swapped for other text. Typed notes now go in exactly as written.',
+        tags: ['world', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.27.0',
     date: '2026-10-10',
     theme: 'only what is there',
