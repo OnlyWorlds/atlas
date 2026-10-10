@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.25.1',
+    date: '2026-10-10',
+    theme: 'a quicker first look',
+    entries: [
+      {
+        id: 'demo-faster-firefox',
+        title: 'Moppetopia opens faster, most of all in Firefox',
+        body: 'Exploring Moppetopia wrote every element to this browser twice: once to build the copy, once to keep it. It now builds the copy in memory and writes it once, so it opens in about a third of the time in Firefox, where each write is slow.',
+        tags: ['performance'],
+      },
+    ],
+  },
+  {
     version: '1.25',
     date: '2026-10-10',
     theme: 'one level down',

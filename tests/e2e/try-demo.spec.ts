@@ -72,6 +72,18 @@ async function tryDemoOpensACopy(page: Page) {
     const left = await scratch.getDirectoryHandle('try-left-by-a-reload', { create: true });
     await (await (await left.getFileHandle('world.json', { create: true })).createWritable()).close();
   });
+  // From here on, record every folder made in browser storage (#126, S387):
+  // the scratch lives in memory, so the try must never make `atlas-scratch`.
+  await page.evaluate(() => {
+    const made: string[] = [];
+    (window as any).__dirsMade = made;
+    const proto = (window as any).FileSystemDirectoryHandle.prototype;
+    const orig = proto.getDirectoryHandle;
+    proto.getDirectoryHandle = function (name: string, opts?: { create?: boolean }) {
+      if (opts?.create) made.push(name);
+      return orig.call(this, name, opts);
+    };
+  });
   // A double click is one ask: one copy, and no "already opening" error.
   await page.locator('[data-action="try-demo"]').dblclick();
   await expect(page.locator('.ow-toast', { hasText: 'your own copy, in this browser' })).toBeVisible({ timeout: 20_000 });
@@ -146,6 +158,12 @@ async function tryDemoOpensACopy(page: Page) {
   expect(seen.filter(r => r.method !== 'GET')).toEqual([]);
   expect(seen.every(r => r.key === '0000000001' && r.pin === null)).toBe(true);
   expect(await scratchLeft(page)).toEqual([]);
+  // The copy was built in memory: no scratch folder was made in browser
+  // storage, and the world's own folder was (#126).
+  const made: string[] = await page.evaluate(() => (window as any).__dirsMade);
+  expect(made).not.toContain('atlas-scratch');
+  expect(made.some(n => n.startsWith('try-'))).toBe(false);
+  expect(made).toContain('browser-worlds');
 }
 
 test('try a demo world: one click opens an editable, unlinked Moppetopia, and nothing writes to OnlyWorlds', async ({ page }) => {

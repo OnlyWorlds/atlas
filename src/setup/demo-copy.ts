@@ -7,15 +7,16 @@
  * the reader's checks, the make protocol, the where-question, the restore of
  * a copy the browser cleared. Nothing new decides identity.
  *
- *   1  one build at a time across tabs (a Web Lock), and the scratch home
- *      (`atlas-scratch/`, never the browser home, so the boot reconciliation
- *      never sees it) swept of what an interrupted try left (S381 gate F5)
+ *   1  one build at a time across tabs (a Web Lock); the scratch is a folder
+ *      in memory (`store/memory-dir.ts`, 1.25.1, #126), so nothing outlives
+ *      the try; the OPFS `atlas-scratch/` an interrupted try of an older
+ *      version left is swept (S381 gate F5)
  *   2  world.json: the world's id and name, and its own fields (the calendar,
  *      the description) as the server holds them; no `api` block, no key
  *   3  every element, through the link door's download (`initialDownloadAll`;
  *      a full origin stops it at once, gate F4)
  *   4  the portable copy (`collectWorldFiles`: no link, no sync files), zipped
- *   5  the scratch directory removed, whatever happened
+ *   5  the scratch goes with the call (memory, never written to disk)
  *
  * The copy keeps the world's id, as a world file downloaded from a linked
  * Moppetopia would (folder format §4.1). So the caller asks `isHere` once the
@@ -26,6 +27,7 @@
  */
 import { PlainError } from '../core/plain-error';
 import { opfsRoot } from '../core/browser-worlds';
+import { memoryDirectory } from '../store/memory-dir';
 import { initialDownloadAll, type InitialDownloadProgress, type DownloadStop } from '../sync/initial-download';
 import { pickSyncedMeta, isMetaEmpty } from '../sync/world-meta-sync';
 import { keyCheckError } from './key-check-errors';
@@ -82,15 +84,14 @@ async function build(opts: DemoCopyOpts): Promise<DemoWorldFile> {
   if (opts.isHere?.(meta.id)) return { kind: 'here', worldId: meta.id };
   const name = meta.name?.trim() || DEMO_WORLD_NAME;
 
-  const scratch = await (await opfsRoot()).getDirectoryHandle(SCRATCH, { create: true });
-  // Inside the lock nothing else builds, so whatever is here was left by a
-  // try that never reached its own cleanup (a reload, a closed tab).
-  for await (const [entry] of (scratch as unknown as { entries(): AsyncIterable<[string, FileSystemHandle]> }).entries()) {
-    await scratch.removeEntry(entry, { recursive: true }).catch(() => {});
-  }
-  const dirName = `try-${crypto.randomUUID()}`;
-  const dir = await scratch.getDirectoryHandle(dirName, { create: true });
-  try {
+  // Up to 1.25 the scratch lived in OPFS: inside the lock nothing else
+  // builds, so a scratch folder still there was left by a try that never
+  // reached its own cleanup (a reload, a closed tab). Swept once, never made.
+  await (await opfsRoot()).removeEntry(SCRATCH, { recursive: true }).catch(() => {});
+  // The scratch is in memory since 1.25.1 (#126): the same store writes the
+  // same files, and Firefox no longer pays an OPFS write for each of them.
+  const dir = memoryDirectory('demo-scratch');
+  {
     const { FsFolderStore } = await import('../store/folder-store-fs');
     const store = new FsFolderStore();
     await store.open(dir);
@@ -115,7 +116,5 @@ async function build(opts: DemoCopyOpts): Promise<DemoWorldFile> {
     const collected = await ws.collectWorldFiles(dir);
     const bytes = ws.zipWorld(collected, ws.worldFileName(name, meta.id).dir);
     return { kind: 'file', bytes, worldId: meta.id, name };
-  } finally {
-    await scratch.removeEntry(dirName, { recursive: true }).catch(err => console.warn('[demo-copy] scratch not removed', err)); // raw-error-ok: a console record
   }
 }
