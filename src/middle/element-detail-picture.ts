@@ -116,7 +116,7 @@ async function removeFlow(el: Element, entry: WorldRegistryEntry, key: string, b
   const name = el.name || 'this element';
   const lines = [
     'Remove this picture from OnlyWorlds for good?',
-    'Its link stops working for everyone; a copy cached on the way can still show for a while.',
+    'It leaves OnlyWorlds at once, but copies already cached on the way can keep showing at its link for days, so this does not take it off the internet.',
     others.length === 0
       ? `The image URL of ${name} is cleared.`
       : `It is also the picture of ${others.length} other element${others.length === 1 ? '' : 's'} here (${others.slice(0, 3).map(e => e.name || 'unnamed').join(', ')}${others.length > 3 ? ', and more' : ''}). Atlas clears their image URLs too.`,

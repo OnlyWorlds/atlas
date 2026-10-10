@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.26.2',
+    date: '2026-10-10',
+    theme: 'no promise too far',
+    entries: [
+      {
+        id: 'remove-picture-wording',
+        title: 'Remove picture says what it cannot do',
+        body: 'Removing a picture takes it off OnlyWorlds at once, but copies already cached on the way can keep showing at its link for days. The question before a removal now says so, instead of promising the link stops working.',
+        tags: ['world', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.26.1',
     date: '2026-10-10',
     theme: 'no edit left behind',
