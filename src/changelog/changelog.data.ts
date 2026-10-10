@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.26.5',
+    date: '2026-10-10',
+    theme: 'whole names',
+    entries: [
+      {
+        id: 'collection-whole-names',
+        title: 'A collection shows whole names',
+        body: 'On a page, a collection cut most names short ("Captain ...") to fit the type beside them. The type now sits under the name, and a long name wraps instead of being cut, in Atlas and on the published page. A published page\'s link preview also carries its own opening text and its first picture.',
+        tags: ['pages', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.26.4',
     date: '2026-10-10',
     theme: 'letting go',

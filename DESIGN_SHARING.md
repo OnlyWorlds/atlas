@@ -89,7 +89,7 @@ A new dedicated tool, deployed to a subdomain (e.g. `show.onlyworlds.com`). Veri
 - **Path-based deep links, cold-loadable.** `show.onlyworlds.com/<id>` or `/<world-slug>` via `_redirects` `/* /index.html 200` (rewrite, not redirect — URL stays, SPA router takes over). No hash routing.
 - **Custom subdomain** works as a Pages custom domain (onlyworlds.com is already a CF zone).
 - **Custom slugs** — `show.onlyworlds.com/<your-slug>` with a uniqueness check at publish (small Anchor addition: a unique slug field).
-- **Link previews / SEO** — a Cloudflare **Pages Function** injects per-page OpenGraph `<meta>` server-side (Discord/Twitter/Google unfurls), which a pure SPA can't do. `_routes.json` excludes `/assets/*` so static assets stay free/fast.
+- **Link previews / SEO** — a Cloudflare **Pages Function** injects per-page OpenGraph `<meta>` server-side (Discord/Twitter/Google unfurls), which a pure SPA can't do. Since S388 (#123) the description is the page's first prose (plain text, cut at a word near 200 characters) and `og:image` the first picture a reader meets (a card showing its image, a collection member's, a map's; https only, `summary_large_image`); a page without either keeps the intent line and no image. `_routes.json` excludes `/assets/*` so static assets stay free/fast.
 - **One deployment serves both** static SPA shell (client fetches page data live from the OW API) **and** dynamic per-path meta. Supports both frozen-snapshot and live-showcase models.
 
 Recommended architecture: **Pages + a thin Function** (static SPA + edge meta-injection). Standalone Worker is overkill unless we outgrow Pages.

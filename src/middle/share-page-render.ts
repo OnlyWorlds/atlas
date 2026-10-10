@@ -304,14 +304,18 @@ export function renderCollectionView(
     } else {
       cell.appendChild(collectionIcon(entry.type));
     }
+    // Name over type, in one column: beside each other the type label took a
+    // fixed slice and cut most names to "Captain ..." even at 1440 (#123).
+    const text = document.createElement('span');
+    text.className = 'atlas-share-collection-text';
     const name = document.createElement('span');
     name.className = 'atlas-share-collection-name';
     name.textContent = entry.name || '(unnamed)';
-    cell.appendChild(name);
     const type = document.createElement('span');
     type.className = 'atlas-share-collection-type';
     type.textContent = ELEMENT_LABELS[entry.type as keyof typeof ELEMENT_LABELS]?.singular ?? entry.type;
-    cell.appendChild(type);
+    text.append(name, type);
+    cell.appendChild(text);
     wrap.appendChild(cell);
   }
   return wrap;
