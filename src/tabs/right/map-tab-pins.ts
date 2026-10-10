@@ -18,6 +18,7 @@ import { mapTabCache, type MapTabCacheEntry } from './map-tab-cache';
 import { getEffectiveMapPrefs } from '../../core/map-view-prefs';
 import type { PinLabels } from '../../core/map-view-prefs';
 import { medianNearestNeighbour, pinScaleForSpacing, scheduleLabelDensity } from './map-label-density';
+import { refreshSubmapDoor, refreshUpButton } from './map-submap-door';
 
 export function syncPins(entry: MapTabCacheEntry): void {
   const elements = getState().data.elements;
@@ -102,6 +103,10 @@ export function syncPins(entry: MapTabCacheEntry): void {
   // post-sync set (relevant for threshold mode).
   applyLabelVisibility(entry, prefs.pin_labels, prefs.pin_label_threshold, minePins.length);
   scheduleLabelDensity(entry);
+  // Into a submap and back up (#139): both read the pins and the selection
+  // just reconciled.
+refreshSubmapDoor(entry);
+refreshUpButton(entry);
 }
 
 /**

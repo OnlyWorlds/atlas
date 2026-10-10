@@ -6024,6 +6024,58 @@ body.atlas-placing .atlas-map-canvas-container.leaflet-grab {
   font-size: 18px;
 }
 
+/* Into a submap and back up (#139, map-submap-door.ts). The way up heads the
+   toolbar and names where it goes. */
+.atlas-map-up-btn {
+  gap: 3px;
+  padding: 0 6px 0 3px;
+  max-width: 45%;
+  flex-shrink: 1;
+  min-width: 0;
+}
+.atlas-map-up-label {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* The door beside a selected pin floats over the user's artwork: canvas
+   chrome, the dark chip in both themes (conv. 90). Leaflet sizes the icon
+   box; the buttons stack in it. */
+.atlas-submap-door {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: max-content !important;
+  height: auto !important;
+  background: none;
+  border: none;
+}
+.atlas-submap-door-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 7px;
+  background: rgba(var(--atlas-canvas-scrim-rgb), 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(var(--atlas-accent-rgb), 0.55);
+  border-radius: 999px;
+  font-size: 12px;
+  color: rgba(var(--atlas-canvas-ink-rgb), 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.atlas-submap-door-btn:hover {
+  border-color: var(--atlas-cyan);
+  color: var(--atlas-cyan);
+}
+.atlas-submap-door-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
 /* Zone label rendered above the centroid / line midpoint (DESIGN_ZONES.md §4.5).
    ZoneOverlay mounts these as Leaflet divIcons. Opacity is set inline by
    applyStyle; transition makes hover-only labels fade smoothly. */

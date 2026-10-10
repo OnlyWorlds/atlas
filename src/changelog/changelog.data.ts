@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.25',
+    date: '2026-10-10',
+    theme: 'one level down',
+    entries: [
+      {
+        id: 'submap-door',
+        title: 'Step into a place\'s own map, and back up',
+        body: 'Click a pin whose place has a map of its own (the pin wears a small map badge) and an Open button appears beside it, which shows that map in the same tab. A map that sits inside another shows the way back at the start of its toolbar.',
+        tags: ['maps'],
+      },
+    ],
+  },
+  {
     version: '1.24.1',
     date: '2026-10-10',
     theme: 'room to read',

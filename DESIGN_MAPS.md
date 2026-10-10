@@ -349,6 +349,8 @@ Pin-click flow today:
 
 To navigate the user TO a map, see §3.5 (top-bar `[map]` / `[pin]` clusters).
 
+**Into a submap and back up** (1.25, #139, the Captain's ask; `src/tabs/right/map-submap-door.ts`). The click still only selects. While the selected element is a Location with maps of its own (`map.location`, other than the map on screen) and has a pin on the visible map, a door floats above and right of that pin: "Open <map>", up to three, in `getAssociatedMaps` order. The pin's map badge (`hasLinkedSubMap`) says a door exists before the click. A map with a parent in the tree (explicit `parent_map`, else inferred, §2) heads its toolbar with "↑ <parent>". Both swap the CURRENT map tab in place (`swapMapTab`), so a walk down and back up keeps one tab; a target already open in another tab is focused. Guards: `tests/unit/map-submap-door.test.ts`, `tests/e2e/submap-door.spec.ts` (revert-checked red).
+
 ### 3.7 Right-click on map — place existing OR create new (planned, session 209)
 
 Current behavior: right-click → opens element-create modal → new element + drops pin pointing at it. Renamed and extended to support **placing existing elements**:

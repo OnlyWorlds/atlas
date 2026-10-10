@@ -1,0 +1,81 @@
+/**
+ * #139 (S387, the Captain's ask in h20 #2081): from a map, into the map of a
+ * place pinned on it, and back up. Selecting a pin whose Location has its own
+ * map shows a door beside that pin; the submap's toolbar names the way up.
+ * Both swap the current map tab in place.
+ */
+import { test, expect, Page } from '@playwright/test';
+
+async function setupWorld(page: Page) {
+  await page.goto('/');
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+  await page.evaluate(async () => { await (window as any).__atlasTestApi.resetAll(); });
+  await page.goto('/');
+  await page.waitForFunction(() => Boolean((window as any).__atlasTestApi));
+  await page.waitForSelector('.atlas-shell');
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const root = await navigator.storage.getDirectory();
+    api.setNextDirectory(await root.getDirectoryHandle('submap-root', { create: true }));
+  });
+  await page.evaluate(() => (window as any).__atlasTestApi.setupHomeFolder());
+  await page.waitForSelector('[data-action="create-local"]');
+  await page.click('[data-action="create-local"]');
+  await page.fill('input[name="world-name"]', 'Submap World');
+  await page.click('[data-modal="create-world"] [data-action="pick"]');
+  await expect(page.locator('[data-role="elements-search"]')).toBeVisible();
+  await page.click('[data-action="new-map"]');
+  await page.fill('input[name="map-name"]', 'Realm');
+  await page.click('[data-modal="create-map"] [data-action="submit"]');
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Realm' })).toBeVisible();
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const realm = api.getState().data.elements.find((e: any) => e.type === 'map' && e.name === 'Realm');
+    const isle = await store.createElement('location', { name: 'Isle' });
+    const plain = await store.createElement('location', { name: 'Plain Place' });
+    await store.createElement('map', { name: 'Isle Map', location: isle.id, parent_map: realm.id });
+    await store.createElement('pin', { name: 'Isle', map_id: realm.id, element_id: isle.id, element_type: 'location', x: 400, y: 400 });
+    await store.createElement('pin', { name: 'Plain Place', map_id: realm.id, element_id: plain.id, element_type: 'location', x: 1200, y: 1200 });
+    api.patchData(await store.listElements());
+  });
+}
+
+const pinOf = (page: Page, name: string) =>
+  page.locator(`xpath=//div[contains(@class,'leaflet-2d-pin-label')][span[text()='${name}']]/preceding-sibling::img[1]`);
+
+test('a pin whose place has its own map opens it, and the submap leads back up, in the same tab', async ({ page }) => {
+  await setupWorld(page);
+  const mapTabs = page.locator('.atlas-tab', { hasText: /Realm|Isle Map/ });
+  await expect(mapTabs).toHaveCount(1);
+  await expect(page.locator('[data-action="map-up"]')).toHaveCount(0); // Realm is a root
+
+  await pinOf(page, 'Isle').click();
+  const door = page.locator('[data-action="open-submap"]');
+  await expect(door).toHaveText(/Open Isle Map/);
+  await door.click();
+
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Isle Map' })).toBeVisible();
+  await expect(mapTabs).toHaveCount(1); // swapped in place, not a second tab
+  const up = page.locator('[data-action="map-up"]');
+  await expect(up).toHaveAttribute('aria-label', 'Up to Realm');
+  await up.click();
+
+  await expect(page.locator('.atlas-tab.active', { hasText: 'Realm' })).toBeVisible();
+  await expect(mapTabs).toHaveCount(1);
+  await expect(page.locator('[data-action="map-up"]')).toHaveCount(0);
+});
+
+test('a place with no map of its own gets no door, and leaving the selection removes it', async ({ page }) => {
+  await setupWorld(page);
+  await pinOf(page, 'Plain Place').click();
+  await expect(page).toHaveURL(/\/element\//);
+  await expect(page.locator('[data-action="open-submap"]')).toHaveCount(0);
+
+  await pinOf(page, 'Isle').click();
+  await expect(page.locator('[data-action="open-submap"]')).toHaveCount(1);
+  // Selecting something else takes the door away (on an element route the
+  // selection follows the URL, so the chip's × alone does not clear it).
+  await pinOf(page, 'Plain Place').click();
+  await expect(page.locator('[data-action="open-submap"]')).toHaveCount(0);
+});
