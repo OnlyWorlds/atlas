@@ -74,8 +74,34 @@ test('a place with no map of its own gets no door, and leaving the selection rem
 
   await pinOf(page, 'Isle').click();
   await expect(page.locator('[data-action="open-submap"]')).toHaveCount(1);
-  // Selecting something else takes the door away (on an element route the
-  // selection follows the URL, so the chip's × alone does not clear it).
+  // Selecting something else takes the door away.
   await pinOf(page, 'Plain Place').click();
   await expect(page.locator('[data-action="open-submap"]')).toHaveCount(0);
+
+  // So does clearing the selection with the chip's × (#175: on an element
+  // route it used to select straight back).
+  await pinOf(page, 'Isle').click();
+  await expect(page.locator('[data-action="open-submap"]')).toHaveCount(1);
+  await page.locator('.atlas-room-nav-selected [data-action="clear-selection"]').click();
+  await expect(page.locator('[data-action="open-submap"]')).toHaveCount(0);
+  await expect(page.locator('.atlas-room-nav-selected')).toHaveCount(0);
+});
+
+test("every pin's image is named by its place, never 'Marker' (#176)", async ({ page }) => {
+  await setupWorld(page);
+  const pins = page.locator('.leaflet-marker-pane img.leaflet-marker-icon');
+  await expect(pins).toHaveCount(2);
+  const alts = await pins.evaluateAll(imgs => imgs.map(i => (i as HTMLImageElement).alt).sort());
+  expect(alts).toEqual(['Isle', 'Plain Place']);
+
+  // A rename reaches the name a screen reader hears.
+  await page.evaluate(async () => {
+    const api = (window as any).__atlasTestApi;
+    const store = api.getActiveStore();
+    const plain = api.getState().data.elements.find((e: any) => e.name === 'Plain Place');
+    await store.updateElement(plain.id, { name: 'Wide Plain' });
+    api.patchData(await store.listElements());
+  });
+  await expect(page.locator('.leaflet-marker-pane img[alt="Wide Plain"]')).toHaveCount(1);
+  await expect(page.locator('.leaflet-marker-pane img[alt="Marker"]')).toHaveCount(0);
 });

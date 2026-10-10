@@ -29,6 +29,11 @@ import { leafletToStorage, storageToLeaflet, generateId } from './CoordinateUtil
  *   - 'bottom-tip': bottom-center aligns to latlng — appropriate for teardrop
  *     pin-shape so the visible tip points at the map coord.
  */
+/** A pin image's accessible name (#176): its label or element name, else "Pin". */
+export function pinAlt(data: { label?: string; name?: string }): string {
+  return String(data.label || data.name || '').trim() || 'Pin';
+}
+
 function computeIconAnchor(iconSize: number, anchor: 'center' | 'bottom-tip'): [number, number] {
   if (anchor === 'bottom-tip') {
     // Leave a 2px margin at the bottom of the canvas (matches the
@@ -401,13 +406,16 @@ export class Leaflet2DManager {
     // syncPins picks this.)
     const iconAnchorXY = computeIconAnchor(iconSize, data.anchor ?? 'center');
 
-    // Create marker
+    // Create marker. `alt` is the image's accessible name: Leaflet's default
+    // is "Marker" on every pin, so a screen reader could not tell one from
+    // another (#176). It is an attribute, set as text.
     const marker = L.marker(latlng, {
       icon: L.icon({
         iconUrl,
         iconSize: [iconSize, iconSize],
         iconAnchor: iconAnchorXY
-      })
+      }),
+      alt: pinAlt(data),
     });
 
     // Create label — anchored to the pin's latlng with PIXEL-space iconAnchor so
@@ -521,6 +529,15 @@ export class Leaflet2DManager {
 
     // Update data
     Object.assign(pin.data, updates);
+
+    // The accessible name follows the name (#176), set before any setIcon
+    // below, which builds the new <img> from the marker's options.
+    if (updates.label !== undefined || updates.name !== undefined) {
+      const alt = pinAlt(pin.data);
+      pin.marker.options.alt = alt;
+      const img = pin.marker.getElement();
+      if (img instanceof HTMLImageElement) img.alt = alt;
+    }
 
     // Update position if changed
     if (updates.x !== undefined || updates.y !== undefined) {

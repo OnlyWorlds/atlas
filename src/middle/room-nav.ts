@@ -254,6 +254,11 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
           const target = e.target as HTMLElement;
           if (target.closest('[data-action="clear-selection"]')) {
             e.stopPropagation();
+            // On an element page the route names the element, and the app
+            // mirrors it back into the selection on every state tick (#175):
+            // leave the page first, the way Esc does (conv. 32), then clear.
+            // The route is read at the click, not at render.
+            if (parseHash(window.location.hash).mode === 'element') navigate(homeHash(worldId));
             patchSlice('ui', { ...getState().ui, selectedElementId: null });
             return;
           }

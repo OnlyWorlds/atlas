@@ -56,6 +56,25 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.26.4',
+    date: '2026-10-10',
+    theme: 'letting go',
+    entries: [
+      {
+        id: 'clear-selection-sticks',
+        title: 'Clearing the selection on an element page sticks',
+        body: 'On an element page, the × on the selected element and the Escape key cleared the selection, and it came straight back. Both now go to the world\'s home with nothing selected.',
+        tags: ['layout', 'fix'],
+      },
+      {
+        id: 'pins-named-for-screen-readers',
+        title: 'A screen reader names each pin',
+        body: 'Every pin on a map was announced as "Marker". Each pin now carries the name of the element it marks, and keeps it through a rename.',
+        tags: ['maps', 'fix'],
+      },
+    ],
+  },
+  {
     version: '1.26.3',
     date: '2026-10-10',
     theme: 'pins and markers do not vote',

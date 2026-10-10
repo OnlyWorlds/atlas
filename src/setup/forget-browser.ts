@@ -145,6 +145,13 @@ export async function forgetEverything(deps: {
   for (const name of names) await deleteDatabase(name).catch(err => console.warn('[forget] could not delete', name, err));
   localStorage.clear();
   sessionStorage.clear();
-  try { new BroadcastChannel(CHANNEL).postMessage({ kind: 'forgotten', from: TAB }); } catch { /* no other tab to tell */ }
+  // Closed after the post: a message already posted is still delivered, and
+  // an open channel left behind receives every later roll call (S388: in the
+  // one-process test run it took the next test's and threw there).
+  try {
+    const ch = new BroadcastChannel(CHANNEL);
+    ch.postMessage({ kind: 'forgotten', from: TAB });
+    ch.close();
+  } catch { /* no other tab to tell */ }
   (deps.reload ?? (() => location.replace(location.pathname)))();
 }

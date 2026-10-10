@@ -335,9 +335,12 @@ export function startApp(container: HTMLElement): AppHandle {
     deselectToHome: () => {
       const active = getState().active;
       if (!active) return;
-      // Clear selection + nav home — DESIGN convention #32.
-      patchSlice('ui', { ...getState().ui, selectedElementId: null });
+      // Nav home, then clear the selection: DESIGN convention #32. In this
+      // order, because every state tick mirrors a route's element into the
+      // selection, so a clear made while the route still names the element
+      // came straight back (#175, S388).
       navigate(homeHash(active.worldId));
+      patchSlice('ui', { ...getState().ui, selectedElementId: null });
     },
     openNotes: () => {
       const active = getState().active;
