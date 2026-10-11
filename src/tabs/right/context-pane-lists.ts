@@ -24,6 +24,7 @@ import { ELEMENT_ICONS } from '../../core/constants';
 import { getActiveStore } from '../../core/active-store';
 import { refreshElementsAfterWrite, requestPushIfLinked } from '../../sync/sync-attach';
 import { showProblem } from '../../ui/problem-fixes';
+import { autolinkMarkdown, buildAutolinkIndex } from '../../core/prose-autolink';
 
 export interface ContextListsHandle {
   /** Visually emphasize a row whose element id matches (or clear). */
@@ -233,22 +234,35 @@ export function mountContextLists(opts: ContextListsOpts): ContextListsHandle {
   // "Potentials" reads more openly than "Suggested" — these aren't system
   // recommendations, they're elements the writer might pull into the scene.
   sugHeader.textContent = 'Potentials';
-  // Potentials come from LINKS (the cast's neighbours, nearby narratives'
-  // casts), never from names in the text: those are the dotted mentions in
-  // the prose, linked from there. Said here and in the empty line, so "No
-  // potentials" beside dotted names does not read as a contradiction (S369).
-  sugHeader.title = 'Elements linked to your cast, or to nearby parts of the story, that are not in this cast yet';
+  // Two kinds (#24): elements the text NAMES but does not link yet (the
+  // dotted mentions in the prose, first), then elements linked to the cast
+  // or to nearby narratives' casts. Before #24 only the second kind showed,
+  // and "No potentials" beside dotted names read as a contradiction (S369).
+  sugHeader.title = 'Elements the text names but does not link yet, then elements linked to your cast or to nearby parts of the story';
   sugCol.appendChild(sugHeader);
 
   const sugBody = document.createElement('div');
   sugBody.className = 'atlas-context-pane-list-body';
   sugCol.appendChild(sugBody);
 
-  const suggested = buildSuggested(narrative, dismissed);
-  if (suggested.length === 0) {
+  const named = namedInText(narrative, getState().data.elements);
+  for (const el of named) {
+    const row = buildRow(el, {
+      reason: 'in the text',
+      onClick: () => onSelect(el.id),
+      onLink: () => linkNamed(narrative.id, el.id, row),
+    });
+    row.dataset.named = '';
+    sugBody.appendChild(row);
+    rowEls.set(el.id, row);
+  }
+
+  const namedIds = new Set(named.map(e => e.id));
+  const suggested = buildSuggested(narrative, dismissed).filter(s => !namedIds.has(s.el.id));
+  if (suggested.length === 0 && named.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'atlas-context-pane-empty';
-    empty.textContent = 'No potentials yet. They come from links in the world, not from names in the text.';
+    empty.textContent = 'No potentials yet.';
     sugBody.appendChild(empty);
   } else {
     for (const s of suggested) {
@@ -289,6 +303,8 @@ interface RowOpts {
   status?: CastStatus;
   onClick: () => void;
   onDismiss?: () => void;
+  /** "Named in the text" rows (#24): link the element where the text names it. */
+  onLink?: () => void;
 }
 
 function buildRow(el: Element, opts: RowOpts): HTMLElement {
@@ -338,6 +354,20 @@ function buildRow(el: Element, opts: RowOpts): HTMLElement {
 
   row.addEventListener('click', opts.onClick);
 
+  if (opts.onLink) {
+    const linkBtn = document.createElement('span');
+    linkBtn.className = 'atlas-context-pane-row-link';
+    linkBtn.setAttribute('role', 'button');
+    linkBtn.dataset.action = 'link-named';
+    linkBtn.title = `Link ${el.name || 'it'} where the text names it`;
+    linkBtn.textContent = 'Link';
+    linkBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      opts.onLink?.();
+    });
+    row.appendChild(linkBtn);
+  }
+
   if (opts.onDismiss) {
     const dismissBtn = document.createElement('span');
     dismissBtn.className = 'atlas-context-pane-row-dismiss';
@@ -352,6 +382,43 @@ function buildRow(el: Element, opts: RowOpts): HTMLElement {
   }
 
   return row;
+}
+
+const namedCache = new WeakMap<readonly Element[], Map<string, Element[]>>();
+
+/**
+ * The elements a narrative's text names but does not link (#24): the
+ * autolink kernel's own first-mention pass over the stored story, so the list
+ * agrees with what "Link all" would chip. Unambiguous names only; an element
+ * already linked anywhere in the text is not named here. Cached per elements
+ * array: the pane redraws often and the index walks the whole world.
+ */
+export function namedInText(narrative: Element, elements: readonly Element[]): Element[] {
+  const story = typeof narrative.story === 'string' ? narrative.story : '';
+  if (!story) return [];
+  let perArray = namedCache.get(elements);
+  if (!perArray) { perArray = new Map(); namedCache.set(elements, perArray); }
+  const key = `${narrative.id}\u0000${story}`;
+  const hit = perArray.get(key);
+  if (hit) return hit;
+  const byId = new Map(elements.map(e => [e.id, e]));
+  const { linked } = autolinkMarkdown(story, buildAutolinkIndex(elements as Element[]));
+  const out = linked
+    .map(c => byId.get(c.id))
+    .filter((e): e is Element => !!e && e.id !== narrative.id);
+  perArray.set(key, out);
+  return out;
+}
+
+async function linkNamed(narrativeId: string, elementId: string, row: HTMLElement): Promise<void> {
+  try {
+    const { bulkLinkNarratives } = await import('../../middle/writing-bulk-link');
+    const { count } = await bulkLinkNarratives([narrativeId], 'link', elementId);
+    if (count > 0) row.remove();
+  } catch (err) {
+    console.error('[context-lists] link named failed', err);
+    showProblem(err, { doing: 'linking the name', retry: () => linkNamed(narrativeId, elementId, row) });
+  }
 }
 
 async function dismissSuggestion(narrativeId: string, suggestedId: string): Promise<void> {

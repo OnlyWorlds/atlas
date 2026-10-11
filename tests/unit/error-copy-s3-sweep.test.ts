@@ -107,13 +107,14 @@ describe('writing-create modal: an inline worded line', () => {
 });
 
 describe('context pane Potentials', () => {
-  it('the empty line says potentials come from links, not names in the text', () => {
+  it('the header says potentials are names in the text and links in the world (#24)', () => {
     const host = document.createElement('div');
     const narrative = { id: 'n1', type: 'narrative', name: 'Scene one' } as unknown as Element;
     mountContextLists({ host, narrative, onSelect: () => {} });
     const empty = host.querySelector('.atlas-context-pane-list-suggested .atlas-context-pane-empty')!;
-    expect(empty.textContent).toBe('No potentials yet. They come from links in the world, not from names in the text.');
+    expect(empty.textContent).toBe('No potentials yet.');
     const header = host.querySelector<HTMLElement>('.atlas-context-pane-list-suggested .atlas-context-pane-list-header')!;
+    expect(header.title).toMatch(/names but does not link/);
     expect(header.title).toMatch(/linked to your cast/);
   });
 });

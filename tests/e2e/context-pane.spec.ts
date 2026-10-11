@@ -671,3 +671,39 @@ test('the create modal nudges when the new name already sits in prose', async ({
   await modal.locator('[data-action="create"]').click();
   await expect(page.locator('.ow-toast', { hasText: 'Created character: Vera · appears in 2 narratives, unlinked' })).toBeVisible();
 });
+
+test('Potentials: names in the text are listed, and Link chips one in the live scene, undoably (#24)', async ({ page }) => {
+  await freshBoot(page);
+  await setupAtlasRoot(page, 'ctx-named-root');
+  await createWorld(page, 'named world');
+  const ireena = await createElement(page, 'character', { name: 'Ireena' });
+  const barovia = await createElement(page, 'location', { name: 'Barovia' });
+  const scene = await createElement(page, 'narrative', {
+    name: 'Arrival', supertype: 'Book', story: 'Ireena left Barovia at dawn.',
+  });
+  await page.evaluate((id) => {
+    const m = window.location.hash.match(/#\/w\/([^/]+)/);
+    if (!m) throw new Error('no active world in URL');
+    window.location.hash = `#/w/${m[1]}/writing/${id}`;
+  }, scene);
+  await page.waitForSelector('.atlas-writing-workspace');
+  await openContextTab(page);
+
+  const named = page.locator('.atlas-context-pane-list-suggested [data-named]');
+  await expect(named).toHaveCount(2);
+  await expect(named.first()).toContainText('in the text');
+
+  await page.locator(`.atlas-context-pane-list-suggested [data-named][data-element-id="${ireena}"] [data-action="link-named"]`).click();
+  // The live editor chipped Ireena, and only Ireena; the text reads the same.
+  const prose = page.locator('.atlas-writing-workspace .ProseMirror');
+  await expect(prose.locator(`.atlas-element-chip[data-id="${ireena}"]`)).toHaveCount(1);
+  await expect(prose.locator('.atlas-element-chip')).toHaveCount(1);
+  await expect(prose).toContainText('Ireena left Barovia at dawn.');
+  await expect(page.locator(`.atlas-context-pane-list-suggested [data-named][data-element-id="${ireena}"]`)).toHaveCount(0);
+  await expect(page.locator(`.atlas-context-pane-list-suggested [data-named][data-element-id="${barovia}"]`)).toHaveCount(1);
+
+  // One Ctrl+Z undoes it: a live transaction, not a disk write.
+  await prose.click();
+  await page.keyboard.press('Control+z');
+  await expect(prose.locator('.atlas-element-chip')).toHaveCount(0);
+});

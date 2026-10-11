@@ -13871,6 +13871,22 @@ a.atlas-share-map-pin { cursor: pointer; }
   background: var(--atlas-danger-hover-tint);
 }
 
+/* "Named in the text" rows (#24): link the element where the text names it. */
+.atlas-context-pane-row-link {
+  flex-shrink: 0;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--atlas-cyan);
+  border: 1px solid var(--atlas-cyan-soft);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.atlas-context-pane-row-link:hover {
+  background: var(--atlas-cyan-tint);
+}
+
 /* Element preview — fills the post-graph slot when active.
    Layout: header (flex-shrink:0) + body (scrollable) + actions (flex-shrink:0).
    The body scrolls; header + actions stay pinned at top/bottom so the action

@@ -412,10 +412,13 @@ function findHints(
 /**
  * Convert EVERY current autolink hint (or every hint fully inside `range`)
  * into a chip, in ONE transaction — a single Ctrl+Z undoes the whole batch
- * (S265, the link-all affordance). Returns the number converted.
+ * (S265, the link-all affordance). Returns the number converted. `only`: one
+ * element's hints alone (#24, "Named in the text" under Potentials).
  */
-export function convertAllAutolinks(view: EditorView, range?: { from: number; to: number }): number {
-  const hints = findHints(view, range).sort((a, b) => a.from - b.from);
+export function convertAllAutolinks(view: EditorView, range?: { from: number; to: number }, only?: string): number {
+  const hints = findHints(view, range)
+    .filter(h => !only || h.candidate.id === only)
+    .sort((a, b) => a.from - b.from);
   if (hints.length === 0) return 0;
   const chipType = view.state.schema.nodes.elementChip;
   if (!chipType) return 0;

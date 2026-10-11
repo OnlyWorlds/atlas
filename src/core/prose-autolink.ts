@@ -171,8 +171,12 @@ export interface MarkdownAutolinkResult {
  * already linked anywhere in the story count as mentioned. The inserted
  * label is the WRITER'S MATCHED TEXT verbatim (`promotionLabel`, S309) —
  * mirrors the live Tab handler, which delegates to the same rule.
+ *
+ * `only` (#24, "Named in the text"): chip that one element alone. The full
+ * index still scans, so a longer name still wins its match ("Strahd" never
+ * chips inside "Strahd von Zarovich").
  */
-export function autolinkMarkdown(story: string, index: AutolinkIndex): MarkdownAutolinkResult {
+export function autolinkMarkdown(story: string, index: AutolinkIndex, only?: string): MarkdownAutolinkResult {
   if (!story || !index.scanner) return { story, linked: [] };
 
   // Protected spans: any markdown link `[label](url)` in full.
@@ -205,6 +209,7 @@ export function autolinkMarkdown(story: string, index: AutolinkIndex): MarkdownA
     const cands = index.byName.get(m[0].toLowerCase());
     if (!cands || cands.length !== 1) continue; // unknown or ambiguous
     const cand = cands[0];
+    if (only && cand.id !== only) continue;
     if (already.has(cand.id) || proposed.has(cand.id)) continue;
     proposed.add(cand.id);
     replacements.push({ from, to, cand });
@@ -252,9 +257,9 @@ export interface RichtextAutolinkResult {
  * document order, split text nodes around first mentions, insert elementChip
  * nodes. Marks on a split text node carry to its text halves (a bolded name
  * becomes an unbolded chip — same as the live Tab conversion). Returns a new
- * doc; the input is never mutated.
+ * doc; the input is never mutated. `only`: as in {@link autolinkMarkdown}.
  */
-export function autolinkRichtext(doc: unknown, index: AutolinkIndex): RichtextAutolinkResult {
+export function autolinkRichtext(doc: unknown, index: AutolinkIndex, only?: string): RichtextAutolinkResult {
   if (!doc || typeof doc !== 'object' || !index.scanner) return { doc, linked: [] };
   const root = structuredClone(doc) as RtNode;
 
@@ -273,7 +278,7 @@ export function autolinkRichtext(doc: unknown, index: AutolinkIndex): RichtextAu
     const next: RtNode[] = [];
     for (const child of n.content) {
       if (child.type === 'text' && typeof child.text === 'string' && child.text.length > 0 && !inWebLink(child)) {
-        next.push(...splitTextNode(child, index, already, proposed, linked));
+        next.push(...splitTextNode(child, index, already, proposed, linked, only));
       } else {
         transform(child);
         next.push(child);
@@ -302,6 +307,7 @@ function splitTextNode(
   already: Set<string>,
   proposed: Set<string>,
   linked: AutolinkCandidate[],
+  only?: string,
 ): RtNode[] {
   const text = node.text!;
   const re = new RegExp(index.scanner!.source, index.scanner!.flags);
@@ -313,6 +319,7 @@ function splitTextNode(
     const cands = index.byName.get(m[0].toLowerCase());
     if (!cands || cands.length !== 1) continue;
     const cand = cands[0];
+    if (only && cand.id !== only) continue;
     if (already.has(cand.id) || proposed.has(cand.id)) continue;
     proposed.add(cand.id);
     linked.push(cand);

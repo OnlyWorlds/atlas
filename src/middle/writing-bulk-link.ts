@@ -62,9 +62,14 @@ export interface BulkLinkSummary {
   count: number;
 }
 
+/**
+ * `only` (#24, "Named in the text" under Potentials): link that one element's
+ * mentions alone, by the same routing.
+ */
 export async function bulkLinkNarratives(
   ids: readonly string[],
   mode: 'link' | 'unlink',
+  only?: string,
 ): Promise<BulkLinkSummary> {
   const folder = getActiveStore();
   if (!folder) return { changed: 0, count: 0 };
@@ -78,7 +83,7 @@ export async function bulkLinkNarratives(
 
   for (const id of ids) {
     if (live && live.narrativeId === id) {
-      const n = mode === 'link' ? live.linkAll() : live.unlinkAll();
+      const n = mode === 'link' ? live.linkAll(only) : live.unlinkAll();
       if (n > 0) { changed++; count += n; }
       continue;
     }
@@ -90,8 +95,8 @@ export async function bulkLinkNarratives(
 
     if (mode === 'link') {
       const out = half === 'sidecar'
-        ? fromSidecar(autolinkRichtext(sidecar, index!), r => r.linked.length)
-        : fromStory(autolinkMarkdown(story, index!), r => r.linked.length, sidecar);
+        ? fromSidecar(autolinkRichtext(sidecar, index!, only), r => r.linked.length)
+        : fromStory(autolinkMarkdown(story, index!, only), r => r.linked.length, sidecar);
       if (out.n === 0) continue;
       await folder.updateElement(id, { ...out.patch, ...computeRelationPatch(el, out.patch.story as string, exists) });
       changed++; count += out.n; wroteDisk = true;

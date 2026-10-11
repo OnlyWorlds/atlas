@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.31.0',
+    date: '2026-10-11',
+    theme: 'named, not linked',
+    entries: [
+      {
+        id: 'potentials-named-in-text',
+        title: 'Potentials list the names in your text',
+        body: 'When a scene names an element without linking it, the name gets a dotted underline, but Potentials beside it said there were none. Potentials now lists those elements first, marked "in the text", each with a Link button that links it where the text names it. Your text does not change.',
+        tags: ['writing', 'context'],
+      },
+    ],
+  },
+  {
     version: '1.30.1',
     date: '2026-10-11',
     theme: 'a world comes back without the PIN',

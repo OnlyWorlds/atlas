@@ -10,8 +10,8 @@ import type { TermLinkTarget, TermMatchOptions } from '../core/prose-autolink';
 
 export interface LiveEditorOps {
   narrativeId: string;
-  /** Convert every autolink hint in the live doc. Returns count. */
-  linkAll(): number;
+  /** Convert every autolink hint in the live doc (or only `only`'s). Returns count. */
+  linkAll(only?: string): number;
   /** Replace every chip in the live doc with its label. Returns count. */
   unlinkAll(): number;
   /** Chip every match of `term` to `target` in the live doc (S355). Returns count. */

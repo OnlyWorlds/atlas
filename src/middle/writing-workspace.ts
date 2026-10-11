@@ -773,9 +773,9 @@ export function mountWritingWorkspace(target: HTMLElement): () => void {
       // would be reverted by the next autosave).
       setLiveEditorOps({
         narrativeId: el.id,
-        linkAll: () => {
+        linkAll: (only?: string) => {
           const v = editorHandle?.editor.view;
-          return v ? convertAllAutolinks(v) : 0;
+          return v ? convertAllAutolinks(v, undefined, only) : 0;
         },
         unlinkAll: () => {
           const v = editorHandle?.editor.view;
