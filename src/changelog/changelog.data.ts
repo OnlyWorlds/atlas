@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.32.2',
+    date: '2026-10-11',
+    theme: 'one reader for world files',
+    entries: [
+      {
+        id: 'world-file-sdk-reader',
+        title: 'World files read the same everywhere',
+        body: 'Atlas now opens and makes world files with the OnlyWorlds SDK\'s own reader and writer, the same ones other OnlyWorlds tools use, so a world file made in one opens in the others. Files Atlas made before open as they always did.',
+        tags: ['data'],
+      },
+    ],
+  },
+  {
     version: '1.32.1',
     date: '2026-10-11',
     theme: 'the Web settings in plain words',

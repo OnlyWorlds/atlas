@@ -9,13 +9,17 @@
  * transient (`isTransientPath`). One top-level folder, `<slug>-<id8>/`. JSON
  * is deflated, media stored as it is.
  *
- * THE READER refuses before anything is written: a path that climbs out, is
- * absolute or names a drive, an empty path part, a declared size or a file
- * count past the budget, no world, more than one world or files outside it,
- * and the tour's sandbox. Transient files and archive junk are dropped.
+ * THE FORMAT is the SDK's since 4.10 (`readWorldFile`, `writeWorldFile`;
+ * Kael, h37 #3348): one reader and writer for every tool. It refuses before
+ * anything is written: a path that climbs out, is absolute or names a drive,
+ * an empty path part, a path that is both a file and a folder, a declared size
+ * or a file count past the budget, no world, more than one world or files
+ * outside it. Atlas adds its own: the `.atlas/making/x` collision and the
+ * tour's sandbox (`demo: true`), its own sentences for each refusal, and the
+ * files it leaves out (sync and transient).
  */
 
-import { unzipSync, zipSync, type Unzipped, type Zippable } from 'fflate';
+import { readWorldFile, writeWorldFile, OwWorldFileError, type OwWorldFileReason } from '@onlyworlds/sdk';
 import { PlainError } from '../core/plain-error';
 import { ATLAS_INTERNAL_DIR } from '../core/constants';
 import { isTransientPath, walkWorld, worldFileName, WORLD_FILE_MAX_BYTES, WORLD_FILE_MAX_ENTRIES } from './world-tree';
@@ -98,22 +102,22 @@ export function sameStamps(collected: CollectedFile[], now: Map<string, string>)
 
 /** The zip: one top-level folder, JSON deflated, everything else stored. */
 export function zipWorld(files: WorldFileEntry[], topDir: string): Uint8Array {
-  const input: Zippable = {};
-  for (const f of files) {
-    input[`${topDir}/${f.path}`] = [f.data, { level: /\.json$/i.test(f.path) ? 6 : 0 }];
+  try {
+    return writeWorldFile(files, topDir);
+  } catch (err) {
+    throw new PlainError(err instanceof OwWorldFileError ? REFUSALS[err.reason] : NOT_OPENABLE);
   }
-  return zipSync(input);
 }
 
-/** Archive junk a re-zipped folder picks up on the way: never part of a world. */
-function isJunk(path: string): boolean {
-  return path.split('/').some(seg => seg === '__MACOSX' || seg === '.DS_Store' || seg === 'Thumbs.db');
-}
-
-function isSafePath(path: string): boolean {
-  if (!path || path.includes('\\') || path.startsWith('/') || /^[a-zA-Z]:/.test(path)) return false;
-  return path.split('/').every(seg => seg !== '' && seg !== '.' && seg !== '..');
-}
+/** Each of the SDK's refusals, in Atlas's words. */
+const REFUSALS: Record<OwWorldFileReason, string> = {
+  unsafe_path: UNSAFE_PATH,
+  too_big: TOO_BIG,
+  too_many: TOO_MANY,
+  not_a_world: NOT_A_WORLD,
+  more_than_one: MORE_THAN_ONE,
+  not_openable: NOT_OPENABLE,
+};
 
 export interface ReadWorld {
   worldId: string;
@@ -130,79 +134,32 @@ export function readWorldZip(
   bytes: Uint8Array,
   opts: { maxBytes?: number; maxEntries?: number } = {},
 ): ReadWorld {
-  const maxBytes = opts.maxBytes ?? WORLD_FILE_MAX_BYTES;
-  const maxEntries = opts.maxEntries ?? WORLD_FILE_MAX_ENTRIES;
-  let declared = 0;
-  let count = 0;
-  let refusal: string | null = null;
-  let raw: Unzipped;
+  // The format and its refusals are the SDK's (4.10, Kael h37 #3348): one
+  // reader for every tool. Atlas keeps its own sentences, its `.atlas/` rules
+  // and the demo refusal.
+  let read: ReturnType<typeof readWorldFile>;
   try {
-    raw = unzipSync(bytes, {
-      filter: file => {
-        if (refusal) return false;
-        if (file.name.endsWith('/')) return false; // a directory entry
-        if (!isSafePath(file.name)) { refusal = UNSAFE_PATH; return false; }
-        if (isJunk(file.name)) return false;
-        count++;
-        declared += file.originalSize;
-        if (count > maxEntries) { refusal = TOO_MANY; return false; }
-        if (declared > maxBytes) { refusal = TOO_BIG; return false; }
-        return true;
-      },
+    read = readWorldFile(bytes, {
+      maxBytes: opts.maxBytes ?? WORLD_FILE_MAX_BYTES,
+      maxEntries: opts.maxEntries ?? WORLD_FILE_MAX_ENTRIES,
+      // The portable copy, whoever made the file (S373 gate F5): no sync or
+      // transient files; the SDK already drops the link from world.json.
+      skip: path => isTransientPath(path) || !isPortable(path),
     });
-  } catch {
-    throw new PlainError(refusal ?? NOT_OPENABLE);
-  }
-  if (refusal) throw new PlainError(refusal);
-  const names = Object.keys(raw);
-  // A declared size can lie; the inflated bytes cannot.
-  if (names.reduce((n, k) => n + raw[k].length, 0) > maxBytes) throw new PlainError(TOO_BIG);
-
-  // Exactly one world: world.json at the root, or in the one top-level folder.
-  let prefix: string;
-  if (names.includes(WORLD_FILE)) {
-    // A world at the root holds no other world inside it (S373 gate F10).
-    if (names.some(n => n !== WORLD_FILE && n.endsWith(`/${WORLD_FILE}`))) throw new PlainError(MORE_THAN_ONE);
-    prefix = '';
-  } else {
-    const tops = new Set(names.map(n => (n.includes('/') ? n.split('/')[0] + '/' : n)));
-    const worldTops = [...tops].filter(t => t.endsWith('/') && names.includes(`${t}${WORLD_FILE}`));
-    if (worldTops.length === 0) throw new PlainError(NOT_A_WORLD);
-    if (worldTops.length > 1 || tops.size > 1) throw new PlainError(MORE_THAN_ONE);
-    prefix = worldTops[0];
-    // Nor does a world in its one folder (S376 gate B10: F10 ran only at the root).
-    if (names.some(n => n !== `${prefix}${WORLD_FILE}` && n.endsWith(`/${WORLD_FILE}`))) throw new PlainError(MORE_THAN_ONE);
+  } catch (err) {
+    throw new PlainError(err instanceof OwWorldFileError ? REFUSALS[err.reason] : NOT_OPENABLE);
   }
   // A path under `.atlas/` whose first part is a transient FILE's name
   // (`.atlas/making/x`) would collide with the make's own marker (S376 gate B10).
-  for (const name of names) {
-    const path = name.slice(prefix.length);
+  for (const { path } of read.files) {
     if (!path.startsWith(`${ATLAS_INTERNAL_DIR}/`)) continue;
     const rest = path.slice(ATLAS_INTERNAL_DIR.length + 1);
     if (rest.includes('/') && isTransientPath(`${ATLAS_INTERNAL_DIR}/${rest.split('/')[0]}`)) throw new PlainError(NOT_OPENABLE);
   }
-
-  let meta: { id?: unknown; name?: unknown; demo?: unknown };
-  try {
-    meta = JSON.parse(new TextDecoder().decode(raw[`${prefix}${WORLD_FILE}`]));
-  } catch {
-    throw new PlainError(NOT_A_WORLD);
-  }
-  if (!meta || typeof meta !== 'object' || typeof meta.id !== 'string' || !meta.id.trim()) throw new PlainError(NOT_A_WORLD);
-  if (meta.demo === true) throw new PlainError(NOT_OPENABLE);
-
-  // The portable copy, whoever made the file (S373 gate F5): no sync files,
-  // and no link or key in world.json; a restore puts this browser's back.
-  const files: WorldFileEntry[] = [];
-  for (const name of names) {
-    const path = name.slice(prefix.length);
-    if (isTransientPath(path) || !isPortable(path)) continue;
-    files.push({ path, data: path === WORLD_FILE ? withoutLink(raw[name]) : raw[name] });
-  }
-  files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  if (read.world.demo === true) throw new PlainError(NOT_OPENABLE);
   return {
-    worldId: meta.id,
-    worldName: typeof meta.name === 'string' && meta.name.trim() ? meta.name : 'Untitled world',
-    files,
+    worldId: read.worldId,
+    worldName: read.name.trim() ? read.name : 'Untitled world',
+    files: read.files,
   };
 }
