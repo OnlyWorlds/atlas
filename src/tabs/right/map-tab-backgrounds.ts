@@ -95,7 +95,7 @@ export async function applyMapBackground(
       applyFlat();
       const hint = document.createElement('div');
       hint.className = 'atlas-map-loading-hint atlas-map-imgfail-hint';
-      hint.textContent = 'map image did not load; check it in Configure map';
+      hint.textContent = 'Map image did not load; check it in Configure map';
       container.appendChild(hint);
     });
     backgroundApplied = true;
@@ -250,7 +250,7 @@ export function refreshCachedBackgrounds(): string[] {
 function showLoadingHint(container: HTMLElement): { remove: () => void } {
   const el = document.createElement('div');
   el.className = 'atlas-map-loading-hint';
-  el.textContent = 'loading map image…';
+  el.textContent = 'Loading map image…';
   container.appendChild(el);
   return { remove: () => el.remove() };
 }

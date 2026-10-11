@@ -72,7 +72,7 @@ export function openWordGoalPopover(opts: GoalPopoverOpts): () => void {
   const pop = document.createElement('div');
   pop.className = 'atlas-wc-goal-popover';
   pop.setAttribute('role', 'dialog');
-  pop.setAttribute('aria-label', 'set session word goal');
+  pop.setAttribute('aria-label', 'Set session word goal');
   pop.innerHTML = `
     <label class="atlas-wc-goal-label">Session goal</label>
     <div class="atlas-wc-goal-row">

@@ -238,7 +238,7 @@ test('"reload from disk" in Ctrl+K runs a pass and says what it found', async ({
   await editFileOutside(page, a, { description: 'outside' });
   await page.keyboard.press('Control+k');
   await page.locator('[data-role="cmdk-input"]').fill('reload');
-  await expect(page.locator('.atlas-cmdk-row[data-kind="action"]')).toContainText('reload from disk');
+  await expect(page.locator('.atlas-cmdk-row[data-kind="action"]')).toContainText('Reload from disk');
   await page.keyboard.press('Enter');
   await expect(page.locator('.ow-toast', { hasText: '1 element changed on disk.' })).toBeVisible();
   await page.keyboard.press('Control+k');

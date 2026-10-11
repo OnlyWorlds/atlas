@@ -81,7 +81,7 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
     const writing = elements.filter(e => isWritingNarrative(e, route.worldId!));
     const anchor = mostRecentlyEdited(writing);
     return anchor
-      ? { element: anchor, detailsMode: 'element', caption: 'your most recently edited narrative' }
+      ? { element: anchor, detailsMode: 'element', caption: 'Your most recently edited narrative' }
       : { element: null, detailsMode: 'empty' };
   }
   if (route.mode === 'element' && route.elementId) {
@@ -102,7 +102,7 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
     const topId = [...rankAnchors(extractTemporalNodes([...elements]), 1)][0];
     const el = topId ? (elements.find(e => e.id === topId) ?? null) : null;
     return el
-      ? { element: el, detailsMode: 'element', caption: 'most connected in this period' }
+      ? { element: el, detailsMode: 'element', caption: 'Most connected in this period' }
       : { element: null, detailsMode: 'empty' };
   }
   // Knowledge room: an open entry (or knower known-view) is the subject —
@@ -126,7 +126,7 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
       (best, e) => (heldByCount(e) > heldByCount(best) ? e : best),
       entries[0],
     );
-    return { element: anchor, detailsMode: 'element', caption: 'the world’s most widely held entry' };
+    return { element: anchor, detailsMode: 'element', caption: 'The world’s most widely held entry' };
   }
   // Share page detail: anchor on the page's first carded element so the pane
   // previews what the page features. Pages with no element cards fall through
@@ -140,7 +140,7 @@ function resolveSubject(route: Route, elements: readonly Element[]): Subject {
       .map(id => elements.find(e => e.id === id))
       .find((e): e is Element => Boolean(e)) ?? null;
     return firstEl
-      ? { element: firstEl, detailsMode: 'element', caption: 'this page’s first featured element' }
+      ? { element: firstEl, detailsMode: 'element', caption: 'This page’s first featured element' }
       : { element: null, detailsMode: 'empty' };
   }
   return { element: null, detailsMode: 'empty' };

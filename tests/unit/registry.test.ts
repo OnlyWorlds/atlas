@@ -92,13 +92,13 @@ describe('registry — createLocalWorld', () => {
     expect(entry.id).toMatch(/^[0-9a-f-]{36}$/i);
   });
 
-  it('defaults to "untitled world" when name is blank', () => {
+  it('defaults to "Untitled world" when name is blank', () => {
     const { entry } = createLocalWorld(defaultRegistry(), {
       name: '   ',
       folderName: 'x',
       handleKey: 'k',
     });
-    expect(entry.name).toBe('untitled world');
+    expect(entry.name).toBe('Untitled world');
   });
 
   it('respects parentId for nesting', () => {

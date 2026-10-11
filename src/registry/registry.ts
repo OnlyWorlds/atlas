@@ -185,7 +185,7 @@ export function createLocalWorld(
   const now = new Date().toISOString();
   const entry: WorldRegistryEntry = {
     id: crypto.randomUUID(),
-    name: opts.name.trim() || 'untitled world',
+    name: opts.name.trim() || 'Untitled world',
     state: 'local-only',
     folder: {
       handle_key: opts.handleKey,
@@ -238,7 +238,7 @@ export function createApiLinkedWorld(
   }
   const entry: WorldRegistryEntry = {
     id: crypto.randomUUID(),
-    name: opts.name.trim() || 'untitled world',
+    name: opts.name.trim() || 'Untitled world',
     state: 'api-linked',
     api: apiBlock,
     folder: {

@@ -60,7 +60,7 @@ export function renderAccountTab(reg: WorldsRegistry): string {
                  placeholder="OnlyWorlds PIN (4 digits)"
                  inputmode="numeric"
                  maxlength="4" />
-          <button type="button" class="atlas-btn-ghost atlas-settings-pin-toggle" data-shown="false">show</button>
+          <button type="button" class="atlas-btn-ghost atlas-settings-pin-toggle" data-shown="false">Show</button>
         </div>
       </label>
       ${renderAccountTokenBlock(reg)}
@@ -77,7 +77,7 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
         <div class="atlas-account-signed-in">
           <span class="material-symbols-outlined atlas-account-check">check_circle</span>
           <span class="atlas-account-status">Signed in${reg.account_username ? ` as ${escapeText(reg.account_username)}` : ''} <span class="atlas-account-last4">· token …${escapeText(last4)}</span></span>
-          <button type="button" class="atlas-btn-ghost" data-action="account-forget">forget</button>
+          <button type="button" class="atlas-btn-ghost" data-action="account-forget">Forget</button>
         </div>
         <p class="atlas-settings-hint">Atlas lists your OnlyWorlds worlds in the sidebar and makes its own key when you open one. Forgetting the token keeps every opened world working.</p>
       </div>
@@ -90,7 +90,7 @@ function renderAccountTokenBlock(reg: WorldsRegistry): string {
         <input class="atlas-input" type="password" name="account-token"
                placeholder="ow_a_..."
                autocomplete="off" spellcheck="false" />
-        <button type="button" class="atlas-btn-primary" data-action="account-sign-in">sign in</button>
+        <button type="button" class="atlas-btn-primary" data-action="account-sign-in">Sign in</button>
       </div>
       <p class="atlas-settings-hint">Connects Atlas to your OnlyWorlds account: see all your worlds, open any of them without hunting keys. Create a token on onlyworlds.com, under Account, then Account tokens.</p>
       <div class="atlas-modal-error" data-role="account-token-error" hidden></div>
@@ -106,7 +106,7 @@ export function wireAccountTab(toasts: ToastManager): void {
     const shown = pinToggle.dataset.shown === 'true';
     if (pinInput) pinInput.type = shown ? 'password' : 'text';
     pinToggle.dataset.shown = String(!shown);
-    pinToggle.textContent = shown ? 'show' : 'hide';
+    pinToggle.textContent = shown ? 'Show' : 'Hide';
   });
   emailInput?.addEventListener('change', () => {
     const next = setEmail(getState().registry, emailInput.value);
@@ -159,7 +159,7 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
     }
     if (errorEl) errorEl.hidden = true;
     signInBtn.disabled = true;
-    signInBtn.textContent = 'checking…';
+    signInBtn.textContent = 'Checking…';
     try {
       const profile = await new AccountClient(token).getProfile();
       const next = setAccountToken(getState().registry, token, profile.username);
@@ -172,7 +172,7 @@ function wireAccountTokenBlock(toasts: ToastManager): void {
       console.warn('[settings] sign-in failed:', err);
       showError(signInErrorLine(err));
       signInBtn.disabled = false;
-      signInBtn.textContent = 'sign in';
+      signInBtn.textContent = 'Sign in';
     }
   };
 

@@ -8268,7 +8268,9 @@ svg .atlas-zone-hovered {
   font-size: 22px;
 }
 
-.atlas-home-onboarding-tile span:last-child {
+/* The type label (the last span of a core tile) is lowercase; the line under
+   an unmade tile is a Sentence-case phrase and keeps its own size (1.32.0). */
+.atlas-home-onboarding-tile span:last-child:not(.atlas-home-tile-line) {
   font-size: 11px;
   text-transform: lowercase;
 }

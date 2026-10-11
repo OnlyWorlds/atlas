@@ -310,7 +310,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       // without scraping a class that exists to carry styling.
       btn.dataset.action = 'set-now';
       btn.title = "Set the world's current point in time. Everything after it becomes the forward half (drag the line to move it).";
-      btn.innerHTML = `<span class="material-symbols-outlined">flag</span><span>set now time</span>`;
+      btn.innerHTML = `<span class="material-symbols-outlined">flag</span><span>Set now time</span>`;
       btn.addEventListener('click', () => void setNow(suggestNow(allNodes)));
       nowWrap.appendChild(btn);
     } else {
@@ -405,7 +405,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     if (!store || !el) { toasts.error('That element is not in this world any more.'); return; } // deleted mid-drag (gate)
     const mapping = TEMPORAL_TYPE_FIELDS[el.type];
     const field = edge === 'end' ? mapping?.end : mapping?.start;
-    if (!field) { toasts.error('this type has no date field'); return; }
+    if (!field) { toasts.error('This type has no date field'); return; }
     // Either edge respects the other as its bound (S264 ruling + the S265
     // end-stretch): the canvas drag clamps live, but the confirm popover
     // accepts free text — reject an inversion instead of writing one.
@@ -413,14 +413,14 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       const endRaw = mapping.end ? (el as Record<string, unknown>)[mapping.end] : undefined;
       const endVal = parseTemporalValue(endRaw);
       if (endVal != null && date > endVal) {
-        toasts.error(`the start can't pass the end (${endVal})`);
+        toasts.error(`The start can't pass the end (${endVal})`);
         return;
       }
     } else {
       const startRaw = mapping.start ? (el as Record<string, unknown>)[mapping.start] : undefined;
       const startVal = parseTemporalValue(startRaw);
       if (startVal != null && date < startVal) {
-        toasts.error(`the end can't precede the start (${startVal})`);
+        toasts.error(`The end can't precede the start (${startVal})`);
         return;
       }
     }
@@ -562,11 +562,11 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       item(cal.name, { icon: 'calendar_month', active: lens?.id === cal.id, action: () => setLens(cal.id) });
     }
     if (calendars.length > 0) {
-      item('none (bare numbers)', { icon: 'tag', active: !lens, action: () => setLens(null) });
+      item('None (bare numbers)', { icon: 'tag', active: !lens, action: () => setLens(null) });
     }
     if (!viewOnly) {
       if (lens) {
-        item(`edit ${lens.name}`, {
+        item(`Edit ${lens.name}`, {
           icon: 'edit',
           action: () => new CalendarBuilderModal(toasts, {
             elementId: lens.id,
@@ -578,11 +578,11 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       // The clock sits ABOVE create (Captain's ruling): it is the prerequisite,
       // and the order teaches it. Create greys out until the clock exists.
       const clockSet = clockIsSet();
-      item(clockSet ? 'world clock' : 'World clock: set it first', {
+      item(clockSet ? 'World clock' : 'World clock: set it first', {
         icon: 'schedule',
         action: () => void openWorldClock(),
       });
-      item('+ new calendar', {
+      item('+ New calendar', {
         icon: 'add',
         disabled: !clockSet,
         title: clockSet ? undefined : 'The world clock comes first: a calendar names steps of time, so one step needs a meaning',
@@ -700,7 +700,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     mintBanner.innerHTML =
       `<span class="material-symbols-outlined">history_edu</span>` +
       `<span class="atlas-cal-mint-text">This world carries old time fields. Mint your first calendar from them: the names move into the calendar and the old fields are cleared.</span>` +
-      `<button type="button" class="atlas-btn-ghost" data-action="mint-calendar">new calendar</button>` +
+      `<button type="button" class="atlas-btn-ghost" data-action="mint-calendar">New calendar</button>` +
       `<button type="button" class="atlas-cal-mint-dismiss" data-action="mint-dismiss" title="Hide for this session">×</button>`;
     mintBanner.querySelector('[data-action="mint-calendar"]')!
       .addEventListener('click', () => void startMint());
@@ -787,7 +787,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       return;
     }
     render(); // full render — the rail heading names the (now-active) chart
-    toasts.success(`saved "${chart.name}"`);
+    toasts.success(`Saved "${chart.name}"`);
   }
 
   /** Load a saved chart into the live view (restores its scope). */
@@ -822,7 +822,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
       if (route.elementId) navigate(timelineHash(w)); else render();
     } else {
       // Unknown kind from a newer atlas / corrupt charts.json.
-      toasts.show('this chart type is not supported here', 'info');
+      toasts.show('This chart type is not supported here', 'info');
     }
   }
 
@@ -852,7 +852,7 @@ export function mountTimeline(target: HTMLElement, toasts: ToastManager): () => 
     // Always a full render: a fresh save is "active" by scope-match alone
     // (no appliedSelection), and only render() rebuilds the rail heading.
     render();
-    toasts.show(`removed "${chart.name}"`, 'info');
+    toasts.show(`Removed "${chart.name}"`, 'info');
   }
 
   /** Swap a saved-chart card's name for an inline rename input. */

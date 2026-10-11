@@ -52,7 +52,7 @@ function renderEntry(entry: ChangelogEntry): string {
   return `
         <li class="cl-entry" id="${esc(entry.id)}">
           <div class="cl-entry-head">
-            <a class="cl-entry-anchor" href="#${esc(entry.id)}" aria-label="link to this change">#</a>
+            <a class="cl-entry-anchor" href="#${esc(entry.id)}" aria-label="Link to this change">#</a>
             <h3 class="cl-entry-title">${esc(entry.title)}</h3>
             <span class="cl-tags">${tags}</span>
           </div>

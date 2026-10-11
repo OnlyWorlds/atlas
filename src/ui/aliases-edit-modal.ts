@@ -31,7 +31,7 @@ export class AliasesEditModal extends BaseModal {
 
   open(): void {
     const { overlay, body } = this.buildModalShell({
-      title: `aliases · ${this.opts.elementName || '(unnamed)'}`,
+      title: `Aliases · ${this.opts.elementName || '(unnamed)'}`,
       dataModal: 'aliases-edit',
       panelClass: 'atlas-aliases-modal',
     });
@@ -43,7 +43,7 @@ export class AliasesEditModal extends BaseModal {
       </p>
       <div class="atlas-aliases-rows" data-role="rows"></div>
       <button type="button" class="atlas-aliases-add-link" data-role="add-row">
-        + add alias
+        + Add alias
       </button>
       <div class="atlas-modal-error" data-role="error" hidden></div>
       <div class="atlas-modal-actions">

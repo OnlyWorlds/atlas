@@ -523,7 +523,7 @@ function render(): void {
     bulb.type = 'button';
     bulb.className = 'atlas-tour-deeper-toggle';
     bulb.dataset.tourControl = 'deeper';
-    bulb.innerHTML = '<span class="material-symbols-outlined">emoji_objects</span> more information';
+    bulb.innerHTML = '<span class="material-symbols-outlined">emoji_objects</span> More information';
     const deeper = document.createElement('div');
     deeper.className = 'atlas-tour-deeper';
     // Paragraph breaks (\n\n in the step data) render as real paragraphs —

@@ -203,7 +203,7 @@ export function renderReferencedBy(el: Element): HTMLElement | null {
         label: 'Markers',
         sources: [],
         chips: folded.markers.map(f => buildEntryChip(
-          ELEMENT_ICONS.marker, markerFoldLabel(f), f.zoneId ? `zone · id ${f.zoneId}` : 'markers with no zone', f.navId)),
+          ELEMENT_ICONS.marker, markerFoldLabel(f), f.zoneId ? `zone · id ${f.zoneId}` : 'Markers with no zone', f.navId)),
       });
     }
     wrap.appendChild(buildSection({

@@ -94,7 +94,7 @@ export function openSplitDialog(opts: SplitOptions): void {
   new SplitConfirmModal({
     tierLabel,
     afterPreview: previewOf(afterMarkdown, PREVIEW_CHARS),
-    defaultName: `unnamed ${tierLabel.toLowerCase()}`,
+    defaultName: `Unnamed ${tierLabel.toLowerCase()}`,
     onConfirm: async (newName) => {
       await performSplit({
         currentNarrative: narrative,

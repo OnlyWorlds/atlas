@@ -489,7 +489,7 @@ function buildVertexHandle(marker: Marker, canvasHeight: number): L.Marker {
   // Tooltip via native title — surfaces the two affordances (drag-to-move /
   // drag-to-trash / right-click-delete) on hover. No layout cost, no
   // dependency on a popover lib.
-  const tooltip = 'drag to move · drop on trash to delete · right-click to delete';
+  const tooltip = 'Drag to move · drop on trash to delete · right-click to delete';
   const icon = L.divIcon({
     className: 'atlas-zone-edit-handle',
     html: `<span class="atlas-zone-edit-handle-num" title="${tooltip}">${displayOrder}</span>`,

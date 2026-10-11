@@ -449,7 +449,7 @@ function renderWaypointToast(id: WaypointId): void {
     const seeAll = document.createElement('button');
     seeAll.type = 'button';
     seeAll.className = 'atlas-waypoint-toast-rider-btn';
-    seeAll.textContent = 'see all';
+    seeAll.textContent = 'See all';
     seeAll.addEventListener('click', (e) => {
       e.stopPropagation();
       const worldId = getState().active?.worldId ?? null;
@@ -459,7 +459,7 @@ function renderWaypointToast(id: WaypointId): void {
     const turnOff = document.createElement('button');
     turnOff.type = 'button';
     turnOff.className = 'atlas-waypoint-toast-rider-btn';
-    turnOff.textContent = 'turn off';
+    turnOff.textContent = 'Turn off';
     turnOff.addEventListener('click', (e) => {
       e.stopPropagation();
       setMuted(true);

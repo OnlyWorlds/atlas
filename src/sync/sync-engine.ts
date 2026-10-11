@@ -538,9 +538,9 @@ export class SyncEngine {
     this.setState({
       kind: 'error',
       message: this.lastAuthReason === 'key_revoked'
-        ? 'this world\'s key was revoked. Unlink the world, then link it again with Make online'
+        ? 'This world\'s key was revoked. Unlink the world, then link it again with Make online'
         : this.lastAuthReason === 'read_only_key'
-          ? 'this is a read key, so edits can\'t sync. Unlink the world, then link it again with Make online'
+          ? 'This is a read key, so edits can\'t sync. Unlink the world, then link it again with Make online'
           : 'OnlyWorlds did not accept this world\'s key or your PIN. Check your PIN in Settings, or unlink',
       recoverable: true,
     });

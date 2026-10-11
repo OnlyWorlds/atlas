@@ -293,12 +293,12 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
               <p class="atlas-grounded-check"><span class="material-symbols-outlined">check_circle</span>Your OnlyWorlds folder is ready</p>
               <p class="atlas-grounded-path"><code>${escapeText(atlasRoot?.pathHint ?? atlasRoot?.folderName ?? "")}</code></p>
               <p class="atlas-grounded-next">${state.registry.worlds_add_icons === false
-                ? 'Now make a world to put in it: <strong>add a world</strong>, at the top of the Worlds list, shows every way to start one.'
+                ? 'Now make a world to put in it: <strong>Add a world</strong>, at the top of the Worlds list, shows every way to start one.'
                 : `Now make a world to put in it. The
                 <span class="atlas-grounded-next-glyph"
                   ><span class="material-symbols-outlined atlas-add-glyph-plus">add</span
                   ><span class="material-symbols-outlined atlas-add-glyph-main">folder</span></span>
-                button in the top left creates one. The <strong>add a world</strong> button
+                button in the top left creates one. The <strong>Add a world</strong> button
                 under it lists every way to start one.`}</p>
             </div>
             <div class="atlas-grounded-detail" data-role="path-detail"></div>
@@ -309,43 +309,43 @@ export function mountWelcomePanel(target: HTMLElement): () => void {
         // sits on the sidebar button, so nothing in it is clickable (S255v2).
         const owLine =
           `<p class="atlas-grounded-detail-ow"><img src="${import.meta.env.BASE_URL}owlogo.png" alt="" />` +
-          `the OnlyWorlds icon in the footer has more info</p>`;
+          `The OnlyWorlds icon in the footer has more info</p>`;
         const DETAILS: Record<string, string> = {
           'add-world': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">add</span>
-            <h3>add a world</h3>
+            <h3>Add a world</h3>
             <p>Every way to start a world: start one, open a world folder or file, or download or view one from OnlyWorlds.</p>
-            <p class="atlas-grounded-detail-hint">click to choose</p>`,
+            <p class="atlas-grounded-detail-hint">Click to choose</p>`,
           'create-local': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">create_new_folder</span>
-            <h3>start a world</h3>
+            <h3>Start a world</h3>
             <p>A new world, in your OnlyWorlds folder or in this browser: the dialog asks. It is plain files, works offline, and can go online later.</p>
-            <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
+            <p class="atlas-grounded-detail-hint">Click the icon to start</p>`,
           'new-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">cloud_upload</span>
-            <h3>new world on OnlyWorlds</h3>
+            <h3>New world on OnlyWorlds</h3>
             <p>Creates the world here and on onlyworlds.com, synced from the start. Needs a free account.</p>
             ${owLine}
-            <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
+            <p class="atlas-grounded-detail-hint">Click the icon to start</p>`,
           'link-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">link</span>
-            <h3>download a world from OnlyWorlds</h3>
+            <h3>Download a world from OnlyWorlds</h3>
             <p>Already have a world online? Its API key and PIN bring down a full copy, kept in sync.</p>
             ${owLine}
-            <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
+            <p class="atlas-grounded-detail-hint">Click the icon to start</p>`,
           'view-api': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">visibility</span>
-            <h3>view a shared world</h3>
+            <h3>View a shared world</h3>
             <p>Someone shared a read key with you? Paste it: Atlas downloads their world to browse, view only. No PIN needed.</p>
             ${owLine}
-            <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
+            <p class="atlas-grounded-detail-hint">Click the icon to start</p>`,
           // S309: open-folder was the ONE create button with no entry here —
           // untaught on every input path, hover included.
           'open-folder': `
             <span class="material-symbols-outlined atlas-grounded-detail-icon">folder_open</span>
-            <h3>open a world folder</h3>
+            <h3>Open a world folder</h3>
             <p>Already have a world as files on your drive, from Atlas or another OnlyWorlds tool? Point at its folder and Atlas opens it in place. Nothing is copied or moved.</p>
-            <p class="atlas-grounded-detail-hint">click the icon to start</p>`,
+            <p class="atlas-grounded-detail-hint">Click the icon to start</p>`,
         };
         const onPathHover = (e: Event): void => {
           const path = (e as CustomEvent<{ path: string | null }>).detail?.path;

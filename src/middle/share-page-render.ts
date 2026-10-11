@@ -717,7 +717,7 @@ export function renderBlockView(block: PageBlock, elements: Map<string, Element>
       if (!frozen) {
         const miss = document.createElement('div');
         miss.className = 'atlas-share-hint';
-        miss.textContent = 'chart not found; it may have been deleted';
+        miss.textContent = 'Chart not found; it may have been deleted';
         return miss;
       }
       return renderChartView(frozen);

@@ -20,13 +20,13 @@ export function renderGeneralTab(): string {
       <div class="atlas-settings-row">
         <label class="atlas-settings-label">Theme</label>
         <div class="atlas-settings-radio-row">
-          <label class="atlas-settings-radio"><input type="radio" name="app-theme" value="dark" ${theme === 'dark' ? 'checked' : ''}> dark</label>
-          <label class="atlas-settings-radio"><input type="radio" name="app-theme" value="light" ${theme === 'light' ? 'checked' : ''}> light</label>
+          <label class="atlas-settings-radio"><input type="radio" name="app-theme" value="dark" ${theme === 'dark' ? 'checked' : ''}> Dark</label>
+          <label class="atlas-settings-radio"><input type="radio" name="app-theme" value="light" ${theme === 'light' ? 'checked' : ''}> Light</label>
         </div>
       </div>
       <label class="atlas-settings-toggle">
         <input type="checkbox" name="worlds-add-icons" ${getState().registry.worlds_add_icons === false ? '' : 'checked'} />
-        <span>Show the row of add-world icons in the Worlds list (the "add a world" button stays either way)</span>
+        <span>Show the row of add-world icons in the Worlds list (the "Add a world" button stays either way)</span>
       </label>
     </section>
     <section class="atlas-settings-section">
@@ -34,7 +34,7 @@ export function renderGeneralTab(): string {
       <p class="atlas-settings-hint">Atlas v${pkg.version}: the OnlyWorlds world browser and editor. ${hasFolderMode() ? 'Your worlds live as files, in a folder on your drive or in this browser' : 'Your worlds live as files in this browser'}; syncing with onlyworlds.com is optional.</p>
       <div class="atlas-settings-row">
         <a class="atlas-settings-link" href="https://onlyworlds.com" target="_blank" rel="noopener">onlyworlds.com</a>
-        <a class="atlas-settings-link" href="https://onlyworlds.github.io" target="_blank" rel="noopener">documentation</a>
+        <a class="atlas-settings-link" href="https://onlyworlds.github.io" target="_blank" rel="noopener">Documentation</a>
       </div>
     </section>
     <section class="atlas-settings-section" data-role="help-feedback">

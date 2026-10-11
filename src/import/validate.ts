@@ -92,13 +92,13 @@ export function validatePayload(parsed: ParseResult, existing: Element[] = []): 
           const target = rel.target ?? polymorphicTarget(rec);
           if (rel.kind === 'single') {
             if (v !== null && v !== '' && typeof v !== 'string') {
-              issues.push(cardinalityIssue(path, k, v, 'a single element name or id (string)'));
+              issues.push(cardinalityIssue(path, k, v, 'A single element name or id (string)'));
             } else if (typeof v === 'string' && v.trim() && !isUuid(v) && target && !nameExists(target, v)) {
               issues.push(missingRefIssue(path, k, v, target));
             }
           } else {
             if (v !== undefined && v !== null && !Array.isArray(v)) {
-              issues.push(cardinalityIssue(path, k, v, 'an array of element names or ids'));
+              issues.push(cardinalityIssue(path, k, v, 'An array of element names or ids'));
             } else if (Array.isArray(v)) {
               v.forEach((item, j) => {
                 if (typeof item === 'string' && item.trim() && !isUuid(item) && target && !nameExists(target, item)) {

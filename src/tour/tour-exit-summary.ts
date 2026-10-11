@@ -39,17 +39,17 @@ export interface TourRoom {
  */
 export const TOUR_ROOMS: readonly TourRoom[] = [
   { id: 'home', label: 'Home', icon: 'home',
-    blurb: 'your world at a glance, and everything you have made recently' },
+    blurb: 'Your world at a glance, and everything you have made recently' },
   { id: 'writing', label: 'Writing', icon: 'menu_book',
-    blurb: 'books, chapters and scenes, with every mention linked into the world' },
+    blurb: 'Books, chapters and scenes, with every mention linked into the world' },
   { id: 'knowledge', label: 'Knowledge', icon: 'psychology',
-    blurb: 'who knows what, so the reader and the villain can know different things' },
+    blurb: 'Who knows what, so the reader and the villain can know different things' },
   { id: 'timeline', label: 'Charts', icon: 'insights',
-    blurb: 'your elements arranged in time, saved and shared as named views' },
+    blurb: 'Your elements arranged in time, saved and shared as named views' },
   { id: 'share', label: 'Pages', icon: 'wall_art',
-    blurb: 'build a page from your world and publish it as a link' },
+    blurb: 'Build a page from your world and publish it as a link' },
   { id: 'import', label: 'Data', icon: 'import_export',
-    blurb: 'bring a world in from a file, or take yours out again' },
+    blurb: 'Bring a world in from a file, or take yours out again' },
 ];
 
 /**

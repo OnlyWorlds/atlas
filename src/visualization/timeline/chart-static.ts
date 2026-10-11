@@ -169,7 +169,7 @@ export function renderChartView(block: PayloadChartBlock, opts: ChartViewOptions
 
   const title = document.createElement('div');
   title.className = 'atlas-chart-static-title';
-  title.textContent = block.title || 'chart';
+  title.textContent = block.title || 'Chart';
   wrap.appendChild(title);
 
   const canvasWrap = document.createElement('div');

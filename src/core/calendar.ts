@@ -124,8 +124,8 @@ export function floorMod(a: number, b: number): number {
 
 export function validateCalendarConfig(cfg: CalendarConfig): string[] {
   const errors: string[] = [];
-  if (cfg.version !== 1) errors.push(`unsupported calendar version: ${cfg.version}`);
-  if (!cfg.grain || typeof cfg.grain !== 'string') errors.push('grain is required');
+  if (cfg.version !== 1) errors.push(`Unsupported calendar version: ${cfg.version}`);
+  if (!cfg.grain || typeof cfg.grain !== 'string') errors.push('Grain is required');
 
   const months = cfg.bundles?.months;
   if (months) {
@@ -133,7 +133,7 @@ export function validateCalendarConfig(cfg: CalendarConfig): string[] {
       || months.names.length === 0 || months.names.length !== months.lengths.length) {
       errors.push('months.names and months.lengths must be same-length non-empty arrays');
     } else if (months.lengths.some((l) => !Number.isInteger(l) || l < 1)) {
-      errors.push('every month length must be a whole number, 1 or more');
+      errors.push('Every month length must be a whole number, 1 or more');
     }
     if (cfg.bundles?.year) errors.push('year.steps is legal only when no months are defined (year length is derived from months)');
   } else if (cfg.bundles?.year) {
@@ -144,32 +144,32 @@ export function validateCalendarConfig(cfg: CalendarConfig): string[] {
 
   const week = cfg.bundles?.week;
   if (week) {
-    if (!Number.isInteger(week.length) || week.length < 1) errors.push('the week length must be a whole number, 1 or more');
-    else if (!Array.isArray(week.names) || week.names.length !== week.length) errors.push('give the week as many day names as its length');
+    if (!Number.isInteger(week.length) || week.length < 1) errors.push('The week length must be a whole number, 1 or more');
+    else if (!Array.isArray(week.names) || week.names.length !== week.length) errors.push('Give the week as many day names as its length');
   }
 
   const inter = cfg.intercalary ?? [];
-  if (inter.length > 0 && !months) errors.push('festival days need months');
+  if (inter.length > 0 && !months) errors.push('Festival days need months');
   const monthCount = months?.names.length ?? 0;
   for (const ic of inter) {
     if (!Number.isInteger(ic.after_month) || ic.after_month < 0 || ic.after_month > monthCount) {
-      errors.push(`festival day "${ic.name}": pick the month it follows`);
+      errors.push(`Festival day "${ic.name}": pick the month it follows`);
     }
     if (ic.every_years != null && (!Number.isInteger(ic.every_years) || ic.every_years < 1)) {
-      errors.push(`festival day "${ic.name}": every N yrs must be a whole number, 1 or more`);
+      errors.push(`Festival day "${ic.name}": every N yrs must be a whole number, 1 or more`);
     }
   }
 
   const eras = cfg.eras ?? [];
   for (const era of eras) {
-    if (!era.name) errors.push('every era needs a name');
-    if (!Number.isFinite(era.start)) errors.push(`era "${era.name}": start must be a number`);
-    if (era.end != null && !Number.isFinite(era.end)) errors.push(`era "${era.name}": end must be a number`);
+    if (!era.name) errors.push('Every era needs a name');
+    if (!Number.isFinite(era.start)) errors.push(`Era "${era.name}": start must be a number`);
+    if (era.end != null && !Number.isFinite(era.end)) errors.push(`Era "${era.name}": end must be a number`);
     if ((era.direction ?? 'up') === 'up' && era.end != null && era.end <= era.start) {
-      errors.push(`era "${era.name}": end must be after start`);
+      errors.push(`Era "${era.name}": end must be after start`);
     }
     if ((era.direction ?? 'up') === 'down' && era.end != null && era.end >= era.start) {
-      errors.push(`era "${era.name}": a counting-down era must end below its start`);
+      errors.push(`Era "${era.name}": a counting-down era must end below its start`);
     }
   }
   // Overlap check over resolved domains.
@@ -178,7 +178,7 @@ export function validateCalendarConfig(cfg: CalendarConfig): string[] {
     for (let j = i + 1; j < domains.length; j++) {
       const a = domains[i]; const b = domains[j];
       if (a.lo < b.hi && b.lo < a.hi) {
-        errors.push(`eras "${a.era.name}" and "${b.era.name}" overlap`);
+        errors.push(`Eras "${a.era.name}" and "${b.era.name}" overlap`);
       }
     }
   }

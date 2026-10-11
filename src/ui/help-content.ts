@@ -116,7 +116,7 @@ export const HELP_CONTENT: Record<string, RoomHelp> = {
       'choose how sync behaves, or keep a world fully local',
       'rename the writing tiers',
       'tune editing and web-pane behavior',
-      'hide the row of add-world icons (General); "add a world" stays',
+      'hide the row of add-world icons (General); "Add a world" stays',
     ],
   },
   // `map` is a real router mode (router.ts:207) and was the ONLY one with no

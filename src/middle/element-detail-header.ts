@@ -912,7 +912,7 @@ async function deletePinFromHeader(pinId: string, mapName: string): Promise<void
   try {
     await store.deletePin(pinId);
     const elements = await refreshElementsAfterWrite(store);
-    toastManager.success(`pin on ${mapName} deleted`);
+    toastManager.success(`Pin on ${mapName} deleted`);
   } catch (err) {
     console.error('[element-detail] deletePinFromHeader failed:', err);
     showProblem(err, { doing: 'deleting the pin' });

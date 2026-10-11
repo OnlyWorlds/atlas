@@ -256,7 +256,7 @@ function buildAddRow(el: Element): HTMLElement {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'atlas-custom-add-btn';
-  btn.textContent = '+ add field';
+  btn.textContent = '+ Add field';
   btn.title = 'Name a field, then fill in its value. Names you have used elsewhere in this world are suggested. Stored with an x_ prefix so it never collides with OnlyWorlds fields.';
   row.appendChild(btn);
 
@@ -269,7 +269,7 @@ function buildAddRow(el: Element): HTMLElement {
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'atlas-custom-add-input';
-    input.placeholder = 'field name';
+    input.placeholder = 'Field name';
     input.setAttribute('list', 'atlas-custom-field-names');
     input.maxLength = MAX_FIELD_NAME_LEN + 8;
 

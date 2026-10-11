@@ -52,7 +52,7 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
       <div class="atlas-ow-links">
         <a href="${OW_SITE_URL}" target="_blank" rel="noopener">onlyworlds.com</a>
         <a href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">AI toolkit</a>
-        <a href="${OW_COUNCIL_URL}" target="_blank" rel="noopener" data-ow-council>council</a>
+        <a href="${OW_COUNCIL_URL}" target="_blank" rel="noopener" data-ow-council>Council</a>
         <a href="${OW_GITHUB_URL}" target="_blank" rel="noopener">GitHub</a>
       </div>
     </section>
@@ -61,9 +61,9 @@ export function renderOnlyWorldsTab(reg: WorldsRegistry, activeWorld: WorldRegis
       <p class="atlas-settings-hint">The folder is the API: every world is plain JSON on disk, one file per element. Read the type folders and key on each file's internal id. A world kept in this browser is readable by Atlas only, until you ${hasFolderMode() ? 'move it to a folder or ' : ''}download it as one file (Settings, This world).</p>
       <div class="atlas-ow-links">
         <a href="${OW_SDK_URL}" target="_blank" rel="noopener">@onlyworlds/sdk</a>
-        <a href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">schema reference</a>
+        <a href="${OW_TOOLKIT_URL}" target="_blank" rel="noopener">Schema reference</a>
         <a href="${OW_API_URL}" target="_blank" rel="noopener">REST API</a>
-        ${activeWorld ? `<a href="#/w/${activeWorld.id}/import" data-ow-nav="#/w/${activeWorld.id}/import">example world JSON</a>` : ''}
+        ${activeWorld ? `<a href="#/w/${activeWorld.id}/import" data-ow-nav="#/w/${activeWorld.id}/import">Example world JSON</a>` : ''}
       </div>
     </section>
   `;
@@ -105,8 +105,8 @@ function renderWaypointsSection(activeWorld: WorldRegistryEntry | undefined): st
       ${demoActive ? '<p class="atlas-settings-hint atlas-ow-demo-hint">You are exploring the sample world; these light up in a world of your own.</p>' : ''}
       <div class="atlas-ow-waypoint-grid">${rows}</div>
       <div class="atlas-ow-waypoints-foot">
-        <button type="button" class="atlas-btn-ghost" data-action="waypoints-mark-all">mark all as familiar</button>
-        <button type="button" class="atlas-btn-ghost" data-action="waypoints-mute">${isMuted() ? 'turn messages on' : 'turn messages off'}</button>
+        <button type="button" class="atlas-btn-ghost" data-action="waypoints-mark-all">Mark all as familiar</button>
+        <button type="button" class="atlas-btn-ghost" data-action="waypoints-mute">${isMuted() ? 'Turn messages on' : 'Turn messages off'}</button>
       </div>
     </section>
   `;

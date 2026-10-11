@@ -64,10 +64,10 @@ describe('searchPalette ranking', () => {
     // Element prefix (100) > room prefix (90) — the palette's long tail is
     // elements; rooms are always one nav click away.
     expect(results[0]).toMatchObject({ kind: 'element', name: 'Wright the Smith' });
-    expect(results[1]).toMatchObject({ kind: 'room', name: 'writing' });
+    expect(results[1]).toMatchObject({ kind: 'room', name: 'Writing' });
 
     const weaker = searchPalette('wri', [el({ name: 'Marta', description: 'A skilled wright of barrels.' })]);
-    expect(weaker[0]).toMatchObject({ kind: 'room', name: 'writing' });
+    expect(weaker[0]).toMatchObject({ kind: 'room', name: 'Writing' });
   });
 
   it('caps element results at 12', () => {
@@ -107,8 +107,8 @@ describe('searchPalette ranking', () => {
 
     it('DISPLAYS the branded label whichever word was typed', () => {
       // Typing the old word should find the room and then teach its new name.
-      expect(roomOf('import')!.name).toBe('data');
-      expect(roomOf('data')!.name).toBe('data');
+      expect(roomOf('import')!.name).toBe('Data');
+      expect(roomOf('data')!.name).toBe('Data');
     });
   });
 });
@@ -119,6 +119,21 @@ describe('searchPalette: commands (S364)', () => {
       expect(searchPalette(q, []).some(r => r.kind === 'action' && r.id === 'reload-disk'), q).toBe(true);
     }
     expect(searchPalette('di', []).some(r => r.kind === 'action')).toBe(false);
+  });
+});
+
+describe('searchPalette: Sentence-case labels, lowercase queries (1.32.0)', () => {
+  it('finds every room by its displayed label, typed in any case', () => {
+    for (const label of ['Home', 'Writing', 'Knowledge', 'Charts', 'Pages', 'Data', 'Settings']) {
+      for (const q of [label, label.toLowerCase(), label.slice(0, 3).toLowerCase()]) {
+        expect(searchPalette(q, []).some(r => r.kind === 'room' && r.name === label), q).toBe(true);
+      }
+    }
+  });
+
+  it('finds a command by a lowercase prefix and substring of its label', () => {
+    expect(searchPalette('reload from', []).some(r => r.kind === 'action' && r.name === 'Reload from disk')).toBe(true);
+    expect(searchPalette('from disk', []).some(r => r.kind === 'action' && r.name === 'Reload from disk')).toBe(true);
   });
 });
 

@@ -232,7 +232,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     newBookBtn.type = 'button';
     newBookBtn.className = 'atlas-writing-sidebar-create-btn';
     newBookBtn.title = `New ${labels.l1.toLowerCase()}`;
-    newBookBtn.innerHTML = `<span class="material-symbols-outlined">add</span><span>new ${escapeText(labels.l1.toLowerCase())}</span>`;
+    newBookBtn.innerHTML = `<span class="material-symbols-outlined">add</span><span>New ${escapeText(labels.l1.toLowerCase())}</span>`;
     newBookBtn.addEventListener('click', () => {
       new WritingCreateModal({
         label: labels.l1,
@@ -471,7 +471,7 @@ export function mountWritingBody(mount: WritingBodyMount): () => void {
     chevron.type = 'button';
     chevron.className = 'atlas-writing-tree-chevron';
     chevron.tabIndex = -1;
-    chevron.setAttribute('aria-label', isCollapsed ? 'expand' : 'collapse');
+    chevron.setAttribute('aria-label', isCollapsed ? 'Expand' : 'Collapse');
     if (hasChildren) {
       chevron.innerHTML = `<span class="material-symbols-outlined">${isCollapsed ? 'chevron_right' : 'expand_more'}</span>`;
       chevron.addEventListener('click', (e) => {

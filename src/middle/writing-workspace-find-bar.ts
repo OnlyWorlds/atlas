@@ -61,7 +61,7 @@ export function createFindBar(container: HTMLElement, opts: FindBarOpts): FindBa
         class="atlas-input atlas-find-bar-input"
         type="text"
         placeholder="Find"
-        aria-label="find"
+        aria-label="Find"
         data-role="find-input"
       />
       <span class="atlas-find-bar-count" data-role="count">0 of 0</span>
@@ -101,7 +101,7 @@ export function createFindBar(container: HTMLElement, opts: FindBarOpts): FindBa
         class="atlas-input atlas-find-bar-input"
         type="text"
         placeholder="Replace with"
-        aria-label="replace"
+        aria-label="Replace"
         data-role="replace-input"
       />
       <button type="button" class="atlas-btn-ghost" data-role="replace-one">Replace</button>

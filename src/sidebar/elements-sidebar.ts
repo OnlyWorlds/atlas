@@ -339,7 +339,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
       if (notSynced > 0) {
         parts.push(`<span class="atlas-disk-notice-warn" title="Changed outside Atlas without a new edit time, so they do not upload. Change them in Atlas to upload them.">${notSynced} not synced</span>`);
       }
-      parts.push(`<button type="button" class="atlas-disk-notice-btn" data-disk-action="show">${n.showOnly ? 'show all' : 'show'}</button>`);
+      parts.push(`<button type="button" class="atlas-disk-notice-btn" data-disk-action="show">${n.showOnly ? 'Show all' : 'Show'}</button>`);
     }
     if (n && n.removed.length > 0) {
       const linked = getState().registry.worlds.find(w => w.id === n.worldId)?.state === 'api-linked';
@@ -614,7 +614,7 @@ export function mountElementsBody(mount: ElementsBodyMount): () => void {
     const knower = lens ? elements.find(e => e.id === lens.knowerId) : undefined;
     const knownSet = lens && knower ? lensKnownSet(lens.knowerId, elements) : null;
     lensBanner.setAttribute('data-active', knownSet ? 'true' : 'false');
-    if (knownSet) lensLabel.textContent = `world as ${knower!.name || '(unnamed)'} knows it`;
+    if (knownSet) lensLabel.textContent = `World as ${knower!.name || '(unnamed)'} knows it`;
 
     // Cast-assign banner: says what the next click does + offers the exit ×.
     const assign = state.ui.castAssign;

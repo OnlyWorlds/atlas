@@ -21,20 +21,20 @@ export interface ColourPopoverOpts {
 }
 
 const PRESETS: Array<{ hex: string; name: string }> = [
-  { hex: '#22d3ee', name: 'atlas cyan' },
-  { hex: '#3b82f6', name: 'water' },
-  { hex: '#1d4ed8', name: 'deep water' },
-  { hex: '#22c55e', name: 'forest' },
-  { hex: '#84cc16', name: 'meadow' },
-  { hex: '#f59e0b', name: 'sand' },
-  { hex: '#f97316', name: 'ember' },
-  { hex: '#ef4444', name: 'danger' },
-  { hex: '#ec4899', name: 'rose' },
-  { hex: '#a855f7', name: 'violet' },
-  { hex: '#a3a3a3', name: 'road' },
-  { hex: '#737373', name: 'stone' },
-  { hex: '#e5e5e5', name: 'chalk' },
-  { hex: '#78350f', name: 'earth' },
+  { hex: '#22d3ee', name: 'Atlas cyan' },
+  { hex: '#3b82f6', name: 'Water' },
+  { hex: '#1d4ed8', name: 'Deep water' },
+  { hex: '#22c55e', name: 'Forest' },
+  { hex: '#84cc16', name: 'Meadow' },
+  { hex: '#f59e0b', name: 'Sand' },
+  { hex: '#f97316', name: 'Ember' },
+  { hex: '#ef4444', name: 'Danger' },
+  { hex: '#ec4899', name: 'Rose' },
+  { hex: '#a855f7', name: 'Violet' },
+  { hex: '#a3a3a3', name: 'Road' },
+  { hex: '#737373', name: 'Stone' },
+  { hex: '#e5e5e5', name: 'Chalk' },
+  { hex: '#78350f', name: 'Earth' },
 ];
 
 let openPopover: HTMLElement | null = null;

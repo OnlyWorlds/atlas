@@ -170,7 +170,7 @@ export function mountWritingSetup(
     detectedValue: string | null,
   ): string {
     return detectedValue && detectedValue !== value && detectedValue !== defaultValue
-      ? `<button type="button" class="atlas-writing-setup-suggestion" data-suggest="${escapeAttr(key)}" data-suggest-value="${escapeAttr(detectedValue)}">use detected: <strong>${escapeText(detectedValue)}</strong></button>`
+      ? `<button type="button" class="atlas-writing-setup-suggestion" data-suggest="${escapeAttr(key)}" data-suggest-value="${escapeAttr(detectedValue)}">Use detected: <strong>${escapeText(detectedValue)}</strong></button>`
       : '';
   }
 

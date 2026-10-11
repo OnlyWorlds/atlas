@@ -76,7 +76,7 @@ test('alias and description matches surface; room jump works', async ({ page }) 
 
   await page.keyboard.press('Control+k');
   await page.locator('[data-role="cmdk-input"]').fill('knowl');
-  await expect(page.locator('.atlas-cmdk-row.is-active')).toContainText('knowledge');
+  await expect(page.locator('.atlas-cmdk-row.is-active')).toContainText('Knowledge');
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/knowledge/);
 });

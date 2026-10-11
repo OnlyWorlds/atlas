@@ -279,7 +279,7 @@ function buildPreview(
     const openBtn = document.createElement('button');
     openBtn.type = 'button';
     openBtn.className = 'atlas-btn-secondary';
-    openBtn.textContent = 'open in detail';
+    openBtn.textContent = 'Open in detail';
     openBtn.addEventListener('click', () => {
       const worldId = getState().active?.worldId;
       if (worldId) navigate(elementHash(worldId, el.id));
@@ -292,7 +292,7 @@ function buildPreview(
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'atlas-btn-primary';
-    addBtn.textContent = '+ add to story';
+    addBtn.textContent = '+ Add to story';
     addBtn.title = 'Insert at cursor, or wrap selected prose as a chip';
     addBtn.addEventListener('click', () => {
       document.dispatchEvent(new CustomEvent('atlas:context-add-to-cast', {

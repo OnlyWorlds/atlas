@@ -107,7 +107,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         </div>`;
       header.innerHTML = `${icons}
         <button type="button" class="atlas-worlds-add-btn" data-action="add-world">
-          <span class="material-symbols-outlined" aria-hidden="true">add</span>add a world
+          <span class="material-symbols-outlined" aria-hidden="true">add</span>Add a world
         </button>
       `;
     } else if (isTouring()) {
@@ -127,7 +127,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
         ${addIconButton('view-api', 'visibility', 'Open someone else\'s world with a read key, look but do not touch. Yours to use after the tour.', { locked: true })}
         </div>
         <button type="button" class="atlas-worlds-add-btn atlas-tour-locked" aria-disabled="true" title="Every way to add a world. Yours to use after the tour.">
-          <span class="material-symbols-outlined" aria-hidden="true">add</span>add a world
+          <span class="material-symbols-outlined" aria-hidden="true">add</span>Add a world
         </button>
       `;
       header.querySelector<HTMLButtonElement>('[data-action="create-local"]')
@@ -204,7 +204,7 @@ export function mountWorldsBody(mount: WorldsBodyMount): () => void {
       if (!localStorage.getItem(TOUR_CREATE_SEEN_KEY)) {
         const tag = document.createElement('span');
         tag.className = 'atlas-tour-tag';
-        tag.textContent = 'start here';
+        tag.textContent = 'Start here';
         header.appendChild(tag);
         startBtn.addEventListener('mouseenter', () => {
           localStorage.setItem(TOUR_CREATE_SEEN_KEY, '1');

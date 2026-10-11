@@ -288,7 +288,7 @@ export function mountRoomNav(mount: RoomNavMount): () => void {
     search.setAttribute('aria-label', 'Search this world');
     search.innerHTML =
       `<span class="material-symbols-outlined">search</span>` +
-      `<span class="atlas-room-nav-search-text">search</span>` +
+      `<span class="atlas-room-nav-search-text">Search</span>` +
       `<kbd class="atlas-room-nav-search-kbd">ctrl k</kbd>`;
     search.addEventListener('click', () => { void openPalette(); });
     strip.appendChild(search);

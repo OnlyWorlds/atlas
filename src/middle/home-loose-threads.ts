@@ -94,7 +94,7 @@ export function buildLooseThreads(elements: readonly Element[], worldId: string)
 
   const lead = document.createElement('span');
   lead.className = 'atlas-home-threads-lead';
-  lead.textContent = 'loose threads';
+  lead.textContent = 'Loose threads';
   row.appendChild(lead);
 
   const expand = document.createElement('div');

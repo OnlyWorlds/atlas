@@ -308,9 +308,9 @@ function buildCover(
     ? `<p class="atlas-home-world-description atlas-home-clickable" data-edit="description">${escapeText(meta.description)}</p>`
     : viewOnly
       ? ''
-      : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">describe your world…</p>`;
+      : `<p class="atlas-home-world-description atlas-home-clickable atlas-home-placeholder" data-edit="description">Describe your world…</p>`;
   identity.innerHTML = `
-    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="click to rename (here only; the online name is in Settings)">${escapeText(meta.name)}</h1>
+    <h1 class="atlas-home-world-name atlas-home-clickable" data-edit="name" title="Click to rename (here only; the online name is in Settings)">${escapeText(meta.name)}</h1>
     ${descriptionMarkup}
   `;
   cover.appendChild(identity);
@@ -397,12 +397,12 @@ function buildCover(
 const CAST_KINDS = [
   {
     kind: 'protagonist' as const, role: 'protagonist', icon: 'person_pin',
-    elementType: 'character' as const, ghostName: 'choose a protagonist',
+    elementType: 'character' as const, ghostName: 'Choose a protagonist',
     ghostTitle: 'Open a character and click the person pin in its header to set your protagonist',
   },
   {
     kind: 'nexus' as const, role: 'home', icon: 'home_pin',
-    elementType: 'location' as const, ghostName: 'choose a home',
+    elementType: 'location' as const, ghostName: 'Choose a home',
     ghostTitle: 'Open a location and click the home pin in its header to set your home place',
   },
 ];
@@ -742,7 +742,7 @@ function buildTour(
   anyTile.setAttribute('data-create-any', '');
   anyTile.innerHTML = `
     <span class="material-symbols-outlined">add</span>
-    <span>anything else</span>
+    <span>Anything else</span>
   `;
   anyTile.addEventListener('click', () => new ElementCreateModal(toasts, { suppressNavigate: true }).open());
   const sidebarCreate = (): HTMLElement | null => document.querySelector('[data-action="create-element"]');
@@ -883,7 +883,7 @@ function openIdentityEdit(
 ): void {
   openFieldEditPopover({
     anchor,
-    label: field === 'name' ? 'world name' : 'world description',
+    label: field === 'name' ? 'World name' : 'World description',
     value: current,
     widget: field === 'name' ? 'text-short' : 'text-long',
     onSave: async (next: unknown) => {

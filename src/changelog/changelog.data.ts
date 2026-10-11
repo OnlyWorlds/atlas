@@ -56,6 +56,19 @@ export interface ChangelogRelease {
  */
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: '1.32.0',
+    date: '2026-10-11',
+    theme: 'capitals everywhere else',
+    entries: [
+      {
+        id: 'sentence-case-everywhere',
+        title: 'Capitals on the rest of the buttons',
+        body: 'The last lowercase labels now start with a capital too: the command palette, Settings, the colour picker, the zone line styles, the chart menu, the calendar checks, the Worlds list and the tour\'s last page. The landing\'s doors and small status tags stay as they were. A world made without a name is now called Untitled world.',
+        tags: ['fix'],
+      },
+    ],
+  },
+  {
     version: '1.31.0',
     date: '2026-10-11',
     theme: 'names in the text, capitals on the buttons',

@@ -40,10 +40,10 @@ export const CORE_CARDS: readonly CardDef[] = [
  * Collective opens Knowledge because circles ARE collectives (his S264 call).
  */
 export const GROW_CARDS: readonly CardDef[] = [
-  { type: 'event', room: 'timeline', roomIcon: 'insights', line: 'see it on a chart' },
-  { type: 'narrative', room: 'writing', roomIcon: 'menu_book', line: 'tell it as a story' },
-  { type: 'map', room: 'map', roomIcon: 'map', line: 'put places on it' },
-  { type: 'collective', room: 'knowledge', roomIcon: 'psychology', line: 'who knows what' },
+  { type: 'event', room: 'timeline', roomIcon: 'insights', line: 'See it on a chart' },
+  { type: 'narrative', room: 'writing', roomIcon: 'menu_book', line: 'Tell it as a story' },
+  { type: 'map', room: 'map', roomIcon: 'map', line: 'Put places on it' },
+  { type: 'collective', room: 'knowledge', roomIcon: 'psychology', line: 'Who knows what' },
 ];
 
 export interface HomeCard {

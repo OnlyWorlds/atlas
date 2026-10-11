@@ -60,22 +60,22 @@ export interface PaletteResult {
  */
 const ACTIONS: Array<{ label: string; id: string; icon: string; aliases?: string[]; folderOnly?: boolean; door?: boolean; diskOnly?: boolean; browserStorage?: boolean; makesWorld?: boolean }> = [
   // A world kept in this browser has no folder to rescan, so it hides this.
-  { label: 'reload from disk', id: 'reload-disk', icon: 'folder_open', aliases: ['refresh from disk', 'rescan', 'files'], diskOnly: true },
+  { label: 'Reload from disk', id: 'reload-disk', icon: 'folder_open', aliases: ['refresh from disk', 'rescan', 'files'], diskOnly: true },
   // The world doors (S365): the same runner as the Worlds list's buttons.
-  { label: 'add a world', id: 'add-world', icon: 'add', aliases: ['new world', 'create world', 'world'], door: true, makesWorld: true },
-  { label: 'open a world folder', id: 'open-world-folder', icon: 'folder_open', aliases: ['open folder', 'open world'], folderOnly: true, door: true },
+  { label: 'Add a world', id: 'add-world', icon: 'add', aliases: ['new world', 'create world', 'world'], door: true, makesWorld: true },
+  { label: 'Open a world folder', id: 'open-world-folder', icon: 'folder_open', aliases: ['open folder', 'open world'], folderOnly: true, door: true },
   // 1.17 (contract §8): a world file opens wherever browser storage works.
-  { label: 'open a world file', id: 'open-world-file', icon: 'file_open', aliases: ['world file', 'open file', 'zip'], door: true, browserStorage: true },
+  { label: 'Open a world file', id: 'open-world-file', icon: 'file_open', aliases: ['world file', 'open file', 'zip'], door: true, browserStorage: true },
 ];
 
 const ROOMS: Array<{ label: string; segment: string; icon: string; aliases?: string[] }> = [
-  { label: 'home', segment: '', icon: 'home' },
-  { label: 'writing', segment: 'writing', icon: 'edit_note' },
-  { label: 'knowledge', segment: 'knowledge', icon: 'psychology' },
-  { label: 'charts', segment: 'timeline', icon: 'timeline', aliases: ['timeline'] },
-  { label: 'pages', segment: 'share', icon: 'wall_art', aliases: ['share'] },
-  { label: 'data', segment: 'import', icon: 'swap_vert', aliases: ['import', 'export'] },
-  { label: 'settings', segment: 'settings', icon: 'settings' },
+  { label: 'Home', segment: '', icon: 'home' },
+  { label: 'Writing', segment: 'writing', icon: 'edit_note' },
+  { label: 'Knowledge', segment: 'knowledge', icon: 'psychology' },
+  { label: 'Charts', segment: 'timeline', icon: 'timeline', aliases: ['timeline'] },
+  { label: 'Pages', segment: 'share', icon: 'wall_art', aliases: ['share'] },
+  { label: 'Data', segment: 'import', icon: 'swap_vert', aliases: ['import', 'export'] },
+  { label: 'Settings', segment: 'settings', icon: 'settings' },
 ];
 
 function openWorldEntry() {
@@ -97,7 +97,9 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
   for (const room of ROOMS) {
     // Match the label AND its aliases, but always DISPLAY the label — typing
     // "import" should find the room and then teach you it is called Data.
-    const names = [room.label, ...(room.aliases ?? [])];
+    // Labels are Sentence case (1.32.0) and the query is lowercased, so the
+    // names are too.
+    const names = [room.label, ...(room.aliases ?? [])].map(normalize);
     if (names.some(n => n.startsWith(q))) {
       out.push({ kind: 'room', id: room.segment, name: room.label, hint: 'room', score: 90 });
     } else if (names.some(n => n.includes(q))) {
@@ -115,7 +117,7 @@ export function searchPalette(query: string, elements: readonly Element[]): Pale
     if (action.makesWorld && !hasFolderMode() && !browserStorageDoorOpen()) continue;
     if (action.door && isTourFlagActive()) continue;
     if (action.diskOnly && filesWhereOf(openWorldEntry()) === 'browser') continue;
-    const names = [action.label, ...(action.aliases ?? [])];
+    const names = [action.label, ...(action.aliases ?? [])].map(normalize);
     if (names.some(n => n.startsWith(q))) {
       out.push({ kind: 'action', id: action.id, name: action.label, hint: 'command', score: 85 });
     } else if (q.length >= 3 && names.some(n => n.includes(q))) {
@@ -300,8 +302,8 @@ class CommandPalette extends BaseModal {
       + (this.activeIndex === this.results.length ? ' is-active' : '');
     seeAll.setAttribute('data-action', 'cmdk-see-all');
     seeAll.textContent = this.results.some(r => r.kind !== 'create')
-      ? 'see all in the sidebar →'
-      : 'no quick matches: filter the sidebar →';
+      ? 'See all in the sidebar →'
+      : 'No quick matches: filter the sidebar →';
     seeAll.addEventListener('mouseenter', () => {
       if (this.activeIndex !== this.results.length) {
         this.activeIndex = this.results.length;

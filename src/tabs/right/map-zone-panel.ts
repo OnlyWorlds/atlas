@@ -204,9 +204,9 @@ function renderTune(kind: Kind<Zone>, rule: StyleRule | undefined, resolved: Ret
       <label class="atlas-zone-tune-row">
         <span>Stroke</span>
         <select class="atlas-select" data-action="tune-dash">
-          <option value="solid" ${dash === 'solid' ? 'selected' : ''}>solid</option>
-          <option value="dashed" ${dash === 'dashed' ? 'selected' : ''}>dashed</option>
-          <option value="dotted" ${dash === 'dotted' ? 'selected' : ''}>dotted</option>
+          <option value="solid" ${dash === 'solid' ? 'selected' : ''}>Solid</option>
+          <option value="dashed" ${dash === 'dashed' ? 'selected' : ''}>Dashed</option>
+          <option value="dotted" ${dash === 'dotted' ? 'selected' : ''}>Dotted</option>
         </select>
       </label>
       <label class="atlas-zone-tune-row atlas-zone-tune-check">
